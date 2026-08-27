@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+client/build/
+client/dist/
+client/*.spec
+web/maps/

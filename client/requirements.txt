@@ -1,0 +1,5 @@
+truck_telemetry
+websockets
+pystray
+pillow
+pyinstaller
