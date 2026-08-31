@@ -1,5 +1,5 @@
 """
-Backend minimo del companion de ETS2/ATS.
+Backend minimo del companion de ETS2/ATS. (rebuild cache-bust)
 
 Actua como relay en tiempo real entre:
   - el cliente local (lee la telemetria del juego y la manda por WebSocket)
