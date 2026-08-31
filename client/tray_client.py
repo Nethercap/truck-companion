@@ -1,21 +1,19 @@
 """
-Version con icono de bandeja del sistema del cliente de Truck Companion.
+Version con icono de bandeja del sistema del cliente de Truck Dash.
 
-Es la que se empaqueta como .exe (ver build_exe.ps1). Corre el mismo loop de
-client.py en un hilo de fondo, y muestra un icono en la bandeja con el estado
-de conexion y el codigo de pairing actual.
+Es la que se empaqueta como .exe. Corre el mismo loop de client.py en un
+hilo de fondo, y muestra un icono en la bandeja con el estado de conexion
+y el codigo de pairing actual. Al conseguir el codigo, abre el navegador
+directo en la web publica (trucksim-dash.com/app) ya conectado.
 
 Uso (antes de empaquetar, para probar):
   python tray_client.py
-  python tray_client.py --backend wss://tu-backend.up.railway.app
+  python tray_client.py --backend wss://tu-backend.up.railway.app --web-url https://trucksim-dash.com/app/
 """
 
 import argparse
 import asyncio
-import http.server
-import functools
 import os
-import socket
 import sys
 import threading
 import tkinter as tk
@@ -28,69 +26,14 @@ from PIL import Image, ImageDraw
 import client as client_lib
 
 # En modo --windowed (sin consola) PyInstaller deja sys.stdout/stderr en None,
-# no solo silenciados. Cualquier print() o log interno (como el logging propio
-# de http.server en cada request) revienta con AttributeError al escribir en
-# None, lo que mata el hilo del servidor a mitad de una respuesta (por eso
-# el navegador ve ERR_EMPTY_RESPONSE). Se redirigen a un sumidero inofensivo.
+# no solo silenciados. Cualquier print() o log interno revienta con
+# AttributeError al escribir en None. Se redirigen a un sumidero inofensivo.
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w")
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
-# Ubicacion de la carpeta de la web. Por ahora asume que el checkout completo
-# del proyecto esta al lado (D:\ets2-companion\truck-companion-web), como en
-# esta maquina de desarrollo. Cuando la web quede hosteada publicamente, esto
-# se reemplaza por abrir directo esa URL en vez de levantar un server local.
-#
-# Ojo: cuando corre como .exe (PyInstaller), __file__ NO apunta a la carpeta
-# original del proyecto, y el ejecutable ademas vive un par de niveles mas
-# adentro (dist/TruckCompanion/TruckCompanion.exe). Por eso se calcula distinto
-# segun si esta "frozen" (empaquetado) o corriendo como script normal.
-def _default_web_dir() -> str:
-    if getattr(sys, "frozen", False):
-        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-        # exe_dir = .../truck-companion-client/dist/TruckCompanion
-        return os.path.normpath(os.path.join(exe_dir, "..", "..", "..", "truck-companion-web"))
-    return os.path.normpath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "truck-companion-web")
-    )
-
-
-DEFAULT_WEB_DIR = _default_web_dir()
-
-
-def find_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("0.0.0.0", 0))
-        return s.getsockname()[1]
-
-
-def get_lan_ip() -> str | None:
-    # Truco estandar: no hace falta que el paquete llegue a destino, alcanza
-    # con que el SO elija la interfaz de red correcta para saber que IP local
-    # usaria para salir a internet (no manda datos de verdad).
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
-            return s.getsockname()[0]
-    except OSError:
-        return None
-
-
-def start_web_server(web_dir: str) -> int | None:
-    if not os.path.isdir(web_dir):
-        print(f"No se encontro la carpeta de la web en: {web_dir}")
-        return None
-    port = find_free_port()
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=web_dir)
-    # 0.0.0.0 (no 127.0.0.1) para que tambien sea accesible desde otros
-    # dispositivos en la misma red local (ej. el celular), no solo esta PC.
-    # Windows puede pedir permiso de firewall la primera vez - hay que
-    # permitirlo para redes privadas.
-    httpd = http.server.ThreadingHTTPServer(("0.0.0.0", port), handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
-    return port
+DEFAULT_WEB_URL = "https://trucksim-dash.com/app/"
 
 
 class AppState:
@@ -98,13 +41,13 @@ class AppState:
         self.status = "Iniciando..."
         self.code = None
         self.icon = None
-        self.web_port = None
         self.backend_url = None
+        self.web_url = DEFAULT_WEB_URL
 
     def set_status(self, status: str):
         self.status = status
         if self.icon:
-            self.icon.title = f"Truck Companion — {self.status}"
+            self.icon.title = f"Truck Dash — {self.status}"
 
     def set_code(self, code: str):
         self.code = code
@@ -125,27 +68,6 @@ def make_icon_image():
     draw.ellipse((18, 40, 28, 50), fill=(30, 30, 30, 255))
     draw.ellipse((36, 40, 46, 50), fill=(30, 30, 30, 255))
     return img
-
-
-def show_code_notification(icon, item):
-    if state.code:
-        show_text_dialog("Truck Companion", "Codigo de pairing:", copy_value=state.code)
-    else:
-        show_text_dialog("Truck Companion", "Todavia no hay codigo de pairing.")
-
-
-def quit_app(icon, item):
-    icon.stop()
-
-
-_browser_opened = False
-
-
-def build_web_url(host: str = "127.0.0.1") -> str | None:
-    if state.web_port is None or not state.code or not state.backend_url:
-        return None
-    query = urllib.parse.urlencode({"backend": state.backend_url, "code": state.code})
-    return f"http://{host}:{state.web_port}/index.html?{query}"
 
 
 def show_text_dialog(title: str, message: str, copy_value: str | None = None):
@@ -170,16 +92,25 @@ def show_text_dialog(title: str, message: str, copy_value: str | None = None):
     threading.Thread(target=_show, daemon=True).start()
 
 
-def show_mobile_url(icon, item):
-    lan_ip = get_lan_ip()
-    if not lan_ip:
-        show_text_dialog("Truck Companion", "No se pudo detectar la IP de tu red local.")
-        return
-    url = build_web_url(host=lan_ip)
-    if not url:
-        show_text_dialog("Truck Companion", "Todavia no hay codigo de pairing.")
-        return
-    show_text_dialog("Truck Companion", "Abri esto en el celular (misma wifi):", copy_value=url)
+def show_code_notification(icon, item):
+    if state.code:
+        show_text_dialog("Truck Dash", "Codigo de pairing:", copy_value=state.code)
+    else:
+        show_text_dialog("Truck Dash", "Todavia no hay codigo de pairing.")
+
+
+def quit_app(icon, item):
+    icon.stop()
+
+
+_browser_opened = False
+
+
+def build_web_url() -> str | None:
+    if not state.code or not state.backend_url:
+        return None
+    query = urllib.parse.urlencode({"backend": state.backend_url, "code": state.code})
+    return f"{state.web_url}?{query}"
 
 
 def open_web_ui(backend_url: str, code: str):
@@ -198,7 +129,7 @@ def open_web_menu_item(icon, item):
     if url:
         webbrowser.open(url)
     else:
-        show_text_dialog("Truck Companion", "Todavia no hay codigo de pairing.")
+        show_text_dialog("Truck Dash", "Todavia no hay codigo de pairing.")
 
 
 async def run_client(backend_url: str, fixed_code: str | None):
@@ -233,8 +164,9 @@ async def run_client(backend_url: str, fixed_code: str | None):
                 last_game = None
                 while True:
                     raw = truck_telemetry.get_data()
-                    # ver comentario equivalente en client.py: se descarta el
-                    # primer frame hasta que el SDK confirme sync real.
+                    # sdkActive en False significa que el SDK todavia no
+                    # sincronizo el primer frame real del juego (ver
+                    # comentario equivalente en client.py).
                     if raw.get("sdkActive"):
                         payload = client_lib.build_payload(raw)
                         game = payload.get("game")
@@ -264,20 +196,19 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", default="wss://truck-companion-production.up.railway.app")
     parser.add_argument("--code", default=None)
-    parser.add_argument("--web-dir", default=DEFAULT_WEB_DIR, help="Carpeta de la web a servir localmente")
+    parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="URL de la web a abrir (para desarrollo local)")
     args = parser.parse_args()
 
-    state.web_port = start_web_server(args.web_dir)
+    state.web_url = args.web_url
 
     start_asyncio_thread(args.backend, args.code)
 
     menu = pystray.Menu(
         pystray.MenuItem("Abrir web", open_web_menu_item, default=True),
         pystray.MenuItem("Mostrar codigo de pairing", show_code_notification),
-        pystray.MenuItem("Mostrar URL para el celular", show_mobile_url),
         pystray.MenuItem("Salir", quit_app),
     )
-    icon = pystray.Icon("truck-companion", make_icon_image(), "Truck Companion", menu)
+    icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", menu)
     state.icon = icon
     icon.run()
     sys.exit(0)
