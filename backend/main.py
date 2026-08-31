@@ -13,9 +13,10 @@ mientras dure la sesion del proceso. No se persiste nada en DB todavia.
 import random
 import string
 import time
+from collections import defaultdict, deque
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Truck Companion Backend")
@@ -27,8 +28,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PAIRING_CODE_LENGTH = 6
+# 8 caracteres alfanumericos (36^8 ~= 2.8 billones de combinaciones) en vez de
+# 6 (36^6 ~= 2.200 millones) para que adivinar un codigo ajeno sea muchisimo
+# mas caro, sumado al limite de intentos de abajo.
+PAIRING_CODE_LENGTH = 8
 PAIRING_CODE_TTL_SECONDS = 10 * 60
+
+# Limite basico de intentos por IP para las conexiones que requieren un codigo
+# valido (/ws/live y /ws/client), asi no se puede probar codigos al voleo en
+# rafaga. No es un rate limiter robusto (no sobrevive un restart, no distingue
+# proxies), pero alcanza para esta escala y sube mucho el costo de adivinar.
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_MAX_ATTEMPTS = 20
+_attempt_log: dict[str, deque] = defaultdict(deque)
+
+
+def check_rate_limit(client_ip: str) -> bool:
+    now = time.time()
+    log = _attempt_log[client_ip]
+    while log and now - log[0] > RATE_LIMIT_WINDOW_SECONDS:
+        log.popleft()
+    if len(log) >= RATE_LIMIT_MAX_ATTEMPTS:
+        return False
+    log.append(now)
+    return True
 
 
 class Session:
@@ -63,7 +86,10 @@ def cleanup_expired_sessions():
 
 
 @app.post("/pair/new")
-def create_pairing_code():
+def create_pairing_code(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="demasiados intentos, esperá un minuto")
     cleanup_expired_sessions()
     code = generate_code()
     sessions[code] = Session(code)
@@ -78,6 +104,11 @@ def health():
 @app.websocket("/ws/client/{code}")
 async def ws_client(websocket: WebSocket, code: str):
     """Conexion del cliente local (envia telemetria)."""
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    if not check_rate_limit(client_ip):
+        await websocket.close(code=4429, reason="demasiados intentos, esperá un minuto")
+        return
+
     session = sessions.get(code)
     if session is None:
         await websocket.close(code=4404, reason="codigo de pairing invalido o expirado")
@@ -102,6 +133,11 @@ async def ws_client(websocket: WebSocket, code: str):
 @app.websocket("/ws/live/{code}")
 async def ws_viewer(websocket: WebSocket, code: str):
     """Conexion de la web (recibe telemetria en vivo)."""
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    if not check_rate_limit(client_ip):
+        await websocket.close(code=4429, reason="demasiados intentos, esperá un minuto")
+        return
+
     session = sessions.get(code)
     if session is None:
         await websocket.close(code=4404, reason="codigo de pairing invalido o expirado")
