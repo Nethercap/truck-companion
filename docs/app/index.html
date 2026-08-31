@@ -116,14 +116,12 @@
   @media (max-width: 900px) and (orientation: portrait) {
     #infoPanel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
     .layout.panelHidden #infoPanel { transform: translateY(110%); }
-    .setup input#backendUrl { display: none; }
   }
 
   @media (max-height: 500px) and (orientation: landscape) {
     body { padding: 0.5rem; }
     h1 { display: none; }
     .setup { margin-bottom: 0.3rem; }
-    .setup input#backendUrl { display: none; }
     #status { margin-bottom: 0.3rem; }
     #infoPanel { width: 220px; padding: 0.5rem; font-size: 0.8rem; }
     .speedBig { font-size: 1.8rem; }
@@ -165,7 +163,7 @@
 <body>
   <h1 style="display:flex;align-items:center;gap:0.5rem;"><img src="assets/logo.svg" alt="" style="height:1.1em;width:1.1em;" /> Truck Dash — ETS2 / ATS</h1>
   <div class="setup">
-    <input id="backendUrl" value="wss://truck-companion-production.up.railway.app" size="34" />
+    <input id="backendUrl" value="wss://truck-companion-production.up.railway.app" size="34" style="display:none" />
     <input id="code" data-i18n-placeholder="pairingCode" maxlength="6" style="text-transform:uppercase" />
     <button id="connectBtn" data-i18n="connect">Connect</button>
     <button id="unitToggle" data-i18n-title="toggleUnits" title="Toggle units">km · km/h</button>
@@ -414,6 +412,28 @@ async function loadCities(mapInfo) {
 // del output de truckermudgeon/maps. nodes: [[x,y], ...], edges: [[fromIdx, toIdx, weight], ...]
 let routeGraph = null; // { nodes, adjacency: Map<idx, [[idx, weight], ...]> }
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
+let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
+const OFF_ROUTE_THRESHOLD_M = 400; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS)
+
+// Distancia minima (aprox) del punto (x,z) a la polilinea de la ruta actual,
+// en unidades del juego. Alcanza con chequear contra cada segmento entre
+// vertices consecutivos (la ruta ya viene con buena densidad de puntos).
+function distanceToRouteMeters(x, z) {
+  if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2) return Infinity;
+  let best = Infinity;
+  for (let i = 0; i < currentRouteWorldPoints.length - 1; i++) {
+    const [ax, az] = currentRouteWorldPoints[i];
+    const [bx, bz] = currentRouteWorldPoints[i + 1];
+    const dx = bx - ax, dz = bz - az;
+    const lenSq = dx * dx + dz * dz;
+    let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = ax + t * dx, pz = az + t * dz;
+    const dist = Math.hypot(x - px, z - pz);
+    if (dist < best) best = dist;
+  }
+  return best;
+}
 
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
@@ -564,6 +584,7 @@ function updateDestinationMarker(data) {
     if (destMarker) { leafletMap.removeLayer(destMarker); destMarker = null; }
     if (destLine) { leafletMap.removeLayer(destLine); destLine = null; }
     currentRouteTarget = null;
+    currentRouteWorldPoints = null;
     return;
   }
   const destLatLng = mapTransform.toLatLng(city.X, city.Y);
@@ -574,12 +595,19 @@ function updateDestinationMarker(data) {
     destMarker.setLatLng(destLatLng);
   }
 
-  // Recalcula la ruta real por carreteras solo cuando cambia el destino
-  // (recorrer el grafo entero en cada tick de telemetria seria carisimo y
-  // no hace falta: la ruta no cambia mientras siga el mismo trabajo).
-  if (data.cityDst !== currentRouteTarget && data.position?.x != null && routeGraph) {
+  // Recalcula la ruta real por carreteras cuando cambia el destino, o -como
+  // un GPS- cuando te desviaste demasiado de la ruta ya calculada. Recorrer
+  // el grafo entero en cada tick seria carisimo, por eso no se chequea la
+  // desviacion salvo que ya haya una ruta calculada para comparar contra.
+  const destChanged = data.cityDst !== currentRouteTarget;
+  const offRoute = !destChanged
+    && data.position?.x != null
+    && distanceToRouteMeters(data.position.x, data.position.z) > OFF_ROUTE_THRESHOLD_M;
+
+  if ((destChanged || offRoute) && data.position?.x != null && routeGraph) {
     currentRouteTarget = data.cityDst;
     const routePoints = findRoute([data.position.x, data.position.z], [city.X, city.Y]);
+    currentRouteWorldPoints = routePoints;
     const linePoints = routePoints
       ? routePoints.map(([x, y]) => mapTransform.toLatLng(x, y))
       : [trailWorld[trailWorld.length - 1], destLatLng].filter(Boolean); // fallback: linea recta si no se encontro ruta
@@ -623,6 +651,7 @@ async function loadGameMap(game) {
   await loadCities(mapInfo);
   await loadRouteGraph(mapInfo);
   currentRouteTarget = null;
+  currentRouteWorldPoints = null;
 
   if (!leafletMap) {
     leafletMap = L.map('leafletMap', { crs: L.CRS.Simple, minZoom: tileMapInfo.minZoom, maxZoom });
@@ -677,6 +706,7 @@ function updateMap(position, game) {
       // recalculo la proxima vez que llegue el destino, igual que un GPS
       // recalcula cuando te salis del camino.
       currentRouteTarget = null;
+      currentRouteWorldPoints = null;
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
@@ -875,6 +905,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   trailWorld.length = 0;
   lastWorldPos = null;
   currentRouteTarget = null;
+  currentRouteWorldPoints = null;
   if (trailLine) trailLine.setLatLngs([]);
   if (destLine && leafletMap) { leafletMap.removeLayer(destLine); destLine = null; }
   ws = new WebSocket(`${backend}/ws/live/${code}`);
