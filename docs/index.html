@@ -2,909 +2,354 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>Truck Companion</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Truck Dash</title>
+<meta name="description" content="Truck Dash — a free real-time companion dashboard for Euro Truck Simulator 2 and American Truck Simulator." />
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
 <style>
   :root {
-    --bg: #0d0f12;
-    --panel: #171a1f;
-    --accent: #3b9eff;
-    --danger: #ff4d4d;
-    --text: #eee;
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --panel-alt: #1a1e24;
+    --border: #262b33;
+    --text: #f2f3f5;
     --muted: #9aa4b2;
+    --blue: #3b9eff;
+    --orange: #ff8a3d;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html { scroll-behavior: smooth; }
   body {
-    font-family: system-ui, sans-serif;
+    margin: 0;
     background: var(--bg);
     color: var(--text);
-    margin: 0;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
   }
-  h1 { font-size: 1rem; margin: 0 0 0.5rem; flex-shrink: 0; }
-  .setup { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.4rem; flex-shrink: 0; }
-  .setup input { font-size: 0.9rem; padding: 0.3rem 0.5rem; background: var(--panel); border: 1px solid #333; color: var(--text); border-radius: 6px; }
-  .setup button { font-size: 0.9rem; padding: 0.35rem 0.7rem; border-radius: 6px; border: none; background: var(--accent); color: #fff; cursor: pointer; }
-  #status { font-size: 0.8rem; margin-bottom: 0.6rem; flex-shrink: 0; }
-  .ok { color: #4caf50; }
-  .err { color: var(--danger); }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
 
-  /* Modo pantalla completa: se oculta todo el header (titulo, setup, status)
-     y se saca el padding del body para que el mapa llegue de punta a punta,
-     no solo "ancho completo dentro de un margen". */
-  body.fsMode { padding: 0; }
-  body.fsMode h1,
-  body.fsMode .setup,
-  body.fsMode #status { display: none; }
-  body.fsMode .layout { border-radius: 0; }
-  body.fsMode #mapPanel { border-radius: 0; }
-  body.fsMode #infoPanel { border-radius: 0; }
-
-  /* El mapa ocupa TODO el espacio disponible (pantalla completa), y el panel
-     de info flota encima como overlay, no como columna fija - asi el mapa
-     nunca se ve recortado y la info se puede ocultar para verlo entero. */
-  .layout {
-    position: relative;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    border-radius: 12px;
+  header {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: rgba(11, 13, 16, 0.85);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
   }
+  .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.2rem; }
+  .brand img { height: 28px; width: 28px; }
+  .brand .name { display: flex; align-items: baseline; gap: 0.5rem; }
+  .brand .sub { font-weight: 400; font-size: 0.8rem; color: var(--muted); }
 
-  #mapPanel { position: absolute; inset: 0; overflow: hidden; padding: 0; border-radius: 12px; }
-  #leafletMap { width: 100%; height: 100%; background: #2b2f36; }
-  .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
-  .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
+  nav.desktopNav { display: flex; align-items: center; gap: 1.5rem; }
+  nav.desktopNav a { color: var(--text); font-size: 0.95rem; }
+  nav.desktopNav a:hover { color: var(--blue); text-decoration: none; }
 
-  .mapBtn {
-    position: absolute; z-index: 1000;
-    width: 36px; height: 36px; border-radius: 50%; border: none;
-    background: #fff; color: #111; font-size: 1.1rem; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  .langBtn, .menuBtn {
+    background: var(--panel-alt); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.4rem 0.7rem; font-size: 0.85rem; cursor: pointer;
   }
-  .mapBtn:hover { background: #eee; }
-  #recenterBtn { top: 0.6rem; left: 0.6rem; }
-  #panelToggleBtn { top: 3.4rem; left: 0.6rem; }
-  #fullscreenBtn { top: 6.2rem; left: 0.6rem; }
+  .langBtn:hover, .menuBtn:hover { border-color: var(--blue); }
 
-  /* Mini-HUD: velocidad/limite/crucero flotando arriba a la derecha del mapa,
-     visible solo cuando el panel de info esta oculto (si el panel esta
-     abierto, esos mismos datos ya se ven ahi adentro). */
-  #miniHud {
-    display: none;
-    position: absolute; top: 0.6rem; right: 0.6rem; z-index: 1000;
-    background: rgba(23, 26, 31, 0.9);
-    border-radius: 10px;
-    padding: 0.5rem 0.7rem;
-    align-items: center;
-    gap: 0.6rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-  }
-  .layout.panelHidden #miniHud { display: flex; }
-  #miniHud .limitSign { width: 34px; height: 34px; font-size: 0.85rem; border-width: 3px; }
-  #miniHud .speedBig { font-size: 1.4rem; }
-  #miniHud .cruiseDisplay { font-size: 0.75rem; }
-  #miniHud .cruiseSpeed { font-size: 1rem; }
+  .menuBtn { display: none; font-size: 1.2rem; padding: 0.3rem 0.6rem; }
 
-  /* Panel de info flotante: por default (desktop y horizontal) va pegado al
-     borde derecho, alto completo. En vertical se convierte en una hoja que
-     sube desde abajo. En ambos casos, panelHidden lo desliza fuera de vista
-     sin desmontarlo (asi no perdemos el estado del mapa/leaflet). */
-  #infoPanel {
-    position: absolute;
-    top: 0; right: 0; bottom: 0;
-    width: 300px;
-    background: var(--panel);
-    border-radius: 12px 0 0 12px;
-    padding: 0.75rem;
-    overflow-y: auto;
-    z-index: 900;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  /* Sidebar mobile */
+  #sidebar {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 260px;
+    background: var(--panel); border-left: 1px solid var(--border);
+    padding: 1.5rem; z-index: 200;
+    transform: translateX(100%);
     transition: transform 0.25s ease;
+    display: flex; flex-direction: column; gap: 1.2rem;
   }
-  .layout.panelHidden #infoPanel { transform: translateX(120%); }
-
-  @media (max-width: 900px) and (orientation: portrait) {
-    #infoPanel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
-    .layout.panelHidden #infoPanel { transform: translateY(110%); }
-    .setup input#backendUrl { display: none; }
+  #sidebar.open { transform: translateX(0); }
+  #sidebarOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 190;
+    display: none;
   }
+  #sidebarOverlay.open { display: block; }
+  #sidebar a { color: var(--text); font-size: 1.05rem; }
+  #sidebar .closeBtn { align-self: flex-end; background: none; border: none; color: var(--text); font-size: 1.4rem; cursor: pointer; }
 
-  @media (max-height: 500px) and (orientation: landscape) {
-    body { padding: 0.5rem; }
-    h1 { display: none; }
-    .setup { margin-bottom: 0.3rem; }
-    .setup input#backendUrl { display: none; }
-    #status { margin-bottom: 0.3rem; }
-    #infoPanel { width: 220px; padding: 0.5rem; font-size: 0.8rem; }
-    .speedBig { font-size: 1.8rem; }
-    .limitSign { width: 38px; height: 38px; font-size: 0.9rem; }
+  @media (max-width: 760px) {
+    nav.desktopNav { display: none; }
+    .menuBtn { display: block; }
   }
 
-  .speedRow { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
-  .speedBig { font-size: 2.4rem; font-weight: 700; line-height: 1; }
-  .speedUnit { font-size: 0.9rem; color: var(--muted); }
-  .limitSign {
-    width: 48px; height: 48px; border-radius: 50%;
-    border: 4px solid var(--danger);
-    background: #fff; color: #111;
+  main { max-width: 860px; margin: 0 auto; padding: 0 1.5rem; }
+
+  .hero { text-align: center; padding: 4.5rem 0 3.5rem; }
+  .hero h1 { font-size: 3rem; margin: 0 0 0.3rem; letter-spacing: -0.02em; }
+  .hero h1 .dash { color: var(--orange); }
+  .hero .tagline { font-size: 1.15rem; color: var(--muted); margin: 0 0 2rem; }
+  .cta {
+    display: inline-block; background: var(--blue); color: #fff; font-weight: 600;
+    padding: 0.8rem 1.8rem; border-radius: 8px; font-size: 1.05rem;
+  }
+  .cta:hover { background: #2b8ef0; text-decoration: none; }
+  .heroBadges { margin-top: 1.2rem; font-size: 0.85rem; color: var(--muted); }
+  .heroBadges span { margin: 0 0.5rem; }
+
+  section { padding: 3rem 0; border-top: 1px solid var(--border); }
+  section h2 { font-size: 1.6rem; margin: 0 0 1.2rem; }
+  section h2 .accent { color: var(--orange); }
+  section p { color: #d7dbe0; }
+
+  .featureGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; margin-top: 1.5rem; }
+  .featureCard { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem; }
+  .featureCard .icon { font-size: 1.4rem; margin-bottom: 0.4rem; }
+  .featureCard h3 { font-size: 1rem; margin: 0 0 0.3rem; }
+  .featureCard p { font-size: 0.88rem; color: var(--muted); margin: 0; }
+
+  .steps { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
+  .step { display: flex; gap: 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem; }
+  .step .num {
+    flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--orange); color: #1a1002; font-weight: 800;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; font-weight: 800;
-    flex-shrink: 0;
   }
-  .limitSign.over { animation: pulse 1s infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,77,0.6); } 50% { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
+  .step h3 { margin: 0 0 0.3rem; font-size: 1rem; }
+  .step p { margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--muted); }
+  .step .links { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.88rem; }
 
-  .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; }
+  .transparencyNote {
+    margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted);
+    background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1.1rem;
+  }
 
-  .fuelStack { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.78rem; color: var(--muted); text-align: right; margin-left: auto; }
-  .cruiseSpeed { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+  .contactBox { display: flex; align-items: center; gap: 0.8rem; font-size: 1.1rem; margin-top: 1rem; }
 
-  .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
-  .row:last-child { border-bottom: none; }
-  .row .label { color: var(--muted); }
-  .route { font-size: 0.9rem; }
-  .route .cities { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; }
-  .route .arrow { color: var(--muted); }
-
-  .statLine { font-size: 0.85rem; padding: 0.3rem 0; border-bottom: 1px solid #262a31; }
-  .statLine:last-of-type { border-bottom: none; }
-  .statLine .statWarn { color: #ffb020; }
-  .statLine .statDanger { color: var(--danger); }
+  footer {
+    text-align: center; color: var(--muted); font-size: 0.8rem;
+    padding: 2rem 1.5rem 3rem;
+  }
 </style>
 </head>
 <body>
-  <h1>Truck Companion — ETS2 / ATS</h1>
-  <div class="setup">
-    <input id="backendUrl" value="wss://truck-companion-production.up.railway.app" size="34" />
-    <input id="code" data-i18n-placeholder="pairingCode" maxlength="6" style="text-transform:uppercase" />
-    <button id="connectBtn" data-i18n="connect">Connect</button>
-    <button id="unitToggle" data-i18n-title="toggleUnits" title="Toggle units">km · km/h</button>
-    <button id="langToggle" data-i18n-title="toggleLanguage" title="Toggle language">EN</button>
-  </div>
-  <div id="status" data-i18n="notConnected">Not connected</div>
 
-  <div class="layout" id="layout">
-    <div id="mapPanel">
-      <div id="leafletMap"></div>
-      <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
-      <button id="recenterBtn" class="mapBtn" data-i18n-title="recenter" title="Recenter on truck">🎯</button>
-      <button id="panelToggleBtn" class="mapBtn" data-i18n-title="togglePanel" title="Show/hide info">☰</button>
-      <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
-
-      <div id="miniHud">
-        <div class="limitSign" id="miniLimitSign">--</div>
-        <div>
-          <div class="speedBig" id="miniSpeedBig">--</div>
-          <div class="speedUnit" id="miniSpeedUnitLabel">km/h</div>
-        </div>
-        <div class="cruiseDisplay" id="miniCruiseDisplay" style="display:none">
-          <div>
-            <div class="cruiseSpeed" id="miniCruiseSpeed">--</div>
-          </div>
-        </div>
-      </div>
+<header>
+  <div class="brand">
+    <img src="assets/logo.svg" alt="Truck Dash logo" />
+    <div class="name">
+      <span>Truck <span style="color:var(--blue)">Dash</span></span>
+      <span class="sub" data-i18n="brandSub">Truck-Sim Companion</span>
     </div>
+  </div>
+  <nav class="desktopNav">
+    <a href="#about" data-i18n="navAbout">About Truck Dash</a>
+    <a href="#get-started" data-i18n="navGetStarted">Get Started (free)</a>
+    <a href="#contact" data-i18n="navContact">Contact</a>
+    <button class="langBtn" id="langToggle">ES</button>
+  </nav>
+  <button class="menuBtn" id="menuBtn" aria-label="Menu">☰</button>
+</header>
 
-    <div id="infoPanel">
-      <div class="speedRow">
-        <div class="limitSign" id="limitSign">--</div>
-        <div>
-          <div class="speedBig" id="speedBig">--</div>
-          <div class="speedUnit" id="speedUnitLabel">km/h</div>
-        </div>
-        <div class="cruiseDisplay" id="cruiseDisplay" style="display:none">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 12 L16 8"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
-          <div>
-            <div class="cruiseSpeed" id="cruiseSpeed">--</div>
-            <div class="speedUnit" data-i18n="cruiseControl">Cruise control</div>
-          </div>
-        </div>
-        <div class="fuelStack">
-          <div id="fuelPctLine">-</div>
-          <div id="fuelRangeLine">-</div>
-          <div id="fuelAvgLine">-</div>
-        </div>
-      </div>
+<div id="sidebarOverlay"></div>
+<div id="sidebar">
+  <button class="closeBtn" id="sidebarClose">×</button>
+  <a href="#about" data-i18n="navAbout">About Truck Dash</a>
+  <a href="#get-started" data-i18n="navGetStarted">Get Started (free)</a>
+  <a href="#contact" data-i18n="navContact">Contact</a>
+  <button class="langBtn" id="langToggleMobile">ES</button>
+</div>
 
-      <div class="route">
-        <div class="cities">
-          <span id="citySrc">?</span>
-          <span class="arrow">→</span>
-          <span id="cityDst">?</span>
-        </div>
-        <div class="row"><span class="label" data-i18n="truck">Truck</span><span id="truck">-</span></div>
-        <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
-        <div class="row"><span class="label" data-i18n="weight">Weight</span><span id="cargoMass">-</span></div>
-        <div class="row"><span class="label" data-i18n="distanceLeft">Distance left</span><span id="routeDistance">-</span></div>
-        <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
-        <div class="row"><span class="label" data-i18n="nextRest">Time to next rest stop</span><span id="restStop">-</span></div>
-        <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
-        <div class="row"><span class="label" data-i18n="tolls">Tolls paid</span><span id="tollsTotal">-</span></div>
-        <div class="row"><span class="label" data-i18n="fines">Fines</span><span id="finesTotal">-</span></div>
-        <div class="row"><span class="label" data-i18n="ferryTrain">Ferry/train trips</span><span id="ferryTrainCount">0</span></div>
-      </div>
-
-      <div class="statLine" id="wearLine">-</div>
-      <div class="row" id="mechanicalAlertsRow" style="display:none"><span class="label" data-i18n="alerts">Alerts</span><span id="mechanicalAlerts" style="color:var(--danger)">-</span></div>
+<main>
+  <div class="hero">
+    <img src="assets/logo.svg" alt="Truck Dash" style="height:72px;width:72px;margin-bottom:0.5rem;" />
+    <h1>Truck<span class="dash"> Dash</span></h1>
+    <p class="tagline" data-i18n="heroTagline">A free, real-time companion dashboard for Euro Truck Simulator 2 and American Truck Simulator.</p>
+    <a href="#get-started" class="cta" data-i18n="heroCta">Get Started — it's free</a>
+    <div class="heroBadges">
+      <span data-i18n="badgeNoLogin">No login</span>·
+      <span data-i18n="badgeFree">100% free</span>·
+      <span>ETS2 + ATS</span>
     </div>
   </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <section id="about">
+    <h2 data-i18n="aboutTitle">About <span class="accent">Truck Dash</span></h2>
+    <p data-i18n="aboutBody">Truck Dash is a browser dashboard that runs alongside Euro Truck Simulator 2 or American Truck Simulator, showing your live position on a real map, a real route to your destination, speed and speed limit, cargo, fuel, wear, and more — all in real time, for free, with no account needed.</p>
+    <div class="featureGrid">
+      <div class="featureCard">
+        <div class="icon">🗺️</div>
+        <h3 data-i18n="featMapTitle">Real map & routes</h3>
+        <p data-i18n="featMapBody">Actual road network for both games, with a live route calculated to your destination — not a straight line.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon">🚦</div>
+        <h3 data-i18n="featSpeedTitle">Speed & limits</h3>
+        <p data-i18n="featSpeedBody">Google Maps-style speed limit sign, cruise control readout, and alerts when you're over the limit.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon">⛽</div>
+        <h3 data-i18n="featTruckTitle">Truck vitals</h3>
+        <p data-i18n="featTruckBody">Fuel, range, consumption, and wear per part, with warnings before something breaks down.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon">📱</div>
+        <h3 data-i18n="featMobileTitle">Any device</h3>
+        <p data-i18n="featMobileBody">Works on desktop and mobile, in portrait or landscape, with a fullscreen mode for a clean view.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="get-started">
+    <h2 data-i18n="gsTitle">Get Started <span class="accent">(free)</span></h2>
+    <p data-i18n="gsIntro">Three one-time steps and you're set. No installer, no account, no admin rights needed.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <h3 data-i18n="gsStep1Title">Install the SCS telemetry plugin</h3>
+          <p data-i18n="gsStep1Body">Truck Dash reads data through the game's official telemetry SDK. Download the plugin and copy the DLL into your game's install folder — once per game.</p>
+          <div class="links">
+            <a href="https://github.com/RenCloud/scs-sdk-plugin" target="_blank" rel="noopener" data-i18n="gsStep1Link">SCS SDK plugin (GitHub)</a>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <h3 data-i18n="gsStep2Title">Download the Truck Dash client</h3>
+          <p data-i18n="gsStep2Body">A small, portable program that reads the game's telemetry and opens your browser, already connected. No install, no Python needed.</p>
+          <div class="links">
+            <a href="https://github.com/Nethercap/truck-companion/releases/latest" target="_blank" rel="noopener" data-i18n="gsStep2Link">Download for Windows</a>
+            <a href="https://github.com/Nethercap/truck-companion/blob/main/client/README.md" target="_blank" rel="noopener">README (English)</a>
+            <a href="https://github.com/Nethercap/truck-companion/blob/main/client/README.es.md" target="_blank" rel="noopener">README (Español)</a>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <h3 data-i18n="gsStep3Title">Run it and start driving</h3>
+          <p data-i18n="gsStep3Body">Open the game, run the client, and your browser opens automatically — already paired and live.</p>
+        </div>
+      </div>
+    </div>
+    <div class="transparencyNote">
+      <span data-i18n="transparencyNote">Truck Dash is fully open source — client, backend, and web are all in the same public repository, so you can see exactly what it does before running it.</span>
+      &nbsp;<a href="https://github.com/Nethercap/truck-companion" target="_blank" rel="noopener" data-i18n="viewSource">View source on GitHub →</a>
+    </div>
+  </section>
+
+  <section id="contact">
+    <h2 data-i18n="contactTitle">Contact</h2>
+    <p data-i18n="contactBody">Questions, bugs, or ideas? Reach out directly:</p>
+    <div class="contactBox">
+      📧 <a href="mailto:nether.appdev@gmail.com">nether.appdev@gmail.com</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div>Truck Dash — <span data-i18n="footerNote">an independent fan-made companion tool, not affiliated with SCS Software.</span></div>
+</footer>
+
 <script>
-const statusEl = document.getElementById('status');
-let ws = null;
-
 const TRANSLATIONS = {
   en: {
-    pairingCode: 'Pairing code',
-    connect: 'Connect',
-    toggleUnits: 'Toggle units',
-    toggleLanguage: 'Toggle language',
-    notConnected: 'Not connected',
-    mapNotLoaded: 'Map not loaded',
-    recenter: 'Recenter on truck',
-    togglePanel: 'Show/hide info panel',
-    toggleFullscreen: 'Fullscreen',
-    truck: 'Truck',
-    cargo: 'Cargo',
-    weight: 'Weight',
-    distanceLeft: 'Distance left',
-    etaGame: 'In-game ETA',
-    nextRest: 'Time to next rest stop',
-    jobPay: 'Job pay',
-    fuel: 'Fuel',
-    range: 'Range',
-    engine: 'Engine',
-    transmission: 'Transmission',
-    cabin: 'Cabin',
-    chassis: 'Chassis',
-    wheels: 'Wheels',
-    avgConsumption: 'Avg. consumption',
-    cruiseControl: 'Cruise control',
-    alerts: 'Alerts',
-    tolls: 'Tolls paid',
-    fines: 'Fines',
-    ferryTrain: 'Ferry/train trips',
-    lowAirPressure: 'Low air pressure',
-    highWaterTemp: 'High water temperature',
-    lowBattery: 'Low battery voltage',
-    highOilTemp: 'High oil temperature',
-    noCargo: '(no cargo)',
-    enterCode: 'Enter the pairing code shown by the local client.',
-    connectedWaiting: 'Connected, waiting for telemetry...',
-    connectedPaused: 'Connected (game paused)',
-    connectedLive: 'Connected, live',
-    disconnected: 'Disconnected',
-    connectionError: 'Connection error',
-    mapNotFound: (label, path) => `Exported map not found for ${label} (${path})`,
+    brandSub: 'Truck-Sim Companion',
+    navAbout: 'About Truck Dash',
+    navGetStarted: 'Get Started (free)',
+    navContact: 'Contact',
+    heroTagline: 'A free, real-time companion dashboard for Euro Truck Simulator 2 and American Truck Simulator.',
+    heroCta: "Get Started — it's free",
+    badgeNoLogin: 'No login',
+    badgeFree: '100% free',
+    aboutTitle: 'About <span class="accent">Truck Dash</span>',
+    aboutBody: 'Truck Dash is a browser dashboard that runs alongside Euro Truck Simulator 2 or American Truck Simulator, showing your live position on a real map, a real route to your destination, speed and speed limit, cargo, fuel, wear, and more — all in real time, for free, with no account needed.',
+    featMapTitle: 'Real map & routes',
+    featMapBody: 'Actual road network for both games, with a live route calculated to your destination — not a straight line.',
+    featSpeedTitle: 'Speed & limits',
+    featSpeedBody: "Google Maps-style speed limit sign, cruise control readout, and alerts when you're over the limit.",
+    featTruckTitle: 'Truck vitals',
+    featTruckBody: 'Fuel, range, consumption, and wear per part, with warnings before something breaks down.',
+    featMobileTitle: 'Any device',
+    featMobileBody: 'Works on desktop and mobile, in portrait or landscape, with a fullscreen mode for a clean view.',
+    gsTitle: 'Get Started <span class="accent">(free)</span>',
+    gsIntro: "Three one-time steps and you're set. No installer, no account, no admin rights needed.",
+    gsStep1Title: 'Install the SCS telemetry plugin',
+    gsStep1Body: "Truck Dash reads data through the game's official telemetry SDK. Download the plugin and copy the DLL into your game's install folder — once per game.",
+    gsStep1Link: 'SCS SDK plugin (GitHub)',
+    gsStep2Title: 'Download the Truck Dash client',
+    gsStep2Body: "A small, portable program that reads the game's telemetry and opens your browser, already connected. No install, no Python needed.",
+    gsStep2Link: 'Download for Windows',
+    gsStep3Title: 'Run it and start driving',
+    gsStep3Body: 'Open the game, run the client, and your browser opens automatically — already paired and live.',
+    transparencyNote: 'Truck Dash is fully open source — client, backend, and web are all in the same public repository, so you can see exactly what it does before running it.',
+    viewSource: 'View source on GitHub →',
+    contactTitle: 'Contact',
+    contactBody: 'Questions, bugs, or ideas? Reach out directly:',
+    footerNote: 'an independent fan-made companion tool, not affiliated with SCS Software.',
   },
   es: {
-    pairingCode: 'Código de pairing',
-    connect: 'Conectar',
-    toggleUnits: 'Cambiar unidades',
-    toggleLanguage: 'Cambiar idioma',
-    notConnected: 'Sin conectar',
-    mapNotLoaded: 'Mapa no cargado',
-    recenter: 'Centrar en el camión',
-    togglePanel: 'Mostrar/ocultar panel de info',
-    toggleFullscreen: 'Pantalla completa',
-    truck: 'Camión',
-    cargo: 'Cargamento',
-    weight: 'Peso',
-    distanceLeft: 'Distancia restante',
-    etaGame: 'ETA in-game',
-    nextRest: 'Tiempo al próximo descanso',
-    jobPay: 'Pago del trabajo',
-    fuel: 'Combustible',
-    range: 'Autonomía',
-    engine: 'Motor',
-    transmission: 'Transmisión',
-    cabin: 'Cabina',
-    chassis: 'Chasis',
-    wheels: 'Ruedas',
-    avgConsumption: 'Consumo promedio',
-    cruiseControl: 'Control de crucero',
-    alerts: 'Alertas',
-    tolls: 'Peajes pagados',
-    fines: 'Multas',
-    ferryTrain: 'Viajes en tren/ferry',
-    lowAirPressure: 'Presión de aire baja',
-    highWaterTemp: 'Temperatura de agua alta',
-    lowBattery: 'Voltaje de batería bajo',
-    highOilTemp: 'Temperatura de aceite alta',
-    noCargo: '(sin carga)',
-    enterCode: 'Ingresá el código de pairing que te mostró el cliente local.',
-    connectedWaiting: 'Conectado, esperando telemetría...',
-    connectedPaused: 'Conectado (juego en pausa)',
-    connectedLive: 'Conectado, en vivo',
-    disconnected: 'Desconectado',
-    connectionError: 'Error de conexión',
-    mapNotFound: (label, path) => `No se encontró el mapa exportado para ${label} (${path})`,
+    brandSub: 'Companion de Truck-Sim',
+    navAbout: 'Sobre Truck Dash',
+    navGetStarted: 'Empezar (gratis)',
+    navContact: 'Contacto',
+    heroTagline: 'Un tablero en tiempo real, gratuito, para Euro Truck Simulator 2 y American Truck Simulator.',
+    heroCta: 'Empezar — es gratis',
+    badgeNoLogin: 'Sin login',
+    badgeFree: '100% gratis',
+    aboutTitle: 'Sobre <span class="accent">Truck Dash</span>',
+    aboutBody: 'Truck Dash es un tablero en el navegador que corre junto a Euro Truck Simulator 2 o American Truck Simulator, mostrando tu posición en vivo sobre un mapa real, una ruta real hacia tu destino, velocidad y límite, cargamento, combustible, desgaste y más — todo en tiempo real, gratis, sin necesitar cuenta.',
+    featMapTitle: 'Mapa y rutas reales',
+    featMapBody: 'Red de carreteras real de ambos juegos, con una ruta en vivo calculada hasta tu destino — no una línea recta.',
+    featSpeedTitle: 'Velocidad y límites',
+    featSpeedBody: 'Cartel de límite de velocidad estilo Google Maps, lectura del control de crucero, y alertas si te pasás del límite.',
+    featTruckTitle: 'Estado del camión',
+    featTruckBody: 'Combustible, autonomía, consumo, y desgaste por pieza, con alertas antes de que algo se rompa.',
+    featMobileTitle: 'Cualquier dispositivo',
+    featMobileBody: 'Funciona en escritorio y celular, vertical u horizontal, con modo pantalla completa para una vista limpia.',
+    gsTitle: 'Empezar <span class="accent">(gratis)</span>',
+    gsIntro: 'Tres pasos, una sola vez, y listo. Sin instalador, sin cuenta, sin permisos de administrador.',
+    gsStep1Title: 'Instalá el plugin de telemetría de SCS',
+    gsStep1Body: 'Truck Dash lee los datos a través del SDK oficial de telemetría del juego. Descargá el plugin y copiá el DLL en la carpeta de instalación de tu juego — una sola vez por juego.',
+    gsStep1Link: 'Plugin SDK de SCS (GitHub)',
+    gsStep2Title: 'Descargá el cliente de Truck Dash',
+    gsStep2Body: 'Un programa chico y portable que lee la telemetría del juego y abre tu navegador, ya conectado. Sin instalar, sin necesitar Python.',
+    gsStep2Link: 'Descargar para Windows',
+    gsStep3Title: 'Abrilo y arrancá a manejar',
+    gsStep3Body: 'Abrí el juego, corré el cliente, y tu navegador se abre solo — ya emparejado y en vivo.',
+    transparencyNote: 'Truck Dash es 100% código abierto — el cliente, el backend y la web están en el mismo repositorio público, así podés ver exactamente qué hace antes de correrlo.',
+    viewSource: 'Ver código fuente en GitHub →',
+    contactTitle: 'Contacto',
+    contactBody: '¿Preguntas, errores, o ideas? Escribime directamente:',
+    footerNote: 'una herramienta independiente hecha por un fan, sin afiliación con SCS Software.',
   },
 };
 
 let currentLang = 'en';
-function t(key, ...args) {
-  const entry = TRANSLATIONS[currentLang][key];
-  return typeof entry === 'function' ? entry(...args) : entry;
-}
+function t(key) { return TRANSLATIONS[currentLang][key]; }
 
 function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.textContent = t(el.getAttribute('data-i18n'));
+    el.innerHTML = t(el.getAttribute('data-i18n'));
   });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
-  });
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    el.title = t(el.getAttribute('data-i18n-title'));
-  });
-  if (!ws) statusEl.textContent = t('notConnected');
+  document.documentElement.lang = currentLang;
 }
 
-document.getElementById('langToggle').addEventListener('click', () => {
+function toggleLang() {
   currentLang = currentLang === 'en' ? 'es' : 'en';
-  document.getElementById('langToggle').textContent = currentLang.toUpperCase();
-  document.documentElement.lang = currentLang;
+  const label = currentLang === 'en' ? 'ES' : 'EN';
+  document.getElementById('langToggle').textContent = label;
+  document.getElementById('langToggleMobile').textContent = label;
   applyTranslations();
-  if (lastData) updateHud(lastData);
-});
+}
+document.getElementById('langToggle').addEventListener('click', toggleLang);
+document.getElementById('langToggleMobile').addEventListener('click', toggleLang);
 applyTranslations();
 
-let useImperial = false;
-const KM_TO_MI = 0.621371;
-document.getElementById('unitToggle').addEventListener('click', () => {
-  useImperial = !useImperial;
-  document.getElementById('unitToggle').textContent = useImperial ? 'mi · mph' : 'km · km/h';
-  document.getElementById('speedUnitLabel').textContent = useImperial ? 'mph' : 'km/h';
-  if (lastData) updateHud(lastData);
-});
-let lastData = null;
-
-// Mapas reales exportados con ts-map (tiles + TileMapInfo.json con el bounding
-// box en coordenadas de juego). Cada juego tiene su propia carpeta porque son
-// mapas distintos (Europa vs USA).
-//
-// Los tiles pesan ~800MB entre los dos juegos, demasiado para vivir en el
-// repo/GitHub Pages - se sirven desde un bucket R2 aparte (maps.trucksim-dash.com).
-// Se usa SIEMPRE la URL remota (tambien para el flujo local del .exe, que ya
-// necesita internet igual para hablar con el backend): asi el .exe no depende
-// de tener una copia local de 800MB de tiles al lado para funcionar en otra PC.
-const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
-const GAME_MAPS = {
-  ats: { dir: `${REMOTE_MAP_BASE}/ats`, label: 'American Truck Simulator' },
-  ets2: { dir: `${REMOTE_MAP_BASE}/ets2`, label: 'Euro Truck Simulator 2' },
-};
-
-let leafletMap = null;
-let tileLayer = null;
-let truckMarker = null;
-let trailLine = null;
-let destMarker = null;
-let destLine = null;
-let mapTransform = null; // { toLatLng(x, z) }
-let currentGame = null;
-let citiesByName = {}; // Name -> {X, Y}
-const trailWorld = [];
-const MAX_TRAIL_POINTS = 1000;
-
-async function loadCities(mapInfo) {
-  try {
-    const res = await fetch(`${mapInfo.dir}/Cities.json`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const list = await res.json();
-    citiesByName = {};
-    for (const c of list) citiesByName[c.Name] = c;
-  } catch (err) {
-    citiesByName = {};
-  }
-}
-
-// Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
-// del output de truckermudgeon/maps. nodes: [[x,y], ...], edges: [[fromIdx, toIdx, weight], ...]
-let routeGraph = null; // { nodes, adjacency: Map<idx, [[idx, weight], ...]> }
-let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
-
-async function loadRouteGraph(mapInfo) {
-  routeGraph = null;
-  try {
-    const res = await fetch(`${mapInfo.dir}/route-graph-${currentGame}.json`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const adjacency = new Map();
-    for (const [a, b, w] of data.edges) {
-      if (!adjacency.has(a)) adjacency.set(a, []);
-      if (!adjacency.has(b)) adjacency.set(b, []);
-      adjacency.get(a).push([b, w]);
-      adjacency.get(b).push([a, w]);
-    }
-
-    // El grafo extraido de los datos del juego no siempre queda 100% conectado
-    // (intersecciones complejas mal resueltas dejan bolsones aislados). Si el
-    // nodo mas cercano a un punto cae en uno de esos bolsones chicos, A* nunca
-    // encuentra camino aunque exista una ruta real por al lado. Para evitarlo,
-    // identificamos la componente conexa mas grande ("giant component") y
-    // preferimos siempre buscar el nodo mas cercano dentro de ella.
-    const componentId = new Int32Array(data.nodes.length).fill(-1);
-    let biggestComponent = -1;
-    let biggestSize = 0;
-    for (let start = 0; start < data.nodes.length; start++) {
-      if (componentId[start] !== -1) continue;
-      const id = start;
-      let size = 0;
-      const stack = [start];
-      componentId[start] = id;
-      while (stack.length) {
-        const cur = stack.pop();
-        size++;
-        for (const [n] of adjacency.get(cur) || []) {
-          if (componentId[n] === -1) {
-            componentId[n] = id;
-            stack.push(n);
-          }
-        }
-      }
-      if (size > biggestSize) { biggestSize = size; biggestComponent = id; }
-    }
-
-    routeGraph = { nodes: data.nodes, adjacency, componentId, giantComponent: biggestComponent };
-  } catch (err) {
-    routeGraph = null;
-  }
-}
-
-function nearestNodeIndex(x, y, requireGiantComponent) {
-  let best = -1;
-  let bestDist = Infinity;
-  const nodes = routeGraph.nodes;
-  for (let i = 0; i < nodes.length; i++) {
-    if (requireGiantComponent && routeGraph.componentId[i] !== routeGraph.giantComponent) continue;
-    const dx = nodes[i][0] - x;
-    const dy = nodes[i][1] - y;
-    const d = dx * dx + dy * dy;
-    if (d < bestDist) { bestDist = d; best = i; }
-  }
-  return best;
-}
-
-// Min-heap simple para A*.
-class MinHeap {
-  constructor() { this.items = []; }
-  push(priority, value) {
-    this.items.push([priority, value]);
-    let i = this.items.length - 1;
-    while (i > 0) {
-      const parent = (i - 1) >> 1;
-      if (this.items[parent][0] <= this.items[i][0]) break;
-      [this.items[parent], this.items[i]] = [this.items[i], this.items[parent]];
-      i = parent;
-    }
-  }
-  pop() {
-    const top = this.items[0];
-    const last = this.items.pop();
-    if (this.items.length > 0) {
-      this.items[0] = last;
-      let i = 0;
-      while (true) {
-        const l = 2 * i + 1, r = 2 * i + 2;
-        let smallest = i;
-        if (l < this.items.length && this.items[l][0] < this.items[smallest][0]) smallest = l;
-        if (r < this.items.length && this.items[r][0] < this.items[smallest][0]) smallest = r;
-        if (smallest === i) break;
-        [this.items[i], this.items[smallest]] = [this.items[smallest], this.items[i]];
-        i = smallest;
-      }
-    }
-    return top ? top[1] : undefined;
-  }
-  get size() { return this.items.length; }
-}
-
-function findRoute(startXY, endXY) {
-  if (!routeGraph) return null;
-  const nodes = routeGraph.nodes;
-  const adjacency = routeGraph.adjacency;
-  const startIdx = nearestNodeIndex(startXY[0], startXY[1], true);
-  const endIdx = nearestNodeIndex(endXY[0], endXY[1], true);
-  if (startIdx === -1 || endIdx === -1) return null;
-
-  const heuristic = (i) => Math.hypot(nodes[i][0] - nodes[endIdx][0], nodes[i][1] - nodes[endIdx][1]);
-
-  const gScore = new Map([[startIdx, 0]]);
-  const cameFrom = new Map();
-  const open = new MinHeap();
-  open.push(heuristic(startIdx), startIdx);
-  const visited = new Set();
-
-  while (open.size > 0) {
-    const current = open.pop();
-    if (current === endIdx) break;
-    if (visited.has(current)) continue;
-    visited.add(current);
-
-    const neighbors = adjacency.get(current) || [];
-    for (const [neighbor, weight] of neighbors) {
-      if (visited.has(neighbor)) continue;
-      const tentativeG = gScore.get(current) + weight;
-      if (tentativeG < (gScore.get(neighbor) ?? Infinity)) {
-        gScore.set(neighbor, tentativeG);
-        cameFrom.set(neighbor, current);
-        open.push(tentativeG + heuristic(neighbor), neighbor);
-      }
-    }
-  }
-
-  if (!gScore.has(endIdx)) return null;
-
-  const path = [endIdx];
-  let node = endIdx;
-  while (cameFrom.has(node)) {
-    node = cameFrom.get(node);
-    path.push(node);
-  }
-  path.reverse();
-  return path.map(i => nodes[i]);
-}
-
-function updateDestinationMarker(data) {
-  if (!leafletMap || !mapTransform) return;
-  const city = data.cityDst && citiesByName[data.cityDst];
-  if (!city) {
-    if (destMarker) { leafletMap.removeLayer(destMarker); destMarker = null; }
-    if (destLine) { leafletMap.removeLayer(destLine); destLine = null; }
-    currentRouteTarget = null;
-    return;
-  }
-  const destLatLng = mapTransform.toLatLng(city.X, city.Y);
-  if (!destMarker) {
-    const destIcon = L.divIcon({ className: 'truckMarker', html: '🏁', iconSize: [20, 20] });
-    destMarker = L.marker(destLatLng, { icon: destIcon }).addTo(leafletMap);
-  } else {
-    destMarker.setLatLng(destLatLng);
-  }
-
-  // Recalcula la ruta real por carreteras solo cuando cambia el destino
-  // (recorrer el grafo entero en cada tick de telemetria seria carisimo y
-  // no hace falta: la ruta no cambia mientras siga el mismo trabajo).
-  if (data.cityDst !== currentRouteTarget && data.position?.x != null && routeGraph) {
-    currentRouteTarget = data.cityDst;
-    const routePoints = findRoute([data.position.x, data.position.z], [city.X, city.Y]);
-    const linePoints = routePoints
-      ? routePoints.map(([x, y]) => mapTransform.toLatLng(x, y))
-      : [trailWorld[trailWorld.length - 1], destLatLng].filter(Boolean); // fallback: linea recta si no se encontro ruta
-
-    if (!destLine) {
-      destLine = L.polyline(linePoints, { color: '#a30000', weight: 3, opacity: 0.9 }).addTo(leafletMap);
-    } else {
-      destLine.setLatLngs(linePoints);
-    }
-  }
-}
-
-async function loadGameMap(game) {
-  if (game === currentGame || !GAME_MAPS[game]) return;
-  const mapInfo = GAME_MAPS[game];
-
-  let tileMapInfo;
-  try {
-    const res = await fetch(`${mapInfo.dir}/TileMapInfo.json`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    tileMapInfo = await res.json();
-  } catch (err) {
-    document.getElementById('mapHint').textContent = t('mapNotFound', mapInfo.label, `${mapInfo.dir}/TileMapInfo.json`);
-    return;
-  }
-
-  currentGame = game;
-  const { x1, x2, y1, y2, maxZoom } = tileMapInfo;
-  const pixelsAtMaxZoom = 256 * Math.pow(2, maxZoom);
-  const scale = pixelsAtMaxZoom / (x2 - x1);
-
-  // Convierte coordenadas de juego (x, z) a LatLng del sistema CRS.Simple de Leaflet.
-  mapTransform = {
-    toLatLng: (x, z) => {
-      const px = (x - x1) * scale;
-      const py = (z - y1) * scale;
-      return leafletMap.unproject([px, py], maxZoom);
-    },
-  };
-
-  await loadCities(mapInfo);
-  await loadRouteGraph(mapInfo);
-  currentRouteTarget = null;
-
-  if (!leafletMap) {
-    leafletMap = L.map('leafletMap', { crs: L.CRS.Simple, minZoom: tileMapInfo.minZoom, maxZoom });
-  } else {
-    if (tileLayer) leafletMap.removeLayer(tileLayer);
-    if (trailLine) leafletMap.removeLayer(trailLine);
-    if (truckMarker) leafletMap.removeLayer(truckMarker);
-    if (destMarker) { leafletMap.removeLayer(destMarker); destMarker = null; }
-    if (destLine) { leafletMap.removeLayer(destLine); destLine = null; }
-    trailWorld.length = 0;
-  }
-
-  const corner1 = leafletMap.unproject([0, 0], maxZoom);
-  const corner2 = leafletMap.unproject([pixelsAtMaxZoom, pixelsAtMaxZoom], maxZoom);
-  const bounds = L.latLngBounds(corner1, corner2);
-
-  tileLayer = L.tileLayer(`${mapInfo.dir}/Tiles/{z}/{x}/{y}.png`, {
-    minZoom: tileMapInfo.minZoom,
-    maxZoom,
-    noWrap: true,
-    bounds,
-  }).addTo(leafletMap);
-
-  leafletMap.setMaxBounds(bounds);
-  leafletMap.fitBounds(bounds);
-
-  trailLine = L.polyline([], { color: '#3b9eff', weight: 3, opacity: 0.7 }).addTo(leafletMap);
-  const truckIcon = L.divIcon({ className: 'truckMarker', html: '🚚', iconSize: [20, 20] });
-  truckMarker = L.marker(corner1, { icon: truckIcon }).addTo(leafletMap);
-
-  document.getElementById('mapHint').textContent = mapInfo.label;
-}
-
-let lastWorldPos = null;
-const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es un teleport (job asignado, garage, etc.), no un tramo manejado
-
-function updateMap(position, game) {
-  if (position.x == null || position.z == null) return;
-  loadGameMap(game || 'ats');
-  if (!mapTransform || !leafletMap) return;
-
-  const latLng = mapTransform.toLatLng(position.x, position.z);
-
-  if (lastWorldPos) {
-    const dx = position.x - lastWorldPos.x;
-    const dz = position.z - lastWorldPos.z;
-    const jumped = Math.sqrt(dx * dx + dz * dz) > TRAIL_JUMP_THRESHOLD_M;
-    if (jumped) trailWorld.length = 0;
-  }
-  lastWorldPos = { x: position.x, z: position.z };
-
-  trailWorld.push(latLng);
-  if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
-
-  trailLine.setLatLngs(trailWorld);
-  truckMarker.setLatLng(latLng);
-}
-
-function formatSeconds(totalSeconds) {
-  if (totalSeconds == null || !isFinite(totalSeconds)) return '-';
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  return `${h}h ${m}m`;
-}
-
-function updateHud(data) {
-  lastData = data;
-
-  // El mini-HUD (top-right del mapa, visible solo con el panel oculto)
-  // duplica velocidad/limite/crucero, asi que se actualizan en pares.
-  const speedDisplay = useImperial ? data.speedKmh * KM_TO_MI : data.speedKmh;
-  const speedText = data.speedKmh != null ? Math.round(speedDisplay) : '--';
-  document.getElementById('speedBig').textContent = speedText;
-  document.getElementById('miniSpeedBig').textContent = speedText;
-
-  const limit = data.speedLimitKmh;
-  for (const id of ['limitSign', 'miniLimitSign']) {
-    const limitEl = document.getElementById(id);
-    if (limit && limit > 0) {
-      const limitDisplay = useImperial ? limit * KM_TO_MI : limit;
-      limitEl.textContent = Math.round(limitDisplay);
-      const over = data.speedKmh > limit + 3;
-      limitEl.classList.toggle('over', over);
-    } else {
-      limitEl.textContent = '--';
-      limitEl.classList.remove('over');
-    }
-  }
-
-  document.getElementById('citySrc').textContent = data.citySrc || '?';
-  document.getElementById('cityDst').textContent = data.cityDst || '?';
-  const truckLabel = [data.truckBrand, data.truckName].filter(Boolean).join(' ');
-  document.getElementById('truck').textContent = truckLabel || '-';
-  document.getElementById('cargo').textContent = data.cargo || t('noCargo');
-  document.getElementById('cargoMass').textContent = data.cargoMassKg ? `${Math.round(data.cargoMassKg)} kg` : '-';
-
-  if (data.routeDistanceKm) {
-    const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
-    document.getElementById('routeDistance').textContent = `${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`;
-  } else {
-    document.getElementById('routeDistance').textContent = '-';
-  }
-
-  document.getElementById('etaGame').textContent = formatSeconds(data.routeTimeSeconds);
-
-  if (data.restStopSeconds != null && data.restStopSeconds > 0) {
-    document.getElementById('restStop').textContent = formatSeconds(data.restStopSeconds);
-  } else {
-    document.getElementById('restStop').textContent = '-';
-  }
-
-  document.getElementById('jobIncome').textContent = data.jobIncome ? `$${data.jobIncome.toLocaleString()}` : '-';
-
-  // Combustible: fuel/fuelCapacity vienen en unidades del juego (litros o
-  // galones segun el pais del camion), pero el porcentaje da igual la unidad.
-  // Se muestran arriba, al lado de la velocidad, apiladas en 3 lineas.
-  if (data.fuel != null && data.fuelCapacity) {
-    const pct = Math.max(0, Math.min(100, (data.fuel / data.fuelCapacity) * 100));
-    document.getElementById('fuelPctLine').innerHTML = `${t('fuel')} ${statSpan(pct, 15, 30)}`;
-  } else {
-    document.getElementById('fuelPctLine').textContent = `${t('fuel')} -`;
-  }
-  if (data.fuelRangeKm != null) {
-    const rangeDisplay = useImperial ? data.fuelRangeKm * KM_TO_MI : data.fuelRangeKm;
-    document.getElementById('fuelRangeLine').textContent = `${t('range')} ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`;
-  } else {
-    document.getElementById('fuelRangeLine').textContent = `${t('range')} -`;
-  }
-  if (data.fuelAvgConsumption) {
-    // fuelAvgConsumption viene del SDK en litros/100km sin importar el pais
-    // del camion. En imperial se convierte a mpg (formula estandar).
-    const consumptionText = useImperial
-      ? `${(235.215 / data.fuelAvgConsumption).toFixed(1)} mpg`
-      : `${data.fuelAvgConsumption.toFixed(1)} L/100km`;
-    document.getElementById('fuelAvgLine').textContent = consumptionText;
-  } else {
-    document.getElementById('fuelAvgLine').textContent = '-';
-  }
-
-  const wear = data.wear || {};
-  const wearParts = ['engine', 'transmission', 'cabin', 'chassis', 'wheels'].map(part => {
-    const value = wear[part];
-    const pctText = value == null ? '-' : statSpan(value * 100, null, null, true);
-    return `${t(part)} ${pctText}`;
-  });
-  document.getElementById('wearLine').innerHTML = wearParts.join(' &nbsp;·&nbsp; ');
-
-  const ccSpeed = useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh;
-  const ccText = Math.round(ccSpeed);
-  for (const [displayId, speedId] of [['cruiseDisplay', 'cruiseSpeed'], ['miniCruiseDisplay', 'miniCruiseSpeed']]) {
-    if (data.cruiseControl) {
-      document.getElementById(speedId).textContent = ccText;
-      document.getElementById(displayId).style.display = '';
-    } else {
-      document.getElementById(displayId).style.display = 'none';
-    }
-  }
-
-  const warnings = data.mechanicalWarnings || {};
-  const activeAlerts = [];
-  if (warnings.airPressure) activeAlerts.push('⚠ ' + t('lowAirPressure'));
-  if (warnings.waterTemperature) activeAlerts.push('⚠ ' + t('highWaterTemp'));
-  if (warnings.batteryVoltage) activeAlerts.push('⚠ ' + t('lowBattery'));
-  if (data.oilTemperature != null && data.oilTemperature > 115) activeAlerts.push('⚠ ' + t('highOilTemp'));
-  const alertsRow = document.getElementById('mechanicalAlertsRow');
-  if (activeAlerts.length) {
-    alertsRow.style.display = '';
-    document.getElementById('mechanicalAlerts').textContent = activeAlerts.join(' · ');
-  } else {
-    alertsRow.style.display = 'none';
-  }
-
-  updateSessionEvents(data.event || {});
-}
-
-// Peajes/multas/tren-ferry llegan como pulsos (bool + monto en el mismo tick
-// en que ocurre el evento). Se acumulan por sesion detectando el flanco de
-// subida (false -> true) para no sumar el mismo evento en cada tick que el
-// flag siga en true.
-const sessionTotals = { tolls: 0, fines: 0, ferryTrainCount: 0 };
-const previousEventState = { tollgate: false, fined: false, ferry: false, train: false };
-
-function updateSessionEvents(event) {
-  if (event.tollgate && !previousEventState.tollgate) sessionTotals.tolls += event.tollgatePayAmount || 0;
-  if (event.fined && !previousEventState.fined) sessionTotals.fines += event.fineAmount || 0;
-  if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
-  if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
-  previousEventState.tollgate = !!event.tollgate;
-  previousEventState.fined = !!event.fined;
-  previousEventState.ferry = !!event.ferry;
-  previousEventState.train = !!event.train;
-
-  document.getElementById('tollsTotal').textContent = `$${sessionTotals.tolls.toLocaleString()}`;
-  document.getElementById('finesTotal').textContent = `$${sessionTotals.fines.toLocaleString()}`;
-  document.getElementById('ferryTrainCount').textContent = sessionTotals.ferryTrainCount;
-}
-
-// Devuelve el porcentaje como <span> coloreado segun si es "malo" alto (desgaste)
-// o "malo" bajo (combustible). isWear=true => alerta cuando el valor es ALTO.
-function statSpan(pct, dangerBelow, warnBelow, isWear) {
-  let cls = '';
-  if (isWear) {
-    cls = pct > 60 ? 'statDanger' : pct > 30 ? 'statWarn' : '';
-  } else {
-    cls = pct < dangerBelow ? 'statDanger' : pct < warnBelow ? 'statWarn' : '';
-  }
-  const classAttr = cls ? ` class="${cls}"` : '';
-  return `<span${classAttr}>${Math.round(pct)}%</span>`;
-}
-
-document.getElementById('panelToggleBtn').addEventListener('click', () => {
-  document.getElementById('layout').classList.toggle('panelHidden');
-});
-
-document.getElementById('fullscreenBtn').addEventListener('click', () => {
-  document.body.classList.toggle('fsMode');
-  // La Fullscreen API real (esconde tambien la barra de URL en el celular)
-  // es un extra sobre ocultar el header - si el navegador no la deja usar
-  // (algunos webviews la bloquean) el modo fsMode sigue funcionando igual.
-  if (document.body.classList.contains('fsMode')) {
-    document.documentElement.requestFullscreen?.().catch(() => {});
-  } else if (document.fullscreenElement) {
-    document.exitFullscreen?.().catch(() => {});
-  }
-});
-
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement) document.body.classList.remove('fsMode');
-});
-
-document.getElementById('recenterBtn').addEventListener('click', () => {
-  if (leafletMap && truckMarker) {
-    leafletMap.setView(truckMarker.getLatLng(), leafletMap.getZoom(), { animate: false });
-  }
-});
-
-document.getElementById('connectBtn').addEventListener('click', () => {
-  const backend = document.getElementById('backendUrl').value.trim();
-  const code = document.getElementById('code').value.trim().toUpperCase();
-  if (!code) { alert(t('enterCode')); return; }
-
-  if (ws) ws.close();
-  trailWorld.length = 0;
-  lastWorldPos = null;
-  currentRouteTarget = null;
-  if (trailLine) trailLine.setLatLngs([]);
-  if (destLine && leafletMap) { leafletMap.removeLayer(destLine); destLine = null; }
-  ws = new WebSocket(`${backend}/ws/live/${code}`);
-
-  ws.onopen = () => {
-    statusEl.textContent = t('connectedWaiting');
-    statusEl.className = 'ok';
-  };
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    statusEl.textContent = data.paused ? t('connectedPaused') : t('connectedLive');
-    statusEl.className = 'ok';
-    updateHud(data);
-    updateMap(data.position || {}, data.game);
-    updateDestinationMarker(data);
-  };
-  ws.onclose = () => {
-    statusEl.textContent = t('disconnected');
-    statusEl.className = 'err';
-  };
-  ws.onerror = () => {
-    statusEl.textContent = t('connectionError');
-    statusEl.className = 'err';
-  };
-});
-
-// El .exe del cliente abre el navegador directo con ?code=...&backend=...
-// para que el usuario no tenga que tipear nada a mano.
-(function autoConnectFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const backend = params.get('backend');
-  if (backend) document.getElementById('backendUrl').value = backend;
-  if (code) {
-    document.getElementById('code').value = code.toUpperCase();
-    document.getElementById('connectBtn').click();
-  }
-})();
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('open'); }
+function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+document.getElementById('menuBtn').addEventListener('click', openSidebar);
+document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
+overlay.addEventListener('click', closeSidebar);
+sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', closeSidebar));
 </script>
 </body>
 </html>

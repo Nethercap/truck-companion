@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Truck Dash</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --bg: #0d0f12;
+    --panel: #171a1f;
+    --accent: #3b9eff;
+    --danger: #ff4d4d;
+    --text: #eee;
+    --muted: #9aa4b2;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  h1 { font-size: 1rem; margin: 0 0 0.5rem; flex-shrink: 0; }
+  .setup { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.4rem; flex-shrink: 0; }
+  .setup input { font-size: 0.9rem; padding: 0.3rem 0.5rem; background: var(--panel); border: 1px solid #333; color: var(--text); border-radius: 6px; }
+  .setup button { font-size: 0.9rem; padding: 0.35rem 0.7rem; border-radius: 6px; border: none; background: var(--accent); color: #fff; cursor: pointer; }
+  #status { font-size: 0.8rem; margin-bottom: 0.6rem; flex-shrink: 0; }
+  .ok { color: #4caf50; }
+  .err { color: var(--danger); }
+
+  /* Modo pantalla completa: se oculta todo el header (titulo, setup, status)
+     y se saca el padding del body para que el mapa llegue de punta a punta,
+     no solo "ancho completo dentro de un margen". */
+  body.fsMode { padding: 0; }
+  body.fsMode h1,
+  body.fsMode .setup,
+  body.fsMode #status { display: none; }
+  body.fsMode .layout { border-radius: 0; }
+  body.fsMode #mapPanel { border-radius: 0; }
+  body.fsMode #infoPanel { border-radius: 0; }
+
+  /* El mapa ocupa TODO el espacio disponible (pantalla completa), y el panel
+     de info flota encima como overlay, no como columna fija - asi el mapa
+     nunca se ve recortado y la info se puede ocultar para verlo entero. */
+  .layout {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+
+  #mapPanel { position: absolute; inset: 0; overflow: hidden; padding: 0; border-radius: 12px; }
+  #leafletMap { width: 100%; height: 100%; background: #2b2f36; }
+  .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
+  .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
+
+  .mapBtn {
+    position: absolute; z-index: 1000;
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: #fff; color: #111; font-size: 1.1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .mapBtn:hover { background: #eee; }
+  #recenterBtn { top: 0.6rem; left: 0.6rem; }
+  #panelToggleBtn { top: 3.4rem; left: 0.6rem; }
+  #fullscreenBtn { top: 6.2rem; left: 0.6rem; }
+
+  /* Mini-HUD: velocidad/limite/crucero flotando arriba a la derecha del mapa,
+     visible solo cuando el panel de info esta oculto (si el panel esta
+     abierto, esos mismos datos ya se ven ahi adentro). */
+  #miniHud {
+    display: none;
+    position: absolute; top: 0.6rem; right: 0.6rem; z-index: 1000;
+    background: rgba(23, 26, 31, 0.9);
+    border-radius: 10px;
+    padding: 0.5rem 0.7rem;
+    align-items: center;
+    gap: 0.6rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .layout.panelHidden #miniHud { display: flex; }
+  #miniHud .limitSign { width: 34px; height: 34px; font-size: 0.85rem; border-width: 3px; }
+  #miniHud .speedBig { font-size: 1.4rem; }
+  #miniHud .cruiseDisplay { font-size: 0.75rem; }
+  #miniHud .cruiseSpeed { font-size: 1rem; }
+
+  /* Panel de info flotante: por default (desktop y horizontal) va pegado al
+     borde derecho, alto completo. En vertical se convierte en una hoja que
+     sube desde abajo. En ambos casos, panelHidden lo desliza fuera de vista
+     sin desmontarlo (asi no perdemos el estado del mapa/leaflet). */
+  #infoPanel {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 300px;
+    background: var(--panel);
+    border-radius: 12px 0 0 12px;
+    padding: 0.75rem;
+    overflow-y: auto;
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: transform 0.25s ease;
+  }
+  .layout.panelHidden #infoPanel { transform: translateX(120%); }
+
+  @media (max-width: 900px) and (orientation: portrait) {
+    #infoPanel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
+    .layout.panelHidden #infoPanel { transform: translateY(110%); }
+    .setup input#backendUrl { display: none; }
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    body { padding: 0.5rem; }
+    h1 { display: none; }
+    .setup { margin-bottom: 0.3rem; }
+    .setup input#backendUrl { display: none; }
+    #status { margin-bottom: 0.3rem; }
+    #infoPanel { width: 220px; padding: 0.5rem; font-size: 0.8rem; }
+    .speedBig { font-size: 1.8rem; }
+    .limitSign { width: 38px; height: 38px; font-size: 0.9rem; }
+  }
+
+  .speedRow { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+  .speedBig { font-size: 2.4rem; font-weight: 700; line-height: 1; }
+  .speedUnit { font-size: 0.9rem; color: var(--muted); }
+  .limitSign {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 4px solid var(--danger);
+    background: #fff; color: #111;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .limitSign.over { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,77,0.6); } 50% { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
+
+  .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; }
+
+  .fuelStack { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.78rem; color: var(--muted); text-align: right; margin-left: auto; }
+  .cruiseSpeed { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+
+  .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
+  .row:last-child { border-bottom: none; }
+  .row .label { color: var(--muted); }
+  .route { font-size: 0.9rem; }
+  .route .cities { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; }
+  .route .arrow { color: var(--muted); }
+
+  .statLine { font-size: 0.85rem; padding: 0.3rem 0; border-bottom: 1px solid #262a31; }
+  .statLine:last-of-type { border-bottom: none; }
+  .statLine .statWarn { color: #ffb020; }
+  .statLine .statDanger { color: var(--danger); }
+</style>
+</head>
+<body>
+  <h1 style="display:flex;align-items:center;gap:0.5rem;"><img src="assets/logo.svg" alt="" style="height:1.1em;width:1.1em;" /> Truck Dash — ETS2 / ATS</h1>
+  <div class="setup">
+    <input id="backendUrl" value="wss://truck-companion-production.up.railway.app" size="34" />
+    <input id="code" data-i18n-placeholder="pairingCode" maxlength="6" style="text-transform:uppercase" />
+    <button id="connectBtn" data-i18n="connect">Connect</button>
+    <button id="unitToggle" data-i18n-title="toggleUnits" title="Toggle units">km · km/h</button>
+    <button id="langToggle" data-i18n-title="toggleLanguage" title="Toggle language">EN</button>
+  </div>
+  <div id="status" data-i18n="notConnected">Not connected</div>
+
+  <div class="layout" id="layout">
+    <div id="mapPanel">
+      <div id="leafletMap"></div>
+      <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
+      <button id="recenterBtn" class="mapBtn" data-i18n-title="recenter" title="Recenter on truck">🎯</button>
+      <button id="panelToggleBtn" class="mapBtn" data-i18n-title="togglePanel" title="Show/hide info">☰</button>
+      <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
+
+      <div id="miniHud">
+        <div class="limitSign" id="miniLimitSign">--</div>
+        <div>
+          <div class="speedBig" id="miniSpeedBig">--</div>
+          <div class="speedUnit" id="miniSpeedUnitLabel">km/h</div>
+        </div>
+        <div class="cruiseDisplay" id="miniCruiseDisplay" style="display:none">
+          <div>
+            <div class="cruiseSpeed" id="miniCruiseSpeed">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="infoPanel">
+      <div class="speedRow">
+        <div class="limitSign" id="limitSign">--</div>
+        <div>
+          <div class="speedBig" id="speedBig">--</div>
+          <div class="speedUnit" id="speedUnitLabel">km/h</div>
+        </div>
+        <div class="cruiseDisplay" id="cruiseDisplay" style="display:none">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 12 L16 8"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+          <div>
+            <div class="cruiseSpeed" id="cruiseSpeed">--</div>
+            <div class="speedUnit" data-i18n="cruiseControl">Cruise control</div>
+          </div>
+        </div>
+        <div class="fuelStack">
+          <div id="fuelPctLine">-</div>
+          <div id="fuelRangeLine">-</div>
+          <div id="fuelAvgLine">-</div>
+        </div>
+      </div>
+
+      <div class="route">
+        <div class="cities">
+          <span id="citySrc">?</span>
+          <span class="arrow">→</span>
+          <span id="cityDst">?</span>
+        </div>
+        <div class="row"><span class="label" data-i18n="truck">Truck</span><span id="truck">-</span></div>
+        <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
+        <div class="row"><span class="label" data-i18n="weight">Weight</span><span id="cargoMass">-</span></div>
+        <div class="row"><span class="label" data-i18n="distanceLeft">Distance left</span><span id="routeDistance">-</span></div>
+        <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
+        <div class="row"><span class="label" data-i18n="nextRest">Time to next rest stop</span><span id="restStop">-</span></div>
+        <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
+        <div class="row"><span class="label" data-i18n="tolls">Tolls paid</span><span id="tollsTotal">-</span></div>
+        <div class="row"><span class="label" data-i18n="fines">Fines</span><span id="finesTotal">-</span></div>
+        <div class="row"><span class="label" data-i18n="ferryTrain">Ferry/train trips</span><span id="ferryTrainCount">0</span></div>
+      </div>
+
+      <div class="statLine" id="wearLine">-</div>
+      <div class="row" id="mechanicalAlertsRow" style="display:none"><span class="label" data-i18n="alerts">Alerts</span><span id="mechanicalAlerts" style="color:var(--danger)">-</span></div>
+    </div>
+  </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const statusEl = document.getElementById('status');
+let ws = null;
+
+const TRANSLATIONS = {
+  en: {
+    pairingCode: 'Pairing code',
+    connect: 'Connect',
+    toggleUnits: 'Toggle units',
+    toggleLanguage: 'Toggle language',
+    notConnected: 'Not connected',
+    mapNotLoaded: 'Map not loaded',
+    recenter: 'Recenter on truck',
+    togglePanel: 'Show/hide info panel',
+    toggleFullscreen: 'Fullscreen',
+    truck: 'Truck',
+    cargo: 'Cargo',
+    weight: 'Weight',
+    distanceLeft: 'Distance left',
+    etaGame: 'In-game ETA',
+    nextRest: 'Time to next rest stop',
+    jobPay: 'Job pay',
+    fuel: 'Fuel',
+    range: 'Range',
+    engine: 'Engine',
+    transmission: 'Transmission',
+    cabin: 'Cabin',
+    chassis: 'Chassis',
+    wheels: 'Wheels',
+    avgConsumption: 'Avg. consumption',
+    cruiseControl: 'Cruise control',
+    alerts: 'Alerts',
+    tolls: 'Tolls paid',
+    fines: 'Fines',
+    ferryTrain: 'Ferry/train trips',
+    lowAirPressure: 'Low air pressure',
+    highWaterTemp: 'High water temperature',
+    lowBattery: 'Low battery voltage',
+    highOilTemp: 'High oil temperature',
+    noCargo: '(no cargo)',
+    enterCode: 'Enter the pairing code shown by the local client.',
+    connectedWaiting: 'Connected, waiting for telemetry...',
+    connectedPaused: 'Connected (game paused)',
+    connectedLive: 'Connected, live',
+    disconnected: 'Disconnected',
+    connectionError: 'Connection error',
+    mapNotFound: (label, path) => `Exported map not found for ${label} (${path})`,
+  },
+  es: {
+    pairingCode: 'Código de pairing',
+    connect: 'Conectar',
+    toggleUnits: 'Cambiar unidades',
+    toggleLanguage: 'Cambiar idioma',
+    notConnected: 'Sin conectar',
+    mapNotLoaded: 'Mapa no cargado',
+    recenter: 'Centrar en el camión',
+    togglePanel: 'Mostrar/ocultar panel de info',
+    toggleFullscreen: 'Pantalla completa',
+    truck: 'Camión',
+    cargo: 'Cargamento',
+    weight: 'Peso',
+    distanceLeft: 'Distancia restante',
+    etaGame: 'ETA in-game',
+    nextRest: 'Tiempo al próximo descanso',
+    jobPay: 'Pago del trabajo',
+    fuel: 'Combustible',
+    range: 'Autonomía',
+    engine: 'Motor',
+    transmission: 'Transmisión',
+    cabin: 'Cabina',
+    chassis: 'Chasis',
+    wheels: 'Ruedas',
+    avgConsumption: 'Consumo promedio',
+    cruiseControl: 'Control de crucero',
+    alerts: 'Alertas',
+    tolls: 'Peajes pagados',
+    fines: 'Multas',
+    ferryTrain: 'Viajes en tren/ferry',
+    lowAirPressure: 'Presión de aire baja',
+    highWaterTemp: 'Temperatura de agua alta',
+    lowBattery: 'Voltaje de batería bajo',
+    highOilTemp: 'Temperatura de aceite alta',
+    noCargo: '(sin carga)',
+    enterCode: 'Ingresá el código de pairing que te mostró el cliente local.',
+    connectedWaiting: 'Conectado, esperando telemetría...',
+    connectedPaused: 'Conectado (juego en pausa)',
+    connectedLive: 'Conectado, en vivo',
+    disconnected: 'Desconectado',
+    connectionError: 'Error de conexión',
+    mapNotFound: (label, path) => `No se encontró el mapa exportado para ${label} (${path})`,
+  },
+};
+
+let currentLang = 'en';
+function t(key, ...args) {
+  const entry = TRANSLATIONS[currentLang][key];
+  return typeof entry === 'function' ? entry(...args) : entry;
+}
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  if (!ws) statusEl.textContent = t('notConnected');
+}
+
+document.getElementById('langToggle').addEventListener('click', () => {
+  currentLang = currentLang === 'en' ? 'es' : 'en';
+  document.getElementById('langToggle').textContent = currentLang.toUpperCase();
+  document.documentElement.lang = currentLang;
+  applyTranslations();
+  if (lastData) updateHud(lastData);
+});
+applyTranslations();
+
+let useImperial = false;
+const KM_TO_MI = 0.621371;
+document.getElementById('unitToggle').addEventListener('click', () => {
+  useImperial = !useImperial;
+  document.getElementById('unitToggle').textContent = useImperial ? 'mi · mph' : 'km · km/h';
+  document.getElementById('speedUnitLabel').textContent = useImperial ? 'mph' : 'km/h';
+  if (lastData) updateHud(lastData);
+});
+let lastData = null;
+
+// Mapas reales exportados con ts-map (tiles + TileMapInfo.json con el bounding
+// box en coordenadas de juego). Cada juego tiene su propia carpeta porque son
+// mapas distintos (Europa vs USA).
+//
+// Los tiles pesan ~800MB entre los dos juegos, demasiado para vivir en el
+// repo/GitHub Pages - se sirven desde un bucket R2 aparte (maps.trucksim-dash.com).
+// Se usa SIEMPRE la URL remota (tambien para el flujo local del .exe, que ya
+// necesita internet igual para hablar con el backend): asi el .exe no depende
+// de tener una copia local de 800MB de tiles al lado para funcionar en otra PC.
+const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
+const GAME_MAPS = {
+  ats: { dir: `${REMOTE_MAP_BASE}/ats`, label: 'American Truck Simulator' },
+  ets2: { dir: `${REMOTE_MAP_BASE}/ets2`, label: 'Euro Truck Simulator 2' },
+};
+
+let leafletMap = null;
+let tileLayer = null;
+let truckMarker = null;
+let trailLine = null;
+let destMarker = null;
+let destLine = null;
+let mapTransform = null; // { toLatLng(x, z) }
+let currentGame = null;
+let citiesByName = {}; // Name -> {X, Y}
+const trailWorld = [];
+const MAX_TRAIL_POINTS = 1000;
+
+async function loadCities(mapInfo) {
+  try {
+    const res = await fetch(`${mapInfo.dir}/Cities.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const list = await res.json();
+    citiesByName = {};
+    for (const c of list) citiesByName[c.Name] = c;
+  } catch (err) {
+    citiesByName = {};
+  }
+}
+
+// Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
+// del output de truckermudgeon/maps. nodes: [[x,y], ...], edges: [[fromIdx, toIdx, weight], ...]
+let routeGraph = null; // { nodes, adjacency: Map<idx, [[idx, weight], ...]> }
+let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
+
+async function loadRouteGraph(mapInfo) {
+  routeGraph = null;
+  try {
+    const res = await fetch(`${mapInfo.dir}/route-graph-${currentGame}.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const adjacency = new Map();
+    for (const [a, b, w] of data.edges) {
+      if (!adjacency.has(a)) adjacency.set(a, []);
+      if (!adjacency.has(b)) adjacency.set(b, []);
+      adjacency.get(a).push([b, w]);
+      adjacency.get(b).push([a, w]);
+    }
+
+    // El grafo extraido de los datos del juego no siempre queda 100% conectado
+    // (intersecciones complejas mal resueltas dejan bolsones aislados). Si el
+    // nodo mas cercano a un punto cae en uno de esos bolsones chicos, A* nunca
+    // encuentra camino aunque exista una ruta real por al lado. Para evitarlo,
+    // identificamos la componente conexa mas grande ("giant component") y
+    // preferimos siempre buscar el nodo mas cercano dentro de ella.
+    const componentId = new Int32Array(data.nodes.length).fill(-1);
+    let biggestComponent = -1;
+    let biggestSize = 0;
+    for (let start = 0; start < data.nodes.length; start++) {
+      if (componentId[start] !== -1) continue;
+      const id = start;
+      let size = 0;
+      const stack = [start];
+      componentId[start] = id;
+      while (stack.length) {
+        const cur = stack.pop();
+        size++;
+        for (const [n] of adjacency.get(cur) || []) {
+          if (componentId[n] === -1) {
+            componentId[n] = id;
+            stack.push(n);
+          }
+        }
+      }
+      if (size > biggestSize) { biggestSize = size; biggestComponent = id; }
+    }
+
+    routeGraph = { nodes: data.nodes, adjacency, componentId, giantComponent: biggestComponent };
+  } catch (err) {
+    routeGraph = null;
+  }
+}
+
+function nearestNodeIndex(x, y, requireGiantComponent) {
+  let best = -1;
+  let bestDist = Infinity;
+  const nodes = routeGraph.nodes;
+  for (let i = 0; i < nodes.length; i++) {
+    if (requireGiantComponent && routeGraph.componentId[i] !== routeGraph.giantComponent) continue;
+    const dx = nodes[i][0] - x;
+    const dy = nodes[i][1] - y;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return best;
+}
+
+// Min-heap simple para A*.
+class MinHeap {
+  constructor() { this.items = []; }
+  push(priority, value) {
+    this.items.push([priority, value]);
+    let i = this.items.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (this.items[parent][0] <= this.items[i][0]) break;
+      [this.items[parent], this.items[i]] = [this.items[i], this.items[parent]];
+      i = parent;
+    }
+  }
+  pop() {
+    const top = this.items[0];
+    const last = this.items.pop();
+    if (this.items.length > 0) {
+      this.items[0] = last;
+      let i = 0;
+      while (true) {
+        const l = 2 * i + 1, r = 2 * i + 2;
+        let smallest = i;
+        if (l < this.items.length && this.items[l][0] < this.items[smallest][0]) smallest = l;
+        if (r < this.items.length && this.items[r][0] < this.items[smallest][0]) smallest = r;
+        if (smallest === i) break;
+        [this.items[i], this.items[smallest]] = [this.items[smallest], this.items[i]];
+        i = smallest;
+      }
+    }
+    return top ? top[1] : undefined;
+  }
+  get size() { return this.items.length; }
+}
+
+function findRoute(startXY, endXY) {
+  if (!routeGraph) return null;
+  const nodes = routeGraph.nodes;
+  const adjacency = routeGraph.adjacency;
+  const startIdx = nearestNodeIndex(startXY[0], startXY[1], true);
+  const endIdx = nearestNodeIndex(endXY[0], endXY[1], true);
+  if (startIdx === -1 || endIdx === -1) return null;
+
+  const heuristic = (i) => Math.hypot(nodes[i][0] - nodes[endIdx][0], nodes[i][1] - nodes[endIdx][1]);
+
+  const gScore = new Map([[startIdx, 0]]);
+  const cameFrom = new Map();
+  const open = new MinHeap();
+  open.push(heuristic(startIdx), startIdx);
+  const visited = new Set();
+
+  while (open.size > 0) {
+    const current = open.pop();
+    if (current === endIdx) break;
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    const neighbors = adjacency.get(current) || [];
+    for (const [neighbor, weight] of neighbors) {
+      if (visited.has(neighbor)) continue;
+      const tentativeG = gScore.get(current) + weight;
+      if (tentativeG < (gScore.get(neighbor) ?? Infinity)) {
+        gScore.set(neighbor, tentativeG);
+        cameFrom.set(neighbor, current);
+        open.push(tentativeG + heuristic(neighbor), neighbor);
+      }
+    }
+  }
+
+  if (!gScore.has(endIdx)) return null;
+
+  const path = [endIdx];
+  let node = endIdx;
+  while (cameFrom.has(node)) {
+    node = cameFrom.get(node);
+    path.push(node);
+  }
+  path.reverse();
+  return path.map(i => nodes[i]);
+}
+
+function updateDestinationMarker(data) {
+  if (!leafletMap || !mapTransform) return;
+  const city = data.cityDst && citiesByName[data.cityDst];
+  if (!city) {
+    if (destMarker) { leafletMap.removeLayer(destMarker); destMarker = null; }
+    if (destLine) { leafletMap.removeLayer(destLine); destLine = null; }
+    currentRouteTarget = null;
+    return;
+  }
+  const destLatLng = mapTransform.toLatLng(city.X, city.Y);
+  if (!destMarker) {
+    const destIcon = L.divIcon({ className: 'truckMarker', html: '🏁', iconSize: [20, 20] });
+    destMarker = L.marker(destLatLng, { icon: destIcon }).addTo(leafletMap);
+  } else {
+    destMarker.setLatLng(destLatLng);
+  }
+
+  // Recalcula la ruta real por carreteras solo cuando cambia el destino
+  // (recorrer el grafo entero en cada tick de telemetria seria carisimo y
+  // no hace falta: la ruta no cambia mientras siga el mismo trabajo).
+  if (data.cityDst !== currentRouteTarget && data.position?.x != null && routeGraph) {
+    currentRouteTarget = data.cityDst;
+    const routePoints = findRoute([data.position.x, data.position.z], [city.X, city.Y]);
+    const linePoints = routePoints
+      ? routePoints.map(([x, y]) => mapTransform.toLatLng(x, y))
+      : [trailWorld[trailWorld.length - 1], destLatLng].filter(Boolean); // fallback: linea recta si no se encontro ruta
+
+    if (!destLine) {
+      destLine = L.polyline(linePoints, { color: '#a30000', weight: 3, opacity: 0.9 }).addTo(leafletMap);
+    } else {
+      destLine.setLatLngs(linePoints);
+    }
+  }
+}
+
+async function loadGameMap(game) {
+  if (game === currentGame || !GAME_MAPS[game]) return;
+  const mapInfo = GAME_MAPS[game];
+
+  let tileMapInfo;
+  try {
+    const res = await fetch(`${mapInfo.dir}/TileMapInfo.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    tileMapInfo = await res.json();
+  } catch (err) {
+    document.getElementById('mapHint').textContent = t('mapNotFound', mapInfo.label, `${mapInfo.dir}/TileMapInfo.json`);
+    return;
+  }
+
+  currentGame = game;
+  const { x1, x2, y1, y2, maxZoom } = tileMapInfo;
+  const pixelsAtMaxZoom = 256 * Math.pow(2, maxZoom);
+  const scale = pixelsAtMaxZoom / (x2 - x1);
+
+  // Convierte coordenadas de juego (x, z) a LatLng del sistema CRS.Simple de Leaflet.
+  mapTransform = {
+    toLatLng: (x, z) => {
+      const px = (x - x1) * scale;
+      const py = (z - y1) * scale;
+      return leafletMap.unproject([px, py], maxZoom);
+    },
+  };
+
+  await loadCities(mapInfo);
+  await loadRouteGraph(mapInfo);
+  currentRouteTarget = null;
+
+  if (!leafletMap) {
+    leafletMap = L.map('leafletMap', { crs: L.CRS.Simple, minZoom: tileMapInfo.minZoom, maxZoom });
+  } else {
+    if (tileLayer) leafletMap.removeLayer(tileLayer);
+    if (trailLine) leafletMap.removeLayer(trailLine);
+    if (truckMarker) leafletMap.removeLayer(truckMarker);
+    if (destMarker) { leafletMap.removeLayer(destMarker); destMarker = null; }
+    if (destLine) { leafletMap.removeLayer(destLine); destLine = null; }
+    trailWorld.length = 0;
+  }
+
+  const corner1 = leafletMap.unproject([0, 0], maxZoom);
+  const corner2 = leafletMap.unproject([pixelsAtMaxZoom, pixelsAtMaxZoom], maxZoom);
+  const bounds = L.latLngBounds(corner1, corner2);
+
+  tileLayer = L.tileLayer(`${mapInfo.dir}/Tiles/{z}/{x}/{y}.png`, {
+    minZoom: tileMapInfo.minZoom,
+    maxZoom,
+    noWrap: true,
+    bounds,
+  }).addTo(leafletMap);
+
+  leafletMap.setMaxBounds(bounds);
+  leafletMap.fitBounds(bounds);
+
+  trailLine = L.polyline([], { color: '#3b9eff', weight: 3, opacity: 0.7 }).addTo(leafletMap);
+  const truckIcon = L.divIcon({ className: 'truckMarker', html: '🚚', iconSize: [20, 20] });
+  truckMarker = L.marker(corner1, { icon: truckIcon }).addTo(leafletMap);
+
+  document.getElementById('mapHint').textContent = mapInfo.label;
+}
+
+let lastWorldPos = null;
+const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es un teleport (job asignado, garage, etc.), no un tramo manejado
+
+function updateMap(position, game) {
+  if (position.x == null || position.z == null) return;
+  loadGameMap(game || 'ats');
+  if (!mapTransform || !leafletMap) return;
+
+  const latLng = mapTransform.toLatLng(position.x, position.z);
+
+  if (lastWorldPos) {
+    const dx = position.x - lastWorldPos.x;
+    const dz = position.z - lastWorldPos.z;
+    const jumped = Math.sqrt(dx * dx + dz * dz) > TRAIL_JUMP_THRESHOLD_M;
+    if (jumped) trailWorld.length = 0;
+  }
+  lastWorldPos = { x: position.x, z: position.z };
+
+  trailWorld.push(latLng);
+  if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
+
+  trailLine.setLatLngs(trailWorld);
+  truckMarker.setLatLng(latLng);
+}
+
+function formatSeconds(totalSeconds) {
+  if (totalSeconds == null || !isFinite(totalSeconds)) return '-';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+function updateHud(data) {
+  lastData = data;
+
+  // El mini-HUD (top-right del mapa, visible solo con el panel oculto)
+  // duplica velocidad/limite/crucero, asi que se actualizan en pares.
+  const speedDisplay = useImperial ? data.speedKmh * KM_TO_MI : data.speedKmh;
+  const speedText = data.speedKmh != null ? Math.round(speedDisplay) : '--';
+  document.getElementById('speedBig').textContent = speedText;
+  document.getElementById('miniSpeedBig').textContent = speedText;
+
+  const limit = data.speedLimitKmh;
+  for (const id of ['limitSign', 'miniLimitSign']) {
+    const limitEl = document.getElementById(id);
+    if (limit && limit > 0) {
+      const limitDisplay = useImperial ? limit * KM_TO_MI : limit;
+      limitEl.textContent = Math.round(limitDisplay);
+      const over = data.speedKmh > limit + 3;
+      limitEl.classList.toggle('over', over);
+    } else {
+      limitEl.textContent = '--';
+      limitEl.classList.remove('over');
+    }
+  }
+
+  document.getElementById('citySrc').textContent = data.citySrc || '?';
+  document.getElementById('cityDst').textContent = data.cityDst || '?';
+  const truckLabel = [data.truckBrand, data.truckName].filter(Boolean).join(' ');
+  document.getElementById('truck').textContent = truckLabel || '-';
+  document.getElementById('cargo').textContent = data.cargo || t('noCargo');
+  document.getElementById('cargoMass').textContent = data.cargoMassKg ? `${Math.round(data.cargoMassKg)} kg` : '-';
+
+  if (data.routeDistanceKm) {
+    const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
+    document.getElementById('routeDistance').textContent = `${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`;
+  } else {
+    document.getElementById('routeDistance').textContent = '-';
+  }
+
+  document.getElementById('etaGame').textContent = formatSeconds(data.routeTimeSeconds);
+
+  if (data.restStopSeconds != null && data.restStopSeconds > 0) {
+    document.getElementById('restStop').textContent = formatSeconds(data.restStopSeconds);
+  } else {
+    document.getElementById('restStop').textContent = '-';
+  }
+
+  document.getElementById('jobIncome').textContent = data.jobIncome ? `$${data.jobIncome.toLocaleString()}` : '-';
+
+  // Combustible: fuel/fuelCapacity vienen en unidades del juego (litros o
+  // galones segun el pais del camion), pero el porcentaje da igual la unidad.
+  // Se muestran arriba, al lado de la velocidad, apiladas en 3 lineas.
+  if (data.fuel != null && data.fuelCapacity) {
+    const pct = Math.max(0, Math.min(100, (data.fuel / data.fuelCapacity) * 100));
+    document.getElementById('fuelPctLine').innerHTML = `${t('fuel')} ${statSpan(pct, 15, 30)}`;
+  } else {
+    document.getElementById('fuelPctLine').textContent = `${t('fuel')} -`;
+  }
+  if (data.fuelRangeKm != null) {
+    const rangeDisplay = useImperial ? data.fuelRangeKm * KM_TO_MI : data.fuelRangeKm;
+    document.getElementById('fuelRangeLine').textContent = `${t('range')} ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`;
+  } else {
+    document.getElementById('fuelRangeLine').textContent = `${t('range')} -`;
+  }
+  if (data.fuelAvgConsumption) {
+    // fuelAvgConsumption viene del SDK en litros/100km sin importar el pais
+    // del camion. En imperial se convierte a mpg (formula estandar).
+    const consumptionText = useImperial
+      ? `${(235.215 / data.fuelAvgConsumption).toFixed(1)} mpg`
+      : `${data.fuelAvgConsumption.toFixed(1)} L/100km`;
+    document.getElementById('fuelAvgLine').textContent = consumptionText;
+  } else {
+    document.getElementById('fuelAvgLine').textContent = '-';
+  }
+
+  const wear = data.wear || {};
+  const wearParts = ['engine', 'transmission', 'cabin', 'chassis', 'wheels'].map(part => {
+    const value = wear[part];
+    const pctText = value == null ? '-' : statSpan(value * 100, null, null, true);
+    return `${t(part)} ${pctText}`;
+  });
+  document.getElementById('wearLine').innerHTML = wearParts.join(' &nbsp;·&nbsp; ');
+
+  const ccSpeed = useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh;
+  const ccText = Math.round(ccSpeed);
+  for (const [displayId, speedId] of [['cruiseDisplay', 'cruiseSpeed'], ['miniCruiseDisplay', 'miniCruiseSpeed']]) {
+    if (data.cruiseControl) {
+      document.getElementById(speedId).textContent = ccText;
+      document.getElementById(displayId).style.display = '';
+    } else {
+      document.getElementById(displayId).style.display = 'none';
+    }
+  }
+
+  const warnings = data.mechanicalWarnings || {};
+  const activeAlerts = [];
+  if (warnings.airPressure) activeAlerts.push('⚠ ' + t('lowAirPressure'));
+  if (warnings.waterTemperature) activeAlerts.push('⚠ ' + t('highWaterTemp'));
+  if (warnings.batteryVoltage) activeAlerts.push('⚠ ' + t('lowBattery'));
+  if (data.oilTemperature != null && data.oilTemperature > 115) activeAlerts.push('⚠ ' + t('highOilTemp'));
+  const alertsRow = document.getElementById('mechanicalAlertsRow');
+  if (activeAlerts.length) {
+    alertsRow.style.display = '';
+    document.getElementById('mechanicalAlerts').textContent = activeAlerts.join(' · ');
+  } else {
+    alertsRow.style.display = 'none';
+  }
+
+  updateSessionEvents(data.event || {});
+}
+
+// Peajes/multas/tren-ferry llegan como pulsos (bool + monto en el mismo tick
+// en que ocurre el evento). Se acumulan por sesion detectando el flanco de
+// subida (false -> true) para no sumar el mismo evento en cada tick que el
+// flag siga en true.
+const sessionTotals = { tolls: 0, fines: 0, ferryTrainCount: 0 };
+const previousEventState = { tollgate: false, fined: false, ferry: false, train: false };
+
+function updateSessionEvents(event) {
+  if (event.tollgate && !previousEventState.tollgate) sessionTotals.tolls += event.tollgatePayAmount || 0;
+  if (event.fined && !previousEventState.fined) sessionTotals.fines += event.fineAmount || 0;
+  if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
+  if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
+  previousEventState.tollgate = !!event.tollgate;
+  previousEventState.fined = !!event.fined;
+  previousEventState.ferry = !!event.ferry;
+  previousEventState.train = !!event.train;
+
+  document.getElementById('tollsTotal').textContent = `$${sessionTotals.tolls.toLocaleString()}`;
+  document.getElementById('finesTotal').textContent = `$${sessionTotals.fines.toLocaleString()}`;
+  document.getElementById('ferryTrainCount').textContent = sessionTotals.ferryTrainCount;
+}
+
+// Devuelve el porcentaje como <span> coloreado segun si es "malo" alto (desgaste)
+// o "malo" bajo (combustible). isWear=true => alerta cuando el valor es ALTO.
+function statSpan(pct, dangerBelow, warnBelow, isWear) {
+  let cls = '';
+  if (isWear) {
+    cls = pct > 60 ? 'statDanger' : pct > 30 ? 'statWarn' : '';
+  } else {
+    cls = pct < dangerBelow ? 'statDanger' : pct < warnBelow ? 'statWarn' : '';
+  }
+  const classAttr = cls ? ` class="${cls}"` : '';
+  return `<span${classAttr}>${Math.round(pct)}%</span>`;
+}
+
+document.getElementById('panelToggleBtn').addEventListener('click', () => {
+  document.getElementById('layout').classList.toggle('panelHidden');
+});
+
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+  document.body.classList.toggle('fsMode');
+  // La Fullscreen API real (esconde tambien la barra de URL en el celular)
+  // es un extra sobre ocultar el header - si el navegador no la deja usar
+  // (algunos webviews la bloquean) el modo fsMode sigue funcionando igual.
+  if (document.body.classList.contains('fsMode')) {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  } else if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) document.body.classList.remove('fsMode');
+});
+
+document.getElementById('recenterBtn').addEventListener('click', () => {
+  if (leafletMap && truckMarker) {
+    leafletMap.setView(truckMarker.getLatLng(), leafletMap.getZoom(), { animate: false });
+  }
+});
+
+document.getElementById('connectBtn').addEventListener('click', () => {
+  const backend = document.getElementById('backendUrl').value.trim();
+  const code = document.getElementById('code').value.trim().toUpperCase();
+  if (!code) { alert(t('enterCode')); return; }
+
+  if (ws) ws.close();
+  trailWorld.length = 0;
+  lastWorldPos = null;
+  currentRouteTarget = null;
+  if (trailLine) trailLine.setLatLngs([]);
+  if (destLine && leafletMap) { leafletMap.removeLayer(destLine); destLine = null; }
+  ws = new WebSocket(`${backend}/ws/live/${code}`);
+
+  ws.onopen = () => {
+    statusEl.textContent = t('connectedWaiting');
+    statusEl.className = 'ok';
+  };
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    statusEl.textContent = data.paused ? t('connectedPaused') : t('connectedLive');
+    statusEl.className = 'ok';
+    updateHud(data);
+    updateMap(data.position || {}, data.game);
+    updateDestinationMarker(data);
+  };
+  ws.onclose = () => {
+    statusEl.textContent = t('disconnected');
+    statusEl.className = 'err';
+  };
+  ws.onerror = () => {
+    statusEl.textContent = t('connectionError');
+    statusEl.className = 'err';
+  };
+});
+
+// El .exe del cliente abre el navegador directo con ?code=...&backend=...
+// para que el usuario no tenga que tipear nada a mano.
+(function autoConnectFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const backend = params.get('backend');
+  if (backend) document.getElementById('backendUrl').value = backend;
+  if (code) {
+    document.getElementById('code').value = code.toUpperCase();
+    document.getElementById('connectBtn').click();
+  }
+})();
+</script>
+</body>
+</html>
