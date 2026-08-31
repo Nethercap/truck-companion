@@ -194,7 +194,7 @@ def start_asyncio_thread(backend_url: str, fixed_code: str | None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", default="wss://truck-companion-production.up.railway.app")
+    parser.add_argument("--backend", default="wss://truck-companion-production-7184.up.railway.app")
     parser.add_argument("--code", default=None)
     parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="URL de la web a abrir (para desarrollo local)")
     args = parser.parse_args()
