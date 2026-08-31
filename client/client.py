@@ -123,8 +123,14 @@ async def run(backend_ws_url: str, code: str):
                 print(f"Conectado al backend. Codigo de pairing: {code}")
                 while True:
                     raw = truck_telemetry.get_data()
-                    payload = build_payload(raw)
-                    await ws.send(json.dumps(payload))
+                    # sdkActive en False significa que el SDK todavia no
+                    # sincronizo el primer frame real del juego (justo
+                    # despues de init() puede devolver datos viejos/en cero,
+                    # lo que se veia como el camion en una posicion rara
+                    # hasta arrancar a manejar). Se descarta ese frame.
+                    if raw.get("sdkActive"):
+                        payload = build_payload(raw)
+                        await ws.send(json.dumps(payload))
                     await asyncio.sleep(SEND_INTERVAL_SECONDS)
         except (websockets.ConnectionClosed, OSError) as exc:
             print(f"Conexion perdida ({exc}). Reintentando en {RECONNECT_DELAY_SECONDS}s...")
@@ -136,7 +142,7 @@ async def run(backend_ws_url: str, code: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", default="ws://127.0.0.1:8123", help="URL base del backend (ws:// o wss://)")
+    parser.add_argument("--backend", default="wss://truck-companion-production.up.railway.app", help="URL base del backend (ws:// o wss://)")
     parser.add_argument("--code", default=None, help="Codigo de pairing existente (si no se pasa, se pide uno nuevo)")
     args = parser.parse_args()
 

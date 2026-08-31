@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Truck Companion</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
@@ -33,34 +34,101 @@
   .ok { color: #4caf50; }
   .err { color: var(--danger); }
 
+  /* Modo pantalla completa: se oculta todo el header (titulo, setup, status)
+     y se saca el padding del body para que el mapa llegue de punta a punta,
+     no solo "ancho completo dentro de un margen". */
+  body.fsMode { padding: 0; }
+  body.fsMode h1,
+  body.fsMode .setup,
+  body.fsMode #status { display: none; }
+  body.fsMode .layout { border-radius: 0; }
+  body.fsMode #mapPanel { border-radius: 0; }
+  body.fsMode #infoPanel { border-radius: 0; }
+
+  /* El mapa ocupa TODO el espacio disponible (pantalla completa), y el panel
+     de info flota encima como overlay, no como columna fija - asi el mapa
+     nunca se ve recortado y la info se puede ocultar para verlo entero. */
   .layout {
+    position: relative;
     flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: minmax(320px, 2fr) minmax(260px, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    gap: 0.75rem;
+    overflow: hidden;
+    border-radius: 12px;
   }
-  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; overflow-y: auto; } }
 
-  .sideCol { display: flex; flex-direction: column; gap: 0.75rem; min-height: 0; }
-
-  .panel { background: var(--panel); border-radius: 12px; padding: 0.75rem; min-height: 0; }
-
-  #mapPanel { position: relative; overflow: hidden; padding: 0; }
+  #mapPanel { position: absolute; inset: 0; overflow: hidden; padding: 0; border-radius: 12px; }
   #leafletMap { width: 100%; height: 100%; background: #2b2f36; }
   .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
-  .recenterBtn {
-    position: absolute; top: 0.6rem; right: 0.6rem; z-index: 1000;
+  .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
+
+  .mapBtn {
+    position: absolute; z-index: 1000;
     width: 36px; height: 36px; border-radius: 50%; border: none;
     background: #fff; color: #111; font-size: 1.1rem; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
-  .recenterBtn:hover { background: #eee; }
-  .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
+  .mapBtn:hover { background: #eee; }
+  #recenterBtn { top: 0.6rem; left: 0.6rem; }
+  #panelToggleBtn { top: 3.4rem; left: 0.6rem; }
+  #fullscreenBtn { top: 6.2rem; left: 0.6rem; }
 
-  .hud { display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; flex: 1; }
+  /* Mini-HUD: velocidad/limite/crucero flotando arriba a la derecha del mapa,
+     visible solo cuando el panel de info esta oculto (si el panel esta
+     abierto, esos mismos datos ya se ven ahi adentro). */
+  #miniHud {
+    display: none;
+    position: absolute; top: 0.6rem; right: 0.6rem; z-index: 1000;
+    background: rgba(23, 26, 31, 0.9);
+    border-radius: 10px;
+    padding: 0.5rem 0.7rem;
+    align-items: center;
+    gap: 0.6rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .layout.panelHidden #miniHud { display: flex; }
+  #miniHud .limitSign { width: 34px; height: 34px; font-size: 0.85rem; border-width: 3px; }
+  #miniHud .speedBig { font-size: 1.4rem; }
+  #miniHud .cruiseDisplay { font-size: 0.75rem; }
+  #miniHud .cruiseSpeed { font-size: 1rem; }
+
+  /* Panel de info flotante: por default (desktop y horizontal) va pegado al
+     borde derecho, alto completo. En vertical se convierte en una hoja que
+     sube desde abajo. En ambos casos, panelHidden lo desliza fuera de vista
+     sin desmontarlo (asi no perdemos el estado del mapa/leaflet). */
+  #infoPanel {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 300px;
+    background: var(--panel);
+    border-radius: 12px 0 0 12px;
+    padding: 0.75rem;
+    overflow-y: auto;
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: transform 0.25s ease;
+  }
+  .layout.panelHidden #infoPanel { transform: translateX(120%); }
+
+  @media (max-width: 900px) and (orientation: portrait) {
+    #infoPanel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
+    .layout.panelHidden #infoPanel { transform: translateY(110%); }
+    .setup input#backendUrl { display: none; }
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    body { padding: 0.5rem; }
+    h1 { display: none; }
+    .setup { margin-bottom: 0.3rem; }
+    .setup input#backendUrl { display: none; }
+    #status { margin-bottom: 0.3rem; }
+    #infoPanel { width: 220px; padding: 0.5rem; font-size: 0.8rem; }
+    .speedBig { font-size: 1.8rem; }
+    .limitSign { width: 38px; height: 38px; font-size: 0.9rem; }
+  }
+
   .speedRow { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
   .speedBig { font-size: 2.4rem; font-weight: 700; line-height: 1; }
   .speedUnit { font-size: 0.9rem; color: var(--muted); }
@@ -75,7 +143,9 @@
   .limitSign.over { animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,77,0.6); } 50% { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
 
-  .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; margin-left: auto; }
+  .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; }
+
+  .fuelStack { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.78rem; color: var(--muted); text-align: right; margin-left: auto; }
   .cruiseSpeed { font-size: 1.5rem; font-weight: 700; line-height: 1; }
 
   .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
@@ -85,19 +155,16 @@
   .route .cities { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; }
   .route .arrow { color: var(--muted); }
 
-  .barTrack { flex: 1; height: 7px; background: #262a31; border-radius: 4px; overflow: hidden; margin-left: 0.6rem; }
-  .barFill { height: 100%; border-radius: 4px; background: var(--accent); }
-  .barFill.warn { background: #ffb020; }
-  .barFill.danger { background: var(--danger); }
-  .barRow { display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; padding: 0.2rem 0; }
-  .barRow .barLabel { color: var(--muted); width: 85px; flex-shrink: 0; }
-  .barRow .barValue { width: 45px; text-align: right; flex-shrink: 0; }
+  .statLine { font-size: 0.85rem; padding: 0.3rem 0; border-bottom: 1px solid #262a31; }
+  .statLine:last-of-type { border-bottom: none; }
+  .statLine .statWarn { color: #ffb020; }
+  .statLine .statDanger { color: var(--danger); }
 </style>
 </head>
 <body>
   <h1>Truck Companion — ETS2 / ATS</h1>
   <div class="setup">
-    <input id="backendUrl" value="ws://127.0.0.1:8123" size="26" />
+    <input id="backendUrl" value="wss://truck-companion-production.up.railway.app" size="34" />
     <input id="code" data-i18n-placeholder="pairingCode" maxlength="6" style="text-transform:uppercase" />
     <button id="connectBtn" data-i18n="connect">Connect</button>
     <button id="unitToggle" data-i18n-title="toggleUnits" title="Toggle units">km · km/h</button>
@@ -105,61 +172,69 @@
   </div>
   <div id="status" data-i18n="notConnected">Not connected</div>
 
-  <div class="layout">
-    <div class="panel" id="mapPanel">
+  <div class="layout" id="layout">
+    <div id="mapPanel">
       <div id="leafletMap"></div>
       <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
-      <button id="recenterBtn" class="recenterBtn" data-i18n-title="recenter" title="Recenter on truck">🎯</button>
+      <button id="recenterBtn" class="mapBtn" data-i18n-title="recenter" title="Recenter on truck">🎯</button>
+      <button id="panelToggleBtn" class="mapBtn" data-i18n-title="togglePanel" title="Show/hide info">☰</button>
+      <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
+
+      <div id="miniHud">
+        <div class="limitSign" id="miniLimitSign">--</div>
+        <div>
+          <div class="speedBig" id="miniSpeedBig">--</div>
+          <div class="speedUnit" id="miniSpeedUnitLabel">km/h</div>
+        </div>
+        <div class="cruiseDisplay" id="miniCruiseDisplay" style="display:none">
+          <div>
+            <div class="cruiseSpeed" id="miniCruiseSpeed">--</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="sideCol">
-      <div class="panel hud">
-        <div class="speedRow">
-          <div class="limitSign" id="limitSign">--</div>
+    <div id="infoPanel">
+      <div class="speedRow">
+        <div class="limitSign" id="limitSign">--</div>
+        <div>
+          <div class="speedBig" id="speedBig">--</div>
+          <div class="speedUnit" id="speedUnitLabel">km/h</div>
+        </div>
+        <div class="cruiseDisplay" id="cruiseDisplay" style="display:none">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 12 L16 8"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
           <div>
-            <div class="speedBig" id="speedBig">--</div>
-            <div class="speedUnit" id="speedUnitLabel">km/h</div>
-          </div>
-          <div class="cruiseDisplay" id="cruiseDisplay" style="display:none">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 12 L16 8"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
-            <div>
-              <div class="cruiseSpeed" id="cruiseSpeed">--</div>
-              <div class="speedUnit" data-i18n="cruiseControl">Cruise control</div>
-            </div>
+            <div class="cruiseSpeed" id="cruiseSpeed">--</div>
+            <div class="speedUnit" data-i18n="cruiseControl">Cruise control</div>
           </div>
         </div>
-
-        <div class="route">
-          <div class="cities">
-            <span id="citySrc">?</span>
-            <span class="arrow">→</span>
-            <span id="cityDst">?</span>
-          </div>
-          <div class="row"><span class="label" data-i18n="truck">Truck</span><span id="truck">-</span></div>
-          <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
-          <div class="row"><span class="label" data-i18n="weight">Weight</span><span id="cargoMass">-</span></div>
-          <div class="row"><span class="label" data-i18n="distanceLeft">Distance left</span><span id="routeDistance">-</span></div>
-          <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
-          <div class="row"><span class="label" data-i18n="nextRest">Time to next rest stop</span><span id="restStop">-</span></div>
-          <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
-          <div class="row"><span class="label" data-i18n="tolls">Tolls paid</span><span id="tollsTotal">-</span></div>
-          <div class="row"><span class="label" data-i18n="fines">Fines</span><span id="finesTotal">-</span></div>
-          <div class="row"><span class="label" data-i18n="ferryTrain">Ferry/train trips</span><span id="ferryTrainCount">0</span></div>
+        <div class="fuelStack">
+          <div id="fuelPctLine">-</div>
+          <div id="fuelRangeLine">-</div>
+          <div id="fuelAvgLine">-</div>
         </div>
       </div>
 
-      <div class="panel hud" id="techPanel">
-        <div class="barRow"><span class="barLabel" data-i18n="fuel">Fuel</span><div class="barTrack"><div class="barFill" id="fuelBar"></div></div><span class="barValue" id="fuelPct">-</span></div>
-        <div class="row"><span class="label" data-i18n="range">Range</span><span id="fuelRange">-</span></div>
-        <div class="row"><span class="label" data-i18n="avgConsumption">Avg. consumption</span><span id="fuelAvgConsumption">-</span></div>
-        <div class="row" id="mechanicalAlertsRow" style="display:none"><span class="label" data-i18n="alerts">Alerts</span><span id="mechanicalAlerts" style="color:var(--danger)">-</span></div>
-        <div style="height: 0.4rem"></div>
-        <div class="barRow"><span class="barLabel" data-i18n="engine">Engine</span><div class="barTrack"><div class="barFill" id="wearEngineBar"></div></div><span class="barValue" id="wearEnginePct">-</span></div>
-        <div class="barRow"><span class="barLabel" data-i18n="transmission">Transmission</span><div class="barTrack"><div class="barFill" id="wearTransmissionBar"></div></div><span class="barValue" id="wearTransmissionPct">-</span></div>
-        <div class="barRow"><span class="barLabel" data-i18n="cabin">Cabin</span><div class="barTrack"><div class="barFill" id="wearCabinBar"></div></div><span class="barValue" id="wearCabinPct">-</span></div>
-        <div class="barRow"><span class="barLabel" data-i18n="chassis">Chassis</span><div class="barTrack"><div class="barFill" id="wearChassisBar"></div></div><span class="barValue" id="wearChassisPct">-</span></div>
-        <div class="barRow"><span class="barLabel" data-i18n="wheels">Wheels</span><div class="barTrack"><div class="barFill" id="wearWheelsBar"></div></div><span class="barValue" id="wearWheelsPct">-</span></div>
+      <div class="route">
+        <div class="cities">
+          <span id="citySrc">?</span>
+          <span class="arrow">→</span>
+          <span id="cityDst">?</span>
+        </div>
+        <div class="row"><span class="label" data-i18n="truck">Truck</span><span id="truck">-</span></div>
+        <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
+        <div class="row"><span class="label" data-i18n="weight">Weight</span><span id="cargoMass">-</span></div>
+        <div class="row"><span class="label" data-i18n="distanceLeft">Distance left</span><span id="routeDistance">-</span></div>
+        <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
+        <div class="row"><span class="label" data-i18n="nextRest">Time to next rest stop</span><span id="restStop">-</span></div>
+        <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
+        <div class="row"><span class="label" data-i18n="tolls">Tolls paid</span><span id="tollsTotal">-</span></div>
+        <div class="row"><span class="label" data-i18n="fines">Fines</span><span id="finesTotal">-</span></div>
+        <div class="row"><span class="label" data-i18n="ferryTrain">Ferry/train trips</span><span id="ferryTrainCount">0</span></div>
       </div>
+
+      <div class="statLine" id="wearLine">-</div>
+      <div class="row" id="mechanicalAlertsRow" style="display:none"><span class="label" data-i18n="alerts">Alerts</span><span id="mechanicalAlerts" style="color:var(--danger)">-</span></div>
     </div>
   </div>
 
@@ -177,6 +252,8 @@ const TRANSLATIONS = {
     notConnected: 'Not connected',
     mapNotLoaded: 'Map not loaded',
     recenter: 'Recenter on truck',
+    togglePanel: 'Show/hide info panel',
+    toggleFullscreen: 'Fullscreen',
     truck: 'Truck',
     cargo: 'Cargo',
     weight: 'Weight',
@@ -218,6 +295,8 @@ const TRANSLATIONS = {
     notConnected: 'Sin conectar',
     mapNotLoaded: 'Mapa no cargado',
     recenter: 'Centrar en el camión',
+    togglePanel: 'Mostrar/ocultar panel de info',
+    toggleFullscreen: 'Pantalla completa',
     truck: 'Camión',
     cargo: 'Cargamento',
     weight: 'Peso',
@@ -604,19 +683,25 @@ function formatSeconds(totalSeconds) {
 function updateHud(data) {
   lastData = data;
 
+  // El mini-HUD (top-right del mapa, visible solo con el panel oculto)
+  // duplica velocidad/limite/crucero, asi que se actualizan en pares.
   const speedDisplay = useImperial ? data.speedKmh * KM_TO_MI : data.speedKmh;
-  document.getElementById('speedBig').textContent = data.speedKmh != null ? Math.round(speedDisplay) : '--';
+  const speedText = data.speedKmh != null ? Math.round(speedDisplay) : '--';
+  document.getElementById('speedBig').textContent = speedText;
+  document.getElementById('miniSpeedBig').textContent = speedText;
 
-  const limitEl = document.getElementById('limitSign');
   const limit = data.speedLimitKmh;
-  if (limit && limit > 0) {
-    const limitDisplay = useImperial ? limit * KM_TO_MI : limit;
-    limitEl.textContent = Math.round(limitDisplay);
-    const over = data.speedKmh > limit + 3;
-    limitEl.classList.toggle('over', over);
-  } else {
-    limitEl.textContent = '--';
-    limitEl.classList.remove('over');
+  for (const id of ['limitSign', 'miniLimitSign']) {
+    const limitEl = document.getElementById(id);
+    if (limit && limit > 0) {
+      const limitDisplay = useImperial ? limit * KM_TO_MI : limit;
+      limitEl.textContent = Math.round(limitDisplay);
+      const over = data.speedKmh > limit + 3;
+      limitEl.classList.toggle('over', over);
+    } else {
+      limitEl.textContent = '--';
+      limitEl.classList.remove('over');
+    }
   }
 
   document.getElementById('citySrc').textContent = data.citySrc || '?';
@@ -645,48 +730,47 @@ function updateHud(data) {
 
   // Combustible: fuel/fuelCapacity vienen en unidades del juego (litros o
   // galones segun el pais del camion), pero el porcentaje da igual la unidad.
+  // Se muestran arriba, al lado de la velocidad, apiladas en 3 lineas.
   if (data.fuel != null && data.fuelCapacity) {
     const pct = Math.max(0, Math.min(100, (data.fuel / data.fuelCapacity) * 100));
-    setBar('fuel', pct, pct < 15 ? 'danger' : pct < 30 ? 'warn' : null);
+    document.getElementById('fuelPctLine').innerHTML = `${t('fuel')} ${statSpan(pct, 15, 30)}`;
   } else {
-    setBar('fuel', 0, null);
-    document.getElementById('fuelPct').textContent = '-';
+    document.getElementById('fuelPctLine').textContent = `${t('fuel')} -`;
   }
   if (data.fuelRangeKm != null) {
     const rangeDisplay = useImperial ? data.fuelRangeKm * KM_TO_MI : data.fuelRangeKm;
-    document.getElementById('fuelRange').textContent = `${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`;
+    document.getElementById('fuelRangeLine').textContent = `${t('range')} ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`;
   } else {
-    document.getElementById('fuelRange').textContent = '-';
+    document.getElementById('fuelRangeLine').textContent = `${t('range')} -`;
+  }
+  if (data.fuelAvgConsumption) {
+    // fuelAvgConsumption viene del SDK en litros/100km sin importar el pais
+    // del camion. En imperial se convierte a mpg (formula estandar).
+    const consumptionText = useImperial
+      ? `${(235.215 / data.fuelAvgConsumption).toFixed(1)} mpg`
+      : `${data.fuelAvgConsumption.toFixed(1)} L/100km`;
+    document.getElementById('fuelAvgLine').textContent = consumptionText;
+  } else {
+    document.getElementById('fuelAvgLine').textContent = '-';
   }
 
   const wear = data.wear || {};
-  for (const part of ['engine', 'transmission', 'cabin', 'chassis', 'wheels']) {
+  const wearParts = ['engine', 'transmission', 'cabin', 'chassis', 'wheels'].map(part => {
     const value = wear[part];
-    if (value == null) { setBar(`wear${capitalize(part)}`, 0, null); continue; }
-    const pct = value * 100;
-    setBar(`wear${capitalize(part)}`, pct, pct > 60 ? 'danger' : pct > 30 ? 'warn' : null);
-  }
+    const pctText = value == null ? '-' : statSpan(value * 100, null, null, true);
+    return `${t(part)} ${pctText}`;
+  });
+  document.getElementById('wearLine').innerHTML = wearParts.join(' &nbsp;·&nbsp; ');
 
-  // fuelAvgConsumption viene del SDK en litros/100km sin importar el pais
-  // del camion. En imperial se convierte a mpg (formula estandar).
-  if (data.fuelAvgConsumption) {
-    if (useImperial) {
-      const mpg = 235.215 / data.fuelAvgConsumption;
-      document.getElementById('fuelAvgConsumption').textContent = `${mpg.toFixed(1)} mpg`;
+  const ccSpeed = useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh;
+  const ccText = Math.round(ccSpeed);
+  for (const [displayId, speedId] of [['cruiseDisplay', 'cruiseSpeed'], ['miniCruiseDisplay', 'miniCruiseSpeed']]) {
+    if (data.cruiseControl) {
+      document.getElementById(speedId).textContent = ccText;
+      document.getElementById(displayId).style.display = '';
     } else {
-      document.getElementById('fuelAvgConsumption').textContent = `${data.fuelAvgConsumption.toFixed(1)} L/100km`;
+      document.getElementById(displayId).style.display = 'none';
     }
-  } else {
-    document.getElementById('fuelAvgConsumption').textContent = '-';
-  }
-
-  const cruiseDisplay = document.getElementById('cruiseDisplay');
-  if (data.cruiseControl) {
-    const ccSpeed = useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh;
-    document.getElementById('cruiseSpeed').textContent = Math.round(ccSpeed);
-    cruiseDisplay.style.display = '';
-  } else {
-    cruiseDisplay.style.display = 'none';
   }
 
   const warnings = data.mechanicalWarnings || {};
@@ -728,17 +812,38 @@ function updateSessionEvents(event) {
   document.getElementById('ferryTrainCount').textContent = sessionTotals.ferryTrainCount;
 }
 
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-function setBar(prefix, pct, alertLevel) {
-  const bar = document.getElementById(`${prefix}Bar`);
-  const label = document.getElementById(`${prefix}Pct`);
-  if (!bar) return;
-  bar.style.width = `${pct}%`;
-  bar.classList.remove('warn', 'danger');
-  if (alertLevel) bar.classList.add(alertLevel);
-  if (label) label.textContent = `${Math.round(pct)}%`;
+// Devuelve el porcentaje como <span> coloreado segun si es "malo" alto (desgaste)
+// o "malo" bajo (combustible). isWear=true => alerta cuando el valor es ALTO.
+function statSpan(pct, dangerBelow, warnBelow, isWear) {
+  let cls = '';
+  if (isWear) {
+    cls = pct > 60 ? 'statDanger' : pct > 30 ? 'statWarn' : '';
+  } else {
+    cls = pct < dangerBelow ? 'statDanger' : pct < warnBelow ? 'statWarn' : '';
+  }
+  const classAttr = cls ? ` class="${cls}"` : '';
+  return `<span${classAttr}>${Math.round(pct)}%</span>`;
 }
+
+document.getElementById('panelToggleBtn').addEventListener('click', () => {
+  document.getElementById('layout').classList.toggle('panelHidden');
+});
+
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+  document.body.classList.toggle('fsMode');
+  // La Fullscreen API real (esconde tambien la barra de URL en el celular)
+  // es un extra sobre ocultar el header - si el navegador no la deja usar
+  // (algunos webviews la bloquean) el modo fsMode sigue funcionando igual.
+  if (document.body.classList.contains('fsMode')) {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  } else if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) document.body.classList.remove('fsMode');
+});
 
 document.getElementById('recenterBtn').addEventListener('click', () => {
   if (leafletMap && truckMarker) {

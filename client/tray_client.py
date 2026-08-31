@@ -18,6 +18,7 @@ import os
 import socket
 import sys
 import threading
+import tkinter as tk
 import urllib.parse
 import webbrowser
 
@@ -60,8 +61,20 @@ DEFAULT_WEB_DIR = _default_web_dir()
 
 def find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
+        s.bind(("0.0.0.0", 0))
         return s.getsockname()[1]
+
+
+def get_lan_ip() -> str | None:
+    # Truco estandar: no hace falta que el paquete llegue a destino, alcanza
+    # con que el SO elija la interfaz de red correcta para saber que IP local
+    # usaria para salir a internet (no manda datos de verdad).
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except OSError:
+        return None
 
 
 def start_web_server(web_dir: str) -> int | None:
@@ -70,7 +83,11 @@ def start_web_server(web_dir: str) -> int | None:
         return None
     port = find_free_port()
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=web_dir)
-    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+    # 0.0.0.0 (no 127.0.0.1) para que tambien sea accesible desde otros
+    # dispositivos en la misma red local (ej. el celular), no solo esta PC.
+    # Windows puede pedir permiso de firewall la primera vez - hay que
+    # permitirlo para redes privadas.
+    httpd = http.server.ThreadingHTTPServer(("0.0.0.0", port), handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     return port
@@ -95,6 +112,8 @@ class AppState:
 
 state = AppState()
 
+GAME_LABELS = {"ats": "American Truck Simulator", "ets2": "Euro Truck Simulator 2"}
+
 
 def make_icon_image():
     size = 64
@@ -110,9 +129,9 @@ def make_icon_image():
 
 def show_code_notification(icon, item):
     if state.code:
-        icon.notify(f"Codigo de pairing: {state.code}", "Truck Companion")
+        show_text_dialog("Truck Companion", "Codigo de pairing:", copy_value=state.code)
     else:
-        icon.notify("Todavia no hay codigo de pairing.", "Truck Companion")
+        show_text_dialog("Truck Companion", "Todavia no hay codigo de pairing.")
 
 
 def quit_app(icon, item):
@@ -122,11 +141,45 @@ def quit_app(icon, item):
 _browser_opened = False
 
 
-def build_web_url() -> str | None:
+def build_web_url(host: str = "127.0.0.1") -> str | None:
     if state.web_port is None or not state.code or not state.backend_url:
         return None
     query = urllib.parse.urlencode({"backend": state.backend_url, "code": state.code})
-    return f"http://127.0.0.1:{state.web_port}/index.html?{query}"
+    return f"http://{host}:{state.web_port}/index.html?{query}"
+
+
+def show_text_dialog(title: str, message: str, copy_value: str | None = None):
+    def _show():
+        root = tk.Tk()
+        root.title(title)
+        root.attributes("-topmost", True)
+        root.resizable(False, False)
+        tk.Label(root, text=message, padx=12).pack(pady=(12, 6))
+        if copy_value:
+            entry = tk.Entry(root, width=max(40, len(copy_value) + 2), justify="center")
+            entry.insert(0, copy_value)
+            entry.pack(padx=12, pady=(0, 6))
+            entry.focus()
+            entry.select_range(0, tk.END)
+            root.clipboard_clear()
+            root.clipboard_append(copy_value)
+            tk.Label(root, text="(ya copiado al portapapeles)", fg="#4caf50", padx=12).pack()
+        tk.Button(root, text="Cerrar", command=root.destroy, padx=20, pady=4).pack(pady=12)
+        root.mainloop()
+
+    threading.Thread(target=_show, daemon=True).start()
+
+
+def show_mobile_url(icon, item):
+    lan_ip = get_lan_ip()
+    if not lan_ip:
+        show_text_dialog("Truck Companion", "No se pudo detectar la IP de tu red local.")
+        return
+    url = build_web_url(host=lan_ip)
+    if not url:
+        show_text_dialog("Truck Companion", "Todavia no hay codigo de pairing.")
+        return
+    show_text_dialog("Truck Companion", "Abri esto en el celular (misma wifi):", copy_value=url)
 
 
 def open_web_ui(backend_url: str, code: str):
@@ -145,7 +198,7 @@ def open_web_menu_item(icon, item):
     if url:
         webbrowser.open(url)
     else:
-        icon.notify("Todavia no hay codigo de pairing.", "Truck Companion")
+        show_text_dialog("Truck Companion", "Todavia no hay codigo de pairing.")
 
 
 async def run_client(backend_url: str, fixed_code: str | None):
@@ -177,10 +230,19 @@ async def run_client(backend_url: str, fixed_code: str | None):
         try:
             async with websockets.connect(url) as ws:
                 state.set_status(f"Codigo {code} - conectado")
+                last_game = None
                 while True:
                     raw = truck_telemetry.get_data()
-                    payload = client_lib.build_payload(raw)
-                    await ws.send(json.dumps(payload))
+                    # ver comentario equivalente en client.py: se descarta el
+                    # primer frame hasta que el SDK confirme sync real.
+                    if raw.get("sdkActive"):
+                        payload = client_lib.build_payload(raw)
+                        game = payload.get("game")
+                        if game != last_game:
+                            last_game = game
+                            game_label = GAME_LABELS.get(game, "juego detectado")
+                            state.set_status(f"Codigo {code} - jugando {game_label}")
+                        await ws.send(json.dumps(payload))
                     await asyncio.sleep(client_lib.SEND_INTERVAL_SECONDS)
         except (websockets.ConnectionClosed, OSError) as exc:
             state.set_status(f"Codigo {code} - reconectando...")
@@ -200,7 +262,7 @@ def start_asyncio_thread(backend_url: str, fixed_code: str | None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", default="ws://127.0.0.1:8123")
+    parser.add_argument("--backend", default="wss://truck-companion-production.up.railway.app")
     parser.add_argument("--code", default=None)
     parser.add_argument("--web-dir", default=DEFAULT_WEB_DIR, help="Carpeta de la web a servir localmente")
     args = parser.parse_args()
@@ -212,6 +274,7 @@ def main():
     menu = pystray.Menu(
         pystray.MenuItem("Abrir web", open_web_menu_item, default=True),
         pystray.MenuItem("Mostrar codigo de pairing", show_code_notification),
+        pystray.MenuItem("Mostrar URL para el celular", show_mobile_url),
         pystray.MenuItem("Salir", quit_app),
     )
     icon = pystray.Icon("truck-companion", make_icon_image(), "Truck Companion", menu)
