@@ -375,14 +375,14 @@ let lastData = null;
 // mapas distintos (Europa vs USA).
 //
 // Los tiles pesan ~800MB entre los dos juegos, demasiado para vivir en el
-// repo/GitHub Pages - se sirven desde un bucket de storage aparte (Cloudflare
-// R2). MAP_ASSETS_BASE queda vacio (rutas relativas) para el flujo local del
-// .exe (que sirve la carpeta maps/ el mismo), y se completa con la URL publica
-// del bucket para el deploy real en la web publica.
-const MAP_ASSETS_BASE = '';
+// repo/GitHub Pages - se sirven desde un bucket R2 aparte (maps.trucksim-dash.com).
+// Se usa SIEMPRE la URL remota (tambien para el flujo local del .exe, que ya
+// necesita internet igual para hablar con el backend): asi el .exe no depende
+// de tener una copia local de 800MB de tiles al lado para funcionar en otra PC.
+const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 const GAME_MAPS = {
-  ats: { dir: `${MAP_ASSETS_BASE}maps/ats`, label: 'American Truck Simulator' },
-  ets2: { dir: `${MAP_ASSETS_BASE}maps/ets2`, label: 'Euro Truck Simulator 2' },
+  ats: { dir: `${REMOTE_MAP_BASE}/ats`, label: 'American Truck Simulator' },
+  ets2: { dir: `${REMOTE_MAP_BASE}/ets2`, label: 'Euro Truck Simulator 2' },
 };
 
 let leafletMap = null;
