@@ -373,9 +373,16 @@ let lastData = null;
 // Mapas reales exportados con ts-map (tiles + TileMapInfo.json con el bounding
 // box en coordenadas de juego). Cada juego tiene su propia carpeta porque son
 // mapas distintos (Europa vs USA).
+//
+// Los tiles pesan ~800MB entre los dos juegos, demasiado para vivir en el
+// repo/GitHub Pages - se sirven desde un bucket de storage aparte (Cloudflare
+// R2). MAP_ASSETS_BASE queda vacio (rutas relativas) para el flujo local del
+// .exe (que sirve la carpeta maps/ el mismo), y se completa con la URL publica
+// del bucket para el deploy real en la web publica.
+const MAP_ASSETS_BASE = '';
 const GAME_MAPS = {
-  ats: { dir: 'maps/ats', label: 'American Truck Simulator' },
-  ets2: { dir: 'maps/ets2', label: 'Euro Truck Simulator 2' },
+  ats: { dir: `${MAP_ASSETS_BASE}maps/ats`, label: 'American Truck Simulator' },
+  ets2: { dir: `${MAP_ASSETS_BASE}maps/ets2`, label: 'Euro Truck Simulator 2' },
 };
 
 let leafletMap = null;

@@ -4,4 +4,4 @@ __pycache__/
 client/build/
 client/dist/
 client/*.spec
-web/maps/
+docs/maps/
