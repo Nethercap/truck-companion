@@ -118,6 +118,21 @@
     background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1.1rem;
   }
 
+  .screenshotWrap { margin-top: 1.5rem; text-align: center; }
+  .screenshotCaption { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--muted); }
+  .screenshotWrap img {
+    max-width: 100%; border-radius: 10px; border: 1px solid var(--border);
+    cursor: zoom-in; display: inline-block;
+  }
+
+  .lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85);
+    z-index: 2000; align-items: center; justify-content: center; padding: 2rem;
+    cursor: zoom-out;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+
   .contactBox { display: flex; align-items: center; gap: 0.8rem; font-size: 1.1rem; margin-top: 1rem; }
 
   footer {
@@ -230,6 +245,10 @@
         </div>
       </div>
     </div>
+    <div class="screenshotWrap">
+      <p class="screenshotCaption" data-i18n="screenshotCaption">This is what it looks like while driving:</p>
+      <img src="assets/screenshot-dashboard.png" alt="Truck Dash live dashboard" onclick="document.getElementById('lightbox').classList.add('open')" />
+    </div>
     <div class="transparencyNote">
       <span data-i18n="transparencyNote">Truck Dash is fully open source — client, backend, and web are all in the same public repository, so you can see exactly what it does before running it.</span>
       &nbsp;<a href="https://github.com/Nethercap/truck-companion" target="_blank" rel="noopener" data-i18n="viewSource">View source on GitHub →</a>
@@ -253,6 +272,10 @@
 <footer>
   <div>Truck Dash — <span data-i18n="footerNote">an independent fan-made companion tool, not affiliated with SCS Software.</span></div>
 </footer>
+
+<div id="lightbox" class="lightbox" onclick="this.classList.remove('open')">
+  <img src="assets/screenshot-dashboard.png" alt="Truck Dash live dashboard, enlarged" />
+</div>
 
 <script>
 const TRANSLATIONS = {
@@ -289,6 +312,7 @@ const TRANSLATIONS = {
     gsStep3Title: 'Run it and start driving',
     gsStep3Body: 'Open the game, run the client, and your browser opens automatically — already paired and live.',
     transparencyNote: 'Truck Dash is fully open source — client, backend, and web are all in the same public repository, so you can see exactly what it does before running it.',
+    screenshotCaption: 'This is what it looks like while driving:',
     viewSource: 'View source on GitHub →',
     sourceOptionNote: "Prefer not to run a pre-built .exe? You can run the client straight from the source code instead — no download of a compiled binary needed, just Python.",
     sourceOptionLink: 'Instructions (English)',
@@ -330,6 +354,7 @@ const TRANSLATIONS = {
     gsStep3Title: 'Abrilo y arrancá a manejar',
     gsStep3Body: 'Abrí el juego, corré el cliente, y tu navegador se abre solo — ya emparejado y en vivo.',
     transparencyNote: 'Truck Dash es 100% código abierto — el cliente, el backend y la web están en el mismo repositorio público, así podés ver exactamente qué hace antes de correrlo.',
+    screenshotCaption: 'Así se ve mientras manejás:',
     viewSource: 'Ver código fuente en GitHub →',
     sourceOptionNote: '¿Preferís no correr un .exe precompilado? Podés correr el cliente directo desde el código fuente en su lugar — no hace falta bajar ningún binario compilado, solo Python.',
     sourceOptionLink: 'Instrucciones (English)',
@@ -369,6 +394,10 @@ document.getElementById('menuBtn').addEventListener('click', openSidebar);
 document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
 overlay.addEventListener('click', closeSidebar);
 sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', closeSidebar));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('open');
+});
 </script>
 </body>
 </html>
