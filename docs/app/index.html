@@ -436,7 +436,7 @@ async function loadCities(mapInfo) {
 let routeGraph = null; // { nodes, adjacency: Map<idx, [[idx, weight], ...]> }
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
 let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
-const OFF_ROUTE_THRESHOLD_M = 400; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS)
+const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS) - en interconexiones con rampas paralelas cercanas, 400 tardaba en detectar que se tomo una rampa distinta
 
 // Distancia minima (aprox) del punto (x,z) a la polilinea de la ruta actual,
 // en unidades del juego. Alcanza con chequear contra cada segmento entre
