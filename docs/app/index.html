@@ -165,6 +165,10 @@
   .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; }
 
   .fuelStack { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.78rem; color: var(--muted); text-align: right; margin-left: auto; }
+  /* El consumo promedio a veces entra en una linea ("- ") y a veces en dos
+     ("604.8" + "mpg" envuelve por el ancho de la columna) - sin un alto fijo
+     el resto de las columnas del speedRow saltaba de posicion al cambiar. */
+  #fuelAvgLine { min-height: 2.2em; }
   .cruiseSpeed { font-size: 1.5rem; font-weight: 700; line-height: 1; }
 
   .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
