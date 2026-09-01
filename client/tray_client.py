@@ -99,6 +99,17 @@ def show_code_notification(icon, item):
         show_text_dialog("Truck Dash", "Todavia no hay codigo de pairing.")
 
 
+def show_mobile_info(icon, item):
+    if not state.code:
+        show_text_dialog("Truck Dash", "Todavia no hay codigo de pairing.")
+        return
+    show_text_dialog(
+        "Truck Dash",
+        f"En el celular, abri trucksim-dash.com/app e ingresa este codigo:",
+        copy_value=state.code,
+    )
+
+
 def quit_app(icon, item):
     icon.stop()
 
@@ -206,6 +217,7 @@ def main():
     menu = pystray.Menu(
         pystray.MenuItem("Abrir web", open_web_menu_item, default=True),
         pystray.MenuItem("Mostrar codigo de pairing", show_code_notification),
+        pystray.MenuItem("Mostrar codigo para el celular", show_mobile_info),
         pystray.MenuItem("Salir", quit_app),
     )
     icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", menu)
