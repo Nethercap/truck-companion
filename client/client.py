@@ -142,7 +142,7 @@ async def run(backend_ws_url: str, code: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", default="wss://truck-companion-production-7184.up.railway.app", help="URL base del backend (ws:// o wss://)")
+    parser.add_argument("--backend", default="wss://truck-companion-production.up.railway.app", help="URL base del backend (ws:// o wss://)")
     parser.add_argument("--code", default=None, help="Codigo de pairing existente (si no se pasa, se pide uno nuevo)")
     args = parser.parse_args()
 
