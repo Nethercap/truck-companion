@@ -65,6 +65,19 @@
   .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
   .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
 
+  /* Flecha de heading del camion: el mapa se queda siempre norte-arriba (las
+     etiquetas de ciudades vienen horneadas en los tiles, rotar el mapa las
+     dejaria ilegibles), pero la flecha SI rota para mostrar hacia donde
+     apunta el camion. 0deg = norte, gira en sentido horario con headingDeg. */
+  .truckArrow {
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 16px solid var(--accent);
+    filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000);
+    transition: transform 0.2s linear;
+  }
+
   .mapBtn {
     position: absolute; z-index: 1000;
     width: 36px; height: 36px; border-radius: 50%; border: none;
@@ -665,6 +678,10 @@ async function loadGameMap(game) {
 
   if (!leafletMap) {
     leafletMap = L.map('leafletMap', { crs: L.CRS.Simple, minZoom: tileMapInfo.minZoom, maxZoom });
+    // Si el usuario arrastra el mapa a mano, dejamos de recentrar solos en
+    // cada update (si no, seria imposible mirar otra parte del mapa) - se
+    // reactiva con el boton de recentrar.
+    leafletMap.on('dragstart', () => { autoFollow = false; });
   } else {
     if (tileLayer) leafletMap.removeLayer(tileLayer);
     if (trailLine) leafletMap.removeLayer(trailLine);
@@ -689,16 +706,41 @@ async function loadGameMap(game) {
   leafletMap.fitBounds(bounds);
 
   trailLine = L.polyline([], { color: '#3b9eff', weight: 3, opacity: 0.7 }).addTo(leafletMap);
-  const truckIcon = L.divIcon({ className: 'truckMarker', html: '🚚', iconSize: [20, 20] });
+  const truckIcon = L.divIcon({ className: 'truckMarker', html: '<div class="truckArrow"></div>', iconSize: [20, 20] });
   truckMarker = L.marker(corner1, { icon: truckIcon }).addTo(leafletMap);
 
   document.getElementById('mapHint').textContent = mapInfo.label;
 }
 
 let lastWorldPos = null;
+let autoFollow = true; // se desactiva si el usuario arrastra el mapa a mano, se reactiva con el boton de recentrar
 const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es un teleport (job asignado, garage, etc.), no un tramo manejado
 
-function updateMap(position, game) {
+// Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
+// proyectando la posicion actual sobre la polilinea y descartando los puntos
+// anteriores - asi no queda roja debajo de la azul (trail) ya recorrida.
+function trimRouteBehindTruck(x, z) {
+  if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !destLine) return;
+  let bestIdx = 0, bestDist = Infinity, bestPoint = null;
+  for (let i = 0; i < currentRouteWorldPoints.length - 1; i++) {
+    const [ax, az] = currentRouteWorldPoints[i];
+    const [bx, bz] = currentRouteWorldPoints[i + 1];
+    const dx = bx - ax, dz = bz - az;
+    const lenSq = dx * dx + dz * dz;
+    let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = ax + t * dx, pz = az + t * dz;
+    const dist = Math.hypot(x - px, z - pz);
+    if (dist < bestDist) { bestDist = dist; bestIdx = i; bestPoint = [px, pz]; }
+  }
+  // Si estamos lejos de la ruta calculada, es un desvio real: offRoute ya se
+  // encarga de recalcularla entera, no recortar sobre una ruta vieja.
+  if (bestDist > OFF_ROUTE_THRESHOLD_M) return;
+  currentRouteWorldPoints = [bestPoint, ...currentRouteWorldPoints.slice(bestIdx + 1)];
+  destLine.setLatLngs(currentRouteWorldPoints.map(([px, pz]) => mapTransform.toLatLng(px, pz)));
+}
+
+function updateMap(position, game, headingDeg) {
   if (position.x == null || position.z == null) return;
   loadGameMap(game || 'ats');
   if (!mapTransform || !leafletMap) return;
@@ -726,6 +768,16 @@ function updateMap(position, game) {
 
   trailLine.setLatLngs(trailWorld);
   truckMarker.setLatLng(latLng);
+  if (headingDeg != null) {
+    const el = truckMarker.getElement();
+    const arrow = el && el.querySelector('.truckArrow');
+    if (arrow) arrow.style.transform = `rotate(${headingDeg}deg)`;
+  }
+  trimRouteBehindTruck(position.x, position.z);
+
+  if (autoFollow) {
+    leafletMap.setView(latLng, leafletMap.getZoom(), { animate: false });
+  }
 }
 
 function formatSeconds(totalSeconds) {
@@ -913,6 +965,7 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 document.getElementById('recenterBtn').addEventListener('click', () => {
+  autoFollow = true;
   if (leafletMap && truckMarker) {
     leafletMap.setView(truckMarker.getLatLng(), leafletMap.getZoom(), { animate: false });
   }
@@ -941,7 +994,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
     statusEl.textContent = data.paused ? t('connectedPaused') : t('connectedLive');
     statusEl.className = 'ok';
     updateHud(data);
-    updateMap(data.position || {}, data.game);
+    updateMap(data.position || {}, data.game, data.headingDeg);
     updateDestinationMarker(data);
   };
   ws.onclose = () => {
