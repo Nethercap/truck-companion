@@ -203,9 +203,10 @@
         <div class="num">1</div>
         <div>
           <h3 data-i18n="gsStep1Title">Install the SCS telemetry plugin</h3>
-          <p data-i18n="gsStep1Body">Truck Dash reads data through the game's official telemetry SDK. Download the plugin and copy the DLL into your game's install folder — once per game.</p>
+          <p data-i18n="gsStep1Body">Truck Dash reads data through the game's official telemetry SDK. Download the plugin and copy <strong>only the .dll file</strong> (not the whole downloaded folder) into your game's install folder, inside <code>bin\win_x64\plugins\</code> — create that <code>plugins</code> folder if it doesn't exist yet. Once per game.</p>
           <div class="links">
             <a href="https://github.com/RenCloud/scs-sdk-plugin/releases" target="_blank" rel="noopener" data-i18n="gsStep1Link">SCS SDK plugin (GitHub)</a>
+            <a href="https://github.com/RenCloud/scs-sdk-plugin" target="_blank" rel="noopener" data-i18n="gsStep1LinkReadme">Plugin install instructions</a>
           </div>
         </div>
       </div>
@@ -279,8 +280,9 @@ const TRANSLATIONS = {
     gsTitle: 'Get Started <span class="accent">(free)</span>',
     gsIntro: "Three one-time steps and you're set. No installer, no account, no admin rights needed.",
     gsStep1Title: 'Install the SCS telemetry plugin',
-    gsStep1Body: "Truck Dash reads data through the game's official telemetry SDK. Download the plugin and copy the DLL into your game's install folder — once per game.",
+    gsStep1Body: "Truck Dash reads data through the game's official telemetry SDK. Download the plugin and copy only the .dll file (not the whole downloaded folder) into your game's install folder, inside bin\\win_x64\\plugins\\ — create that plugins folder if it doesn't exist yet. Once per game.",
     gsStep1Link: 'SCS SDK plugin (GitHub)',
+    gsStep1LinkReadme: 'Plugin install instructions',
     gsStep2Title: 'Download the Truck Dash client',
     gsStep2Body: "A small, portable program that reads the game's telemetry and opens your browser, already connected. No install, no Python needed.",
     gsStep2Link: 'Download for Windows',
@@ -319,8 +321,9 @@ const TRANSLATIONS = {
     gsTitle: 'Empezar <span class="accent">(gratis)</span>',
     gsIntro: 'Tres pasos, una sola vez, y listo. Sin instalador, sin cuenta, sin permisos de administrador.',
     gsStep1Title: 'Instalá el plugin de telemetría de SCS',
-    gsStep1Body: 'Truck Dash lee los datos a través del SDK oficial de telemetría del juego. Descargá el plugin y copiá el DLL en la carpeta de instalación de tu juego — una sola vez por juego.',
+    gsStep1Body: 'Truck Dash lee los datos a través del SDK oficial de telemetría del juego. Descargá el plugin y copiá solo el archivo .dll (no la carpeta descargada entera) en la carpeta de instalación de tu juego, dentro de bin\\win_x64\\plugins\\ — creá esa carpeta plugins si todavía no existe. Una sola vez por juego.',
     gsStep1Link: 'Plugin SDK de SCS (GitHub)',
+    gsStep1LinkReadme: 'Instrucciones de instalación del plugin',
     gsStep2Title: 'Descargá el cliente de Truck Dash',
     gsStep2Body: 'Un programa chico y portable que lee la telemetría del juego y abre tu navegador, ya conectado. Sin instalar, sin necesitar Python.',
     gsStep2Link: 'Descargar para Windows',

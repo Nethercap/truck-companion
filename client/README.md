@@ -39,9 +39,21 @@ Download the latest release from the
 unzip it, and run `TruckDash.exe`. No installation, no admin rights, no
 Python required — everything needed is bundled inside.
 
-You'll also need the SCS Telemetry SDK plugin installed once in your game's
-installation folder — see the main [repository README](../README.md) for
-that step.
+You'll also need the SCS Telemetry SDK plugin installed once per game. Grab
+it from [RenCloud/scs-sdk-plugin releases](https://github.com/RenCloud/scs-sdk-plugin/releases)
+(check the [plugin's own README](https://github.com/RenCloud/scs-sdk-plugin)
+too) and copy **only the `scs-telemetry.dll` file** — not the whole
+downloaded folder/zip — into your game's install folder, inside
+`bin\win_x64\plugins\` (create that `plugins` folder if it doesn't exist).
+The most common mistake is dropping the `.dll` directly into `bin\win_x64\`
+instead of the `plugins\` subfolder — if the dashboard never shows live data,
+that's the first thing to check. See the main
+[repository README](../README.md) for the full walkthrough with an example
+path.
+
+If it still doesn't work after that, right-click the tray icon and pick
+**"Show log file (troubleshooting)"** — it'll tell you whether the plugin
+was even detected.
 
 ## Building it yourself
 

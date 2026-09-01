@@ -35,8 +35,10 @@ that client does and does not do.
 ## Setting up the game (one-time)
 
 1. Download the SCS telemetry SDK plugin from
-   [RenCloud/scs-sdk-plugin](https://github.com/RenCloud/scs-sdk-plugin) (the
-   `.zip` under the latest release's Assets).
+   [RenCloud/scs-sdk-plugin releases](https://github.com/RenCloud/scs-sdk-plugin/releases)
+   (the `.zip` under the latest release's Assets) — see the
+   [plugin's own README](https://github.com/RenCloud/scs-sdk-plugin) too if
+   anything below is unclear.
 2. Copy **only the `scs-telemetry.dll` file** (not the whole downloaded
    folder/zip) into your game's install folder, inside
    `bin\win_x64\plugins\` (create that folder if it doesn't exist). The
