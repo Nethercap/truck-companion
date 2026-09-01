@@ -46,18 +46,21 @@
   body.fsMode #mapPanel { border-radius: 0; }
   body.fsMode #infoPanel { border-radius: 0; }
 
-  /* El mapa ocupa TODO el espacio disponible (pantalla completa), y el panel
-     de info flota encima como overlay, no como columna fija - asi el mapa
-     nunca se ve recortado y la info se puede ocultar para verlo entero. */
+  /* El mapa y el panel de info son columnas lado a lado (fila en horizontal,
+     mapa arriba / panel abajo en vertical). Al ocultar el panel se le lleva
+     su ancho/alto a 0 en vez de solo taparlo con un overlay, asi el mapa
+     realmente ocupa el espacio liberado (y Leaflet lo recalcula via
+     invalidateSize en el handler del boton, ver mas abajo). */
   .layout {
     position: relative;
     flex: 1;
     min-height: 0;
     overflow: hidden;
     border-radius: 12px;
+    display: flex;
   }
 
-  #mapPanel { position: absolute; inset: 0; overflow: hidden; padding: 0; border-radius: 12px; }
+  #mapPanel { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; padding: 0; border-radius: 12px; }
   #leafletMap { width: 100%; height: 100%; background: #2b2f36; }
   .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
   .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
@@ -93,29 +96,33 @@
   #miniHud .cruiseDisplay { font-size: 0.75rem; }
   #miniHud .cruiseSpeed { font-size: 1rem; }
 
-  /* Panel de info flotante: por default (desktop y horizontal) va pegado al
-     borde derecho, alto completo. En vertical se convierte en una hoja que
-     sube desde abajo. En ambos casos, panelHidden lo desliza fuera de vista
-     sin desmontarlo (asi no perdemos el estado del mapa/leaflet). */
+  /* Panel de info: por default (desktop y horizontal) es una columna fija de
+     300px pegada al borde derecho, alto completo. En vertical se convierte en
+     una fila fija abajo. En ambos casos, panelHidden le lleva el ancho/alto a
+     0 (no display:none) para no perder el estado del mapa/leaflet, y el mapa
+     (flex:1 en el contenedor) ocupa el espacio que el panel libera. */
   #infoPanel {
-    position: absolute;
-    top: 0; right: 0; bottom: 0;
+    position: relative;
+    flex: 0 0 300px;
     width: 300px;
     background: var(--panel);
-    border-radius: 12px 0 0 12px;
+    border-radius: 0 12px 12px 0;
     padding: 0.75rem;
     overflow-y: auto;
+    overflow-x: hidden;
     z-index: 900;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    transition: transform 0.25s ease;
+    transition: flex-basis 0.25s ease, padding 0.25s ease;
   }
-  .layout.panelHidden #infoPanel { transform: translateX(120%); }
+  .layout.panelHidden #infoPanel { flex-basis: 0; padding-left: 0; padding-right: 0; }
 
   @media (max-width: 900px) and (orientation: portrait) {
-    #infoPanel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
-    .layout.panelHidden #infoPanel { transform: translateY(110%); }
+    .layout { flex-direction: column; }
+    #mapPanel { flex: 1 1 auto; min-height: 0; }
+    #infoPanel { flex: 0 0 34vh; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
+    .layout.panelHidden #infoPanel { flex-basis: 0; padding-top: 0; padding-bottom: 0; }
   }
 
   @media (max-height: 500px) and (orientation: landscape) {
@@ -875,6 +882,18 @@ function statSpan(pct, dangerBelow, warnBelow, isWear) {
 
 document.getElementById('panelToggleBtn').addEventListener('click', () => {
   document.getElementById('layout').classList.toggle('panelHidden');
+  // El mapa cambia de tamano real (el panel ahora desplaza, no tapa), asi
+  // que Leaflet necesita invalidateSize para recalcular su viewport, y
+  // recentramos en el camion para que no quede corrido hacia el costado
+  // que el panel dejo de ocupar. Se espera a que termine la transicion CSS
+  // (0.25s) para que invalidateSize lea el tamano final, no el intermedio.
+  setTimeout(() => {
+    if (!leafletMap) return;
+    leafletMap.invalidateSize();
+    if (truckMarker) {
+      leafletMap.setView(truckMarker.getLatLng(), leafletMap.getZoom(), { animate: false });
+    }
+  }, 260);
 });
 
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
