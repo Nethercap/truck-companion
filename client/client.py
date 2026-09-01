@@ -77,7 +77,9 @@ def build_payload(raw: dict) -> dict:
             "wheels": raw.get("wearWheels"),
         },
         "jobIncome": raw.get("jobIncome"),
-        "fuelAvgConsumption": raw.get("fuelAvgConsumption"),
+        # el SDK reporta esto en litros/km, no litros/100km como se asumia -
+        # por eso el mpg calculado en la web daba absurdamente alto (~600).
+        "fuelAvgConsumption": (raw.get("fuelAvgConsumption") or 0) * 100 or None,
         "cruiseControl": raw.get("cruiseControl"),
         "cruiseControlSpeedKmh": (raw.get("cruiseControlSpeed") or 0) * 3.6,
         "lights": {
