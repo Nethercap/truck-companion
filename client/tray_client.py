@@ -13,6 +13,7 @@ Uso (antes de empaquetar, para probar):
 
 import argparse
 import asyncio
+import logging
 import os
 import sys
 import threading
@@ -34,6 +35,16 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
 DEFAULT_WEB_URL = "https://trucksim-dash.com/app/"
+
+# Log a un archivo junto al .exe (o al script, si corre desde source) - antes
+# las excepciones se tragaban en silencio (por el --windowed de arriba) y no
+# habia forma de diagnosticar un reporte como "no me conecta ni la primera
+# vez" sin acceso a la PC del usuario.
+LOG_PATH = os.path.join(
+    os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__)),
+    "truckdash.log",
+)
+logging.basicConfig(filename=LOG_PATH, level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
 class AppState:
@@ -110,6 +121,14 @@ def show_mobile_info(icon, item):
     )
 
 
+def show_log_location(icon, item):
+    show_text_dialog("Truck Dash", "Log file (for troubleshooting):", copy_value=LOG_PATH)
+    try:
+        os.startfile(os.path.dirname(LOG_PATH))
+    except Exception:
+        pass
+
+
 def quit_app(icon, item):
     icon.stop()
 
@@ -144,16 +163,19 @@ def open_web_menu_item(icon, item):
 
 
 async def run_client(backend_url: str, fixed_code: str | None):
+    logging.info("Starting client, backend=%s", backend_url)
     code = fixed_code
     if code is None:
         state.set_status("Requesting pairing code...")
         try:
             code = await asyncio.to_thread(client_lib.request_pairing_code, backend_url)
         except Exception as exc:
+            logging.exception("Failed to get pairing code")
             state.set_status(f"Error getting code: {exc}")
             return
     state.set_code(code)
     state.set_status(f"Code {code} - connecting...")
+    logging.info("Got pairing code %s", code)
     open_web_ui(backend_url, code)
 
     import truck_telemetry
@@ -161,10 +183,16 @@ async def run_client(backend_url: str, fixed_code: str | None):
     import json
 
     url = f"{backend_url}/ws/client/{code}"
+    sdk_init_logged = False
+    sdk_active_logged = False
     while True:
         try:
             truck_telemetry.init()
+            if not sdk_init_logged:
+                logging.info("truck_telemetry.init() succeeded")
+                sdk_init_logged = True
         except Exception:
+            logging.exception("truck_telemetry.init() failed - is the SDK plugin installed?")
             state.set_status(f"Code {code} - waiting for the game to open...")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
             continue
@@ -172,13 +200,19 @@ async def run_client(backend_url: str, fixed_code: str | None):
         try:
             async with websockets.connect(url) as ws:
                 state.set_status(f"Code {code} - connected")
+                logging.info("Connected to backend")
                 last_game = None
                 while True:
                     raw = truck_telemetry.get_data()
                     # sdkActive en False significa que el SDK todavia no
                     # sincronizo el primer frame real del juego (ver
-                    # comentario equivalente en client.py).
+                    # comentario equivalente en client.py) - por ejemplo
+                    # mientras estas en el menu de elegir el proximo trabajo,
+                    # sin camion todavia spawneado.
                     if raw.get("sdkActive"):
+                        if not sdk_active_logged:
+                            logging.info("sdkActive=True, sending telemetry")
+                            sdk_active_logged = True
                         payload = client_lib.build_payload(raw)
                         game = payload.get("game")
                         if game != last_game:
@@ -186,11 +220,16 @@ async def run_client(backend_url: str, fixed_code: str | None):
                             game_label = GAME_LABELS.get(game, "game detected")
                             state.set_status(f"Code {code} - playing {game_label}")
                         await ws.send(json.dumps(payload))
+                    else:
+                        sdk_active_logged = False
+                        state.set_status(f"Code {code} - connected, waiting for you to be in the truck...")
                     await asyncio.sleep(client_lib.SEND_INTERVAL_SECONDS)
         except (websockets.ConnectionClosed, OSError) as exc:
+            logging.warning("Backend connection lost: %s", exc)
             state.set_status(f"Code {code} - reconnecting...")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
         except Exception:
+            logging.exception("Unexpected error in telemetry loop")
             state.set_status(f"Code {code} - waiting for the game...")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
 
@@ -218,6 +257,7 @@ def main():
         pystray.MenuItem("Open web", open_web_menu_item, default=True),
         pystray.MenuItem("Show pairing code", show_code_notification),
         pystray.MenuItem("Show code for mobile", show_mobile_info),
+        pystray.MenuItem("Show log file (troubleshooting)", show_log_location),
         pystray.MenuItem("Quit", quit_app),
     )
     icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", menu)

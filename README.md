@@ -35,12 +35,17 @@ that client does and does not do.
 ## Setting up the game (one-time)
 
 1. Download the SCS telemetry SDK plugin from
-   [RenCloud/scs-sdk-plugin](https://github.com/RenCloud/scs-sdk-plugin).
-2. Copy `scs-telemetry.dll` into your game's install folder, inside
-   `bin\win_x64\plugins\` (create that folder if it doesn't exist). For
-   example:
+   [RenCloud/scs-sdk-plugin](https://github.com/RenCloud/scs-sdk-plugin) (the
+   `.zip` under the latest release's Assets).
+2. Copy **only the `scs-telemetry.dll` file** (not the whole downloaded
+   folder/zip) into your game's install folder, inside
+   `bin\win_x64\plugins\` (create that folder if it doesn't exist). The
+   `.dll` has to sit directly inside `plugins\`, for example:
    `...\Euro Truck Simulator 2\bin\win_x64\plugins\scs-telemetry.dll`
 3. Do the same for American Truck Simulator if you play both.
+4. If the dashboard stays stuck on "waiting for telemetry" even after
+   driving for a bit, open the tray icon's **"Show log file (troubleshooting)"**
+   menu item — it'll show whether the plugin was even detected.
 
 ## Running the client
 
