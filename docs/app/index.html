@@ -63,6 +63,18 @@
   #mapPanel { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; padding: 0; border-radius: 12px; }
   #leafletMap { width: 100%; height: 100%; background: #2b2f36; }
   .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
+
+  /* Banner grande y parpadeante cuando se corta la conexion - a diferencia
+     del texto chico de #status, esto se nota de un vistazo aunque estes
+     mirando el dashboard de reojo en otra pantalla mientras manejas. */
+  #reconnectBanner {
+    display: none;
+    position: absolute; top: 0; left: 0; right: 0; z-index: 1500;
+    background: var(--danger); color: #fff; text-align: center;
+    font-size: 0.85rem; font-weight: 600; padding: 0.4rem;
+    animation: reconnectPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes reconnectPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
   .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
 
   /* Flecha de heading del camion: el mapa se queda siempre norte-arriba (las
@@ -194,12 +206,14 @@
     <button id="langToggle" data-i18n-title="toggleLanguage" title="Toggle language">EN</button>
   </div>
   <div id="status" data-i18n="notConnected">Not connected</div>
-  <div id="mobileHint" data-i18n="mobileHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-shrink:0;">On mobile: open trucksim-dash.com/app and enter your pairing code.</div>
+  <div id="mobileHint" data-i18n="mobileHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.2rem;flex-shrink:0;">On mobile: open trucksim-dash.com/app and enter your pairing code.</div>
+  <div id="pairingDurationHint" data-i18n="pairingDurationHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-shrink:0;">The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit).</div>
 
   <div class="layout" id="layout">
     <div id="mapPanel">
       <div id="leafletMap"></div>
       <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
+      <div id="reconnectBanner"></div>
       <button id="recenterBtn" class="mapBtn" data-i18n-title="recenter" title="Recenter on truck">🎯</button>
       <button id="panelToggleBtn" class="mapBtn" data-i18n-title="togglePanel" title="Show/hide info">☰</button>
       <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
@@ -275,6 +289,7 @@ const TRANSLATIONS = {
     toggleLanguage: 'Toggle language',
     notConnected: 'Not connected',
     mobileHint: 'On mobile: open trucksim-dash.com/app and enter your pairing code.',
+    pairingDurationHint: 'The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit or Disconnect).',
     mapNotLoaded: 'Map not loaded',
     recenter: 'Recenter on truck',
     togglePanel: 'Show/hide info panel',
@@ -309,6 +324,7 @@ const TRANSLATIONS = {
     connectedPaused: 'Connected (game paused)',
     connectedLive: 'Connected, live',
     disconnected: 'Disconnected',
+    reconnectingBanner: '⚠ Connection lost — reconnecting... (data below may be stale)',
     connectionError: 'Connection error',
     mapNotFound: (label, path) => `Exported map not found for ${label} (${path})`,
   },
@@ -319,6 +335,7 @@ const TRANSLATIONS = {
     toggleLanguage: 'Cambiar idioma',
     notConnected: 'Sin conectar',
     mobileHint: 'Desde el celular: abrí trucksim-dash.com/app e ingresá tu código de pairing.',
+    pairingDurationHint: 'El código expira a los 10 minutos si no se usa. Una vez conectado, la sesión sigue activa hasta que cierres el cliente (ícono de bandeja → Quit o Disconnect).',
     mapNotLoaded: 'Mapa no cargado',
     recenter: 'Centrar en el camión',
     togglePanel: 'Mostrar/ocultar panel de info',
@@ -353,6 +370,7 @@ const TRANSLATIONS = {
     connectedPaused: 'Conectado (juego en pausa)',
     connectedLive: 'Conectado, en vivo',
     disconnected: 'Desconectado',
+    reconnectingBanner: '⚠ Se cortó la conexión — reconectando... (los datos de abajo pueden estar viejos)',
     connectionError: 'Error de conexión',
     mapNotFound: (label, path) => `No se encontró el mapa exportado para ${label} (${path})`,
   },
@@ -1017,25 +1035,35 @@ document.getElementById('recenterBtn').addEventListener('click', () => {
   }
 });
 
-document.getElementById('connectBtn').addEventListener('click', () => {
-  const backend = document.getElementById('backendUrl').value.trim();
-  const code = document.getElementById('code').value.trim().toUpperCase();
-  if (!code) { alert(t('enterCode')); return; }
+let reconnectTimer = null;
+const RECONNECT_DELAY_MS = 3000;
 
-  if (ws) ws.close();
-  trailWorld.length = 0;
-  lastWorldPos = null;
-  currentRouteTarget = null;
-  currentRouteWorldPoints = null;
-  if (trailLine) trailLine.setLatLngs([]);
-  if (destLine && leafletMap) { leafletMap.removeLayer(destLine); destLine = null; }
-  ws = new WebSocket(`${backend}/ws/live/${code}`);
+function showReconnectBanner(text) {
+  const banner = document.getElementById('reconnectBanner');
+  banner.textContent = text;
+  banner.style.display = 'block';
+}
 
-  ws.onopen = () => {
+function hideReconnectBanner() {
+  document.getElementById('reconnectBanner').style.display = 'none';
+}
+
+// Conecta (o reconecta) el websocket del viewer. Se llama tanto al apretar
+// Connect como automaticamente si la conexion se corta - antes, si se
+// cortaba, el unico aviso era el texto chico de #status, facil de no notar
+// si estas mirando el dashboard en otra pantalla mientras manejas.
+function connectWs(backend, code) {
+  clearTimeout(reconnectTimer);
+  const socket = new WebSocket(`${backend}/ws/live/${code}`);
+  ws = socket;
+
+  socket.onopen = () => {
+    hideReconnectBanner();
     statusEl.textContent = t('connectedWaiting');
     statusEl.className = 'ok';
   };
-  ws.onmessage = (event) => {
+  socket.onmessage = (event) => {
+    hideReconnectBanner();
     const data = JSON.parse(event.data);
     statusEl.textContent = data.paused ? t('connectedPaused') : t('connectedLive');
     statusEl.className = 'ok';
@@ -1043,14 +1071,34 @@ document.getElementById('connectBtn').addEventListener('click', () => {
     updateMap(data.position || {}, data.game);
     updateDestinationMarker(data);
   };
-  ws.onclose = () => {
+  socket.onclose = () => {
+    if (ws !== socket) return; // reemplazado por una conexion mas nueva, ignorar
     statusEl.textContent = t('disconnected');
     statusEl.className = 'err';
+    showReconnectBanner(t('reconnectingBanner'));
+    reconnectTimer = setTimeout(() => connectWs(backend, code), RECONNECT_DELAY_MS);
   };
-  ws.onerror = () => {
+  socket.onerror = () => {
+    if (ws !== socket) return;
     statusEl.textContent = t('connectionError');
     statusEl.className = 'err';
   };
+}
+
+document.getElementById('connectBtn').addEventListener('click', () => {
+  const backend = document.getElementById('backendUrl').value.trim();
+  const code = document.getElementById('code').value.trim().toUpperCase();
+  if (!code) { alert(t('enterCode')); return; }
+
+  clearTimeout(reconnectTimer);
+  if (ws) { ws.onclose = null; ws.close(); }
+  trailWorld.length = 0;
+  lastWorldPos = null;
+  currentRouteTarget = null;
+  currentRouteWorldPoints = null;
+  if (trailLine) trailLine.setLatLngs([]);
+  if (destLine && leafletMap) { leafletMap.removeLayer(destLine); destLine = null; }
+  connectWs(backend, code);
 });
 
 // El .exe del cliente abre el navegador directo con ?code=...&backend=...

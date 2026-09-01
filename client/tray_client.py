@@ -234,12 +234,43 @@ async def run_client(backend_url: str, fixed_code: str | None):
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
 
 
+_loop: asyncio.AbstractEventLoop | None = None
+_client_task: asyncio.Task | None = None
+
+
+def _start_client_task(backend_url: str, fixed_code: str | None):
+    global _client_task
+    _client_task = _loop.create_task(run_client(backend_url, fixed_code))
+
+
 def start_asyncio_thread(backend_url: str, fixed_code: str | None):
     def runner():
-        asyncio.run(run_client(backend_url, fixed_code))
+        global _loop
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+        _start_client_task(backend_url, fixed_code)
+        _loop.run_forever()
 
     thread = threading.Thread(target=runner, daemon=True)
     thread.start()
+
+
+def disconnect_session(icon, item):
+    # Corta la sesion activa (cierra el websocket actual, invalidando el
+    # codigo viejo para quien lo tenga) y pide un codigo de pairing nuevo,
+    # sin cerrar toda la aplicacion - a diferencia de Quit.
+    if _loop is None:
+        return
+    logging.info("Manual disconnect requested, getting a new pairing code")
+
+    def _do():
+        if _client_task:
+            _client_task.cancel()
+        state.set_code(None)
+        state.set_status("Disconnected - requesting new code...")
+        _start_client_task(state.backend_url, None)
+
+    _loop.call_soon_threadsafe(_do)
 
 
 def main():
@@ -250,6 +281,7 @@ def main():
     args = parser.parse_args()
 
     state.web_url = args.web_url
+    state.backend_url = args.backend
 
     start_asyncio_thread(args.backend, args.code)
 
@@ -257,6 +289,7 @@ def main():
         pystray.MenuItem("Open web", open_web_menu_item, default=True),
         pystray.MenuItem("Show pairing code", show_code_notification),
         pystray.MenuItem("Show code for mobile", show_mobile_info),
+        pystray.MenuItem("Disconnect (get new code)", disconnect_session),
         pystray.MenuItem("Show log file (troubleshooting)", show_log_location),
         pystray.MenuItem("Quit", quit_app),
     )
