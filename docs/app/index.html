@@ -740,7 +740,31 @@ function trimRouteBehindTruck(x, z) {
   destLine.setLatLngs(currentRouteWorldPoints.map(([px, pz]) => mapTransform.toLatLng(px, pz)));
 }
 
-function updateMap(position, game, headingDeg) {
+let lastDisplayedLatLng = null; // ultima posicion ya animada del marcador, para interpolar el proximo tramo
+let moveAnimFrameId = null;
+const MOVE_ANIM_MS = 900; // un poco menos que el intervalo de envio (1s) para que no se pisen dos animaciones
+
+// Anima el marcador (y el mapa, si autoFollow esta activo) de forma fluida
+// entre la posicion anterior y la nueva, en vez de saltar de una vez - los
+// updates llegan a ~1Hz asi que sin esto se ve "a los tics" como reporto el
+// usuario.
+function animateTruckTo(fromLatLng, toLatLng) {
+  if (moveAnimFrameId) cancelAnimationFrame(moveAnimFrameId);
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / MOVE_ANIM_MS);
+    const cur = L.latLng(
+      fromLatLng.lat + (toLatLng.lat - fromLatLng.lat) * t,
+      fromLatLng.lng + (toLatLng.lng - fromLatLng.lng) * t
+    );
+    truckMarker.setLatLng(cur);
+    if (autoFollow) leafletMap.setView(cur, leafletMap.getZoom(), { animate: false });
+    moveAnimFrameId = t < 1 ? requestAnimationFrame(step) : null;
+  }
+  moveAnimFrameId = requestAnimationFrame(step);
+}
+
+function updateMap(position, game) {
   if (position.x == null || position.z == null) return;
   loadGameMap(game || 'ats');
   if (!mapTransform || !leafletMap) return;
@@ -753,6 +777,7 @@ function updateMap(position, game, headingDeg) {
     const jumped = Math.sqrt(dx * dx + dz * dz) > TRAIL_JUMP_THRESHOLD_M;
     if (jumped) {
       trailWorld.length = 0;
+      lastDisplayedLatLng = null; // no animar el salto, que se posicione de una
       // Un salto grande (teletransporte al asignar trabajo, garage, etc.)
       // deja la ruta ya calculada desalineada del camion. Se fuerza un
       // recalculo la proxima vez que llegue el destino, igual que un GPS
@@ -767,17 +792,34 @@ function updateMap(position, game, headingDeg) {
   if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
 
   trailLine.setLatLngs(trailWorld);
-  truckMarker.setLatLng(latLng);
-  if (headingDeg != null) {
-    const el = truckMarker.getElement();
-    const arrow = el && el.querySelector('.truckArrow');
-    if (arrow) arrow.style.transform = `rotate(${headingDeg}deg)`;
-  }
-  trimRouteBehindTruck(position.x, position.z);
 
-  if (autoFollow) {
-    leafletMap.setView(latLng, leafletMap.getZoom(), { animate: false });
+  // La flecha de heading se calcula del desplazamiento en pixeles de pantalla
+  // entre la posicion anterior y la nueva (no del heading crudo del SDK) -
+  // asi apunta bien sin depender de como se relacionan los ejes x/z del
+  // juego con la orientacion del mapa exportado por ts-map.
+  const prevLatLng = lastDisplayedLatLng;
+  if (prevLatLng) {
+    const zoom = leafletMap.getZoom();
+    const p1 = leafletMap.project(prevLatLng, zoom);
+    const p2 = leafletMap.project(latLng, zoom);
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    if (Math.hypot(dx, dy) > 0.5) {
+      const angleDeg = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+      const el = truckMarker.getElement();
+      const arrow = el && el.querySelector('.truckArrow');
+      if (arrow) arrow.style.transform = `rotate(${angleDeg}deg)`;
+    }
   }
+
+  if (prevLatLng) {
+    animateTruckTo(prevLatLng, latLng);
+  } else {
+    truckMarker.setLatLng(latLng);
+    if (autoFollow) leafletMap.setView(latLng, leafletMap.getZoom(), { animate: false });
+  }
+  lastDisplayedLatLng = latLng;
+
+  trimRouteBehindTruck(position.x, position.z);
 }
 
 function formatSeconds(totalSeconds) {
@@ -994,7 +1036,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
     statusEl.textContent = data.paused ? t('connectedPaused') : t('connectedLive');
     statusEl.className = 'ok';
     updateHud(data);
-    updateMap(data.position || {}, data.game, data.headingDeg);
+    updateMap(data.position || {}, data.game);
     updateDestinationMarker(data);
   };
   ws.onclose = () => {

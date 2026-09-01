@@ -52,10 +52,6 @@ def build_payload(raw: dict) -> dict:
             "y": raw.get("coordinateY"),
             "z": raw.get("coordinateZ"),
         },
-        # rotationX del SDK viene como fraccion de vuelta completa (0=norte),
-        # puede ser negativo - el modulo en Python ya devuelve el resultado
-        # positivo equivalente para divisor positivo.
-        "headingDeg": ((raw.get("rotationX") or 0) % 1) * 360,
         "speedKmh": round(speed_kmh, 1),
         "speedLimitKmh": round(speed_limit_kmh, 1),
         "cargo": raw.get("cargo") or None,
