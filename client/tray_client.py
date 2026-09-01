@@ -38,7 +38,7 @@ DEFAULT_WEB_URL = "https://trucksim-dash.com/app/"
 
 class AppState:
     def __init__(self):
-        self.status = "Iniciando..."
+        self.status = "Starting..."
         self.code = None
         self.icon = None
         self.backend_url = None
@@ -85,8 +85,8 @@ def show_text_dialog(title: str, message: str, copy_value: str | None = None):
             entry.select_range(0, tk.END)
             root.clipboard_clear()
             root.clipboard_append(copy_value)
-            tk.Label(root, text="(ya copiado al portapapeles)", fg="#4caf50", padx=12).pack()
-        tk.Button(root, text="Cerrar", command=root.destroy, padx=20, pady=4).pack(pady=12)
+            tk.Label(root, text="(copied to clipboard)", fg="#4caf50", padx=12).pack()
+        tk.Button(root, text="Close", command=root.destroy, padx=20, pady=4).pack(pady=12)
         root.mainloop()
 
     threading.Thread(target=_show, daemon=True).start()
@@ -94,18 +94,18 @@ def show_text_dialog(title: str, message: str, copy_value: str | None = None):
 
 def show_code_notification(icon, item):
     if state.code:
-        show_text_dialog("Truck Dash", "Codigo de pairing:", copy_value=state.code)
+        show_text_dialog("Truck Dash", "Pairing code:", copy_value=state.code)
     else:
-        show_text_dialog("Truck Dash", "Todavia no hay codigo de pairing.")
+        show_text_dialog("Truck Dash", "No pairing code yet.")
 
 
 def show_mobile_info(icon, item):
     if not state.code:
-        show_text_dialog("Truck Dash", "Todavia no hay codigo de pairing.")
+        show_text_dialog("Truck Dash", "No pairing code yet.")
         return
     show_text_dialog(
         "Truck Dash",
-        f"En el celular, abri trucksim-dash.com/app e ingresa este codigo:",
+        "On your phone, open trucksim-dash.com/app and enter this code:",
         copy_value=state.code,
     )
 
@@ -140,20 +140,20 @@ def open_web_menu_item(icon, item):
     if url:
         webbrowser.open(url)
     else:
-        show_text_dialog("Truck Dash", "Todavia no hay codigo de pairing.")
+        show_text_dialog("Truck Dash", "No pairing code yet.")
 
 
 async def run_client(backend_url: str, fixed_code: str | None):
     code = fixed_code
     if code is None:
-        state.set_status("Solicitando codigo de pairing...")
+        state.set_status("Requesting pairing code...")
         try:
             code = await asyncio.to_thread(client_lib.request_pairing_code, backend_url)
         except Exception as exc:
-            state.set_status(f"Error obteniendo codigo: {exc}")
+            state.set_status(f"Error getting code: {exc}")
             return
     state.set_code(code)
-    state.set_status(f"Codigo {code} - conectando...")
+    state.set_status(f"Code {code} - connecting...")
     open_web_ui(backend_url, code)
 
     import truck_telemetry
@@ -165,13 +165,13 @@ async def run_client(backend_url: str, fixed_code: str | None):
         try:
             truck_telemetry.init()
         except Exception:
-            state.set_status(f"Codigo {code} - esperando que se abra el juego...")
+            state.set_status(f"Code {code} - waiting for the game to open...")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
             continue
 
         try:
             async with websockets.connect(url) as ws:
-                state.set_status(f"Codigo {code} - conectado")
+                state.set_status(f"Code {code} - connected")
                 last_game = None
                 while True:
                     raw = truck_telemetry.get_data()
@@ -183,15 +183,15 @@ async def run_client(backend_url: str, fixed_code: str | None):
                         game = payload.get("game")
                         if game != last_game:
                             last_game = game
-                            game_label = GAME_LABELS.get(game, "juego detectado")
-                            state.set_status(f"Codigo {code} - jugando {game_label}")
+                            game_label = GAME_LABELS.get(game, "game detected")
+                            state.set_status(f"Code {code} - playing {game_label}")
                         await ws.send(json.dumps(payload))
                     await asyncio.sleep(client_lib.SEND_INTERVAL_SECONDS)
         except (websockets.ConnectionClosed, OSError) as exc:
-            state.set_status(f"Codigo {code} - reconectando...")
+            state.set_status(f"Code {code} - reconnecting...")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
         except Exception:
-            state.set_status(f"Codigo {code} - esperando al juego...")
+            state.set_status(f"Code {code} - waiting for the game...")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
 
 
@@ -207,7 +207,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", default="wss://truck-companion-production.up.railway.app")
     parser.add_argument("--code", default=None)
-    parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="URL de la web a abrir (para desarrollo local)")
+    parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="Web URL to open (for local development)")
     args = parser.parse_args()
 
     state.web_url = args.web_url
@@ -215,10 +215,10 @@ def main():
     start_asyncio_thread(args.backend, args.code)
 
     menu = pystray.Menu(
-        pystray.MenuItem("Abrir web", open_web_menu_item, default=True),
-        pystray.MenuItem("Mostrar codigo de pairing", show_code_notification),
-        pystray.MenuItem("Mostrar codigo para el celular", show_mobile_info),
-        pystray.MenuItem("Salir", quit_app),
+        pystray.MenuItem("Open web", open_web_menu_item, default=True),
+        pystray.MenuItem("Show pairing code", show_code_notification),
+        pystray.MenuItem("Show code for mobile", show_mobile_info),
+        pystray.MenuItem("Quit", quit_app),
     )
     icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", menu)
     state.icon = icon
