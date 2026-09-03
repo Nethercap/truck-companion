@@ -129,6 +129,14 @@ def record_session_started():
         _save_stats()
 
 
+def record_job_delivered(revenue: float):
+    with _stats_lock:
+        stats = _load_stats()
+        stats["jobs_delivered"] = stats.get("jobs_delivered", 0) + 1
+        stats["total_revenue"] = stats.get("total_revenue", 0) + (revenue or 0)
+        _save_stats()
+
+
 class Session:
     def __init__(self, code: str):
         self.code = code
@@ -136,6 +144,7 @@ class Session:
         self.client_ws: Optional[WebSocket] = None
         self.viewer_ws_list: list[WebSocket] = []
         self.counted = False  # ya se sumo al contador historico (una vez por sesion, no por reconexion)
+        self.last_job_delivered = False  # flanco para no contar el mismo evento en cada tick que el pulso siga en true
 
 
 sessions: dict[str, Session] = {}
@@ -179,9 +188,13 @@ def health():
 
 @app.get("/stats/public")
 def stats_public():
-    """Contador historico total, para mostrar en la landing (no requiere auth)."""
+    """Contadores historicos totales, para mostrar en la landing (no requiere auth)."""
     stats = _load_stats()
-    return {"total_sessions": stats.get("total_sessions", 0)}
+    return {
+        "total_sessions": stats.get("total_sessions", 0),
+        "jobs_delivered": stats.get("jobs_delivered", 0),
+        "total_revenue": stats.get("total_revenue", 0),
+    }
 
 
 @app.get("/admin/stats")
@@ -214,6 +227,19 @@ async def ws_client(websocket: WebSocket, code: str):
     try:
         while True:
             data = await websocket.receive_text()
+            # jobDelivered llega como pulso (True por un solo frame) - se
+            # detecta el flanco de subida aca (server-side, una vez por
+            # entrega real) en vez de contar en el cliente web, que podria
+            # tener varios viewers mirando la misma sesion.
+            try:
+                event = (json.loads(data).get("event")) or {}
+                job_delivered = bool(event.get("jobDelivered"))
+                if job_delivered and not session.last_job_delivered:
+                    revenue = event.get("jobDeliveredRevenue") or 0
+                    asyncio.create_task(asyncio.to_thread(record_job_delivered, revenue))
+                session.last_job_delivered = job_delivered
+            except Exception:
+                pass
             for viewer in list(session.viewer_ws_list):
                 try:
                     await viewer.send_text(data)

@@ -16,6 +16,22 @@
     --muted: #9aa4b2;
   }
   * { box-sizing: border-box; }
+
+  #toastContainer {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3000;
+    display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;
+  }
+  .toast {
+    background: var(--panel); border: 1px solid #333; color: var(--text);
+    padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    opacity: 0; transform: translateY(-10px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { border-color: #4caf50; }
+  .toast.danger { border-color: var(--danger); }
   html, body { height: 100%; }
   body {
     font-family: system-ui, sans-serif;
@@ -199,6 +215,7 @@
 </style>
 </head>
 <body>
+  <div id="toastContainer"></div>
   <h1 style="display:flex;align-items:center;gap:0.5rem;"><img src="assets/logo.svg" alt="" style="height:1.1em;width:1.1em;" /> Truck Dash — ETS2 / ATS</h1>
   <div class="setup">
     <input id="backendUrl" value="wss://truck-companion-production.up.railway.app" size="34" style="display:none" />
@@ -328,6 +345,8 @@ const TRANSLATIONS = {
     disconnected: 'Disconnected',
     reconnectingBanner: '⚠ Connection lost — reconnecting... (data below may be stale)',
     connectionError: 'Connection error',
+    jobDeliveredToast: '✅ Job delivered! +${amount}',
+    jobCancelledToast: '❌ Job cancelled',
     mapNotFound: (label, path) => `Exported map not found for ${label} (${path})`,
   },
   es: {
@@ -374,6 +393,8 @@ const TRANSLATIONS = {
     disconnected: 'Desconectado',
     reconnectingBanner: '⚠ Se cortó la conexión — reconectando... (los datos de abajo pueden estar viejos)',
     connectionError: 'Error de conexión',
+    jobDeliveredToast: '✅ ¡Trabajo entregado! +${amount}',
+    jobCancelledToast: '❌ Trabajo cancelado',
     mapNotFound: (label, path) => `No se encontró el mapa exportado para ${label} (${path})`,
   },
 };
@@ -968,17 +989,38 @@ function updateHud(data) {
 // subida (false -> true) para no sumar el mismo evento en cada tick que el
 // flag siga en true.
 const sessionTotals = { tolls: 0, fines: 0, ferryTrainCount: 0 };
-const previousEventState = { tollgate: false, fined: false, ferry: false, train: false };
+const previousEventState = { tollgate: false, fined: false, ferry: false, train: false, jobDelivered: false, jobCancelled: false };
+
+function showToast(text, kind = 'success', durationMs = 5000) {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.textContent = text;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, durationMs);
+}
 
 function updateSessionEvents(event) {
   if (event.tollgate && !previousEventState.tollgate) sessionTotals.tolls += event.tollgatePayAmount || 0;
   if (event.fined && !previousEventState.fined) sessionTotals.fines += event.fineAmount || 0;
   if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
   if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
+  if (event.jobDelivered && !previousEventState.jobDelivered) {
+    showToast(t('jobDeliveredToast').replace('{amount}', Math.round(event.jobDeliveredRevenue || 0).toLocaleString()), 'success');
+  }
+  if (event.jobCancelled && !previousEventState.jobCancelled) {
+    showToast(t('jobCancelledToast'), 'danger');
+  }
   previousEventState.tollgate = !!event.tollgate;
   previousEventState.fined = !!event.fined;
   previousEventState.ferry = !!event.ferry;
   previousEventState.train = !!event.train;
+  previousEventState.jobDelivered = !!event.jobDelivered;
+  previousEventState.jobCancelled = !!event.jobCancelled;
 
   document.getElementById('tollsTotal').textContent = `$${sessionTotals.tolls.toLocaleString()}`;
   document.getElementById('finesTotal').textContent = `$${sessionTotals.fines.toLocaleString()}`;

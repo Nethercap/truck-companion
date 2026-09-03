@@ -292,6 +292,7 @@ const TRANSLATIONS = {
     badgeNoLogin: 'No login',
     badgeFree: '100% free',
     driverCounterText: '🚚 {n} drivers have tracked their jobs with Truck Dash so far',
+    jobsDeliveredText: '{n} jobs delivered',
     aboutTitle: 'About <span class="accent">Truck Dash</span>',
     aboutBody: 'Truck Dash is a browser dashboard that runs alongside Euro Truck Simulator 2 or American Truck Simulator, showing your live position on a real map, a real route to your destination, speed and speed limit, cargo, fuel, wear, and more — all in real time, for free, with no account needed.',
     aboutDashLink: "This is the dashboard itself — you'll need the local client running (see Get Started below) for it to show your own live data:",
@@ -335,6 +336,7 @@ const TRANSLATIONS = {
     badgeNoLogin: 'Sin login',
     badgeFree: '100% gratis',
     driverCounterText: '🚚 {n} camioneros ya trackearon sus viajes con Truck Dash',
+    jobsDeliveredText: '{n} trabajos entregados',
     aboutTitle: 'Sobre <span class="accent">Truck Dash</span>',
     aboutBody: 'Truck Dash es un tablero en el navegador que corre junto a Euro Truck Simulator 2 o American Truck Simulator, mostrando tu posición en vivo sobre un mapa real, una ruta real hacia tu destino, velocidad y límite, cargamento, combustible, desgaste y más — todo en tiempo real, gratis, sin necesitar cuenta.',
     aboutDashLink: 'Este es el tablero en sí — necesitás el cliente local corriendo (ver Empezar más abajo) para que muestre tus propios datos en vivo:',
@@ -381,11 +383,16 @@ function applyTranslations() {
 }
 
 let lastDriverCount = null;
+let lastJobsDelivered = null;
 
 function renderDriverCounter() {
   if (lastDriverCount == null) return;
   const el = document.getElementById('driverCounter');
-  el.innerHTML = t('driverCounterText').replace('{n}', `<strong>${lastDriverCount.toLocaleString()}</strong>`);
+  let html = t('driverCounterText').replace('{n}', `<strong>${lastDriverCount.toLocaleString()}</strong>`);
+  if (lastJobsDelivered != null) {
+    html += ' — ' + t('jobsDeliveredText').replace('{n}', `<strong>${lastJobsDelivered.toLocaleString()}</strong>`);
+  }
+  el.innerHTML = html;
   el.hidden = false;
 }
 
@@ -409,6 +416,7 @@ function fetchDriverCount() {
   fetch(STATS_URL).then(r => r.ok ? r.json() : null).then(data => {
     if (data && typeof data.total_sessions === 'number') {
       lastDriverCount = data.total_sessions;
+      lastJobsDelivered = typeof data.jobs_delivered === 'number' ? data.jobs_delivered : null;
       renderDriverCounter();
     }
   }).catch(() => {}); // si falla, simplemente no se muestra el contador - no es critico

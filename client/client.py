@@ -112,6 +112,14 @@ def build_payload(raw: dict) -> dict:
             "ferryPayAmount": raw.get("ferryPayAmount"),
             "train": raw.get("train"),
             "trainPayAmount": raw.get("trainPayAmount"),
+            # jobDelivered/jobCancelled son "pulso": el SDK los pone en True
+            # por un solo frame en el momento exacto que termina el trabajo,
+            # igual que tollgate/fined/ferry/train de arriba.
+            "jobDelivered": raw.get("jobDelivered"),
+            "jobDeliveredRevenue": raw.get("jobDeliveredRevenue"),
+            "jobDeliveredDistanceKm": raw.get("jobDeliveredDistanceKm"),
+            "jobCancelled": raw.get("jobCancelled"),
+            "jobCancelledPenalty": raw.get("jobCancelledPenalty"),
         },
     }
 
