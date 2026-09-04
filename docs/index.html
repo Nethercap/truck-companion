@@ -93,6 +93,14 @@
   .driverCounter { margin-top: 0.8rem; font-size: 0.85rem; color: var(--muted); }
   .driverCounter strong { color: var(--orange); font-size: 1rem; }
 
+  .latestJobs { max-width: 900px; margin: 2rem auto 0; padding: 0 1.5rem; }
+  .latestJobsTitle { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.6rem; text-align: center; }
+  .latestJobsTableWrap { overflow-x: auto; border-radius: 10px; }
+  .latestJobsTable { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: var(--panel); }
+  .latestJobsTable th, .latestJobsTable td { padding: 0.5rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .latestJobsTable th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  .latestJobsTable tbody tr:last-child td { border-bottom: none; }
+
   section { padding: 3rem 0; border-top: 1px solid var(--border); }
   section h2 { font-size: 1.6rem; margin: 0 0 1.2rem; }
   section h2 .accent { color: var(--orange); }
@@ -183,6 +191,25 @@
       <span>ETS2 + ATS</span>
     </div>
     <p id="driverCounter" class="driverCounter" hidden></p>
+  </div>
+
+  <div id="latestJobs" class="latestJobs" hidden>
+    <p class="latestJobsTitle" data-i18n="latestJobsTitle">Latest jobs completed</p>
+    <div class="latestJobsTableWrap">
+      <table class="latestJobsTable">
+        <thead>
+          <tr>
+            <th data-i18n="colRoute">Route</th>
+            <th data-i18n="colTruck">Truck</th>
+            <th data-i18n="colCargo">Cargo</th>
+            <th data-i18n="colPay">Pay</th>
+            <th data-i18n="colDistance">Distance</th>
+            <th data-i18n="colGame">Game</th>
+          </tr>
+        </thead>
+        <tbody id="latestJobsBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <section id="about">
@@ -293,6 +320,13 @@ const TRANSLATIONS = {
     badgeFree: '100% free',
     driverCounterText: '🚚 {n} drivers have tracked their jobs with Truck Dash so far',
     jobsDeliveredText: '{n} jobs delivered',
+    latestJobsTitle: 'Latest jobs completed',
+    colRoute: 'Route',
+    colTruck: 'Truck',
+    colCargo: 'Cargo',
+    colPay: 'Pay',
+    colDistance: 'Distance',
+    colGame: 'Game',
     aboutTitle: 'About <span class="accent">Truck Dash</span>',
     aboutBody: 'Truck Dash is a browser dashboard that runs alongside Euro Truck Simulator 2 or American Truck Simulator, showing your live position on a real map, a real route to your destination, speed and speed limit, cargo, fuel, wear, and more — all in real time, for free, with no account needed.',
     aboutDashLink: "This is the dashboard itself — you'll need the local client running (see Get Started below) for it to show your own live data:",
@@ -337,6 +371,13 @@ const TRANSLATIONS = {
     badgeFree: '100% gratis',
     driverCounterText: '🚚 {n} camioneros ya trackearon sus viajes con Truck Dash',
     jobsDeliveredText: '{n} trabajos entregados',
+    latestJobsTitle: 'Últimos trabajos completados',
+    colRoute: 'Ruta',
+    colTruck: 'Camión',
+    colCargo: 'Carga',
+    colPay: 'Pago',
+    colDistance: 'Distancia',
+    colGame: 'Juego',
     aboutTitle: 'Sobre <span class="accent">Truck Dash</span>',
     aboutBody: 'Truck Dash es un tablero en el navegador que corre junto a Euro Truck Simulator 2 o American Truck Simulator, mostrando tu posición en vivo sobre un mapa real, una ruta real hacia tu destino, velocidad y límite, cargamento, combustible, desgaste y más — todo en tiempo real, gratis, sin necesitar cuenta.',
     aboutDashLink: 'Este es el tablero en sí — necesitás el cliente local corriendo (ver Empezar más abajo) para que muestre tus propios datos en vivo:',
@@ -412,6 +453,29 @@ applyTranslations();
 // lado del backend en R2 y sobrevive a redeploys. Se pide cada 60s: no hace
 // falta que sea instantaneo, es un numero acumulado que no cambia seguido.
 const STATS_URL = 'https://truck-companion-production.up.railway.app/stats/public';
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const GAME_LABELS = { ets2: 'ETS2', ats: 'ATS' };
+
+function renderLatestJobs(jobs) {
+  const container = document.getElementById('latestJobs');
+  if (!jobs || !jobs.length) { container.hidden = true; return; }
+  document.getElementById('latestJobsBody').innerHTML = jobs.map(j => `
+    <tr>
+      <td>${escapeHtml(j.citySrc || '?')} → ${escapeHtml(j.cityDst || '?')}</td>
+      <td>${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
+      <td>${escapeHtml(j.cargo) || '-'}</td>
+      <td>$${Math.round(j.revenue || 0).toLocaleString()}</td>
+      <td>${Math.round(j.distanceKm || 0)} km</td>
+      <td>${GAME_LABELS[j.game] || '-'}</td>
+    </tr>
+  `).join('');
+  container.hidden = false;
+}
+
 function fetchDriverCount() {
   fetch(STATS_URL).then(r => r.ok ? r.json() : null).then(data => {
     if (data && typeof data.total_sessions === 'number') {
@@ -419,6 +483,7 @@ function fetchDriverCount() {
       lastJobsDelivered = typeof data.jobs_delivered === 'number' ? data.jobs_delivered : null;
       renderDriverCounter();
     }
+    if (data) renderLatestJobs(data.latest_jobs);
   }).catch(() => {}); // si falla, simplemente no se muestra el contador - no es critico
 }
 fetchDriverCount();

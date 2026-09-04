@@ -129,11 +129,20 @@ def record_session_started():
         _save_stats()
 
 
-def record_job_delivered(revenue: float):
+LATEST_JOBS_MAX = 5
+
+
+def record_job_delivered(job_info: dict):
     with _stats_lock:
         stats = _load_stats()
         stats["jobs_delivered"] = stats.get("jobs_delivered", 0) + 1
-        stats["total_revenue"] = stats.get("total_revenue", 0) + (revenue or 0)
+        stats["total_revenue"] = stats.get("total_revenue", 0) + (job_info.get("revenue") or 0)
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        stats.setdefault("daily_jobs", {})
+        stats["daily_jobs"][today] = stats["daily_jobs"].get(today, 0) + 1
+        latest = stats.setdefault("latest_jobs", [])
+        latest.insert(0, job_info)
+        del latest[LATEST_JOBS_MAX:]
         _save_stats()
 
 
@@ -194,6 +203,7 @@ def stats_public():
         "total_sessions": stats.get("total_sessions", 0),
         "jobs_delivered": stats.get("jobs_delivered", 0),
         "total_revenue": stats.get("total_revenue", 0),
+        "latest_jobs": stats.get("latest_jobs", []),
     }
 
 
@@ -232,11 +242,21 @@ async def ws_client(websocket: WebSocket, code: str):
             # entrega real) en vez de contar en el cliente web, que podria
             # tener varios viewers mirando la misma sesion.
             try:
-                event = (json.loads(data).get("event")) or {}
+                payload = json.loads(data)
+                event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
                 if job_delivered and not session.last_job_delivered:
-                    revenue = event.get("jobDeliveredRevenue") or 0
-                    asyncio.create_task(asyncio.to_thread(record_job_delivered, revenue))
+                    job_info = {
+                        "game": payload.get("game"),
+                        "citySrc": payload.get("citySrc"),
+                        "cityDst": payload.get("cityDst"),
+                        "truckBrand": payload.get("truckBrand"),
+                        "truckName": payload.get("truckName"),
+                        "cargo": payload.get("cargo"),
+                        "revenue": event.get("jobDeliveredRevenue") or 0,
+                        "distanceKm": event.get("jobDeliveredDistanceKm") or 0,
+                    }
+                    asyncio.create_task(asyncio.to_thread(record_job_delivered, job_info))
                 session.last_job_delivered = job_delivered
             except Exception:
                 pass
