@@ -214,6 +214,26 @@ def stats_admin(x_admin_key: Optional[str] = Header(default=None)):
     return _load_stats()
 
 
+# Permite sembrar una base real conocida manualmente (ej. gente que probo el
+# cliente o trabajos completados antes de tener este tracking automatico) -
+# solo pisa las claves top-level que se manden, no toca daily/daily_jobs/
+# latest_jobs.
+_SEEDABLE_KEYS = {"total_sessions", "jobs_delivered", "total_revenue"}
+
+
+@app.post("/admin/stats/seed")
+def stats_seed(payload: dict, x_admin_key: Optional[str] = Header(default=None)):
+    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403)
+    with _stats_lock:
+        stats = _load_stats()
+        for key, value in payload.items():
+            if key in _SEEDABLE_KEYS and isinstance(value, (int, float)):
+                stats[key] = value
+        _save_stats()
+        return stats
+
+
 @app.websocket("/ws/client/{code}")
 async def ws_client(websocket: WebSocket, code: str):
     """Conexion del cliente local (envia telemetria)."""
