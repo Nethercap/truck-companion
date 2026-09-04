@@ -476,15 +476,32 @@ function renderLatestJobs(jobs) {
   container.hidden = false;
 }
 
+const STATS_CACHE_KEY = 'truckdash_stats_cache';
+
+function applyStatsData(data) {
+  if (data && typeof data.total_sessions === 'number') {
+    lastDriverCount = data.total_sessions;
+    lastJobsDelivered = typeof data.jobs_delivered === 'number' ? data.jobs_delivered : null;
+    renderDriverCounter();
+  }
+  if (data) renderLatestJobs(data.latest_jobs);
+}
+
+// Se muestra al toque el ultimo valor cacheado en localStorage (evita el
+// "aparece de golpe" de esperar el fetch antes de mostrar nada), y despues
+// se refresca con el dato real en cuanto llega - no hace falta que sea
+// instantaneo, es un numero acumulado que no cambia seguido.
+try {
+  const cached = localStorage.getItem(STATS_CACHE_KEY);
+  if (cached) applyStatsData(JSON.parse(cached));
+} catch (e) {}
+
 function fetchDriverCount() {
   fetch(STATS_URL).then(r => r.ok ? r.json() : null).then(data => {
-    if (data && typeof data.total_sessions === 'number') {
-      lastDriverCount = data.total_sessions;
-      lastJobsDelivered = typeof data.jobs_delivered === 'number' ? data.jobs_delivered : null;
-      renderDriverCounter();
-    }
-    if (data) renderLatestJobs(data.latest_jobs);
-  }).catch(() => {}); // si falla, simplemente no se muestra el contador - no es critico
+    if (!data) return;
+    applyStatsData(data);
+    try { localStorage.setItem(STATS_CACHE_KEY, JSON.stringify(data)); } catch (e) {}
+  }).catch(() => {}); // si falla, se queda con lo cacheado (si habia) - no es critico
 }
 fetchDriverCount();
 setInterval(fetchDriverCount, 60000);
