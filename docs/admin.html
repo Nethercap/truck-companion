@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Truck Dash — Admin</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --panel-alt: #191d23;
+    --border: #262b33;
+    --text: #eee;
+    --muted: #9aa4b2;
+    --blue: #3b9eff;
+    --orange: #ff8a3d;
+    --danger: #ff4d4d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, sans-serif;
+    background: var(--bg); color: var(--text); padding: 1.5rem;
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 1rem; }
+  .keyRow { display: flex; gap: 0.6rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  input {
+    font-size: 0.9rem; padding: 0.45rem 0.6rem; background: var(--panel);
+    border: 1px solid var(--border); color: var(--text); border-radius: 6px;
+    min-width: 280px;
+  }
+  button {
+    font-size: 0.9rem; padding: 0.45rem 0.9rem; border-radius: 6px; border: none;
+    background: var(--blue); color: #fff; cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  #status { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
+  #status.err { color: var(--danger); }
+  .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem 1.4rem; min-width: 160px;
+  }
+  .card .label { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.3rem; }
+  .card .value { font-size: 1.6rem; font-weight: 700; color: var(--orange); }
+  h2 { font-size: 0.95rem; margin: 1.5rem 0 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--panel); border-radius: 8px; overflow: hidden; }
+  th, td { padding: 0.5rem 0.7rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+  tbody tr:last-child td { border-bottom: none; }
+  .tableWrap { overflow-x: auto; }
+  #content { display: none; }
+</style>
+</head>
+<body>
+  <h1>Truck Dash — Admin</h1>
+  <div class="keyRow">
+    <input id="adminKey" type="password" placeholder="X-Admin-Key" />
+    <button id="loadBtn">Load stats</button>
+    <button id="forgetBtn" style="background:var(--panel-alt);border:1px solid var(--border);">Forget key</button>
+  </div>
+  <div id="status">Enter the admin key to load stats.</div>
+
+  <div id="content">
+    <div class="cards">
+      <div class="card"><div class="label">Total sessions</div><div class="value" id="cardSessions">-</div></div>
+      <div class="card"><div class="label">Jobs delivered</div><div class="value" id="cardJobs">-</div></div>
+      <div class="card"><div class="label">Total revenue</div><div class="value" id="cardRevenue">-</div></div>
+    </div>
+
+    <h2>Sessions per day</h2>
+    <div class="tableWrap"><table>
+      <thead><tr><th>Date</th><th>Sessions</th></tr></thead>
+      <tbody id="dailySessionsBody"></tbody>
+    </table></div>
+
+    <h2>Jobs delivered per day</h2>
+    <div class="tableWrap"><table>
+      <thead><tr><th>Date</th><th>Jobs</th></tr></thead>
+      <tbody id="dailyJobsBody"></tbody>
+    </table></div>
+
+    <h2>Latest jobs</h2>
+    <div class="tableWrap"><table>
+      <thead><tr><th>Route</th><th>Truck</th><th>Cargo</th><th>Pay</th><th>Distance</th><th>Game</th></tr></thead>
+      <tbody id="latestJobsBody"></tbody>
+    </table></div>
+  </div>
+
+<script>
+const STORAGE_KEY = 'truckdash_admin_key';
+const API_URL = 'https://truck-companion-production.up.railway.app/admin/stats';
+
+const statusEl = document.getElementById('status');
+const keyInput = document.getElementById('adminKey');
+const content = document.getElementById('content');
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderDailyTable(bodyId, dailyObj) {
+  const entries = Object.entries(dailyObj || {}).sort((a, b) => b[0].localeCompare(a[0]));
+  document.getElementById(bodyId).innerHTML = entries.length
+    ? entries.map(([date, count]) => `<tr><td>${escapeHtml(date)}</td><td>${count}</td></tr>`).join('')
+    : '<tr><td colspan="2" style="color:var(--muted)">No data yet</td></tr>';
+}
+
+function renderLatestJobs(jobs) {
+  const tbody = document.getElementById('latestJobsBody');
+  if (!jobs || !jobs.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">No data yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = jobs.map(j => `
+    <tr>
+      <td>${escapeHtml(j.citySrc || '?')} → ${escapeHtml(j.cityDst || '?')}</td>
+      <td>${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
+      <td>${escapeHtml(j.cargo) || '-'}</td>
+      <td>$${Math.round(j.revenue || 0).toLocaleString()}</td>
+      <td>${Math.round(j.distanceKm || 0)} km</td>
+      <td>${escapeHtml((j.game || '-').toUpperCase())}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadStats() {
+  const key = keyInput.value.trim();
+  if (!key) { statusEl.textContent = 'Enter the admin key to load stats.'; statusEl.className = ''; return; }
+
+  statusEl.textContent = 'Loading...';
+  statusEl.className = '';
+  try {
+    const res = await fetch(API_URL, { headers: { 'X-Admin-Key': key } });
+    if (res.status === 403) {
+      statusEl.textContent = 'Invalid admin key (403).';
+      statusEl.className = 'err';
+      content.style.display = 'none';
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    localStorage.setItem(STORAGE_KEY, key);
+    statusEl.textContent = `Loaded at ${new Date().toLocaleTimeString()}.`;
+    statusEl.className = '';
+
+    document.getElementById('cardSessions').textContent = (data.total_sessions || 0).toLocaleString();
+    document.getElementById('cardJobs').textContent = (data.jobs_delivered || 0).toLocaleString();
+    document.getElementById('cardRevenue').textContent = `$${Math.round(data.total_revenue || 0).toLocaleString()}`;
+    renderDailyTable('dailySessionsBody', data.daily);
+    renderDailyTable('dailyJobsBody', data.daily_jobs);
+    renderLatestJobs(data.latest_jobs);
+    content.style.display = 'block';
+  } catch (err) {
+    statusEl.textContent = `Error: ${err.message}`;
+    statusEl.className = 'err';
+  }
+}
+
+document.getElementById('loadBtn').addEventListener('click', loadStats);
+keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadStats(); });
+document.getElementById('forgetBtn').addEventListener('click', () => {
+  localStorage.removeItem(STORAGE_KEY);
+  keyInput.value = '';
+  content.style.display = 'none';
+  statusEl.textContent = 'Key forgotten. Enter the admin key to load stats.';
+  statusEl.className = '';
+});
+
+const savedKey = localStorage.getItem(STORAGE_KEY);
+if (savedKey) {
+  keyInput.value = savedKey;
+  loadStats();
+}
+</script>
+</body>
+</html>
