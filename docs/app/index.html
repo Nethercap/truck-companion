@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Truck Dash</title>
 <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 <style>
   :root {
     --bg: #0d0f12;
@@ -80,10 +80,7 @@
   }
 
   #mapPanel { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; padding: 0; border-radius: 12px; }
-  /* El mapa rota via CSS cuando el modo navegacion esta activo (heading-up,
-     como un GPS real) en vez de quedar siempre norte-arriba. Los controles y
-     el resto de la UI quedan afuera de este elemento, asi que no rotan. */
-  #leafletMap { width: 100%; height: 100%; background: #2b2f36; transition: transform 0.3s linear; }
+  #mapCanvas { width: 100%; height: 100%; background: #2b2f36; }
   .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
 
   /* Banner grande y parpadeante cuando se corta la conexion - a diferencia
@@ -267,7 +264,7 @@
 
   <div class="layout" id="layout">
     <div id="mapPanel">
-      <div id="leafletMap"></div>
+      <div id="mapCanvas"></div>
       <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
       <div id="reconnectBanner"></div>
       <button id="recenterBtn" class="mapBtn" data-i18n-title="recenter" title="Recenter on truck">🎯</button>
@@ -335,7 +332,9 @@
     </div>
   </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
 <script>
 const statusEl = document.getElementById('status');
 let ws = null;
@@ -493,37 +492,163 @@ document.getElementById('unitToggle').addEventListener('click', () => {
 });
 let lastData = null;
 
-// Mapas reales exportados con ts-map (tiles + TileMapInfo.json con el bounding
-// box en coordenadas de juego). Cada juego tiene su propia carpeta porque son
-// mapas distintos (Europa vs USA).
-//
-// Los tiles pesan ~800MB entre los dos juegos, demasiado para vivir en el
-// repo/GitHub Pages - se sirven desde un bucket R2 aparte (maps.trucksim-dash.com).
-// Se usa SIEMPRE la URL remota (tambien para el flujo local del .exe, que ya
-// necesita internet igual para hablar con el backend): asi el .exe no depende
-// de tener una copia local de 800MB de tiles al lado para funcionar en otra PC.
+// Mapa vectorial (roads/prefabs/pois/labels) generado con truckermudgeon/maps
+// + tippecanoe, servido como un unico archivo .pmtiles por juego (soporta
+// range-requests HTTP, el navegador solo baja lo que necesita segun zoom/
+// posicion). assetsDir sigue apuntando a los mismos Cities.json y
+// route-graph-*.json de siempre (esos no cambiaron, solo el renderizado del
+// mapa en si). Todo se sirve desde R2 (maps.trucksim-dash.com), igual que
+// los tiles PNG que reemplaza.
 const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 const GAME_MAPS = {
-  ats: { dir: `${REMOTE_MAP_BASE}/ats`, label: 'American Truck Simulator' },
-  ets2: { dir: `${REMOTE_MAP_BASE}/ets2`, label: 'Euro Truck Simulator 2' },
+  ats: {
+    assetsDir: `${REMOTE_MAP_BASE}/ats`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats.pmtiles`,
+    sourceLayer: 'ats',
+    label: 'American Truck Simulator',
+    toLngLat: atsToLngLat,
+    origin: [-96, 39],
+  },
+  ets2: {
+    assetsDir: `${REMOTE_MAP_BASE}/ets2`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2.pmtiles`,
+    sourceLayer: 'ets2',
+    label: 'Euro Truck Simulator 2',
+    toLngLat: ets2ToLngLat,
+    origin: [15, 50],
+  },
 };
 
-let leafletMap = null;
-let tileLayer = null;
+// Conversion de coordenadas de juego (x,z) a lng/lat WGS84 real, con el mismo
+// algoritmo (proyeccion Lambert Conformal Conic) que usa truckermudgeon/maps
+// para generar los tiles vectoriales - asi el camion cae en el lugar correcto
+// sobre el mapa. Formulas portadas de su packages/libs/map/projections.ts.
+const EARTH_RADIUS_M = 6370997;
+const LENGTH_OF_DEGREE = (EARTH_RADIUS_M * Math.PI) / 180;
+
+const ATS_DEF = { lat1: 33, lat2: 45, origin: [39, -96], factor: [-0.00017706234, 0.000176689948] };
+const atsProj4 = proj4(`+proj=lcc +R=${EARTH_RADIUS_M} +lat_1=${ATS_DEF.lat1} +lat_2=${ATS_DEF.lat2} +lat_0=${ATS_DEF.origin[0]} +lon_0=${ATS_DEF.origin[1]}`);
+function atsToLngLat(x, z) {
+  const lcc = [x * ATS_DEF.factor[1] * LENGTH_OF_DEGREE, z * ATS_DEF.factor[0] * LENGTH_OF_DEGREE];
+  return atsProj4.inverse(lcc);
+}
+
+const ETS2_DEF = { lat1: 37, lat2: 65, origin: [50, 15], offset: [16660, 4150], factor: [-0.000171570875, 0.0001729241463] };
+const ets2Proj4 = proj4(`+proj=lcc +R=${EARTH_RADIUS_M} +lat_1=${ETS2_DEF.lat1} +lat_2=${ETS2_DEF.lat2} +lat_0=${ETS2_DEF.origin[0]} +lon_0=${ETS2_DEF.origin[1]}`);
+function ets2ToLngLat(x, z) {
+  const sx = Math.floor(x / 4000);
+  const sz = Math.floor(z / 4000);
+  x -= ETS2_DEF.offset[0];
+  z -= ETS2_DEF.offset[1];
+  // El contenido de UK esta autorado a una escala un poco mas grande, y todo
+  // lo que cae arriba-a-la-izquierda del sector de Calais se trata como UK -
+  // mismo hack que usa truckermudgeon/maps, no hay otra forma de detectarlo
+  // desde los archivos del juego.
+  const ukScale = 0.75;
+  const calaisX = -31100, calaisZ = -5500;
+  const isUk = sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
+  if (isUk) {
+    x = (x + calaisX / 2) * ukScale;
+    z = (z + calaisZ / 2) * ukScale;
+  }
+  const lcc = [x * ETS2_DEF.factor[1] * LENGTH_OF_DEGREE, z * ETS2_DEF.factor[0] * LENGTH_OF_DEGREE];
+  return ets2Proj4.inverse(lcc);
+}
+
+// Bearing geografico real (formula de azimut) entre dos puntos lng/lat -
+// estable sin importar hacia donde este rotado el mapa actualmente (a
+// diferencia del viejo truco en pixeles de pantalla que hacia falta con
+// Leaflet CRS.Simple, donde los ejes x/z del juego no se correspondian con
+// ninguna orientacion real).
+function geoBearingDeg(lng1, lat1, lng2, lat2) {
+  const toRad = d => d * Math.PI / 180;
+  const dLng = toRad(lng2 - lng1);
+  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+let map = null; // instancia de MapLibre
+let mapReady = false; // true despues del evento 'load' inicial (recien ahi se pueden agregar sources/layers)
+let pendingGame = null; // juego que se quiso cargar antes de que el mapa terminara de inicializar
 let truckMarker = null;
-let trailLine = null;
+let truckArrowEl = null; // referencia al div interno de la flecha, para rotarlo
 let destMarker = null;
-let destLine = null;
-let mapTransform = null; // { toLatLng(x, z) }
+let toLngLat = null; // funcion (x,z) => [lng,lat] del juego actual
 let currentGame = null;
-let currentMaxZoom = null;
 let citiesByName = {}; // Name -> {X, Y}
-const trailWorld = [];
+const trailWorld = []; // [[lng,lat], ...]
 const MAX_TRAIL_POINTS = 1000;
+
+function emptyLineString() {
+  return { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } };
+}
+
+// Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
+// se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
+// permite cambiarle la url a un source ya existente.
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'road-local', 'road-divided', 'road-freeway', 'poi', 'exit-label', 'country-label', 'city-label'];
+
+// Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
+// Green + 5 colores "Nav*" que casi no aparecen en la practica).
+function buildVecLayers(sourceLayer) {
+  const L = sourceLayer;
+  return [
+    { id: 'mapArea', type: 'fill', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'mapArea'],
+      paint: { 'fill-color': ['match', ['get', 'color'], 0, '#3a3f47', 1, '#454b54', 2, '#23262b', 3, '#31402f', '#3a3f47'], 'fill-opacity': 0.9 } },
+    { id: 'prefab', type: 'fill', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'prefab'],
+      paint: { 'fill-color': '#4a5058', 'fill-opacity': 0.95 } },
+    { id: 'road-local', type: 'line', source: 'vec', 'source-layer': L,
+      filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'local']],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#7d838c', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 12, 1.5, 17, 5] } },
+    { id: 'road-divided', type: 'line', source: 'vec', 'source-layer': L,
+      filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'divided']],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#cbd0d6', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 12, 2.5, 17, 8] } },
+    { id: 'road-freeway', type: 'line', source: 'vec', 'source-layer': L,
+      filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
+    { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'poi'], minzoom: 11,
+      layout: { 'text-field': ['match', ['get', 'sprite'], 'gas_ico', '⛽', 'service_ico', '🔧', 'weight_station_ico', '⚖', '📍'], 'text-size': 14, 'text-allow-overlap': false } },
+    { id: 'exit-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'exit'], minzoom: 10,
+      layout: { 'text-field': ['concat', 'Exit ', ['get', 'name']], 'text-size': 11 },
+      paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
+    { id: 'country-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'country'], maxzoom: 8,
+      layout: { 'text-field': ['get', 'name'], 'text-size': 13 },
+      paint: { 'text-color': '#9aa4b2', 'text-halo-color': '#000', 'text-halo-width': 1 } },
+    { id: 'city-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'city'],
+      layout: { 'text-field': ['get', 'name'], 'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 12, 15] },
+      paint: { 'text-color': '#ffffff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
+  ];
+}
+
+function ensureMapInitialized() {
+  if (map) return;
+  const protocol = new pmtiles.Protocol();
+  maplibregl.addProtocol('pmtiles', protocol.tile);
+  map = new maplibregl.Map({
+    container: 'mapCanvas',
+    style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#2b2f36' } }] },
+    center: [0, 20],
+    zoom: 1,
+    attributionControl: false,
+  });
+  map.on('dragstart', () => { autoFollow = false; });
+  map.once('load', () => {
+    mapReady = true;
+    map.addSource('trail', { type: 'geojson', data: emptyLineString() });
+    map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
+    map.addSource('route', { type: 'geojson', data: emptyLineString() });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#a30000', 'line-width': 3, 'line-opacity': 0.9 } });
+    if (pendingGame) { const g = pendingGame; pendingGame = null; loadGameMap(g); }
+  });
+}
 
 async function loadCities(mapInfo) {
   try {
-    const res = await fetch(`${mapInfo.dir}/Cities.json`);
+    const res = await fetch(`${mapInfo.assetsDir}/Cities.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const list = await res.json();
     citiesByName = {};
@@ -563,7 +688,7 @@ function distanceToRouteMeters(x, z) {
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
   try {
-    const res = await fetch(`${mapInfo.dir}/route-graph-${currentGame}.json`);
+    const res = await fetch(`${mapInfo.assetsDir}/route-graph-${currentGame}.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const adjacency = new Map();
@@ -703,21 +828,23 @@ function findRoute(startXY, endXY) {
 }
 
 function updateDestinationMarker(data) {
-  if (!leafletMap || !mapTransform) return;
+  if (!map || !toLngLat) return;
   const city = data.cityDst && citiesByName[data.cityDst];
   if (!city) {
-    if (destMarker) { leafletMap.removeLayer(destMarker); destMarker = null; }
-    if (destLine) { leafletMap.removeLayer(destLine); destLine = null; }
+    if (destMarker) { destMarker.remove(); destMarker = null; }
+    if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
     currentRouteTarget = null;
     currentRouteWorldPoints = null;
     return;
   }
-  const destLatLng = mapTransform.toLatLng(city.X, city.Y);
+  const destLngLat = toLngLat(city.X, city.Y);
   if (!destMarker) {
-    const destIcon = L.divIcon({ className: 'truckMarker', html: '🏁', iconSize: [20, 20] });
-    destMarker = L.marker(destLatLng, { icon: destIcon }).addTo(leafletMap);
+    const el = document.createElement('div');
+    el.className = 'truckMarker';
+    el.textContent = '🏁';
+    destMarker = new maplibregl.Marker({ element: el }).setLngLat(destLngLat).addTo(map);
   } else {
-    destMarker.setLatLng(destLatLng);
+    destMarker.setLngLat(destLngLat);
   }
 
   // Recalcula la ruta real por carreteras cuando cambia el destino, o -como
@@ -733,85 +860,56 @@ function updateDestinationMarker(data) {
     currentRouteTarget = data.cityDst;
     const routePoints = findRoute([data.position.x, data.position.z], [city.X, city.Y]);
     currentRouteWorldPoints = routePoints;
-    const linePoints = routePoints
-      ? routePoints.map(([x, y]) => mapTransform.toLatLng(x, y))
-      : [trailWorld[trailWorld.length - 1], destLatLng].filter(Boolean); // fallback: linea recta si no se encontro ruta
+    const lineCoords = routePoints
+      ? routePoints.map(([x, y]) => toLngLat(x, y))
+      : [lastDisplayedLngLat, destLngLat].filter(Boolean); // fallback: linea recta si no se encontro ruta
 
-    if (!destLine) {
-      destLine = L.polyline(linePoints, { color: '#a30000', weight: 3, opacity: 0.9 }).addTo(leafletMap);
-    } else {
-      destLine.setLatLngs(linePoints);
+    if (map.getSource('route')) {
+      map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: lineCoords } });
     }
   }
 }
 
 async function loadGameMap(game) {
-  if (game === currentGame || !GAME_MAPS[game]) return;
+  if (!GAME_MAPS[game]) return;
+  ensureMapInitialized();
+  if (!mapReady) { pendingGame = game; return; }
+  if (game === currentGame) return;
+
   const mapInfo = GAME_MAPS[game];
-
-  let tileMapInfo;
-  try {
-    const res = await fetch(`${mapInfo.dir}/TileMapInfo.json`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    tileMapInfo = await res.json();
-  } catch (err) {
-    document.getElementById('mapHint').textContent = t('mapNotFound', mapInfo.label, `${mapInfo.dir}/TileMapInfo.json`);
-    return;
-  }
-
   currentGame = game;
-  currentMaxZoom = tileMapInfo.maxZoom;
-  const { x1, x2, y1, y2, maxZoom } = tileMapInfo;
-  const pixelsAtMaxZoom = 256 * Math.pow(2, maxZoom);
-  const scale = pixelsAtMaxZoom / (x2 - x1);
-
-  // Convierte coordenadas de juego (x, z) a LatLng del sistema CRS.Simple de Leaflet.
-  mapTransform = {
-    toLatLng: (x, z) => {
-      const px = (x - x1) * scale;
-      const py = (z - y1) * scale;
-      return leafletMap.unproject([px, py], maxZoom);
-    },
-  };
+  toLngLat = mapInfo.toLngLat;
 
   await loadCities(mapInfo);
   await loadRouteGraph(mapInfo);
   currentRouteTarget = null;
   currentRouteWorldPoints = null;
+  trailWorld.length = 0;
+  lastDisplayedLngLat = null;
+  if (map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
+  if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
+  if (destMarker) { destMarker.remove(); destMarker = null; }
 
-  if (!leafletMap) {
-    leafletMap = L.map('leafletMap', { crs: L.CRS.Simple, minZoom: tileMapInfo.minZoom, maxZoom });
-    // Si el usuario arrastra el mapa a mano, dejamos de recentrar solos en
-    // cada update (si no, seria imposible mirar otra parte del mapa) - se
-    // reactiva con el boton de recentrar.
-    leafletMap.on('dragstart', () => { autoFollow = false; });
-    if (navMode) leafletMap.dragging.disable(); // por si se activo el modo nav antes de que el mapa terminara de cargar
-  } else {
-    if (tileLayer) leafletMap.removeLayer(tileLayer);
-    if (trailLine) leafletMap.removeLayer(trailLine);
-    if (truckMarker) leafletMap.removeLayer(truckMarker);
-    if (destMarker) { leafletMap.removeLayer(destMarker); destMarker = null; }
-    if (destLine) { leafletMap.removeLayer(destLine); destLine = null; }
-    trailWorld.length = 0;
+  // El source vectorial 'vec' no se puede "reapuntar" a otra url una vez
+  // creado - hay que sacarlo (y las capas que dependen de el) y crearlo de
+  // nuevo con el pmtiles del juego que corresponda.
+  for (const id of VEC_LAYER_IDS) { if (map.getLayer(id)) map.removeLayer(id); }
+  if (map.getSource('vec')) map.removeSource('vec');
+  map.addSource('vec', { type: 'vector', url: `pmtiles://${mapInfo.pmtilesUrl}` });
+  // Se insertan justo antes de 'trail-line' para que el trail/ruta/marcadores
+  // queden siempre por encima del mapa base.
+  for (const layer of buildVecLayers(mapInfo.sourceLayer)) map.addLayer(layer, 'trail-line');
+
+  map.jumpTo({ center: mapInfo.origin, zoom: 5 });
+
+  if (!truckMarker) {
+    const el = document.createElement('div');
+    el.className = 'truckMarker';
+    truckArrowEl = document.createElement('div');
+    truckArrowEl.className = 'truckArrow';
+    el.appendChild(truckArrowEl);
+    truckMarker = new maplibregl.Marker({ element: el }).setLngLat(mapInfo.origin).addTo(map);
   }
-
-  const corner1 = leafletMap.unproject([0, 0], maxZoom);
-  const corner2 = leafletMap.unproject([pixelsAtMaxZoom, pixelsAtMaxZoom], maxZoom);
-  const bounds = L.latLngBounds(corner1, corner2);
-
-  tileLayer = L.tileLayer(`${mapInfo.dir}/Tiles/{z}/{x}/{y}.png`, {
-    minZoom: tileMapInfo.minZoom,
-    maxZoom,
-    noWrap: true,
-    bounds,
-  }).addTo(leafletMap);
-
-  leafletMap.setMaxBounds(bounds);
-  leafletMap.fitBounds(bounds);
-
-  trailLine = L.polyline([], { color: '#3b9eff', weight: 3, opacity: 0.7 }).addTo(leafletMap);
-  const truckIcon = L.divIcon({ className: 'truckMarker', html: '<div class="truckArrow"></div>', iconSize: [20, 20] });
-  truckMarker = L.marker(corner1, { icon: truckIcon }).addTo(leafletMap);
 
   document.getElementById('mapHint').textContent = mapInfo.label;
 }
@@ -823,9 +921,9 @@ const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es u
 // Modo navegacion: mapa heading-up (rota con el camion, como un GPS real) en
 // vez de norte-arriba, con zoom dinamico (se acerca en curvas, se aleja en
 // rectas) e indicaciones de giro genericas (sin nombres de calle, el grafo
-// no los tiene). El heading se calcula en espacio de pantalla (leafletMap.
-// project, no rota con el CSS) asi que sigue siendo consistente incluso con
-// el mapa visualmente rotado.
+// no los tiene). A diferencia de la version con Leaflet (que rotaba un div
+// via CSS), MapLibre soporta rotacion real del mapa (bearing) - el pan sigue
+// funcionando bien incluso rotado, asi que no hace falta deshabilitar drag.
 let navMode = false;
 let lastHeadingDeg = 0;
 const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo giro
@@ -833,38 +931,27 @@ const NAV_TURN_ANGLE_THRESHOLD_DEG = 25; // cambio de rumbo minimo para contar c
 
 function setNavMode(on) {
   navMode = on;
-  const mapEl = document.getElementById('leafletMap');
   const btn = document.getElementById('navToggleBtn');
   if (on) {
     autoFollow = true;
-    if (leafletMap) leafletMap.dragging.disable(); // arrastrar con el mapa rotado via CSS quedaria desalineado
+    if (map) map.dragRotate.disable(); // el rumbo lo manejamos nosotros segun el heading, no rotacion manual
     btn.classList.add('active');
+    if (truckArrowEl) truckArrowEl.style.transform = 'rotate(0deg)'; // el mapa ya rota, el camion siempre "para arriba"
   } else {
-    mapEl.style.transform = 'none';
-    if (leafletMap) leafletMap.dragging.enable();
+    if (map) { map.dragRotate.enable(); map.easeTo({ bearing: 0, duration: 300 }); }
     btn.classList.remove('active');
     document.getElementById('navPanel').style.display = 'none';
+    if (truckArrowEl) truckArrowEl.style.transform = `rotate(${lastHeadingDeg}deg)`;
   }
-}
-
-function updateNavRotation() {
-  document.getElementById('leafletMap').style.transform = `rotate(${-lastHeadingDeg}deg)`;
-}
-
-// Bearing en espacio de pantalla entre dos puntos ya proyectados a pixeles
-// (mismo criterio que el heading de la flecha: evita depender de como se
-// relacionan los ejes x/z del juego con la orientacion del mapa).
-function screenBearing(p1, p2) {
-  return (Math.atan2(p2.x - p1.x, -(p2.y - p1.y)) * 180 / Math.PI + 360) % 360;
 }
 
 // Busca el proximo giro real en la ruta ya calculada (recortada a la
 // posicion actual por trimRouteBehindTruck), mirando hasta NAV_TURN_LOOKAHEAD_M
-// adelante. Devuelve null si el camino sigue derecho en ese tramo.
+// adelante, usando bearing geografico real (no depende del mapa ni de su
+// rotacion actual). Devuelve null si el camino sigue derecho en ese tramo.
 function findUpcomingTurn() {
-  if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !leafletMap || !mapTransform) return null;
-  const zoom = leafletMap.getZoom();
-  const screenPts = [];
+  if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !toLngLat) return null;
+  const pts = [];
   let cumDist = 0;
   for (let i = 0; i < currentRouteWorldPoints.length; i++) {
     const [wx, wz] = currentRouteWorldPoints[i];
@@ -873,17 +960,18 @@ function findUpcomingTurn() {
       cumDist += Math.hypot(wx - pwx, wz - pwz);
     }
     if (cumDist > NAV_TURN_LOOKAHEAD_M) break;
-    screenPts.push({ p: leafletMap.project(mapTransform.toLatLng(wx, wz), zoom), dist: cumDist });
+    const [lng, lat] = toLngLat(wx, wz);
+    pts.push({ lng, lat, dist: cumDist });
   }
-  if (screenPts.length < 3) return null;
+  if (pts.length < 3) return null;
 
-  const initialBearing = screenBearing(screenPts[0].p, screenPts[1].p);
-  for (let i = 1; i < screenPts.length - 1; i++) {
-    const segBearing = screenBearing(screenPts[i].p, screenPts[i + 1].p);
+  const initialBearing = geoBearingDeg(pts[0].lng, pts[0].lat, pts[1].lng, pts[1].lat);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const segBearing = geoBearingDeg(pts[i].lng, pts[i].lat, pts[i + 1].lng, pts[i + 1].lat);
     let delta = segBearing - initialBearing;
     delta = ((delta + 540) % 360) - 180; // normalizar a [-180, 180]
     if (Math.abs(delta) > NAV_TURN_ANGLE_THRESHOLD_DEG) {
-      return { distanceMeters: screenPts[i].dist, direction: delta > 0 ? 'right' : 'left' };
+      return { distanceMeters: pts[i].dist, direction: delta > 0 ? 'right' : 'left' };
     }
   }
   return null;
@@ -907,17 +995,17 @@ function updateNavPanelAndZoom() {
   }
   panel.style.display = 'block';
 
-  if (!currentMaxZoom) return;
-  // Zoom dinamico: mas cerca del giro, mas zoom - como un GPS real. Se usan
-  // niveles relativos al maxZoom del tileset (varia por juego).
-  let targetZoom = currentMaxZoom - 2; // "autopista", tramo recto
+  // Zoom dinamico: mas cerca del giro, mas zoom - como un GPS real. Al ser
+  // tiles vectoriales el mapa puede acercar mas alla del ultimo zoom
+  // generado (overzoom automatico de MapLibre), asi que se usan niveles
+  // absolutos en vez de relativos a un maxZoom del tileset.
+  let targetZoom = 13; // "autopista", tramo recto
   if (turn) {
-    if (turn.distanceMeters < 150) targetZoom = currentMaxZoom;
-    else if (turn.distanceMeters < 400) targetZoom = currentMaxZoom - 1;
+    if (turn.distanceMeters < 150) targetZoom = 16;
+    else if (turn.distanceMeters < 400) targetZoom = 15;
   }
-  targetZoom = Math.max(leafletMap.getMinZoom(), Math.min(currentMaxZoom, targetZoom));
-  if (leafletMap.getZoom() !== targetZoom) {
-    leafletMap.setZoom(targetZoom, { animate: true });
+  if (Math.abs(map.getZoom() - targetZoom) > 0.2) {
+    map.easeTo({ zoom: targetZoom, duration: 400 });
   }
 }
 
@@ -925,7 +1013,7 @@ function updateNavPanelAndZoom() {
 // proyectando la posicion actual sobre la polilinea y descartando los puntos
 // anteriores - asi no queda roja debajo de la azul (trail) ya recorrida.
 function trimRouteBehindTruck(x, z) {
-  if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !destLine) return;
+  if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !map.getSource('route')) return;
   let bestIdx = 0, bestDist = Infinity, bestPoint = null;
   for (let i = 0; i < currentRouteWorldPoints.length - 1; i++) {
     const [ax, az] = currentRouteWorldPoints[i];
@@ -942,10 +1030,13 @@ function trimRouteBehindTruck(x, z) {
   // encarga de recalcularla entera, no recortar sobre una ruta vieja.
   if (bestDist > OFF_ROUTE_THRESHOLD_M) return;
   currentRouteWorldPoints = [bestPoint, ...currentRouteWorldPoints.slice(bestIdx + 1)];
-  destLine.setLatLngs(currentRouteWorldPoints.map(([px, pz]) => mapTransform.toLatLng(px, pz)));
+  map.getSource('route').setData({
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: currentRouteWorldPoints.map(([px, pz]) => toLngLat(px, pz)) },
+  });
 }
 
-let lastDisplayedLatLng = null; // ultima posicion ya animada del marcador, para interpolar el proximo tramo
+let lastDisplayedLngLat = null; // ultima posicion ya animada del marcador ([lng,lat]), para interpolar el proximo tramo
 let moveAnimFrameId = null;
 const MOVE_ANIM_MS = 900; // un poco menos que el intervalo de envio (1s) para que no se pisen dos animaciones
 
@@ -953,17 +1044,17 @@ const MOVE_ANIM_MS = 900; // un poco menos que el intervalo de envio (1s) para q
 // entre la posicion anterior y la nueva, en vez de saltar de una vez - los
 // updates llegan a ~1Hz asi que sin esto se ve "a los tics" como reporto el
 // usuario.
-function animateTruckTo(fromLatLng, toLatLng) {
+function animateTruckTo(fromLngLat, toPos) {
   if (moveAnimFrameId) cancelAnimationFrame(moveAnimFrameId);
   const start = performance.now();
   function step(now) {
     const t = Math.min(1, (now - start) / MOVE_ANIM_MS);
-    const cur = L.latLng(
-      fromLatLng.lat + (toLatLng.lat - fromLatLng.lat) * t,
-      fromLatLng.lng + (toLatLng.lng - fromLatLng.lng) * t
-    );
-    truckMarker.setLatLng(cur);
-    if (autoFollow) leafletMap.setView(cur, leafletMap.getZoom(), { animate: false });
+    const cur = [
+      fromLngLat[0] + (toPos[0] - fromLngLat[0]) * t,
+      fromLngLat[1] + (toPos[1] - fromLngLat[1]) * t,
+    ];
+    truckMarker.setLngLat(cur);
+    if (autoFollow) map.jumpTo({ center: cur });
     moveAnimFrameId = t < 1 ? requestAnimationFrame(step) : null;
   }
   moveAnimFrameId = requestAnimationFrame(step);
@@ -972,63 +1063,56 @@ function animateTruckTo(fromLatLng, toLatLng) {
 function updateMap(position, game) {
   if (position.x == null || position.z == null) return;
   loadGameMap(game || 'ats');
-  if (!mapTransform || !leafletMap) return;
+  if (!toLngLat || !map) return;
 
-  const latLng = mapTransform.toLatLng(position.x, position.z);
+  const lngLat = toLngLat(position.x, position.z);
+  const prevWorldPos = lastWorldPos;
+  const prevLngLat = lastDisplayedLngLat;
+  let justJumped = false;
 
-  if (lastWorldPos) {
-    const dx = position.x - lastWorldPos.x;
-    const dz = position.z - lastWorldPos.z;
-    const jumped = Math.sqrt(dx * dx + dz * dz) > TRAIL_JUMP_THRESHOLD_M;
-    if (jumped) {
-      trailWorld.length = 0;
-      lastDisplayedLatLng = null; // no animar el salto, que se posicione de una
+  if (prevWorldPos) {
+    const dx = position.x - prevWorldPos.x;
+    const dz = position.z - prevWorldPos.z;
+    const movedM = Math.hypot(dx, dz);
+    if (movedM > TRAIL_JUMP_THRESHOLD_M) {
       // Un salto grande (teletransporte al asignar trabajo, garage, etc.)
       // deja la ruta ya calculada desalineada del camion. Se fuerza un
       // recalculo la proxima vez que llegue el destino, igual que un GPS
       // recalcula cuando te salis del camino.
+      justJumped = true;
+      trailWorld.length = 0;
       currentRouteTarget = null;
       currentRouteWorldPoints = null;
+    } else if (prevLngLat && movedM > 0.3) {
+      // Heading: bearing geografico real entre la posicion mostrada anterior
+      // y la nueva - estable sin importar la rotacion actual del mapa.
+      const angleDeg = geoBearingDeg(prevLngLat[0], prevLngLat[1], lngLat[0], lngLat[1]);
+      lastHeadingDeg = angleDeg;
+      // En modo navegacion el mapa ya rota al heading (ver mas abajo), asi
+      // que la flecha se deja apuntando siempre "para arriba" en pantalla.
+      if (truckArrowEl) truckArrowEl.style.transform = navMode ? 'rotate(0deg)' : `rotate(${angleDeg}deg)`;
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
 
-  trailWorld.push(latLng);
+  trailWorld.push(lngLat);
   if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
-
-  trailLine.setLatLngs(trailWorld);
-
-  // La flecha de heading se calcula del desplazamiento en pixeles de pantalla
-  // entre la posicion anterior y la nueva (no del heading crudo del SDK) -
-  // asi apunta bien sin depender de como se relacionan los ejes x/z del
-  // juego con la orientacion del mapa exportado por ts-map.
-  const prevLatLng = lastDisplayedLatLng;
-  if (prevLatLng) {
-    const zoom = leafletMap.getZoom();
-    const p1 = leafletMap.project(prevLatLng, zoom);
-    const p2 = leafletMap.project(latLng, zoom);
-    const dx = p2.x - p1.x, dy = p2.y - p1.y;
-    if (Math.hypot(dx, dy) > 0.5) {
-      const angleDeg = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
-      lastHeadingDeg = angleDeg;
-      const el = truckMarker.getElement();
-      const arrow = el && el.querySelector('.truckArrow');
-      if (arrow) arrow.style.transform = `rotate(${angleDeg}deg)`;
-    }
+  if (map.getSource('trail')) {
+    map.getSource('trail').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailWorld } });
   }
 
   if (navMode) {
-    updateNavRotation();
+    map.easeTo({ bearing: lastHeadingDeg, duration: 250 });
     updateNavPanelAndZoom();
   }
 
-  if (prevLatLng) {
-    animateTruckTo(prevLatLng, latLng);
+  if (!justJumped && prevLngLat) {
+    animateTruckTo(prevLngLat, lngLat);
   } else {
-    truckMarker.setLatLng(latLng);
-    if (autoFollow) leafletMap.setView(latLng, leafletMap.getZoom(), { animate: false });
+    truckMarker.setLngLat(lngLat);
+    if (autoFollow) map.jumpTo({ center: lngLat });
   }
-  lastDisplayedLatLng = latLng;
+  lastDisplayedLngLat = lngLat;
 
   trimRouteBehindTruck(position.x, position.z);
 }
@@ -1209,15 +1293,15 @@ function statSpan(pct, dangerBelow, warnBelow, isWear) {
 document.getElementById('panelToggleBtn').addEventListener('click', () => {
   document.getElementById('layout').classList.toggle('panelHidden');
   // El mapa cambia de tamano real (el panel ahora desplaza, no tapa), asi
-  // que Leaflet necesita invalidateSize para recalcular su viewport, y
+  // que MapLibre necesita resize() para recalcular su viewport, y
   // recentramos en el camion para que no quede corrido hacia el costado
   // que el panel dejo de ocupar. Se espera a que termine la transicion CSS
-  // (0.25s) para que invalidateSize lea el tamano final, no el intermedio.
+  // (0.25s) para que resize lea el tamano final, no el intermedio.
   setTimeout(() => {
-    if (!leafletMap) return;
-    leafletMap.invalidateSize();
+    if (!map) return;
+    map.resize();
     if (truckMarker) {
-      leafletMap.setView(truckMarker.getLatLng(), leafletMap.getZoom(), { animate: false });
+      map.jumpTo({ center: truckMarker.getLngLat() });
     }
   }, 260);
 });
@@ -1248,8 +1332,8 @@ document.getElementById('updateBannerClose').addEventListener('click', () => {
 
 document.getElementById('recenterBtn').addEventListener('click', () => {
   autoFollow = true;
-  if (leafletMap && truckMarker) {
-    leafletMap.setView(truckMarker.getLatLng(), leafletMap.getZoom(), { animate: false });
+  if (map && truckMarker) {
+    map.jumpTo({ center: truckMarker.getLngLat() });
   }
 });
 
@@ -1350,10 +1434,11 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   if (ws) { ws.onclose = null; ws.close(); }
   trailWorld.length = 0;
   lastWorldPos = null;
+  lastDisplayedLngLat = null;
   currentRouteTarget = null;
   currentRouteWorldPoints = null;
-  if (trailLine) trailLine.setLatLngs([]);
-  if (destLine && leafletMap) { leafletMap.removeLayer(destLine); destLine = null; }
+  if (map && map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
+  if (map && map.getSource('route')) map.getSource('route').setData(emptyLineString());
   connectWs(backend, code);
 });
 
