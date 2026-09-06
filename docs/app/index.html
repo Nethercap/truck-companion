@@ -1053,10 +1053,10 @@ function updateNavPanel(turn) {
 // (overzoom automatico de MapLibre), asi que se usan niveles absolutos.
 function navTargetZoom(turn) {
   if (turn) {
-    if (turn.distanceMeters < 150) return 15;
-    if (turn.distanceMeters < 400) return 14;
+    if (turn.distanceMeters < 150) return 13;
+    if (turn.distanceMeters < 400) return 12;
   }
-  return 12; // "autopista", tramo recto
+  return 10; // "autopista", tramo recto - similar al GPS/route advisor del juego
 }
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
