@@ -154,19 +154,46 @@
      abierto, esos mismos datos ya se ven ahi adentro). */
   #miniHud {
     display: none;
+    flex-direction: column;
+    align-items: flex-end;
     position: absolute; top: 0.6rem; right: 0.6rem; z-index: 1000;
     background: rgba(23, 26, 31, 0.9);
     border-radius: 10px;
     padding: 0.5rem 0.7rem;
-    align-items: center;
-    gap: 0.6rem;
     box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
   .layout.panelHidden #miniHud { display: flex; }
+  .miniHudTop { display: flex; align-items: center; gap: 0.6rem; }
   #miniHud .limitSign { width: 34px; height: 34px; font-size: 0.85rem; border-width: 3px; }
   #miniHud .speedBig { font-size: 1.4rem; }
   #miniHud .cruiseDisplay { font-size: 0.75rem; }
   #miniHud .cruiseSpeed { font-size: 1rem; }
+  /* Items opcionales (activables desde Settings) que se muestran en lineas
+     debajo de velocidad/limite, en vez de al costado como el cruise control. */
+  .miniHudExtra { margin-top: 0.35rem; font-size: 0.72rem; color: var(--muted); text-align: right; display: flex; flex-direction: column; gap: 0.15rem; }
+  .miniHudExtra:empty { display: none; margin-top: 0; }
+
+  .settingsOverlay {
+    position: fixed; inset: 0; z-index: 2500; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .settingsPanel {
+    background: var(--panel); border: 1px solid #333; border-radius: 10px;
+    padding: 1.2rem; width: min(340px, 90vw); max-height: 85vh; overflow-y: auto;
+  }
+  .settingsPanel h3 { margin: 0 0 0.8rem; font-size: 1rem; }
+  .settingsSectionTitle { font-size: 0.8rem; color: var(--muted); margin: 1rem 0 0.4rem; }
+  .settingsRow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; padding: 0.25rem 0; cursor: pointer; }
+  .colorOptions { display: flex; gap: 0.6rem; }
+  .colorSwatch {
+    width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  .colorSwatch.selected { border-color: #fff; }
+  #settingsCloseBtn {
+    margin-top: 1.2rem; width: 100%; padding: 0.5rem; border-radius: 6px; border: none;
+    background: var(--accent); color: #fff; cursor: pointer; font-size: 0.9rem;
+  }
 
   /* Panel de info: por default (desktop y horizontal) es una columna fija de
      300px pegada al borde derecho, alto completo. En vertical se convierte en
@@ -252,6 +279,30 @@
     <button id="connectBtn" data-i18n="connect">Connect</button>
     <button id="unitToggle" data-i18n-title="toggleUnits" title="Toggle units">km · km/h</button>
     <button id="langToggle" data-i18n-title="toggleLanguage" title="Toggle language">EN</button>
+    <button id="settingsBtn" data-i18n-title="settings" title="Settings">⚙️</button>
+  </div>
+
+  <div id="settingsModal" class="settingsOverlay" style="display:none;">
+    <div class="settingsPanel">
+      <h3 data-i18n="settingsTitle">Settings</h3>
+
+      <p class="settingsSectionTitle" data-i18n="settingsMiniHudTitle">Show in mini-HUD (when info panel is hidden):</p>
+      <label class="settingsRow"><input type="checkbox" id="setMiniFuelPct" /> <span data-i18n="fuel">Fuel</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setMiniFuelRange" /> <span data-i18n="range">Range</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setMiniEta" /> <span data-i18n="etaGame">In-game ETA</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setMiniDistance" /> <span data-i18n="distanceLeft">Distance left</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setMiniCruise" /> <span data-i18n="cruiseControl">Cruise control</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setMiniGps" /> <span data-i18n="settingsGpsDirections">GPS directions</span></label>
+
+      <p class="settingsSectionTitle" data-i18n="settingsRouteColorTitle">Route line color:</p>
+      <div class="colorOptions">
+        <button class="colorSwatch" data-color="#a30000" style="background:#a30000" data-i18n-title="colorRed" title="Red"></button>
+        <button class="colorSwatch" data-color="#3b9eff" style="background:#3b9eff" data-i18n-title="colorBlue" title="Blue"></button>
+        <button class="colorSwatch" data-color="#4caf50" style="background:#4caf50" data-i18n-title="colorGreen" title="Green"></button>
+      </div>
+
+      <button id="settingsCloseBtn" data-i18n="close">Close</button>
+    </div>
   </div>
   <div id="status" data-i18n="notConnected">Not connected</div>
   <div id="mobileHint" data-i18n="mobileHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.2rem;flex-shrink:0;">On mobile: open trucksim-dash.com/app and enter your pairing code.</div>
@@ -275,16 +326,19 @@
       <div id="navPanel" class="navPanel" style="display:none;"></div>
 
       <div id="miniHud">
-        <div class="limitSign" id="miniLimitSign">--</div>
-        <div>
-          <div class="speedBig" id="miniSpeedBig">--</div>
-          <div class="speedUnit" id="miniSpeedUnitLabel">km/h</div>
-        </div>
-        <div class="cruiseDisplay" id="miniCruiseDisplay" style="display:none">
+        <div class="miniHudTop">
+          <div class="limitSign" id="miniLimitSign">--</div>
           <div>
-            <div class="cruiseSpeed" id="miniCruiseSpeed">--</div>
+            <div class="speedBig" id="miniSpeedBig">--</div>
+            <div class="speedUnit" id="miniSpeedUnitLabel">km/h</div>
+          </div>
+          <div class="cruiseDisplay" id="miniCruiseDisplay" style="display:none">
+            <div>
+              <div class="cruiseSpeed" id="miniCruiseSpeed">--</div>
+            </div>
           </div>
         </div>
+        <div id="miniHudExtra" class="miniHudExtra"></div>
       </div>
     </div>
 
@@ -345,6 +399,15 @@ const TRANSLATIONS = {
     connect: 'Connect',
     toggleUnits: 'Toggle units',
     toggleLanguage: 'Toggle language',
+    settings: 'Settings',
+    settingsTitle: 'Settings',
+    settingsMiniHudTitle: 'Show in mini-HUD (when info panel is hidden):',
+    settingsRouteColorTitle: 'Route line color:',
+    settingsGpsDirections: 'GPS directions',
+    colorRed: 'Red',
+    colorBlue: 'Blue',
+    colorGreen: 'Green',
+    close: 'Close',
     notConnected: 'Not connected',
     mobileHint: 'On mobile: open trucksim-dash.com/app and enter your pairing code.',
     pairingDurationHint: 'The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit or Disconnect).',
@@ -401,6 +464,15 @@ const TRANSLATIONS = {
     connect: 'Conectar',
     toggleUnits: 'Cambiar unidades',
     toggleLanguage: 'Cambiar idioma',
+    settings: 'Configuración',
+    settingsTitle: 'Configuración',
+    settingsMiniHudTitle: 'Mostrar en el mini-HUD (con el panel de info oculto):',
+    settingsRouteColorTitle: 'Color de la línea de ruta:',
+    settingsGpsDirections: 'Indicaciones de GPS',
+    colorRed: 'Rojo',
+    colorBlue: 'Azul',
+    colorGreen: 'Verde',
+    close: 'Cerrar',
     notConnected: 'Sin conectar',
     mobileHint: 'Desde el celular: abrí trucksim-dash.com/app e ingresá tu código de pairing.',
     pairingDurationHint: 'El código expira a los 10 minutos si no se usa. Una vez conectado, la sesión sigue activa hasta que cierres el cliente (ícono de bandeja → Quit o Disconnect).',
@@ -491,6 +563,76 @@ document.getElementById('unitToggle').addEventListener('click', () => {
   if (lastData) updateHud(lastData);
 });
 let lastData = null;
+
+// Preferencias de usuario (que se muestra en el mini-HUD + color de la ruta),
+// persistidas en localStorage para que sobrevivan a un reload.
+const SETTINGS_KEY = 'truckdash_settings';
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor }));
+  } catch (e) {}
+}
+const _savedSettings = loadSettings();
+const miniHudSettings = Object.assign(
+  { fuelPct: false, fuelRange: false, eta: false, distance: false, cruise: true, gps: false },
+  _savedSettings.miniHud
+);
+let routeColor = _savedSettings.routeColor || '#a30000';
+
+function initSettingsUi() {
+  document.getElementById('setMiniFuelPct').checked = miniHudSettings.fuelPct;
+  document.getElementById('setMiniFuelRange').checked = miniHudSettings.fuelRange;
+  document.getElementById('setMiniEta').checked = miniHudSettings.eta;
+  document.getElementById('setMiniDistance').checked = miniHudSettings.distance;
+  document.getElementById('setMiniCruise').checked = miniHudSettings.cruise;
+  document.getElementById('setMiniGps').checked = miniHudSettings.gps;
+  document.querySelectorAll('.colorSwatch').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.color === routeColor);
+  });
+}
+
+const MINI_HUD_CHECKBOXES = {
+  setMiniFuelPct: 'fuelPct',
+  setMiniFuelRange: 'fuelRange',
+  setMiniEta: 'eta',
+  setMiniDistance: 'distance',
+  setMiniCruise: 'cruise',
+  setMiniGps: 'gps',
+};
+for (const [id, key] of Object.entries(MINI_HUD_CHECKBOXES)) {
+  document.getElementById(id).addEventListener('change', (e) => {
+    miniHudSettings[key] = e.target.checked;
+    saveSettings();
+    if (lastData) updateHud(lastData);
+  });
+}
+
+document.querySelectorAll('.colorSwatch').forEach(btn => {
+  btn.addEventListener('click', () => {
+    routeColor = btn.dataset.color;
+    document.querySelectorAll('.colorSwatch').forEach(b => b.classList.toggle('selected', b === btn));
+    if (map && map.getLayer('route-line')) map.setPaintProperty('route-line', 'line-color', routeColor);
+    saveSettings();
+  });
+});
+
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  initSettingsUi();
+  document.getElementById('settingsModal').style.display = 'flex';
+});
+document.getElementById('settingsCloseBtn').addEventListener('click', () => {
+  document.getElementById('settingsModal').style.display = 'none';
+});
+document.getElementById('settingsModal').addEventListener('click', (e) => {
+  if (e.target.id === 'settingsModal') document.getElementById('settingsModal').style.display = 'none';
+});
 
 // Mapa vectorial (roads/prefabs/pois/labels) generado con truckermudgeon/maps
 // + tippecanoe, servido como un unico archivo .pmtiles por juego (soporta
@@ -684,7 +826,7 @@ function ensureMapInitialized() {
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     map.addSource('route', { type: 'geojson', data: emptyLineString() });
-    map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#a30000', 'line-width': 3, 'line-opacity': 0.9 } });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 0.9 } });
     if (pendingGame) { const g = pendingGame; pendingGame = null; loadGameMap(g); }
   });
 }
@@ -1055,15 +1197,32 @@ function findUpcomingTurn() {
 // bloqueaba poder arrastrar el mapa a mano, porque cada frame deshacia el
 // drag del usuario). Ahora la camara se actualiza una sola vez por tick,
 // desde updateMap, con un unico llamado que combina centro+zoom+bearing.
+// Redondea la distancia al proximo giro en escalones cada vez mas finos a
+// medida que te acercas (como un GPS real): >10km redondea a 1km, entre
+// 1-10km a 500m, entre 100m-1km a 100m, y por debajo de 100m a 10m.
+// Ej: 11km, 9.5km, 800m, 80m.
+function roundTurnDistanceMeters(m) {
+  if (m > 10000) return Math.round(m / 1000) * 1000;
+  if (m > 1000) return Math.round(m / 500) * 500;
+  if (m > 100) return Math.round(m / 100) * 100;
+  return Math.round(m / 10) * 10;
+}
+
+function formatTurnDistance(m) {
+  const rounded = roundTurnDistanceMeters(m);
+  if (rounded >= 1000) {
+    const km = rounded / 1000;
+    return `${Number.isInteger(km) ? km : km.toFixed(1)} km`;
+  }
+  return `${rounded} m`;
+}
+
 function updateNavPanel(turn) {
   const panel = document.getElementById('navPanel');
   if (turn) {
     const arrow = turn.direction === 'left' ? '↰' : '↱';
     const dirText = turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight');
-    const distText = turn.distanceMeters >= 1000
-      ? `${(turn.distanceMeters / 1000).toFixed(1)} km`
-      : `${Math.round(turn.distanceMeters)} m`;
-    panel.textContent = `${arrow} ${dirText} ${t('navIn')} ${distText}`;
+    panel.textContent = `${arrow} ${dirText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters)}`;
   } else if (currentRouteWorldPoints) {
     panel.textContent = `⬆ ${t('navStraight')}`;
   } else {
@@ -1214,6 +1373,33 @@ function formatSeconds(totalSeconds) {
   return `${h}h ${m}m`;
 }
 
+// Items opcionales del mini-HUD (Settings) - se arman en el mismo formato
+// "Label: valor" que ya usan fuelRangeLine/etc mas abajo, reutilizando la
+// misma logica de conversion de unidades.
+function updateMiniHudExtra(data) {
+  const lines = [];
+  if (miniHudSettings.fuelPct && data.fuel != null && data.fuelCapacity) {
+    const pct = Math.max(0, Math.min(100, (data.fuel / data.fuelCapacity) * 100));
+    lines.push(`${t('fuel')}: ${Math.round(pct)}%`);
+  }
+  if (miniHudSettings.fuelRange && data.fuelRangeKm != null) {
+    const rangeDisplay = useImperial ? data.fuelRangeKm * KM_TO_MI : data.fuelRangeKm;
+    lines.push(`${t('range')}: ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`);
+  }
+  if (miniHudSettings.eta && data.routeTimeSeconds != null) {
+    lines.push(`${t('etaGame')}: ${formatSeconds(data.routeTimeSeconds)}`);
+  }
+  if (miniHudSettings.distance && data.routeDistanceKm) {
+    const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
+    lines.push(`${t('distanceLeft')}: ${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`);
+  }
+  if (miniHudSettings.gps && navMode) {
+    const navText = document.getElementById('navPanel').textContent;
+    if (navText) lines.push(navText);
+  }
+  document.getElementById('miniHudExtra').innerHTML = lines.map(l => `<div>${l}</div>`).join('');
+}
+
 function updateHud(data) {
   lastData = data;
 
@@ -1298,14 +1484,14 @@ function updateHud(data) {
 
   const ccSpeed = useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh;
   const ccText = Math.round(ccSpeed);
-  for (const [displayId, speedId] of [['cruiseDisplay', 'cruiseSpeed'], ['miniCruiseDisplay', 'miniCruiseSpeed']]) {
-    if (data.cruiseControl) {
-      document.getElementById(speedId).textContent = ccText;
-      document.getElementById(displayId).style.display = '';
-    } else {
-      document.getElementById(displayId).style.display = 'none';
-    }
-  }
+  document.getElementById('cruiseSpeed').textContent = ccText;
+  document.getElementById('cruiseDisplay').style.display = data.cruiseControl ? '' : 'none';
+  document.getElementById('miniCruiseSpeed').textContent = ccText;
+  // El mini-HUD del cruise control es opcional (Settings) - el del panel de
+  // info completo siempre se muestra cuando esta activo.
+  document.getElementById('miniCruiseDisplay').style.display = (data.cruiseControl && miniHudSettings.cruise) ? '' : 'none';
+
+  updateMiniHudExtra(data);
 
   const warnings = data.mechanicalWarnings || {};
   const activeAlerts = [];
