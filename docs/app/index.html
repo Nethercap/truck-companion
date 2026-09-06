@@ -637,7 +637,7 @@ function buildVecLayers(sourceLayer) {
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
     { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'poi'], minzoom: 7,
-      layout: { 'text-field': ['match', ['get', 'sprite'], 'gas_ico', '⛽', 'service_ico', '🔧', 'weight_station_ico', '⚖', '📍'], 'text-size': 14, 'text-allow-overlap': false, 'text-ignore-placement': false } },
+      layout: { 'text-field': ['match', ['get', 'sprite'], 'gas_ico', '⛽', 'service_ico', '🔧', 'weight_station_ico', '⚖', '📍'], 'text-size': 14, 'text-allow-overlap': true, 'text-ignore-placement': true } },
     { id: 'exit-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'exit'], minzoom: 10,
       layout: { 'text-field': ['concat', 'Exit ', ['get', 'name']], 'text-size': 11 },
       paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
