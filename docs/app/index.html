@@ -59,7 +59,8 @@
   body.fsMode .setup,
   body.fsMode #status,
   body.fsMode #mobileHint,
-  body.fsMode #pairingDurationHint { display: none; }
+  body.fsMode #pairingDurationHint,
+  body.fsMode #updateBanner { display: none; }
   body.fsMode .layout { border-radius: 0; }
   body.fsMode #mapPanel { border-radius: 0; }
   body.fsMode #infoPanel { border-radius: 0; }
@@ -93,6 +94,22 @@
     animation: reconnectPulse 1.2s ease-in-out infinite;
   }
   @keyframes reconnectPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+  /* Aviso no bloqueante de version nueva del cliente disponible - a
+     diferencia del banner de reconexion, no parpadea ni tapa el mapa, es
+     solo informativo en el header. */
+  .updateBanner {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--accent);
+    color: var(--text); font-size: 0.78rem; padding: 0.4rem 0.7rem;
+    border-radius: 6px; margin-bottom: 0.6rem; flex-shrink: 0;
+  }
+  .updateBanner a { color: var(--accent); font-weight: 600; }
+  .updateBanner button {
+    margin-left: auto; background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.9rem; padding: 0 0.2rem;
+  }
+  .updateBanner button:hover { color: var(--text); }
   .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
 
   /* Flecha de heading del camion: el mapa se queda siempre norte-arriba (las
@@ -227,6 +244,11 @@
   <div id="status" data-i18n="notConnected">Not connected</div>
   <div id="mobileHint" data-i18n="mobileHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.2rem;flex-shrink:0;">On mobile: open trucksim-dash.com/app and enter your pairing code.</div>
   <div id="pairingDurationHint" data-i18n="pairingDurationHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-shrink:0;">The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit).</div>
+  <div id="updateBanner" class="updateBanner" style="display:none;">
+    <span id="updateBannerText"></span>
+    <a id="updateBannerLink" href="#" target="_blank" rel="noopener" data-i18n="updateBannerLink">Download</a>
+    <button id="updateBannerClose" aria-label="Dismiss">✕</button>
+  </div>
 
   <div class="layout" id="layout">
     <div id="mapPanel">
@@ -309,6 +331,8 @@ const TRANSLATIONS = {
     notConnected: 'Not connected',
     mobileHint: 'On mobile: open trucksim-dash.com/app and enter your pairing code.',
     pairingDurationHint: 'The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit or Disconnect).',
+    updateAvailableText: '🆕 A new client version is available (v{v}). Your connected client is outdated.',
+    updateBannerLink: 'Download',
     mapNotLoaded: 'Map not loaded',
     recenter: 'Recenter on truck',
     togglePanel: 'Show/hide info panel',
@@ -357,6 +381,8 @@ const TRANSLATIONS = {
     notConnected: 'Sin conectar',
     mobileHint: 'Desde el celular: abrí trucksim-dash.com/app e ingresá tu código de pairing.',
     pairingDurationHint: 'El código expira a los 10 minutos si no se usa. Una vez conectado, la sesión sigue activa hasta que cierres el cliente (ícono de bandeja → Quit o Disconnect).',
+    updateAvailableText: '🆕 Hay una versión nueva del cliente (v{v}). Tu cliente conectado está desactualizado.',
+    updateBannerLink: 'Descargar',
     mapNotLoaded: 'Mapa no cargado',
     recenter: 'Centrar en el camión',
     togglePanel: 'Mostrar/ocultar panel de info',
@@ -1072,6 +1098,10 @@ document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement) document.body.classList.remove('fsMode');
 });
 
+document.getElementById('updateBannerClose').addEventListener('click', () => {
+  document.getElementById('updateBanner').style.display = 'none';
+});
+
 document.getElementById('recenterBtn').addEventListener('click', () => {
   autoFollow = true;
   if (leafletMap && truckMarker) {
@@ -1092,11 +1122,48 @@ function hideReconnectBanner() {
   document.getElementById('reconnectBanner').style.display = 'none';
 }
 
+// Aviso (no bloqueante) de que hay una version del cliente .exe mas nueva
+// que la que esta corriendo la persona conectada - se compara la version
+// reportada en cada payload (data.clientVersion) contra /version del backend.
+let latestClientVersion = null;
+let latestDownloadUrl = null;
+
+function isNewerVersion(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
+function fetchLatestClientVersion(backend) {
+  const httpBase = backend.replace('wss://', 'https://').replace('ws://', 'http://');
+  fetch(`${httpBase}/version`).then(r => r.ok ? r.json() : null).then(data => {
+    if (data && data.latest_client_version) {
+      latestClientVersion = data.latest_client_version;
+      latestDownloadUrl = data.download_url;
+    }
+  }).catch(() => {}); // no critico - si falla, simplemente no se muestra el aviso
+}
+
+function checkUpdateBanner(connectedVersion) {
+  const banner = document.getElementById('updateBanner');
+  if (!latestClientVersion || !connectedVersion || !isNewerVersion(latestClientVersion, connectedVersion)) {
+    banner.style.display = 'none';
+    return;
+  }
+  document.getElementById('updateBannerText').textContent = t('updateAvailableText').replace('{v}', latestClientVersion);
+  document.getElementById('updateBannerLink').href = latestDownloadUrl || 'https://trucksim-dash.com/#get-started';
+  banner.style.display = 'flex';
+}
+
 // Conecta (o reconecta) el websocket del viewer. Se llama tanto al apretar
 // Connect como automaticamente si la conexion se corta - antes, si se
 // cortaba, el unico aviso era el texto chico de #status, facil de no notar
 // si estas mirando el dashboard en otra pantalla mientras manejas.
 function connectWs(backend, code) {
+  fetchLatestClientVersion(backend);
   clearTimeout(reconnectTimer);
   const socket = new WebSocket(`${backend}/ws/live/${code}`);
   ws = socket;
@@ -1114,6 +1181,7 @@ function connectWs(backend, code) {
     updateHud(data);
     updateMap(data.position || {}, data.game);
     updateDestinationMarker(data);
+    checkUpdateBanner(data.clientVersion);
   };
   socket.onclose = () => {
     if (ws !== socket) return; // reemplazado por una conexion mas nueva, ignorar

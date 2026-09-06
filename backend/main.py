@@ -197,6 +197,24 @@ def health():
     return {"status": "ok", "active_sessions": len(sessions)}
 
 
+# Version mas nueva del cliente disponible - se actualiza a mano (via
+# /admin/stats/seed) cada vez que se sube un .exe nuevo al Release de GitHub.
+# El link de descarga es siempre el mismo (.../releases/latest/download/...),
+# no hace falta guardar uno por version.
+DEFAULT_CLIENT_VERSION = "1.0.0"
+CLIENT_DOWNLOAD_URL = "https://github.com/Nethercap/truck-companion/releases/latest/download/TruckDash-windows.zip"
+
+
+@app.get("/version")
+def version():
+    """Ultima version del cliente disponible - consultado por el .exe y por /app (no requiere auth)."""
+    stats = _load_stats()
+    return {
+        "latest_client_version": stats.get("latest_client_version", DEFAULT_CLIENT_VERSION),
+        "download_url": CLIENT_DOWNLOAD_URL,
+    }
+
+
 @app.get("/stats/public")
 def stats_public():
     """Contadores historicos totales, para mostrar en la landing (no requiere auth)."""
@@ -234,6 +252,8 @@ def stats_seed(payload: dict, x_admin_key: Optional[str] = Header(default=None))
                 stats[key] = value
             elif key == "latest_jobs" and isinstance(value, list):
                 stats[key] = value[:LATEST_JOBS_MAX]
+            elif key == "latest_client_version" and isinstance(value, str):
+                stats[key] = value
         _save_stats()
         return stats
 

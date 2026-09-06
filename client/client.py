@@ -25,9 +25,23 @@ from urllib.request import urlopen, Request
 SEND_INTERVAL_SECONDS = 1.0
 RECONNECT_DELAY_SECONDS = 3.0
 
+# Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
+# {"latest_client_version": "..."} en el backend) - se manda en cada payload
+# para que /app pueda avisar si el cliente conectado quedo desactualizado.
+CLIENT_VERSION = "1.0.1"
+
 
 def http_base_url(ws_url: str) -> str:
     return ws_url.replace("wss://", "https://").replace("ws://", "http://")
+
+
+def is_newer_version(a: str, b: str) -> bool:
+    """True si la version a es mas nueva que b, comparando como tuplas de
+    enteros (ej. "1.2.10" > "1.2.9", a diferencia de una comparacion de
+    strings que fallaria en ese caso)."""
+    def parts(v: str):
+        return tuple(int(x) for x in v.split(".") if x.isdigit())
+    return parts(a) > parts(b)
 
 
 def request_pairing_code(backend_ws_url: str) -> str:
@@ -45,6 +59,7 @@ def build_payload(raw: dict) -> dict:
     speed_limit_kmh = (raw.get("speedLimit") or 0) * 3.6
     return {
         "ts": time.time(),
+        "clientVersion": CLIENT_VERSION,
         "paused": raw.get("paused"),
         "game": {0: None, 1: "ets2", 2: "ats"}.get(raw.get("game")),
         "position": {

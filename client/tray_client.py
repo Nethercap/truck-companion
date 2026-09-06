@@ -13,6 +13,7 @@ Uso (antes de empaquetar, para probar):
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -20,6 +21,7 @@ import threading
 import tkinter as tk
 import urllib.parse
 import webbrowser
+from urllib.request import urlopen
 
 import pystray
 from PIL import Image, ImageDraw
@@ -162,6 +164,52 @@ def open_web_menu_item(icon, item):
         show_text_dialog("Truck Dash", "No pairing code yet.")
 
 
+def check_for_update(backend_url: str):
+    """Devuelve (latest_version, download_url) si hay una version mas nueva
+    disponible, o (None, None) si esta al dia o si fallo la consulta (no es
+    critico, no debe romper nada si el endpoint no responde)."""
+    try:
+        url = client_lib.http_base_url(backend_url) + "/version"
+        with urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read())
+        latest = data.get("latest_client_version")
+        download_url = data.get("download_url")
+        if latest and client_lib.is_newer_version(latest, client_lib.CLIENT_VERSION):
+            return latest, download_url
+    except Exception:
+        logging.exception("Failed to check for updates")
+    return None, None
+
+
+def check_for_update_silent(backend_url: str):
+    """Chequeo automatico al conectar - solo avisa si hay algo nuevo, no
+    molesta si ya esta al dia (a diferencia del item de menu manual)."""
+    latest, download_url = check_for_update(backend_url)
+    if latest:
+        logging.info("Update available: v%s (running v%s)", latest, client_lib.CLIENT_VERSION)
+        show_text_dialog(
+            "Truck Dash",
+            f"A new version is available: v{latest} (you have v{client_lib.CLIENT_VERSION}).\nDownload:",
+            copy_value=download_url,
+        )
+
+
+def check_for_update_menu_item(icon, item):
+    backend_url = state.backend_url
+    if not backend_url:
+        show_text_dialog("Truck Dash", "Not connected yet.")
+        return
+    latest, download_url = check_for_update(backend_url)
+    if latest:
+        show_text_dialog(
+            "Truck Dash",
+            f"A new version is available: v{latest} (you have v{client_lib.CLIENT_VERSION}).\nDownload:",
+            copy_value=download_url,
+        )
+    else:
+        show_text_dialog("Truck Dash", f"You're up to date (v{client_lib.CLIENT_VERSION}).")
+
+
 async def run_client(backend_url: str, fixed_code: str | None):
     logging.info("Starting client, backend=%s", backend_url)
     code = fixed_code
@@ -177,6 +225,7 @@ async def run_client(backend_url: str, fixed_code: str | None):
     state.set_status(f"Code {code} - connecting...")
     logging.info("Got pairing code %s", code)
     open_web_ui(backend_url, code)
+    asyncio.create_task(asyncio.to_thread(check_for_update_silent, backend_url))
 
     import truck_telemetry
     import websockets
@@ -292,6 +341,7 @@ def main():
         pystray.MenuItem("Show pairing code", show_code_notification),
         pystray.MenuItem("Show code for mobile", show_mobile_info),
         pystray.MenuItem("Disconnect (get new code)", disconnect_session),
+        pystray.MenuItem("Check for updates", check_for_update_menu_item),
         pystray.MenuItem("Show log file (troubleshooting)", show_log_location),
         pystray.MenuItem("Quit", quit_app),
     )
