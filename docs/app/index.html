@@ -568,6 +568,32 @@ function geoBearingDeg(lng1, lat1, lng2, lat2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+// Suaviza visualmente la ruta calculada (spline Catmull-Rom) - el grafo de
+// rutas tiene los nodos bastante espaciados, asi que entre uno y otro es una
+// linea recta, lo que se nota como "quiebres" en las curvas comparado con la
+// geometria real de la calle (que sale de los tiles vectoriales, mucho mas
+// densa). Esto es solo cosmetico: no cambia currentRouteWorldPoints, que se
+// sigue usando tal cual para A*/deteccion de desvio/proximo giro.
+function smoothLineCoords(points, segmentsPerPoint = 6) {
+  if (points.length < 3) return points;
+  const n = points.length;
+  const result = [points[0]];
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i === 0 ? i : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < n ? i + 2 : n - 1];
+    for (let t = 1; t <= segmentsPerPoint; t++) {
+      const s = t / segmentsPerPoint;
+      const s2 = s * s, s3 = s2 * s;
+      const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * s + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * s2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * s3);
+      const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * s + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * s2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * s3);
+      result.push([x, y]);
+    }
+  }
+  return result;
+}
+
 let map = null; // instancia de MapLibre
 let mapReady = false; // true despues del evento 'load' inicial (recien ahi se pueden agregar sources/layers)
 let pendingGame = null; // juego que se quiso cargar antes de que el mapa terminara de inicializar
@@ -645,6 +671,12 @@ function ensureMapInitialized() {
     attributionControl: false,
   });
   map.on('dragstart', () => { autoFollow = false; });
+  // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
+  // zoom dinamico (si no, el proximo tick lo pisa y parece que "no se puede
+  // tocar") - se reactiva con el boton de recentrar. originalEvent solo esta
+  // presente cuando el zoom lo dispara una interaccion real (rueda/pellizco/
+  // doble click), no nuestros propios easeTo/jumpTo programaticos.
+  map.on('zoomstart', (e) => { if (e.originalEvent) navAutoZoomPaused = true; });
   map.once('load', () => {
     mapReady = true;
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
@@ -874,7 +906,7 @@ function updateDestinationMarker(data) {
       : [lastDisplayedLngLat, destLngLat].filter(Boolean); // fallback: linea recta si no se encontro ruta
 
     if (map.getSource('route')) {
-      map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: lineCoords } });
+      map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: smoothLineCoords(lineCoords) } });
     }
   }
 }
@@ -938,12 +970,14 @@ const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es u
 // via CSS), MapLibre soporta rotacion real del mapa (bearing) - el pan sigue
 // funcionando bien incluso rotado, asi que no hace falta deshabilitar drag.
 let navMode = false;
+let navAutoZoomPaused = false; // true si el usuario zoomeo a mano en modo nav - se reactiva al recentrar
 let lastHeadingDeg = 0;
 const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo giro
 const NAV_TURN_ANGLE_THRESHOLD_DEG = 25; // cambio de rumbo minimo para contar como "giro" y no ruido del trazado
 
 function setNavMode(on) {
   navMode = on;
+  navAutoZoomPaused = false;
   const btn = document.getElementById('navToggleBtn');
   if (on) {
     autoFollow = true;
@@ -1019,10 +1053,10 @@ function updateNavPanel(turn) {
 // (overzoom automatico de MapLibre), asi que se usan niveles absolutos.
 function navTargetZoom(turn) {
   if (turn) {
-    if (turn.distanceMeters < 150) return 16;
-    if (turn.distanceMeters < 400) return 15;
+    if (turn.distanceMeters < 150) return 15;
+    if (turn.distanceMeters < 400) return 14;
   }
-  return 13; // "autopista", tramo recto
+  return 12; // "autopista", tramo recto
 }
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
@@ -1048,7 +1082,7 @@ function trimRouteBehindTruck(x, z) {
   currentRouteWorldPoints = [bestPoint, ...currentRouteWorldPoints.slice(bestIdx + 1)];
   map.getSource('route').setData({
     type: 'Feature',
-    geometry: { type: 'LineString', coordinates: currentRouteWorldPoints.map(([px, pz]) => toLngLat(px, pz)) },
+    geometry: { type: 'LineString', coordinates: smoothLineCoords(currentRouteWorldPoints.map(([px, pz]) => toLngLat(px, pz))) },
   });
 }
 
@@ -1130,11 +1164,13 @@ function updateMap(position, game) {
   if (navMode) {
     const turn = findUpcomingTurn();
     updateNavPanel(turn);
-    const zoom = navTargetZoom(turn);
+    // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
+    // seguimos actualizando centro/bearing hasta que recentre.
+    const zoomOverride = navAutoZoomPaused ? {} : { zoom: navTargetZoom(turn) };
     if (!justJumped && prevLngLat) {
-      map.easeTo({ center: lngLat, zoom, bearing: lastHeadingDeg, duration: MOVE_ANIM_MS });
+      map.easeTo({ center: lngLat, bearing: lastHeadingDeg, duration: MOVE_ANIM_MS, ...zoomOverride });
     } else {
-      map.jumpTo({ center: lngLat, zoom, bearing: lastHeadingDeg });
+      map.jumpTo({ center: lngLat, bearing: lastHeadingDeg, ...zoomOverride });
     }
   } else if (autoFollow) {
     if (!justJumped && prevLngLat) {
@@ -1362,6 +1398,7 @@ document.getElementById('updateBannerClose').addEventListener('click', () => {
 
 document.getElementById('recenterBtn').addEventListener('click', () => {
   autoFollow = true;
+  navAutoZoomPaused = false;
   if (map && truckMarker) {
     map.jumpTo({ center: truckMarker.getLngLat() });
   }
