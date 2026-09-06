@@ -422,6 +422,7 @@ const TRANSLATIONS = {
     navTurnLeft: 'Turn left',
     navTurnRight: 'Turn right',
     navOnto: 'onto',
+    navToward: 'toward',
     navIn: 'in',
     navStraight: 'Continue straight',
     navNoRoute: 'No destination set',
@@ -488,6 +489,7 @@ const TRANSLATIONS = {
     navTurnLeft: 'Girá a la izquierda',
     navTurnRight: 'Girá a la derecha',
     navOnto: 'hacia',
+    navToward: 'hacia',
     navIn: 'en',
     navStraight: 'Seguí derecho',
     navNoRoute: 'Sin destino asignado',
@@ -834,11 +836,13 @@ async function loadCities(mapInfo) {
   }
 }
 
-// Nombres de ruta reales (US-75, I-70, etc.) extraidos de los carteles de
-// autopista del juego (ver extract_road_names.py) - opcional: si el archivo
-// no existe para el mapa actual (ETS2 todavia no lo tiene), roadNames queda
-// vacio y las indicaciones GPS vuelven al texto generico de siempre.
-let roadNames = []; // [{x, y, label}, ...] en coordenadas de juego
+// Nombres reales extraidos de los carteles del juego (ver extract_road_names.py
+// para ATS - escudos de ruta US-75/I-70 - y extract_road_names_ets2.py para
+// ETS2 - nombres de ciudad/cruce, ya que ahi el numero de ruta no tiene un
+// patron de sprite reutilizable como en ATS). Opcional: si el archivo no
+// existe para el mapa actual, roadNames queda vacio y las indicaciones GPS
+// vuelven al texto generico de siempre.
+let roadNames = []; // [{x, y, label, kind: 'road'|'city'}, ...] en coordenadas de juego
 
 async function loadRoadNames(mapInfo) {
   roadNames = [];
@@ -862,10 +866,10 @@ function nearestRoadName(x, z, maxDist) {
     const dist = Math.hypot(sign.x - x, sign.y - z);
     if (dist < bestDist) {
       bestDist = dist;
-      best = sign.label;
+      best = sign;
     }
   }
-  return best;
+  return best; // { x, y, label, kind: 'road'|'city' } o null
 }
 
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
@@ -1194,8 +1198,8 @@ function findUpcomingTurn() {
       // cruce mismo (que suele estar justo en el vertice) no interfiere.
       const afterTurnIdx = Math.min(i + 2, currentRouteWorldPoints.length - 1);
       const [wx, wz] = currentRouteWorldPoints[afterTurnIdx];
-      const roadName = nearestRoadName(wx, wz, NAV_ROAD_NAME_MAX_DIST_M);
-      return { distanceMeters: pts[i].dist, direction: delta > 0 ? 'right' : 'left', roadName };
+      const nearSign = nearestRoadName(wx, wz, NAV_ROAD_NAME_MAX_DIST_M);
+      return { distanceMeters: pts[i].dist, direction: delta > 0 ? 'right' : 'left', nearSign };
     }
   }
   return null;
@@ -1213,7 +1217,11 @@ function updateNavPanel(turn) {
   if (turn) {
     const arrow = turn.direction === 'left' ? '↰' : '↱';
     const dirText = turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight');
-    const ontoText = turn.roadName ? ` ${t('navOnto')} ${turn.roadName}` : '';
+    let ontoText = '';
+    if (turn.nearSign) {
+      const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
+      ontoText = ` ${preposition} ${turn.nearSign.label}`;
+    }
     panel.textContent = `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters)}`;
   } else if (currentRouteWorldPoints) {
     panel.textContent = `⬆ ${t('navStraight')}`;
