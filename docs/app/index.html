@@ -595,7 +595,7 @@ function buildVecLayers(sourceLayer) {
   const L = sourceLayer;
   return [
     { id: 'mapArea', type: 'fill', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'mapArea'],
-      paint: { 'fill-color': ['match', ['get', 'color'], 0, '#3a3f47', 1, '#454b54', 2, '#23262b', 3, '#31402f', '#3a3f47'], 'fill-opacity': 0.9 } },
+      paint: { 'fill-color': ['match', ['get', 'color'], 0, '#454b54', 1, '#575e68', 2, '#1c1f24', 3, '#3d5238', '#454b54'], 'fill-opacity': 0.95 } },
     { id: 'prefab', type: 'fill', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'prefab'],
       paint: { 'fill-color': '#4a5058', 'fill-opacity': 0.95 } },
     { id: 'road-local', type: 'line', source: 'vec', 'source-layer': L,
@@ -990,10 +990,15 @@ function findUpcomingTurn() {
   return null;
 }
 
-function updateNavPanelAndZoom() {
+// Solo actualiza el texto del panel y devuelve el zoom objetivo - ya NO toca
+// la camara directamente (antes esto llamaba a su propio easeTo() mientras
+// animateTruckTo tambien movia la camara ~60 veces por segundo via jumpTo();
+// se pisaban entre si, lo que se sentia como un zoom lento/tosco y ademas
+// bloqueaba poder arrastrar el mapa a mano, porque cada frame deshacia el
+// drag del usuario). Ahora la camara se actualiza una sola vez por tick,
+// desde updateMap, con un unico llamado que combina centro+zoom+bearing.
+function updateNavPanel(turn) {
   const panel = document.getElementById('navPanel');
-  const turn = findUpcomingTurn();
-
   if (turn) {
     const arrow = turn.direction === 'left' ? '↰' : '↱';
     const dirText = turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight');
@@ -1007,19 +1012,17 @@ function updateNavPanelAndZoom() {
     panel.textContent = `${t('navNoRoute')}`;
   }
   panel.style.display = 'block';
+}
 
-  // Zoom dinamico: mas cerca del giro, mas zoom - como un GPS real. Al ser
-  // tiles vectoriales el mapa puede acercar mas alla del ultimo zoom
-  // generado (overzoom automatico de MapLibre), asi que se usan niveles
-  // absolutos en vez de relativos a un maxZoom del tileset.
-  let targetZoom = 13; // "autopista", tramo recto
+// Zoom dinamico: mas cerca del giro, mas zoom - como un GPS real. Al ser
+// tiles vectoriales el mapa puede acercar mas alla del ultimo zoom generado
+// (overzoom automatico de MapLibre), asi que se usan niveles absolutos.
+function navTargetZoom(turn) {
   if (turn) {
-    if (turn.distanceMeters < 150) targetZoom = 16;
-    else if (turn.distanceMeters < 400) targetZoom = 15;
+    if (turn.distanceMeters < 150) return 16;
+    if (turn.distanceMeters < 400) return 15;
   }
-  if (Math.abs(map.getZoom() - targetZoom) > 0.2) {
-    map.easeTo({ zoom: targetZoom, duration: 400 });
-  }
+  return 13; // "autopista", tramo recto
 }
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
@@ -1053,10 +1056,12 @@ let lastDisplayedLngLat = null; // ultima posicion ya animada del marcador ([lng
 let moveAnimFrameId = null;
 const MOVE_ANIM_MS = 900; // un poco menos que el intervalo de envio (1s) para que no se pisen dos animaciones
 
-// Anima el marcador (y el mapa, si autoFollow esta activo) de forma fluida
-// entre la posicion anterior y la nueva, en vez de saltar de una vez - los
-// updates llegan a ~1Hz asi que sin esto se ve "a los tics" como reporto el
-// usuario.
+// Anima SOLO el marcador de forma fluida entre la posicion anterior y la
+// nueva (los updates llegan a ~1Hz, sin esto se ve "a los tics"). La camara
+// se maneja aparte, una sola vez por tick (ver updateMap) - antes esta misma
+// funcion tambien movia la camara en cada frame (~60/s) con jumpTo(), lo que
+// se peleaba con el easeTo() del modo navegacion y de paso le ganaba a
+// cualquier intento de arrastrar el mapa a mano.
 function animateTruckTo(fromLngLat, toPos) {
   if (moveAnimFrameId) cancelAnimationFrame(moveAnimFrameId);
   const start = performance.now();
@@ -1067,7 +1072,6 @@ function animateTruckTo(fromLngLat, toPos) {
       fromLngLat[1] + (toPos[1] - fromLngLat[1]) * t,
     ];
     truckMarker.setLngLat(cur);
-    if (autoFollow) map.jumpTo({ center: cur });
     moveAnimFrameId = t < 1 ? requestAnimationFrame(step) : null;
   }
   moveAnimFrameId = requestAnimationFrame(step);
@@ -1114,18 +1118,31 @@ function updateMap(position, game) {
     map.getSource('trail').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailWorld } });
   }
 
-  if (navMode) {
-    map.easeTo({ bearing: lastHeadingDeg, duration: 250 });
-    updateNavPanelAndZoom();
-  }
-
   if (!justJumped && prevLngLat) {
     animateTruckTo(prevLngLat, lngLat);
   } else {
     truckMarker.setLngLat(lngLat);
-    if (autoFollow) map.jumpTo({ center: lngLat });
   }
   lastDisplayedLngLat = lngLat;
+
+  // Camara: un unico llamado por tick que combina centro+zoom+bearing segun
+  // corresponda, en vez de varios llamados peleandose entre si.
+  if (navMode) {
+    const turn = findUpcomingTurn();
+    updateNavPanel(turn);
+    const zoom = navTargetZoom(turn);
+    if (!justJumped && prevLngLat) {
+      map.easeTo({ center: lngLat, zoom, bearing: lastHeadingDeg, duration: MOVE_ANIM_MS });
+    } else {
+      map.jumpTo({ center: lngLat, zoom, bearing: lastHeadingDeg });
+    }
+  } else if (autoFollow) {
+    if (!justJumped && prevLngLat) {
+      map.easeTo({ center: lngLat, duration: MOVE_ANIM_MS });
+    } else {
+      map.jumpTo({ center: lngLat });
+    }
+  }
 
   trimRouteBehindTruck(position.x, position.z);
 }
