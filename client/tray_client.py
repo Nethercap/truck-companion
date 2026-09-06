@@ -213,7 +213,9 @@ async def run_client(backend_url: str, fixed_code: str | None):
                         if not sdk_active_logged:
                             logging.info("sdkActive=True, sending telemetry")
                             sdk_active_logged = True
+                        client_lib.update_job_snapshot(raw)
                         payload = client_lib.build_payload(raw)
+                        client_lib.attach_job_snapshot_if_finished(payload)
                         game = payload.get("game")
                         if game != last_game:
                             last_game = game

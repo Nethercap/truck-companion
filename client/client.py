@@ -124,6 +124,37 @@ def build_payload(raw: dict) -> dict:
     }
 
 
+# Al momento exacto en que el SDK pulsa jobDelivered/jobCancelled, los campos
+# del trabajo (citySrc/cityDst/cargo/truckBrand/truckName) ya vienen vacios -
+# el juego los limpia antes o al mismo tiempo que dispara el pulso, no
+# despues como sugiere la doc del plugin. Por eso se cachea el ultimo snapshot
+# valido mientras el trabajo esta activo (onJob=True) y se lo pega al evento
+# recien en el momento de la entrega/cancelacion.
+_last_job_snapshot = {"citySrc": None, "cityDst": None, "truckBrand": None, "truckName": None, "cargo": None}
+
+
+def update_job_snapshot(raw: dict):
+    global _last_job_snapshot
+    if raw.get("onJob") and raw.get("cityDst"):
+        _last_job_snapshot = {
+            "citySrc": raw.get("citySrc") or None,
+            "cityDst": raw.get("cityDst") or None,
+            "truckBrand": raw.get("truckBrand") or None,
+            "truckName": raw.get("truckName") or None,
+            "cargo": raw.get("cargo") or None,
+        }
+
+
+def attach_job_snapshot_if_finished(payload: dict):
+    event = payload.get("event") or {}
+    if event.get("jobDelivered") or event.get("jobCancelled"):
+        event["jobSrc"] = _last_job_snapshot["citySrc"]
+        event["jobDst"] = _last_job_snapshot["cityDst"]
+        event["jobTruckBrand"] = _last_job_snapshot["truckBrand"]
+        event["jobTruckName"] = _last_job_snapshot["truckName"]
+        event["jobCargo"] = _last_job_snapshot["cargo"]
+
+
 async def run(backend_ws_url: str, code: str):
     truck_telemetry.init()
     print("Conectado al SDK de telemetria del juego.")
@@ -141,7 +172,9 @@ async def run(backend_ws_url: str, code: str):
                     # lo que se veia como el camion en una posicion rara
                     # hasta arrancar a manejar). Se descarta ese frame.
                     if raw.get("sdkActive"):
+                        update_job_snapshot(raw)
                         payload = build_payload(raw)
+                        attach_job_snapshot_if_finished(payload)
                         await ws.send(json.dumps(payload))
                     await asyncio.sleep(SEND_INTERVAL_SECONDS)
         except (websockets.ConnectionClosed, OSError) as exc:

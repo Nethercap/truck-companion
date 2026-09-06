@@ -130,6 +130,7 @@ def record_session_started():
 
 
 LATEST_JOBS_MAX = 5
+JOB_DELIVERED_COOLDOWN_SECONDS = 20
 
 
 def record_job_delivered(job_info: dict):
@@ -154,6 +155,7 @@ class Session:
         self.viewer_ws_list: list[WebSocket] = []
         self.counted = False  # ya se sumo al contador historico (una vez por sesion, no por reconexion)
         self.last_job_delivered = False  # flanco para no contar el mismo evento en cada tick que el pulso siga en true
+        self.last_job_delivered_at = 0.0  # cooldown extra: el SDK a veces re-pulsa el mismo evento (ver JOB_DELIVERED_COOLDOWN_SECONDS)
 
 
 sessions: dict[str, Session] = {}
@@ -265,14 +267,29 @@ async def ws_client(websocket: WebSocket, code: str):
                 payload = json.loads(data)
                 event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
-                if job_delivered and not session.last_job_delivered:
+                now = time.time()
+                # El SDK a veces re-pulsa jobDelivered para el mismo evento
+                # real (bug conocido del plugin en ciertas condiciones, ver
+                # changelog de scs-sdk-plugin) - un cooldown ademas del flanco
+                # de subida evita contarlo dos veces.
+                if (
+                    job_delivered
+                    and not session.last_job_delivered
+                    and now - session.last_job_delivered_at > JOB_DELIVERED_COOLDOWN_SECONDS
+                ):
+                    session.last_job_delivered_at = now
+                    # citySrc/cityDst/cargo ya vienen vacios en el mismo tick
+                    # del pulso (el juego los limpia antes o al mismo tiempo,
+                    # no despues) - el cliente cachea el ultimo snapshot valido
+                    # y lo manda aparte en jobSrc/jobDst/etc, con fallback a
+                    # los campos top-level por si el cliente no los mando.
                     job_info = {
                         "game": payload.get("game"),
-                        "citySrc": payload.get("citySrc"),
-                        "cityDst": payload.get("cityDst"),
-                        "truckBrand": payload.get("truckBrand"),
-                        "truckName": payload.get("truckName"),
-                        "cargo": payload.get("cargo"),
+                        "citySrc": event.get("jobSrc") or payload.get("citySrc"),
+                        "cityDst": event.get("jobDst") or payload.get("cityDst"),
+                        "truckBrand": event.get("jobTruckBrand") or payload.get("truckBrand"),
+                        "truckName": event.get("jobTruckName") or payload.get("truckName"),
+                        "cargo": event.get("jobCargo") or payload.get("cargo"),
                         "revenue": event.get("jobDeliveredRevenue") or 0,
                         "distanceKm": event.get("jobDeliveredDistanceKm") or 0,
                     }
