@@ -421,6 +421,7 @@ const TRANSLATIONS = {
     toggleNavMode: 'Navigation mode (heading-up, dynamic zoom)',
     navTurnLeft: 'Turn left',
     navTurnRight: 'Turn right',
+    navOnto: 'onto',
     navIn: 'in',
     navStraight: 'Continue straight',
     navNoRoute: 'No destination set',
@@ -486,6 +487,7 @@ const TRANSLATIONS = {
     toggleNavMode: 'Modo navegación (rota con el rumbo, zoom dinámico)',
     navTurnLeft: 'Girá a la izquierda',
     navTurnRight: 'Girá a la derecha',
+    navOnto: 'hacia',
     navIn: 'en',
     navStraight: 'Seguí derecho',
     navNoRoute: 'Sin destino asignado',
@@ -832,6 +834,40 @@ async function loadCities(mapInfo) {
   }
 }
 
+// Nombres de ruta reales (US-75, I-70, etc.) extraidos de los carteles de
+// autopista del juego (ver extract_road_names.py) - opcional: si el archivo
+// no existe para el mapa actual (ETS2 todavia no lo tiene), roadNames queda
+// vacio y las indicaciones GPS vuelven al texto generico de siempre.
+let roadNames = []; // [{x, y, label}, ...] en coordenadas de juego
+
+async function loadRoadNames(mapInfo) {
+  roadNames = [];
+  try {
+    const res = await fetch(`${mapInfo.assetsDir}/road-names.json`);
+    if (!res.ok) return;
+    roadNames = await res.json();
+  } catch (err) {
+    roadNames = [];
+  }
+}
+
+// Busca el cartel de ruta mas cercano a (x,z) dentro de maxDist metros -
+// se usa para etiquetar el tramo al que se esta por girar. Es un scan lineal
+// (varios miles de carteles) pero solo se llama una vez por tick de nav, asi
+// que el costo es despreciable.
+function nearestRoadName(x, z, maxDist) {
+  let best = null;
+  let bestDist = maxDist;
+  for (const sign of roadNames) {
+    const dist = Math.hypot(sign.x - x, sign.y - z);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = sign.label;
+    }
+  }
+  return best;
+}
+
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
 // del output de truckermudgeon/maps. nodes: [[x,y], ...], edges: [[fromIdx, toIdx, weight], ...]
 let routeGraph = null; // { nodes, adjacency: Map<idx, [[idx, weight], ...]> }
@@ -1056,6 +1092,7 @@ async function loadGameMap(game) {
 
   await loadCities(mapInfo);
   await loadRouteGraph(mapInfo);
+  await loadRoadNames(mapInfo);
   currentRouteTarget = null;
   currentRouteWorldPoints = null;
   trailWorld.length = 0;
@@ -1107,6 +1144,7 @@ let navAutoZoomPaused = false; // true si el usuario zoomeo a mano en modo nav -
 let lastHeadingDeg = 0;
 const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo giro
 const NAV_TURN_ANGLE_THRESHOLD_DEG = 25; // cambio de rumbo minimo para contar como "giro" y no ruido del trazado
+const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta mas cercano al tramo del giro
 
 function setNavMode(on) {
   navMode = on;
@@ -1151,7 +1189,13 @@ function findUpcomingTurn() {
     let delta = segBearing - initialBearing;
     delta = ((delta + 540) % 360) - 180; // normalizar a [-180, 180]
     if (Math.abs(delta) > NAV_TURN_ANGLE_THRESHOLD_DEG) {
-      return { distanceMeters: pts[i].dist, direction: delta > 0 ? 'right' : 'left' };
+      // Nombre de ruta del tramo AL QUE se gira (no del que se viene), buscando
+      // cerca del punto de mundo un poco despues del giro - asi el cartel del
+      // cruce mismo (que suele estar justo en el vertice) no interfiere.
+      const afterTurnIdx = Math.min(i + 2, currentRouteWorldPoints.length - 1);
+      const [wx, wz] = currentRouteWorldPoints[afterTurnIdx];
+      const roadName = nearestRoadName(wx, wz, NAV_ROAD_NAME_MAX_DIST_M);
+      return { distanceMeters: pts[i].dist, direction: delta > 0 ? 'right' : 'left', roadName };
     }
   }
   return null;
@@ -1169,7 +1213,8 @@ function updateNavPanel(turn) {
   if (turn) {
     const arrow = turn.direction === 'left' ? '↰' : '↱';
     const dirText = turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight');
-    panel.textContent = `${arrow} ${dirText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters)}`;
+    const ontoText = turn.roadName ? ` ${t('navOnto')} ${turn.roadName}` : '';
+    panel.textContent = `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters)}`;
   } else if (currentRouteWorldPoints) {
     panel.textContent = `⬆ ${t('navStraight')}`;
   } else {
