@@ -630,7 +630,16 @@ function ensureMapInitialized() {
   maplibregl.addProtocol('pmtiles', protocol.tile);
   map = new maplibregl.Map({
     container: 'mapCanvas',
-    style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#2b2f36' } }] },
+    style: {
+      version: 8,
+      // Sin esto, MapLibre no puede resolver los glifos de texto y CUALQUIER
+      // capa 'symbol' (poi/exit/city/country) tira error al agregarse - eso
+      // ademas cortaba en seco el loop de addLayer y se perdian todas las
+      // capas de texto de una. Host publico oficial de MapLibre para fuentes basicas.
+      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      sources: {},
+      layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#2b2f36' } }],
+    },
     center: [0, 20],
     zoom: 1,
     attributionControl: false,
@@ -897,8 +906,12 @@ async function loadGameMap(game) {
   if (map.getSource('vec')) map.removeSource('vec');
   map.addSource('vec', { type: 'vector', url: `pmtiles://${mapInfo.pmtilesUrl}` });
   // Se insertan justo antes de 'trail-line' para que el trail/ruta/marcadores
-  // queden siempre por encima del mapa base.
-  for (const layer of buildVecLayers(mapInfo.sourceLayer)) map.addLayer(layer, 'trail-line');
+  // queden siempre por encima del mapa base. try/catch por capa: si una sola
+  // definicion tiene un error, que no tumbe a las demas (ya paso una vez con
+  // las capas de texto por faltar 'glyphs' en el estilo).
+  for (const layer of buildVecLayers(mapInfo.sourceLayer)) {
+    try { map.addLayer(layer, 'trail-line'); } catch (err) { console.error('No se pudo agregar la capa', layer.id, err); }
+  }
 
   map.jumpTo({ center: mapInfo.origin, zoom: 5 });
 
