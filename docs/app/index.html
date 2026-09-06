@@ -127,16 +127,16 @@
 
   .mapBtn {
     position: absolute; z-index: 1000;
-    width: 36px; height: 36px; border-radius: 50%; border: none;
+    width: 44px; height: 44px; border-radius: 50%; border: none;
     background: #fff; color: #111; font-size: 1.1rem; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
   .mapBtn:hover { background: #eee; }
   #recenterBtn { top: 0.6rem; left: 0.6rem; }
-  #panelToggleBtn { top: 3.4rem; left: 0.6rem; }
-  #fullscreenBtn { top: 6.2rem; left: 0.6rem; }
-  #navToggleBtn { top: 9.0rem; left: 0.6rem; }
+  #panelToggleBtn { top: 3.9rem; left: 0.6rem; }
+  #fullscreenBtn { top: 7.2rem; left: 0.6rem; }
+  #navToggleBtn { top: 10.5rem; left: 0.6rem; }
   #navToggleBtn.active { background: var(--accent); color: #fff; }
 
   /* Panel de indicaciones del modo navegacion - giro/distancia genericos
@@ -632,6 +632,11 @@ document.getElementById('settingsCloseBtn').addEventListener('click', () => {
 });
 document.getElementById('settingsModal').addEventListener('click', (e) => {
   if (e.target.id === 'settingsModal') document.getElementById('settingsModal').style.display = 'none';
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('settingsModal').style.display === 'flex') {
+    document.getElementById('settingsModal').style.display = 'none';
+  }
 });
 
 // Mapa vectorial (roads/prefabs/pois/labels) generado con truckermudgeon/maps
