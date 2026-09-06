@@ -217,10 +217,10 @@ def stats_admin(x_admin_key: Optional[str] = Header(default=None)):
 
 
 # Permite sembrar una base real conocida manualmente (ej. gente que probo el
-# cliente o trabajos completados antes de tener este tracking automatico) -
-# solo pisa las claves top-level que se manden, no toca daily/daily_jobs/
-# latest_jobs.
-_SEEDABLE_KEYS = {"total_sessions", "jobs_delivered", "total_revenue"}
+# cliente o trabajos completados antes de tener este tracking automatico), o
+# limpiar latest_jobs si quedo con datos malos (ej. duplicados de un bug ya
+# arreglado).
+_SEEDABLE_NUMERIC_KEYS = {"total_sessions", "jobs_delivered", "total_revenue"}
 
 
 @app.post("/admin/stats/seed")
@@ -230,8 +230,10 @@ def stats_seed(payload: dict, x_admin_key: Optional[str] = Header(default=None))
     with _stats_lock:
         stats = _load_stats()
         for key, value in payload.items():
-            if key in _SEEDABLE_KEYS and isinstance(value, (int, float)):
+            if key in _SEEDABLE_NUMERIC_KEYS and isinstance(value, (int, float)):
                 stats[key] = value
+            elif key == "latest_jobs" and isinstance(value, list):
+                stats[key] = value[:LATEST_JOBS_MAX]
         _save_stats()
         return stats
 
