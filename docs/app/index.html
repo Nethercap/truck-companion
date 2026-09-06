@@ -636,8 +636,9 @@ function buildVecLayers(sourceLayer) {
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
-    { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'poi'], minzoom: 7,
-      layout: { 'text-field': ['match', ['get', 'sprite'], 'gas_ico', '⛽', 'service_ico', '🔧', 'weight_station_ico', '⚖', '📍'], 'text-size': 14, 'text-allow-overlap': true, 'text-ignore-placement': true } },
+    { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: 7,
+      filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]]],
+      layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
     { id: 'exit-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'exit'], minzoom: 10,
       layout: { 'text-field': ['concat', 'Exit ', ['get', 'name']], 'text-size': 11 },
       paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
@@ -677,7 +678,8 @@ function ensureMapInitialized() {
   // presente cuando el zoom lo dispara una interaccion real (rueda/pellizco/
   // doble click), no nuestros propios easeTo/jumpTo programaticos.
   map.on('zoomstart', (e) => { if (e.originalEvent) navAutoZoomPaused = true; });
-  map.once('load', () => {
+  map.once('load', async () => {
+    await loadPoiIcons();
     mapReady = true;
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
@@ -685,6 +687,28 @@ function ensureMapInitialized() {
     map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#a30000', 'line-width': 3, 'line-opacity': 0.9 } });
     if (pendingGame) { const g = pendingGame; pendingGame = null; loadGameMap(g); }
   });
+}
+
+// Iconos reales del juego (extraidos por el parser, mismos que usaba el mapa
+// raster viejo) para los POIs - emoji como texto no funciona porque la fuente
+// de glifos que usamos (demotiles.maplibre.org) no tiene emoji, solo texto
+// normal (por eso los labels de ciudad si andaban pero los POIs no).
+// El campo "sprite" del dato trae cientos de tokens distintos (carteles de
+// ruta, iconos de empresas individuales, etc.) - solo cargamos los que nos
+// interesan mostrar como POI generico.
+const POI_ICONS = ['gas_ico', 'service_ico', 'weigh_station_ico', 'parking_ico', 'toll_ico', 'garage_large_ico', 'dealer_ico', 'recruitment_ico', 'viewpoint'];
+const POI_ICON_BASE = `${REMOTE_MAP_BASE}/vector/icons`;
+
+async function loadPoiIcons() {
+  for (const name of POI_ICONS) {
+    if (map.hasImage(name)) continue;
+    try {
+      const res = await map.loadImage(`${POI_ICON_BASE}/${name}.png`);
+      map.addImage(name, res.data);
+    } catch (err) {
+      console.error('No se pudo cargar el icono de POI', name, err);
+    }
+  }
 }
 
 async function loadCities(mapInfo) {
