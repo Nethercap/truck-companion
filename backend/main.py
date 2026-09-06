@@ -25,6 +25,20 @@ import boto3
 from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+# Monitoreo de errores: se activa solo si esta seteada la env var SENTRY_DSN
+# en Railway. Si no esta, no hace nada y no rompe el arranque (mismo patron
+# que en el backend de Playloggr).
+_sentry_dsn = os.environ.get("SENTRY_DSN", "")
+if _sentry_dsn:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.1,
+        environment=os.environ.get("RAILWAY_ENVIRONMENT_NAME", "production"),
+        send_default_pii=True,
+    )
+
 app = FastAPI(title="Truck Companion Backend")
 
 app.add_middleware(

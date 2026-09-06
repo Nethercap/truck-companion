@@ -2,3 +2,4 @@ fastapi
 uvicorn[standard]
 websockets
 boto3
+sentry-sdk[fastapi]
