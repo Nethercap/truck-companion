@@ -80,7 +80,10 @@
   }
 
   #mapPanel { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; padding: 0; border-radius: 12px; }
-  #leafletMap { width: 100%; height: 100%; background: #2b2f36; }
+  /* El mapa rota via CSS cuando el modo navegacion esta activo (heading-up,
+     como un GPS real) en vez de quedar siempre norte-arriba. Los controles y
+     el resto de la UI quedan afuera de este elemento, asi que no rotan. */
+  #leafletMap { width: 100%; height: 100%; background: #2b2f36; transition: transform 0.3s linear; }
   .mapHint { position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
 
   /* Banner grande y parpadeante cuando se corta la conexion - a diferencia
@@ -136,6 +139,18 @@
   #recenterBtn { top: 0.6rem; left: 0.6rem; }
   #panelToggleBtn { top: 3.4rem; left: 0.6rem; }
   #fullscreenBtn { top: 6.2rem; left: 0.6rem; }
+  #navToggleBtn { top: 9.0rem; left: 0.6rem; }
+  #navToggleBtn.active { background: var(--accent); color: #fff; }
+
+  /* Panel de indicaciones del modo navegacion - giro/distancia genericos
+     calculados de la curvatura de la ruta ya calculada, sin nombres de
+     calle (el grafo no los tiene). */
+  .navPanel {
+    position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%);
+    z-index: 1200; background: rgba(23, 26, 31, 0.92); color: #fff;
+    padding: 0.5rem 1rem; border-radius: 10px; font-size: 0.95rem;
+    font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
+  }
 
   /* Mini-HUD: velocidad/limite/crucero flotando arriba a la derecha del mapa,
      visible solo cuando el panel de info esta oculto (si el panel esta
@@ -258,6 +273,9 @@
       <button id="recenterBtn" class="mapBtn" data-i18n-title="recenter" title="Recenter on truck">🎯</button>
       <button id="panelToggleBtn" class="mapBtn" data-i18n-title="togglePanel" title="Show/hide info">☰</button>
       <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
+      <button id="navToggleBtn" class="mapBtn" data-i18n-title="toggleNavMode" title="Navigation mode">🧭</button>
+
+      <div id="navPanel" class="navPanel" style="display:none;"></div>
 
       <div id="miniHud">
         <div class="limitSign" id="miniLimitSign">--</div>
@@ -337,6 +355,12 @@ const TRANSLATIONS = {
     recenter: 'Recenter on truck',
     togglePanel: 'Show/hide info panel',
     toggleFullscreen: 'Fullscreen',
+    toggleNavMode: 'Navigation mode (heading-up, dynamic zoom)',
+    navTurnLeft: 'Turn left',
+    navTurnRight: 'Turn right',
+    navIn: 'in',
+    navStraight: 'Continue straight',
+    navNoRoute: 'No destination set',
     truck: 'Truck',
     cargo: 'Cargo',
     weight: 'Weight',
@@ -387,6 +411,12 @@ const TRANSLATIONS = {
     recenter: 'Centrar en el camión',
     togglePanel: 'Mostrar/ocultar panel de info',
     toggleFullscreen: 'Pantalla completa',
+    toggleNavMode: 'Modo navegación (rota con el rumbo, zoom dinámico)',
+    navTurnLeft: 'Girá a la izquierda',
+    navTurnRight: 'Girá a la derecha',
+    navIn: 'en',
+    navStraight: 'Seguí derecho',
+    navNoRoute: 'Sin destino asignado',
     truck: 'Camión',
     cargo: 'Cargamento',
     weight: 'Peso',
@@ -486,6 +516,7 @@ let destMarker = null;
 let destLine = null;
 let mapTransform = null; // { toLatLng(x, z) }
 let currentGame = null;
+let currentMaxZoom = null;
 let citiesByName = {}; // Name -> {X, Y}
 const trailWorld = [];
 const MAX_TRAIL_POINTS = 1000;
@@ -729,6 +760,7 @@ async function loadGameMap(game) {
   }
 
   currentGame = game;
+  currentMaxZoom = tileMapInfo.maxZoom;
   const { x1, x2, y1, y2, maxZoom } = tileMapInfo;
   const pixelsAtMaxZoom = 256 * Math.pow(2, maxZoom);
   const scale = pixelsAtMaxZoom / (x2 - x1);
@@ -753,6 +785,7 @@ async function loadGameMap(game) {
     // cada update (si no, seria imposible mirar otra parte del mapa) - se
     // reactiva con el boton de recentrar.
     leafletMap.on('dragstart', () => { autoFollow = false; });
+    if (navMode) leafletMap.dragging.disable(); // por si se activo el modo nav antes de que el mapa terminara de cargar
   } else {
     if (tileLayer) leafletMap.removeLayer(tileLayer);
     if (trailLine) leafletMap.removeLayer(trailLine);
@@ -786,6 +819,107 @@ async function loadGameMap(game) {
 let lastWorldPos = null;
 let autoFollow = true; // se desactiva si el usuario arrastra el mapa a mano, se reactiva con el boton de recentrar
 const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es un teleport (job asignado, garage, etc.), no un tramo manejado
+
+// Modo navegacion: mapa heading-up (rota con el camion, como un GPS real) en
+// vez de norte-arriba, con zoom dinamico (se acerca en curvas, se aleja en
+// rectas) e indicaciones de giro genericas (sin nombres de calle, el grafo
+// no los tiene). El heading se calcula en espacio de pantalla (leafletMap.
+// project, no rota con el CSS) asi que sigue siendo consistente incluso con
+// el mapa visualmente rotado.
+let navMode = false;
+let lastHeadingDeg = 0;
+const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo giro
+const NAV_TURN_ANGLE_THRESHOLD_DEG = 25; // cambio de rumbo minimo para contar como "giro" y no ruido del trazado
+
+function setNavMode(on) {
+  navMode = on;
+  const mapEl = document.getElementById('leafletMap');
+  const btn = document.getElementById('navToggleBtn');
+  if (on) {
+    autoFollow = true;
+    if (leafletMap) leafletMap.dragging.disable(); // arrastrar con el mapa rotado via CSS quedaria desalineado
+    btn.classList.add('active');
+  } else {
+    mapEl.style.transform = 'none';
+    if (leafletMap) leafletMap.dragging.enable();
+    btn.classList.remove('active');
+    document.getElementById('navPanel').style.display = 'none';
+  }
+}
+
+function updateNavRotation() {
+  document.getElementById('leafletMap').style.transform = `rotate(${-lastHeadingDeg}deg)`;
+}
+
+// Bearing en espacio de pantalla entre dos puntos ya proyectados a pixeles
+// (mismo criterio que el heading de la flecha: evita depender de como se
+// relacionan los ejes x/z del juego con la orientacion del mapa).
+function screenBearing(p1, p2) {
+  return (Math.atan2(p2.x - p1.x, -(p2.y - p1.y)) * 180 / Math.PI + 360) % 360;
+}
+
+// Busca el proximo giro real en la ruta ya calculada (recortada a la
+// posicion actual por trimRouteBehindTruck), mirando hasta NAV_TURN_LOOKAHEAD_M
+// adelante. Devuelve null si el camino sigue derecho en ese tramo.
+function findUpcomingTurn() {
+  if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !leafletMap || !mapTransform) return null;
+  const zoom = leafletMap.getZoom();
+  const screenPts = [];
+  let cumDist = 0;
+  for (let i = 0; i < currentRouteWorldPoints.length; i++) {
+    const [wx, wz] = currentRouteWorldPoints[i];
+    if (i > 0) {
+      const [pwx, pwz] = currentRouteWorldPoints[i - 1];
+      cumDist += Math.hypot(wx - pwx, wz - pwz);
+    }
+    if (cumDist > NAV_TURN_LOOKAHEAD_M) break;
+    screenPts.push({ p: leafletMap.project(mapTransform.toLatLng(wx, wz), zoom), dist: cumDist });
+  }
+  if (screenPts.length < 3) return null;
+
+  const initialBearing = screenBearing(screenPts[0].p, screenPts[1].p);
+  for (let i = 1; i < screenPts.length - 1; i++) {
+    const segBearing = screenBearing(screenPts[i].p, screenPts[i + 1].p);
+    let delta = segBearing - initialBearing;
+    delta = ((delta + 540) % 360) - 180; // normalizar a [-180, 180]
+    if (Math.abs(delta) > NAV_TURN_ANGLE_THRESHOLD_DEG) {
+      return { distanceMeters: screenPts[i].dist, direction: delta > 0 ? 'right' : 'left' };
+    }
+  }
+  return null;
+}
+
+function updateNavPanelAndZoom() {
+  const panel = document.getElementById('navPanel');
+  const turn = findUpcomingTurn();
+
+  if (turn) {
+    const arrow = turn.direction === 'left' ? '↰' : '↱';
+    const dirText = turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight');
+    const distText = turn.distanceMeters >= 1000
+      ? `${(turn.distanceMeters / 1000).toFixed(1)} km`
+      : `${Math.round(turn.distanceMeters)} m`;
+    panel.textContent = `${arrow} ${dirText} ${t('navIn')} ${distText}`;
+  } else if (currentRouteWorldPoints) {
+    panel.textContent = `⬆ ${t('navStraight')}`;
+  } else {
+    panel.textContent = `${t('navNoRoute')}`;
+  }
+  panel.style.display = 'block';
+
+  if (!currentMaxZoom) return;
+  // Zoom dinamico: mas cerca del giro, mas zoom - como un GPS real. Se usan
+  // niveles relativos al maxZoom del tileset (varia por juego).
+  let targetZoom = currentMaxZoom - 2; // "autopista", tramo recto
+  if (turn) {
+    if (turn.distanceMeters < 150) targetZoom = currentMaxZoom;
+    else if (turn.distanceMeters < 400) targetZoom = currentMaxZoom - 1;
+  }
+  targetZoom = Math.max(leafletMap.getMinZoom(), Math.min(currentMaxZoom, targetZoom));
+  if (leafletMap.getZoom() !== targetZoom) {
+    leafletMap.setZoom(targetZoom, { animate: true });
+  }
+}
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
 // proyectando la posicion actual sobre la polilinea y descartando los puntos
@@ -876,10 +1010,16 @@ function updateMap(position, game) {
     const dx = p2.x - p1.x, dy = p2.y - p1.y;
     if (Math.hypot(dx, dy) > 0.5) {
       const angleDeg = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+      lastHeadingDeg = angleDeg;
       const el = truckMarker.getElement();
       const arrow = el && el.querySelector('.truckArrow');
       if (arrow) arrow.style.transform = `rotate(${angleDeg}deg)`;
     }
+  }
+
+  if (navMode) {
+    updateNavRotation();
+    updateNavPanelAndZoom();
   }
 
   if (prevLatLng) {
@@ -1096,6 +1236,10 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
 
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement) document.body.classList.remove('fsMode');
+});
+
+document.getElementById('navToggleBtn').addEventListener('click', () => {
+  setNavMode(!navMode);
 });
 
 document.getElementById('updateBannerClose').addEventListener('click', () => {
