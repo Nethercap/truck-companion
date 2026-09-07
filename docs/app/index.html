@@ -280,6 +280,7 @@
     <button id="unitToggle" data-i18n-title="toggleUnits" title="Toggle units">km · km/h</button>
     <button id="langToggle" data-i18n-title="toggleLanguage" title="Toggle language">EN</button>
     <button id="settingsBtn" data-i18n-title="settings" title="Settings" style="display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg></button>
+    <button id="modsBtn" data-i18n-title="modsTitle" title="Map mods" style="display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.5,11H19V7c0-1.1-0.9-2-2-2h-4V3.5C13,2.12,11.88,1,10.5,1S8,2.12,8,3.5V5H4C2.9,5,2.01,5.9,2.01,7v3.8H3.5 c1.49,0,2.7,1.21,2.7,2.7s-1.21,2.7-2.7,2.7H2.01V20c0,1.1,0.9,2,2,2h3.8v-1.5c0-1.49,1.21-2.7,2.7-2.7s2.7,1.21,2.7,2.7V22H17 c1.1,0,2-0.9,2-2v-4h1.5c1.38,0,2.5-1.12,2.5-2.5S21.88,11,20.5,11z"/></svg></button>
   </div>
 
   <div id="settingsModal" class="settingsOverlay" style="display:none;">
@@ -301,10 +302,21 @@
         <button class="colorSwatch" data-color="#4caf50" style="background:#4caf50" data-i18n-title="colorGreen" title="Green"></button>
       </div>
 
-      <p class="settingsSectionTitle" data-i18n="settingsMapModsTitle">Map mods (ATS):</p>
+      <button id="settingsCloseBtn" data-i18n="close">Close</button>
+    </div>
+  </div>
+
+  <div id="modsModal" class="settingsOverlay" style="display:none;">
+    <div class="settingsPanel">
+      <h3 data-i18n="modsTitle">Map mods</h3>
+
+      <p class="settingsSectionTitle">American Truck Simulator</p>
       <label class="settingsRow"><input type="checkbox" id="setCoastToCoast" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
 
-      <button id="settingsCloseBtn" data-i18n="close">Close</button>
+      <p class="settingsSectionTitle">Euro Truck Simulator 2</p>
+      <p class="settingsRow" style="color:var(--muted);cursor:default;" data-i18n="modsNoneYet">No mods available yet</p>
+
+      <button id="modsCloseBtn" data-i18n="close">Close</button>
     </div>
   </div>
   <div id="status" data-i18n="notConnected">Not connected</div>
@@ -408,7 +420,8 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Show in mini-HUD (when info panel is hidden):',
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
-    settingsMapModsTitle: 'Map mods (ATS):',
+    modsTitle: 'Map mods',
+    modsNoneYet: 'No mods available yet',
     settingsCoastToCoast: 'I have Coast to Coast installed',
     colorRed: 'Red',
     colorBlue: 'Blue',
@@ -477,7 +490,8 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Mostrar en el mini-HUD (con el panel de info oculto):',
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
-    settingsMapModsTitle: 'Mods de mapa (ATS):',
+    modsTitle: 'Mods de mapa',
+    modsNoneYet: 'Todavía no hay mods disponibles',
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
     colorRed: 'Rojo',
     colorBlue: 'Azul',
@@ -609,10 +623,13 @@ function initSettingsUi() {
   document.getElementById('setMiniDistance').checked = miniHudSettings.distance;
   document.getElementById('setMiniCruise').checked = miniHudSettings.cruise;
   document.getElementById('setMiniGps').checked = miniHudSettings.gps;
-  document.getElementById('setCoastToCoast').checked = hasCoastToCoast;
   document.querySelectorAll('.colorSwatch').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.color === routeColor);
   });
+}
+
+function initModsUi() {
+  document.getElementById('setCoastToCoast').checked = hasCoastToCoast;
 }
 
 document.getElementById('setCoastToCoast').addEventListener('change', (e) => {
@@ -658,9 +675,25 @@ document.getElementById('settingsCloseBtn').addEventListener('click', () => {
 document.getElementById('settingsModal').addEventListener('click', (e) => {
   if (e.target.id === 'settingsModal') document.getElementById('settingsModal').style.display = 'none';
 });
+
+document.getElementById('modsBtn').addEventListener('click', () => {
+  initModsUi();
+  document.getElementById('modsModal').style.display = 'flex';
+});
+document.getElementById('modsCloseBtn').addEventListener('click', () => {
+  document.getElementById('modsModal').style.display = 'none';
+});
+document.getElementById('modsModal').addEventListener('click', (e) => {
+  if (e.target.id === 'modsModal') document.getElementById('modsModal').style.display = 'none';
+});
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('settingsModal').style.display === 'flex') {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('settingsModal').style.display === 'flex') {
     document.getElementById('settingsModal').style.display = 'none';
+  }
+  if (document.getElementById('modsModal').style.display === 'flex') {
+    document.getElementById('modsModal').style.display = 'none';
   }
 });
 
