@@ -170,6 +170,13 @@ class Session:
         self.counted = False  # ya se sumo al contador historico (una vez por sesion, no por reconexion)
         self.last_job_delivered = False  # flanco para no contar el mismo evento en cada tick que el pulso siga en true
         self.last_job_delivered_at = 0.0  # cooldown extra: el SDK a veces re-pulsa el mismo evento (ver JOB_DELIVERED_COOLDOWN_SECONDS)
+        # Mismo snapshot que ya cachea client.py (citySrc/cityDst/cargo se
+        # limpian en el mismo tick que jobDelivered pulsa), pero duplicado
+        # server-side: si el cliente local se reinicia (update, crash) justo
+        # antes de entregar, pierde su snapshot en memoria pero la sesion del
+        # backend sigue viva mientras dure el pairing, asi que ya tiene ticks
+        # validos acumulados de antes del reinicio.
+        self.last_job_snapshot = {"citySrc": None, "cityDst": None, "truckBrand": None, "truckName": None, "cargo": None}
 
 
 sessions: dict[str, Session] = {}
@@ -304,6 +311,17 @@ async def ws_client(websocket: WebSocket, code: str):
                 event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
                 now = time.time()
+                # Ver comentario en Session.last_job_snapshot - se actualiza en
+                # cada tick que venga con datos validos, sin importar si el
+                # cliente se reinicio en el medio.
+                if payload.get("citySrc") and payload.get("cityDst"):
+                    session.last_job_snapshot = {
+                        "citySrc": payload.get("citySrc"),
+                        "cityDst": payload.get("cityDst"),
+                        "truckBrand": payload.get("truckBrand"),
+                        "truckName": payload.get("truckName"),
+                        "cargo": payload.get("cargo"),
+                    }
                 # El SDK a veces re-pulsa jobDelivered para el mismo evento
                 # real (bug conocido del plugin en ciertas condiciones, ver
                 # changelog de scs-sdk-plugin) - un cooldown ademas del flanco
@@ -319,13 +337,14 @@ async def ws_client(websocket: WebSocket, code: str):
                     # no despues) - el cliente cachea el ultimo snapshot valido
                     # y lo manda aparte en jobSrc/jobDst/etc, con fallback a
                     # los campos top-level por si el cliente no los mando.
+                    snap = session.last_job_snapshot
                     job_info = {
                         "game": payload.get("game"),
-                        "citySrc": event.get("jobSrc") or payload.get("citySrc"),
-                        "cityDst": event.get("jobDst") or payload.get("cityDst"),
-                        "truckBrand": event.get("jobTruckBrand") or payload.get("truckBrand"),
-                        "truckName": event.get("jobTruckName") or payload.get("truckName"),
-                        "cargo": event.get("jobCargo") or payload.get("cargo"),
+                        "citySrc": event.get("jobSrc") or payload.get("citySrc") or snap["citySrc"],
+                        "cityDst": event.get("jobDst") or payload.get("cityDst") or snap["cityDst"],
+                        "truckBrand": event.get("jobTruckBrand") or payload.get("truckBrand") or snap["truckBrand"],
+                        "truckName": event.get("jobTruckName") or payload.get("truckName") or snap["truckName"],
+                        "cargo": event.get("jobCargo") or payload.get("cargo") or snap["cargo"],
                         "revenue": event.get("jobDeliveredRevenue") or 0,
                         "distanceKm": event.get("jobDeliveredDistanceKm") or 0,
                     }
