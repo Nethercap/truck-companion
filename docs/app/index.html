@@ -386,10 +386,7 @@
         </div>
         <div class="row"><span class="label" data-i18n="truck">Truck</span><span id="truck">-</span></div>
         <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
-        <div class="row"><span class="label" data-i18n="weight">Weight</span><span id="cargoMass">-</span></div>
-        <div class="row"><span class="label" data-i18n="distanceLeft">Distance left</span><span id="routeDistance">-</span></div>
         <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
-        <div class="row"><span class="label" data-i18n="nextRest">Time to next rest stop</span><span id="restStop">-</span></div>
         <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
         <div class="row"><span class="label" data-i18n="tolls">Tolls paid</span><span id="tollsTotal">-</span></div>
         <div class="row"><span class="label" data-i18n="fines">Fines</span><span id="finesTotal">-</span></div>
@@ -446,10 +443,8 @@ const TRANSLATIONS = {
     navNoRoute: 'No destination set',
     truck: 'Truck',
     cargo: 'Cargo',
-    weight: 'Weight',
     distanceLeft: 'Distance left',
     etaGame: 'In-game ETA',
-    nextRest: 'Time to next rest stop',
     jobPay: 'Job pay',
     fuel: 'Fuel',
     range: 'Range',
@@ -516,10 +511,8 @@ const TRANSLATIONS = {
     navNoRoute: 'Sin destino asignado',
     truck: 'Camión',
     cargo: 'Cargamento',
-    weight: 'Peso',
     distanceLeft: 'Distancia restante',
     etaGame: 'ETA in-game',
-    nextRest: 'Tiempo al próximo descanso',
     jobPay: 'Pago del trabajo',
     fuel: 'Combustible',
     range: 'Autonomía',
@@ -1496,22 +1489,19 @@ function updateHud(data) {
   document.getElementById('cityDst').textContent = data.cityDst || '?';
   const truckLabel = [data.truckBrand, data.truckName].filter(Boolean).join(' ');
   document.getElementById('truck').textContent = truckLabel || '-';
-  document.getElementById('cargo').textContent = data.cargo || t('noCargo');
-  document.getElementById('cargoMass').textContent = data.cargoMassKg ? `${Math.round(data.cargoMassKg)} kg` : '-';
-
-  if (data.routeDistanceKm) {
-    const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
-    document.getElementById('routeDistance').textContent = `${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`;
+  if (data.cargo) {
+    const cargoWeightText = data.cargoMassKg ? ` (${(data.cargoMassKg / 1000).toFixed(1)} TN)` : '';
+    document.getElementById('cargo').textContent = `${data.cargo}${cargoWeightText}`;
   } else {
-    document.getElementById('routeDistance').textContent = '-';
+    document.getElementById('cargo').textContent = t('noCargo');
   }
 
-  document.getElementById('etaGame').textContent = formatSeconds(data.routeTimeSeconds);
-
-  if (data.restStopSeconds != null && data.restStopSeconds > 0) {
-    document.getElementById('restStop').textContent = formatSeconds(data.restStopSeconds);
+  const etaText = formatSeconds(data.routeTimeSeconds);
+  if (data.routeDistanceKm) {
+    const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
+    document.getElementById('etaGame').textContent = `${etaText} (${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'})`;
   } else {
-    document.getElementById('restStop').textContent = '-';
+    document.getElementById('etaGame').textContent = etaText;
   }
 
   document.getElementById('jobIncome').textContent = data.jobIncome ? `$${data.jobIncome.toLocaleString()}` : '-';
