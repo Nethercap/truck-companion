@@ -314,7 +314,7 @@
       <label class="settingsRow"><input type="checkbox" id="setCoastToCoast" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
 
       <p class="settingsSectionTitle">Euro Truck Simulator 2</p>
-      <p class="settingsRow" style="color:var(--muted);cursor:default;" data-i18n="modsNoneYet">No mods available yet</p>
+      <label class="settingsRow"><input type="checkbox" id="setProMods" /> <span data-i18n="settingsProMods">I have ProMods installed</span></label>
 
       <button id="modsCloseBtn" data-i18n="close">Close</button>
     </div>
@@ -418,8 +418,8 @@ const TRANSLATIONS = {
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
-    modsNoneYet: 'No mods available yet',
     settingsCoastToCoast: 'I have Coast to Coast installed',
+    settingsProMods: 'I have ProMods installed',
     colorRed: 'Red',
     colorBlue: 'Blue',
     colorGreen: 'Green',
@@ -486,8 +486,8 @@ const TRANSLATIONS = {
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
-    modsNoneYet: 'Todavía no hay mods disponibles',
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
+    settingsProMods: 'Tengo instalado ProMods',
     colorRed: 'Rojo',
     colorBlue: 'Azul',
     colorGreen: 'Verde',
@@ -595,7 +595,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, hasCoastToCoast }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, hasCoastToCoast, hasProMods }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -608,6 +608,7 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // el usuario, asi que no se puede auto-detectar Coast to Coast - el usuario
 // lo activa a mano si lo tiene instalado (ver GAME_MAPS.ats_c2c).
 let hasCoastToCoast = _savedSettings.hasCoastToCoast || false;
+let hasProMods = _savedSettings.hasProMods || false;
 
 function initSettingsUi() {
   document.getElementById('setMiniFuelPct').checked = miniHudSettings.fuelPct;
@@ -623,6 +624,7 @@ function initSettingsUi() {
 
 function initModsUi() {
   document.getElementById('setCoastToCoast').checked = hasCoastToCoast;
+  document.getElementById('setProMods').checked = hasProMods;
 }
 
 document.getElementById('setCoastToCoast').addEventListener('change', (e) => {
@@ -630,6 +632,11 @@ document.getElementById('setCoastToCoast').addEventListener('change', (e) => {
   saveSettings();
   // Fuerza un reload del mapa actual con la variante correcta la proxima vez
   // que llegue un tick de telemetria (updateMap ya resuelve ats vs ats_c2c).
+  currentGame = null;
+});
+document.getElementById('setProMods').addEventListener('change', (e) => {
+  hasProMods = e.target.checked;
+  saveSettings();
   currentGame = null;
 });
 
@@ -726,6 +733,15 @@ const GAME_MAPS = {
     pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2.pmtiles`,
     sourceLayer: 'ets2',
     label: 'Euro Truck Simulator 2',
+    toLngLat: ets2ToLngLat,
+    origin: [15, 50],
+  },
+  // Mismo criterio que ats_c2c: opt-in via toggle en Mods, no auto-detectable.
+  ets2_promods: {
+    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods.pmtiles`,
+    sourceLayer: 'ets2',
+    label: 'Euro Truck Simulator 2 + ProMods',
     toLngLat: ets2ToLngLat,
     origin: [15, 50],
   },
@@ -1354,10 +1370,16 @@ function animateTruckTo(fromLngLat, toPos) {
   moveAnimFrameId = requestAnimationFrame(step);
 }
 
+function resolveEffectiveGame(game) {
+  const g = game || 'ats';
+  if (g === 'ats' && hasCoastToCoast) return 'ats_c2c';
+  if (g === 'ets2' && hasProMods) return 'ets2_promods';
+  return g;
+}
+
 function updateMap(position, game) {
   if (position.x == null || position.z == null) return;
-  const effectiveGame = (game || 'ats') === 'ats' && hasCoastToCoast ? 'ats_c2c' : (game || 'ats');
-  loadGameMap(effectiveGame);
+  loadGameMap(resolveEffectiveGame(game));
   if (!toLngLat || !map) return;
 
   const lngLat = toLngLat(position.x, position.z);
