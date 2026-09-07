@@ -312,6 +312,7 @@
 
       <p class="settingsSectionTitle">American Truck Simulator</p>
       <label class="settingsRow"><input type="checkbox" id="setCoastToCoast" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setProModsCanada" /> <span data-i18n="settingsProModsCanada">I have ProMods Canada installed</span></label>
 
       <p class="settingsSectionTitle">Euro Truck Simulator 2</p>
       <label class="settingsRow"><input type="checkbox" id="setProMods" /> <span data-i18n="settingsProMods">I have ProMods (Europe + all addons) installed</span></label>
@@ -419,6 +420,7 @@ const TRANSLATIONS = {
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
     settingsCoastToCoast: 'I have Coast to Coast installed',
+    settingsProModsCanada: 'I have ProMods Canada installed',
     settingsProMods: 'I have ProMods (Europe + all addons) installed',
     colorRed: 'Red',
     colorBlue: 'Blue',
@@ -487,6 +489,7 @@ const TRANSLATIONS = {
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
+    settingsProModsCanada: 'Tengo instalado ProMods Canada',
     settingsProMods: 'Tengo instalado ProMods (Europe + todos los addons)',
     colorRed: 'Rojo',
     colorBlue: 'Azul',
@@ -595,7 +598,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, hasCoastToCoast, hasProMods }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, hasCoastToCoast, hasProMods, hasProModsCanada }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -609,6 +612,7 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // lo activa a mano si lo tiene instalado (ver GAME_MAPS.ats_c2c).
 let hasCoastToCoast = _savedSettings.hasCoastToCoast || false;
 let hasProMods = _savedSettings.hasProMods || false;
+let hasProModsCanada = _savedSettings.hasProModsCanada || false;
 
 function initSettingsUi() {
   document.getElementById('setMiniFuelPct').checked = miniHudSettings.fuelPct;
@@ -624,6 +628,7 @@ function initSettingsUi() {
 
 function initModsUi() {
   document.getElementById('setCoastToCoast').checked = hasCoastToCoast;
+  document.getElementById('setProModsCanada').checked = hasProModsCanada;
   document.getElementById('setProMods').checked = hasProMods;
 }
 
@@ -632,6 +637,11 @@ document.getElementById('setCoastToCoast').addEventListener('change', (e) => {
   saveSettings();
   // Fuerza un reload del mapa actual con la variante correcta la proxima vez
   // que llegue un tick de telemetria (updateMap ya resuelve ats vs ats_c2c).
+  currentGame = null;
+});
+document.getElementById('setProModsCanada').addEventListener('change', (e) => {
+  hasProModsCanada = e.target.checked;
+  saveSettings();
   currentGame = null;
 });
 document.getElementById('setProMods').addEventListener('change', (e) => {
@@ -725,6 +735,14 @@ const GAME_MAPS = {
     pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_c2c.pmtiles`,
     sourceLayer: 'ats',
     label: 'American Truck Simulator + Coast to Coast',
+    toLngLat: atsToLngLat,
+    origin: [-96, 39],
+  },
+  ats_promods: {
+    assetsDir: `${REMOTE_MAP_BASE}/ats_promods`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_promods.pmtiles`,
+    sourceLayer: 'ats',
+    label: 'American Truck Simulator + ProMods Canada',
     toLngLat: atsToLngLat,
     origin: [-96, 39],
   },
@@ -1373,6 +1391,7 @@ function animateTruckTo(fromLngLat, toPos) {
 function resolveEffectiveGame(game) {
   const g = game || 'ats';
   if (g === 'ats' && hasCoastToCoast) return 'ats_c2c';
+  if (g === 'ats' && hasProModsCanada) return 'ats_promods';
   if (g === 'ets2' && hasProMods) return 'ets2_promods';
   return g;
 }
