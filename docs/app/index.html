@@ -301,6 +301,9 @@
         <button class="colorSwatch" data-color="#4caf50" style="background:#4caf50" data-i18n-title="colorGreen" title="Green"></button>
       </div>
 
+      <p class="settingsSectionTitle" data-i18n="settingsMapModsTitle">Map mods (ATS):</p>
+      <label class="settingsRow"><input type="checkbox" id="setCoastToCoast" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
+
       <button id="settingsCloseBtn" data-i18n="close">Close</button>
     </div>
   </div>
@@ -405,6 +408,8 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Show in mini-HUD (when info panel is hidden):',
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
+    settingsMapModsTitle: 'Map mods (ATS):',
+    settingsCoastToCoast: 'I have Coast to Coast installed',
     colorRed: 'Red',
     colorBlue: 'Blue',
     colorGreen: 'Green',
@@ -472,6 +477,8 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Mostrar en el mini-HUD (con el panel de info oculto):',
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
+    settingsMapModsTitle: 'Mods de mapa (ATS):',
+    settingsCoastToCoast: 'Tengo instalado Coast to Coast',
     colorRed: 'Rojo',
     colorBlue: 'Azul',
     colorGreen: 'Verde',
@@ -581,7 +588,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, hasCoastToCoast }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -590,6 +597,10 @@ const miniHudSettings = Object.assign(
   _savedSettings.miniHud
 );
 let routeColor = _savedSettings.routeColor || '#a30000';
+// Opt-in: el SDK de telemetria no informa que mods de mapa tiene instalados
+// el usuario, asi que no se puede auto-detectar Coast to Coast - el usuario
+// lo activa a mano si lo tiene instalado (ver GAME_MAPS.ats_c2c).
+let hasCoastToCoast = _savedSettings.hasCoastToCoast || false;
 
 function initSettingsUi() {
   document.getElementById('setMiniFuelPct').checked = miniHudSettings.fuelPct;
@@ -598,10 +609,19 @@ function initSettingsUi() {
   document.getElementById('setMiniDistance').checked = miniHudSettings.distance;
   document.getElementById('setMiniCruise').checked = miniHudSettings.cruise;
   document.getElementById('setMiniGps').checked = miniHudSettings.gps;
+  document.getElementById('setCoastToCoast').checked = hasCoastToCoast;
   document.querySelectorAll('.colorSwatch').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.color === routeColor);
   });
 }
+
+document.getElementById('setCoastToCoast').addEventListener('change', (e) => {
+  hasCoastToCoast = e.target.checked;
+  saveSettings();
+  // Fuerza un reload del mapa actual con la variante correcta la proxima vez
+  // que llegue un tick de telemetria (updateMap ya resuelve ats vs ats_c2c).
+  currentGame = null;
+});
 
 const MINI_HUD_CHECKBOXES = {
   setMiniFuelPct: 'fuelPct',
@@ -658,6 +678,20 @@ const GAME_MAPS = {
     pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats.pmtiles`,
     sourceLayer: 'ats',
     label: 'American Truck Simulator',
+    toLngLat: atsToLngLat,
+    origin: [-96, 39],
+  },
+  // Mismo juego/proyeccion que "ats", pero generado incluyendo el mod de
+  // mapa Coast to Coast (rutas/ciudades nuevas). Usuarios sin el mod
+  // instalado no deben usar este mapa: verian rutas que en su copia del
+  // juego no existen y el A* podria calcular caminos que no pueden tomar -
+  // por eso es opt-in via un toggle en Settings (ver hasCoastToCoast) en vez
+  // de auto-detectarse (el SDK de telemetria no informa mods instalados).
+  ats_c2c: {
+    assetsDir: `${REMOTE_MAP_BASE}/ats_c2c`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_c2c.pmtiles`,
+    sourceLayer: 'ats',
+    label: 'American Truck Simulator + Coast to Coast',
     toLngLat: atsToLngLat,
     origin: [-96, 39],
   },
@@ -1296,7 +1330,8 @@ function animateTruckTo(fromLngLat, toPos) {
 
 function updateMap(position, game) {
   if (position.x == null || position.z == null) return;
-  loadGameMap(game || 'ats');
+  const effectiveGame = (game || 'ats') === 'ats' && hasCoastToCoast ? 'ats_c2c' : (game || 'ats');
+  loadGameMap(effectiveGame);
   if (!toLngLat || !map) return;
 
   const lngLat = toLngLat(position.x, position.z);
