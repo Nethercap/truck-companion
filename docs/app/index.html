@@ -311,8 +311,9 @@
       <h3 data-i18n="modsTitle">Map mods</h3>
 
       <p class="settingsSectionTitle">American Truck Simulator</p>
-      <label class="settingsRow"><input type="checkbox" id="setCoastToCoast" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
-      <label class="settingsRow"><input type="checkbox" id="setProModsCanada" /> <span data-i18n="settingsProModsCanada">I have ProMods Canada installed</span></label>
+      <label class="settingsRow"><input type="radio" name="atsMod" id="setAtsModNone" value="none" /> <span data-i18n="settingsNoMod">None</span></label>
+      <label class="settingsRow"><input type="radio" name="atsMod" id="setCoastToCoast" value="c2c" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
+      <label class="settingsRow"><input type="radio" name="atsMod" id="setProModsCanada" value="promods_canada" /> <span data-i18n="settingsProModsCanada">I have ProMods Canada installed</span></label>
 
       <p class="settingsSectionTitle">Euro Truck Simulator 2</p>
       <label class="settingsRow"><input type="checkbox" id="setProMods" /> <span data-i18n="settingsProMods">I have ProMods (Europe + all addons) installed</span></label>
@@ -419,6 +420,7 @@ const TRANSLATIONS = {
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
+    settingsNoMod: 'None',
     settingsCoastToCoast: 'I have Coast to Coast installed',
     settingsProModsCanada: 'I have ProMods Canada installed',
     settingsProMods: 'I have ProMods (Europe + all addons) installed',
@@ -488,6 +490,7 @@ const TRANSLATIONS = {
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
+    settingsNoMod: 'Ninguno',
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
     settingsProModsCanada: 'Tengo instalado ProMods Canada',
     settingsProMods: 'Tengo instalado ProMods (Europe + todos los addons)',
@@ -598,7 +601,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, hasCoastToCoast, hasProMods, hasProModsCanada }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -608,11 +611,13 @@ const miniHudSettings = Object.assign(
 );
 let routeColor = _savedSettings.routeColor || '#a30000';
 // Opt-in: el SDK de telemetria no informa que mods de mapa tiene instalados
-// el usuario, asi que no se puede auto-detectar Coast to Coast - el usuario
-// lo activa a mano si lo tiene instalado (ver GAME_MAPS.ats_c2c).
-let hasCoastToCoast = _savedSettings.hasCoastToCoast || false;
+// el usuario, asi que no se puede auto-detectar - el usuario lo activa a
+// mano si lo tiene instalado (ver GAME_MAPS.ats_c2c/ats_promods/ets2_promods).
+// Coast to Coast y ProMods Canada son ambos mapas de ATS, mutuamente
+// excluyentes (no se pueden combinar), por eso es un selector unico
+// ('none'|'c2c'|'promods_canada') en vez de dos checkboxes independientes.
+let atsMod = _savedSettings.atsMod || 'none';
 let hasProMods = _savedSettings.hasProMods || false;
-let hasProModsCanada = _savedSettings.hasProModsCanada || false;
 
 function initSettingsUi() {
   document.getElementById('setMiniFuelPct').checked = miniHudSettings.fuelPct;
@@ -627,22 +632,21 @@ function initSettingsUi() {
 }
 
 function initModsUi() {
-  document.getElementById('setCoastToCoast').checked = hasCoastToCoast;
-  document.getElementById('setProModsCanada').checked = hasProModsCanada;
+  document.getElementById('setAtsModNone').checked = atsMod === 'none';
+  document.getElementById('setCoastToCoast').checked = atsMod === 'c2c';
+  document.getElementById('setProModsCanada').checked = atsMod === 'promods_canada';
   document.getElementById('setProMods').checked = hasProMods;
 }
 
-document.getElementById('setCoastToCoast').addEventListener('change', (e) => {
-  hasCoastToCoast = e.target.checked;
-  saveSettings();
-  // Fuerza un reload del mapa actual con la variante correcta la proxima vez
-  // que llegue un tick de telemetria (updateMap ya resuelve ats vs ats_c2c).
-  currentGame = null;
-});
-document.getElementById('setProModsCanada').addEventListener('change', (e) => {
-  hasProModsCanada = e.target.checked;
-  saveSettings();
-  currentGame = null;
+document.querySelectorAll('input[name="atsMod"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    if (!e.target.checked) return;
+    atsMod = e.target.value;
+    saveSettings();
+    // Fuerza un reload del mapa actual con la variante correcta la proxima
+    // vez que llegue un tick de telemetria (updateMap ya resuelve la variante).
+    currentGame = null;
+  });
 });
 document.getElementById('setProMods').addEventListener('change', (e) => {
   hasProMods = e.target.checked;
@@ -728,7 +732,7 @@ const GAME_MAPS = {
   // mapa Coast to Coast (rutas/ciudades nuevas). Usuarios sin el mod
   // instalado no deben usar este mapa: verian rutas que en su copia del
   // juego no existen y el A* podria calcular caminos que no pueden tomar -
-  // por eso es opt-in via un toggle en Settings (ver hasCoastToCoast) en vez
+  // por eso es opt-in via el selector de mods en Mods (ver atsMod) en vez
   // de auto-detectarse (el SDK de telemetria no informa mods instalados).
   ats_c2c: {
     assetsDir: `${REMOTE_MAP_BASE}/ats_c2c`,
@@ -1390,8 +1394,8 @@ function animateTruckTo(fromLngLat, toPos) {
 
 function resolveEffectiveGame(game) {
   const g = game || 'ats';
-  if (g === 'ats' && hasCoastToCoast) return 'ats_c2c';
-  if (g === 'ats' && hasProModsCanada) return 'ats_promods';
+  if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
+  if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
   if (g === 'ets2' && hasProMods) return 'ets2_promods';
   return g;
 }
