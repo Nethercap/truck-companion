@@ -89,7 +89,7 @@
   }
   .cta:hover { background: #2b8ef0; text-decoration: none; }
   .discordLink {
-    display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.9rem;
+    display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.9rem;
     color: var(--muted); font-size: 0.9rem; font-weight: 500;
   }
   .discordLink:hover { color: #fff; text-decoration: none; }
@@ -201,7 +201,8 @@
     <div class="heroBadges">
       <span data-i18n="badgeNoLogin">No login</span>·
       <span data-i18n="badgeFree">100% free</span>·
-      <span>ETS2 + ATS</span>
+      <span>ETS2 + ATS</span>·
+      <span data-i18n="badgeMods">Mod support</span>
     </div>
     <p id="driverCounter" class="driverCounter" hidden></p>
   </div>
@@ -370,6 +371,7 @@ const TRANSLATIONS = {
     heroDiscord: 'Join our Discord',
     badgeNoLogin: 'No login',
     badgeFree: '100% free',
+    badgeMods: 'Mod support',
     driverCounterText: '🚚 {n} drivers have tracked their jobs with Truck Dash so far',
     jobsDeliveredText: '{n} jobs delivered',
     latestJobsTitle: 'Latest jobs completed',
@@ -434,6 +436,7 @@ const TRANSLATIONS = {
     heroDiscord: 'Unite a nuestro Discord',
     badgeNoLogin: 'Sin login',
     badgeFree: '100% gratis',
+    badgeMods: 'Soporte de mods',
     driverCounterText: '🚚 {n} camioneros ya trackearon sus viajes con Truck Dash',
     jobsDeliveredText: '{n} trabajos entregados',
     latestJobsTitle: 'Últimos trabajos completados',
