@@ -389,6 +389,7 @@
         <div class="row"><span class="label" data-i18n="truck">Truck</span><span id="truck">-</span></div>
         <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
         <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
+        <div class="row"><span class="label" data-i18n="etaReal">Real ETA</span><span id="etaReal">-</span></div>
         <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
         <div class="row"><span class="label" data-i18n="tolls">Tolls paid</span><span id="tollsTotal">-</span></div>
         <div class="row"><span class="label" data-i18n="fines">Fines</span><span id="finesTotal">-</span></div>
@@ -449,6 +450,7 @@ const TRANSLATIONS = {
     cargo: 'Cargo',
     distanceLeft: 'Distance left',
     etaGame: 'In-game ETA',
+    etaReal: 'Real ETA',
     jobPay: 'Job pay',
     fuel: 'Fuel',
     range: 'Range',
@@ -519,6 +521,7 @@ const TRANSLATIONS = {
     cargo: 'Cargamento',
     distanceLeft: 'Distancia restante',
     etaGame: 'ETA in-game',
+    etaReal: 'ETA real',
     jobPay: 'Pago del trabajo',
     fuel: 'Combustible',
     range: 'Autonomía',
@@ -1506,6 +1509,37 @@ function updateMiniHudExtra(data) {
   document.getElementById('miniHudExtra').innerHTML = lines.map(l => `<div>${l}</div>`).join('');
 }
 
+// ETA real: en vez del ETA del juego (que corre en tiempo de juego, no en
+// tiempo real - depende de la config de reloj del juego), se calcula
+// distancia_restante / velocidad_promedio_real usando una ventana movil de
+// los ultimos ETA_WINDOW_SECONDS de telemetria real - asi refleja el ritmo
+// real de manejo (paradas, trafico) en vez de una velocidad estandar fija.
+const ETA_WINDOW_SECONDS = 5 * 60;
+const ETA_MIN_SAMPLE_SPAN_SECONDS = 30; // no calcular con muy poca data, da valores erraticos
+let etaSamples = []; // [{ t: data.ts (segundos), distanceKm }, ...]
+let etaSampleTarget = null; // cityDst actual - resetea la ventana si cambia el destino
+
+function computeRealEtaSeconds(data) {
+  if (!data.routeDistanceKm || data.ts == null) return null;
+  if (data.cityDst !== etaSampleTarget) {
+    etaSampleTarget = data.cityDst;
+    etaSamples = [];
+  }
+  etaSamples.push({ t: data.ts, distanceKm: data.routeDistanceKm });
+  etaSamples = etaSamples.filter(s => data.ts - s.t <= ETA_WINDOW_SECONDS);
+  if (etaSamples.length < 2) return null;
+
+  const oldest = etaSamples[0];
+  const elapsedSeconds = data.ts - oldest.t;
+  if (elapsedSeconds < ETA_MIN_SAMPLE_SPAN_SECONDS) return null;
+
+  const distanceCoveredKm = oldest.distanceKm - data.routeDistanceKm;
+  const avgSpeedKmh = (distanceCoveredKm / elapsedSeconds) * 3600;
+  if (avgSpeedKmh <= 0) return null;
+
+  return (data.routeDistanceKm / avgSpeedKmh) * 3600;
+}
+
 function updateHud(data) {
   lastData = data;
 
@@ -1548,6 +1582,9 @@ function updateHud(data) {
   } else {
     document.getElementById('etaGame').textContent = etaText;
   }
+
+  const realEtaSeconds = computeRealEtaSeconds(data);
+  document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : '-';
 
   document.getElementById('jobIncome').textContent = data.jobIncome ? `$${data.jobIncome.toLocaleString()}` : '-';
 
