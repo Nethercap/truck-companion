@@ -371,6 +371,7 @@ async def ws_client(websocket: WebSocket, code: str):
                         "cargo": event.get("jobCargo") or payload.get("cargo") or snap["cargo"],
                         "revenue": event.get("jobDeliveredRevenue") or 0,
                         "distanceKm": event.get("jobDeliveredDistanceKm") or 0,
+                        "deliveredAt": now,  # para poder distinguir a simple vista una entrega real repetida de un duplicado real
                     }
                     asyncio.create_task(asyncio.to_thread(record_job_delivered, job_info))
                 session.last_job_delivered = job_delivered
