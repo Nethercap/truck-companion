@@ -451,6 +451,7 @@ const TRANSLATIONS = {
     distanceLeft: 'Distance left',
     etaGame: 'In-game ETA',
     etaReal: 'Real ETA',
+    calculating: 'Calculating…',
     jobPay: 'Job pay',
     fuel: 'Fuel',
     range: 'Range',
@@ -522,6 +523,7 @@ const TRANSLATIONS = {
     distanceLeft: 'Distancia restante',
     etaGame: 'ETA in-game',
     etaReal: 'ETA real',
+    calculating: 'Calculando…',
     jobPay: 'Pago del trabajo',
     fuel: 'Combustible',
     range: 'Autonomía',
@@ -1516,28 +1518,41 @@ function updateMiniHudExtra(data) {
 // real de manejo (paradas, trafico) en vez de una velocidad estandar fija.
 const ETA_WINDOW_SECONDS = 5 * 60;
 const ETA_MIN_SAMPLE_SPAN_SECONDS = 30; // no calcular con muy poca data, da valores erraticos
+const ETA_RECALC_INTERVAL_SECONDS = 2 * 60; // no refrescar el valor mostrado en cada tick, solo cada 2 minutos
 let etaSamples = []; // [{ t: data.ts (segundos), distanceKm }, ...]
 let etaSampleTarget = null; // cityDst actual - resetea la ventana si cambia el destino
+let etaDisplayValue = null; // ultimo valor mostrado (se mantiene fijo entre recalculos)
+let etaLastRecalcTime = null;
 
 function computeRealEtaSeconds(data) {
   if (!data.routeDistanceKm || data.ts == null) return null;
   if (data.cityDst !== etaSampleTarget) {
     etaSampleTarget = data.cityDst;
     etaSamples = [];
+    etaDisplayValue = null;
+    etaLastRecalcTime = null;
   }
   etaSamples.push({ t: data.ts, distanceKm: data.routeDistanceKm });
   etaSamples = etaSamples.filter(s => data.ts - s.t <= ETA_WINDOW_SECONDS);
-  if (etaSamples.length < 2) return null;
 
+  // Solo se refresca el valor mostrado cada ETA_RECALC_INTERVAL_SECONDS - un
+  // numero que salta en cada tick es mas ruido que informacion.
+  if (etaLastRecalcTime != null && data.ts - etaLastRecalcTime < ETA_RECALC_INTERVAL_SECONDS) {
+    return etaDisplayValue;
+  }
+
+  if (etaSamples.length < 2) return etaDisplayValue;
   const oldest = etaSamples[0];
   const elapsedSeconds = data.ts - oldest.t;
-  if (elapsedSeconds < ETA_MIN_SAMPLE_SPAN_SECONDS) return null;
+  if (elapsedSeconds < ETA_MIN_SAMPLE_SPAN_SECONDS) return etaDisplayValue;
 
   const distanceCoveredKm = oldest.distanceKm - data.routeDistanceKm;
   const avgSpeedKmh = (distanceCoveredKm / elapsedSeconds) * 3600;
-  if (avgSpeedKmh <= 0) return null;
+  if (avgSpeedKmh <= 0) return etaDisplayValue;
 
-  return (data.routeDistanceKm / avgSpeedKmh) * 3600;
+  etaLastRecalcTime = data.ts;
+  etaDisplayValue = (data.routeDistanceKm / avgSpeedKmh) * 3600;
+  return etaDisplayValue;
 }
 
 function updateHud(data) {
@@ -1584,7 +1599,7 @@ function updateHud(data) {
   }
 
   const realEtaSeconds = computeRealEtaSeconds(data);
-  document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : '-';
+  document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');
 
   document.getElementById('jobIncome').textContent = data.jobIncome ? `$${data.jobIncome.toLocaleString()}` : '-';
 
