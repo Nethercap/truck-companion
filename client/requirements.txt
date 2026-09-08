@@ -3,3 +3,4 @@ websockets
 pystray
 pillow
 pyinstaller
+truststore

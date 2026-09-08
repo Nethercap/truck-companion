@@ -22,6 +22,16 @@ import truck_telemetry
 import websockets
 from urllib.request import urlopen, Request
 
+# Usa el almacen de certificados nativo de Windows/macOS/Linux para validar
+# TLS, en vez del bundle de certificados que trae empaquetado Python (via
+# certifi) - asi valida exactamente igual que el navegador del usuario. Sin
+# esto, algunas PCs ven "certificate has expired" en el cliente (bundle
+# desactualizado, ej. la cadena vieja de Let's Encrypt via DST Root CA X3,
+# que expiro en 2021) mientras Chrome/Edge, que si usan el almacen del SO,
+# ven el mismo certificado como valido.
+import truststore
+truststore.inject_into_ssl()
+
 SEND_INTERVAL_SECONDS = 1.0
 RECONNECT_DELAY_SECONDS = 3.0
 
