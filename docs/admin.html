@@ -62,6 +62,7 @@
 
   <div id="content">
     <div class="cards">
+      <div class="card"><div class="label">Active sessions (live)</div><div class="value" id="cardActiveSessions">-</div></div>
       <div class="card"><div class="label">Total sessions</div><div class="value" id="cardSessions">-</div></div>
       <div class="card"><div class="label">Jobs delivered</div><div class="value" id="cardJobs">-</div></div>
       <div class="card"><div class="label">Total revenue</div><div class="value" id="cardRevenue">-</div></div>
@@ -144,6 +145,7 @@ async function loadStats() {
     statusEl.textContent = `Loaded at ${new Date().toLocaleTimeString()}.`;
     statusEl.className = '';
 
+    document.getElementById('cardActiveSessions').textContent = (data.active_sessions || 0).toLocaleString();
     document.getElementById('cardSessions').textContent = (data.total_sessions || 0).toLocaleString();
     document.getElementById('cardJobs').textContent = (data.jobs_delivered || 0).toLocaleString();
     document.getElementById('cardRevenue').textContent = `$${Math.round(data.total_revenue || 0).toLocaleString()}`;

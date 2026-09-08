@@ -276,7 +276,9 @@ def stats_public():
 def stats_admin(x_admin_key: Optional[str] = Header(default=None)):
     if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
         raise HTTPException(status_code=403)
-    return _load_stats()
+    # active_sessions es en vivo (cuenta sessions en memoria de este proceso,
+    # como /health) - no se persiste en R2 como el resto de las stats.
+    return {**_load_stats(), "active_sessions": len(sessions)}
 
 
 # Permite sembrar una base real conocida manualmente (ej. gente que probo el

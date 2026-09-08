@@ -88,6 +88,13 @@ def test_admin_stats_requires_correct_key(client):
     assert resp.status_code == 200
 
 
+def test_admin_stats_includes_live_active_sessions(client, main):
+    main.sessions["AAAAAAAA"] = main.Session("AAAAAAAA")
+    main.sessions["BBBBBBBB"] = main.Session("BBBBBBBB")
+    resp = client.get("/admin/stats", headers={"X-Admin-Key": "test-admin-key"})
+    assert resp.json()["active_sessions"] == 2
+
+
 def test_admin_stats_403_when_admin_key_not_configured(client, main, monkeypatch):
     monkeypatch.setattr(main, "ADMIN_KEY", None)
     resp = client.get("/admin/stats", headers={"X-Admin-Key": "anything"})
