@@ -1518,7 +1518,8 @@ function updateMiniHudExtra(data) {
 // real de manejo (paradas, trafico) en vez de una velocidad estandar fija.
 const ETA_WINDOW_SECONDS = 5 * 60;
 const ETA_MIN_SAMPLE_SPAN_SECONDS = 30; // no calcular con muy poca data, da valores erraticos
-const ETA_RECALC_INTERVAL_SECONDS = 2 * 60; // no refrescar el valor mostrado en cada tick, solo cada 2 minutos
+const ETA_RECALC_INTERVAL_SECONDS = 5; // cada cuanto se refresca el valor mostrado
+const ETA_MIN_SPEED_KMH = 5; // por debajo de esto (camion parado/casi parado) la division da un ETA absurdo
 let etaSamples = []; // [{ t: data.ts (segundos), distanceKm }, ...]
 let etaSampleTarget = null; // cityDst actual - resetea la ventana si cambia el destino
 let etaDisplayValue = null; // ultimo valor mostrado (se mantiene fijo entre recalculos)
@@ -1548,7 +1549,11 @@ function computeRealEtaSeconds(data) {
 
   const distanceCoveredKm = oldest.distanceKm - data.routeDistanceKm;
   const avgSpeedKmh = (distanceCoveredKm / elapsedSeconds) * 3600;
-  if (avgSpeedKmh <= 0) return etaDisplayValue;
+  // Camion parado o casi (garage, semaforo, peaje) durante toda la ventana:
+  // la velocidad promedio da casi cero y la division explota a un ETA de
+  // cientos de miles de horas. Se descarta y se mantiene el ultimo valor
+  // valido en vez de mostrar un numero absurdo.
+  if (avgSpeedKmh < ETA_MIN_SPEED_KMH) return etaDisplayValue;
 
   etaLastRecalcTime = data.ts;
   etaDisplayValue = (data.routeDistanceKm / avgSpeedKmh) * 3600;
