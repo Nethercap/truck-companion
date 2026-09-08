@@ -155,6 +155,43 @@ def test_record_job_delivered_tracks_revenue_and_latest(main):
     assert stats["latest_jobs"][0]["cargo"] == "Wood"  # el mas reciente va primero
 
 
+def test_record_job_delivered_ignores_duplicate_within_window(main):
+    # Dos procesos del cliente (dos pairing codes) reportando la misma
+    # entrega real - mismo route/cargo/pay/distancia, sin pasar por la misma
+    # Session (ese guard no alcanza aca), pero el fingerprint global si lo
+    # detecta y lo descarta.
+    job = {
+        "citySrc": "Bakersfield",
+        "cityDst": "Santa Cruz",
+        "cargo": "Scaffolding",
+        "revenue": 11295,
+        "distanceKm": 525,
+    }
+    main.record_job_delivered(job)
+    main.record_job_delivered(dict(job))  # duplicado exacto
+    stats = main._load_stats()
+    assert stats["jobs_delivered"] == 1
+    assert stats["total_revenue"] == 11295
+    assert len(stats["latest_jobs"]) == 1
+
+
+def test_record_job_delivered_allows_same_route_after_window(main, monkeypatch):
+    job = {
+        "citySrc": "Bakersfield",
+        "cityDst": "Santa Cruz",
+        "cargo": "Scaffolding",
+        "revenue": 11295,
+        "distanceKm": 525,
+    }
+    main.record_job_delivered(job)
+    # simula que paso mas tiempo que la ventana de dedupe
+    stats = main._load_stats()
+    stats["_last_job_time"] -= main.JOB_DEDUPE_WINDOW_SECONDS + 1
+    main.record_job_delivered(dict(job))
+    stats = main._load_stats()
+    assert stats["jobs_delivered"] == 2
+
+
 def test_version_endpoint_defaults(client, main):
     resp = client.get("/version")
     assert resp.status_code == 200

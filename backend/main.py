@@ -145,11 +145,35 @@ def record_session_started():
 
 LATEST_JOBS_MAX = 5
 JOB_DELIVERED_COOLDOWN_SECONDS = 20
+# El anti-duplicado de arriba vive dentro de una Session (un pairing code) y
+# no alcanza si dos procesos del cliente (dos codigos distintos) reportan la
+# MISMA entrega real - ej. el usuario abrio el .exe dos veces sin querer, o
+# lo dejo en el inicio automatico y tambien lo abrio a mano. Esta segunda
+# capa compara contra el ultimo trabajo ya guardado en las stats globales
+# (sobrevive un redeploy, a diferencia del estado en memoria de Session) y
+# lo descarta si es identico y llego dentro de esta ventana.
+JOB_DEDUPE_WINDOW_SECONDS = 5 * 60
 
 
 def record_job_delivered(job_info: dict):
     with _stats_lock:
         stats = _load_stats()
+        fingerprint = (
+            job_info.get("citySrc"),
+            job_info.get("cityDst"),
+            job_info.get("cargo"),
+            job_info.get("revenue"),
+            job_info.get("distanceKm"),
+        )
+        now = time.time()
+        last_fp = stats.get("_last_job_fingerprint")
+        last_t = stats.get("_last_job_time") or 0
+        if last_fp == list(fingerprint) and now - last_t < JOB_DEDUPE_WINDOW_SECONDS:
+            logging.info("ignoring duplicate job_delivered (matches last recorded job)")
+            return
+        stats["_last_job_fingerprint"] = list(fingerprint)
+        stats["_last_job_time"] = now
+
         stats["jobs_delivered"] = stats.get("jobs_delivered", 0) + 1
         stats["total_revenue"] = stats.get("total_revenue", 0) + (job_info.get("revenue") or 0)
         today = time.strftime("%Y-%m-%d", time.gmtime())
