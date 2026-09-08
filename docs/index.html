@@ -132,6 +132,7 @@
     margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted);
     background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1.1rem;
   }
+  .stepNote { margin-top: 0.7rem; font-size: 0.82rem; color: var(--muted); }
 
   .screenshotWrap { margin-top: 1.5rem; text-align: center; }
   .screenshotCaption { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--muted); }
@@ -300,6 +301,7 @@
             <a href="https://github.com/Nethercap/truck-companion/blob/main/client/README.md" target="_blank" rel="noopener">README (English)</a>
             <a href="https://github.com/Nethercap/truck-companion/blob/main/client/README.es.md" target="_blank" rel="noopener">README (Español)</a>
           </div>
+          <p class="stepNote" data-i18n="gsStep2SslNote">Getting a "certificate has expired" error on startup? That's almost always your antivirus's HTTPS scanning (Kaspersky, ESET, Avast) or your system clock, not our servers — see the troubleshooting section in the README above.</p>
         </div>
       </div>
       <div class="step">
@@ -406,6 +408,7 @@ const TRANSLATIONS = {
     gsStep2Title: 'Download the Truck Dash client',
     gsStep2Body: "A small, portable program that reads the game's telemetry and opens your browser, already connected. No install, no Python needed.",
     gsStep2Link: 'Download for Windows',
+    gsStep2SslNote: 'Getting a "certificate has expired" error on startup? That\'s almost always your antivirus\'s HTTPS scanning (Kaspersky, ESET, Avast) or your system clock, not our servers — see the troubleshooting section in the README above.',
     gsStep3Title: 'Run it and start driving',
     gsStep3Body: 'Open the game, run the client, and your browser opens automatically — already paired and live.',
     transparencyNote: 'Truck Dash is fully open source — client, backend, and web are all in the same public repository, so you can see exactly what it does before running it.',
@@ -471,6 +474,7 @@ const TRANSLATIONS = {
     gsStep2Title: 'Descargá el cliente de Truck Dash',
     gsStep2Body: 'Un programa chico y portable que lee la telemetría del juego y abre tu navegador, ya conectado. Sin instalar, sin necesitar Python.',
     gsStep2Link: 'Descargar para Windows',
+    gsStep2SslNote: '¿Te aparece un error de "certificate has expired" al arrancar? Casi siempre es el escaneo HTTPS de tu antivirus (Kaspersky, ESET, Avast) o el reloj de tu sistema, no nuestros servidores — mirá la sección de troubleshooting en el README de arriba.',
     gsStep3Title: 'Abrilo y arrancá a manejar',
     gsStep3Body: 'Abrí el juego, corré el cliente, y tu navegador se abre solo — ya emparejado y en vivo.',
     transparencyNote: 'Truck Dash es 100% código abierto — el cliente, el backend y la web están en el mismo repositorio público, así podés ver exactamente qué hace antes de correrlo.',

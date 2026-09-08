@@ -55,6 +55,24 @@ If it still doesn't work after that, right-click the tray icon and pick
 **"Show log file (troubleshooting)"** — it'll tell you whether the plugin
 was even detected.
 
+### "certificate has expired" / SSL error on startup
+
+If the log shows `SSLCertVerificationError: certificate has expired` when
+the client tries to get a pairing code, this is a problem on your PC, not
+with Truck Dash's servers (our certificate is valid — you can check
+yourself by opening https://truck-companion-production.up.railway.app/health
+in a browser and clicking the padlock icon). The usual causes, in order of
+likelihood:
+
+1. **Your antivirus is intercepting HTTPS traffic.** Kaspersky, ESET NOD32,
+   and Avast are common culprits — they re-sign HTTPS connections with their
+   own certificate, and if that certificate is misconfigured, this exact
+   error shows up. Try temporarily disabling "HTTPS scanning" / "SSL/TLS
+   scanning" in your antivirus (not the whole antivirus) and try again.
+2. **Your system clock is wrong.** Even with "set time automatically"
+   turned on, it can drift if it hasn't synced in a while. Double-check the
+   date and time are actually correct (not just set to "automatic").
+
 ## Building it yourself
 
 If you'd rather not run a pre-built `.exe`, you can run the client directly
