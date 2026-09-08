@@ -1334,15 +1334,12 @@ function updateNavPanel(turn) {
   panel.style.display = 'block';
 }
 
-// Zoom dinamico: mas cerca del giro, mas zoom - como un GPS real. Al ser
-// tiles vectoriales el mapa puede acercar mas alla del ultimo zoom generado
-// (overzoom automatico de MapLibre), asi que se usan niveles absolutos.
+// Zoom fijo en modo navegacion - el acercamiento automatico al doblar
+// (probado antes) generaba saltos molestos justo en intersecciones/enlaces,
+// que es donde mas importa ver el contexto completo, no menos.
+const NAV_FIXED_ZOOM = 10;
 function navTargetZoom(turn) {
-  if (turn) {
-    if (turn.distanceMeters < 150) return 13;
-    if (turn.distanceMeters < 400) return 12;
-  }
-  return 10; // "autopista", tramo recto - similar al GPS/route advisor del juego
+  return NAV_FIXED_ZOOM;
 }
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
