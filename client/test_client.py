@@ -47,6 +47,18 @@ def test_build_payload_handles_missing_fields_gracefully():
     assert payload["position"] == {"x": None, "y": None, "z": None}
 
 
+def test_build_payload_job_deadline_seconds_from_game_minutes():
+    payload = client.build_payload({"time_abs": 1000, "time_abs_delivery": 1090})
+    assert payload["jobDeadlineSeconds"] == 90 * 60
+
+
+def test_build_payload_job_deadline_none_without_active_job():
+    payload = client.build_payload({"time_abs": 1000, "time_abs_delivery": 0})
+    assert payload["jobDeadlineSeconds"] is None
+    payload = client.build_payload({})
+    assert payload["jobDeadlineSeconds"] is None
+
+
 def test_update_job_snapshot_only_updates_while_on_job_with_destination():
     client._last_job_snapshot = {
         "citySrc": None, "cityDst": None, "truckBrand": None,

@@ -138,6 +138,9 @@
   #fullscreenBtn { top: 7.2rem; left: 0.6rem; }
   #navToggleBtn { top: 10.5rem; left: 0.6rem; }
   #navToggleBtn.active { background: var(--accent); color: #fff; }
+  #waypointBtn { top: 13.8rem; left: 0.6rem; }
+  #waypointBtn.active { background: var(--accent); color: #fff; }
+  #waypointBtn.set { background: #ffb020; color: #111; }
 
   /* Panel de indicaciones del modo navegacion - giro/distancia genericos
      calculados de la curvatura de la ruta ya calculada, sin nombres de
@@ -194,6 +197,13 @@
     margin-top: 1.2rem; width: 100%; padding: 0.5rem; border-radius: 6px; border: none;
     background: var(--accent); color: #fff; cursor: pointer; font-size: 0.9rem;
   }
+  .waypointModalButtons { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem; }
+  .waypointModalButtons button {
+    padding: 0.55rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem;
+    background: var(--accent); color: #fff;
+  }
+  .waypointModalButtons button.secondary { background: var(--panel-alt, #23262c); color: var(--text); border: 1px solid #333; }
+  .waypointModalExplain { margin-top: 1rem; font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
 
   /* Panel de info: por default (desktop y horizontal) es una columna fija de
      300px pegada al borde derecho, alto completo. En vertical se convierte en
@@ -246,6 +256,7 @@
     flex-shrink: 0;
   }
   .limitSign.over { animation: pulse 1s infinite; }
+  #jobDeadline.over { color: var(--danger); font-weight: 700; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,77,0.6); } 50% { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
 
   .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; }
@@ -260,6 +271,12 @@
   .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
   .row:last-child { border-bottom: none; }
   .row .label { color: var(--muted); }
+  .waypointSubRow { padding-top: 0; padding-left: 0.6rem; font-size: 0.74rem; opacity: 0.8; }
+  .waypointClearBtn {
+    background: none; border: 1px solid #444; color: var(--muted); border-radius: 4px;
+    font-size: 0.7rem; padding: 0.1rem 0.4rem; cursor: pointer; margin-left: 0.4rem;
+  }
+  .waypointClearBtn:hover { color: #fff; border-color: #777; }
   .route { font-size: 0.9rem; }
   .route .cities { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; }
   .route .arrow { color: var(--muted); }
@@ -321,6 +338,18 @@
       <button id="modsCloseBtn" data-i18n="close">Close</button>
     </div>
   </div>
+
+  <div id="waypointModal" class="settingsOverlay" style="display:none;">
+    <div class="settingsPanel">
+      <h3 data-i18n="waypointModalTitle">Waypoint added</h3>
+      <p data-i18n="waypointModalQuestion">Did you also set this point as a waypoint in the game's own GPS/map?</p>
+      <div class="waypointModalButtons">
+        <button id="waypointConfirmInGameBtn" data-i18n="waypointModalYes">Yes, I set it in-game too</button>
+        <button id="waypointConfirmNotInGameBtn" class="secondary" data-i18n="waypointModalNo">No, just here</button>
+      </div>
+      <p class="waypointModalExplain" data-i18n="waypointModalExplain">If you set it in-game too, the game's own ETA/distance already account for the detour, so we don't touch those numbers - we just draw the route through this point. If not, the game has no idea about this point, so we calculate our own distance/time through it separately (shown as "with waypoint" under the ETA rows) - the game's own numbers will keep ignoring the detour.</p>
+    </div>
+  </div>
   <div id="status" data-i18n="notConnected">Not connected</div>
   <div id="mobileHint" data-i18n="mobileHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.2rem;flex-shrink:0;">On mobile: open trucksim-dash.com/app and enter your pairing code.</div>
   <div id="pairingDurationHint" data-i18n="pairingDurationHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-shrink:0;">The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit).</div>
@@ -339,6 +368,7 @@
       <button id="panelToggleBtn" class="mapBtn" data-i18n-title="togglePanel" title="Show/hide info">☰</button>
       <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
       <button id="navToggleBtn" class="mapBtn" data-i18n-title="toggleNavMode" title="Navigation mode"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.7 2 L2.5 22 L6 22 L11 4.7 Z"/><path d="M15.3 2 L21.5 22 L18 22 L13 4.7 Z"/><rect x="10.9" y="3" width="1.7" height="3"/><rect x="11" y="8.2" width="1.7" height="3"/><rect x="11.1" y="13.4" width="1.7" height="3"/><rect x="11.2" y="18.6" width="1.7" height="2.5"/></svg></button>
+      <button id="waypointBtn" class="mapBtn" data-i18n-title="toggleWaypointMode" title="Add waypoint"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 2v20h2v-7h9l-1.5-3.5L17 8H8V2H6z"/></svg></button>
 
       <div id="navPanel" class="navPanel" style="display:none;"></div>
 
@@ -389,7 +419,11 @@
         <div class="row"><span class="label" data-i18n="truck">Truck</span><span id="truck">-</span></div>
         <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
         <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
+        <div class="row waypointSubRow" id="etaGameWaypointRow" hidden><span class="label" data-i18n="withWaypoint">(with waypoint)</span><span id="etaGameWaypoint">-</span></div>
+        <div class="row" id="jobDeadlineRow" hidden><span class="label" data-i18n="jobDeadline">Job deadline</span><span id="jobDeadline">-</span></div>
         <div class="row"><span class="label" data-i18n="etaReal">Real ETA</span><span id="etaReal">-</span></div>
+        <div class="row waypointSubRow" id="etaRealWaypointRow" hidden><span class="label" data-i18n="withWaypoint">(with waypoint)</span><span id="etaRealWaypoint">-</span></div>
+        <div class="row" id="waypointRow" hidden><span class="label" data-i18n="waypoint">Waypoint</span><span id="waypointLabel">-</span> <button id="waypointClearBtn" class="waypointClearBtn" data-i18n="clear">Clear</button></div>
         <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
         <div class="row"><span class="label" data-i18n="tolls">Tolls paid</span><span id="tollsTotal">-</span></div>
         <div class="row"><span class="label" data-i18n="fines">Fines</span><span id="finesTotal">-</span></div>
@@ -439,6 +473,18 @@ const TRANSLATIONS = {
     togglePanel: 'Show/hide info panel',
     toggleFullscreen: 'Fullscreen',
     toggleNavMode: 'Navigation mode (heading-up, dynamic zoom)',
+    toggleWaypointMode: 'Add waypoint (click a point on the map)',
+    waypointModalTitle: 'Waypoint added',
+    waypointModalQuestion: "Did you also set this point as a waypoint in the game's own GPS/map?",
+    waypointModalYes: 'Yes, I set it in-game too',
+    waypointModalNo: 'No, just here',
+    waypointModalExplain: "If you set it in-game too, the game's own ETA/distance already account for the detour, so we don't touch those numbers — we just draw the route through this point. If not, the game has no idea about this point, so we calculate our own distance/time through it separately (shown as \"with waypoint\" under the ETA rows) — the game's own numbers will keep ignoring the detour.",
+    withWaypoint: '(with waypoint)',
+    jobDeadline: 'Job deadline',
+    waypoint: 'Waypoint',
+    clear: 'Clear',
+    waypointInGame: 'Set (also in-game)',
+    waypointAppOnly: 'Set (app only)',
     navTurnLeft: 'Turn left',
     navTurnRight: 'Turn right',
     navOnto: 'onto',
@@ -511,6 +557,18 @@ const TRANSLATIONS = {
     togglePanel: 'Mostrar/ocultar panel de info',
     toggleFullscreen: 'Pantalla completa',
     toggleNavMode: 'Modo navegación (rota con el rumbo, zoom dinámico)',
+    toggleWaypointMode: 'Agregar waypoint (clic en un punto del mapa)',
+    waypointModalTitle: 'Waypoint agregado',
+    waypointModalQuestion: '¿También marcaste este punto como waypoint en el GPS/mapa del juego?',
+    waypointModalYes: 'Sí, también lo marqué en el juego',
+    waypointModalNo: 'No, solo acá',
+    waypointModalExplain: 'Si también lo marcaste en el juego, el ETA/distancia del propio juego ya tienen en cuenta el desvío, así que no tocamos esos números — solo dibujamos la ruta pasando por este punto. Si no, el juego no tiene idea de este punto, así que calculamos nosotros mismos la distancia/tiempo pasando por él por separado (se muestra como "with waypoint" debajo de las filas de ETA) — los números del propio juego van a seguir ignorando el desvío.',
+    withWaypoint: '(con waypoint)',
+    jobDeadline: 'Deadline del trabajo',
+    waypoint: 'Waypoint',
+    clear: 'Quitar',
+    waypointInGame: 'Marcado (también en el juego)',
+    waypointAppOnly: 'Marcado (solo en la app)',
     navTurnLeft: 'Girá a la izquierda',
     navTurnRight: 'Girá a la derecha',
     navOnto: 'hacia',
@@ -731,6 +789,7 @@ const GAME_MAPS = {
     sourceLayer: 'ats',
     label: 'American Truck Simulator',
     toLngLat: atsToLngLat,
+    fromLngLat: atsFromLngLat,
     origin: [-96, 39],
   },
   // Mismo juego/proyeccion que "ats", pero generado incluyendo el mod de
@@ -745,6 +804,7 @@ const GAME_MAPS = {
     sourceLayer: 'ats',
     label: 'American Truck Simulator + Coast to Coast',
     toLngLat: atsToLngLat,
+    fromLngLat: atsFromLngLat,
     origin: [-96, 39],
   },
   ats_promods: {
@@ -753,6 +813,7 @@ const GAME_MAPS = {
     sourceLayer: 'ats',
     label: 'American Truck Simulator + ProMods Canada',
     toLngLat: atsToLngLat,
+    fromLngLat: atsFromLngLat,
     origin: [-96, 39],
   },
   ets2: {
@@ -761,6 +822,7 @@ const GAME_MAPS = {
     sourceLayer: 'ets2',
     label: 'Euro Truck Simulator 2',
     toLngLat: ets2ToLngLat,
+    fromLngLat: ets2FromLngLat,
     origin: [15, 50],
   },
   // Mismo criterio que ats_c2c: opt-in via toggle en Mods, no auto-detectable.
@@ -770,6 +832,7 @@ const GAME_MAPS = {
     sourceLayer: 'ets2',
     label: 'Euro Truck Simulator 2 + ProMods (Europe + addons)',
     toLngLat: ets2ToLngLat,
+    fromLngLat: ets2FromLngLat,
     origin: [15, 50],
   },
 };
@@ -786,6 +849,13 @@ const atsProj4 = proj4(`+proj=lcc +R=${EARTH_RADIUS_M} +lat_1=${ATS_DEF.lat1} +l
 function atsToLngLat(x, z) {
   const lcc = [x * ATS_DEF.factor[1] * LENGTH_OF_DEGREE, z * ATS_DEF.factor[0] * LENGTH_OF_DEGREE];
   return atsProj4.inverse(lcc);
+}
+// Inversa de atsToLngLat - para convertir un click del mapa (lng/lat) de
+// vuelta a coordenadas de juego, necesario para ubicar un waypoint puesto a
+// mano en el grafo de rutas (que trabaja en coordenadas de juego, no lng/lat).
+function atsFromLngLat(lng, lat) {
+  const [lccX, lccY] = atsProj4.forward([lng, lat]);
+  return [lccX / (ATS_DEF.factor[1] * LENGTH_OF_DEGREE), lccY / (ATS_DEF.factor[0] * LENGTH_OF_DEGREE)];
 }
 
 const ETS2_DEF = { lat1: 37, lat2: 65, origin: [50, 15], offset: [16660, 4150], factor: [-0.000171570875, 0.0001729241463] };
@@ -809,6 +879,34 @@ function ets2ToLngLat(x, z) {
   const lcc = [x * ETS2_DEF.factor[1] * LENGTH_OF_DEGREE, z * ETS2_DEF.factor[0] * LENGTH_OF_DEGREE];
   return ets2Proj4.inverse(lcc);
 }
+// Inversa de ets2ToLngLat. El hack de UK hace esto no trivial de invertir en
+// un solo paso (si el punto es UK depende del sector x,z ANTES de aplicarle
+// la escala de UK, que es justo lo que estamos por calcular) - se resuelve
+// en dos pasadas: primero se asume que no es UK, se ve a que sector cae, y
+// si ese sector resulta ser UK se rehace la cuenta aplicando la escala.
+function ets2FromLngLat(lng, lat) {
+  const [lccX, lccY] = ets2Proj4.forward([lng, lat]);
+  const ukScale = 0.75;
+  const calaisX = -31100, calaisZ = -5500;
+
+  const tryConvert = (assumeUk) => {
+    let x = lccX / (ETS2_DEF.factor[1] * LENGTH_OF_DEGREE);
+    let z = lccY / (ETS2_DEF.factor[0] * LENGTH_OF_DEGREE);
+    if (assumeUk) {
+      x = x / ukScale - calaisX / 2;
+      z = z / ukScale - calaisZ / 2;
+    }
+    x += ETS2_DEF.offset[0];
+    z += ETS2_DEF.offset[1];
+    return [x, z];
+  };
+
+  const [x0, z0] = tryConvert(false);
+  const sx = Math.floor(x0 / 4000);
+  const sz = Math.floor(z0 / 4000);
+  const isUk = sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
+  return isUk ? tryConvert(true) : [x0, z0];
+}
 
 let map = null; // instancia de MapLibre
 let mapReady = false; // true despues del evento 'load' inicial (recien ahi se pueden agregar sources/layers)
@@ -817,6 +915,7 @@ let truckMarker = null;
 let truckArrowEl = null; // referencia al div interno de la flecha, para rotarlo
 let destMarker = null;
 let toLngLat = null; // funcion (x,z) => [lng,lat] del juego actual
+let fromLngLat = null; // funcion (lng,lat) => [x,z] del juego actual - inversa, para ubicar un waypoint
 let currentGame = null;
 let citiesByName = {}; // Name -> {X, Y}
 const trailWorld = []; // [[lng,lat], ...]
@@ -894,6 +993,13 @@ function ensureMapInitialized() {
   // presente cuando el zoom lo dispara una interaccion real (rueda/pellizco/
   // doble click), no nuestros propios easeTo/jumpTo programaticos.
   map.on('zoomstart', (e) => { if (e.originalEvent) navAutoZoomPaused = true; });
+  map.on('click', (e) => {
+    if (!waypointMode || !fromLngLat) return;
+    pendingWaypointLngLat = [e.lngLat.lng, e.lngLat.lat];
+    pendingWaypointWorldPos = fromLngLat(e.lngLat.lng, e.lngLat.lat);
+    setWaypointMode(false);
+    document.getElementById('waypointModal').style.display = 'flex';
+  });
   map.once('load', async () => {
     await loadPoiIcons();
     mapReady = true;
@@ -981,6 +1087,102 @@ let routeGraph = null; // { nodes, adjacency: Map<idx, [[idx, weight], ...]> }
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
 let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
 const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS) - en interconexiones con rampas paralelas cercanas, 400 tardaba en detectar que se tomo una rampa distinta
+
+// Waypoint intermedio puesto a mano desde la app (posicion -> waypoint ->
+// destino). El SDK del juego no sabe nada de esto - si el usuario tambien lo
+// marco en el GPS del juego (waypointInGame=true), el "In-game ETA"/distancia
+// que ya manda el juego van a reflejar el desvio solos, y no tocamos esos
+// numeros. Si no (waypointInGame=false), calculamos nosotros mismos la
+// distancia extra sumando los tramos del grafo de rutas, y se muestra aparte
+// en las filas "(with waypoint)" - el numero del juego sigue ignorando el
+// desvio en ese caso.
+let waypointWorldPos = null; // [x,z] en coordenadas de juego, o null si no hay waypoint
+let waypointInGame = null; // true|false|null
+let waypointMarker = null;
+let waypointMode = false; // true mientras se espera el proximo click en el mapa para ubicar el waypoint
+let waypointRouteDistanceKm = null; // distancia total (posicion->waypoint->destino) calculada por nosotros
+let pendingWaypointWorldPos = null; // [x,z] del click, mientras se muestra el modal de confirmacion
+let pendingWaypointLngLat = null;
+let lastKnownAvgSpeedKmh = null; // ultimo promedio de velocidad real calculado por computeRealEtaSeconds, reusado para el ETA con waypoint
+
+function sumPathDistanceMeters(points) {
+  if (!points || points.length < 2) return 0;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  }
+  return total;
+}
+
+function setWaypointMode(on) {
+  waypointMode = on;
+  document.getElementById('waypointBtn').classList.toggle('active', on);
+}
+
+function placeWaypointMarker(lngLat) {
+  if (!waypointMarker) {
+    const el = document.createElement('div');
+    el.className = 'truckMarker';
+    el.textContent = '📍';
+    waypointMarker = new maplibregl.Marker({ element: el }).setLngLat(lngLat).addTo(map);
+  } else {
+    waypointMarker.setLngLat(lngLat);
+  }
+}
+
+function clearWaypoint() {
+  waypointWorldPos = null;
+  waypointInGame = null;
+  waypointRouteDistanceKm = null;
+  if (waypointMarker) { waypointMarker.remove(); waypointMarker = null; }
+  const btn = document.getElementById('waypointBtn');
+  if (btn) btn.classList.remove('set');
+  const row = document.getElementById('waypointRow');
+  if (row) row.hidden = true;
+  const gameRow = document.getElementById('etaGameWaypointRow');
+  if (gameRow) gameRow.hidden = true;
+  const realRow = document.getElementById('etaRealWaypointRow');
+  if (realRow) realRow.hidden = true;
+  currentRouteTarget = null; // fuerza recalculo de la ruta normal (sin waypoint) la proxima vez
+}
+
+function finalizeWaypoint() {
+  waypointWorldPos = pendingWaypointWorldPos;
+  placeWaypointMarker(pendingWaypointLngLat);
+  pendingWaypointWorldPos = null;
+  pendingWaypointLngLat = null;
+  document.getElementById('waypointBtn').classList.add('set');
+  document.getElementById('waypointRow').hidden = false;
+  document.getElementById('waypointLabel').textContent = waypointInGame ? t('waypointInGame') : t('waypointAppOnly');
+  currentRouteTarget = null; // fuerza recalculo pasando por el waypoint en el proximo tick
+  etaSamples = [];
+  etaDisplayValue = null;
+  etaLastRecalcTime = null;
+}
+
+// Actualiza las filas "(with waypoint)" bajo In-game ETA y Real ETA - solo
+// tienen sentido si hay un waypoint puesto Y el usuario dijo que NO lo marco
+// tambien en el juego (si lo marco ahi, el numero del juego ya es correcto
+// solo, mostrar un numero aparte seria confuso/redundante).
+function updateWaypointRoute(data) {
+  const gameRow = document.getElementById('etaGameWaypointRow');
+  const realRow = document.getElementById('etaRealWaypointRow');
+  if (!waypointWorldPos || waypointInGame !== false || waypointRouteDistanceKm == null) {
+    gameRow.hidden = true;
+    realRow.hidden = true;
+    return;
+  }
+  const distDisplay = useImperial ? waypointRouteDistanceKm * KM_TO_MI : waypointRouteDistanceKm;
+  const distText = `${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`;
+  let timeText = t('calculating');
+  if (lastKnownAvgSpeedKmh && lastKnownAvgSpeedKmh > 0) {
+    timeText = formatSeconds((waypointRouteDistanceKm / lastKnownAvgSpeedKmh) * 3600);
+  }
+  gameRow.hidden = false;
+  realRow.hidden = false;
+  document.getElementById('etaGameWaypoint').textContent = `${timeText} (${distText})`;
+  document.getElementById('etaRealWaypoint').textContent = timeText;
+}
 
 // Distancia minima (aprox) del punto (x,z) a la polilinea de la ruta actual,
 // en unidades del juego. Alcanza con chequear contra cada segmento entre
@@ -1164,18 +1366,30 @@ function updateDestinationMarker(data) {
     destMarker.setLngLat(destLngLat);
   }
 
-  // Recalcula la ruta real por carreteras cuando cambia el destino, o -como
-  // un GPS- cuando te desviaste demasiado de la ruta ya calculada. Recorrer
-  // el grafo entero en cada tick seria carisimo, por eso no se chequea la
-  // desviacion salvo que ya haya una ruta calculada para comparar contra.
-  const destChanged = data.cityDst !== currentRouteTarget;
+  // Recalcula la ruta real por carreteras cuando cambia el destino (o el
+  // waypoint), o -como un GPS- cuando te desviaste demasiado de la ruta ya
+  // calculada. Recorrer el grafo entero en cada tick seria carisimo, por eso
+  // no se chequea la desviacion salvo que ya haya una ruta calculada para
+  // comparar contra. routeKey incluye el waypoint para que un cambio de
+  // waypoint (ponerlo/sacarlo/moverlo) tambien dispare el recalculo.
+  const routeKey = waypointWorldPos ? `${data.cityDst}|${waypointWorldPos[0]},${waypointWorldPos[1]}` : data.cityDst;
+  const destChanged = routeKey !== currentRouteTarget;
   const offRoute = !destChanged
     && data.position?.x != null
     && distanceToRouteMeters(data.position.x, data.position.z) > OFF_ROUTE_THRESHOLD_M;
 
   if ((destChanged || offRoute) && data.position?.x != null && routeGraph) {
-    currentRouteTarget = data.cityDst;
-    const routePoints = findRoute([data.position.x, data.position.z], [city.X, city.Y]);
+    currentRouteTarget = routeKey;
+    let routePoints;
+    if (waypointWorldPos) {
+      const leg1 = findRoute([data.position.x, data.position.z], waypointWorldPos);
+      const leg2 = findRoute(waypointWorldPos, [city.X, city.Y]);
+      routePoints = (leg1 && leg2) ? leg1.concat(leg2.slice(1)) : null;
+      waypointRouteDistanceKm = routePoints ? sumPathDistanceMeters(routePoints) / 1000 : null;
+    } else {
+      routePoints = findRoute([data.position.x, data.position.z], [city.X, city.Y]);
+      waypointRouteDistanceKm = null;
+    }
     currentRouteWorldPoints = routePoints;
     const lineCoords = routePoints
       ? routePoints.map(([x, y]) => toLngLat(x, y))
@@ -1196,6 +1410,7 @@ async function loadGameMap(game) {
   const mapInfo = GAME_MAPS[game];
   currentGame = game;
   toLngLat = mapInfo.toLngLat;
+  fromLngLat = mapInfo.fromLngLat;
 
   await loadCities(mapInfo);
   await loadRouteGraph(mapInfo);
@@ -1207,6 +1422,7 @@ async function loadGameMap(game) {
   if (map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
   if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
   if (destMarker) { destMarker.remove(); destMarker = null; }
+  clearWaypoint();
 
   // El source vectorial 'vec' no se puede "reapuntar" a otra url una vez
   // creado - hay que sacarlo (y las capas que dependen de el) y crearlo de
@@ -1554,6 +1770,7 @@ function computeRealEtaSeconds(data) {
 
   etaLastRecalcTime = data.ts;
   etaDisplayValue = (data.routeDistanceKm / avgSpeedKmh) * 3600;
+  lastKnownAvgSpeedKmh = avgSpeedKmh; // reusado por updateWaypointRoute para el ETA "(with waypoint)"
   return etaDisplayValue;
 }
 
@@ -1600,6 +1817,17 @@ function updateHud(data) {
     document.getElementById('etaGame').textContent = etaText;
   }
 
+  const jobDeadlineRow = document.getElementById('jobDeadlineRow');
+  if (data.jobDeadlineSeconds != null) {
+    jobDeadlineRow.hidden = false;
+    const deadlineEl = document.getElementById('jobDeadline');
+    deadlineEl.textContent = formatSeconds(Math.max(0, data.jobDeadlineSeconds));
+    deadlineEl.classList.toggle('over', data.jobDeadlineSeconds <= 0);
+  } else {
+    jobDeadlineRow.hidden = true;
+  }
+
+  updateWaypointRoute(data);
   const realEtaSeconds = computeRealEtaSeconds(data);
   document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');
 
@@ -1757,6 +1985,31 @@ document.addEventListener('fullscreenchange', () => {
 
 document.getElementById('navToggleBtn').addEventListener('click', () => {
   setNavMode(!navMode);
+});
+
+document.getElementById('waypointBtn').addEventListener('click', () => {
+  if (waypointWorldPos) {
+    clearWaypoint();
+  } else {
+    setWaypointMode(!waypointMode);
+  }
+});
+
+document.getElementById('waypointConfirmInGameBtn').addEventListener('click', () => {
+  waypointInGame = true;
+  document.getElementById('waypointModal').style.display = 'none';
+  finalizeWaypoint();
+});
+
+document.getElementById('waypointConfirmNotInGameBtn').addEventListener('click', () => {
+  waypointInGame = false;
+  document.getElementById('waypointModal').style.display = 'none';
+  finalizeWaypoint();
+});
+
+document.getElementById('waypointClearBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  clearWaypoint();
 });
 
 document.getElementById('updateBannerClose').addEventListener('click', () => {

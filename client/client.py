@@ -88,6 +88,15 @@ def build_payload(raw: dict) -> dict:
         "routeDistanceKm": (raw.get("routeDistance") or 0) / 1000,
         "routeTimeSeconds": raw.get("routeTime"),
         "restStopSeconds": raw.get("restStop"),
+        # time_abs/time_abs_delivery vienen en minutos de tiempo de juego (no
+        # tiempo real) - la diferencia es cuanto falta para el deadline de
+        # entrega del trabajo actual. Sin trabajo activo, time_abs_delivery
+        # suele venir en 0, lo que daria un numero negativo enorme - se
+        # descarta ese caso mandando None.
+        "jobDeadlineSeconds": (
+            (raw.get("time_abs_delivery") - raw.get("time_abs")) * 60
+            if raw.get("time_abs_delivery") else None
+        ),
         "truckBrand": raw.get("truckBrand") or None,
         "truckName": raw.get("truckName") or None,
         "odometerKm": raw.get("truckOdometer"),
