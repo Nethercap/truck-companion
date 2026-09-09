@@ -199,6 +199,63 @@ def test_record_job_delivered_allows_same_route_after_window(main, monkeypatch):
     assert stats["jobs_delivered"] == 2
 
 
+def test_notify_discord_job_delivered_noop_without_webhook_url(main, monkeypatch):
+    monkeypatch.setattr(main, "DISCORD_WEBHOOK_URL", None)
+    called = []
+    monkeypatch.setattr(main.urllib.request, "urlopen", lambda *a, **k: called.append(1))
+    main.notify_discord_job_delivered({"citySrc": "A", "cityDst": "B"})
+    assert called == []
+
+
+def test_notify_discord_job_delivered_posts_embed_with_job_fields(main, monkeypatch):
+    monkeypatch.setattr(main, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/fake")
+    captured = {}
+
+    class FakeResponse:
+        def close(self):
+            pass
+
+    def fake_urlopen(req, timeout=10):
+        captured["url"] = req.full_url
+        captured["body"] = main.json.loads(req.data)
+        return FakeResponse()
+
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen)
+    main.notify_discord_job_delivered({
+        "citySrc": "Bakersfield", "cityDst": "Santa Cruz",
+        "truckBrand": "Kenworth", "truckName": "T680",
+        "cargo": "Scaffolding", "revenue": 11295, "distanceKm": 525, "game": "ats",
+    })
+    embed = captured["body"]["embeds"][0]
+    assert embed["title"] == "Bakersfield → Santa Cruz"
+    fields = {f["name"]: f["value"] for f in embed["fields"]}
+    assert fields["Truck"] == "Kenworth T680"
+    assert fields["Cargo"] == "Scaffolding"
+    assert fields["Game"] == "ATS"
+    assert fields["Distance"] == "525 km"
+    assert fields["Pay"] == "$11,295"
+
+
+def test_notify_discord_job_delivered_swallows_network_errors(main, monkeypatch):
+    monkeypatch.setattr(main, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/fake")
+
+    def raise_error(*a, **k):
+        raise OSError("network down")
+
+    monkeypatch.setattr(main.urllib.request, "urlopen", raise_error)
+    # no debe lanzar - solo loguear
+    main.notify_discord_job_delivered({"citySrc": "A", "cityDst": "B"})
+
+
+def test_record_job_delivered_calls_discord_notify(main, monkeypatch):
+    called = []
+    monkeypatch.setattr(main, "notify_discord_job_delivered", lambda job_info: called.append(job_info))
+    job = {"citySrc": "A", "cityDst": "B", "cargo": "X", "revenue": 100, "distanceKm": 10}
+    main.record_job_delivered(job)
+    assert len(called) == 1
+    assert called[0]["cityDst"] == "B"
+
+
 def test_version_endpoint_defaults(client, main):
     resp = client.get("/version")
     assert resp.status_code == 200

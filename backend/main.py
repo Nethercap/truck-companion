@@ -18,6 +18,7 @@ import random
 import string
 import threading
 import time
+import urllib.request
 from collections import defaultdict, deque
 from typing import Optional
 
@@ -81,6 +82,11 @@ def check_rate_limit(client_ip: str) -> bool:
 # efimero - se pierde en cada redeploy, y esto es justamente el dato que
 # queremos que sobreviva a los redeploys.
 ADMIN_KEY = os.environ.get("ADMIN_KEY")
+# Webhook global de Discord (uno solo, compartido por todos los usuarios) que
+# postea cada trabajo entregado - se activa solo si esta seteada la env var en
+# Railway, igual patron que SENTRY_DSN. Se crea en el canal de Discord via
+# Integraciones -> Webhooks -> Copiar URL.
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 R2_ENDPOINT = os.environ.get("R2_ENDPOINT")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
@@ -155,6 +161,42 @@ JOB_DELIVERED_COOLDOWN_SECONDS = 20
 JOB_DEDUPE_WINDOW_SECONDS = 5 * 60
 
 
+GAME_LABELS = {"ats": "ATS", "ets2": "ETS2"}
+# Colores de marca de cada juego (decimal, formato que espera el campo "color"
+# de un embed de Discord) para diferenciar el post de un vistazo.
+GAME_EMBED_COLORS = {"ats": 0xB33A3A, "ets2": 0x3B6EA5}
+
+
+def notify_discord_job_delivered(job_info: dict):
+    """Postea la entrega en el webhook global de Discord. No hace nada si no
+    esta configurado el webhook, y nunca debe poder romper el guardado de
+    stats - cualquier error de red/formato se descarta en silencio."""
+    if not DISCORD_WEBHOOK_URL:
+        return
+    try:
+        game = job_info.get("game")
+        truck = " ".join(filter(None, [job_info.get("truckBrand"), job_info.get("truckName")])) or "?"
+        embed = {
+            "title": f"{job_info.get('citySrc') or '?'} → {job_info.get('cityDst') or '?'}",
+            "color": GAME_EMBED_COLORS.get(game, 0x808080),
+            "fields": [
+                {"name": "Truck", "value": truck, "inline": True},
+                {"name": "Cargo", "value": job_info.get("cargo") or "-", "inline": True},
+                {"name": "Game", "value": GAME_LABELS.get(game, game or "?"), "inline": True},
+                {"name": "Distance", "value": f"{round(job_info.get('distanceKm') or 0)} km", "inline": True},
+                {"name": "Pay", "value": f"${round(job_info.get('revenue') or 0):,}", "inline": True},
+            ],
+        }
+        body = json.dumps({"embeds": [embed]}).encode("utf-8")
+        req = urllib.request.Request(
+            DISCORD_WEBHOOK_URL, data=body, method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=10).close()
+    except Exception as exc:
+        logging.warning(f"No se pudo postear la entrega en Discord: {exc}")
+
+
 def record_job_delivered(job_info: dict):
     with _stats_lock:
         stats = _load_stats()
@@ -183,6 +225,8 @@ def record_job_delivered(job_info: dict):
         latest.insert(0, job_info)
         del latest[LATEST_JOBS_MAX:]
         _save_stats()
+
+    notify_discord_job_delivered(job_info)
 
 
 class Session:
