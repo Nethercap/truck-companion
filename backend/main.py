@@ -177,7 +177,7 @@ def notify_discord_job_delivered(job_info: dict):
         game = job_info.get("game")
         truck = " ".join(filter(None, [job_info.get("truckBrand"), job_info.get("truckName")])) or "?"
         embed = {
-            "title": f"{job_info.get('citySrc') or '?'} → {job_info.get('cityDst') or '?'}",
+            "title": f"{job_info.get('citySrc') or '?'} -> {job_info.get('cityDst') or '?'}",
             "color": GAME_EMBED_COLORS.get(game, 0x808080),
             "fields": [
                 {"name": "Truck", "value": truck, "inline": True},

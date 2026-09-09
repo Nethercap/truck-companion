@@ -227,7 +227,7 @@ def test_notify_discord_job_delivered_posts_embed_with_job_fields(main, monkeypa
         "cargo": "Scaffolding", "revenue": 11295, "distanceKm": 525, "game": "ats",
     })
     embed = captured["body"]["embeds"][0]
-    assert embed["title"] == "Bakersfield → Santa Cruz"
+    assert embed["title"] == "Bakersfield -> Santa Cruz"
     fields = {f["name"]: f["value"] for f in embed["fields"]}
     assert fields["Truck"] == "Kenworth T680"
     assert fields["Cargo"] == "Scaffolding"
