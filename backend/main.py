@@ -170,9 +170,10 @@ GAME_EMBED_COLORS = {"ats": 0xB33A3A, "ets2": 0x3B6EA5}
 def notify_discord_job_delivered(job_info: dict):
     """Postea la entrega en el webhook global de Discord. No hace nada si no
     esta configurado el webhook, y nunca debe poder romper el guardado de
-    stats - cualquier error de red/formato se descarta en silencio."""
+    stats - cualquier error de red/formato se descarta en silencio (se
+    retorna igual el error, solo para uso del endpoint de diagnostico)."""
     if not DISCORD_WEBHOOK_URL:
-        return
+        return "not_configured"
     try:
         game = job_info.get("game")
         truck = " ".join(filter(None, [job_info.get("truckBrand"), job_info.get("truckName")])) or "?"
@@ -195,8 +196,10 @@ def notify_discord_job_delivered(job_info: dict):
             headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
         )
         urllib.request.urlopen(req, timeout=10).close()
+        return None
     except Exception as exc:
         logging.warning(f"No se pudo postear la entrega en Discord: {exc}")
+        return str(exc)
 
 
 def record_job_delivered(job_info: dict):
@@ -331,6 +334,17 @@ def stats_admin(x_admin_key: Optional[str] = Header(default=None)):
     # active_sessions es en vivo (cuenta sessions en memoria de este proceso,
     # como /health) - no se persiste en R2 como el resto de las stats.
     return {**_load_stats(), "active_sessions": len(sessions)}
+
+
+@app.post("/admin/replay-discord-notify")
+def replay_discord_notify(job_info: dict, x_admin_key: Optional[str] = Header(default=None)):
+    """Diagnostico temporal: reproduce el paso exacto de notify_discord_job_delivered
+    (incluida la construccion del embed) con un job_info a eleccion, para poder
+    reproducir un fallo puntual sin esperar a otra entrega real."""
+    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403)
+    error = notify_discord_job_delivered(job_info)
+    return {"ok": error is None, "error": error}
 
 
 @app.post("/admin/test-discord-webhook")
