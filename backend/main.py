@@ -190,7 +190,9 @@ def notify_discord_job_delivered(job_info: dict):
         body = json.dumps({"embeds": [embed]}).encode("utf-8")
         req = urllib.request.Request(
             DISCORD_WEBHOOK_URL, data=body, method="POST",
-            headers={"Content-Type": "application/json"},
+            # Discord/Cloudflare devuelve 403 con el User-Agent por defecto de
+            # urllib ("Python-urllib/x.y") - un UA de navegador comun lo evita.
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
         )
         urllib.request.urlopen(req, timeout=10).close()
     except Exception as exc:
