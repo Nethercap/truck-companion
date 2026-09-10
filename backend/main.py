@@ -285,7 +285,13 @@ def create_pairing_code(request: Request):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "active_sessions": len(sessions)}
+    return {
+        "status": "ok",
+        "active_sessions": len(sessions),
+        # Railway setea esta env var sola con el commit deployado - sirve para
+        # confirmar desde afuera que un push realmente se reflejo en produccion.
+        "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")[:7],
+    }
 
 
 # Version mas nueva del cliente disponible - se actualiza a mano (via
