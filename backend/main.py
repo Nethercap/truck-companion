@@ -333,6 +333,29 @@ def stats_admin(x_admin_key: Optional[str] = Header(default=None)):
     return {**_load_stats(), "active_sessions": len(sessions)}
 
 
+@app.post("/admin/test-discord-webhook")
+def test_discord_webhook(x_admin_key: Optional[str] = Header(default=None)):
+    """Diagnostico temporal: dispara un post de prueba al webhook desde el
+    proceso real de Railway (no desde una maquina local), para descartar
+    diferencias de entorno/red que un test local no puede ver."""
+    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403)
+    if not DISCORD_WEBHOOK_URL:
+        return {"configured": False}
+    try:
+        req = urllib.request.Request(
+            DISCORD_WEBHOOK_URL,
+            data=json.dumps({"content": "Test desde /admin/test-discord-webhook"}).encode("utf-8"),
+            method="POST",
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            status = resp.status
+        return {"configured": True, "ok": True, "status": status}
+    except Exception as exc:
+        return {"configured": True, "ok": False, "error": str(exc)}
+
+
 # Permite sembrar una base real conocida manualmente (ej. gente que probo el
 # cliente o trabajos completados antes de tener este tracking automatico), o
 # limpiar latest_jobs si quedo con datos malos (ej. duplicados de un bug ya
