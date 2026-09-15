@@ -165,18 +165,10 @@
      calculados de la curvatura de la ruta ya calculada, sin nombres de
      calle (el grafo no los tiene). */
   .navPanel {
-    /* No centrado a la pagina entera (left:50%) - eso lo hacia meterse
-       debajo del mini-HUD/velocidad de la esquina superior derecha y encima
-       de la pila de botones de la izquierda. Izquierda: 60px (ancho del
-       boton redondo + separacion). Derecha: ~190px (ancho del mini-HUD de
-       velocidad, que se quedo ahi arriba aunque el resto se movio abajo).
-       Se centra el TEXTO dentro de ese espacio en vez de la pantalla entera. */
-    position: absolute; top: 0.6rem; left: 60px; right: 190px;
+    position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%);
     z-index: 1200; background: rgba(23, 26, 31, 0.92); color: #fff;
     padding: 0.5rem 1rem; border-radius: 10px; font-size: 0.95rem;
-    font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    margin: 0 auto; width: fit-content; max-width: calc(100% - 250px);
+    font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
   }
 
   /* Mini-HUD: velocidad/limite/crucero flotando arriba a la derecha del mapa,
