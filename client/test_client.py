@@ -105,6 +105,9 @@ def test_send_game_command_presses_key_and_focuses_window(monkeypatch):
 def test_save_and_load_keybinds_roundtrip(tmp_path, monkeypatch):
     fake_path = str(tmp_path / "keybinds.json")
     monkeypatch.setattr(client, "keybinds_path", lambda: fake_path)
+    # Sin esto, load_keybinds() detecta el controls.sii real de la maquina
+    # que corre el test (si el juego esta instalado) y pisa lo que guardamos.
+    monkeypatch.setattr(client, "detect_keybinds_from_controls_sii", lambda: {})
     client.save_keybinds({**client.DEFAULT_KEYBINDS, "toggle_hazards": "x"})
     loaded = client.load_keybinds()
     assert loaded["toggle_hazards"] == "x"
@@ -128,8 +131,9 @@ class _FakeWs:
         self.sent.append(text)
 
 
-def test_receive_commands_replies_to_get_keybinds():
+def test_receive_commands_replies_to_get_keybinds(monkeypatch):
     import asyncio
+    monkeypatch.setattr(client, "detect_keybinds_from_controls_sii", lambda: {})
     ws = _FakeWs([client.json.dumps({"type": "get_keybinds"})])
     keybinds = dict(client.DEFAULT_KEYBINDS)
     asyncio.run(client.receive_commands(ws, keybinds))
@@ -143,12 +147,75 @@ def test_receive_commands_applies_and_persists_set_keybinds(tmp_path, monkeypatc
     import asyncio
     fake_path = str(tmp_path / "keybinds.json")
     monkeypatch.setattr(client, "keybinds_path", lambda: fake_path)
+    monkeypatch.setattr(client, "detect_keybinds_from_controls_sii", lambda: {})
     ws = _FakeWs([client.json.dumps({"type": "set_keybinds", "data": {"toggle_hazards": "x", "unknown_action": "q"}})])
     keybinds = dict(client.DEFAULT_KEYBINDS)
     asyncio.run(client.receive_commands(ws, keybinds))
     assert keybinds["toggle_hazards"] == "x"
     assert "unknown_action" not in keybinds  # se ignoran acciones desconocidas
     assert client.load_keybinds()["toggle_hazards"] == "x"  # quedo persistido
+
+
+_SAMPLE_CONTROLS_SII = r"""SiiNunit
+{
+input_config : _nameless.1 {
+ config_lines[0]: "device keyboard `di8.keyboard`"
+ config_lines[1]: "mix beacon `unbound?0 || long_press(joy.b3?0) | semantical.beacon?0`"
+ config_lines[2]: "mix liftaxle `keyboard.u?0 || long_press(joy.b4?0) | semantical.liftaxle?0`"
+ config_lines[3]: "mix parkingbrake `keyboard.space?0 || short_press(joy.b4?0) | semantical.parkingbrake?0`"
+ config_lines[4]: "mix engine `keyboard.e?0 | joy.b24?0 | semantical.engine?0`"
+ config_lines[5]: "mix attach `keyboard.t?0 || long_press(joy.pov1_left?0) | semantical.attach?0`"
+ config_lines[6]: "mix camcycle `keyboard.key9?0 || long_press(joy.pov1_up?0) | semantical.camcycle?0`"
+ config_lines[7]: "mix diflock `keyboard.v?0 | semantical.diflock?0`"
+ config_lines[8]: "mix wipers `keyboard.p?0 || short_press(joy.b3?0) | semantical.wipers?0`"
+ config_lines[9]: "mix cruiectrl `keyboard.c?0 || short_press(joy.b2?0) | semantical.cruiectrl?0`"
+ config_lines[10]: "mix light `keyboard.l?0 || short_press(joy.pov1_down?0) | semantical.light?0`"
+ config_lines[11]: "mix flasher4way `keyboard.f?0 || long_press(joy.b2?0) | semantical.flasher4way?0`"
+ config_lines[12]: "mix infotainment `keyboard.o?0 | semantical.infotainment?0`"
+}
+}
+"""
+
+
+def test_parse_controls_sii_extracts_keyboard_binding_per_action():
+    result = client.parse_controls_sii(_SAMPLE_CONTROLS_SII)
+    assert result["engine"] == "e"
+    assert result["parkingbrake"] == "space"
+    assert result["camcycle"] == "9"  # "key9" -> "9"
+    assert result["flasher4way"] == "f"
+    assert result["beacon"] is None  # solo bind de joystick (unbound en teclado)
+
+
+def test_detect_keybinds_from_controls_sii_maps_to_our_action_names(tmp_path, monkeypatch):
+    sii_file = tmp_path / "controls.sii"
+    sii_file.write_text(_SAMPLE_CONTROLS_SII, encoding="utf-8")
+    monkeypatch.setattr(client, "find_controls_sii_files", lambda: [str(sii_file)])
+    detected = client.detect_keybinds_from_controls_sii()
+    assert detected["toggle_engine"] == "e"
+    assert detected["toggle_parking_brake"] == "space"
+    assert detected["cycle_camera"] == "9"
+    assert detected["toggle_hazards"] == "f"
+    assert detected["toggle_infotainment"] == "o"
+    assert detected["toggle_wipers"] == "p"
+    assert detected["toggle_beacon"] is None
+
+
+def test_detect_keybinds_from_controls_sii_returns_empty_without_files(monkeypatch):
+    monkeypatch.setattr(client, "find_controls_sii_files", lambda: [])
+    assert client.detect_keybinds_from_controls_sii() == {}
+
+
+def test_find_controls_sii_files_excludes_bak_folders(monkeypatch, tmp_path):
+    good = tmp_path / "Euro Truck Simulator 2" / "steam_profiles" / "ABC" / "controls.sii"
+    good.parent.mkdir(parents=True)
+    good.write_text("x", encoding="utf-8")
+    bak = tmp_path / "Euro Truck Simulator 2" / "steam_profiles(1.60.bak)" / "ABC" / "controls.sii"
+    bak.parent.mkdir(parents=True)
+    bak.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(client, "documents_folder", lambda: str(tmp_path))
+    files = client.find_controls_sii_files()
+    assert str(good) in files
+    assert not any(".bak" in f.lower() for f in files)
 
 
 def test_update_job_snapshot_only_updates_while_on_job_with_destination():

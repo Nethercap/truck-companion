@@ -588,6 +588,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v7M9 6l3-4 3 4"/><circle cx="7" cy="18" r="2.6"/><circle cx="17" cy="18" r="2.6"/><path d="M9.5 18h5"/></svg>
           <span data-i18n="cmdLiftAxle">Lift axle</span>
         </button>
+        <button class="cmdBtn" id="cmdWipers" data-action="toggle_wipers" data-i18n-title="cmdWipers" title="Wipers">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18a9 9 0 0 1 18 0"/><path d="M7 18c0-4 2-7 3-9M17 18c0-5-3-8-5-10"/></svg>
+          <span data-i18n="cmdWipers">Wipers</span>
+        </button>
         <button class="cmdBtn" id="cmdRemap" data-i18n-title="cmdRemap" title="Remap keys">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V20a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H4a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H10a1.7 1.7 0 0 0 1-1.55V4a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V10a1.7 1.7 0 0 0 1.55 1H20a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg>
           <span data-i18n="cmdRemap">Remap</span>
@@ -662,8 +666,8 @@ const TRANSLATIONS = {
     cmdLights: 'Lights',
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Lift axle',
+    cmdWipers: 'Wipers',
     cmdRemap: 'Remap',
-    commandSentToast: 'Command sent',
     commandNotConnectedToast: 'Not connected to the local client',
     keybindsModalTitle: 'Remap keys',
     keybindsModalExplain: "Keys must match your in-game control settings — if you remapped a control in the game, update it here too. Leave a field empty to leave that command unassigned.",
@@ -770,8 +774,8 @@ const TRANSLATIONS = {
     cmdLights: 'Luces',
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Eje elevable',
+    cmdWipers: 'Limpiaparabrisas',
     cmdRemap: 'Remapear',
-    commandSentToast: 'Comando enviado',
     commandNotConnectedToast: 'No conectado al cliente local',
     keybindsModalTitle: 'Remapear teclas',
     keybindsModalExplain: 'Las teclas tienen que coincidir con tu configuración de controles del juego — si remapeaste algo en el juego, actualizalo acá también. Dejá un campo vacío para que ese comando quede sin asignar.',
@@ -2401,7 +2405,6 @@ document.querySelectorAll('#commandsPanel .cmdBtn[data-action]').forEach(btn => 
       return;
     }
     ws.send(JSON.stringify({ type: 'command', action: btn.dataset.action }));
-    showToast(t('commandSentToast'), 'success', 1500);
   });
 });
 
@@ -2483,6 +2486,7 @@ function updateCommandButtonStates(data) {
   document.getElementById('cmdHandbrake').classList.toggle('active', !!data.parkingBrake);
   document.getElementById('cmdEngine').classList.toggle('active', !!data.engineEnabled);
   document.getElementById('cmdLiftAxle').classList.toggle('active', !!data.liftAxle);
+  document.getElementById('cmdWipers').classList.toggle('active', !!data.wipers);
   document.getElementById('cmdTrailer').classList.toggle('active', !!data.trailerAttached);
   document.getElementById('cmdCruise').classList.toggle('active', !!data.cruiseControl);
   // "Lights" no es un simple on/off (la tecla real rota entre apagado/

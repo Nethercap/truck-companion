@@ -15,9 +15,11 @@ y lo muestra en consola para que el usuario lo tipee en la web.
 import argparse
 import asyncio
 import ctypes
+import glob
 import json
 import logging
 import os
+import re
 import sys
 import time
 
@@ -47,15 +49,13 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.1.1"
+CLIENT_VERSION = "1.2.0"
 
-# Comandos que la web puede mandar para simular una tecla en el juego. Los
-# valores son los binds por defecto de ETS2/ATS - si el usuario los remapeo en
-# el juego, tiene que editar keybinds.json (se crea al lado del .exe la
-# primera vez) para que coincidan. "trailer_toggle" y "differential_lock" no
-# tienen un bind por defecto confiable en todas las versiones -> quedan sin
-# asignar (null) hasta que el usuario los configure a mano, tanto en el juego
-# como en keybinds.json.
+# Comandos que la web puede mandar para simular una tecla en el juego. Estos
+# son solo el ultimo respaldo si no se pudo detectar nada real - ver
+# detect_keybinds_from_controls_sii() mas abajo, que lee el controls.sii del
+# perfil del juego y devuelve las teclas que el usuario tiene configuradas de
+# verdad (mucho mas confiable que adivinar).
 DEFAULT_KEYBINDS = {
     "toggle_hazards": "z",
     "toggle_beacon": "o",
@@ -68,12 +68,131 @@ DEFAULT_KEYBINDS = {
     "cycle_lights": "l",
     "toggle_infotainment": None,
     "toggle_lift_axle": None,
+    "toggle_wipers": "p",
 }
 
 GAME_WINDOW_TITLES = ("Euro Truck Simulator 2", "American Truck Simulator")
 
 _user32 = ctypes.windll.user32
 _kernel32 = ctypes.windll.kernel32
+_shell32 = ctypes.windll.shell32
+
+# Nombre de nuestra accion -> nombre interno que usa SCS en controls.sii
+# (linea "mix <nombre_scs> `...`"). Se saco leyendo un controls.sii real -
+# no esta documentado oficialmente, puede variar entre versiones del juego.
+ACTION_TO_SCS_ACTION = {
+    "toggle_hazards": "flasher4way",
+    "toggle_beacon": "beacon",
+    "toggle_differential_lock": "diflock",
+    "toggle_parking_brake": "parkingbrake",
+    "toggle_engine": "engine",
+    "toggle_trailer": "attach",
+    "cycle_camera": "camcycle",
+    "toggle_cruise_control": "cruiectrl",
+    "cycle_lights": "light",
+    "toggle_infotainment": "infotainment",
+    "toggle_lift_axle": "liftaxle",
+    "toggle_wipers": "wipers",
+}
+
+# Nombres de tecla que usa SCS en controls.sii -> nombre que espera
+# pydirectinput. No hace falta que sea exhaustivo (solo lo que realmente
+# puede terminar asignado a estos comandos), las teclas no listadas se pasan
+# tal cual (funciona para la mayoria de las letras sueltas).
+_SCS_KEY_TO_PYDIRECTINPUT = {
+    "space": "space", "esc": "esc", "tab": "tab", "backspace": "backspace",
+    "enter": "enter", "numenter": "enter",
+    "del": "delete", "ins": "insert", "home": "home", "end": "end",
+    "pgup": "pageup", "pgdn": "pagedown",
+    "uarrow": "up", "darrow": "down", "larrow": "left", "rarrow": "right",
+    "lshift": "shiftleft", "rshift": "shiftright",
+    "lctrl": "ctrlleft", "rctrl": "ctrlright",
+    "lalt": "altleft", "ralt": "altright",
+    "grave": "`", "minus": "-", "equals": "=",
+    "lbracket": "[", "rbracket": "]", "backslash": "\\",
+    "semicolon": ";", "apostrophe": "'", "comma": ",", "period": ".", "slash": "/",
+    "numplus": "add", "numminus": "subtract", "nummultiply": "multiply", "numslash": "divide",
+}
+for _i in range(10):
+    _SCS_KEY_TO_PYDIRECTINPUT[f"key{_i}"] = str(_i)
+for _i in range(1, 13):
+    _SCS_KEY_TO_PYDIRECTINPUT[f"f{_i}"] = f"f{_i}"
+
+_MIX_LINE_RE = re.compile(r'"mix\s+([a-zA-Z0-9_]+)\s+`([^`]*)`"')
+_KEYBOARD_BIND_RE = re.compile(r"keyboard\.([a-zA-Z0-9_]+)")
+
+
+def documents_folder() -> str:
+    # No asumir "~/Documents" - OneDrive puede redirigir la carpeta de
+    # Documentos a otro lado (ej. "OneDrive/Documentos"), y ahi es donde el
+    # juego realmente guarda los perfiles.
+    class _Guid(ctypes.Structure):
+        _fields_ = [
+            ("Data1", ctypes.c_ulong), ("Data2", ctypes.c_ushort), ("Data3", ctypes.c_ushort),
+            ("Data4", ctypes.c_ubyte * 8),
+        ]
+    folderid_documents = _Guid(0xFDD39AD0, 0x238F, 0x46AF, (ctypes.c_ubyte * 8)(0xAD, 0xB4, 0x6C, 0x85, 0x48, 0x03, 0x69, 0xC7))
+    path_ptr = ctypes.c_wchar_p()
+    try:
+        if _shell32.SHGetKnownFolderPath(ctypes.byref(folderid_documents), 0, 0, ctypes.byref(path_ptr)) == 0:
+            path = path_ptr.value
+            ctypes.windll.ole32.CoTaskMemFree(path_ptr)
+            return path
+    except Exception:
+        pass
+    return os.path.expanduser("~/Documents")
+
+
+def find_controls_sii_files() -> list:
+    docs = documents_folder()
+    files = []
+    for game_dir in ("Euro Truck Simulator 2", "American Truck Simulator"):
+        for pattern in ("steam_profiles/*/controls.sii", "profiles/*/controls.sii"):
+            files.extend(glob.glob(os.path.join(docs, game_dir, pattern)))
+    # Los backups de perfil tras un update de version (ej. "steam_profiles(1.61.x).bak")
+    # no son el perfil activo, hay que descartarlos.
+    return [f for f in files if ".bak" not in f.lower()]
+
+
+def parse_controls_sii(text: str) -> dict:
+    """{accion_scs: tecla_pydirectinput o None} de cada linea 'mix' del
+    controls.sii - solo mira el primer binding de teclado de cada una,
+    ignora binds de joystick/mouse."""
+    result = {}
+    for match in _MIX_LINE_RE.finditer(text):
+        action, expr = match.group(1), match.group(2)
+        key_match = _KEYBOARD_BIND_RE.search(expr)
+        if key_match:
+            scs_key = key_match.group(1)
+            result[action] = _SCS_KEY_TO_PYDIRECTINPUT.get(scs_key, scs_key)
+        else:
+            result[action] = None
+    return result
+
+
+def detect_keybinds_from_controls_sii() -> dict:
+    """Lee el controls.sii real del juego (el perfil modificado mas
+    recientemente, de cualquiera de los dos juegos) y devuelve nuestras
+    acciones mapeadas a la tecla que el usuario tiene configurada de verdad.
+    Best-effort: cualquier error (no encontro el archivo, formato
+    inesperado) devuelve {} sin romper nada - el llamador sigue teniendo los
+    defaults hardcodeados como respaldo."""
+    files = find_controls_sii_files()
+    if not files:
+        return {}
+    newest = max(files, key=os.path.getmtime)
+    try:
+        with open(newest, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read()
+        scs_binds = parse_controls_sii(text)
+    except Exception as exc:
+        logging.warning(f"No se pudo leer/parsear controls.sii ({exc})")
+        return {}
+    return {
+        our_action: scs_binds.get(scs_action)
+        for our_action, scs_action in ACTION_TO_SCS_ACTION.items()
+        if scs_action in scs_binds
+    }
 
 
 def keybinds_path() -> str:
@@ -90,11 +209,18 @@ def load_keybinds() -> dict:
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
                 keybinds.update(json.load(f))
-        else:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(DEFAULT_KEYBINDS, f, indent=2)
     except Exception as exc:
-        logging.warning(f"No se pudo leer/crear keybinds.json ({exc}), se usan los binds por defecto.")
+        logging.warning(f"No se pudo leer keybinds.json ({exc}), se usan los binds detectados/por defecto.")
+    # Lo detectado del controls.sii pisa tanto los defaults como lo guardado
+    # - es la fuente mas confiable (la tecla que el juego tiene de verdad
+    # asignada ahora mismo), mucho mejor que un valor viejo cacheado.
+    keybinds.update({k: v for k, v in detect_keybinds_from_controls_sii().items() if v})
+    if not os.path.exists(path):
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(keybinds, f, indent=2)
+        except Exception as exc:
+            logging.warning(f"No se pudo crear keybinds.json ({exc})")
     return keybinds
 
 
@@ -319,7 +445,15 @@ async def receive_commands(ws, keybinds: dict):
             if msg_type == "command":
                 send_game_command(payload.get("action", ""), keybinds)
             elif msg_type == "get_keybinds":
-                await ws.send(json.dumps({"type": "keybinds", "data": keybinds}))
+                # Re-detecta en vivo del controls.sii en cada apertura del
+                # modal - lo detectado pisa lo guardado (el modal tiene que
+                # mostrar lo que el juego tiene asignado de verdad ahora, no
+                # un valor viejo cacheado). Si el usuario despues guarda algo
+                # distinto a mano, eso se usa para los botones hasta que
+                # vuelva a abrir el modal - no se persigue mas alla de eso.
+                live = dict(keybinds)
+                live.update({a: k for a, k in detect_keybinds_from_controls_sii().items() if k})
+                await ws.send(json.dumps({"type": "keybinds", "data": live}))
             elif msg_type == "set_keybinds":
                 incoming = payload.get("data") or {}
                 keybinds.update({k: (v or None) for k, v in incoming.items() if k in DEFAULT_KEYBINDS})
