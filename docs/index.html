@@ -136,17 +136,30 @@
 
   .screenshotWrap { margin-top: 1.5rem; text-align: center; }
   .screenshotCaption { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--muted); }
-  /* Una sola fila horizontal con scroll (swipe en mobile) en vez de bloques
-     apilados - todas las capturas en la misma linea, sea cual sea su
-     orientacion (horizontal de PC, vertical de celular). */
-  .screenshotSwipe {
-    display: flex; gap: 1rem; overflow-x: auto; padding: 0.25rem 0.25rem 0.75rem;
-    scroll-snap-type: x proximity; justify-content: flex-start;
+  /* Carrusel real (una imagen a la vez, con flechitas) en vez de una fila
+     con scroll - track que se desliza con transform, cada slide ocupa el
+     100% del viewport. Funciona para cualquier orientacion de imagen (el
+     viewport tiene una altura fija, la imagen se acomoda adentro). */
+  .carousel { display: flex; align-items: center; gap: 0.6rem; }
+  .carouselViewport { overflow: hidden; flex: 1; min-width: 0; }
+  .carouselTrack { display: flex; transition: transform 0.3s ease; }
+  .carouselSlide {
+    flex: 0 0 100%; display: flex; align-items: center; justify-content: center;
+    min-height: 300px;
   }
-  .screenshotSwipe img {
-    max-height: 420px; width: auto; flex: 0 0 auto; scroll-snap-align: start;
-    border-radius: 10px; border: 1px solid var(--border); cursor: zoom-in;
+  .carouselSlide img {
+    max-height: 480px; max-width: 100%; width: auto; border-radius: 10px;
+    border: 1px solid var(--border); cursor: zoom-in;
   }
+  .carouselArrow {
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); font-size: 1.5rem; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .carouselArrow:hover { border-color: var(--accent); color: var(--accent); }
+  .carouselDots { display: flex; gap: 0.4rem; justify-content: center; margin-top: 0.7rem; }
+  .carouselDot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); border: none; cursor: pointer; padding: 0; }
+  .carouselDot.active { background: var(--accent); }
 
   .lightbox {
     display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85);
@@ -280,13 +293,20 @@
     </div>
     <div class="screenshotWrap">
       <p class="screenshotCaption" data-i18n="screenshotCaption">This is what it looks like while driving:</p>
-      <div class="screenshotSwipe">
-        <img src="assets/screenshot-dashboard.png" alt="Truck Dash live dashboard" onclick="openLightbox('assets/screenshot-dashboard.png')" />
-        <img src="assets/screenshot-gps-1.png" alt="Truck Dash GPS navigation mode, zoomed out" onclick="openLightbox('assets/screenshot-gps-1.png')" />
-        <img src="assets/screenshot-gps-2.png" alt="Truck Dash GPS navigation mode, zoomed in with speed limit" onclick="openLightbox('assets/screenshot-gps-2.png')" />
-        <img src="assets/screenshot-gps-3.png" alt="Truck Dash GPS navigation mode, close up on an intersection" onclick="openLightbox('assets/screenshot-gps-3.png')" />
-        <img src="assets/screenshot-buttonbox.png" alt="Truck Dash command buttons for hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, infotainment, lift axle and wipers" onclick="openLightbox('assets/screenshot-buttonbox.png')" />
+      <div class="carousel">
+        <button class="carouselArrow carouselPrev" onclick="carouselNav(-1)" aria-label="Previous screenshot">‹</button>
+        <div class="carouselViewport">
+          <div class="carouselTrack" id="carouselTrack">
+            <div class="carouselSlide"><img src="assets/screenshot-dashboard.png" alt="Truck Dash live dashboard" onclick="openLightbox('assets/screenshot-dashboard.png')" /></div>
+            <div class="carouselSlide"><img src="assets/screenshot-gps-1.png" alt="Truck Dash GPS navigation mode, zoomed out" onclick="openLightbox('assets/screenshot-gps-1.png')" /></div>
+            <div class="carouselSlide"><img src="assets/screenshot-gps-2.png" alt="Truck Dash GPS navigation mode, zoomed in with speed limit" onclick="openLightbox('assets/screenshot-gps-2.png')" /></div>
+            <div class="carouselSlide"><img src="assets/screenshot-gps-3.png" alt="Truck Dash GPS navigation mode, close up on an intersection" onclick="openLightbox('assets/screenshot-gps-3.png')" /></div>
+            <div class="carouselSlide"><img src="assets/screenshot-buttonbox.png" alt="Truck Dash command buttons for hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, infotainment, lift axle and wipers" onclick="openLightbox('assets/screenshot-buttonbox.png')" /></div>
+          </div>
+        </div>
+        <button class="carouselArrow carouselNext" onclick="carouselNav(1)" aria-label="Next screenshot">›</button>
       </div>
+      <div class="carouselDots" id="carouselDots"></div>
     </div>
   </section>
 
@@ -626,6 +646,27 @@ function openLightbox(src) {
   document.getElementById('lightboxImg').src = src;
   document.getElementById('lightbox').classList.add('open');
 }
+
+let carouselIndex = 0;
+const carouselTrack = document.getElementById('carouselTrack');
+const carouselSlideCount = carouselTrack.children.length;
+const carouselDots = document.getElementById('carouselDots');
+for (let i = 0; i < carouselSlideCount; i++) {
+  const dot = document.createElement('button');
+  dot.className = 'carouselDot';
+  dot.setAttribute('aria-label', `Screenshot ${i + 1}`);
+  dot.addEventListener('click', () => { carouselIndex = i; updateCarousel(); });
+  carouselDots.appendChild(dot);
+}
+function updateCarousel() {
+  carouselTrack.style.transform = `translateX(-${carouselIndex * 100}%)`;
+  carouselDots.querySelectorAll('.carouselDot').forEach((dot, i) => dot.classList.toggle('active', i === carouselIndex));
+}
+function carouselNav(dir) {
+  carouselIndex = (carouselIndex + dir + carouselSlideCount) % carouselSlideCount;
+  updateCarousel();
+}
+updateCarousel();
 </script>
 </body>
 </html>
