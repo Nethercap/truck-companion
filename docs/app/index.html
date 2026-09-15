@@ -271,19 +271,24 @@
     border-radius: 0 0 12px 12px;
     overflow: hidden;
     transition: flex-basis 0.25s ease;
+    padding-top: 14px; /* deja lugar para el pico, que siempre esta ahi arriba */
   }
-  /* Colapsado no se va del todo a 0: deja una tira fina con un "pico"
-     traslucido (como el handle de un bottom sheet) que avisa que se puede
-     extender desde abajo, en vez de desaparecer sin rastro. */
-  .layout.commandsHidden #commandsDrawer { flex-basis: 14px; }
+  /* Colapsado no se va del todo a 0: queda solo la tira del pico. */
+  .layout.commandsHidden #commandsDrawer { flex-basis: 14px; padding-top: 0; }
   .layout.commandsHidden #commandsDrawer .cmdGrid { display: none; }
   #commandsDrawer .cmdGrid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+  /* Pico traslucido tipo "handle" de bottom sheet - siempre visible arriba
+     del todo del drawer, en ambos estados (expandido/colapsado), y siempre
+     clickeable para togglear uno u otro. En colapsado ocupa todo el alto
+     (14px) ya que es lo unico que queda del drawer. */
   .commandsPeek {
-    display: none; position: absolute; inset: 0;
-    align-items: center; justify-content: center; cursor: pointer;
+    position: absolute; top: 0; left: 0; right: 0; height: 14px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    z-index: 1;
   }
-  .layout.commandsHidden .commandsPeek { display: flex; }
+  .layout.commandsHidden .commandsPeek { height: 100%; }
   .commandsPeekTab { width: 48px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.35); }
+  .commandsPeek:hover .commandsPeekTab { background: rgba(255,255,255,0.55); }
 
   /* En vertical, el drawer no se usa (la botonera se muda al swipe de abajo)
      y el boton de mostrar/ocultar tampoco tiene sentido ahi. */
