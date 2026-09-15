@@ -49,7 +49,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.2.0"
+CLIENT_VERSION = "1.2.1"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -260,20 +260,25 @@ def bring_window_to_foreground(hwnd) -> None:
         _user32.AttachThreadInput(current_thread_id, target_thread_id, False)
 
 
-def send_game_command(action: str, keybinds: dict) -> None:
+def send_game_command(action: str, keybinds: dict) -> str:
+    """Devuelve un codigo de resultado ("ok", "no_key", "no_window", o el
+    texto de la excepcion) - la web lo usa para avisar cuando algo no
+    funciono, en vez de fallar en silencio sin que nadie se de cuenta."""
     key = keybinds.get(action)
     if not key:
         logging.info(f"Comando '{action}' no tiene tecla asignada en keybinds.json, se ignora.")
-        return
+        return "no_key"
     hwnd = find_game_window()
     if not hwnd:
         logging.info("No se encontro la ventana del juego, se ignora el comando.")
-        return
+        return "no_window"
     try:
         bring_window_to_foreground(hwnd)
         pydirectinput.press(key)
+        return "ok"
     except Exception as exc:
         logging.warning(f"No se pudo enviar el comando '{action}' (tecla '{key}'): {exc}")
+        return str(exc)
 
 
 def http_base_url(ws_url: str) -> str:
@@ -437,13 +442,23 @@ async def receive_commands(ws, keybinds: dict):
     en cualquier momento, no como respuesta a nada que mandemos nosotros.
     Tambien atiende get/set de keybinds, para el modal de remapeo de la web -
     keybinds se muta in-place (mismo dict que usa send_game_command) para que
-    un cambio aplique de inmediato, sin reconectar."""
+    un cambio aplique de inmediato, sin reconectar.
+
+    Todo lo que hace I/O bloqueante (leer controls.sii del disco, mandar la
+    tecla) corre en un thread aparte (asyncio.to_thread) - si no, bloquea el
+    event loop entero mientras dura, lo que puede llegar a atrasar el
+    ping/pong del websocket lo suficiente como para que el servidor lo de
+    por muerto y corte la conexion (notado con controls.sii en una carpeta
+    de OneDrive, que puede tardar en resolver)."""
     async for message in ws:
         try:
             payload = json.loads(message)
             msg_type = payload.get("type")
             if msg_type == "command":
-                send_game_command(payload.get("action", ""), keybinds)
+                action = payload.get("action", "")
+                result = await asyncio.to_thread(send_game_command, action, keybinds)
+                if result != "ok":
+                    await ws.send(json.dumps({"type": "command_result", "action": action, "ok": False, "reason": result}))
             elif msg_type == "get_keybinds":
                 # Re-detecta en vivo del controls.sii en cada apertura del
                 # modal - lo detectado pisa lo guardado (el modal tiene que
@@ -451,13 +466,14 @@ async def receive_commands(ws, keybinds: dict):
                 # un valor viejo cacheado). Si el usuario despues guarda algo
                 # distinto a mano, eso se usa para los botones hasta que
                 # vuelva a abrir el modal - no se persigue mas alla de eso.
+                detected = await asyncio.to_thread(detect_keybinds_from_controls_sii)
                 live = dict(keybinds)
-                live.update({a: k for a, k in detect_keybinds_from_controls_sii().items() if k})
+                live.update({a: k for a, k in detected.items() if k})
                 await ws.send(json.dumps({"type": "keybinds", "data": live}))
             elif msg_type == "set_keybinds":
                 incoming = payload.get("data") or {}
                 keybinds.update({k: (v or None) for k, v in incoming.items() if k in DEFAULT_KEYBINDS})
-                save_keybinds(keybinds)
+                await asyncio.to_thread(save_keybinds, keybinds)
                 await ws.send(json.dumps({"type": "keybinds", "data": keybinds}))
         except Exception as exc:
             logging.warning(f"Comando invalido recibido ({exc}): {message!r}")

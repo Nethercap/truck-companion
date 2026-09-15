@@ -673,6 +673,9 @@ const TRANSLATIONS = {
     cmdLiftAxle: 'Lift axle',
     cmdWipers: 'Wipers',
     cmdRemap: 'Remap',
+    commandResultNoKey: "This command has no key assigned - set one in Remap",
+    commandResultNoWindow: "Couldn't find the game window (is it running?)",
+    commandResultError: 'Command failed: {reason}',
     commandNotConnectedToast: 'Not connected to the local client',
     keybindsModalTitle: 'Remap keys',
     keybindsModalExplain: "Keys must match your in-game control settings — if you remapped a control in the game, update it here too. Leave a field empty to leave that command unassigned.",
@@ -781,6 +784,9 @@ const TRANSLATIONS = {
     cmdLiftAxle: 'Eje elevable',
     cmdWipers: 'Limpiaparabrisas',
     cmdRemap: 'Remapear',
+    commandResultNoKey: 'Este comando no tiene tecla asignada - configurala en Remap',
+    commandResultNoWindow: 'No se encontró la ventana del juego (¿está abierto?)',
+    commandResultError: 'Falló el comando: {reason}',
     commandNotConnectedToast: 'No conectado al cliente local',
     keybindsModalTitle: 'Remapear teclas',
     keybindsModalExplain: 'Las teclas tienen que coincidir con tu configuración de controles del juego — si remapeaste algo en el juego, actualizalo acá también. Dejá un campo vacío para que ese comando quede sin asignar.',
@@ -2339,13 +2345,25 @@ document.getElementById('recenterBtn').addEventListener('click', () => {
 let reconnectTimer = null;
 const RECONNECT_DELAY_MS = 3000;
 
+// El proxy de Railway corta conexiones largas cada ~1 min sin avisos - el
+// cliente reconecta solo en un par de segundos, asi que mostrar el banner
+// rojo parpadeante en CADA corte es una falsa alarma constante. Se demora
+// RECONNECT_BANNER_DELAY_MS: si ya reconecto antes de eso, nunca se llega a
+// mostrar - solo aparece si el corte fue mas largo de lo normal.
+const RECONNECT_BANNER_DELAY_MS = 10000;
+let reconnectBannerDelayTimer = null;
+
 function showReconnectBanner(text) {
-  const banner = document.getElementById('reconnectBanner');
-  banner.textContent = text;
-  banner.style.display = 'block';
+  clearTimeout(reconnectBannerDelayTimer);
+  reconnectBannerDelayTimer = setTimeout(() => {
+    const banner = document.getElementById('reconnectBanner');
+    banner.textContent = text;
+    banner.style.display = 'block';
+  }, RECONNECT_BANNER_DELAY_MS);
 }
 
 function hideReconnectBanner() {
+  clearTimeout(reconnectBannerDelayTimer);
   document.getElementById('reconnectBanner').style.display = 'none';
 }
 
@@ -2482,6 +2500,18 @@ function handleKeybindsMessage(data) {
   });
 }
 
+// Solo avisa cuando algo salio MAL - a proposito no dice nada si el comando
+// funciono, para no repetir un toast en cada click (ver historial: eso ya
+// se probo y molestaba). El motivo viene del cliente local, que es el unico
+// que sabe realmente si encontro la ventana del juego, etc.
+const COMMAND_RESULT_REASON_KEY = { no_key: 'commandResultNoKey', no_window: 'commandResultNoWindow' };
+function handleCommandResult(data) {
+  if (data.ok) return;
+  const reasonKey = COMMAND_RESULT_REASON_KEY[data.reason];
+  const text = reasonKey ? t(reasonKey) : t('commandResultError').replace('{reason}', data.reason || '?');
+  showToast(text, 'danger', 4000);
+}
+
 // Resalta los botones cuyo estado (segun la telemetria real) esta activo -
 // no es un estado local del boton, siempre refleja lo que dice el juego.
 function updateCommandButtonStates(data) {
@@ -2522,6 +2552,7 @@ function connectWs(backend, code) {
     const data = JSON.parse(event.data);
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
+    if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria
     statusEl.textContent = data.paused ? t('connectedPaused') : t('connectedLive');
     statusEl.className = 'ok';
     updateHud(data);
