@@ -190,7 +190,7 @@
     padding: 0.5rem 0.7rem;
     box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
-  .layout.panelHidden #miniHud { display: flex; }
+  .layout.panelHidden #miniHud, .layout.commandsPageActive #miniHud { display: flex; }
   .miniHudTop { display: flex; align-items: center; gap: 0.6rem; }
   #miniHud .limitSign { width: 34px; height: 34px; font-size: 0.85rem; border-width: 3px; }
   #miniHud .speedBig { font-size: 1.4rem; }
@@ -2443,6 +2443,22 @@ function placeCommandsPanel() {
 placeCommandsPanel();
 commandsPortraitQuery.addEventListener('change', placeCommandsPanel);
 window.addEventListener('resize', placeCommandsPanel);
+
+// En vertical, mientras estas en la 2da pagina del swipe (la botonera) los
+// datos del panel (velocidad, etc.) no se ven - se trata como si el panel
+// estuviera oculto para que aparezca el mini-HUD flotante arriba del mapa,
+// igual que cuando lo cerras del todo con el boton ☰.
+const panelSwipeEl = document.getElementById('panelSwipe');
+function updateCommandsPageActive() {
+  if (!commandsPortraitQuery.matches) {
+    document.getElementById('layout').classList.remove('commandsPageActive');
+    return;
+  }
+  const onCommandsPage = panelSwipeEl.scrollLeft > panelSwipeEl.clientWidth / 2;
+  document.getElementById('layout').classList.toggle('commandsPageActive', onCommandsPage);
+}
+panelSwipeEl.addEventListener('scroll', updateCommandsPageActive);
+commandsPortraitQuery.addEventListener('change', updateCommandsPageActive);
 
 document.querySelectorAll('#commandsPanel .cmdBtn[data-action]').forEach(btn => {
   btn.addEventListener('click', () => {
