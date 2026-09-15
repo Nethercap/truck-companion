@@ -205,6 +205,11 @@
     margin-top: 1.2rem; width: 100%; padding: 0.5rem; border-radius: 6px; border: none;
     background: var(--accent); color: #fff; cursor: pointer; font-size: 0.9rem;
   }
+  .settingsLinkBtn {
+    width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #333;
+    background: #23262c; color: var(--text); cursor: pointer; font-size: 0.85rem;
+  }
+  .settingsLinkBtn:hover { border-color: #555; }
   .waypointModalButtons { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem; }
   .waypointModalButtons button {
     padding: 0.55rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem;
@@ -366,6 +371,10 @@
 
   .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
   .row:last-child { border-bottom: none; }
+  /* El atributo hidden pierde contra ".row { display: flex }" (misma
+     especificidad, gana el ultimo en el CSS de autor) - sin esto las filas
+     de waypoint quedaban ocupando espacio aunque estuvieran "ocultas". */
+  [hidden] { display: none !important; }
   .row .label { color: var(--muted); }
   .waypointSubRow { padding-top: 0; padding-left: 0.6rem; font-size: 0.74rem; opacity: 0.8; }
   .waypointClearBtn {
@@ -418,6 +427,9 @@
         <button class="colorSwatch" data-color="#3b9eff" style="background:#3b9eff" data-i18n-title="colorBlue" title="Blue"></button>
         <button class="colorSwatch" data-color="#4caf50" style="background:#4caf50" data-i18n-title="colorGreen" title="Green"></button>
       </div>
+
+      <p class="settingsSectionTitle" data-i18n="settingsCommandsTitle">Truck command buttons:</p>
+      <button id="settingsRemapBtn" class="settingsLinkBtn" data-i18n="cmdRemap">Remap keys</button>
 
       <button id="settingsCloseBtn" data-i18n="close">Close</button>
     </div>
@@ -557,10 +569,6 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21h6"/><path d="M8 17h8l-1-6a3 3 0 0 0-6 0Z"/><circle cx="12" cy="6" r="2"/><path d="M12 2v1M8.5 3.5l.6.9M15.5 3.5l-.6.9"/></svg>
           <span data-i18n="cmdBeacon">Beacon</span>
         </button>
-        <button class="cmdBtn" id="cmdDiffLock" data-action="toggle_differential_lock" data-i18n-title="cmdDiffLock" title="Differential lock">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2.4"/><circle cx="17" cy="17" r="2.4"/><path d="M9.2 17h5.6"/><path d="M12 12v-1"/><rect x="9.5" y="6" width="5" height="4.2" rx="1"/><path d="M10.3 6V4.6a1.7 1.7 0 0 1 3.4 0V6"/></svg>
-          <span data-i18n="cmdDiffLock">Diff lock</span>
-        </button>
         <button class="cmdBtn" id="cmdHandbrake" data-action="toggle_parking_brake" data-i18n-title="cmdHandbrake" title="Parking brake">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><text x="12" y="16.5" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">P</text></svg>
           <span data-i18n="cmdHandbrake">Handbrake</span>
@@ -596,10 +604,6 @@
         <button class="cmdBtn" id="cmdWipers" data-action="toggle_wipers" data-i18n-title="cmdWipers" title="Wipers">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18a9 9 0 0 1 18 0"/><path d="M7 18c0-4 2-7 3-9M17 18c0-5-3-8-5-10"/></svg>
           <span data-i18n="cmdWipers">Wipers</span>
-        </button>
-        <button class="cmdBtn" id="cmdRemap" data-i18n-title="cmdRemap" title="Remap keys">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V20a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H4a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H10a1.7 1.7 0 0 0 1-1.55V4a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V10a1.7 1.7 0 0 0 1.55 1H20a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg>
-          <span data-i18n="cmdRemap">Remap</span>
         </button>
       </div>
     </div>
@@ -637,6 +641,7 @@ const TRANSLATIONS = {
     settingsLiveTitle: 'Other players nearby:',
     settingsLiveShare: 'Share my position and see others (same game/map only)',
     settingsLiveHideOthers: "Hide other players' markers on the map",
+    settingsCommandsTitle: 'Truck command buttons:',
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
@@ -662,7 +667,6 @@ const TRANSLATIONS = {
     toggleCommands: 'Truck commands',
     cmdHazards: 'Hazards',
     cmdBeacon: 'Beacon',
-    cmdDiffLock: 'Diff lock',
     cmdHandbrake: 'Handbrake',
     cmdEngine: 'Engine',
     cmdTrailer: 'Trailer',
@@ -748,6 +752,7 @@ const TRANSLATIONS = {
     settingsLiveTitle: 'Otros jugadores cerca:',
     settingsLiveShare: 'Compartir mi posición y ver a otros (solo mismo juego/mapa)',
     settingsLiveHideOthers: 'Ocultar los marcadores de otros jugadores en el mapa',
+    settingsCommandsTitle: 'Botonera del camión:',
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
@@ -773,7 +778,6 @@ const TRANSLATIONS = {
     toggleCommands: 'Comandos del camión',
     cmdHazards: 'Balizas',
     cmdBeacon: 'Beacon',
-    cmdDiffLock: 'Diferencial',
     cmdHandbrake: 'Freno de mano',
     cmdEngine: 'Motor',
     cmdTrailer: 'Trailer',
@@ -2468,7 +2472,10 @@ function openKeybindsModal() {
   requestKeybinds();
 }
 
-document.getElementById('cmdRemap').addEventListener('click', openKeybindsModal);
+document.getElementById('settingsRemapBtn').addEventListener('click', () => {
+  document.getElementById('settingsModal').style.display = 'none';
+  openKeybindsModal();
+});
 
 document.getElementById('keybindsCloseBtn').addEventListener('click', () => {
   keybindsModalOpen = false;
@@ -2517,7 +2524,6 @@ function handleCommandResult(data) {
 function updateCommandButtonStates(data) {
   document.getElementById('cmdHazards').classList.toggle('active', !!data.lights?.hazards);
   document.getElementById('cmdBeacon').classList.toggle('active', !!data.lights?.beacon);
-  document.getElementById('cmdDiffLock').classList.toggle('active', !!data.differentialLock);
   document.getElementById('cmdHandbrake').classList.toggle('active', !!data.parkingBrake);
   document.getElementById('cmdEngine').classList.toggle('active', !!data.engineEnabled);
   document.getElementById('cmdLiftAxle').classList.toggle('active', !!data.liftAxle);

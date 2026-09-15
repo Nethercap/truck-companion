@@ -49,7 +49,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.2.1"
+CLIENT_VERSION = "1.2.2"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -240,13 +240,24 @@ def find_game_window():
     return None
 
 
+_VK_MENU = 0x12  # Alt
+_KEYEVENTF_KEYUP = 0x0002
+_SW_RESTORE = 9
+
+
 def bring_window_to_foreground(hwnd) -> None:
     # Windows por default no deja que un proceso en segundo plano le robe el
-    # foco a otro (para que no te pisen la ventana sin que lo pidas) - el
-    # truco estandar es "adjuntar" el hilo de input del proceso en foreground
-    # actual al nuestro momentaneamente, lo que habilita SetForegroundWindow.
-    # Best-effort: en casos raros Windows igual lo bloquea, no hay forma 100%
-    # confiable sin tocar politicas del sistema.
+    # foco a otro (para que no te pisen la ventana sin que lo pidas). Con el
+    # dashboard abierto en el celular esto rara vez hace falta (el foco en la
+    # PC ya suele estar en el juego, nada en el celular se lo puede robar),
+    # pero abriendo el dashboard en la MISMA PC (navegador con foco) es
+    # justo el caso donde Windows bloquea mas fuerte el robo de foco -
+    # AttachThreadInput solo no siempre alcanza ahi. Un tap de Alt (invisible,
+    # no llega a abrir ningun menu) resetea el lock de foreground justo antes
+    # de pedirlo - truco bien conocido en automatizacion de Windows, se
+    # combina con AttachThreadInput para maxima confiabilidad. Best-effort:
+    # en casos raros Windows igual lo bloquea, no hay forma 100% garantizada
+    # sin tocar politicas del sistema.
     foreground_hwnd = _user32.GetForegroundWindow()
     current_thread_id = _kernel32.GetCurrentThreadId()
     foreground_thread_id = _user32.GetWindowThreadProcessId(foreground_hwnd, None)
@@ -254,6 +265,10 @@ def bring_window_to_foreground(hwnd) -> None:
     _user32.AttachThreadInput(current_thread_id, foreground_thread_id, True)
     _user32.AttachThreadInput(current_thread_id, target_thread_id, True)
     try:
+        _user32.keybd_event(_VK_MENU, 0, 0, 0)
+        _user32.keybd_event(_VK_MENU, 0, _KEYEVENTF_KEYUP, 0)
+        if _user32.IsIconic(hwnd):
+            _user32.ShowWindow(hwnd, _SW_RESTORE)
         _user32.SetForegroundWindow(hwnd)
     finally:
         _user32.AttachThreadInput(current_thread_id, foreground_thread_id, False)
