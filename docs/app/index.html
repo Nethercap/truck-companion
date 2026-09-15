@@ -2410,6 +2410,18 @@ document.querySelectorAll('#commandsPanel .cmdBtn[data-action]').forEach(btn => 
 // los muestra editables, y al guardar se los manda de vuelta para que los
 // persista. La lista de acciones se arma sola a partir de los botones que ya
 // existen en la botonera, para no duplicar esa lista a mano.
+// Si la conexion se corta justo cuando el modal esta abierto (el cliente
+// reconecta solo cada RECONNECT_DELAY_SECONDS), el pedido de teclas se
+// pierde y el modal queda vacio para siempre - keybindsModalOpen +
+// requestKeybinds() permiten reintentar apenas vuelve a conectar, en vez de
+// depender de un solo pedido que puede caer justo en el peor momento.
+let keybindsModalOpen = false;
+
+function requestKeybinds() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'get_keybinds' }));
+}
+
 function openKeybindsModal() {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     showToast(t('commandNotConnectedToast'), 'danger');
@@ -2425,13 +2437,15 @@ function openKeybindsModal() {
     row.innerHTML = `<span>${label}</span><input type="text" maxlength="16" data-action="${action}" placeholder="${t('keybindsUnassigned')}">`;
     list.appendChild(row);
   });
+  keybindsModalOpen = true;
   document.getElementById('keybindsModal').style.display = 'flex';
-  ws.send(JSON.stringify({ type: 'get_keybinds' }));
+  requestKeybinds();
 }
 
 document.getElementById('cmdRemap').addEventListener('click', openKeybindsModal);
 
 document.getElementById('keybindsCloseBtn').addEventListener('click', () => {
+  keybindsModalOpen = false;
   document.getElementById('keybindsModal').style.display = 'none';
 });
 
@@ -2446,6 +2460,7 @@ document.getElementById('keybindsSaveBtn').addEventListener('click', () => {
   });
   ws.send(JSON.stringify({ type: 'set_keybinds', data }));
   showToast(t('keybindsSavedToast'), 'success');
+  keybindsModalOpen = false;
   document.getElementById('keybindsModal').style.display = 'none';
 });
 
@@ -2491,6 +2506,7 @@ function connectWs(backend, code) {
     statusEl.textContent = t('connectedWaiting');
     statusEl.className = 'ok';
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
+    if (keybindsModalOpen) requestKeybinds(); // el pedido anterior se pudo haber perdido en el corte
   };
   socket.onmessage = (event) => {
     hideReconnectBanner();
