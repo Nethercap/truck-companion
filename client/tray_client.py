@@ -234,6 +234,7 @@ async def run_client(backend_url: str, fixed_code: str | None):
     url = f"{backend_url}/ws/client/{code}"
     sdk_init_logged = False
     sdk_active_logged = False
+    keybinds = client_lib.load_keybinds()
     while True:
         try:
             truck_telemetry.init()
@@ -251,30 +252,38 @@ async def run_client(backend_url: str, fixed_code: str | None):
                 state.set_status(f"Code {code} - connected")
                 logging.info("Connected to backend")
                 last_game = None
-                while True:
-                    raw = truck_telemetry.get_data()
-                    # sdkActive en False significa que el SDK todavia no
-                    # sincronizo el primer frame real del juego (ver
-                    # comentario equivalente en client.py) - por ejemplo
-                    # mientras estas en el menu de elegir el proximo trabajo,
-                    # sin camion todavia spawneado.
-                    if raw.get("sdkActive"):
-                        if not sdk_active_logged:
-                            logging.info("sdkActive=True, sending telemetry")
-                            sdk_active_logged = True
-                        client_lib.update_job_snapshot(raw)
-                        payload = client_lib.build_payload(raw)
-                        client_lib.attach_job_snapshot_if_finished(payload)
-                        game = payload.get("game")
-                        if game != last_game:
-                            last_game = game
-                            game_label = GAME_LABELS.get(game, "game detected")
-                            state.set_status(f"Code {code} - playing {game_label}")
-                        await ws.send(json.dumps(payload))
-                    else:
-                        sdk_active_logged = False
-                        state.set_status(f"Code {code} - connected, waiting for you to be in the truck...")
-                    await asyncio.sleep(client_lib.SEND_INTERVAL_SECONDS)
+                # Escucha en paralelo los comandos de la botonera (on/off
+                # balizas, etc.) y get/set de keybinds del modal de remapeo -
+                # sin esto, la conexion solo manda telemetria y nunca lee lo
+                # que la web le mande de vuelta por el mismo socket.
+                recv_task = asyncio.create_task(client_lib.receive_commands(ws, keybinds))
+                try:
+                    while True:
+                        raw = truck_telemetry.get_data()
+                        # sdkActive en False significa que el SDK todavia no
+                        # sincronizo el primer frame real del juego (ver
+                        # comentario equivalente en client.py) - por ejemplo
+                        # mientras estas en el menu de elegir el proximo trabajo,
+                        # sin camion todavia spawneado.
+                        if raw.get("sdkActive"):
+                            if not sdk_active_logged:
+                                logging.info("sdkActive=True, sending telemetry")
+                                sdk_active_logged = True
+                            client_lib.update_job_snapshot(raw)
+                            payload = client_lib.build_payload(raw)
+                            client_lib.attach_job_snapshot_if_finished(payload)
+                            game = payload.get("game")
+                            if game != last_game:
+                                last_game = game
+                                game_label = GAME_LABELS.get(game, "game detected")
+                                state.set_status(f"Code {code} - playing {game_label}")
+                            await ws.send(json.dumps(payload))
+                        else:
+                            sdk_active_logged = False
+                            state.set_status(f"Code {code} - connected, waiting for you to be in the truck...")
+                        await asyncio.sleep(client_lib.SEND_INTERVAL_SECONDS)
+                finally:
+                    recv_task.cancel()
         except (websockets.ConnectionClosed, OSError) as exc:
             logging.warning("Backend connection lost: %s", exc)
             state.set_status(f"Code {code} - reconnecting...")

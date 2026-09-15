@@ -47,7 +47,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.1.0"
+CLIENT_VERSION = "1.1.1"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Los
 # valores son los binds por defecto de ETS2/ATS - si el usuario los remapeo en
