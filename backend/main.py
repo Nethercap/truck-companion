@@ -250,9 +250,70 @@ class Session:
         # backend sigue viva mientras dure el pairing, asi que ya tiene ticks
         # validos acumulados de antes del reinicio.
         self.last_job_snapshot = {"citySrc": None, "cityDst": None, "truckBrand": None, "truckName": None, "cargo": None}
+        # Posiciones en vivo de "otros jugadores" (opt-in): map_variant es el
+        # mapa+mod que el usuario tiene elegido en la web (ats, ats_promods,
+        # etc.) - no viene del SDK, el juego no sabe de mods, lo manda la web.
+        # share_position en False (default) significa que esta sesion no
+        # aparece para nadie ni ve a nadie - reciprocidad simple, sin
+        # cuentas ni consentimiento granular por usuario.
+        self.map_variant: Optional[str] = None
+        self.share_position = False
+        self.last_position: Optional[dict] = None  # {"x":, "z":, "game":, "ts":}
 
 
 sessions: dict[str, Session] = {}
+
+# Cuanto puede tener una posicion compartida antes de dejar de mostrarse a
+# los demas (cliente desconectado/cerrado sin que la sesion expire todavia).
+LIVE_POSITION_STALE_SECONDS = 15
+LIVE_POSITIONS_BROADCAST_INTERVAL_SECONDS = 2
+
+
+async def broadcast_live_positions_loop():
+    while True:
+        await asyncio.sleep(LIVE_POSITIONS_BROADCAST_INTERVAL_SECONDS)
+        try:
+            broadcast_live_positions()
+        except Exception:
+            logging.exception("Error en broadcast_live_positions_loop")
+
+
+def broadcast_live_positions():
+    now = time.time()
+    sharing = [
+        s for s in sessions.values()
+        if s.share_position and s.map_variant and s.last_position
+        and now - s.last_position["ts"] <= LIVE_POSITION_STALE_SECONDS
+    ]
+    if not sharing:
+        return
+    by_variant: dict[str, list[Session]] = defaultdict(list)
+    for s in sharing:
+        by_variant[s.map_variant].append(s)
+
+    for session in sharing:
+        if not session.viewer_ws_list:
+            continue
+        peers = [
+            {"id": s.code, "x": s.last_position["x"], "z": s.last_position["z"]}
+            for s in by_variant[session.map_variant]
+            if s.code != session.code
+        ]
+        message = json.dumps({"type": "live_players", "players": peers})
+        for viewer in list(session.viewer_ws_list):
+            asyncio.create_task(_safe_send(viewer, message))
+
+
+async def _safe_send(ws: WebSocket, message: str):
+    try:
+        await ws.send_text(message)
+    except Exception:
+        pass
+
+
+@app.on_event("startup")
+async def start_background_tasks():
+    asyncio.create_task(broadcast_live_positions_loop())
 
 
 def generate_code() -> str:
@@ -392,6 +453,12 @@ async def ws_client(websocket: WebSocket, code: str):
                 event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
                 now = time.time()
+                # Se guarda siempre (barato, solo en memoria) - el filtro de
+                # privacidad pasa por share_position/map_variant a la hora de
+                # armar el broadcast, no aca.
+                pos = payload.get("position") or {}
+                if pos.get("x") is not None and pos.get("z") is not None:
+                    session.last_position = {"x": pos["x"], "z": pos["z"], "ts": now}
                 # Ver comentario en Session.last_job_snapshot - se actualiza en
                 # cada tick que venga con datos validos, sin importar si el
                 # cliente se reinicio en el medio.
@@ -462,8 +529,34 @@ async def ws_viewer(websocket: WebSocket, code: str):
     session.viewer_ws_list.append(websocket)
     try:
         while True:
-            # No esperamos mensajes del viewer, solo mantenemos la conexion viva.
-            await websocket.receive_text()
+            # Normalmente no esperamos nada del viewer (solo mantiene viva la
+            # conexion), salvo los mensajes de la botonera del /app: comandos
+            # (on/off balizas, motor, etc.) y get/set de keybinds para el
+            # modal de remapeo - se reenvian tal cual al cliente local, que es
+            # el que realmente simula la tecla / guarda keybinds.json. Si el
+            # cliente no esta conectado en este momento, se descarta. La
+            # respuesta del cliente (tipo "keybinds") no necesita relay
+            # aparte: ya le llega a todos los viewers por el loop de
+            # ws_client de mas abajo, que reenvia cualquier mensaje del
+            # cliente tal cual.
+            data = await websocket.receive_text()
+            try:
+                payload = json.loads(data)
+                msg_type = payload.get("type")
+                if msg_type in ("command", "get_keybinds", "set_keybinds"):
+                    if session.client_ws is not None:
+                        await session.client_ws.send_text(data)
+                elif msg_type == "set_live_share":
+                    # Opt-in de "ver/mostrar otros jugadores" - reciprocidad
+                    # simple: si no compartis tu posicion, tampoco ves la de
+                    # nadie (se resuelve solo via el filtro en
+                    # broadcast_live_positions, no hace falta nada mas aca).
+                    session.share_position = bool(payload.get("enabled"))
+                    session.map_variant = payload.get("mapVariant") if session.share_position else None
+                    if not session.share_position:
+                        session.last_position = None
+            except Exception:
+                pass
     except WebSocketDisconnect:
         pass
     finally:

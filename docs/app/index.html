@@ -77,7 +77,13 @@
     overflow: hidden;
     border-radius: 12px;
     display: flex;
+    flex-direction: column;
   }
+
+  /* Fila mapa+panel de info (lo que antes era ".layout" en horizontal) -
+     separada de .layout para poder meter el commandsDrawer como una franja
+     propia debajo, sin que quede como una tercera columna al costado. */
+  .rowWrap { flex: 1; min-height: 0; overflow: hidden; display: flex; }
 
   #mapPanel { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; padding: 0; border-radius: 12px; }
   #mapCanvas { width: 100%; height: 100%; background: #2b2f36; }
@@ -111,6 +117,7 @@
   }
   .updateBanner button:hover { color: var(--text); }
   .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
+  .otherPlayerMarker { font-size: 17px; opacity: 0.85; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
 
   /* Flecha de heading del camion: el mapa se queda siempre norte-arriba (las
      etiquetas de ciudades vienen horneadas en los tiles, rotar el mapa las
@@ -141,6 +148,7 @@
   #waypointBtn { top: 13.8rem; left: 0.6rem; }
   #waypointBtn.active { background: var(--accent); color: #fff; }
   #waypointBtn.set { background: #ffb020; color: #111; }
+  #commandsToggleBtn { top: 17.1rem; left: 0.6rem; }
 
   /* Panel de indicaciones del modo navegacion - giro/distancia genericos
      calculados de la curvatura de la ruta ya calculada, sin nombres de
@@ -205,6 +213,13 @@
   .waypointModalButtons button.secondary { background: var(--panel-alt, #23262c); color: var(--text); border: 1px solid #333; }
   .waypointModalExplain { margin-top: 1rem; font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
 
+  #keybindsList { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem; max-height: 50vh; overflow-y: auto; }
+  .keybindRow { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; font-size: 0.85rem; }
+  .keybindRow input {
+    width: 64px; text-align: center; background: #23262c; border: 1px solid #333;
+    color: var(--text); border-radius: 6px; padding: 0.3rem 0.4rem; font-size: 0.85rem;
+  }
+
   /* Panel de info: por default (desktop y horizontal) es una columna fija de
      300px pegada al borde derecho, alto completo. En vertical se convierte en
      una fila fija abajo. En ambos casos, panelHidden le lleva el ancho/alto a
@@ -227,11 +242,87 @@
   }
   .layout.panelHidden #infoPanel { flex-basis: 0; padding-left: 0; padding-right: 0; }
 
+  /* Botonera de comandos (on/off balizas, motor, etc.) - un solo bloque de
+     markup (#commandsPanel) que JS reubica segun el layout: en horizontal
+     vive en #commandsDrawer (franja fija debajo del mapa+panel, colapsable),
+     en vertical se mueve dentro del swipe de #infoPanel como 2da pagina (ver
+     placeCommandsPanel() en el script). */
+  .cmdGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 0.6rem;
+    padding: 0.6rem;
+  }
+  .cmdBtn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.3rem; min-height: 64px; padding: 0.5rem 0.3rem;
+    background: #23262c; border: 1px solid #333; border-radius: 10px;
+    color: var(--text); cursor: pointer; font-size: 0.66rem; text-align: center;
+    line-height: 1.15;
+  }
+  .cmdBtn svg { width: 24px; height: 24px; flex-shrink: 0; }
+  .cmdBtn:hover { border-color: #555; }
+  .cmdBtn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  #commandsDrawer {
+    flex: 0 0 auto;
+    position: relative;
+    background: var(--panel);
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    transition: flex-basis 0.25s ease;
+  }
+  /* Colapsado no se va del todo a 0: deja una tira fina con un "pico"
+     traslucido (como el handle de un bottom sheet) que avisa que se puede
+     extender desde abajo, en vez de desaparecer sin rastro. */
+  .layout.commandsHidden #commandsDrawer { flex-basis: 14px; }
+  .layout.commandsHidden #commandsDrawer .cmdGrid { display: none; }
+  #commandsDrawer .cmdGrid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+  .commandsPeek {
+    display: none; position: absolute; inset: 0;
+    align-items: center; justify-content: center; cursor: pointer;
+  }
+  .layout.commandsHidden .commandsPeek { display: flex; }
+  .commandsPeekTab { width: 48px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.35); }
+
+  /* En vertical, el drawer no se usa (la botonera se muda al swipe de abajo)
+     y el boton de mostrar/ocultar tampoco tiene sentido ahi. */
+  @media (max-width: 900px) and (orientation: portrait) {
+    #commandsDrawer { display: none; }
+    #commandsToggleBtn { display: none; }
+  }
+
+  /* Swipe de 2 paginas dentro del panel de info, solo en vertical: pagina 1
+     los datos de siempre, pagina 2 la botonera. En horizontal .panelSwipe se
+     vuelve "transparente" al layout (display:contents) y todo se ve como
+     antes, sin scroll horizontal ni paginas. */
+  .panelSwipe { display: contents; }
+  .panelPage { height: 100%; }
+
+  /* Flechita en el borde del panel de info que insinua que se puede swipear
+     a la 2da pagina (la botonera) - solo tiene sentido en vertical. */
+  .swipeHint {
+    display: none; position: absolute; right: 4px; top: 50%;
+    transform: translateY(-50%); color: var(--muted); font-size: 1.3rem;
+    opacity: 0.55; pointer-events: none; animation: swipeHintNudge 1.6s ease-in-out infinite;
+  }
+  @keyframes swipeHintNudge {
+    0%, 100% { transform: translateY(-50%) translateX(0); opacity: 0.55; }
+    50% { transform: translateY(-50%) translateX(-5px); opacity: 0.25; }
+  }
+
   @media (max-width: 900px) and (orientation: portrait) {
     .layout { flex-direction: column; }
+    .rowWrap { flex-direction: column; }
     #mapPanel { flex: 1 1 auto; min-height: 0; }
     #infoPanel { flex: 0 0 34vh; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
     .layout.panelHidden #infoPanel { flex-basis: 0; padding-top: 0; padding-bottom: 0; }
+    .panelSwipe {
+      display: flex; height: 100%; overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory; scroll-behavior: smooth;
+    }
+    .panelPage { flex: 0 0 100%; scroll-snap-align: start; overflow-y: auto; }
+    .swipeHint { display: block; }
   }
 
   @media (max-height: 500px) and (orientation: landscape) {
@@ -312,6 +403,10 @@
       <label class="settingsRow"><input type="checkbox" id="setMiniCruise" /> <span data-i18n="cruiseControl">Cruise control</span></label>
       <label class="settingsRow"><input type="checkbox" id="setMiniGps" /> <span data-i18n="settingsGpsDirections">GPS directions</span></label>
 
+      <p class="settingsSectionTitle" data-i18n="settingsLiveTitle">Other players nearby:</p>
+      <label class="settingsRow"><input type="checkbox" id="setLiveShare" /> <span data-i18n="settingsLiveShare">Share my position and see others (same game/map only)</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setLiveHideOthers" /> <span data-i18n="settingsLiveHideOthers">Hide other players' markers on the map</span></label>
+
       <p class="settingsSectionTitle" data-i18n="settingsRouteColorTitle">Route line color:</p>
       <div class="colorOptions">
         <button class="colorSwatch" data-color="#a30000" style="background:#a30000" data-i18n-title="colorRed" title="Red"></button>
@@ -360,6 +455,7 @@
   </div>
 
   <div class="layout" id="layout">
+   <div class="rowWrap">
     <div id="mapPanel">
       <div id="mapCanvas"></div>
       <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
@@ -369,6 +465,7 @@
       <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
       <button id="navToggleBtn" class="mapBtn" data-i18n-title="toggleNavMode" title="Navigation mode"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.7 2 L2.5 22 L6 22 L11 4.7 Z"/><path d="M15.3 2 L21.5 22 L18 22 L13 4.7 Z"/><rect x="10.9" y="3" width="1.7" height="3"/><rect x="11" y="8.2" width="1.7" height="3"/><rect x="11.1" y="13.4" width="1.7" height="3"/><rect x="11.2" y="18.6" width="1.7" height="2.5"/></svg></button>
       <button id="waypointBtn" class="mapBtn" data-i18n-title="toggleWaypointMode" title="Add waypoint"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 2v20h2v-7h9l-1.5-3.5L17 8H8V2H6z"/></svg></button>
+      <button id="commandsToggleBtn" class="mapBtn" data-i18n-title="toggleCommands" title="Truck commands"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 12h4M9 10v4"/><circle cx="16" cy="10.5" r="1"/><circle cx="18" cy="12.5" r="1"/><circle cx="16" cy="14.5" r="1"/></svg></button>
 
       <div id="navPanel" class="navPanel" style="display:none;"></div>
 
@@ -390,6 +487,9 @@
     </div>
 
     <div id="infoPanel">
+     <div class="swipeHint" id="swipeHint">›</div>
+     <div class="panelSwipe" id="panelSwipe">
+      <div class="panelPage" id="infoPageContent">
       <div class="speedRow">
         <div class="limitSign" id="limitSign">--</div>
         <div>
@@ -432,6 +532,79 @@
 
       <div class="statLine" id="wearLine">-</div>
       <div class="row" id="mechanicalAlertsRow" style="display:none"><span class="label" data-i18n="alerts">Alerts</span><span id="mechanicalAlerts" style="color:var(--danger)">-</span></div>
+      </div>
+      <div class="panelPage" id="commandsSlotPortrait"></div>
+     </div>
+    </div>
+   </div>
+
+    <div id="commandsDrawer">
+      <div class="commandsPeek" id="commandsPeek"><div class="commandsPeekTab"></div></div>
+    </div>
+
+    <div id="commandsPanel" style="display:none;">
+      <div class="cmdGrid">
+        <button class="cmdBtn" id="cmdHazards" data-action="toggle_hazards" data-i18n-title="cmdHazards" title="Hazard lights">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 L2 20 h20 Z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>
+          <span data-i18n="cmdHazards">Hazards</span>
+        </button>
+        <button class="cmdBtn" id="cmdBeacon" data-action="toggle_beacon" data-i18n-title="cmdBeacon" title="Beacon light">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21h6"/><path d="M8 17h8l-1-6a3 3 0 0 0-6 0Z"/><circle cx="12" cy="6" r="2"/><path d="M12 2v1M8.5 3.5l.6.9M15.5 3.5l-.6.9"/></svg>
+          <span data-i18n="cmdBeacon">Beacon</span>
+        </button>
+        <button class="cmdBtn" id="cmdDiffLock" data-action="toggle_differential_lock" data-i18n-title="cmdDiffLock" title="Differential lock">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2.4"/><circle cx="17" cy="17" r="2.4"/><path d="M9.2 17h5.6"/><path d="M12 12v-1"/><rect x="9.5" y="6" width="5" height="4.2" rx="1"/><path d="M10.3 6V4.6a1.7 1.7 0 0 1 3.4 0V6"/></svg>
+          <span data-i18n="cmdDiffLock">Diff lock</span>
+        </button>
+        <button class="cmdBtn" id="cmdHandbrake" data-action="toggle_parking_brake" data-i18n-title="cmdHandbrake" title="Parking brake">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 8v8M9.5 8h2.3a2 2 0 0 1 0 4H9.5M11.8 12L14.5 16"/></svg>
+          <span data-i18n="cmdHandbrake">Handbrake</span>
+        </button>
+        <button class="cmdBtn" id="cmdEngine" data-action="toggle_engine" data-i18n-title="cmdEngine" title="Engine">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v7"/><circle cx="12" cy="14" r="7"/></svg>
+          <span data-i18n="cmdEngine">Engine</span>
+        </button>
+        <button class="cmdBtn" id="cmdTrailer" data-action="toggle_trailer" data-i18n-title="cmdTrailer" title="Trailer attach/detach">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="8" width="12" height="8" rx="1"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/><path d="M9 11H5a2 2 0 0 0-2 2v1"/></svg>
+          <span data-i18n="cmdTrailer">Trailer</span>
+        </button>
+        <button class="cmdBtn" id="cmdCamera" data-action="cycle_camera" data-i18n-title="cmdCamera" title="Switch camera">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="14" height="11" rx="2"/><path d="M16 10.5l5-3v9l-5-3Z"/></svg>
+          <span data-i18n="cmdCamera">Camera</span>
+        </button>
+        <button class="cmdBtn" id="cmdCruise" data-action="toggle_cruise_control" data-i18n-title="cmdCruise" title="Cruise control">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 12 L16 8"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+          <span data-i18n="cmdCruise">Cruise</span>
+        </button>
+        <button class="cmdBtn" id="cmdLights" data-action="cycle_lights" data-i18n-title="cmdLights" title="Cycle lights">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8a5 5 0 0 1 5-5h1a5 5 0 0 1 5 5v3l-11 4Z"/><path d="M15 9l6-2M15 12l6 1M15 6l5-4"/></svg>
+          <span data-i18n="cmdLights">Lights</span>
+        </button>
+        <button class="cmdBtn" id="cmdInfotainment" data-action="toggle_infotainment" data-i18n-title="cmdInfotainment" title="Infotainment screen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8M9 18v3M15 18v3"/><circle cx="7" cy="11" r="1" fill="currentColor" stroke="none"/><path d="M11 9h7M11 12h7M11 15h4"/></svg>
+          <span data-i18n="cmdInfotainment">Infotainment</span>
+        </button>
+        <button class="cmdBtn" id="cmdLiftAxle" data-action="toggle_lift_axle" data-i18n-title="cmdLiftAxle" title="Lift axle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v7M9 6l3-4 3 4"/><circle cx="7" cy="18" r="2.6"/><circle cx="17" cy="18" r="2.6"/><path d="M9.5 18h5"/></svg>
+          <span data-i18n="cmdLiftAxle">Lift axle</span>
+        </button>
+        <button class="cmdBtn" id="cmdRemap" data-i18n-title="cmdRemap" title="Remap keys">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V20a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H4a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H10a1.7 1.7 0 0 0 1-1.55V4a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V10a1.7 1.7 0 0 0 1.55 1H20a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg>
+          <span data-i18n="cmdRemap">Remap</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="keybindsModal" class="settingsOverlay" style="display:none;">
+    <div class="settingsPanel">
+      <h3 data-i18n="keybindsModalTitle">Remap keys</h3>
+      <p class="waypointModalExplain" data-i18n="keybindsModalExplain">Keys must match your in-game control settings. Leave a field empty to leave that command unassigned.</p>
+      <div id="keybindsList"></div>
+      <div class="waypointModalButtons">
+        <button id="keybindsSaveBtn" data-i18n="save">Save</button>
+        <button id="keybindsCloseBtn" class="secondary" data-i18n="close">Close</button>
+      </div>
     </div>
   </div>
 
@@ -452,6 +625,9 @@ const TRANSLATIONS = {
     settings: 'Settings',
     settingsTitle: 'Settings',
     settingsMiniHudTitle: 'Show in mini-HUD (when info panel is hidden):',
+    settingsLiveTitle: 'Other players nearby:',
+    settingsLiveShare: 'Share my position and see others (same game/map only)',
+    settingsLiveHideOthers: "Hide other players' markers on the map",
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
@@ -474,6 +650,27 @@ const TRANSLATIONS = {
     toggleFullscreen: 'Fullscreen',
     toggleNavMode: 'Navigation mode (heading-up, dynamic zoom)',
     toggleWaypointMode: 'Add waypoint (click a point on the map)',
+    toggleCommands: 'Truck commands',
+    cmdHazards: 'Hazards',
+    cmdBeacon: 'Beacon',
+    cmdDiffLock: 'Diff lock',
+    cmdHandbrake: 'Handbrake',
+    cmdEngine: 'Engine',
+    cmdTrailer: 'Trailer',
+    cmdCamera: 'Camera',
+    cmdCruise: 'Cruise',
+    cmdLights: 'Lights',
+    cmdInfotainment: 'Infotainment',
+    cmdLiftAxle: 'Lift axle',
+    cmdRemap: 'Remap',
+    commandSentToast: 'Command sent',
+    commandNotConnectedToast: 'Not connected to the local client',
+    keybindsModalTitle: 'Remap keys',
+    keybindsModalExplain: "Keys must match your in-game control settings — if you remapped a control in the game, update it here too. Leave a field empty to leave that command unassigned.",
+    keybindsUnassigned: 'unassigned',
+    keybindsSavedToast: 'Keybinds saved',
+    keybindsLoadFailedToast: "Couldn't load current keybinds",
+    save: 'Save',
     waypointModalTitle: 'Waypoint added',
     waypointModalQuestion: "Did you also set this point as a waypoint in the game's own GPS/map?",
     waypointModalYes: 'Yes, I set it in-game too',
@@ -536,6 +733,9 @@ const TRANSLATIONS = {
     settings: 'Configuración',
     settingsTitle: 'Configuración',
     settingsMiniHudTitle: 'Mostrar en el mini-HUD (con el panel de info oculto):',
+    settingsLiveTitle: 'Otros jugadores cerca:',
+    settingsLiveShare: 'Compartir mi posición y ver a otros (solo mismo juego/mapa)',
+    settingsLiveHideOthers: 'Ocultar los marcadores de otros jugadores en el mapa',
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
@@ -558,6 +758,27 @@ const TRANSLATIONS = {
     toggleFullscreen: 'Pantalla completa',
     toggleNavMode: 'Modo navegación (rota con el rumbo, zoom dinámico)',
     toggleWaypointMode: 'Agregar waypoint (clic en un punto del mapa)',
+    toggleCommands: 'Comandos del camión',
+    cmdHazards: 'Balizas',
+    cmdBeacon: 'Beacon',
+    cmdDiffLock: 'Diferencial',
+    cmdHandbrake: 'Freno de mano',
+    cmdEngine: 'Motor',
+    cmdTrailer: 'Trailer',
+    cmdCamera: 'Cámara',
+    cmdCruise: 'Crucero',
+    cmdLights: 'Luces',
+    cmdInfotainment: 'Infotainment',
+    cmdLiftAxle: 'Eje elevable',
+    cmdRemap: 'Remapear',
+    commandSentToast: 'Comando enviado',
+    commandNotConnectedToast: 'No conectado al cliente local',
+    keybindsModalTitle: 'Remapear teclas',
+    keybindsModalExplain: 'Las teclas tienen que coincidir con tu configuración de controles del juego — si remapeaste algo en el juego, actualizalo acá también. Dejá un campo vacío para que ese comando quede sin asignar.',
+    keybindsUnassigned: 'sin asignar',
+    keybindsSavedToast: 'Teclas guardadas',
+    keybindsLoadFailedToast: 'No se pudieron cargar las teclas actuales',
+    save: 'Guardar',
     waypointModalTitle: 'Waypoint agregado',
     waypointModalQuestion: '¿También marcaste este punto como waypoint en el GPS/mapa del juego?',
     waypointModalYes: 'Sí, también lo marqué en el juego',
@@ -664,7 +885,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -681,6 +902,14 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // ('none'|'c2c'|'promods_canada') en vez de dos checkboxes independientes.
 let atsMod = _savedSettings.atsMod || 'none';
 let hasProMods = _savedSettings.hasProMods || false;
+// Opt-in de "jugadores en vivo": reciprocidad simple (no compartis -> no ves
+// a nadie), decidido asi porque no hay cuentas ni consentimiento granular.
+// hideOtherPlayers es aparte y solo local (no le dice nada al backend) -
+// podes seguir compartiendo tu posicion pero no dibujar la de los demas.
+let liveShareEnabled = _savedSettings.liveShareEnabled || false;
+let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
+const livePlayerMarkers = new Map(); // id de sesion -> maplibregl.Marker
+let lastSentMapVariant = null;
 
 function initSettingsUi() {
   document.getElementById('setMiniFuelPct').checked = miniHudSettings.fuelPct;
@@ -689,6 +918,8 @@ function initSettingsUi() {
   document.getElementById('setMiniDistance').checked = miniHudSettings.distance;
   document.getElementById('setMiniCruise').checked = miniHudSettings.cruise;
   document.getElementById('setMiniGps').checked = miniHudSettings.gps;
+  document.getElementById('setLiveShare').checked = liveShareEnabled;
+  document.getElementById('setLiveHideOthers').checked = hideOtherPlayers;
   document.querySelectorAll('.colorSwatch').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.color === routeColor);
   });
@@ -716,6 +947,55 @@ document.getElementById('setProMods').addEventListener('change', (e) => {
   saveSettings();
   currentGame = null;
 });
+
+// Le manda al backend si esta sesion comparte su posicion, y con que
+// variante de mapa (ats, ats_promods, etc.) - el backend usa esto para
+// agrupar "jugadores del mismo juego/mod" y para la reciprocidad (si
+// enabled=false, esta sesion tampoco va a recibir la posicion de nadie).
+function sendLiveShareState() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const mapVariant = liveShareEnabled ? resolveEffectiveGame(lastData?.game) : null;
+  lastSentMapVariant = mapVariant;
+  ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant }));
+}
+
+document.getElementById('setLiveShare').addEventListener('change', (e) => {
+  liveShareEnabled = e.target.checked;
+  saveSettings();
+  if (!liveShareEnabled) updateLivePlayers([]); // saca los marcadores ajenos ya dibujados
+  sendLiveShareState();
+});
+document.getElementById('setLiveHideOthers').addEventListener('change', (e) => {
+  hideOtherPlayers = e.target.checked;
+  saveSettings();
+  if (hideOtherPlayers) updateLivePlayers([]);
+});
+
+// Dibuja los marcadores de "otros jugadores" recibidos del backend - id de
+// sesion (efimero, cambia si se reconecta) en vez de nada personal. Reusa
+// el patron de Marker ya establecido para waypoint/destino.
+function updateLivePlayers(players) {
+  const seen = new Set();
+  if (map && toLngLat && !hideOtherPlayers) {
+    for (const p of players) {
+      seen.add(p.id);
+      const lngLat = toLngLat(p.x, p.z);
+      let marker = livePlayerMarkers.get(p.id);
+      if (!marker) {
+        const el = document.createElement('div');
+        el.className = 'otherPlayerMarker';
+        el.textContent = '🚛';
+        marker = new maplibregl.Marker({ element: el }).setLngLat(lngLat).addTo(map);
+        livePlayerMarkers.set(p.id, marker);
+      } else {
+        marker.setLngLat(lngLat);
+      }
+    }
+  }
+  for (const [id, marker] of livePlayerMarkers) {
+    if (!seen.has(id)) { marker.remove(); livePlayerMarkers.delete(id); }
+  }
+}
 
 const MINI_HUD_CHECKBOXES = {
   setMiniFuelPct: 'fuelPct',
@@ -1776,6 +2056,7 @@ function computeRealEtaSeconds(data) {
 
 function updateHud(data) {
   lastData = data;
+  updateCommandButtonStates(data);
 
   // El mini-HUD (top-right del mapa, visible solo con el panel oculto)
   // duplica velocidad/limite/crucero, asi que se actualizan en pares.
@@ -1967,6 +2248,28 @@ document.getElementById('panelToggleBtn').addEventListener('click', () => {
   }, 260);
 });
 
+function toggleCommandsDrawer() {
+  document.getElementById('layout').classList.toggle('commandsHidden');
+  setTimeout(() => {
+    if (!map) return;
+    map.resize();
+    if (truckMarker) {
+      map.jumpTo({ center: truckMarker.getLngLat() });
+    }
+  }, 260);
+}
+document.getElementById('commandsToggleBtn').addEventListener('click', toggleCommandsDrawer);
+// El "pico" traslucido que asoma cuando el drawer esta colapsado tambien
+// funciona como boton - es mas facil de tocar que buscar el boton redondo.
+document.getElementById('commandsPeek').addEventListener('click', toggleCommandsDrawer);
+
+// La flechita de "hay mas swipeando" en el panel de info (vertical) se
+// esconde apenas el usuario ya descubrio que puede swipear, para no
+// insistir con la animacion todo el rato.
+document.getElementById('panelSwipe').addEventListener('scroll', () => {
+  document.getElementById('swipeHint').style.display = 'none';
+}, { once: true });
+
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
   document.body.classList.toggle('fsMode');
   // La Fullscreen API real (esconde tambien la barra de URL en el celular)
@@ -2073,6 +2376,106 @@ function checkUpdateBanner(connectedVersion) {
   banner.style.display = 'flex';
 }
 
+// Botonera de comandos: un solo bloque de markup (#commandsPanel) que se
+// reubica segun el layout - en horizontal vive en el drawer fijo debajo del
+// mapa, en vertical se muda dentro del swipe del panel de info como 2da
+// pagina (ver .panelSwipe/.panelPage en el CSS). Mover el nodo con
+// appendChild conserva los listeners ya puestos, no hace falta re-bindear.
+const commandsPortraitQuery = window.matchMedia('(max-width: 900px) and (orientation: portrait)');
+function placeCommandsPanel() {
+  const commandsPanel = document.getElementById('commandsPanel');
+  const target = commandsPortraitQuery.matches
+    ? document.getElementById('commandsSlotPortrait')
+    : document.getElementById('commandsDrawer');
+  if (commandsPanel.parentElement !== target) target.appendChild(commandsPanel);
+  commandsPanel.style.display = 'block';
+}
+placeCommandsPanel();
+commandsPortraitQuery.addEventListener('change', placeCommandsPanel);
+window.addEventListener('resize', placeCommandsPanel);
+
+document.querySelectorAll('#commandsPanel .cmdBtn[data-action]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      showToast(t('commandNotConnectedToast'), 'danger');
+      return;
+    }
+    ws.send(JSON.stringify({ type: 'command', action: btn.dataset.action }));
+    showToast(t('commandSentToast'), 'success', 1500);
+  });
+});
+
+// Modal de remapeo de teclas: pide los binds actuales al cliente local (no
+// se guardan en la web, viven solo en keybinds.json del lado del cliente),
+// los muestra editables, y al guardar se los manda de vuelta para que los
+// persista. La lista de acciones se arma sola a partir de los botones que ya
+// existen en la botonera, para no duplicar esa lista a mano.
+function openKeybindsModal() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast(t('commandNotConnectedToast'), 'danger');
+    return;
+  }
+  const list = document.getElementById('keybindsList');
+  list.innerHTML = '';
+  document.querySelectorAll('#commandsPanel .cmdBtn[data-action]').forEach(btn => {
+    const action = btn.dataset.action;
+    const label = btn.querySelector('span').textContent;
+    const row = document.createElement('div');
+    row.className = 'keybindRow';
+    row.innerHTML = `<span>${label}</span><input type="text" maxlength="16" data-action="${action}" placeholder="${t('keybindsUnassigned')}">`;
+    list.appendChild(row);
+  });
+  document.getElementById('keybindsModal').style.display = 'flex';
+  ws.send(JSON.stringify({ type: 'get_keybinds' }));
+}
+
+document.getElementById('cmdRemap').addEventListener('click', openKeybindsModal);
+
+document.getElementById('keybindsCloseBtn').addEventListener('click', () => {
+  document.getElementById('keybindsModal').style.display = 'none';
+});
+
+document.getElementById('keybindsSaveBtn').addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast(t('commandNotConnectedToast'), 'danger');
+    return;
+  }
+  const data = {};
+  document.querySelectorAll('#keybindsList input[data-action]').forEach(input => {
+    data[input.dataset.action] = input.value.trim() || null;
+  });
+  ws.send(JSON.stringify({ type: 'set_keybinds', data }));
+  showToast(t('keybindsSavedToast'), 'success');
+  document.getElementById('keybindsModal').style.display = 'none';
+});
+
+// Respuesta del cliente a get/set_keybinds - llega por el mismo socket que
+// la telemetria (viaja como cualquier otro mensaje del cliente), asi que hay
+// que distinguirla en onmessage antes de tratarla como un tick normal.
+function handleKeybindsMessage(data) {
+  const keybinds = data.data || {};
+  document.querySelectorAll('#keybindsList input[data-action]').forEach(input => {
+    input.value = keybinds[input.dataset.action] || '';
+  });
+}
+
+// Resalta los botones cuyo estado (segun la telemetria real) esta activo -
+// no es un estado local del boton, siempre refleja lo que dice el juego.
+function updateCommandButtonStates(data) {
+  document.getElementById('cmdHazards').classList.toggle('active', !!data.lights?.hazards);
+  document.getElementById('cmdBeacon').classList.toggle('active', !!data.lights?.beacon);
+  document.getElementById('cmdDiffLock').classList.toggle('active', !!data.differentialLock);
+  document.getElementById('cmdHandbrake').classList.toggle('active', !!data.parkingBrake);
+  document.getElementById('cmdEngine').classList.toggle('active', !!data.engineEnabled);
+  document.getElementById('cmdLiftAxle').classList.toggle('active', !!data.liftAxle);
+  document.getElementById('cmdTrailer').classList.toggle('active', !!data.trailerAttached);
+  document.getElementById('cmdCruise').classList.toggle('active', !!data.cruiseControl);
+  // "Lights" no es un simple on/off (la tecla real rota entre apagado/
+  // parking/bajas), asi que se resalta cuando hay CUALQUIER luz delantera
+  // encendida, no un estado exacto que matchee el ciclo.
+  document.getElementById('cmdLights').classList.toggle('active', !!(data.lights?.beamLow || data.lights?.beamHigh));
+}
+
 // Conecta (o reconecta) el websocket del viewer. Se llama tanto al apretar
 // Connect como automaticamente si la conexion se corta - antes, si se
 // cortaba, el unico aviso era el texto chico de #status, facil de no notar
@@ -2087,16 +2490,22 @@ function connectWs(backend, code) {
     hideReconnectBanner();
     statusEl.textContent = t('connectedWaiting');
     statusEl.className = 'ok';
+    sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
   };
   socket.onmessage = (event) => {
     hideReconnectBanner();
     const data = JSON.parse(event.data);
+    if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
+    if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
     statusEl.textContent = data.paused ? t('connectedPaused') : t('connectedLive');
     statusEl.className = 'ok';
     updateHud(data);
     updateMap(data.position || {}, data.game);
     updateDestinationMarker(data);
     checkUpdateBanner(data.clientVersion);
+    // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
+    // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
+    if (liveShareEnabled && resolveEffectiveGame(data.game) !== lastSentMapVariant) sendLiveShareState();
   };
   socket.onclose = () => {
     if (ws !== socket) return; // reemplazado por una conexion mas nueva, ignorar

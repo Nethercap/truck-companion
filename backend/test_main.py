@@ -256,6 +256,102 @@ def test_record_job_delivered_calls_discord_notify(main, monkeypatch):
     assert called[0]["cityDst"] == "B"
 
 
+def test_broadcast_live_positions_filters_by_variant_and_excludes_self(main):
+    import asyncio
+
+    class FakeWs:
+        def __init__(self):
+            self.sent = []
+
+        async def send_text(self, text):
+            self.sent.append(text)
+
+    async def run():
+        s1 = main.Session("AAAAAAAA")
+        s1.share_position = True
+        s1.map_variant = "ats_promods"
+        s1.last_position = {"x": 1.0, "z": 2.0, "ts": main.time.time()}
+        ws1 = FakeWs()
+        s1.viewer_ws_list = [ws1]
+
+        s2 = main.Session("BBBBBBBB")
+        s2.share_position = True
+        s2.map_variant = "ats_promods"
+        s2.last_position = {"x": 3.0, "z": 4.0, "ts": main.time.time()}
+
+        s3 = main.Session("CCCCCCCC")  # otra variante de mapa, no deberia verse
+        s3.share_position = True
+        s3.map_variant = "ets2"
+        s3.last_position = {"x": 9.0, "z": 9.0, "ts": main.time.time()}
+
+        main.sessions.update({s1.code: s1, s2.code: s2, s3.code: s3})
+        main.broadcast_live_positions()
+        await asyncio.sleep(0)  # deja correr los create_task del broadcast
+
+        assert len(ws1.sent) == 1
+        body = main.json.loads(ws1.sent[0])
+        assert body["type"] == "live_players"
+        assert [p["id"] for p in body["players"]] == ["BBBBBBBB"]
+
+    asyncio.run(run())
+
+
+def test_broadcast_live_positions_excludes_not_sharing_and_stale(main):
+    import asyncio
+
+    class FakeWs:
+        def __init__(self):
+            self.sent = []
+
+        async def send_text(self, text):
+            self.sent.append(text)
+
+    async def run():
+        viewer = main.Session("AAAAAAAA")
+        viewer.share_position = True
+        viewer.map_variant = "ats"
+        viewer.last_position = {"x": 0.0, "z": 0.0, "ts": main.time.time()}
+        ws = FakeWs()
+        viewer.viewer_ws_list = [ws]
+
+        not_sharing = main.Session("BBBBBBBB")
+        not_sharing.share_position = False
+        not_sharing.map_variant = "ats"
+        not_sharing.last_position = {"x": 1.0, "z": 1.0, "ts": main.time.time()}
+
+        stale = main.Session("CCCCCCCC")
+        stale.share_position = True
+        stale.map_variant = "ats"
+        stale.last_position = {"x": 2.0, "z": 2.0, "ts": main.time.time() - main.LIVE_POSITION_STALE_SECONDS - 1}
+
+        main.sessions.update({viewer.code: viewer, not_sharing.code: not_sharing, stale.code: stale})
+        main.broadcast_live_positions()
+        await asyncio.sleep(0)
+
+        assert len(ws.sent) == 1
+        body = main.json.loads(ws.sent[0])
+        assert body["players"] == []
+
+    asyncio.run(run())
+
+
+def test_set_live_share_via_websocket_updates_session(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as ws:
+        ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": True, "mapVariant": "ats_promods"}))
+        # No hay nada que leer de vuelta - se confirma via el estado de la sesion.
+        import time as _time
+        _time.sleep(0.05)
+        session = main.sessions[code]
+        assert session.share_position is True
+        assert session.map_variant == "ats_promods"
+
+        ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": False}))
+        _time.sleep(0.05)
+        assert session.share_position is False
+        assert session.map_variant is None
+
+
 def test_version_endpoint_defaults(client, main):
     resp = client.get("/version")
     assert resp.status_code == 200

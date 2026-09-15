@@ -4,3 +4,4 @@ pystray
 pillow
 pyinstaller
 truststore
+pydirectinput

@@ -14,13 +14,22 @@ y lo muestra en consola para que el usuario lo tipee en la web.
 
 import argparse
 import asyncio
+import ctypes
 import json
+import logging
+import os
 import sys
 import time
 
+import pydirectinput
 import truck_telemetry
 import websockets
 from urllib.request import urlopen, Request
+
+# pydirectinput por defecto pausa 0.1s despues de cada tecla (pensado para
+# macros/automatizacion) - para un boton individual eso se siente como
+# lag, no hace falta ese delay aca.
+pydirectinput.PAUSE = 0
 
 # Usa el almacen de certificados nativo de Windows/macOS/Linux para validar
 # TLS, en vez del bundle de certificados que trae empaquetado Python (via
@@ -38,7 +47,107 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.0.3"
+CLIENT_VERSION = "1.1.0"
+
+# Comandos que la web puede mandar para simular una tecla en el juego. Los
+# valores son los binds por defecto de ETS2/ATS - si el usuario los remapeo en
+# el juego, tiene que editar keybinds.json (se crea al lado del .exe la
+# primera vez) para que coincidan. "trailer_toggle" y "differential_lock" no
+# tienen un bind por defecto confiable en todas las versiones -> quedan sin
+# asignar (null) hasta que el usuario los configure a mano, tanto en el juego
+# como en keybinds.json.
+DEFAULT_KEYBINDS = {
+    "toggle_hazards": "z",
+    "toggle_beacon": "o",
+    "toggle_differential_lock": None,
+    "toggle_parking_brake": ".",
+    "toggle_engine": "e",
+    "toggle_trailer": None,
+    "cycle_camera": "f1",
+    "toggle_cruise_control": "c",
+    "cycle_lights": "l",
+    "toggle_infotainment": None,
+    "toggle_lift_axle": None,
+}
+
+GAME_WINDOW_TITLES = ("Euro Truck Simulator 2", "American Truck Simulator")
+
+_user32 = ctypes.windll.user32
+_kernel32 = ctypes.windll.kernel32
+
+
+def keybinds_path() -> str:
+    # Al lado del .exe (o del script, corriendo desde fuente) - no en el
+    # directorio de trabajo actual, que puede variar segun como se lance.
+    base_dir = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
+    return os.path.join(base_dir, "keybinds.json")
+
+
+def load_keybinds() -> dict:
+    path = keybinds_path()
+    keybinds = dict(DEFAULT_KEYBINDS)
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                keybinds.update(json.load(f))
+        else:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_KEYBINDS, f, indent=2)
+    except Exception as exc:
+        logging.warning(f"No se pudo leer/crear keybinds.json ({exc}), se usan los binds por defecto.")
+    return keybinds
+
+
+def save_keybinds(keybinds: dict) -> None:
+    try:
+        with open(keybinds_path(), "w", encoding="utf-8") as f:
+            json.dump(keybinds, f, indent=2)
+    except Exception as exc:
+        logging.warning(f"No se pudo guardar keybinds.json ({exc})")
+
+
+def find_game_window():
+    for title in GAME_WINDOW_TITLES:
+        hwnd = _user32.FindWindowW(None, title)
+        if hwnd:
+            return hwnd
+    return None
+
+
+def bring_window_to_foreground(hwnd) -> None:
+    # Windows por default no deja que un proceso en segundo plano le robe el
+    # foco a otro (para que no te pisen la ventana sin que lo pidas) - el
+    # truco estandar es "adjuntar" el hilo de input del proceso en foreground
+    # actual al nuestro momentaneamente, lo que habilita SetForegroundWindow.
+    # Best-effort: en casos raros Windows igual lo bloquea, no hay forma 100%
+    # confiable sin tocar politicas del sistema.
+    foreground_hwnd = _user32.GetForegroundWindow()
+    current_thread_id = _kernel32.GetCurrentThreadId()
+    foreground_thread_id = _user32.GetWindowThreadProcessId(foreground_hwnd, None)
+    target_thread_id = _user32.GetWindowThreadProcessId(hwnd, None)
+    _user32.AttachThreadInput(current_thread_id, foreground_thread_id, True)
+    _user32.AttachThreadInput(current_thread_id, target_thread_id, True)
+    try:
+        _user32.SetForegroundWindow(hwnd)
+    finally:
+        _user32.AttachThreadInput(current_thread_id, foreground_thread_id, False)
+        _user32.AttachThreadInput(current_thread_id, target_thread_id, False)
+
+
+def send_game_command(action: str, keybinds: dict) -> None:
+    key = keybinds.get(action)
+    if not key:
+        logging.info(f"Comando '{action}' no tiene tecla asignada en keybinds.json, se ignora.")
+        return
+    hwnd = find_game_window()
+    if not hwnd:
+        logging.info("No se encontro la ventana del juego, se ignora el comando.")
+        return
+    try:
+        bring_window_to_foreground(hwnd)
+        pydirectinput.press(key)
+    except Exception as exc:
+        logging.warning(f"No se pudo enviar el comando '{action}' (tecla '{key}'): {exc}")
 
 
 def http_base_url(ws_url: str) -> str:
@@ -125,6 +234,13 @@ def build_payload(raw: dict) -> dict:
             "blinkerRight": raw.get("blinkerRightOn"),
         },
         "wipers": raw.get("wipers"),
+        # Estados usados para resaltar los botones de comandos como activos
+        # en la web (no se piden por separado, ya vienen en el SDK).
+        "engineEnabled": raw.get("engineEnabled"),
+        "parkingBrake": raw.get("parkBrake"),
+        "differentialLock": raw.get("differentialLock"),
+        "liftAxle": raw.get("liftAxleIndicator"),
+        "trailerAttached": bool((raw.get("trailer") or [{}])[0].get("attached")),
         # el SDK no tiene alerta dedicada de temperatura de aceite, solo de
         # presion de aire/agua/bateria - la de aceite se infiere en la web
         # con un umbral simple sobre oilTemperature.
@@ -189,28 +305,57 @@ def attach_job_snapshot_if_finished(payload: dict):
         event["jobCargo"] = _last_job_snapshot["cargo"]
 
 
+async def receive_commands(ws, keybinds: dict):
+    """Escucha en paralelo al envio de telemetria - la web puede mandar
+    comandos de botonera (on/off balizas, motor, etc.) por el mismo socket,
+    en cualquier momento, no como respuesta a nada que mandemos nosotros.
+    Tambien atiende get/set de keybinds, para el modal de remapeo de la web -
+    keybinds se muta in-place (mismo dict que usa send_game_command) para que
+    un cambio aplique de inmediato, sin reconectar."""
+    async for message in ws:
+        try:
+            payload = json.loads(message)
+            msg_type = payload.get("type")
+            if msg_type == "command":
+                send_game_command(payload.get("action", ""), keybinds)
+            elif msg_type == "get_keybinds":
+                await ws.send(json.dumps({"type": "keybinds", "data": keybinds}))
+            elif msg_type == "set_keybinds":
+                incoming = payload.get("data") or {}
+                keybinds.update({k: (v or None) for k, v in incoming.items() if k in DEFAULT_KEYBINDS})
+                save_keybinds(keybinds)
+                await ws.send(json.dumps({"type": "keybinds", "data": keybinds}))
+        except Exception as exc:
+            logging.warning(f"Comando invalido recibido ({exc}): {message!r}")
+
+
 async def run(backend_ws_url: str, code: str):
     truck_telemetry.init()
     print("Conectado al SDK de telemetria del juego.")
+    keybinds = load_keybinds()
 
     url = f"{backend_ws_url}/ws/client/{code}"
     while True:
         try:
             async with websockets.connect(url) as ws:
                 print(f"Conectado al backend. Codigo de pairing: {code}")
-                while True:
-                    raw = truck_telemetry.get_data()
-                    # sdkActive en False significa que el SDK todavia no
-                    # sincronizo el primer frame real del juego (justo
-                    # despues de init() puede devolver datos viejos/en cero,
-                    # lo que se veia como el camion en una posicion rara
-                    # hasta arrancar a manejar). Se descarta ese frame.
-                    if raw.get("sdkActive"):
-                        update_job_snapshot(raw)
-                        payload = build_payload(raw)
-                        attach_job_snapshot_if_finished(payload)
-                        await ws.send(json.dumps(payload))
-                    await asyncio.sleep(SEND_INTERVAL_SECONDS)
+                recv_task = asyncio.create_task(receive_commands(ws, keybinds))
+                try:
+                    while True:
+                        raw = truck_telemetry.get_data()
+                        # sdkActive en False significa que el SDK todavia no
+                        # sincronizo el primer frame real del juego (justo
+                        # despues de init() puede devolver datos viejos/en cero,
+                        # lo que se veia como el camion en una posicion rara
+                        # hasta arrancar a manejar). Se descarta ese frame.
+                        if raw.get("sdkActive"):
+                            update_job_snapshot(raw)
+                            payload = build_payload(raw)
+                            attach_job_snapshot_if_finished(payload)
+                            await ws.send(json.dumps(payload))
+                        await asyncio.sleep(SEND_INTERVAL_SECONDS)
+                finally:
+                    recv_task.cancel()
         except (websockets.ConnectionClosed, OSError) as exc:
             print(f"Conexion perdida ({exc}). Reintentando en {RECONNECT_DELAY_SECONDS}s...")
             await asyncio.sleep(RECONNECT_DELAY_SECONDS)
