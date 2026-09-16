@@ -48,6 +48,11 @@
   .setup { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.4rem; flex-shrink: 0; }
   .setup input { font-size: 0.9rem; padding: 0.3rem 0.5rem; background: var(--panel); border: 1px solid #333; color: var(--text); border-radius: 6px; }
   .setup button { font-size: 0.9rem; padding: 0.35rem 0.7rem; border-radius: 6px; border: none; background: var(--accent); color: #fff; cursor: pointer; }
+  #discordBtn {
+    font-size: 0.9rem; padding: 0.35rem 0.7rem; border-radius: 6px; text-decoration: none;
+    background: #5865F2; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;
+  }
+  #discordBtn:hover { background: #4752c4; }
   #status { font-size: 0.8rem; margin-bottom: 0.6rem; flex-shrink: 0; }
   .ok { color: #4caf50; }
   .err { color: var(--danger); }
@@ -423,6 +428,10 @@
     <button id="langToggle" data-i18n-title="toggleLanguage" title="Toggle language">EN</button>
     <button id="settingsBtn" data-i18n-title="settings" title="Settings" style="display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg></button>
     <button id="modsBtn" data-i18n-title="modsTitle" title="Map mods">MODS</button>
+    <a id="discordBtn" href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener" data-i18n-title="joinDiscord" title="Join our Discord">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.375-.444.864-.608 1.25-1.844-.276-3.68-.276-5.487 0-.164-.395-.406-.875-.617-1.25a.077.077 0 0 0-.079-.036 16.5 16.5 0 0 0-4.885 1.49.07.07 0 0 0-.032.027C.533 9.09-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 16.68 16.68 0 0 0 4.994 2.478.078.078 0 0 0 .084-.026 11.7 11.7 0 0 0 1.007-1.607.075.075 0 0 0-.041-.104 11 11 0 0 1-1.566-.73.075.075 0 0 1-.008-.125c.105-.078.21-.16.31-.243a.072.072 0 0 1 .078-.01c3.28 1.478 6.83 1.478 10.075 0a.073.073 0 0 1 .078.009c.1.083.205.166.31.244a.075.075 0 0 1-.006.125c-.5.29-1.02.53-1.567.73a.075.075 0 0 0-.04.105c.3.559.638 1.09 1.006 1.607a.077.077 0 0 0 .084.026 16.62 16.62 0 0 0 5.003-2.478.077.077 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028zM8.02 15.278c-.988 0-1.802-.906-1.802-2.02 0-1.113.796-2.02 1.802-2.02 1.014 0 1.82.915 1.803 2.02 0 1.114-.796 2.02-1.803 2.02zm7.975 0c-.989 0-1.803-.906-1.803-2.02 0-1.113.796-2.02 1.803-2.02 1.013 0 1.82.915 1.802 2.02 0 1.114-.788 2.02-1.802 2.02z"/></svg>
+      <span data-i18n="joinDiscord">Discord</span>
+    </a>
   </div>
 
   <div id="settingsModal" class="settingsOverlay" style="display:none;">
@@ -667,6 +676,7 @@ const TRANSLATIONS = {
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
+    joinDiscord: 'Discord',
     settingsNoMod: 'None',
     settingsCoastToCoast: 'I have Coast to Coast installed',
     settingsProModsCanada: 'I have ProMods Canada installed',
@@ -778,6 +788,7 @@ const TRANSLATIONS = {
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
+    joinDiscord: 'Discord',
     settingsNoMod: 'Ninguno',
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
     settingsProModsCanada: 'Tengo instalado ProMods Canada',
