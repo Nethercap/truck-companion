@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Truck Dash</title>
 <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0d0f12" />
+<link rel="apple-touch-icon" href="assets/icon-192.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 <style>
   :root {
@@ -217,6 +223,23 @@
     background: var(--panel); border: 1px solid #333; border-radius: 10px;
     padding: 1.2rem; width: min(340px, 90vw); max-height: 85vh; overflow-y: auto;
   }
+  /* Tour rapido de onboarding: no tapa toda la pantalla (a diferencia de los
+     modales), pointer-events:none en el fondo para que se siga viendo el
+     mapa - solo el tooltip en si es clickeable. El highlight del boton
+     actual se hace poniendole box-shadow directo por JS, no con un overlay
+     con un agujero (mas simple, sin SVG masks). */
+  .tourOverlay { position: fixed; inset: 0; z-index: 3000; pointer-events: none; }
+  .tourTooltip {
+    position: absolute; z-index: 3001; pointer-events: auto;
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+    padding: 0.8rem; width: min(240px, 80vw); box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .tourTooltip p { margin: 0 0 0.7rem; font-size: 0.85rem; line-height: 1.4; }
+  .tourButtons { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .tourButtons button { font-size: 0.82rem; padding: 0.3rem 0.6rem; border-radius: 6px; border: none; background: var(--accent); color: #fff; cursor: pointer; }
+  .tourButtons button.secondary { background: none; border: 1px solid #444; color: var(--muted); }
+  .tourHighlight { position: relative; z-index: 3001; box-shadow: 0 0 0 4px var(--accent), 0 0 20px 4px rgba(59,158,255,0.6) !important; }
+
   .settingsPanel h3 { margin: 0 0 0.8rem; font-size: 1rem; }
   .settingsSectionTitle { font-size: 0.8rem; color: var(--muted); margin: 1rem 0 0.4rem; }
   .settingsRow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; padding: 0.25rem 0; cursor: pointer; }
@@ -432,6 +455,7 @@
       <svg viewBox="0 0 127.14 96.36" width="16" height="16" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.9,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
       <span data-i18n="joinDiscord">Discord</span>
     </a>
+    <button id="helpBtn" data-i18n-title="replayTour" title="Show quick tour" style="display:flex;align-items:center;justify-content:center;width:2rem;padding:0.35rem;">?</button>
   </div>
 
   <div id="settingsModal" class="settingsOverlay" style="display:none;">
@@ -494,6 +518,7 @@
   <div id="status" data-i18n="notConnected">Not connected</div>
   <div id="mobileHint" data-i18n="mobileHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.2rem;flex-shrink:0;">On mobile: open trucksim-dash.com/app and enter your pairing code.</div>
   <div id="pairingDurationHint" data-i18n="pairingDurationHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-shrink:0;">The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit).</div>
+  <div id="activePlayersHint" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.6rem;flex-shrink:0;display:none;"></div>
   <div id="updateBanner" class="updateBanner" style="display:none;">
     <span id="updateBannerText"></span>
     <a id="updateBannerLink" href="#" target="_blank" rel="noopener" data-i18n="updateBannerLink">Download</a>
@@ -652,6 +677,16 @@
     </div>
   </div>
 
+  <div id="tourOverlay" class="tourOverlay" style="display:none;">
+    <div id="tourTooltip" class="tourTooltip">
+      <p id="tourText"></p>
+      <div class="tourButtons">
+        <button id="tourSkipBtn" class="secondary" data-i18n="tourSkip">Skip</button>
+        <button id="tourNextBtn" data-i18n="tourNext">Next</button>
+      </div>
+    </div>
+  </div>
+
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
@@ -688,6 +723,18 @@ const TRANSLATIONS = {
     notConnected: 'Not connected',
     mobileHint: 'On mobile: open trucksim-dash.com/app and enter your pairing code.',
     pairingDurationHint: 'The code expires after 10 minutes if unused. Once connected, the session stays active until you quit the client (tray icon → Quit or Disconnect).',
+    activePlayersHint: '🟢 {count} drivers active right now',
+    replayTour: 'Show quick tour',
+    tourSkip: 'Skip',
+    tourNext: 'Next',
+    tourDone: 'Got it',
+    tourCode: "Paste the pairing code shown by the local client here, then hit Connect.",
+    tourTopButtons: "Toggle units (km/mi), language, open Settings (mini-HUD, live players, remap keys) and Mods.",
+    tourRecenter: "Recenter the map on your truck.",
+    tourFullscreen: "Fullscreen mode - hides this header for a clean view.",
+    tourNavMode: "GPS navigation mode: the map rotates with your heading and zooms in on turns.",
+    tourWaypoint: "Add a waypoint - click a point on the map, useful for detours.",
+    tourCommands: "Show/hide the truck command buttons (hazards, engine, lights, etc.).",
     updateAvailableText: '🆕 A new client version is available (v{v}). Your connected client is outdated.',
     updateBannerLink: 'Download',
     mapNotLoaded: 'Map not loaded',
@@ -800,6 +847,18 @@ const TRANSLATIONS = {
     notConnected: 'Sin conectar',
     mobileHint: 'Desde el celular: abrí trucksim-dash.com/app e ingresá tu código de pairing.',
     pairingDurationHint: 'El código expira a los 10 minutos si no se usa. Una vez conectado, la sesión sigue activa hasta que cierres el cliente (ícono de bandeja → Quit o Disconnect).',
+    activePlayersHint: '🟢 {count} conductores activos ahora',
+    replayTour: 'Ver el tour rápido',
+    tourSkip: 'Saltar',
+    tourNext: 'Siguiente',
+    tourDone: 'Listo',
+    tourCode: 'Pegá acá el código de pairing que te muestra el cliente local, y apretá Connect.',
+    tourTopButtons: 'Cambiar unidades (km/mi), idioma, abrir Settings (mini-HUD, jugadores en vivo, remapeo de teclas) y Mods.',
+    tourRecenter: 'Centrar el mapa en tu camión.',
+    tourFullscreen: 'Modo pantalla completa - oculta esta franja de arriba para una vista más limpia.',
+    tourNavMode: 'Modo navegación GPS: el mapa rota con tu rumbo y hace zoom en los giros.',
+    tourWaypoint: 'Agregar un waypoint - clic en un punto del mapa, útil para desvíos.',
+    tourCommands: 'Mostrar/ocultar la botonera de comandos del camión (balizas, motor, luces, etc.).',
     updateAvailableText: '🆕 Hay una versión nueva del cliente (v{v}). Tu cliente conectado está desactualizado.',
     updateBannerLink: 'Descargar',
     mapNotLoaded: 'Mapa no cargado',
@@ -2419,6 +2478,22 @@ function isNewerVersion(a, b) {
   return false;
 }
 
+// Se pide una sola vez al entrar (no depende de estar conectado - usa el
+// backend default aunque el usuario todavia no puso su codigo). Si falla,
+// no se muestra nada, no es critico.
+function fetchActivePlayers() {
+  const backend = document.getElementById('backendUrl').value;
+  const httpBase = backend.replace('wss://', 'https://').replace('ws://', 'http://');
+  fetch(`${httpBase}/health`).then(r => r.ok ? r.json() : null).then(data => {
+    if (data && typeof data.connected_clients === 'number') {
+      const hint = document.getElementById('activePlayersHint');
+      hint.textContent = t('activePlayersHint').replace('{count}', data.connected_clients);
+      hint.style.display = 'block';
+    }
+  }).catch(() => {});
+}
+fetchActivePlayers();
+
 function fetchLatestClientVersion(backend) {
   const httpBase = backend.replace('wss://', 'https://').replace('ws://', 'http://');
   fetch(`${httpBase}/version`).then(r => r.ok ? r.json() : null).then(data => {
@@ -2649,6 +2724,73 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   connectWs(backend, code);
 });
 
+// Tour rapido de onboarding - se muestra solo la primera vez (localStorage),
+// y se puede volver a pedir con el boton "?" de la fila de arriba. Cada paso
+// apunta a un boton real (por id), le pone un highlight, y posiciona el
+// tooltip cerca sin salirse de la pantalla.
+const TOUR_STEPS = [
+  { selector: '#code', textKey: 'tourCode' },
+  { selector: '#unitToggle', textKey: 'tourTopButtons' },
+  { selector: '#recenterBtn', textKey: 'tourRecenter' },
+  { selector: '#fullscreenBtn', textKey: 'tourFullscreen' },
+  { selector: '#navToggleBtn', textKey: 'tourNavMode' },
+  { selector: '#waypointBtn', textKey: 'tourWaypoint' },
+  { selector: '#commandsToggleBtn', textKey: 'tourCommands' },
+];
+let tourStepIndex = 0;
+
+function positionTourTooltip(target) {
+  const tooltip = document.getElementById('tourTooltip');
+  const rect = target.getBoundingClientRect();
+  const margin = 12;
+  let left = rect.right + margin;
+  let top = rect.top;
+  // Si no entra a la derecha, se pone debajo (o arriba si tampoco entra abajo).
+  if (left + tooltip.offsetWidth > window.innerWidth - margin) {
+    left = Math.max(margin, Math.min(rect.left, window.innerWidth - tooltip.offsetWidth - margin));
+    top = rect.bottom + margin;
+    if (top + tooltip.offsetHeight > window.innerHeight - margin) top = rect.top - tooltip.offsetHeight - margin;
+  }
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${Math.max(margin, top)}px`;
+}
+
+function showTourStep(index) {
+  document.querySelectorAll('.tourHighlight').forEach(el => el.classList.remove('tourHighlight'));
+  const step = TOUR_STEPS[index];
+  const target = document.querySelector(step.selector);
+  if (!target) { tourStepIndex++; if (tourStepIndex < TOUR_STEPS.length) showTourStep(tourStepIndex); else endTour(); return; }
+  target.classList.add('tourHighlight');
+  target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  document.getElementById('tourText').textContent = t(step.textKey);
+  document.getElementById('tourNextBtn').textContent = index === TOUR_STEPS.length - 1 ? t('tourDone') : t('tourNext');
+  positionTourTooltip(target);
+}
+
+function startTour() {
+  tourStepIndex = 0;
+  document.getElementById('tourOverlay').style.display = 'block';
+  showTourStep(0);
+}
+
+function endTour() {
+  document.querySelectorAll('.tourHighlight').forEach(el => el.classList.remove('tourHighlight'));
+  document.getElementById('tourOverlay').style.display = 'none';
+  localStorage.setItem('truckdash_tour_seen', '1');
+}
+
+document.getElementById('tourNextBtn').addEventListener('click', () => {
+  tourStepIndex++;
+  if (tourStepIndex < TOUR_STEPS.length) showTourStep(tourStepIndex);
+  else endTour();
+});
+document.getElementById('tourSkipBtn').addEventListener('click', endTour);
+document.getElementById('helpBtn').addEventListener('click', startTour);
+
+if (!localStorage.getItem('truckdash_tour_seen')) {
+  setTimeout(startTour, 600); // deja que el mapa/botones terminen de acomodarse
+}
+
 // El .exe del cliente abre el navegador directo con ?code=...&backend=...
 // para que el usuario no tenga que tipear nada a mano.
 (function autoConnectFromUrl() {
@@ -2661,6 +2803,12 @@ document.getElementById('connectBtn').addEventListener('click', () => {
     document.getElementById('connectBtn').click();
   }
 })();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
