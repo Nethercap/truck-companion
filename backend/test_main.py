@@ -34,6 +34,17 @@ def test_health(client):
     assert resp.json()["status"] == "ok"
 
 
+def test_health_connected_clients_only_counts_sessions_with_client_ws(client, main):
+    main.sessions["AAAAAAAA"] = main.Session("AAAAAAAA")  # sin client_ws (solo pairing code emitido)
+    connected = main.Session("BBBBBBBB")
+    connected.client_ws = object()
+    main.sessions["BBBBBBBB"] = connected
+    resp = client.get("/health")
+    body = resp.json()
+    assert body["active_sessions"] == 2
+    assert body["connected_clients"] == 1
+
+
 def test_pair_new_returns_unique_code(client, main):
     resp = client.post("/pair/new")
     assert resp.status_code == 200

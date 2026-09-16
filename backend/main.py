@@ -352,6 +352,11 @@ def health():
     return {
         "status": "ok",
         "active_sessions": len(sessions),
+        # A diferencia de active_sessions (cuenta codigos de pairing emitidos,
+        # incluso sin cliente conectado todavia), esto es gente con el cliente
+        # local realmente corriendo y mandando telemetria en este momento -
+        # lo que la web muestra como "X jugadores activos ahora".
+        "connected_clients": sum(1 for s in sessions.values() if s.client_ws is not None),
         # Railway setea esta env var sola con el commit deployado - sirve para
         # confirmar desde afuera que un push realmente se reflejo en produccion.
         "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")[:7],
