@@ -705,6 +705,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
     telemetry_ready = False
     inactive_since = None
     last_status_sent = None
+    last_cloud_send = 0.0
 
     async def publish_status():
         nonlocal last_status_sent
@@ -747,7 +748,10 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             if state.set_status("live", game):
                 open_web_ui()  # en modo autostart, recien aca (juego detectado) se abre el navegador
             text = json.dumps(payload)
-            await cloud.send(text)
+            now_send = time.time()
+            if now_send - last_cloud_send >= client_lib.CLOUD_SEND_INTERVAL_SECONDS or client_lib.payload_has_event(payload):
+                last_cloud_send = now_send
+                await cloud.send(text)
             await local.broadcast(text)
         else:
             # Sin frame real del juego: en el menu, o el juego se cerro (la

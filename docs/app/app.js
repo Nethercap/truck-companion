@@ -829,6 +829,7 @@ let currentGame = null;
 let citiesByName = {}; // Name -> {X, Y}
 const trailWorld = []; // [[lng,lat], ...]
 const MAX_TRAIL_POINTS = 1000;
+let trailWorldRaw = null; // coords de juego del ultimo punto agregado al trail
 
 function emptyLineString() {
   return { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } };
@@ -1779,6 +1780,8 @@ const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es u
 let navMode = false;
 let navAutoZoomPaused = false; // true si el usuario zoomeo a mano en modo nav - se reactiva al recentrar
 let lastHeadingDeg = 0;
+let headingRef = null; // ultima posicion (lng/lat) usada como referencia del heading
+let headingRefWorld = { x: 0, z: 0 };
 const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo giro
 const NAV_TURN_ANGLE_THRESHOLD_DEG = 35; // cambio de rumbo minimo, medido justo en la interseccion, para contar como "giro"
 const NAV_TURN_LEG_M = 60; // cuanto camino antes/despues de la interseccion se usa para medir el rumbo de entrada/salida
@@ -1922,7 +1925,24 @@ function trimRouteBehindTruck(x, z) {
 
 let lastDisplayedLngLat = null; // ultima posicion ya animada del marcador ([lng,lat]), para interpolar el proximo tramo
 let moveAnimFrameId = null;
-const MOVE_ANIM_MS = 900; // un poco menos que el intervalo de envio (1s) para que no se pisen dos animaciones
+// Duracion de la interpolacion entre dos ticks de telemetria: se mide el
+// intervalo real de llegada (1 s con clientes viejos, 250 ms con 1.5+ por el
+// relay, 100 ms en LAN) y se anima un poco menos que eso, asi la posicion
+// mostrada siempre "alcanza" la real antes del proximo tick sin quedar a
+// saltos. Media movil para que un tick atrasado no rompa el ritmo.
+let tickIntervalMs = 1000;
+let lastTickArrival = null;
+function noteTickArrival() {
+  const now = performance.now();
+  if (lastTickArrival != null) {
+    const delta = Math.max(50, Math.min(2000, now - lastTickArrival));
+    tickIntervalMs = tickIntervalMs * 0.7 + delta * 0.3;
+  }
+  lastTickArrival = now;
+}
+function moveAnimMs() {
+  return Math.max(60, Math.min(950, tickIntervalMs * 0.9));
+}
 
 // Anima SOLO el marcador de forma fluida entre la posicion anterior y la
 // nueva (los updates llegan a ~1Hz, sin esto se ve "a los tics"). La camara
@@ -1934,7 +1954,7 @@ function animateTruckTo(fromLngLat, toPos) {
   if (moveAnimFrameId) cancelAnimationFrame(moveAnimFrameId);
   const start = performance.now();
   function step(now) {
-    const t = Math.min(1, (now - start) / MOVE_ANIM_MS);
+    const t = Math.min(1, (now - start) / moveAnimMs());
     const cur = [
       fromLngLat[0] + (toPos[0] - fromLngLat[0]) * t,
       fromLngLat[1] + (toPos[1] - fromLngLat[1]) * t,
@@ -1977,12 +1997,26 @@ function updateMap(position, game) {
       // recalcula cuando te salis del camino.
       justJumped = true;
       trailWorld.length = 0;
+      trailWorldRaw = null;
+      headingRef = null;
       currentRouteTarget = null;
       currentRouteWorldPoints = null;
     } else if (prevLngLat && movedM > 0.3) {
       // Heading: bearing geografico real entre la posicion mostrada anterior
-      // y la nueva - estable sin importar la rotacion actual del mapa.
-      const angleDeg = geoBearingDeg(prevLngLat[0], prevLngLat[1], lngLat[0], lngLat[1]);
+      // y la nueva - estable sin importar la rotacion actual del mapa. Con
+      // ticks de 100 ms el desplazamiento es de pocos metros y el angulo
+      // tiene ruido: se referencia contra un punto de hace >= 4 m y se
+      // suaviza el giro (media angular) para que la camara no tiemble.
+      headingRef = headingRef || prevLngLat;
+      const refDist = Math.hypot(position.x - headingRefWorld.x, position.z - headingRefWorld.z);
+      let angleDeg = lastHeadingDeg;
+      if (refDist >= 4) {
+        const raw = geoBearingDeg(headingRef[0], headingRef[1], lngLat[0], lngLat[1]);
+        let d = ((raw - lastHeadingDeg + 540) % 360) - 180;
+        angleDeg = (lastHeadingDeg + d * 0.6 + 360) % 360;
+        headingRef = lngLat;
+        headingRefWorld = { x: position.x, z: position.z };
+      }
       lastHeadingDeg = angleDeg;
       // En modo navegacion el mapa ya rota al heading (ver mas abajo), asi
       // que la flecha se deja apuntando siempre "para arriba" en pantalla.
@@ -1992,8 +2026,14 @@ function updateMap(position, game) {
   lastWorldPos = { x: position.x, z: position.z };
   checkWaypointReached(position.x, position.z);
 
-  trailWorld.push(lngLat);
-  if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
+  // A 10 Hz un punto por tick llenaria el trail en 100 s: solo se agrega
+  // si el camion se movio >= 5 m desde el ultimo punto guardado.
+  const lastTrail = trailWorldRaw;
+  if (!lastTrail || Math.hypot(position.x - lastTrail.x, position.z - lastTrail.z) >= 5) {
+    trailWorld.push(lngLat);
+    trailWorldRaw = { x: position.x, z: position.z };
+    if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
+  }
   if (map.getSource('trail')) {
     map.getSource('trail').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailWorld } });
   }
@@ -2014,13 +2054,13 @@ function updateMap(position, game) {
     // seguimos actualizando centro/bearing hasta que recentre.
     const zoomOverride = navAutoZoomPaused ? {} : { zoom: navTargetZoom(turn) };
     if (!justJumped && prevLngLat) {
-      map.easeTo({ center: lngLat, bearing: lastHeadingDeg, duration: MOVE_ANIM_MS, ...zoomOverride });
+      map.easeTo({ center: lngLat, bearing: lastHeadingDeg, duration: moveAnimMs(), easing: t => t, ...zoomOverride });
     } else {
       map.jumpTo({ center: lngLat, bearing: lastHeadingDeg, ...zoomOverride });
     }
   } else if (autoFollow) {
     if (!justJumped && prevLngLat) {
-      map.easeTo({ center: lngLat, duration: MOVE_ANIM_MS });
+      map.easeTo({ center: lngLat, duration: moveAnimMs(), easing: t => t });
     } else {
       map.jumpTo({ center: lngLat });
     }
@@ -2927,6 +2967,7 @@ function updateCommandButtonStates(data) {
 // Un tick de telemetria (venga del relay, del servidor LAN del cliente o del
 // modo demo): actualiza HUD, mapa, ruta y estado.
 function handleTelemetry(data) {
+  noteTickArrival();
   conn.clientConnected = true;
   conn.hasTelemetry = true;
   const pausedChanged = conn.paused !== !!data.paused;
@@ -3116,6 +3157,7 @@ if (!localStorage.getItem('truckdash_tour_seen')) {
 const DEMO_ROUTE = { game: 'ats', from: 'Salt Lake City', to: 'Las Vegas', cargo: 'Bulldozer', cargoMassKg: 18189, truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158 };
 const DEMO_SPEED_MS = 26; // ~94 km/h
 const DEMO_TIME_SCALE = 6; // 6x mas rapido que en tiempo real, para que pasen cosas
+const DEMO_TICK_MS = 250; // misma tasa que el cliente 1.5+ por el relay (4 Hz)
 // El mapa del juego esta a escala ~1:20: el juego muestra distancias/ETA
 // multiplicadas, y la telemetria real tambien (routeDistance viene ya
 // escalado). La demo hace lo mismo para que los numeros se vean normales.
@@ -3148,7 +3190,7 @@ function runDemo() {
   let fuel = 0.82;
   let odometer = 184220;
   let tick = 0;
-  const speedNoise = () => DEMO_SPEED_MS * 3.6 + Math.sin(tick / 7) * 4;
+  const speedNoise = () => DEMO_SPEED_MS * 3.6 + Math.sin(tick / 28) * 4;
 
   const pointAt = (dist) => {
     let acc = 0;
@@ -3165,12 +3207,12 @@ function runDemo() {
 
   const step = () => {
     tick++;
-    travelled += DEMO_SPEED_MS * DEMO_TIME_SCALE;
+    travelled += DEMO_SPEED_MS * DEMO_TIME_SCALE * (DEMO_TICK_MS / 1000);
     if (travelled >= total) travelled = 0; // vuelve a empezar
     const [x, z] = pointAt(travelled);
     const remainingKm = ((total - travelled) / 1000) * DEMO_DISTANCE_SCALE;
-    fuel = Math.max(0.05, fuel - 0.00012 * DEMO_TIME_SCALE);
-    odometer += (DEMO_SPEED_MS * DEMO_TIME_SCALE * DEMO_DISTANCE_SCALE) / 1000;
+    fuel = Math.max(0.05, fuel - 0.00012 * DEMO_TIME_SCALE * (DEMO_TICK_MS / 1000));
+    odometer += (DEMO_SPEED_MS * DEMO_TIME_SCALE * DEMO_DISTANCE_SCALE * (DEMO_TICK_MS / 1000)) / 1000;
     const speedKmh = speedNoise();
     handleTelemetry({
       ts: Date.now() / 1000,
@@ -3179,7 +3221,7 @@ function runDemo() {
       game: DEMO_ROUTE.game,
       position: { x, y: 0, z },
       speedKmh,
-      speedLimitKmh: Math.floor(tick / 40) % 3 === 0 ? 88.5 : 104.6,
+      speedLimitKmh: Math.floor(tick / 160) % 3 === 0 ? 88.5 : 104.6,
       cargo: DEMO_ROUTE.cargo,
       cargoMassKg: DEMO_ROUTE.cargoMassKg,
       citySrc: DEMO_ROUTE.from,
@@ -3203,7 +3245,7 @@ function runDemo() {
       cruiseControl: true,
       cruiseControlSpeedKmh: 94,
       lights: { beamLow: true },
-      engineRpm: 1250 + Math.sin(tick / 5) * 120,
+      engineRpm: 1250 + Math.sin(tick / 20) * 120,
       engineRpmMax: 2500,
       gear: 12,
       engineEnabled: true,
@@ -3214,7 +3256,7 @@ function runDemo() {
     });
   };
   step();
-  demoTimer = setInterval(step, 1000);
+  demoTimer = setInterval(step, DEMO_TICK_MS);
 }
 
 renderConnectionUi();

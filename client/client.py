@@ -43,13 +43,19 @@ pydirectinput.PAUSE = 0
 import truststore
 truststore.inject_into_ssl()
 
-SEND_INTERVAL_SECONDS = 1.0
+# Tasa de envio. La web interpola entre ticks: a 1 Hz el camion "salta" y
+# los giros llegan tarde; a 4 Hz por el relay (unos 5 KB/s por sesion) se ve
+# fluido, y en LAN (sin costo de red) va a 10 Hz. El loop corre a la tasa
+# LAN y manda al relay solo cada CLOUD_SEND_INTERVAL - salvo que el tick
+# traiga un evento (entrega, peaje, multa...), que se manda siempre.
+SEND_INTERVAL_SECONDS = 0.1
+CLOUD_SEND_INTERVAL_SECONDS = 0.25
 RECONNECT_DELAY_SECONDS = 3.0
 
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.4.4"
+CLIENT_VERSION = "1.5.0"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -523,6 +529,14 @@ def attach_job_snapshot_if_finished(payload: dict):
         event["jobCargo"] = _last_job_snapshot["cargo"]
 
 
+EVENT_FLAGS = ("jobDelivered", "jobCancelled", "tollgate", "fined", "ferry", "train")
+
+
+def payload_has_event(payload: dict) -> bool:
+    event = payload.get("event") or {}
+    return any(event.get(k) for k in EVENT_FLAGS)
+
+
 async def handle_control_message(message: str, keybinds: dict, send) -> None:
     """Procesa un mensaje de control de la web (comando de botonera, get/set
     de keybinds) y responde via `send` (coroutine que manda un str). Lo usan
@@ -591,7 +605,7 @@ async def run(backend_ws_url: str, code: str):
                             payload = build_payload(raw)
                             attach_job_snapshot_if_finished(payload)
                             await ws.send(json.dumps(payload))
-                        await asyncio.sleep(SEND_INTERVAL_SECONDS)
+                        await asyncio.sleep(CLOUD_SEND_INTERVAL_SECONDS)
                 finally:
                     recv_task.cancel()
         except (websockets.ConnectionClosed, OSError) as exc:
