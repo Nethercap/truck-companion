@@ -112,7 +112,7 @@ def download_and_apply_update(download_url: str, expected_sha256: str | None, pr
         raise RuntimeError("Auto-update only works with the packaged TruckDash.exe")
 
     if progress:
-        progress("Downloading update...")
+        progress("downloading")
     with urlopen(download_url, timeout=60) as resp:
         data = resp.read()
 
@@ -122,7 +122,7 @@ def download_and_apply_update(download_url: str, expected_sha256: str | None, pr
             raise RuntimeError("Downloaded file does not match the published SHA-256, update aborted")
 
     if progress:
-        progress("Unpacking...")
+        progress("unpacking")
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         members = [m for m in zf.namelist() if m.lower().endswith("truckdash.exe")]
         if not members:
@@ -135,7 +135,7 @@ def download_and_apply_update(download_url: str, expected_sha256: str | None, pr
         f.write(new_exe_bytes)
 
     if progress:
-        progress("Installing...")
+        progress("installing")
     old = exe + ".old"
     if os.path.exists(old):
         os.remove(old)

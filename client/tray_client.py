@@ -33,6 +33,7 @@ import client as client_lib
 import local_server
 import plugin_installer
 import win_integration
+from i18n import T
 
 # En modo --windowed (sin consola) PyInstaller deja sys.stdout/stderr en None,
 # no solo silenciados. Cualquier print() o log interno revienta con
@@ -53,20 +54,8 @@ GAME_LABELS = {"ats": "American Truck Simulator", "ets2": "Euro Truck Simulator 
 # Estados del cliente - el mismo string viaja a la web (mensaje client_status)
 # para que el dashboard pueda decir "el cliente esta conectado pero el juego
 # no esta abierto" en vez de un generico "waiting for telemetry".
-STATUS_TEXT = {
-    "starting": "Starting...",
-    "waiting_game": "Waiting for the game to open",
-    "plugin_not_installed": "Telemetry plugin not installed - open Setup to install it",
-    "plugin_missing": "Game is running but no telemetry - is the plugin installed? (open Setup)",
-    "waiting_truck": "Waiting for you to be in the truck",
-    "live": "Live",
-}
-CLOUD_TEXT = {
-    "connecting": "connecting to server...",
-    "connected": "server OK",
-    "offline": "server unreachable (internet? antivirus HTTPS scanning?) - LAN mode still works",
-    "reconnecting": "reconnecting to server...",
-}
+STATUS_KEYS = ("starting", "waiting_game", "plugin_not_installed", "plugin_missing", "waiting_truck", "live")
+CLOUD_KEYS = ("connecting", "connected", "offline", "reconnecting")
 
 
 class AppState:
@@ -84,10 +73,11 @@ class AppState:
         self.local: local_server.LocalServer | None = None  # modo LAN (ver local_server.py)
 
     def status_text(self) -> str:
-        text = STATUS_TEXT.get(self.status, self.status)
+        text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
         if self.status == "live" and self.game:
-            text = f"Live - playing {GAME_LABELS.get(self.game, self.game)}"
-        return f"{text} ({CLOUD_TEXT.get(self.cloud, self.cloud)})"
+            text = T("status_live_playing", game=GAME_LABELS.get(self.game, self.game))
+        cloud = T(f"cloud_{self.cloud}") if self.cloud in CLOUD_KEYS else self.cloud
+        return f"{text} ({cloud})"
 
     def refresh_title(self):
         if self.icon:
@@ -163,8 +153,8 @@ def show_text_dialog(title: str, message: str, copy_value: str | None = None):
             entry.select_range(0, tk.END)
             root.clipboard_clear()
             root.clipboard_append(copy_value)
-            tk.Label(root, text="(copied to clipboard)", fg="#4caf50", padx=12).pack()
-        tk.Button(root, text="Close", command=root.destroy, padx=20, pady=4).pack(pady=12)
+            tk.Label(root, text=T("copied"), fg="#4caf50", padx=12).pack()
+        tk.Button(root, text=T("close"), command=root.destroy, padx=20, pady=4).pack(pady=12)
         root.mainloop()
 
     threading.Thread(target=_show, daemon=True).start()
@@ -209,7 +199,7 @@ def _setup_window_main():
 class SetupWindow:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title(f"Truck Dash - Setup & status (v{client_lib.CLIENT_VERSION})")
+        self.root.title(T("win_title", v=client_lib.CLIENT_VERSION))
         self.root.configure(bg=BG)
         self.root.resizable(False, False)
         self.root.attributes("-topmost", True)
@@ -238,23 +228,23 @@ class SetupWindow:
         header = tk.Frame(self.root, bg=BG, padx=16, pady=12)
         header.pack(fill="x")
         self.label(header, "Truck Dash", font=("Segoe UI", 16, "bold")).pack(side="left")
-        self.label(header, "  free GPS & dashboard for ETS2 / ATS", fg=MUTED).pack(side="left")
+        self.label(header, T("tagline"), fg=MUTED).pack(side="left")
 
         # --- Estado de conexion ---
-        status_frame = self.section("STATUS")
+        status_frame = self.section(T("sec_status"))
         self.status_label = self.label(status_frame, "", wraplength=520)
         self.status_label.pack(anchor="w", pady=(4, 2))
         code_row = tk.Frame(status_frame, bg=BG)
         code_row.pack(anchor="w", pady=(2, 4))
-        self.label(code_row, "Pairing code: ", fg=MUTED).pack(side="left")
+        self.label(code_row, T("pairing_code"), fg=MUTED).pack(side="left")
         self.code_label = self.label(code_row, "-", font=("Consolas", 14, "bold"), fg=BLUE)
         self.code_label.pack(side="left")
-        self.button(code_row, "Copy", self.copy_code).pack(side="left", padx=(10, 4))
-        self.button(code_row, "Open dashboard", self.open_dashboard, primary=True).pack(side="left", padx=4)
-        self.label(status_frame, "On your phone: open trucksim-dash.com/app and type this code. It doesn't need to be on the same Wi-Fi.", fg=MUTED, wraplength=520).pack(anchor="w")
+        self.button(code_row, T("copy"), self.copy_code).pack(side="left", padx=(10, 4))
+        self.button(code_row, T("open_dashboard"), self.open_dashboard, primary=True).pack(side="left", padx=4)
+        self.label(status_frame, T("phone_hint"), fg=MUTED, wraplength=520).pack(anchor="w")
 
         # --- Modo LAN ---
-        lan_frame = self.section("SAME WI-FI (LOWEST LATENCY)")
+        lan_frame = self.section(T("sec_lan"))
         lan_row = tk.Frame(lan_frame, bg=BG)
         lan_row.pack(anchor="w", pady=(4, 0), fill="x")
         self.qr_label = tk.Label(lan_row, bg=BG)
@@ -263,47 +253,48 @@ class SetupWindow:
         lan_text.pack(side="left", fill="x", expand=True)
         self.lan_url_label = self.label(lan_text, "", fg=BLUE, font=("Consolas", 11, "bold"), wraplength=380)
         self.lan_url_label.pack(anchor="w")
-        self.lan_hint_label = self.label(lan_text, "Phone/tablet on the same Wi-Fi: scan the code or type the address. No pairing code needed, and it keeps working even if the internet drops. If Windows asks about the firewall, click Allow.", fg=MUTED, wraplength=380)
+        self.lan_hint_label = self.label(lan_text, T("lan_hint"), fg=MUTED, wraplength=380)
         self.lan_hint_label.pack(anchor="w", pady=(4, 0))
         lan_btns = tk.Frame(lan_text, bg=BG)
         lan_btns.pack(anchor="w", pady=(6, 0))
-        self.button(lan_btns, "Copy address", self.copy_lan_url).pack(side="left")
-        self.button(lan_btns, "Open here", self.open_lan_here).pack(side="left", padx=6)
+        self.button(lan_btns, T("copy_address"), self.copy_lan_url).pack(side="left")
+        self.button(lan_btns, T("open_here"), self.open_lan_here).pack(side="left", padx=6)
         self.render_lan()
 
         # --- Juegos / plugin ---
-        self.games_frame = self.section("GAME SETUP")
+        self.games_frame = self.section(T("sec_games"))
         self.games_body = tk.Frame(self.games_frame, bg=BG)
         self.games_body.pack(fill="x", pady=(4, 0))
         self.render_installs()
         row = tk.Frame(self.games_frame, bg=BG)
         row.pack(anchor="w", pady=(6, 0))
-        self.button(row, "Add game folder...", self.add_game_folder).pack(side="left")
-        self.button(row, "Re-scan", self.rescan).pack(side="left", padx=6)
-        self.label(self.games_frame, f"Telemetry plugin: scs-telemetry.dll v{plugin_installer.PLUGIN_DLL_VERSION} (RenCloud, MIT). Installed into <game>\\bin\\win_x64\\plugins\\. Restart the game after installing.", fg=MUTED, wraplength=520).pack(anchor="w", pady=(6, 0))
+        self.button(row, T("add_game_folder"), self.add_game_folder).pack(side="left")
+        self.button(row, T("rescan"), self.rescan).pack(side="left", padx=6)
+        self.label(self.games_frame, T("plugin_note", v=plugin_installer.PLUGIN_DLL_VERSION), fg=MUTED, wraplength=520).pack(anchor="w", pady=(6, 0))
 
         # --- Opciones ---
-        options = self.section("OPTIONS")
+        options = self.section(T("sec_options"))
         self.autostart_var = tk.BooleanVar(value=win_integration.is_autostart_enabled())
-        chk = tk.Checkbutton(options, text="Start Truck Dash with Windows (opens the dashboard when the game starts)", variable=self.autostart_var,
+        chk = tk.Checkbutton(options, text=T("autostart"), variable=self.autostart_var,
                              command=self.toggle_autostart, bg=BG, fg=FG, selectcolor="#262b33", activebackground=BG, activeforeground=FG)
         chk.pack(anchor="w", pady=(4, 0))
         if not win_integration.exe_path():
             chk.configure(state="disabled")
-            self.label(options, "(available in the packaged TruckDash.exe)", fg=MUTED).pack(anchor="w")
+            self.label(options, T("autostart_packaged_only"), fg=MUTED).pack(anchor="w")
 
         # --- Update ---
         self.update_frame = tk.Frame(self.root, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
         self.update_label.pack(side="left")
-        self.update_button = self.button(self.update_frame, "Update now", self.do_update, primary=True)
+        self.update_button = self.button(self.update_frame, T("update_now"), self.do_update, primary=True)
         self.update_button.pack(side="right")
 
         footer = tk.Frame(self.root, bg=BG, padx=16, pady=12)
         footer.pack(fill="x")
-        self.button(footer, "Check for updates", self.check_updates).pack(side="left")
-        self.button(footer, "Show log file", lambda: show_log_location(None, None)).pack(side="left", padx=6)
-        self.button(footer, "Close", self.root.destroy).pack(side="right")
+        self.button(footer, T("check_updates"), self.check_updates).pack(side="left")
+        self.button(footer, T("show_log"), lambda: show_log_location(None, None)).pack(side="left", padx=6)
+        self.button(footer, T("report_problem"), lambda: report_problem(None, None)).pack(side="left", padx=6)
+        self.button(footer, T("close"), self.root.destroy).pack(side="right")
 
         self.refresh_status()
 
@@ -312,40 +303,40 @@ class SetupWindow:
             child.destroy()
         installs = state.refresh_installs()
         if not installs:
-            self.label(self.games_body, "No Steam install of ETS2 / ATS found. If the game is installed elsewhere, use \"Add game folder...\" and pick the game's folder.", fg=MUTED, wraplength=520).pack(anchor="w")
+            self.label(self.games_body, T("no_steam_install"), fg=MUTED, wraplength=520).pack(anchor="w")
             return
         for install in installs:
             row = tk.Frame(self.games_body, bg=BG)
             row.pack(fill="x", pady=2)
             self.label(row, install["name"], width=26).pack(side="left")
             if install["state"] == "installed":
-                self.label(row, "Plugin installed", fg=GREEN).pack(side="left")
+                self.label(row, T("plugin_installed"), fg=GREEN).pack(side="left")
             elif install["state"] == "outdated":
-                self.label(row, "Plugin present (other version)", fg=ORANGE).pack(side="left")
-                self.button(row, "Replace", lambda i=install: self.install_for(i)).pack(side="left", padx=8)
+                self.label(row, T("plugin_other_version"), fg=ORANGE).pack(side="left")
+                self.button(row, T("replace"), lambda i=install: self.install_for(i)).pack(side="left", padx=8)
             else:
-                self.label(row, "Plugin not installed", fg=RED).pack(side="left")
-                self.button(row, "Install plugin", lambda i=install: self.install_for(i), primary=True).pack(side="left", padx=8)
+                self.label(row, T("plugin_not_installed"), fg=RED).pack(side="left")
+                self.button(row, T("install_plugin"), lambda i=install: self.install_for(i), primary=True).pack(side="left", padx=8)
 
     def install_for(self, install):
         try:
             path = plugin_installer.install_plugin(install["bin_dir"])
             logging.info("Installed telemetry plugin at %s", path)
-            self.flash(f"Plugin installed for {install['name']}. Restart the game if it's open.", GREEN)
+            self.flash(T("installed_ok", name=install['name']), GREEN)
         except PermissionError:
-            self.flash(f"Windows didn't let me write into {install['bin_dir']}. Copy the .dll by hand (see README) or run TruckDash once as administrator.", RED)
+            self.flash(T("install_perm_error", dir=install['bin_dir']), RED)
         except Exception as exc:
             logging.exception("Plugin install failed")
-            self.flash(f"Couldn't install the plugin: {exc}", RED)
+            self.flash(T("install_error", err=exc), RED)
         self.render_installs()
 
     def add_game_folder(self):
-        chosen = filedialog.askdirectory(title="Select the game's install folder (contains bin\\win_x64)")
+        chosen = filedialog.askdirectory(title=T("pick_folder_title"))
         if not chosen:
             return
         bin_dir = plugin_installer.resolve_bin_dir(os.path.normpath(chosen))
         if not bin_dir:
-            self.flash("That folder doesn't look like an ETS2/ATS install (no eurotrucks2.exe / amtrucks.exe inside bin\\win_x64).", RED)
+            self.flash(T("not_game_folder"), RED)
             return
         settings = win_integration.load_settings()
         extra = settings.setdefault("extra_game_dirs", [])
@@ -377,8 +368,8 @@ class SetupWindow:
         srv = state.local
         url = srv.url if srv else None
         if not srv or srv.error or not srv.web_ready or not url:
-            reason = "starting..." if not srv else (srv.error or "couldn't download the web app (no internet yet?)")
-            self.lan_url_label.configure(text=f"LAN mode unavailable: {reason}", fg=MUTED)
+            reason = T("lan_starting") if not srv else (srv.error or T("lan_no_web"))
+            self.lan_url_label.configure(text=T("lan_unavailable", reason=reason), fg=MUTED)
             self.qr_label.configure(image="", text="")
             return
         self.lan_url_label.configure(text=url, fg=BLUE)
@@ -416,7 +407,7 @@ class SetupWindow:
             if latest:
                 state.update_available = (latest, url, sha)
             else:
-                self.root.after(0, lambda: self.flash(f"You're up to date (v{client_lib.CLIENT_VERSION}).", GREEN))
+                self.root.after(0, lambda: self.flash(T("up_to_date", v=client_lib.CLIENT_VERSION), GREEN))
         threading.Thread(target=_run, daemon=True).start()
 
     def do_update(self):
@@ -425,18 +416,18 @@ class SetupWindow:
         version, url, sha = state.update_available
         self.update_button.configure(state="disabled")
 
-        def progress(text):
-            self.root.after(0, lambda: self.update_label.configure(text=text))
+        def progress(key):
+            self.root.after(0, lambda: self.update_label.configure(text=T(key)))
 
         def _run():
             try:
                 exe = win_integration.download_and_apply_update(url, sha, progress)
-                progress("Restarting...")
+                progress("restarting")
                 time.sleep(0.5)
                 win_integration.relaunch_and_exit(exe, [win_integration.AUTOSTART_FLAG] if state.autostart_mode else None)
             except Exception as exc:
                 logging.exception("Update failed")
-                self.root.after(0, lambda: (self.update_label.configure(text=f"Update failed: {exc}"), self.update_button.configure(state="normal")))
+                self.root.after(0, lambda: (self.update_label.configure(text=T("update_failed", err=exc)), self.update_button.configure(state="normal")))
         threading.Thread(target=_run, daemon=True).start()
 
     def refresh_status(self):
@@ -452,7 +443,7 @@ class SetupWindow:
         if state.update_available:
             version = state.update_available[0]
             if not self.update_frame.winfo_ismapped():
-                self.update_label.configure(text=f"New version available: v{version} (you have v{client_lib.CLIENT_VERSION}).")
+                self.update_label.configure(text=T("update_available", new=version, cur=client_lib.CLIENT_VERSION))
                 self.update_frame.pack(fill="x", before=self.root.winfo_children()[-1])
         try:
             self.root.after(500, self.refresh_status)
@@ -469,13 +460,13 @@ class SetupWindow:
 
 def show_code_notification(icon, item):
     if state.code:
-        show_text_dialog("Truck Dash", "Pairing code (type it at trucksim-dash.com/app on your phone):", copy_value=state.code)
+        show_text_dialog("Truck Dash", T("dlg_pairing_code"), copy_value=state.code)
     else:
-        show_text_dialog("Truck Dash", "No pairing code yet.")
+        show_text_dialog("Truck Dash", T("dlg_no_code"))
 
 
 def show_log_location(icon, item):
-    show_text_dialog("Truck Dash", "Log file (for troubleshooting):", copy_value=LOG_PATH)
+    show_text_dialog("Truck Dash", T("dlg_log"), copy_value=LOG_PATH)
     try:
         os.startfile(os.path.dirname(LOG_PATH))
     except Exception:
@@ -511,15 +502,15 @@ def open_web_menu_item(icon, item):
     if url:
         webbrowser.open(url)
     else:
-        show_text_dialog("Truck Dash", "No pairing code yet.")
+        show_text_dialog("Truck Dash", T("dlg_no_code"))
 
 
 def show_lan_menu_item(icon, item):
     srv = state.local
     if srv and srv.web_ready and not srv.error and srv.url:
-        show_text_dialog("Truck Dash", "Same Wi-Fi: open this on your phone/tablet (or scan the QR in Setup & status):", copy_value=srv.url)
+        show_text_dialog("Truck Dash", T("dlg_lan"), copy_value=srv.url)
     else:
-        show_text_dialog("Truck Dash", "LAN mode isn't available right now (see Setup & status).")
+        show_text_dialog("Truck Dash", T("dlg_lan_unavailable"))
 
 
 def check_for_update(backend_url: str):
@@ -548,14 +539,45 @@ def check_for_update_silent(backend_url: str):
 
 def check_for_update_menu_item(icon, item):
     if not state.backend_url:
-        show_text_dialog("Truck Dash", "Not connected yet.")
+        show_text_dialog("Truck Dash", T("dlg_not_connected"))
         return
     latest, download_url, sha = check_for_update(state.backend_url)
     if latest:
         state.update_available = (latest, download_url, sha)
         open_setup_window()
     else:
-        show_text_dialog("Truck Dash", f"You're up to date (v{client_lib.CLIENT_VERSION}).")
+        show_text_dialog("Truck Dash", T("up_to_date", v=client_lib.CLIENT_VERSION))
+
+
+def report_problem(icon, item):
+    """Abre un issue de GitHub con el diagnostico ya cargado (version, estado,
+    juegos detectados, LAN, Windows y las ultimas lineas del log). El usuario
+    ve y edita todo antes de publicar - no se manda nada solo."""
+    import platform
+    import urllib.parse
+
+    try:
+        with open(LOG_PATH, encoding="utf-8", errors="ignore") as f:
+            tail = "".join(f.readlines()[-25:])[-2500:]
+    except OSError:
+        tail = "(no log)"
+    installs = ", ".join(f"{i['game']}={i['state']}" for i in state.installs) or "none detected"
+    lan = state.local
+    lan_text = "unavailable" if not lan or lan.error or not lan.web_ready else "ok"
+    body = "\n".join([
+        "**What happened?**", "", "(describe the problem here)", "", "**Steps to reproduce**", "", "1. ", "",
+        "---", "<details><summary>Diagnostics (auto-filled)</summary>", "",
+        f"- Client version: {client_lib.CLIENT_VERSION}",
+        f"- Telemetry state: {state.status} (game: {state.game or '-'})",
+        f"- Server link: {state.cloud}",
+        f"- Games / plugin: {installs}",
+        f"- LAN mode: {lan_text}",
+        f"- Autostart: {win_integration.is_autostart_enabled()}",
+        f"- Windows: {platform.platform()}",
+        "", "Last log lines:", "```", tail.strip(), "```", "</details>",
+    ])
+    query = urllib.parse.urlencode({"title": "[client] ", "body": body, "labels": "bug"})
+    webbrowser.open(f"https://github.com/Nethercap/truck-companion/issues/new?{query}")
 
 
 def toggle_autostart_menu_item(icon, item):
@@ -801,18 +823,19 @@ def main():
         open_setup_window()
 
     menu_items = [
-        pystray.MenuItem("Setup & status", open_setup_window, default=True),
-        pystray.MenuItem("Open dashboard", open_web_menu_item),
-        pystray.MenuItem("Show pairing code", show_code_notification),
-        pystray.MenuItem("Same Wi-Fi address (LAN mode)", show_lan_menu_item),
-        pystray.MenuItem("Disconnect (get new code)", disconnect_session),
-        pystray.MenuItem("Start with Windows", toggle_autostart_menu_item, checked=lambda item: win_integration.is_autostart_enabled(), enabled=lambda item: win_integration.exe_path() is not None),
-        pystray.MenuItem("Check for updates", check_for_update_menu_item),
-        pystray.MenuItem("Show log file (troubleshooting)", show_log_location),
+        pystray.MenuItem(T("menu_setup"), open_setup_window, default=True),
+        pystray.MenuItem(T("menu_open_dashboard"), open_web_menu_item),
+        pystray.MenuItem(T("menu_show_code"), show_code_notification),
+        pystray.MenuItem(T("menu_lan"), show_lan_menu_item),
+        pystray.MenuItem(T("menu_disconnect"), disconnect_session),
+        pystray.MenuItem(T("menu_autostart"), toggle_autostart_menu_item, checked=lambda item: win_integration.is_autostart_enabled(), enabled=lambda item: win_integration.exe_path() is not None),
+        pystray.MenuItem(T("menu_check_updates"), check_for_update_menu_item),
+        pystray.MenuItem(T("menu_show_log"), show_log_location),
+        pystray.MenuItem(T("menu_report"), report_problem),
     ]
     if DONATE_URL:
-        menu_items.append(pystray.MenuItem("Support Truck Dash", open_donate))
-    menu_items.append(pystray.MenuItem("Quit", quit_app))
+        menu_items.append(pystray.MenuItem(T("menu_support"), open_donate))
+    menu_items.append(pystray.MenuItem(T("menu_quit"), quit_app))
     icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", pystray.Menu(*menu_items))
     state.icon = icon
     icon.run()
