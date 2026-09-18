@@ -19,10 +19,10 @@ const TRANSLATIONS = {
     settingsRouteFastest: 'Fastest — prefers highways, like the in-game GPS',
     settingsRouteShortest: 'Shortest distance',
     settingsCurrencyTitle: 'Job pay in your currency:',
-    currencyAuto: 'Auto — from your browser ({cur})',
-    currencyAutoUnknown: 'Auto — from your browser',
+    currencyAuto: 'Auto — from your time zone ({cur})',
+    currencyAutoUnknown: 'Auto — from your time zone',
     currencyOff: 'Game currency only (€ / $)',
-    currencyHint: 'Shown next to the pay here and in the Discord #jobs post. Only the currency code is sent, nothing else.',
+    currencyHint: 'Worked out from your device\'s time zone (or its language) — no location, nothing tracked. Shown next to the pay here and in the Discord #jobs post; only the currency code is sent.',
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
@@ -234,10 +234,10 @@ const TRANSLATIONS = {
     settingsRouteFastest: 'Más rápida — prefiere autopistas, como el GPS del juego',
     settingsRouteShortest: 'Distancia más corta',
     settingsCurrencyTitle: 'Pago del trabajo en tu moneda:',
-    currencyAuto: 'Automático — según tu navegador ({cur})',
-    currencyAutoUnknown: 'Automático — según tu navegador',
+    currencyAuto: 'Automático — según tu zona horaria ({cur})',
+    currencyAutoUnknown: 'Automático — según tu zona horaria',
     currencyOff: 'Solo la moneda del juego (€ / $)',
-    currencyHint: 'Se muestra al lado del pago acá y en el post de entregas de Discord. Solo viaja el código de la moneda, nada más.',
+    currencyHint: 'Se deduce de la zona horaria de tu dispositivo (o de su idioma): sin ubicación, sin rastreo. Se muestra al lado del pago acá y en el post de entregas de Discord; solo viaja el código de la moneda.',
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
@@ -532,9 +532,10 @@ let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como 
 // ---------------------------------------------------------------------------
 // Pago en la moneda "real" del usuario. El SDK paga en la moneda interna del
 // juego (EUR en ETS2, USD en ATS, sin importar la que el usuario eligio ver
-// en las opciones del juego). La moneda local se deduce del idioma del
-// navegador (en-GB -> GBP, pl -> PLN, es-AR -> ARS) - sin geolocalizacion ni
-// nada que identifique - o se elige a mano en Ajustes. Las tasas las da el
+// en las opciones del juego). La moneda local se deduce de la zona horaria
+// del navegador (Europe/London -> GBP) o, si no, de su idioma (es-AR -> ARS)
+// - sin geolocalizacion ni nada que identifique - o se elige a mano en
+// Ajustes. Las tasas las da el
 // backend (/rates, base EUR, se refrescan una vez por dia) y se cachean en
 // localStorage para que sirvan tambien en LAN / sin red. La moneda elegida
 // se manda al backend (set_currency) para que el post de entrega en Discord
@@ -563,19 +564,75 @@ try {
   if (cached && cached.rates && Date.now() - (cached.savedAt || 0) < RATES_MAX_AGE_MS) exchangeRates = cached;
 } catch (e) {}
 
-// Se recorren TODOS los idiomas del navegador, no solo el primero: un
-// telefono en espanol de Latinoamerica reporta ['es-419', 'es-AR'] y el
-// primero no tiene pais (419 = "Latinoamerica").
+// Pais "real" del usuario. Primero la zona horaria del navegador
+// (Europe/London, America/Argentina/Buenos_Aires): refleja donde ESTA la
+// maquina, no en que idioma la usa - un aleman viviendo en Reino Unido
+// tiene que ver libras, no euros. Si la zona no esta en la tabla, se cae
+// al idioma; y ahi se recorren TODOS los idiomas del navegador, no solo el
+// primero: un telefono en espanol de Latinoamerica reporta ['es-419',
+// 'es-AR'] y el primero no tiene pais (419 = "Latinoamerica").
+const TZ_COUNTRY = {
+  'Europe/London': 'GB', 'Europe/Belfast': 'GB', 'Europe/Dublin': 'IE', 'Europe/Lisbon': 'PT', 'Atlantic/Madeira': 'PT', 'Atlantic/Azores': 'PT',
+  'Europe/Madrid': 'ES', 'Atlantic/Canary': 'ES', 'Africa/Ceuta': 'ES', 'Europe/Paris': 'FR', 'Europe/Berlin': 'DE', 'Europe/Busingen': 'DE',
+  'Europe/Amsterdam': 'NL', 'Europe/Brussels': 'BE', 'Europe/Luxembourg': 'LU', 'Europe/Zurich': 'CH', 'Europe/Vienna': 'AT', 'Europe/Rome': 'IT',
+  'Europe/Malta': 'MT', 'Europe/Copenhagen': 'DK', 'Europe/Stockholm': 'SE', 'Europe/Oslo': 'NO', 'Europe/Helsinki': 'FI', 'Atlantic/Reykjavik': 'IS',
+  'Europe/Warsaw': 'PL', 'Europe/Prague': 'CZ', 'Europe/Bratislava': 'SK', 'Europe/Budapest': 'HU', 'Europe/Ljubljana': 'SI', 'Europe/Zagreb': 'HR',
+  'Europe/Sarajevo': 'BA', 'Europe/Belgrade': 'RS', 'Europe/Podgorica': 'ME', 'Europe/Skopje': 'MK', 'Europe/Tirane': 'AL', 'Europe/Athens': 'GR',
+  'Europe/Sofia': 'BG', 'Europe/Bucharest': 'RO', 'Europe/Chisinau': 'MD', 'Europe/Kyiv': 'UA', 'Europe/Kiev': 'UA', 'Europe/Zaporozhye': 'UA',
+  'Europe/Uzhgorod': 'UA', 'Europe/Simferopol': 'UA', 'Europe/Minsk': 'BY', 'Europe/Vilnius': 'LT', 'Europe/Riga': 'LV', 'Europe/Tallinn': 'EE',
+  'Europe/Moscow': 'RU', 'Europe/Kaliningrad': 'RU', 'Europe/Samara': 'RU', 'Europe/Volgograd': 'RU', 'Europe/Saratov': 'RU', 'Europe/Ulyanovsk': 'RU',
+  'Europe/Astrakhan': 'RU', 'Europe/Kirov': 'RU', 'Asia/Yekaterinburg': 'RU', 'Asia/Omsk': 'RU', 'Asia/Novosibirsk': 'RU', 'Asia/Krasnoyarsk': 'RU',
+  'Asia/Irkutsk': 'RU', 'Asia/Yakutsk': 'RU', 'Asia/Vladivostok': 'RU', 'Asia/Magadan': 'RU', 'Asia/Kamchatka': 'RU', 'Asia/Sakhalin': 'RU',
+  'Asia/Chita': 'RU', 'Asia/Barnaul': 'RU', 'Asia/Tomsk': 'RU', 'Asia/Novokuznetsk': 'RU', 'Asia/Anadyr': 'RU',
+  'Europe/Istanbul': 'TR', 'Asia/Istanbul': 'TR', 'Asia/Tbilisi': 'GE', 'Asia/Yerevan': 'AM', 'Asia/Baku': 'AZ', 'Asia/Almaty': 'KZ', 'Asia/Qyzylorda': 'KZ',
+  'Asia/Aqtobe': 'KZ', 'Asia/Aqtau': 'KZ', 'Asia/Oral': 'KZ', 'Asia/Atyrau': 'KZ', 'Asia/Qostanay': 'KZ', 'Asia/Tashkent': 'UZ', 'Asia/Samarkand': 'UZ',
+  'Asia/Jerusalem': 'IL', 'Asia/Tel_Aviv': 'IL', 'Asia/Riyadh': 'SA', 'Asia/Dubai': 'AE', 'Asia/Qatar': 'QA', 'Asia/Kuwait': 'KW',
+  'Africa/Cairo': 'EG', 'Africa/Casablanca': 'MA', 'Africa/Algiers': 'DZ', 'Africa/Tunis': 'TN', 'Africa/Johannesburg': 'ZA', 'Africa/Lagos': 'NG', 'Africa/Nairobi': 'KE',
+  'America/New_York': 'US', 'America/Chicago': 'US', 'America/Denver': 'US', 'America/Phoenix': 'US', 'America/Los_Angeles': 'US', 'America/Anchorage': 'US',
+  'Pacific/Honolulu': 'US', 'America/Detroit': 'US', 'America/Boise': 'US', 'America/Juneau': 'US', 'America/Adak': 'US', 'America/Nome': 'US',
+  'America/Sitka': 'US', 'America/Yakutat': 'US', 'America/Menominee': 'US', 'America/Metlakatla': 'US',
+  'America/Toronto': 'CA', 'America/Vancouver': 'CA', 'America/Edmonton': 'CA', 'America/Winnipeg': 'CA', 'America/Halifax': 'CA', 'America/St_Johns': 'CA',
+  'America/Regina': 'CA', 'America/Montreal': 'CA', 'America/Moncton': 'CA', 'America/Whitehorse': 'CA', 'America/Yellowknife': 'CA', 'America/Iqaluit': 'CA',
+  'America/Dawson': 'CA', 'America/Glace_Bay': 'CA', 'America/Goose_Bay': 'CA', 'America/Swift_Current': 'CA', 'America/Cambridge_Bay': 'CA',
+  'America/Mexico_City': 'MX', 'America/Cancun': 'MX', 'America/Merida': 'MX', 'America/Monterrey': 'MX', 'America/Chihuahua': 'MX', 'America/Mazatlan': 'MX',
+  'America/Tijuana': 'MX', 'America/Hermosillo': 'MX', 'America/Matamoros': 'MX', 'America/Ojinaga': 'MX', 'America/Bahia_Banderas': 'MX', 'America/Ciudad_Juarez': 'MX',
+  'America/Sao_Paulo': 'BR', 'America/Fortaleza': 'BR', 'America/Recife': 'BR', 'America/Bahia': 'BR', 'America/Belem': 'BR', 'America/Manaus': 'BR',
+  'America/Cuiaba': 'BR', 'America/Campo_Grande': 'BR', 'America/Porto_Velho': 'BR', 'America/Boa_Vista': 'BR', 'America/Rio_Branco': 'BR', 'America/Maceio': 'BR',
+  'America/Araguaina': 'BR', 'America/Santarem': 'BR', 'America/Noronha': 'BR', 'America/Eirunepe': 'BR',
+  'America/Buenos_Aires': 'AR', 'America/Cordoba': 'AR', 'America/Mendoza': 'AR', 'America/Catamarca': 'AR', 'America/Jujuy': 'AR',
+  'America/Santiago': 'CL', 'America/Punta_Arenas': 'CL', 'Pacific/Easter': 'CL', 'America/Bogota': 'CO', 'America/Lima': 'PE', 'America/Montevideo': 'UY',
+  'America/Asuncion': 'PY', 'America/La_Paz': 'BO', 'America/Caracas': 'VE', 'America/Guayaquil': 'EC', 'America/Costa_Rica': 'CR', 'America/Guatemala': 'GT',
+  'America/Santo_Domingo': 'DO', 'America/Tegucigalpa': 'HN', 'America/Managua': 'NI', 'America/Panama': 'PA', 'America/El_Salvador': 'SV', 'America/Havana': 'CU',
+  'America/Puerto_Rico': 'PR',
+  'Asia/Tokyo': 'JP', 'Asia/Shanghai': 'CN', 'Asia/Chongqing': 'CN', 'Asia/Urumqi': 'CN', 'Asia/Harbin': 'CN', 'Asia/Seoul': 'KR', 'Asia/Taipei': 'TW',
+  'Asia/Hong_Kong': 'HK', 'Asia/Singapore': 'SG', 'Asia/Kuala_Lumpur': 'MY', 'Asia/Kuching': 'MY', 'Asia/Bangkok': 'TH', 'Asia/Jakarta': 'ID', 'Asia/Makassar': 'ID',
+  'Asia/Jayapura': 'ID', 'Asia/Pontianak': 'ID', 'Asia/Manila': 'PH', 'Asia/Ho_Chi_Minh': 'VN', 'Asia/Saigon': 'VN', 'Asia/Kolkata': 'IN', 'Asia/Calcutta': 'IN',
+  'Asia/Karachi': 'PK', 'Asia/Dhaka': 'BD', 'Asia/Colombo': 'LK', 'Pacific/Auckland': 'NZ',
+};
+// Familias enteras de zonas -> pais (America/Argentina/Salta, Australia/Perth...)
+const TZ_PREFIX_COUNTRY = [['America/Argentina/', 'AR'], ['America/Indiana/', 'US'], ['America/Kentucky/', 'US'], ['America/North_Dakota/', 'US'], ['Australia/', 'AU']];
+function countryFromTimeZone(tz) {
+  if (!tz) return null;
+  if (TZ_COUNTRY[tz]) return TZ_COUNTRY[tz];
+  const hit = TZ_PREFIX_COUNTRY.find(([prefix]) => tz.startsWith(prefix));
+  return hit ? hit[1] : null;
+}
+function countryFromLanguages() {
+  const tags = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+  for (const tag of tags) {
+    let region = null;
+    try { region = new Intl.Locale(tag).maximize().region; } catch (e) {}
+    if (!region || !/^[A-Z]{2}$/.test(region)) { const m = /[-_]([A-Za-z]{2})\b/.exec(tag); region = m ? m[1].toUpperCase() : null; }
+    if (region && REGION_CURRENCY[region]) return region;
+  }
+  return null;
+}
 function browserCurrency() {
   try {
-    const tags = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
-    for (const tag of tags) {
-      let region = null;
-      try { region = new Intl.Locale(tag).maximize().region; } catch (e) {}
-      if (!region || !/^[A-Z]{2}$/.test(region)) { const m = /[-_]([A-Za-z]{2})\b/.exec(tag); region = m ? m[1].toUpperCase() : null; }
-      if (region && REGION_CURRENCY[region]) return REGION_CURRENCY[region];
-    }
-    return null;
+    let tz = null;
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+    const country = countryFromTimeZone(tz) || countryFromLanguages();
+    return country ? REGION_CURRENCY[country] || null : null;
   } catch (e) { return null; }
 }
 function localCurrency() {
