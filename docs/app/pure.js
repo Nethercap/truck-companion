@@ -85,6 +85,148 @@ function connectionViewFor(conn) {
   return { chip: conn.paused ? 'chipPaused' : 'chipLive', cls: 'live', detail: null, empty: null, live: true };
 }
 
+// Distancia acumulada a lo largo de la ruta y punto interpolado a `dist`
+// metros del inicio - base para medir rumbos de entrada/salida en un nodo.
+function routeMetrics(pts) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  }
+  const pointAt = (dist) => {
+    if (dist <= 0) return pts[0];
+    for (let i = 1; i < pts.length; i++) {
+      if (cum[i] >= dist) {
+        const seg = cum[i] - cum[i - 1];
+        const f = seg ? (dist - cum[i - 1]) / seg : 0;
+        return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f];
+      }
+    }
+    return pts[pts.length - 1];
+  };
+  return { cum, pointAt };
+}
+
+function normDeg(d) { return ((d + 540) % 360) - 180; }
+
+// Un prefab (interseccion, enlace de autopista) aporta varios nodos de
+// cruce a pocos metros uno de otro, y la ruta los une con cuerdas rectas
+// que zigzaguean (11 m a 60 grados y vuelta) aunque la calzada siga
+// derecha. Se agrupan como UN cruce: nodos de cruce consecutivos unidos
+// por tramos cortos. Devuelve el indice del ultimo nodo del grupo.
+// maxSpanM acota el largo total: una avenida con nodos de cruce cada 20 m
+// no es un solo prefab, y sin tope el giro del final se atribuia al inicio.
+function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM) {
+  const span = maxSpanM != null ? maxSpanM : 100;
+  let j = i;
+  while (j + 1 < pts.length - 1 && pts[j + 1][3] === 1 && cum[j + 1] - cum[j] < maxGapM && cum[j + 1] - cum[i] <= span) j++;
+  return j;
+}
+
+// Maniobra a anunciar en el cruce que empieza en el nodo i de la ruta (y
+// termina en iEnd, ver junctionClusterEnd). Dos casos:
+//  - 'turn': el rumbo cambia mas de turnThreshold grados, medido legM metros
+//    antes del cruce contra legM metros despues (una curva larga no cuenta).
+//  - 'fork': el cambio es chico pero en ese cruce hay OTRA salida mas recta
+//    que la nuestra - salida de autopista, bifurcacion en Y, rampa. Se mide
+//    a forkLegM (mas lejos: una rampa se separa de la autopista de a poco) y
+//    se compara contra la salida alternativa mas recta del grafo (vecinos
+//    de los nodos del cruce, extendidos un salto mas si el primero es corto).
+//    Solo cuenta si nosotros nos desviamos al menos forkMinDev y la
+//    diferencia con la alternativa es al menos forkMinSep; si la alternativa
+//    dobla mas que nosotros (una calle lateral) no es bifurcacion.
+//  - null: derecho.
+// pts[k] = [x, z, ferry, junction, nodeIdx]; adjacency: Map nodeIdx -> [[to, ...]]
+// (dirigida: en una via de un solo sentido solo aparecen las salidas
+// reales, asi que una rampa de INGRESO que se une por atras no es candidata).
+function detectManeuver(ctx) {
+  const { pts, i, cum, pointAt, bearingBetween, nodes, adjacency } = ctx;
+  const iEnd = ctx.iEnd != null ? ctx.iEnd : i;
+  const turnThreshold = ctx.turnThreshold != null ? ctx.turnThreshold : 35;
+  const legM = ctx.legM != null ? ctx.legM : 60;
+  const forkLegM = ctx.forkLegM != null ? ctx.forkLegM : 250;
+  const forkMinDev = ctx.forkMinDev != null ? ctx.forkMinDev : 6;
+  const forkMinSep = ctx.forkMinSep != null ? ctx.forkMinSep : 8;
+  const forkAltSlack = ctx.forkAltSlack != null ? ctx.forkAltSlack : 10;
+  const inBearing = bearingBetween(pointAt(cum[i] - legM), pts[i]);
+  const outBearing = bearingBetween(pts[iEnd], pointAt(cum[iEnd] + legM));
+  const delta = normDeg(outBearing - inBearing);
+  if (Math.abs(delta) > turnThreshold) {
+    // Dentro del grupo, el giro se atribuye al nodo donde mas cambia el
+    // rumbo entre cuerdas consecutivas - no al primero del grupo, que en una
+    // avenida con nodos cada 20 m puede quedar 80 m antes de la esquina.
+    let at = i, bestLocal = -1;
+    for (let k = i; k <= iEnd; k++) {
+      if (k < 1 || k + 1 >= pts.length) continue;
+      const local = Math.abs(normDeg(bearingBetween(pts[k], pts[k + 1]) - bearingBetween(pts[k - 1], pts[k])));
+      if (local > bestLocal) { bestLocal = local; at = k; }
+    }
+    return { kind: 'turn', direction: delta > 0 ? 'right' : 'left', delta, at };
+  }
+
+  if (!adjacency || !nodes) return null;
+  const routeDelta = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkLegM)) - inBearing);
+  if (Math.abs(routeDelta) < forkMinDev) return null;
+  const onRoute = new Set();
+  for (let k = Math.max(0, i - 1); k <= Math.min(pts.length - 1, iEnd + 1); k++) if (pts[k][4] != null) onRoute.add(pts[k][4]);
+  let bestAlt = null;
+  for (let k = i; k <= iEnd; k++) {
+    const idx = pts[k][4];
+    if (idx == null) continue;
+    for (const [n] of (adjacency.get(idx) || [])) {
+      if (onRoute.has(n)) continue;
+      let far = nodes[n];
+      if (Math.hypot(far[0] - pts[k][0], far[1] - pts[k][1]) < forkLegM) {
+        const b1 = bearingBetween(pts[k], far);
+        let bestM = null, bestDiff = Infinity;
+        for (const [m] of (adjacency.get(n) || [])) {
+          if (m === idx || onRoute.has(m)) continue;
+          const diff = Math.abs(normDeg(bearingBetween(far, nodes[m]) - b1));
+          if (diff < bestDiff) { bestDiff = diff; bestM = m; }
+        }
+        if (bestM != null) far = nodes[bestM];
+      }
+      const altDelta = normDeg(bearingBetween(pts[i], far) - inBearing);
+      if (Math.abs(altDelta) > 100) continue; // vuelve para atras, no es una continuacion
+      if (bestAlt == null || Math.abs(altDelta) < Math.abs(bestAlt)) bestAlt = altDelta;
+    }
+  }
+  if (bestAlt == null) return null;
+  if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return null;
+  if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return null;
+  return { kind: 'fork', direction: routeDelta > bestAlt ? 'right' : 'left', delta: routeDelta, at: i };
+}
+
+// Anti-parpadeo de la indicacion de giro: una maniobra nueva tiene que
+// detectarse `ticks` ticks seguidos para mostrarse, y desaparecer otros
+// tantos para borrarse. Con la misma maniobra ya mostrada se devuelve la
+// deteccion fresca (distancia actualizada). state: objeto mutable propio.
+function stabilizeManeuver(state, turn, ticks) {
+  // Mismo cruce (nodos a menos de 40 m: un prefab suele tener varios) =
+  // misma maniobra: se actualiza la distancia pero se conserva el tipo y el
+  // sentido ya mostrados, para que "keep left" no cambie a "turn left" al
+  // acercarse (la rampa curva cada vez mas dentro de los 60 m de medicion).
+  if (turn && state.shown && Math.hypot(turn.node[0] - state.shown.node[0], turn.node[1] - state.shown.node[1]) < 40) {
+    state.shown = { ...state.shown, distanceMeters: turn.distanceMeters, nearSign: turn.nearSign || state.shown.nearSign };
+    state.candidate = undefined; state.candidateTicks = 0;
+    return state.shown;
+  }
+  const key = turn ? `${turn.kind}|${turn.direction}|${Math.round(turn.node[0])},${Math.round(turn.node[1])}` : null;
+  const shownKey = state.shown ? state.shownKey : null;
+  if (key === shownKey) {
+    if (turn) state.shown = turn;
+    state.candidate = undefined; state.candidateTicks = 0;
+    return state.shown || null;
+  }
+  if (state.candidate === key) state.candidateTicks++;
+  else { state.candidate = key; state.candidateTicks = 1; }
+  if (state.candidateTicks >= ticks) {
+    state.shown = turn; state.shownKey = key;
+    state.candidate = undefined; state.candidateTicks = 0;
+    return turn;
+  }
+  return state.shown || null;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, connectionViewFor };
+  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver };
 }

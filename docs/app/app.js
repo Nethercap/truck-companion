@@ -100,6 +100,8 @@ const TRANSLATIONS = {
     waypointAppOnly: 'Set (app only)',
     navTurnLeft: 'Turn left',
     navTurnRight: 'Turn right',
+    navKeepLeft: 'Keep left',
+    navKeepRight: 'Keep right',
     navOnto: 'onto',
     navToward: 'toward',
     navIn: 'in',
@@ -315,6 +317,8 @@ const TRANSLATIONS = {
     waypointAppOnly: 'Marcado (solo en la app)',
     navTurnLeft: 'Girá a la izquierda',
     navTurnRight: 'Girá a la derecha',
+    navKeepLeft: 'Mantenete a la izquierda',
+    navKeepRight: 'Mantenete a la derecha',
     navOnto: 'hacia',
     navToward: 'hacia',
     navIn: 'en',
@@ -1845,10 +1849,13 @@ function findRoute(startXY, endXY) {
   // el es un ferry/tren (dibujado punteado, sin anunciar giros en el mar);
   // junction = 1 si el nodo es una interseccion real (3+ vecinos), que es
   // el unico lugar donde se anuncia un giro.
+  // El 5to elemento es el indice del nodo en el grafo: lo usa la deteccion
+  // de bifurcaciones (detectManeuver) para mirar que otras salidas hay.
   return path.map((i, k) => [
     nodes[i][0], nodes[i][1],
     (k > 0 && routeGraph.ferryEdges.has(`${path[k - 1]}|${i}`)) ? 1 : 0,
     routeGraph.degree[i] >= 3 ? 1 : 0,
+    i,
   ]);
 }
 
@@ -1950,6 +1957,8 @@ function updateDestinationMarker(data) {
 
   if ((destChanged || offRoute) && data.position?.x != null && routeGraph) {
     currentRouteTarget = routeKey;
+    navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;
+    routeBehind = [];
     let routePoints = [];
     let from = [data.position.x, data.position.z];
     let complete = true;
@@ -2071,6 +2080,12 @@ let headingRefWorld = { x: 0, z: 0 };
 const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo giro
 const NAV_TURN_ANGLE_THRESHOLD_DEG = 35; // cambio de rumbo minimo, medido justo en la interseccion, para contar como "giro"
 const NAV_TURN_LEG_M = 60; // cuanto camino antes/despues de la interseccion se usa para medir el rumbo de entrada/salida
+const NAV_FORK_LEG_M = 250; // para bifurcaciones se mira mas lejos: una rampa se separa de la autopista gradualmente
+const NAV_TURN_DEBOUNCE_TICKS = 2; // una indicacion nueva tiene que verse 2 ticks seguidos (anti-parpadeo al pasar salidas)
+const navManeuverState = {};
+let routeBehind = []; // ultimos nodos de la ruta ya recorridos (ver trimRouteBehindTruck)
+const NAV_JUNCTION_CLUSTER_GAP_M = 50; // nodos de cruce mas cerca que esto son el mismo cruce (prefab)
+const NAV_JUNCTION_CLUSTER_SPAN_M = 100; // y el cruce entero no mide mas que esto
 const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta mas cercano al tramo del giro
 
 // Vista 3D (inclinacion de camara) en modo navegacion, persistida. En nav el
@@ -2126,51 +2141,55 @@ document.getElementById('tilt3dBtn').addEventListener('click', () => {
 // ~60 m a cada lado del cruce. Antes se comparaba el rumbo acumulado contra
 // el inicial, asi que una curva larga en una ruta sin cruces sumaba 25 grados
 // y disparaba "gira a la izquierda" (queja #1 de los usuarios).
+// Ademas de giros (>35 grados) se anuncian bifurcaciones ("keep right/left"):
+// salidas de autopista y rampas se separan de a poco, con menos de 35
+// grados, y antes pasaban en silencio - la primera indicacion era el giro
+// al final de la rampa (queja de r/trucksim). Ver detectManeuver en pure.js.
 function findUpcomingTurn() {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !toLngLat) return null;
-  const pts = currentRouteWorldPoints;
-  const cum = [0];
-  for (let i = 1; i < pts.length; i++) {
-    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
-  }
+  const pts = routeBehind.length ? routeBehind.concat(currentRouteWorldPoints) : currentRouteWorldPoints;
+  const here = routeBehind.length; // indice de la posicion actual dentro de pts
+  const { cum, pointAt } = routeMetrics(pts);
   // Rumbo geografico entre dos puntos de mundo.
   const bearingBetween = (p, q) => {
     const [lng1, lat1] = toLngLat(p[0], p[1]);
     const [lng2, lat2] = toLngLat(q[0], q[1]);
     return geoBearingDeg(lng1, lat1, lng2, lat2);
   };
-  // Punto sobre la ruta a `dist` metros de distancia acumulada (interpolado).
-  const pointAt = (dist) => {
-    if (dist <= 0) return pts[0];
-    for (let i = 1; i < pts.length; i++) {
-      if (cum[i] >= dist) {
-        const seg = cum[i] - cum[i - 1];
-        const f = seg ? (dist - cum[i - 1]) / seg : 0;
-        return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f];
-      }
-    }
-    return pts[pts.length - 1];
-  };
+  const graph = routeGraph ? { nodes: routeGraph.nodes, adjacency: routeGraph.adjacency } : {};
 
-  for (let i = 1; i < pts.length - 1; i++) {
-    if (cum[i] > NAV_TURN_LOOKAHEAD_M) break;
+  for (let i = here + 1; i < pts.length - 1; i++) {
+    if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
     if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
-    const inFrom = pointAt(cum[i] - NAV_TURN_LEG_M);
-    const outTo = pointAt(cum[i] + NAV_TURN_LEG_M);
-    const inBearing = bearingBetween(inFrom, pts[i]);
-    const outBearing = bearingBetween(pts[i], outTo);
-    let delta = outBearing - inBearing;
-    delta = ((delta + 540) % 360) - 180; // normalizar a [-180, 180]
-    if (Math.abs(delta) > NAV_TURN_ANGLE_THRESHOLD_DEG) {
+    const iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
+    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, adjacency: graph.adjacency,
+      turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
+    let m = detectManeuver({ ...ctx, i, iEnd });
+    if (m && m.kind === 'fork') {
+      // La bifurcacion se mide a 250 m: si en ese tramo hay un cruce con un
+      // giro de verdad, lo que "se desvia" es ese giro, no una rampa - se
+      // deja que el giro se anuncie por si mismo (una esquina de 90 grados
+      // avisada como "keep left" 200 m antes confundia).
+      for (let j = iEnd + 1; j < pts.length - 1 && cum[j] - cum[iEnd] <= NAV_FORK_LEG_M; j++) {
+        if (pts[j][3] !== 1) continue;
+        const jEnd = junctionClusterEnd(pts, cum, j, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
+        const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd, adjacency: null });
+        if (mj && mj.kind === 'turn') { m = null; break; }
+        j = jEnd;
+      }
+    }
+    if (m) {
+      const at = m.at != null ? m.at : i;
       // Nombre de ruta del tramo AL QUE se gira (no del que se viene), buscando
       // cerca del punto de mundo un poco despues del giro - asi el cartel del
       // cruce mismo (que suele estar justo en el vertice) no interfiere.
-      const afterTurnIdx = Math.min(i + 2, pts.length - 1);
+      const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
       const [wx, wz] = pts[afterTurnIdx];
       const nearSign = nearestRoadName(wx, wz, NAV_ROAD_NAME_MAX_DIST_M);
-      return { distanceMeters: cum[i], direction: delta > 0 ? 'right' : 'left', nearSign };
+      return { distanceMeters: cum[at] - cum[here], direction: m.direction, kind: m.kind, nearSign, node: [pts[at][0], pts[at][1]] };
     }
+    i = iEnd; // el resto del cruce ya se evaluo como parte de este
   }
   return null;
 }
@@ -2188,8 +2207,11 @@ function updateNavPanel(turn) {
   const panel = document.getElementById('navPanel');
   const nextLine = nextCityName ? `<span class="navNext">${t('navNextCity')}: ${nextCityName}</span>` : '';
   if (turn) {
-    const arrow = turn.direction === 'left' ? '↰' : '↱';
-    const dirText = turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight');
+    const fork = turn.kind === 'fork';
+    const arrow = fork ? (turn.direction === 'left' ? '↖' : '↗') : (turn.direction === 'left' ? '↰' : '↱');
+    const dirText = fork
+      ? (turn.direction === 'left' ? t('navKeepLeft') : t('navKeepRight'))
+      : (turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight'));
     let ontoText = '';
     if (turn.nearSign) {
       const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
@@ -2262,6 +2284,12 @@ function trimRouteBehindTruck(x, z) {
   // Si estamos lejos de la ruta calculada, es un desvio real: offRoute ya se
   // encarga de recalcularla entera, no recortar sobre una ruta vieja.
   if (bestDist > OFF_ROUTE_THRESHOLD_M) return;
+  // Los nodos que quedan atras se guardan aparte (ultimos 8): findUpcomingTurn
+  // los usa para medir el rumbo de ENTRADA a un cruce cercano - sin ellos, a
+  // menos de 60 m del cruce el tramo de entrada se achicaba hasta cero y la
+  // medicion cambiaba justo al llegar (giros que aparecian/desaparecian).
+  for (let k = 1; k <= bestIdx; k++) routeBehind.push(currentRouteWorldPoints[k]);
+  if (routeBehind.length > 8) routeBehind.splice(0, routeBehind.length - 8);
   currentRouteWorldPoints = [bestPoint, ...currentRouteWorldPoints.slice(bestIdx + 1)];
   const parts = splitRouteForDrawing(currentRouteWorldPoints);
   map.getSource('route').setData(parts.land);
@@ -2412,7 +2440,7 @@ function updateMap(position, game) {
 
   // Camara: un unico llamado por tick que combina centro+zoom+bearing segun
   // corresponda, en vez de varios llamados peleandose entre si.
-  const turn = navMode ? findUpcomingTurn() : null;
+  const turn = navMode ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
   if (navMode) {
     updateNavPanel(turn);
     // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
