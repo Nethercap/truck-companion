@@ -49,7 +49,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.4.1"
+CLIENT_VERSION = "1.4.2"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -356,7 +356,14 @@ def build_payload(raw: dict) -> dict:
         "gear": raw.get("gearDashboard"),
         "routeDistanceKm": (raw.get("routeDistance") or 0) / 1000,
         "routeTimeSeconds": raw.get("routeTime"),
+        # restStop viene en MINUTOS de tiempo de juego (hasta el proximo descanso
+        # obligatorio por fatiga). restStopSeconds es el nombre viejo, mal
+        # puesto, que la web sigue aceptando; los dos traen minutos.
         "restStopSeconds": raw.get("restStop"),
+        "restStopMinutes": raw.get("restStop"),
+        # Reloj del juego en minutos: la web lo usa para medir la escala de
+        # tiempo real (ETA real, descanso en tiempo real).
+        "gameTimeMinutes": raw.get("time_abs"),
         # time_abs/time_abs_delivery vienen en minutos de tiempo de juego (no
         # tiempo real) - la diferencia es cuanto falta para el deadline de
         # entrega del trabajo actual. Sin trabajo activo, time_abs_delivery

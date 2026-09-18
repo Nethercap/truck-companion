@@ -207,6 +207,8 @@ const TRANSLATIONS = {
     demoNoCommands: 'Truck buttons need the real game - this is the demo',
     emptyDemoLink: 'or try the demo',
     reportProblem: 'Report a problem',
+    nextRest: 'Next rest stop',
+    realShort: 'real',
     mapLoadingCities: 'Loading map: cities…',
     mapLoadingGraph: 'Loading map: road network…',
     mapLoadingNames: 'Loading map: road names…',
@@ -416,6 +418,8 @@ const TRANSLATIONS = {
     demoNoCommands: 'La botonera necesita el juego real - esto es la demo',
     emptyDemoLink: 'o probá la demo',
     reportProblem: 'Reportar un problema',
+    nextRest: 'Próximo descanso',
+    realShort: 'real',
     mapLoadingCities: 'Cargando mapa: ciudades…',
     mapLoadingGraph: 'Cargando mapa: red de rutas…',
     mapLoadingNames: 'Cargando mapa: nombres de rutas…',
@@ -701,7 +705,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260826', ats_c2c: '20260906', ats_promods: '20260915', ets2: '20260918', ets2_promods: '20260918' };
+const MAP_DATA_VERSION = { ats: '20260919', ats_c2c: '20260919', ats_promods: '20260919', ets2: '20260919', ets2_promods: '20260919' };
 const GAME_MAPS = {
   ats: {
     assetsDir: `${REMOTE_MAP_BASE}/ats`,
@@ -1376,14 +1380,31 @@ async function loadRouteGraph(mapInfo) {
     // Aristas [a, b, peso, esFerry?] - las de ferry/tren (build_route_graph.py
     // las agrega desde *-ferries.json) se guardan aparte para dibujar ese
     // tramo punteado y no contarlo como "giro".
+    // flags (4to elemento): bit 1 = ferry/tren, bit 2 = un solo sentido
+    // (solo a -> b). Sin flags = doble mano. Las de un sentido son las
+    // calzadas de autopista dividida y rampas: sin esto el A* mandaba por la
+    // calzada contraria.
     const ferryEdges = new Set();
-    for (const [a, b, w, ferry] of data.edges) {
-      if (!adjacency.has(a)) adjacency.set(a, []);
-      if (!adjacency.has(b)) adjacency.set(b, []);
-      adjacency.get(a).push([b, w]);
-      adjacency.get(b).push([a, w]);
-      if (ferry) { ferryEdges.add(`${a}|${b}`); ferryEdges.add(`${b}|${a}`); }
+    // Grado "topologico" (con cuantos nodos distintos se conecta cada nodo,
+    // sin importar el sentido): >= 3 es una interseccion real, que es donde
+    // tiene sentido anunciar un giro.
+    const neighborSets = new Map();
+    const link = (from, to, w) => {
+      if (!adjacency.has(from)) adjacency.set(from, []);
+      adjacency.get(from).push([to, w]);
+      if (!neighborSets.has(from)) neighborSets.set(from, new Set());
+      neighborSets.get(from).add(to);
+      if (!neighborSets.has(to)) neighborSets.set(to, new Set());
+      neighborSets.get(to).add(from);
+    };
+    for (const [a, b, w, flags] of data.edges) {
+      const f = flags || 0;
+      link(a, b, w);
+      if (!(f & 2)) link(b, a, w);
+      if (f & 1) { ferryEdges.add(`${a}|${b}`); ferryEdges.add(`${b}|${a}`); }
     }
+    const degree = new Uint8Array(data.nodes.length);
+    for (const [i, set] of neighborSets) degree[i] = Math.min(255, set.size);
 
     // El grafo extraido de los datos del juego no siempre queda 100% conectado
     // (intersecciones complejas mal resueltas dejan bolsones aislados). Si el
@@ -1404,7 +1425,7 @@ async function loadRouteGraph(mapInfo) {
       while (stack.length) {
         const cur = stack.pop();
         size++;
-        for (const [n] of adjacency.get(cur) || []) {
+        for (const n of neighborSets.get(cur) || []) {
           if (componentId[n] === -1) {
             componentId[n] = id;
             stack.push(n);
@@ -1415,7 +1436,7 @@ async function loadRouteGraph(mapInfo) {
       if (size > biggestSize) { biggestSize = size; biggestComponent = id; }
     }
 
-    routeGraph = { nodes: data.nodes, adjacency, componentId, componentSize, giantComponent: biggestComponent, ferryEdges };
+    routeGraph = { nodes: data.nodes, adjacency, componentId, componentSize, giantComponent: biggestComponent, ferryEdges, degree };
   } catch (err) {
     routeGraph = null;
   }
@@ -1535,9 +1556,15 @@ function findRoute(startXY, endXY) {
     path.push(node);
   }
   path.reverse();
-  // Cada punto lleva un 3er elemento = 1 si el tramo que LLEGA a el es un
-  // ferry/tren (para dibujarlo punteado y no anunciar "giros" en el mar).
-  return path.map((i, k) => (k > 0 && routeGraph.ferryEdges.has(`${path[k - 1]}|${i}`)) ? [nodes[i][0], nodes[i][1], 1] : nodes[i]);
+  // Cada punto: [x, y, ferry, junction]. ferry = 1 si el tramo que LLEGA a
+  // el es un ferry/tren (dibujado punteado, sin anunciar giros en el mar);
+  // junction = 1 si el nodo es una interseccion real (3+ vecinos), que es
+  // el unico lugar donde se anuncia un giro.
+  return path.map((i, k) => [
+    nodes[i][0], nodes[i][1],
+    (k > 0 && routeGraph.ferryEdges.has(`${path[k - 1]}|${i}`)) ? 1 : 0,
+    routeGraph.degree[i] >= 3 ? 1 : 0,
+  ]);
 }
 
 // Objetivo de la ruta, en orden de preferencia: la empresa de carga (si hay
@@ -1748,7 +1775,8 @@ let navMode = false;
 let navAutoZoomPaused = false; // true si el usuario zoomeo a mano en modo nav - se reactiva al recentrar
 let lastHeadingDeg = 0;
 const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo giro
-const NAV_TURN_ANGLE_THRESHOLD_DEG = 25; // cambio de rumbo minimo para contar como "giro" y no ruido del trazado
+const NAV_TURN_ANGLE_THRESHOLD_DEG = 35; // cambio de rumbo minimo, medido justo en la interseccion, para contar como "giro"
+const NAV_TURN_LEG_M = 60; // cuanto camino antes/despues de la interseccion se usa para medir el rumbo de entrada/salida
 const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta mas cercano al tramo del giro
 
 function setNavMode(on) {
@@ -1772,38 +1800,55 @@ function setNavMode(on) {
 // posicion actual por trimRouteBehindTruck), mirando hasta NAV_TURN_LOOKAHEAD_M
 // adelante, usando bearing geografico real (no depende del mapa ni de su
 // rotacion actual). Devuelve null si el camino sigue derecho en ese tramo.
+// Proximo giro: SOLO en intersecciones reales del grafo (nodos con 3+
+// vecinos) y comparando el rumbo de entrada contra el de salida medidos en
+// ~60 m a cada lado del cruce. Antes se comparaba el rumbo acumulado contra
+// el inicial, asi que una curva larga en una ruta sin cruces sumaba 25 grados
+// y disparaba "gira a la izquierda" (queja #1 de los usuarios).
 function findUpcomingTurn() {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !toLngLat) return null;
-  const pts = [];
-  let cumDist = 0;
-  for (let i = 0; i < currentRouteWorldPoints.length; i++) {
-    const [wx, wz] = currentRouteWorldPoints[i];
-    if (i > 0) {
-      const [pwx, pwz] = currentRouteWorldPoints[i - 1];
-      cumDist += Math.hypot(wx - pwx, wz - pwz);
-    }
-    if (cumDist > NAV_TURN_LOOKAHEAD_M) break;
-    // Un tramo de ferry/tren no es un giro: cortar la busqueda ahi (lo que
-    // haya del otro lado del agua se anuncia cuando estemos alla).
-    if (i > 0 && currentRouteWorldPoints[i][2] === 1) break;
-    const [lng, lat] = toLngLat(wx, wz);
-    pts.push({ lng, lat, dist: cumDist });
+  const pts = currentRouteWorldPoints;
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   }
-  if (pts.length < 3) return null;
+  // Rumbo geografico entre dos puntos de mundo.
+  const bearingBetween = (p, q) => {
+    const [lng1, lat1] = toLngLat(p[0], p[1]);
+    const [lng2, lat2] = toLngLat(q[0], q[1]);
+    return geoBearingDeg(lng1, lat1, lng2, lat2);
+  };
+  // Punto sobre la ruta a `dist` metros de distancia acumulada (interpolado).
+  const pointAt = (dist) => {
+    if (dist <= 0) return pts[0];
+    for (let i = 1; i < pts.length; i++) {
+      if (cum[i] >= dist) {
+        const seg = cum[i] - cum[i - 1];
+        const f = seg ? (dist - cum[i - 1]) / seg : 0;
+        return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f];
+      }
+    }
+    return pts[pts.length - 1];
+  };
 
-  const initialBearing = geoBearingDeg(pts[0].lng, pts[0].lat, pts[1].lng, pts[1].lat);
   for (let i = 1; i < pts.length - 1; i++) {
-    const segBearing = geoBearingDeg(pts[i].lng, pts[i].lat, pts[i + 1].lng, pts[i + 1].lat);
-    let delta = segBearing - initialBearing;
+    if (cum[i] > NAV_TURN_LOOKAHEAD_M) break;
+    if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
+    if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
+    const inFrom = pointAt(cum[i] - NAV_TURN_LEG_M);
+    const outTo = pointAt(cum[i] + NAV_TURN_LEG_M);
+    const inBearing = bearingBetween(inFrom, pts[i]);
+    const outBearing = bearingBetween(pts[i], outTo);
+    let delta = outBearing - inBearing;
     delta = ((delta + 540) % 360) - 180; // normalizar a [-180, 180]
     if (Math.abs(delta) > NAV_TURN_ANGLE_THRESHOLD_DEG) {
       // Nombre de ruta del tramo AL QUE se gira (no del que se viene), buscando
       // cerca del punto de mundo un poco despues del giro - asi el cartel del
       // cruce mismo (que suele estar justo en el vertice) no interfiere.
-      const afterTurnIdx = Math.min(i + 2, currentRouteWorldPoints.length - 1);
-      const [wx, wz] = currentRouteWorldPoints[afterTurnIdx];
+      const afterTurnIdx = Math.min(i + 2, pts.length - 1);
+      const [wx, wz] = pts[afterTurnIdx];
       const nearSign = nearestRoadName(wx, wz, NAV_ROAD_NAME_MAX_DIST_M);
-      return { distanceMeters: pts[i].dist, direction: delta > 0 ? 'right' : 'left', nearSign };
+      return { distanceMeters: cum[i], direction: delta > 0 ? 'right' : 'left', nearSign };
     }
   }
   return null;
@@ -2093,7 +2138,50 @@ let etaSampleTarget = null; // cityDst actual - resetea la ventana si cambia el 
 let etaDisplayValue = null; // ultimo valor mostrado (se mantiene fijo entre recalculos)
 let etaLastRecalcTime = null;
 
+// Escala de tiempo del juego (minutos de juego por minuto real). Se mide en
+// vivo con gameTimeMinutes (time_abs del SDK) contra el reloj real; hasta
+// tener medicion se asume la escala del mapa (ATS 20x, ETS2 19x, que es lo
+// que usa el juego cuando el camion se mueve).
+let timeScaleSamples = [];
+let lastGameTimeSample = null;
+function measuredTimeScale(data) {
+  if (data.gameTimeMinutes != null && data.ts != null) {
+    if (lastGameTimeSample && data.ts - lastGameTimeSample.ts >= 30) {
+      const gameMin = data.gameTimeMinutes - lastGameTimeSample.gameMin;
+      const realMin = (data.ts - lastGameTimeSample.ts) / 60;
+      const scale = gameMin / realMin;
+      if (scale > 1 && scale < 60) timeScaleSamples.push(scale);
+      if (timeScaleSamples.length > 10) timeScaleSamples.shift();
+      lastGameTimeSample = { ts: data.ts, gameMin: data.gameTimeMinutes };
+    } else if (!lastGameTimeSample) {
+      lastGameTimeSample = { ts: data.ts, gameMin: data.gameTimeMinutes };
+    }
+  }
+  if (timeScaleSamples.length >= 2) {
+    const sorted = [...timeScaleSamples].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  }
+  return distanceScale();
+}
+
+// ETA real = ETA del juego pasado a tiempo real (base) corregido por el ritmo
+// medido (distancia recorrida en los ultimos minutos) a medida que hay datos.
+// Antes era solo lo medido: en ciudad, a 20 km/h, extrapolaba "5 h" para un
+// viaje de 50 min reales y recien se acomodaba en la autopista.
 function computeRealEtaSeconds(data) {
+  if (!data.routeDistanceKm || data.ts == null) return null;
+  const scale = measuredTimeScale(data);
+  const prior = data.routeTimeSeconds != null && data.routeTimeSeconds > 0 ? data.routeTimeSeconds / scale : null;
+  const measured = computeMeasuredEtaSeconds(data);
+  if (measured == null) return prior;
+  if (prior == null) return measured;
+  // Peso de lo medido: 0 con menos de 2 min de muestras, 0.7 a partir de 10 min.
+  const span = etaSamples.length ? data.ts - etaSamples[0].t : 0;
+  const w = Math.max(0, Math.min(0.7, (span - 120) / (600 - 120) * 0.7));
+  return prior * (1 - w) + measured * w;
+}
+
+function computeMeasuredEtaSeconds(data) {
   if (!data.routeDistanceKm || data.ts == null) return null;
   if (data.cityDst !== etaSampleTarget) {
     etaSampleTarget = data.cityDst;
@@ -2280,6 +2368,20 @@ function updateHud(data) {
   updateWaypointRoute(data);
   const realEtaSeconds = computeRealEtaSeconds(data);
   document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');
+
+  // Proximo descanso obligatorio (fatiga): el SDK manda MINUTOS de juego
+  // (restStopMinutes; restStopSeconds es el nombre viejo del cliente <=1.4.1,
+  // tambien en minutos). Solo se muestra si el juego manda un valor util -
+  // con la simulacion de fatiga apagada no significa nada.
+  const restMin = data.restStopMinutes != null ? data.restStopMinutes : data.restStopSeconds;
+  const restRow = document.getElementById('restStopRow');
+  if (restMin != null && restMin > 0 && restMin < 24 * 60) {
+    restRow.hidden = false;
+    const realSec = (restMin * 60) / measuredTimeScale(data);
+    document.getElementById('restStop').textContent = `${formatSeconds(restMin * 60)} · ≈ ${formatSeconds(realSec)} ${t('realShort')}`;
+  } else {
+    restRow.hidden = true;
+  }
 
   document.getElementById('jobIncome').textContent = data.jobIncome ? `$${data.jobIncome.toLocaleString()}` : '-';
 
@@ -3143,6 +3245,8 @@ function runDemo() {
       isCargoLoaded: true,
       routeDistanceKm: remainingKm,
       routeTimeSeconds: (remainingKm * 1000) / DEMO_SPEED_MS,
+      gameTimeMinutes: Math.floor((Date.now() / 1000) * DEMO_DISTANCE_SCALE / 60),
+      restStopMinutes: 6 * 60 + 40,
       jobDeadlineSeconds: 3600 * 9,
       truckBrand: DEMO_ROUTE.truckBrand,
       truckName: DEMO_ROUTE.truckName,
