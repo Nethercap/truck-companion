@@ -68,3 +68,34 @@ jobs:
             - `TruckDash.exe`: `${{ env.EXE_SHA256 }}`
 
             Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". The client is open source, needs no admin rights and only reads the game's telemetry.
+      - name: Announce on Discord
+        # Embed en el canal de releases del Discord. Solo si el secret
+        # DISCORD_RELEASES_WEBHOOK existe (repo → Settings → Secrets → Actions).
+        if: startsWith(github.ref, 'refs/tags/v') && secrets.DISCORD_RELEASES_WEBHOOK != ''
+        shell: pwsh
+        env:
+          DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          $tag = $env:TAG
+          # Notas: el cuerpo del ultimo commit del tag (la primera linea es el titulo).
+          $lines = (git log -1 --format=%B "$tag") -split "`n" | Where-Object { $_ -notmatch '^Co-Authored-By' }
+          $title = $lines[0]
+          $body = (($lines | Select-Object -Skip 1) -join "`n").Trim()
+          if ($body.Length -gt 1500) { $body = $body.Substring(0, 1500) + "..." }
+          $payload = @{
+            username = "Truck Dash releases"
+            embeds = @(@{
+              title = "Truck Dash $tag is out"
+              url = "https://github.com/$env:REPO/releases/tag/$tag"
+              description = "**$title**`n`n$body"
+              color = 3907327
+              fields = @(
+                @{ name = "Download"; value = "[TruckDash-windows.zip](https://github.com/$env:REPO/releases/download/$tag/TruckDash-windows.zip)"; inline = $true },
+                @{ name = "SHA-256 (zip)"; value = "``$env:ZIP_SHA256``"; inline = $false }
+              )
+              footer = @{ text = "Running clients get an update prompt automatically. SmartScreen: More info -> Run anyway (unsigned build)." }
+            })
+          } | ConvertTo-Json -Depth 6
+          Invoke-RestMethod -Method Post -Uri $env:DISCORD_RELEASES_WEBHOOK -ContentType "application/json" -Body $payload
