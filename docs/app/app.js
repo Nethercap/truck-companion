@@ -194,6 +194,8 @@ const TRANSLATIONS = {
     poiCatDealer: 'Truck dealer',
     poiCatWeigh: 'Weigh station',
     poiLoading: 'Loading places…',
+    poiLoadFailed: "Couldn't load the places list (no connection to trucksim-dash.com?).",
+    poiRetry: 'Retry',
     poiNoPosition: 'Waiting for your position (start driving first).',
     poiNoResults: 'Nothing found.',
     poiAddedToast: 'Routing via {name}',
@@ -396,6 +398,8 @@ const TRANSLATIONS = {
     poiCatDealer: 'Concesionaria',
     poiCatWeigh: 'Báscula',
     poiLoading: 'Cargando lugares…',
+    poiLoadFailed: 'No se pudo cargar la lista de lugares (¿sin conexión a trucksim-dash.com?).',
+    poiRetry: 'Reintentar',
     poiNoPosition: 'Esperando tu posición (arrancá a manejar primero).',
     poiNoResults: 'No se encontró nada.',
     poiAddedToast: 'Ruteando por {name}',
@@ -1146,21 +1150,40 @@ function updateWaypointRoute(data) {
 const POI_BASE = (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname)) ? '../data' : 'https://trucksim-dash.com/data';
 const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh' };
 const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️' };
-let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]] }
+let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]], cities: {token: name} }
 let poisVariant = null;
+let poisLoading = null; // promesa en curso, para no disparar dos fetch del mismo archivo
+let poisError = null;
 let poiCategory = 'g';
 
 async function loadPois(variant) {
   if (poisVariant === variant && pois) return pois;
+  if (poisVariant === variant && poisLoading) return poisLoading;
   poisVariant = variant;
   pois = null;
-  try {
-    const res = await fetch(`${POI_BASE}/pois-${variant}.json`);
-    if (res.ok) pois = await res.json();
-  } catch (err) {
-    pois = null;
-  }
-  return pois;
+  poisError = null;
+  poisLoading = (async () => {
+    try {
+      const res = await fetch(`${POI_BASE}/pois-${variant}.json`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      pois = await res.json();
+    } catch (err) {
+      pois = null;
+      poisError = String(err);
+      console.error('No se pudieron cargar los POIs', variant, err);
+    } finally {
+      poisLoading = null;
+    }
+    // Si el modal esta abierto esperando, refrescarlo sin importar quien
+    // disparo la carga (el mapa al iniciar o el propio modal).
+    if (document.getElementById('poiModal').style.display === 'flex') renderPoiResults();
+    return pois;
+  })();
+  return poisLoading;
+}
+
+function poiVariantNow() {
+  return currentGame || (lastData ? resolveEffectiveGame(lastData.game) : null);
 }
 
 function findCompanyPoi(token, cityToken) {
@@ -1209,7 +1232,20 @@ function cityLabel(token) {
 function renderPoiResults() {
   const list = document.getElementById('poiResults');
   const pos = lastWorldPos;
-  if (!pois) { list.innerHTML = `<div class="poiEmpty">${t('poiLoading')}</div>`; return; }
+  if (!pois) {
+    if (poisError || (!poisLoading && !poiVariantNow())) {
+      list.innerHTML = `<div class="poiEmpty">${t('poiLoadFailed')}</div><button class="poiItem" id="poiRetryBtn">${t('poiRetry')}</button>`;
+      document.getElementById('poiRetryBtn').addEventListener('click', () => {
+        poisVariant = null; poisError = null;
+        list.innerHTML = `<div class="poiEmpty">${t('poiLoading')}</div>`;
+        const v = poiVariantNow();
+        if (v) loadPois(v); else renderPoiResults();
+      });
+      return;
+    }
+    list.innerHTML = `<div class="poiEmpty">${t('poiLoading')}</div>`;
+    return;
+  }
   if (!pos) { list.innerHTML = `<div class="poiEmpty">${t('poiNoPosition')}</div>`; return; }
   const query = document.getElementById('poiSearchInput').value;
   let results;
@@ -1236,8 +1272,9 @@ function renderPoiResults() {
 function openPoiModal() {
   document.getElementById('poiModal').style.display = 'flex';
   document.getElementById('poiSearchInput').value = '';
+  const variant = poiVariantNow();
+  if (!pois && variant && !poisLoading) loadPois(variant);
   renderPoiResults();
-  if (!pois && currentGame) loadPois(currentGame).then(renderPoiResults);
 }
 function closePoiModal() { document.getElementById('poiModal').style.display = 'none'; }
 
