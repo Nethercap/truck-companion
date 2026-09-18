@@ -451,3 +451,21 @@ def test_viewer_with_unknown_code_is_still_rejected(client, main):
             pass
     assert exc.value.code == 4404
     assert "ZZZZ9999" not in main.sessions
+
+
+def test_job_delivered_true_on_first_tick_of_a_session_is_not_counted(client, main, monkeypatch):
+    # El flag del SDK queda en true un buen rato despues de entregar: un
+    # cliente que (re)conecta con el flag ya en true no debe generar una
+    # entrega nueva. Solo cuenta la transicion false -> true vista en la sesion.
+    recorded = []
+    monkeypatch.setattr(main, "record_job_delivered", lambda info: recorded.append(info))
+    code = client.post("/pair/new").json()["code"]
+    tick = lambda delivered: main.json.dumps({"citySrc": "A", "cityDst": "B", "cargo": "C", "event": {"jobDelivered": delivered, "jobDeliveredRevenue": 100, "jobDeliveredDistanceKm": 10}})
+    with client.websocket_connect(f"/ws/client/{code}") as ws:
+        ws.send_text(tick(True))   # estado heredado: no cuenta
+        ws.send_text(tick(True))
+        ws.send_text(tick(False))
+        ws.send_text(tick(True))   # transicion real: cuenta
+        import time as _time
+        _time.sleep(0.1)
+    assert len(recorded) == 1

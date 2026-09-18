@@ -158,7 +158,11 @@ JOB_DELIVERED_COOLDOWN_SECONDS = 20
 # capa compara contra el ultimo trabajo ya guardado en las stats globales
 # (sobrevive un redeploy, a diferencia del estado en memoria de Session) y
 # lo descarta si es identico y llego dentro de esta ventana.
-JOB_DEDUPE_WINDOW_SECONDS = 5 * 60
+# Una hora: el flag jobDelivered del SDK queda en true durante minutos (hasta
+# el proximo trabajo), asi que un cliente o backend reiniciado en ese rato
+# vuelve a ver el mismo evento. Dos entregas reales identicas (misma ruta,
+# carga, pago exacto y distancia) en una hora no existen en la practica.
+JOB_DEDUPE_WINDOW_SECONDS = 60 * 60
 
 
 GAME_LABELS = {"ats": "ATS", "ets2": "ETS2"}
@@ -241,7 +245,12 @@ class Session:
         self.client_ws: Optional[WebSocket] = None
         self.viewer_ws_list: list[WebSocket] = []
         self.counted = False  # ya se sumo al contador historico (una vez por sesion, no por reconexion)
-        self.last_job_delivered = False  # flanco para no contar el mismo evento en cada tick que el pulso siga en true
+        # Flanco para no contar el mismo evento en cada tick que el flag siga
+        # en true. None = todavia no vimos ningun tick de este cliente: el
+        # primer payload solo fija el estado, NO cuenta - si el flag ya viene
+        # en true es una entrega anterior a esta sesion (backend o cliente
+        # reiniciado, codigo nuevo), no una nueva.
+        self.last_job_delivered: Optional[bool] = None
         self.last_job_delivered_at = 0.0  # cooldown extra: el SDK a veces re-pulsa el mismo evento (ver JOB_DELIVERED_COOLDOWN_SECONDS)
         # Mismo snapshot que ya cachea client.py (citySrc/cityDst/cargo se
         # limpian en el mismo tick que jobDelivered pulsa), pero duplicado
@@ -541,7 +550,7 @@ async def ws_client(websocket: WebSocket, code: str):
                 # de subida evita contarlo dos veces.
                 if (
                     job_delivered
-                    and not session.last_job_delivered
+                    and session.last_job_delivered is False
                     and now - session.last_job_delivered_at > JOB_DELIVERED_COOLDOWN_SECONDS
                 ):
                     session.last_job_delivered_at = now

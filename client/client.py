@@ -49,7 +49,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.4.0"
+CLIENT_VERSION = "1.4.1"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -455,7 +455,26 @@ def update_job_snapshot(raw: dict):
         }
 
 
+# jobDelivered/jobCancelled NO son un pulso de un frame en la memoria
+# compartida: el plugin los deja en true hasta que el juego los limpia (minutos,
+# hasta el proximo trabajo). Si se mandaran tal cual, cada reconexion del
+# cliente o reinicio del backend volveria a "entregar" el mismo trabajo. Se
+# manda true solo en la transicion false -> true vista por este proceso; el
+# primer tick despues de arrancar solo fija el estado (None = desconocido).
+_last_event_state = {"jobDelivered": None, "jobCancelled": None}
+
+
+def edge_filter_job_events(payload: dict) -> None:
+    event = payload.get("event") or {}
+    for key in ("jobDelivered", "jobCancelled"):
+        current = bool(event.get(key))
+        previous = _last_event_state[key]
+        _last_event_state[key] = current
+        event[key] = current and previous is False
+
+
 def attach_job_snapshot_if_finished(payload: dict):
+    edge_filter_job_events(payload)
     event = payload.get("event") or {}
     if event.get("jobDelivered") or event.get("jobCancelled"):
         event["jobSrc"] = _last_job_snapshot["citySrc"]

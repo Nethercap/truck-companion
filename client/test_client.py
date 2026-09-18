@@ -239,6 +239,11 @@ def test_attach_job_snapshot_if_finished_attaches_on_delivered_or_cancelled():
         "citySrc": "Phoenix", "cityDst": "Denver",
         "truckBrand": "Kenworth", "truckName": "T680", "cargo": "Steel",
     }
+    # Primero un tick sin evento (estado conocido = false), despues la entrega:
+    # una entrega vista en el primer tick del proceso es un flag heredado, no
+    # se adjunta nada (ver edge_filter_job_events).
+    client._last_event_state.update({"jobDelivered": None, "jobCancelled": None})
+    client.attach_job_snapshot_if_finished({"event": {"jobDelivered": False, "jobCancelled": False}})
     payload = {"event": {"jobDelivered": True}}
     client.attach_job_snapshot_if_finished(payload)
     assert payload["event"]["jobSrc"] == "Phoenix"
@@ -250,3 +255,16 @@ def test_attach_job_snapshot_if_finished_noop_when_no_event():
     payload = {"event": {"jobDelivered": False, "jobCancelled": False}}
     client.attach_job_snapshot_if_finished(payload)
     assert "jobSrc" not in payload["event"]
+
+
+def test_job_delivered_sent_only_on_rising_edge_never_on_first_tick():
+    client._last_event_state.update({"jobDelivered": None, "jobCancelled": None})
+    def tick(delivered):
+        payload = {"event": {"jobDelivered": delivered, "jobCancelled": False}}
+        client.attach_job_snapshot_if_finished(payload)
+        return payload["event"]["jobDelivered"]
+    assert tick(True) is False    # flag heredado de antes de arrancar: no es una entrega nueva
+    assert tick(True) is False
+    assert tick(False) is False
+    assert tick(True) is True     # transicion real
+    assert tick(True) is False    # sigue en true: no se repite
