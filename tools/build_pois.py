@@ -30,7 +30,7 @@ VARIANTS = {
     "ats_c2c": ("parser-output-ats-c2c", "usa"),
     "ats_promods": ("parser-output-ats-promods-v164", "usa"),
     "ets2": ("parser-output-ets2", "europe"),
-    "ets2_promods": ("parser-output-ets2-promods-full", "europe"),
+    "ets2_promods": ("parser-output-ets2-promods-v284", "europe"),  # ProMods 2.84 + ME 2.84 + Maghreb 1.04 + TGS 1.70
 }
 
 FACILITY_CODES = {

@@ -695,6 +695,13 @@ document.addEventListener('keydown', (e) => {
 // mapa en si). Todo se sirve desde R2 (maps.trucksim-dash.com), igual que
 // los tiles PNG que reemplaza.
 const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
+// Version de los datos de cada mapa (fecha de la ultima regeneracion). Se
+// agrega como ?v= a Cities/route-graph/road-names/pmtiles: R2 no manda
+// Cache-Control y los navegadores cachean por heuristica sobre
+// Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
+// nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
+// numero de la variante que se regenero.
+const MAP_DATA_VERSION = { ats: '20260826', ats_c2c: '20260906', ats_promods: '20260915', ets2: '20260918', ets2_promods: '20260918' };
 const GAME_MAPS = {
   ats: {
     assetsDir: `${REMOTE_MAP_BASE}/ats`,
@@ -919,6 +926,8 @@ function ensureMapInitialized() {
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     map.addSource('route', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 0.9 } });
+    map.addSource('route-ferry', { type: 'geojson', data: emptyLineString() });
+    map.addLayer({ id: 'route-ferry-line', type: 'line', source: 'route-ferry', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [1.5, 2] } });
     if (pendingGame) { const g = pendingGame; pendingGame = null; loadGameMap(g); }
   });
 }
@@ -947,7 +956,7 @@ async function loadPoiIcons() {
 
 async function loadCities(mapInfo) {
   try {
-    const res = await fetch(`${mapInfo.assetsDir}/Cities.json`);
+    const res = await fetch(`${mapInfo.assetsDir}/Cities.json?v=${MAP_DATA_VERSION[currentGame] || ''}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const list = await res.json();
     citiesByName = {};
@@ -968,7 +977,7 @@ let roadNames = []; // [{x, y, label, kind: 'road'|'city'}, ...] en coordenadas 
 async function loadRoadNames(mapInfo) {
   roadNames = [];
   try {
-    const res = await fetch(`${mapInfo.assetsDir}/road-names.json`);
+    const res = await fetch(`${mapInfo.assetsDir}/road-names.json?v=${MAP_DATA_VERSION[currentGame] || ''}`);
     if (!res.ok) return;
     roadNames = await res.json();
   } catch (err) {
@@ -1360,15 +1369,20 @@ function distanceToRouteMeters(x, z) {
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
   try {
-    const res = await fetch(`${mapInfo.assetsDir}/route-graph-${currentGame}.json`);
+    const res = await fetch(`${mapInfo.assetsDir}/route-graph-${currentGame}.json?v=${MAP_DATA_VERSION[currentGame] || ''}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const adjacency = new Map();
-    for (const [a, b, w] of data.edges) {
+    // Aristas [a, b, peso, esFerry?] - las de ferry/tren (build_route_graph.py
+    // las agrega desde *-ferries.json) se guardan aparte para dibujar ese
+    // tramo punteado y no contarlo como "giro".
+    const ferryEdges = new Set();
+    for (const [a, b, w, ferry] of data.edges) {
       if (!adjacency.has(a)) adjacency.set(a, []);
       if (!adjacency.has(b)) adjacency.set(b, []);
       adjacency.get(a).push([b, w]);
       adjacency.get(b).push([a, w]);
+      if (ferry) { ferryEdges.add(`${a}|${b}`); ferryEdges.add(`${b}|${a}`); }
     }
 
     // El grafo extraido de los datos del juego no siempre queda 100% conectado
@@ -1378,6 +1392,7 @@ async function loadRouteGraph(mapInfo) {
     // identificamos la componente conexa mas grande ("giant component") y
     // preferimos siempre buscar el nodo mas cercano dentro de ella.
     const componentId = new Int32Array(data.nodes.length).fill(-1);
+    const componentSize = new Map();
     let biggestComponent = -1;
     let biggestSize = 0;
     for (let start = 0; start < data.nodes.length; start++) {
@@ -1396,21 +1411,36 @@ async function loadRouteGraph(mapInfo) {
           }
         }
       }
+      componentSize.set(id, size);
       if (size > biggestSize) { biggestSize = size; biggestComponent = id; }
     }
 
-    routeGraph = { nodes: data.nodes, adjacency, componentId, giantComponent: biggestComponent };
+    routeGraph = { nodes: data.nodes, adjacency, componentId, componentSize, giantComponent: biggestComponent, ferryEdges };
   } catch (err) {
     routeGraph = null;
   }
 }
 
-function nearestNodeIndex(x, y, requireGiantComponent) {
+// Bolsones de pocos nodos = intersecciones mal resueltas por el parser; una
+// componente de cientos de nodos es una isla real (Gran Bretana, Islandia,
+// Sicilia...) y hay que poder rutear dentro de ella aunque no este unida al
+// continente. Con las aristas de ferry en el grafo casi todo termina en una
+// sola componente, pero por las dudas se admite cualquiera de este tamano.
+const MIN_REAL_COMPONENT_NODES = 300;
+
+function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1) {
   let best = -1;
   let bestDist = Infinity;
   const nodes = routeGraph.nodes;
   for (let i = 0; i < nodes.length; i++) {
-    if (requireGiantComponent && routeGraph.componentId[i] !== routeGraph.giantComponent) continue;
+    const comp = routeGraph.componentId[i];
+    if (onlyComponent !== -1) {
+      if (comp !== onlyComponent) continue;
+    } else if (requireGiantComponent === true) {
+      if (comp !== routeGraph.giantComponent) continue;
+    } else if (requireGiantComponent === 'real') {
+      if ((routeGraph.componentSize.get(comp) || 0) < MIN_REAL_COMPONENT_NODES) continue;
+    }
     const dx = nodes[i][0] - x;
     const dy = nodes[i][1] - y;
     const d = dx * dx + dy * dy;
@@ -1457,9 +1487,18 @@ function findRoute(startXY, endXY) {
   if (!routeGraph) return null;
   const nodes = routeGraph.nodes;
   const adjacency = routeGraph.adjacency;
-  const startIdx = nearestNodeIndex(startXY[0], startXY[1], true);
-  const endIdx = nearestNodeIndex(endXY[0], endXY[1], true);
+  // Origen y destino tienen que caer en la misma componente para que A*
+  // encuentre camino: primero el nodo mas cercano en cualquier componente
+  // real; si no coinciden (ej. destino en una isla sin ferry en el grafo),
+  // se re-snapea el destino dentro de la componente del origen (ruta hasta
+  // el punto mas cercano alcanzable, mejor que nada).
+  let startIdx = nearestNodeIndex(startXY[0], startXY[1], 'real');
+  let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real');
   if (startIdx === -1 || endIdx === -1) return null;
+  if (routeGraph.componentId[startIdx] !== routeGraph.componentId[endIdx]) {
+    endIdx = nearestNodeIndex(endXY[0], endXY[1], false, routeGraph.componentId[startIdx]);
+    if (endIdx === -1) return null;
+  }
 
   const heuristic = (i) => Math.hypot(nodes[i][0] - nodes[endIdx][0], nodes[i][1] - nodes[endIdx][1]);
 
@@ -1496,7 +1535,9 @@ function findRoute(startXY, endXY) {
     path.push(node);
   }
   path.reverse();
-  return path.map(i => nodes[i]);
+  // Cada punto lleva un 3er elemento = 1 si el tramo que LLEGA a el es un
+  // ferry/tren (para dibujarlo punteado y no anunciar "giros" en el mar).
+  return path.map((i, k) => (k > 0 && routeGraph.ferryEdges.has(`${path[k - 1]}|${i}`)) ? [nodes[i][0], nodes[i][1], 1] : nodes[i]);
 }
 
 // Objetivo de la ruta, en orden de preferencia: la empresa de carga (si hay
@@ -1522,12 +1563,38 @@ function resolveRouteTarget(data) {
   return null;
 }
 
+// Parte la lista de puntos de la ruta en (a) tramos por tierra y (b) tramos
+// de ferry/tren (puntos marcados con 3er elemento = 1), cada uno como
+// MultiLineString en lng/lat, para pintarlos con estilos distintos.
+function splitRouteForDrawing(routePoints) {
+  const land = [], ferry = [];
+  let current = [];
+  for (let k = 0; k < routePoints.length; k++) {
+    const p = routePoints[k];
+    if (k > 0 && p[2] === 1) {
+      if (current.length > 1) land.push(current);
+      const prev = routePoints[k - 1];
+      ferry.push([toLngLat(prev[0], prev[1]), toLngLat(p[0], p[1])]);
+      current = [toLngLat(p[0], p[1])];
+    } else {
+      current.push(toLngLat(p[0], p[1]));
+    }
+  }
+  if (current.length > 1) land.push(current);
+  return {
+    land: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: land.map(part => smoothLineCoords(part)) } },
+    ferry: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: ferry } },
+  };
+}
+
 function updateDestinationMarker(data) {
   if (!map || !toLngLat) return;
   const target = resolveRouteTarget(data);
   if (!target) {
     if (destMarker) { destMarker.remove(); destMarker = null; }
     if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
+  if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
+    if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
     currentRouteTarget = null;
     currentRouteWorldPoints = null;
     return;
@@ -1576,12 +1643,17 @@ function updateDestinationMarker(data) {
     if (!routePoints.length) routePoints = null;
     waypointRouteDistanceKm = (routePoints && waypoints.some(wp => !wp.inGame)) ? (sumPathDistanceMeters(routePoints) * distanceScale()) / 1000 : null;
     currentRouteWorldPoints = routePoints;
-    const lineCoords = routePoints
-      ? routePoints.map(([x, y]) => toLngLat(x, y))
-      : [lastDisplayedLngLat, destLngLat].filter(Boolean); // fallback: linea recta si no se encontro ruta
-
     if (map.getSource('route')) {
-      map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: smoothLineCoords(lineCoords) } });
+      if (routePoints) {
+        const parts = splitRouteForDrawing(routePoints);
+        map.getSource('route').setData(parts.land);
+        if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(parts.ferry);
+      } else {
+        // fallback: linea recta si no se encontro ruta
+        const lineCoords = [lastDisplayedLngLat, destLngLat].filter(Boolean);
+        map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: lineCoords } });
+        if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
+      }
     }
     if (!complete) console.warn('Ruta incompleta: algun tramo no se pudo calcular por el grafo');
   }
@@ -1611,6 +1683,7 @@ async function loadGameMap(game) {
   lastDisplayedLngLat = null;
   if (map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
   if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
+  if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
   if (destMarker) { destMarker.remove(); destMarker = null; }
   clearWaypoint();
 
@@ -1619,7 +1692,7 @@ async function loadGameMap(game) {
   // nuevo con el pmtiles del juego que corresponda.
   for (const id of VEC_LAYER_IDS) { if (map.getLayer(id)) map.removeLayer(id); }
   if (map.getSource('vec')) map.removeSource('vec');
-  map.addSource('vec', { type: 'vector', url: `pmtiles://${mapInfo.pmtilesUrl}` });
+  map.addSource('vec', { type: 'vector', url: `pmtiles://${mapInfo.pmtilesUrl}?v=${MAP_DATA_VERSION[game] || ''}` });
   // Se insertan justo antes de 'trail-line' para que el trail/ruta/marcadores
   // queden siempre por encima del mapa base. try/catch por capa: si una sola
   // definicion tiene un error, que no tumbe a las demas (ya paso una vez con
@@ -1710,6 +1783,9 @@ function findUpcomingTurn() {
       cumDist += Math.hypot(wx - pwx, wz - pwz);
     }
     if (cumDist > NAV_TURN_LOOKAHEAD_M) break;
+    // Un tramo de ferry/tren no es un giro: cortar la busqueda ahi (lo que
+    // haya del otro lado del agua se anuncia cuando estemos alla).
+    if (i > 0 && currentRouteWorldPoints[i][2] === 1) break;
     const [lng, lat] = toLngLat(wx, wz);
     pts.push({ lng, lat, dist: cumDist });
   }
