@@ -92,6 +92,9 @@ from `maps.trucksim-dash.com`.
 
 ## License / transparency
 
+MIT License (see [`LICENSE`](LICENSE)). The bundled SCS telemetry plugin
+(`client/vendor/scs-telemetry.dll`) is by RenCloud, also MIT.
+
 This project reads only what the SCS Telemetry SDK exposes and does not
 modify the game in any way. All source code — client, backend, and web — is
 in this repository for anyone to review.
