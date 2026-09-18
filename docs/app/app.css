@@ -1,0 +1,524 @@
+/* Estilos de la app (extraidos de index.html) - ver index.html para el markup. */
+  :root {
+    --bg: #0d0f12;
+    --panel: #171a1f;
+    --accent: #3b9eff;
+    --danger: #ff4d4d;
+    --text: #eee;
+    --muted: #9aa4b2;
+  }
+  * { box-sizing: border-box; }
+
+  #toastContainer {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3000;
+    display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;
+  }
+  .toast {
+    background: var(--panel); border: 1px solid #333; color: var(--text);
+    padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    opacity: 0; transform: translateY(-10px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { border-color: #4caf50; }
+  .toast.danger { border-color: var(--danger); }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  h1 { font-size: 1rem; margin: 0 0 0.5rem; flex-shrink: 0; }
+  .appTitle { display: flex; align-items: center; gap: 0.5rem; }
+  /* Barra superior: [codigo + Connect | chip de estado]  ....  [acciones]
+     Las acciones son todas botones-icono del mismo tamano; las "secundarias"
+     (unidades, idioma, mods, discord) se esconden en pantallas angostas y
+     quedan accesibles desde Settings (seccion "quick" del modal). */
+  .setup { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.4rem; flex-shrink: 0; }
+  .setup input { font-size: 0.9rem; padding: 0.3rem 0.5rem; background: var(--panel); border: 1px solid #333; color: var(--text); border-radius: 6px; }
+  .connectGroup { display: flex; gap: 0.4rem; align-items: center; }
+  .connectGroup input { width: 9.5rem; letter-spacing: 0.08em; font-weight: 600; }
+  .connectGroup button { font-size: 0.9rem; padding: 0.38rem 0.8rem; border-radius: 6px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
+  .statusChip {
+    display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; font-weight: 600;
+    background: var(--panel); border: 1px solid #333; border-radius: 999px; padding: 0.3rem 0.5rem 0.3rem 0.7rem;
+  }
+  .statusChip[hidden] { display: none !important; }
+  .statusDot { width: 9px; height: 9px; border-radius: 50%; background: #666; flex-shrink: 0; }
+  .statusChip.live .statusDot { background: #4caf50; box-shadow: 0 0 0 3px rgba(76,175,80,0.25); }
+  .statusChip.warn .statusDot { background: #ffb020; }
+  .statusChip.err .statusDot { background: var(--danger); }
+  .statusChip.info .statusDot { background: var(--accent); }
+  .chipBtn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0 0.2rem; line-height: 1; }
+  .chipBtn:hover { color: var(--text); }
+  .topActions { display: flex; gap: 0.4rem; align-items: center; margin-left: auto; }
+  .iconBtn {
+    width: 2.1rem; height: 2.1rem; border-radius: 8px; border: 1px solid #333; background: var(--panel);
+    color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700; padding: 0; text-decoration: none;
+  }
+  .iconBtn:hover { border-color: #555; background: #23262c; }
+  .iconBtn svg { width: 18px; height: 18px; }
+  .iconBtn.discord { color: #8ea1ff; }
+  .iconBtn.discord:hover { background: #5865F2; color: #fff; border-color: #5865F2; }
+  .langSelect { width: auto; padding: 0 0.4rem; -webkit-appearance: none; appearance: none; text-transform: uppercase; }
+  .langSelect option { text-transform: none; color: #111; }
+  @media (max-width: 640px) {
+    .iconBtn.secondary { display: none; }
+  }
+  #status { font-size: 0.8rem; margin-bottom: 0.3rem; flex-shrink: 0; }
+  .setupHints { display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.76rem; color: var(--muted); margin-bottom: 0.5rem; flex-shrink: 0; }
+  body.connected .setupHints { display: none; }
+  body.connected.live #status { display: none; }
+  .ok { color: #4caf50; }
+  .err { color: var(--danger); }
+  .warn { color: #ffb020; }
+
+  /* Quick actions duplicadas dentro de Settings (para cuando la barra
+     superior esconde los botones secundarios en el celular). */
+  .settingsQuick { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.4rem; }
+  .settingsQuick .settingsLinkBtn { text-align: center; text-decoration: none; display: block; }
+  .settingsAbout { font-size: 0.8rem; color: var(--muted); margin: 0.2rem 0 0; }
+  .settingsAbout a { color: var(--accent); }
+  .tripHistory { display: flex; flex-direction: column; gap: 0.25rem; max-height: 30vh; overflow-y: auto; font-size: 0.8rem; margin-bottom: 0.5rem; }
+  .tripHistory .trip { display: flex; justify-content: space-between; gap: 0.5rem; background: #23262c; border-radius: 6px; padding: 0.3rem 0.5rem; }
+  .tripHistory .trip .tripRoute { font-weight: 600; }
+  .tripHistory .trip .tripMeta { color: var(--muted); font-size: 0.72rem; }
+  .tripHistory .tripEmpty { color: var(--muted); font-size: 0.8rem; }
+
+  /* Empty state sobre el mapa: dice POR QUE no hay datos todavia (cliente no
+     corriendo / juego cerrado / plugin sin instalar / en el menu) con el
+     paso concreto para arreglarlo - antes solo se veia "waiting for
+     telemetry" y un mapa gris. */
+  .emptyState {
+    position: absolute; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; padding: 1rem;
+  }
+  .emptyStateCard {
+    pointer-events: auto; background: rgba(23, 26, 31, 0.94); border: 1px solid #333; border-radius: 12px;
+    padding: 1.1rem 1.3rem; max-width: 380px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .emptyStateIcon { font-size: 1.8rem; margin-bottom: 0.3rem; }
+  .emptyStateTitle { font-weight: 700; font-size: 1rem; margin-bottom: 0.3rem; }
+  .emptyStateBody { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+  .emptyStateLink { display: inline-block; margin-top: 0.7rem; background: var(--accent); color: #fff; padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: none; }
+
+  /* Modo pantalla completa: se oculta todo el header (titulo, setup, status)
+     y se saca el padding del body para que el mapa llegue de punta a punta,
+     no solo "ancho completo dentro de un margen". */
+  body.fsMode { padding: 0; }
+  body.fsMode h1,
+  body.fsMode .setup,
+  body.fsMode #status,
+  body.fsMode .setupHints,
+  body.fsMode #updateBanner { display: none !important; }
+  body.fsMode .layout { border-radius: 0; }
+  body.fsMode #mapPanel { border-radius: 0; }
+  body.fsMode #infoPanel { border-radius: 0; }
+
+  /* El mapa y el panel de info son columnas lado a lado (fila en horizontal,
+     mapa arriba / panel abajo en vertical). Al ocultar el panel se le lleva
+     su ancho/alto a 0 en vez de solo taparlo con un overlay, asi el mapa
+     realmente ocupa el espacio liberado (y Leaflet lo recalcula via
+     invalidateSize en el handler del boton, ver mas abajo). */
+  .layout {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Fila mapa+panel de info (lo que antes era ".layout" en horizontal) -
+     separada de .layout para poder meter el commandsDrawer como una franja
+     propia debajo, sin que quede como una tercera columna al costado. */
+  .rowWrap { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+
+  #mapPanel { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; padding: 0; border-radius: 12px; }
+  #mapCanvas { width: 100%; height: 100%; background: #2b2f36; }
+  .mapHint { position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
+
+  /* Banner grande y parpadeante cuando se corta la conexion - a diferencia
+     del texto chico de #status, esto se nota de un vistazo aunque estes
+     mirando el dashboard de reojo en otra pantalla mientras manejas. */
+  #reconnectBanner {
+    display: none;
+    position: absolute; top: 0; left: 0; right: 0; z-index: 1500;
+    background: var(--danger); color: #fff; text-align: center;
+    font-size: 0.85rem; font-weight: 600; padding: 0.4rem;
+    animation: reconnectPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes reconnectPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+  /* Aviso no bloqueante de version nueva del cliente disponible - a
+     diferencia del banner de reconexion, no parpadea ni tapa el mapa, es
+     solo informativo en el header. */
+  .updateBanner {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--accent);
+    color: var(--text); font-size: 0.78rem; padding: 0.4rem 0.7rem;
+    border-radius: 6px; margin-bottom: 0.6rem; flex-shrink: 0;
+  }
+  .updateBanner a { color: var(--accent); font-weight: 600; }
+  .updateBanner button {
+    margin-left: auto; background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.9rem; padding: 0 0.2rem;
+  }
+  .updateBanner button:hover { color: var(--text); }
+  .truckMarker { color: var(--accent); font-size: 20px; text-shadow: 0 0 3px #000, 0 0 3px #000; transform: translate(-50%, -50%); }
+  .svgMarker { width: 26px; height: 26px; display: block; filter: drop-shadow(0 0 2px #000) drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+  .svgMarker.dest { width: 28px; height: 28px; }
+  .svgMarker.waypoint { width: 24px; height: 24px; }
+  .otherPlayerMarker { width: 22px; height: 22px; opacity: 0.9; filter: drop-shadow(0 0 2px #000); }
+
+  /* Flecha de heading del camion: el mapa se queda siempre norte-arriba (las
+     etiquetas de ciudades vienen horneadas en los tiles, rotar el mapa las
+     dejaria ilegibles), pero la flecha SI rota para mostrar hacia donde
+     apunta el camion. 0deg = norte, gira en sentido horario con headingDeg. */
+  .truckArrow {
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 16px solid var(--accent);
+    filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000);
+    transition: transform 0.2s linear;
+  }
+
+  .mapBtn {
+    position: absolute; z-index: 1000;
+    width: 44px; height: 44px; border-radius: 50%; border: none;
+    background: #fff; color: #111; font-size: 1.1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .mapBtn:hover { background: #eee; }
+  #recenterBtn { top: 0.6rem; left: 0.6rem; }
+  #fullscreenBtn { top: 3.9rem; left: 0.6rem; }
+  #navToggleBtn { top: 7.2rem; left: 0.6rem; }
+  #navToggleBtn.active { background: var(--accent); color: #fff; }
+  #waypointBtn { top: 10.5rem; left: 0.6rem; }
+  #waypointBtn.active { background: var(--accent); color: #fff; }
+  #waypointBtn.set { background: #ffb020; color: #111; }
+  #commandsToggleBtn { top: 13.8rem; left: 0.6rem; }
+
+  /* panelToggleBtn se movio de la pila de la izquierda a esta esquina, justo
+     debajo del indicador de velocidad del mini-HUD - un contenedor flex en
+     columna en vez de una posicion fija en pixeles, asi que si el mini-HUD
+     crece (mas lineas opcionales activadas en Settings) el boton se corre
+     solo hacia abajo en vez de superponerse. */
+  #topRightControls {
+    position: absolute; top: 0.6rem; right: 0.6rem; z-index: 1000;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;
+  }
+  #topRightControls .mapBtn { position: static; }
+
+  /* Panel de indicaciones del modo navegacion - giro/distancia genericos
+     calculados de la curvatura de la ruta ya calculada, sin nombres de
+     calle (el grafo no los tiene). */
+  .navPanel {
+    position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%);
+    z-index: 1200; background: rgba(23, 26, 31, 0.92); color: #fff;
+    padding: 0.5rem 1rem; border-radius: 10px; font-size: 0.95rem;
+    font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
+  }
+
+  /* Mini-HUD: velocidad/limite/crucero flotando arriba a la derecha del mapa,
+     visible solo cuando el panel de info esta oculto (si el panel esta
+     abierto, esos mismos datos ya se ven ahi adentro). */
+  #miniHud {
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    background: rgba(23, 26, 31, 0.9);
+    border-radius: 10px;
+    padding: 0.5rem 0.7rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .layout.panelHidden #miniHud, .layout.commandsPageActive #miniHud { display: flex; }
+  .miniHudTop { display: flex; align-items: center; gap: 0.6rem; }
+  #miniHud .limitSign { width: 34px; height: 34px; font-size: 0.85rem; border-width: 3px; }
+  #miniHud .speedBig { font-size: 1.4rem; }
+  #miniHud .cruiseDisplay { font-size: 0.75rem; }
+  #miniHud .cruiseSpeed { font-size: 1rem; }
+  /* Items opcionales (activables desde Settings: combustible, autonomia,
+     ETA, distancia) - caja propia abajo a la derecha, arriba del nombre del
+     mapa/mod (mapHint), en vez de colgar de la velocidad/limite de arriba a
+     la derecha (eso dejaba muy poco lugar libre en el medio para el panel
+     de indicaciones de navegacion). Misma regla de visibilidad que el
+     resto del mini-HUD (panel oculto o pagina de botonera en vertical). */
+  .miniHudExtra {
+    display: none; flex-direction: column; gap: 0.15rem;
+    position: absolute; bottom: 2.1rem; right: 0.5rem; z-index: 1000;
+    background: rgba(23, 26, 31, 0.9); border-radius: 8px; padding: 0.4rem 0.6rem;
+    font-size: 0.72rem; color: var(--muted); text-align: right;
+  }
+  .miniHudExtra:empty { display: none; }
+  .layout.panelHidden .miniHudExtra:not(:empty), .layout.commandsPageActive .miniHudExtra:not(:empty) { display: flex; }
+
+  .settingsOverlay {
+    position: fixed; inset: 0; z-index: 2500; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .settingsPanel {
+    background: var(--panel); border: 1px solid #333; border-radius: 10px;
+    padding: 1.2rem; width: min(340px, 90vw); max-height: 85vh; overflow-y: auto;
+  }
+  /* Tour rapido de onboarding: no tapa toda la pantalla (a diferencia de los
+     modales), pointer-events:none en el fondo para que se siga viendo el
+     mapa - solo el tooltip en si es clickeable. El highlight del boton
+     actual se hace poniendole box-shadow directo por JS, no con un overlay
+     con un agujero (mas simple, sin SVG masks). */
+  .tourOverlay { position: fixed; inset: 0; z-index: 3000; pointer-events: none; }
+  .tourTooltip {
+    position: absolute; z-index: 3001; pointer-events: auto;
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+    padding: 0.8rem; width: min(240px, 80vw); box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .tourTooltip p { margin: 0 0 0.7rem; font-size: 0.85rem; line-height: 1.4; }
+  .tourButtons { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .tourButtons button { font-size: 0.82rem; padding: 0.3rem 0.6rem; border-radius: 6px; border: none; background: var(--accent); color: #fff; cursor: pointer; }
+  .tourButtons button.secondary { background: none; border: 1px solid #444; color: var(--muted); }
+  .tourHighlight { position: relative; z-index: 3001; box-shadow: 0 0 0 4px var(--accent), 0 0 20px 4px rgba(59,158,255,0.6) !important; }
+
+  .settingsPanel h3 { margin: 0 0 0.8rem; font-size: 1rem; }
+  .settingsSectionTitle { font-size: 0.8rem; color: var(--muted); margin: 1rem 0 0.4rem; }
+  .settingsRow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; padding: 0.25rem 0; cursor: pointer; }
+  .colorOptions { display: flex; gap: 0.6rem; }
+  .colorSwatch {
+    width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  .colorSwatch.selected { border-color: #fff; }
+  #settingsCloseBtn {
+    margin-top: 1.2rem; width: 100%; padding: 0.5rem; border-radius: 6px; border: none;
+    background: var(--accent); color: #fff; cursor: pointer; font-size: 0.9rem;
+  }
+  .settingsLinkBtn {
+    width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #333;
+    background: #23262c; color: var(--text); cursor: pointer; font-size: 0.85rem;
+  }
+  .settingsLinkBtn:hover { border-color: #555; }
+  .waypointModalButtons { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem; }
+  .waypointModalButtons button {
+    padding: 0.55rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem;
+    background: var(--accent); color: #fff;
+  }
+  .waypointModalButtons button.secondary { background: var(--panel-alt, #23262c); color: var(--text); border: 1px solid #333; }
+  .waypointModalExplain { margin-top: 1rem; font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+
+  #keybindsList { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem; max-height: 50vh; overflow-y: auto; }
+  .keybindRow { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; font-size: 0.85rem; }
+  .keybindRow input {
+    width: 64px; text-align: center; background: #23262c; border: 1px solid #333;
+    color: var(--text); border-radius: 6px; padding: 0.3rem 0.4rem; font-size: 0.85rem;
+  }
+
+  /* Panel de info: por default (desktop y horizontal) es una columna fija de
+     300px pegada al borde derecho, alto completo. En vertical se convierte en
+     una fila fija abajo. En ambos casos, panelHidden le lleva el ancho/alto a
+     0 (no display:none) para no perder el estado del mapa/leaflet, y el mapa
+     (flex:1 en el contenedor) ocupa el espacio que el panel libera. */
+  #infoPanel {
+    position: relative;
+    flex: 0 0 300px;
+    width: 300px;
+    background: var(--panel);
+    border-radius: 0 12px 12px 0;
+    padding: 0.75rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: flex-basis 0.25s ease, padding 0.25s ease;
+  }
+  .layout.panelHidden #infoPanel { flex-basis: 0; padding-left: 0; padding-right: 0; }
+
+  /* Botonera de comandos (on/off balizas, motor, etc.) - un solo bloque de
+     markup (#commandsPanel) que JS reubica segun el layout: en horizontal
+     vive en #commandsDrawer (franja fija debajo del mapa+panel, colapsable),
+     en vertical se mueve dentro del swipe de #infoPanel como 2da pagina (ver
+     placeCommandsPanel() en el script). */
+  .cmdGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 0.6rem;
+    padding: 0.6rem;
+  }
+  .cmdBtn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.3rem; min-height: 64px; padding: 0.5rem 0.3rem;
+    background: #23262c; border: 1px solid #333; border-radius: 10px;
+    color: var(--text); cursor: pointer; font-size: 0.66rem; text-align: center;
+    line-height: 1.15;
+  }
+  .cmdBtn svg { width: 24px; height: 24px; flex-shrink: 0; }
+  .cmdBtn:hover { border-color: #555; }
+  .cmdBtn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  #commandsDrawer {
+    flex: 0 0 auto;
+    position: relative;
+    background: var(--panel);
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    transition: flex-basis 0.25s ease;
+    padding-top: 14px; /* deja lugar para el pico, que siempre esta ahi arriba */
+  }
+  /* Colapsado no se va del todo a 0: queda solo la tira del pico. */
+  .layout.commandsHidden #commandsDrawer { flex-basis: 14px; padding-top: 0; }
+  .layout.commandsHidden #commandsDrawer .cmdGrid { display: none; }
+  #commandsDrawer .cmdGrid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+  /* Pico traslucido tipo "handle" de bottom sheet - siempre visible arriba
+     del todo del drawer, en ambos estados (expandido/colapsado), y siempre
+     clickeable para togglear uno u otro. En colapsado ocupa todo el alto
+     (14px) ya que es lo unico que queda del drawer. */
+  .commandsPeek {
+    position: absolute; top: 0; left: 0; right: 0; height: 14px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    z-index: 1;
+  }
+  .layout.commandsHidden .commandsPeek { height: 100%; }
+  .commandsPeekTab { width: 48px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.35); }
+  .commandsPeek:hover .commandsPeekTab { background: rgba(255,255,255,0.55); }
+
+  /* En vertical, el drawer no se usa (la botonera se muda al swipe de abajo)
+     y el boton de mostrar/ocultar tampoco tiene sentido ahi. */
+  @media (max-width: 900px) and (orientation: portrait) {
+    #commandsDrawer { display: none; }
+    #commandsToggleBtn { display: none; }
+  }
+
+  /* Swipe de 2 paginas dentro del panel de info, solo en vertical: pagina 1
+     los datos de siempre, pagina 2 la botonera. En horizontal .panelSwipe se
+     vuelve "transparente" al layout (display:contents) y todo se ve como
+     antes, sin scroll horizontal ni paginas. */
+  .panelSwipe { display: contents; }
+  .panelPage { height: 100%; }
+
+  /* Flechita en el borde del panel de info que insinua que se puede swipear
+     a la 2da pagina (la botonera) - solo tiene sentido en vertical. */
+  .swipeHint {
+    display: none; position: absolute; right: 4px; top: 50%;
+    transform: translateY(-50%); color: var(--muted); font-size: 1.3rem;
+    opacity: 0.55; pointer-events: none; animation: swipeHintNudge 1.6s ease-in-out infinite;
+  }
+  @keyframes swipeHintNudge {
+    0%, 100% { transform: translateY(-50%) translateX(0); opacity: 0.55; }
+    50% { transform: translateY(-50%) translateX(-5px); opacity: 0.25; }
+  }
+
+  @media (max-width: 900px) and (orientation: portrait) {
+    .layout { flex-direction: column; }
+    .rowWrap { flex-direction: column; }
+    #mapPanel { flex: 1 1 auto; min-height: 0; }
+    #infoPanel { flex: 0 0 34vh; width: auto; max-height: 34vh; border-radius: 16px 16px 0 0; }
+    .layout.panelHidden #infoPanel { flex-basis: 0; padding-top: 0; padding-bottom: 0; }
+    .panelSwipe {
+      display: flex; height: 100%; overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory; scroll-behavior: smooth;
+    }
+    .panelPage { flex: 0 0 100%; scroll-snap-align: start; overflow-y: auto; }
+    /* Mas especificidad que las reglas base (que estan mas abajo en el
+       archivo y si no las pisarian). */
+    #infoPanel .panelSwipe #gaugesPage { display: block; }
+    #infoPanel.gaugesView .panelSwipe #infoPageContent { display: block; }
+    #infoPanel .panelTabs { display: none; }
+    .swipeHint { display: block; }
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    body { padding: 0.5rem; }
+    h1 { display: none; }
+    .setup { margin-bottom: 0.3rem; }
+    #status { margin-bottom: 0.3rem; }
+    #infoPanel { width: 220px; padding: 0.5rem; font-size: 0.8rem; }
+    .speedBig { font-size: 1.8rem; }
+    .limitSign { width: 38px; height: 38px; font-size: 0.9rem; }
+  }
+
+  .speedRow { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+  .speedBig { font-size: 2.4rem; font-weight: 700; line-height: 1; }
+  .speedUnit { font-size: 0.9rem; color: var(--muted); }
+  .limitSign {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 4px solid var(--danger);
+    background: #fff; color: #111;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .limitSign.over { animation: pulse 1s infinite; }
+  #jobDeadline.over { color: var(--danger); font-weight: 700; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,77,0.6); } 50% { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
+
+  .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; }
+
+  .fuelStack { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.78rem; color: var(--muted); text-align: right; margin-left: auto; }
+  /* El consumo promedio a veces entra en una linea ("- ") y a veces en dos
+     ("604.8" + "mpg" envuelve por el ancho de la columna) - sin un alto fijo
+     el resto de las columnas del speedRow saltaba de posicion al cambiar. */
+  #fuelAvgLine { min-height: 2.4em; line-height: 1.2; }
+  .cruiseSpeed { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+
+  /* Panel de info agrupado en tarjetas (Trip / Truck / Session) en vez de
+     una lista plana de filas todas iguales. */
+  .card { background: #1d2127; border-radius: 10px; padding: 0.45rem 0.6rem 0.35rem; }
+  .cardTitle { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.15rem; }
+  .panelTabs { display: flex; gap: 0.3rem; margin-bottom: 0.2rem; }
+  .panelTab { flex: 1; font-size: 0.72rem; padding: 0.25rem; border-radius: 6px; border: 1px solid #333; background: transparent; color: var(--muted); cursor: pointer; }
+  .panelTab.active { background: #23262c; color: var(--text); border-color: #444; }
+  /* Landscape: el cluster es una vista alternativa del mismo panel (tab).
+     Portrait: es la 2da pagina del swipe y los tabs no hacen falta. */
+  #gaugesPage { display: none; }
+  #infoPanel.gaugesView #infoPageContent { display: none; }
+  #infoPanel.gaugesView #gaugesPage { display: block; }
+  .cluster { width: 100%; height: auto; display: block; }
+  .cluster .dialTrack { fill: none; stroke: #2b3038; stroke-width: 10; stroke-linecap: round; }
+  .cluster .dialFill { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+  .cluster .dialFill.rpm { stroke: #ff8a3d; }
+  .cluster .needle { stroke: #fff; stroke-width: 3; stroke-linecap: round; transition: transform 0.6s ease; }
+  .cluster .needleHub { fill: #fff; }
+  .cluster .dialValue { font-size: 26px; font-weight: 800; fill: #fff; font-family: system-ui, sans-serif; }
+  .cluster .dialValue.small { font-size: 16px; }
+  .cluster .dialUnit { font-size: 10px; fill: var(--muted); font-family: system-ui, sans-serif; }
+  .cluster .gearText { font-size: 18px; font-weight: 800; fill: #ff8a3d; font-family: system-ui, sans-serif; }
+  .cluster .tick { stroke: #555c66; stroke-width: 2; }
+  .cluster .tickLabel { font-size: 8px; fill: var(--muted); font-family: system-ui, sans-serif; }
+  .cluster .barTrack { fill: #2b3038; }
+  .cluster .barFill { fill: #4caf50; transition: width 0.6s ease; }
+  .cluster .barFill.low { fill: #ffb020; }
+  .cluster .barFill.critical { fill: var(--danger); }
+  .gaugesFooter { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); padding: 0 0.3rem; }
+  .gaugesFooter b { color: #4caf50; }
+  .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
+  .row:last-child { border-bottom: none; }
+  /* El atributo hidden pierde contra ".row { display: flex }" (misma
+     especificidad, gana el ultimo en el CSS de autor) - sin esto las filas
+     de waypoint quedaban ocupando espacio aunque estuvieran "ocultas". */
+  [hidden] { display: none !important; }
+  .row .label { color: var(--muted); }
+  .waypointSubRow { padding-top: 0; padding-left: 0.6rem; font-size: 0.74rem; opacity: 0.8; }
+  .waypointClearBtn {
+    background: none; border: 1px solid #444; color: var(--muted); border-radius: 4px;
+    font-size: 0.7rem; padding: 0.1rem 0.4rem; cursor: pointer; margin-left: 0.4rem;
+  }
+  .waypointClearBtn:hover { color: #fff; border-color: #777; }
+  .route { font-size: 0.9rem; }
+  .route .cities { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; }
+  .route .arrow { color: var(--muted); }
+
+  .statLine { font-size: 0.85rem; padding: 0.3rem 0; border-bottom: 1px solid #262a31; }
+  .statLine:last-of-type { border-bottom: none; }
+  .statLine .statWarn { color: #ffb020; }
+  .statLine .statDanger { color: var(--danger); }
