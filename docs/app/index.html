@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260920d" />
+<link rel="stylesheet" href="app.css?v=20260920e" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -83,6 +83,10 @@
       <p class="settingsSectionTitle" data-i18n="settingsRouteTitle">Route preference:</p>
       <label class="settingsRow"><input type="radio" name="routeProfile" id="setRouteFastest" value="fastest" /> <span data-i18n="settingsRouteFastest">Fastest — prefers highways, like the in-game GPS</span></label>
       <label class="settingsRow"><input type="radio" name="routeProfile" id="setRouteShortest" value="shortest" /> <span data-i18n="settingsRouteShortest">Shortest distance</span></label>
+
+      <p class="settingsSectionTitle" data-i18n="settingsCurrencyTitle">Job pay in your currency:</p>
+      <select id="setCurrency" class="settingsLinkBtn settingsSelect"></select>
+      <p class="settingsHint" data-i18n="currencyHint">Shown next to the pay here and in the Discord #jobs post. Only the currency code is sent, nothing else.</p>
 
       <p class="settingsSectionTitle" data-i18n="settingsRouteColorTitle">Route line color:</p>
       <div class="colorOptions">
@@ -412,8 +416,8 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260920d"></script>
-<script src="i18n.js?v=20260920d"></script>
-<script src="app.js?v=20260920d"></script>
+<script src="pure.js?v=20260920e"></script>
+<script src="i18n.js?v=20260920e"></script>
+<script src="app.js?v=20260920e"></script>
 </body>
 </html>

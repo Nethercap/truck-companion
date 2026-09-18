@@ -504,3 +504,73 @@ def test_modded_economy_jobs_are_flagged_and_excluded_from_revenue(main, monkeyp
     assert stats["total_revenue"] == 12000
     assert stats["latest_jobs"][1]["modded"] is True
     assert stats["latest_jobs"][0]["modded"] is False
+
+
+def test_format_money_symbols_prefix_suffix_and_unknown(main):
+    assert main.format_money(11295, "USD") == "$11,295"
+    assert main.format_money(12345.4, "EUR") == "€12,345"
+    assert main.format_money(53000, "PLN") == "53,000 zł"
+    assert main.format_money(500, "XXX") == "500 XXX"
+    assert main.format_money(500, None) == "500"
+
+
+def test_convert_money_uses_eur_base_table(main, monkeypatch):
+    monkeypatch.setattr(main, "get_rates", lambda: {"base": "EUR", "rates": {"EUR": 1.0, "USD": 1.1, "GBP": 0.85}})
+    assert round(main.convert_money(1100, "USD", "GBP")) == 850
+    assert round(main.convert_money(100, "EUR", "USD")) == 110
+    assert main.convert_money(100, "EUR", "ARS") is None  # no esta en la tabla
+
+
+def test_convert_money_without_rates_is_none(main, monkeypatch):
+    monkeypatch.setattr(main, "get_rates", lambda: None)
+    assert main.convert_money(100, "EUR", "USD") is None
+
+
+def test_notify_discord_pay_uses_game_currency_and_local_equivalent(main, monkeypatch):
+    monkeypatch.setattr(main, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/fake")
+    captured = {}
+
+    class FakeResponse:
+        def close(self):
+            pass
+
+    def fake_urlopen(req, timeout=10):
+        captured["body"] = main.json.loads(req.data)
+        return FakeResponse()
+
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen)
+    main.notify_discord_job_delivered({
+        "citySrc": "Verona", "cityDst": "Kiel", "cargo": "Beans", "revenue": 12345, "distanceKm": 1400,
+        "game": "ets2", "currency": "EUR", "localCurrency": "GBP", "localRevenue": 10604,
+    })
+    fields = {f["name"]: f["value"] for f in captured["body"]["embeds"][0]["fields"]}
+    assert fields["Pay"] == "€12,345 · ≈ £10,604"
+
+    # ETS2 sin moneda local: solo euros (antes salia con "$")
+    main.notify_discord_job_delivered({"citySrc": "A", "cityDst": "B", "revenue": 500, "game": "ets2"})
+    fields = {f["name"]: f["value"] for f in captured["body"]["embeds"][0]["fields"]}
+    assert fields["Pay"] == "€500"
+
+
+def test_record_job_delivered_converts_to_local_currency(main, monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "_r2_client", lambda: None)
+    monkeypatch.setattr(main, "_stats_cache", {"total_sessions": 0, "daily": {}})
+    monkeypatch.setattr(main, "notify_discord_job_delivered", lambda job: None)
+    monkeypatch.setattr(main, "get_rates", lambda: {"base": "EUR", "rates": {"EUR": 1.0, "USD": 1.1, "GBP": 0.85}})
+    job = {"game": "ets2", "citySrc": "A", "cityDst": "B", "cargo": "C", "revenue": 1000, "distanceKm": 100,
+           "currency": "EUR", "localCurrency": "GBP"}
+    main.record_job_delivered(job)
+    assert job["localRevenue"] == 850
+    # misma moneda que el juego: no hay nada que convertir
+    job2 = {"game": "ets2", "citySrc": "A", "cityDst": "C", "cargo": "C", "revenue": 1000, "distanceKm": 100,
+            "currency": "EUR", "localCurrency": "EUR"}
+    main.record_job_delivered(job2)
+    assert job2["localCurrency"] is None and "localRevenue" not in job2
+
+
+def test_is_valid_currency(main):
+    assert main.is_valid_currency("GBP")
+    assert main.is_valid_currency("ars")
+    assert not main.is_valid_currency("EURO")
+    assert not main.is_valid_currency("12$")
+    assert not main.is_valid_currency(None)

@@ -18,6 +18,11 @@ const TRANSLATIONS = {
     settingsRouteTitle: 'Route preference:',
     settingsRouteFastest: 'Fastest — prefers highways, like the in-game GPS',
     settingsRouteShortest: 'Shortest distance',
+    settingsCurrencyTitle: 'Job pay in your currency:',
+    currencyAuto: 'Auto — from your browser ({cur})',
+    currencyAutoUnknown: 'Auto — from your browser',
+    currencyOff: 'Game currency only (€ / $)',
+    currencyHint: 'Shown next to the pay here and in the Discord #jobs post. Only the currency code is sent, nothing else.',
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
@@ -132,7 +137,7 @@ const TRANSLATIONS = {
     disconnected: 'Disconnected',
     reconnectingBanner: '⚠ Connection lost — reconnecting... (data below may be stale)',
     connectionError: 'Connection error',
-    jobDeliveredToast: '✅ Job delivered! +${amount}',
+    jobDeliveredToast: '✅ Job delivered! +{amount}',
     jobCancelledToast: '❌ Job cancelled',
     mapNotFound: (label, path) => `Exported map not found for ${label} (${path})`,
     changeCode: 'Use another code',
@@ -228,6 +233,11 @@ const TRANSLATIONS = {
     settingsRouteTitle: 'Preferencia de ruta:',
     settingsRouteFastest: 'Más rápida — prefiere autopistas, como el GPS del juego',
     settingsRouteShortest: 'Distancia más corta',
+    settingsCurrencyTitle: 'Pago del trabajo en tu moneda:',
+    currencyAuto: 'Automático — según tu navegador ({cur})',
+    currencyAutoUnknown: 'Automático — según tu navegador',
+    currencyOff: 'Solo la moneda del juego (€ / $)',
+    currencyHint: 'Se muestra al lado del pago acá y en el post de entregas de Discord. Solo viaja el código de la moneda, nada más.',
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
@@ -342,7 +352,7 @@ const TRANSLATIONS = {
     disconnected: 'Desconectado',
     reconnectingBanner: '⚠ Se cortó la conexión — reconectando... (los datos de abajo pueden estar viejos)',
     connectionError: 'Error de conexión',
-    jobDeliveredToast: '✅ ¡Trabajo entregado! +${amount}',
+    jobDeliveredToast: '✅ ¡Trabajo entregado! +{amount}',
     jobCancelledToast: '❌ Trabajo cancelado',
     mapNotFound: (label, path) => `No se encontró el mapa exportado para ${label} (${path})`,
     changeCode: 'Usar otro código',
@@ -508,7 +518,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -518,6 +528,132 @@ const miniHudSettings = Object.assign(
 );
 let routeColor = _savedSettings.routeColor || '#a30000';
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
+
+// ---------------------------------------------------------------------------
+// Pago en la moneda "real" del usuario. El SDK paga en la moneda interna del
+// juego (EUR en ETS2, USD en ATS, sin importar la que el usuario eligio ver
+// en las opciones del juego). La moneda local se deduce del idioma del
+// navegador (en-GB -> GBP, pl -> PLN, es-AR -> ARS) - sin geolocalizacion ni
+// nada que identifique - o se elige a mano en Ajustes. Las tasas las da el
+// backend (/rates, base EUR, se refrescan una vez por dia) y se cachean en
+// localStorage para que sirvan tambien en LAN / sin red. La moneda elegida
+// se manda al backend (set_currency) para que el post de entrega en Discord
+// tambien la muestre - pedido de la comunidad.
+const GAME_CURRENCY = { ats: 'USD', ets2: 'EUR' };
+const REGION_CURRENCY = {
+  US: 'USD', PR: 'USD', EC: 'USD', SV: 'USD', PA: 'USD', GB: 'GBP', IM: 'GBP', JE: 'GBP', GG: 'GBP',
+  DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', BE: 'EUR', AT: 'EUR', PT: 'EUR', IE: 'EUR', FI: 'EUR',
+  GR: 'EUR', SK: 'EUR', SI: 'EUR', LT: 'EUR', LV: 'EUR', EE: 'EUR', LU: 'EUR', MT: 'EUR', CY: 'EUR', HR: 'EUR',
+  BG: 'EUR', AD: 'EUR', MC: 'EUR', SM: 'EUR', VA: 'EUR', ME: 'EUR', XK: 'EUR',
+  PL: 'PLN', CZ: 'CZK', HU: 'HUF', RO: 'RON', SE: 'SEK', NO: 'NOK', DK: 'DKK', IS: 'ISK', CH: 'CHF', LI: 'CHF',
+  TR: 'TRY', RU: 'RUB', UA: 'UAH', BY: 'BYN', RS: 'RSD', BA: 'BAM', MK: 'MKD', AL: 'ALL', MD: 'MDL', GE: 'GEL',
+  AM: 'AMD', AZ: 'AZN', KZ: 'KZT', UZ: 'UZS', IL: 'ILS', SA: 'SAR', AE: 'AED', QA: 'QAR', KW: 'KWD', EG: 'EGP',
+  MA: 'MAD', DZ: 'DZD', TN: 'TND', ZA: 'ZAR', NG: 'NGN', KE: 'KES',
+  CA: 'CAD', MX: 'MXN', BR: 'BRL', AR: 'ARS', CL: 'CLP', CO: 'COP', PE: 'PEN', UY: 'UYU', PY: 'PYG', BO: 'BOB',
+  VE: 'VES', CR: 'CRC', GT: 'GTQ', DO: 'DOP', HN: 'HNL', NI: 'NIO', CU: 'CUP',
+  JP: 'JPY', CN: 'CNY', KR: 'KRW', TW: 'TWD', HK: 'HKD', SG: 'SGD', MY: 'MYR', TH: 'THB', ID: 'IDR', PH: 'PHP',
+  VN: 'VND', IN: 'INR', PK: 'PKR', BD: 'BDT', LK: 'LKR', AU: 'AUD', NZ: 'NZD',
+};
+let currencyPref = _savedSettings.currency || 'auto'; // 'auto' | 'off' | codigo ISO
+const RATES_KEY = 'truckdash_rates';
+const RATES_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+let exchangeRates = null; // {base:'EUR', rates:{...}, fetched_at}
+try {
+  const cached = JSON.parse(localStorage.getItem(RATES_KEY) || 'null');
+  if (cached && cached.rates && Date.now() - (cached.savedAt || 0) < RATES_MAX_AGE_MS) exchangeRates = cached;
+} catch (e) {}
+
+// Se recorren TODOS los idiomas del navegador, no solo el primero: un
+// telefono en espanol de Latinoamerica reporta ['es-419', 'es-AR'] y el
+// primero no tiene pais (419 = "Latinoamerica").
+function browserCurrency() {
+  try {
+    const tags = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+    for (const tag of tags) {
+      let region = null;
+      try { region = new Intl.Locale(tag).maximize().region; } catch (e) {}
+      if (!region || !/^[A-Z]{2}$/.test(region)) { const m = /[-_]([A-Za-z]{2})\b/.exec(tag); region = m ? m[1].toUpperCase() : null; }
+      if (region && REGION_CURRENCY[region]) return REGION_CURRENCY[region];
+    }
+    return null;
+  } catch (e) { return null; }
+}
+function localCurrency() {
+  if (currencyPref === 'off') return null;
+  if (currencyPref === 'auto') return browserCurrency();
+  return currencyPref;
+}
+function gameCurrency(game) { return GAME_CURRENCY[game] || 'USD'; }
+function convertMoney(amount, from, to) {
+  if (!exchangeRates || !exchangeRates.rates) return null;
+  const a = exchangeRates.rates[from], b = exchangeRates.rates[to];
+  return a && b ? amount / a * b : null;
+}
+// Simbolo propio en vez de Intl: en un navegador es-AR, Intl escribe ARS
+// como "$" a secas y USD como "US$" - al lado del otro se confunden. Misma
+// tabla que usa el backend para el post de Discord, asi se ven iguales.
+const CURRENCY_SYMBOLS = {
+  USD: '$', EUR: '€', GBP: '£', PLN: 'zł', BRL: 'R$', TRY: '₺', JPY: '¥', CNY: '¥', INR: '₹', RUB: '₽', UAH: '₴',
+  KRW: '₩', CZK: 'Kč', HUF: 'Ft', SEK: 'kr', NOK: 'kr', DKK: 'kr', ISK: 'kr', CHF: 'CHF', CAD: 'CA$', AUD: 'A$',
+  NZD: 'NZ$', MXN: 'MX$', ARS: 'AR$', CLP: 'CLP$', COP: 'COL$', PEN: 'S/', UYU: '$U', ZAR: 'R', ILS: '₪', RON: 'lei',
+  BGN: 'лв', PHP: '₱', THB: '฿', IDR: 'Rp', MYR: 'RM', SGD: 'S$', HKD: 'HK$', TWD: 'NT$', VND: '₫', EGP: 'E£',
+  SAR: 'SAR', AED: 'AED', KZT: '₸', GEL: '₾', RSD: 'din', BAM: 'KM', MKD: 'den', ALL: 'L', MDL: 'lei', BYN: 'Br',
+};
+const CURRENCY_SUFFIX = new Set(['PLN', 'CZK', 'HUF', 'SEK', 'NOK', 'DKK', 'ISK', 'CHF', 'RON', 'BGN', 'RSD', 'BAM', 'MKD', 'ALL', 'MDL', 'BYN', 'SAR', 'AED', 'KZT', 'GEL']);
+function formatMoney(amount, currency) {
+  const n = Math.round(amount || 0).toLocaleString();
+  const symbol = CURRENCY_SYMBOLS[currency];
+  if (!symbol) return `${n} ${currency}`;
+  return CURRENCY_SUFFIX.has(currency) ? `${n} ${symbol}` : `${symbol}${n}`;
+}
+// "$61,158" o "€12,345 · ≈ £10,604" si la moneda local es otra y hay tasas.
+function moneyLine(amount, game) {
+  const gc = gameCurrency(game);
+  let text = formatMoney(amount, gc);
+  const lc = localCurrency();
+  if (lc && lc !== gc) {
+    const conv = convertMoney(amount, gc, lc);
+    if (conv != null) text += ` · ≈ ${formatMoney(conv, lc)}`;
+  }
+  return text;
+}
+function fetchExchangeRates() {
+  if (localCurrency() == null) return;
+  if (exchangeRates && Date.now() - (exchangeRates.savedAt || 0) < RATES_MAX_AGE_MS) return;
+  fetch('https://truck-companion-production.up.railway.app/rates').then(r => r.ok ? r.json() : null).then(data => {
+    if (!data || !data.rates) return;
+    exchangeRates = { ...data, savedAt: Date.now() };
+    try { localStorage.setItem(RATES_KEY, JSON.stringify(exchangeRates)); } catch (e) {}
+    fillCurrencySelect();
+    if (lastData) updateHud(lastData);
+    renderTripHistory();
+  }).catch(() => {}); // no critico: sin tasas se muestra solo la moneda del juego
+}
+function sendCurrencyPref() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || conn.local) return;
+  ws.send(JSON.stringify({ type: 'set_currency', currency: localCurrency() }));
+}
+function currencyLabel(code) {
+  try {
+    const name = new Intl.DisplayNames([currentLang || 'en'], { type: 'currency' }).of(code);
+    return name && name !== code ? `${code} — ${name}` : code;
+  } catch (e) { return code; }
+}
+function fillCurrencySelect() {
+  const sel = document.getElementById('setCurrency');
+  if (!sel) return;
+  const auto = browserCurrency();
+  const codes = new Set(Object.values(REGION_CURRENCY));
+  if (exchangeRates && exchangeRates.rates) Object.keys(exchangeRates.rates).forEach(c => codes.add(c));
+  if (currencyPref !== 'auto' && currencyPref !== 'off') codes.add(currencyPref);
+  const opts = [
+    `<option value="auto">${auto ? t('currencyAuto').replace('{cur}', auto) : t('currencyAutoUnknown')}</option>`,
+    `<option value="off">${t('currencyOff')}</option>`,
+    ...[...codes].sort().map(c => `<option value="${c}">${escapeHtml(currencyLabel(c))}</option>`),
+  ];
+  sel.innerHTML = opts.join('');
+  sel.value = currencyPref;
+}
 // Opt-in: el SDK de telemetria no informa que mods de mapa tiene instalados
 // el usuario, asi que no se puede auto-detectar - el usuario lo activa a
 // mano si lo tiene instalado (ver GAME_MAPS.ats_c2c/ats_promods/ets2_promods).
@@ -554,6 +690,7 @@ function initSettingsUi() {
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setLiveHideOthers').checked = hideOtherPlayers;
+  fillCurrencySelect();
   renderTripHistory();
   document.querySelectorAll('input[name="routeProfile"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
@@ -597,6 +734,15 @@ document.querySelectorAll('input[name="atsMod"]').forEach(radio => {
     currentGame = null;
   });
 });
+document.getElementById('setCurrency').addEventListener('change', (e) => {
+  currencyPref = e.target.value;
+  saveSettings();
+  fetchExchangeRates();
+  sendCurrencyPref();
+  if (lastData) updateHud(lastData);
+  renderTripHistory();
+});
+
 document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
     hasProMods = e.target.value === 'promods';
@@ -2528,7 +2674,7 @@ function updateHud(data) {
     restRow.hidden = true;
   }
 
-  document.getElementById('jobIncome').textContent = data.jobIncome ? `$${data.jobIncome.toLocaleString()}` : '-';
+  document.getElementById('jobIncome').textContent = data.jobIncome ? moneyLine(data.jobIncome, data.game) : '-';
 
   // Combustible: fuel/fuelCapacity vienen en unidades del juego (litros o
   // galones segun el pais del camion), pero el porcentaje da igual la unidad.
@@ -2619,7 +2765,7 @@ function updateSessionEvents(event) {
   if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
   if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
   if (event.jobDelivered && !previousEventState.jobDelivered) {
-    showToast(t('jobDeliveredToast').replace('{amount}', Math.round(event.jobDeliveredRevenue || 0).toLocaleString()), 'success');
+    showToast(t('jobDeliveredToast').replace('{amount}', moneyLine(event.jobDeliveredRevenue || 0, lastData?.game)), 'success');
     recordTrip(event);
   }
   if (event.jobCancelled && !previousEventState.jobCancelled) {
@@ -2693,7 +2839,7 @@ function renderTripHistory() {
   list.innerHTML = trips.map(tr => {
     const dist = useImperial ? `${Math.round(tr.distanceKm * KM_TO_MI)} mi` : `${tr.distanceKm} km`;
     const date = new Date(tr.t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    return `<div class="trip"><div><div class="tripRoute">${esc(tr.src || '?')} → ${esc(tr.dst || '?')}</div><div class="tripMeta">${esc(tr.cargo || '-')} · ${dist} · ${esc(tr.truck || '')}</div></div><div style="text-align:right"><div>$${tr.revenue.toLocaleString()}</div><div class="tripMeta">${date}${tr.game ? ' · ' + tr.game.toUpperCase() : ''}</div></div></div>`;
+    return `<div class="trip"><div><div class="tripRoute">${esc(tr.src || '?')} → ${esc(tr.dst || '?')}</div><div class="tripMeta">${esc(tr.cargo || '-')} · ${dist} · ${esc(tr.truck || '')}</div></div><div style="text-align:right"><div>${moneyLine(tr.revenue, tr.game)}</div><div class="tripMeta">${date}${tr.game ? ' · ' + tr.game.toUpperCase() : ''}</div></div></div>`;
   }).join('');
 }
 document.getElementById('tripHistoryClearBtn').addEventListener('click', () => {
@@ -2955,6 +3101,7 @@ function fetchActivePlayers() {
   }).catch(() => {});
 }
 fetchActivePlayers();
+fetchExchangeRates();
 
 function fetchLatestClientVersion(backend) {
   const httpBase = backend.replace('wss://', 'https://').replace('ws://', 'http://');
@@ -3170,6 +3317,7 @@ function connectWs(backend, code, options = {}) {
     conn.everOpen = true;
     renderConnectionUi();
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
+    sendCurrencyPref(); // idem: la moneda para el post de Discord
     if (keybindsModalOpen) requestKeybinds(); // el pedido anterior se pudo haber perdido en el corte
   };
   socket.onmessage = (event) => {

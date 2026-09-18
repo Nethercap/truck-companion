@@ -23,7 +23,7 @@ from collections import defaultdict, deque
 from typing import Optional
 
 import boto3
-from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 # Monitoreo de errores: se activa solo si esta seteada la env var SENTRY_DSN
@@ -149,6 +149,128 @@ def record_session_started():
         _save_stats()
 
 
+# ---------------------------------------------------------------------------
+# Tipos de cambio. El SDK paga en la moneda interna del juego (EUR en ETS2,
+# USD en ATS, sin importar la moneda que el usuario eligio ver en las
+# opciones del juego). La web manda la moneda "de la vida real" del usuario
+# (deducida del idioma del navegador, o elegida a mano) y con estas tasas se
+# muestra el pago tambien en esa moneda - en el /app y en el post de Discord.
+# Fuente: open.er-api.com (gratis, sin key, 160+ monedas incl. ARS, se
+# actualiza una vez por dia) con frankfurter.app (BCE, ~30 monedas) de
+# respaldo. Se refresca cada 24 h y la ultima tabla buena se guarda en R2,
+# asi un redeploy con la API caida sigue teniendo tasas (viejas, pero sirven).
+GAME_CURRENCY = {"ats": "USD", "ets2": "EUR"}
+RATES_KEY = "rates.json"
+RATES_TTL_SECONDS = 24 * 60 * 60
+RATES_SOURCES = (
+    ("https://open.er-api.com/v6/latest/EUR", lambda d: d.get("rates") if d.get("result") == "success" else None),
+    ("https://api.frankfurter.app/latest?from=EUR", lambda d: d.get("rates")),
+)
+_rates_lock = threading.Lock()
+_rates_cache: Optional[dict] = None  # {"base": "EUR", "rates": {...}, "fetched_at": ts}
+_rates_refreshing = False
+
+
+def _fetch_rates() -> Optional[dict]:
+    for url, pick in RATES_SOURCES:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "TruckDash/1.0 (+https://trucksim-dash.com)"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                rates = pick(json.loads(resp.read()))
+            if rates and isinstance(rates, dict) and rates.get("USD"):
+                rates = {k.upper(): float(v) for k, v in rates.items() if isinstance(v, (int, float)) and v > 0}
+                rates["EUR"] = 1.0
+                return {"base": "EUR", "rates": rates, "fetched_at": time.time(), "source": url.split("/")[2]}
+        except Exception as exc:
+            logging.warning(f"rates: {url} failed: {exc}")
+    return None
+
+
+def _refresh_rates_blocking():
+    global _rates_cache, _rates_refreshing
+    fresh = _fetch_rates()
+    with _rates_lock:
+        _rates_refreshing = False
+        if fresh is None:
+            return
+        _rates_cache = fresh
+    client = _r2_client()
+    if client is not None:
+        try:
+            client.put_object(Bucket=R2_STATS_BUCKET, Key=RATES_KEY, Body=json.dumps(fresh).encode("utf-8"), ContentType="application/json")
+        except Exception:
+            logging.exception("Failed to persist rates to R2")
+
+
+def get_rates() -> Optional[dict]:
+    """Tabla de tasas (base EUR). Si esta vencida se devuelve igual y se
+    refresca en un thread aparte, para no colgar un request en la API
+    externa; solo el primer pedido despues de un arranque en frio y sin
+    copia en R2 espera al fetch."""
+    global _rates_cache, _rates_refreshing
+    with _rates_lock:
+        if _rates_cache is None:
+            client = _r2_client()
+            if client is not None:
+                try:
+                    obj = client.get_object(Bucket=R2_STATS_BUCKET, Key=RATES_KEY)
+                    _rates_cache = json.loads(obj["Body"].read())
+                except Exception:
+                    logging.info("No rates file in R2 yet")
+        cached = _rates_cache
+        stale = cached is None or time.time() - (cached.get("fetched_at") or 0) > RATES_TTL_SECONDS
+        if stale and not _rates_refreshing:
+            _rates_refreshing = True
+            if cached is None:
+                pass  # se hace abajo, sincrono
+            else:
+                threading.Thread(target=_refresh_rates_blocking, daemon=True).start()
+    if cached is None:
+        _refresh_rates_blocking()
+        with _rates_lock:
+            cached = _rates_cache
+    return cached
+
+
+def convert_money(amount: float, from_currency: str, to_currency: str) -> Optional[float]:
+    rates = get_rates()
+    if not rates:
+        return None
+    table = rates.get("rates") or {}
+    src, dst = table.get(from_currency), table.get(to_currency)
+    if not src or not dst:
+        return None
+    return amount / src * dst
+
+
+# Simbolos para el embed de Discord (ahi no hay Intl como en el navegador).
+# Prefijo salvo las de la lista de sufijo; el resto sale "1,234 XXX".
+CURRENCY_SYMBOLS = {
+    "USD": "$", "EUR": "€", "GBP": "£", "PLN": "zł", "BRL": "R$", "TRY": "₺", "JPY": "¥", "CNY": "¥",
+    "INR": "₹", "RUB": "₽", "UAH": "₴", "KRW": "₩", "CZK": "Kč", "HUF": "Ft", "SEK": "kr", "NOK": "kr",
+    "DKK": "kr", "ISK": "kr", "CHF": "CHF", "CAD": "CA$", "AUD": "A$", "NZD": "NZ$", "MXN": "MX$",
+    "ARS": "AR$", "CLP": "CLP$", "COP": "COL$", "PEN": "S/", "UYU": "$U", "ZAR": "R", "ILS": "₪",
+    "RON": "lei", "BGN": "лв", "PHP": "₱", "THB": "฿", "IDR": "Rp", "MYR": "RM", "SGD": "S$",
+    "HKD": "HK$", "TWD": "NT$", "VND": "₫", "EGP": "E£", "SAR": "SAR", "AED": "AED", "KZT": "₸",
+    "GEL": "₾", "RSD": "din", "BAM": "KM", "MKD": "den", "ALL": "L", "MDL": "lei", "BYN": "Br",
+}
+CURRENCY_SUFFIX = {"PLN", "CZK", "HUF", "SEK", "NOK", "DKK", "ISK", "CHF", "RON", "BGN", "RSD", "BAM", "MKD", "ALL", "MDL", "BYN", "SAR", "AED", "KZT", "GEL"}
+
+
+def format_money(amount: float, currency: Optional[str]) -> str:
+    number = f"{round(amount):,}"
+    if not currency:
+        return number
+    symbol = CURRENCY_SYMBOLS.get(currency)
+    if symbol is None:
+        return f"{number} {currency}"
+    return f"{number} {symbol}" if currency in CURRENCY_SUFFIX else f"{symbol}{number}"
+
+
+def is_valid_currency(value) -> bool:
+    return isinstance(value, str) and len(value) == 3 and value.isalpha()
+
+
 LATEST_JOBS_MAX = 5
 JOB_DELIVERED_COOLDOWN_SECONDS = 20
 # El anti-duplicado de arriba vive dentro de una Session (un pairing code) y
@@ -181,6 +303,13 @@ def notify_discord_job_delivered(job_info: dict):
     try:
         game = job_info.get("game")
         truck = " ".join(filter(None, [job_info.get("truckBrand"), job_info.get("truckName")])) or "?"
+        # Moneda del juego (EUR/USD) y, si la web del conductor nos dijo la
+        # suya y es distinta, el equivalente en esa - pedido de la comunidad.
+        pay_text = format_money(job_info.get("revenue") or 0, job_info.get("currency") or GAME_CURRENCY.get(game))
+        if job_info.get("localRevenue") is not None and job_info.get("localCurrency"):
+            pay_text += f" · ≈ {format_money(job_info['localRevenue'], job_info['localCurrency'])}"
+        if job_info.get("modded"):
+            pay_text += " ⚠ modded economy"
         embed = {
             "title": f"{job_info.get('citySrc') or '?'} -> {job_info.get('cityDst') or '?'}",
             "color": GAME_EMBED_COLORS.get(game, 0x808080),
@@ -189,7 +318,7 @@ def notify_discord_job_delivered(job_info: dict):
                 {"name": "Cargo", "value": job_info.get("cargo") or "-", "inline": True},
                 {"name": "Game", "value": GAME_LABELS.get(game, game or "?"), "inline": True},
                 {"name": "Distance", "value": f"{round(job_info.get('distanceKm') or 0)} km", "inline": True},
-                {"name": "Pay", "value": f"${round(job_info.get('revenue') or 0):,}" + (" ⚠ modded economy" if job_info.get("modded") else ""), "inline": True},
+                {"name": "Pay", "value": pay_text, "inline": True},
             ],
         }
         body = json.dumps({"embeds": [embed]}).encode("utf-8")
@@ -224,6 +353,12 @@ def is_modded_economy(job_info: dict) -> bool:
 
 def record_job_delivered(job_info: dict):
     job_info["modded"] = is_modded_economy(job_info)
+    local = job_info.get("localCurrency")
+    if local and job_info.get("currency") and local != job_info["currency"]:
+        converted = convert_money(job_info.get("revenue") or 0, job_info["currency"], local)
+        job_info["localRevenue"] = round(converted) if converted is not None else None
+    else:
+        job_info["localCurrency"] = None
     with _stats_lock:
         stats = _load_stats()
         fingerprint = (
@@ -291,6 +426,10 @@ class Session:
         # guarda para poder darselo a un viewer que se conecta despues, en vez
         # de que tenga que esperar al proximo cambio de estado.
         self.last_client_status: Optional[dict] = None
+        # Moneda "real" del usuario, la manda la web (set_currency) para que
+        # el post de entrega en Discord muestre el pago tambien en esa. None
+        # = no la mando / la apago en Ajustes.
+        self.viewer_currency: Optional[str] = None
         self.last_seen = time.time()
 
 
@@ -451,6 +590,17 @@ def version():
     }
 
 
+@app.get("/rates")
+def rates(response: Response):
+    """Tasas de cambio (base EUR) para que el /app muestre el pago en la
+    moneda del usuario. Sin auth; cacheable una hora."""
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    data = get_rates()
+    if not data:
+        raise HTTPException(status_code=503, detail="rates unavailable")
+    return {"base": data["base"], "rates": data["rates"], "fetched_at": data["fetched_at"]}
+
+
 @app.get("/stats/public")
 def stats_public():
     """Contadores historicos totales, para mostrar en la landing (no requiere auth)."""
@@ -595,6 +745,8 @@ async def ws_client(websocket: WebSocket, code: str):
                         "truckName": event.get("jobTruckName") or payload.get("truckName") or snap["truckName"],
                         "cargo": event.get("jobCargo") or payload.get("cargo") or snap["cargo"],
                         "revenue": event.get("jobDeliveredRevenue") or 0,
+                        "currency": GAME_CURRENCY.get(payload.get("game")),
+                        "localCurrency": session.viewer_currency,
                         "distanceKm": event.get("jobDeliveredDistanceKm") or 0,
                         "deliveredAt": now,  # para poder distinguir a simple vista una entrega real repetida de un duplicado real
                     }
@@ -660,6 +812,9 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     session.map_variant = payload.get("mapVariant") if session.share_position else None
                     if not session.share_position:
                         session.last_position = None
+                elif msg_type == "set_currency":
+                    cur = payload.get("currency")
+                    session.viewer_currency = cur.upper() if is_valid_currency(cur) else None
             except Exception:
                 pass
     except WebSocketDisconnect:

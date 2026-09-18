@@ -981,6 +981,20 @@ function escapeHtml(str) {
 }
 
 const GAME_LABELS = { ets2: 'ETS2', ats: 'ATS' };
+// El SDK paga en EUR (ETS2) o USD (ATS); entradas viejas no traen currency.
+// localRevenue/localCurrency: equivalente en la moneda real del conductor,
+// si su web nos la dijo (ver /app Ajustes).
+function formatMoney(amount, currency) {
+  const n = Math.round(amount || 0);
+  try { return new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n); }
+  catch (e) { return `${n.toLocaleString('en')} ${currency}`; }
+}
+function formatPay(j) {
+  const currency = j.currency || (j.game === 'ets2' ? 'EUR' : 'USD');
+  let text = formatMoney(j.revenue, currency);
+  if (j.localRevenue != null && j.localCurrency && j.localCurrency !== currency) text += ` · ≈ ${formatMoney(j.localRevenue, j.localCurrency)}`;
+  return text;
+}
 
 function renderLatestJobs(jobs) {
   const container = document.getElementById('latestJobs');
@@ -990,7 +1004,7 @@ function renderLatestJobs(jobs) {
       <td>${escapeHtml(j.citySrc || '?')} → ${escapeHtml(j.cityDst || '?')}</td>
       <td class="colTruck">${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
       <td>${escapeHtml(j.cargo) || '-'}</td>
-      <td>$${Math.round(j.revenue || 0).toLocaleString()}${j.modded ? ' <span title="Modded economy - not counted in totals">⚠</span>' : ''}</td>
+      <td>${formatPay(j)}${j.modded ? ' <span title="Modded economy - not counted in totals">⚠</span>' : ''}</td>
       <td class="colDistance">${Math.round(j.distanceKm || 0)} km</td>
       <td class="colGame">${GAME_LABELS[j.game] || '-'}</td>
     </tr>

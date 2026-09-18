@@ -566,3 +566,5 @@
   .statLine:last-of-type { border-bottom: none; }
   .statLine .statWarn { color: #ffb020; }
   .statLine .statDanger { color: var(--danger); }
+  .settingsSelect { width: 100%; max-width: 100%; }
+  .settingsHint { font-size: 0.78rem; color: #8a8a8a; margin: 0.3rem 0 0; }
