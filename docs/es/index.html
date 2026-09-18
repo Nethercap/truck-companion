@@ -351,6 +351,7 @@
           <span data-i18n="heroCta">Descargar para Windows</span>
         </a>
         <a href="#get-started" class="cta secondary" data-i18n="heroCta2">Cómo funciona</a>
+        <a href="/app/?demo=1" class="cta secondary" data-i18n="heroDemo">Ver la demo en vivo</a>
       </div>
       <p class="ctaNote" data-i18n="ctaNote">.exe portable, sin instalador, sin permisos de administrador. El tablero abre en cualquier navegador.</p>
       <div class="heroBadges">
@@ -555,7 +556,7 @@
     <div class="faq" id="faqList">
       <details><summary data-i18n="faqQ1">¿Es realmente gratis? ¿Cuál es la trampa?</summary><p data-i18n="faqA1">No hay trampa. Sin cuenta, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si algún día se agregan donaciones, van a ser opcionales y no van a desbloquear nada.</p></details>
       <details><summary data-i18n="faqQ2">Windows dice que el archivo es "no reconocido" o peligroso. ¿Es seguro?</summary><p data-i18n="faqA2">Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python.</p></details>
-      <details><summary data-i18n="faqQ3">¿Mi celular tiene que estar en la misma WiFi que la PC?</summary><p data-i18n="faqA3">No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear.</p></details>
+      <details><summary data-i18n="faqQ3">¿Mi celular tiene que estar en la misma WiFi que la PC?</summary><p data-i18n="faqA3">No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.</p></details>
       <details><summary data-i18n="faqQ4">¿Funciona con ProMods, Coast to Coast u otros mods de mapa?</summary><p data-i18n="faqA4">Sí: Coast to Coast y ProMods Canada para ATS, y ProMods (Europa + todos los addons) para ETS2 vienen incluidos — se activan con un toggle en el panel de Mods de la app. Se van agregando más; pedí el que usás en Discord.</p></details>
       <details><summary data-i18n="faqQ5">¿Modifica el juego, mis partidas o mis logros?</summary><p data-i18n="faqA5">No. Lee los datos a través del SDK de telemetría oficial de SCS Software, que es una función soportada y de solo lectura de ambos juegos. No se escribe nada en el juego, tu perfil ni tus partidas, y los logros no se ven afectados. También funciona junto con TruckersMP.</p></details>
       <details><summary data-i18n="faqQ6">¿Qué necesito?</summary><p data-i18n="faqA6">Una PC con Windows corriendo Euro Truck Simulator 2 o American Truck Simulator, y cualquier dispositivo con un navegador moderno para el tablero: tu celular, una tablet o un segundo monitor. Podés agregar el tablero a la pantalla de inicio para que abra como una app.</p></details>
@@ -645,6 +646,7 @@ const TRANSLATIONS = {
     heroTagline: 'Live map with real roads, turn-by-turn directions, speed limit, fuel and wear, plus a button box to control your truck — on your phone, tablet or second screen. 100% free, no account, no limits, open source.',
     heroCta: 'Download for Windows',
     heroCta2: 'How it works',
+    heroDemo: 'See the live demo',
     ctaNote: 'Portable .exe, no installer, no admin rights. Dashboard opens in any browser.',
     badgeFree: 'Free forever',
     badgeNoLogin: 'No account',
@@ -730,7 +732,7 @@ const TRANSLATIONS = {
     faqQ2: 'Windows says the file is "unrecognized" or dangerous. Is it safe?',
     faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead.',
     faqQ3: 'Does my phone need to be on the same Wi-Fi as my PC?',
-    faqA3: 'No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type.',
+    faqA3: 'No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type. If you ARE on the same Wi-Fi, the client also offers a direct LAN mode (scan a QR code in its Setup window) with the lowest latency, no code and no internet needed.',
     faqQ4: 'Does it work with ProMods, Coast to Coast or other map mods?',
     faqA4: 'Yes: Coast to Coast and ProMods Canada for ATS, and ProMods (Europe + all addons) for ETS2 are built in — enable them with one toggle in the app\'s Mods panel. More mods are being added; ask on Discord for the one you use.',
     faqQ5: 'Does it modify the game, my saves or my achievements?',
@@ -775,6 +777,7 @@ const TRANSLATIONS = {
     heroTagline: 'Mapa en vivo con rutas reales, indicaciones de giro, límite de velocidad, combustible y desgaste, más una botonera para controlar el camión — en tu celular, tablet o segundo monitor. 100% gratis, sin cuenta, sin límites, código abierto.',
     heroCta: 'Descargar para Windows',
     heroCta2: 'Cómo funciona',
+    heroDemo: 'Ver la demo en vivo',
     ctaNote: '.exe portable, sin instalador, sin permisos de administrador. El tablero abre en cualquier navegador.',
     badgeFree: 'Gratis para siempre',
     badgeNoLogin: 'Sin cuenta',
@@ -860,7 +863,7 @@ const TRANSLATIONS = {
     faqQ2: 'Windows dice que el archivo es "no reconocido" o peligroso. ¿Es seguro?',
     faqA2: 'Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python.',
     faqQ3: '¿Mi celular tiene que estar en la misma WiFi que la PC?',
-    faqA3: 'No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear.',
+    faqA3: 'No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.',
     faqQ4: '¿Funciona con ProMods, Coast to Coast u otros mods de mapa?',
     faqA4: 'Sí: Coast to Coast y ProMods Canada para ATS, y ProMods (Europa + todos los addons) para ETS2 vienen incluidos — se activan con un toggle en el panel de Mods de la app. Se van agregando más; pedí el que usás en Discord.',
     faqQ5: '¿Modifica el juego, mis partidas o mis logros?',

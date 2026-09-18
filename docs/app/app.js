@@ -199,6 +199,11 @@ const TRANSLATIONS = {
     poiAddedToast: 'Routing via {name}',
     poiHint: 'Tap a place to route through it as a waypoint.',
     tourPoi: 'Find fuel, rest areas, service shops or a company near you and route there.',
+    chipDemo: 'Demo',
+    detailDemo: 'Simulated trip on the real ATS map. Everything you see works the same with your own game.',
+    exitDemo: 'Exit demo',
+    demoNoCommands: 'Truck buttons need the real game - this is the demo',
+    emptyDemoLink: 'or try the demo',
   },
   es: {
     pairingCode: 'Código de pairing',
@@ -396,6 +401,11 @@ const TRANSLATIONS = {
     poiAddedToast: 'Ruteando por {name}',
     poiHint: 'Tocá un lugar para pasar por ahí como waypoint.',
     tourPoi: 'Buscá combustible, áreas de descanso, talleres o una empresa cerca tuyo y ruteá hasta ahí.',
+    chipDemo: 'Demo',
+    detailDemo: 'Viaje simulado sobre el mapa real de ATS. Todo lo que ves funciona igual con tu propio juego.',
+    exitDemo: 'Salir de la demo',
+    demoNoCommands: 'La botonera necesita el juego real - esto es la demo',
+    emptyDemoLink: 'o probá la demo',
   },
 };
 // Idiomas extra (de/fr/pt/pl/tr/ru) viven en i18n.js - cualquier clave que
@@ -1130,7 +1140,10 @@ function updateWaypointRoute(data) {
 // para la busqueda "cerca mio", el boton de combustible mas cercano, y para
 // ubicar el punto exacto de carga/descarga de un trabajo (empresa + ciudad).
 // ---------------------------------------------------------------------------
-const POI_BASE = '../data';
+// Servido desde trucksim-dash.com (o un http.server local de desarrollo) los
+// datos estan al lado; en modo LAN la app la sirve el cliente desde el PC y
+// los POIs se piden al sitio (GitHub Pages manda CORS abierto).
+const POI_BASE = (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname)) ? '../data' : 'https://trucksim-dash.com/data';
 const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh' };
 const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️' };
 let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]] }
@@ -2358,10 +2371,11 @@ const RECONNECT_DELAY_MS = 3000;
 // (socket abierto o no), lo que dice el backend (hay un cliente local
 // conectado con este codigo?) y el diagnostico que manda el cliente
 // (client_status: waiting_game / plugin_missing / waiting_truck / live).
-const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false };
+const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false };
 
 function connectionView() {
   if (conn.socket === 'idle') return null;
+  if (conn.demo) return { chip: 'chipDemo', cls: 'info', detail: 'detailDemo', empty: null, live: true };
   if (conn.invalidCode) return { chip: 'chipInvalidCode', cls: 'err', detail: 'detailInvalidCode', empty: null };
   if (conn.socket === 'connecting') return { chip: 'chipConnecting', cls: '', detail: null, empty: null };
   if (conn.socket === 'closed') return { chip: 'chipReconnecting', cls: 'err', detail: null, empty: ['emptyReconnectTitle', 'emptyReconnectBody', '📡'] };
@@ -2392,8 +2406,12 @@ function renderConnectionUi() {
   chip.hidden = false;
   chip.className = `statusChip ${view.cls}`;
   let chipText = t(view.chip);
-  if (view.live && lastData?.game) chipText += ` · ${lastData.game.toUpperCase()}`;
+  if (view.live && lastData?.game && !conn.demo) chipText += ` · ${lastData.game.toUpperCase()}`;
+  if (conn.local) chipText += ' · LAN';
   document.getElementById('statusChipText').textContent = chipText;
+  // En modo LAN o demo no hay "otro codigo" que poner: el lapiz sale de la sesion.
+  document.getElementById('changeCodeBtn').title = conn.demo ? t('exitDemo') : t('changeCode');
+  document.getElementById('changeCodeBtn').style.display = conn.local ? 'none' : '';
   statusEl.textContent = view.detail ? t(view.detail) : '';
   statusEl.className = view.cls;
   if (view.empty) {
@@ -2404,6 +2422,7 @@ function renderConnectionUi() {
     const link = document.getElementById('emptyStateLink');
     link.style.display = showDownload ? '' : 'none';
     link.textContent = t('emptyDownload');
+    document.getElementById('emptyStateDemo').style.display = showDownload ? '' : 'none';
     empty.style.display = 'flex';
   } else {
     empty.style.display = 'none';
@@ -2411,6 +2430,7 @@ function renderConnectionUi() {
 }
 
 document.getElementById('changeCodeBtn').addEventListener('click', () => {
+  if (conn.demo) { location.href = location.pathname; return; }
   clearTimeout(reconnectTimer);
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
   conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false;
@@ -2531,6 +2551,7 @@ commandsPortraitQuery.addEventListener('change', updateCommandsPageActive);
 
 document.querySelectorAll('#commandsPanel .cmdBtn[data-action]').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (conn.demo) { showToast(t('demoNoCommands'), 'danger', 2500); return; }
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       showToast(t('commandNotConnectedToast'), 'danger');
       return;
@@ -2644,10 +2665,34 @@ function updateCommandButtonStates(data) {
 // Connect como automaticamente si la conexion se corta - antes, si se
 // cortaba, el unico aviso era el texto chico de #status, facil de no notar
 // si estas mirando el dashboard en otra pantalla mientras manejas.
-function connectWs(backend, code) {
-  fetchLatestClientVersion(backend);
+// Un tick de telemetria (venga del relay, del servidor LAN del cliente o del
+// modo demo): actualiza HUD, mapa, ruta y estado.
+function handleTelemetry(data) {
+  conn.clientConnected = true;
+  conn.hasTelemetry = true;
+  const pausedChanged = conn.paused !== !!data.paused;
+  conn.paused = !!data.paused;
+  if (!conn.clientStatus || conn.clientStatus.status !== 'live' || conn.clientStatus.game !== data.game || pausedChanged) {
+    conn.clientStatus = { status: 'live', game: data.game };
+    lastData = data;
+    renderConnectionUi();
+  }
+  updateHud(data);
+  updateMap(data.position || {}, data.game);
+  updateDestinationMarker(data);
+  checkUpdateBanner(data.clientVersion);
+  // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
+  // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
+  if (liveShareEnabled && !conn.local && resolveEffectiveGame(data.game) !== lastSentMapVariant) sendLiveShareState();
+}
+
+function connectWs(backend, code, options = {}) {
+  conn.local = !!options.local;
+  fetchLatestClientVersion(conn.local ? document.getElementById('backendUrl').value : backend);
   clearTimeout(reconnectTimer);
-  const socket = new WebSocket(`${backend}/ws/live/${code}`);
+  // Modo LAN: el cliente sirve esta pagina y el WebSocket directo, sin
+  // pairing code (misma red = misma persona); ver client/local_server.py.
+  const socket = new WebSocket(conn.local ? backend : `${backend}/ws/live/${code}`);
   ws = socket;
   conn.socket = 'connecting';
   conn.invalidCode = false;
@@ -2681,22 +2726,7 @@ function connectWs(backend, code) {
       checkUpdateBanner(data.clientVersion);
       return;
     }
-    conn.clientConnected = true;
-    conn.hasTelemetry = true;
-    const pausedChanged = conn.paused !== !!data.paused;
-    conn.paused = !!data.paused;
-    if (!conn.clientStatus || conn.clientStatus.status !== 'live' || conn.clientStatus.game !== data.game || pausedChanged) {
-      conn.clientStatus = { status: 'live', game: data.game };
-      lastData = data;
-      renderConnectionUi();
-    }
-    updateHud(data);
-    updateMap(data.position || {}, data.game);
-    updateDestinationMarker(data);
-    checkUpdateBanner(data.clientVersion);
-    // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
-    // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
-    if (liveShareEnabled && resolveEffectiveGame(data.game) !== lastSentMapVariant) sendLiveShareState();
+    handleTelemetry(data);
   };
   socket.onclose = (ev) => {
     if (ws !== socket) return; // reemplazado por una conexion mas nueva, ignorar
@@ -2709,7 +2739,7 @@ function connectWs(backend, code) {
     conn.socket = 'closed';
     renderConnectionUi();
     showReconnectBanner(t('reconnectingBanner'));
-    reconnectTimer = setTimeout(() => connectWs(backend, code), RECONNECT_DELAY_MS);
+    reconnectTimer = setTimeout(() => connectWs(backend, code, options), RECONNECT_DELAY_MS);
   };
   socket.onerror = () => {
     if (ws !== socket) return;
@@ -2785,6 +2815,8 @@ function startTour() {
   const needsClientStep = !document.getElementById('code').value.trim() && conn.socket === 'idle';
   if (needsClientStep && TOUR_STEPS[0].textKey !== 'tourDownload') TOUR_STEPS.unshift({ selector: '#connectGroup', textKey: 'tourDownload' });
   if (!needsClientStep && TOUR_STEPS[0].textKey === 'tourDownload') TOUR_STEPS.shift();
+  // En modo LAN/demo no hay codigo que pegar: ese paso sobra.
+  if ((conn.local || conn.demo) && TOUR_STEPS[0].textKey === 'tourCode') TOUR_STEPS.shift();
   document.getElementById('tourOverlay').style.display = 'block';
   showTourStep(0);
 }
@@ -2809,20 +2841,141 @@ if (!localStorage.getItem('truckdash_tour_seen')) {
 
 // El .exe del cliente abre el navegador directo con ?code=...&backend=...
 // para que el usuario no tenga que tipear nada a mano.
+// (autoConnectFromUrl se llama al final del archivo, cuando todo esta definido)
+
+// ---------------------------------------------------------------------------
+// Modo demo (?demo=1): un viaje simulado sobre el mapa real de ATS, para que
+// quien entra desde la landing vea el GPS, la ruta, el cluster y las
+// indicaciones funcionando sin bajar nada. Usa el mismo camino que la
+// telemetria real (handleTelemetry) - lo unico falso es el origen del payload.
+// ---------------------------------------------------------------------------
+const DEMO_ROUTE = { game: 'ats', from: 'Salt Lake City', to: 'Las Vegas', cargo: 'Bulldozer', cargoMassKg: 18189, truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158 };
+const DEMO_SPEED_MS = 26; // ~94 km/h
+const DEMO_TIME_SCALE = 6; // 6x mas rapido que en tiempo real, para que pasen cosas
+// El mapa del juego esta a escala ~1:20: el juego muestra distancias/ETA
+// multiplicadas, y la telemetria real tambien (routeDistance viene ya
+// escalado). La demo hace lo mismo para que los numeros se vean normales.
+const DEMO_DISTANCE_SCALE = 20;
+let demoTimer = null;
+
+function startDemo() {
+  conn.demo = true;
+  conn.socket = 'open';
+  conn.clientConnected = true;
+  document.getElementById('code').value = 'DEMO';
+  renderConnectionUi();
+  loadGameMap(DEMO_ROUTE.game);
+  const waitAssets = () => {
+    if (!mapReady || !routeGraph || !citiesByName[DEMO_ROUTE.from] || !citiesByName[DEMO_ROUTE.to] || !truckMarker) {
+      demoTimer = setTimeout(waitAssets, 500);
+      return;
+    }
+    runDemo();
+  };
+  waitAssets();
+}
+
+function runDemo() {
+  const a = citiesByName[DEMO_ROUTE.from], b = citiesByName[DEMO_ROUTE.to];
+  const path = findRoute([a.X, a.Y], [b.X, b.Y]);
+  if (!path || path.length < 2) { showToast('Demo route unavailable', 'danger'); return; }
+  const total = sumPathDistanceMeters(path);
+  let travelled = 0;
+  let fuel = 0.82;
+  let odometer = 184220;
+  let tick = 0;
+  const speedNoise = () => DEMO_SPEED_MS * 3.6 + Math.sin(tick / 7) * 4;
+
+  const pointAt = (dist) => {
+    let acc = 0;
+    for (let i = 1; i < path.length; i++) {
+      const seg = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      if (acc + seg >= dist) {
+        const f = seg ? (dist - acc) / seg : 0;
+        return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * f, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * f];
+      }
+      acc += seg;
+    }
+    return path[path.length - 1];
+  };
+
+  const step = () => {
+    tick++;
+    travelled += DEMO_SPEED_MS * DEMO_TIME_SCALE;
+    if (travelled >= total) travelled = 0; // vuelve a empezar
+    const [x, z] = pointAt(travelled);
+    const remainingKm = ((total - travelled) / 1000) * DEMO_DISTANCE_SCALE;
+    fuel = Math.max(0.05, fuel - 0.00012 * DEMO_TIME_SCALE);
+    odometer += (DEMO_SPEED_MS * DEMO_TIME_SCALE * DEMO_DISTANCE_SCALE) / 1000;
+    const speedKmh = speedNoise();
+    handleTelemetry({
+      ts: Date.now() / 1000,
+      clientVersion: '9.9.9',
+      paused: false,
+      game: DEMO_ROUTE.game,
+      position: { x, y: 0, z },
+      speedKmh,
+      speedLimitKmh: Math.floor(tick / 40) % 3 === 0 ? 88.5 : 104.6,
+      cargo: DEMO_ROUTE.cargo,
+      cargoMassKg: DEMO_ROUTE.cargoMassKg,
+      citySrc: DEMO_ROUTE.from,
+      cityDst: DEMO_ROUTE.to,
+      onJob: true,
+      isCargoLoaded: true,
+      routeDistanceKm: remainingKm,
+      routeTimeSeconds: (remainingKm * 1000) / DEMO_SPEED_MS,
+      jobDeadlineSeconds: 3600 * 9,
+      truckBrand: DEMO_ROUTE.truckBrand,
+      truckName: DEMO_ROUTE.truckName,
+      odometerKm: odometer,
+      fuel: fuel * 600,
+      fuelCapacity: 600,
+      fuelRangeKm: fuel * 600 / 0.38,
+      wear: { engine: 0.03, transmission: 0.02, cabin: 0.06, chassis: 0.04, wheels: 0.11 },
+      jobIncome: DEMO_ROUTE.jobIncome,
+      fuelAvgConsumption: 38,
+      cruiseControl: true,
+      cruiseControlSpeedKmh: 94,
+      lights: { beamLow: true },
+      engineRpm: 1250 + Math.sin(tick / 5) * 120,
+      engineRpmMax: 2500,
+      gear: 12,
+      engineEnabled: true,
+      parkingBrake: false,
+      trailerAttached: true,
+      mechanicalWarnings: {},
+      event: {},
+    });
+  };
+  step();
+  demoTimer = setInterval(step, 1000);
+}
+
+renderConnectionUi();
+renderTripHistory();
+buildSpeedTicks();
+
+// El .exe del cliente abre el navegador directo con ?code=...&backend=...
+// para que el usuario no tenga que tipear nada a mano; ?local=1 y ?demo=1
+// son los otros dos puntos de entrada. Va al final: usa funciones y
+// variables (let) declaradas mas arriba.
 (function autoConnectFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const backend = params.get('backend');
   if (backend) document.getElementById('backendUrl').value = backend;
+  if (params.get('demo')) { startDemo(); return; }
+  if (params.get('local')) {
+    // Servido por el cliente en la LAN: el WebSocket esta en el mismo host,
+    // puerto fijo (ver client/local_server.py).
+    connectWs(`ws://${location.hostname}:27766`, null, { local: true });
+    return;
+  }
   if (code) {
     document.getElementById('code').value = code.toUpperCase();
     document.getElementById('connectBtn').click();
   }
 })();
-
-renderConnectionUi();
-renderTripHistory();
-buildSpeedTicks();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

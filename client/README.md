@@ -58,6 +58,16 @@ live), your pairing code for the phone, an option to **start Truck Dash with
 Windows** (the dashboard then opens automatically when the game starts), and
 one-click updates when a new version is out.
 
+### Same Wi-Fi? LAN mode
+
+If your phone or tablet is on the same Wi-Fi as the PC, the Setup window
+also shows a **LAN address** (with a QR code to scan). That opens the
+dashboard served directly by the client (`http://<your-pc-ip>:27765/app/`)
+with a direct WebSocket link — lowest latency, no pairing code, and it keeps
+working even if your internet drops. Windows may ask once to allow
+TruckDash through the firewall (private networks) — click Allow. The cloud
+mode with the pairing code keeps working at the same time.
+
 ### Windows SmartScreen ("unrecognized app")
 
 The `.exe` is not code-signed (certificates cost money), so the first time

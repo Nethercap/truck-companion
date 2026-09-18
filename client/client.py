@@ -49,7 +49,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.3.0"
+CLIENT_VERSION = "1.3.1"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -337,9 +337,23 @@ def build_payload(raw: dict) -> dict:
         "cargo": raw.get("cargo") or None,
         "cargoMassKg": raw.get("cargoMass"),
         "citySrc": raw.get("citySrc") or None,
-        "companySrc": raw.get("companySrc") or None,
         "cityDst": raw.get("cityDst") or None,
-        "companyDst": raw.get("companyDst") or None,
+        # El SDK llama a estos campos compSrc/compDst (no companySrc) - el
+        # nombre viejo hacia que siempre salieran vacios. Los *Id son los
+        # tokens internos (ej. "wal_mkt", "kansas_city"): la web los cruza
+        # con los POIs del mapa para rutear a la empresa exacta de
+        # carga/descarga en vez de al centro de la ciudad.
+        "companySrc": raw.get("compSrc") or None,
+        "companySrcId": raw.get("compSrcId") or None,
+        "citySrcId": raw.get("citySrcId") or None,
+        "companyDst": raw.get("compDst") or None,
+        "companyDstId": raw.get("compDstId") or None,
+        "cityDstId": raw.get("cityDstId") or None,
+        "onJob": bool(raw.get("onJob")),
+        "isCargoLoaded": bool(raw.get("isCargoLoaded")),
+        "engineRpm": raw.get("engineRpm"),
+        "engineRpmMax": raw.get("engineRpmMax"),
+        "gear": raw.get("gearDashboard"),
         "routeDistanceKm": (raw.get("routeDistance") or 0) / 1000,
         "routeTimeSeconds": raw.get("routeTime"),
         "restStopSeconds": raw.get("restStop"),
@@ -451,6 +465,32 @@ def attach_job_snapshot_if_finished(payload: dict):
         event["jobCargo"] = _last_job_snapshot["cargo"]
 
 
+async def handle_control_message(message: str, keybinds: dict, send) -> None:
+    """Procesa un mensaje de control de la web (comando de botonera, get/set
+    de keybinds) y responde via `send` (coroutine que manda un str). Lo usan
+    tanto la conexion al backend (cloud) como el servidor LAN local."""
+    try:
+        payload = json.loads(message)
+        msg_type = payload.get("type")
+        if msg_type == "command":
+            action = payload.get("action", "")
+            result = await asyncio.to_thread(send_game_command, action, keybinds)
+            if result != "ok":
+                await send(json.dumps({"type": "command_result", "action": action, "ok": False, "reason": result}))
+        elif msg_type == "get_keybinds":
+            detected = await asyncio.to_thread(detect_keybinds_from_controls_sii)
+            live = dict(keybinds)
+            live.update({a: k for a, k in detected.items() if k})
+            await send(json.dumps({"type": "keybinds", "data": live}))
+        elif msg_type == "set_keybinds":
+            incoming = payload.get("data") or {}
+            keybinds.update({k: (v or None) for k, v in incoming.items() if k in DEFAULT_KEYBINDS})
+            await asyncio.to_thread(save_keybinds, keybinds)
+            await send(json.dumps({"type": "keybinds", "data": keybinds}))
+    except Exception as exc:
+        logging.warning(f"Comando invalido recibido ({exc}): {message!r}")
+
+
 async def receive_commands(ws, keybinds: dict):
     """Escucha en paralelo al envio de telemetria - la web puede mandar
     comandos de botonera (on/off balizas, motor, etc.) por el mismo socket,
@@ -466,32 +506,7 @@ async def receive_commands(ws, keybinds: dict):
     por muerto y corte la conexion (notado con controls.sii en una carpeta
     de OneDrive, que puede tardar en resolver)."""
     async for message in ws:
-        try:
-            payload = json.loads(message)
-            msg_type = payload.get("type")
-            if msg_type == "command":
-                action = payload.get("action", "")
-                result = await asyncio.to_thread(send_game_command, action, keybinds)
-                if result != "ok":
-                    await ws.send(json.dumps({"type": "command_result", "action": action, "ok": False, "reason": result}))
-            elif msg_type == "get_keybinds":
-                # Re-detecta en vivo del controls.sii en cada apertura del
-                # modal - lo detectado pisa lo guardado (el modal tiene que
-                # mostrar lo que el juego tiene asignado de verdad ahora, no
-                # un valor viejo cacheado). Si el usuario despues guarda algo
-                # distinto a mano, eso se usa para los botones hasta que
-                # vuelva a abrir el modal - no se persigue mas alla de eso.
-                detected = await asyncio.to_thread(detect_keybinds_from_controls_sii)
-                live = dict(keybinds)
-                live.update({a: k for a, k in detected.items() if k})
-                await ws.send(json.dumps({"type": "keybinds", "data": live}))
-            elif msg_type == "set_keybinds":
-                incoming = payload.get("data") or {}
-                keybinds.update({k: (v or None) for k, v in incoming.items() if k in DEFAULT_KEYBINDS})
-                await asyncio.to_thread(save_keybinds, keybinds)
-                await ws.send(json.dumps({"type": "keybinds", "data": keybinds}))
-        except Exception as exc:
-            logging.warning(f"Comando invalido recibido ({exc}): {message!r}")
+        await handle_control_message(message, keybinds, ws.send)
 
 
 async def run(backend_ws_url: str, code: str):

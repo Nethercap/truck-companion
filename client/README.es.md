@@ -61,6 +61,16 @@ camión / en vivo), tu código de pairing para el celular, una opción para
 **iniciar Truck Dash con Windows** (el tablero se abre solo cuando arranca
 el juego), y actualizaciones con un click cuando sale una versión nueva.
 
+### ¿Misma WiFi? Modo LAN
+
+Si tu celular o tablet está en la misma WiFi que la PC, la ventana de Setup
+también muestra una **dirección LAN** (con un código QR para escanear). Eso
+abre el tablero servido directo por el cliente (`http://<ip-de-tu-pc>:27765/app/`)
+con un WebSocket directo — la menor latencia, sin código de pairing, y sigue
+funcionando aunque se corte internet. Windows puede preguntar una vez si
+permitís TruckDash en el firewall (redes privadas) — tocá Permitir. El modo
+cloud con código sigue funcionando al mismo tiempo.
+
 ### Windows SmartScreen ("aplicación no reconocida")
 
 El `.exe` no tiene firma digital (los certificados cuestan dinero), así que

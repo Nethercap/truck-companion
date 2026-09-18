@@ -30,6 +30,7 @@ import pystray
 from PIL import Image, ImageDraw
 
 import client as client_lib
+import local_server
 import plugin_installer
 import win_integration
 
@@ -54,20 +55,24 @@ GAME_LABELS = {"ats": "American Truck Simulator", "ets2": "Euro Truck Simulator 
 # no esta abierto" en vez de un generico "waiting for telemetry".
 STATUS_TEXT = {
     "starting": "Starting...",
-    "no_backend": "Can't reach the Truck Dash server (internet? antivirus HTTPS scanning?)",
-    "connecting": "Connecting...",
-    "reconnecting": "Reconnecting...",
-    "waiting_game": "Connected - waiting for the game to open",
+    "waiting_game": "Waiting for the game to open",
     "plugin_not_installed": "Telemetry plugin not installed - open Setup to install it",
     "plugin_missing": "Game is running but no telemetry - is the plugin installed? (open Setup)",
-    "waiting_truck": "Connected - waiting for you to be in the truck",
+    "waiting_truck": "Waiting for you to be in the truck",
     "live": "Live",
+}
+CLOUD_TEXT = {
+    "connecting": "connecting to server...",
+    "connected": "server OK",
+    "offline": "server unreachable (internet? antivirus HTTPS scanning?) - LAN mode still works",
+    "reconnecting": "reconnecting to server...",
 }
 
 
 class AppState:
     def __init__(self):
-        self.status = "starting"
+        self.status = "starting"  # estado de la telemetria (ver STATUS_TEXT)
+        self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.code = None
         self.icon = None
@@ -76,21 +81,29 @@ class AppState:
         self.autostart_mode = False  # lanzado por el inicio automatico de Windows
         self.update_available = None  # (version, download_url, sha256) o None
         self.installs = []  # ver plugin_installer.find_game_installs()
+        self.local: local_server.LocalServer | None = None  # modo LAN (ver local_server.py)
 
     def status_text(self) -> str:
         text = STATUS_TEXT.get(self.status, self.status)
         if self.status == "live" and self.game:
             text = f"Live - playing {GAME_LABELS.get(self.game, self.game)}"
-        return text
+        return f"{text} ({CLOUD_TEXT.get(self.cloud, self.cloud)})"
+
+    def refresh_title(self):
+        if self.icon:
+            code_part = f" - code {self.code}" if self.code else ""
+            self.icon.title = f"Truck Dash{code_part} - {self.status_text()}"
 
     def set_status(self, status: str, game: str | None = None):
         changed = status != self.status or game != self.game
         self.status = status
         self.game = game
-        if self.icon:
-            code_part = f" - code {self.code}" if self.code else ""
-            self.icon.title = f"Truck Dash{code_part} - {self.status_text()}"
+        self.refresh_title()
         return changed
+
+    def set_cloud(self, cloud: str):
+        self.cloud = cloud
+        self.refresh_title()
 
     def set_code(self, code: str | None):
         self.code = code
@@ -240,6 +253,24 @@ class SetupWindow:
         self.button(code_row, "Open dashboard", self.open_dashboard, primary=True).pack(side="left", padx=4)
         self.label(status_frame, "On your phone: open trucksim-dash.com/app and type this code. It doesn't need to be on the same Wi-Fi.", fg=MUTED, wraplength=520).pack(anchor="w")
 
+        # --- Modo LAN ---
+        lan_frame = self.section("SAME WI-FI (LOWEST LATENCY)")
+        lan_row = tk.Frame(lan_frame, bg=BG)
+        lan_row.pack(anchor="w", pady=(4, 0), fill="x")
+        self.qr_label = tk.Label(lan_row, bg=BG)
+        self.qr_label.pack(side="left", padx=(0, 12))
+        lan_text = tk.Frame(lan_row, bg=BG)
+        lan_text.pack(side="left", fill="x", expand=True)
+        self.lan_url_label = self.label(lan_text, "", fg=BLUE, font=("Consolas", 11, "bold"), wraplength=380)
+        self.lan_url_label.pack(anchor="w")
+        self.lan_hint_label = self.label(lan_text, "Phone/tablet on the same Wi-Fi: scan the code or type the address. No pairing code needed, and it keeps working even if the internet drops. If Windows asks about the firewall, click Allow.", fg=MUTED, wraplength=380)
+        self.lan_hint_label.pack(anchor="w", pady=(4, 0))
+        lan_btns = tk.Frame(lan_text, bg=BG)
+        lan_btns.pack(anchor="w", pady=(6, 0))
+        self.button(lan_btns, "Copy address", self.copy_lan_url).pack(side="left")
+        self.button(lan_btns, "Open here", self.open_lan_here).pack(side="left", padx=6)
+        self.render_lan()
+
         # --- Juegos / plugin ---
         self.games_frame = self.section("GAME SETUP")
         self.games_body = tk.Frame(self.games_frame, bg=BG)
@@ -342,6 +373,38 @@ class SetupWindow:
             self.root.clipboard_clear()
             self.root.clipboard_append(state.code)
 
+    def render_lan(self):
+        srv = state.local
+        url = srv.url if srv else None
+        if not srv or srv.error or not srv.web_ready or not url:
+            reason = "starting..." if not srv else (srv.error or "couldn't download the web app (no internet yet?)")
+            self.lan_url_label.configure(text=f"LAN mode unavailable: {reason}", fg=MUTED)
+            self.qr_label.configure(image="", text="")
+            return
+        self.lan_url_label.configure(text=url, fg=BLUE)
+        try:
+            import qrcode
+            from PIL import ImageTk
+            qr = qrcode.QRCode(box_size=3, border=1)
+            qr.add_data(url)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="#f2f3f5", back_color=BG).convert("RGB")
+            self._qr_photo = ImageTk.PhotoImage(img)
+            self.qr_label.configure(image=self._qr_photo)
+        except Exception:
+            logging.exception("QR render failed")
+            self.qr_label.configure(image="", text="")
+
+    def copy_lan_url(self):
+        url = state.local.url if state.local else None
+        if url:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(url)
+
+    def open_lan_here(self):
+        if state.local and state.local.web_ready:
+            webbrowser.open(f"http://127.0.0.1:{local_server.HTTP_PORT}/app/?local=1")
+
     def open_dashboard(self):
         url = build_web_url()
         if url:
@@ -377,9 +440,15 @@ class SetupWindow:
         threading.Thread(target=_run, daemon=True).start()
 
     def refresh_status(self):
-        color = {"live": GREEN, "waiting_truck": BLUE, "waiting_game": FG, "no_backend": RED, "plugin_missing": ORANGE, "plugin_not_installed": ORANGE}.get(state.status, FG)
+        color = {"live": GREEN, "waiting_truck": BLUE, "waiting_game": FG, "plugin_missing": ORANGE, "plugin_not_installed": ORANGE}.get(state.status, FG)
+        if state.cloud in ("offline", "reconnecting") and state.status != "live":
+            color = RED if state.cloud == "offline" else ORANGE
         self.status_label.configure(text=state.status_text(), fg=color)
         self.code_label.configure(text=state.code or "-")
+        lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
+        if getattr(self, "_last_lan_url", "?") != lan_url:
+            self._last_lan_url = lan_url
+            self.render_lan()
         if state.update_available:
             version = state.update_available[0]
             if not self.update_frame.winfo_ismapped():
@@ -445,6 +514,14 @@ def open_web_menu_item(icon, item):
         show_text_dialog("Truck Dash", "No pairing code yet.")
 
 
+def show_lan_menu_item(icon, item):
+    srv = state.local
+    if srv and srv.web_ready and not srv.error and srv.url:
+        show_text_dialog("Truck Dash", "Same Wi-Fi: open this on your phone/tablet (or scan the QR in Setup & status):", copy_value=srv.url)
+    else:
+        show_text_dialog("Truck Dash", "LAN mode isn't available right now (see Setup & status).")
+
+
 def check_for_update(backend_url: str):
     """(latest_version, download_url, sha256) si hay una version mas nueva,
     o (None, None, None) si esta al dia o fallo la consulta (no es critico)."""
@@ -503,29 +580,152 @@ def telemetry_status_when_unavailable() -> str:
     return "waiting_game"
 
 
-async def send_status(ws):
-    try:
-        await ws.send(json.dumps({
-            "type": "client_status",
-            "status": state.status,
-            "game": state.game,
-            "clientVersion": client_lib.CLIENT_VERSION,
-        }))
-    except Exception:
-        pass
+def status_message() -> str:
+    return json.dumps({
+        "type": "client_status",
+        "status": state.status,
+        "game": state.game,
+        "clientVersion": client_lib.CLIENT_VERSION,
+    })
+
+
+class CloudLink:
+    """Conexion al backend (relay). Reconecta sola; expone send() que
+    descarta en silencio si no hay conexion en ese momento."""
+
+    def __init__(self, backend_url: str, code: str, keybinds: dict):
+        self.url = f"{backend_url}/ws/client/{code}"
+        self.keybinds = keybinds
+        self.ws = None
+
+    async def send(self, text: str):
+        ws = self.ws
+        if ws is None:
+            return
+        try:
+            await ws.send(text)
+        except Exception:
+            pass
+
+    async def run(self):
+        import websockets
+
+        while True:
+            try:
+                async with websockets.connect(self.url) as ws:
+                    self.ws = ws
+                    state.set_cloud("connected")
+                    logging.info("Connected to backend")
+                    await ws.send(status_message())
+                    await client_lib.receive_commands(ws, self.keybinds)
+            except (websockets.ConnectionClosed, OSError) as exc:
+                logging.warning("Backend connection lost: %s", exc)
+            except Exception:
+                logging.exception("Unexpected error in backend link")
+            finally:
+                self.ws = None
+            state.set_cloud("reconnecting")
+            await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
+
+
+async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
+    """Lee el SDK a 1 Hz y publica cada payload por los dos caminos (cloud y
+    LAN). Independiente de si el backend esta accesible: sin internet, el
+    modo LAN sigue andando."""
+    import truck_telemetry
+
+    telemetry_ready = False
+    inactive_since = None
+    last_status_sent = None
+
+    async def publish_status():
+        nonlocal last_status_sent
+        if state.status != last_status_sent:
+            last_status_sent = state.status
+            msg = status_message()
+            await cloud.send(msg)
+            await local.broadcast(msg, is_status=True)
+
+    while True:
+        if not telemetry_ready:
+            try:
+                truck_telemetry.init()
+                telemetry_ready = True
+                logging.info("truck_telemetry.init() succeeded")
+            except Exception:
+                new_status = telemetry_status_when_unavailable()
+                if new_status != state.status:
+                    logging.info("Telemetry unavailable: %s", new_status)
+                state.set_status(new_status)
+                await publish_status()
+                await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
+                continue
+
+        try:
+            raw = truck_telemetry.get_data()
+        except Exception:
+            logging.exception("get_data() failed, re-initializing telemetry")
+            telemetry_ready = False
+            await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
+            continue
+
+        if raw.get("sdkActive"):
+            inactive_since = None
+            client_lib.update_job_snapshot(raw)
+            payload = client_lib.build_payload(raw)
+            client_lib.attach_job_snapshot_if_finished(payload)
+            game = payload.get("game")
+            if state.set_status("live", game):
+                open_web_ui()  # en modo autostart, recien aca (juego detectado) se abre el navegador
+            text = json.dumps(payload)
+            await cloud.send(text)
+            await local.broadcast(text)
+        else:
+            # Sin frame real del juego: en el menu, o el juego se cerro (la
+            # memoria compartida sobrevive mientras tengamos el handle). Si la
+            # ventana del juego ya no existe, se cierra el handle para volver
+            # a "esperando el juego".
+            if inactive_since is None:
+                inactive_since = time.time()
+            if time.time() - inactive_since > 5 and not client_lib.find_game_window():
+                truck_telemetry.deinit()
+                telemetry_ready = False
+                inactive_since = None
+                state.set_status("waiting_game")
+            else:
+                state.set_status("waiting_truck")
+        await publish_status()
+        await asyncio.sleep(client_lib.SEND_INTERVAL_SECONDS)
 
 
 async def run_client(backend_url: str, fixed_code: str | None):
     logging.info("Starting client v%s, backend=%s", client_lib.CLIENT_VERSION, backend_url)
     state.refresh_installs()
+    keybinds = client_lib.load_keybinds()
+
+    # El servidor LAN arranca primero y no depende del backend: sin internet
+    # el dashboard sigue disponible en la red local. Una sola instancia: si
+    # run_client se relanza (Disconnect -> codigo nuevo) se reusa la que ya
+    # tiene los puertos tomados.
+    if state.local is None:
+        state.local = local_server.LocalServer(keybinds)
+        asyncio.create_task(state.local.start())
+    local = state.local
+    local.keybinds = keybinds
+
+    # Placeholder sin conexion hasta tener codigo: telemetry_loop publica por
+    # LAN igual y descarta el envio cloud mientras tanto.
+    cloud = CloudLink(backend_url, "", keybinds)
+    telemetry_task = asyncio.create_task(telemetry_loop(cloud, local))
+
     code = fixed_code
     while code is None:
-        state.set_status("connecting")
+        state.set_cloud("connecting")
         try:
             code = await asyncio.to_thread(client_lib.request_pairing_code, backend_url)
-        except Exception as exc:
+        except Exception:
             logging.exception("Failed to get pairing code")
-            state.set_status("no_backend")
+            state.set_cloud("offline")
             await asyncio.sleep(10)
     state.set_code(code)
     logging.info("Got pairing code %s", code)
@@ -533,78 +733,11 @@ async def run_client(backend_url: str, fixed_code: str | None):
         open_web_ui()
     asyncio.create_task(asyncio.to_thread(check_for_update_silent, backend_url))
 
-    import truck_telemetry
-    import websockets
-
-    url = f"{backend_url}/ws/client/{code}"
-    keybinds = client_lib.load_keybinds()
-    telemetry_ready = False
-    while True:
-        try:
-            async with websockets.connect(url) as ws:
-                logging.info("Connected to backend")
-                recv_task = asyncio.create_task(client_lib.receive_commands(ws, keybinds))
-                last_status_sent = None
-                inactive_since = None
-                try:
-                    while True:
-                        if not telemetry_ready:
-                            try:
-                                truck_telemetry.init()
-                                telemetry_ready = True
-                                logging.info("truck_telemetry.init() succeeded")
-                            except Exception:
-                                new_status = telemetry_status_when_unavailable()
-                                if new_status != state.status:
-                                    logging.info("Telemetry unavailable: %s", new_status)
-                                state.set_status(new_status)
-                                if state.status != last_status_sent:
-                                    await send_status(ws)
-                                    last_status_sent = state.status
-                                await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
-                                continue
-
-                        raw = truck_telemetry.get_data()
-                        if raw.get("sdkActive"):
-                            inactive_since = None
-                            client_lib.update_job_snapshot(raw)
-                            payload = client_lib.build_payload(raw)
-                            client_lib.attach_job_snapshot_if_finished(payload)
-                            game = payload.get("game")
-                            if state.set_status("live", game):
-                                open_web_ui()  # en modo autostart, recien aca (juego detectado) se abre el navegador
-                            await ws.send(json.dumps(payload))
-                        else:
-                            # Sin frame real del juego: en el menu, o el juego se
-                            # cerro (la memoria compartida sobrevive mientras
-                            # tengamos el handle). Si la ventana del juego ya no
-                            # existe, se cierra el handle para volver a
-                            # "esperando el juego" en vez de quedar en "en el
-                            # menu" para siempre.
-                            if inactive_since is None:
-                                inactive_since = time.time()
-                            if time.time() - inactive_since > 5 and not client_lib.find_game_window():
-                                truck_telemetry.deinit()
-                                telemetry_ready = False
-                                inactive_since = None
-                                state.set_status("waiting_game")
-                            else:
-                                state.set_status("waiting_truck")
-                        if state.status != last_status_sent:
-                            await send_status(ws)
-                            last_status_sent = state.status
-                        await asyncio.sleep(client_lib.SEND_INTERVAL_SECONDS)
-                finally:
-                    recv_task.cancel()
-        except (websockets.ConnectionClosed, OSError) as exc:
-            logging.warning("Backend connection lost: %s", exc)
-            state.set_status("reconnecting")
-            await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
-        except Exception:
-            logging.exception("Unexpected error in telemetry loop")
-            telemetry_ready = False
-            state.set_status("reconnecting")
-            await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
+    cloud.url = f"{backend_url}/ws/client/{code}"
+    try:
+        await cloud.run()
+    finally:
+        telemetry_task.cancel()
 
 
 _loop: asyncio.AbstractEventLoop | None = None
@@ -639,7 +772,7 @@ def disconnect_session(icon, item):
         if _client_task:
             _client_task.cancel()
         state.set_code(None)
-        state.set_status("connecting")
+        state.set_cloud("connecting")
         _browser_opened = False
         _start_client_task(state.backend_url, None)
 
@@ -671,6 +804,7 @@ def main():
         pystray.MenuItem("Setup & status", open_setup_window, default=True),
         pystray.MenuItem("Open dashboard", open_web_menu_item),
         pystray.MenuItem("Show pairing code", show_code_notification),
+        pystray.MenuItem("Same Wi-Fi address (LAN mode)", show_lan_menu_item),
         pystray.MenuItem("Disconnect (get new code)", disconnect_session),
         pystray.MenuItem("Start with Windows", toggle_autostart_menu_item, checked=lambda item: win_integration.is_autostart_enabled(), enabled=lambda item: win_integration.exe_path() is not None),
         pystray.MenuItem("Check for updates", check_for_update_menu_item),

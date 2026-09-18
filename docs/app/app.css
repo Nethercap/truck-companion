@@ -108,6 +108,7 @@
   .emptyStateIcon { font-size: 1.8rem; margin-bottom: 0.3rem; }
   .emptyStateTitle { font-weight: 700; font-size: 1rem; margin-bottom: 0.3rem; }
   .emptyStateBody { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+  .emptyStateDemo { display: block; margin-top: 0.5rem; font-size: 0.8rem; color: var(--muted); text-decoration: underline; }
   .emptyStateLink { display: inline-block; margin-top: 0.7rem; background: var(--accent); color: #fff; padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: none; }
 
   /* Modo pantalla completa: se oculta todo el header (titulo, setup, status)
