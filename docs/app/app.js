@@ -1145,9 +1145,11 @@ function updateWaypointRoute(data) {
 // ubicar el punto exacto de carga/descarga de un trabajo (empresa + ciudad).
 // ---------------------------------------------------------------------------
 // Servido desde trucksim-dash.com (o un http.server local de desarrollo) los
-// datos estan al lado; en modo LAN la app la sirve el cliente desde el PC y
-// los POIs se piden al sitio (GitHub Pages manda CORS abierto).
-const POI_BASE = (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname)) ? '../data' : 'https://trucksim-dash.com/data';
+// datos estan al lado; en modo LAN (?local=1) la app la sirve el cliente
+// desde el PC y los POIs se piden al sitio (GitHub Pages manda CORS abierto).
+// Se decide por el parametro y no por el hostname: en LAN la pagina puede
+// ser 127.0.0.1 ("Open here") igual que un servidor de desarrollo.
+const POI_BASE = new URLSearchParams(location.search).get('local') ? 'https://trucksim-dash.com/data' : '../data';
 const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh' };
 const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️' };
 let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]], cities: {token: name} }

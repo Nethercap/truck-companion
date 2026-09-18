@@ -31,8 +31,9 @@ from urllib.request import urlopen
 
 import client as client_lib
 
-HTTP_PORT = 27765
-WS_PORT = 27766
+# Overridables por env para correr una segunda instancia (desarrollo) al lado del .exe.
+HTTP_PORT = int(os.environ.get("TRUCKDASH_HTTP_PORT", 27765))
+WS_PORT = int(os.environ.get("TRUCKDASH_WS_PORT", 27766))
 WEB_ORIGIN = "https://trucksim-dash.com"
 WEB_FILES = [
     "app/index.html", "app/app.js", "app/app.css", "app/i18n.js", "app/pure.js",
@@ -76,6 +77,11 @@ def refresh_web_cache() -> bool:
 
 
 class _StaticHandler(http.server.SimpleHTTPRequestHandler):
+    """Sirve la web app y los datos (/data/*.json) pidiendolos primero al
+    sitio (asi el modo LAN corre siempre la version actual de la web sin
+    depender de cuando arranco el cliente) y cayendo a la copia en cache si
+    no hay internet."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=cache_dir(), **kwargs)
 
@@ -84,17 +90,41 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
         # se ignora. "/" y "/app" van al index.
         path = self.path.split("?", 1)[0]
         if path in ("/", "/app", "/app/"):
-            self.path = "/app/index.html"
-        else:
-            self.path = path
+            path = "/app/index.html"
+        if path.startswith("/app/") or path.startswith("/data/"):
+            rel = path.lstrip("/")
+            local_path = os.path.join(cache_dir(), rel.replace("/", os.sep))
+            if _refresh_file(rel, local_path):
+                pass  # cache actualizada
+            elif not os.path.exists(local_path):
+                self.send_error(404, "Not cached and site unreachable")
+                return
+        self.path = path
         super().do_GET()
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache")
+        self.send_header("Access-Control-Allow-Origin", "*")
         super().end_headers()
 
     def log_message(self, format, *args):
         pass
+
+
+def _refresh_file(rel: str, local_path: str) -> bool:
+    """Baja rel (ej. app/app.js) del sitio a local_path. False si no se pudo
+    (sin internet, 404) - el llamador usa la copia anterior si existe."""
+    if ".." in rel:
+        return False
+    try:
+        with urlopen(f"{WEB_ORIGIN}/{rel}", timeout=6) as resp:
+            data = resp.read()
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        with open(local_path, "wb") as f:
+            f.write(data)
+        return True
+    except Exception:
+        return False
 
 
 class LocalServer:
