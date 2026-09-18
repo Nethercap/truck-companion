@@ -162,7 +162,7 @@ JOB_DELIVERED_COOLDOWN_SECONDS = 20
 # el proximo trabajo), asi que un cliente o backend reiniciado en ese rato
 # vuelve a ver el mismo evento. Dos entregas reales identicas (misma ruta,
 # carga, pago exacto y distancia) en una hora no existen en la practica.
-JOB_DEDUPE_WINDOW_SECONDS = 60 * 60
+JOB_DEDUPE_WINDOW_SECONDS = 6 * 60 * 60
 
 
 GAME_LABELS = {"ats": "ATS", "ets2": "ETS2"}
@@ -524,6 +524,15 @@ async def ws_client(websocket: WebSocket, code: str):
                 payload = json.loads(data)
                 if payload.get("type") == "client_status":
                     session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion")}
+                # Mensajes de control (client_status, etc.) no son telemetria:
+                # no deben tocar el flanco de jobDelivered. Antes el primer
+                # client_status de cada conexion dejaba el estado en False y el
+                # primer tick real (con el flag todavia en true desde antes)
+                # parecia una entrega nueva - una por cada redeploy/reconexion.
+                if payload.get("type") or "event" not in payload:
+                    for viewer in list(session.viewer_ws_list):
+                        await _safe_send(viewer, data)
+                    continue
                 event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
                 now = time.time()

@@ -469,3 +469,26 @@ def test_job_delivered_true_on_first_tick_of_a_session_is_not_counted(client, ma
         import time as _time
         _time.sleep(0.1)
     assert len(recorded) == 1
+
+
+def test_client_status_message_does_not_seed_the_delivery_edge(client, main, monkeypatch):
+    # Secuencia real de una reconexion: client_status primero, despues
+    # telemetria con el flag heredado en true. No debe contar.
+    recorded = []
+    monkeypatch.setattr(main, "record_job_delivered", lambda info: recorded.append(info))
+    code = client.post("/pair/new").json()["code"]
+    tick = lambda delivered: main.json.dumps({"citySrc": "A", "cityDst": "B", "cargo": "C", "event": {"jobDelivered": delivered, "jobDeliveredRevenue": 100, "jobDeliveredDistanceKm": 10}})
+    with client.websocket_connect(f"/ws/live/{code}") as viewer:
+        viewer.receive_text()  # session_state
+        with client.websocket_connect(f"/ws/client/{code}") as ws:
+            viewer.receive_text()  # session_state (cliente conectado)
+            ws.send_text(main.json.dumps({"type": "client_status", "status": "live", "game": "ets2", "clientVersion": "1.4.2"}))
+            relayed = main.json.loads(viewer.receive_text())
+            assert relayed["type"] == "client_status"  # se sigue reenviando a los viewers
+            ws.send_text(tick(True))
+            viewer.receive_text()
+            ws.send_text(tick(True))
+            viewer.receive_text()
+            import time as _time
+            _time.sleep(0.1)
+    assert recorded == []
