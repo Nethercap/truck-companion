@@ -49,7 +49,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.4.2"
+CLIENT_VERSION = "1.4.3"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver

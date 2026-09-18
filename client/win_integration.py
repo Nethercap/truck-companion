@@ -148,6 +148,30 @@ def download_and_apply_update(download_url: str, expected_sha256: str | None, pr
     return exe
 
 
-def relaunch_and_exit(exe: str, extra_args: list[str] | None = None) -> None:
-    subprocess.Popen([exe, *(extra_args or [])], close_fds=True)
+def child_environment() -> dict:
+    """Entorno para lanzar OTRA copia del .exe empaquetado. PyInstaller (modo
+    onefile) le pasa al proceso hijo variables internas (_MEIPASS2 en
+    versiones viejas, _PYI_* en las nuevas) que apuntan a la carpeta temporal
+    ya extraida del proceso actual. Si el .exe nuevo las hereda, usa ESA
+    carpeta (codigo viejo) en vez de extraer la suya, y cuando el proceso
+    viejo sale intenta borrarla debajo del nuevo: "Failed to remove temporary
+    directory" y la ventana de Setup del nuevo rota. Se limpian todas."""
+    return {k: v for k, v in os.environ.items() if not k.startswith("_PYI_") and k != "_MEIPASS2"}
+
+
+def relaunch_and_exit(exe: str, extra_args: list[str] | None = None, stop_callback=None) -> None:
+    """Lanza el .exe nuevo como proceso independiente y cierra este. Con
+    stop_callback (ej. parar el icono de la bandeja) el cierre es ordenado, y
+    el bootloader de PyInstaller limpia su carpeta temporal sin quejarse; si
+    en 5 s no termino, se fuerza."""
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    subprocess.Popen([exe, *(extra_args or [])], close_fds=True, env=child_environment(), cwd=os.path.dirname(exe), creationflags=flags)
+    if stop_callback:
+        import threading
+        threading.Timer(5.0, lambda: os._exit(0)).start()
+        try:
+            stop_callback()
+            return
+        except Exception:
+            pass
     os._exit(0)

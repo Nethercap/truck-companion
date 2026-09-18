@@ -134,3 +134,14 @@ def test_download_and_apply_update_verifies_sha_and_swaps_exe(tmp_path, monkeypa
 
     win_integration.cleanup_old_exe()
     assert not (tmp_path / "TruckDash.exe.old").exists()
+
+
+def test_child_environment_drops_pyinstaller_internals(monkeypatch):
+    monkeypatch.setenv("_MEIPASS2", r"C:\Temp\_MEI1")
+    monkeypatch.setenv("_PYI_ARCHIVE_FILE", "x")
+    monkeypatch.setenv("_PYI_PARENT_PROCESS_LEVEL", "1")
+    monkeypatch.setenv("PATH_KEEP_ME", "1")
+    env = win_integration.child_environment()
+    assert "_MEIPASS2" not in env
+    assert not any(k.startswith("_PYI_") for k in env)
+    assert env["PATH_KEEP_ME"] == "1"

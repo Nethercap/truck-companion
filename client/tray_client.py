@@ -424,7 +424,7 @@ class SetupWindow:
                 exe = win_integration.download_and_apply_update(url, sha, progress)
                 progress("restarting")
                 time.sleep(0.5)
-                win_integration.relaunch_and_exit(exe, [win_integration.AUTOSTART_FLAG] if state.autostart_mode else None)
+                win_integration.relaunch_and_exit(exe, [win_integration.AUTOSTART_FLAG] if state.autostart_mode else None, stop_callback=lambda: state.icon and state.icon.stop())
             except Exception as exc:
                 logging.exception("Update failed")
                 self.root.after(0, lambda: (self.update_label.configure(text=T("update_failed", err=exc)), self.update_button.configure(state="normal")))
@@ -807,7 +807,14 @@ def main():
     parser.add_argument("--code", default=None)
     parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="Web URL to open (for local development)")
     parser.add_argument("--autostart", action="store_true", help="Launched by Windows startup: no setup window, browser opens when the game starts")
+    parser.add_argument("--apply-update", default=None, help=argparse.SUPPRESS)  # URL de un zip: aplica la actualizacion y relanza (para probar el flujo real)
     args = parser.parse_args()
+
+    if args.apply_update:
+        logging.info("Applying update from %s (test flag)", args.apply_update)
+        new_exe = win_integration.download_and_apply_update(args.apply_update, None, progress=lambda k: logging.info("update: %s", k))
+        win_integration.relaunch_and_exit(new_exe)
+        return
 
     win_integration.cleanup_old_exe()
     state.web_url = args.web_url
