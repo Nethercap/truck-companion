@@ -119,6 +119,18 @@ def build_og_image():
     print(f"  og-image.png {os.path.getsize(out) // 1024}KB")
 
 
+def build_github_social_preview():
+    """1280x640 (lo que GitHub pide para el "social preview" del repo, en
+    Settings > General). Se sube a mano; GitHub no tiene API para eso."""
+    src = os.path.join(ASSETS, "og-image.png")
+    im = Image.open(src).convert("RGB")
+    canvas = Image.new("RGB", (1280, 640), BG)
+    canvas.paste(im, (40, 5))
+    out = os.path.join(ASSETS, "github-social-preview.png")
+    canvas.save(out, "PNG", optimize=True)
+    print(f"  github-social-preview.png {os.path.getsize(out) // 1024}KB")
+
+
 def build_favicon():
     src = os.path.join(ROOT, "docs", "app", "assets", "icon-192.png")
     for size in (32, 180):
@@ -133,5 +145,7 @@ if __name__ == "__main__":
     build_webp()
     print("OG image:")
     build_og_image()
+    print("GitHub social preview:")
+    build_github_social_preview()
     print("Favicons:")
     build_favicon()

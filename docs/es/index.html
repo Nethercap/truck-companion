@@ -377,7 +377,7 @@
       </a>
     </div>
     <div class="mockup" aria-hidden="true">
-      <div class="monitor"><img src="/assets/screenshot-dashboard.webp" alt="" width="1916" height="1200" /></div>
+      <div class="monitor"><img src="/assets/demo.webp" alt="" width="720" height="450" /></div>
       <div class="phone"><img src="/assets/screenshot-gps-2.webp" alt="" width="636" height="1400" /></div>
     </div>
   </div>
@@ -479,7 +479,8 @@
         <button class="carouselArrow carouselPrev" onclick="carouselNav(-1)" aria-label="Previous screenshot">‹</button>
         <div class="carouselViewport">
           <div class="carouselTrack" id="carouselTrack">
-            <div class="carouselSlide"><img src="/assets/screenshot-dashboard.webp" alt="Truck Dash live dashboard on desktop" width="1916" height="1200" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideDashboard">Escritorio: mapa real, ruta en vivo y todos los datos del camión en una sola vista.</p></div>
+            <div class="carouselSlide"><img src="/assets/demo.webp" alt="Truck Dash in navigation mode: the map rotates with the truck, turn prompt, speed and cruise readout" width="720" height="450" onclick="openLightbox(this.src)" /><p class="slideCaption"><span data-i18n="slideDemo">En vivo: modo GPS con indicaciones giro a giro, límite de velocidad y crucero.</span> <a href="/app/?demo=1" data-i18n="slideDemoLink">Probá la demo →</a></p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-dashboard.webp" alt="Truck Dash live dashboard on desktop" width="1916" height="1200" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideDashboard">Escritorio: mapa real, ruta en vivo y todos los datos del camión en una sola vista.</p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-waypoints.webp" alt="Route through two numbered waypoints near Cheyenne with fuel and rest stops on the map" width="801" height="556" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideWaypoints">Rutas con paradas: waypoints numerados que se quitan solos cuando llegás.</p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-find-nearby.webp" alt="Find nearby panel listing fuel stations sorted by distance" width="685" height="871" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideFindNearby">Buscar cerca: combustible, áreas de descanso, talleres, garages y empresas, ordenados por distancia.</p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-gps-2.webp" alt="Truck Dash GPS navigation mode with speed limit" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideGps">Celular en modo GPS: mapa orientado al rumbo, límite de velocidad y crucero.</p></div>
@@ -707,6 +708,8 @@ const TRANSLATIONS = {
     featModsBody: 'Coast to Coast and ProMods Canada for ATS, ProMods (Europe + addons) for ETS2 — one toggle, no extra downloads.',
     tagUnique: 'only here',
     screenshotCaption: 'This is what it looks like while driving:',
+    slideDemo: 'Live: GPS mode with turn-by-turn prompts, speed limit and cruise control.',
+    slideDemoLink: 'Try the demo →',
     slideDashboard: 'Desktop: real map, live route and every truck stat in one view.',
     slideWaypoints: 'Multi-stop routing: numbered waypoints that clear themselves as you reach them.',
     slideFindNearby: 'Find nearby: fuel, rest areas, service, garages and companies, sorted by distance.',
@@ -845,6 +848,8 @@ const TRANSLATIONS = {
     featModsBody: 'Coast to Coast y ProMods Canada para ATS, ProMods (Europa + addons) para ETS2 — un solo toggle, sin descargas extra.',
     tagUnique: 'solo acá',
     screenshotCaption: 'Así se ve mientras manejás:',
+    slideDemo: 'En vivo: modo GPS con indicaciones giro a giro, límite de velocidad y crucero.',
+    slideDemoLink: 'Probá la demo →',
     slideDashboard: 'Escritorio: mapa real, ruta en vivo y todos los datos del camión en una sola vista.',
     slideWaypoints: 'Rutas con paradas: waypoints numerados que se quitan solos cuando llegás.',
     slideFindNearby: 'Buscar cerca: combustible, áreas de descanso, talleres, garages y empresas, ordenados por distancia.',
