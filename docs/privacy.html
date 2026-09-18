@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy – Truck Dash</title>
+<meta name="description" content="What Truck Dash reads, what it sends, what it stores — and what it never does." />
+<link rel="canonical" href="https://trucksim-dash.com/privacy.html" />
+<link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+<meta name="theme-color" content="#0b0d10" />
+<style>
+  :root { --bg: #0b0d10; --panel: #14171c; --border: #262b33; --text: #f2f3f5; --muted: #9aa4b2; --blue: #3b9eff; --orange: #ff8a3d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.6; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header { display: flex; align-items: center; gap: 0.6rem; padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--border); font-weight: 800; }
+  header img { width: 26px; height: 26px; }
+  main { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  h1 { font-size: 2rem; margin: 0 0 0.3rem; }
+  .updated { color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+  h2 { font-size: 1.2rem; margin: 2rem 0 0.6rem; color: var(--orange); }
+  ul { padding-left: 1.2rem; }
+  li { margin-bottom: 0.4rem; }
+  .box { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.2rem; margin: 1rem 0; }
+  code { background: #1a1e24; padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<header><img src="/assets/logo.svg" alt="" /> <a href="/" style="color:var(--text)">Truck Dash</a></header>
+<main>
+  <h1>Privacy policy</h1>
+  <p class="updated">Last updated: September 2026</p>
+
+  <p>Truck Dash is a free, open-source companion for Euro Truck Simulator 2 and American Truck Simulator. It has no user accounts and is designed to handle as little data as possible. This page explains exactly what it reads, sends and stores.</p>
+
+  <h2>What the local client reads</h2>
+  <ul>
+    <li><strong>Game telemetry</strong> through SCS Software's official Telemetry SDK (a shared-memory segment the game exposes when the plugin is installed): position, speed, fuel, cargo, job, truck wear and similar in-game values.</li>
+    <li><strong>Your in-game key bindings</strong> (<code>controls.sii</code> in the game's profile folder), read-only, so the button box presses the same keys you configured in the game.</li>
+    <li><strong>Where the game is installed</strong> (via Steam's library list), only to offer installing the telemetry plugin for you.</li>
+  </ul>
+  <div class="box">The client never reads, modifies or uploads any other file on your computer. It does not need administrator rights. It writes only its own settings (<code>keybinds.json</code>) and a log file next to the executable.</div>
+
+  <h2>What is sent to the server</h2>
+  <p>The client sends live telemetry over an encrypted WebSocket to a small relay server (hosted on Railway), tagged only with a random 8-character pairing code. The server forwards it to the browser(s) connected with the same code. Telemetry is <strong>not stored</strong>; it exists in memory only while your session is open.</p>
+  <p>No name, email, Steam ID, IP-based profile, hardware ID or any other identifier is collected. Your IP address is seen by the server like by any website you visit, and is used only for basic abuse rate-limiting in memory.</p>
+
+  <h2>What is stored</h2>
+  <ul>
+    <li><strong>Aggregate counters</strong>: total number of sessions started and jobs delivered (numbers only).</li>
+    <li><strong>Latest delivered jobs</strong> for the community feed and the Discord bot: origin city, destination city, cargo, truck model, pay and distance of the last few deliveries. No identifier links a job to a person.</li>
+    <li><strong>In your own browser</strong> (localStorage): your preferences (units, language, settings), whether you've seen the tour, and, if enabled, a local trip history. This never leaves your device.</li>
+  </ul>
+
+  <h2>Optional features</h2>
+  <ul>
+    <li><strong>Other drivers, live</strong>: off by default. If you turn it on, your in-game position is shared with other users who also opted in and are on the same game/map, identified only by a temporary session id. Turn it off at any time in Settings.</li>
+    <li><strong>Voice directions</strong> use your device's built-in speech engine; nothing is sent anywhere.</li>
+  </ul>
+
+  <h2>Cookies and analytics</h2>
+  <p>Truck Dash sets no cookies and uses no analytics or advertising trackers. Map tiles and fonts are loaded from Cloudflare R2 and Google Fonts respectively, which see the usual request metadata (IP, user agent) as any CDN does.</p>
+
+  <h2>Third parties</h2>
+  <ul>
+    <li><a href="https://railway.app" target="_blank" rel="noopener">Railway</a> hosts the relay backend.</li>
+    <li><a href="https://www.cloudflare.com/" target="_blank" rel="noopener">Cloudflare R2</a> hosts the map data.</li>
+    <li><a href="https://pages.github.com/" target="_blank" rel="noopener">GitHub Pages</a> hosts this website and the client downloads.</li>
+    <li>Delivered jobs are posted to the public Truck Dash Discord server through a webhook.</li>
+  </ul>
+
+  <h2>Your choices</h2>
+  <p>Close the client (tray icon → Quit) and your session and its data are gone. Clear your browser's site data to remove local preferences and history. To ask anything about this policy, write to <a href="mailto:nether.appdev@gmail.com">nether.appdev@gmail.com</a> or open an issue on <a href="https://github.com/Nethercap/truck-companion" target="_blank" rel="noopener">GitHub</a>.</p>
+
+  <p style="margin-top:2.5rem;color:var(--muted);font-size:0.85rem">Truck Dash is an independent fan-made tool, not affiliated with SCS Software.</p>
+</main>
+</body>
+</html>
