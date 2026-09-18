@@ -563,6 +563,7 @@ function initModsUi() {
   document.getElementById('setAtsModNone').checked = atsMod === 'none';
   document.getElementById('setCoastToCoast').checked = atsMod === 'c2c';
   document.getElementById('setProModsCanada').checked = atsMod === 'promods_canada';
+  document.getElementById('setEts2ModNone').checked = !hasProMods;
   document.getElementById('setProMods').checked = hasProMods;
 }
 
@@ -576,10 +577,12 @@ document.querySelectorAll('input[name="atsMod"]').forEach(radio => {
     currentGame = null;
   });
 });
-document.getElementById('setProMods').addEventListener('change', (e) => {
-  hasProMods = e.target.checked;
-  saveSettings();
-  currentGame = null;
+document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    hasProMods = e.target.value === 'promods';
+    saveSettings();
+    currentGame = null;
+  });
 });
 
 // Le manda al backend si esta sesion comparte su posicion, y con que
