@@ -492,3 +492,15 @@ def test_client_status_message_does_not_seed_the_delivery_edge(client, main, mon
             import time as _time
             _time.sleep(0.1)
     assert recorded == []
+
+
+def test_modded_economy_jobs_are_flagged_and_excluded_from_revenue(main, monkeypatch):
+    monkeypatch.setattr(main, "notify_discord_job_delivered", lambda info: None)
+    main._stats_cache = None
+    main.record_job_delivered({"citySrc": "Krakow", "cityDst": "Katowice", "cargo": "Wool", "revenue": 2168054, "distanceKm": 119})
+    main.record_job_delivered({"citySrc": "A", "cityDst": "B", "cargo": "Steel", "revenue": 12000, "distanceKm": 400})
+    stats = main._load_stats()
+    assert stats["jobs_delivered"] == 2
+    assert stats["total_revenue"] == 12000
+    assert stats["latest_jobs"][1]["modded"] is True
+    assert stats["latest_jobs"][0]["modded"] is False

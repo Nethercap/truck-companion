@@ -189,7 +189,7 @@ def notify_discord_job_delivered(job_info: dict):
                 {"name": "Cargo", "value": job_info.get("cargo") or "-", "inline": True},
                 {"name": "Game", "value": GAME_LABELS.get(game, game or "?"), "inline": True},
                 {"name": "Distance", "value": f"{round(job_info.get('distanceKm') or 0)} km", "inline": True},
-                {"name": "Pay", "value": f"${round(job_info.get('revenue') or 0):,}", "inline": True},
+                {"name": "Pay", "value": f"${round(job_info.get('revenue') or 0):,}" + (" ⚠ modded economy" if job_info.get("modded") else ""), "inline": True},
             ],
         }
         body = json.dumps({"embeds": [embed]}).encode("utf-8")
@@ -206,7 +206,24 @@ def notify_discord_job_delivered(job_info: dict):
         return str(exc)
 
 
+# Mods de economia/dinero (muy comunes) hacen que una entrega "pague"
+# millones. El valor viene tal cual del SDK, asi que se publica igual pero
+# marcado, y NO suma al total publico de ingresos (una sola entrega asi
+# duplicaba el contador de la landing).
+MAX_PLAUSIBLE_REVENUE = 500_000
+MAX_PLAUSIBLE_REVENUE_PER_KM = 1_000
+
+
+def is_modded_economy(job_info: dict) -> bool:
+    revenue = job_info.get("revenue") or 0
+    distance = job_info.get("distanceKm") or 0
+    if revenue > MAX_PLAUSIBLE_REVENUE:
+        return True
+    return distance > 0 and revenue / distance > MAX_PLAUSIBLE_REVENUE_PER_KM
+
+
 def record_job_delivered(job_info: dict):
+    job_info["modded"] = is_modded_economy(job_info)
     with _stats_lock:
         stats = _load_stats()
         fingerprint = (
@@ -226,7 +243,8 @@ def record_job_delivered(job_info: dict):
         stats["_last_job_time"] = now
 
         stats["jobs_delivered"] = stats.get("jobs_delivered", 0) + 1
-        stats["total_revenue"] = stats.get("total_revenue", 0) + (job_info.get("revenue") or 0)
+        if not job_info["modded"]:
+            stats["total_revenue"] = stats.get("total_revenue", 0) + (job_info.get("revenue") or 0)
         today = time.strftime("%Y-%m-%d", time.gmtime())
         stats.setdefault("daily_jobs", {})
         stats["daily_jobs"][today] = stats["daily_jobs"].get(today, 0) + 1

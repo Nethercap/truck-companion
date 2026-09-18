@@ -990,7 +990,7 @@ function renderLatestJobs(jobs) {
       <td>${escapeHtml(j.citySrc || '?')} → ${escapeHtml(j.cityDst || '?')}</td>
       <td class="colTruck">${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
       <td>${escapeHtml(j.cargo) || '-'}</td>
-      <td>$${Math.round(j.revenue || 0).toLocaleString()}</td>
+      <td>$${Math.round(j.revenue || 0).toLocaleString()}${j.modded ? ' <span title="Modded economy - not counted in totals">⚠</span>' : ''}</td>
       <td class="colDistance">${Math.round(j.distanceKm || 0)} km</td>
       <td class="colGame">${GAME_LABELS[j.game] || '-'}</td>
     </tr>
