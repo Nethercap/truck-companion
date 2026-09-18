@@ -67,7 +67,7 @@
     --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; overflow-x: hidden; }
   body {
     margin: 0;
     background: var(--bg);
@@ -164,7 +164,7 @@
   .heroBadges span::before { content: "✓ "; color: var(--green); }
   .driverCounter { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); }
   .driverCounter strong { color: var(--orange); font-size: 1rem; }
-  .discordLink { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--muted); font-size: 0.9rem; }
+  .discordLink { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--muted); font-size: 0.9rem; margin-top: 0.6rem; }
   .discordLink:hover { color: #fff; text-decoration: none; }
 
   .mockup { position: relative; height: 520px; display: flex; justify-content: center; align-items: flex-end; }
@@ -281,7 +281,11 @@
   .faq details p { margin: 0 0 0.9rem; font-size: 0.9rem; color: var(--muted); }
 
   .community { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.5rem; align-items: start; margin-top: 1.5rem; }
-  .communityCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; }
+  /* min-width:0: sin esto un item de grid nunca se achica por debajo del ancho
+     intrinseco de su contenido (la tabla con nowrap), y toda la pagina
+     termina con scroll horizontal en el celular. */
+  .community > * { min-width: 0; }
+  .communityCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; min-width: 0; }
   .communityCard h3 { margin: 0 0 0.5rem; font-size: 1.2rem; }
   .communityCard p { margin: 0 0 0.9rem; font-size: 0.9rem; color: var(--muted); }
   .discordCta { display: inline-flex; align-items: center; gap: 0.5rem; background: #5865F2; color: #fff; font-weight: 600; padding: 0.6rem 1.1rem; border-radius: 8px; }
@@ -293,6 +297,10 @@
   .latestJobsTable th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.02em; }
   .latestJobsTable tbody tr:last-child td { border-bottom: none; }
   @media (max-width: 860px) { .community { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .latestJobsTable th, .latestJobsTable td { white-space: normal; padding: 0.4rem 0.4rem; }
+    .latestJobsTable .colTruck, .latestJobsTable .colGame, .latestJobsTable .colDistance { display: none; }
+  }
 
   .contactRow { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-top: 1rem; font-size: 0.95rem; }
   .contactRow a { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -316,12 +324,12 @@
     </div>
   </div>
   <nav class="desktopNav">
-    <a href="#features" data-i18n="navFeatures">Features</a>
     <a href="#get-started" data-i18n="navGetStarted">Get started</a>
+    <a href="#features" data-i18n="navFeatures">Features</a>
+    <a href="#community" data-i18n="navCommunity">Community</a>
     <a href="#compare" data-i18n="navCompare">Free vs paid</a>
     <a href="#mods" data-i18n="navMods">Mods</a>
     <a href="#faq" data-i18n="navFaq">FAQ</a>
-    <a href="#community" data-i18n="navCommunity">Community</a>
     <a class="langBtn" data-lang-link href="/es/">ES</a>
   </nav>
   <button class="menuBtn" id="menuBtn" aria-label="Menu">☰</button>
@@ -330,12 +338,12 @@
 <div id="sidebarOverlay"></div>
 <div id="sidebar">
   <button class="closeBtn" id="sidebarClose" aria-label="Close">×</button>
-  <a href="#features" data-i18n="navFeatures">Features</a>
   <a href="#get-started" data-i18n="navGetStarted">Get started</a>
+  <a href="#features" data-i18n="navFeatures">Features</a>
+  <a href="#community" data-i18n="navCommunity">Community</a>
   <a href="#compare" data-i18n="navCompare">Free vs paid</a>
   <a href="#mods" data-i18n="navMods">Mods</a>
   <a href="#faq" data-i18n="navFaq">FAQ</a>
-  <a href="#community" data-i18n="navCommunity">Community</a>
   <a class="langBtn" data-lang-link href="/es/">ES</a>
 </div>
 
@@ -362,6 +370,10 @@
         <span>ETS2 + ATS</span>
       </div>
       <p id="driverCounter" class="driverCounter" hidden></p>
+      <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener" class="discordLink">
+        <svg viewBox="0 0 127.14 96.36" width="16" height="16" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.9,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+        <span data-i18n="heroDiscord">Join our Discord</span>
+      </a>
     </div>
     <div class="mockup" aria-hidden="true">
       <div class="monitor"><img src="/assets/screenshot-dashboard.webp" alt="" width="1916" height="1200" /></div>
@@ -479,6 +491,43 @@
     </div>
   </section>
 
+  <section id="community">
+    <h2 data-i18n="communityTitle">Community</h2>
+    <div class="community">
+      <div class="communityCard">
+        <h3 data-i18n="discordTitle">Join the Discord</h3>
+        <p data-i18n="discordBody">Every job delivered with Truck Dash is posted live in the server. Ask for help, request a mod, share your rig.</p>
+        <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener" class="discordCta">
+          <svg viewBox="0 0 127.14 96.36" width="18" height="18" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.9,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+          <span data-i18n="heroDiscord">Join our Discord</span>
+        </a>
+        <p style="margin-top:1rem" data-i18n="contactBody">Bugs, ideas or questions? Discord is fastest, or:</p>
+        <div class="contactRow" style="margin-top:0">
+          <a href="https://github.com/Nethercap/truck-companion/issues" target="_blank" rel="noopener" data-i18n="issuesLink">GitHub issues</a>
+          <a href="mailto:nether.appdev@gmail.com">nether.appdev@gmail.com</a>
+        </div>
+      </div>
+      <div class="communityCard" id="latestJobs" hidden>
+        <h3 data-i18n="latestJobsTitle">Latest jobs delivered</h3>
+        <p class="latestJobsTitle" data-i18n="latestJobsSub">Live from Truck Dash drivers right now.</p>
+        <div class="latestJobsTableWrap">
+          <table class="latestJobsTable">
+            <thead>
+              <tr>
+                <th data-i18n="colRoute">Route</th>
+                <th class="colTruck" data-i18n="colTruck">Truck</th>
+                <th data-i18n="colCargo">Cargo</th>
+                <th data-i18n="colPay">Pay</th>
+                <th class="colDistance" data-i18n="colDistance">Distance</th>
+                <th class="colGame" data-i18n="colGame">Game</th>
+              </tr>
+            </thead>
+            <tbody id="latestJobsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
   <section id="compare">
     <h2 data-i18n="compareTitle">What paid GPS apps charge for, <span class="accent">free here</span></h2>
     <p class="sectionIntro" data-i18n="compareIntro">Most truck-sim GPS apps give you a limited free tier and put routing limits, waypoints and ad removal behind a subscription. Truck Dash has no tiers.</p>
@@ -565,43 +614,6 @@
     </div>
   </section>
 
-  <section id="community">
-    <h2 data-i18n="communityTitle">Community</h2>
-    <div class="community">
-      <div class="communityCard">
-        <h3 data-i18n="discordTitle">Join the Discord</h3>
-        <p data-i18n="discordBody">Every job delivered with Truck Dash is posted live in the server. Ask for help, request a mod, share your rig.</p>
-        <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener" class="discordCta">
-          <svg viewBox="0 0 127.14 96.36" width="18" height="18" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.9,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
-          <span data-i18n="heroDiscord">Join our Discord</span>
-        </a>
-        <p style="margin-top:1rem" data-i18n="contactBody">Bugs, ideas or questions? Discord is fastest, or:</p>
-        <div class="contactRow" style="margin-top:0">
-          <a href="https://github.com/Nethercap/truck-companion/issues" target="_blank" rel="noopener" data-i18n="issuesLink">GitHub issues</a>
-          <a href="mailto:nether.appdev@gmail.com">nether.appdev@gmail.com</a>
-        </div>
-      </div>
-      <div class="communityCard" id="latestJobs" hidden>
-        <h3 data-i18n="latestJobsTitle">Latest jobs delivered</h3>
-        <p class="latestJobsTitle" data-i18n="latestJobsSub">Live from Truck Dash drivers right now.</p>
-        <div class="latestJobsTableWrap">
-          <table class="latestJobsTable">
-            <thead>
-              <tr>
-                <th data-i18n="colRoute">Route</th>
-                <th data-i18n="colTruck">Truck</th>
-                <th data-i18n="colCargo">Cargo</th>
-                <th data-i18n="colPay">Pay</th>
-                <th data-i18n="colDistance">Distance</th>
-                <th data-i18n="colGame">Game</th>
-              </tr>
-            </thead>
-            <tbody id="latestJobsBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
 </main>
 
 <footer>
@@ -952,11 +964,11 @@ function renderLatestJobs(jobs) {
   document.getElementById('latestJobsBody').innerHTML = jobs.map(j => `
     <tr>
       <td>${escapeHtml(j.citySrc || '?')} → ${escapeHtml(j.cityDst || '?')}</td>
-      <td>${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
+      <td class="colTruck">${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
       <td>${escapeHtml(j.cargo) || '-'}</td>
       <td>$${Math.round(j.revenue || 0).toLocaleString()}</td>
-      <td>${Math.round(j.distanceKm || 0)} km</td>
-      <td>${GAME_LABELS[j.game] || '-'}</td>
+      <td class="colDistance">${Math.round(j.distanceKm || 0)} km</td>
+      <td class="colGame">${GAME_LABELS[j.game] || '-'}</td>
     </tr>
   `).join('');
   container.hidden = false;
