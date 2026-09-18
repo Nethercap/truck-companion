@@ -263,7 +263,7 @@ const TRANSLATIONS = {
     cmdLights: 'Luces',
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Eje elevable',
-    cmdWipers: 'Limpiaparabrisas',
+    cmdWipers: 'Limpia­parabrisas', // guion suave: corta en dos lineas solo si no entra en el boton
     cmdRemap: 'Remapear',
     commandResultNoKey: 'Este comando no tiene tecla asignada - configurala en Remap',
     commandResultNoWindow: 'No se encontró la ventana del juego (¿está abierto?)',

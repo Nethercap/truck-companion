@@ -364,6 +364,8 @@
     line-height: 1.15;
   }
   .cmdBtn svg { width: 24px; height: 24px; flex-shrink: 0; }
+  /* Etiquetas largas de una sola palabra (idiomas) no deben salirse del boton. */
+  .cmdBtn span { max-width: 100%; overflow-wrap: anywhere; }
   .cmdBtn:hover { border-color: #555; }
   .cmdBtn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 

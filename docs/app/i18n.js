@@ -60,7 +60,7 @@ const TRANSLATIONS_EXTRA = {
     cmdLights: 'Licht',
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Liftachse',
-    cmdWipers: 'Scheibenwischer',
+    cmdWipers: 'Scheiben­wischer',
     cmdRemap: 'Tasten belegen',
     commandResultNoKey: 'Diesem Befehl ist keine Taste zugewiesen – unter „Tasten belegen“ festlegen',
     commandResultNoWindow: 'Spielfenster nicht gefunden (läuft das Spiel?)',
