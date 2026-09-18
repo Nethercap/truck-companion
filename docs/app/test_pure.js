@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance } = require('./pure.js');
+const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, connectionViewFor } = require('./pure.js');
 
 test('geoBearingDeg: norte puro es 0deg', () => {
   const bearing = geoBearingDeg(0, 0, 0, 1);
@@ -68,4 +68,77 @@ test('formatTurnDistance: usa km sin decimales cuando es entero', () => {
 test('formatTurnDistance: usa metros por debajo de 1km', () => {
   assert.equal(formatTurnDistance(800), '800 m');
   assert.equal(formatTurnDistance(80), '80 m');
+});
+
+// ---------------------------------------------------------------------------
+// connectionViewFor: el diagnostico que ve el usuario segun el estado
+// ---------------------------------------------------------------------------
+const base = { socket: 'open', demo: false, invalidCode: false, clientConnected: null, clientStatus: null, hasTelemetry: false, paused: false };
+const view = (over) => connectionViewFor({ ...base, ...over });
+
+test('conn: sin sesion no hay nada que mostrar', () => {
+  assert.equal(view({ socket: 'idle' }), null);
+});
+
+test('conn: conectando muestra el chip neutro sin tarjeta', () => {
+  const v = view({ socket: 'connecting' });
+  assert.equal(v.chip, 'chipConnecting');
+  assert.equal(v.empty, null);
+});
+
+test('conn: socket caido -> reconectando con tarjeta, aunque antes estuviera live', () => {
+  const v = view({ socket: 'closed', hasTelemetry: true, clientStatus: { status: 'live' } });
+  assert.equal(v.chip, 'chipReconnecting');
+  assert.equal(v.empty[0], 'emptyReconnectTitle');
+});
+
+test('conn: codigo invalido gana sobre todo lo demas (menos demo)', () => {
+  const v = view({ invalidCode: true, clientConnected: true, hasTelemetry: true });
+  assert.equal(v.chip, 'chipInvalidCode');
+  assert.equal(view({ invalidCode: true, demo: true }).chip, 'chipDemo');
+});
+
+test('conn: backend dice que no hay cliente -> "cliente no corriendo" con link de descarga', () => {
+  const v = view({ clientConnected: false });
+  assert.equal(v.chip, 'chipNoClient');
+  assert.equal(v.empty[3], true); // showDownload
+});
+
+test('conn: cliente conectado sin diagnostico ni telemetria -> esperando el juego', () => {
+  const v = view({ clientConnected: true });
+  assert.equal(v.chip, 'chipWaitingGame');
+});
+
+test('conn: plugin no instalado / faltante -> tarjeta del plugin', () => {
+  for (const status of ['plugin_missing', 'plugin_not_installed']) {
+    const v = view({ clientConnected: true, clientStatus: { status } });
+    assert.equal(v.chip, 'chipPluginMissing');
+    assert.equal(v.empty[0], 'emptyPluginTitle');
+  }
+});
+
+test('conn: en el menu (waiting_truck) -> "ya casi", sin telemetria todavia', () => {
+  const v = view({ clientConnected: true, clientStatus: { status: 'waiting_truck' } });
+  assert.equal(v.chip, 'chipWaitingTruck');
+  assert.equal(v.cls, 'info');
+});
+
+test('conn: live con telemetria -> chip verde sin tarjeta; pausado cambia el chip', () => {
+  const live = view({ clientConnected: true, clientStatus: { status: 'live' }, hasTelemetry: true });
+  assert.equal(live.chip, 'chipLive');
+  assert.equal(live.live, true);
+  assert.equal(live.empty, null);
+  const paused = view({ clientConnected: true, clientStatus: { status: 'live' }, hasTelemetry: true, paused: true });
+  assert.equal(paused.chip, 'chipPaused');
+});
+
+test('conn: el cliente dijo live pero todavia no llego un frame -> esperando camion, no live', () => {
+  const v = view({ clientConnected: true, clientStatus: { status: 'live' }, hasTelemetry: false });
+  assert.equal(v.chip, 'chipWaitingTruck');
+});
+
+test('conn: demo siempre es live, sin importar lo demas', () => {
+  const v = view({ demo: true, clientConnected: false });
+  assert.equal(v.chip, 'chipDemo');
+  assert.equal(v.live, true);
 });

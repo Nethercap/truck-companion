@@ -206,6 +206,11 @@ const TRANSLATIONS = {
     exitDemo: 'Exit demo',
     demoNoCommands: 'Truck buttons need the real game - this is the demo',
     emptyDemoLink: 'or try the demo',
+    reportProblem: 'Report a problem',
+    mapLoadingCities: 'Loading map: cities…',
+    mapLoadingGraph: 'Loading map: road network…',
+    mapLoadingNames: 'Loading map: road names…',
+    mapLoadingTiles: 'Loading map: tiles…',
   },
   es: {
     pairingCode: 'Código de pairing',
@@ -410,6 +415,11 @@ const TRANSLATIONS = {
     exitDemo: 'Salir de la demo',
     demoNoCommands: 'La botonera necesita el juego real - esto es la demo',
     emptyDemoLink: 'o probá la demo',
+    reportProblem: 'Reportar un problema',
+    mapLoadingCities: 'Cargando mapa: ciudades…',
+    mapLoadingGraph: 'Cargando mapa: red de rutas…',
+    mapLoadingNames: 'Cargando mapa: nombres de rutas…',
+    mapLoadingTiles: 'Cargando mapa: tiles…',
   },
 };
 // Idiomas extra (de/fr/pt/pl/tr/ru) viven en i18n.js - cualquier clave que
@@ -1588,8 +1598,11 @@ async function loadGameMap(game) {
   toLngLat = mapInfo.toLngLat;
   fromLngLat = mapInfo.fromLngLat;
 
+  setMapLoading('mapLoadingCities');
   await loadCities(mapInfo);
+  setMapLoading('mapLoadingGraph');
   await loadRouteGraph(mapInfo);
+  setMapLoading('mapLoadingNames');
   await loadRoadNames(mapInfo);
   loadPois(game); // no bloquea: la busqueda muestra "cargando" hasta que llegue
   currentRouteTarget = null;
@@ -1627,6 +1640,25 @@ async function loadGameMap(game) {
   }
 
   document.getElementById('mapHint').textContent = mapInfo.label;
+  // Los tiles siguen bajando en segundo plano; la barra se va cuando la
+  // primera pasada de render termina (o a los 4 s como tope, por si el
+  // evento no llega).
+  setMapLoading('mapLoadingTiles');
+  let cleared = false;
+  const clear = () => { if (!cleared) { cleared = true; setMapLoading(null); } };
+  map.once('idle', clear);
+  setTimeout(clear, 4000);
+}
+
+// Barra "Cargando mapa..." sobre el mapa mientras bajan ciudades, grafo de
+// rutas y carteles (varios MB, 5-8 s la primera vez). Antes en ese rato el
+// mapa quedaba gris con "Map not loaded" y parecia que no andaba.
+function setMapLoading(stepKey) {
+  const el = document.getElementById('mapLoading');
+  if (!el) return;
+  if (!stepKey) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  document.getElementById('mapLoadingText').textContent = t(stepKey);
 }
 
 let lastWorldPos = null;
@@ -2304,6 +2336,31 @@ function recordTrip(event) {
   });
   try { localStorage.setItem(TRIPS_KEY, JSON.stringify(trips.slice(0, TRIPS_MAX))); } catch (e) {}
 }
+// Issue de GitHub prefilled con lo que hace falta para reproducir (version
+// del cliente/web, navegador, estado de conexion, juego, mapa). Nada privado:
+// el usuario ve el texto antes de publicar.
+const WEB_BUILD = '20260918';
+function buildIssueUrl() {
+  const lines = [
+    '**What happened?**', '', '(describe the problem here)', '', '**Steps to reproduce**', '', '1. ', '',
+    '---', '<details><summary>Diagnostics (auto-filled)</summary>', '',
+    `- Web build: ${WEB_BUILD}`,
+    `- Client version: ${conn.clientStatus?.clientVersion || lastData?.clientVersion || 'unknown'}`,
+    `- Mode: ${conn.demo ? 'demo' : conn.local ? 'LAN' : 'cloud'}`,
+    `- Connection: socket=${conn.socket}, clientConnected=${conn.clientConnected}, status=${conn.clientStatus?.status || '-'}, telemetry=${conn.hasTelemetry}`,
+    `- Game / map: ${lastData?.game || '-'} / ${currentGame || '-'}`,
+    `- Language / units: ${currentLang} / ${useImperial ? 'imperial' : 'metric'}`,
+    `- Browser: ${navigator.userAgent}`,
+    `- Screen: ${window.innerWidth}x${window.innerHeight}, ${window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape'}`,
+    '', '</details>',
+  ];
+  const params = new URLSearchParams({ title: '[web] ', body: lines.join('\n'), labels: 'bug' });
+  return `https://github.com/Nethercap/truck-companion/issues/new?${params}`;
+}
+document.getElementById('reportProblemBtn').addEventListener('click', () => {
+  window.open(buildIssueUrl(), '_blank', 'noopener');
+});
+
 function renderTripHistory() {
   const list = document.getElementById('tripHistoryList');
   if (!list) return;
@@ -2437,24 +2494,39 @@ const RECONNECT_DELAY_MS = 3000;
 // (socket abierto o no), lo que dice el backend (hay un cliente local
 // conectado con este codigo?) y el diagnostico que manda el cliente
 // (client_status: waiting_game / plugin_missing / waiting_truck / live).
-const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false };
+const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false };
 
 function connectionView() {
-  if (conn.socket === 'idle') return null;
-  if (conn.demo) return { chip: 'chipDemo', cls: 'info', detail: 'detailDemo', empty: null, live: true };
-  if (conn.invalidCode) return { chip: 'chipInvalidCode', cls: 'err', detail: 'detailInvalidCode', empty: null };
-  if (conn.socket === 'connecting') return { chip: 'chipConnecting', cls: '', detail: null, empty: null };
-  if (conn.socket === 'closed') return { chip: 'chipReconnecting', cls: 'err', detail: null, empty: ['emptyReconnectTitle', 'emptyReconnectBody', '📡'] };
-  if (conn.clientConnected === false) return { chip: 'chipNoClient', cls: 'err', detail: 'detailNoClient', empty: ['emptyNoClientTitle', 'emptyNoClientBody', '💻', true] };
-  const st = conn.clientStatus?.status;
-  if (st === 'plugin_missing' || st === 'plugin_not_installed') return { chip: 'chipPluginMissing', cls: 'warn', detail: 'detailPluginMissing', empty: ['emptyPluginTitle', 'emptyPluginBody', '🧩'] };
-  if (st === 'waiting_game' || (!conn.hasTelemetry && st !== 'waiting_truck' && st !== 'live')) return { chip: 'chipWaitingGame', cls: 'warn', detail: 'detailWaitingGame', empty: ['emptyWaitingGameTitle', 'emptyWaitingGameBody', '🎮'] };
-  if (st === 'waiting_truck' || !conn.hasTelemetry) return { chip: 'chipWaitingTruck', cls: 'info', detail: 'detailWaitingTruck', empty: ['emptyWaitingTruckTitle', 'emptyWaitingTruckBody', '🚚'] };
-  return { chip: conn.paused ? 'chipPaused' : 'chipLive', cls: 'live', detail: null, empty: null, live: true };
+  return connectionViewFor(conn);
 }
+
+// Pantalla encendida mientras la app esta en uso como GPS (Wake Lock API).
+// Sin esto el celular se apaga a los 30 s y hay que estar tocandolo. Se pide
+// cuando hay sesion (cualquier estado que no sea idle) y se vuelve a pedir
+// al volver a primer plano (el navegador lo suelta al ocultar la pestana).
+// Silencioso si el navegador no lo soporta o lo rechaza (bateria baja).
+let wakeLock = null;
+async function updateWakeLock(wanted) {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    if (wanted && !wakeLock && document.visibilityState === 'visible') {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!wanted && wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (e) {
+    wakeLock = null;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && conn.socket !== 'idle') updateWakeLock(true);
+});
 
 function renderConnectionUi() {
   const view = connectionView();
+  updateWakeLock(!!view);
   const chip = document.getElementById('statusChip');
   const group = document.getElementById('connectGroup');
   const empty = document.getElementById('emptyState');
@@ -2499,7 +2571,7 @@ document.getElementById('changeCodeBtn').addEventListener('click', () => {
   if (conn.demo) { location.href = location.pathname; return; }
   clearTimeout(reconnectTimer);
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
-  conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false;
+  conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false; conn.everOpen = false;
   renderConnectionUi();
   document.getElementById('code').focus();
 });
@@ -2767,6 +2839,7 @@ function connectWs(backend, code, options = {}) {
   socket.onopen = () => {
     hideReconnectBanner();
     conn.socket = 'open';
+    conn.everOpen = true;
     renderConnectionUi();
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
     if (keybindsModalOpen) requestKeybinds(); // el pedido anterior se pudo haber perdido en el corte
@@ -2796,8 +2869,12 @@ function connectWs(backend, code, options = {}) {
   };
   socket.onclose = (ev) => {
     if (ws !== socket) return; // reemplazado por una conexion mas nueva, ignorar
-    // 4404 = codigo invalido/vencido (ver backend) - reintentar no sirve.
-    if (ev && ev.code === 4404) {
+    // 4404 = el backend no conoce el codigo. Si esta pestana YA estuvo
+    // conectada con el, el codigo era valido: es un redeploy del backend
+    // (las sesiones viven en memoria) y el cliente local la recrea al
+    // reconectar en pocos segundos - se sigue reintentando. Si nunca se
+    // conecto, es un codigo mal tipeado o vencido: se avisa y se para.
+    if (ev && ev.code === 4404 && !conn.everOpen) {
       conn.socket = 'open'; conn.invalidCode = true;
       renderConnectionUi();
       return;

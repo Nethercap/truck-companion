@@ -62,6 +62,29 @@ function formatTurnDistance(m) {
   return `${rounded} m`;
 }
 
+// Diagnostico de la conexion que muestra la app (chip de la barra, linea de
+// detalle y tarjeta vacia sobre el mapa) a partir del estado combinado de:
+// el socket del viewer, lo que dijo el backend (hay cliente local?), el
+// diagnostico que manda el cliente (client_status) y si llego telemetria.
+// Devuelve claves de i18n, no texto - app.js las traduce. Puro para poder
+// testearlo (test_pure.js) - es la parte con mas combinaciones de la app.
+//   conn = { socket: 'idle'|'connecting'|'open'|'closed', demo, invalidCode,
+//            clientConnected: null|bool, clientStatus: {status}|null,
+//            hasTelemetry, paused }
+function connectionViewFor(conn) {
+  if (conn.socket === 'idle') return null;
+  if (conn.demo) return { chip: 'chipDemo', cls: 'info', detail: 'detailDemo', empty: null, live: true };
+  if (conn.invalidCode) return { chip: 'chipInvalidCode', cls: 'err', detail: 'detailInvalidCode', empty: null };
+  if (conn.socket === 'connecting') return { chip: 'chipConnecting', cls: '', detail: null, empty: null };
+  if (conn.socket === 'closed') return { chip: 'chipReconnecting', cls: 'err', detail: null, empty: ['emptyReconnectTitle', 'emptyReconnectBody', '📡'] };
+  if (conn.clientConnected === false) return { chip: 'chipNoClient', cls: 'err', detail: 'detailNoClient', empty: ['emptyNoClientTitle', 'emptyNoClientBody', '💻', true] };
+  const st = conn.clientStatus ? conn.clientStatus.status : undefined;
+  if (st === 'plugin_missing' || st === 'plugin_not_installed') return { chip: 'chipPluginMissing', cls: 'warn', detail: 'detailPluginMissing', empty: ['emptyPluginTitle', 'emptyPluginBody', '🧩'] };
+  if (st === 'waiting_game' || (!conn.hasTelemetry && st !== 'waiting_truck' && st !== 'live')) return { chip: 'chipWaitingGame', cls: 'warn', detail: 'detailWaitingGame', empty: ['emptyWaitingGameTitle', 'emptyWaitingGameBody', '🎮'] };
+  if (st === 'waiting_truck' || !conn.hasTelemetry) return { chip: 'chipWaitingTruck', cls: 'info', detail: 'detailWaitingTruck', empty: ['emptyWaitingTruckTitle', 'emptyWaitingTruckBody', '🚚'] };
+  return { chip: conn.paused ? 'chipPaused' : 'chipLive', cls: 'live', detail: null, empty: null, live: true };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance };
+  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, connectionViewFor };
 }
