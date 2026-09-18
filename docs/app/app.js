@@ -178,6 +178,27 @@ const TRANSLATIONS = {
     privacyLink: 'Privacy',
     changelogLink: 'Changelog',
     tourDownload: 'No client yet? Download it from trucksim-dash.com, run it, and it will show you a pairing code.',
+    waypointInGameShort: '(also in-game)',
+    waypointAppOnlyShort: '(app only)',
+    waypointClearAll: 'Clear all',
+    waypointsLabel: 'Waypoints',
+    waypointReachedToast: '📍 Reached: {name}',
+    waypointLimitToast: 'Up to {n} waypoints',
+    poiTitle: 'Find nearby',
+    poiSearchPlaceholder: 'Company or city…',
+    poiNearestFuel: '⛽ Nearest fuel station',
+    poiCatFuel: 'Fuel station',
+    poiCatRest: 'Rest area',
+    poiCatService: 'Service',
+    poiCatGarage: 'Garage',
+    poiCatDealer: 'Truck dealer',
+    poiCatWeigh: 'Weigh station',
+    poiLoading: 'Loading places…',
+    poiNoPosition: 'Waiting for your position (start driving first).',
+    poiNoResults: 'Nothing found.',
+    poiAddedToast: 'Routing via {name}',
+    poiHint: 'Tap a place to route through it as a waypoint.',
+    tourPoi: 'Find fuel, rest areas, service shops or a company near you and route there.',
   },
   es: {
     pairingCode: 'Código de pairing',
@@ -354,6 +375,27 @@ const TRANSLATIONS = {
     privacyLink: 'Privacidad',
     changelogLink: 'Novedades',
     tourDownload: '¿Todavía no tenés el cliente? Bajalo de trucksim-dash.com, abrilo, y te muestra un código de pairing.',
+    waypointInGameShort: '(también en el juego)',
+    waypointAppOnlyShort: '(solo app)',
+    waypointClearAll: 'Quitar todos',
+    waypointsLabel: 'Waypoints',
+    waypointReachedToast: '📍 Llegaste: {name}',
+    waypointLimitToast: 'Hasta {n} waypoints',
+    poiTitle: 'Buscar cerca',
+    poiSearchPlaceholder: 'Empresa o ciudad…',
+    poiNearestFuel: '⛽ Estación de servicio más cercana',
+    poiCatFuel: 'Estación de servicio',
+    poiCatRest: 'Área de descanso',
+    poiCatService: 'Taller',
+    poiCatGarage: 'Garage',
+    poiCatDealer: 'Concesionaria',
+    poiCatWeigh: 'Báscula',
+    poiLoading: 'Cargando lugares…',
+    poiNoPosition: 'Esperando tu posición (arrancá a manejar primero).',
+    poiNoResults: 'No se encontró nada.',
+    poiAddedToast: 'Ruteando por {name}',
+    poiHint: 'Tocá un lugar para pasar por ahí como waypoint.',
+    tourPoi: 'Buscá combustible, áreas de descanso, talleres o una empresa cerca tuyo y ruteá hasta ahí.',
   },
 };
 // Idiomas extra (de/fr/pt/pl/tr/ru) viven en i18n.js - cualquier clave que
@@ -398,6 +440,7 @@ function setLanguage(lang) {
   applyTranslations();
   renderConnectionUi();
   renderTripHistory();
+  renderWaypointList();
   if (lastData) updateHud(lastData);
 }
 for (const id of ['langSelect', 'setLangSelect']) {
@@ -837,8 +880,7 @@ function ensureMapInitialized() {
   map.on('zoomstart', (e) => { if (e.originalEvent) navAutoZoomPaused = true; });
   map.on('click', (e) => {
     if (!waypointMode || !fromLngLat) return;
-    pendingWaypointLngLat = [e.lngLat.lng, e.lngLat.lat];
-    pendingWaypointWorldPos = fromLngLat(e.lngLat.lng, e.lngLat.lat);
+    pendingWaypoint = { lngLat: [e.lngLat.lng, e.lngLat.lat], pos: fromLngLat(e.lngLat.lng, e.lngLat.lat), label: null };
     setWaypointMode(false);
     document.getElementById('waypointModal').style.display = 'flex';
   });
@@ -930,21 +972,20 @@ let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
 let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
 const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS) - en interconexiones con rampas paralelas cercanas, 400 tardaba en detectar que se tomo una rampa distinta
 
-// Waypoint intermedio puesto a mano desde la app (posicion -> waypoint ->
-// destino). El SDK del juego no sabe nada de esto - si el usuario tambien lo
-// marco en el GPS del juego (waypointInGame=true), el "In-game ETA"/distancia
-// que ya manda el juego van a reflejar el desvio solos, y no tocamos esos
-// numeros. Si no (waypointInGame=false), calculamos nosotros mismos la
-// distancia extra sumando los tramos del grafo de rutas, y se muestra aparte
-// en las filas "(with waypoint)" - el numero del juego sigue ignorando el
-// desvio en ese caso.
-let waypointWorldPos = null; // [x,z] en coordenadas de juego, o null si no hay waypoint
-let waypointInGame = null; // true|false|null
-let waypointMarker = null;
-let waypointMode = false; // true mientras se espera el proximo click en el mapa para ubicar el waypoint
-let waypointRouteDistanceKm = null; // distancia total (posicion->waypoint->destino) calculada por nosotros
-let pendingWaypointWorldPos = null; // [x,z] del click, mientras se muestra el modal de confirmacion
-let pendingWaypointLngLat = null;
+// Waypoints intermedios puestos a mano desde la app (posicion -> wp1 -> wp2
+// ... -> destino), en orden. El SDK del juego no sabe nada de esto - si el
+// usuario tambien los marco en el GPS del juego (inGame=true), el "In-game
+// ETA"/distancia que manda el juego ya reflejan el desvio y no tocamos esos
+// numeros. Si alguno es solo de la app (inGame=false), calculamos nosotros
+// la distancia total sumando los tramos del grafo y se muestra aparte en las
+// filas "(with waypoints)". Un waypoint se da por alcanzado (y se saca solo,
+// como un GPS) cuando el camion pasa a menos de WAYPOINT_REACHED_M.
+const WAYPOINT_REACHED_M = 150;
+const MAX_WAYPOINTS = 9;
+let waypoints = []; // [{ pos: [x,z], lngLat: [lng,lat], inGame: bool, label: string|null, marker }]
+let waypointMode = false; // true mientras se espera el proximo click en el mapa para ubicar un waypoint
+let waypointRouteDistanceKm = null; // distancia total (posicion->waypoints->destino) calculada por nosotros
+let pendingWaypoint = null; // { pos, lngLat, label } mientras se muestra el modal de confirmacion
 let lastKnownAvgSpeedKmh = null; // ultimo promedio de velocidad real calculado por computeRealEtaSeconds, reusado para el ETA con waypoint
 
 function sumPathDistanceMeters(points) {
@@ -965,59 +1006,107 @@ function setWaypointMode(on) {
 // fuente de glifos del mapa no los renderiza igual en todos lados).
 const MARKER_SVG = {
   dest: '<svg class="svgMarker dest" viewBox="0 0 24 24"><path d="M5 22V3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M6 4h12l-2.5 4L18 12H6z" fill="#ff4d4d" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+  pickup: '<svg class="svgMarker dest" viewBox="0 0 24 24"><path d="M5 22V3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M6 4h12l-2.5 4L18 12H6z" fill="#3b9eff" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>',
   waypoint: '<svg class="svgMarker waypoint" viewBox="0 0 24 24"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z" fill="#ffb020" stroke="#fff" stroke-width="1.4"/><circle cx="12" cy="9.5" r="2.6" fill="#1a1002"/></svg>',
   otherPlayer: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M2 7h11v9H2z" fill="#9aa4b2" stroke="#fff" stroke-width="1.2"/><path d="M13 10h4l3 3v3h-7z" fill="#cbd0d6" stroke="#fff" stroke-width="1.2"/><circle cx="6" cy="17.5" r="2" fill="#111" stroke="#fff" stroke-width="1"/><circle cx="17" cy="17.5" r="2" fill="#111" stroke="#fff" stroke-width="1"/></svg>',
-  poi: '<svg class="svgMarker waypoint" viewBox="0 0 24 24"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z" fill="#3b9eff" stroke="#fff" stroke-width="1.4"/><circle cx="12" cy="9.5" r="2.6" fill="#0d1f33"/></svg>',
 };
 
-function placeWaypointMarker(lngLat) {
-  if (!waypointMarker) {
-    const el = document.createElement('div');
-    el.innerHTML = MARKER_SVG.waypoint;
-    waypointMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(lngLat).addTo(map);
-  } else {
-    waypointMarker.setLngLat(lngLat);
-  }
+function makeWaypointMarker(lngLat, index) {
+  const el = document.createElement('div');
+  el.innerHTML = MARKER_SVG.waypoint + `<span class="waypointBadge">${index + 1}</span>`;
+  el.className = 'waypointMarkerWrap';
+  return new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(lngLat).addTo(map);
 }
 
-function clearWaypoint() {
-  waypointWorldPos = null;
-  waypointInGame = null;
-  waypointRouteDistanceKm = null;
-  if (waypointMarker) { waypointMarker.remove(); waypointMarker = null; }
-  const btn = document.getElementById('waypointBtn');
-  if (btn) btn.classList.remove('set');
-  const row = document.getElementById('waypointRow');
-  if (row) row.hidden = true;
-  const gameRow = document.getElementById('etaGameWaypointRow');
-  if (gameRow) gameRow.hidden = true;
-  const realRow = document.getElementById('etaRealWaypointRow');
-  if (realRow) realRow.hidden = true;
-  currentRouteTarget = null; // fuerza recalculo de la ruta normal (sin waypoint) la proxima vez
+function renumberWaypointMarkers() {
+  waypoints.forEach((wp, i) => {
+    const badge = wp.marker && wp.marker.getElement().querySelector('.waypointBadge');
+    if (badge) badge.textContent = String(i + 1);
+  });
 }
 
-function finalizeWaypoint() {
-  waypointWorldPos = pendingWaypointWorldPos;
-  placeWaypointMarker(pendingWaypointLngLat);
-  pendingWaypointWorldPos = null;
-  pendingWaypointLngLat = null;
-  document.getElementById('waypointBtn').classList.add('set');
-  document.getElementById('waypointRow').hidden = false;
-  document.getElementById('waypointLabel').textContent = waypointInGame ? t('waypointInGame') : t('waypointAppOnly');
-  currentRouteTarget = null; // fuerza recalculo pasando por el waypoint en el proximo tick
+function invalidateRoute() {
+  currentRouteTarget = null; // fuerza recalculo de la ruta en el proximo tick
   etaSamples = [];
   etaDisplayValue = null;
   etaLastRecalcTime = null;
 }
 
-// Actualiza las filas "(with waypoint)" bajo In-game ETA y Real ETA - solo
-// tienen sentido si hay un waypoint puesto Y el usuario dijo que NO lo marco
-// tambien en el juego (si lo marco ahi, el numero del juego ya es correcto
-// solo, mostrar un numero aparte seria confuso/redundante).
+function addWaypoint(pos, lngLat, inGame, label) {
+  if (waypoints.length >= MAX_WAYPOINTS) { showToast(t('waypointLimitToast').replace('{n}', MAX_WAYPOINTS), 'danger'); return; }
+  const wp = { pos, lngLat, inGame, label: label || null, marker: makeWaypointMarker(lngLat, waypoints.length) };
+  waypoints.push(wp);
+  renderWaypointList();
+  invalidateRoute();
+}
+
+function removeWaypoint(index) {
+  const [wp] = waypoints.splice(index, 1);
+  if (wp && wp.marker) wp.marker.remove();
+  renumberWaypointMarkers();
+  if (!waypoints.length) waypointRouteDistanceKm = null;
+  renderWaypointList();
+  invalidateRoute();
+}
+
+function clearWaypoint() {
+  for (const wp of waypoints) if (wp.marker) wp.marker.remove();
+  waypoints = [];
+  waypointRouteDistanceKm = null;
+  renderWaypointList();
+  invalidateRoute();
+}
+
+function renderWaypointList() {
+  const btn = document.getElementById('waypointBtn');
+  btn.classList.toggle('set', waypoints.length > 0);
+  const badge = document.getElementById('waypointCount');
+  if (badge) { badge.textContent = String(waypoints.length); badge.style.display = waypoints.length ? '' : 'none'; }
+  const row = document.getElementById('waypointRow');
+  const list = document.getElementById('waypointList');
+  if (!row || !list) return;
+  row.hidden = waypoints.length === 0;
+  list.innerHTML = waypoints.map((wp, i) => {
+    const label = wp.label ? wp.label : `${t('waypoint')} ${i + 1}`;
+    const kind = wp.inGame ? t('waypointInGameShort') : t('waypointAppOnlyShort');
+    return `<div class="waypointItem"><span class="waypointNum">${i + 1}</span><span class="waypointName">${label.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))} <span class="waypointKind">${kind}</span></span><button class="waypointClearBtn" data-index="${i}" data-i18n-title="clear" title="${t('clear')}">✕</button></div>`;
+  }).join('');
+  list.querySelectorAll('button[data-index]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); removeWaypoint(Number(b.dataset.index)); }));
+}
+
+function finalizeWaypoint(inGame) {
+  if (!pendingWaypoint) return;
+  addWaypoint(pendingWaypoint.pos, pendingWaypoint.lngLat, inGame, pendingWaypoint.label);
+  pendingWaypoint = null;
+}
+
+// Un waypoint agregado desde la busqueda de POIs (estacion, taller, empresa)
+// no pasa por el modal: el juego no lo conoce (inGame=false) y ya tiene nombre.
+function addPoiWaypoint(pos, label) {
+  if (!toLngLat) return;
+  addWaypoint(pos, toLngLat(pos[0], pos[1]), false, label);
+  showToast(t('poiAddedToast').replace('{name}', label), 'success', 3000);
+}
+
+// Saca el primer waypoint cuando el camion llega (pasa cerca) - asi una
+// ruta con varias paradas avanza sola, como un GPS de verdad.
+function checkWaypointReached(x, z) {
+  if (!waypoints.length) return;
+  const wp = waypoints[0];
+  if (Math.hypot(wp.pos[0] - x, wp.pos[1] - z) < WAYPOINT_REACHED_M) {
+    showToast(t('waypointReachedToast').replace('{name}', wp.label || `${t('waypoint')} 1`), 'success', 3000);
+    removeWaypoint(0);
+  }
+}
+
+// Actualiza las filas "(with waypoints)" bajo In-game ETA y Real ETA - solo
+// tienen sentido si hay algun waypoint que el juego NO conoce (si estan
+// todos marcados tambien en el juego, el numero del juego ya es correcto).
 function updateWaypointRoute(data) {
   const gameRow = document.getElementById('etaGameWaypointRow');
   const realRow = document.getElementById('etaRealWaypointRow');
-  if (!waypointWorldPos || waypointInGame !== false || waypointRouteDistanceKm == null) {
+  const anyAppOnly = waypoints.some(wp => !wp.inGame);
+  if (!anyAppOnly || waypointRouteDistanceKm == null) {
     gameRow.hidden = true;
     realRow.hidden = true;
     return;
@@ -1033,6 +1122,131 @@ function updateWaypointRoute(data) {
   document.getElementById('etaGameWaypoint').textContent = `${timeText} (${distText})`;
   document.getElementById('etaRealWaypoint').textContent = timeText;
 }
+
+// ---------------------------------------------------------------------------
+// POIs: estaciones de servicio, areas de descanso, talleres, garages,
+// concesionarias, basculas y empresas, por variante de mapa (generados con
+// tools/build_pois.py a partir del parser de truckermudgeon/maps). Se usan
+// para la busqueda "cerca mio", el boton de combustible mas cercano, y para
+// ubicar el punto exacto de carga/descarga de un trabajo (empresa + ciudad).
+// ---------------------------------------------------------------------------
+const POI_BASE = '../data';
+const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh' };
+const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️' };
+let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]] }
+let poisVariant = null;
+let poiCategory = 'g';
+
+async function loadPois(variant) {
+  if (poisVariant === variant && pois) return pois;
+  poisVariant = variant;
+  pois = null;
+  try {
+    const res = await fetch(`${POI_BASE}/pois-${variant}.json`);
+    if (res.ok) pois = await res.json();
+  } catch (err) {
+    pois = null;
+  }
+  return pois;
+}
+
+function findCompanyPoi(token, cityToken) {
+  if (!pois || !token) return null;
+  const hit = pois.companies.find(c => c[2] === token && (!cityToken || c[4] === cityToken))
+    || pois.companies.find(c => c[2] === token);
+  return hit ? { x: hit[0], z: hit[1], label: hit[3], city: hit[4] } : null;
+}
+
+function nearestFacilities(code, x, z, limit) {
+  if (!pois) return [];
+  const out = [];
+  for (const f of pois.facilities) {
+    if (f[2] !== code) continue;
+    out.push({ x: f[0], z: f[1], code, dist: Math.hypot(f[0] - x, f[1] - z) });
+  }
+  out.sort((a, b) => a.dist - b.dist);
+  return out.slice(0, limit);
+}
+
+function searchCompanies(query, x, z, limit) {
+  if (!pois) return [];
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const out = [];
+  for (const c of pois.companies) {
+    const label = (c[3] || '').toLowerCase();
+    const city = (c[4] || '').toLowerCase().replace(/_/g, ' ');
+    if (label.includes(q) || city.includes(q)) out.push({ x: c[0], z: c[1], label: c[3], city: c[4], dist: x != null ? Math.hypot(c[0] - x, c[1] - z) : 0 });
+  }
+  out.sort((a, b) => a.dist - b.dist);
+  return out.slice(0, limit);
+}
+
+function formatPoiDistance(meters) {
+  if (useImperial) { const mi = meters / 1609.34; return mi < 10 ? `${mi.toFixed(1)} mi` : `${Math.round(mi)} mi`; }
+  const km = meters / 1000;
+  return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+}
+
+function cityLabel(token) {
+  if (!token) return '';
+  return (pois && pois.cities && pois.cities[token]) || token.replace(/_/g, ' ');
+}
+
+function renderPoiResults() {
+  const list = document.getElementById('poiResults');
+  const pos = lastWorldPos;
+  if (!pois) { list.innerHTML = `<div class="poiEmpty">${t('poiLoading')}</div>`; return; }
+  if (!pos) { list.innerHTML = `<div class="poiEmpty">${t('poiNoPosition')}</div>`; return; }
+  const query = document.getElementById('poiSearchInput').value;
+  let results;
+  if (query.trim()) {
+    results = searchCompanies(query, pos.x, pos.z, 20).map(r => ({ ...r, name: r.label, sub: cityLabel(r.city) }));
+  } else {
+    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => ({ ...r, name: t(POI_CODES[r.code]), sub: '' }));
+  }
+  if (!results.length) { list.innerHTML = `<div class="poiEmpty">${t('poiNoResults')}</div>`; return; }
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  list.innerHTML = results.map((r, i) => `
+    <button class="poiItem" data-index="${i}">
+      <span class="poiIcon">${r.code ? POI_ICONS_TEXT[r.code] : '🏭'}</span>
+      <span class="poiText"><span class="poiName">${esc(r.name)}</span>${r.sub ? `<span class="poiSub">${esc(r.sub)}</span>` : ''}</span>
+      <span class="poiDist">${formatPoiDistance(r.dist)}</span>
+    </button>`).join('');
+  list.querySelectorAll('.poiItem').forEach(btn => btn.addEventListener('click', () => {
+    const r = results[Number(btn.dataset.index)];
+    addPoiWaypoint([r.x, r.z], r.sub ? `${r.name} (${r.sub})` : r.name);
+    closePoiModal();
+  }));
+}
+
+function openPoiModal() {
+  document.getElementById('poiModal').style.display = 'flex';
+  document.getElementById('poiSearchInput').value = '';
+  renderPoiResults();
+  if (!pois && currentGame) loadPois(currentGame).then(renderPoiResults);
+}
+function closePoiModal() { document.getElementById('poiModal').style.display = 'none'; }
+
+document.getElementById('poiBtn').addEventListener('click', openPoiModal);
+document.getElementById('poiCloseBtn').addEventListener('click', closePoiModal);
+document.getElementById('poiModal').addEventListener('click', (e) => { if (e.target.id === 'poiModal') closePoiModal(); });
+document.getElementById('poiSearchInput').addEventListener('input', renderPoiResults);
+document.querySelectorAll('.poiChip').forEach(chip => chip.addEventListener('click', () => {
+  poiCategory = chip.dataset.code;
+  document.querySelectorAll('.poiChip').forEach(c => c.classList.toggle('active', c === chip));
+  document.getElementById('poiSearchInput').value = '';
+  renderPoiResults();
+}));
+// Atajo: la estacion de servicio mas cercana como waypoint, en un toque.
+document.getElementById('poiNearestFuelBtn').addEventListener('click', () => {
+  const pos = lastWorldPos;
+  if (!pos || !pois) { renderPoiResults(); return; }
+  const [best] = nearestFacilities('g', pos.x, pos.z, 1);
+  if (!best) { showToast(t('poiNoResults'), 'danger'); return; }
+  addPoiWaypoint([best.x, best.z], `${t('poiCatFuel')} (${formatPoiDistance(best.dist)})`);
+  closePoiModal();
+});
 
 // Distancia minima (aprox) del punto (x,z) a la polilinea de la ruta actual,
 // en unidades del juego. Alcanza con chequear contra cada segmento entre
@@ -1196,32 +1410,64 @@ function findRoute(startXY, endXY) {
   return path.map(i => nodes[i]);
 }
 
+// Objetivo de la ruta, en orden de preferencia: la empresa de carga (si hay
+// trabajo tomado pero la carga todavia no se subio - ahi es adonde te manda
+// el GPS del juego), la empresa de destino exacta (token empresa + ciudad
+// via POIs), el centro de la ciudad de destino (Cities.json), o - sin
+// trabajo - el ultimo waypoint puesto a mano (ej. "combustible mas cercano").
+function resolveRouteTarget(data) {
+  if (data.onJob && data.isCargoLoaded === false && data.companySrcId) {
+    const pickup = findCompanyPoi(data.companySrcId, data.citySrcId);
+    if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${data.companySrcId}@${data.citySrcId}` };
+  }
+  if (data.cityDst) {
+    const company = data.companyDstId ? findCompanyPoi(data.companyDstId, data.cityDstId) : null;
+    if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${data.companyDstId}@${data.cityDstId}` };
+    const city = citiesByName[data.cityDst];
+    if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDst}` };
+  }
+  if (waypoints.length) {
+    const last = waypoints[waypoints.length - 1];
+    return { x: last.pos[0], z: last.pos[1], kind: 'waypoint', key: 'wp-only' };
+  }
+  return null;
+}
+
 function updateDestinationMarker(data) {
   if (!map || !toLngLat) return;
-  const city = data.cityDst && citiesByName[data.cityDst];
-  if (!city) {
+  const target = resolveRouteTarget(data);
+  if (!target) {
     if (destMarker) { destMarker.remove(); destMarker = null; }
     if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
     currentRouteTarget = null;
     currentRouteWorldPoints = null;
     return;
   }
-  const destLngLat = toLngLat(city.X, city.Y);
-  if (!destMarker) {
-    const el = document.createElement('div');
-    el.innerHTML = MARKER_SVG.dest;
-    destMarker = new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat(destLngLat).addTo(map);
+  const destLngLat = toLngLat(target.x, target.z);
+  if (target.kind === 'waypoint') {
+    // El ultimo waypoint ya tiene su propio marcador - no duplicar bandera.
+    if (destMarker) { destMarker.remove(); destMarker = null; }
   } else {
-    destMarker.setLngLat(destLngLat);
+    if (destMarker && destMarker._kind !== target.kind) { destMarker.remove(); destMarker = null; }
+    if (!destMarker) {
+      const el = document.createElement('div');
+      el.innerHTML = target.kind === 'pickup' ? MARKER_SVG.pickup : MARKER_SVG.dest;
+      destMarker = new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat(destLngLat).addTo(map);
+      destMarker._kind = target.kind;
+    } else {
+      destMarker.setLngLat(destLngLat);
+    }
   }
 
-  // Recalcula la ruta real por carreteras cuando cambia el destino (o el
-  // waypoint), o -como un GPS- cuando te desviaste demasiado de la ruta ya
+  // Recalcula la ruta real por carreteras cuando cambia el objetivo (o los
+  // waypoints), o -como un GPS- cuando te desviaste demasiado de la ruta ya
   // calculada. Recorrer el grafo entero en cada tick seria carisimo, por eso
   // no se chequea la desviacion salvo que ya haya una ruta calculada para
-  // comparar contra. routeKey incluye el waypoint para que un cambio de
-  // waypoint (ponerlo/sacarlo/moverlo) tambien dispare el recalculo.
-  const routeKey = waypointWorldPos ? `${data.cityDst}|${waypointWorldPos[0]},${waypointWorldPos[1]}` : data.cityDst;
+  // comparar contra. routeKey incluye los waypoints para que un cambio
+  // (poner/sacar/alcanzar uno) tambien dispare el recalculo.
+  const legs = waypoints.map(wp => wp.pos);
+  if (target.kind !== 'waypoint') legs.push([target.x, target.z]);
+  const routeKey = `${target.key}|${legs.map(p => `${p[0]},${p[1]}`).join(';')}`;
   const destChanged = routeKey !== currentRouteTarget;
   const offRoute = !destChanged
     && data.position?.x != null
@@ -1229,16 +1475,17 @@ function updateDestinationMarker(data) {
 
   if ((destChanged || offRoute) && data.position?.x != null && routeGraph) {
     currentRouteTarget = routeKey;
-    let routePoints;
-    if (waypointWorldPos) {
-      const leg1 = findRoute([data.position.x, data.position.z], waypointWorldPos);
-      const leg2 = findRoute(waypointWorldPos, [city.X, city.Y]);
-      routePoints = (leg1 && leg2) ? leg1.concat(leg2.slice(1)) : null;
-      waypointRouteDistanceKm = routePoints ? sumPathDistanceMeters(routePoints) / 1000 : null;
-    } else {
-      routePoints = findRoute([data.position.x, data.position.z], [city.X, city.Y]);
-      waypointRouteDistanceKm = null;
+    let routePoints = [];
+    let from = [data.position.x, data.position.z];
+    let complete = true;
+    for (const to of legs) {
+      const leg = findRoute(from, to);
+      if (leg) routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
+      else { complete = false; routePoints.push(from, to); }
+      from = to;
     }
+    if (!routePoints.length) routePoints = null;
+    waypointRouteDistanceKm = (routePoints && waypoints.some(wp => !wp.inGame)) ? sumPathDistanceMeters(routePoints) / 1000 : null;
     currentRouteWorldPoints = routePoints;
     const lineCoords = routePoints
       ? routePoints.map(([x, y]) => toLngLat(x, y))
@@ -1247,6 +1494,7 @@ function updateDestinationMarker(data) {
     if (map.getSource('route')) {
       map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: smoothLineCoords(lineCoords) } });
     }
+    if (!complete) console.warn('Ruta incompleta: algun tramo no se pudo calcular por el grafo');
   }
 }
 
@@ -1264,6 +1512,7 @@ async function loadGameMap(game) {
   await loadCities(mapInfo);
   await loadRouteGraph(mapInfo);
   await loadRoadNames(mapInfo);
+  loadPois(game); // no bloquea: la busqueda muestra "cargando" hasta que llegue
   currentRouteTarget = null;
   currentRouteWorldPoints = null;
   trailWorld.length = 0;
@@ -1470,7 +1719,10 @@ function resolveEffectiveGame(game) {
 function updateMap(position, game) {
   if (position.x == null || position.z == null) return;
   loadGameMap(resolveEffectiveGame(game));
-  if (!toLngLat || !map) return;
+  // loadGameMap es async: entre que setea toLngLat y crea el marcador del
+  // camion pasan varios awaits (Cities/grafo/carteles) - los ticks de ese
+  // rato se descartan en vez de reventar con truckMarker en null.
+  if (!toLngLat || !map || !truckMarker) return;
 
   const lngLat = toLngLat(position.x, position.z);
   const prevWorldPos = lastWorldPos;
@@ -1501,6 +1753,7 @@ function updateMap(position, game) {
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
+  checkWaypointReached(position.x, position.z);
 
   trailWorld.push(lngLat);
   if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
@@ -2060,27 +2313,24 @@ document.getElementById('navToggleBtn').addEventListener('click', () => {
   setNavMode(!navMode);
 });
 
+// Un click activa el modo "agregar" (el proximo click en el mapa pone un
+// waypoint); con waypoints puestos, el boton sigue agregando - se quitan de a
+// uno desde la lista del panel de info, o todos con el boton de la lista.
 document.getElementById('waypointBtn').addEventListener('click', () => {
-  if (waypointWorldPos) {
-    clearWaypoint();
-  } else {
-    setWaypointMode(!waypointMode);
-  }
+  setWaypointMode(!waypointMode);
 });
 
 document.getElementById('waypointConfirmInGameBtn').addEventListener('click', () => {
-  waypointInGame = true;
   document.getElementById('waypointModal').style.display = 'none';
-  finalizeWaypoint();
+  finalizeWaypoint(true);
 });
 
 document.getElementById('waypointConfirmNotInGameBtn').addEventListener('click', () => {
-  waypointInGame = false;
   document.getElementById('waypointModal').style.display = 'none';
-  finalizeWaypoint();
+  finalizeWaypoint(false);
 });
 
-document.getElementById('waypointClearBtn').addEventListener('click', (e) => {
+document.getElementById('waypointClearAllBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   clearWaypoint();
 });
@@ -2497,6 +2747,7 @@ const TOUR_STEPS = [
   { selector: '#navToggleBtn', textKey: 'tourNavMode' },
   { selector: '#waypointBtn', textKey: 'tourWaypoint' },
   { selector: '#commandsToggleBtn', textKey: 'tourCommands' },
+  { selector: '#poiBtn', textKey: 'tourPoi' },
 ];
 let tourStepIndex = 0;
 

@@ -509,6 +509,33 @@
   [hidden] { display: none !important; }
   .row .label { color: var(--muted); }
   .waypointSubRow { padding-top: 0; padding-left: 0.6rem; font-size: 0.74rem; opacity: 0.8; }
+  .waypointRow { border-bottom: 1px solid #262a31; padding-bottom: 0.2rem; }
+  .waypointList { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.15rem 0 0.1rem; }
+  .waypointItem { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+  .waypointNum { width: 16px; height: 16px; border-radius: 50%; background: #ffb020; color: #1a1002; font-size: 0.66rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .waypointName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .waypointKind { color: var(--muted); font-size: 0.68rem; }
+  /* Sin position:relative: pisaria el position:absolute que MapLibre le pone
+     al marcador y el div pasaria a ocupar todo el ancho del mapa. */
+  .waypointMarkerWrap { width: 24px; height: 24px; }
+  .waypointBadge { position: absolute; top: -4px; right: -8px; width: 15px; height: 15px; border-radius: 50%; background: #1a1002; color: #ffb020; font-size: 0.62rem; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 1px solid #ffb020; }
+  .mapBtnBadge { position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; border-radius: 9px; background: #ffb020; color: #1a1002; font-size: 0.66rem; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+  .poiPanel { width: min(420px, 94vw); }
+  .poiQuick { margin-bottom: 0.6rem; font-weight: 600; }
+  .poiChips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.6rem; }
+  .poiChip { font-size: 0.74rem; padding: 0.25rem 0.55rem; border-radius: 999px; border: 1px solid #333; background: #23262c; color: var(--muted); cursor: pointer; }
+  .poiChip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .poiSearch { width: 100%; font-size: 0.9rem; padding: 0.45rem 0.6rem; background: #23262c; border: 1px solid #333; color: var(--text); border-radius: 8px; margin-bottom: 0.5rem; }
+  .poiResults { display: flex; flex-direction: column; gap: 0.25rem; max-height: 45vh; overflow-y: auto; }
+  .poiItem { display: flex; align-items: center; gap: 0.6rem; width: 100%; text-align: left; background: #23262c; border: 1px solid #333; border-radius: 8px; padding: 0.45rem 0.6rem; color: var(--text); cursor: pointer; font-size: 0.85rem; }
+  .poiItem:hover { border-color: #555; }
+  .poiIcon { font-size: 1.1rem; width: 1.5rem; text-align: center; flex-shrink: 0; }
+  .poiText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .poiName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .poiSub { font-size: 0.72rem; color: var(--muted); }
+  .poiDist { color: var(--accent); font-weight: 600; font-size: 0.8rem; flex-shrink: 0; }
+  .poiEmpty { color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
+  #poiCloseBtn { margin-top: 0.8rem; width: 100%; padding: 0.5rem; border-radius: 6px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-size: 0.9rem; }
   .waypointClearBtn {
     background: none; border: 1px solid #444; color: var(--muted); border-radius: 4px;
     font-size: 0.7rem; padding: 0.1rem 0.4rem; cursor: pointer; margin-left: 0.4rem;
