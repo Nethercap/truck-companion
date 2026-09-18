@@ -1,0 +1,32 @@
+name: Discord webhook test
+
+# Manda un embed de prueba al webhook de releases (secret
+# DISCORD_RELEASES_WEBHOOK) para verificar la integracion sin publicar un
+# release. Se corre a mano: Actions -> "Discord webhook test" -> Run workflow.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post test embed
+        env:
+          DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_RELEASES_WEBHOOK" ]; then echo "secret not set"; exit 1; fi
+          curl -sf -H "Content-Type: application/json" -d '{
+            "username": "Truck Dash releases",
+            "embeds": [{
+              "title": "Webhook test - this is what a release announcement looks like",
+              "url": "https://github.com/Nethercap/truck-companion/releases",
+              "description": "**fix(client): example release title**\n\nRelease notes go here, taken from the tagged commit message.",
+              "color": 3907327,
+              "fields": [
+                { "name": "Download", "value": "[TruckDash-windows.zip](https://github.com/Nethercap/truck-companion/releases/latest)", "inline": true },
+                { "name": "SHA-256 (zip)", "value": "`0000000000000000000000000000000000000000000000000000000000000000`", "inline": false }
+              ],
+              "footer": { "text": "Running clients get an update prompt automatically. SmartScreen: More info -> Run anyway (unsigned build)." }
+            }]
+          }' "$DISCORD_RELEASES_WEBHOOK" && echo "posted"
