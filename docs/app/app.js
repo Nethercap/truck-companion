@@ -1150,6 +1150,16 @@ function updateWaypointRoute(data) {
 // Se decide por el parametro y no por el hostname: en LAN la pagina puede
 // ser 127.0.0.1 ("Open here") igual que un servidor de desarrollo.
 const POI_BASE = new URLSearchParams(location.search).get('local') ? 'https://trucksim-dash.com/data' : '../data';
+// El mundo del juego esta comprimido (ATS 1:20, ETS2 1:19) y el juego muestra
+// TODAS las distancias multiplicadas por esa escala (el routeDistance de la
+// telemetria ya viene asi). Todo lo que calculamos nosotros sobre
+// coordenadas crudas (POIs, tramos con waypoints, distancia al proximo giro)
+// se muestra con la misma escala para que sea coherente con el juego. Los
+// umbrales de logica (giro cerca, waypoint alcanzado) siguen en metros crudos.
+function distanceScale() {
+  return (currentGame || '').startsWith('ets2') ? 19 : 20;
+}
+
 const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh' };
 const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️' };
 let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]], cities: {token: name} }
@@ -1220,10 +1230,23 @@ function searchCompanies(query, x, z, limit) {
   return out.slice(0, limit);
 }
 
-function formatPoiDistance(meters) {
+function formatPoiDistance(rawMeters) {
+  const meters = rawMeters * distanceScale();
   if (useImperial) { const mi = meters / 1609.34; return mi < 10 ? `${mi.toFixed(1)} mi` : `${Math.round(mi)} mi`; }
   const km = meters / 1000;
   return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+}
+
+// Ciudad mas cercana a un punto (para ubicar "Estacion de servicio" en la
+// lista): centro de ciudad a menos de NEAR_CITY_M crudos, o nada.
+const NEAR_CITY_M = 4000;
+function nearestCityName(x, z) {
+  let best = null, bestDist = NEAR_CITY_M;
+  for (const [name, c] of Object.entries(citiesByName)) {
+    const d = Math.hypot(c.X - x, c.Y - z);
+    if (d < bestDist) { bestDist = d; best = name; }
+  }
+  return best;
 }
 
 function cityLabel(token) {
@@ -1254,7 +1277,7 @@ function renderPoiResults() {
   if (query.trim()) {
     results = searchCompanies(query, pos.x, pos.z, 20).map(r => ({ ...r, name: r.label, sub: cityLabel(r.city) }));
   } else {
-    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => ({ ...r, name: t(POI_CODES[r.code]), sub: '' }));
+    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => ({ ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' }));
   }
   if (!results.length) { list.innerHTML = `<div class="poiEmpty">${t('poiNoResults')}</div>`; return; }
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1537,7 +1560,7 @@ function updateDestinationMarker(data) {
       from = to;
     }
     if (!routePoints.length) routePoints = null;
-    waypointRouteDistanceKm = (routePoints && waypoints.some(wp => !wp.inGame)) ? sumPathDistanceMeters(routePoints) / 1000 : null;
+    waypointRouteDistanceKm = (routePoints && waypoints.some(wp => !wp.inGame)) ? (sumPathDistanceMeters(routePoints) * distanceScale()) / 1000 : null;
     currentRouteWorldPoints = routePoints;
     const lineCoords = routePoints
       ? routePoints.map(([x, y]) => toLngLat(x, y))
@@ -1691,7 +1714,7 @@ function updateNavPanel(turn) {
       const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
       ontoText = ` ${preposition} ${turn.nearSign.label}`;
     }
-    panel.textContent = `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters)}`;
+    panel.textContent = `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale())}`;
   } else if (currentRouteWorldPoints) {
     panel.textContent = `⬆ ${t('navStraight')}`;
   } else {
@@ -1892,7 +1915,7 @@ function announceTurn(turn) {
   }
   const text = stage.key === 'now'
     ? t('voiceNow').replace('{turn}', turnText)
-    : t('voiceIn').replace('{dist}', voiceDistanceText(turn.distanceMeters)).replace('{turn}', turnText);
+    : t('voiceIn').replace('{dist}', voiceDistanceText(turn.distanceMeters * distanceScale())).replace('{turn}', turnText);
   speak(text.charAt(0).toUpperCase() + text.slice(1));
 }
 
