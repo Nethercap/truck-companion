@@ -1573,9 +1573,16 @@ function findRoute(startXY, endXY) {
 // via POIs), el centro de la ciudad de destino (Cities.json), o - sin
 // trabajo - el ultimo waypoint puesto a mano (ej. "combustible mas cercano").
 function resolveRouteTarget(data) {
-  if (data.onJob && data.isCargoLoaded === false && data.companySrcId) {
-    const pickup = findCompanyPoi(data.companySrcId, data.citySrcId);
+  // Trabajo tomado pero carga todavia no enganchada: hay que ir a buscarla.
+  // Empresa exacta si esta en los POIs; si no, el centro de la ciudad de
+  // ORIGEN (antes caia al destino, que es justo a donde no hay que ir aun).
+  // Clientes < 1.3.1 no mandan onJob/isCargoLoaded/companySrcId y quedan
+  // con la ruta al destino - por eso el aviso de actualizacion.
+  if (data.onJob && data.isCargoLoaded === false) {
+    const pickup = data.companySrcId ? findCompanyPoi(data.companySrcId, data.citySrcId) : null;
     if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${data.companySrcId}@${data.citySrcId}` };
+    const srcCity = data.citySrc && citiesByName[data.citySrc];
+    if (srcCity) return { x: srcCity.X, z: srcCity.Y, kind: 'pickup', key: `pickupcity:${data.citySrc}` };
   }
   if (data.cityDst) {
     const company = data.companyDstId ? findCompanyPoi(data.companyDstId, data.cityDstId) : null;
