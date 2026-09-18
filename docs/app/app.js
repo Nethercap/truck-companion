@@ -15,6 +15,9 @@ const TRANSLATIONS = {
     settingsLiveShare: 'Share my position and see others (same game/map only)',
     settingsLiveHideOthers: "Hide other players' markers on the map",
     settingsCommandsTitle: 'Truck command buttons:',
+    settingsRouteTitle: 'Route preference:',
+    settingsRouteFastest: 'Fastest — prefers highways, like the in-game GPS',
+    settingsRouteShortest: 'Shortest distance',
     settingsRouteColorTitle: 'Route line color:',
     settingsGpsDirections: 'GPS directions',
     modsTitle: 'Map mods',
@@ -212,6 +215,9 @@ const TRANSLATIONS = {
     settingsLiveShare: 'Compartir mi posición y ver a otros (solo mismo juego/mapa)',
     settingsLiveHideOthers: 'Ocultar los marcadores de otros jugadores en el mapa',
     settingsCommandsTitle: 'Botonera del camión:',
+    settingsRouteTitle: 'Preferencia de ruta:',
+    settingsRouteFastest: 'Más rápida — prefiere autopistas, como el GPS del juego',
+    settingsRouteShortest: 'Distancia más corta',
     settingsRouteColorTitle: 'Color de la línea de ruta:',
     settingsGpsDirections: 'Indicaciones de GPS',
     modsTitle: 'Mods de mapa',
@@ -482,7 +488,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -491,6 +497,7 @@ const miniHudSettings = Object.assign(
   _savedSettings.miniHud
 );
 let routeColor = _savedSettings.routeColor || '#a30000';
+let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
 // Opt-in: el SDK de telemetria no informa que mods de mapa tiene instalados
 // el usuario, asi que no se puede auto-detectar - el usuario lo activa a
 // mano si lo tiene instalado (ver GAME_MAPS.ats_c2c/ats_promods/ets2_promods).
@@ -517,10 +524,19 @@ function initSettingsUi() {
   document.getElementById('setMiniDistance').checked = miniHudSettings.distance;
   document.getElementById('setMiniCruise').checked = miniHudSettings.cruise;
   document.getElementById('setMiniGps').checked = miniHudSettings.gps;
+  document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
+  document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setLiveHideOthers').checked = hideOtherPlayers;
   renderTripHistory();
-  document.querySelectorAll('.colorSwatch').forEach(btn => {
+  document.querySelectorAll('input[name="routeProfile"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    routeProfile = e.target.value;
+    saveSettings();
+    invalidateRoute(); // recalcula con el perfil nuevo en el proximo tick
+  });
+});
+document.querySelectorAll('.colorSwatch').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.color === routeColor);
   });
 }
@@ -674,7 +690,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260919', ats_c2c: '20260919', ats_promods: '20260919', ets2: '20260919', ets2_promods: '20260919' };
+const MAP_DATA_VERSION = { ats: '20260920', ats_c2c: '20260920', ats_promods: '20260920', ets2: '20260920', ets2_promods: '20260920' };
 const GAME_MAPS = {
   ats: {
     assetsDir: `${REMOTE_MAP_BASE}/ats`,
@@ -1358,18 +1374,22 @@ async function loadRouteGraph(mapInfo) {
     // sin importar el sentido): >= 3 es una interseccion real, que es donde
     // tiene sentido anunciar un giro.
     const neighborSets = new Map();
-    const link = (from, to, w) => {
+    const link = (from, to, w, wt) => {
       if (!adjacency.has(from)) adjacency.set(from, []);
-      adjacency.get(from).push([to, w]);
+      adjacency.get(from).push([to, w, wt]);
       if (!neighborSets.has(from)) neighborSets.set(from, new Set());
       neighborSets.get(from).add(to);
       if (!neighborSets.has(to)) neighborSets.set(to, new Set());
       neighborSets.get(to).add(from);
     };
-    for (const [a, b, w, flags] of data.edges) {
+    // Aristas [a, b, metros, flags, segundos]: "segundos" es el tiempo tipico
+    // de camion segun el tipo de via (autopista 90, ruta 60, cruce 40...). Con
+    // grafos viejos sin ese campo se estima a 60 km/h.
+    for (const [a, b, w, flags, wt] of data.edges) {
       const f = flags || 0;
-      link(a, b, w);
-      if (!(f & 2)) link(b, a, w);
+      const t = wt != null ? wt : w / (60 / 3.6);
+      link(a, b, w, t);
+      if (!(f & 2)) link(b, a, w, t);
       if (f & 1) { ferryEdges.add(`${a}|${b}`); ferryEdges.add(`${b}|${a}`); }
     }
     const degree = new Uint8Array(data.nodes.length);
@@ -1490,7 +1510,16 @@ function findRoute(startXY, endXY) {
     if (endIdx === -1) return null;
   }
 
-  const heuristic = (i) => Math.hypot(nodes[i][0] - nodes[endIdx][0], nodes[i][1] - nodes[endIdx][1]);
+  // Perfil de ruteo: "fastest" pesa por tiempo (prefiere autopista, como el
+  // GPS del juego), "shortest" por metros. La heuristica de A* tiene que ser
+  // admisible: distancia recta, y para tiempo dividida por la velocidad maxima
+  // posible (90 km/h).
+  const byTime = routeProfile !== 'shortest';
+  const MAX_SPEED_MS = 90 / 3.6;
+  const heuristic = (i) => {
+    const d = Math.hypot(nodes[i][0] - nodes[endIdx][0], nodes[i][1] - nodes[endIdx][1]);
+    return byTime ? d / MAX_SPEED_MS : d;
+  };
 
   const gScore = new Map([[startIdx, 0]]);
   const cameFrom = new Map();
@@ -1505,9 +1534,9 @@ function findRoute(startXY, endXY) {
     visited.add(current);
 
     const neighbors = adjacency.get(current) || [];
-    for (const [neighbor, weight] of neighbors) {
+    for (const [neighbor, wDist, wTime] of neighbors) {
       if (visited.has(neighbor)) continue;
-      const tentativeG = gScore.get(current) + weight;
+      const tentativeG = gScore.get(current) + (byTime ? wTime : wDist);
       if (tentativeG < (gScore.get(neighbor) ?? Infinity)) {
         gScore.set(neighbor, tentativeG);
         cameFrom.set(neighbor, current);
