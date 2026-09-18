@@ -157,20 +157,6 @@ const TRANSLATIONS = {
     cardSession: 'Session',
     tabData: 'Data',
     tabGauges: 'Gauges',
-    settingsVoiceTitle: 'Voice directions:',
-    settingsVoice: 'Speak upcoming turns out loud (uses this device\'s voice)',
-    voiceEnabledToast: 'Voice directions on',
-    voiceUnsupported: 'This browser has no speech synthesis',
-    voiceIn: 'In {dist}, {turn}',
-    voiceNow: '{turn} now',
-    voiceTurnLeft: 'turn left',
-    voiceTurnRight: 'turn right',
-    voiceOnto: 'onto {name}',
-    voiceToward: 'toward {name}',
-    voiceMeters: '{n} meters',
-    voiceKm: '{n} kilometers',
-    voiceFeet: '{n} feet',
-    voiceMiles: '{n} miles',
     settingsHistoryTitle: 'Trip history (saved on this device only):',
     tripHistoryClear: 'Clear history',
     tripHistoryEmpty: 'No deliveries recorded yet. Finished jobs will show up here.',
@@ -368,20 +354,6 @@ const TRANSLATIONS = {
     cardSession: 'Sesión',
     tabData: 'Datos',
     tabGauges: 'Relojes',
-    settingsVoiceTitle: 'Indicaciones por voz:',
-    settingsVoice: 'Decir en voz alta los próximos giros (usa la voz de este dispositivo)',
-    voiceEnabledToast: 'Indicaciones por voz activadas',
-    voiceUnsupported: 'Este navegador no tiene síntesis de voz',
-    voiceIn: 'En {dist}, {turn}',
-    voiceNow: '{turn} ahora',
-    voiceTurnLeft: 'girá a la izquierda',
-    voiceTurnRight: 'girá a la derecha',
-    voiceOnto: 'hacia {name}',
-    voiceToward: 'hacia {name}',
-    voiceMeters: '{n} metros',
-    voiceKm: '{n} kilómetros',
-    voiceFeet: '{n} pies',
-    voiceMiles: '{n} millas',
     settingsHistoryTitle: 'Historial de viajes (guardado solo en este dispositivo):',
     tripHistoryClear: 'Borrar historial',
     tripHistoryEmpty: 'Todavía no hay entregas registradas. Los trabajos terminados aparecen acá.',
@@ -510,7 +482,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, voiceEnabled, useImperial }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -533,12 +505,6 @@ let hasProMods = _savedSettings.hasProMods || false;
 // podes seguir compartiendo tu posicion pero no dibujar la de los demas.
 let liveShareEnabled = _savedSettings.liveShareEnabled || false;
 let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
-// Indicaciones por voz: desactivadas (2026-09-18) - la sintesis del navegador
-// pronuncia mal los nombres de rutas/ciudades y las frases armadas por partes
-// suenan mal en varios idiomas. El codigo queda por si se rehace con audio
-// pregrabado o una API decente; VOICE_FEATURE en false lo apaga entero.
-const VOICE_FEATURE = false;
-let voiceEnabled = VOICE_FEATURE && (_savedSettings.voiceEnabled || false);
 useImperial = !!_savedSettings.useImperial;
 renderUnitButtons();
 const livePlayerMarkers = new Map(); // id de sesion -> maplibregl.Marker
@@ -2012,8 +1978,7 @@ function updateMap(position, game) {
 
   // Camara: un unico llamado por tick que combina centro+zoom+bearing segun
   // corresponda, en vez de varios llamados peleandose entre si.
-  const turn = (navMode || voiceEnabled) ? findUpcomingTurn() : null;
-  if (voiceEnabled) announceTurn(turn);
+  const turn = navMode ? findUpcomingTurn() : null;
   if (navMode) {
     updateNavPanel(turn);
     // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
@@ -2034,71 +1999,6 @@ function updateMap(position, game) {
 
   trimRouteBehindTruck(position.x, position.z);
 }
-
-// Indicaciones por voz: speechSynthesis del navegador (nada sale del
-// dispositivo). Cada giro se anuncia como mucho 3 veces: al detectarse
-// (lejos), a ~300 m y a ~60 m ("ahora"). Un giro se identifica por
-// direccion + cartel; si cambia, se resetea. Distancias redondeadas con la
-// misma regla que el panel (formatTurnDistance) para que coincidan.
-const VOICE_LANG = { en: 'en-US', es: 'es-ES', de: 'de-DE', fr: 'fr-FR', pt: 'pt-BR', pl: 'pl-PL', tr: 'tr-TR', ru: 'ru-RU' };
-const VOICE_STAGES = [ { key: 'far', maxM: 1500, minM: 450 }, { key: 'near', maxM: 450, minM: 120 }, { key: 'now', maxM: 120, minM: 0 } ];
-let voiceTurnKey = null;
-let voiceAnnounced = new Set();
-
-function speak(text) {
-  if (!('speechSynthesis' in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = VOICE_LANG[currentLang] || 'en-US';
-    u.rate = 1.0;
-    window.speechSynthesis.speak(u);
-  } catch (e) {}
-}
-
-function voiceDistanceText(meters) {
-  if (useImperial) {
-    const feet = meters * 3.28084;
-    if (feet < 1000) return t('voiceFeet').replace('{n}', String(Math.round(feet / 50) * 50));
-    const miles = meters / 1609.34;
-    return t('voiceMiles').replace('{n}', miles < 2 ? miles.toFixed(1) : String(Math.round(miles)));
-  }
-  if (meters < 1000) return t('voiceMeters').replace('{n}', String(roundTurnDistanceMeters(meters)));
-  const km = meters / 1000;
-  return t('voiceKm').replace('{n}', km < 10 ? km.toFixed(1) : String(Math.round(km)));
-}
-
-function announceTurn(turn) {
-  if (!turn) { voiceTurnKey = null; voiceAnnounced = new Set(); return; }
-  const key = `${turn.direction}|${turn.nearSign ? turn.nearSign.label : ''}`;
-  if (key !== voiceTurnKey) { voiceTurnKey = key; voiceAnnounced = new Set(); }
-  const stage = VOICE_STAGES.find(st => turn.distanceMeters < st.maxM && turn.distanceMeters >= st.minM);
-  if (!stage || voiceAnnounced.has(stage.key)) return;
-  voiceAnnounced.add(stage.key);
-  let turnText = turn.direction === 'left' ? t('voiceTurnLeft') : t('voiceTurnRight');
-  if (turn.nearSign) {
-    const prep = turn.nearSign.kind === 'city' ? t('voiceToward') : t('voiceOnto');
-    turnText += ' ' + prep.replace('{name}', turn.nearSign.label);
-  }
-  const text = stage.key === 'now'
-    ? t('voiceNow').replace('{turn}', turnText)
-    : t('voiceIn').replace('{dist}', voiceDistanceText(turn.distanceMeters * distanceScale())).replace('{turn}', turnText);
-  speak(text.charAt(0).toUpperCase() + text.slice(1));
-}
-
-document.getElementById('setVoice')?.addEventListener('change', (e) => {
-  voiceEnabled = VOICE_FEATURE && e.target.checked;
-  saveSettings();
-  if (voiceEnabled) {
-    if (!('speechSynthesis' in window)) { showToast(t('voiceUnsupported'), 'danger'); return; }
-    // Hablar algo en el mismo gesto del usuario "desbloquea" la sintesis de
-    // voz en los navegadores moviles (sin gesto previo, speak() se ignora).
-    speak(t('voiceEnabledToast'));
-    showToast(t('voiceEnabledToast'), 'success', 2500);
-  } else {
-    voiceTurnKey = null; voiceAnnounced = new Set();
-  }
-});
 
 function formatSeconds(totalSeconds) {
   if (totalSeconds == null || !isFinite(totalSeconds)) return '-';
