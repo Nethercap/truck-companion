@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260920c" />
+<link rel="stylesheet" href="app.css?v=20260920d" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -141,6 +141,8 @@
         <button class="poiChip" data-code="d">🚛 <span data-i18n="poiCatDealer">Truck dealer</span></button>
         <button class="poiChip" data-code="w">⚖️ <span data-i18n="poiCatWeigh">Weigh station</span></button>
       </div>
+      <input id="poiCityInput" class="poiSearch" type="search" list="poiCityList" data-i18n-placeholder="poiCityPlaceholder" placeholder="City (optional)…" autocomplete="off" />
+      <datalist id="poiCityList"></datalist>
       <input id="poiSearchInput" class="poiSearch" type="search" data-i18n-placeholder="poiSearchPlaceholder" placeholder="Company or city…" autocomplete="off" />
       <div id="poiResults" class="poiResults"></div>
       <p class="waypointModalExplain" data-i18n="poiHint">Tap a place to route through it as a waypoint.</p>
@@ -181,6 +183,7 @@
       <div id="reconnectBanner"></div>
       <button id="recenterBtn" class="mapBtn" data-i18n-title="recenter" title="Recenter on truck"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2 L14.7 6.8 L9.3 6.8 Z"/><path d="M12 22 L14.7 17.2 L9.3 17.2 Z"/><path d="M2 12 L6.8 9.3 L6.8 14.7 Z"/><path d="M22 12 L17.2 9.3 L17.2 14.7 Z"/><circle cx="12" cy="12" r="1.7"/></svg></button>
       <button id="fullscreenBtn" class="mapBtn" data-i18n-title="toggleFullscreen" title="Fullscreen">⛶</button>
+      <button id="tilt3dBtn" class="mapBtn" data-i18n-title="toggle3d" title="3D view" style="display:none"><span class="btnText">3D</span></button>
       <button id="navToggleBtn" class="mapBtn" data-i18n-title="toggleNavMode" title="Navigation mode"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.7 2 L2.5 22 L6 22 L11 4.7 Z"/><path d="M15.3 2 L21.5 22 L18 22 L13 4.7 Z"/><rect x="10.9" y="3" width="1.7" height="3"/><rect x="11" y="8.2" width="1.7" height="3"/><rect x="11.1" y="13.4" width="1.7" height="3"/><rect x="11.2" y="18.6" width="1.7" height="2.5"/></svg></button>
       <button id="waypointBtn" class="mapBtn" data-i18n-title="toggleWaypointMode" title="Add waypoint"><span id="waypointCount" class="mapBtnBadge" style="display:none">0</span><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 2v20h2v-7h9l-1.5-3.5L17 8H8V2H6z"/></svg></button>
       <button id="commandsToggleBtn" class="mapBtn" data-i18n-title="toggleCommands" title="Truck commands"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 12h4M9 10v4"/><circle cx="16" cy="10.5" r="1"/><circle cx="18" cy="12.5" r="1"/><circle cx="16" cy="14.5" r="1"/></svg></button>
@@ -201,6 +204,7 @@
         <div id="miniHud">
           <div class="miniHudTop">
             <div class="limitSign" id="miniLimitSign">--</div>
+            <div class="roadBadge mini" id="miniRoadBadge" style="display:none"></div>
             <div>
               <div class="speedBig" id="miniSpeedBig">--</div>
               <div class="speedUnit" id="miniSpeedUnitLabel">km/h</div>
@@ -230,6 +234,7 @@
         <div>
           <div class="speedBig" id="speedBig">--</div>
           <div class="speedUnit" id="speedUnitLabel">km/h</div>
+          <div class="roadBadge" id="roadBadge" style="display:none"></div>
         </div>
         <div class="cruiseDisplay" id="cruiseDisplay" style="display:none">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 12 L16 8"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
@@ -256,6 +261,7 @@
           <div class="row"><span class="label" data-i18n="cargo">Cargo</span><span id="cargo">-</span></div>
           <div class="row"><span class="label" data-i18n="etaGame">In-game ETA</span><span id="etaGame">-</span></div>
           <div class="row waypointSubRow" id="etaGameWaypointRow" hidden><span class="label" data-i18n="withWaypoint">(with waypoint)</span><span id="etaGameWaypoint">-</span></div>
+          <div class="row" id="nextCityRow" hidden><span class="label" data-i18n="nextCity">Next city</span><span id="nextCity">-</span></div>
           <div class="row" id="jobDeadlineRow" hidden><span class="label" data-i18n="jobDeadline">Job deadline</span><span id="jobDeadline">-</span></div>
           <div class="row"><span class="label" data-i18n="etaReal">Real ETA</span><span id="etaReal">-</span></div>
           <div class="row" id="restStopRow" hidden><span class="label" data-i18n="nextRest">Next rest stop</span><span id="restStop">-</span></div>
@@ -406,8 +412,8 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260920c"></script>
-<script src="i18n.js?v=20260920c"></script>
-<script src="app.js?v=20260920c"></script>
+<script src="pure.js?v=20260920d"></script>
+<script src="i18n.js?v=20260920d"></script>
+<script src="app.js?v=20260920d"></script>
 </body>
 </html>

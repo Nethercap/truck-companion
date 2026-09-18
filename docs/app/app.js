@@ -180,6 +180,10 @@ const TRANSLATIONS = {
     waypointReachedToast: '📍 Reached: {name}',
     waypointLimitToast: 'Up to {n} waypoints',
     poiTitle: 'Find nearby',
+    poiCityPlaceholder: 'City (optional)…',
+    navNextCity: 'Next city',
+    nextCity: 'Next city',
+    toggle3d: '3D view',
     poiSearchPlaceholder: 'Company or city…',
     poiNearestFuel: '⛽ Nearest fuel station',
     poiCatFuel: 'Fuel station',
@@ -386,6 +390,10 @@ const TRANSLATIONS = {
     waypointReachedToast: '📍 Llegaste: {name}',
     waypointLimitToast: 'Hasta {n} waypoints',
     poiTitle: 'Buscar cerca',
+    poiCityPlaceholder: 'Ciudad (opcional)…',
+    navNextCity: 'Próxima ciudad',
+    nextCity: 'Próxima ciudad',
+    toggle3d: 'Vista 3D',
     poiSearchPlaceholder: 'Empresa o ciudad…',
     poiNearestFuel: '⛽ Estación de servicio más cercana',
     poiCatFuel: 'Estación de servicio',
@@ -500,7 +508,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -1009,6 +1017,32 @@ async function loadRoadNames(mapInfo) {
 // se usa para etiquetar el tramo al que se esta por girar. Es un scan lineal
 // (varios miles de carteles) pero solo se llama una vez por tick de nav, asi
 // que el costo es despreciable.
+// Ruta actual: el nombre de ruta (I-80, A9, E45...) de los carteles cercanos
+// que mas se repite en los ultimos segundos - un solo cartel puede ser de
+// otra ruta (salida, cruce), la moda sobre una ventana es estable.
+const ROAD_BADGE_RADIUS_M = 250;
+const roadBadgeSamples = [];
+let currentRoadLabel = null;
+function updateCurrentRoad(x, z) {
+  const sign = nearestRoadName(x, z, ROAD_BADGE_RADIUS_M);
+  roadBadgeSamples.push(sign && sign.kind === 'road' ? sign.label : null);
+  if (roadBadgeSamples.length > 12) roadBadgeSamples.shift();
+  const counts = new Map();
+  for (const l of roadBadgeSamples) if (l) counts.set(l, (counts.get(l) || 0) + 1);
+  let best = null, bestN = 0;
+  for (const [l, n] of counts) if (n > bestN) { best = l; bestN = n; }
+  const label = bestN >= 3 ? best : null;
+  if (label !== currentRoadLabel) {
+    currentRoadLabel = label;
+    for (const id of ['roadBadge', 'miniRoadBadge']) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      el.textContent = label || '';
+      el.style.display = label ? '' : 'none';
+    }
+  }
+}
+
 function nearestRoadName(x, z, maxDist) {
   let best = null;
   let bestDist = maxDist;
@@ -1231,7 +1265,7 @@ async function loadPois(variant) {
     }
     // Si el modal esta abierto esperando, refrescarlo sin importar quien
     // disparo la carga (el mapa al iniciar o el propio modal).
-    if (document.getElementById('poiModal').style.display === 'flex') renderPoiResults();
+    if (document.getElementById('poiModal').style.display === 'flex') { fillPoiCityList(); renderPoiResults(); }
     return pois;
   })();
   return poisLoading;
@@ -1316,8 +1350,19 @@ function renderPoiResults() {
   }
   if (!pos) { list.innerHTML = `<div class="poiEmpty">${t('poiNoPosition')}</div>`; return; }
   const query = document.getElementById('poiSearchInput').value;
+  const cityFilter = document.getElementById('poiCityInput').value.trim().toLowerCase();
+  const cityToken = cityFilter && pois.cities ? Object.keys(pois.cities).find(tok => pois.cities[tok].toLowerCase() === cityFilter) : null;
   let results;
-  if (query.trim()) {
+  if (cityToken) {
+    // Ciudad elegida: todas sus empresas (filtradas por el texto si hay), a
+    // distancia del camion - dos pasos, como en un GPS de verdad.
+    const q = query.trim().toLowerCase();
+    results = pois.companies
+      .filter(c => c[4] === cityToken && (!q || (c[3] || '').toLowerCase().includes(q)))
+      .map(c => ({ x: c[0], z: c[1], label: c[3], city: c[4], dist: Math.hypot(c[0] - pos.x, c[1] - pos.z), name: c[3], sub: cityLabel(c[4]) }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .slice(0, 40);
+  } else if (query.trim()) {
     results = searchCompanies(query, pos.x, pos.z, 20).map(r => ({ ...r, name: r.label, sub: cityLabel(r.city) }));
   } else {
     results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => ({ ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' }));
@@ -1337,9 +1382,16 @@ function renderPoiResults() {
   }));
 }
 
+function fillPoiCityList() {
+  const list = document.getElementById('poiCityList');
+  if (!list || !pois || !pois.cities) return;
+  list.innerHTML = Object.values(pois.cities).sort().map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+}
 function openPoiModal() {
   document.getElementById('poiModal').style.display = 'flex';
   document.getElementById('poiSearchInput').value = '';
+  document.getElementById('poiCityInput').value = '';
+  fillPoiCityList();
   const variant = poiVariantNow();
   if (!pois && variant && !poisLoading) loadPois(variant);
   renderPoiResults();
@@ -1350,6 +1402,7 @@ document.getElementById('poiBtn').addEventListener('click', openPoiModal);
 document.getElementById('poiCloseBtn').addEventListener('click', closePoiModal);
 document.getElementById('poiModal').addEventListener('click', (e) => { if (e.target.id === 'poiModal') closePoiModal(); });
 document.getElementById('poiSearchInput').addEventListener('input', renderPoiResults);
+document.getElementById('poiCityInput').addEventListener('input', () => { renderPoiResults(); });
 document.querySelectorAll('.poiChip').forEach(chip => chip.addEventListener('click', () => {
   poiCategory = chip.dataset.code;
   document.querySelectorAll('.poiChip').forEach(c => c.classList.toggle('active', c === chip));
@@ -1817,6 +1870,27 @@ const NAV_TURN_ANGLE_THRESHOLD_DEG = 35; // cambio de rumbo minimo, medido justo
 const NAV_TURN_LEG_M = 60; // cuanto camino antes/despues de la interseccion se usa para medir el rumbo de entrada/salida
 const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta mas cercano al tramo del giro
 
+// Vista 3D (inclinacion de camara) en modo navegacion, persistida. En nav el
+// camion se ubica en el tercio inferior de la pantalla (padding) para ver mas
+// camino adelante, con o sin 3D.
+let nav3d = _savedSettings.nav3d || false;
+function navPadding() {
+  const h = map ? map.getContainer().clientHeight : 0;
+  // Rellenar ARRIBA desplaza el centro hacia abajo: el camion queda en el
+  // tercio inferior y se ve mas camino adelante.
+  return navMode ? { top: Math.round(h * 0.45), bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 };
+}
+function applyNavCamera() {
+  if (!map) return;
+  if (navMode) {
+    map.easeTo({ pitch: nav3d ? 58 : 0, padding: navPadding(), duration: 400 });
+  } else {
+    map.easeTo({ pitch: 0, bearing: 0, padding: navPadding(), duration: 300 });
+  }
+  document.getElementById('tilt3dBtn').classList.toggle('active', navMode && nav3d);
+  document.getElementById('tilt3dBtn').style.display = navMode ? '' : 'none';
+}
+
 function setNavMode(on) {
   navMode = on;
   navAutoZoomPaused = false;
@@ -1827,12 +1901,18 @@ function setNavMode(on) {
     btn.classList.add('active');
     if (truckArrowEl) truckArrowEl.style.transform = 'rotate(0deg)'; // el mapa ya rota, el camion siempre "para arriba"
   } else {
-    if (map) { map.dragRotate.enable(); map.easeTo({ bearing: 0, duration: 300 }); }
+    if (map) map.dragRotate.enable();
     btn.classList.remove('active');
     document.getElementById('navPanel').style.display = 'none';
     if (truckArrowEl) truckArrowEl.style.transform = `rotate(${lastHeadingDeg}deg)`;
   }
+  applyNavCamera();
 }
+document.getElementById('tilt3dBtn').addEventListener('click', () => {
+  nav3d = !nav3d;
+  saveSettings();
+  applyNavCamera();
+});
 
 // Busca el proximo giro real en la ruta ya calculada (recortada a la
 // posicion actual por trimRouteBehindTruck), mirando hasta NAV_TURN_LOOKAHEAD_M
@@ -1899,8 +1979,11 @@ function findUpcomingTurn() {
 // bloqueaba poder arrastrar el mapa a mano, porque cada frame deshacia el
 // drag del usuario). Ahora la camara se actualiza una sola vez por tick,
 // desde updateMap, con un unico llamado que combina centro+zoom+bearing.
+function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
 function updateNavPanel(turn) {
   const panel = document.getElementById('navPanel');
+  const nextLine = nextCityName ? `<span class="navNext">${t('navNextCity')}: ${nextCityName}</span>` : '';
   if (turn) {
     const arrow = turn.direction === 'left' ? '↰' : '↱';
     const dirText = turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight');
@@ -1909,9 +1992,9 @@ function updateNavPanel(turn) {
       const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
       ontoText = ` ${preposition} ${turn.nearSign.label}`;
     }
-    panel.textContent = `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale())}`;
+    panel.innerHTML = `${arrow} ${escapeHtml(dirText)}${escapeHtml(ontoText)} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale())}${nextLine}`;
   } else if (currentRouteWorldPoints) {
-    panel.textContent = `⬆ ${t('navStraight')}`;
+    panel.innerHTML = `⬆ ${t('navStraight')}${nextLine}`;
   } else {
     panel.textContent = `${t('navNoRoute')}`;
   }
@@ -1923,12 +2006,42 @@ function updateNavPanel(turn) {
 // que es donde mas importa ver el contexto completo, no menos.
 const NAV_FIXED_ZOOM = 10;
 function navTargetZoom(turn) {
-  return NAV_FIXED_ZOOM;
+  return nav3d ? NAV_FIXED_ZOOM + 0.7 : NAV_FIXED_ZOOM;
 }
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
 // proyectando la posicion actual sobre la polilinea y descartando los puntos
 // anteriores - asi no queda roja debajo de la azul (trail) ya recorrida.
+// Proxima ciudad sobre la ruta: la primera cuyo centro queda a menos de
+// NEXT_CITY_RADIUS_M de la ruta (muestreada), salvo la que ya estamos
+// atravesando. Se recalcula cada pocos segundos, no por tick.
+const NEXT_CITY_RADIUS_M = 2500;
+let nextCityName = null;
+let nextCityComputedAt = 0;
+function updateNextCity(x, z) {
+  const now = performance.now();
+  if (now - nextCityComputedAt < 4000) return;
+  nextCityComputedAt = now;
+  let found = null;
+  if (currentRouteWorldPoints && currentRouteWorldPoints.length > 1) {
+    const pts = currentRouteWorldPoints;
+    const step = Math.max(1, Math.floor(pts.length / 400));
+    let bestIdx = Infinity;
+    for (const [name, c] of Object.entries(citiesByName)) {
+      if (Math.hypot(c.X - x, c.Y - z) < 2000) continue; // ciudad actual
+      for (let i = 0; i < pts.length; i += step) {
+        if (i >= bestIdx) break;
+        if (Math.hypot(pts[i][0] - c.X, pts[i][1] - c.Y) < NEXT_CITY_RADIUS_M) { bestIdx = i; found = name; break; }
+      }
+    }
+  }
+  if (found !== nextCityName) {
+    nextCityName = found;
+    const row = document.getElementById('nextCityRow');
+    if (row) { row.hidden = !found; document.getElementById('nextCity').textContent = found || '-'; }
+  }
+}
+
 function trimRouteBehindTruck(x, z) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !map.getSource('route')) return;
   let bestIdx = 0, bestDist = Infinity, bestPoint = null;
@@ -1947,10 +2060,9 @@ function trimRouteBehindTruck(x, z) {
   // encarga de recalcularla entera, no recortar sobre una ruta vieja.
   if (bestDist > OFF_ROUTE_THRESHOLD_M) return;
   currentRouteWorldPoints = [bestPoint, ...currentRouteWorldPoints.slice(bestIdx + 1)];
-  map.getSource('route').setData({
-    type: 'Feature',
-    geometry: { type: 'LineString', coordinates: smoothLineCoords(currentRouteWorldPoints.map(([px, pz]) => toLngLat(px, pz))) },
-  });
+  const parts = splitRouteForDrawing(currentRouteWorldPoints);
+  map.getSource('route').setData(parts.land);
+  if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(parts.ferry);
 }
 
 let lastDisplayedLngLat = null; // ultima posicion ya animada del marcador ([lng,lat]), para interpolar el proximo tramo
@@ -2073,6 +2185,8 @@ function updateMap(position, game) {
   }
   lastWorldPos = { x: position.x, z: position.z };
   checkWaypointReached(position.x, position.z);
+  updateCurrentRoad(position.x, position.z);
+  updateNextCity(position.x, position.z);
 
   // A 10 Hz un punto por tick llenaria el trail en 100 s: solo se agrega
   // si el camion se movio >= 5 m desde el ultimo punto guardado.
@@ -2101,10 +2215,14 @@ function updateMap(position, game) {
     // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
     // seguimos actualizando centro/bearing hasta que recentre.
     const zoomOverride = navAutoZoomPaused ? {} : { zoom: navTargetZoom(turn) };
+    // pitch y padding van en cada llamada: un easeTo nuevo cancela el
+    // anterior, asi que la inclinacion 3D / el desplazamiento del camion al
+    // tercio inferior tienen que viajar con la camara de cada tick.
+    const navView = { pitch: nav3d ? 58 : 0, padding: navPadding() };
     if (!justJumped && prevLngLat) {
-      map.easeTo({ center: lngLat, bearing: lastHeadingDeg, duration: moveAnimMs(), easing: t => t, ...zoomOverride });
+      map.easeTo({ center: lngLat, bearing: lastHeadingDeg, duration: moveAnimMs(), easing: t => t, ...zoomOverride, ...navView });
     } else {
-      map.jumpTo({ center: lngLat, bearing: lastHeadingDeg, ...zoomOverride });
+      map.jumpTo({ center: lngLat, bearing: lastHeadingDeg, ...zoomOverride, ...navView });
     }
   } else if (autoFollow) {
     if (!justJumped && prevLngLat) {

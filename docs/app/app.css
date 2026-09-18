@@ -213,6 +213,9 @@
   #fullscreenBtn { top: 3.9rem; left: 0.6rem; }
   #navToggleBtn { top: 7.2rem; left: 0.6rem; }
   #navToggleBtn.active { background: var(--accent); color: #fff; }
+  /* 3D: al lado del boton de navegacion, solo visible en modo nav */
+  #tilt3dBtn { top: 7.2rem; left: 3.9rem; }
+  #tilt3dBtn.active { background: var(--accent); color: #fff; }
   #waypointBtn { top: 10.5rem; left: 0.6rem; }
   #waypointBtn.active { background: var(--accent); color: #fff; }
   #waypointBtn.set { background: #ffb020; color: #111; }
@@ -232,6 +235,10 @@
   /* Panel de indicaciones del modo navegacion - giro/distancia genericos
      calculados de la curvatura de la ruta ya calculada, sin nombres de
      calle (el grafo no los tiene). */
+  .roadBadge { display: inline-block; margin-top: 0.15rem; padding: 0.05rem 0.45rem; border-radius: 4px; background: #1d4ed8; color: #fff; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.02em; border: 1px solid #93c5fd; }
+  .roadBadge.mini { margin-top: 0.3rem; }
+  .navNext { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 500; margin-top: 0.1rem; }
+  .mapBtn .btnText { font-size: 0.72rem; font-weight: 800; }
   .navPanel {
     position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%);
     z-index: 1200; background: rgba(23, 26, 31, 0.92); color: #fff;
