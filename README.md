@@ -90,6 +90,21 @@ graph), then hosted on Cloudflare R2 rather than committed to this repo
 (they're roughly 800MB combined for both games). The web app fetches them
 from `maps.trucksim-dash.com`.
 
+## Code signing policy
+
+Free code signing for the Windows client is provided by [SignPath.io](https://signpath.io),
+certificate by [SignPath Foundation](https://signpath.org) (application in progress; until
+it is approved, releases are unsigned and each one lists its SHA-256).
+
+- **Committers / reviewers / approvers:** [Nethercap](https://github.com/Nethercap) (sole
+  maintainer). External contributions are reviewed by the maintainer before being merged.
+- Every release is built by GitHub Actions ([`build-client.yml`](.github/workflows/build-client.yml))
+  from the tagged source in this repository; nothing is signed that was not built from it.
+- **Privacy:** the client does not transfer any personal data to any third party. It relays the
+  game's telemetry to the user's own browser session through the relay server, and nothing else
+  — see the [privacy policy](https://trucksim-dash.com/privacy.html) and
+  [`client/README.md`](client/README.md) for exactly what it reads and sends.
+
 ## License / transparency
 
 MIT License (see [`LICENSE`](LICENSE)). The bundled SCS telemetry plugin
