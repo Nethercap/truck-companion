@@ -2738,13 +2738,17 @@ function renderConnectionUi() {
   // En modo LAN o demo no hay "otro codigo" que poner: el lapiz sale de la sesion.
   document.getElementById('changeCodeBtn').title = conn.demo ? t('exitDemo') : t('changeCode');
   document.getElementById('changeCodeBtn').style.display = conn.local ? 'none' : '';
-  statusEl.textContent = view.detail ? t(view.detail) : '';
+  // El cliente (>= 1.4.4) puede mandar un diagnostico fino en ingles
+  // (plugin ausente en la copia del juego que corre, juego como
+  // administrador, plugin sin cargar): se muestra despues del texto traducido.
+  const clientDetail = conn.clientStatus?.detail;
+  statusEl.textContent = (view.detail ? t(view.detail) : '') + (clientDetail ? ` — ${clientDetail}` : '');
   statusEl.className = view.cls;
   if (view.empty) {
     const [titleKey, bodyKey, icon, showDownload] = view.empty;
     document.getElementById('emptyStateIcon').textContent = icon;
     document.getElementById('emptyStateTitle').textContent = t(titleKey);
-    document.getElementById('emptyStateBody').textContent = t(bodyKey);
+    document.getElementById('emptyStateBody').textContent = clientDetail ? clientDetail : t(bodyKey);
     const link = document.getElementById('emptyStateLink');
     link.style.display = showDownload ? '' : 'none';
     link.textContent = t('emptyDownload');
@@ -3047,7 +3051,7 @@ function connectWs(backend, code, options = {}) {
     }
     if (data.type === 'client_status') {
       conn.clientConnected = true;
-      conn.clientStatus = data;
+      conn.clientStatus = data; // incluye .detail si el cliente lo manda
       if (data.status !== 'live') conn.hasTelemetry = false;
       renderConnectionUi();
       checkUpdateBanner(data.clientVersion);

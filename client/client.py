@@ -49,7 +49,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.4.3"
+CLIENT_VERSION = "1.4.4"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -238,6 +238,38 @@ def find_game_window():
         if hwnd:
             return hwnd
     return None
+
+
+_PROCESS_QUERY_INFORMATION = 0x0400
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+
+def running_game_info(hwnd) -> dict | None:
+    """Ruta del .exe del juego que esta corriendo y si parece estar elevado
+    (como administrador). Sirve para diagnosticar "juego abierto pero sin
+    telemetria": plugin instalado en OTRA copia del juego, o juego elevado
+    (un proceso normal no puede abrir la memoria compartida de uno elevado).
+    La heuristica de elevacion: si desde aca (no elevados) no podemos abrir
+    el proceso con QUERY_INFORMATION pero si con QUERY_LIMITED, el juego
+    corre con mayor integridad que nosotros."""
+    pid = ctypes.c_ulong(0)
+    _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    if not pid.value:
+        return None
+    handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+    if not handle:
+        return None
+    try:
+        buf = ctypes.create_unicode_buffer(1024)
+        size = ctypes.c_ulong(1024)
+        exe_path = buf.value if _kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)) else None
+    finally:
+        _kernel32.CloseHandle(handle)
+    full = _kernel32.OpenProcess(_PROCESS_QUERY_INFORMATION, False, pid.value)
+    elevated_guess = (not full) and not _shell32.IsUserAnAdmin()
+    if full:
+        _kernel32.CloseHandle(full)
+    return {"pid": pid.value, "exe_path": exe_path, "elevated_guess": bool(elevated_guess)}
 
 
 _VK_MENU = 0x12  # Alt

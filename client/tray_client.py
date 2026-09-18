@@ -61,6 +61,7 @@ CLOUD_KEYS = ("connecting", "connected", "offline", "reconnecting")
 class AppState:
     def __init__(self):
         self.status = "starting"  # estado de la telemetria (ver STATUS_TEXT)
+        self.status_detail: str | None = None  # diagnostico fino (ingles) cuando status == plugin_missing
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.code = None
@@ -434,7 +435,10 @@ class SetupWindow:
         color = {"live": GREEN, "waiting_truck": BLUE, "waiting_game": FG, "plugin_missing": ORANGE, "plugin_not_installed": ORANGE}.get(state.status, FG)
         if state.cloud in ("offline", "reconnecting") and state.status != "live":
             color = RED if state.cloud == "offline" else ORANGE
-        self.status_label.configure(text=state.status_text(), fg=color)
+        text = state.status_text()
+        if state.status == "plugin_missing" and state.status_detail:
+            text += "\n" + state.status_detail
+        self.status_label.configure(text=text, fg=color)
         self.code_label.configure(text=state.code or "-")
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         if getattr(self, "_last_lan_url", "?") != lan_url:
@@ -594,12 +598,53 @@ def open_donate(icon, item):
 
 def telemetry_status_when_unavailable() -> str:
     """Por que no hay telemetria: el juego no esta abierto, o esta abierto
-    pero el plugin no carga (no instalado / mal ubicado)."""
-    if client_lib.find_game_window():
+    pero el plugin no carga. En ese caso se mira el proceso que corre para
+    decir CUAL es el problema (state.status_detail, que viaja a la web):
+    plugin ausente en esa copia del juego, juego elevado, o plugin presente
+    pero no cargado (falta reiniciar / aceptar el dialogo del SDK)."""
+    hwnd = client_lib.find_game_window()
+    if hwnd:
+        state.status_detail = diagnose_running_game(hwnd)
         return "plugin_missing"
+    state.status_detail = None
     if state.installs and not state.any_plugin_installed():
         return "plugin_not_installed"
     return "waiting_game"
+
+
+_diagnosed_dirs = set()
+
+DETAIL_PLUGIN_ABSENT = "The running game ({bin_dir}) has no telemetry plugin. Open Setup & status and click Install plugin for that folder, then restart the game."
+DETAIL_ELEVATED = "The game is running as administrator, so Truck Dash can't read its telemetry. Run the game normally (not as admin), or run TruckDash as administrator too."
+DETAIL_NOT_LOADED = "The plugin file is in place but the game hasn't loaded it: restart the game, and click OK on the in-game 'Advanced SDK features' dialog the first time."
+
+
+def diagnose_running_game(hwnd) -> str | None:
+    try:
+        info = client_lib.running_game_info(hwnd)
+    except Exception:
+        logging.exception("running_game_info failed")
+        return None
+    if not info or not info.get("exe_path"):
+        return None
+    bin_dir = os.path.dirname(info["exe_path"])
+    if plugin_installer.plugin_state(bin_dir) == "missing":
+        # Copia del juego distinta a las detectadas por Steam (Epic, otra
+        # biblioteca, carpeta movida): se suma a la lista de Setup para que el
+        # boton "Install plugin" apunte a ESTA.
+        if bin_dir not in _diagnosed_dirs:
+            _diagnosed_dirs.add(bin_dir)
+            settings = win_integration.load_settings()
+            extra = settings.setdefault("extra_game_dirs", [])
+            if bin_dir not in extra and not any(i["bin_dir"].lower() == bin_dir.lower() for i in state.installs):
+                extra.append(bin_dir)
+                win_integration.save_settings(settings)
+                state.refresh_installs()
+            logging.info("Game running from %s without the plugin", bin_dir)
+        return DETAIL_PLUGIN_ABSENT.format(bin_dir=bin_dir)
+    if info.get("elevated_guess"):
+        return DETAIL_ELEVATED
+    return DETAIL_NOT_LOADED
 
 
 def status_message() -> str:
@@ -608,6 +653,7 @@ def status_message() -> str:
         "status": state.status,
         "game": state.game,
         "clientVersion": client_lib.CLIENT_VERSION,
+        "detail": state.status_detail,
     })
 
 
@@ -662,8 +708,9 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
 
     async def publish_status():
         nonlocal last_status_sent
-        if state.status != last_status_sent:
-            last_status_sent = state.status
+        key = (state.status, state.status_detail)
+        if key != last_status_sent:
+            last_status_sent = key
             msg = status_message()
             await cloud.send(msg)
             await local.broadcast(msg, is_status=True)
