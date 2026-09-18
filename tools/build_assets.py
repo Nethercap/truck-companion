@@ -25,6 +25,8 @@ SCREENSHOTS = [
     "screenshot-gps-2",
     "screenshot-gps-3",
     "screenshot-buttonbox",
+    "screenshot-waypoints",
+    "screenshot-find-nearby",
 ]
 
 BG = (11, 13, 16)

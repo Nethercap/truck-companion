@@ -519,7 +519,12 @@ let hasProMods = _savedSettings.hasProMods || false;
 // podes seguir compartiendo tu posicion pero no dibujar la de los demas.
 let liveShareEnabled = _savedSettings.liveShareEnabled || false;
 let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
-let voiceEnabled = _savedSettings.voiceEnabled || false;
+// Indicaciones por voz: desactivadas (2026-09-18) - la sintesis del navegador
+// pronuncia mal los nombres de rutas/ciudades y las frases armadas por partes
+// suenan mal en varios idiomas. El codigo queda por si se rehace con audio
+// pregrabado o una API decente; VOICE_FEATURE en false lo apaga entero.
+const VOICE_FEATURE = false;
+let voiceEnabled = VOICE_FEATURE && (_savedSettings.voiceEnabled || false);
 useImperial = !!_savedSettings.useImperial;
 renderUnitButtons();
 const livePlayerMarkers = new Map(); // id de sesion -> maplibregl.Marker
@@ -534,7 +539,6 @@ function initSettingsUi() {
   document.getElementById('setMiniGps').checked = miniHudSettings.gps;
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setLiveHideOthers').checked = hideOtherPlayers;
-  document.getElementById('setVoice').checked = voiceEnabled;
   renderTripHistory();
   document.querySelectorAll('.colorSwatch').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.color === routeColor);
@@ -1919,8 +1923,8 @@ function announceTurn(turn) {
   speak(text.charAt(0).toUpperCase() + text.slice(1));
 }
 
-document.getElementById('setVoice').addEventListener('change', (e) => {
-  voiceEnabled = e.target.checked;
+document.getElementById('setVoice')?.addEventListener('change', (e) => {
+  voiceEnabled = VOICE_FEATURE && e.target.checked;
   saveSettings();
   if (voiceEnabled) {
     if (!('speechSynthesis' in window)) { showToast(t('voiceUnsupported'), 'danger'); return; }

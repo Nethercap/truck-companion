@@ -256,7 +256,8 @@
   .carousel { display: flex; align-items: center; gap: 0.6rem; }
   .carouselViewport { overflow: hidden; flex: 1; min-width: 0; }
   .carouselTrack { display: flex; transition: transform 0.3s ease; }
-  .carouselSlide { flex: 0 0 100%; display: flex; align-items: center; justify-content: center; min-height: 300px; }
+  .carouselSlide { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; gap: 0.5rem; }
+  .slideCaption { margin: 0; font-size: 0.85rem; color: var(--muted); max-width: 40rem; }
   .carouselSlide img { max-height: 480px; max-width: 100%; width: auto; height: auto; border-radius: 10px; border: 1px solid var(--border); cursor: zoom-in; }
   .carouselArrow {
     flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
@@ -431,9 +432,9 @@
         <p data-i18n="featGpsBody">Vista que rota con tu rumbo mientras manejás, con indicaciones de giro y el nombre de la ruta a la que doblás — como un GPS de verdad.</p>
       </div>
       <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg></div>
-        <h3 data-i18n="featVoiceTitle">Indicaciones por voz</h3>
-        <p data-i18n="featVoiceBody">Avisos de giro hablados, opcionales, directo desde tu celular, para mantener los ojos en la ruta y el HUD del juego apagado.</p>
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
+        <h3 data-i18n="featWaypointsTitle">Waypoints con paradas</h3>
+        <p data-i18n="featWaypointsBody">Tocá el mapa o elegí un lugar para pasar por ahí. Las paradas numeradas se quitan solas cuando llegás, y la ruta se recalcula si te desviás.</p>
       </div>
       <div class="featureCard">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
@@ -478,11 +479,13 @@
         <button class="carouselArrow carouselPrev" onclick="carouselNav(-1)" aria-label="Previous screenshot">‹</button>
         <div class="carouselViewport">
           <div class="carouselTrack" id="carouselTrack">
-            <div class="carouselSlide"><img src="/assets/screenshot-dashboard.webp" alt="Truck Dash live dashboard on desktop" width="1916" height="1200" onclick="openLightbox(this.src)" /></div>
-            <div class="carouselSlide"><img src="/assets/screenshot-gps-1.webp" alt="Truck Dash GPS navigation mode, zoomed out" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /></div>
-            <div class="carouselSlide"><img src="/assets/screenshot-gps-2.webp" alt="Truck Dash GPS navigation mode with speed limit" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /></div>
-            <div class="carouselSlide"><img src="/assets/screenshot-gps-3.webp" alt="Truck Dash GPS navigation mode, close up on an intersection" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /></div>
-            <div class="carouselSlide"><img src="/assets/screenshot-buttonbox.webp" alt="Truck Dash button box: hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-dashboard.webp" alt="Truck Dash live dashboard on desktop" width="1916" height="1200" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideDashboard">Escritorio: mapa real, ruta en vivo y todos los datos del camión en una sola vista.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-waypoints.webp" alt="Route through two numbered waypoints near Cheyenne with fuel and rest stops on the map" width="801" height="556" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideWaypoints">Rutas con paradas: waypoints numerados que se quitan solos cuando llegás.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-find-nearby.webp" alt="Find nearby panel listing fuel stations sorted by distance" width="685" height="871" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideFindNearby">Buscar cerca: combustible, áreas de descanso, talleres, garages y empresas, ordenados por distancia.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-gps-2.webp" alt="Truck Dash GPS navigation mode with speed limit" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideGps">Celular en modo GPS: mapa orientado al rumbo, límite de velocidad y crucero.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-gps-3.webp" alt="Truck Dash GPS navigation mode, close up on an intersection" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideTurn">Giro a giro: el mapa se acerca a la intersección cuando llegás.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-buttonbox.webp" alt="Truck Dash button box: hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideButtons">Botonera: tocás en el celular, el cliente aprieta la tecla real en el juego.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-gps-1.webp" alt="Truck Dash GPS navigation mode, zoomed out" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideOverview">Alejado: toda la ruta, el recorrido hecho en azul, la red de rutas en naranja.</p></div>
           </div>
         </div>
         <button class="carouselArrow carouselNext" onclick="carouselNav(1)" aria-label="Next screenshot">›</button>
@@ -686,8 +689,8 @@ const TRANSLATIONS = {
     featMapBody: 'The actual road network of both games, with a route calculated over real roads to your destination — never a straight line.',
     featGpsTitle: 'GPS navigation mode',
     featGpsBody: 'Heading-up view that rotates as you drive, with turn-by-turn directions and the name of the road you\'re turning onto — like a real sat-nav.',
-    featVoiceTitle: 'Voice directions',
-    featVoiceBody: 'Optional spoken turn prompts straight from your phone, so you can keep your eyes on the road and the in-game HUD off.',
+    featWaypointsTitle: 'Multi-stop waypoints',
+    featWaypointsBody: 'Tap the map or pick a place to route through it. Numbered stops clear themselves as you reach them, and the route recalculates if you stray.',
     featPoiTitle: 'Find fuel, rest &amp; service',
     featPoiBody: 'Search gas stations, rest areas, service shops and garages, and get the nearest one routed in one tap.',
     featSpeedTitle: 'Speed, limits &amp; cruise',
@@ -704,6 +707,13 @@ const TRANSLATIONS = {
     featModsBody: 'Coast to Coast and ProMods Canada for ATS, ProMods (Europe + addons) for ETS2 — one toggle, no extra downloads.',
     tagUnique: 'only here',
     screenshotCaption: 'This is what it looks like while driving:',
+    slideDashboard: 'Desktop: real map, live route and every truck stat in one view.',
+    slideWaypoints: 'Multi-stop routing: numbered waypoints that clear themselves as you reach them.',
+    slideFindNearby: 'Find nearby: fuel, rest areas, service, garages and companies, sorted by distance.',
+    slideGps: 'Phone in GPS mode: heading-up map, speed limit and cruise readout.',
+    slideTurn: 'Turn-by-turn: the map zooms in on the intersection as you approach.',
+    slideButtons: 'Button box: tap on your phone, the client presses the real key in the game.',
+    slideOverview: 'Zoomed out: the whole route, driven trail in blue, road network in orange.',
     compareTitle: 'What paid GPS apps charge for, <span class="accent">free here</span>',
     compareIntro: 'Most truck-sim GPS apps give you a limited free tier and put routing limits, waypoints and ad removal behind a subscription. Truck Dash has no tiers.',
     compareColFree: 'Paid apps – free tier',
@@ -817,8 +827,8 @@ const TRANSLATIONS = {
     featMapBody: 'La red de carreteras real de ambos juegos, con una ruta calculada por caminos reales hasta tu destino — nunca una línea recta.',
     featGpsTitle: 'Modo navegación GPS',
     featGpsBody: 'Vista que rota con tu rumbo mientras manejás, con indicaciones de giro y el nombre de la ruta a la que doblás — como un GPS de verdad.',
-    featVoiceTitle: 'Indicaciones por voz',
-    featVoiceBody: 'Avisos de giro hablados, opcionales, directo desde tu celular, para mantener los ojos en la ruta y el HUD del juego apagado.',
+    featWaypointsTitle: 'Waypoints con paradas',
+    featWaypointsBody: 'Tocá el mapa o elegí un lugar para pasar por ahí. Las paradas numeradas se quitan solas cuando llegás, y la ruta se recalcula si te desviás.',
     featPoiTitle: 'Encontrá combustible, descanso y taller',
     featPoiBody: 'Buscá estaciones de servicio, áreas de descanso, talleres y garages, y ruteá a la más cercana con un toque.',
     featSpeedTitle: 'Velocidad, límites y crucero',
@@ -835,6 +845,13 @@ const TRANSLATIONS = {
     featModsBody: 'Coast to Coast y ProMods Canada para ATS, ProMods (Europa + addons) para ETS2 — un solo toggle, sin descargas extra.',
     tagUnique: 'solo acá',
     screenshotCaption: 'Así se ve mientras manejás:',
+    slideDashboard: 'Escritorio: mapa real, ruta en vivo y todos los datos del camión en una sola vista.',
+    slideWaypoints: 'Rutas con paradas: waypoints numerados que se quitan solos cuando llegás.',
+    slideFindNearby: 'Buscar cerca: combustible, áreas de descanso, talleres, garages y empresas, ordenados por distancia.',
+    slideGps: 'Celular en modo GPS: mapa orientado al rumbo, límite de velocidad y crucero.',
+    slideTurn: 'Giro a giro: el mapa se acerca a la intersección cuando llegás.',
+    slideButtons: 'Botonera: tocás en el celular, el cliente aprieta la tecla real en el juego.',
+    slideOverview: 'Alejado: toda la ruta, el recorrido hecho en azul, la red de rutas en naranja.',
     compareTitle: 'Lo que las apps de GPS pagas cobran, <span class="accent">acá es gratis</span>',
     compareIntro: 'La mayoría de las apps de GPS para simuladores de camiones dan un plan gratis limitado y ponen los límites de ruteo, los waypoints y sacar la publicidad detrás de una suscripción. Truck Dash no tiene planes.',
     compareColFree: 'Apps pagas – plan gratis',
