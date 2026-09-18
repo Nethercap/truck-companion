@@ -23,6 +23,12 @@ const TRANSLATIONS = {
     modsTitle: 'Map mods',
     joinDiscord: 'Discord',
     settingsNoMod: 'None',
+    modsAutoLabel: 'Automatic — read from the game (needs client 1.5.1+)',
+    modsManualLabel: 'Choose manually',
+    modsDetectNoData: 'no data yet',
+    modsDetectNoLog: 'game log not found',
+    modsDetected: 'detected {mods}',
+    modsDetectedNone: 'no map mods',
     settingsCoastToCoast: 'I have Coast to Coast installed',
     settingsProModsCanada: 'I have ProMods Canada installed',
     settingsProMods: 'I have ProMods (Europe + all addons) installed',
@@ -223,6 +229,12 @@ const TRANSLATIONS = {
     modsTitle: 'Mods de mapa',
     joinDiscord: 'Discord',
     settingsNoMod: 'Ninguno',
+    modsAutoLabel: 'Automático — se lee del juego (necesita cliente 1.5.1+)',
+    modsManualLabel: 'Elegir a mano',
+    modsDetectNoData: 'sin datos todavía',
+    modsDetectNoLog: 'no se encontró el log del juego',
+    modsDetected: 'detectado {mods}',
+    modsDetectedNone: 'sin mods de mapa',
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
     settingsProModsCanada: 'Tengo instalado ProMods Canada',
     settingsProMods: 'Tengo instalado ProMods (Europe + todos los addons)',
@@ -488,7 +500,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto }));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -506,6 +518,12 @@ let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como 
 // ('none'|'c2c'|'promods_canada') en vez de dos checkboxes independientes.
 let atsMod = _savedSettings.atsMod || 'none';
 let hasProMods = _savedSettings.hasProMods || false;
+// Deteccion automatica de mods de mapa: el cliente (>= 1.5.1) lee
+// game.log.txt y manda {ets2: {promods,..}|null, ats: {c2c, promods_canada}|null}
+// en client_status. Con modsAuto (default) la variante del mapa sale de ahi;
+// las opciones manuales quedan como override o para clientes viejos.
+let modsAuto = _savedSettings.modsAuto !== false;
+let detectedMods = null;
 // Opt-in de "jugadores en vivo": reciprocidad simple (no compartis -> no ves
 // a nadie), decidido asi porque no hay cuentas ni consentimiento granular.
 // hideOtherPlayers es aparte y solo local (no le dice nada al backend) -
@@ -542,6 +560,10 @@ document.querySelectorAll('.colorSwatch').forEach(btn => {
 }
 
 function initModsUi() {
+  document.getElementById('setModsAuto').checked = modsAuto;
+  document.getElementById('setModsManual').checked = !modsAuto;
+  document.getElementById('modsAutoStatus').textContent = `ATS: ${describeDetectedMods('ats')} · ETS2: ${describeDetectedMods('ets2')}`;
+  document.getElementById('modsManualBlock').style.opacity = modsAuto ? '0.5' : '1';
   document.getElementById('setAtsModNone').checked = atsMod === 'none';
   document.getElementById('setCoastToCoast').checked = atsMod === 'c2c';
   document.getElementById('setProModsCanada').checked = atsMod === 'promods_canada';
@@ -549,6 +571,14 @@ function initModsUi() {
   document.getElementById('setProMods').checked = hasProMods;
 }
 
+document.querySelectorAll('input[name="modsAuto"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    modsAuto = e.target.value === 'auto';
+    saveSettings();
+    initModsUi();
+    currentGame = null;
+  });
+});
 document.querySelectorAll('input[name="atsMod"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
     if (!e.target.checked) return;
@@ -1967,10 +1997,28 @@ function animateTruckTo(fromLngLat, toPos) {
 
 function resolveEffectiveGame(game) {
   const g = game || 'ats';
+  const det = modsAuto && detectedMods ? detectedMods[g] : null;
+  if (det) {
+    if (g === 'ats' && det.promods_canada) return 'ats_promods';
+    if (g === 'ats' && det.c2c) return 'ats_c2c';
+    if (g === 'ets2' && det.promods) return 'ets2_promods';
+    return g;
+  }
   if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
   if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
   if (g === 'ets2' && hasProMods) return 'ets2_promods';
   return g;
+}
+
+function describeDetectedMods(game) {
+  const det = detectedMods ? detectedMods[game] : null;
+  if (det === undefined || detectedMods === null) return t('modsDetectNoData');
+  if (det === null) return t('modsDetectNoLog');
+  const names = [];
+  if (det.promods) names.push('ProMods');
+  if (det.promods_canada) names.push('ProMods Canada');
+  if (det.c2c) names.push('Coast to Coast');
+  return names.length ? t('modsDetected').replace('{mods}', names.join(' + ')) : t('modsDetectedNone');
 }
 
 function updateMap(position, game) {
@@ -3022,6 +3070,11 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'client_status') {
       conn.clientConnected = true;
       conn.clientStatus = data; // incluye .detail si el cliente lo manda
+      if (data.mapMods !== undefined && JSON.stringify(data.mapMods) !== JSON.stringify(detectedMods)) {
+        detectedMods = data.mapMods;
+        if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada
+        if (document.getElementById('modsModal').style.display === 'flex') initModsUi();
+      }
       if (data.status !== 'live') conn.hasTelemetry = false;
       renderConnectionUi();
       checkUpdateBanner(data.clientVersion);

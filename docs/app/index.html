@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260920b" />
+<link rel="stylesheet" href="app.css?v=20260920c" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -110,6 +110,11 @@
     <div class="settingsPanel">
       <h3 data-i18n="modsTitle">Map mods</h3>
 
+      <label class="settingsRow"><input type="radio" name="modsAuto" id="setModsAuto" value="auto" /> <span data-i18n="modsAutoLabel">Automatic — read from the game (needs client 1.5.1+)</span></label>
+      <p class="settingsAbout" id="modsAutoStatus" style="margin:0 0 0.4rem 1.6rem"></p>
+      <label class="settingsRow"><input type="radio" name="modsAuto" id="setModsManual" value="manual" /> <span data-i18n="modsManualLabel">Choose manually</span></label>
+
+      <div id="modsManualBlock">
       <p class="settingsSectionTitle">American Truck Simulator</p>
       <label class="settingsRow"><input type="radio" name="atsMod" id="setAtsModNone" value="none" /> <span data-i18n="settingsNoMod">None</span></label>
       <label class="settingsRow"><input type="radio" name="atsMod" id="setCoastToCoast" value="c2c" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
@@ -118,6 +123,7 @@
       <p class="settingsSectionTitle">Euro Truck Simulator 2</p>
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setEts2ModNone" value="none" /> <span data-i18n="settingsNoMod">None</span></label>
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setProMods" value="promods" /> <span data-i18n="settingsProMods">I have ProMods (Europe + all addons) installed</span></label>
+      </div>
 
       <button id="modsCloseBtn" data-i18n="close">Close</button>
     </div>
@@ -400,8 +406,8 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260920b"></script>
-<script src="i18n.js?v=20260920b"></script>
-<script src="app.js?v=20260920b"></script>
+<script src="pure.js?v=20260920c"></script>
+<script src="i18n.js?v=20260920c"></script>
+<script src="app.js?v=20260920c"></script>
 </body>
 </html>

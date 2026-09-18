@@ -268,3 +268,35 @@ def test_job_delivered_sent_only_on_rising_edge_never_on_first_tick():
     assert tick(False) is False
     assert tick(True) is True     # transicion real
     assert tick(True) is False    # sigue en true: no se repite
+
+
+SAMPLE_LOG = (
+    "00:00:24.567 : [mods] Active 3 mods (local: 2, workshop: 1)\n"
+    "00:00:24.567 : [mods] Active workshop mod ID 645553604 (name: SiSL's Mega Pack, version: 3.3, author: SiSL)\n"
+    "00:00:24.567 : [mods] Active local mod promods-def-v284 (name: ProMods Definition Package, version: 2.84, author: ProMods Team)\n"
+    "00:00:24.567 : [mods] Active local mod promods-me-defmap-v284 (name: ProMods Middle East Addon, version: 2.84, author: ProMods Team)\n"
+)
+
+
+def test_parse_active_mods_takes_last_profile_block():
+    log = (
+        "00:00:10.000 : [mods] Active 1 mods (local: 1, workshop: 0)\n"
+        "00:00:10.000 : [mods] Active local mod coast2coast (name: Coast to Coast, version: 2.15, author: Mantrid)\n"
+    ) + SAMPLE_LOG
+    mods = client.parse_active_mods(log)
+    assert [m["file"] for m in mods] == ["645553604", "promods-def-v284", "promods-me-defmap-v284"]
+    assert mods[1]["name"] == "ProMods Definition Package"
+
+
+def test_parse_active_mods_none_without_list():
+    assert client.parse_active_mods("00:00:01 : [hashfs] base.scs: Created") is None
+
+
+def test_detect_map_mods_flags():
+    assert client.detect_map_mods(client.parse_active_mods(SAMPLE_LOG)) == {"promods": True, "promods_canada": False, "c2c": False}
+    mods = [
+        {"file": "promods-ats-canada-v164", "name": "ProMods Canada", "version": "1.64", "author": "ProMods"},
+        {"file": "coast2coast_v2.15", "name": "Coast to Coast", "version": "2.15", "author": "Mantrid"},
+    ]
+    assert client.detect_map_mods(mods) == {"promods": False, "promods_canada": True, "c2c": True}
+    assert client.detect_map_mods([]) == {"promods": False, "promods_canada": False, "c2c": False}

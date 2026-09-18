@@ -55,7 +55,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.5.0"
+CLIENT_VERSION = "1.5.1"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -147,6 +147,70 @@ def documents_folder() -> str:
     except Exception:
         pass
     return os.path.expanduser("~/Documents")
+
+
+# ---------------------------------------------------------------------------
+# Deteccion de mods de mapa activos, leyendo game.log.txt (texto plano que el
+# juego reescribe en cada arranque y donde lista los mods del perfil al
+# cargarlo). Asi la web elige sola el mapa (ProMods, Coast to Coast, ProMods
+# Canada) en vez de pedirle al usuario que marque que tiene instalado.
+# ---------------------------------------------------------------------------
+_MOD_LINE_RE = re.compile(r"\[mods\] Active (?:local|workshop) mod (?:ID )?(?P<file>\S+) \(name: (?P<name>.*?), version: (?P<version>.*?), author: (?P<author>.*?)\)")
+_MODS_HEADER_RE = re.compile(r"\[mods\] Active (\d+) mods")
+
+
+def game_log_paths() -> dict:
+    docs = documents_folder()
+    return {
+        "ets2": os.path.join(docs, "Euro Truck Simulator 2", "game.log.txt"),
+        "ats": os.path.join(docs, "American Truck Simulator", "game.log.txt"),
+    }
+
+
+def parse_active_mods(log_text: str) -> list | None:
+    """Lista de mods activos del ULTIMO perfil cargado segun el log, como
+    [{file, name, version, author}], o None si el log no tiene ninguna lista
+    de mods todavia (el juego no llego a cargar un perfil)."""
+    last_header = None
+    for m in _MODS_HEADER_RE.finditer(log_text):
+        last_header = m
+    if last_header is None:
+        return None
+    mods = []
+    for m in _MOD_LINE_RE.finditer(log_text, last_header.end()):
+        mods.append({"file": m.group("file"), "name": m.group("name"), "version": m.group("version"), "author": m.group("author")})
+    return mods
+
+
+def detect_map_mods(mods: list) -> dict:
+    """{promods, promods_canada, c2c} a partir de nombres/archivos de mods.
+    ProMods Europa y sus addons (ME, Maghreb, TGS) cuentan como 'promods';
+    'ProMods Canada' es el pack de ATS."""
+    flags = {"promods": False, "promods_canada": False, "c2c": False}
+    for mod in mods:
+        text = f"{mod.get('file', '')} {mod.get('name', '')}".lower()
+        if "promods" in text or "pm-" in text or "cnx-pm" in text:
+            if "canada" in text or "promods-ats" in text or "pm-ats" in text:
+                flags["promods_canada"] = True
+            else:
+                flags["promods"] = True
+        if "coast to coast" in text or "coast2coast" in text or re.search(r"c2c", text):
+            flags["c2c"] = True
+    return flags
+
+
+def read_map_mods() -> dict:
+    """{'ets2': {...flags} | None, 'ats': {...} | None} - None = sin datos
+    (el log no existe o no tiene lista de mods)."""
+    result = {}
+    for game, path in game_log_paths().items():
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                mods = parse_active_mods(f.read())
+        except OSError:
+            mods = None
+        result[game] = detect_map_mods(mods) if mods is not None else None
+    return result
 
 
 def find_controls_sii_files() -> list:

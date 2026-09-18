@@ -62,6 +62,8 @@ class AppState:
     def __init__(self):
         self.status = "starting"  # estado de la telemetria (ver STATUS_TEXT)
         self.status_detail: str | None = None  # diagnostico fino (ingles) cuando status == plugin_missing
+        self.map_mods: dict | None = None  # {'ets2': {promods,..}|None, 'ats': {...}|None} leido de game.log.txt
+        self.map_mods_read_at = 0.0
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.code = None
@@ -654,7 +656,27 @@ def status_message() -> str:
         "game": state.game,
         "clientVersion": client_lib.CLIENT_VERSION,
         "detail": state.status_detail,
+        "mapMods": state.map_mods,
     })
+
+
+def refresh_map_mods(force: bool = False) -> bool:
+    """Relee game.log.txt (cada 10 s como mucho: es chico) para saber que
+    mods de mapa tiene activos el perfil cargado. Devuelve True si cambio."""
+    now = time.time()
+    if not force and now - state.map_mods_read_at < 10:
+        return False
+    state.map_mods_read_at = now
+    try:
+        mods = client_lib.read_map_mods()
+    except Exception:
+        logging.exception("read_map_mods failed")
+        return False
+    if mods != state.map_mods:
+        state.map_mods = mods
+        logging.info("Map mods detected: %s", mods)
+        return True
+    return False
 
 
 class CloudLink:
@@ -709,7 +731,8 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
 
     async def publish_status():
         nonlocal last_status_sent
-        key = (state.status, state.status_detail)
+        refresh_map_mods()
+        key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True))
         if key != last_status_sent:
             last_status_sent = key
             msg = status_message()
