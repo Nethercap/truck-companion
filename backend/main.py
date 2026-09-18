@@ -326,12 +326,18 @@ async def start_background_tasks():
     asyncio.create_task(broadcast_live_positions_loop())
 
 
+CODE_ALPHABET = string.ascii_uppercase + string.digits
+
+
 def generate_code() -> str:
-    alphabet = string.ascii_uppercase + string.digits
     while True:
-        code = "".join(random.choices(alphabet, k=PAIRING_CODE_LENGTH))
+        code = "".join(random.choices(CODE_ALPHABET, k=PAIRING_CODE_LENGTH))
         if code not in sessions:
             return code
+
+
+def is_well_formed_code(code: str) -> bool:
+    return len(code) == PAIRING_CODE_LENGTH and all(c in CODE_ALPHABET for c in code)
 
 
 # Una sesion sin cliente local ni viewers durante este tiempo se da por
@@ -473,8 +479,20 @@ async def ws_client(websocket: WebSocket, code: str):
 
     session = sessions.get(code)
     if session is None:
-        await websocket.close(code=4404, reason="codigo de pairing invalido o expirado")
-        return
+        # Las sesiones viven en memoria: tras un redeploy (o si la sesion se
+        # limpio por inactividad, ej. PC suspendida) el cliente reconecta con
+        # el codigo que YA tenia y antes recibia "invalido" para siempre. El
+        # codigo es suyo (lo genero este backend y solo el lo conoce), asi
+        # que se le recrea la sesion en vez de rechazarlo. Los viewers que
+        # tengan la pestana abierta reintentan solos y la encuentran. No se
+        # cuenta como sesion nueva en las stats (es la misma persona).
+        if not is_well_formed_code(code):
+            await websocket.close(code=4404, reason="codigo de pairing invalido")
+            return
+        session = Session(code)
+        session.counted = True
+        sessions[code] = session
+        logging.info("Sesion %s recreada por reconexion del cliente", code)
 
     await websocket.accept()
     session.client_ws = websocket

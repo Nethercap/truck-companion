@@ -421,3 +421,33 @@ def test_version_endpoint_exposes_seeded_sha256(client, main):
     body = client.get("/version").json()
     assert body["latest_client_version"] == "1.3.0"
     assert body["sha256"] == "abc123"
+
+
+def test_client_reconnect_with_unknown_code_recreates_session_without_counting(client, main):
+    # Simula un redeploy: el cliente tiene un codigo valido que ya no esta en memoria.
+    assert "ABCD1234" not in main.sessions
+    with client.websocket_connect("/ws/client/ABCD1234"):
+        session = main.sessions["ABCD1234"]
+        assert session.client_ws is not None
+        assert session.counted is True  # no infla total_sessions
+        with client.websocket_connect("/ws/live/ABCD1234") as viewer:
+            first = main.json.loads(viewer.receive_text())
+            assert first["client_connected"] is True
+
+
+def test_client_with_malformed_code_is_rejected(client, main):
+    from starlette.websockets import WebSocketDisconnect
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with client.websocket_connect("/ws/client/short"):
+            pass
+    assert exc.value.code == 4404
+    assert "short" not in main.sessions
+
+
+def test_viewer_with_unknown_code_is_still_rejected(client, main):
+    from starlette.websockets import WebSocketDisconnect
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with client.websocket_connect("/ws/live/ZZZZ9999"):
+            pass
+    assert exc.value.code == 4404
+    assert "ZZZZ9999" not in main.sessions
