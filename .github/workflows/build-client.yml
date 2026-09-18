@@ -71,13 +71,16 @@ jobs:
       - name: Announce on Discord
         # Embed en el canal de releases del Discord. Solo si el secret
         # DISCORD_RELEASES_WEBHOOK existe (repo → Settings → Secrets → Actions).
-        if: startsWith(github.ref, 'refs/tags/v') && secrets.DISCORD_RELEASES_WEBHOOK != ''
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
+          # El contexto `secrets` no esta disponible en el `if:` de un paso, por
+          # eso la comprobacion va aca adentro.
+          if (-not $env:DISCORD_RELEASES_WEBHOOK) { Write-Host "DISCORD_RELEASES_WEBHOOK not set, skipping announcement"; exit 0 }
           $tag = $env:TAG
           # Notas: el cuerpo del ultimo commit del tag (la primera linea es el titulo).
           $lines = (git log -1 --format=%B "$tag") -split "`n" | Where-Object { $_ -notmatch '^Co-Authored-By' }
