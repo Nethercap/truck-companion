@@ -259,6 +259,12 @@ class Session:
         self.map_variant: Optional[str] = None
         self.share_position = False
         self.last_position: Optional[dict] = None  # {"x":, "z":, "game":, "ts":}
+        # Ultimo estado de diagnostico reportado por el cliente local (mensaje
+        # "client_status": waiting_game / plugin_missing / live / ...). Se
+        # guarda para poder darselo a un viewer que se conecta despues, en vez
+        # de que tenga que esperar al proximo cambio de estado.
+        self.last_client_status: Optional[dict] = None
+        self.last_seen = time.time()
 
 
 sessions: dict[str, Session] = {}
@@ -270,10 +276,14 @@ LIVE_POSITIONS_BROADCAST_INTERVAL_SECONDS = 2
 
 
 async def broadcast_live_positions_loop():
+    ticks = 0
     while True:
         await asyncio.sleep(LIVE_POSITIONS_BROADCAST_INTERVAL_SECONDS)
+        ticks += 1
         try:
             broadcast_live_positions()
+            if ticks % 30 == 0:  # cada ~1 min
+                cleanup_expired_sessions()
         except Exception:
             logging.exception("Error en broadcast_live_positions_loop")
 
@@ -324,16 +334,40 @@ def generate_code() -> str:
             return code
 
 
+# Una sesion sin cliente local ni viewers durante este tiempo se da por
+# abandonada (el usuario cerro el .exe y la pestana) y se libera - antes solo
+# se limpiaban los codigos que nunca llegaron a conectar, y las sesiones ya
+# usadas quedaban en memoria para siempre (inflando active_sessions).
+IDLE_SESSION_TTL_SECONDS = 30 * 60
+
+
 def cleanup_expired_sessions():
     now = time.time()
     expired = [
         code
         for code, session in sessions.items()
         if session.client_ws is None
-        and now - session.created_at > PAIRING_CODE_TTL_SECONDS
+        and (
+            (not session.counted and now - session.created_at > PAIRING_CODE_TTL_SECONDS)
+            or (not session.viewer_ws_list and now - session.last_seen > IDLE_SESSION_TTL_SECONDS)
+        )
     ]
     for code in expired:
         del sessions[code]
+
+
+def session_state_message(session: "Session") -> str:
+    return json.dumps({
+        "type": "session_state",
+        "client_connected": session.client_ws is not None,
+        "client_status": session.last_client_status,
+    })
+
+
+async def broadcast_session_state(session: "Session"):
+    message = session_state_message(session)
+    for viewer in list(session.viewer_ws_list):
+        await _safe_send(viewer, message)
 
 
 @app.post("/pair/new")
@@ -378,6 +412,9 @@ def version():
     return {
         "latest_client_version": stats.get("latest_client_version", DEFAULT_CLIENT_VERSION),
         "download_url": CLIENT_DOWNLOAD_URL,
+        # SHA-256 del zip del release (publicado junto al release). El cliente
+        # lo verifica antes de auto-actualizarse; si no esta, actualiza igual.
+        "sha256": stats.get("latest_client_sha256"),
     }
 
 
@@ -420,7 +457,7 @@ def stats_seed(payload: dict, x_admin_key: Optional[str] = Header(default=None))
                 stats[key] = value
             elif key == "latest_jobs" and isinstance(value, list):
                 stats[key] = value[:LATEST_JOBS_MAX]
-            elif key == "latest_client_version" and isinstance(value, str):
+            elif key in ("latest_client_version", "latest_client_sha256") and isinstance(value, str):
                 stats[key] = value
         _save_stats()
         return stats
@@ -441,20 +478,25 @@ async def ws_client(websocket: WebSocket, code: str):
 
     await websocket.accept()
     session.client_ws = websocket
+    session.last_seen = time.time()
     if not session.counted:
         session.counted = True
         # PUT a R2 es I/O bloqueante - correrlo en un thread para no trabar el
         # event loop (que en paralelo esta reenviando telemetria a viewers).
         asyncio.create_task(asyncio.to_thread(record_session_started))
+    await broadcast_session_state(session)
     try:
         while True:
             data = await websocket.receive_text()
+            session.last_seen = time.time()
             # jobDelivered llega como pulso (True por un solo frame) - se
             # detecta el flanco de subida aca (server-side, una vez por
             # entrega real) en vez de contar en el cliente web, que podria
             # tener varios viewers mirando la misma sesion.
             try:
                 payload = json.loads(data)
+                if payload.get("type") == "client_status":
+                    session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion")}
                 event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
                 now = time.time()
@@ -515,6 +557,8 @@ async def ws_client(websocket: WebSocket, code: str):
         pass
     finally:
         session.client_ws = None
+        session.last_seen = time.time()
+        await broadcast_session_state(session)
 
 
 @app.websocket("/ws/live/{code}")
@@ -532,6 +576,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
 
     await websocket.accept()
     session.viewer_ws_list.append(websocket)
+    session.last_seen = time.time()
+    await _safe_send(websocket, session_state_message(session))
     try:
         while True:
             # Normalmente no esperamos nada del viewer (solo mantiene viva la
@@ -567,3 +613,4 @@ async def ws_viewer(websocket: WebSocket, code: str):
     finally:
         if websocket in session.viewer_ws_list:
             session.viewer_ws_list.remove(websocket)
+        session.last_seen = time.time()

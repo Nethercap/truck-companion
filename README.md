@@ -30,32 +30,37 @@ that client does and does not do.
   deployed on Railway.
 - [`docs/`](docs/) — the public web app and landing page, served via GitHub
   Pages at trucksim-dash.com. Map tiles and route graphs (~800MB) are hosted
-  separately on Cloudflare R2, not in this repo.
+  separately on Cloudflare R2, not in this repo. `docs/es/index.html` is
+  generated from `docs/index.html` with `python tools/build_landing_es.py`
+  (don't edit it by hand); screenshots/OG image come from
+  `python tools/build_assets.py`.
 
-## Setting up the game (one-time)
+## Getting started
 
-1. Download the SCS telemetry SDK plugin from
-   [RenCloud/scs-sdk-plugin releases](https://github.com/RenCloud/scs-sdk-plugin/releases)
-   (the `.zip` under the latest release's Assets) — see the
-   [plugin's own README](https://github.com/RenCloud/scs-sdk-plugin) too if
-   anything below is unclear.
-2. Copy **only the `scs-telemetry.dll` file** (not the whole downloaded
-   folder/zip) into your game's install folder, inside
-   `bin\win_x64\plugins\` (create that folder if it doesn't exist). The
-   `.dll` has to sit directly inside `plugins\`, for example:
-   `...\Euro Truck Simulator 2\bin\win_x64\plugins\scs-telemetry.dll`
-3. Do the same for American Truck Simulator if you play both.
-4. If the dashboard stays stuck on "waiting for telemetry" even after
-   driving for a bit, open the tray icon's **"Show log file (troubleshooting)"**
-   menu item — it'll show whether the plugin was even detected.
+1. Download the latest build from the
+   [Releases page](https://github.com/Nethercap/truck-companion/releases),
+   unzip it, and run `TruckDash.exe` (portable, no admin rights).
+2. The **Setup & status** window that opens finds your ETS2 / ATS install and
+   installs the SCS telemetry plugin for you with one click. (Manual steps,
+   SmartScreen notes and troubleshooting are in
+   [`client/README.md`](client/README.md).)
+3. Open the game. Your browser opens the dashboard already connected; on your
+   phone, open trucksim-dash.com/app and type the pairing code shown in the
+   tray icon.
 
-## Running the client
+## Releases
 
-Download the latest build from the
-[Releases page](https://github.com/Nethercap/truck-companion/releases),
-unzip it, and run `TruckDash.exe`. It opens your browser automatically,
-already connected — no manual setup needed. See
-[`client/README.md`](client/README.md) for exactly what it reads and sends.
+`TruckDash.exe` is built by the [Build client](.github/workflows/build-client.yml)
+GitHub Actions workflow from a `v*` tag, which also publishes the Release with
+the zip and its SHA-256:
+
+```
+git tag v1.3.0 && git push origin v1.3.0
+```
+
+After a release, seed the version the backend advertises (so running clients
+offer the update): `POST /admin/stats/seed` with
+`{"latest_client_version": "1.3.0", "latest_client_sha256": "<sha of the zip>"}`.
 
 ## Running everything locally (for development)
 

@@ -1,0 +1,70 @@
+name: Build client
+
+# Compila TruckDash.exe en un runner limpio de GitHub (build reproducible,
+# nadie tiene que confiar en un .exe compilado en la PC de alguien) y, si el
+# disparador es un tag v*, publica el Release con el zip y su SHA-256.
+#
+# Uso: git tag v1.3.0 && git push origin v1.3.0
+# (o "Run workflow" a mano desde Actions para solo verificar que compila)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r client/requirements.txt
+      - name: Run client tests
+        run: |
+          pip install pytest
+          python -m pytest client/test_client.py client/test_plugin_installer.py -q
+      - name: Build TruckDash.exe
+        working-directory: client
+        run: pyinstaller TruckDash.spec
+      - name: Package zip and checksums
+        shell: pwsh
+        working-directory: client
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Copy-Item dist/TruckDash.exe release/TruckDash.exe
+          Copy-Item README.md release/README.md
+          Copy-Item README.es.md release/README.es.md
+          Compress-Archive -Path release/* -DestinationPath TruckDash-windows.zip -Force
+          $zip = (Get-FileHash TruckDash-windows.zip -Algorithm SHA256).Hash.ToLower()
+          $exe = (Get-FileHash dist/TruckDash.exe -Algorithm SHA256).Hash.ToLower()
+          "$zip  TruckDash-windows.zip`n$exe  TruckDash.exe" | Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+          "ZIP_SHA256=$zip" >> $env:GITHUB_ENV
+          "EXE_SHA256=$exe" >> $env:GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TruckDash-windows
+          path: |
+            client/TruckDash-windows.zip
+            client/SHA256SUMS.txt
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            client/TruckDash-windows.zip
+            client/SHA256SUMS.txt
+          body: |
+            Built automatically by GitHub Actions from this tag (see the "Build client" workflow run for the full log).
+
+            **SHA-256**
+            - `TruckDash-windows.zip`: `${{ env.ZIP_SHA256 }}`
+            - `TruckDash.exe`: `${{ env.EXE_SHA256 }}`
+
+            Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". The client is open source, needs no admin rights and only reads the game's telemetry.

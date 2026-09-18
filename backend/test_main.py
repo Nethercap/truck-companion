@@ -369,3 +369,55 @@ def test_version_endpoint_defaults(client, main):
     body = resp.json()
     assert body["latest_client_version"] == main.DEFAULT_CLIENT_VERSION
     assert body["download_url"] == main.CLIENT_DOWNLOAD_URL
+
+
+def test_viewer_receives_session_state_on_connect_and_when_client_connects(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as viewer:
+        first = main.json.loads(viewer.receive_text())
+        assert first == {"type": "session_state", "client_connected": False, "client_status": None}
+
+        with client.websocket_connect(f"/ws/client/{code}") as local_client:
+            connected = main.json.loads(viewer.receive_text())
+            assert connected["type"] == "session_state"
+            assert connected["client_connected"] is True
+
+            local_client.send_text(main.json.dumps({"type": "client_status", "status": "waiting_game", "game": None, "clientVersion": "1.3.0"}))
+            relayed = main.json.loads(viewer.receive_text())
+            assert relayed["type"] == "client_status"
+            assert relayed["status"] == "waiting_game"
+            assert main.sessions[code].last_client_status["status"] == "waiting_game"
+
+        disconnected = main.json.loads(viewer.receive_text())
+        assert disconnected["client_connected"] is False
+        # El ultimo estado se conserva para un viewer que llegue despues
+        assert disconnected["client_status"]["status"] == "waiting_game"
+
+
+def test_cleanup_removes_idle_used_sessions_but_keeps_watched_ones(main):
+    import time
+
+    idle = main.Session("IDLE0000")
+    idle.counted = True
+    idle.last_seen = time.time() - main.IDLE_SESSION_TTL_SECONDS - 1
+    watched = main.Session("WATCH000")
+    watched.counted = True
+    watched.last_seen = time.time() - main.IDLE_SESSION_TTL_SECONDS - 1
+    watched.viewer_ws_list.append(object())
+    recent = main.Session("RECENT00")
+    recent.counted = True
+    recent.last_seen = time.time() - 60
+
+    main.sessions.update({"IDLE0000": idle, "WATCH000": watched, "RECENT00": recent})
+    main.cleanup_expired_sessions()
+
+    assert "IDLE0000" not in main.sessions
+    assert "WATCH000" in main.sessions
+    assert "RECENT00" in main.sessions
+
+
+def test_version_endpoint_exposes_seeded_sha256(client, main):
+    client.post("/admin/stats/seed", json={"latest_client_version": "1.3.0", "latest_client_sha256": "abc123"}, headers={"X-Admin-Key": "test-admin-key"})
+    body = client.get("/version").json()
+    assert body["latest_client_version"] == "1.3.0"
+    assert body["sha256"] == "abc123"

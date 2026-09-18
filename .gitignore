@@ -3,5 +3,8 @@ __pycache__/
 .venv/
 client/build/
 client/dist/
-client/*.spec
+
 docs/maps/
+client/settings.json
+client/keybinds.json
+client/truckdash.log

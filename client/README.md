@@ -14,10 +14,17 @@ Euro Truck Simulator 2 and American Truck Simulator.
   [trucksim-dash.com](https://trucksim-dash.com).
 - It opens your default browser pointed at the Truck Dash web app, with a
   one-time pairing code so only your own browser session receives your data.
+- On request (Setup window), it copies the SCS Telemetry SDK plugin into the
+  game's `bin\win_x64\plugins\` folder, and reads Steam's library list to
+  find where the game is installed.
+- On request, it presses keys in the game window when you tap a button in
+  the dashboard's button box, using the bindings from your own `controls.sii`.
 
 **It does not**:
 - Read, modify, or access any files on your computer other than the game's
-  telemetry shared memory and its own program files.
+  telemetry shared memory, the game's `controls.sii` (read-only, for the
+  button box), the plugin file it installs on request, and its own settings
+  and log next to the `.exe`.
 - Require administrator privileges.
 - Collect or store any personal information. Telemetry is relayed live and
   is not saved anywhere server-side beyond the current session.
@@ -39,19 +46,37 @@ Download the latest release from the
 unzip it, and run `TruckDash.exe`. No installation, no admin rights, no
 Python required — everything needed is bundled inside.
 
-You'll also need the SCS Telemetry SDK plugin installed once per game. Grab
-it from [RenCloud/scs-sdk-plugin releases](https://github.com/RenCloud/scs-sdk-plugin/releases)
-(check the [plugin's own README](https://github.com/RenCloud/scs-sdk-plugin)
-too) and copy **only the `scs-telemetry.dll` file** — not the whole
-downloaded folder/zip — into your game's install folder, inside
-`bin\win_x64\plugins\` (create that `plugins` folder if it doesn't exist).
-The most common mistake is dropping the `.dll` directly into `bin\win_x64\`
-instead of the `plugins\` subfolder — if the dashboard never shows live data,
-that's the first thing to check. See the main
-[repository README](../README.md) for the full walkthrough with an example
-path.
+On first run a **Setup & status** window opens (you can reopen it any time
+from the tray icon). It finds your ETS2 / ATS install through Steam and
+installs the SCS Telemetry SDK plugin into the game for you with one click
+(`<game>\bin\win_x64\plugins\scs-telemetry.dll`). Restart the game if it
+was open. Non-Steam install? Use "Add game folder..." and pick the game's
+folder.
 
-If it still doesn't work after that, right-click the tray icon and pick
+The same window shows the live status (waiting for the game / in the truck /
+live), your pairing code for the phone, an option to **start Truck Dash with
+Windows** (the dashboard then opens automatically when the game starts), and
+one-click updates when a new version is out.
+
+### Windows SmartScreen ("unrecognized app")
+
+The `.exe` is not code-signed (certificates cost money), so the first time
+Windows may show "Windows protected your PC". Click **More info → Run
+anyway**. Every release is built by GitHub Actions from the tagged source and
+lists the SHA-256 of the files so you can verify what you downloaded — or
+just run it from source (below).
+
+### Manual plugin install
+
+If you'd rather copy the plugin yourself: grab it from
+[RenCloud/scs-sdk-plugin releases](https://github.com/RenCloud/scs-sdk-plugin/releases)
+and copy **only the `Win64\scs-telemetry.dll` file** into your game's install
+folder, inside `bin\win_x64\plugins\` (create that `plugins` folder if it
+doesn't exist). The most common mistake is dropping the `.dll` directly into
+`bin\win_x64\` instead of the `plugins\` subfolder. The client bundles the
+same file (`vendor/scs-telemetry.dll`, MIT licensed).
+
+If the dashboard still shows no data, right-click the tray icon and pick
 **"Show log file (troubleshooting)"** — it'll tell you whether the plugin
 was even detected.
 
