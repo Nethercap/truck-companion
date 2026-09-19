@@ -2162,6 +2162,18 @@ function setNavMode(on) {
   }
   applyNavCamera();
 }
+// En vertical el mini-HUD (velocidad/limite/ruta) baja al rincon inferior
+// derecho del mapa: arriba a la derecha chocaba con el panel de indicaciones
+// de navegacion (reporte con capturas del 19/9). En horizontal vuelve arriba.
+const portraitMq = window.matchMedia('(max-width: 900px) and (orientation: portrait)');
+function placeMiniHud() {
+  const hud = document.getElementById('miniHud');
+  const target = portraitMq.matches ? document.getElementById('bottomRightHud') : document.getElementById('topRightControls');
+  if (hud && hud.parentElement !== target) target.insertBefore(hud, target.firstChild);
+}
+if (portraitMq.addEventListener) portraitMq.addEventListener('change', placeMiniHud); else portraitMq.addListener(placeMiniHud);
+placeMiniHud();
+
 document.getElementById('tilt3dBtn').addEventListener('click', () => {
   nav3d = !nav3d;
   saveSettings();
@@ -3455,6 +3467,10 @@ function mergeEventPulses(older, newer) {
   }
   return out;
 }
+let telemetryFlushNow = null; // set por queueTelemetry: procesa lo pendiente ya mismo
+function flushPendingTelemetry() {
+  if (telemetryFlushNow) telemetryFlushNow();
+}
 function queueTelemetry(data) {
   noteTickArrival();
   if (pendingTelemetry) data.event = mergeEventPulses(pendingTelemetry.event, data.event);
@@ -3475,16 +3491,23 @@ function queueTelemetry(data) {
     pendingTelemetry = null;
     if (d) handleTelemetry(d);
   };
-  rafId = requestAnimationFrame(flush);
-  timerId = setTimeout(flush, TELEMETRY_FLUSH_FALLBACK_MS);
+  telemetryFlushNow = () => { telemetryFlushNow = null; flush(); };
+  rafId = requestAnimationFrame(() => { telemetryFlushNow = null; flush(); });
+  timerId = setTimeout(() => { telemetryFlushNow = null; flush(); }, TELEMETRY_FLUSH_FALLBACK_MS);
 }
 
 function handleTelemetry(data) {
   conn.clientConnected = true;
+  // Si la telemetria vuelve (menu -> camion) hay que redibujar el chip y
+  // sacar la tarjeta "Ya casi" aunque el status ya diga live: el aviso de
+  // status del cliente puede llegar ANTES que el primer tick (el relay los
+  // manda por carriles distintos) y quedaba la tarjeta pegada con el
+  // tablero andando (reporte con capturas del 19/9).
+  const telemetryResumed = !conn.hasTelemetry;
   conn.hasTelemetry = true;
   const pausedChanged = conn.paused !== !!data.paused;
   conn.paused = !!data.paused;
-  if (!conn.clientStatus || conn.clientStatus.status !== 'live' || conn.clientStatus.game !== data.game || pausedChanged) {
+  if (telemetryResumed || !conn.clientStatus || conn.clientStatus.status !== 'live' || conn.clientStatus.game !== data.game || pausedChanged) {
     conn.clientStatus = { status: 'live', game: data.game };
     lastData = data;
     renderConnectionUi();
@@ -3522,6 +3545,7 @@ function connectWs(backend, code, options = {}) {
   socket.onmessage = (event) => {
     hideReconnectBanner();
     const data = JSON.parse(event.data);
+    if (data.type) flushPendingTelemetry(); // los mensajes de control se procesan en orden con la telemetria que llego antes
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
     if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria

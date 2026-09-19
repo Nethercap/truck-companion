@@ -270,9 +270,15 @@
      la derecha (eso dejaba muy poco lugar libre en el medio para el panel
      de indicaciones de navegacion). Misma regla de visibilidad que el
      resto del mini-HUD (panel oculto o pagina de botonera en vertical). */
+  /* Pila abajo a la derecha del mapa: extras y, en vertical, tambien el
+     mini-HUD de velocidad (arriba chocaba con el panel de indicaciones). */
+  .bottomRightHud {
+    position: absolute; bottom: 2.1rem; right: 0.5rem; z-index: 1000;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; pointer-events: none;
+  }
+  .bottomRightHud > * { pointer-events: auto; }
   .miniHudExtra {
     display: none; flex-direction: column; gap: 0.15rem;
-    position: absolute; bottom: 2.1rem; right: 0.5rem; z-index: 1000;
     background: rgba(23, 26, 31, 0.9); border-radius: 8px; padding: 0.4rem 0.6rem;
     font-size: 0.72rem; color: var(--muted); text-align: right;
   }
@@ -436,6 +442,10 @@
   }
 
   @media (max-width: 900px) and (orientation: portrait) {
+    /* Panel de indicaciones entre la columna de botones de la izquierda y
+       los botones de la derecha, con salto de linea, en vez de centrado y
+       sin cortar (se montaba sobre la velocidad). */
+    .navPanel { left: 7.4rem; right: 4rem; transform: none; white-space: normal; font-size: 0.88rem; padding: 0.45rem 0.7rem; }
     .layout { flex-direction: column; }
     .rowWrap { flex-direction: column; }
     #mapPanel { flex: 1 1 auto; min-height: 0; }
