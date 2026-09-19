@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260922b" />
+<link rel="stylesheet" href="app.css?v=20260922c" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -131,6 +131,7 @@
         <div class="convoyCodeRow"><span id="convoyCodeBig" class="convoyCodeBig"></span><button id="convoyCopyBtn" class="settingsLinkBtn" data-i18n="convoyCopyLink">Copy link</button></div>
         <div id="convoyMemberList" class="convoyMemberList"></div>
         <div class="convoyMeta"><span id="convoySpectators"></span></div>
+        <label class="settingsRow"><input type="checkbox" id="convoyShowMarkers"> <span data-i18n="convoyShowMarkers">Show members on the map (arrows and edge chips)</span></label>
         <label class="settingsRow"><input type="checkbox" id="convoyMute"> <span data-i18n="convoyMute">Mute convoy sounds</span></label>
         <div class="convoyActions">
           <button id="convoyLeaveBtn" class="settingsLinkBtn" data-i18n="convoyLeave">Leave convoy</button>
@@ -461,9 +462,9 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260922b"></script>
-<script src="i18n.js?v=20260922b"></script>
-<script src="app.js?v=20260922b"></script>
-<script src="convoy.js?v=20260922b"></script>
+<script src="pure.js?v=20260922c"></script>
+<script src="i18n.js?v=20260922c"></script>
+<script src="app.js?v=20260922c"></script>
+<script src="convoy.js?v=20260922c"></script>
 </body>
 </html>

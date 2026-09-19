@@ -39,11 +39,12 @@ const convoy = {
 let convoyNick = _savedSettings.convoyNick || '';
 let convoyMuted = !!_savedSettings.convoyMuted;
 let convoyShareIncome = !!_savedSettings.convoyShareIncome;
+let convoyShowMarkers = _savedSettings.convoyShowMarkers !== false; // flechas + chapitas de borde de los companeros
 
 function convoySaveSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    Object.assign(raw, { convoyNick, convoyMuted, convoyShareIncome });
+    Object.assign(raw, { convoyNick, convoyMuted, convoyShareIncome, convoyShowMarkers });
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(raw));
   } catch (e) {}
 }
@@ -280,6 +281,11 @@ function convoySameGame(m) {
 
 function convoyRenderMarkers() {
   if (!map || !mapReady || !toLngLat) return;
+  if (!convoyShowMarkers) {
+    for (const [id, entry] of convoy.markers) { entry.marker.remove(); convoy.markers.delete(id); }
+    for (const el of convoy.edges.values()) el.style.display = 'none';
+    return;
+  }
   // Encuadre inicial del espectador: recien cuando el mapa termino de cargar
   // del todo (loadGameMap termina con un jumpTo al origen que pisaria el
   // encuadre si se hiciera antes).
@@ -324,7 +330,7 @@ function convoyVariantLabel(v) {
 // lado en que estan, con apodo y distancia. Se recalcula al mover el mapa.
 function convoyRenderEdgeIndicators() {
   const layer = document.getElementById('convoyEdgeLayer');
-  if (!layer || !map || !toLngLat) return;
+  if (!layer || !map || !toLngLat || !convoyShowMarkers) return;
   const rect = map.getContainer().getBoundingClientRect();
   const W = rect.width, H = rect.height, PAD = 26;
   const seen = new Set();
@@ -449,6 +455,7 @@ function convoyRenderModal() {
   document.getElementById('convoyNick').value = convoyNick;
   document.getElementById('convoyShareIncome').checked = convoyShareIncome;
   document.getElementById('convoyMute').checked = convoyMuted;
+  document.getElementById('convoyShowMarkers').checked = convoyShowMarkers;
   if (!inRoom) return;
   document.getElementById('convoyCodeBig').textContent = convoy.code || '';
   document.getElementById('convoySpectators').textContent = t('convoySpectators').replace('{n}', convoy.spectators);
@@ -480,6 +487,7 @@ function convoyWireUi() {
   $('convoyNick').addEventListener('input', e => { convoyNick = e.target.value.trim().slice(0, 16); convoySaveSettings(); });
   $('convoyShareIncome').addEventListener('change', e => { convoyShareIncome = e.target.checked; convoySaveSettings(); if (convoyInRoom()) convoySend({ type: 'convoy_variant', mapVariant: convoyMyVariant(), shareIncome: convoyShareIncome }); });
   $('convoyMute').addEventListener('change', e => { convoyMuted = e.target.checked; convoySaveSettings(); });
+  $('convoyShowMarkers').addEventListener('change', e => { convoyShowMarkers = e.target.checked; convoySaveSettings(); convoyRenderMarkers(); });
   $('convoyCodeInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6); });
   const start = (kind) => {
     const nickname = ($('convoyNick').value || '').trim();
