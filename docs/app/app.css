@@ -525,7 +525,12 @@
      de waypoint quedaban ocupando espacio aunque estuvieran "ocultas". */
   [hidden] { display: none !important; }
   .row .label { color: var(--muted); }
-  .waypointSubRow { padding-top: 0; padding-left: 0.6rem; font-size: 0.74rem; opacity: 0.8; }
+  /* Filas "via waypoint" bajo los ETA: son una estimacion PROPIA de la app
+     (el juego no conoce el waypoint) - se marcan en ambar, el color de los
+     waypoints en toda la app, para que no se lean como el dato del juego. */
+  .waypointSubRow { padding: 0.1rem 0 0.22rem 0.5rem; margin-left: 0.15rem; font-size: 0.76rem; border-left: 2px dashed #ffb020; border-bottom-style: dashed; }
+  .waypointSubRow .label { color: #ffb020; }
+  .waypointSubRow span:last-child { color: #e8c98a; font-style: italic; }
   .waypointRow { border-bottom: 1px solid #262a31; padding-bottom: 0.2rem; }
   .waypointList { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.15rem 0 0.1rem; }
   .waypointItem { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; }

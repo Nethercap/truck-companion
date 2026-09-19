@@ -53,13 +53,26 @@ function roundTurnDistanceMeters(m) {
   return Math.round(m / 10) * 10;
 }
 
-function formatTurnDistance(m) {
+function formatTurnDistance(m, imperial) {
+  if (imperial) return formatTurnDistanceImperial(m);
   const rounded = roundTurnDistanceMeters(m);
   if (rounded >= 1000) {
     const km = rounded / 1000;
     return `${Number.isInteger(km) ? km : km.toFixed(1)} km`;
   }
   return `${rounded} m`;
+}
+
+// Mismo criterio en millas/pies: >10 mi de a 1 mi, >1 mi de a 0.5, entre
+// 0.2 y 1 mi de a 0.1, y por debajo en pies de a 50. Ej: 9 mi, 2.5 mi,
+// 0.4 mi, 800 ft.
+function formatTurnDistanceImperial(m) {
+  const mi = m / 1609.344;
+  if (mi >= 10) return `${Math.round(mi)} mi`;
+  if (mi >= 1) { const r = Math.round(mi * 2) / 2; return `${Number.isInteger(r) ? r : r.toFixed(1)} mi`; }
+  if (mi >= 0.2) { const r = Math.round(mi * 10) / 10; return `${r >= 1 ? '1' : r.toFixed(1)} mi`; }
+  const ft = Math.round(m * 3.28084 / 50) * 50;
+  return `${ft} ft`;
 }
 
 // Diagnostico de la conexion que muestra la app (chip de la barra, linea de
@@ -228,5 +241,5 @@ function stabilizeManeuver(state, turn, ticks) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver };
+  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver };
 }

@@ -92,7 +92,8 @@ const TRANSLATIONS = {
     waypointModalYes: 'Yes, I set it in-game too',
     waypointModalNo: 'No, just here',
     waypointModalExplain: "If you set it in-game too, the game's own ETA/distance already account for the detour, so we don't touch those numbers — we just draw the route through this point. If not, the game has no idea about this point, so we calculate our own distance/time through it separately (shown as \"with waypoint\" under the ETA rows) — the game's own numbers will keep ignoring the detour.",
-    withWaypoint: '(with waypoint)',
+    withWaypoint: '📍 via waypoint',
+    withWaypointHint: 'Estimated by the app via your waypoint - the game does not know about it',
     jobDeadline: 'Job deadline',
     waypoint: 'Waypoint',
     clear: 'Clear',
@@ -309,7 +310,8 @@ const TRANSLATIONS = {
     waypointModalYes: 'Sí, también lo marqué en el juego',
     waypointModalNo: 'No, solo acá',
     waypointModalExplain: 'Si también lo marcaste en el juego, el ETA/distancia del propio juego ya tienen en cuenta el desvío, así que no tocamos esos números — solo dibujamos la ruta pasando por este punto. Si no, el juego no tiene idea de este punto, así que calculamos nosotros mismos la distancia/tiempo pasando por él por separado (se muestra como "with waypoint" debajo de las filas de ETA) — los números del propio juego van a seguir ignorando el desvío.',
-    withWaypoint: '(con waypoint)',
+    withWaypoint: '📍 vía waypoint',
+    withWaypointHint: 'Estimación propia de la app pasando por tu waypoint: el juego no lo conoce',
     jobDeadline: 'Deadline del trabajo',
     waypoint: 'Waypoint',
     clear: 'Quitar',
@@ -882,6 +884,7 @@ document.querySelectorAll('.colorSwatch').forEach(btn => {
     routeColor = btn.dataset.color;
     document.querySelectorAll('.colorSwatch').forEach(b => b.classList.toggle('selected', b === btn));
     if (map && map.getLayer('route-line')) map.setPaintProperty('route-line', 'line-color', routeColor);
+  if (map && map.getLayer('route-next-line')) map.setPaintProperty('route-next-line', 'line-color', routeColor);
     saveSettings();
   });
 });
@@ -1159,8 +1162,19 @@ function ensureMapInitialized() {
     mapReady = true;
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
+    // La ruta lleva un borde claro debajo: 3 px de rojo oscuro sobre una
+    // autopista naranja de 10 px se veia como una raya en el medio, no como
+    // "la ruta" (un usuario creyo que la app no ruteaba por la autopista).
     map.addSource('route', { type: 'geojson', data: emptyLineString() });
-    map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 0.9 } });
+    map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.55 } });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 3.5, 'line-opacity': 0.95 } });
+    // Tramos DESPUES del primer waypoint (waypoint -> destino del trabajo):
+    // punteados y mas tenues, para que se distingan de "como llego al
+    // waypoint" - si no, la vuelta que hay que dar despues de un area de
+    // descanso parecia una ruta absurda hacia el waypoint.
+    map.addSource('route-next', { type: 'geojson', data: emptyLineString() });
+    map.addLayer({ id: 'route-next-casing', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.3 } });
+    map.addLayer({ id: 'route-next-line', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 0.6, 'line-dasharray': [2, 1.5] } });
     map.addSource('route-ferry', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'route-ferry-line', type: 'line', source: 'route-ferry', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [1.5, 2] } });
     if (pendingGame) { const g = pendingGame; pendingGame = null; loadGameMap(g); }
@@ -1892,13 +1906,26 @@ function resolveRouteTarget(data) {
 // Parte la lista de puntos de la ruta en (a) tramos por tierra y (b) tramos
 // de ferry/tren (puntos marcados con 3er elemento = 1), cada uno como
 // MultiLineString en lng/lat, para pintarlos con estilos distintos.
+// Separa la ruta en: tramo actual (hasta el primer waypoint), tramos
+// siguientes (p[5] > 0: de un waypoint al siguiente / al destino) y ferries.
 function splitRouteForDrawing(routePoints) {
-  const land = [], ferry = [];
+  const land = [], next = [], ferry = [];
   let current = [];
+  let currentLeg = 0;
+  const flush = () => { if (current.length > 1) (currentLeg > 0 ? next : land).push(current); };
   for (let k = 0; k < routePoints.length; k++) {
     const p = routePoints[k];
+    const leg = p[5] != null ? p[5] : currentLeg;
+    if (k > 0 && leg !== currentLeg) {
+      // cambio de tramo: el punto del waypoint cierra el tramo anterior y abre el siguiente
+      current.push(toLngLat(p[0], p[1]));
+      flush();
+      current = [toLngLat(p[0], p[1])];
+      currentLeg = leg;
+      continue;
+    }
     if (k > 0 && p[2] === 1) {
-      if (current.length > 1) land.push(current);
+      flush();
       const prev = routePoints[k - 1];
       ferry.push([toLngLat(prev[0], prev[1]), toLngLat(p[0], p[1])]);
       current = [toLngLat(p[0], p[1])];
@@ -1906,9 +1933,10 @@ function splitRouteForDrawing(routePoints) {
       current.push(toLngLat(p[0], p[1]));
     }
   }
-  if (current.length > 1) land.push(current);
+  flush();
   return {
     land: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: land.map(part => smoothLineCoords(part)) } },
+    next: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: next.map(part => smoothLineCoords(part)) } },
     ferry: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: ferry } },
   };
 }
@@ -1919,7 +1947,7 @@ function updateDestinationMarker(data) {
   if (!target) {
     if (destMarker) { destMarker.remove(); destMarker = null; }
     if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
-  if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
+    if (map.getSource('route-next')) map.getSource('route-next').setData(emptyLineString());
     if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
     currentRouteTarget = null;
     currentRouteWorldPoints = null;
@@ -1962,12 +1990,14 @@ function updateDestinationMarker(data) {
     let routePoints = [];
     let from = [data.position.x, data.position.z];
     let complete = true;
-    for (const to of legs) {
-      const leg = findRoute(from, to);
-      if (leg) routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
-      else { complete = false; routePoints.push(from, to); }
+    legs.forEach((to, legIdx) => {
+      let leg = findRoute(from, to);
+      if (leg) {
+        leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
+        routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
+      } else { complete = false; routePoints.push([from[0], from[1], 0, 0, null, legIdx], [to[0], to[1], 0, 0, null, legIdx]); }
       from = to;
-    }
+    });
     if (!routePoints.length) routePoints = null;
     waypointRouteDistanceKm = (routePoints && waypoints.some(wp => !wp.inGame)) ? (sumPathDistanceMeters(routePoints) * distanceScale()) / 1000 : null;
     currentRouteWorldPoints = routePoints;
@@ -1975,11 +2005,13 @@ function updateDestinationMarker(data) {
       if (routePoints) {
         const parts = splitRouteForDrawing(routePoints);
         map.getSource('route').setData(parts.land);
+        if (map.getSource('route-next')) map.getSource('route-next').setData(parts.next);
         if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(parts.ferry);
       } else {
         // fallback: linea recta si no se encontro ruta
         const lineCoords = [lastDisplayedLngLat, destLngLat].filter(Boolean);
         map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: lineCoords } });
+        if (map.getSource('route-next')) map.getSource('route-next').setData(emptyLineString());
         if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
       }
     }
@@ -2217,7 +2249,7 @@ function updateNavPanel(turn) {
       const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
       ontoText = ` ${preposition} ${turn.nearSign.label}`;
     }
-    panel.innerHTML = `${arrow} ${escapeHtml(dirText)}${escapeHtml(ontoText)} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale())}${nextLine}`;
+    panel.innerHTML = `${arrow} ${escapeHtml(dirText)}${escapeHtml(ontoText)} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial)}${nextLine}`;
   } else if (currentRouteWorldPoints) {
     panel.innerHTML = `⬆ ${t('navStraight')}${nextLine}`;
   } else {
@@ -2267,14 +2299,23 @@ function updateNextCity(x, z) {
   }
 }
 
+// Solo se proyecta sobre los proximos TRIM_WINDOW_M de ruta: en un enlace
+// con puente, la calle transversal (que la ruta recorre 800 m mas adelante,
+// despues del lazo) pasa a 10 m del camion y era "el tramo mas cercano" -
+// la linea saltaba como si ya se hubiera dado la vuelta (reporte de un
+// usuario). El camion avanza < 30 m por tick, asi que la ventana sobra.
+const TRIM_WINDOW_M = 400;
 function trimRouteBehindTruck(x, z) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !map.getSource('route')) return;
   let bestIdx = 0, bestDist = Infinity, bestPoint = null;
+  let along = 0;
   for (let i = 0; i < currentRouteWorldPoints.length - 1; i++) {
     const [ax, az] = currentRouteWorldPoints[i];
     const [bx, bz] = currentRouteWorldPoints[i + 1];
     const dx = bx - ax, dz = bz - az;
     const lenSq = dx * dx + dz * dz;
+    if (along > TRIM_WINDOW_M) break;
+    along += Math.sqrt(lenSq);
     let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
     t = Math.max(0, Math.min(1, t));
     const px = ax + t * dx, pz = az + t * dz;
@@ -2290,9 +2331,12 @@ function trimRouteBehindTruck(x, z) {
   // medicion cambiaba justo al llegar (giros que aparecian/desaparecian).
   for (let k = 1; k <= bestIdx; k++) routeBehind.push(currentRouteWorldPoints[k]);
   if (routeBehind.length > 8) routeBehind.splice(0, routeBehind.length - 8);
-  currentRouteWorldPoints = [bestPoint, ...currentRouteWorldPoints.slice(bestIdx + 1)];
+  // El punto interpolado hereda el tramo del nodo que sigue.
+  const nextPt = currentRouteWorldPoints[bestIdx + 1];
+  currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0], ...currentRouteWorldPoints.slice(bestIdx + 1)];
   const parts = splitRouteForDrawing(currentRouteWorldPoints);
   map.getSource('route').setData(parts.land);
+  if (map.getSource('route-next')) map.getSource('route-next').setData(parts.next);
   if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(parts.ferry);
 }
 

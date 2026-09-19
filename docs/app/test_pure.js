@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver } = require('./pure.js');
+const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver } = require('./pure.js');
 
 test('geoBearingDeg: norte puro es 0deg', () => {
   const bearing = geoBearingDeg(0, 0, 0, 1);
@@ -268,4 +268,15 @@ test('maneuver: en una cadena de nodos, el giro se atribuye al nodo de la esquin
   assert.equal(iEnd, 5);
   const m = detectManeuver({ pts, i: 1, iEnd, cum, pointAt, bearingBetween: planarBearing, nodes: null, adjacency: null });
   assert.deepEqual([m.kind, m.direction, m.at], ['turn', 'right', 5]);
+});
+
+test('formatTurnDistance imperial: millas y pies con escalones tipo GPS', () => {
+  assert.equal(formatTurnDistance(16093, true), '10 mi');
+  assert.equal(formatTurnDistance(4000, true), '2.5 mi');
+  assert.equal(formatTurnDistance(1609, true), '1 mi');
+  assert.equal(formatTurnDistance(650, true), '0.4 mi');
+  assert.equal(formatTurnDistance(240, true), '800 ft');
+  assert.equal(formatTurnDistance(30, true), '100 ft');
+  assert.equal(formatTurnDistance(650, false), '700 m'); // metrico intacto
+  assert.equal(formatTurnDistanceImperial(4000), '2.5 mi');
 });
