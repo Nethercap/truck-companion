@@ -172,6 +172,8 @@ const TRANSLATIONS = {
     cardTrip: 'Trip',
     cardTruck: 'Truck',
     cardSession: 'Session',
+    sessionReset: 'Reset',
+    sessionResetToast: 'Session counters reset (game changed)',
     tabData: 'Data',
     tabGauges: 'Gauges',
     settingsHistoryTitle: 'Trip history (saved on this device only):',
@@ -390,6 +392,8 @@ const TRANSLATIONS = {
     cardTrip: 'Viaje',
     cardTruck: 'Camión',
     cardSession: 'Sesión',
+    sessionReset: 'Reiniciar',
+    sessionResetToast: 'Contadores de sesión reiniciados (cambió el juego)',
     tabData: 'Datos',
     tabGauges: 'Relojes',
     settingsHistoryTitle: 'Historial de viajes (guardado solo en este dispositivo):',
@@ -674,7 +678,7 @@ function moneyLine(amount, game) {
   const gc = gameCurrency(game);
   let text = formatMoney(amount, gc);
   const lc = localCurrency();
-  if (lc && lc !== gc) {
+  if (lc && lc !== gc && amount) {
     const conv = convertMoney(amount, gc, lc);
     if (conv != null) text += ` · ≈ ${formatMoney(conv, lc)}`;
   }
@@ -2865,15 +2869,33 @@ function updateHud(data) {
     alertsRow.style.display = 'none';
   }
 
-  updateSessionEvents(data.event || {});
+  updateSessionEvents(data.event || {}, data.game);
 }
 
 // Peajes/multas/tren-ferry llegan como pulsos (bool + monto en el mismo tick
 // en que ocurre el evento). Se acumulan por sesion detectando el flanco de
 // subida (false -> true) para no sumar el mismo evento en cada tick que el
 // flag siga en true.
-const sessionTotals = { tolls: 0, fines: 0, ferryTrainCount: 0 };
+const sessionTotals = { tolls: 0, fines: 0, ferryTrainCount: 0, game: null };
 const previousEventState = { tollgate: false, fined: false, ferry: false, train: false, jobDelivered: false, jobCancelled: false };
+
+// Los contadores viven en memoria mientras la pagina este abierta: un
+// usuario cerro ETS2, abrio ATS con el celular todavia en la web y seguia
+// viendo la multa de ETS2 (reporte de Discord). Se reinician solos al
+// cambiar de juego y a mano con el boton "Reset" de la tarjeta.
+function resetSessionTotals(game) {
+  sessionTotals.tolls = 0; sessionTotals.fines = 0; sessionTotals.ferryTrainCount = 0;
+  sessionTotals.game = game || null;
+  for (const k of Object.keys(previousEventState)) previousEventState[k] = false;
+  renderSessionTotals();
+}
+function renderSessionTotals() {
+  const game = sessionTotals.game || lastData?.game;
+  document.getElementById('tollsTotal').textContent = moneyLine(sessionTotals.tolls, game);
+  document.getElementById('finesTotal').textContent = moneyLine(sessionTotals.fines, game);
+  document.getElementById('ferryTrainCount').textContent = sessionTotals.ferryTrainCount;
+}
+document.getElementById('sessionResetBtn').addEventListener('click', () => resetSessionTotals(lastData?.game));
 
 function showToast(text, kind = 'success', durationMs = 5000) {
   const container = document.getElementById('toastContainer');
@@ -2888,7 +2910,13 @@ function showToast(text, kind = 'success', durationMs = 5000) {
   }, durationMs);
 }
 
-function updateSessionEvents(event) {
+function updateSessionEvents(event, game) {
+  if (game && sessionTotals.game && game !== sessionTotals.game) {
+    resetSessionTotals(game);
+    showToast(t('sessionResetToast'), 'success', 3000);
+  } else if (game && !sessionTotals.game) {
+    sessionTotals.game = game;
+  }
   if (event.tollgate && !previousEventState.tollgate) sessionTotals.tolls += event.tollgatePayAmount || 0;
   if (event.fined && !previousEventState.fined) sessionTotals.fines += event.fineAmount || 0;
   if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
@@ -2907,9 +2935,7 @@ function updateSessionEvents(event) {
   previousEventState.jobDelivered = !!event.jobDelivered;
   previousEventState.jobCancelled = !!event.jobCancelled;
 
-  document.getElementById('tollsTotal').textContent = `$${sessionTotals.tolls.toLocaleString()}`;
-  document.getElementById('finesTotal').textContent = `$${sessionTotals.fines.toLocaleString()}`;
-  document.getElementById('ferryTrainCount').textContent = sessionTotals.ferryTrainCount;
+  renderSessionTotals();
 }
 
 // Historial de viajes SOLO local (localStorage): el SDK no expone ninguna

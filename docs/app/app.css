@@ -492,6 +492,8 @@
      una lista plana de filas todas iguales. */
   .card { background: #1d2127; border-radius: 10px; padding: 0.45rem 0.6rem 0.35rem; }
   .cardTitle { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.15rem; }
+  .cardTitleRow { display: flex; justify-content: space-between; align-items: center; }
+  .cardTitleRow .waypointClearBtn { text-transform: none; letter-spacing: 0; margin-left: 0; }
   .panelTabs { display: flex; gap: 0.3rem; margin-bottom: 0.2rem; }
   .panelTab { flex: 1; font-size: 0.72rem; padding: 0.25rem; border-radius: 6px; border: 1px solid #333; background: transparent; color: var(--muted); cursor: pointer; }
   .panelTab.active { background: #23262c; color: var(--text); border-color: #444; }
