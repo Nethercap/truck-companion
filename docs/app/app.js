@@ -938,7 +938,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260920', ats_c2c: '20260920', ats_promods: '20260920', ets2: '20260920', ets2_promods: '20260920' };
+const MAP_DATA_VERSION = { ats: '20260921', ats_c2c: '20260921', ats_promods: '20260921', ets2: '20260921', ets2_promods: '20260921' };
 const GAME_MAPS = {
   ats: {
     assetsDir: `${REMOTE_MAP_BASE}/ats`,
