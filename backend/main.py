@@ -391,12 +391,62 @@ def record_job_delivered(job_info: dict):
     notify_discord_job_delivered(job_info)
 
 
+class ViewerOutbox:
+    """Cola de salida de UN viewer (una pestana de la web), con su propia
+    task que hace los send. La telemetria NO se encola: se guarda solo el
+    ultimo tick y se pisa si llega otro antes de que el send anterior
+    termine - un viewer lento (celular con wifi flojo) recibe menos ticks,
+    no ticks viejos. Antes el relay hacia `await viewer.send_text()` dentro
+    del loop que lee al cliente: un solo viewer lento frenaba la lectura,
+    el buffer del servidor crecia y TODOS los viewers de esa sesion veian
+    datos cada vez mas atrasados (minutos, reporte de Discord). Los
+    mensajes de control (keybinds, command_result, client_status) si van
+    en orden y sin perderse."""
+
+    def __init__(self, ws: WebSocket):
+        self.ws = ws
+        self.latest: Optional[str] = None
+        self.control: deque = deque()
+        self.wake = asyncio.Event()
+        self.dropped = 0
+        self.task = asyncio.create_task(self._run())
+
+    def push_telemetry(self, text: str):
+        if self.latest is not None:
+            self.dropped += 1
+        self.latest = text
+        self.wake.set()
+
+    def push_control(self, text: str):
+        self.control.append(text)
+        self.wake.set()
+
+    async def _run(self):
+        try:
+            while True:
+                await self.wake.wait()
+                self.wake.clear()
+                while self.control:
+                    await self.ws.send_text(self.control.popleft())
+                if self.latest is not None:
+                    text, self.latest = self.latest, None
+                    await self.ws.send_text(text)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass  # el viewer se desconecto; ws_viewer lo saca de la sesion
+
+    def close(self):
+        self.task.cancel()
+
+
 class Session:
     def __init__(self, code: str):
         self.code = code
         self.created_at = time.time()
         self.client_ws: Optional[WebSocket] = None
         self.viewer_ws_list: list[WebSocket] = []
+        self.viewer_outboxes: dict[WebSocket, ViewerOutbox] = {}
         self.counted = False  # ya se sumo al contador historico (una vez por sesion, no por reconexion)
         # Flanco para no contar el mismo evento en cada tick que el flag siga
         # en true. None = todavia no vimos ningun tick de este cliente: el
@@ -698,8 +748,8 @@ async def ws_client(websocket: WebSocket, code: str):
                 # primer tick real (con el flag todavia en true desde antes)
                 # parecia una entrega nueva - una por cada redeploy/reconexion.
                 if payload.get("type") or "event" not in payload:
-                    for viewer in list(session.viewer_ws_list):
-                        await _safe_send(viewer, data)
+                    for outbox in list(session.viewer_outboxes.values()):
+                        outbox.push_control(data)
                     continue
                 event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
@@ -754,11 +804,8 @@ async def ws_client(websocket: WebSocket, code: str):
                 session.last_job_delivered = job_delivered
             except Exception:
                 pass
-            for viewer in list(session.viewer_ws_list):
-                try:
-                    await viewer.send_text(data)
-                except Exception:
-                    session.viewer_ws_list.remove(viewer)
+            for outbox in list(session.viewer_outboxes.values()):
+                outbox.push_telemetry(data)
     except WebSocketDisconnect:
         pass
     finally:
@@ -782,6 +829,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
 
     await websocket.accept()
     session.viewer_ws_list.append(websocket)
+    session.viewer_outboxes[websocket] = ViewerOutbox(websocket)
     session.last_seen = time.time()
     await _safe_send(websocket, session_state_message(session))
     try:
@@ -822,4 +870,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
     finally:
         if websocket in session.viewer_ws_list:
             session.viewer_ws_list.remove(websocket)
+        outbox = session.viewer_outboxes.pop(websocket, None)
+        if outbox is not None:
+            outbox.close()
         session.last_seen = time.time()

@@ -3434,8 +3434,52 @@ function updateCommandButtonStates(data) {
 // si estas mirando el dashboard en otra pantalla mientras manejas.
 // Un tick de telemetria (venga del relay, del servidor LAN del cliente o del
 // modo demo): actualiza HUD, mapa, ruta y estado.
-function handleTelemetry(data) {
+// Coalescing de la telemetria: se procesa a lo sumo UN tick por frame de
+// pantalla, siempre el ultimo que llego. Con 10 Hz en LAN (o 4 por la nube)
+// un tablet lento tardaba mas en dibujar un tick que lo que tardaba en
+// llegar el siguiente, la cola del navegador crecia sin techo y a los
+// minutos mostraba velocidad 0 con el camion a 50 (reporte de Discord).
+// Los pulsos de evento (peaje, multa, entrega...) de un tick descartado se
+// arrastran al siguiente para no perderlos.
+let pendingTelemetry = null;
+let telemetryFlushScheduled = false;
+const TELEMETRY_FLUSH_FALLBACK_MS = 120;
+const EVENT_PULSE_KEYS = ['tollgate', 'fined', 'ferry', 'train', 'jobDelivered', 'jobCancelled'];
+function mergeEventPulses(older, newer) {
+  if (!older) return newer;
+  const out = Object.assign({}, newer || {});
+  for (const k of EVENT_PULSE_KEYS) {
+    if (older[k] && !out[k]) {
+      for (const [kk, v] of Object.entries(older)) if (out[kk] === undefined || out[kk] === false || out[kk] === 0) out[kk] = v;
+    }
+  }
+  return out;
+}
+function queueTelemetry(data) {
   noteTickArrival();
+  if (pendingTelemetry) data.event = mergeEventPulses(pendingTelemetry.event, data.event);
+  pendingTelemetry = data;
+  if (telemetryFlushScheduled) return;
+  telemetryFlushScheduled = true;
+  // requestAnimationFrame no corre si la pagina no se esta pintando
+  // (pestana en segundo plano, pantalla apagada - y document.hidden no
+  // siempre lo refleja): se programa ademas un timer de respaldo y gana el
+  // que dispare primero. Asi los contadores/eventos siguen al dia aunque no
+  // haya frames.
+  let rafId = null, timerId = null;
+  const flush = () => {
+    if (rafId != null) cancelAnimationFrame(rafId);
+    if (timerId != null) clearTimeout(timerId);
+    telemetryFlushScheduled = false;
+    const d = pendingTelemetry;
+    pendingTelemetry = null;
+    if (d) handleTelemetry(d);
+  };
+  rafId = requestAnimationFrame(flush);
+  timerId = setTimeout(flush, TELEMETRY_FLUSH_FALLBACK_MS);
+}
+
+function handleTelemetry(data) {
   conn.clientConnected = true;
   conn.hasTelemetry = true;
   const pausedChanged = conn.paused !== !!data.paused;
@@ -3501,7 +3545,7 @@ function connectWs(backend, code, options = {}) {
       checkUpdateBanner(data.clientVersion);
       return;
     }
-    handleTelemetry(data);
+    queueTelemetry(data);
   };
   socket.onclose = (ev) => {
     if (ws !== socket) return; // reemplazado por una conexion mas nueva, ignorar

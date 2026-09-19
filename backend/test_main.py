@@ -574,3 +574,35 @@ def test_is_valid_currency(main):
     assert not main.is_valid_currency("EURO")
     assert not main.is_valid_currency("12$")
     assert not main.is_valid_currency(None)
+
+
+def test_viewer_outbox_coalesces_telemetry_but_keeps_control_in_order(main):
+    import asyncio
+
+    class SlowWs:
+        def __init__(self):
+            self.sent = []
+
+        async def send_text(self, text):
+            self.sent.append(text)
+            await asyncio.sleep(0.05)  # viewer lento
+
+    async def scenario():
+        ws = SlowWs()
+        ob = main.ViewerOutbox(ws)
+        for i in range(6):
+            ob.push_telemetry(f"t{i}")
+            await asyncio.sleep(0.005)  # llegan mucho mas rapido de lo que el viewer consume
+        ob.push_control("c1")
+        ob.push_control("c2")
+        ob.push_telemetry("t6")
+        await asyncio.sleep(0.4)
+        ob.close()
+        return ws.sent, ob.dropped
+
+    sent, dropped = asyncio.run(scenario())
+    assert sent[0] == "t0"                      # el primero sale enseguida
+    assert "t6" in sent and sent[-1] == "t6"    # el ultimo siempre llega
+    assert dropped >= 3                          # los del medio se pisaron
+    assert [m for m in sent if m.startswith("c")] == ["c1", "c2"]  # control: todos y en orden
+    assert len(sent) < 9

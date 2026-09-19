@@ -127,10 +127,49 @@ def _refresh_file(rel: str, local_path: str) -> bool:
         return False
 
 
+
+class _ViewerOutbox:
+    """Cola de salida de un viewer LAN: la telemetria se pisa (solo el ultimo
+    tick), los mensajes de estado se encolan y no se pierden."""
+
+    def __init__(self, ws, on_dead):
+        self.ws = ws
+        self.on_dead = on_dead
+        self.latest = None
+        self.control = []
+        self.wake = asyncio.Event()
+        self.task = asyncio.create_task(self._run())
+
+    def push(self, text, must_deliver=False):
+        if must_deliver:
+            self.control.append(text)
+        else:
+            self.latest = text
+        self.wake.set()
+
+    async def _run(self):
+        try:
+            while True:
+                await self.wake.wait()
+                self.wake.clear()
+                while self.control:
+                    await self.ws.send(self.control.pop(0))
+                if self.latest is not None:
+                    text, self.latest = self.latest, None
+                    await self.ws.send(text)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            self.on_dead()
+
+    def close(self):
+        self.task.cancel()
+
 class LocalServer:
     def __init__(self, keybinds: dict):
         self.keybinds = keybinds
         self.viewers: set = set()
+        self._outboxes: dict = {}
         self.last_status_message: str | None = None
         self.http_server: http.server.ThreadingHTTPServer | None = None
         self.ws_server = None
@@ -167,17 +206,32 @@ class LocalServer:
             pass
         finally:
             self.viewers.discard(ws)
+            ob = self._outboxes.pop(ws, None)
+            if ob is not None:
+                ob.close()
 
     async def broadcast(self, text: str, is_status: bool = False):
+        """Manda a todos los viewers LAN sin esperar a ninguno: cada viewer
+        tiene su propia task de envio y la telemetria se pisa (solo importa el
+        ultimo tick). Antes el loop de telemetria esperaba el send de cada
+        viewer en orden: un tablet lento en el wifi frenaba el loop entero
+        (incluido el envio a la nube) y la web se quedaba minutos atras."""
         if is_status:
             self.last_status_message = text
         if not self.viewers:
             return
-        dead = []
         for viewer in list(self.viewers):
-            try:
-                await viewer.send(text)
-            except Exception:
-                dead.append(viewer)
-        for viewer in dead:
-            self.viewers.discard(viewer)
+            self._outbox(viewer).push(text, must_deliver=is_status)
+
+    def _outbox(self, viewer):
+        ob = self._outboxes.get(viewer)
+        if ob is None:
+            ob = _ViewerOutbox(viewer, on_dead=lambda v=viewer: self._drop_viewer(v))
+            self._outboxes[viewer] = ob
+        return ob
+
+    def _drop_viewer(self, viewer):
+        self.viewers.discard(viewer)
+        ob = self._outboxes.pop(viewer, None)
+        if ob is not None:
+            ob.close()
