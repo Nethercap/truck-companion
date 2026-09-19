@@ -280,7 +280,12 @@ function convoySameGame(m) {
 
 function convoyRenderMarkers() {
   if (!map || !mapReady || !toLngLat) return;
-  if (convoy.needFit && convoy.members.some(m => m.x != null)) { convoy.needFit = false; convoyFitMembers(); }
+  // Encuadre inicial del espectador: recien cuando el mapa termino de cargar
+  // del todo (loadGameMap termina con un jumpTo al origen que pisaria el
+  // encuadre si se hiciera antes).
+  const loadingEl = document.getElementById('mapLoading');
+  const settled = !!currentGame && (!loadingEl || loadingEl.style.display === 'none');
+  if (convoy.needFit && settled && convoy.members.some(m => m.x != null)) { convoy.needFit = false; convoyFitMembers(); }
   const seen = new Set();
   const myVariant = convoy.spectator ? null : convoyMyVariant();
   for (const m of convoy.members) {
@@ -339,7 +344,9 @@ function convoyRenderEdgeIndicators() {
     }
     const cx = W / 2, cy = H / 2;
     const dx = p.x - cx, dy = p.y - cy;
-    const sx = (W / 2 - PAD) / Math.abs(dx || 1e-6), sy = (H / 2 - PAD) / Math.abs(dy || 1e-6);
+    // abajo hay mas margen: ahi van el nombre del mapa y el mini-HUD
+    const padY = dy > 0 ? PAD + 22 : PAD;
+    const sx = (W / 2 - PAD) / Math.abs(dx || 1e-6), sy = (H / 2 - padY) / Math.abs(dy || 1e-6);
     const k = Math.min(sx, sy);
     const ex = cx + dx * k, ey = cy + dy * k;
     const dist = convoy.spectator ? null : convoyDistanceTo(m);
@@ -542,7 +549,8 @@ function convoyStartSpectator(code, backend) {
         convoy.spectatorGame = ref.game;
         // loadGameMap termina con un jumpTo al origen del mapa: el encuadre
         // sobre los miembros va despues de eso.
-        loadGameMap(ref.variant || ref.game).then(() => { convoy.needFit = true; convoyRenderMarkers(); });
+        convoy.needFit = true;
+        loadGameMap(ref.variant || ref.game);
       }
       convoyRenderAll();
       return;
