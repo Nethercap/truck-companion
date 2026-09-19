@@ -73,6 +73,7 @@ const TRANSLATIONS = {
     cmdCamera: 'Camera',
     cmdCruise: 'Cruise',
     cmdLights: 'Lights',
+    cmdHighBeam: 'High beams',
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Lift axle',
     cmdWipers: 'Wipers',
@@ -293,6 +294,7 @@ const TRANSLATIONS = {
     cmdCamera: 'Cámara',
     cmdCruise: 'Crucero',
     cmdLights: 'Luces',
+    cmdHighBeam: 'Luces altas',
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Eje elevable',
     cmdWipers: 'Limpia­parabrisas', // guion suave: corta en dos lineas solo si no entra en el boton
@@ -3454,6 +3456,7 @@ function updateCommandButtonStates(data) {
   // parking/bajas), asi que se resalta cuando hay CUALQUIER luz delantera
   // encendida, no un estado exacto que matchee el ciclo.
   document.getElementById('cmdLights').classList.toggle('active', !!(data.lights?.beamLow || data.lights?.beamHigh));
+  document.getElementById('cmdHighBeam').classList.toggle('active', !!data.lights?.beamHigh);
 }
 
 // Conecta (o reconecta) el websocket del viewer. Se llama tanto al apretar
