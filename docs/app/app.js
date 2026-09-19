@@ -942,7 +942,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260921', ats_c2c: '20260921', ats_promods: '20260921', ets2: '20260921', ets2_promods: '20260921' };
+const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921b', ats_promods: '20260921b', ets2: '20260921b', ets2_promods: '20260921b' };
 const GAME_MAPS = {
   ats: {
     assetsDir: `${REMOTE_MAP_BASE}/ats`,
@@ -1683,9 +1683,9 @@ async function loadRouteGraph(mapInfo) {
     // sin importar el sentido): >= 3 es una interseccion real, que es donde
     // tiene sentido anunciar un giro.
     const neighborSets = new Map();
-    const link = (from, to, w, wt) => {
+    const link = (from, to, w, wt, mid) => {
       if (!adjacency.has(from)) adjacency.set(from, []);
-      adjacency.get(from).push([to, w, wt]);
+      adjacency.get(from).push([to, w, wt, mid]);
       if (!neighborSets.has(from)) neighborSets.set(from, new Set());
       neighborSets.get(from).add(to);
       if (!neighborSets.has(to)) neighborSets.set(to, new Set());
@@ -1694,11 +1694,14 @@ async function loadRouteGraph(mapInfo) {
     // Aristas [a, b, metros, flags, segundos]: "segundos" es el tiempo tipico
     // de camion segun el tipo de via (autopista 90, ruta 60, cruce 40...). Con
     // grafos viejos sin ese campo se estima a 60 km/h.
-    for (const [a, b, w, flags, wt] of data.edges) {
+    // 6to elemento opcional: puntos intermedios de la curva real del tramo
+    // (Hermite, como dibuja el juego), para que la ruta siga la calzada en
+    // las curvas. Para el sentido inverso se recorren al reves.
+    for (const [a, b, w, flags, wt, mid] of data.edges) {
       const f = flags || 0;
       const t = wt != null ? wt : w / (60 / 3.6);
-      link(a, b, w, t);
-      if (!(f & 2)) link(b, a, w, t);
+      link(a, b, w, t, mid || null);
+      if (!(f & 2)) link(b, a, w, t, mid ? mid.slice().reverse() : null);
       if (f & 1) { ferryEdges.add(`${a}|${b}`); ferryEdges.add(`${b}|${a}`); }
     }
     const degree = new Uint8Array(data.nodes.length);
@@ -1869,12 +1872,25 @@ function findRoute(startXY, endXY) {
   // el unico lugar donde se anuncia un giro.
   // El 5to elemento es el indice del nodo en el grafo: lo usa la deteccion
   // de bifurcaciones (detectManeuver) para mirar que otras salidas hay.
-  return path.map((i, k) => [
-    nodes[i][0], nodes[i][1],
-    (k > 0 && routeGraph.ferryEdges.has(`${path[k - 1]}|${i}`)) ? 1 : 0,
-    routeGraph.degree[i] >= 3 ? 1 : 0,
-    i,
-  ]);
+  // Entre nodo y nodo se intercalan los puntos de la curva real del tramo
+  // (si la arista los trae): no son cruces (junction 0) ni nodos (indice
+  // null), solo geometria para dibujar/proyectar/medir rumbos.
+  const out = [];
+  for (let k = 0; k < path.length; k++) {
+    const i = path[k];
+    if (k > 0) {
+      const prev = path[k - 1];
+      const edge = (adjacency.get(prev) || []).find(e => e[0] === i);
+      if (edge && edge[3]) for (const [mx, my] of edge[3]) out.push([mx, my, 0, 0, null]);
+    }
+    out.push([
+      nodes[i][0], nodes[i][1],
+      (k > 0 && routeGraph.ferryEdges.has(`${path[k - 1]}|${i}`)) ? 1 : 0,
+      routeGraph.degree[i] >= 3 ? 1 : 0,
+      i,
+    ]);
+  }
+  return out;
 }
 
 // Objetivo de la ruta, en orden de preferencia: la empresa de carga (si hay

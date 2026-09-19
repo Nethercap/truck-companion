@@ -179,8 +179,13 @@ function detectManeuver(ctx) {
   if (!adjacency || !nodes) return null;
   const routeDelta = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkLegM)) - inBearing);
   if (Math.abs(routeDelta) < forkMinDev) return null;
+  // Nodos propios de la ruta (no cuentan como "otra salida"): los del cruce
+  // y el nodo real anterior/siguiente - saltando puntos intermedios de la
+  // geometria de la curva, que no tienen indice de nodo.
   const onRoute = new Set();
-  for (let k = Math.max(0, i - 1); k <= Math.min(pts.length - 1, iEnd + 1); k++) if (pts[k][4] != null) onRoute.add(pts[k][4]);
+  for (let k = i; k <= iEnd; k++) if (pts[k][4] != null) onRoute.add(pts[k][4]);
+  for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
+  for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
   let bestAlt = null;
   for (let k = i; k <= iEnd; k++) {
     const idx = pts[k][4];
