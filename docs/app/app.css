@@ -585,3 +585,51 @@
   .statLine .statDanger { color: var(--danger); }
   .settingsSelect { width: 100%; max-width: 100%; }
   .settingsHint { font-size: 0.78rem; color: #8a8a8a; margin: 0.3rem 0 0; }
+
+  /* ---- Convoy (beta) ---- */
+  .betaTag { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; background: #ffb020; color: #1a1002; border-radius: 4px; padding: 1px 5px; vertical-align: middle; }
+  #convoyBtn.active { background: var(--accent); color: #fff; }
+  #convoyBtn .mapBtnBadge { top: -4px; right: -4px; }
+  .convoyInput { background: #15181d; border: 1px solid #444; color: var(--text); border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.9rem; flex: 1; min-width: 0; }
+  .convoyInput.code { text-transform: uppercase; letter-spacing: 0.2em; font-weight: 800; font-family: ui-monospace, monospace; }
+  .convoyJoinRow { display: flex; gap: 0.4rem; align-items: center; }
+  .convoyCodeRow { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin: 0.3rem 0 0.6rem; }
+  .convoyCodeBig { font-family: ui-monospace, monospace; font-size: 1.6rem; font-weight: 800; letter-spacing: 0.25em; }
+  .convoyMemberList { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.4rem 0; }
+  .convoyMemberRow { display: flex; align-items: center; gap: 0.45rem; font-size: 0.86rem; }
+  .convoyMemberRow .convoyStatus { margin-left: auto; color: var(--muted); font-size: 0.76rem; }
+  .convoyDot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .convoyName { font-weight: 700; }
+  .convoyTag { font-size: 0.64rem; font-weight: 700; border: 1px solid #555; color: var(--muted); border-radius: 4px; padding: 0 4px; margin-left: 0.3rem; }
+  .convoyTag.leader { border-color: #ffb020; color: #ffb020; }
+  .convoyMeta { font-size: 0.78rem; color: var(--muted); margin: 0.2rem 0; }
+  .convoyActions { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+  .settingsLinkBtn.danger { border-color: #7a2d2d; color: #ff8080; }
+  .convoyCards .convoyDots { font-size: 0.55rem; letter-spacing: 0.15em; color: var(--muted); }
+  .convoyCardsScroll { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 0.5rem; padding-bottom: 0.2rem; }
+  .convoyCard { flex: 0 0 100%; scroll-snap-align: start; }
+  .convoyCardHead { display: flex; align-items: center; gap: 0.4rem; border-left: 3px solid; padding-left: 0.4rem; margin-bottom: 0.25rem; font-size: 0.9rem; }
+  .convoyCardHead .convoyStatus { margin-left: auto; color: var(--muted); font-size: 0.74rem; text-align: right; }
+  .convoyNote { font-size: 0.8rem; color: #ffd740; margin: 0.15rem 0 0.25rem; }
+  .convoyCardActions { display: flex; gap: 0.4rem; margin-top: 0.35rem; }
+  .convoyCardActions .waypointClearBtn { margin-left: 0; }
+  /* marcadores de companeros */
+  .convoyMarker { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+  .convoyMarker .convoyArrow { filter: drop-shadow(0 0 2px #000); transform-origin: 50% 50%; }
+  .convoyMarker .convoyLabel { font-size: 0.68rem; font-weight: 700; color: #fff; background: rgba(0,0,0,0.6); padding: 1px 5px; border-radius: 4px; white-space: nowrap; margin-top: -2px; }
+  .convoyMarker .convoyLabel small { font-weight: 500; opacity: 0.8; }
+  .convoyMarker.dim { opacity: 0.55; }
+  .convoyMarker.paused .convoyArrow { opacity: 0.5; }
+  .convoyEdgeLayer { position: absolute; inset: 0; pointer-events: none; z-index: 1050; overflow: hidden; }
+  .convoyEdge { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; background: rgba(23, 26, 31, 0.92); border: 2px solid; border-radius: 999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; color: #fff; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  .convoyEdgeArrow { display: inline-block; }
+  #convoyMsgBtn { top: 13.8rem; left: 0.6rem; font-size: 1.2rem; }
+  @media (max-width: 900px) and (orientation: portrait) { #convoyMsgBtn { top: 13.8rem; } }
+  .convoyMsgPop { position: absolute; top: 13.8rem; left: 3.9rem; z-index: 1300; background: rgba(23, 26, 31, 0.96); border: 1px solid #333; border-radius: 10px; padding: 0.4rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; width: 15rem; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .convoyQuickBtn { display: flex; align-items: center; gap: 0.4rem; background: #23262c; border: 1px solid #3a3d44; color: var(--text); border-radius: 8px; padding: 0.45rem 0.5rem; font-size: 0.78rem; cursor: pointer; text-align: left; }
+  .convoyQuickBtn:hover { border-color: #666; }
+  /* espectador: sin datos propios ni botonera */
+  body.spectator .speedRow, body.spectator #jobIncome, body.spectator .card:not(.convoyCards), body.spectator #commandsPanel, body.spectator #commandsDrawer, body.spectator #miniHud, body.spectator #convoyMsgBtn { display: none !important; }
+  body.spectator #convoyCards { display: block !important; }
+  body.spectator .truckMarker { display: none; }
+  body.spectator .layout { --spectator: 1; }

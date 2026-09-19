@@ -13,8 +13,11 @@ mientras dure la sesion del proceso. No se persiste nada en DB todavia.
 import asyncio
 import json
 import logging
+import math
 import os
 import random
+import re
+import secrets
 import string
 import threading
 import time
@@ -87,6 +90,8 @@ ADMIN_KEY = os.environ.get("ADMIN_KEY")
 # Railway, igual patron que SENTRY_DSN. Se crea en el canal de Discord via
 # Integraciones -> Webhooks -> Copiar URL.
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+# Webhook aparte para los resumenes de convoy (opt-in del creador). Sin la env var no se postea nada.
+DISCORD_CONVOY_WEBHOOK_URL = os.environ.get("DISCORD_CONVOY_WEBHOOK_URL")
 R2_ENDPOINT = os.environ.get("R2_ENDPOINT")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
@@ -433,8 +438,10 @@ class ViewerOutbox:
                     await self.ws.send_text(text)
         except asyncio.CancelledError:
             pass
-        except Exception:
-            pass  # el viewer se desconecto; ws_viewer lo saca de la sesion
+        except Exception as exc:
+            # Normalmente el viewer se desconecto (ws_viewer lo saca de la
+            # sesion); se loguea en debug por si es otra cosa.
+            logging.debug("viewer outbox ended: %r", exc)
 
     def close(self):
         self.task.cancel()
@@ -480,6 +487,13 @@ class Session:
         # el post de entrega en Discord muestre el pago tambien en esa. None
         # = no la mando / la apago en Ajustes.
         self.viewer_currency: Optional[str] = None
+        # Id publico (para "otros jugadores" y convoy): NUNCA se manda el
+        # codigo de pairing a otros viewers - con el codigo se puede conectar
+        # a la sesion y mandarle comandos al camion.
+        self.public_id = secrets.token_hex(4)
+        # Ultimo resumen de telemetria (subconjunto chico) para el convoy.
+        self.last_summary: Optional[dict] = None
+        self.convoy_code: Optional[str] = None
         self.last_seen = time.time()
 
 
@@ -521,7 +535,7 @@ def broadcast_live_positions():
         if not session.viewer_ws_list:
             continue
         peers = [
-            {"id": s.code, "x": s.last_position["x"], "z": s.last_position["z"]}
+            {"id": s.public_id, "x": s.last_position["x"], "z": s.last_position["z"]}
             for s in by_variant[session.map_variant]
             if s.code != session.code
         ]
@@ -540,6 +554,7 @@ async def _safe_send(ws: WebSocket, message: str):
 @app.on_event("startup")
 async def start_background_tasks():
     asyncio.create_task(broadcast_live_positions_loop())
+    asyncio.create_task(convoy_tick_loop())
 
 
 CODE_ALPHABET = string.ascii_uppercase + string.digits
@@ -590,6 +605,380 @@ async def broadcast_session_state(session: "Session"):
     message = session_state_message(session)
     for viewer in list(session.viewer_ws_list):
         await _safe_send(viewer, message)
+
+
+# ===========================================================================
+# Modo convoy (beta): varios jugadores (cada uno con su cliente y su juego)
+# comparten un codigo y se ven entre si en el mapa + carrusel; cualquiera con
+# el link mira de espectador sin juego. Salas en memoria como las sesiones:
+# nada se persiste, la sala muere a los CONVOY_EMPTY_TTL_SECONDS vacia.
+# Identidad: el miembro es la SESION de pairing (asi sobrevive a que la
+# pestana se reconecte); hacia afuera solo viaja un id publico.
+# ===========================================================================
+CONVOY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # sin I ni O (se confunden con 1 y 0)
+CONVOY_CODE_LEN = 6
+CONVOY_MAX_DRIVERS = 16
+CONVOY_MAX_SPECTATORS = 20
+CONVOY_EMPTY_TTL_SECONDS = 10 * 60
+CONVOY_TICK_SECONDS = 1.0
+CONVOY_MEMBER_STALE_SECONDS = 20
+CONVOY_ROUTE_MAX_POINTS = 600
+CONVOY_MSG_MIN_INTERVAL = 5.0
+CONVOY_QUICK_MESSAGES = ("ok", "stop_next", "fuel", "behind", "wait", "go")
+CONVOY_COLORS = 12
+NICKNAME_RE = re.compile(r"^[\w \-]{2,16}$", re.UNICODE)
+GAME_DISTANCE_SCALE = {"ats": 20.0, "ets2": 19.0}
+
+
+def summarize_for_convoy(payload: dict, prev: Optional[dict], now: float) -> dict:
+    """Subconjunto chico de la telemetria que ven los companeros (1 Hz, no
+    los 4 Hz completos). El rumbo se calcula aca por diferencia de posicion
+    (>= 4 m) porque el cliente no lo manda."""
+    pos = payload.get("position") or {}
+    x, z = pos.get("x"), pos.get("z")
+    heading = prev.get("heading") if prev else None
+    if prev and x is not None and prev.get("x") is not None:
+        dx, dz = x - prev["x"], z - prev["z"]
+        if dx * dx + dz * dz >= 16:
+            heading = (math.degrees(math.atan2(dx, -dz)) + 360) % 360
+    fuel_pct = None
+    if payload.get("fuel") is not None and payload.get("fuelCapacity"):
+        fuel_pct = max(0, min(100, round(100 * payload["fuel"] / payload["fuelCapacity"])))
+    return {
+        "x": x, "z": z, "heading": heading, "ts": now,
+        "game": payload.get("game"), "paused": bool(payload.get("paused")),
+        "speedKmh": payload.get("speedKmh"),
+        "cargo": payload.get("cargo"), "cargoMassKg": payload.get("cargoMassKg"),
+        "citySrc": payload.get("citySrc"), "cityDst": payload.get("cityDst"),
+        "etaSeconds": payload.get("routeTimeSeconds"), "distanceKm": payload.get("routeDistanceKm"),
+        "fuelPct": fuel_pct,
+        "restMin": payload.get("restStopMinutes") if payload.get("restStopMinutes") is not None else payload.get("restStopSeconds"),
+        "truck": " ".join(filter(None, [payload.get("truckBrand"), payload.get("truckName")])) or None,
+        "jobIncome": payload.get("jobIncome"),
+    }
+
+
+class ConvoyMember:
+    def __init__(self, session: "Session", nickname: str, color: int):
+        self.session = session
+        self.id = secrets.token_hex(3)
+        self.nickname = nickname
+        self.color = color
+        self.joined_at = time.time()
+        self.variant: Optional[str] = None      # ats, ats_promods, ets2... (lo manda la web)
+        self.route: Optional[list] = None       # [[x, z], ...] ruta calculada por SU web
+        self.route_rev = 0
+        self.msg: Optional[dict] = None         # {"key", "ts"}
+        self.last_msg_at = 0.0
+        self.share_income = False
+        self.km = 0.0                           # km "mostrados" recorridos dentro del convoy
+        self._last_pos: Optional[tuple] = None
+
+
+class Convoy:
+    def __init__(self, code: str, creator: "Session", post_summary: bool):
+        self.code = code
+        self.created_at = time.time()
+        self.creator_session = creator.code
+        self.post_summary = post_summary
+        self.members: dict[str, ConvoyMember] = {}   # session code -> miembro
+        self.spectators: dict[WebSocket, ViewerOutbox] = {}
+        self.banned: set = set()                     # session codes expulsados
+        self.empty_since: Optional[float] = None
+        self.deliveries = 0
+        self.nicknames_seen: list = []
+
+    def member_of(self, session: "Session") -> Optional[ConvoyMember]:
+        return self.members.get(session.code)
+
+    def is_creator(self, session: "Session") -> bool:
+        return session.code == self.creator_session
+
+    def public_members(self, now: float) -> list:
+        out = []
+        for m in self.members.values():
+            s = m.session.last_summary or {}
+            online = m.session.client_ws is not None and s.get("ts") is not None and now - s["ts"] <= CONVOY_MEMBER_STALE_SECONDS
+            item = {
+                "id": m.id, "nickname": m.nickname, "color": m.color,
+                "creator": m.session.code == self.creator_session,
+                "online": online, "variant": m.variant, "routeRev": m.route_rev,
+                "msg": m.msg if m.msg and now - m.msg["ts"] < 60 else None,
+            }
+            if online:
+                item.update({k: s.get(k) for k in ("x", "z", "heading", "game", "paused", "speedKmh", "cargo", "cargoMassKg",
+                                                   "citySrc", "cityDst", "etaSeconds", "distanceKm", "fuelPct", "restMin", "truck")})
+                if m.share_income:
+                    item["jobIncome"] = s.get("jobIncome")
+            out.append(item)
+        return out
+
+    def state_message(self, for_member: Optional[ConvoyMember], kicked: bool = False) -> dict:
+        now = time.time()
+        return {
+            "type": "convoy_state", "code": self.code,
+            "you": for_member.id if for_member else None, "kicked": kicked,
+            "creatorId": next((m.id for m in self.members.values() if m.session.code == self.creator_session), None),
+            "members": self.public_members(now), "spectators": len(self.spectators),
+            "postSummary": self.post_summary,
+        }
+
+
+convoys: dict[str, Convoy] = {}
+
+
+def new_convoy_code() -> str:
+    for _ in range(50):
+        code = "".join(secrets.choice(CONVOY_CODE_ALPHABET) for _ in range(CONVOY_CODE_LEN))
+        if code not in convoys:
+            return code
+    raise RuntimeError("no free convoy code")
+
+
+def valid_convoy_code(code) -> Optional[str]:
+    if not isinstance(code, str):
+        return None
+    code = code.strip().upper()
+    return code if len(code) == CONVOY_CODE_LEN and all(c in CONVOY_CODE_ALPHABET for c in code) else None
+
+
+def clean_nickname(value) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    value = " ".join(value.strip().split())
+    return value if NICKNAME_RE.match(value) else None
+
+
+def convoy_broadcast(convoy: Convoy, message: Optional[dict] = None):
+    """Manda el estado (o un mensaje puntual) a todos los viewers de todos
+    los miembros y a los espectadores. Va por la cola de control de cada
+    ViewerOutbox: en orden, sin pisarse."""
+    for m in convoy.members.values():
+        text = json.dumps(message if message is not None else convoy.state_message(m))
+        for outbox in list(m.session.viewer_outboxes.values()):
+            outbox.push_control(text)
+    if convoy.spectators:
+        text = json.dumps(message if message is not None else convoy.state_message(None))
+        for outbox in list(convoy.spectators.values()):
+            outbox.push_control(text)
+
+
+def convoy_route_message(m: ConvoyMember) -> dict:
+    return {"type": "convoy_route", "id": m.id, "rev": m.route_rev, "points": m.route or []}
+
+
+def convoy_leave(session: "Session", kicked: bool = False):
+    code = session.convoy_code
+    if not code:
+        return
+    convoy = convoys.get(code)
+    session.convoy_code = None
+    if not convoy:
+        return
+    member = convoy.members.pop(session.code, None)
+    if member is not None:
+        # avisar al que se va (con kicked si corresponde) y al resto
+        text = json.dumps({**convoy.state_message(None, kicked=kicked), "left": True})
+        for outbox in list(session.viewer_outboxes.values()):
+            outbox.push_control(text)
+        convoy_broadcast(convoy, {"type": "convoy_event", "event": "left", "nickname": member.nickname, "id": member.id})
+    if not convoy.members:
+        convoy.empty_since = time.time()
+    convoy_broadcast(convoy)
+
+
+def handle_convoy_message(session: "Session", websocket: WebSocket, msg_type: str, payload: dict) -> Optional[dict]:
+    now = time.time()
+    if msg_type in ("convoy_create", "convoy_join"):
+        nickname = clean_nickname(payload.get("nickname"))
+        if not nickname:
+            return {"type": "convoy_error", "reason": "bad_nickname"}
+        if msg_type == "convoy_create":
+            wanted = valid_convoy_code(payload.get("code"))
+            existing = convoys.get(wanted) if wanted else None
+            if existing is not None and (existing.member_of(session) or existing.is_creator(session)):
+                # La pestana se reconecto y pide "crear" con su codigo de
+                # siempre: la sesion sigue siendo miembro/creadora, es un
+                # re-ingreso, no un convoy nuevo (antes se iba del suyo y se
+                # creaba otro con codigo distinto).
+                code, convoy = wanted, existing
+            else:
+                if session.convoy_code and session.convoy_code in convoys:
+                    convoy_leave(session)
+                # El creador puede pedir el mismo codigo de antes (tras un redeploy) si esta libre.
+                code = wanted if wanted and wanted not in convoys else new_convoy_code()
+                convoy = Convoy(code, session, bool(payload.get("postSummary")))
+                convoys[code] = convoy
+        else:
+            code = valid_convoy_code(payload.get("code"))
+            convoy = convoys.get(code) if code else None
+            if convoy is None:
+                return {"type": "convoy_error", "reason": "not_found"}
+            if session.code in convoy.banned:
+                return {"type": "convoy_error", "reason": "banned"}
+            if session.convoy_code and session.convoy_code != code:
+                convoy_leave(session)
+        member = convoy.member_of(session)
+        if member is None:
+            if len(convoy.members) >= CONVOY_MAX_DRIVERS:
+                return {"type": "convoy_error", "reason": "full"}
+            if any(m.nickname.lower() == nickname.lower() for m in convoy.members.values()):
+                return {"type": "convoy_error", "reason": "nickname_taken"}
+            used = {m.color for m in convoy.members.values()}
+            color = next((c for c in range(CONVOY_COLORS) if c not in used), len(convoy.members) % CONVOY_COLORS)
+            member = ConvoyMember(session, nickname, color)
+            convoy.members[session.code] = member
+            convoy.nicknames_seen.append(nickname)
+            convoy.empty_since = None
+            session.convoy_code = code
+            convoy_broadcast(convoy, {"type": "convoy_event", "event": "joined", "nickname": nickname, "id": member.id})
+        else:
+            member.nickname = nickname  # reconexion de la misma sesion
+        member.variant = payload.get("mapVariant") or member.variant
+        member.share_income = bool(payload.get("shareIncome"))
+        convoy_broadcast(convoy)
+        # rutas de los demas para el que entra
+        for m in convoy.members.values():
+            if m.route:
+                for outbox in list(session.viewer_outboxes.values()):
+                    outbox.push_control(json.dumps(convoy_route_message(m)))
+        return None
+    convoy = convoys.get(session.convoy_code) if session.convoy_code else None
+    if convoy is None:
+        return {"type": "convoy_error", "reason": "not_in_convoy"} if msg_type != "convoy_leave" else None
+    member = convoy.member_of(session)
+    if msg_type == "convoy_leave":
+        convoy_leave(session)
+    elif msg_type == "convoy_close":
+        if convoy.is_creator(session):
+            for m in list(convoy.members.values()):
+                convoy_leave(m.session)
+            finish_convoy(convoy)
+    elif msg_type == "convoy_kick":
+        if convoy.is_creator(session):
+            target = next((m for m in convoy.members.values() if m.id == payload.get("id")), None)
+            if target and target.session.code != session.code:
+                convoy.banned.add(target.session.code)
+                convoy_leave(target.session, kicked=True)
+    elif msg_type == "convoy_variant":
+        if member:
+            member.variant = payload.get("mapVariant") or member.variant
+            member.share_income = bool(payload.get("shareIncome", member.share_income))
+    elif msg_type == "convoy_route":
+        if member:
+            pts = payload.get("points")
+            if isinstance(pts, list) and all(isinstance(q, list) and len(q) == 2 for q in pts[:CONVOY_ROUTE_MAX_POINTS]):
+                member.route = [[round(float(q[0]), 1), round(float(q[1]), 1)] for q in pts[:CONVOY_ROUTE_MAX_POINTS]] or None
+            else:
+                member.route = None
+            member.route_rev += 1
+            convoy_broadcast(convoy, convoy_route_message(member))
+    elif msg_type == "convoy_msg":
+        key = payload.get("key")
+        if member and key in CONVOY_QUICK_MESSAGES and now - member.last_msg_at >= CONVOY_MSG_MIN_INTERVAL:
+            member.last_msg_at = now
+            member.msg = {"key": key, "ts": now}
+            convoy_broadcast(convoy, {"type": "convoy_msg", "id": member.id, "nickname": member.nickname, "key": key})
+    return None
+
+
+def finish_convoy(convoy: Convoy):
+    convoys.pop(convoy.code, None)
+    for outbox in list(convoy.spectators.values()):
+        outbox.push_control(json.dumps({"type": "convoy_state", "code": convoy.code, "you": None, "members": [], "spectators": 0, "ended": True}))
+    if convoy.post_summary:
+        asyncio.create_task(asyncio.to_thread(post_convoy_summary, convoy))
+
+
+def post_convoy_summary(convoy: Convoy):
+    if not DISCORD_CONVOY_WEBHOOK_URL:
+        return
+    try:
+        duration = max(0, time.time() - convoy.created_at)
+        km = sum(m.km for m in convoy.members.values()) + getattr(convoy, "km_left", 0.0)
+        names = ", ".join(dict.fromkeys(convoy.nicknames_seen)) or "-"
+        embed = {
+            "title": f"Convoy {convoy.code}",
+            "color": 0x3B9EFF,
+            "fields": [
+                {"name": "Drivers", "value": names, "inline": False},
+                {"name": "Duration", "value": f"{int(duration // 3600)}h {int(duration % 3600 // 60)}m", "inline": True},
+                {"name": "Distance", "value": f"{round(km):,} km", "inline": True},
+                {"name": "Deliveries", "value": str(convoy.deliveries), "inline": True},
+            ],
+        }
+        req = urllib.request.Request(DISCORD_CONVOY_WEBHOOK_URL, data=json.dumps({"embeds": [embed]}).encode("utf-8"), method="POST",
+                                     headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"})
+        urllib.request.urlopen(req, timeout=10).close()
+    except Exception as exc:
+        logging.warning(f"convoy summary post failed: {exc}")
+
+
+def convoy_tick():
+    now = time.time()
+    for convoy in list(convoys.values()):
+        # km recorridos (sumados por miembro, escala de distancia del juego)
+        for m in convoy.members.values():
+            s = m.session.last_summary
+            if s and s.get("x") is not None:
+                if m._last_pos is not None:
+                    d = math.hypot(s["x"] - m._last_pos[0], s["z"] - m._last_pos[1])
+                    if d < 2000:  # teletransporte / carga de partida: no cuenta
+                        m.km += d * GAME_DISTANCE_SCALE.get(s.get("game"), 20.0) / 1000
+                m._last_pos = (s["x"], s["z"])
+        # miembros cuya sesion murio (cliente cerrado hace mucho) se van solos
+        for code, m in list(convoy.members.items()):
+            if code not in sessions:
+                convoy.km_left = getattr(convoy, "km_left", 0.0) + m.km
+                convoy_leave(m.session)
+        if not convoy.members:
+            if convoy.empty_since is None:
+                convoy.empty_since = now
+            if now - convoy.empty_since > CONVOY_EMPTY_TTL_SECONDS or not convoy.spectators and now - convoy.empty_since > 60:
+                finish_convoy(convoy)
+            continue
+        convoy_broadcast(convoy)
+
+
+async def convoy_tick_loop():
+    while True:
+        await asyncio.sleep(CONVOY_TICK_SECONDS)
+        try:
+            convoy_tick()
+        except Exception:
+            logging.exception("Error en convoy_tick_loop")
+
+
+@app.websocket("/ws/convoy/{code}")
+async def ws_convoy_spectator(websocket: WebSocket, code: str):
+    """Espectador: mira el convoy sin juego ni codigo de pairing. Solo recibe."""
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    if not check_rate_limit(client_ip):
+        await websocket.close(code=4429, reason="demasiados intentos, esperá un minuto")
+        return
+    code = valid_convoy_code(code)
+    convoy = convoys.get(code) if code else None
+    if convoy is None:
+        await websocket.close(code=4404, reason="convoy inexistente o terminado")
+        return
+    if len(convoy.spectators) >= CONVOY_MAX_SPECTATORS:
+        await websocket.close(code=4403, reason="convoy lleno de espectadores")
+        return
+    await websocket.accept()
+    outbox = ViewerOutbox(websocket)
+    convoy.spectators[websocket] = outbox
+    outbox.push_control(json.dumps(convoy.state_message(None)))
+    for m in convoy.members.values():
+        if m.route:
+            outbox.push_control(json.dumps(convoy_route_message(m)))
+    try:
+        while True:
+            await websocket.receive_text()  # no se espera nada del espectador
+    except WebSocketDisconnect:
+        pass
+    finally:
+        convoy.spectators.pop(websocket, None)
+        outbox.close()
 
 
 @app.post("/pair/new")
@@ -760,6 +1149,11 @@ async def ws_client(websocket: WebSocket, code: str):
                 pos = payload.get("position") or {}
                 if pos.get("x") is not None and pos.get("z") is not None:
                     session.last_position = {"x": pos["x"], "z": pos["z"], "ts": now}
+                session.last_summary = summarize_for_convoy(payload, session.last_summary, now)
+                if session.convoy_code and job_delivered and session.last_job_delivered is False:
+                    convoy = convoys.get(session.convoy_code)
+                    if convoy:
+                        convoy.deliveries += 1
                 # Ver comentario en Session.last_job_snapshot - se actualiza en
                 # cada tick que venga con datos validos, sin importar si el
                 # cliente se reinicio en el medio.
@@ -863,8 +1257,12 @@ async def ws_viewer(websocket: WebSocket, code: str):
                 elif msg_type == "set_currency":
                     cur = payload.get("currency")
                     session.viewer_currency = cur.upper() if is_valid_currency(cur) else None
+                elif msg_type and msg_type.startswith("convoy_"):
+                    reply = handle_convoy_message(session, websocket, msg_type, payload)
+                    if reply is not None:
+                        await _safe_send(websocket, json.dumps(reply))
             except Exception:
-                pass
+                logging.exception("viewer message failed")
     except WebSocketDisconnect:
         pass
     finally:

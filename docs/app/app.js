@@ -173,6 +173,60 @@ const TRANSLATIONS = {
     cardTrip: 'Trip',
     cardTruck: 'Truck',
     cardSession: 'Session',
+    convoyTitle: 'Convoy',
+    convoyCardsTitle: 'Convoy',
+    convoyIntro: 'Share a code with friends: everyone sees each other on the map and in a card carousel. Each one runs their own game and client - no need to be in the same session.',
+    convoyNickLabel: 'Nickname',
+    convoyShareIncome: 'Show my job pay to the others',
+    convoyCreateTitle: 'Start a convoy:',
+    convoyPostSummary: 'Post a summary in the Truck Dash Discord when it ends',
+    convoyCreate: 'Create convoy',
+    convoyJoinTitle: 'Join one:',
+    convoyJoin: 'Join',
+    convoyNotConnected: 'Connect your client first (enter your pairing code).',
+    convoyUnavailableLan: 'Convoy needs the cloud link: open trucksim-dash.com/app with your pairing code instead of the LAN address.',
+    convoyUnavailableDemo: 'Not available in the demo.',
+    convoyPrivacyHint: 'Convoy members see your position and trip data while you are in. Nothing is stored when the convoy ends. The buttons always control only your own truck.',
+    convoyCopyLink: 'Copy link',
+    convoyCopied: 'Link copied - paste it in Discord',
+    convoyLeave: 'Leave convoy',
+    convoyCloseConvoy: 'End convoy for everyone',
+    convoyKick: 'Remove',
+    convoySpectators: '👁 {n} watching',
+    convoyMute: 'Mute convoy sounds',
+    convoyFollow: 'Follow leader',
+    convoyUnfollow: 'Stop following',
+    convoyShowRoute: 'Show route',
+    convoyHideRoute: 'Hide route',
+    convoyBehind: '{d} behind',
+    convoyAway: '{d} away',
+    convoyOffline: 'offline',
+    convoyInMenu: 'in the menu',
+    convoyOtherGame: 'in {game}',
+    convoyLeaderTag: 'leader',
+    convoyYou: 'you',
+    convoyJoined: '{n} joined the convoy',
+    convoyLeft: '{n} left the convoy',
+    convoyKicked: 'You were removed from the convoy',
+    convoyEnded: 'The convoy ended',
+    convoyErrNick: 'Nickname: 2-16 letters, numbers, spaces or - _',
+    convoyErrNotFound: 'No convoy with that code (or it ended)',
+    convoyErrBanned: 'You were removed from that convoy',
+    convoyErrFull: 'That convoy is full',
+    convoyErrTaken: 'That nickname is already in the convoy',
+    convoyErrNotIn: 'You are not in a convoy',
+    convoyErrGeneric: 'Convoy error',
+    convoyMsgBtn: 'Quick message to the convoy',
+    convoyMsg_ok: 'All good',
+    convoyMsg_stop_next: 'Stop at next rest area',
+    convoyMsg_fuel: 'Need fuel',
+    convoyMsg_behind: 'Falling behind',
+    convoyMsg_wait: 'Wait for me',
+    convoyMsg_go: "Let's go",
+    chipSpectator: 'Spectator',
+    detailSpectator: 'Watching a convoy - no game needed. Open the app with your pairing code to drive with them.',
+    speed: 'Speed',
+    route: 'Route',
     sessionReset: 'Reset',
     sessionResetToast: 'Session counters reset (game changed)',
     tabData: 'Data',
@@ -394,6 +448,60 @@ const TRANSLATIONS = {
     cardTrip: 'Viaje',
     cardTruck: 'Camión',
     cardSession: 'Sesión',
+    convoyTitle: 'Convoy',
+    convoyCardsTitle: 'Convoy',
+    convoyIntro: 'Compartí un código con amigos: todos se ven en el mapa y en un carrusel de tarjetas. Cada uno con su juego y su cliente, sin estar en la misma sesión.',
+    convoyNickLabel: 'Apodo',
+    convoyShareIncome: 'Mostrar mi pago del trabajo a los demás',
+    convoyCreateTitle: 'Armar un convoy:',
+    convoyPostSummary: 'Publicar un resumen en el Discord de Truck Dash al terminar',
+    convoyCreate: 'Crear convoy',
+    convoyJoinTitle: 'Unirse a uno:',
+    convoyJoin: 'Unirse',
+    convoyNotConnected: 'Primero conectá tu cliente (poné tu código de pairing).',
+    convoyUnavailableLan: 'El convoy necesita la nube: abrí trucksim-dash.com/app con tu código de pairing en vez de la dirección LAN.',
+    convoyUnavailableDemo: 'No disponible en la demo.',
+    convoyPrivacyHint: 'Los del convoy ven tu posición y tus datos de viaje mientras estés adentro. No se guarda nada al terminar. Los botones siempre controlan solo tu camión.',
+    convoyCopyLink: 'Copiar link',
+    convoyCopied: 'Link copiado: pegalo en Discord',
+    convoyLeave: 'Salir del convoy',
+    convoyCloseConvoy: 'Terminar el convoy para todos',
+    convoyKick: 'Expulsar',
+    convoySpectators: '👁 {n} mirando',
+    convoyMute: 'Silenciar sonidos del convoy',
+    convoyFollow: 'Seguir al líder',
+    convoyUnfollow: 'Dejar de seguir',
+    convoyShowRoute: 'Ver ruta',
+    convoyHideRoute: 'Ocultar ruta',
+    convoyBehind: 'vas {d} detrás',
+    convoyAway: 'a {d}',
+    convoyOffline: 'desconectado',
+    convoyInMenu: 'en el menú',
+    convoyOtherGame: 'en {game}',
+    convoyLeaderTag: 'líder',
+    convoyYou: 'vos',
+    convoyJoined: '{n} entró al convoy',
+    convoyLeft: '{n} salió del convoy',
+    convoyKicked: 'Te sacaron del convoy',
+    convoyEnded: 'El convoy terminó',
+    convoyErrNick: 'Apodo: 2 a 16 letras, números, espacios o - _',
+    convoyErrNotFound: 'No hay ningún convoy con ese código (o terminó)',
+    convoyErrBanned: 'Te sacaron de ese convoy',
+    convoyErrFull: 'Ese convoy está lleno',
+    convoyErrTaken: 'Ese apodo ya está en el convoy',
+    convoyErrNotIn: 'No estás en un convoy',
+    convoyErrGeneric: 'Error del convoy',
+    convoyMsgBtn: 'Mensaje rápido al convoy',
+    convoyMsg_ok: 'Todo bien',
+    convoyMsg_stop_next: 'Parada en la próxima área',
+    convoyMsg_fuel: 'Necesito combustible',
+    convoyMsg_behind: 'Me quedo atrás',
+    convoyMsg_wait: 'Espérenme',
+    convoyMsg_go: 'Vamos',
+    chipSpectator: 'Espectador',
+    detailSpectator: 'Mirando un convoy, sin juego. Abrí la app con tu código de pairing para manejar con ellos.',
+    speed: 'Velocidad',
+    route: 'Ruta',
     sessionReset: 'Reiniciar',
     sessionResetToast: 'Contadores de sesión reiniciados (cambió el juego)',
     tabData: 'Datos',
@@ -530,7 +638,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -2038,6 +2146,7 @@ function updateDestinationMarker(data) {
       }
     }
     if (!complete) console.warn('Ruta incompleta: algun tramo no se pudo calcular por el grafo');
+    if (typeof convoyOnRouteChanged === 'function') convoyOnRouteChanged(); // Convoy: los demas ven mi ruta
   }
 }
 
@@ -3148,7 +3257,7 @@ const RECONNECT_DELAY_MS = 3000;
 // (socket abierto o no), lo que dice el backend (hay un cliente local
 // conectado con este codigo?) y el diagnostico que manda el cliente
 // (client_status: waiting_game / plugin_missing / waiting_truck / live).
-const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false };
+const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false, spectator: false };
 
 function connectionView() {
   return connectionViewFor(conn);
@@ -3186,6 +3295,7 @@ function renderConnectionUi() {
   const empty = document.getElementById('emptyState');
   document.body.classList.toggle('connected', !!view);
   document.body.classList.toggle('live', !!(view && view.live));
+  document.body.classList.toggle('spectator', !!conn.spectator);
   if (!view) {
     chip.hidden = true;
     group.style.display = '';
@@ -3200,6 +3310,7 @@ function renderConnectionUi() {
   let chipText = t(view.chip);
   if (view.live && lastData?.game && !conn.demo) chipText += ` · ${lastData.game.toUpperCase()}`;
   if (conn.local) chipText += ' · LAN';
+  if (conn.spectator) chipText += ` · ${document.getElementById('spectatorCode').textContent}`;
   document.getElementById('statusChipText').textContent = chipText;
   // En modo LAN o demo no hay "otro codigo" que poner: el lapiz sale de la sesion.
   document.getElementById('changeCodeBtn').title = conn.demo ? t('exitDemo') : t('changeCode');
@@ -3535,6 +3646,7 @@ function handleTelemetry(data) {
   updateMap(data.position || {}, data.game);
   updateDestinationMarker(data);
   checkUpdateBanner(data.clientVersion);
+  if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
   // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
   if (liveShareEnabled && !conn.local && resolveEffectiveGame(data.game) !== lastSentMapVariant) sendLiveShareState();
@@ -3560,6 +3672,7 @@ function connectWs(backend, code, options = {}) {
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
     sendCurrencyPref(); // idem: la moneda para el post de Discord
     if (keybindsModalOpen) requestKeybinds(); // el pedido anterior se pudo haber perdido en el corte
+    if (typeof convoyOnSocketOpen === 'function') { convoyOnSocketOpen(); convoyRenderModal(); } // Convoy: volver a entrar tras (re)conectar
   };
   socket.onmessage = (event) => {
     hideReconnectBanner();
@@ -3568,6 +3681,7 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
     if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria
+    if (data.type && data.type.startsWith('convoy_')) { if (typeof convoyHandleMessage === 'function') convoyHandleMessage(data); return; } // Convoy (beta)
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;
@@ -3834,6 +3948,17 @@ buildSpeedTicks();
   const backend = params.get('backend');
   if (backend) document.getElementById('backendUrl').value = backend;
   if (params.get('demo')) { startDemo(); return; }
+  const convoyParam = (params.get('convoy') || '').toUpperCase();
+  if (convoyParam && !code && !params.get('local')) {
+    // Link de convoy sin cliente: espectador. Con cliente (?code=...) se
+    // conecta normal y se abre el modal con el codigo puesto.
+    // convoy.js se carga despues de este archivo y arranca el modo
+    // espectador al leer esta variable (un setTimeout puede dispararse antes
+    // de que ese script llegue).
+    window.__convoySpectator = { code: convoyParam, backend: document.getElementById('backendUrl').value.replace('wss://', 'https://').replace('ws://', 'http://') };
+    return;
+  }
+  if (convoyParam) setTimeout(() => convoyOpenModal(convoyParam), 800);
   if (params.get('local')) {
     // Servido por el cliente en la LAN: el WebSocket esta en el mismo host,
     // puerto fijo (ver client/local_server.py).

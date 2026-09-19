@@ -302,7 +302,9 @@ def test_broadcast_live_positions_filters_by_variant_and_excludes_self(main):
         assert len(ws1.sent) == 1
         body = main.json.loads(ws1.sent[0])
         assert body["type"] == "live_players"
-        assert [p["id"] for p in body["players"]] == ["BBBBBBBB"]
+        # id publico, nunca el codigo de pairing (con el codigo se le mandan comandos al camion)
+        assert [p["id"] for p in body["players"]] == [s2.public_id]
+        assert "BBBBBBBB" not in ws1.sent[0]
 
     asyncio.run(run())
 
@@ -606,3 +608,127 @@ def test_viewer_outbox_coalesces_telemetry_but_keeps_control_in_order(main):
     assert dropped >= 3                          # los del medio se pisaron
     assert [m for m in sent if m.startswith("c")] == ["c1", "c2"]  # control: todos y en orden
     assert len(sent) < 9
+
+
+
+# ---- convoy (beta) --------------------------------------------------------
+
+class _ConvoyWs:
+    def __init__(self):
+        self.sent = []
+
+    async def send_text(self, text):
+        import json as _json
+        self.sent.append(_json.loads(text))
+
+
+def _convoy_session(main, code, nick_ws=True):
+    s = main.Session(code)
+    s.client_ws = object()  # "conectado"
+    ws = _ConvoyWs()
+    s.viewer_ws_list = [ws]
+    s.viewer_outboxes[ws] = main.ViewerOutbox(ws)
+    main.sessions[code] = s
+    return s, ws
+
+
+def _drain(main):
+    import asyncio
+    async def run():
+        for _ in range(5):
+            await asyncio.sleep(0.01)
+    asyncio.run(run())
+
+
+def test_convoy_create_join_state_and_leave(main):
+    import asyncio
+
+    async def scenario():
+        main.convoys.clear()
+        a, wa = _convoy_session(main, "AAAAAAAA")
+        b, wb = _convoy_session(main, "BBBBBBBB")
+        a.last_summary = main.summarize_for_convoy({"position": {"x": 0, "z": 0}, "game": "ats", "speedKmh": 80, "cargo": "Beans"}, None, main.time.time())
+        r = main.handle_convoy_message(a, wa, "convoy_create", {"nickname": "Netherman", "mapVariant": "ats", "postSummary": False})
+        assert r is None
+        code = a.convoy_code
+        assert code and len(code) == 6 and code in main.convoys
+        r = main.handle_convoy_message(b, wb, "convoy_join", {"nickname": "Cobra", "code": code.lower(), "mapVariant": "ats_c2c"})
+        assert r is None and b.convoy_code == code
+        await asyncio.sleep(0.05)
+        states = [m for m in wb.sent if m.get("type") == "convoy_state"]
+        assert states, wb.sent
+        st = states[-1]
+        assert st["code"] == code and st["you"] and len(st["members"]) == 2
+        me = next(m for m in st["members"] if m["id"] == st["you"])
+        other = next(m for m in st["members"] if m["id"] != st["you"])
+        assert me["nickname"] == "Cobra" and me["variant"] == "ats_c2c" and not me["creator"]
+        assert other["creator"] and other["online"] and other["speedKmh"] == 80 and other["cargo"] == "Beans"
+        assert "jobIncome" not in other            # pago oculto por defecto
+        assert "AAAAAAAA" not in main.json.dumps(st)  # el codigo de pairing nunca viaja
+        # mensaje rapido + rate limit
+        main.handle_convoy_message(b, wb, "convoy_msg", {"key": "fuel"})
+        main.handle_convoy_message(b, wb, "convoy_msg", {"key": "go"})
+        await asyncio.sleep(0.05)
+        msgs = [m for m in wa.sent if m.get("type") == "convoy_msg"]
+        assert [m["key"] for m in msgs] == ["fuel"]
+        # ruta del lider llega al otro
+        main.handle_convoy_message(a, wa, "convoy_route", {"points": [[0, 0], [10, 10], [20, 25]]})
+        await asyncio.sleep(0.05)
+        routes = [m for m in wb.sent if m.get("type") == "convoy_route"]
+        assert routes and routes[-1]["points"] == [[0, 0], [10, 10], [20, 25]]
+        # expulsar: solo el creador; el expulsado no puede volver
+        main.handle_convoy_message(b, wb, "convoy_kick", {"id": me["id"]})
+        assert b.convoy_code == code
+        main.handle_convoy_message(a, wa, "convoy_kick", {"id": me["id"]})
+        assert b.convoy_code is None
+        r = main.handle_convoy_message(b, wb, "convoy_join", {"nickname": "Cobra", "code": code})
+        assert r == {"type": "convoy_error", "reason": "banned"}
+        await asyncio.sleep(0.05)
+        kicked = [m for m in wb.sent if m.get("type") == "convoy_state" and m.get("kicked")]
+        assert kicked
+        # apodo invalido / codigo inexistente
+        assert main.handle_convoy_message(b, wb, "convoy_join", {"nickname": "<x>", "code": code})["reason"] == "bad_nickname"
+        assert main.handle_convoy_message(b, wb, "convoy_join", {"nickname": "Zed", "code": "ZZZZZZ"})["reason"] == "not_found"
+        # el creador se va: sala vacia, expira
+        main.handle_convoy_message(a, wa, "convoy_leave", {})
+        assert a.convoy_code is None and not main.convoys[code].members
+        main.convoys[code].empty_since = main.time.time() - 10_000
+        main.convoy_tick()
+        assert code not in main.convoys
+
+    asyncio.run(scenario())
+
+
+def test_convoy_summary_heading_and_km(main):
+    import asyncio
+
+    async def scenario():
+        main.convoys.clear()
+        a, wa = _convoy_session(main, "DDDDDDDD")
+        main.handle_convoy_message(a, wa, "convoy_create", {"nickname": "Solo", "mapVariant": "ets2"})
+        t = main.time.time()
+        a.last_summary = main.summarize_for_convoy({"position": {"x": 0, "z": 0}, "game": "ets2"}, None, t)
+        main.convoy_tick()
+        a.last_summary = main.summarize_for_convoy({"position": {"x": 0, "z": -100}, "game": "ets2"}, a.last_summary, t + 1)
+        assert round(a.last_summary["heading"]) == 0  # hacia el norte (z decrece)
+        main.convoy_tick()
+        m = main.convoys[a.convoy_code].members[a.code]
+        assert abs(m.km - 100 * 19 / 1000) < 1e-6  # 100 m crudos = 1.9 km mostrados en ETS2
+
+    asyncio.run(scenario())
+
+
+def test_convoy_create_again_with_own_code_is_a_rejoin(main):
+    import asyncio
+
+    async def scenario():
+        main.convoys.clear()
+        a, wa = _convoy_session(main, "EEEEEEEE")
+        main.handle_convoy_message(a, wa, "convoy_create", {"nickname": "Netherman", "mapVariant": "ats"})
+        code = a.convoy_code
+        # la pestana se reconecta y vuelve a mandar create con el mismo codigo
+        main.handle_convoy_message(a, wa, "convoy_create", {"nickname": "Netherman", "mapVariant": "ats", "code": code})
+        assert a.convoy_code == code and len(main.convoys) == 1
+        assert main.convoys[code].members[a.code].nickname == "Netherman"
+
+    asyncio.run(scenario())

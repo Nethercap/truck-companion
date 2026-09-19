@@ -87,6 +87,7 @@ function formatTurnDistanceImperial(m) {
 function connectionViewFor(conn) {
   if (conn.socket === 'idle') return null;
   if (conn.demo) return { chip: 'chipDemo', cls: 'info', detail: 'detailDemo', empty: null, live: true };
+  if (conn.spectator) return { chip: 'chipSpectator', cls: 'info', detail: 'detailSpectator', empty: null, live: true };
   if (conn.invalidCode) return { chip: 'chipInvalidCode', cls: 'err', detail: 'detailInvalidCode', empty: null };
   if (conn.socket === 'connecting') return { chip: 'chipConnecting', cls: '', detail: null, empty: null };
   if (conn.socket === 'closed') return { chip: 'chipReconnecting', cls: 'err', detail: null, empty: ['emptyReconnectTitle', 'emptyReconnectBody', '📡'] };

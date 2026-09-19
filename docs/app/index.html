@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260921h" />
+<link rel="stylesheet" href="app.css?v=20260922a" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -26,7 +26,7 @@
     </div>
     <div class="statusChip" id="statusChip" hidden>
       <span class="statusDot" id="statusDot"></span>
-      <span id="statusChipText"></span>
+      <span id="statusChipText"></span><span id="spectatorCode" hidden></span>
       <button id="changeCodeBtn" class="chipBtn" data-i18n-title="changeCode" title="Use another code">✎</button>
     </div>
     <div class="topActions">
@@ -43,6 +43,7 @@
       </select>
       <button class="iconBtn secondary" id="modsBtn" data-i18n-title="modsTitle" title="Map mods"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-4v-3a1.5 1.5 0 0 0-3 0v3H7a2 2 0 0 1-2-2v-4h3a1.5 1.5 0 0 0 0-3H5V9a2 2 0 0 1 2-2h4V4a1.5 1.5 0 0 1 3 0v3z"/></svg></button>
       <a class="iconBtn secondary discord" id="discordBtn" href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener" data-i18n-title="joinDiscord" title="Join our Discord"><svg viewBox="0 0 127.14 96.36" width="18" height="18" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.9,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg></a>
+      <button class="iconBtn secondary" id="convoyBtn" data-i18n-title="convoyTitle" title="Convoy (beta)" style="position:relative"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 14h9V8H2zM11 10h4l3 3v1h-7z"/><circle cx="5" cy="16.5" r="1.6"/><circle cx="15" cy="16.5" r="1.6"/><path d="M16 6h6v5h-6"/></svg><span id="convoyBadge" class="mapBtnBadge" style="display:none">0</span></button>
       <button class="iconBtn" id="settingsBtn" data-i18n-title="settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <button class="iconBtn" id="helpBtn" data-i18n-title="replayTour" title="Show quick tour">?</button>
     </div>
@@ -107,6 +108,36 @@
       <button id="reportProblemBtn" class="settingsLinkBtn" data-i18n="reportProblem">Report a problem</button>
 
       <button id="settingsCloseBtn" data-i18n="close">Close</button>
+    </div>
+  </div>
+
+  <div id="convoyModal" class="settingsOverlay" style="display:none;">
+    <div class="settingsPanel">
+      <h3><span data-i18n="convoyTitle">Convoy</span> <span class="betaTag">beta</span></h3>
+      <div id="convoyOut">
+        <p class="settingsHint" data-i18n="convoyIntro">Share a code with friends: everyone sees each other on the map and in a card carousel. Each one runs their own game and client - no need to be in the same session.</p>
+        <label class="settingsRow"><span data-i18n="convoyNickLabel">Nickname</span> <input id="convoyNick" type="text" maxlength="16" class="convoyInput" placeholder="Netherman"></label>
+        <label class="settingsRow"><input type="checkbox" id="convoyShareIncome"> <span data-i18n="convoyShareIncome">Show my job pay to the others</span></label>
+        <p class="settingsSectionTitle" data-i18n="convoyCreateTitle">Start a convoy:</p>
+        <label class="settingsRow"><input type="checkbox" id="convoyPostSummary"> <span data-i18n="convoyPostSummary">Post a summary in the Truck Dash Discord when it ends</span></label>
+        <button id="convoyCreateBtn" class="settingsLinkBtn" data-i18n="convoyCreate">Create convoy</button>
+        <p class="settingsSectionTitle" data-i18n="convoyJoinTitle">Join one:</p>
+        <div class="convoyJoinRow"><input id="convoyCodeInput" type="text" maxlength="6" class="convoyInput code" placeholder="CODE" autocapitalize="characters"><button id="convoyJoinBtn" class="settingsLinkBtn" data-i18n="convoyJoin">Join</button></div>
+        <p class="settingsHint" id="convoyNotConnected" hidden data-i18n="convoyNotConnected">Connect your client first (enter your pairing code).</p>
+        <p class="settingsHint" id="convoyUnavailable" hidden></p>
+        <p class="settingsHint" data-i18n="convoyPrivacyHint">Convoy members see your position and trip data while you are in. Nothing is stored when the convoy ends. The buttons always control only your own truck.</p>
+      </div>
+      <div id="convoyIn" hidden>
+        <div class="convoyCodeRow"><span id="convoyCodeBig" class="convoyCodeBig"></span><button id="convoyCopyBtn" class="settingsLinkBtn" data-i18n="convoyCopyLink">Copy link</button></div>
+        <div id="convoyMemberList" class="convoyMemberList"></div>
+        <div class="convoyMeta"><span id="convoySpectators"></span></div>
+        <label class="settingsRow"><input type="checkbox" id="convoyMute"> <span data-i18n="convoyMute">Mute convoy sounds</span></label>
+        <div class="convoyActions">
+          <button id="convoyLeaveBtn" class="settingsLinkBtn" data-i18n="convoyLeave">Leave convoy</button>
+          <button id="convoyCloseConvoyBtn" class="settingsLinkBtn danger" hidden data-i18n="convoyCloseConvoy">End convoy for everyone</button>
+        </div>
+      </div>
+      <button id="convoyModalClose" data-i18n="close">Close</button>
     </div>
   </div>
 
@@ -181,6 +212,9 @@
    <div class="rowWrap">
     <div id="mapPanel">
       <div id="mapCanvas"></div>
+      <div id="convoyEdgeLayer" class="convoyEdgeLayer"></div>
+      <button id="convoyMsgBtn" class="mapBtn" style="display:none" data-i18n-title="convoyMsgBtn" title="Quick message to the convoy">💬</button>
+      <div id="convoyMsgPop" class="convoyMsgPop" style="display:none"></div>
       <div id="bottomRightHud" class="bottomRightHud">
         <div id="miniHudExtra" class="miniHudExtra"></div>
       </div>
@@ -278,6 +312,11 @@
           </div>
           <div class="row"><span class="label" data-i18n="jobPay">Job pay</span><span id="jobIncome">-</span></div>
         </div>
+      </div>
+
+      <div class="card convoyCards" id="convoyCards" hidden>
+        <div class="cardTitle cardTitleRow"><span><span data-i18n="convoyCardsTitle">Convoy</span> <span class="betaTag">beta</span></span><span id="convoyDots" class="convoyDots"></span></div>
+        <div class="convoyCardsScroll" id="convoyCardsScroll"></div>
       </div>
 
       <div class="card">
@@ -422,8 +461,9 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260921h"></script>
-<script src="i18n.js?v=20260921h"></script>
-<script src="app.js?v=20260921h"></script>
+<script src="pure.js?v=20260922a"></script>
+<script src="i18n.js?v=20260922a"></script>
+<script src="app.js?v=20260922a"></script>
+<script src="convoy.js?v=20260922a"></script>
 </body>
 </html>
