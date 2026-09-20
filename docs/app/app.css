@@ -205,14 +205,23 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
   .mapBtn:hover { background: #eee; }
-  .mapNavigationControls { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .mapLeftControls {
+    position: absolute; top: 0.6rem; left: 0.6rem; z-index: 1000;
+    display: flex; flex-direction: column; gap: 0.5rem;
+    max-height: calc(100% - 1.2rem); overflow-y: auto; scrollbar-width: none;
+  }
+  .mapLeftControls .mapBtn { position: static; flex-shrink: 0; }
+  .mapNavigationControls {
+    position: absolute; top: 50%; right: 0.6rem; transform: translateY(-50%); z-index: 1000;
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  }
   .mapNavigationControls .mapBtn { position: static; flex-shrink: 0; }
   #zoomInBtn, #zoomOutBtn { font-size: 1.6rem; }
   #recenterBtn { top: 0.6rem; left: 0.6rem; }
   #fullscreenBtn { top: 3.9rem; left: 0.6rem; }
   #navToggleBtn { top: 7.2rem; left: 0.6rem; }
   #navToggleBtn.active { background: var(--accent); color: #fff; }
-  /* 3D: al lado del boton de navegacion, solo visible en modo nav */
+  /* 3D is part of the left control stack and appears in navigation mode. */
   #tilt3dBtn { top: 7.2rem; left: 3.9rem; }
   #tilt3dBtn.active { background: var(--accent); color: #fff; }
   #waypointBtn { top: 10.5rem; left: 0.6rem; }
@@ -241,7 +250,6 @@
     #topRightControls #miniHud { grid-column: 1; grid-row: 1 / span 2; }
     #topRightControls #panelToggleBtn { grid-column: 2; grid-row: 1; }
     #topRightControls #poiBtn { grid-column: 2; grid-row: 2; }
-    .layout.panelHidden .navPanel, .layout.commandsPageActive .navPanel { top: 6.8rem; }
   }
 
 
@@ -253,10 +261,11 @@
   .navNext { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 500; margin-top: 0.1rem; }
   .mapBtn .btnText { font-size: 0.72rem; font-weight: 800; }
   .navPanel {
-    position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: 2.1rem; left: 50%; transform: translateX(-50%);
+    max-width: calc(100% - 8rem); box-sizing: border-box; overflow-wrap: anywhere;
     z-index: 1200; background: rgba(23, 26, 31, 0.92); color: #fff;
     padding: 0.5rem 1rem; border-radius: 10px; font-size: 0.95rem;
-    font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
+    font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: normal;
   }
 
   /* Mini-HUD: velocidad/limite/crucero flotando arriba a la derecha del mapa,
@@ -458,7 +467,7 @@
     /* Panel de indicaciones entre la columna de botones de la izquierda y
        los botones de la derecha, con salto de linea, en vez de centrado y
        sin cortar (se montaba sobre la velocidad). */
-    .navPanel { left: 7.4rem; right: 4rem; transform: none; white-space: normal; font-size: 0.88rem; padding: 0.45rem 0.7rem; }
+    .navPanel { left: 4rem; right: 4rem; transform: none; white-space: normal; font-size: 0.88rem; padding: 0.45rem 0.7rem; }
     .layout { flex-direction: column; }
     .rowWrap { flex-direction: column; }
     #mapPanel { flex: 1 1 auto; min-height: 0; }
