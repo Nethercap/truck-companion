@@ -1,0 +1,174 @@
+{
+  "_comment": "Fuente de verdad de los datos de mapa publicados. Se edita a mano al publicar una variante (ver mod-integration-pipeline/README.md en D:/ets2-companion). tools/check_map_mods.py lo lee, consulta las versiones upstream donde se puede y escribe map-mods-status.json; admin.html muestra ambos.",
+  "updated": "2026-09-20",
+  "r2Base": "https://maps.trucksim-dash.com",
+  "variants": {
+    "ats": {
+      "label": "American Truck Simulator",
+      "game": "ats",
+      "gameVersion": "1.61.1",
+      "built": "2026-08-26",
+      "mapDataVersion": "20260921b",
+      "mods": [],
+      "files": [
+        "vector/ats.pmtiles",
+        "ats/route-graph-ats.json",
+        "ats/Cities.json",
+        "ats/road-names.json"
+      ]
+    },
+    "ats_c2c": {
+      "label": "ATS + Coast to Coast",
+      "game": "ats",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-06",
+      "mapDataVersion": "20260921b",
+      "mods": [
+        "c2c"
+      ],
+      "files": [
+        "vector/ats_c2c.pmtiles",
+        "ats_c2c/route-graph-ats_c2c.json",
+        "ats_c2c/Cities.json",
+        "ats_c2c/road-names.json"
+      ]
+    },
+    "ats_promods": {
+      "label": "ATS + ProMods Canada",
+      "game": "ats",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-15",
+      "mapDataVersion": "20260921b",
+      "mods": [
+        "promods_canada"
+      ],
+      "files": [
+        "vector/ats_promods.pmtiles",
+        "ats_promods/route-graph-ats_promods.json",
+        "ats_promods/Cities.json",
+        "ats_promods/road-names.json"
+      ]
+    },
+    "ets2": {
+      "label": "Euro Truck Simulator 2",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "built": "2026-08-27",
+      "mapDataVersion": "20260921b",
+      "mods": [],
+      "files": [
+        "vector/ets2.pmtiles",
+        "ets2/route-graph-ets2.json",
+        "ets2/Cities.json",
+        "ets2/road-names.json"
+      ]
+    },
+    "ets2_promods": {
+      "label": "ETS2 + ProMods Europe (+ Middle East, The Maghreb, The Great Steppe)",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-18",
+      "mapDataVersion": "20260921b",
+      "mods": [
+        "promods",
+        "promods_me",
+        "promods_maghreb",
+        "promods_tgs"
+      ],
+      "files": [
+        "vector/ets2_promods.pmtiles",
+        "ets2_promods/route-graph-ets2_promods.json",
+        "ets2_promods/Cities.json",
+        "ets2_promods/road-names.json"
+      ]
+    }
+  },
+  "mods": {
+    "c2c": {
+      "name": "Coast to Coast",
+      "game": "ats",
+      "version": "2.23.60.2",
+      "homepage": "https://truckymods.io/american-truck-simulator/maps/coast-to-coast",
+      "check": {
+        "url": "https://forum.scssoft.com/viewtopic.php?t=202317",
+        "pattern": "<title>[^<]*Coast to Coast Map - v(\\d+(?:\\.\\d+)+)",
+        "note": "titulo del hilo oficial en el foro de SCS"
+      }
+    },
+    "promods_canada": {
+      "name": "ProMods Canada",
+      "game": "ats",
+      "version": "1.64",
+      "homepage": "https://www.promods.net/setup.php",
+      "check": null,
+      "checkNote": "promods.net bloquea scripts (403): verificar a mano"
+    },
+    "promods": {
+      "name": "ProMods Europe",
+      "game": "ets2",
+      "version": "2.84",
+      "homepage": "https://www.promods.net/setup.php",
+      "check": {
+        "url": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771",
+        "pattern": "ProMods (\\d+\\.\\d+) - RusMap",
+        "note": "leido de la pagina del conector ProMods-RusMap en TruckyMods (promods.net bloquea scripts)"
+      }
+    },
+    "promods_me": {
+      "name": "ProMods Middle East",
+      "game": "ets2",
+      "version": "2.84",
+      "homepage": "https://www.promods.net/setup.php",
+      "check": null,
+      "checkNote": "va con la version de ProMods Europe"
+    },
+    "promods_maghreb": {
+      "name": "ProMods The Maghreb",
+      "game": "ets2",
+      "version": "1.04",
+      "homepage": "https://www.promods.net/setup.php",
+      "check": null,
+      "checkNote": "promods.net bloquea scripts (403): verificar a mano"
+    },
+    "promods_tgs": {
+      "name": "ProMods The Great Steppe",
+      "game": "ets2",
+      "version": "1.70",
+      "homepage": "https://www.promods.net/setup.php",
+      "check": null,
+      "checkNote": "promods.net bloquea scripts (403): verificar a mano"
+    },
+    "rusmap": {
+      "name": "RusMap",
+      "game": "ets2",
+      "version": null,
+      "planned": true,
+      "homepage": "https://forum.scssoft.com/viewtopic.php?t=332124",
+      "check": {
+        "url": "https://forum.scssoft.com/viewtopic.php?t=332124",
+        "pattern": "<title>[^<]*RusMap[_ ]?v?\\.?(\\d+\\.\\d+(?:\\.\\d+)*)",
+        "note": "titulo del hilo oficial en el foro de SCS"
+      }
+    },
+    "reforma": {
+      "name": "Reforma (+ Sierra Nevada)",
+      "game": "ats",
+      "version": null,
+      "planned": true,
+      "homepage": "https://forum.scssoft.com/viewtopic.php?t=316081",
+      "check": {
+        "url": "https://forum.scssoft.com/viewtopic.php?t=316081",
+        "pattern": "<title>[^<]*Reforma (\\d+(?:\\.\\d+)+)",
+        "note": "titulo del hilo oficial en el foro de SCS"
+      }
+    },
+    "roextended": {
+      "name": "Roextended",
+      "game": "ets2",
+      "version": null,
+      "planned": true,
+      "homepage": "https://roextended.ro/",
+      "check": null
+    }
+  }
+}

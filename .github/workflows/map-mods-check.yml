@@ -1,0 +1,34 @@
+# Estado de los datos de mapa: una vez por semana (y a mano) consulta las
+# versiones upstream de los mods (foro de SCS / TruckyMods; promods.net
+# bloquea scripts, esos quedan "a mano"), hace HEAD a los archivos de cada
+# variante en R2 y escribe docs/data/map-mods-status.json, que muestra el
+# panel de admin. Si algo quedo desactualizado o falta un archivo, avisa por
+# Discord (secret DISCORD_ADMIN_WEBHOOK_URL, opcional).
+name: Map mods check
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"   # lunes 09:17 UTC (~06:17 ART)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check upstream versions and R2 files
+        env:
+          DISCORD_ADMIN_WEBHOOK_URL: ${{ secrets.DISCORD_ADMIN_WEBHOOK_URL }}
+        run: python tools/check_map_mods.py
+      - name: Commit status if it changed
+        run: |
+          git config user.name "map-mods-check"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data/map-mods-status.json
+          if git diff --cached --quiet; then echo "sin cambios"; else git commit -m "chore: map mods status $(date -u +%Y-%m-%d)" && git push; fi

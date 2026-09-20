@@ -50,6 +50,15 @@
   tbody tr:last-child td { border-bottom: none; }
   .tableWrap { overflow-x: auto; }
   #content { display: none; }
+  .pill { display: inline-block; font-size: 0.72rem; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
+  .pill.ok { background: #16351f; color: #7ee29a; }
+  .pill.outdated { background: #3a2a10; color: #ffb020; }
+  .pill.unknown, .pill.manual { background: #2a2d33; color: var(--muted); }
+  .pill.planned { background: #10253a; color: #7cc0ff; }
+  .pill.missing { background: #3a1414; color: #ff8080; }
+  td.muted { color: var(--muted); font-size: 0.78rem; white-space: normal; }
+  a { color: var(--blue); }
+  #mapData { margin-top: 2rem; }
 </style>
 </head>
 <body>
@@ -85,6 +94,26 @@
     <div class="tableWrap"><table>
       <thead><tr><th>Route</th><th>Truck</th><th>Cargo</th><th>Pay</th><th>Distance</th><th>Game</th></tr></thead>
       <tbody id="latestJobsBody"></tbody>
+    </table></div>
+  </div>
+
+  <!-- Datos de mapa: no necesita la admin key (lee JSON publicos del sitio y /version) -->
+  <div id="mapData">
+    <h2>Map data <span id="mapDataChecked" style="text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
+    <div class="cards">
+      <div class="card"><div class="label">Latest client (seeded)</div><div class="value" id="cardClientVersion">-</div></div>
+      <div class="card"><div class="label">Map data version</div><div class="value" id="cardMapVersion" style="font-size:1.1rem">-</div></div>
+      <div class="card"><div class="label">Data in R2 (these variants)</div><div class="value" id="cardR2Size" style="font-size:1.1rem">-</div></div>
+    </div>
+    <h2>Mods</h2>
+    <div class="tableWrap"><table>
+      <thead><tr><th>Mod</th><th>Game</th><th>Ours</th><th>Upstream</th><th>Status</th><th>Check</th></tr></thead>
+      <tbody id="modsBody"></tbody>
+    </table></div>
+    <h2>Published variants</h2>
+    <div class="tableWrap"><table>
+      <thead><tr><th>Variant</th><th>Game</th><th>Mods</th><th>Built</th><th>Files</th><th>Size</th><th>R2</th></tr></thead>
+      <tbody id="variantsBody"></tbody>
     </table></div>
   </div>
 
@@ -161,6 +190,45 @@ async function loadStats() {
 }
 
 document.getElementById('loadBtn').addEventListener('click', loadStats);
+
+// ---- Datos de mapa (manifest + estado del checker semanal + /version) ----
+const PILL = { ok: 'up to date', outdated: 'OUTDATED', unknown: 'could not check', manual: 'check by hand', planned: 'planned', missing: 'missing files' };
+function pill(status) { return `<span class="pill ${status}">${PILL[status] || status}</span>`; }
+function mb(bytes) { return bytes ? `${(bytes / 1e6).toFixed(1)} MB` : '-'; }
+async function loadMapData() {
+  try {
+    const [manifest, status, version] = await Promise.all([
+      fetch('data/map-manifest.json', { cache: 'no-cache' }).then(r => r.json()),
+      fetch('data/map-mods-status.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : { mods: {}, variants: {} }).catch(() => ({ mods: {}, variants: {} })),
+      fetch('https://truck-companion-production.up.railway.app/version').then(r => r.json()).catch(() => null),
+    ]);
+    document.getElementById('cardClientVersion').textContent = version ? version.latest_client_version : '-';
+    const versions = [...new Set(Object.values(manifest.variants).map(v => v.mapDataVersion))];
+    document.getElementById('cardMapVersion').textContent = versions.join(', ');
+    const totalBytes = Object.values(status.variants || {}).reduce((a, v) => a + (v.totalBytes || 0), 0);
+    document.getElementById('cardR2Size').textContent = totalBytes ? mb(totalBytes) : '-';
+    document.getElementById('mapDataChecked').textContent = status.checkedAt ? `· checked ${status.checkedAt.replace('T', ' ').replace('Z', ' UTC')} (weekly)` : '· not checked yet';
+
+    document.getElementById('modsBody').innerHTML = Object.entries(manifest.mods).map(([id, mod]) => {
+      const st = (status.mods || {})[id] || { status: mod.check ? 'unknown' : 'manual' };
+      const s = mod.version ? st.status : 'planned';
+      const note = st.error || (mod.check && mod.check.note) || mod.checkNote || '';
+      const source = st.source || (mod.check && mod.check.url) || mod.homepage;
+      return `<tr><td><a href="${escapeHtml(mod.homepage)}" target="_blank" rel="noopener">${escapeHtml(mod.name)}</a></td><td>${escapeHtml((mod.game || '').toUpperCase())}</td><td>${escapeHtml(mod.version || '—')}</td><td>${escapeHtml(st.upstream || '?')}</td><td>${pill(s)}</td><td class="muted">${source ? `<a href="${escapeHtml(source)}" target="_blank" rel="noopener">source</a> · ` : ''}${escapeHtml(note)}</td></tr>`;
+    }).join('');
+
+    document.getElementById('variantsBody').innerHTML = Object.entries(manifest.variants).map(([id, v]) => {
+      const st = (status.variants || {})[id];
+      const mods = v.mods.map(m => `${manifest.mods[m]?.name || m} ${manifest.mods[m]?.version || ''}`.trim()).join(', ') || 'vanilla';
+      const files = st ? Object.entries(st.files).map(([k, f]) => `${f.ok ? '✅' : '❌'} ${k.split('/').pop()}${f.lastModified ? ` (${new Date(f.lastModified).toISOString().slice(0, 10)})` : ''}`).join('<br>') : v.files.map(k => k.split('/').pop()).join('<br>');
+      const r2 = st ? pill(st.allOk ? 'ok' : 'missing') : pill('unknown');
+      return `<tr><td><b>${escapeHtml(id)}</b><br><span class="muted">${escapeHtml(v.label)}</span></td><td>${escapeHtml(v.game.toUpperCase())} ${escapeHtml(v.gameVersion || '')}</td><td>${escapeHtml(mods)}</td><td>${escapeHtml(v.built)}</td><td class="muted" style="white-space:nowrap">${files}</td><td>${st ? mb(st.totalBytes) : '-'}</td><td>${r2}</td></tr>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('mapDataChecked').textContent = `· error: ${err.message}`;
+  }
+}
+loadMapData();
 keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadStats(); });
 document.getElementById('forgetBtn').addEventListener('click', () => {
   localStorage.removeItem(STORAGE_KEY);
