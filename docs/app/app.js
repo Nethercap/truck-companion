@@ -1282,6 +1282,7 @@ function ensureMapInitialized() {
   // presente cuando el zoom lo dispara una interaccion real (rueda/pellizco/
   // doble click), no nuestros propios easeTo/jumpTo programaticos.
   map.on('zoomstart', (e) => { if (e.originalEvent) navAutoZoomPaused = true; });
+  map.on('zoom', updateTruckArrowSize);
   map.on('click', (e) => {
     if (!waypointMode || !fromLngLat) return;
     pendingWaypoint = { lngLat: [e.lngLat.lng, e.lngLat.lat], pos: fromLngLat(e.lngLat.lng, e.lngLat.lat), label: null };
@@ -2279,6 +2280,7 @@ async function loadGameMap(game) {
     el.appendChild(truckArrowEl);
     truckMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map', rotation: lastHeadingDeg }).setLngLat(mapInfo.origin).addTo(map);
   }
+  updateTruckArrowSize();
 
   document.getElementById('mapHint').textContent = mapInfo.label;
   // Los tiles siguen bajando en segundo plano; la barra se va cuando la
@@ -2506,6 +2508,13 @@ function updateNavPanel(turn) {
 // (probado antes) generaba saltos molestos justo en intersecciones/enlaces,
 // que es donde mas importa ver el contexto completo, no menos.
 const NAV_FIXED_ZOOM = 10;
+function updateTruckArrowSize() {
+  if (!map || !truckArrowEl) return;
+  // Scale only the inner arrow: MapLibre owns the marker's position and heading.
+  const scale = Math.max(0.4, Math.min(1.2, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12));
+  truckArrowEl.style.transform = `scale(${scale})`;
+}
+
 function navTargetZoom(turn) {
   return nav3d ? NAV_FIXED_ZOOM + 0.7 : NAV_FIXED_ZOOM;
 }
