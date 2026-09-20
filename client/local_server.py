@@ -28,6 +28,9 @@ import os
 import socket
 import sys
 import threading
+import shutil
+from urllib.error import HTTPError
+from urllib.request import Request
 from urllib.request import urlopen
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -100,6 +103,9 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         url = urlsplit(self.path)
+        if url.path.startswith("/map-assets/"):
+            self.serve_map_asset()
+            return
         if url.path in ("/", "/app", "/app/", "/app/index.html"):
             query = parse_qs(url.query, keep_blank_values=True)
             needs_local = not any(key in query for key in ("local", "demo", "code", "backend"))
@@ -136,6 +142,36 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
                 return
         self.path = path
         super().do_GET()
+
+    def serve_map_asset(self):
+        """Relay public map data through the PC, including PMTiles byte ranges."""
+        relative = self.path[len("/map-assets/"):]
+        if not relative or ".." in relative or "\\" in relative:
+            self.send_error(400)
+            return
+        headers = {"User-Agent": "Mozilla/5.0 TruckDash", "Accept-Encoding": "identity"}
+        for name in ("Range", "If-Range"):
+            if self.headers.get(name):
+                headers[name] = self.headers[name]
+        try:
+            response = urlopen(Request("https://maps.trucksim-dash.com/" + relative, headers=headers), timeout=30)
+        except HTTPError as exc:
+            self.send_error(exc.code)
+            return
+        except Exception as exc:
+            logging.warning("Map asset request failed: %s", exc)
+            self.send_error(502, "Map server unavailable")
+            return
+        with response:
+            self.send_response(response.status)
+            for name in ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified"):
+                if response.headers.get(name):
+                    self.send_header(name, response.headers[name])
+            self.end_headers()
+            try:
+                shutil.copyfileobj(response, self.wfile, length=65536)
+            except (BrokenPipeError, ConnectionResetError, TimeoutError):
+                self.close_connection = True
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache")

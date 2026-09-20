@@ -43,3 +43,35 @@ def test_bundled_dashboard_is_served_without_downloading(monkeypatch, tmp_path):
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def test_map_proxy_preserves_byte_ranges(monkeypatch, tmp_path):
+    import io
+    from urllib.request import Request
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "index.html").write_text("app")
+    monkeypatch.setattr(local_server, "BUNDLED_WEB_ROOT", str(tmp_path))
+    seen = []
+
+    def remote(request, timeout):
+        seen.append(request)
+        response = io.BytesIO(b"tiles")
+        response.status = 206
+        response.headers = {"Content-Type": "application/octet-stream", "Content-Length": "5", "Content-Range": "bytes 10-14/100", "ETag": '"v1"'}
+        return response
+
+    monkeypatch.setattr(local_server, "urlopen", remote)
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), local_server._StaticHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urlopen(Request(f"http://127.0.0.1:{server.server_port}/map-assets/vector/ets2.pmtiles?v=1", headers={"Range": "bytes=10-14"})) as response:
+            assert response.status == 206
+            assert response.headers["Content-Range"] == "bytes 10-14/100"
+            assert response.read() == b"tiles"
+        assert seen[0].full_url == "https://maps.trucksim-dash.com/vector/ets2.pmtiles?v=1"
+        assert seen[0].get_header("Range") == "bytes=10-14"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()

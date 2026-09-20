@@ -1056,7 +1056,8 @@ document.addEventListener('keydown', (e) => {
 // route-graph-*.json de siempre (esos no cambiaron, solo el renderizado del
 // mapa en si). Todo se sirve desde R2 (maps.trucksim-dash.com), igual que
 // los tiles PNG que reemplaza.
-const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
+const REMOTE_MAP_BASE = new URLSearchParams(location.search).get('local')
+  ? `${location.origin}/map-assets` : 'https://maps.trucksim-dash.com';
 // Version de los datos de cada mapa (fecha de la ultima regeneracion). Se
 // agrega como ?v= a Cities/route-graph/road-names/pmtiles: R2 no manda
 // Cache-Control y los navegadores cachean por heuristica sobre
@@ -1609,7 +1610,7 @@ function updateWaypointRoute(data) {
 // desde el PC y los POIs se piden al sitio (GitHub Pages manda CORS abierto).
 // Se decide por el parametro y no por el hostname: en LAN la pagina puede
 // ser 127.0.0.1 ("Open here") igual que un servidor de desarrollo.
-const POI_BASE = new URLSearchParams(location.search).get('local') ? 'https://trucksim-dash.com/data' : '../data';
+const POI_BASE = '../data';
 // El mundo del juego esta comprimido (ATS 1:20, ETS2 1:19) y el juego muestra
 // TODAS las distancias multiplicadas por esa escala (el routeDistance de la
 // telemetria ya viene asi). Todo lo que calculamos nosotros sobre
