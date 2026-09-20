@@ -1249,6 +1249,37 @@ function buildVecLayers(sourceLayer) {
   ];
 }
 
+// Keep the map clear on landscape phones; telemetry never resets this timer.
+const landscapeMapMq = window.matchMedia('(orientation: landscape) and (max-width: 900px), (orientation: landscape) and (max-height: 600px) and (pointer: coarse)');
+const mapControlPointers = new Set();
+let mapControlsIdleTimer = null;
+function showMapControls() {
+  clearTimeout(mapControlsIdleTimer);
+  document.getElementById('mapPanel').classList.remove('mapControlsIdle');
+  if (landscapeMapMq.matches && mapControlPointers.size === 0) {
+    mapControlsIdleTimer = setTimeout(() => {
+      document.getElementById('mapPanel').classList.add('mapControlsIdle');
+    }, 10000);
+  }
+}
+const mapInteractionPanel = document.getElementById('mapPanel');
+mapInteractionPanel.addEventListener('pointerdown', (event) => {
+  mapControlPointers.add(event.pointerId);
+  showMapControls();
+}, { passive: true });
+function releaseMapControlPointer(event) {
+  if (mapControlPointers.delete(event.pointerId)) showMapControls();
+}
+window.addEventListener('pointerup', releaseMapControlPointer, { passive: true });
+window.addEventListener('pointercancel', releaseMapControlPointer, { passive: true });
+mapInteractionPanel.addEventListener('wheel', showMapControls, { passive: true });
+mapInteractionPanel.addEventListener('keydown', showMapControls);
+mapInteractionPanel.addEventListener('focusin', showMapControls);
+window.addEventListener('blur', () => { mapControlPointers.clear(); showMapControls(); });
+if (landscapeMapMq.addEventListener) landscapeMapMq.addEventListener('change', showMapControls);
+else landscapeMapMq.addListener(showMapControls);
+showMapControls();
+
 function ensureMapInitialized() {
   if (map) return;
   const protocol = new pmtiles.Protocol();

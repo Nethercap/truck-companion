@@ -129,3 +129,41 @@ test('unknown remaining distance is displayed as unknown, never as completed', (
   assert.equal(s.elements.get('routeRemaining').textContent, '--');
   assert.equal(s.elements.get('routeProgress').value, 0);
 });
+
+function idleControlsSetup() {
+  const source = fs.readFileSync(`${__dirname}/app.js`, 'utf8');
+  const panelEvents = {}, windowEvents = {}, classes = new Set(), timers = new Map();
+  let now = 0, nextId = 0;
+  const mq = { matches: true, addEventListener(type, fn) { this.change = fn; } };
+  const context = vm.createContext({
+    window: { matchMedia: () => mq, addEventListener(type, fn) { windowEvents[type] = fn; } },
+    document: { getElementById: () => ({ classList: { add: c => classes.add(c), remove: c => classes.delete(c) }, addEventListener(type, fn) { panelEvents[type] = fn; } }) },
+    setTimeout(fn, delay) { timers.set(++nextId, { fn, at: now + delay }); return nextId; },
+    clearTimeout(id) { timers.delete(id); },
+  });
+  vm.runInContext(source.slice(source.indexOf('const landscapeMapMq'), source.indexOf('function ensureMapInitialized()')), context);
+  return { panelEvents, windowEvents, mq, hidden: () => classes.has('mapControlsIdle'), advance(ms) {
+    now += ms;
+    for (const [id, timer] of timers) if (timer.at <= now) { timers.delete(id); timer.fn(); }
+  } };
+}
+
+test('landscape controls hide after ten idle seconds and stay visible throughout a long touch', () => {
+  const s = idleControlsSetup();
+  s.advance(9999); assert.equal(s.hidden(), false);
+  s.advance(1); assert.equal(s.hidden(), true);
+  s.panelEvents.pointerdown({ pointerId: 1 });
+  assert.equal(s.hidden(), false);
+  s.advance(20000); assert.equal(s.hidden(), false);
+  s.windowEvents.pointerup({ pointerId: 1 });
+  s.advance(9999); assert.equal(s.hidden(), false);
+  s.advance(1); assert.equal(s.hidden(), true);
+});
+
+test('rotation out of mobile landscape reveals controls and cancels auto-hide', () => {
+  const s = idleControlsSetup();
+  s.advance(10000); assert.equal(s.hidden(), true);
+  s.mq.matches = false; s.mq.change();
+  assert.equal(s.hidden(), false);
+  s.advance(20000); assert.equal(s.hidden(), false);
+});
