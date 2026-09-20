@@ -29,6 +29,7 @@ import socket
 import sys
 import threading
 from urllib.request import urlopen
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import client as client_lib
 
@@ -98,6 +99,22 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=cache_dir(), **kwargs)
 
     def do_GET(self):
+        url = urlsplit(self.path)
+        if url.path in ("/", "/app", "/app/", "/app/index.html"):
+            query = parse_qs(url.query, keep_blank_values=True)
+            needs_local = not any(key in query for key in ("local", "demo", "code", "backend"))
+            if url.path in ("/", "/app") or needs_local:
+                if needs_local:
+                    query["local"] = ["1"]
+                location = "/app/"
+                if query:
+                    location += "?" + urlencode(query, doseq=True)
+                # The browser needs the /app/ base URL for relative CSS/JS paths.
+                self.send_response(302)
+                self.send_header("Location", location)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
         if has_bundled_web():
             # Serve the exact UI shipped with this executable, never the website.
             if self.path.split("?", 1)[0] in ("/", "/app", "/app/"):
