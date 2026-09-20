@@ -191,9 +191,9 @@
   /* Geographic heading and camera compensation are handled by the marker. */
   .truckArrow {
     width: 0; height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-bottom: 16px solid var(--accent);
+    border-left: 21px solid transparent;
+    border-right: 21px solid transparent;
+    border-bottom: 48px solid var(--accent);
     filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000);
   }
 
