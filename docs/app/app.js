@@ -59,6 +59,8 @@ const TRANSLATIONS = {
     updateAvailableText: '🆕 A new client version is available (v{v}). Your connected client is outdated.',
     updateBannerLink: 'Download',
     mapNotLoaded: 'Map not loaded',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
     recenter: 'Recenter on truck',
     togglePanel: 'Show/hide info panel',
     toggleFullscreen: 'Fullscreen',
@@ -335,6 +337,8 @@ const TRANSLATIONS = {
     updateAvailableText: '🆕 Hay una versión nueva del cliente (v{v}). Tu cliente conectado está desactualizado.',
     updateBannerLink: 'Descargar',
     mapNotLoaded: 'Mapa no cargado',
+    zoomIn: 'Acercar',
+    zoomOut: 'Alejar',
     recenter: 'Centrar en el camión',
     togglePanel: 'Mostrar/ocultar panel de info',
     toggleFullscreen: 'Pantalla completa',
@@ -648,7 +652,8 @@ const miniHudSettings = Object.assign(
   { fuelPct: false, fuelRange: false, eta: false, distance: false, cruise: true, gps: false },
   _savedSettings.miniHud
 );
-let routeColor = _savedSettings.routeColor || '#a30000';
+let routeColor = (!_savedSettings.routeColor || _savedSettings.routeColor === '#a30000')
+  ? '#ef3434' : _savedSettings.routeColor;
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
 
 // ---------------------------------------------------------------------------
@@ -1216,15 +1221,15 @@ function buildVecLayers(sourceLayer) {
     { id: 'road-local', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'local']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#7d838c', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 12, 1.5, 17, 5] } },
+      paint: { 'line-color': '#7d838c', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 12, 2.25, 17, 7.5] } },
     { id: 'road-divided', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'divided']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#cbd0d6', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 12, 2.5, 17, 8] } },
+      paint: { 'line-color': '#cbd0d6', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1.2, 12, 3.75, 17, 12] } },
     { id: 'road-freeway', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
+      paint: { 'line-color': '#f2cf66', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1.5, 12, 5.25, 17, 15] } },
     { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: 7,
       filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]]],
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
@@ -1260,7 +1265,13 @@ function ensureMapInitialized() {
     zoom: 1,
     attributionControl: false,
   });
-  map.on('dragstart', () => { autoFollow = false; });
+  map.on('dragstart', pauseMapFollow);
+  map.on('dragend', scheduleMapFollow);
+  map.on('moveend', scheduleMapFollow);
+  map.on('zoomstart', (e) => { if (e.originalEvent) pauseMapFollow(); });
+  map.on('zoomend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
+  map.on('rotatestart', (e) => { if (e.originalEvent) pauseMapFollow(); });
+  map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
   // zoom dinamico (si no, el proximo tick lo pisa y parece que "no se puede
   // tocar") - se reactiva con el boton de recentrar. originalEvent solo esta
@@ -1278,12 +1289,10 @@ function ensureMapInitialized() {
     mapReady = true;
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
-    // La ruta lleva un borde claro debajo: 3 px de rojo oscuro sobre una
-    // autopista naranja de 10 px se veia como una raya en el medio, no como
-    // "la ruta" (un usuario creyo que la app no ruteaba por la autopista).
+    // A light backing keeps the red dashes readable against yellow roads.
     map.addSource('route', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.55 } });
-    map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 3.5, 'line-opacity': 0.95 } });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 4, 'line-opacity': 1, 'line-dasharray': [3, 2] } });
     // Tramos DESPUES del primer waypoint (waypoint -> destino del trabajo):
     // punteados y mas tenues, para que se distingan de "como llego al
     // waypoint" - si no, la vuelta que hay que dar despues de un area de
@@ -2202,7 +2211,7 @@ async function loadGameMap(game) {
     truckArrowEl = document.createElement('div');
     truckArrowEl.className = 'truckArrow';
     el.appendChild(truckArrowEl);
-    truckMarker = new maplibregl.Marker({ element: el }).setLngLat(mapInfo.origin).addTo(map);
+    truckMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map', rotation: lastHeadingDeg }).setLngLat(mapInfo.origin).addTo(map);
   }
 
   document.getElementById('mapHint').textContent = mapInfo.label;
@@ -2228,7 +2237,41 @@ function setMapLoading(stepKey) {
 }
 
 let lastWorldPos = null;
-let autoFollow = true; // se desactiva si el usuario arrastra el mapa a mano, se reactiva con el boton de recentrar
+let autoFollow = true;
+let mapFollowTimer = null;
+const MAP_FOLLOW_DELAY_MS = 10000;
+
+function pauseMapFollow() {
+  clearTimeout(mapFollowTimer);
+  mapFollowTimer = null;
+  autoFollow = false;
+}
+
+function resumeMapFollow() {
+  clearTimeout(mapFollowTimer);
+  mapFollowTimer = null;
+  autoFollow = true;
+  if (map && truckMarker) {
+    map.jumpTo({ center: truckMarker.getLngLat(), bearing: navMode ? lastHeadingDeg : 0 });
+  }
+}
+
+function scheduleMapFollow() {
+  clearTimeout(mapFollowTimer);
+  if (autoFollow) return;
+  // Wait until all parts of a combined touch gesture have finished.
+  if (map && (map.isMoving() || map.isZooming() || map.isRotating())) return;
+  mapFollowTimer = setTimeout(resumeMapFollow, MAP_FOLLOW_DELAY_MS);
+}
+
+function changeMapZoom(delta) {
+  if (!map) return;
+  navAutoZoomPaused = true;
+  // Apply immediately so the next telemetry camera update cannot cancel it.
+  map.jumpTo({ zoom: Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + delta)) });
+  if (!autoFollow) scheduleMapFollow();
+}
+
 const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es un teleport (job asignado, garage, etc.), no un tramo manejado
 
 // Modo navegacion: mapa heading-up (rota con el camion, como un GPS real) en
@@ -2279,30 +2322,16 @@ function setNavMode(on) {
   navAutoZoomPaused = false;
   const btn = document.getElementById('navToggleBtn');
   if (on) {
-    autoFollow = true;
+    resumeMapFollow();
     if (map) map.dragRotate.disable(); // el rumbo lo manejamos nosotros segun el heading, no rotacion manual
     btn.classList.add('active');
-    if (truckArrowEl) truckArrowEl.style.transform = 'rotate(0deg)'; // el mapa ya rota, el camion siempre "para arriba"
   } else {
     if (map) map.dragRotate.enable();
     btn.classList.remove('active');
     document.getElementById('navPanel').style.display = 'none';
-    if (truckArrowEl) truckArrowEl.style.transform = `rotate(${lastHeadingDeg}deg)`;
   }
   applyNavCamera();
 }
-// En vertical el mini-HUD (velocidad/limite/ruta) baja al rincon inferior
-// derecho del mapa: arriba a la derecha chocaba con el panel de indicaciones
-// de navegacion (reporte con capturas del 19/9). En horizontal vuelve arriba.
-const portraitMq = window.matchMedia('(max-width: 900px) and (orientation: portrait)');
-function placeMiniHud() {
-  const hud = document.getElementById('miniHud');
-  const target = portraitMq.matches ? document.getElementById('bottomRightHud') : document.getElementById('topRightControls');
-  if (hud && hud.parentElement !== target) target.insertBefore(hud, target.firstChild);
-}
-if (portraitMq.addEventListener) portraitMq.addEventListener('change', placeMiniHud); else portraitMq.addListener(placeMiniHud);
-placeMiniHud();
-
 document.getElementById('tilt3dBtn').addEventListener('click', () => {
   nav3d = !nav3d;
   saveSettings();
@@ -2598,9 +2627,8 @@ function updateMap(position, game) {
         headingRefWorld = { x: position.x, z: position.z };
       }
       lastHeadingDeg = angleDeg;
-      // En modo navegacion el mapa ya rota al heading (ver mas abajo), asi
-      // que la flecha se deja apuntando siempre "para arriba" en pantalla.
-      if (truckArrowEl) truckArrowEl.style.transform = navMode ? 'rotate(0deg)' : `rotate(${angleDeg}deg)`;
+      // MapLibre compensates camera rotation and pitch for the geographic heading.
+      truckMarker.setRotation(angleDeg);
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
@@ -2630,8 +2658,8 @@ function updateMap(position, game) {
   // Camara: un unico llamado por tick que combina centro+zoom+bearing segun
   // corresponda, en vez de varios llamados peleandose entre si.
   const turn = navMode ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
-  if (navMode) {
-    updateNavPanel(turn);
+  if (navMode) updateNavPanel(turn);
+  if (navMode && autoFollow) {
     // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
     // seguimos actualizando centro/bearing hasta que recentre.
     const zoomOverride = navAutoZoomPaused ? {} : { zoom: navTargetZoom(turn) };
@@ -3240,16 +3268,14 @@ document.getElementById('updateBannerClose').addEventListener('click', () => {
   document.getElementById('updateBanner').style.display = 'none';
 });
 
-document.getElementById('recenterBtn').addEventListener('click', () => {
-  autoFollow = true;
-  navAutoZoomPaused = false;
-  if (map && truckMarker) {
-    // Fuera del modo nav, ademas de centrar se endereza el mapa (norte
-    // arriba) por si el usuario lo roto a mano; en modo nav el bearing lo
-    // pisa el proximo tick con el heading real, no hace falta tocarlo aca.
-    map.jumpTo(navMode ? { center: truckMarker.getLngLat() } : { center: truckMarker.getLngLat(), bearing: 0 });
-  }
-});
+document.getElementById('zoomInBtn').addEventListener('click', () => changeMapZoom(1));
+document.getElementById('zoomOutBtn').addEventListener('click', () => changeMapZoom(-1));
+for (const id of ['recenterBtn', 'resumeFollowBtn']) {
+  document.getElementById(id).addEventListener('click', () => {
+    navAutoZoomPaused = false;
+    resumeMapFollow();
+  });
+}
 
 let reconnectTimer = null;
 const RECONNECT_DELAY_MS = 3000;

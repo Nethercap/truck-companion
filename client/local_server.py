@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import socket
+import sys
 import threading
 from urllib.request import urlopen
 
@@ -35,6 +36,13 @@ import client as client_lib
 HTTP_PORT = int(os.environ.get("TRUCKDASH_HTTP_PORT", 27765))
 WS_PORT = int(os.environ.get("TRUCKDASH_WS_PORT", 27766))
 WEB_ORIGIN = "https://trucksim-dash.com"
+BUNDLED_WEB_ROOT = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), "web")
+
+
+def has_bundled_web() -> bool:
+    return os.path.isfile(os.path.join(BUNDLED_WEB_ROOT, "app", "index.html"))
+
+
 WEB_FILES = [
     "app/index.html", "app/app.js", "app/app.css", "app/i18n.js", "app/pure.js",
     "app/manifest.json", "app/assets/logo.svg", "app/assets/icon-192.png", "app/assets/icon-512.png",
@@ -42,6 +50,8 @@ WEB_FILES = [
 
 
 def cache_dir() -> str:
+    if has_bundled_web():
+        return BUNDLED_WEB_ROOT
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     path = os.path.join(base, "TruckDash", "webcache")
     os.makedirs(os.path.join(path, "app", "assets"), exist_ok=True)
@@ -60,6 +70,8 @@ def lan_ip() -> str | None:
 def refresh_web_cache() -> bool:
     """Baja la ultima version del web app a la cache local. Devuelve True si
     hay una copia servible (nueva o anterior)."""
+    if has_bundled_web():
+        return True
     target = cache_dir()
     ok = 0
     for rel in WEB_FILES:
@@ -86,6 +98,12 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=cache_dir(), **kwargs)
 
     def do_GET(self):
+        if has_bundled_web():
+            # Serve the exact UI shipped with this executable, never the website.
+            if self.path.split("?", 1)[0] in ("/", "/app", "/app/"):
+                self.path = "/app/index.html"
+            super().do_GET()
+            return
         # Los archivos se referencian con ?v=... para cache-busting - el query
         # se ignora. "/" y "/app" van al index.
         path = self.path.split("?", 1)[0]

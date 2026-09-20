@@ -9,6 +9,8 @@ a = Analysis(
     datas=[
         ('vendor/scs-telemetry.dll', 'vendor'),  # plugin de telemetria que el cliente instala en el juego
         ('assets/icon.png', 'assets'),          # icono de la bandeja (logo real)
+        ('../docs/app', 'web/app'),
+        ('../docs/data', 'web/data'),
     ],
     hiddenimports=[],
     hookspath=[],

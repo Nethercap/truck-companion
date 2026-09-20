@@ -43,7 +43,10 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
-DEFAULT_WEB_URL = "https://trucksim-dash.com/app/"
+DEFAULT_WEB_URL = (
+    f"http://127.0.0.1:{local_server.HTTP_PORT}/app/?local=1"
+    if local_server.has_bundled_web() else "https://trucksim-dash.com/app/"
+)
 DONATE_URL = ""  # Ko-fi / GitHub Sponsors - vacio hasta tener uno (el item del menu no aparece)
 
 LOG_PATH = os.path.join(win_integration.base_dir(), "truckdash.log")
@@ -487,6 +490,8 @@ _browser_opened = False
 
 
 def build_web_url() -> str | None:
+    if urllib.parse.parse_qs(urllib.parse.urlsplit(state.web_url).query).get("local") == ["1"]:
+        return state.web_url
     if not state.code or not state.backend_url:
         return None
     query = urllib.parse.urlencode({"backend": state.backend_url, "code": state.code})
@@ -805,9 +810,11 @@ async def run_client(backend_url: str, fixed_code: str | None):
     # tiene los puertos tomados.
     if state.local is None:
         state.local = local_server.LocalServer(keybinds)
-        asyncio.create_task(state.local.start())
+        await state.local.start()
     local = state.local
     local.keybinds = keybinds
+    if local.web_ready and local_server.has_bundled_web() and not state.autostart_mode:
+        open_web_ui()
 
     # Placeholder sin conexion hasta tener codigo: telemetry_loop publica por
     # LAN igual y descarta el envio cloud mientras tanto.

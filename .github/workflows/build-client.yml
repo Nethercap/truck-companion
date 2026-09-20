@@ -28,7 +28,7 @@ jobs:
       - name: Run client tests
         run: |
           pip install pytest
-          python -m pytest client/test_client.py client/test_plugin_installer.py -q
+          python -m pytest client/test_client.py client/test_plugin_installer.py client/test_local_server.py -q
       - name: Build TruckDash.exe
         working-directory: client
         run: pyinstaller TruckDash.spec

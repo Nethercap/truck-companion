@@ -1512,6 +1512,8 @@ const TRANSLATIONS_EXTRA = {
     updateAvailableText: '🆕 Доступна новая версия клиента (v{v}). Подключённый клиент устарел.',
     updateBannerLink: 'Скачать',
     mapNotLoaded: 'Карта не загружена',
+    zoomIn: 'Приблизить карту',
+    zoomOut: 'Отдалить карту',
     recenter: 'Центрировать на грузовике',
     togglePanel: 'Показать/скрыть панель информации',
     toggleFullscreen: 'Полный экран',
