@@ -76,3 +76,56 @@ test('zoom buttons keep following, pause dynamic zoom and respect map limits', (
   s.run('changeMapZoom(-20)');
   assert.equal(s.cameras.at(-1).zoom, 1);
 });
+
+function summarySetup() {
+  const source = fs.readFileSync(`${__dirname}/app.js`, 'utf8');
+  const elements = new Map();
+  const cleared = [];
+  const data = { game: 'ets2', cityDst: 'Paris', routeDistanceKm: 100 };
+  const context = vm.createContext({
+    document: { getElementById(id) {
+      if (!elements.has(id)) elements.set(id, { style: {}, classList: { toggle() {}, remove() {} } });
+      return elements.get(id);
+    } },
+    lastData: data, waypoints: [], citiesByName: { Paris: { X: 1, Y: 2 }, Berlin: { X: 3, Y: 4 } },
+    currentRouteWorldPoints: null, routeBehind: [], destMarker: { remove() { cleared.push('marker'); } },
+    map: { getSource(id) { return { setData() { cleared.push(id); } }; } },
+    clearWaypoint() { context.waypoints = []; }, setWaypointMode() {}, emptyLineString() { return {}; },
+    useImperial: false, KM_TO_MI: 0.621371, lastKnownAvgSpeedKmh: null,
+    computeRealEtaSeconds: () => 600, formatSeconds: () => '10 min',
+  });
+  vm.runInContext(source.slice(source.indexOf('let dismissedRouteIdentity'), source.indexOf('function splitRouteForDrawing')), context);
+  vm.runInContext(source.slice(source.indexOf('function resetDisplayedRoute'), source.indexOf("document.getElementById('resetRouteBtn')")), context);
+  return { context, elements, cleared, run: code => vm.runInContext(code, context) };
+}
+
+test('route progress reflects remaining distance and stays within bounds on rerouting', () => {
+  const s = summarySetup();
+  s.run('updateRouteSummary(lastData)');
+  assert.equal(s.elements.get('routeProgress').value, 0);
+  s.run('lastData.routeDistanceKm = 25; updateRouteSummary(lastData)');
+  assert.equal(s.elements.get('routeProgress').value, 75);
+  s.run('lastData.routeDistanceKm = 120; updateRouteSummary(lastData)');
+  assert.equal(s.elements.get('routeProgress').value, 0);
+  s.run('lastData.routeDistanceKm = 0; updateRouteSummary(lastData)');
+  assert.equal(s.elements.get('routeProgress').value, 100);
+});
+
+test('reset clears all route layers and suppresses the same telemetry destination', () => {
+  const s = summarySetup();
+  s.run('resetDisplayedRoute(); updateRouteSummary(lastData)');
+  assert.deepEqual(s.cleared, ['route', 'route-next', 'route-ferry', 'marker']);
+  assert.equal(s.run('resolveRouteTarget(lastData)'), null);
+  assert.equal(s.elements.get('routeSummary').hidden, true);
+  assert.equal(s.context.lastData.cityDst, 'Paris');
+  s.run("lastData.cityDst = 'Berlin'; updateRouteSummary(lastData)");
+  assert.equal(s.elements.get('routeSummary').hidden, false);
+  assert.equal(s.elements.get('routeProgress').value, 0);
+});
+
+test('unknown remaining distance is displayed as unknown, never as completed', () => {
+  const s = summarySetup();
+  s.run('lastData.routeDistanceKm = null; updateRouteSummary(lastData)');
+  assert.equal(s.elements.get('routeRemaining').textContent, '--');
+  assert.equal(s.elements.get('routeProgress').value, 0);
+});

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260922k" />
+<link rel="stylesheet" href="app.css?v=20260922l" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -238,6 +238,15 @@
       <div id="reconnectBanner"></div>
 
       <div id="navPanel" class="navPanel" style="display:none;"></div>
+      <div id="routeSummary" class="routeSummary" hidden>
+        <div class="routeSummaryDetails">
+          <span id="routeRemaining">--</span>
+          <span id="routeArrival" data-i18n-title="routeArrival" title="Arrival (local time)">--:--</span>
+          <span id="routeDuration" data-i18n-title="routeDuration" title="Remaining real time">--</span>
+          <button id="resetRouteBtn" type="button" data-i18n-title="resetRoute" title="Clear dashboard route">&#215;</button>
+        </div>
+        <progress id="routeProgress" max="100" value="0" data-i18n-title="routeProgress" title="Route progress"></progress>
+      </div>
 
       <div id="emptyState" class="emptyState" style="display:none;">
         <div class="emptyStateCard">
@@ -471,8 +480,8 @@
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
 <script src="pure.js?v=20260922e"></script>
-<script src="i18n.js?v=20260922e"></script>
-<script src="app.js?v=20260922i"></script>
+<script src="i18n.js?v=20260922l"></script>
+<script src="app.js?v=20260922l"></script>
 <script src="convoy.js?v=20260922e"></script>
 </body>
 </html>

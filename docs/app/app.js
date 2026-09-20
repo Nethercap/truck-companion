@@ -59,6 +59,10 @@ const TRANSLATIONS = {
     updateAvailableText: '🆕 A new client version is available (v{v}). Your connected client is outdated.',
     updateBannerLink: 'Download',
     mapNotLoaded: 'Map not loaded',
+    resetRoute: 'Clear dashboard route',
+    routeProgress: 'Route progress',
+    routeArrival: 'Arrival (local time)',
+    routeDuration: 'Remaining real time',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
     recenter: 'Recenter on truck',
@@ -1471,6 +1475,7 @@ function invalidateRoute() {
 
 function addWaypoint(pos, lngLat, inGame, label) {
   if (waypoints.length >= MAX_WAYPOINTS) { showToast(t('waypointLimitToast').replace('{n}', MAX_WAYPOINTS), 'danger'); return; }
+  dismissedRouteIdentity = null;
   const wp = { pos, lngLat, inGame, label: label || null, marker: makeWaypointMarker(lngLat, waypoints.length) };
   waypoints.push(wp);
   renderWaypointList();
@@ -2019,7 +2024,21 @@ function findRoute(startXY, endXY) {
 // el GPS del juego), la empresa de destino exacta (token empresa + ciudad
 // via POIs), el centro de la ciudad de destino (Cities.json), o - sin
 // trabajo - el ultimo waypoint puesto a mano (ej. "combustible mas cercano").
+let dismissedRouteIdentity = null;
+let routeProgressState = { key: null, total: 0 };
+let routeSummaryEtaSeconds = null;
+
+function routeIdentity(data) {
+  return JSON.stringify([data.game, data.citySrc, data.cityDst, data.companySrcId,
+    data.companyDstId, data.onJob, data.isCargoLoaded, data.cargo]);
+}
+
 function resolveRouteTarget(data) {
+  if (dismissedRouteIdentity === routeIdentity(data)) return null;
+  return resolveRawRouteTarget(data);
+}
+
+function resolveRawRouteTarget(data) {
   // Trabajo tomado pero carga todavia no enganchada: hay que ir a buscarla.
   // Empresa exacta si esta en los POIs; si no, el centro de la ciudad de
   // ORIGEN (antes caia al destino, que es justo a donde no hay que ir aun).
@@ -2081,6 +2100,53 @@ function splitRouteForDrawing(routePoints) {
     ferry: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: ferry } },
   };
 }
+
+function resetDisplayedRoute() {
+  dismissedRouteIdentity = lastData ? routeIdentity(lastData) : null;
+  clearWaypoint();
+  setWaypointMode(false);
+  currentRouteWorldPoints = null;
+  routeBehind = [];
+  routeProgressState = { key: null, total: 0 };
+  for (const id of ['route', 'route-next', 'route-ferry']) {
+    if (map && map.getSource(id)) map.getSource(id).setData(emptyLineString());
+  }
+  if (destMarker) { destMarker.remove(); destMarker = null; }
+  document.getElementById('navPanel').style.display = 'none';
+  document.getElementById('routeSummary').hidden = true;
+  document.getElementById('mapPanel').classList.remove('hasRouteSummary');
+  if (typeof convoyOnRouteChanged === 'function') convoyOnRouteChanged();
+}
+
+function updateRouteSummary(data) {
+  const target = resolveRouteTarget(data);
+  const panel = document.getElementById('routeSummary');
+  panel.hidden = !target;
+  document.getElementById('mapPanel').classList.toggle('hasRouteSummary', !!target);
+  if (!target) { routeProgressState = { key: null, total: 0 }; return; }
+  const manual = waypoints.some(wp => !wp.inGame) || target.kind === 'waypoint';
+  const remaining = manual
+    ? (currentRouteWorldPoints ? sumPathDistanceMeters(currentRouteWorldPoints) * distanceScale() / 1000 : null)
+    : (Number.isFinite(data.routeDistanceKm) ? Math.max(0, data.routeDistanceKm) : null);
+  const key = routeIdentity(data) + target.key;
+  if (routeProgressState.key !== key) routeProgressState = { key, total: 0 };
+  if (remaining != null) routeProgressState.total = Math.max(routeProgressState.total, remaining);
+  const percent = remaining == null || routeProgressState.total <= 0 ? 0
+    : Math.max(0, Math.min(100, (1 - remaining / routeProgressState.total) * 100));
+  const progress = document.getElementById('routeProgress');
+  progress.value = percent;
+  progress.title = `${Math.round(percent)}%`;
+  document.getElementById('routeRemaining').textContent = remaining == null ? '--'
+    : `${(useImperial ? remaining * KM_TO_MI : remaining).toFixed(1)} ${useImperial ? 'mi' : 'km'}`;
+  const seconds = manual
+    ? (remaining != null && lastKnownAvgSpeedKmh > 0 ? remaining / lastKnownAvgSpeedKmh * 3600 : null)
+    : (remaining === 0 ? 0 : routeSummaryEtaSeconds);
+  document.getElementById('routeDuration').textContent = formatSeconds(seconds);
+  document.getElementById('routeArrival').textContent = seconds != null && Number.isFinite(seconds)
+    ? new Date(Date.now() + seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+}
+
+document.getElementById('resetRouteBtn').addEventListener('click', resetDisplayedRoute);
 
 function updateDestinationMarker(data) {
   if (!map || !toLngLat) return;
@@ -2410,6 +2476,10 @@ function findUpcomingTurn() {
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 function updateNavPanel(turn) {
+  if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
+    document.getElementById('navPanel').style.display = 'none';
+    return;
+  }
   const panel = document.getElementById('navPanel');
   const nextLine = nextCityName ? `<span class="navNext">${t('navNextCity')}: ${nextCityName}</span>` : '';
   if (turn) {
@@ -2960,6 +3030,7 @@ function updateHud(data) {
 
   updateWaypointRoute(data);
   const realEtaSeconds = computeRealEtaSeconds(data);
+  routeSummaryEtaSeconds = realEtaSeconds;
   document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');
 
   // Proximo descanso obligatorio (fatiga): el SDK manda MINUTOS de juego
@@ -3673,6 +3744,7 @@ function handleTelemetry(data) {
   updateHud(data);
   updateMap(data.position || {}, data.game);
   updateDestinationMarker(data);
+  updateRouteSummary(data);
   checkUpdateBanner(data.clientVersion);
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
