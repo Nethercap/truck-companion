@@ -323,7 +323,7 @@ function convoyRenderMarkers() {
 }
 
 function convoyVariantLabel(v) {
-  return { ats_c2c: 'C2C', ats_promods: 'ProMods', ets2_promods: 'ProMods', ats: 'ATS', ets2: 'ETS2' }[v] || v;
+  return { ats_c2c: 'C2C', ats_promods: 'ProMods', ets2_promods: 'ProMods', ets2_promods_rusmap: 'ProMods+RusMap', ats: 'ATS', ets2: 'ETS2' }[v] || v;
 }
 
 // Companeros fuera de pantalla: una chapita pegada al borde del mapa, del

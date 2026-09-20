@@ -37,6 +37,7 @@ const TRANSLATIONS = {
     settingsCoastToCoast: 'I have Coast to Coast installed',
     settingsProModsCanada: 'I have ProMods Canada installed',
     settingsProMods: 'I have ProMods (Europe + all addons) installed',
+    settingsProModsRusMap: 'I have ProMods + RusMap (with the ProMods-RusMap connector)',
     colorRed: 'Red',
     colorBlue: 'Blue',
     colorGreen: 'Green',
@@ -313,6 +314,7 @@ const TRANSLATIONS = {
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
     settingsProModsCanada: 'Tengo instalado ProMods Canada',
     settingsProMods: 'Tengo instalado ProMods (Europe + todos los addons)',
+    settingsProModsRusMap: 'Tengo ProMods + RusMap (con el conector ProMods-RusMap)',
     colorRed: 'Rojo',
     colorBlue: 'Azul',
     colorGreen: 'Verde',
@@ -640,7 +642,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, hasProMods, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -840,7 +842,9 @@ function fillCurrencySelect() {
 // excluyentes (no se pueden combinar), por eso es un selector unico
 // ('none'|'c2c'|'promods_canada') en vez de dos checkboxes independientes.
 let atsMod = _savedSettings.atsMod || 'none';
-let hasProMods = _savedSettings.hasProMods || false;
+// Selector manual de ETS2: 'none' | 'promods' | 'promods_rusmap'. Antes era un
+// booleano hasProMods; lo guardado viejo se migra.
+let ets2Mod = _savedSettings.ets2Mod || (_savedSettings.hasProMods ? 'promods' : 'none');
 // Deteccion automatica de mods de mapa: el cliente (>= 1.5.1) lee
 // game.log.txt y manda {ets2: {promods,..}|null, ats: {c2c, promods_canada}|null}
 // en client_status. Con modsAuto (default) la variante del mapa sale de ahi;
@@ -891,8 +895,9 @@ function initModsUi() {
   document.getElementById('setAtsModNone').checked = atsMod === 'none';
   document.getElementById('setCoastToCoast').checked = atsMod === 'c2c';
   document.getElementById('setProModsCanada').checked = atsMod === 'promods_canada';
-  document.getElementById('setEts2ModNone').checked = !hasProMods;
-  document.getElementById('setProMods').checked = hasProMods;
+  document.getElementById('setEts2ModNone').checked = ets2Mod === 'none';
+  document.getElementById('setProMods').checked = ets2Mod === 'promods';
+  document.getElementById('setProModsRusMap').checked = ets2Mod === 'promods_rusmap';
 }
 
 document.querySelectorAll('input[name="modsAuto"]').forEach(radio => {
@@ -924,7 +929,7 @@ document.getElementById('setCurrency').addEventListener('change', (e) => {
 
 document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
-    hasProMods = e.target.value === 'promods';
+    ets2Mod = e.target.value;
     saveSettings();
     currentGame = null;
   });
@@ -1054,7 +1059,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921b', ats_promods: '20260921b', ets2: '20260921b', ets2_promods: '20260921b' };
+const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921b', ats_promods: '20260921b', ets2: '20260921b', ets2_promods: '20260921b', ets2_promods_rusmap: '20260920' };
 const GAME_MAPS = {
   ats: {
     assetsDir: `${REMOTE_MAP_BASE}/ats`,
@@ -1104,6 +1109,17 @@ const GAME_MAPS = {
     pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods.pmtiles`,
     sourceLayer: 'ets2',
     label: 'Euro Truck Simulator 2 + ProMods (Europe + addons)',
+    toLngLat: ets2ToLngLat,
+    fromLngLat: ets2FromLngLat,
+    origin: [15, 50],
+  },
+  // ProMods + RusMap (Rusia europea y Bielorrusia) unidos por el conector
+  // oficial ProMods-RusMap. Misma proyeccion/coordenadas que ets2.
+  ets2_promods_rusmap: {
+    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods_rusmap`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods_rusmap.pmtiles`,
+    sourceLayer: 'ets2',
+    label: 'Euro Truck Simulator 2 + ProMods + RusMap',
     toLngLat: ets2ToLngLat,
     fromLngLat: ets2FromLngLat,
     origin: [15, 50],
@@ -2533,12 +2549,14 @@ function resolveEffectiveGame(game) {
   if (det) {
     if (g === 'ats' && det.promods_canada) return 'ats_promods';
     if (g === 'ats' && det.c2c) return 'ats_c2c';
+    if (g === 'ets2' && det.promods && det.rusmap) return 'ets2_promods_rusmap';
     if (g === 'ets2' && det.promods) return 'ets2_promods';
     return g;
   }
   if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
   if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
-  if (g === 'ets2' && hasProMods) return 'ets2_promods';
+  if (g === 'ets2' && ets2Mod === 'promods_rusmap') return 'ets2_promods_rusmap';
+  if (g === 'ets2' && ets2Mod === 'promods') return 'ets2_promods';
   return g;
 }
 
@@ -2548,6 +2566,7 @@ function describeDetectedMods(game) {
   if (det === null) return t('modsDetectNoLog');
   const names = [];
   if (det.promods) names.push('ProMods');
+  if (det.rusmap) names.push('RusMap');
   if (det.promods_canada) names.push('ProMods Canada');
   if (det.c2c) names.push('Coast to Coast');
   return names.length ? t('modsDetected').replace('{mods}', names.join(' + ')) : t('modsDetectedNone');

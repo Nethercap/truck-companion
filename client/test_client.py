@@ -293,10 +293,15 @@ def test_parse_active_mods_none_without_list():
 
 
 def test_detect_map_mods_flags():
-    assert client.detect_map_mods(client.parse_active_mods(SAMPLE_LOG)) == {"promods": True, "promods_canada": False, "c2c": False}
+    assert client.detect_map_mods(client.parse_active_mods(SAMPLE_LOG)) == {"promods": True, "promods_canada": False, "c2c": False, "rusmap": False}
     mods = [
         {"file": "promods-ats-canada-v164", "name": "ProMods Canada", "version": "1.64", "author": "ProMods"},
         {"file": "coast2coast_v2.15", "name": "Coast to Coast", "version": "2.15", "author": "Mantrid"},
     ]
-    assert client.detect_map_mods(mods) == {"promods": False, "promods_canada": True, "c2c": True}
-    assert client.detect_map_mods([]) == {"promods": False, "promods_canada": False, "c2c": False}
+    assert client.detect_map_mods(mods) == {"promods": False, "promods_canada": True, "c2c": True, "rusmap": False}
+    assert client.detect_map_mods([]) == {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False}
+
+
+def test_detect_map_mods_rusmap_with_promods():
+    mods = [{"file": "promods-eu-map-v284.scs", "name": "ProMods Europe"}, {"file": "RusMap_Map.scs", "name": "RusMap 2.61"}, {"file": "cnx-pm-v284-rm-v261.scs", "name": "ProMods 2.84 - RusMap 2.61 Connector"}]
+    assert client.detect_map_mods(mods) == {"promods": True, "promods_canada": False, "c2c": False, "rusmap": True}

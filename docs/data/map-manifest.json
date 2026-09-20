@@ -81,6 +81,27 @@
         "ets2_promods/Cities.json",
         "ets2_promods/road-names.json"
       ]
+    },
+    "ets2_promods_rusmap": {
+      "label": "ETS2 + ProMods + RusMap (connector 2.84/2.61)",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-20",
+      "mapDataVersion": "20260920",
+      "mods": [
+        "promods",
+        "promods_me",
+        "promods_maghreb",
+        "promods_tgs",
+        "rusmap",
+        "cnx_promods_rusmap"
+      ],
+      "files": [
+        "vector/ets2_promods_rusmap.pmtiles",
+        "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.json",
+        "ets2_promods_rusmap/Cities.json",
+        "ets2_promods_rusmap/road-names.json"
+      ]
     }
   },
   "mods": {
@@ -141,8 +162,8 @@
     "rusmap": {
       "name": "RusMap",
       "game": "ets2",
-      "version": null,
-      "planned": true,
+      "version": "2.61",
+      "planned": false,
       "homepage": "https://forum.scssoft.com/viewtopic.php?t=332124",
       "check": {
         "url": "https://forum.scssoft.com/viewtopic.php?t=332124",
@@ -169,6 +190,17 @@
       "planned": true,
       "homepage": "https://roextended.ro/",
       "check": null
+    },
+    "cnx_promods_rusmap": {
+      "name": "ProMods–RusMap connector",
+      "game": "ets2",
+      "version": "2.84/2.61",
+      "homepage": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771",
+      "check": {
+        "url": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771",
+        "pattern": "ProMods (\\d+\\.\\d+ - RusMap \\d+\\.\\d+)",
+        "note": "titulo de la pagina en TruckyMods"
+      }
     }
   }
 }

@@ -31,6 +31,7 @@ VARIANTS = {
     "ats_promods": ("parser-output-ats-promods-v164", "usa"),
     "ets2": ("parser-output-ets2", "europe"),
     "ets2_promods": ("parser-output-ets2-promods-v284", "europe"),  # ProMods 2.84 + ME 2.84 + Maghreb 1.04 + TGS 1.70
+    "ets2_promods_rusmap": ("parser-output-ets2-promods-rusmap", "europe"),  # + RusMap 2.61 + conector 2.84/2.61
 }
 
 FACILITY_CODES = {
