@@ -166,6 +166,7 @@
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setProModsRoex" value="promods_roex" /> <span data-i18n="settingsProModsRoex">I have ProMods + Roextended (Hybrid edition)</span></label>
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setProModsRusMapRoex" value="promods_rusmap_roex" /> <span data-i18n="settingsProModsRusMapRoex">I have ProMods + RusMap + Roextended (Hybrid edition)</span></label>
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setGrandUtopia" value="gu" /> <span data-i18n="settingsGrandUtopia">I play on Grand Utopia (standalone map)</span></label>
+      <label class="settingsRow"><input type="radio" name="ets2Mod" id="setTruckersMP" value="tmp" /> <span data-i18n="settingsTruckersMP">I play on TruckersMP (base map + TruckersMP HQ and CD road)</span></label>
       </div>
 
       <button id="modsCloseBtn" data-i18n="close">Close</button>
@@ -447,6 +448,22 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18a9 9 0 0 1 18 0"/><path d="M7 18c0-4 2-7 3-9M17 18c0-5-3-8-5-10"/></svg>
           <span data-i18n="cmdWipers">Wipers</span>
         </button>
+        <!-- botones custom del usuario (hasta 3) + boton de agregar: los arma renderCustomButtons() -->
+      </div>
+    </div>
+  </div>
+
+  <div id="customBtnModal" class="settingsOverlay" style="display:none;">
+    <div class="settingsPanel">
+      <h3 data-i18n="customBtnModalTitle">Custom button</h3>
+      <p class="waypointModalExplain" data-i18n="customBtnExplain">The client presses this key in the game, exactly like the built-in buttons. Bind the same key to something in the game's controls.</p>
+      <div class="keybindRow"><span data-i18n="customBtnLabel">Label</span><input type="text" id="customBtnTitle" maxlength="14" style="width:140px" /></div>
+      <div class="keybindRow" style="margin-top:0.5rem"><span data-i18n="customBtnKey">Key</span><input type="text" id="customBtnKey" maxlength="24" style="width:140px" data-i18n-placeholder="customBtnKeyPlaceholder" placeholder="Press a key…" /></div>
+      <p class="waypointModalExplain" data-i18n="customBtnKeyHint">Click the field and press the key (Ctrl / Shift / Alt combos work). Letters, digits, F1–F24, numpad and the usual punctuation.</p>
+      <div class="waypointModalButtons">
+        <button id="customBtnSave" data-i18n="save">Save</button>
+        <button id="customBtnDelete" class="secondary" data-i18n="customBtnDelete">Delete</button>
+        <button id="customBtnCancel" class="secondary" data-i18n="close">Close</button>
       </div>
     </div>
   </div>

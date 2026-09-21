@@ -55,6 +55,7 @@ const TRANSLATIONS = {
     settingsProModsRoex: 'I have ProMods + Roextended (Hybrid edition)',
     settingsProModsRusMapRoex: 'I have ProMods + RusMap + Roextended (Hybrid edition)',
     settingsGrandUtopia: 'I play on Grand Utopia (standalone map)',
+    settingsTruckersMP: 'I play on TruckersMP (base map + TruckersMP HQ and CD road)',
     settingsProMods: 'I have ProMods (Europe + all addons) installed',
     settingsProModsRusMap: 'I have ProMods + RusMap (with the ProMods-RusMap connector)',
     colorRed: 'Red',
@@ -102,6 +103,17 @@ const TRANSLATIONS = {
     commandResultNoWindow: "Couldn't find the game window (is it running?)",
     commandResultError: 'Command failed: {reason}',
     commandNotConnectedToast: 'Not connected to the local client',
+    commandResultBadKey: "The client doesn't accept that key (check the custom button)",
+    customBtnAdd: 'Add button',
+    customBtnEdit: 'Edit',
+    customBtnModalTitle: 'Custom button',
+    customBtnExplain: "The client presses this key in the game, exactly like the built-in buttons. Bind the same key to something in the game's controls.",
+    customBtnLabel: 'Label',
+    customBtnKey: 'Key',
+    customBtnKeyPlaceholder: 'Press a key…',
+    customBtnKeyHint: 'Click the field and press the key (Ctrl / Shift / Alt combos work). Letters, digits, F1–F24, numpad and the usual punctuation.',
+    customBtnDelete: 'Delete',
+    customBtnIncomplete: 'Give the button a label and a key',
     keybindsModalTitle: 'Remap keys',
     keybindsModalExplain: "Keys must match your in-game control settings — if you remapped a control in the game, update it here too. Leave a field empty to leave that command unassigned.",
     keybindsUnassigned: 'unassigned',
@@ -351,6 +363,7 @@ const TRANSLATIONS = {
     settingsProModsRoex: 'Tengo ProMods + Roextended (edición Hybrid)',
     settingsProModsRusMapRoex: 'Tengo ProMods + RusMap + Roextended (edición Hybrid)',
     settingsGrandUtopia: 'Juego en Grand Utopia (mapa standalone)',
+    settingsTruckersMP: 'Juego en TruckersMP (mapa base + sede TMP y ruta CD)',
     settingsProMods: 'Tengo instalado ProMods (Europe + todos los addons)',
     settingsProModsRusMap: 'Tengo ProMods + RusMap (con el conector ProMods-RusMap)',
     colorRed: 'Rojo',
@@ -398,6 +411,17 @@ const TRANSLATIONS = {
     commandResultNoWindow: 'No se encontró la ventana del juego (¿está abierto?)',
     commandResultError: 'Falló el comando: {reason}',
     commandNotConnectedToast: 'No conectado al cliente local',
+    commandResultBadKey: 'El cliente no acepta esa tecla (revisá el botón custom)',
+    customBtnAdd: 'Agregar botón',
+    customBtnEdit: 'Editar',
+    customBtnModalTitle: 'Botón personalizado',
+    customBtnExplain: 'El cliente aprieta esta tecla en el juego, igual que los botones de siempre. Asignale esa misma tecla a algo en los controles del juego.',
+    customBtnLabel: 'Nombre',
+    customBtnKey: 'Tecla',
+    customBtnKeyPlaceholder: 'Apretá una tecla…',
+    customBtnKeyHint: 'Hacé clic en el campo y apretá la tecla (sirven combinaciones con Ctrl / Shift / Alt). Letras, números, F1–F24, teclado numérico y la puntuación habitual.',
+    customBtnDelete: 'Borrar',
+    customBtnIncomplete: 'Ponele un nombre y una tecla al botón',
     keybindsModalTitle: 'Remapear teclas',
     keybindsModalExplain: 'Las teclas tienen que coincidir con tu configuración de controles del juego — si remapeaste algo en el juego, actualizalo acá también. Dejá un campo vacío para que ese comando quede sin asignar.',
     keybindsUnassigned: 'sin asignar',
@@ -680,10 +704,18 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
+// Botones custom de la botonera: [{title, key}], hasta CUSTOM_BUTTONS_MAX.
+// Viven en este dispositivo (como el resto de los ajustes); la tecla viaja
+// con el comando y el cliente la valida contra su lista blanca.
+const CUSTOM_BUTTONS_MAX = 3;
+let customButtons = (Array.isArray(_savedSettings.customButtons) ? _savedSettings.customButtons : [])
+  .filter(b => b && typeof b.title === 'string' && typeof b.key === 'string' && b.key)
+  .slice(0, CUSTOM_BUTTONS_MAX)
+  .map(b => ({ title: b.title.slice(0, 14), key: b.key.slice(0, 24) }));
 const miniHudSettings = Object.assign(
   { fuelPct: false, fuelRange: false, eta: false, distance: false, cruise: true, gps: false },
   _savedSettings.miniHud
@@ -951,6 +983,8 @@ function initModsUi() {
   document.getElementById('setProModsRoex').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_roex;
   document.getElementById('setProModsRusMapRoex').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_rusmap_roex;
   document.getElementById('setGrandUtopia').checked = ets2Mod === 'gu';
+  document.getElementById('setTruckersMP').checked = ets2Mod === 'tmp';
+  document.getElementById('setTruckersMP').closest('label').hidden = !MAP_DATA_VERSION.ets2_tmp;
 }
 
 document.querySelectorAll('input[name="modsAuto"]').forEach(radio => {
@@ -1119,7 +1153,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921c', ats_promods: '20260921b', ats_c2c_promods: '20260921', ats_reforma: '20260921', ats_reforma_c2c_promods: '20260921', ets2: '20260921b', ets2_promods: '20260921b', ets2_promods_rusmap: '20260920', ets2_promods_roex: '20260921', ets2_promods_rusmap_roex: '20260921', ets2_gu: '20260921' };
+const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921c', ats_promods: '20260921b', ats_c2c_promods: '20260921', ats_reforma: '20260921', ats_reforma_c2c_promods: '20260921', ets2: '20260921b', ets2_promods: '20260921d', ets2_promods_rusmap: '20260921d', ets2_promods_roex: '20260921d', ets2_promods_rusmap_roex: '20260921', ets2_gu: '20260921e', ets2_tmp: '20260921d' };
 // Una variante sin entrada en MAP_DATA_VERSION esta cableada pero todavia no
 // publicada en R2 (ej. Roextended a la espera de sus paquetes Def/Models):
 // no se ofrece en Ajustes y la auto-deteccion cae a la mas parecida.
@@ -1239,6 +1273,18 @@ const GAME_MAPS = {
     toLngLat: ets2ToLngLat,
     fromLngLat: ets2FromLngLat,
     origin: [20, 47],
+  },
+  // TruckersMP: juego base + sede "TruckersMP HQ" (4 sectores cerca de
+  // Duisburg) + prefabs/carteles de la ruta Calais-Duisburg. Se detecta por
+  // los archivos .mp que el launcher monta (aparecen en game.log.txt).
+  ets2_tmp: {
+    assetsDir: `${REMOTE_MAP_BASE}/ets2_tmp`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_tmp.pmtiles`,
+    sourceLayer: 'ets2',
+    label: 'Euro Truck Simulator 2 + TruckersMP',
+    toLngLat: ets2ToLngLat,
+    fromLngLat: ets2FromLngLat,
+    origin: [15, 50],
   },
   // Grand Utopia: mapa standalone (reemplaza Europa; perfil propio en el
   // juego). Misma proyeccion que ets2, queda al oeste de Europa.
@@ -2703,6 +2749,9 @@ function resolveEffectiveGame(game) {
     if (g === 'ets2' && det.roextended) return publishedVariant('ets2_promods_roex', 'ets2_promods');
     if (g === 'ets2' && det.promods && det.rusmap) return 'ets2_promods_rusmap';
     if (g === 'ets2' && det.promods) return 'ets2_promods';
+    // TruckersMP sin mods de mapa: juego base + sede TMP + CD road. En su
+    // servidor ProMods gana ProMods (la sede no esta en ese pack, es minimo).
+    if (g === 'ets2' && det.truckersmp) return publishedVariant('ets2_tmp', 'ets2');
     return g;
   }
   if (g === 'ats' && atsMod === 'reforma_c2c_promods_canada') return 'ats_reforma_c2c_promods';
@@ -2711,6 +2760,7 @@ function resolveEffectiveGame(game) {
   if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
   if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
   if (g === 'ets2' && ets2Mod === 'gu') return 'ets2_gu';
+  if (g === 'ets2' && ets2Mod === 'tmp') return publishedVariant('ets2_tmp', 'ets2');
   if (g === 'ets2' && ets2Mod === 'promods_rusmap_roex') return publishedVariant('ets2_promods_rusmap_roex', 'ets2_promods_rusmap');
   if (g === 'ets2' && ets2Mod === 'promods_roex') return publishedVariant('ets2_promods_roex', 'ets2_promods');
   if (g === 'ets2' && ets2Mod === 'promods_rusmap') return 'ets2_promods_rusmap';
@@ -2727,6 +2777,7 @@ function describeDetectedMods(game) {
   if (det.rusmap) names.push('RusMap');
   if (det.roextended) names.push('Roextended');
   if (det.grand_utopia) names.push('Grand Utopia');
+  if (det.truckersmp) names.push('TruckersMP');
   if (det.promods_canada) names.push('ProMods Canada');
   if (det.c2c) names.push('Coast to Coast');
   if (det.reforma) names.push('Reforma');
@@ -3639,16 +3690,114 @@ function updateCommandsPageActive() {
 panelSwipeEl.addEventListener('scroll', updateCommandsPageActive);
 commandsPortraitQuery.addEventListener('change', updateCommandsPageActive);
 
+function sendCommand(payload) {
+  if (conn.demo) { showToast(t('demoNoCommands'), 'danger', 2500); return; }
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast(t('commandNotConnectedToast'), 'danger');
+    return;
+  }
+  ws.send(JSON.stringify(Object.assign({ type: 'command' }, payload)));
+}
 document.querySelectorAll('#commandsPanel .cmdBtn[data-action]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (conn.demo) { showToast(t('demoNoCommands'), 'danger', 2500); return; }
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      showToast(t('commandNotConnectedToast'), 'danger');
-      return;
-    }
-    ws.send(JSON.stringify({ type: 'command', action: btn.dataset.action }));
-  });
+  btn.addEventListener('click', () => sendCommand({ action: btn.dataset.action }));
 });
+
+// ---------------------------------------------------------------- botones custom
+// Nombre de tecla (formato pydirectinput del cliente) a partir de un keydown:
+// letras/digitos tal cual, F1-F24, numpad como num0-num9 / add / subtract...,
+// teclas con nombre y puntuacion; modificadores adelante separados por "+".
+const KEY_EVENT_NAMES = { ' ': 'space', Enter: 'enter', Tab: 'tab', Escape: 'esc', Backspace: 'backspace', Delete: 'delete', Insert: 'insert', Home: 'home', End: 'end',
+  PageUp: 'pageup', PageDown: 'pagedown', ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+const KEY_CODE_NAMES = { NumpadAdd: 'add', NumpadSubtract: 'subtract', NumpadMultiply: 'multiply', NumpadDivide: 'divide', NumpadDecimal: 'decimal', NumpadEnter: 'enter' };
+function keyNameFromEvent(e) {
+  let key = null;
+  if (KEY_CODE_NAMES[e.code]) key = KEY_CODE_NAMES[e.code];
+  else if (/^Numpad[0-9]$/.test(e.code)) key = 'num' + e.code.slice(6);
+  else if (/^F([1-9]|1[0-9]|2[0-4])$/.test(e.key)) key = e.key.toLowerCase();
+  else if (KEY_EVENT_NAMES[e.key]) key = KEY_EVENT_NAMES[e.key];
+  else if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3).toLowerCase(); // independiente del layout/AltGr
+  else if (/^Digit[0-9]$/.test(e.code)) key = e.code.slice(5);
+  else if (e.key.length === 1 && ";',./\\[]-=`".includes(e.key)) key = e.key;
+  if (!key) return null;
+  const mods = [];
+  if (e.ctrlKey) mods.push('ctrl');
+  if (e.shiftKey) mods.push('shift');
+  if (e.altKey) mods.push('alt');
+  if (mods.includes('alt') && key === 'f4') return null; // cerraria el juego
+  return mods.concat(key).join('+');
+}
+function keyCapLabel(key) {
+  return key.split('+').map(part => {
+    if (/^(f[0-9]+|[a-z0-9])$/.test(part)) return part.toUpperCase();
+    if (/^num[0-9]$/.test(part)) return 'Num ' + part.slice(3);
+    if (/^[a-z]/.test(part)) return part[0].toUpperCase() + part.slice(1); // Ctrl, Shift, Space, Pageup...
+    return part;
+  }).join('+');
+}
+
+let customBtnEditing = null; // indice en customButtons, o null = alta
+
+function renderCustomButtons() {
+  const grid = document.querySelector('#commandsPanel .cmdGrid');
+  if (!grid) return;
+  grid.querySelectorAll('.cmdCustom, .cmdAdd').forEach(el => el.remove());
+  customButtons.forEach((b, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'cmdBtn cmdCustom';
+    btn.title = `${b.title} · ${keyCapLabel(b.key)}`;
+    btn.innerHTML = `<span class="keyCap"></span><span></span><span class="cmdEditBadge" role="button" title="${escapeHtml(t('customBtnEdit'))}">✎</span>`;
+    btn.querySelector('.keyCap').textContent = keyCapLabel(b.key);
+    btn.querySelectorAll('span')[1].textContent = b.title;
+    btn.addEventListener('click', () => sendCommand({ action: 'custom', key: b.key }));
+    btn.querySelector('.cmdEditBadge').addEventListener('click', (e) => { e.stopPropagation(); openCustomBtnModal(i); });
+    grid.appendChild(btn);
+  });
+  if (customButtons.length < CUSTOM_BUTTONS_MAX) {
+    const add = document.createElement('button');
+    add.className = 'cmdBtn cmdAdd';
+    add.innerHTML = `<span class="plus">+</span><span></span>`;
+    add.querySelectorAll('span')[1].textContent = t('customBtnAdd');
+    add.title = t('customBtnAdd');
+    add.addEventListener('click', () => openCustomBtnModal(null));
+    grid.appendChild(add);
+  }
+}
+
+function openCustomBtnModal(index) {
+  customBtnEditing = index;
+  const b = index == null ? { title: '', key: '' } : customButtons[index];
+  document.getElementById('customBtnTitle').value = b.title;
+  document.getElementById('customBtnKey').value = b.key;
+  document.getElementById('customBtnDelete').style.display = index == null ? 'none' : '';
+  document.getElementById('customBtnModal').style.display = 'flex';
+  document.getElementById('customBtnTitle').focus();
+}
+function closeCustomBtnModal() { document.getElementById('customBtnModal').style.display = 'none'; customBtnEditing = null; }
+
+document.getElementById('customBtnKey').addEventListener('keydown', (e) => {
+  if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return; // esperando la tecla principal
+  e.preventDefault();
+  const name = keyNameFromEvent(e);
+  if (name) e.target.value = name;
+});
+document.getElementById('customBtnSave').addEventListener('click', () => {
+  const title = document.getElementById('customBtnTitle').value.trim().slice(0, 14);
+  const key = document.getElementById('customBtnKey').value.trim().toLowerCase().slice(0, 24);
+  if (!title || !key) { showToast(t('customBtnIncomplete'), 'danger', 3000); return; }
+  if (customBtnEditing == null) customButtons.push({ title, key });
+  else customButtons[customBtnEditing] = { title, key };
+  saveSettings();
+  renderCustomButtons();
+  closeCustomBtnModal();
+});
+document.getElementById('customBtnDelete').addEventListener('click', () => {
+  if (customBtnEditing != null) customButtons.splice(customBtnEditing, 1);
+  saveSettings();
+  renderCustomButtons();
+  closeCustomBtnModal();
+});
+document.getElementById('customBtnCancel').addEventListener('click', closeCustomBtnModal);
+renderCustomButtons();
 
 // Modal de remapeo de teclas: pide los binds actuales al cliente local (no
 // se guardan en la web, viven solo en keybinds.json del lado del cliente),
@@ -3726,7 +3875,7 @@ function handleKeybindsMessage(data) {
 // funciono, para no repetir un toast en cada click (ver historial: eso ya
 // se probo y molestaba). El motivo viene del cliente local, que es el unico
 // que sabe realmente si encontro la ventana del juego, etc.
-const COMMAND_RESULT_REASON_KEY = { no_key: 'commandResultNoKey', no_window: 'commandResultNoWindow' };
+const COMMAND_RESULT_REASON_KEY = { no_key: 'commandResultNoKey', no_window: 'commandResultNoWindow', bad_key: 'commandResultBadKey' };
 function handleCommandResult(data) {
   if (data.ok) return;
   const reasonKey = COMMAND_RESULT_REASON_KEY[data.reason];

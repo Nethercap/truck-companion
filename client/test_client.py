@@ -292,7 +292,29 @@ def test_parse_active_mods_none_without_list():
     assert client.parse_active_mods("00:00:01 : [hashfs] base.scs: Created") is None
 
 
-NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False}
+NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "truckersmp": False}
+
+
+def test_parse_custom_key():
+    assert client.parse_custom_key("f5") == ["f5"]
+    assert client.parse_custom_key("Ctrl+Shift+F5") == ["ctrl", "shift", "f5"]
+    assert client.parse_custom_key("num7") == ["num7"]
+    assert client.parse_custom_key("alt+f4") is None
+    assert client.parse_custom_key("win+r") is None
+    assert client.parse_custom_key("ctrl+ctrl+a") is None
+    assert client.parse_custom_key("ctrl+") is None
+    assert client.parse_custom_key("") is None
+    assert client.parse_custom_key(None) is None
+    assert client.parse_custom_key("f24") == ["f24"] and "f24" in client.pydirectinput.KEYBOARD_MAPPING
+
+
+def test_is_truckersmp_session():
+    # linea real de un game.log.txt jugando por el launcher de TruckersMP (2026-09-21)
+    real = r"00:00:01.855 : [fs] device C:\Users\x\AppData\Roaming\TruckersMP\installation/data/ets2/mods/data1.mp mounted to mod pool."
+    assert client.is_truckersmp_session(real)
+    assert not client.is_truckersmp_session(SAMPLE_LOG)
+    # un mod cualquiera con "truckersmp" en el nombre no cuenta
+    assert not client.is_truckersmp_session("[mods] Active local mod truckersmp_skin (name: TruckersMP skin, version: 1, author: x)")
 
 
 def test_detect_map_mods_flags():

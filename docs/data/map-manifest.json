@@ -123,8 +123,8 @@
       "label": "ETS2 + ProMods Europe (+ Middle East, The Maghreb, The Great Steppe)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-18",
-      "mapDataVersion": "20260921b",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921d",
       "mods": [
         "promods",
         "promods_me",
@@ -142,8 +142,8 @@
       "label": "ETS2 + ProMods + RusMap (connector 2.84/2.61)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-20",
-      "mapDataVersion": "20260920",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921d",
       "mods": [
         "promods",
         "promods_me",
@@ -164,7 +164,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-21",
-      "mapDataVersion": "20260921",
+      "mapDataVersion": "20260921d",
       "mods": [
         "promods",
         "promods_me",
@@ -207,7 +207,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-21",
-      "mapDataVersion": "20260921",
+      "mapDataVersion": "20260921e",
       "mods": [
         "grand_utopia"
       ],
@@ -216,6 +216,22 @@
         "ets2_gu/route-graph-ets2_gu.json",
         "ets2_gu/Cities.json",
         "ets2_gu/road-names.json"
+      ]
+    },
+    "ets2_tmp": {
+      "label": "ETS2 + TruckersMP (HQ + CD road)",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921d",
+      "mods": [
+        "truckersmp"
+      ],
+      "files": [
+        "vector/ets2_tmp.pmtiles",
+        "ets2_tmp/route-graph-ets2_tmp.json",
+        "ets2_tmp/Cities.json",
+        "ets2_tmp/road-names.json"
       ]
     }
   },
@@ -358,6 +374,14 @@
         "pattern": "badge-light-primary[^>]*>(\\d+\\.\\d+[a-z]?)<",
         "note": "badges de version en el historial de TruckyMods (la mas alta gana)"
       }
+    },
+    "truckersmp": {
+      "name": "TruckersMP (map additions)",
+      "game": "ets2",
+      "version": "launcher 1.3.19 (2026-09-21)",
+      "homepage": "https://truckersmp.com/",
+      "check": null,
+      "checkNote": "los paquetes .mp del launcher no llevan version: se actualizan solos; regenerar si cambian hq_final/cd_changes"
     }
   }
 }

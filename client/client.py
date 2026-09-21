@@ -55,7 +55,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.5.5"
+CLIENT_VERSION = "1.5.6"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -188,7 +188,7 @@ def detect_map_mods(mods: list) -> dict:
     """{promods, promods_canada, c2c} a partir de nombres/archivos de mods.
     ProMods Europa y sus addons (ME, Maghreb, TGS) cuentan como 'promods';
     'ProMods Canada' es el pack de ATS."""
-    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False}
+    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "truckersmp": False}
     for mod in mods:
         text = f"{mod.get('file', '')} {mod.get('name', '')}".lower()
         if "promods" in text or "pm-" in text or "cnx-pm" in text:
@@ -211,6 +211,18 @@ def detect_map_mods(mods: list) -> dict:
     return flags
 
 
+_TMP_MOUNT_RE = re.compile(r"\[fs\] device .*truckersmp.*\.mp mounted to mod pool", re.IGNORECASE)
+
+
+def is_truckersmp_session(log_text: str) -> bool:
+    """El launcher de TruckersMP monta sus paquetes .mp desde
+    %APPDATA%/TruckersMP/installation/... y el juego lo escribe en el log
+    ("[fs] device C:/.../TruckersMP/installation/data/ets2/mods/data1.mp
+    mounted to mod pool."); en una sesion normal no aparece. Ojo: en esas
+    sesiones el log NO trae la lista "[mods] Active N mods"."""
+    return bool(_TMP_MOUNT_RE.search(log_text))
+
+
 def read_map_mods() -> dict:
     """{'ets2': {...flags} | None, 'ats': {...} | None} - None = sin datos
     (el log no existe o no tiene lista de mods)."""
@@ -218,10 +230,16 @@ def read_map_mods() -> dict:
     for game, path in game_log_paths().items():
         try:
             with open(path, encoding="utf-8", errors="ignore") as f:
-                mods = parse_active_mods(f.read())
+                text = f.read()
         except OSError:
-            mods = None
-        result[game] = detect_map_mods(mods) if mods is not None else None
+            result[game] = None
+            continue
+        mods = parse_active_mods(text)
+        flags = detect_map_mods(mods) if mods is not None else None
+        if is_truckersmp_session(text):
+            flags = flags or detect_map_mods([])
+            flags["truckersmp"] = True
+        result[game] = flags
     return result
 
 
@@ -387,6 +405,65 @@ def bring_window_to_foreground(hwnd) -> None:
     finally:
         _user32.AttachThreadInput(current_thread_id, foreground_thread_id, False)
         _user32.AttachThreadInput(current_thread_id, target_thread_id, False)
+
+
+# Teclas que pydirectinput no trae de fabrica (scancodes DirectInput): el
+# teclado numerico (el juego lo distingue de la fila de numeros) y F13-F24.
+_EXTRA_SCANCODES = {"num0": 0x52, "num1": 0x4F, "num2": 0x50, "num3": 0x51, "num4": 0x4B, "num5": 0x4C, "num6": 0x4D, "num7": 0x47, "num8": 0x48, "num9": 0x49,
+                    "f13": 0x64, "f14": 0x65, "f15": 0x66, "f16": 0x67, "f17": 0x68, "f18": 0x69, "f19": 0x6A, "f20": 0x6B, "f21": 0x6C, "f22": 0x6D, "f23": 0x6E, "f24": 0x6F}
+pydirectinput.KEYBOARD_MAPPING.update(_EXTRA_SCANCODES)
+
+# Botones custom de la web: la tecla viaja con el comando ("ctrl+shift+f5"),
+# se valida contra esta lista blanca (nada de Win, nada de Alt+F4) y se
+# aprieta con los modificadores sostenidos.
+CUSTOM_KEY_MODIFIERS = ("ctrl", "shift", "alt")
+CUSTOM_KEY_ALLOWED = (
+    set("abcdefghijklmnopqrstuvwxyz0123456789")
+    | {f"f{i}" for i in range(1, 25)}
+    | {f"num{i}" for i in range(10)}
+    | {"space", "enter", "tab", "esc", "backspace", "delete", "insert", "home", "end", "pageup", "pagedown",
+       "up", "down", "left", "right", "add", "subtract", "multiply", "divide", "decimal",
+       ";", "'", ",", ".", "/", "\\", "[", "]", "-", "=", "`"}
+)
+
+
+def parse_custom_key(spec) -> list | None:
+    """'ctrl+shift+f5' -> ['ctrl', 'shift', 'f5'] (modificadores primero,
+    sin repetir), o None si algo no esta en la lista blanca."""
+    if not isinstance(spec, str):
+        return None
+    parts = [p.strip().lower() for p in spec.split("+")]
+    if not parts or any(not p for p in parts) or len(parts) > 4:
+        return None
+    mods, key = parts[:-1], parts[-1]
+    if len(set(mods)) != len(mods) or any(m not in CUSTOM_KEY_MODIFIERS for m in mods):
+        return None
+    if key not in CUSTOM_KEY_ALLOWED or ("alt" in mods and key == "f4"):
+        return None
+    return mods + [key]
+
+
+def send_custom_key(spec) -> str:
+    combo = parse_custom_key(spec)
+    if not combo:
+        return "bad_key"
+    hwnd = find_game_window()
+    if not hwnd:
+        return "no_window"
+    try:
+        bring_window_to_foreground(hwnd)
+        mods, key = combo[:-1], combo[-1]
+        for m in mods:
+            pydirectinput.keyDown(m)
+        try:
+            pydirectinput.press(key)
+        finally:
+            for m in reversed(mods):
+                pydirectinput.keyUp(m)
+        return "ok"
+    except Exception as exc:
+        logging.warning(f"No se pudo enviar la tecla custom '{spec}': {exc}")
+        return str(exc)
 
 
 def send_game_command(action: str, keybinds: dict) -> str:
@@ -622,7 +699,10 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
         msg_type = payload.get("type")
         if msg_type == "command":
             action = payload.get("action", "")
-            result = await asyncio.to_thread(send_game_command, action, keybinds)
+            if action == "custom":
+                result = await asyncio.to_thread(send_custom_key, payload.get("key"))
+            else:
+                result = await asyncio.to_thread(send_game_command, action, keybinds)
             if result != "ok":
                 await send(json.dumps({"type": "command_result", "action": action, "ok": False, "reason": result}))
         elif msg_type == "get_keybinds":

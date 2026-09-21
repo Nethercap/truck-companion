@@ -33,11 +33,12 @@ VARIANTS = {
     "ats_reforma": ("parser-output-ats_reforma", "usa"),  # Reforma 2.9.9.160 + Mega Resources + Sierra Nevada 1.16
     "ats_reforma_c2c_promods": ("parser-output-ats_reforma_c2c_promods", "usa"),  # + C2C + ProMods Canada + OtherMaps Patch 37
     "ets2": ("parser-output-ets2", "europe"),
-    "ets2_promods": ("parser-output-ets2-promods-v284", "europe"),  # ProMods 2.84 + ME 2.84 + Maghreb 1.04 + TGS 1.70
-    "ets2_promods_rusmap": ("parser-output-ets2-promods-rusmap", "europe"),  # + RusMap 2.61 + conector 2.84/2.61
+    "ets2_promods": ("parser-output-ets2_promods", "europe"),  # ProMods 2.84 + ME 2.84 + Maghreb 1.04 + TGS 1.70
+    "ets2_promods_rusmap": ("parser-output-ets2_promods_rusmap", "europe"),  # + RusMap 2.61 + conector 2.84/2.61
     "ets2_promods_roex": ("parser-output-ets2_promods_roex", "europe"),  # ProMods + Roextended Hybrid 1.61 v3 + ROEX53PMME284
     "ets2_promods_rusmap_roex": ("parser-output-ets2_promods_rusmap_roex", "europe"),  # + RusMap + ROEX53RM261
     "ets2_gu": ("parser-output-ets2_gu", "europe"),  # Grand Utopia 1.20c (standalone)
+    "ets2_tmp": ("parser-output-ets2_tmp", "europe"),  # TruckersMP (sede TMP + CD road)
 }
 
 FACILITY_CODES = {

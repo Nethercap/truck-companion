@@ -387,6 +387,16 @@
   /* Etiquetas largas de una sola palabra (idiomas) no deben salirse del boton. */
   .cmdBtn span { max-width: 100%; overflow-wrap: anywhere; }
   .cmdBtn:hover { border-color: #555; }
+  /* Botones custom: una "tecla" dibujada con el nombre de la tecla, y un
+     lapiz chiquito en la esquina para editarlo/borrarlo. */
+  .cmdBtn.cmdCustom { position: relative; }
+  .cmdBtn .keyCap { display: inline-block; min-width: 28px; max-width: 100%; height: 24px; line-height: 22px; padding: 0 5px; border: 1px solid #666; border-bottom-width: 3px; border-radius: 5px; background: #2d3138; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmdBtn.active .keyCap { border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.15); }
+  .cmdEditBadge { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: var(--muted); font-size: 0.7rem; line-height: 18px; text-align: center; cursor: pointer; padding: 0; }
+  .cmdEditBadge:hover { background: rgba(255,255,255,0.2); color: var(--text); }
+  .cmdBtn.cmdAdd { border-style: dashed; color: var(--muted); }
+  .cmdBtn.cmdAdd:hover { color: var(--text); }
+  .cmdBtn.cmdAdd .plus { font-size: 1.4rem; line-height: 24px; height: 24px; }
   .cmdBtn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   #commandsDrawer {
