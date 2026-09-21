@@ -249,6 +249,44 @@ function stabilizeManeuver(state, turn, ticks) {
   return state.shown || null;
 }
 
+// Consumo medido de verdad: litros gastados / km recorridos segun el odometro
+// y el nivel del tanque, sobre una ventana movil de windowKm. El SDK trae un
+// "consumo promedio" y una "autonomia" que el juego calcula con un valor
+// nominal del camion (un usuario midio 32 L/100km fijos contra 23.9 reales),
+// asi que la autonomia salia 25% corta. La serie se reinicia al cargar
+// combustible (el tanque sube), al cambiar de camion/juego o si el odometro
+// retrocede; hasta juntar minKm no hay dato (se cae al del SDK).
+function createFuelTracker({ windowKm = 150, minKm = 15, refuelL = 2 } = {}) {
+  let samples = []; // [{odo, fuel}] ordenados por odometro
+  let key = null;
+  let last = null;
+  return {
+    push(odoKm, fuelL, truckKey) {
+      if (odoKm == null || fuelL == null || !isFinite(odoKm) || !isFinite(fuelL)) return;
+      if (truckKey !== key || (last && (fuelL > last.fuel + refuelL || odoKm < last.odo - 0.01))) {
+        samples = []; key = truckKey;
+      }
+      last = { odo: odoKm, fuel: fuelL };
+      if (!samples.length || odoKm - samples[samples.length - 1].odo >= 0.2) samples.push(last);
+      else samples[samples.length - 1] = last; // mismo tramo: quedarse con el ultimo valor
+      // recortar por delante dejando siempre un punto de arranque dentro de la ventana
+      while (samples.length > 2 && odoKm - samples[1].odo >= windowKm) samples.shift();
+    },
+    // L/100km medido, o null si todavia no hay minKm de datos
+    avgLPer100() {
+      if (samples.length < 2) return null;
+      const first = samples[0], now = samples[samples.length - 1];
+      const km = now.odo - first.odo, used = first.fuel - now.fuel;
+      if (km < minKm || used <= 0) return null;
+      return used / km * 100;
+    },
+    // km de datos que respaldan la medicion (para mostrarlo)
+    spanKm() { return samples.length < 2 ? 0 : samples[samples.length - 1].odo - samples[0].odo; },
+    state() { return { key, samples }; },
+    restore(saved) { if (saved && Array.isArray(saved.samples)) { samples = saved.samples.slice(-1000); key = saved.key; last = samples[samples.length - 1] || null; } },
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver };
+  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker };
 }

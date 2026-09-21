@@ -108,6 +108,8 @@ const TRANSLATIONS = {
     commandResultNoWindow: "Couldn't find the game window (is it running?)",
     commandResultError: 'Command failed: {reason}',
     commandNotConnectedToast: 'Not connected to the local client',
+    fuelMeasuredHint: 'Measured from your fuel level and odometer over the last {km} {unit} (resets when you refuel)',
+    fuelSdkHint: "Game's own average until 15 km of driving have been measured",
     commandResultBadKey: "The client doesn't accept that key (check the custom button)",
     customBtnAdd: 'Add button',
     customBtnEdit: 'Edit',
@@ -421,6 +423,8 @@ const TRANSLATIONS = {
     commandResultNoWindow: 'No se encontró la ventana del juego (¿está abierto?)',
     commandResultError: 'Falló el comando: {reason}',
     commandNotConnectedToast: 'No conectado al cliente local',
+    fuelMeasuredHint: 'Medido con tu nivel de tanque y odómetro en los últimos {km} {unit} (se reinicia al cargar)',
+    fuelSdkHint: 'Promedio del juego hasta juntar 15 km de datos propios',
     commandResultBadKey: 'El cliente no acepta esa tecla (revisá el botón custom)',
     customBtnAdd: 'Agregar botón',
     customBtnEdit: 'Editar',
@@ -1426,7 +1430,8 @@ let destMarker = null;
 let toLngLat = null; // funcion (x,z) => [lng,lat] del juego actual
 let fromLngLat = null; // funcion (lng,lat) => [x,z] del juego actual - inversa, para ubicar un waypoint
 let currentGame = null;
-let citiesByName = {}; // Name -> {X, Y}
+let citiesByName = {}; // Name (localizado o nativo) -> {Name, X, Y, Token, Native?}
+let citiesByToken = {}; // token del juego -> misma entrada
 const trailWorld = []; // [[lng,lat], ...]
 const MAX_TRAIL_POINTS = 1000;
 let trailWorldRaw = null; // coords de juego del ultimo punto agregado al trail
@@ -1564,10 +1569,24 @@ async function loadCities(mapInfo) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const list = await res.json();
     citiesByName = {};
-    for (const c of list) citiesByName[c.Name] = c;
+    citiesByToken = {};
+    for (const c of list) {
+      citiesByName[c.Name] = c;
+      // Nombre nativo (ej. "Москва" ademas de "Moscow"): la telemetria manda
+      // el nombre en el idioma del juego del jugador, asi que se acepta
+      // cualquiera de los dos; el mapa muestra siempre c.Name.
+      if (c.Native && !citiesByName[c.Native]) citiesByName[c.Native] = c;
+      if (c.Token) citiesByToken[c.Token] = c;
+    }
   } catch (err) {
     citiesByName = {};
+    citiesByToken = {};
   }
+}
+// Ciudad por id del juego (cityDstId/citySrcId de la telemetria) y si no por
+// nombre: el id no depende del idioma, el nombre si.
+function findCity(id, name) {
+  return (id && citiesByToken[id]) || (name && citiesByName[name]) || null;
 }
 
 // Nombres reales extraidos de los carteles del juego (ver extract_road_names.py
@@ -1896,8 +1915,9 @@ const NEAR_CITY_M = 4000;
 function nearestCityName(x, z) {
   let best = null, bestDist = NEAR_CITY_M;
   for (const [name, c] of Object.entries(citiesByName)) {
+    if (name !== c.Name) continue; // alias por nombre nativo: misma ciudad
     const d = Math.hypot(c.X - x, c.Y - z);
-    if (d < bestDist) { bestDist = d; best = name; }
+    if (d < bestDist) { bestDist = d; best = c.Name; }
   }
   return best;
 }
@@ -2335,14 +2355,14 @@ function resolveRouteTarget(data) {
   if (data.onJob && data.isCargoLoaded === false) {
     const pickup = data.companySrcId ? findCompanyPoi(data.companySrcId, data.citySrcId) : null;
     if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${data.companySrcId}@${data.citySrcId}` };
-    const srcCity = data.citySrc && citiesByName[data.citySrc];
+    const srcCity = findCity(data.citySrcId, data.citySrc);
     if (srcCity) return { x: srcCity.X, z: srcCity.Y, kind: 'pickup', key: `pickupcity:${data.citySrc}` };
   }
   if (data.cityDst) {
     const company = data.companyDstId ? findCompanyPoi(data.companyDstId, data.cityDstId) : null;
     if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${data.companyDstId}@${data.cityDstId}` };
-    const city = citiesByName[data.cityDst];
-    if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDst}` };
+    const city = findCity(data.cityDstId, data.cityDst);
+    if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}` };
   }
   if (waypoints.length) {
     const last = waypoints[waypoints.length - 1];
@@ -2758,10 +2778,11 @@ function updateNextCity(x, z) {
     const step = Math.max(1, Math.floor(pts.length / 400));
     let bestIdx = Infinity;
     for (const [name, c] of Object.entries(citiesByName)) {
+      if (name !== c.Name) continue; // alias por nombre nativo: misma ciudad
       if (Math.hypot(c.X - x, c.Y - z) < 2000) continue; // ciudad actual
       for (let i = 0; i < pts.length; i += step) {
         if (i >= bestIdx) break;
-        if (Math.hypot(pts[i][0] - c.X, pts[i][1] - c.Y) < NEXT_CITY_RADIUS_M) { bestIdx = i; found = name; break; }
+        if (Math.hypot(pts[i][0] - c.X, pts[i][1] - c.Y) < NEXT_CITY_RADIUS_M) { bestIdx = i; found = c.Name; break; }
       }
     }
   }
@@ -3028,8 +3049,9 @@ function updateMiniHudExtra(data) {
     const pct = Math.max(0, Math.min(100, (data.fuel / data.fuelCapacity) * 100));
     lines.push(`${t('fuel')}: ${Math.round(pct)}%`);
   }
-  if (miniHudSettings.fuelRange && data.fuelRangeKm != null) {
-    const rangeDisplay = useImperial ? data.fuelRangeKm * KM_TO_MI : data.fuelRangeKm;
+  const ffRange = fuelFigures(data).rangeKm;
+  if (miniHudSettings.fuelRange && ffRange != null) {
+    const rangeDisplay = useImperial ? ffRange * KM_TO_MI : ffRange;
     lines.push(`${t('range')}: ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`);
   }
   if (miniHudSettings.eta && data.routeTimeSeconds != null) {
@@ -3220,7 +3242,8 @@ function renderGauges(data) {
   }
   const odo = data.odometerKm;
   document.getElementById('gaugeOdometer').textContent = odo != null ? `${Math.round(useImperial ? odo * KM_TO_MI : odo).toLocaleString()} ${useImperial ? 'mi' : 'km'}` : '-';
-  document.getElementById('gaugeRange').textContent = data.fuelRangeKm != null ? `⛽ ${Math.round(useImperial ? data.fuelRangeKm * KM_TO_MI : data.fuelRangeKm)} ${useImperial ? 'mi' : 'km'}` : '-';
+  const gaugeRangeKm = fuelFigures(data).rangeKm;
+  document.getElementById('gaugeRange').textContent = gaugeRangeKm != null ? `⛽ ${Math.round(useImperial ? gaugeRangeKm * KM_TO_MI : gaugeRangeKm)} ${useImperial ? 'mi' : 'km'}` : '-';
   const cc = document.getElementById('gaugeCruise');
   cc.style.display = data.cruiseControl ? '' : 'none';
   document.getElementById('gaugeCruiseValue').textContent = Math.round(useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh);
@@ -3316,21 +3339,28 @@ function updateHud(data) {
   } else {
     document.getElementById('fuelPctLine').textContent = `${t('fuel')} -`;
   }
-  if (data.fuelRangeKm != null) {
-    const rangeDisplay = useImperial ? data.fuelRangeKm * KM_TO_MI : data.fuelRangeKm;
+  const ff = fuelFigures(data);
+  if (ff.rangeKm != null) {
+    const rangeDisplay = useImperial ? ff.rangeKm * KM_TO_MI : ff.rangeKm;
     document.getElementById('fuelRangeLine').textContent = `${t('range')} ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`;
   } else {
     document.getElementById('fuelRangeLine').textContent = `${t('range')} -`;
   }
-  if (data.fuelAvgConsumption) {
-    // fuelAvgConsumption viene del SDK en litros/100km sin importar el pais
-    // del camion. En imperial se convierte a mpg (formula estandar).
+  // Consumo: el medido por nosotros (litros gastados / km del odometro,
+  // ultimos 150 km) apenas hay 15 km de datos; antes, el promedio del SDK,
+  // que el juego calcula con un valor nominal y sale alto. En imperial se
+  // convierte a mpg (formula estandar). El SDK lo manda en L/100km siempre.
+  if (ff.avg) {
     const consumptionText = useImperial
-      ? `${(235.215 / data.fuelAvgConsumption).toFixed(1)} mpg`
-      : `${data.fuelAvgConsumption.toFixed(1)} L/100km`;
+      ? `${(235.215 / ff.avg).toFixed(1)} mpg`
+      : `${ff.avg.toFixed(1)} L/100km`;
     document.getElementById('fuelAvgLine').textContent = consumptionText;
+    document.getElementById('fuelAvgLine').title = ff.measured
+      ? t('fuelMeasuredHint').replace('{km}', Math.round(useImperial ? ff.spanKm * KM_TO_MI : ff.spanKm)).replace('{unit}', useImperial ? 'mi' : 'km')
+      : t('fuelSdkHint');
   } else {
     document.getElementById('fuelAvgLine').textContent = '-';
+    document.getElementById('fuelAvgLine').title = '';
   }
 
   const wear = data.wear || {};
@@ -4083,7 +4113,32 @@ function queueTelemetry(data) {
   timerId = setTimeout(() => { telemetryFlushNow = null; flush(); }, TELEMETRY_FLUSH_FALLBACK_MS);
 }
 
+// Consumo medido (ver createFuelTracker en pure.js): se alimenta con cada
+// tick y se guarda en localStorage para sobrevivir recargas.
+const FUEL_TRACKER_KEY = 'truckdash_fuel_tracker';
+const fuelTracker = createFuelTracker();
+try { fuelTracker.restore(JSON.parse(localStorage.getItem(FUEL_TRACKER_KEY) || 'null')); } catch (e) {}
+let fuelTrackerSavedAt = 0;
+function trackFuel(data) {
+  if (conn.demo || data.paused) return;
+  fuelTracker.push(data.odometerKm, data.fuel, `${data.game || ''}|${data.truckBrand || ''} ${data.truckName || ''}`);
+  const now = Date.now();
+  if (now - fuelTrackerSavedAt > 15000) {
+    fuelTrackerSavedAt = now;
+    try { localStorage.setItem(FUEL_TRACKER_KEY, JSON.stringify(fuelTracker.state())); } catch (e) {}
+  }
+}
+// Consumo y autonomia a mostrar: los medidos si ya hay datos, si no los del SDK.
+function fuelFigures(data) {
+  const measured = conn.demo ? null : fuelTracker.avgLPer100();
+  const avg = measured || data.fuelAvgConsumption || null;
+  let rangeKm = data.fuelRangeKm;
+  if (measured && data.fuel != null) rangeKm = data.fuel / measured * 100;
+  return { avg, rangeKm, measured: !!measured, spanKm: measured ? fuelTracker.spanKm() : 0 };
+}
+
 function handleTelemetry(data) {
+  trackFuel(data);
   conn.clientConnected = true;
   // Si la telemetria vuelve (menu -> camion) hay que redibujar el chip y
   // sacar la tarjeta "Ya casi" aunque el status ya diga live: el aviso de

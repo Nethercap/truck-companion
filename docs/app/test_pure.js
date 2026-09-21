@@ -1,7 +1,35 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver } = require('./pure.js');
+const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker } = require('./pure.js');
+
+test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
+  const f = createFuelTracker({ windowKm: 100, minKm: 10 });
+  assert.equal(f.avgLPer100(), null);
+  // 25 L/100km constantes: cada km gasta 0.25 L
+  for (let km = 0; km <= 20; km++) f.push(1000 + km, 500 - km * 0.25, 'ets2|Scania S');
+  assert.ok(Math.abs(f.avgLPer100() - 25) < 1e-6);
+  assert.ok(Math.abs(f.spanKm() - 20) < 1e-6);
+  // ventana movil: despues de 150 km a 40 L/100km la media refleja solo los ultimos ~100 km
+  for (let km = 21; km <= 170; km++) f.push(1000 + km, 500 - 20 * 0.25 - (km - 20) * 0.4, 'ets2|Scania S');
+  assert.ok(Math.abs(f.avgLPer100() - 40) < 0.5, String(f.avgLPer100()));
+  assert.ok(f.spanKm() <= 101);
+  // cargar combustible reinicia la serie
+  f.push(1171, 900, 'ets2|Scania S');
+  assert.equal(f.avgLPer100(), null);
+  for (let km = 1; km <= 12; km++) f.push(1171 + km, 900 - km * 0.3, 'ets2|Scania S');
+  assert.ok(Math.abs(f.avgLPer100() - 30) < 1e-6);
+  // otro camion: desde cero
+  f.push(50, 300, 'ets2|Volvo FH');
+  assert.equal(f.avgLPer100(), null);
+  // datos invalidos se ignoran, el odometro quieto no rompe nada
+  f.push(null, 300, 'ets2|Volvo FH'); f.push(50, 299, 'ets2|Volvo FH');
+  assert.equal(f.avgLPer100(), null);
+  // restaurar estado guardado
+  const g = createFuelTracker({ windowKm: 100, minKm: 10 });
+  g.restore(f.state());
+  assert.equal(g.spanKm(), f.spanKm());
+});
 
 test('geoBearingDeg: norte puro es 0deg', () => {
   const bearing = geoBearingDeg(0, 0, 0, 1);
