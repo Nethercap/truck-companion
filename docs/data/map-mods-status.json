@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-21T14:43:19Z",
+  "checkedAt": "2026-09-21T15:55:41Z",
   "mods": {
     "c2c": {
       "ours": "2.23.61.0",
@@ -52,9 +52,9 @@
     },
     "reforma": {
       "ours": "2.9.9.160",
-      "upstream": "2.9.9.160",
-      "status": "ok",
-      "error": null,
+      "upstream": null,
+      "status": "unknown",
+      "error": "TimeoutError: The read operation timed out",
       "source": "https://forum.scssoft.com/viewtopic.php?t=316081"
     },
     "roextended": {
