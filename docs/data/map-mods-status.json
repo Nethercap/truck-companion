@@ -1,11 +1,11 @@
 {
-  "checkedAt": "2026-09-21T03:09:34Z",
+  "checkedAt": "2026-09-21T11:00:01Z",
   "mods": {
     "c2c": {
       "ours": "2.23.61.0",
-      "upstream": null,
-      "status": "unknown",
-      "error": "TimeoutError: The read operation timed out",
+      "upstream": "2.23.61.0",
+      "status": "ok",
+      "error": null,
       "source": "https://forum.scssoft.com/viewtopic.php?t=202317"
     },
     "promods_canada": {
@@ -45,16 +45,16 @@
     },
     "rusmap": {
       "ours": "2.61",
-      "upstream": null,
-      "status": "unknown",
-      "error": "HTTPError: HTTP Error 429: Too Many Requests",
+      "upstream": "2.61",
+      "status": "ok",
+      "error": null,
       "source": "https://forum.scssoft.com/viewtopic.php?t=332124"
     },
     "reforma": {
       "ours": "2.9.9.160",
-      "upstream": null,
-      "status": "unknown",
-      "error": "TimeoutError: The read operation timed out",
+      "upstream": "2.9.9.160",
+      "status": "ok",
+      "error": null,
       "source": "https://forum.scssoft.com/viewtopic.php?t=316081"
     },
     "roextended": {
