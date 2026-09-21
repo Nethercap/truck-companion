@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-20T21:51:44Z",
+  "checkedAt": "2026-09-20T23:55:51Z",
   "mods": {
     "c2c": {
       "ours": "2.23.60.2",
@@ -44,9 +44,9 @@
       "source": null
     },
     "rusmap": {
-      "ours": null,
+      "ours": "2.61",
       "upstream": "2.61",
-      "status": "planned",
+      "status": "ok",
       "error": null,
       "source": "https://forum.scssoft.com/viewtopic.php?t=332124"
     },
@@ -63,6 +63,13 @@
       "status": "manual",
       "error": null,
       "source": null
+    },
+    "cnx_promods_rusmap": {
+      "ours": "2.84/2.61",
+      "upstream": "2.84 - RusMap 2.61",
+      "status": "ok",
+      "error": null,
+      "source": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771"
     }
   },
   "variants": {
@@ -194,6 +201,32 @@
         }
       },
       "totalBytes": 116442818,
+      "allOk": true
+    },
+    "ets2_promods_rusmap": {
+      "files": {
+        "vector/ets2_promods_rusmap.pmtiles": {
+          "ok": true,
+          "bytes": 94769408,
+          "lastModified": "Sun, 20 Sep 2026 23:44:57 GMT"
+        },
+        "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.json": {
+          "ok": true,
+          "bytes": 27031667,
+          "lastModified": "Sun, 20 Sep 2026 23:44:12 GMT"
+        },
+        "ets2_promods_rusmap/Cities.json": {
+          "ok": true,
+          "bytes": 55487,
+          "lastModified": "Sun, 20 Sep 2026 23:44:11 GMT"
+        },
+        "ets2_promods_rusmap/road-names.json": {
+          "ok": true,
+          "bytes": 5116919,
+          "lastModified": "Sun, 20 Sep 2026 23:44:18 GMT"
+        }
+      },
+      "totalBytes": 126973481,
       "allOk": true
     }
   }
