@@ -148,7 +148,7 @@ function liveMapRenderPanel() {
   list.innerHTML = liveMap.players.map(p => {
     const route = p.citySrc && p.cityDst ? `${escapeHtml(p.citySrc)} → ${escapeHtml(p.cityDst)}` : '';
     const speed = p.speedKmh != null ? formatSpeedShort(p.speedKmh) : '';
-    const status = p.paused ? t('convoyPaused') : speed;
+    const status = p.paused ? t('convoyInMenu') : speed;
     const followed = p.id === liveMap.followId;
     return `<div class="liveMapRow${followed ? ' followed' : ''}" data-id="${escapeHtml(p.id)}">
       <span class="convoyDot" style="background:${liveMapColor(p.id)}"></span>
