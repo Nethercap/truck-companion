@@ -55,7 +55,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.5.4"
+CLIENT_VERSION = "1.5.5"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -188,7 +188,7 @@ def detect_map_mods(mods: list) -> dict:
     """{promods, promods_canada, c2c} a partir de nombres/archivos de mods.
     ProMods Europa y sus addons (ME, Maghreb, TGS) cuentan como 'promods';
     'ProMods Canada' es el pack de ATS."""
-    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False}
+    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False}
     for mod in mods:
         text = f"{mod.get('file', '')} {mod.get('name', '')}".lower()
         if "promods" in text or "pm-" in text or "cnx-pm" in text:
@@ -200,6 +200,14 @@ def detect_map_mods(mods: list) -> dict:
             flags["c2c"] = True
         if "rusmap" in text:
             flags["rusmap"] = True
+        # Reforma, Mega Resources, Sierra Nevada y el OtherMaps Patch llevan "reforma" en el nombre
+        if "reforma" in text:
+            flags["reforma"] = True
+        # Roextended: los conectores se llaman ROEX53..., el mapa Hybrid "161Hybrid2v3"
+        if "roex" in text or re.search(r"\d{3}hybrid\d", text):
+            flags["roextended"] = True
+        if "grand utopia" in text or "grandutopia" in text or "grand_utopia" in text:
+            flags["grand_utopia"] = True
     return flags
 
 

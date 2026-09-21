@@ -292,16 +292,29 @@ def test_parse_active_mods_none_without_list():
     assert client.parse_active_mods("00:00:01 : [hashfs] base.scs: Created") is None
 
 
+NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False}
+
+
 def test_detect_map_mods_flags():
-    assert client.detect_map_mods(client.parse_active_mods(SAMPLE_LOG)) == {"promods": True, "promods_canada": False, "c2c": False, "rusmap": False}
+    assert client.detect_map_mods(client.parse_active_mods(SAMPLE_LOG)) == {**NO_MODS, "promods": True}
     mods = [
         {"file": "promods-ats-canada-v164", "name": "ProMods Canada", "version": "1.64", "author": "ProMods"},
         {"file": "coast2coast_v2.15", "name": "Coast to Coast", "version": "2.15", "author": "Mantrid"},
     ]
-    assert client.detect_map_mods(mods) == {"promods": False, "promods_canada": True, "c2c": True, "rusmap": False}
-    assert client.detect_map_mods([]) == {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False}
+    assert client.detect_map_mods(mods) == {**NO_MODS, "promods_canada": True, "c2c": True}
+    assert client.detect_map_mods([]) == NO_MODS
 
 
 def test_detect_map_mods_rusmap_with_promods():
     mods = [{"file": "promods-eu-map-v284.scs", "name": "ProMods Europe"}, {"file": "RusMap_Map.scs", "name": "RusMap 2.61"}, {"file": "cnx-pm-v284-rm-v261.scs", "name": "ProMods 2.84 - RusMap 2.61 Connector"}]
-    assert client.detect_map_mods(mods) == {"promods": True, "promods_canada": False, "c2c": False, "rusmap": True}
+    assert client.detect_map_mods(mods) == {**NO_MODS, "promods": True, "rusmap": True}
+
+
+def test_detect_map_mods_reforma_roex_gu():
+    ats = [{"file": "Reforma_2_9_9_160.scs", "name": "Reforma 2.9.9.160"}, {"file": "Reforma_MegaResources_v2_9_9_160.scs", "name": "Reforma Mega Resources"}, {"file": "Coast_to_Coast_v2.23.61.0.scs", "name": "Coast to Coast v2.23.61.0"}]
+    assert client.detect_map_mods(ats) == {**NO_MODS, "reforma": True, "c2c": True}
+    roex = [{"file": "ROEX53PMME284.scs", "name": "ROEX53PMME284"}, {"file": "161Hybrid2v3.scs", "name": "161Hybrid2v3"}, {"file": "promods-eu-map-v284.scs", "name": "ProMods Europe"}]
+    assert client.detect_map_mods(roex) == {**NO_MODS, "roextended": True, "promods": True}
+    assert client.detect_map_mods([{"file": "161Hybrid2v3.scs", "name": "161Hybrid2v3"}]) == {**NO_MODS, "roextended": True}
+    gu = [{"file": "GU - Grand Utopia (v1.20c).scs", "name": "Grand Utopia"}]
+    assert client.detect_map_mods(gu) == {**NO_MODS, "grand_utopia": True}

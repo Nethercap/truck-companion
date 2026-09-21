@@ -1,6 +1,6 @@
 {
   "_comment": "Fuente de verdad de los datos de mapa publicados. Se edita a mano al publicar una variante (ver mod-integration-pipeline/README.md en D:/ets2-companion). tools/check_map_mods.py lo lee, consulta las versiones upstream donde se puede y escribe map-mods-status.json; admin.html muestra ambos.",
-  "updated": "2026-09-20",
+  "updated": "2026-09-21",
   "r2Base": "https://maps.trucksim-dash.com",
   "variants": {
     "ats": {
@@ -21,8 +21,8 @@
       "label": "ATS + Coast to Coast",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-06",
-      "mapDataVersion": "20260921b",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921c",
       "mods": [
         "c2c"
       ],
@@ -47,6 +47,62 @@
         "ats_promods/route-graph-ats_promods.json",
         "ats_promods/Cities.json",
         "ats_promods/road-names.json"
+      ]
+    },
+    "ats_c2c_promods": {
+      "label": "ATS + Coast to Coast + ProMods Canada",
+      "game": "ats",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921",
+      "mods": [
+        "c2c",
+        "promods_canada"
+      ],
+      "files": [
+        "vector/ats_c2c_promods.pmtiles",
+        "ats_c2c_promods/route-graph-ats_c2c_promods.json",
+        "ats_c2c_promods/Cities.json",
+        "ats_c2c_promods/road-names.json"
+      ]
+    },
+    "ats_reforma": {
+      "label": "ATS + Reforma (+ Mega Resources + Sierra Nevada)",
+      "game": "ats",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921",
+      "mods": [
+        "reforma",
+        "reforma_mega_resources",
+        "reforma_sierra_nevada"
+      ],
+      "files": [
+        "vector/ats_reforma.pmtiles",
+        "ats_reforma/route-graph-ats_reforma.json",
+        "ats_reforma/Cities.json",
+        "ats_reforma/road-names.json"
+      ]
+    },
+    "ats_reforma_c2c_promods": {
+      "label": "ATS + Coast to Coast + ProMods Canada + Reforma",
+      "game": "ats",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921",
+      "mods": [
+        "c2c",
+        "promods_canada",
+        "reforma",
+        "reforma_mega_resources",
+        "reforma_sierra_nevada",
+        "reforma_othermaps_patch"
+      ],
+      "files": [
+        "vector/ats_reforma_c2c_promods.pmtiles",
+        "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.json",
+        "ats_reforma_c2c_promods/Cities.json",
+        "ats_reforma_c2c_promods/road-names.json"
       ]
     },
     "ets2": {
@@ -102,13 +158,74 @@
         "ets2_promods_rusmap/Cities.json",
         "ets2_promods_rusmap/road-names.json"
       ]
+    },
+    "ets2_promods_roex": {
+      "label": "ETS2 + ProMods + Roextended (Hybrid)",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "mapDataVersion": "20260921",
+      "mods": [
+        "promods",
+        "promods_me",
+        "promods_maghreb",
+        "promods_tgs",
+        "roextended"
+      ],
+      "files": [
+        "vector/ets2_promods_roex.pmtiles",
+        "ets2_promods_roex/route-graph-ets2_promods_roex.json",
+        "ets2_promods_roex/Cities.json",
+        "ets2_promods_roex/road-names.json"
+      ],
+      "planned": true,
+      "plannedNote": "faltan los paquetes Def/Models de Roextended 5.3 (los Hybrid son solo el mapa)"
+    },
+    "ets2_promods_rusmap_roex": {
+      "label": "ETS2 + ProMods + RusMap + Roextended (Hybrid)",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "mapDataVersion": "20260921",
+      "mods": [
+        "promods",
+        "promods_me",
+        "promods_maghreb",
+        "promods_tgs",
+        "rusmap",
+        "cnx_promods_rusmap",
+        "roextended",
+        "cnx_roex_rusmap"
+      ],
+      "files": [
+        "vector/ets2_promods_rusmap_roex.pmtiles",
+        "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.json",
+        "ets2_promods_rusmap_roex/Cities.json",
+        "ets2_promods_rusmap_roex/road-names.json"
+      ],
+      "planned": true,
+      "plannedNote": "faltan los paquetes Def/Models de Roextended 5.3 (los Hybrid son solo el mapa)"
+    },
+    "ets2_gu": {
+      "label": "ETS2 + Grand Utopia (standalone)",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "built": "2026-09-21",
+      "mapDataVersion": "20260921",
+      "mods": [
+        "grand_utopia"
+      ],
+      "files": [
+        "vector/ets2_gu.pmtiles",
+        "ets2_gu/route-graph-ets2_gu.json",
+        "ets2_gu/Cities.json",
+        "ets2_gu/road-names.json"
+      ]
     }
   },
   "mods": {
     "c2c": {
       "name": "Coast to Coast",
       "game": "ats",
-      "version": "2.23.60.2",
+      "version": "2.23.61.0",
       "homepage": "https://truckymods.io/american-truck-simulator/maps/coast-to-coast",
       "check": {
         "url": "https://forum.scssoft.com/viewtopic.php?t=202317",
@@ -172,11 +289,10 @@
       }
     },
     "reforma": {
-      "name": "Reforma (+ Sierra Nevada)",
+      "name": "Reforma",
       "game": "ats",
-      "version": null,
-      "planned": true,
-      "homepage": "https://forum.scssoft.com/viewtopic.php?t=316081",
+      "version": "2.9.9.160",
+      "homepage": "https://www.teamreforma.com/",
       "check": {
         "url": "https://forum.scssoft.com/viewtopic.php?t=316081",
         "pattern": "<title>[^<]*Reforma (\\d+(?:\\.\\d+)+)",
@@ -184,12 +300,12 @@
       }
     },
     "roextended": {
-      "name": "Roextended",
+      "name": "Roextended (Hybrid, ed. ProMods+ME)",
       "game": "ets2",
-      "version": null,
-      "planned": true,
+      "version": "1.61 Hybrid v3 (ROEX 5.3)",
       "homepage": "https://roextended.ro/",
-      "check": null
+      "check": null,
+      "checkNote": "roextended.ro: verificar a mano (paquetes 161Hybrid2v3 + ROEX53PMME284 + 161MaghrebFix)"
     },
     "cnx_promods_rusmap": {
       "name": "ProMods–RusMap connector",
@@ -200,6 +316,49 @@
         "url": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771",
         "pattern": "ProMods (\\d+\\.\\d+ - RusMap \\d+\\.\\d+)",
         "note": "titulo de la pagina en TruckyMods"
+      }
+    },
+    "reforma_mega_resources": {
+      "name": "Reforma Mega Resources",
+      "game": "ats",
+      "version": "2.9.9.160",
+      "homepage": "https://www.teamreforma.com/",
+      "check": null,
+      "checkNote": "va en sync con Reforma"
+    },
+    "reforma_sierra_nevada": {
+      "name": "Reforma Sierra Nevada Remake",
+      "game": "ats",
+      "version": "1.16.160",
+      "homepage": "https://www.teamreforma.com/",
+      "check": null,
+      "checkNote": "va en sync con Reforma"
+    },
+    "reforma_othermaps_patch": {
+      "name": "Reforma OtherMaps Compatibility Patch",
+      "game": "ats",
+      "version": "37.160",
+      "homepage": "https://www.teamreforma.com/",
+      "check": null,
+      "checkNote": "solo en el pack Reforma + C2C + ProMods Canada"
+    },
+    "cnx_roex_rusmap": {
+      "name": "Roextended-RusMap connector",
+      "game": "ets2",
+      "version": "ROEX53RM261",
+      "homepage": "https://roextended.ro/",
+      "check": null,
+      "checkNote": "roextended.ro: verificar a mano"
+    },
+    "grand_utopia": {
+      "name": "Grand Utopia",
+      "game": "ets2",
+      "version": "1.20c",
+      "homepage": "https://grandutopia.fr/",
+      "check": {
+        "url": "https://truckymods.io/euro-truck-simulator-2/maps/grand-utopia-map",
+        "pattern": "badge-light-primary[^>]*>(\\d+\\.\\d+[a-z]?)<",
+        "note": "badges de version en el historial de TruckyMods (la mas alta gana)"
       }
     }
   }

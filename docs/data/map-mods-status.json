@@ -1,11 +1,11 @@
 {
-  "checkedAt": "2026-09-20T23:55:51Z",
+  "checkedAt": "2026-09-21T03:09:34Z",
   "mods": {
     "c2c": {
-      "ours": "2.23.60.2",
-      "upstream": "2.23.60.2",
-      "status": "ok",
-      "error": null,
+      "ours": "2.23.61.0",
+      "upstream": null,
+      "status": "unknown",
+      "error": "TimeoutError: The read operation timed out",
       "source": "https://forum.scssoft.com/viewtopic.php?t=202317"
     },
     "promods_canada": {
@@ -45,23 +45,23 @@
     },
     "rusmap": {
       "ours": "2.61",
-      "upstream": "2.61",
-      "status": "ok",
-      "error": null,
+      "upstream": null,
+      "status": "unknown",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=332124"
     },
     "reforma": {
-      "ours": null,
-      "upstream": "2.9.9.160",
-      "status": "planned",
-      "error": null,
+      "ours": "2.9.9.160",
+      "upstream": null,
+      "status": "unknown",
+      "error": "TimeoutError: The read operation timed out",
       "source": "https://forum.scssoft.com/viewtopic.php?t=316081"
     },
     "roextended": {
-      "ours": null,
+      "ours": "1.61 Hybrid v3 (ROEX 5.3)",
       "upstream": null,
       "status": "manual",
-      "error": null,
+      "error": "roextended.ro: verificar a mano (paquetes 161Hybrid2v3 + ROEX53PMME284 + 161MaghrebFix)",
       "source": null
     },
     "cnx_promods_rusmap": {
@@ -70,6 +70,41 @@
       "status": "ok",
       "error": null,
       "source": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771"
+    },
+    "reforma_mega_resources": {
+      "ours": "2.9.9.160",
+      "upstream": null,
+      "status": "manual",
+      "error": "va en sync con Reforma",
+      "source": null
+    },
+    "reforma_sierra_nevada": {
+      "ours": "1.16.160",
+      "upstream": null,
+      "status": "manual",
+      "error": "va en sync con Reforma",
+      "source": null
+    },
+    "reforma_othermaps_patch": {
+      "ours": "37.160",
+      "upstream": null,
+      "status": "manual",
+      "error": "solo en el pack Reforma + C2C + ProMods Canada",
+      "source": null
+    },
+    "cnx_roex_rusmap": {
+      "ours": "ROEX53RM261",
+      "upstream": null,
+      "status": "manual",
+      "error": "roextended.ro: verificar a mano",
+      "source": null
+    },
+    "grand_utopia": {
+      "ours": "1.20c",
+      "upstream": "1.20c",
+      "status": "ok",
+      "error": null,
+      "source": "https://truckymods.io/euro-truck-simulator-2/maps/grand-utopia-map"
     }
   },
   "variants": {
@@ -103,26 +138,26 @@
       "files": {
         "vector/ats_c2c.pmtiles": {
           "ok": true,
-          "bytes": 58159300,
-          "lastModified": "Mon, 07 Sep 2026 01:31:51 GMT"
+          "bytes": 58157537,
+          "lastModified": "Mon, 21 Sep 2026 01:38:53 GMT"
         },
         "ats_c2c/route-graph-ats_c2c.json": {
           "ok": true,
           "bytes": 17624525,
-          "lastModified": "Sat, 19 Sep 2026 19:53:21 GMT"
+          "lastModified": "Mon, 21 Sep 2026 01:38:10 GMT"
         },
         "ats_c2c/Cities.json": {
           "ok": true,
-          "bytes": 25461,
-          "lastModified": "Mon, 07 Sep 2026 01:30:55 GMT"
+          "bytes": 25460,
+          "lastModified": "Mon, 21 Sep 2026 01:38:08 GMT"
         },
         "ats_c2c/road-names.json": {
           "ok": true,
-          "bytes": 972442,
-          "lastModified": "Mon, 07 Sep 2026 01:30:39 GMT"
+          "bytes": 972446,
+          "lastModified": "Mon, 21 Sep 2026 01:38:12 GMT"
         }
       },
-      "totalBytes": 76781728,
+      "totalBytes": 76779968,
       "allOk": true
     },
     "ats_promods": {
@@ -149,6 +184,84 @@
         }
       },
       "totalBytes": 65475573,
+      "allOk": true
+    },
+    "ats_c2c_promods": {
+      "files": {
+        "vector/ats_c2c_promods.pmtiles": {
+          "ok": true,
+          "bytes": 60463280,
+          "lastModified": "Mon, 21 Sep 2026 01:40:28 GMT"
+        },
+        "ats_c2c_promods/route-graph-ats_c2c_promods.json": {
+          "ok": true,
+          "bytes": 18546780,
+          "lastModified": "Mon, 21 Sep 2026 01:39:21 GMT"
+        },
+        "ats_c2c_promods/Cities.json": {
+          "ok": true,
+          "bytes": 27385,
+          "lastModified": "Mon, 21 Sep 2026 01:38:56 GMT"
+        },
+        "ats_c2c_promods/road-names.json": {
+          "ok": true,
+          "bytes": 972678,
+          "lastModified": "Mon, 21 Sep 2026 01:39:20 GMT"
+        }
+      },
+      "totalBytes": 80010123,
+      "allOk": true
+    },
+    "ats_reforma": {
+      "files": {
+        "vector/ats_reforma.pmtiles": {
+          "ok": true,
+          "bytes": 60432412,
+          "lastModified": "Mon, 21 Sep 2026 02:46:10 GMT"
+        },
+        "ats_reforma/route-graph-ats_reforma.json": {
+          "ok": true,
+          "bytes": 21166360,
+          "lastModified": "Mon, 21 Sep 2026 02:45:08 GMT"
+        },
+        "ats_reforma/Cities.json": {
+          "ok": true,
+          "bytes": 28696,
+          "lastModified": "Mon, 21 Sep 2026 02:45:01 GMT"
+        },
+        "ats_reforma/road-names.json": {
+          "ok": true,
+          "bytes": 919304,
+          "lastModified": "Mon, 21 Sep 2026 02:45:02 GMT"
+        }
+      },
+      "totalBytes": 82546772,
+      "allOk": true
+    },
+    "ats_reforma_c2c_promods": {
+      "files": {
+        "vector/ats_reforma_c2c_promods.pmtiles": {
+          "ok": true,
+          "bytes": 74762142,
+          "lastModified": "Mon, 21 Sep 2026 02:53:02 GMT"
+        },
+        "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.json": {
+          "ok": true,
+          "bytes": 24858383,
+          "lastModified": "Mon, 21 Sep 2026 02:52:26 GMT"
+        },
+        "ats_reforma_c2c_promods/Cities.json": {
+          "ok": true,
+          "bytes": 38316,
+          "lastModified": "Mon, 21 Sep 2026 02:52:21 GMT"
+        },
+        "ats_reforma_c2c_promods/road-names.json": {
+          "ok": true,
+          "bytes": 972189,
+          "lastModified": "Mon, 21 Sep 2026 02:52:43 GMT"
+        }
+      },
+      "totalBytes": 100631030,
       "allOk": true
     },
     "ets2": {
@@ -227,6 +340,44 @@
         }
       },
       "totalBytes": 126973481,
+      "allOk": true
+    },
+    "ets2_promods_roex": {
+      "files": {},
+      "totalBytes": 0,
+      "allOk": true,
+      "planned": true
+    },
+    "ets2_promods_rusmap_roex": {
+      "files": {},
+      "totalBytes": 0,
+      "allOk": true,
+      "planned": true
+    },
+    "ets2_gu": {
+      "files": {
+        "vector/ets2_gu.pmtiles": {
+          "ok": true,
+          "bytes": 9074065,
+          "lastModified": "Mon, 21 Sep 2026 03:07:02 GMT"
+        },
+        "ets2_gu/route-graph-ets2_gu.json": {
+          "ok": true,
+          "bytes": 2609248,
+          "lastModified": "Mon, 21 Sep 2026 03:07:00 GMT"
+        },
+        "ets2_gu/Cities.json": {
+          "ok": true,
+          "bytes": 6884,
+          "lastModified": "Mon, 21 Sep 2026 03:07:14 GMT"
+        },
+        "ets2_gu/road-names.json": {
+          "ok": true,
+          "bytes": 461832,
+          "lastModified": "Mon, 21 Sep 2026 03:06:59 GMT"
+        }
+      },
+      "totalBytes": 12152029,
       "allOk": true
     }
   }

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260922d" />
+<link rel="stylesheet" href="app.css?v=20260922e" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -155,11 +155,17 @@
       <label class="settingsRow"><input type="radio" name="atsMod" id="setAtsModNone" value="none" /> <span data-i18n="settingsNoMod">None</span></label>
       <label class="settingsRow"><input type="radio" name="atsMod" id="setCoastToCoast" value="c2c" /> <span data-i18n="settingsCoastToCoast">I have Coast to Coast installed</span></label>
       <label class="settingsRow"><input type="radio" name="atsMod" id="setProModsCanada" value="promods_canada" /> <span data-i18n="settingsProModsCanada">I have ProMods Canada installed</span></label>
+      <label class="settingsRow"><input type="radio" name="atsMod" id="setC2CProModsCanada" value="c2c_promods_canada" /> <span data-i18n="settingsC2CProModsCanada">I have Coast to Coast + ProMods Canada installed</span></label>
+      <label class="settingsRow"><input type="radio" name="atsMod" id="setReforma" value="reforma" /> <span data-i18n="settingsReforma">I have Reforma (Mexico, with Sierra Nevada) installed</span></label>
+      <label class="settingsRow"><input type="radio" name="atsMod" id="setReformaAll" value="reforma_c2c_promods_canada" /> <span data-i18n="settingsReformaAll">I have Reforma + Coast to Coast + ProMods Canada installed</span></label>
 
       <p class="settingsSectionTitle">Euro Truck Simulator 2</p>
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setEts2ModNone" value="none" /> <span data-i18n="settingsNoMod">None</span></label>
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setProMods" value="promods" /> <span data-i18n="settingsProMods">I have ProMods (Europe + all addons) installed</span></label>
       <label class="settingsRow"><input type="radio" name="ets2Mod" id="setProModsRusMap" value="promods_rusmap" /> <span data-i18n="settingsProModsRusMap">I have ProMods + RusMap (with the ProMods-RusMap connector)</span></label>
+      <label class="settingsRow"><input type="radio" name="ets2Mod" id="setProModsRoex" value="promods_roex" /> <span data-i18n="settingsProModsRoex">I have ProMods + Roextended (Hybrid edition)</span></label>
+      <label class="settingsRow"><input type="radio" name="ets2Mod" id="setProModsRusMapRoex" value="promods_rusmap_roex" /> <span data-i18n="settingsProModsRusMapRoex">I have ProMods + RusMap + Roextended (Hybrid edition)</span></label>
+      <label class="settingsRow"><input type="radio" name="ets2Mod" id="setGrandUtopia" value="gu" /> <span data-i18n="settingsGrandUtopia">I play on Grand Utopia (standalone map)</span></label>
       </div>
 
       <button id="modsCloseBtn" data-i18n="close">Close</button>
@@ -463,9 +469,9 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260922d"></script>
-<script src="i18n.js?v=20260922d"></script>
-<script src="app.js?v=20260922d"></script>
-<script src="convoy.js?v=20260922d"></script>
+<script src="pure.js?v=20260922e"></script>
+<script src="i18n.js?v=20260922e"></script>
+<script src="app.js?v=20260922e"></script>
+<script src="convoy.js?v=20260922e"></script>
 </body>
 </html>

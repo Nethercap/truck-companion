@@ -31,7 +31,12 @@ def fetch(url: str, method: str = "GET", timeout: int = 25):
 
 
 def version_tuple(v: str):
-    return tuple(int(x) for x in re.findall(r"\d+", v or ""))
+    # "1.20c" > "1.20b": una letra final cuenta como un componente mas (a=1, b=2...)
+    nums = [int(x) for x in re.findall(r"\d+", v or "")]
+    m = re.search(r"\d([a-z])$", (v or "").strip())
+    if m:
+        nums.append(ord(m.group(1)) - 96)
+    return tuple(nums)
 
 
 def check_mod(mod: dict) -> dict:
@@ -92,6 +97,9 @@ def main():
             print(f"  {mod['name']:34s} nuestra {str(r['ours']):10s} upstream {str(r['upstream']):10s} {r['status']}" + (f"  ({r['error']})" if r["error"] else ""))
 
     for var_id, var in manifest["variants"].items():
+        if var.get("planned"):
+            status["variants"][var_id] = {"files": {}, "totalBytes": 0, "allOk": True, "planned": True}
+            continue
         files = {key: head_file(base, key, var.get("mapDataVersion", "")) for key in var.get("files", [])}
         total = sum(f.get("bytes", 0) for f in files.values())
         status["variants"][var_id] = {"files": files, "totalBytes": total, "allOk": all(f.get("ok") for f in files.values())}

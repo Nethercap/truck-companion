@@ -36,6 +36,12 @@ const TRANSLATIONS = {
     modsDetectedNone: 'no map mods',
     settingsCoastToCoast: 'I have Coast to Coast installed',
     settingsProModsCanada: 'I have ProMods Canada installed',
+    settingsC2CProModsCanada: 'I have Coast to Coast + ProMods Canada installed',
+    settingsReforma: 'I have Reforma (Mexico, with Sierra Nevada) installed',
+    settingsReformaAll: 'I have Reforma + Coast to Coast + ProMods Canada installed',
+    settingsProModsRoex: 'I have ProMods + Roextended (Hybrid edition)',
+    settingsProModsRusMapRoex: 'I have ProMods + RusMap + Roextended (Hybrid edition)',
+    settingsGrandUtopia: 'I play on Grand Utopia (standalone map)',
     settingsProMods: 'I have ProMods (Europe + all addons) installed',
     settingsProModsRusMap: 'I have ProMods + RusMap (with the ProMods-RusMap connector)',
     colorRed: 'Red',
@@ -313,6 +319,12 @@ const TRANSLATIONS = {
     modsDetectedNone: 'sin mods de mapa',
     settingsCoastToCoast: 'Tengo instalado Coast to Coast',
     settingsProModsCanada: 'Tengo instalado ProMods Canada',
+    settingsC2CProModsCanada: 'Tengo instalados Coast to Coast + ProMods Canada',
+    settingsReforma: 'Tengo instalado Reforma (México, con Sierra Nevada)',
+    settingsReformaAll: 'Tengo Reforma + Coast to Coast + ProMods Canada',
+    settingsProModsRoex: 'Tengo ProMods + Roextended (edición Hybrid)',
+    settingsProModsRusMapRoex: 'Tengo ProMods + RusMap + Roextended (edición Hybrid)',
+    settingsGrandUtopia: 'Juego en Grand Utopia (mapa standalone)',
     settingsProMods: 'Tengo instalado ProMods (Europe + todos los addons)',
     settingsProModsRusMap: 'Tengo ProMods + RusMap (con el conector ProMods-RusMap)',
     colorRed: 'Rojo',
@@ -895,9 +907,17 @@ function initModsUi() {
   document.getElementById('setAtsModNone').checked = atsMod === 'none';
   document.getElementById('setCoastToCoast').checked = atsMod === 'c2c';
   document.getElementById('setProModsCanada').checked = atsMod === 'promods_canada';
+  document.getElementById('setC2CProModsCanada').checked = atsMod === 'c2c_promods_canada';
+  document.getElementById('setReforma').checked = atsMod === 'reforma';
+  document.getElementById('setReformaAll').checked = atsMod === 'reforma_c2c_promods_canada';
   document.getElementById('setEts2ModNone').checked = ets2Mod === 'none';
   document.getElementById('setProMods').checked = ets2Mod === 'promods';
   document.getElementById('setProModsRusMap').checked = ets2Mod === 'promods_rusmap';
+  document.getElementById('setProModsRoex').checked = ets2Mod === 'promods_roex';
+  document.getElementById('setProModsRusMapRoex').checked = ets2Mod === 'promods_rusmap_roex';
+  document.getElementById('setProModsRoex').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_roex;
+  document.getElementById('setProModsRusMapRoex').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_rusmap_roex;
+  document.getElementById('setGrandUtopia').checked = ets2Mod === 'gu';
 }
 
 document.querySelectorAll('input[name="modsAuto"]').forEach(radio => {
@@ -1059,7 +1079,13 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921b', ats_promods: '20260921b', ets2: '20260921b', ets2_promods: '20260921b', ets2_promods_rusmap: '20260920' };
+const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921c', ats_promods: '20260921b', ats_c2c_promods: '20260921', ats_reforma: '20260921', ats_reforma_c2c_promods: '20260921', ets2: '20260921b', ets2_promods: '20260921b', ets2_promods_rusmap: '20260920', ets2_gu: '20260921' };
+// Una variante sin entrada en MAP_DATA_VERSION esta cableada pero todavia no
+// publicada en R2 (ej. Roextended a la espera de sus paquetes Def/Models):
+// no se ofrece en Ajustes y la auto-deteccion cae a la mas parecida.
+function publishedVariant(v, fallback) { return MAP_DATA_VERSION[v] ? v : fallback; }
+// Centro aproximado de Grand Utopia en la proyeccion de ets2 (se ajusta al publicar).
+const GU_ORIGIN = [-44.5, 42];
 const GAME_MAPS = {
   ats: {
     assetsDir: `${REMOTE_MAP_BASE}/ats`,
@@ -1094,6 +1120,37 @@ const GAME_MAPS = {
     fromLngLat: atsFromLngLat,
     origin: [-96, 39],
   },
+  // Coast to Coast + ProMods Canada juntos (C2C abajo, ProMods Canada
+  // arriba, como recomienda ProMods). Misma proyeccion que ats.
+  ats_c2c_promods: {
+    assetsDir: `${REMOTE_MAP_BASE}/ats_c2c_promods`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_c2c_promods.pmtiles`,
+    sourceLayer: 'ats',
+    label: 'American Truck Simulator + Coast to Coast + ProMods Canada',
+    toLngLat: atsToLngLat,
+    fromLngLat: atsFromLngLat,
+    origin: [-96, 39],
+  },
+  // Reforma (Mexico) + Mega Resources + Sierra Nevada Remake.
+  ats_reforma: {
+    assetsDir: `${REMOTE_MAP_BASE}/ats_reforma`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_reforma.pmtiles`,
+    sourceLayer: 'ats',
+    label: 'American Truck Simulator + Reforma',
+    toLngLat: atsToLngLat,
+    fromLngLat: atsFromLngLat,
+    origin: [-102, 33],
+  },
+  // "Todo": Coast to Coast + ProMods Canada + Reforma (+ OtherMaps Patch).
+  ats_reforma_c2c_promods: {
+    assetsDir: `${REMOTE_MAP_BASE}/ats_reforma_c2c_promods`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_reforma_c2c_promods.pmtiles`,
+    sourceLayer: 'ats',
+    label: 'American Truck Simulator + Coast to Coast + ProMods Canada + Reforma',
+    toLngLat: atsToLngLat,
+    fromLngLat: atsFromLngLat,
+    origin: [-98, 36],
+  },
   ets2: {
     assetsDir: `${REMOTE_MAP_BASE}/ets2`,
     pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2.pmtiles`,
@@ -1124,6 +1181,36 @@ const GAME_MAPS = {
     fromLngLat: ets2FromLngLat,
     origin: [15, 50],
   },
+  // Roextended edicion Hybrid (corre sobre ProMods) + conector ROEX-PM.
+  ets2_promods_roex: {
+    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods_roex`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods_roex.pmtiles`,
+    sourceLayer: 'ets2',
+    label: 'Euro Truck Simulator 2 + ProMods + Roextended',
+    toLngLat: ets2ToLngLat,
+    fromLngLat: ets2FromLngLat,
+    origin: [20, 47],
+  },
+  ets2_promods_rusmap_roex: {
+    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods_rusmap_roex`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods_rusmap_roex.pmtiles`,
+    sourceLayer: 'ets2',
+    label: 'Euro Truck Simulator 2 + ProMods + RusMap + Roextended',
+    toLngLat: ets2ToLngLat,
+    fromLngLat: ets2FromLngLat,
+    origin: [20, 47],
+  },
+  // Grand Utopia: mapa standalone (reemplaza Europa; perfil propio en el
+  // juego). Misma proyeccion que ets2, queda al oeste de Europa.
+  ets2_gu: {
+    assetsDir: `${REMOTE_MAP_BASE}/ets2_gu`,
+    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_gu.pmtiles`,
+    sourceLayer: 'ets2',
+    label: 'Euro Truck Simulator 2 + Grand Utopia',
+    toLngLat: guToLngLat,
+    fromLngLat: guFromLngLat,
+    origin: GU_ORIGIN,
+  },
 };
 
 // Conversion de coordenadas de juego (x,z) a lng/lat WGS84 real, con el mismo
@@ -1149,7 +1236,14 @@ function atsFromLngLat(lng, lat) {
 
 const ETS2_DEF = { lat1: 37, lat2: 65, origin: [50, 15], offset: [16660, 4150], factor: [-0.000171570875, 0.0001729241463] };
 const ets2Proj4 = proj4(`+proj=lcc +R=${EARTH_RADIUS_M} +lat_1=${ETS2_DEF.lat1} +lat_2=${ETS2_DEF.lat2} +lat_0=${ETS2_DEF.origin[0]} +lon_0=${ETS2_DEF.origin[1]}`);
-function ets2ToLngLat(x, z) {
+function ets2ToLngLat(x, z) { return ets2ToLngLatImpl(x, z, true); }
+function ets2FromLngLat(lng, lat) { return ets2FromLngLatImpl(lng, lat, true); }
+// Grand Utopia (mapa standalone): sus sectores caen en la zona que el hack de
+// UK escala distinto y cruzan su borde - sin el hack (los tiles se generan
+// con TM_NO_UK_HACK=1, misma proyeccion).
+function guToLngLat(x, z) { return ets2ToLngLatImpl(x, z, false); }
+function guFromLngLat(lng, lat) { return ets2FromLngLatImpl(lng, lat, false); }
+function ets2ToLngLatImpl(x, z, ukHack) {
   const sx = Math.floor(x / 4000);
   const sz = Math.floor(z / 4000);
   x -= ETS2_DEF.offset[0];
@@ -1160,7 +1254,7 @@ function ets2ToLngLat(x, z) {
   // desde los archivos del juego.
   const ukScale = 0.75;
   const calaisX = -31100, calaisZ = -5500;
-  const isUk = sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
+  const isUk = ukHack && sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
   if (isUk) {
     x = (x + calaisX / 2) * ukScale;
     z = (z + calaisZ / 2) * ukScale;
@@ -1173,7 +1267,7 @@ function ets2ToLngLat(x, z) {
 // la escala de UK, que es justo lo que estamos por calcular) - se resuelve
 // en dos pasadas: primero se asume que no es UK, se ve a que sector cae, y
 // si ese sector resulta ser UK se rehace la cuenta aplicando la escala.
-function ets2FromLngLat(lng, lat) {
+function ets2FromLngLatImpl(lng, lat, ukHack) {
   const [lccX, lccY] = ets2Proj4.forward([lng, lat]);
   const ukScale = 0.75;
   const calaisX = -31100, calaisZ = -5500;
@@ -1193,7 +1287,7 @@ function ets2FromLngLat(lng, lat) {
   const [x0, z0] = tryConvert(false);
   const sx = Math.floor(x0 / 4000);
   const sz = Math.floor(z0 / 4000);
-  const isUk = sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
+  const isUk = ukHack && sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
   return isUk ? tryConvert(true) : [x0, z0];
 }
 
@@ -2547,14 +2641,31 @@ function resolveEffectiveGame(game) {
   const g = game || 'ats';
   const det = modsAuto && detectedMods ? detectedMods[g] : null;
   if (det) {
+    // Reforma con cualquiera de los otros dos mapas usa el pack "todo" (es
+    // un superconjunto: rutas de mas en Canada/costa, nunca de menos).
+    if (g === 'ats' && det.reforma && (det.c2c || det.promods_canada)) return 'ats_reforma_c2c_promods';
+    if (g === 'ats' && det.reforma) return 'ats_reforma';
+    if (g === 'ats' && det.c2c && det.promods_canada) return 'ats_c2c_promods';
     if (g === 'ats' && det.promods_canada) return 'ats_promods';
     if (g === 'ats' && det.c2c) return 'ats_c2c';
+    // Grand Utopia es standalone: si esta activo, el perfil es de ese mapa.
+    if (g === 'ets2' && det.grand_utopia) return 'ets2_gu';
+    if (g === 'ets2' && det.roextended && det.rusmap) return publishedVariant('ets2_promods_rusmap_roex', 'ets2_promods_rusmap');
+    // Roextended sin ProMods (edicion standalone) no tiene variante propia;
+    // la Hybrid es lo mas parecido.
+    if (g === 'ets2' && det.roextended) return publishedVariant('ets2_promods_roex', 'ets2_promods');
     if (g === 'ets2' && det.promods && det.rusmap) return 'ets2_promods_rusmap';
     if (g === 'ets2' && det.promods) return 'ets2_promods';
     return g;
   }
+  if (g === 'ats' && atsMod === 'reforma_c2c_promods_canada') return 'ats_reforma_c2c_promods';
+  if (g === 'ats' && atsMod === 'reforma') return 'ats_reforma';
+  if (g === 'ats' && atsMod === 'c2c_promods_canada') return 'ats_c2c_promods';
   if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
   if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
+  if (g === 'ets2' && ets2Mod === 'gu') return 'ets2_gu';
+  if (g === 'ets2' && ets2Mod === 'promods_rusmap_roex') return publishedVariant('ets2_promods_rusmap_roex', 'ets2_promods_rusmap');
+  if (g === 'ets2' && ets2Mod === 'promods_roex') return publishedVariant('ets2_promods_roex', 'ets2_promods');
   if (g === 'ets2' && ets2Mod === 'promods_rusmap') return 'ets2_promods_rusmap';
   if (g === 'ets2' && ets2Mod === 'promods') return 'ets2_promods';
   return g;
@@ -2567,8 +2678,11 @@ function describeDetectedMods(game) {
   const names = [];
   if (det.promods) names.push('ProMods');
   if (det.rusmap) names.push('RusMap');
+  if (det.roextended) names.push('Roextended');
+  if (det.grand_utopia) names.push('Grand Utopia');
   if (det.promods_canada) names.push('ProMods Canada');
   if (det.c2c) names.push('Coast to Coast');
+  if (det.reforma) names.push('Reforma');
   return names.length ? t('modsDetected').replace('{mods}', names.join(' + ')) : t('modsDetectedNone');
 }
 
