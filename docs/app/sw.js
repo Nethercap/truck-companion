@@ -6,6 +6,7 @@ const APP_SHELL = [
   './app.css?v=20260922e',
   './app.js?v=20260922e',
   './convoy.js?v=20260922e',
+  './livemap.js?v=20260922e',
   './pure.js?v=20260922e',
   './i18n.js?v=20260922e',
   './assets/icon-192.png',

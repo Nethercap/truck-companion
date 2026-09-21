@@ -322,6 +322,13 @@
         </div>
       </div>
 
+      <div class="card liveMapCard" id="liveMapCard" hidden>
+        <div class="cardTitle cardTitleRow"><span data-i18n="liveMapTitle">Live map</span><span id="liveMapCount" class="convoyStatus"></span></div>
+        <div class="convoyMeta liveMapHead"><span id="liveMapVariant"></span><button id="liveMapFitBtn" class="waypointClearBtn" data-i18n="liveMapFitAll">Show all</button></div>
+        <div id="liveMapList"></div>
+        <div class="convoyActions"><a class="settingsLinkBtn" href="/live/" data-i18n="liveMapAll">All maps</a></div>
+      </div>
+
       <div class="card convoyCards" id="convoyCards" hidden>
         <div class="cardTitle cardTitleRow"><span><span data-i18n="convoyCardsTitle">Convoy</span> <span class="betaTag">beta</span></span><span id="convoyDots" class="convoyDots"></span></div>
         <div class="convoyCardsScroll" id="convoyCardsScroll"></div>
@@ -473,5 +480,6 @@
 <script src="i18n.js?v=20260922e"></script>
 <script src="app.js?v=20260922e"></script>
 <script src="convoy.js?v=20260922e"></script>
+<script src="livemap.js?v=20260922e"></script>
 </body>
 </html>

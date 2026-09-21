@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title data-i18n-text="metaTitle">Live Map – Truck Dash drivers online right now (ETS2 &amp; ATS)</title>
+<meta name="description" data-i18n-content="metaDescription" content="Watch Truck Dash drivers moving live on the ETS2 and ATS maps, including ProMods, Coast to Coast, RusMap, Reforma and more. No account needed." />
+<link rel="canonical" href="https://trucksim-dash.com/live/" />
+<meta property="og:title" content="Truck Dash – Live Map" />
+<meta property="og:description" content="Truck Dash drivers online right now, on every supported map." />
+<meta property="og:image" content="https://trucksim-dash.com/assets/og-image.png" />
+<meta property="og:url" content="https://trucksim-dash.com/live/" />
+<link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://truck-companion-production.up.railway.app" />
+<link rel="preconnect" href="https://maps.trucksim-dash.com" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #14171c; --panel-alt: #1a1e24; --border: #262b33;
+    --text: #f2f3f5; --muted: #9aa4b2; --blue: #3b9eff; --orange: #ff8a3d; --green: #4caf50;
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5; }
+  a { color: var(--blue); text-decoration: none; }
+  h1, h2, h3 { font-family: var(--display); letter-spacing: 0.01em; margin: 0; }
+  header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.8rem 1.5rem; background: rgba(11,13,16,0.85); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.2rem; font-family: var(--display); color: var(--text); }
+  .brand img { height: 28px; width: 28px; }
+  .brand .sub { font-weight: 400; font-size: 0.8rem; color: var(--muted); font-family: system-ui, sans-serif; margin-left: 0.4rem; }
+  nav { display: flex; align-items: center; gap: 1rem; font-size: 0.93rem; }
+  nav a { color: var(--text); white-space: nowrap; }
+  nav a:hover { color: var(--blue); }
+  .langBtn { background: var(--panel-alt); border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.85rem; cursor: pointer; color: var(--text); }
+  main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  .intro { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+  .intro h1 { font-size: 2.2rem; line-height: 1.05; }
+  .intro h1 .dot { display: inline-block; width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); margin-right: 0.35em; vertical-align: 0.05em; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .intro p { color: var(--muted); margin: 0.4rem 0 0; max-width: 60ch; }
+  .total { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 1rem; font-family: var(--display); font-size: 1.1rem; white-space: nowrap; }
+  .total b { color: var(--green); font-size: 1.5rem; margin-right: 0.3rem; }
+  .section { margin-top: 1.6rem; }
+  .section h2 { font-size: 0.85rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.7rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+  .grid.base { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .card { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; color: var(--text); transition: border-color 0.15s, transform 0.15s; }
+  .card:hover { border-color: var(--blue); transform: translateY(-2px); text-decoration: none; }
+  .card .preview { position: relative; aspect-ratio: 16 / 9; background: radial-gradient(ellipse at 50% 60%, rgba(59,158,255,0.10), transparent 65%), var(--panel-alt); }
+  .card .preview svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .card .preview .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 0.85rem; }
+  .card .game { position: absolute; top: 10px; left: 10px; font-family: var(--display); font-weight: 700; font-size: 0.75rem; letter-spacing: 0.08em; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.55); border: 1px solid var(--border); }
+  .card .game.ets2 { color: var(--blue); } .card .game.ats { color: var(--orange); }
+  .card .online { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 0.35rem; font-weight: 700; font-size: 0.8rem; padding: 2px 8px; border-radius: 999px; background: rgba(0,0,0,0.6); border: 1px solid var(--border); }
+  .card .online i { width: 7px; height: 7px; border-radius: 50%; background: #5a6470; }
+  .card .online.on i { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .card .body { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.75rem 0.9rem 0.85rem; }
+  .card h3 { font-size: 1.15rem; line-height: 1.15; }
+  .card .meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
+  .card .meta span + span::before { content: "·"; margin: 0 0.4rem; }
+  .card .arrow { color: var(--muted); font-size: 1.2rem; }
+  .card:hover .arrow { color: var(--blue); }
+  .note { margin-top: 2rem; padding: 0.9rem 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 0.9rem; }
+  .note a { white-space: nowrap; }
+  footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 1rem; border-top: 1px solid var(--border); }
+  @media (max-width: 600px) { header { padding: 0.7rem 1rem; } nav { gap: 0.7rem; font-size: 0.88rem; } .brand .sub, nav .hideSm { display: none; } .intro h1 { font-size: 1.8rem; } }
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="/"><img src="/assets/logo.svg" alt="" width="28" height="28" /><span>Truck <span style="color:var(--blue)">Dash</span></span><span class="sub hideSm" data-i18n="brandSub">Live Map</span></a>
+  <nav>
+    <a href="/" data-i18n="navHome">Home</a>
+    <a href="/app/" data-i18n="navApp">Open the app</a>
+    <button class="langBtn" id="langBtn" type="button">ES</button>
+  </nav>
+</header>
+<main>
+  <div class="intro">
+    <div>
+      <h1><span class="dot"></span><span data-i18n="title">Drivers on the road right now</span></h1>
+      <p data-i18n="subtitle">Every Truck Dash driver who shares their position, live on the map they're playing on — base game or map mod. Pick a map to watch.</p>
+    </div>
+    <div class="total"><b id="totalOnline">–</b><span data-i18n="totalLabel">drivers online</span></div>
+  </div>
+  <section class="section"><h2 data-i18n="baseGames">Base games</h2><div class="grid base" id="baseGrid"></div></section>
+  <section class="section"><h2 data-i18n="mapMods">Map mods</h2><div class="grid" id="modGrid"></div></section>
+  <p class="note" data-i18n="note">Positions are shared anonymously (session id, truck, cargo and job — no name unless you set a nickname) and only while the app is open. Drivers can turn it off in Settings → "Share my position". <a href="/privacy.html">Privacy</a></p>
+</main>
+<footer>© 2026 Truck Dash · <a href="/">trucksim-dash.com</a> · <span data-i18n="madeWith">Map data made possible by TruckerMudgeon's map tools</span></footer>
+<script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  const BACKEND = (params.get('backend') || 'https://truck-companion-production.up.railway.app').replace(/^ws/, 'http').replace(/\/$/, '');
+  const MAPS = 'https://maps.trucksim-dash.com';
+  const I18N = {
+    en: { metaTitle: 'Live Map – Truck Dash drivers online right now (ETS2 & ATS)', brandSub: 'Live Map', navHome: 'Home', navApp: 'Open the app',
+      title: 'Drivers on the road right now', subtitle: "Every Truck Dash driver who shares their position, live on the map they're playing on — base game or map mod. Pick a map to watch.",
+      totalLabel: 'drivers online', baseGames: 'Base games', mapMods: 'Map mods', cities: 'cities', online: 'online', noOne: 'nobody right now',
+      note: 'Positions are shared anonymously (session id, truck, cargo and job — no name unless you set a nickname) and only while the app is open. Drivers can turn it off in Settings → "Share my position". <a href="/privacy.html">Privacy</a>',
+      madeWith: "Map data made possible by TruckerMudgeon's map tools" },
+    es: { metaTitle: 'Mapa en vivo – Conductores de Truck Dash en línea ahora (ETS2 y ATS)', brandSub: 'Mapa en vivo', navHome: 'Inicio', navApp: 'Abrir la app',
+      title: 'Camioneros en ruta ahora mismo', subtitle: 'Todos los conductores de Truck Dash que comparten su posición, en vivo sobre el mapa en el que juegan — juego base o mod de mapa. Elegí un mapa para mirar.',
+      totalLabel: 'conductores en línea', baseGames: 'Juegos base', mapMods: 'Mods de mapa', cities: 'ciudades', online: 'en línea', noOne: 'nadie ahora mismo',
+      note: 'Las posiciones se comparten de forma anónima (id de sesión, camión, carga y viaje — sin nombre salvo que pongas un apodo) y solo mientras la app está abierta. Se apaga en Ajustes → "Compartir mi posición". <a href="/privacy.html">Privacidad</a>',
+      madeWith: 'Datos de mapa posibles gracias a las herramientas de TruckerMudgeon' },
+  };
+  let lang = params.get('lang') || localStorage.getItem('truckdash_lang') || (navigator.language || 'en').slice(0, 2);
+  if (!I18N[lang]) lang = 'en';
+  const t = (k) => I18N[lang][k] || I18N.en[k] || k;
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-text]').forEach(el => { el.textContent = t(el.dataset.i18nText); });
+    document.querySelectorAll('[data-i18n-content]').forEach(el => { el.content = t(el.dataset.i18nContent); });
+    document.getElementById('langBtn').textContent = lang === 'es' ? 'EN' : 'ES';
+    for (const el of document.querySelectorAll('.card')) renderCount(el);
+  }
+  document.getElementById('langBtn').addEventListener('click', () => { lang = lang === 'es' ? 'en' : 'es'; try { localStorage.setItem('truckdash_lang', lang); } catch (e) {} applyLang(); });
+
+  const counts = { variants: {}, total: 0 };
+  const GAME_NAME = { ats: 'ATS', ets2: 'ETS2' };
+  const HUES = ['#3b9eff', '#ff8a3d', '#2ad3a4', '#b48cff', '#ffd166', '#ff6b8a', '#6be3ff', '#c5e17a'];
+
+  // Titulo corto: lo que sigue a "ATS + " / "ETS2 + " en el label del manifest.
+  function shortLabel(v, key) {
+    if (!v.mods.length) return v.game === 'ats' ? 'American Truck Simulator' : 'Euro Truck Simulator 2';
+    // sin el juego adelante ni los parentesis (addons/conectores), que no entran en la tarjeta
+    return v.label.replace(/^(ATS|ETS2)\s*\+\s*/, '').replace(/\s*\([^)]*\)/g, '').trim();
+  }
+
+  function renderCount(card) {
+    const n = counts.variants[card.dataset.variant] || 0;
+    const badge = card.querySelector('.online');
+    badge.classList.toggle('on', n > 0);
+    badge.querySelector('b').textContent = n;
+    badge.title = n ? `${n} ${t('online')}` : t('noOne');
+  }
+
+  function dotsSvg(cities, color) {
+    if (!cities.length) return '';
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const c of cities) { minX = Math.min(minX, c.X); maxX = Math.max(maxX, c.X); minY = Math.min(minY, c.Y); maxY = Math.max(maxY, c.Y); }
+    const W = 320, H = 180, pad = 18;
+    const scale = Math.min((W - 2 * pad) / Math.max(1, maxX - minX), (H - 2 * pad) / Math.max(1, maxY - minY));
+    const ox = (W - (maxX - minX) * scale) / 2, oy = (H - (maxY - minY) * scale) / 2;
+    const r = cities.length > 500 ? 1.3 : cities.length > 250 ? 1.7 : 2.2;
+    const pts = cities.map(c => `<circle cx="${(ox + (c.X - minX) * scale).toFixed(1)}" cy="${(oy + (c.Y - minY) * scale).toFixed(1)}" r="${r}"/>`).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><g fill="${color}" opacity="0.9" style="filter: drop-shadow(0 0 3px ${color}88)">${pts}</g></svg>`;
+  }
+
+  async function buildCards() {
+    const manifest = await fetch('/data/map-manifest.json', { cache: 'no-cache' }).then(r => r.json());
+    const entries = Object.entries(manifest.variants);
+    let hue = 0;
+    await Promise.all(entries.map(async ([key, v], idx) => {
+      let cities;
+      try {
+        const r = await fetch(`${MAPS}/${key}/Cities.json?v=${v.mapDataVersion || ''}`);
+        if (!r.ok) return; // variante todavia no publicada: sin tarjeta
+        cities = await r.json();
+      } catch (e) { return; }
+      const base = !v.mods.length;
+      const color = base ? (v.game === 'ats' ? '#ff8a3d' : '#3b9eff') : HUES[(2 + idx) % HUES.length];
+      const a = document.createElement('a');
+      a.className = 'card'; a.dataset.variant = key; a.dataset.order = idx;
+      a.href = `/app/?live=${encodeURIComponent(key)}${params.get('backend') ? '&backend=' + encodeURIComponent(params.get('backend')) : ''}`;
+      a.innerHTML = `<div class="preview">${dotsSvg(cities, color)}<span class="game ${v.game}">${GAME_NAME[v.game] || v.game}</span><span class="online"><i></i><b>0</b></span></div>
+        <div class="body"><div><h3>${shortLabel(v, key)}</h3><div class="meta"><span>${GAME_NAME[v.game]}</span><span>${cities.length} <span data-i18n="cities">${t('cities')}</span></span></div></div><span class="arrow">→</span></div>`;
+      const grid = document.getElementById(base ? 'baseGrid' : 'modGrid');
+      // orden del manifest aunque las respuestas lleguen desordenadas
+      const after = [...grid.children].find(c => +c.dataset.order > idx);
+      grid.insertBefore(a, after || null);
+      renderCount(a);
+    }));
+  }
+
+  async function refreshCounts() {
+    try {
+      const r = await fetch(`${BACKEND}/live/summary`, { cache: 'no-store' });
+      const body = await r.json();
+      counts.variants = body.variants || {}; counts.total = body.total || 0;
+    } catch (e) { /* backend caido: se dejan los ultimos numeros */ }
+    document.getElementById('totalOnline').textContent = counts.total;
+    for (const el of document.querySelectorAll('.card')) renderCount(el);
+  }
+
+  applyLang();
+  buildCards();
+  refreshCounts();
+  setInterval(refreshCounts, 15000);
+})();
+</script>
+</body>
+</html>

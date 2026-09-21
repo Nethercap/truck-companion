@@ -631,5 +631,27 @@
   /* espectador: sin datos propios ni botonera */
   body.spectator .speedRow, body.spectator #jobIncome, body.spectator .card:not(.convoyCards), body.spectator #commandsPanel, body.spectator #commandsDrawer, body.spectator #miniHud, body.spectator #convoyMsgBtn { display: none !important; }
   body.spectator #convoyCards { display: block !important; }
+  /* Mapa en vivo publico: sin convoy, con la lista de conductores. */
+  body.livemap #convoyCards, body.livemap #convoyBtn { display: none !important; }
+  /* Sin botonera ni waypoints (son del conductor). Recentrar / pantalla
+     completa / modo nav / 3D aparecen recien al fijar un camion: actuan
+     sobre ese camion (truckMarker se mueve con el, ver livemap.js). */
+  body.livemap #waypointBtn, body.livemap #commandsToggleBtn { display: none !important; }
+  body.livemap:not(.livePinned) #recenterBtn, body.livemap:not(.livePinned) #fullscreenBtn, body.livemap:not(.livePinned) #navToggleBtn, body.livemap:not(.livePinned) #tilt3dBtn { display: none !important; }
+  .liveMapHead { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .liveMapRow.followed { background: rgba(59,158,255,0.10); }
+  .liveMapPin { background: none; border: 1px solid transparent; border-radius: 6px; padding: 0.1rem 0.3rem; cursor: pointer; opacity: 0.45; font-size: 0.85rem; }
+  .liveMapPin:hover { opacity: 1; border-color: var(--border); }
+  .liveMapPin.active { opacity: 1; background: rgba(59,158,255,0.25); border-color: var(--blue); }
+  .convoyMarker.followed .convoyArrow { filter: drop-shadow(0 0 6px #3b9eff); }
+  .convoyMarker.followed .convoyLabel { outline: 1px solid var(--blue); }
+  body.livemap .card.liveMapCard { display: block !important; }
+  .liveMapRow { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; border-top: 1px solid var(--border); cursor: pointer; }
+  .liveMapRow:first-child { border-top: none; }
+  .liveMapRow:hover { background: rgba(255,255,255,0.04); }
+  .liveMapRowBody { min-width: 0; flex: 1; }
+  .liveMapRowBody .convoyMeta { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .liveMapRow .convoyStatus { color: var(--muted); font-size: 0.76rem; white-space: nowrap; }
+  #liveMapList { max-height: 60vh; overflow-y: auto; }
   body.spectator .truckMarker { display: none; }
   body.spectator .layout { --spectator: 1; }

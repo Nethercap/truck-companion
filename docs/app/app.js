@@ -12,7 +12,20 @@ const TRANSLATIONS = {
     settingsTitle: 'Settings',
     settingsMiniHudTitle: 'Show in mini-HUD (when info panel is hidden):',
     settingsLiveTitle: 'Other players nearby:',
-    settingsLiveShare: 'Share my position and see others (same game/map only)',
+    settingsLiveShare: 'Share my position: see other drivers and appear on the public live map (anonymous)',
+    liveShareNotice: 'You appear on the live map as an anonymous driver, and other drivers on your map can see you. Turn it off in Settings → "Share my position" if you prefer.',
+    liveMapChip: 'Live map',
+    liveMapTitle: 'Live map',
+    liveMapDrivers: '{n} drivers',
+    liveMapDriversOne: '1 driver',
+    liveMapAnon: 'Driver',
+    liveMapEmpty: 'Nobody is sharing their position on this map right now.',
+    liveMapUnknown: 'Unknown map. Pick one from the live map list.',
+    liveMapFull: 'Too many viewers on this map right now, try again in a bit.',
+    liveMapAll: 'All maps',
+    liveMapFitAll: 'Show all',
+    liveMapPin: 'Pin and follow this truck',
+    liveMapUnpin: 'Stop following',
     settingsLiveHideOthers: "Hide other players' markers on the map",
     settingsCommandsTitle: 'Truck command buttons:',
     settingsRouteTitle: 'Route preference:',
@@ -295,7 +308,20 @@ const TRANSLATIONS = {
     settingsTitle: 'Configuración',
     settingsMiniHudTitle: 'Mostrar en el mini-HUD (con el panel de info oculto):',
     settingsLiveTitle: 'Otros jugadores cerca:',
-    settingsLiveShare: 'Compartir mi posición y ver a otros (solo mismo juego/mapa)',
+    settingsLiveShare: 'Compartir mi posición: ver a otros conductores y aparecer en el mapa en vivo público (anónimo)',
+    liveShareNotice: 'Aparecés en el mapa en vivo como conductor anónimo, y otros conductores de tu mapa te ven. Si preferís, apagalo en Ajustes → "Compartir mi posición".',
+    liveMapChip: 'Mapa en vivo',
+    liveMapTitle: 'Mapa en vivo',
+    liveMapDrivers: '{n} conductores',
+    liveMapDriversOne: '1 conductor',
+    liveMapAnon: 'Conductor',
+    liveMapEmpty: 'Nadie está compartiendo su posición en este mapa ahora.',
+    liveMapUnknown: 'Mapa desconocido. Elegí uno de la lista del mapa en vivo.',
+    liveMapFull: 'Hay demasiados espectadores en este mapa ahora, probá en un rato.',
+    liveMapAll: 'Todos los mapas',
+    liveMapFitAll: 'Ver todos',
+    liveMapPin: 'Fijar y seguir este camión',
+    liveMapUnpin: 'Dejar de seguir',
     settingsLiveHideOthers: 'Ocultar los marcadores de otros jugadores en el mapa',
     settingsCommandsTitle: 'Botonera del camión:',
     settingsRouteTitle: 'Preferencia de ruta:',
@@ -654,7 +680,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -867,7 +893,14 @@ let detectedMods = null;
 // a nadie), decidido asi porque no hay cuentas ni consentimiento granular.
 // hideOtherPlayers es aparte y solo local (no le dice nada al backend) -
 // podes seguir compartiendo tu posicion pero no dibujar la de los demas.
-let liveShareEnabled = _savedSettings.liveShareEnabled || false;
+// Desde 2026-09-21 viene ENCENDIDO por defecto: lo que se comparte es
+// anonimo (posicion, camion, carga, ciudad origen/destino y el apodo de
+// convoy solo si lo puso) y tambien alimenta el mapa en vivo publico (/live/).
+// Lo guardado antes de ese cambio (liveShareV2 ausente) se migra una sola vez
+// a encendido y se avisa con un toast al conectar; el usuario lo apaga en
+// Ajustes cuando quiera.
+let liveShareEnabled = _savedSettings.liveShareV2 ? !!_savedSettings.liveShareEnabled : true;
+let liveShareNoticePending = !_savedSettings.liveShareV2;
 let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
 useImperial = !!_savedSettings.useImperial;
 renderUnitButtons();
@@ -963,7 +996,14 @@ function sendLiveShareState() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const mapVariant = liveShareEnabled ? resolveEffectiveGame(lastData?.game) : null;
   lastSentMapVariant = mapVariant;
-  ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant }));
+  // El apodo de convoy (si lo puso) es lo unico con nombre que se muestra en el mapa en vivo.
+  const nick = liveShareEnabled ? (loadSettings().convoyNick || null) : null;
+  ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant, nick }));
+  if (liveShareNoticePending && liveShareEnabled && !conn.demo && !conn.spectator) {
+    liveShareNoticePending = false;
+    saveSettings(); // persiste liveShareV2: el aviso es una sola vez
+    showToast(t('liveShareNotice'), 'info', 12000);
+  }
 }
 
 document.getElementById('setLiveShare').addEventListener('change', (e) => {
@@ -2275,10 +2315,17 @@ async function loadGameMap(game) {
 
   setMapLoading('mapLoadingCities');
   await loadCities(mapInfo);
-  setMapLoading('mapLoadingGraph');
-  await loadRouteGraph(mapInfo);
-  setMapLoading('mapLoadingNames');
-  await loadRoadNames(mapInfo);
+  if (conn.spectator) {
+    // Espectador (convoy / mapa en vivo): no rutea ni navega, asi que el grafo
+    // (10-25 MB) y los nombres de ruta sobran - el mapa abre en segundos.
+    routeGraph = null;
+    roadNames = [];
+  } else {
+    setMapLoading('mapLoadingGraph');
+    await loadRouteGraph(mapInfo);
+    setMapLoading('mapLoadingNames');
+    await loadRoadNames(mapInfo);
+  }
   loadPois(game); // no bloquea: la busqueda muestra "cargando" hasta que llegue
   currentRouteTarget = null;
   currentRouteWorldPoints = null;
@@ -3951,7 +3998,9 @@ document.getElementById('tourSkipBtn').addEventListener('click', endTour);
 document.getElementById('helpBtn').addEventListener('click', startTour);
 
 if (!localStorage.getItem('truckdash_tour_seen')) {
-  setTimeout(startTour, 600); // deja que el mapa/botones terminen de acomodarse
+  // deja que el mapa/botones terminen de acomodarse; en modo espectador
+  // (convoy o mapa en vivo, sin cliente) el tour de pairing no tiene sentido
+  setTimeout(() => { if (!conn.spectator) startTour(); }, 600);
 }
 
 // El .exe del cliente abre el navegador directo con ?code=...&backend=...
@@ -4083,6 +4132,13 @@ buildSpeedTicks();
   const backend = params.get('backend');
   if (backend) document.getElementById('backendUrl').value = backend;
   if (params.get('demo')) { startDemo(); return; }
+  const liveParam = params.get('live');
+  if (liveParam && !code && !params.get('local')) {
+    // Mapa en vivo publico de una variante (sin cliente): livemap.js se carga
+    // despues de este archivo y arranca al leer esta variable.
+    window.__liveMapSpectator = { variant: liveParam, backend: document.getElementById('backendUrl').value.replace('wss://', 'https://').replace('ws://', 'http://') };
+    return;
+  }
   const convoyParam = (params.get('convoy') || '').toUpperCase();
   if (convoyParam && !code && !params.get('local')) {
     // Link de convoy sin cliente: espectador. Con cliente (?code=...) se
