@@ -1119,7 +1119,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921c', ats_promods: '20260921b', ats_c2c_promods: '20260921', ats_reforma: '20260921', ats_reforma_c2c_promods: '20260921', ets2: '20260921b', ets2_promods: '20260921b', ets2_promods_rusmap: '20260920', ets2_gu: '20260921' };
+const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921c', ats_promods: '20260921b', ats_c2c_promods: '20260921', ats_reforma: '20260921', ats_reforma_c2c_promods: '20260921', ets2: '20260921b', ets2_promods: '20260921b', ets2_promods_rusmap: '20260920', ets2_promods_roex: '20260921', ets2_promods_rusmap_roex: '20260921', ets2_gu: '20260921' };
 // Una variante sin entrada en MAP_DATA_VERSION esta cableada pero todavia no
 // publicada en R2 (ej. Roextended a la espera de sus paquetes Def/Models):
 // no se ofrece en Ajustes y la auto-deteccion cae a la mas parecida.

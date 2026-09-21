@@ -163,6 +163,7 @@
       "label": "ETS2 + ProMods + Roextended (Hybrid)",
       "game": "ets2",
       "gameVersion": "1.61.1",
+      "built": "2026-09-21",
       "mapDataVersion": "20260921",
       "mods": [
         "promods",
@@ -176,14 +177,13 @@
         "ets2_promods_roex/route-graph-ets2_promods_roex.json",
         "ets2_promods_roex/Cities.json",
         "ets2_promods_roex/road-names.json"
-      ],
-      "planned": true,
-      "plannedNote": "faltan los paquetes Def/Models de Roextended 5.3 (los Hybrid son solo el mapa)"
+      ]
     },
     "ets2_promods_rusmap_roex": {
       "label": "ETS2 + ProMods + RusMap + Roextended (Hybrid)",
       "game": "ets2",
       "gameVersion": "1.61.1",
+      "built": "2026-09-21",
       "mapDataVersion": "20260921",
       "mods": [
         "promods",
@@ -200,9 +200,7 @@
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.json",
         "ets2_promods_rusmap_roex/Cities.json",
         "ets2_promods_rusmap_roex/road-names.json"
-      ],
-      "planned": true,
-      "plannedNote": "faltan los paquetes Def/Models de Roextended 5.3 (los Hybrid son solo el mapa)"
+      ]
     },
     "ets2_gu": {
       "label": "ETS2 + Grand Utopia (standalone)",
@@ -302,10 +300,10 @@
     "roextended": {
       "name": "Roextended (Hybrid, ed. ProMods+ME)",
       "game": "ets2",
-      "version": "1.61 Hybrid v3 (ROEX 5.3)",
+      "version": "5.3 (1.61 Hybrid v3 + RXF1-4)",
       "homepage": "https://roextended.ro/",
       "check": null,
-      "checkNote": "roextended.ro: verificar a mano (paquetes 161Hybrid2v3 + ROEX53PMME284 + 161MaghrebFix)"
+      "checkNote": "roextended.ro (foro, requiere cuenta): verificar a mano. Paquetes: 53RXF1-4 (base) + 161Hybrid2v3 (mapa ed. PM+ME) + ROEX53PMME284 + 161MaghrebFix"
     },
     "cnx_promods_rusmap": {
       "name": "ProMods–RusMap connector",
