@@ -8,7 +8,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [],
       "files": [
         "vector/ats.pmtiles",
@@ -23,7 +23,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "c2c"
       ],
@@ -40,7 +40,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "promods_canada"
       ],
@@ -57,7 +57,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "c2c",
         "promods_canada"
@@ -75,7 +75,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "reforma",
         "reforma_mega_resources",
@@ -94,7 +94,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "c2c",
         "promods_canada",
@@ -116,7 +116,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [],
       "files": [
         "vector/ets2.pmtiles",
@@ -131,7 +131,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "promods",
         "promods_me",
@@ -151,7 +151,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "promods",
         "promods_me",
@@ -173,7 +173,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "promods",
         "promods_me",
@@ -194,7 +194,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "promods",
         "promods_me",
@@ -218,7 +218,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "grand_utopia"
       ],
@@ -235,7 +235,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922",
+      "mapDataVersion": "20260922b",
       "mods": [
         "truckersmp"
       ],
