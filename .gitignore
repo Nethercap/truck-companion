@@ -8,3 +8,6 @@ docs/maps/
 client/settings.json
 client/keybinds.json
 client/truckdash.log
+
+# Config local del preview de Claude Code
+.claude/

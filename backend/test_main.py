@@ -732,3 +732,71 @@ def test_convoy_create_again_with_own_code_is_a_rejoin(main):
         assert main.convoys[code].members[a.code].nickname == "Netherman"
 
     asyncio.run(scenario())
+
+
+# ---------------------------------------------------------------- mapa en vivo publico (/live/)
+
+def _sharing_session(main, code, variant, nick=None, summary=None):
+    s = main.Session(code)
+    s.share_position = True
+    s.map_variant = variant
+    s.live_nick = nick
+    s.last_position = {"x": 10.0, "z": 20.0, "ts": main.time.time()}
+    s.last_summary = summary
+    main.sessions[code] = s
+    return s
+
+
+def test_live_summary_counts_sharing_sessions_per_variant(client, main):
+    _sharing_session(main, "AAAAAAAA", "ats_promods")
+    _sharing_session(main, "BBBBBBBB", "ats_promods")
+    _sharing_session(main, "CCCCCCCC", "ets2")
+    hidden = _sharing_session(main, "DDDDDDDD", "ets2")
+    hidden.share_position = False  # no comparte: no cuenta
+    stale = _sharing_session(main, "EEEEEEEE", "ets2")
+    stale.last_position["ts"] -= main.LIVE_POSITION_STALE_SECONDS + 1
+
+    body = client.get("/live/summary").json()
+    assert body["variants"] == {"ats_promods": 2, "ets2": 1}
+    assert body["total"] == 3
+
+
+def test_live_map_spectator_gets_players_of_its_variant_without_pairing_codes(client, main):
+    _sharing_session(main, "AAAAAAAA", "ats_promods", nick="Cobra",
+                     summary={"heading": 90.0, "speedKmh": 80, "paused": False, "truck": "Kenworth W900",
+                              "cargo": "Logs", "citySrc": "Boise", "cityDst": "Reno"})
+    _sharing_session(main, "BBBBBBBB", "ets2")  # otra variante: no aparece
+    with client.websocket_connect("/ws/livemap/ats_promods") as ws:
+        first = main.json.loads(ws.receive_text())
+        assert first["type"] == "live_players"
+        assert first["variant"] == "ats_promods"
+        assert len(first["players"]) == 1
+        p = first["players"][0]
+        assert p["id"] == main.sessions["AAAAAAAA"].public_id
+        assert p["nick"] == "Cobra" and p["truck"] == "Kenworth W900" and p["cityDst"] == "Reno"
+        assert p["heading"] == 90.0
+        raw = main.json.dumps(first)
+        assert "AAAAAAAA" not in raw and "BBBBBBBB" not in raw
+
+
+def test_live_map_rejects_bad_variant(client, main):
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with client.websocket_connect("/ws/livemap/Bad Variant!") as ws:
+            ws.receive_text()
+    assert exc.value.code == 4404
+
+
+def test_set_live_share_stores_trimmed_nick_and_clears_when_disabled(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as ws:
+        ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": True, "mapVariant": "ets2",
+                                      "nick": "  Tomás   Nether " + "x" * 40}))
+        import time as _time
+        _time.sleep(0.05)
+        session = main.sessions[code]
+        assert session.live_nick == ("Tomás Nether " + "x" * 40)[:main.LIVE_NICK_MAX_LEN]
+        ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": False}))
+        _time.sleep(0.05)
+        assert session.live_nick is None

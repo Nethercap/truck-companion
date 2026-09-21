@@ -478,6 +478,9 @@ class Session:
         self.map_variant: Optional[str] = None
         self.share_position = False
         self.last_position: Optional[dict] = None  # {"x":, "z":, "game":, "ts":}
+        # Apodo opcional (el de convoy) que se muestra en el mapa en vivo
+        # publico; sin apodo el marcador sale anonimo.
+        self.live_nick: Optional[str] = None
         # Ultimo estado de diagnostico reportado por el cliente local (mensaje
         # "client_status": waiting_game / plugin_missing / live / ...). Se
         # guarda para poder darselo a un viewer que se conecta despues, en vez
@@ -518,13 +521,19 @@ async def broadcast_live_positions_loop():
             logging.exception("Error en broadcast_live_positions_loop")
 
 
-def broadcast_live_positions():
-    now = time.time()
-    sharing = [
+def sharing_sessions(now: float) -> list["Session"]:
+    """Sesiones que aparecen en el mapa (opt-in + posicion fresca)."""
+    return [
         s for s in sessions.values()
         if s.share_position and s.map_variant and s.last_position
         and now - s.last_position["ts"] <= LIVE_POSITION_STALE_SECONDS
     ]
+
+
+def broadcast_live_positions():
+    now = time.time()
+    sharing = sharing_sessions(now)
+    live_map_broadcast(sharing, now)
     if not sharing:
         return
     by_variant: dict[str, list[Session]] = defaultdict(list)
@@ -549,6 +558,90 @@ async def _safe_send(ws: WebSocket, message: str):
         await ws.send_text(message)
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------- mapa en vivo publico (/live/)
+# Espectadores sin juego ni codigo que miran una variante de mapa entera:
+# reciben, cada LIVE_POSITIONS_BROADCAST_INTERVAL_SECONDS, todos los
+# conductores que comparten posicion en esa variante. Mismo opt-in que "otros
+# jugadores" (un solo toggle en Ajustes, default apagado) y los mismos datos
+# que ya ven los companeros de convoy, sin nada que identifique a la persona
+# salvo el apodo si lo puso.
+LIVE_MAP_MAX_SPECTATORS_PER_VARIANT = 60
+LIVE_MAP_VARIANT_RE = re.compile(r"^[a-z0-9_]{2,40}$")
+LIVE_NICK_MAX_LEN = 24
+
+live_map_spectators: dict[str, dict[WebSocket, ViewerOutbox]] = defaultdict(dict)
+
+
+def clean_live_nick(value) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    nick = " ".join(value.split())[:LIVE_NICK_MAX_LEN]
+    return nick or None
+
+
+def live_map_player(s: "Session") -> dict:
+    sm = s.last_summary or {}
+    return {
+        "id": s.public_id, "x": s.last_position["x"], "z": s.last_position["z"],
+        "heading": sm.get("heading"), "speedKmh": sm.get("speedKmh"), "paused": sm.get("paused", False),
+        "truck": sm.get("truck"), "cargo": sm.get("cargo"),
+        "citySrc": sm.get("citySrc"), "cityDst": sm.get("cityDst"),
+        "nick": s.live_nick,
+    }
+
+
+def live_map_message(variant: str, sharing: list["Session"]) -> str:
+    players = [live_map_player(s) for s in sharing if s.map_variant == variant]
+    return json.dumps({"type": "live_players", "variant": variant, "players": players})
+
+
+def live_map_broadcast(sharing: list["Session"], now: float):
+    for variant, outboxes in list(live_map_spectators.items()):
+        if not outboxes:
+            live_map_spectators.pop(variant, None)
+            continue
+        message = live_map_message(variant, sharing)
+        for outbox in list(outboxes.values()):
+            outbox.push_telemetry(message)
+
+
+@app.get("/live/summary")
+def live_summary():
+    """Conductores en vivo por variante de mapa (para las tarjetas de /live/)."""
+    now = time.time()
+    counts: dict[str, int] = defaultdict(int)
+    for s in sharing_sessions(now):
+        counts[s.map_variant] += 1
+    return {"variants": dict(counts), "total": sum(counts.values()), "ts": now}
+
+
+@app.websocket("/ws/livemap/{variant}")
+async def ws_live_map(websocket: WebSocket, variant: str):
+    """Espectador del mapa en vivo de una variante. Solo recibe."""
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    if not check_rate_limit(client_ip):
+        await websocket.close(code=4429, reason="demasiados intentos, esperá un minuto")
+        return
+    if not LIVE_MAP_VARIANT_RE.match(variant):
+        await websocket.close(code=4404, reason="variante invalida")
+        return
+    if len(live_map_spectators[variant]) >= LIVE_MAP_MAX_SPECTATORS_PER_VARIANT:
+        await websocket.close(code=4403, reason="mapa lleno de espectadores")
+        return
+    await websocket.accept()
+    outbox = ViewerOutbox(websocket)
+    live_map_spectators[variant][websocket] = outbox
+    outbox.push_control(live_map_message(variant, sharing_sessions(time.time())))
+    try:
+        while True:
+            await websocket.receive_text()  # no se espera nada del espectador
+    except WebSocketDisconnect:
+        pass
+    finally:
+        live_map_spectators[variant].pop(websocket, None)
+        outbox.close()
 
 
 @app.on_event("startup")
@@ -1252,6 +1345,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     # broadcast_live_positions, no hace falta nada mas aca).
                     session.share_position = bool(payload.get("enabled"))
                     session.map_variant = payload.get("mapVariant") if session.share_position else None
+                    session.live_nick = clean_live_nick(payload.get("nick")) if session.share_position else None
                     if not session.share_position:
                         session.last_position = None
                 elif msg_type == "set_currency":

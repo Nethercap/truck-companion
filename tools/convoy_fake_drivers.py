@@ -10,6 +10,7 @@ Uso:
   python tools/convoy_fake_drivers.py                  # 2 camiones contra produccion
   python tools/convoy_fake_drivers.py --drivers 3
   python tools/convoy_fake_drivers.py --backend http://127.0.0.1:8000   # backend local
+  python tools/convoy_fake_drivers.py --share --variant ats_promods       # ademas aparecen en el mapa en vivo (/live/)
 
 Requiere: pip install websockets. Cada camion cuenta como una sesion en las
 estadisticas del backend (son pocas, no importa), y se ve en "otros
@@ -74,10 +75,29 @@ async def drive(backend: str, code: str, idx: int):
             await asyncio.sleep(3)
 
 
+async def share(backend: str, code: str, idx: int, variant: str):
+    """Hace lo que haria la pestana de la web con "Compartir mi posicion"
+    activado: abre el socket de viewer y manda set_live_share. Asi el camion
+    falso aparece en "otros jugadores" y en el mapa en vivo sin abrir nada."""
+    ws_url = backend.replace("https://", "wss://").replace("http://", "ws://") + f"/ws/live/{code}"
+    nick = f"Fake {idx + 1}" if idx % 2 == 0 else None  # uno con apodo, otro anonimo
+    while True:
+        try:
+            async with websockets.connect(ws_url) as ws:
+                await ws.send(json.dumps({"type": "set_live_share", "enabled": True, "mapVariant": variant, "nick": nick}))
+                while True:
+                    await ws.recv()  # live_players / session_state: se ignoran
+        except Exception as exc:
+            print(f"[{code}] viewer desconectado ({exc}), reintento en 3 s", flush=True)
+            await asyncio.sleep(3)
+
+
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--backend", default="https://truck-companion-production.up.railway.app")
     ap.add_argument("--drivers", type=int, default=2)
+    ap.add_argument("--share", action="store_true", help="compartir posicion (otros jugadores + mapa en vivo)")
+    ap.add_argument("--variant", default="ats", help="variante de mapa que reportan al compartir (ats, ats_promods, ...)")
     args = ap.parse_args()
     codes = [pair(args.backend) for _ in range(args.drivers)]
     print("Camiones simulados listos. Abri cada uno en una pestana distinta:")
@@ -86,7 +106,10 @@ async def main():
         extra = "" if "railway" in args.backend else f"&backend={args.backend.replace('http://', 'ws://')}"
         print(f"  camion {i + 1}: {base}?code={c}{extra}")
     print("Ctrl+C para cerrarlos.", flush=True)
-    await asyncio.gather(*(drive(args.backend, c, i) for i, c in enumerate(codes)))
+    tasks = [drive(args.backend, c, i) for i, c in enumerate(codes)]
+    if args.share:
+        tasks += [share(args.backend, c, i, args.variant) for i, c in enumerate(codes)]
+    await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
