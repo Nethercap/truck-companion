@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260922e" />
+<link rel="stylesheet" href="app.css?v=20260922f" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -80,6 +80,11 @@
       <p class="settingsSectionTitle" data-i18n="settingsLiveTitle">Other players nearby:</p>
       <label class="settingsRow"><input type="checkbox" id="setLiveShare" /> <span data-i18n="settingsLiveShare">Share my position and see others (same game/map only)</span></label>
       <label class="settingsRow"><input type="checkbox" id="setLiveHideOthers" /> <span data-i18n="settingsLiveHideOthers">Hide other players' markers on the map</span></label>
+
+      <p class="settingsSectionTitle" data-i18n="settingsLiteTitle">Lite mode (old phones / tablets):</p>
+      <label class="settingsRow"><input type="checkbox" id="setLiteMode" /> <span data-i18n="settingsLiteMode">Lite mode: lower-resolution rendering, no animations or 3D, fewer labels, no road names in directions</span></label>
+      <label class="settingsRow"><input type="checkbox" id="setLiteNoRouting" /> <span data-i18n="settingsLiteNoRouting">Also skip routing (no route line, turn-by-turn or real ETA) — saves the most memory</span></label>
+      <p class="settingsHint" data-i18n="settingsLiteHint">Applies after a reload. Use it if the page crashes or the map never finishes loading on an older device.</p>
 
       <p class="settingsSectionTitle" data-i18n="settingsRouteTitle">Route preference:</p>
       <label class="settingsRow"><input type="radio" name="routeProfile" id="setRouteFastest" value="fastest" /> <span data-i18n="settingsRouteFastest">Fastest — prefers highways, like the in-game GPS</span></label>
@@ -493,10 +498,10 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260922e"></script>
-<script src="i18n.js?v=20260922e"></script>
-<script src="app.js?v=20260922e"></script>
-<script src="convoy.js?v=20260922e"></script>
-<script src="livemap.js?v=20260922e"></script>
+<script src="pure.js?v=20260922f"></script>
+<script src="i18n.js?v=20260922f"></script>
+<script src="app.js?v=20260922f"></script>
+<script src="convoy.js?v=20260922f"></script>
+<script src="livemap.js?v=20260922f"></script>
 </body>
 </html>

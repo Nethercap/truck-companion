@@ -13,6 +13,11 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Show in mini-HUD (when info panel is hidden):',
     settingsLiveTitle: 'Other players nearby:',
     settingsLiveShare: 'Share my position: see other drivers and appear on the public live map (anonymous)',
+    settingsLiteTitle: 'Lite mode (old phones / tablets):',
+    settingsLiteMode: 'Lite mode: lower-resolution rendering, no animations or 3D, fewer labels, no road names in directions',
+    settingsLiteNoRouting: 'Also skip routing (no route line, turn-by-turn or real ETA) — saves the most memory',
+    settingsLiteHint: 'Applies after a reload. Use it if the page crashes or the map never finishes loading on an older device.',
+    settingsLiteReload: 'Reloading to apply…',
     liveShareNotice: 'You appear on the live map as an anonymous driver, and other drivers on your map can see you. Turn it off in Settings → "Share my position" if you prefer.',
     liveMapChip: 'Live map',
     liveMapTitle: 'Live map',
@@ -321,6 +326,11 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Mostrar en el mini-HUD (con el panel de info oculto):',
     settingsLiveTitle: 'Otros jugadores cerca:',
     settingsLiveShare: 'Compartir mi posición: ver a otros conductores y aparecer en el mapa en vivo público (anónimo)',
+    settingsLiteTitle: 'Modo liviano (celulares / tablets viejos):',
+    settingsLiteMode: 'Modo liviano: render a menor resolución, sin animaciones ni 3D, menos etiquetas, sin nombres de ruta en las indicaciones',
+    settingsLiteNoRouting: 'Además sin ruteo (sin línea de ruta, indicaciones ni ETA real) — es lo que más memoria ahorra',
+    settingsLiteHint: 'Se aplica al recargar. Usalo si la página se cierra sola o el mapa nunca termina de cargar en un dispositivo viejo.',
+    settingsLiteReload: 'Recargando para aplicar…',
     liveShareNotice: 'Aparecés en el mapa en vivo como conductor anónimo, y otros conductores de tu mapa te ven. Si preferís, apagalo en Ajustes → "Compartir mi posición".',
     liveMapChip: 'Mapa en vivo',
     liveMapTitle: 'Mapa en vivo',
@@ -704,10 +714,18 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
+// Modo liviano para dispositivos viejos (opt-in en Ajustes, se aplica al
+// recargar): render a 1x, sin animacion del camion, sin casing/punteado de
+// ruta, sin 3D, POIs desde z9 y sin nombres de ruta. liteNoRouting ademas no
+// carga el grafo (10-27 MB de JSON = ~150 MB de objetos), que es lo que
+// tumba la pestana en tablets con poca RAM: queda posicion + HUD + botonera.
+const liteMode = !!_savedSettings.liteMode;
+const liteNoRouting = liteMode && !!_savedSettings.liteNoRouting;
+if (liteMode) document.documentElement.classList.add('lite');
 // Botones custom de la botonera: [{title, key}], hasta CUSTOM_BUTTONS_MAX.
 // Viven en este dispositivo (como el resto de los ajustes); la tecla viaja
 // con el comando y el cliente la valida contra su lista blanca.
@@ -949,6 +967,9 @@ function initSettingsUi() {
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
+  document.getElementById('setLiteMode').checked = liteMode;
+  document.getElementById('setLiteNoRouting').checked = liteNoRouting;
+  document.getElementById('setLiteNoRouting').disabled = !liteMode;
   document.getElementById('setLiveHideOthers').checked = hideOtherPlayers;
   fillCurrencySelect();
   renderTripHistory();
@@ -1040,6 +1061,21 @@ function sendLiveShareState() {
   }
 }
 
+// pixelRatio se fija al crear el mapa y el grafo ya esta en memoria: el
+// cambio se aplica recargando la pagina (se guarda antes).
+function saveLiteAndReload(mode, noRouting) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { liteMode: mode, liteNoRouting: noRouting })));
+  } catch (e) {}
+  showToast(t('settingsLiteReload'), 'info', 1500);
+  setTimeout(() => location.reload(), 600);
+}
+document.getElementById('setLiteMode').addEventListener('change', (e) => {
+  saveLiteAndReload(e.target.checked, e.target.checked && document.getElementById('setLiteNoRouting').checked);
+});
+document.getElementById('setLiteNoRouting').addEventListener('change', (e) => {
+  saveLiteAndReload(true, e.target.checked);
+});
 document.getElementById('setLiveShare').addEventListener('change', (e) => {
   liveShareEnabled = e.target.checked;
   saveSettings();
@@ -1421,7 +1457,7 @@ function buildVecLayers(sourceLayer) {
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
-    { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: 7,
+    { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
       filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]]],
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
     { id: 'exit-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'exit'], minzoom: 10,
@@ -1455,6 +1491,9 @@ function ensureMapInitialized() {
     center: [0, 20],
     zoom: 1,
     attributionControl: false,
+    // Lite: pintar a 1x en pantallas de alta densidad (hasta 4x menos pixeles).
+    pixelRatio: liteMode ? 1 : undefined,
+    maxZoom: liteMode ? 15 : undefined,
   });
   map.on('dragstart', () => { autoFollow = false; });
   // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
@@ -1478,14 +1517,14 @@ function ensureMapInitialized() {
     // autopista naranja de 10 px se veia como una raya en el medio, no como
     // "la ruta" (un usuario creyo que la app no ruteaba por la autopista).
     map.addSource('route', { type: 'geojson', data: emptyLineString() });
-    map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.55 } });
+    if (!liteMode) map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.55 } });
     map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 3.5, 'line-opacity': 0.95 } });
     // Tramos DESPUES del primer waypoint (waypoint -> destino del trabajo):
     // punteados y mas tenues, para que se distingan de "como llego al
     // waypoint" - si no, la vuelta que hay que dar despues de un area de
     // descanso parecia una ruta absurda hacia el waypoint.
     map.addSource('route-next', { type: 'geojson', data: emptyLineString() });
-    map.addLayer({ id: 'route-next-casing', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.3 } });
+    if (!liteMode) map.addLayer({ id: 'route-next-casing', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.3 } });
     map.addLayer({ id: 'route-next-line', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 0.6, 'line-dasharray': [2, 1.5] } });
     map.addSource('route-ferry', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'route-ferry-line', type: 'line', source: 'route-ferry', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [1.5, 2] } });
@@ -2361,16 +2400,21 @@ async function loadGameMap(game) {
 
   setMapLoading('mapLoadingCities');
   await loadCities(mapInfo);
-  if (conn.spectator) {
-    // Espectador (convoy / mapa en vivo): no rutea ni navega, asi que el grafo
-    // (10-25 MB) y los nombres de ruta sobran - el mapa abre en segundos.
+  if (conn.spectator || liteNoRouting) {
+    // Espectador (convoy / mapa en vivo) o Lite sin ruteo: no rutea ni
+    // navega, asi que el grafo (10-25 MB) y los nombres de ruta sobran - el
+    // mapa abre en segundos y la pestana no se queda sin memoria.
     routeGraph = null;
     roadNames = [];
   } else {
     setMapLoading('mapLoadingGraph');
     await loadRouteGraph(mapInfo);
-    setMapLoading('mapLoadingNames');
-    await loadRoadNames(mapInfo);
+    if (liteMode) {
+      roadNames = []; // sin nombres de ruta en las indicaciones: 5 MB menos
+    } else {
+      setMapLoading('mapLoadingNames');
+      await loadRoadNames(mapInfo);
+    }
   }
   loadPois(game); // no bloquea: la busqueda muestra "cargando" hasta que llegue
   currentRouteTarget = null;
@@ -2459,7 +2503,7 @@ const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta ma
 // Vista 3D (inclinacion de camara) en modo navegacion, persistida. En nav el
 // camion se ubica en el tercio inferior de la pantalla (padding) para ver mas
 // camino adelante, con o sin 3D.
-let nav3d = _savedSettings.nav3d || false;
+let nav3d = !liteMode && (_savedSettings.nav3d || false);
 function navPadding() {
   const h = map ? map.getContainer().clientHeight : 0;
   // Rellenar ARRIBA desplaza el centro hacia abajo: el camion queda en el
@@ -2474,7 +2518,7 @@ function applyNavCamera() {
     map.easeTo({ pitch: 0, bearing: 0, padding: navPadding(), duration: 300 });
   }
   document.getElementById('tilt3dBtn').classList.toggle('active', navMode && nav3d);
-  document.getElementById('tilt3dBtn').style.display = navMode ? '' : 'none';
+  document.getElementById('tilt3dBtn').style.display = navMode && !liteMode ? '' : 'none';
 }
 
 function setNavMode(on) {
@@ -2717,6 +2761,7 @@ function moveAnimMs() {
 // cualquier intento de arrastrar el mapa a mano.
 function animateTruckTo(fromLngLat, toPos) {
   if (moveAnimFrameId) cancelAnimationFrame(moveAnimFrameId);
+  if (liteMode) { truckMarker.setLngLat(toPos); moveAnimFrameId = null; return; } // sin interpolar por frame
   const start = performance.now();
   function step(now) {
     const t = Math.min(1, (now - start) / moveAnimMs());
