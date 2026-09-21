@@ -154,6 +154,9 @@ function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM) {
 // reales, asi que una rampa de INGRESO que se une por atras no es candidata).
 function detectManeuver(ctx) {
   const { pts, i, cum, pointAt, bearingBetween, nodes, adjacency } = ctx;
+  // nodes puede ser un array de [x,y] (tests) o un Float32Array plano del
+  // grafo binario, en cuyo caso ctx.nodeXY(i) devuelve el par.
+  const nodeAt = ctx.nodeXY || ((k) => nodes[k]);
   const iEnd = ctx.iEnd != null ? ctx.iEnd : i;
   const turnThreshold = ctx.turnThreshold != null ? ctx.turnThreshold : 35;
   const legM = ctx.legM != null ? ctx.legM : 60;
@@ -193,16 +196,16 @@ function detectManeuver(ctx) {
     if (idx == null) continue;
     for (const [n] of (adjacency.get(idx) || [])) {
       if (onRoute.has(n)) continue;
-      let far = nodes[n];
+      let far = nodeAt(n);
       if (Math.hypot(far[0] - pts[k][0], far[1] - pts[k][1]) < forkLegM) {
         const b1 = bearingBetween(pts[k], far);
         let bestM = null, bestDiff = Infinity;
         for (const [m] of (adjacency.get(n) || [])) {
           if (m === idx || onRoute.has(m)) continue;
-          const diff = Math.abs(normDeg(bearingBetween(far, nodes[m]) - b1));
+          const diff = Math.abs(normDeg(bearingBetween(far, nodeAt(m)) - b1));
           if (diff < bestDiff) { bestDiff = diff; bestM = m; }
         }
-        if (bestM != null) far = nodes[bestM];
+        if (bestM != null) far = nodeAt(bestM);
       }
       const altDelta = normDeg(bearingBetween(pts[i], far) - inBearing);
       if (Math.abs(altDelta) > 100) continue; // vuelve para atras, no es una continuacion

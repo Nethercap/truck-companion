@@ -1189,7 +1189,7 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260921b', ats_c2c: '20260921c', ats_promods: '20260921b', ats_c2c_promods: '20260921', ats_reforma: '20260921', ats_reforma_c2c_promods: '20260921', ets2: '20260921b', ets2_promods: '20260921d', ets2_promods_rusmap: '20260921e', ets2_promods_roex: '20260921d', ets2_promods_rusmap_roex: '20260921e', ets2_gu: '20260921e', ets2_tmp: '20260921d' };
+const MAP_DATA_VERSION = { ats: '20260922', ats_c2c: '20260922', ats_promods: '20260922', ats_c2c_promods: '20260922', ats_reforma: '20260922', ats_reforma_c2c_promods: '20260922', ets2: '20260922', ets2_promods: '20260922', ets2_promods_rusmap: '20260922', ets2_promods_roex: '20260922', ets2_promods_rusmap_roex: '20260922', ets2_gu: '20260922', ets2_tmp: '20260922' };
 // Una variante sin entrada en MAP_DATA_VERSION esta cableada pero todavia no
 // publicada en R2 (ej. Roextended a la espera de sus paquetes Def/Models):
 // no se ofrece en Ajustes y la auto-deteccion cae a la mas parecida.
@@ -1630,7 +1630,7 @@ function nearestRoadName(x, z, maxDist) {
 
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
 // del output de truckermudgeon/maps. nodes: [[x,y], ...], edges: [[fromIdx, toIdx, weight], ...]
-let routeGraph = null; // { nodes, adjacency: Map<idx, [[idx, weight], ...]> }
+let routeGraph = null; // typed arrays + CSR, ver buildRouteGraph()
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
 let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
 const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS) - en interconexiones con rampas paralelas cercanas, 400 tardaba en detectar que se tomo una rampa distinta
@@ -2013,81 +2013,148 @@ function distanceToRouteMeters(x, z) {
 
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
+  const base = `${mapInfo.assetsDir}/route-graph-${currentGame}`;
+  const v = `?v=${MAP_DATA_VERSION[currentGame] || ''}`;
+  // Formato binario (TDRG v2, ver route_graph_bin.py): typed arrays, sin
+  // parsear JSON. El JSON de 27 MB se volvia ~150 MB de objetos y tumbaba la
+  // pestana en tablets con poca RAM; el .bin queda en ~25 MB en memoria y
+  // carga en menos de un segundo. Si no esta (variante vieja) se usa el JSON.
+  if (!new URLSearchParams(location.search).has('jsongraph')) {
+    try {
+      const res = await fetch(`${base}.bin${v}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      routeGraph = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
+      return;
+    } catch (err) {
+      console.warn('grafo binario no disponible, se usa el JSON', err);
+    }
+  }
   try {
-    const res = await fetch(`${mapInfo.assetsDir}/route-graph-${currentGame}.json?v=${MAP_DATA_VERSION[currentGame] || ''}`);
+    const res = await fetch(`${base}.json${v}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const adjacency = new Map();
-    // Aristas [a, b, peso, esFerry?] - las de ferry/tren (build_route_graph.py
-    // las agrega desde *-ferries.json) se guardan aparte para dibujar ese
-    // tramo punteado y no contarlo como "giro".
-    // flags (4to elemento): bit 1 = ferry/tren, bit 2 = un solo sentido
-    // (solo a -> b). Sin flags = doble mano. Las de un sentido son las
-    // calzadas de autopista dividida y rampas: sin esto el A* mandaba por la
-    // calzada contraria.
-    const ferryEdges = new Set();
-    // Grado "topologico" (con cuantos nodos distintos se conecta cada nodo,
-    // sin importar el sentido): >= 3 es una interseccion real, que es donde
-    // tiene sentido anunciar un giro.
-    const neighborSets = new Map();
-    const link = (from, to, w, wt, mid) => {
-      if (!adjacency.has(from)) adjacency.set(from, []);
-      adjacency.get(from).push([to, w, wt, mid]);
-      if (!neighborSets.has(from)) neighborSets.set(from, new Set());
-      neighborSets.get(from).add(to);
-      if (!neighborSets.has(to)) neighborSets.set(to, new Set());
-      neighborSets.get(to).add(from);
-    };
-    // Aristas [a, b, metros, flags, segundos]: "segundos" es el tiempo tipico
-    // de camion segun el tipo de via (autopista 90, ruta 60, cruce 40...). Con
-    // grafos viejos sin ese campo se estima a 60 km/h.
-    // 6to elemento opcional: puntos intermedios de la curva real del tramo
-    // (Hermite, como dibuja el juego), para que la ruta siga la calzada en
-    // las curvas. Para el sentido inverso se recorren al reves.
-    for (const [a, b, w, flags, wt, mid] of data.edges) {
-      const f = flags || 0;
-      const t = wt != null ? wt : w / (60 / 3.6);
-      link(a, b, w, t, mid || null);
-      if (!(f & 2)) link(b, a, w, t, mid ? mid.slice().reverse() : null);
-      if (f & 1) { ferryEdges.add(`${a}|${b}`); ferryEdges.add(`${b}|${a}`); }
-    }
-    const degree = new Uint8Array(data.nodes.length);
-    for (const [i, set] of neighborSets) degree[i] = Math.min(255, set.size);
-
-    // El grafo extraido de los datos del juego no siempre queda 100% conectado
-    // (intersecciones complejas mal resueltas dejan bolsones aislados). Si el
-    // nodo mas cercano a un punto cae en uno de esos bolsones chicos, A* nunca
-    // encuentra camino aunque exista una ruta real por al lado. Para evitarlo,
-    // identificamos la componente conexa mas grande ("giant component") y
-    // preferimos siempre buscar el nodo mas cercano dentro de ella.
-    const componentId = new Int32Array(data.nodes.length).fill(-1);
-    const componentSize = new Map();
-    let biggestComponent = -1;
-    let biggestSize = 0;
-    for (let start = 0; start < data.nodes.length; start++) {
-      if (componentId[start] !== -1) continue;
-      const id = start;
-      let size = 0;
-      const stack = [start];
-      componentId[start] = id;
-      while (stack.length) {
-        const cur = stack.pop();
-        size++;
-        for (const n of neighborSets.get(cur) || []) {
-          if (componentId[n] === -1) {
-            componentId[n] = id;
-            stack.push(n);
-          }
-        }
-      }
-      componentSize.set(id, size);
-      if (size > biggestSize) { biggestSize = size; biggestComponent = id; }
-    }
-
-    routeGraph = { nodes: data.nodes, adjacency, componentId, componentSize, giantComponent: biggestComponent, ferryEdges, degree };
+    routeGraph = buildRouteGraph(routeGraphFromJson(await res.json()));
   } catch (err) {
     routeGraph = null;
   }
+}
+
+// TDRG v2: header 'TDRG', u32 version, nNodes, nEdges, nMidPts, nComp; luego
+// secciones alineadas a 4 bytes (ver route_graph_bin.py).
+function decodeRouteGraphBin(buf) {
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, false) !== 0x54445247 || dv.getUint32(4, true) !== 2) throw new Error('formato de grafo desconocido');
+  const n = dv.getUint32(8, true), ne = dv.getUint32(12, true), nMid = dv.getUint32(16, true);
+  let off = 24;
+  const take = (Ctor, count) => {
+    const a = new Ctor(buf, off, count);
+    off = (off + count * Ctor.BYTES_PER_ELEMENT + 3) & ~3;
+    return a;
+  };
+  const nodesDm = take(Int32Array, n * 2);
+  const edgeA = take(Uint32Array, ne), edgeB = take(Uint32Array, ne), edgeDm = take(Uint32Array, ne);
+  const edgeS = take(Uint16Array, ne), edgeF = take(Uint8Array, ne);
+  const midOff = take(Uint32Array, ne + 1), midDelta = take(Int32Array, nMid * 2);
+  const nodes = new Float32Array(n * 2);
+  for (let i = 0; i < n * 2; i++) nodes[i] = nodesDm[i] / 10;
+  const edgeM = new Float32Array(ne);
+  for (let e = 0; e < ne; e++) edgeM[e] = edgeDm[e] / 10;
+  // puntos intermedios: delta acumulado en decimetros -> metros absolutos
+  const midXY = new Float32Array(nMid * 2);
+  let px = 0, py = 0;
+  for (let i = 0; i < nMid; i++) {
+    px += midDelta[2 * i]; py += midDelta[2 * i + 1];
+    midXY[2 * i] = px / 10; midXY[2 * i + 1] = py / 10;
+  }
+  return { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY };
+}
+
+// Mismo resultado a partir del JSON viejo {nodes: [[x,y]], edges: [[a,b,m,flags,seg,mid?]]}.
+function routeGraphFromJson(data) {
+  const n = data.nodes.length, ne = data.edges.length;
+  const nodes = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) { nodes[2 * i] = data.nodes[i][0]; nodes[2 * i + 1] = data.nodes[i][1]; }
+  const edgeA = new Uint32Array(ne), edgeB = new Uint32Array(ne), edgeM = new Float32Array(ne), edgeS = new Uint16Array(ne), edgeF = new Uint8Array(ne);
+  const midOff = new Uint32Array(ne + 1);
+  let nMid = 0;
+  for (let e = 0; e < ne; e++) { const mid = data.edges[e][5]; if (mid) nMid += mid.length; midOff[e + 1] = nMid; }
+  const midXY = new Float32Array(nMid * 2);
+  for (let e = 0; e < ne; e++) {
+    const [a, b, w, flags, wt, mid] = data.edges[e];
+    edgeA[e] = a; edgeB[e] = b; edgeM[e] = w; edgeS[e] = Math.min(65535, Math.round(wt != null ? wt : w / (60 / 3.6))); edgeF[e] = flags || 0;
+    if (mid) for (let k = 0; k < mid.length; k++) { midXY[2 * (midOff[e] + k)] = mid[k][0]; midXY[2 * (midOff[e] + k) + 1] = mid[k][1]; }
+  }
+  return { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY };
+}
+
+// Arma la adyacencia dirigida (CSR) y lo derivado: grado topologico (vecinos
+// distintos, sin sentido: >= 3 es una interseccion real) y componentes
+// conexas (el grafo del juego no queda 100% conectado; se prefiere siempre
+// la componente gigante o una "real" de cientos de nodos, ver nearestNodeIndex).
+// flags de arista: bit 1 = ferry/tren, bit 2 = un solo sentido (solo a -> b);
+// sin flags = doble mano.
+function buildRouteGraph(g) {
+  const { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY } = g;
+  const csr = new Uint32Array(n + 1);
+  for (let e = 0; e < ne; e++) { csr[edgeA[e] + 1]++; if (!(edgeF[e] & 2)) csr[edgeB[e] + 1]++; }
+  for (let i = 0; i < n; i++) csr[i + 1] += csr[i];
+  const nDir = csr[n];
+  const adjTo = new Uint32Array(nDir), adjEdge = new Uint32Array(nDir), adjRev = new Uint8Array(nDir);
+  const fill = csr.slice(0, n);
+  for (let e = 0; e < ne; e++) {
+    const a = edgeA[e], b = edgeB[e];
+    let k = fill[a]++; adjTo[k] = b; adjEdge[k] = e; adjRev[k] = 0;
+    if (!(edgeF[e] & 2)) { k = fill[b]++; adjTo[k] = a; adjEdge[k] = e; adjRev[k] = 1; }
+  }
+  // grado y componentes sobre la version no dirigida (una arista de un
+  // sentido tambien conecta topologicamente a sus dos nodos)
+  const ucsr = new Uint32Array(n + 1);
+  for (let e = 0; e < ne; e++) { ucsr[edgeA[e] + 1]++; ucsr[edgeB[e] + 1]++; }
+  for (let i = 0; i < n; i++) ucsr[i + 1] += ucsr[i];
+  const uto = new Uint32Array(ucsr[n]);
+  const ufill = ucsr.slice(0, n);
+  for (let e = 0; e < ne; e++) { uto[ufill[edgeA[e]]++] = edgeB[e]; uto[ufill[edgeB[e]]++] = edgeA[e]; }
+  const degree = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    let d = 0;
+    for (let k = ucsr[i]; k < ucsr[i + 1]; k++) {
+      const t = uto[k]; let seen = false;
+      for (let j = ucsr[i]; j < k; j++) if (uto[j] === t) { seen = true; break; }
+      if (!seen) d++;
+    }
+    degree[i] = Math.min(255, d);
+  }
+  const componentId = new Int32Array(n).fill(-1);
+  const sizes = [];
+  const stack = new Uint32Array(n);
+  for (let start = 0; start < n; start++) {
+    if (componentId[start] !== -1) continue;
+    const id = sizes.length; let size = 0, top = 0;
+    stack[top++] = start; componentId[start] = id;
+    while (top) {
+      const cur = stack[--top]; size++;
+      for (let k = ucsr[cur]; k < ucsr[cur + 1]; k++) { const nb = uto[k]; if (componentId[nb] === -1) { componentId[nb] = id; stack[top++] = nb; } }
+    }
+    sizes.push(size);
+  }
+  const componentSize = Uint32Array.from(sizes);
+  let giantComponent = 0;
+  for (let c = 1; c < componentSize.length; c++) if (componentSize[c] > componentSize[giantComponent]) giantComponent = c;
+  const graph = {
+    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, degree, componentId, componentSize, giantComponent,
+    nodeXY: (i) => [nodes[2 * i], nodes[2 * i + 1]],
+    // vista "de antes" para detectManeuver y cualquier otro consumidor:
+    // adjacency.get(i) -> [[vecino, metros, segundos], ...]
+    adjacency: {
+      get(i) {
+        const out = [];
+        for (let k = csr[i]; k < csr[i + 1]; k++) { const e = adjEdge[k]; out.push([adjTo[k], edgeM[e], edgeS[e]]); }
+        return out;
+      },
+    },
+  };
+  // indice de arista dirigida entre dos nodos (-1 si no existe)
+  graph.dirEdge = (from, to) => { for (let k = csr[from]; k < csr[from + 1]; k++) if (adjTo[k] === to) return k; return -1; };
+  return graph;
 }
 
 // Bolsones de pocos nodos = intersecciones mal resueltas por el parser; una
@@ -2101,17 +2168,19 @@ function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1) {
   let best = -1;
   let bestDist = Infinity;
   const nodes = routeGraph.nodes;
-  for (let i = 0; i < nodes.length; i++) {
-    const comp = routeGraph.componentId[i];
+  const n = routeGraph.n;
+  const compId = routeGraph.componentId, compSize = routeGraph.componentSize, giant = routeGraph.giantComponent;
+  for (let i = 0; i < n; i++) {
+    const comp = compId[i];
     if (onlyComponent !== -1) {
       if (comp !== onlyComponent) continue;
     } else if (requireGiantComponent === true) {
-      if (comp !== routeGraph.giantComponent) continue;
+      if (comp !== giant) continue;
     } else if (requireGiantComponent === 'real') {
-      if ((routeGraph.componentSize.get(comp) || 0) < MIN_REAL_COMPONENT_NODES) continue;
+      if (compSize[comp] < MIN_REAL_COMPONENT_NODES) continue;
     }
-    const dx = nodes[i][0] - x;
-    const dy = nodes[i][1] - y;
+    const dx = nodes[2 * i] - x;
+    const dy = nodes[2 * i + 1] - y;
     const d = dx * dx + dy * dy;
     if (d < bestDist) { bestDist = d; best = i; }
   }
@@ -2154,8 +2223,7 @@ class MinHeap {
 
 function findRoute(startXY, endXY) {
   if (!routeGraph) return null;
-  const nodes = routeGraph.nodes;
-  const adjacency = routeGraph.adjacency;
+  const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, degree, componentId } = routeGraph;
   // Origen y destino tienen que caer en la misma componente para que A*
   // encuentre camino: primero el nodo mas cercano en cualquier componente
   // real; si no coinciden (ej. destino en una isla sin ferry en el grafo),
@@ -2164,8 +2232,8 @@ function findRoute(startXY, endXY) {
   let startIdx = nearestNodeIndex(startXY[0], startXY[1], 'real');
   let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real');
   if (startIdx === -1 || endIdx === -1) return null;
-  if (routeGraph.componentId[startIdx] !== routeGraph.componentId[endIdx]) {
-    endIdx = nearestNodeIndex(endXY[0], endXY[1], false, routeGraph.componentId[startIdx]);
+  if (componentId[startIdx] !== componentId[endIdx]) {
+    endIdx = nearestNodeIndex(endXY[0], endXY[1], false, componentId[startIdx]);
     if (endIdx === -1) return null;
   }
 
@@ -2175,41 +2243,47 @@ function findRoute(startXY, endXY) {
   // posible (90 km/h).
   const byTime = routeProfile !== 'shortest';
   const MAX_SPEED_MS = 90 / 3.6;
+  const ex = nodes[2 * endIdx], ey = nodes[2 * endIdx + 1];
   const heuristic = (i) => {
-    const d = Math.hypot(nodes[i][0] - nodes[endIdx][0], nodes[i][1] - nodes[endIdx][1]);
+    const d = Math.hypot(nodes[2 * i] - ex, nodes[2 * i + 1] - ey);
     return byTime ? d / MAX_SPEED_MS : d;
   };
 
-  const gScore = new Map([[startIdx, 0]]);
-  const cameFrom = new Map();
+  // Estado de A* en typed arrays (sin Maps/Sets: 300k nodos entran en unos MB
+  // y no generan basura para el GC).
+  const n = routeGraph.n;
+  const gScore = new Float64Array(n).fill(Infinity);
+  const cameFrom = new Int32Array(n).fill(-1);
+  const visited = new Uint8Array(n);
+  gScore[startIdx] = 0;
   const open = new MinHeap();
   open.push(heuristic(startIdx), startIdx);
-  const visited = new Set();
 
   while (open.size > 0) {
     const current = open.pop();
     if (current === endIdx) break;
-    if (visited.has(current)) continue;
-    visited.add(current);
-
-    const neighbors = adjacency.get(current) || [];
-    for (const [neighbor, wDist, wTime] of neighbors) {
-      if (visited.has(neighbor)) continue;
-      const tentativeG = gScore.get(current) + (byTime ? wTime : wDist);
-      if (tentativeG < (gScore.get(neighbor) ?? Infinity)) {
-        gScore.set(neighbor, tentativeG);
-        cameFrom.set(neighbor, current);
+    if (visited[current]) continue;
+    visited[current] = 1;
+    const g = gScore[current];
+    for (let k = csr[current]; k < csr[current + 1]; k++) {
+      const neighbor = adjTo[k];
+      if (visited[neighbor]) continue;
+      const e = adjEdge[k];
+      const tentativeG = g + (byTime ? edgeS[e] : edgeM[e]);
+      if (tentativeG < gScore[neighbor]) {
+        gScore[neighbor] = tentativeG;
+        cameFrom[neighbor] = current;
         open.push(tentativeG + heuristic(neighbor), neighbor);
       }
     }
   }
 
-  if (!gScore.has(endIdx)) return null;
+  if (gScore[endIdx] === Infinity) return null;
 
   const path = [endIdx];
   let node = endIdx;
-  while (cameFrom.has(node)) {
-    node = cameFrom.get(node);
+  while (cameFrom[node] !== -1) {
+    node = cameFrom[node];
     path.push(node);
   }
   path.reverse();
@@ -2221,21 +2295,24 @@ function findRoute(startXY, endXY) {
   // de bifurcaciones (detectManeuver) para mirar que otras salidas hay.
   // Entre nodo y nodo se intercalan los puntos de la curva real del tramo
   // (si la arista los trae): no son cruces (junction 0) ni nodos (indice
-  // null), solo geometria para dibujar/proyectar/medir rumbos.
+  // null), solo geometria para dibujar/proyectar/medir rumbos. Para el
+  // sentido inverso de la arista se recorren al reves.
   const out = [];
   for (let k = 0; k < path.length; k++) {
     const i = path[k];
+    let ferry = 0;
     if (k > 0) {
       const prev = path[k - 1];
-      const edge = (adjacency.get(prev) || []).find(e => e[0] === i);
-      if (edge && edge[3]) for (const [mx, my] of edge[3]) out.push([mx, my, 0, 0, null]);
+      const d = routeGraph.dirEdge(prev, i);
+      if (d !== -1) {
+        const e = adjEdge[d];
+        ferry = edgeF[e] & 1 ? 1 : 0;
+        const m0 = midOff[e], m1 = midOff[e + 1];
+        if (adjRev[d]) { for (let m = m1 - 1; m >= m0; m--) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
+        else { for (let m = m0; m < m1; m++) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
+      }
     }
-    out.push([
-      nodes[i][0], nodes[i][1],
-      (k > 0 && routeGraph.ferryEdges.has(`${path[k - 1]}|${i}`)) ? 1 : 0,
-      routeGraph.degree[i] >= 3 ? 1 : 0,
-      i,
-    ]);
+    out.push([nodes[2 * i], nodes[2 * i + 1], ferry, degree[i] >= 3 ? 1 : 0, i]);
   }
   return out;
 }
@@ -2580,14 +2657,14 @@ function findUpcomingTurn() {
     const [lng2, lat2] = toLngLat(q[0], q[1]);
     return geoBearingDeg(lng1, lat1, lng2, lat2);
   };
-  const graph = routeGraph ? { nodes: routeGraph.nodes, adjacency: routeGraph.adjacency } : {};
+  const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency } : {};
 
   for (let i = here + 1; i < pts.length - 1; i++) {
     if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
     if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
     const iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
-    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, adjacency: graph.adjacency,
+    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     let m = detectManeuver({ ...ctx, i, iEnd });
     if (m && m.kind === 'fork') {
