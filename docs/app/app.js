@@ -1049,7 +1049,11 @@ document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
 // enabled=false, esta sesion tampoco va a recibir la posicion de nadie).
 function sendLiveShareState() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  const mapVariant = liveShareEnabled ? resolveEffectiveGame(lastData?.game) : null;
+  // Sin telemetria todavia no se sabe el juego: resolveEffectiveGame() cae
+  // en 'ats' por defecto y el conductor aparecia en el mapa de ATS aunque
+  // estuviera en ETS2. Se manda null (no comparte) y updateMap re-manda el
+  // estado apenas llega el primer tick con el juego real.
+  const mapVariant = liveShareEnabled && lastData?.game ? resolveEffectiveGame(lastData.game) : null;
   lastSentMapVariant = mapVariant;
   // El apodo de convoy (si lo puso) es lo unico con nombre que se muestra en el mapa en vivo.
   const nick = liveShareEnabled ? (loadSettings().convoyNick || null) : null;
@@ -4102,7 +4106,7 @@ function handleTelemetry(data) {
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
   // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
-  if (liveShareEnabled && !conn.local && resolveEffectiveGame(data.game) !== lastSentMapVariant) sendLiveShareState();
+  if (liveShareEnabled && !conn.local && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) sendLiveShareState();
 }
 
 function connectWs(backend, code, options = {}) {

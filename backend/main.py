@@ -521,6 +521,16 @@ async def broadcast_live_positions_loop():
             logging.exception("Error en broadcast_live_positions_loop")
 
 
+def coerce_map_variant(variant: Optional[str], game) -> Optional[str]:
+    """La variante de mapa la elige la web, pero el juego real lo dice la
+    telemetria: si no coinciden (la web mando "ats" antes del primer tick, o
+    el jugador cambio de juego) se cae a la variante base del juego para no
+    mezclar conductores de ETS2 en el mapa de ATS."""
+    if variant and game in ("ats", "ets2") and not variant.startswith(game):
+        return game
+    return variant
+
+
 def sharing_sessions(now: float) -> list["Session"]:
     """Sesiones que aparecen en el mapa (opt-in + posicion fresca)."""
     return [
@@ -1243,6 +1253,13 @@ async def ws_client(websocket: WebSocket, code: str):
                 if pos.get("x") is not None and pos.get("z") is not None:
                     session.last_position = {"x": pos["x"], "z": pos["z"], "ts": now}
                 session.last_summary = summarize_for_convoy(payload, session.last_summary, now)
+                # La variante de mapa la elige la web (set_live_share), pero la
+                # telemetria es la que sabe de verdad en que juego esta el
+                # camion: si no coinciden (la web mando "ats" antes de recibir
+                # el primer tick, o el juego cambio), se corrige a la variante
+                # base del juego real para no mezclar conductores de ETS2 en
+                # el mapa de ATS.
+                session.map_variant = coerce_map_variant(session.map_variant, payload.get("game"))
                 if session.convoy_code and job_delivered and session.last_job_delivered is False:
                     convoy = convoys.get(session.convoy_code)
                     if convoy:
@@ -1345,6 +1362,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     # broadcast_live_positions, no hace falta nada mas aca).
                     session.share_position = bool(payload.get("enabled"))
                     session.map_variant = payload.get("mapVariant") if session.share_position else None
+                    # mismo chequeo contra el juego que reporta la telemetria
+                    session.map_variant = coerce_map_variant(session.map_variant, (session.last_summary or {}).get("game"))
                     session.live_nick = clean_live_nick(payload.get("nick")) if session.share_position else None
                     if not session.share_position:
                         session.last_position = None

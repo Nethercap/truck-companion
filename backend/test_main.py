@@ -747,6 +747,17 @@ def _sharing_session(main, code, variant, nick=None, summary=None):
     return s
 
 
+def test_coerce_map_variant_follows_the_telemetry_game(main):
+    # la web puede mandar "ats" antes de saber el juego: la telemetria manda
+    assert main.coerce_map_variant("ats", "ets2") == "ets2"
+    assert main.coerce_map_variant("ats_promods", "ets2") == "ets2"
+    assert main.coerce_map_variant("ets2_promods_rusmap", "ats") == "ats"
+    # coincide o no hay datos: se respeta lo que eligio la web
+    assert main.coerce_map_variant("ets2_promods_rusmap", "ets2") == "ets2_promods_rusmap"
+    assert main.coerce_map_variant("ats_c2c", None) == "ats_c2c"
+    assert main.coerce_map_variant(None, "ets2") is None
+
+
 def test_live_summary_counts_sharing_sessions_per_variant(client, main):
     _sharing_session(main, "AAAAAAAA", "ats_promods")
     _sharing_session(main, "BBBBBBBB", "ats_promods")
