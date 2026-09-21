@@ -148,6 +148,14 @@
   .hero h1 .accent { color: var(--orange); }
   .hero .tagline { font-size: 1.12rem; color: #d7dbe0; margin: 0 0 1.6rem; max-width: 34rem; }
   .ctaRow { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
+  .modLists { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; margin-top: 1.2rem; }
+  .modList { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.2rem; }
+  .modList h3 { margin: 0 0 0.6rem; font-size: 1.05rem; }
+  .modList ul { list-style: none; margin: 0; padding: 0; }
+  .modList li { padding: 0.45rem 0; border-top: 1px solid var(--border); line-height: 1.4; }
+  .modList li:first-child { border-top: none; }
+  .modList .muted { color: var(--muted); font-size: 0.9rem; }
+  .modList .tag { display: inline-block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--blue); border: 1px solid rgba(59,158,255,0.5); border-radius: 4px; padding: 0.05rem 0.35rem; margin-left: 0.3rem; vertical-align: middle; }
   .cta {
     display: inline-flex; align-items: center; gap: 0.5rem; background: var(--blue); color: #fff; font-weight: 600;
     padding: 0.85rem 1.5rem; border-radius: 8px; font-size: 1.02rem;
@@ -466,6 +474,11 @@
         <p data-i18n="featLiveBody">Mirá a otros usuarios de Truck Dash en el mismo juego y mapa que vos, moviéndose en vivo — y seguí cualquier mapa desde el <a href="/live/">mapa en vivo público</a>, sin cuenta. Anónimo (posición, camión y viaje nada más); se apaga con un toggle.</p>
       </div>
       <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l4 4v3h-8z"/><circle cx="5" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div>
+        <h3 data-i18n="featConvoyTitle">Convoy con amigos <span class="tag">beta</span></h3>
+        <p data-i18n="featConvoyBody">Cada uno maneja en su propio juego — sin TruckersMP, sin instalar nada. Compartís un código de 6 letras y ven a todos como flechas en el mapa, con velocidad, carga, ETA y a cuánto van del líder. Seguí el destino del líder con un toque, mandá mensajes rápidos o compartí un link de espectador para que cualquiera mire desde el celular.</p>
+      </div>
+      <div class="featureCard">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
         <h3 data-i18n="featMobileTitle">Cualquier pantalla, en cualquier lado</h3>
         <p data-i18n="featMobileBody">Celular, tablet o segundo monitor, vertical u horizontal. Agregalo a la pantalla de inicio como una app. El celular puede estar con datos móviles — no hace falta la misma WiFi.</p>
@@ -473,7 +486,7 @@
       <div class="featureCard">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-4v-3a1.5 1.5 0 0 0-3 0v3H7a2 2 0 0 1-2-2v-4h3a1.5 1.5 0 0 0 0-3H5V9a2 2 0 0 1 2-2h4V4a1.5 1.5 0 0 1 3 0v3z"/></svg></div>
         <h3 data-i18n="featModsTitle">Soporte de mods de mapa</h3>
-        <p data-i18n="featModsBody">Coast to Coast y ProMods Canada para ATS, ProMods (Europa + addons) para ETS2 — un solo toggle, sin descargas extra.</p>
+        <p data-i18n="featModsBody">ProMods, RusMap, Roextended, Grand Utopia, Coast to Coast, ProMods Canada, Reforma y TruckersMP — el cliente detecta cuáles usa tu perfil y la app cambia de mapa sola. Sin descargas extra.</p>
       </div>
     </div>
 
@@ -590,22 +603,30 @@
 
   <section id="mods">
     <h2 data-i18n="modsSectionTitle">Soporte de mods de mapa</h2>
-    <p class="sectionIntro" data-i18n="modsSectionIntro">Si usás alguno de estos mods de mapa, activalo con un solo checkbox en el panel de Mods de la app — sin configuración extra, sin descargas aparte.</p>
-    <div class="featureGrid">
-      <div class="featureCard">
-        <h3>Coast to Coast <span style="color:var(--orange)">(ATS)</span></h3>
-        <p data-i18n="modsCoastToCoastBody">Extiende el mapa de American Truck Simulator con rutas y ciudades nuevas.</p>
+    <p class="sectionIntro" data-i18n="modsSectionIntro">El cliente lee qué mods de mapa tiene activos tu perfil y la app carga el mapa que corresponde sola — sin configurar nada, sin descargas aparte. También podés elegirlo a mano en el panel de Mods de la app.</p>
+    <div class="modLists">
+      <div class="modList">
+        <h3><span style="color:var(--orange)">ATS</span> <span data-i18n="modsAtsTitle">American Truck Simulator</span></h3>
+        <ul>
+          <li><b>Coast to Coast</b> <span class="muted" data-i18n="modsC2CNote">rutas y ciudades nuevas por todo EE. UU.</span></li>
+          <li><b>ProMods Canada</b> <span class="muted" data-i18n="modsPMCNote">Columbia Británica</span></li>
+          <li><b>Coast to Coast + ProMods Canada</b></li>
+          <li><b>Reforma</b> <span class="muted" data-i18n="modsReformaNote">México, con Mega Resources y Sierra Nevada</span></li>
+          <li><b>Reforma + Coast to Coast + ProMods Canada</b> <span class="muted" data-i18n="modsReformaAllNote">el pack completo, con el parche OtherMaps</span></li>
+        </ul>
       </div>
-      <div class="featureCard">
-        <h3>ProMods Canada <span style="color:var(--orange)">(ATS)</span></h3>
-        <p data-i18n="modsProModsCanadaBody">Agrega Columbia Británica al mapa de American Truck Simulator.</p>
-      </div>
-      <div class="featureCard">
-        <h3>ProMods <span style="color:var(--orange)">(ETS2)</span></h3>
-        <p data-i18n="modsProModsBody">Europa 2.84 más todos sus addons (Middle East, The Great Steppe, Maghreb) para Euro Truck Simulator 2 — con Islandia incluida — todo en un solo toggle.</p>
+      <div class="modList">
+        <h3><span style="color:var(--blue)">ETS2</span> <span data-i18n="modsEts2Title">Euro Truck Simulator 2</span></h3>
+        <ul>
+          <li><b>ProMods</b> <span class="muted" data-i18n="modsProModsNote">Europa + Middle East, The Great Steppe y Maghreb</span></li>
+          <li><b>ProMods + RusMap</b> <span class="muted" data-i18n="modsRusMapNote">con el conector ProMods–RusMap</span></li>
+          <li><b>ProMods + Roextended</b> <span class="muted" data-i18n="modsRoexNote">edición Hybrid, con o sin RusMap</span></li>
+          <li><b>Grand Utopia</b> <span class="muted" data-i18n="modsGUNote">mapa standalone</span></li>
+          <li><b>TruckersMP</b> <span class="muted" data-i18n="modsTMPNote">la sede de TruckersMP y la ruta CD</span> <span class="tag" data-i18n="tagSoon">muy pronto</span></li>
+        </ul>
       </div>
     </div>
-    <p class="note" data-i18n="modsFooterNote">Estos mods igual hay que tenerlos instalados en el juego como siempre — Truck Dash solo sabe dibujar las rutas extra una vez que le decís cuál estás usando. ¿Querés soporte para otro mod? Pedilo en Discord.</p>
+    <p class="note" data-i18n="modsFooterNote">Estos mods hay que tenerlos instalados en el juego como siempre — Truck Dash solo sabe dibujar las rutas extra y rutear por ellas. ¿Querés otro mod? Pedilo en Discord.</p>
   </section>
 
   <section id="faq">
@@ -614,7 +635,7 @@
       <details><summary data-i18n="faqQ1">¿Es realmente gratis? ¿Cuál es la trampa?</summary><p data-i18n="faqA1">No hay trampa. Sin cuenta, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si algún día se agregan donaciones, van a ser opcionales y no van a desbloquear nada.</p></details>
       <details><summary data-i18n="faqQ2">Windows dice que el archivo es "no reconocido" o peligroso. ¿Es seguro?</summary><p data-i18n="faqA2">Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python.</p></details>
       <details><summary data-i18n="faqQ3">¿Mi celular tiene que estar en la misma WiFi que la PC?</summary><p data-i18n="faqA3">No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.</p></details>
-      <details><summary data-i18n="faqQ4">¿Funciona con ProMods, Coast to Coast u otros mods de mapa?</summary><p data-i18n="faqA4">Sí: Coast to Coast y ProMods Canada para ATS, y ProMods (Europa + todos los addons) para ETS2 vienen incluidos — se activan con un toggle en el panel de Mods de la app. Se van agregando más; pedí el que usás en Discord.</p></details>
+      <details><summary data-i18n="faqQ4">¿Funciona con ProMods, Coast to Coast u otros mods de mapa?</summary><p data-i18n="faqA4">Sí: ProMods (con RusMap y Roextended), Grand Utopia y TruckersMP para ETS2; Coast to Coast, ProMods Canada y Reforma para ATS — en las combinaciones habituales. El cliente detecta lo que usa tu perfil y la app cambia sola. ¿Querés otro? Pedilo en Discord.</p></details>
       <details><summary data-i18n="faqQ5">¿Modifica el juego, mis partidas o mis logros?</summary><p data-i18n="faqA5">No. Lee los datos a través del SDK de telemetría oficial de SCS Software, que es una función soportada y de solo lectura de ambos juegos. No se escribe nada en el juego, tu perfil ni tus partidas, y los logros no se ven afectados. También funciona junto con TruckersMP.</p></details>
       <details><summary data-i18n="faqQ6">¿Qué necesito?</summary><p data-i18n="faqA6">Una PC con Windows corriendo Euro Truck Simulator 2 o American Truck Simulator, y cualquier dispositivo con un navegador moderno para el tablero: tu celular, una tablet o un segundo monitor. Podés agregar el tablero a la pantalla de inicio para que abra como una app.</p></details>
       <details><summary data-i18n="faqQ7">El tablero dice "esperando telemetría". ¿Y ahora?</summary><p data-i18n="faqA7">Tres cosas para revisar: que el plugin de telemetría esté instalado (el cliente lo puede hacer por vos desde el menú de la bandeja), que el juego esté abierto y estés arriba del camión (no en un menú), y que el ícono de la bandeja diga "connected". El menú de la bandeja tiene una opción "Show log file" que dice exactamente qué detectó.</p></details>
@@ -712,7 +733,22 @@ const TRANSLATIONS = {
     featMobileTitle: 'Any screen, anywhere',
     featMobileBody: 'Phone, tablet or second monitor, portrait or landscape. Add it to your home screen like an app. Your phone can be on mobile data — no same-Wi-Fi requirement.',
     featModsTitle: 'Map mod support',
-    featModsBody: 'Coast to Coast and ProMods Canada for ATS, ProMods (Europe + addons) for ETS2 — one toggle, no extra downloads.',
+    featModsBody: 'ProMods, RusMap, Roextended, Grand Utopia, Coast to Coast, ProMods Canada, Reforma and TruckersMP — the client detects which ones your profile runs and the app switches maps by itself. No extra downloads.',
+    featConvoyTitle: 'Convoy with friends <span class="tag">beta</span>',
+    featConvoyBody: "Each of you drives in your own game — no TruckersMP, nothing to install. Share a 6-letter code and see everyone as arrows on the map, with speed, cargo, ETA and how far behind the leader they are. Follow the leader's destination with one tap, send quick messages, or share a spectator link for anyone to watch from a phone.",
+    tagBeta: 'beta',
+    tagSoon: 'coming soon',
+    modsAtsTitle: 'American Truck Simulator',
+    modsEts2Title: 'Euro Truck Simulator 2',
+    modsC2CNote: 'new roads and cities across the US',
+    modsPMCNote: 'British Columbia',
+    modsReformaNote: 'Mexico, with Mega Resources and Sierra Nevada',
+    modsReformaAllNote: 'the full pack, with the OtherMaps patch',
+    modsProModsNote: 'Europe + Middle East, The Great Steppe and Maghreb',
+    modsRusMapNote: 'with the ProMods–RusMap connector',
+    modsRoexNote: 'Hybrid edition, with or without RusMap',
+    modsGUNote: 'standalone map',
+    modsTMPNote: 'TruckersMP HQ and the CD road',
     tagUnique: 'only here',
     screenshotCaption: 'This is what it looks like while driving:',
     slideDemo: 'Live: GPS mode with turn-by-turn prompts, speed limit and cruise control.',
@@ -753,11 +789,8 @@ const TRANSLATIONS = {
     privacyLink: 'Privacy policy',
     changelogLink: 'Changelog / releases',
     modsSectionTitle: 'Map mod support',
-    modsSectionIntro: 'If you use one of these map mods, turn it on with a single checkbox in the app\'s Mods panel — no extra setup, no separate download.',
-    modsCoastToCoastBody: 'Extends the American Truck Simulator map with new roads and cities.',
-    modsProModsCanadaBody: 'Adds British Columbia to the American Truck Simulator map.',
-    modsProModsBody: 'Europe 2.84 plus all its addons (Middle East, The Great Steppe, Maghreb) for Euro Truck Simulator 2 — Iceland included — all in one toggle.',
-    modsFooterNote: 'These mods still need to be installed in your game as usual — Truck Dash just knows how to draw the extra roads once you tell it which one you\'re using. Want another mod supported? Ask on Discord.',
+    modsSectionIntro: 'The client reads which map mods your profile has active and the app loads the matching map on its own — no extra setup, no separate download. You can also pick one by hand in the app\'s Mods panel.',
+    modsFooterNote: 'These mods still need to be installed in your game as usual — Truck Dash just knows how to draw the extra roads and route on them. Want another mod supported? Ask on Discord.',
     faqTitle: 'Frequently asked questions',
     faqQ1: 'Is it really free? What\'s the catch?',
     faqA1: 'No catch. No account, no ads, no routing limits, no Pro tier. Everything is open source. If donations are ever added they\'ll be optional and won\'t unlock anything.',
@@ -766,7 +799,7 @@ const TRANSLATIONS = {
     faqQ3: 'Does my phone need to be on the same Wi-Fi as my PC?',
     faqA3: 'No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type. If you ARE on the same Wi-Fi, the client also offers a direct LAN mode (scan a QR code in its Setup window) with the lowest latency, no code and no internet needed.',
     faqQ4: 'Does it work with ProMods, Coast to Coast or other map mods?',
-    faqA4: 'Yes: Coast to Coast and ProMods Canada for ATS, and ProMods (Europe + all addons) for ETS2 are built in — enable them with one toggle in the app\'s Mods panel. More mods are being added; ask on Discord for the one you use.',
+    faqA4: 'Yes: ProMods (with RusMap and Roextended), Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.',
     faqQ5: 'Does it modify the game, my saves or my achievements?',
     faqA5: 'No. It reads data through SCS Software\'s official Telemetry SDK, which is a supported, read-only feature of both games. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.',
     faqQ6: 'What do I need?',
@@ -854,7 +887,22 @@ const TRANSLATIONS = {
     featMobileTitle: 'Cualquier pantalla, en cualquier lado',
     featMobileBody: 'Celular, tablet o segundo monitor, vertical u horizontal. Agregalo a la pantalla de inicio como una app. El celular puede estar con datos móviles — no hace falta la misma WiFi.',
     featModsTitle: 'Soporte de mods de mapa',
-    featModsBody: 'Coast to Coast y ProMods Canada para ATS, ProMods (Europa + addons) para ETS2 — un solo toggle, sin descargas extra.',
+    featModsBody: 'ProMods, RusMap, Roextended, Grand Utopia, Coast to Coast, ProMods Canada, Reforma y TruckersMP — el cliente detecta cuáles usa tu perfil y la app cambia de mapa sola. Sin descargas extra.',
+    featConvoyTitle: 'Convoy con amigos <span class="tag">beta</span>',
+    featConvoyBody: 'Cada uno maneja en su propio juego — sin TruckersMP, sin instalar nada. Compartís un código de 6 letras y ven a todos como flechas en el mapa, con velocidad, carga, ETA y a cuánto van del líder. Seguí el destino del líder con un toque, mandá mensajes rápidos o compartí un link de espectador para que cualquiera mire desde el celular.',
+    tagBeta: 'beta',
+    tagSoon: 'muy pronto',
+    modsAtsTitle: 'American Truck Simulator',
+    modsEts2Title: 'Euro Truck Simulator 2',
+    modsC2CNote: 'rutas y ciudades nuevas por todo EE. UU.',
+    modsPMCNote: 'Columbia Británica',
+    modsReformaNote: 'México, con Mega Resources y Sierra Nevada',
+    modsReformaAllNote: 'el pack completo, con el parche OtherMaps',
+    modsProModsNote: 'Europa + Middle East, The Great Steppe y Maghreb',
+    modsRusMapNote: 'con el conector ProMods–RusMap',
+    modsRoexNote: 'edición Hybrid, con o sin RusMap',
+    modsGUNote: 'mapa standalone',
+    modsTMPNote: 'la sede de TruckersMP y la ruta CD',
     tagUnique: 'solo acá',
     screenshotCaption: 'Así se ve mientras manejás:',
     slideDemo: 'En vivo: modo GPS con indicaciones giro a giro, límite de velocidad y crucero.',
@@ -895,11 +943,8 @@ const TRANSLATIONS = {
     privacyLink: 'Política de privacidad',
     changelogLink: 'Novedades / releases',
     modsSectionTitle: 'Soporte de mods de mapa',
-    modsSectionIntro: 'Si usás alguno de estos mods de mapa, activalo con un solo checkbox en el panel de Mods de la app — sin configuración extra, sin descargas aparte.',
-    modsCoastToCoastBody: 'Extiende el mapa de American Truck Simulator con rutas y ciudades nuevas.',
-    modsProModsCanadaBody: 'Agrega Columbia Británica al mapa de American Truck Simulator.',
-    modsProModsBody: 'Europa 2.84 más todos sus addons (Middle East, The Great Steppe, Maghreb) para Euro Truck Simulator 2 — con Islandia incluida — todo en un solo toggle.',
-    modsFooterNote: 'Estos mods igual hay que tenerlos instalados en el juego como siempre — Truck Dash solo sabe dibujar las rutas extra una vez que le decís cuál estás usando. ¿Querés soporte para otro mod? Pedilo en Discord.',
+    modsSectionIntro: 'El cliente lee qué mods de mapa tiene activos tu perfil y la app carga el mapa que corresponde sola — sin configurar nada, sin descargas aparte. También podés elegirlo a mano en el panel de Mods de la app.',
+    modsFooterNote: 'Estos mods hay que tenerlos instalados en el juego como siempre — Truck Dash solo sabe dibujar las rutas extra y rutear por ellas. ¿Querés otro mod? Pedilo en Discord.',
     faqTitle: 'Preguntas frecuentes',
     faqQ1: '¿Es realmente gratis? ¿Cuál es la trampa?',
     faqA1: 'No hay trampa. Sin cuenta, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si algún día se agregan donaciones, van a ser opcionales y no van a desbloquear nada.',
@@ -908,7 +953,7 @@ const TRANSLATIONS = {
     faqQ3: '¿Mi celular tiene que estar en la misma WiFi que la PC?',
     faqA3: 'No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.',
     faqQ4: '¿Funciona con ProMods, Coast to Coast u otros mods de mapa?',
-    faqA4: 'Sí: Coast to Coast y ProMods Canada para ATS, y ProMods (Europa + todos los addons) para ETS2 vienen incluidos — se activan con un toggle en el panel de Mods de la app. Se van agregando más; pedí el que usás en Discord.',
+    faqA4: 'Sí: ProMods (con RusMap y Roextended), Grand Utopia y TruckersMP para ETS2; Coast to Coast, ProMods Canada y Reforma para ATS — en las combinaciones habituales. El cliente detecta lo que usa tu perfil y la app cambia sola. ¿Querés otro? Pedilo en Discord.',
     faqQ5: '¿Modifica el juego, mis partidas o mis logros?',
     faqA5: 'No. Lee los datos a través del SDK de telemetría oficial de SCS Software, que es una función soportada y de solo lectura de ambos juegos. No se escribe nada en el juego, tu perfil ni tus partidas, y los logros no se ven afectados. También funciona junto con TruckersMP.',
     faqQ6: '¿Qué necesito?',
