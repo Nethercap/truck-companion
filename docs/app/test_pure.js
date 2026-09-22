@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker } = require('./pure.js');
+const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -317,4 +317,12 @@ test('connectionView: link guardado esperando al cliente de la PC', () => {
   assert.equal(view.empty[0], 'emptyNoClientTitle');
   const typed = connectionViewFor({ socket: 'open', invalidCode: true });
   assert.equal(typed.chip, 'chipInvalidCode');
+});
+
+test('gameClockFromMinutes: time_abs del SDK a dia de la semana y hora', () => {
+  assert.deepEqual(gameClockFromMinutes(0), { dayIndex: 0, hours: 0, minutes: 0 });        // lunes 00:00
+  assert.deepEqual(gameClockFromMinutes(1440 + 917), { dayIndex: 1, hours: 15, minutes: 17 }); // martes 15:17
+  assert.deepEqual(gameClockFromMinutes(1440 * 9 + 60), { dayIndex: 2, hours: 1, minutes: 0 }); // da la vuelta la semana
+  assert.equal(gameClockFromMinutes(null), null);
+  assert.equal(gameClockFromMinutes(-5), null);
 });

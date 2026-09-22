@@ -211,6 +211,7 @@ const TRANSLATIONS = {
     emptyReconnectBody: 'Lost the connection to the server. Retrying automatically.',
     panelEmptyTitle: 'Waiting for the game',
     panelEmptyBody: 'Trip, truck and session data show up here as soon as the game starts sending telemetry.',
+    gameClock: 'Game time',
     routeRemainingLabel: 'Left',
     routeDurationLabel: 'Time',
     routeArrivalLabel: 'Arrival',
@@ -532,6 +533,7 @@ const TRANSLATIONS = {
     emptyReconnectBody: 'Se perdió la conexión con el servidor. Reintentando solo.',
     panelEmptyTitle: 'Esperando al juego',
     panelEmptyBody: 'Los datos del viaje, el camión y la sesión aparecen acá apenas el juego empiece a mandar telemetría.',
+    gameClock: 'Hora del juego',
     routeRemainingLabel: 'Falta',
     routeDurationLabel: 'Tiempo',
     routeArrivalLabel: 'Llegada',
@@ -3246,6 +3248,20 @@ let etaSampleTarget = null; // cityDst actual - resetea la ventana si cambia el 
 let etaDisplayValue = null; // ultimo valor mostrado (se mantiene fijo entre recalculos)
 let etaLastRecalcTime = null;
 
+// Reloj del juego ("Jue 15:17"): el dia de la semana sale del idioma elegido
+// usando una semana de referencia que empieza en lunes (2024-01-01 lo fue).
+function updateGameClock(gameTimeMinutes) {
+  const row = document.getElementById('gameClockRow');
+  const clock = gameClockFromMinutes(gameTimeMinutes);
+  row.hidden = !clock;
+  if (!clock) return;
+  const ref = new Date(Date.UTC(2024, 0, 1 + clock.dayIndex));
+  const day = ref.toLocaleDateString(currentLang, { weekday: 'short', timeZone: 'UTC' });
+  const hh = String(clock.hours).padStart(2, '0');
+  const mm = String(clock.minutes).padStart(2, '0');
+  document.getElementById('gameClock').textContent = `${day} ${hh}:${mm}`;
+}
+
 // Escala de tiempo del juego (minutos de juego por minuto real). Se mide en
 // vivo con gameTimeMinutes (time_abs del SDK) contra el reloj real; hasta
 // tener medicion se asume la escala del mapa (ATS 20x, ETS2 19x, que es lo
@@ -3475,6 +3491,7 @@ function updateHud(data) {
   }
 
   updateWaypointRoute(data);
+  updateGameClock(data.gameTimeMinutes);
   const realEtaSeconds = computeRealEtaSeconds(data);
   routeSummaryEtaSeconds = realEtaSeconds;
   document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');

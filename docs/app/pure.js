@@ -292,6 +292,17 @@ function createFuelTracker({ windowKm = 150, minKm = 15, refuelL = 2 } = {}) {
   };
 }
 
+// Reloj del juego a partir de time_abs del SDK (minutos absolutos desde el
+// inicio del mundo, que arranca un lunes 00:00 - misma convencion que usan
+// las herramientas de la comunidad). Devuelve el dia de la semana (0 = lunes)
+// y la hora, para que la web lo formatee en el idioma del usuario.
+function gameClockFromMinutes(totalMinutes) {
+  if (totalMinutes == null || !Number.isFinite(totalMinutes) || totalMinutes < 0) return null;
+  const minutes = Math.floor(totalMinutes);
+  const minuteOfDay = minutes % 1440;
+  return { dayIndex: Math.floor(minutes / 1440) % 7, hours: Math.floor(minuteOfDay / 60), minutes: minuteOfDay % 60 };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker };
+  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes };
 }
