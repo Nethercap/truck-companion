@@ -308,3 +308,13 @@ test('formatTurnDistance imperial: millas y pies con escalones tipo GPS', () => 
   assert.equal(formatTurnDistance(650, false), '700 m'); // metrico intacto
   assert.equal(formatTurnDistanceImperial(4000), '2.5 mi');
 });
+
+test('connectionView: link guardado esperando al cliente de la PC', () => {
+  // El backend no conoce el codigo porque el cliente no arranco todavia: se
+  // muestra "no hay cliente" (y se sigue reintentando), no "codigo invalido".
+  const view = connectionViewFor({ socket: 'connecting', waitingClient: true });
+  assert.equal(view.chip, 'chipNoClient');
+  assert.equal(view.empty[0], 'emptyNoClientTitle');
+  const typed = connectionViewFor({ socket: 'open', invalidCode: true });
+  assert.equal(typed.chip, 'chipInvalidCode');
+});
