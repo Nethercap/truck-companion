@@ -3675,7 +3675,7 @@ let codeFromLink = false;
 // (socket abierto o no), lo que dice el backend (hay un cliente local
 // conectado con este codigo?) y el diagnostico que manda el cliente
 // (client_status: waiting_game / plugin_missing / waiting_truck / live).
-const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false, spectator: false, waitingClient: false };
+const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false, everValid: false, spectator: false, waitingClient: false };
 
 function connectionView() {
   return connectionViewFor(conn);
@@ -3758,7 +3758,7 @@ document.getElementById('changeCodeBtn').addEventListener('click', () => {
   if (conn.demo) { location.href = location.pathname; return; }
   clearTimeout(reconnectTimer);
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
-  conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false; conn.everOpen = false; conn.waitingClient = false;
+  conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false; conn.everOpen = false; conn.everValid = false; conn.waitingClient = false;
   renderConnectionUi();
   document.getElementById('code').focus();
 });
@@ -4223,6 +4223,9 @@ function connectWs(backend, code, options = {}) {
   };
   socket.onmessage = (event) => {
     hideReconnectBanner();
+    // Un mensaje del backend = el codigo existia de verdad (el rechazo por
+    // codigo desconocido cierra sin mandar nada). Ver el 4404 mas abajo.
+    conn.everValid = true;
     const data = JSON.parse(event.data);
     if (data.type) flushPendingTelemetry(); // los mensajes de control se procesan en orden con la telemetria que llego antes
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
@@ -4253,12 +4256,12 @@ function connectWs(backend, code, options = {}) {
   };
   socket.onclose = (ev) => {
     if (ws !== socket) return; // reemplazado por una conexion mas nueva, ignorar
-    // 4404 = el backend no conoce el codigo. Si esta pestana YA estuvo
-    // conectada con el, el codigo era valido: es un redeploy del backend
+    // 4404 = el backend no conoce el codigo. Si esta pestana ya habia
+    // recibido datos con el, el codigo era valido: es un redeploy del backend
     // (las sesiones viven en memoria) y el cliente local la recrea al
-    // reconectar en pocos segundos - se sigue reintentando. Si nunca se
-    // conecto, es un codigo mal tipeado o vencido: se avisa y se para.
-    if (ev && ev.code === 4404 && !conn.everOpen) {
+    // reconectar en pocos segundos - se sigue reintentando. Si nunca llego
+    // nada, es un codigo mal tipeado o vencido: se avisa y se para.
+    if (ev && ev.code === 4404 && !conn.everValid) {
       // Codigo que viene de un link guardado (el .exe abre el navegador con
       // ?code=..., y en el celular ese link queda de marcador): que el
       // backend no lo conozca solo quiere decir que el cliente de la PC
