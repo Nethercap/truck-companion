@@ -2084,22 +2084,23 @@ async function loadRouteGraph(mapInfo) {
   // Formato binario (TDRG v2, ver route_graph_bin.py): typed arrays, sin
   // parsear JSON. El JSON de 27 MB se volvia ~150 MB de objetos y tumbaba la
   // pestana en tablets con poca RAM; el .bin queda en ~25 MB en memoria y
-  // carga en menos de un segundo. Si no esta (variante vieja) se usa el JSON.
-  if (!new URLSearchParams(location.search).has('jsongraph')) {
-    try {
-      const res = await fetch(`${base}.bin${v}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      routeGraph = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
-      return;
-    } catch (err) {
-      console.warn('grafo binario no disponible, se usa el JSON', err);
-    }
-  }
+  // carga en menos de un segundo. Desde el 22/9 en R2 solo esta el .bin (el
+  // JSON era el respaldo de la transicion y se retiro, 254 MB); routeGraphFromJson
+  // queda para cargar a mano un grafo local con ?jsongraph=<url> al depurar.
+  const jsonUrl = new URLSearchParams(location.search).get('jsongraph');
   try {
-    const res = await fetch(`${base}.json${v}`);
+    if (jsonUrl) {
+      const res = await fetch(jsonUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      routeGraph = buildRouteGraph(routeGraphFromJson(await res.json()));
+      return;
+    }
+    const res = await fetch(`${base}.bin${v}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    routeGraph = buildRouteGraph(routeGraphFromJson(await res.json()));
+    routeGraph = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
   } catch (err) {
+    // Sin grafo el mapa y el tablero siguen andando; lo que no hay es ruteo.
+    console.warn('no se pudo cargar el grafo de rutas', err);
     routeGraph = null;
   }
 }
