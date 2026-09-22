@@ -1,14 +1,14 @@
-const CACHE_NAME = 'truckdash-v42';
+const CACHE_NAME = 'truckdash-v43';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
-  './app.css?v=20260922q',
-  './app.js?v=20260922q',
-  './convoy.js?v=20260922q',
-  './livemap.js?v=20260922q',
-  './pure.js?v=20260922q',
-  './i18n.js?v=20260922q',
+  './app.css?v=20260922r',
+  './app.js?v=20260922r',
+  './convoy.js?v=20260922r',
+  './livemap.js?v=20260922r',
+  './pure.js?v=20260922r',
+  './i18n.js?v=20260922r',
   './assets/icon-192.png',
   './assets/icon-512.png',
 ];

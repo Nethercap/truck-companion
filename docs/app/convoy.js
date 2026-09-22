@@ -513,7 +513,15 @@ function convoyWireUi() {
   const pop = $('convoyMsgPop');
   pop.innerHTML = CONVOY_QUICK.map(q => `<button class="convoyQuickBtn" data-key="${q.key}"><span>${q.icon}</span><span data-i18n="convoyMsg_${q.key}">${t('convoyMsg_' + q.key)}</span></button>`).join('');
   pop.querySelectorAll('button[data-key]').forEach(b => b.addEventListener('click', () => { convoySend({ type: 'convoy_msg', key: b.dataset.key }); pop.style.display = 'none'; }));
-  $('convoyMsgBtn').addEventListener('click', () => { pop.style.display = pop.style.display === 'none' ? '' : 'none'; });
+  $('convoyMsgBtn').addEventListener('click', () => {
+    // El boton vive en la columna flex de la izquierda: su altura depende de
+    // cuantos botones esten visibles, asi que el popover se ancla a el.
+    const btn = $('convoyMsgBtn').getBoundingClientRect();
+    const panel = document.getElementById('mapPanel').getBoundingClientRect();
+    pop.style.top = `${Math.max(8, btn.top - panel.top)}px`;
+    pop.style.left = `${btn.right - panel.left + 8}px`;
+    pop.style.display = pop.style.display === 'none' ? '' : 'none';
+  });
   document.addEventListener('click', (e) => { if (!pop.contains(e.target) && e.target !== $('convoyMsgBtn') && !$('convoyMsgBtn').contains(e.target)) pop.style.display = 'none'; });
   pop.style.display = 'none';
   convoyRenderAll();

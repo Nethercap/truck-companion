@@ -230,17 +230,21 @@
   /* Que el resumen no tape el mini-HUD ni el cartel del mapa. */
   #mapPanel.hasRouteSummary .bottomRightHud { bottom: 4.6rem; }
   #mapPanel.hasRouteSummary .mapHint { bottom: 4.3rem; font-size: 0.62rem; }
-  #recenterBtn { top: 0.6rem; left: 0.6rem; }
-  #fullscreenBtn { top: 3.9rem; left: 0.6rem; }
-  #navToggleBtn { top: 7.2rem; left: 0.6rem; }
+  /* Columna de botones del mapa: flex, asi los que aparecen y desaparecen
+     (3D solo en modo nav, comandos solo en horizontal, 💬 solo en convoy) no
+     dejan huecos ni se pisan. Antes cada uno tenia su top absoluto y el 3D
+     colgaba al costado del de navegacion. */
+  .mapLeftControls {
+    position: absolute; top: 0.6rem; left: 0.6rem; z-index: 1000;
+    display: flex; flex-direction: column; gap: 0.5rem;
+    max-height: calc(100% - 1.2rem); pointer-events: none;
+  }
+  .mapLeftControls .mapBtn { position: static; flex-shrink: 0; pointer-events: auto; }
   #navToggleBtn.active { background: var(--accent); color: #fff; }
-  /* 3D: al lado del boton de navegacion, solo visible en modo nav */
-  #tilt3dBtn { top: 7.2rem; left: 3.9rem; }
+  /* 3D: debajo del boton de navegacion, solo visible en modo nav */
   #tilt3dBtn.active { background: var(--accent); color: #fff; }
-  #waypointBtn { top: 10.5rem; left: 0.6rem; }
   #waypointBtn.active { background: var(--accent); color: #fff; }
   #waypointBtn.set { background: #ffb020; color: #111; }
-  #commandsToggleBtn { top: 13.8rem; left: 0.6rem; }
 
   /* panelToggleBtn se movio de la pila de la izquierda a esta esquina, justo
      debajo del indicador de velocidad del mini-HUD - un contenedor flex en
@@ -684,8 +688,7 @@
   .convoyEdgeLayer { position: absolute; inset: 0; pointer-events: none; z-index: 1050; overflow: hidden; }
   .convoyEdge { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; background: rgba(23, 26, 31, 0.92); border: 2px solid; border-radius: 999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; color: #fff; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
   .convoyEdgeArrow { display: inline-block; }
-  #convoyMsgBtn { top: 13.8rem; left: 0.6rem; font-size: 1.2rem; }
-  @media (max-width: 900px) and (orientation: portrait) { #convoyMsgBtn { top: 13.8rem; } }
+  #convoyMsgBtn { font-size: 1.2rem; }
   .convoyMsgPop { position: absolute; top: 13.8rem; left: 3.9rem; z-index: 1300; background: rgba(23, 26, 31, 0.96); border: 1px solid #333; border-radius: 10px; padding: 0.4rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; width: 15rem; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
   .convoyQuickBtn { display: flex; align-items: center; gap: 0.4rem; background: #23262c; border: 1px solid #3a3d44; color: var(--text); border-radius: 8px; padding: 0.45rem 0.5rem; font-size: 0.78rem; cursor: pointer; text-align: left; }
   .convoyQuickBtn:hover { border-color: #666; }
