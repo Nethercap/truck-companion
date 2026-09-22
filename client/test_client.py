@@ -384,3 +384,29 @@ def test_pairing_code_is_reused_between_runs(monkeypatch, tmp_path):
     win_integration.save_pairing_code("AB12CD34")
     win_integration.forget_pairing_code()
     assert win_integration.saved_pairing_code() is None
+
+
+def test_single_instance_guard(monkeypatch):
+    """Issue #4: la segunda instancia no arranca. Se usa un nombre de mutex
+    propio del test para no chocar con un Truck Dash real abierto."""
+    import uuid
+    import win_integration
+
+    monkeypatch.setattr(win_integration, "SINGLE_INSTANCE_MUTEX", f"Local\TruckDashTest-{uuid.uuid4().hex}")
+    monkeypatch.setattr(win_integration, "_single_instance_handle", None)
+    assert win_integration.acquire_single_instance() is True
+    assert win_integration.acquire_single_instance() is False          # ya tomado
+    assert win_integration.acquire_single_instance(0.5) is False       # y esperar no lo libera
+
+
+def test_relaunch_passes_the_wait_flag(monkeypatch):
+    """El .exe nuevo tiene que esperar a que el viejo suelte el mutex, si no
+    el auto-update y el boton 'Codigo nuevo' dejarian de arrancar."""
+    import win_integration
+
+    launched = {}
+    monkeypatch.setattr(win_integration.subprocess, "Popen",
+                        lambda cmd, **kw: launched.setdefault("cmd", cmd))
+    monkeypatch.setattr(win_integration.os, "_exit", lambda code: None)
+    win_integration.relaunch_and_exit(r"C:\TruckDash\TruckDash.exe", ["--autostart"])
+    assert launched["cmd"][1:] == ["--autostart", win_integration.RELAUNCH_FLAG]

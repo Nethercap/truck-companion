@@ -21,6 +21,7 @@ ws:// a una IP de la LAN (mixed content, lo bloquean todos los navegadores)
 """
 
 import asyncio
+import errno
 import http.server
 import json
 import logging
@@ -76,6 +77,11 @@ def refresh_web_cache() -> bool:
     return os.path.exists(os.path.join(target, "app", "index.html"))
 
 
+# Lo setea tray_client: abre la ventana de Setup de ESTA instancia cuando
+# llega un segundo arranque (ver /__show-setup mas abajo).
+on_show_setup = None
+
+
 class _StaticHandler(http.server.SimpleHTTPRequestHandler):
     """Sirve la web app y los datos (/data/*.json) pidiendolos primero al
     sitio (asi el modo LAN corre siempre la version actual de la web sin
@@ -89,6 +95,19 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
         # Los archivos se referencian con ?v=... para cache-busting - el query
         # se ignora. "/" y "/app" van al index.
         path = self.path.split("?", 1)[0]
+        # Un segundo arranque del .exe (issue #4) no abre otra instancia: le
+        # pide a esta que muestre su ventana de Setup y se va. Solo desde la
+        # misma maquina, no desde la red.
+        if path == "/__show-setup":
+            local = self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+            if local and on_show_setup:
+                try:
+                    on_show_setup()
+                except Exception:
+                    logging.exception("on_show_setup fallo")
+            self.send_response(204 if local else 403)
+            self.end_headers()
+            return
         if path in ("/", "/app", "/app/"):
             path = "/app/index.html"
         if path.startswith("/app/") or path.startswith("/data/"):
@@ -175,6 +194,7 @@ class LocalServer:
         self.ws_server = None
         self.web_ready = False
         self.error: str | None = None
+        self.port_in_use = False
 
     @property
     def url(self) -> str | None:
@@ -191,7 +211,20 @@ class LocalServer:
             self.ws_server = await websockets.serve(self._handle_viewer, "0.0.0.0", WS_PORT)
             logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d)", HTTP_PORT, WS_PORT)
         except OSError as exc:
+            # El puerto ocupado es el caso comun (otra instancia, u otro
+            # programa): la ventana mostraba el OSError crudo de Python. Se
+            # marca aparte para que la UI diga algo legible (issue #4).
             self.error = str(exc)
+            self.port_in_use = getattr(exc, "errno", None) == errno.EADDRINUSE or "10048" in str(exc)
+            # Si el HTTP levanto y fallo el WS, no dejar medio servidor arriba:
+            # el modo LAN no sirve sin los dos y el puerto queda tomado.
+            if self.http_server is not None:
+                try:
+                    self.http_server.shutdown()
+                    self.http_server.server_close()
+                except Exception:
+                    logging.exception("No se pudo cerrar el HTTP a medio levantar")
+                self.http_server = None
             logging.warning("No se pudo levantar el servidor LAN: %s", exc)
 
     async def _handle_viewer(self, ws):

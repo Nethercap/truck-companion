@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import tempfile
 import zipfile
 from urllib.request import urlopen
@@ -71,6 +72,44 @@ def in_temp_location(path: str | None = None) -> bool:
         if path == base or path.startswith(base + os.sep):
             return True
     return os.sep + "temp" + os.sep in path
+
+
+# Una sola instancia a la vez (issue #4): dos clientes leyendo la misma
+# memoria compartida y peleando por los puertos de LAN no tiene sentido, y
+# cada uno pide su propio codigo de pairing. El mutex lo libera Windows solo
+# cuando el proceso muere, asi que un cierre abrupto no deja trabado el
+# arranque siguiente.
+SINGLE_INSTANCE_MUTEX = r"Local\TruckDash-SingleInstance"
+ERROR_ALREADY_EXISTS = 183
+_single_instance_handle = None
+
+
+def acquire_single_instance(wait_seconds: float = 0.0) -> bool:
+    """True si esta es la unica instancia. Con wait_seconds espera a que la
+    anterior termine de salir (auto-update y "Codigo nuevo" relanzan el .exe:
+    el proceso viejo sigue vivo unos segundos mas)."""
+    global _single_instance_handle
+    if os.name != "nt":
+        return True
+    import ctypes
+    # use_last_error: GetLastError() de ctypes.windll se pisa con el de
+    # cualquier otra llamada intermedia y devolvia basura.
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    deadline = time.monotonic() + max(0.0, wait_seconds)
+    while True:
+        handle = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX)
+        err = ctypes.get_last_error()
+        if handle and err != ERROR_ALREADY_EXISTS:
+            _single_instance_handle = handle  # no se cierra: vive con el proceso
+            return True
+        if handle:
+            kernel32.CloseHandle(handle)
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.25)
 
 
 # El codigo de pairing se reusa entre arranques: asi la web guardada en el
@@ -212,13 +251,21 @@ def child_environment() -> dict:
     return {k: v for k, v in os.environ.items() if not k.startswith("_PYI_") and k != "_MEIPASS2"}
 
 
+RELAUNCH_FLAG = "--relaunch"
+
+
 def relaunch_and_exit(exe: str, extra_args: list[str] | None = None, stop_callback=None) -> None:
     """Lanza el .exe nuevo como proceso independiente y cierra este. Con
     stop_callback (ej. parar el icono de la bandeja) el cierre es ordenado, y
     el bootloader de PyInstaller limpia su carpeta temporal sin quejarse; si
     en 5 s no termino, se fuerza."""
     flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    subprocess.Popen([exe, *(extra_args or [])], close_fds=True, env=child_environment(), cwd=os.path.dirname(exe), creationflags=flags)
+    # RELAUNCH_FLAG: este proceso todavia tiene el mutex de instancia unica un
+    # par de segundos mas, el nuevo tiene que esperarlo en vez de rendirse.
+    args = list(extra_args or [])
+    if RELAUNCH_FLAG not in args:
+        args.append(RELAUNCH_FLAG)
+    subprocess.Popen([exe, *args], close_fds=True, env=child_environment(), cwd=os.path.dirname(exe), creationflags=flags)
     if stop_callback:
         import threading
         threading.Timer(5.0, lambda: os._exit(0)).start()

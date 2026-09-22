@@ -369,15 +369,11 @@ class SetupWindow:
             self.autostart_var.set(win_integration.is_autostart_enabled())
 
     def new_code(self):
-        """Olvida el codigo guardado y reinicia: el link viejo deja de servir.
-        Para cuando el codigo se filtro (stream, captura) o se quiere cortar
-        el acceso de un dispositivo."""
-        win_integration.forget_pairing_code()
-        exe = win_integration.exe_path()
-        if exe:
-            win_integration.relaunch_and_exit(exe, stop_callback=lambda: state.icon and state.icon.stop())
-        else:
-            self.flash(T("new_code_restart"), ORANGE)
+        """Pide un codigo nuevo: los links guardados con el anterior dejan de
+        funcionar. Para cuando el codigo se filtro (stream, captura) o se
+        quiere cortar el acceso de un dispositivo."""
+        if rotate_pairing_code():
+            self.flash(T("new_code_done"), ORANGE)
 
     def copy_code(self):
         if state.code:
@@ -388,7 +384,12 @@ class SetupWindow:
         srv = state.local
         url = srv.url if srv else None
         if not srv or srv.error or not srv.web_ready or not url:
-            reason = T("lan_starting") if not srv else (srv.error or T("lan_no_web"))
+            if not srv:
+                reason = T("lan_starting")
+            elif getattr(srv, "port_in_use", False):
+                reason = T("lan_port_busy", port=local_server.HTTP_PORT)
+            else:
+                reason = srv.error or T("lan_no_web")
             self.lan_url_label.configure(text=T("lan_unavailable", reason=reason), fg=MUTED)
             self.qr_label.configure(image="", text="")
             return
@@ -876,11 +877,16 @@ def start_asyncio_thread(backend_url: str, fixed_code: str | None):
     thread.start()
 
 
-def disconnect_session(icon, item):
+def rotate_pairing_code() -> bool:
+    """Tira el codigo actual y pide uno nuevo sin reiniciar el programa. Desde
+    1.5.9 el codigo se guarda y se reusa, asi que hay que olvidarlo primero:
+    si no, "pedir codigo nuevo" devolvia el mismo de siempre y los links
+    viejos seguian funcionando."""
     global _browser_opened
     if _loop is None:
-        return
-    logging.info("Manual disconnect requested, getting a new pairing code")
+        return False
+    logging.info("Rotando el codigo de pairing")
+    win_integration.forget_pairing_code()
 
     def _do():
         global _browser_opened
@@ -892,6 +898,30 @@ def disconnect_session(icon, item):
         _start_client_task(state.backend_url, None)
 
     _loop.call_soon_threadsafe(_do)
+    return True
+
+
+def disconnect_session(icon, item):
+    rotate_pairing_code()
+
+
+def _focus_running_instance() -> bool:
+    """Le pide a la instancia que ya esta corriendo que muestre su ventana de
+    Setup (ver /__show-setup en local_server). Si no contesta -version vieja,
+    modo LAN caido- devuelve False y se avisa con un cartel."""
+    try:
+        with urlopen(f"http://127.0.0.1:{local_server.HTTP_PORT}/__show-setup", timeout=3) as resp:
+            return resp.status in (200, 204)
+    except Exception:
+        return False
+
+
+def _message_box(text: str) -> None:
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, text, "Truck Dash", 0x40)  # MB_ICONINFORMATION
+    except Exception:
+        logging.info(text)
 
 
 def main():
@@ -900,7 +930,8 @@ def main():
     parser.add_argument("--code", default=None)
     parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="Web URL to open (for local development)")
     parser.add_argument("--autostart", action="store_true", help="Launched by Windows startup: no setup window, browser opens when the game starts")
-    parser.add_argument("--apply-update", default=None, help=argparse.SUPPRESS)  # URL de un zip: aplica la actualizacion y relanza (para probar el flujo real)
+    parser.add_argument("--apply-update", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--relaunch", action="store_true", help=argparse.SUPPRESS)  # relanzado por la instancia anterior: esperar a que suelte el mutex  # URL de un zip: aplica la actualizacion y relanza (para probar el flujo real)
     args = parser.parse_args()
 
     if args.apply_update:
@@ -909,6 +940,15 @@ def main():
         win_integration.relaunch_and_exit(new_exe)
         return
 
+    # Issue #4: una sola instancia. Un segundo doble clic trae al frente la
+    # ventana de la que ya esta corriendo, que es lo que espera cualquiera.
+    if not win_integration.acquire_single_instance(wait_seconds=12.0 if args.relaunch else 0.0):
+        logging.info("Ya hay una instancia corriendo, se le pide que muestre la ventana")
+        if not _focus_running_instance():
+            _message_box(T("already_running"))
+        return
+
+    local_server.on_show_setup = open_setup_window
     win_integration.cleanup_old_exe()
     state.web_url = args.web_url
     state.backend_url = args.backend

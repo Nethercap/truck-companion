@@ -3669,6 +3669,11 @@ const RECONNECT_DELAY_MS = 3000;
 // El codigo llego en la URL (el cliente abre el navegador asi, y en el celular
 // ese link se guarda como marcador) y no lo tipeo alguien a mano.
 let codeFromLink = false;
+// Reintentos de un codigo guardado que el backend nunca conocio: despues de un
+// minuto se asume que el codigo ya no existe (lo rotaron) en vez de esperar
+// para siempre a un cliente que no va a venir.
+const REMEMBERED_MAX_TRIES = 20;
+let rememberedTries = 0;
 
 // Estado de la conexion mostrado en el chip de la barra, la linea de detalle
 // (#status) y el empty state sobre el mapa. Combina lo que sabe el viewer
@@ -4226,6 +4231,7 @@ function connectWs(backend, code, options = {}) {
     // Un mensaje del backend = el codigo existia de verdad (el rechazo por
     // codigo desconocido cierra sin mandar nada). Ver el 4404 mas abajo.
     conn.everValid = true;
+    rememberedTries = 0;
     const data = JSON.parse(event.data);
     if (data.type) flushPendingTelemetry(); // los mensajes de control se procesan en orden con la telemetria que llego antes
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
@@ -4267,12 +4273,15 @@ function connectWs(backend, code, options = {}) {
       // backend no lo conozca solo quiere decir que el cliente de la PC
       // todavia no arranco, asi que se espera igual que cuando se cae. Un
       // codigo tipeado a mano si avisa enseguida que esta mal.
-      if (options.remembered) {
+      if (options.remembered && ++rememberedTries <= REMEMBERED_MAX_TRIES) {
         conn.waitingClient = true; conn.invalidCode = false;
         renderConnectionUi();
         reconnectTimer = setTimeout(() => connectWs(backend, code, options), RECONNECT_DELAY_MS);
         return;
       }
+      // Un minuto esperando y el backend sigue sin conocerlo: el codigo no es
+      // que "todavia no arranco", esta muerto (lo rotaron con "Codigo nuevo").
+      conn.waitingClient = false;
       conn.socket = 'open'; conn.invalidCode = true;
       renderConnectionUi();
       return;
