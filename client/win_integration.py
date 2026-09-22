@@ -48,6 +48,30 @@ def save_settings(settings: dict) -> None:
         logging.warning(f"No se pudo guardar settings.json ({exc})")
 
 
+def in_temp_location(path: str | None = None) -> bool:
+    """True si el .exe esta corriendo desde una carpeta temporal, que es lo que
+    pasa cuando alguien lo abre con doble clic desde adentro del zip (7-Zip y
+    el Explorador lo extraen a %TEMP%\\7zXXXX o similar).
+
+    Registrarlo en el arranque desde ahi es doblemente malo: la ruta desaparece
+    cuando se limpia el temporal, y "programa en carpeta temporal que se agrega
+    a la clave Run" es justo el patron que Windows Defender marca como
+    Behavior:Win32/Persistence.A!ml (reportado en el issue #2)."""
+    path = path or exe_path()
+    if not path:
+        return False
+    path = os.path.normcase(os.path.abspath(path))
+    candidates = [os.environ.get("TEMP"), os.environ.get("TMP"),
+                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp")]
+    for base in candidates:
+        if not base:
+            continue
+        base = os.path.normcase(os.path.abspath(base))
+        if path == base or path.startswith(base + os.sep):
+            return True
+    return os.sep + "temp" + os.sep in path
+
+
 def autostart_command() -> str | None:
     exe = exe_path()
     if not exe:
@@ -68,6 +92,9 @@ def is_autostart_enabled() -> bool:
 def set_autostart(enabled: bool) -> bool:
     """Devuelve True si quedo como se pidio. Solo tiene sentido empaquetado
     (corriendo desde fuente no hay un .exe que registrar)."""
+    if enabled and in_temp_location():
+        logging.warning("Inicio automatico no registrado: el .exe corre desde una carpeta temporal")
+        return False
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:

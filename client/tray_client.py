@@ -358,6 +358,11 @@ class SetupWindow:
         self.flash_label.configure(text=text, fg=color)
 
     def toggle_autostart(self):
+        if self.autostart_var.get() and win_integration.in_temp_location():
+            # Ver in_temp_location(): desde el zip no sirve y Defender lo marca.
+            self.autostart_var.set(False)
+            self.flash(T("autostart_temp_folder"), ORANGE)
+            return
         ok = win_integration.set_autostart(self.autostart_var.get())
         if not ok:
             self.autostart_var.set(win_integration.is_autostart_enabled())
@@ -583,6 +588,9 @@ def report_problem(icon, item):
 
 
 def toggle_autostart_menu_item(icon, item):
+    if not win_integration.is_autostart_enabled() and win_integration.in_temp_location():
+        show_text_dialog("Truck Dash", T("autostart_temp_folder"))
+        return
     win_integration.set_autostart(not win_integration.is_autostart_enabled())
 
 

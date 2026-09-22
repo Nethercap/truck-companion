@@ -43,8 +43,14 @@ the client itself.
 
 Download the latest release from the
 [Releases page](https://github.com/Nethercap/truck-companion/releases),
-unzip it, and run `TruckDash.exe`. No installation, no admin rights, no
-Python required — everything needed is bundled inside.
+**extract the zip to a normal folder** (Documents, for example) and run
+`TruckDash.exe` from there. No installation, no admin rights, no Python
+required, everything needed is bundled inside. Do not run it straight from
+inside the zip: Windows extracts it to a temporary folder that gets wiped, so
+"start with Windows" would point at a path that no longer exists, and an
+antivirus will flag a program that adds itself to startup from a temporary
+folder. The client refuses to register the startup entry in that case and
+tells you to move it first.
 
 On first run a **Setup & status** window opens (you can reopen it any time
 from the tray icon). It finds your ETS2 / ATS install through Steam and
@@ -91,6 +97,14 @@ is no longer UPX-compressed (both are known heuristic triggers), and a code
 signing certificate through [SignPath](https://signpath.org/) for open
 source projects is in progress — a signed build is what actually removes
 these warnings for good.
+
+The one detection we have seen reported is `Behavior:Win32/Persistence.A!ml`
+from Microsoft Defender. That one is not about the file at all: it fires when
+the program is run **from inside the zip** (so it lives in a temporary folder)
+and the user turns on "start with Windows", because a program in a temp folder
+writing itself into the `Run` key is a classic persistence pattern. Extract the
+zip to a real folder and it does not happen; since 1.5.8 the client refuses to
+register startup from a temporary folder anyway.
 
 What you can do meanwhile:
 

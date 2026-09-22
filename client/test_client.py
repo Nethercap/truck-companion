@@ -352,3 +352,19 @@ def test_qr_image_is_dark_on_light_with_quiet_zone():
     assert img.getpixel((0, 0)) == (255, 255, 255)          # zona silenciosa
     assert img.getpixel((4 * 6, 4 * 6)) == (0, 0, 0)        # centro del ojo (modulo 6,6)
     assert img.size[0] >= 4 * (21 + 8)                      # borde de 4 modulos por lado
+
+
+def test_in_temp_location_detects_zip_extraction(monkeypatch, tmp_path):
+    """Issue #2: abierto desde adentro del zip, Windows lo extrae a %TEMP%\7zXXXX
+    y registrar el arranque desde ahi es lo que Defender marca como persistencia."""
+    import win_integration
+
+    temp = tmp_path / "Temp"
+    (temp / "7zOC649DA39").mkdir(parents=True)
+    monkeypatch.setenv("TEMP", str(temp))
+    monkeypatch.setenv("TMP", str(temp))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert win_integration.in_temp_location(str(temp / "7zOC649DA39" / "TruckDash.exe")) is True
+    assert win_integration.in_temp_location(r"C:\Games\TruckDash\TruckDash.exe") is False
+    assert win_integration.in_temp_location(r"D:\Temp\TruckDash.exe") is True  # cualquier carpeta "Temp"
+    assert win_integration.in_temp_location(None) is False
