@@ -28,6 +28,7 @@ import logging
 import os
 import socket
 import threading
+from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import urlopen
 
 import client as client_lib
@@ -91,10 +92,31 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=cache_dir(), **kwargs)
 
+    # Parametros que ya dicen como conectarse: si viene alguno, no se toca.
+    CONNECT_PARAMS = ("local", "demo", "code", "backend", "live", "convoy")
+
     def do_GET(self):
         # Los archivos se referencian con ?v=... para cache-busting - el query
         # se ignora. "/" y "/app" van al index.
         path = self.path.split("?", 1)[0]
+        # Entrar por la IP pelada (http://192.168.x.x:27765) servia el tablero
+        # pero sin ?local=1, asi que no se autoconectaba y pedia codigo; y en
+        # "/" los assets relativos (app.js, app.css) ni siquiera resuelven.
+        # Se redirige a /app/?local=1. Idea y codigo original: Vladimir
+        # Kutkovoy (PR #1).
+        url = urlsplit(self.path)
+        if url.path in ("/", "/app", "/app/", "/app/index.html"):
+            query = parse_qs(url.query, keep_blank_values=True)
+            needs_local = not any(k in query for k in self.CONNECT_PARAMS)
+            if url.path in ("/", "/app") or needs_local:
+                if needs_local:
+                    query["local"] = ["1"]
+                location = "/app/" + ("?" + urlencode(query, doseq=True) if query else "")
+                self.send_response(302)
+                self.send_header("Location", location)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
         # Un segundo arranque del .exe (issue #4) no abre otra instancia: le
         # pide a esta que muestre su ventana de Setup y se va. Solo desde la
         # misma maquina, no desde la red.

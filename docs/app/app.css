@@ -209,6 +209,27 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
   .mapBtn:hover { background: #eee; }
+
+  /* Resumen de la ruta, abajo al centro del mapa (PR #1). */
+  .routeSummary {
+    position: absolute; bottom: 0.6rem; left: 50%; transform: translateX(-50%);
+    width: min(420px, calc(100% - 1.2rem)); box-sizing: border-box; z-index: 1250;
+    background: rgba(23, 26, 31, 0.94); color: #fff; border-radius: 12px;
+    padding: 0.45rem 0.5rem 0.4rem 0.8rem; box-shadow: 0 2px 10px rgba(0,0,0,0.45);
+  }
+  .routeSummary[hidden] { display: none; }
+  .routeProgressTrack { height: 4px; border-radius: 3px; background: #2b3038; overflow: hidden; margin-bottom: 0.35rem; }
+  .routeProgressBar { height: 100%; width: 0; background: #4caf50; transition: width 0.6s ease; }
+  .routeSummaryRow { display: flex; align-items: center; gap: 0.9rem; font-size: 0.8rem; color: var(--muted); }
+  .routeStat b { color: #fff; font-size: 0.95rem; font-weight: 700; margin-right: 0.15rem; }
+  .routeResetBtn {
+    margin-left: auto; width: 30px; height: 30px; flex-shrink: 0; border: 0; border-radius: 50%;
+    background: transparent; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer;
+  }
+  .routeResetBtn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  /* Que el resumen no tape el mini-HUD ni el cartel del mapa. */
+  #mapPanel.hasRouteSummary .bottomRightHud { bottom: 4.6rem; }
+  #mapPanel.hasRouteSummary .mapHint { bottom: 0.15rem; font-size: 0.62rem; }
   #recenterBtn { top: 0.6rem; left: 0.6rem; }
   #fullscreenBtn { top: 3.9rem; left: 0.6rem; }
   #navToggleBtn { top: 7.2rem; left: 0.6rem; }

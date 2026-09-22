@@ -211,6 +211,10 @@ const TRANSLATIONS = {
     emptyReconnectBody: 'Lost the connection to the server. Retrying automatically.',
     panelEmptyTitle: 'Waiting for the game',
     panelEmptyBody: 'Trip, truck and session data show up here as soon as the game starts sending telemetry.',
+    routeRemainingLabel: 'Left',
+    routeDurationLabel: 'Time',
+    routeArrivalLabel: 'Arrival',
+    routeReset: 'Clear the route from the map',
     cardTrip: 'Trip',
     cardTruck: 'Truck',
     cardSession: 'Session',
@@ -528,6 +532,10 @@ const TRANSLATIONS = {
     emptyReconnectBody: 'Se perdió la conexión con el servidor. Reintentando solo.',
     panelEmptyTitle: 'Esperando al juego',
     panelEmptyBody: 'Los datos del viaje, el camión y la sesión aparecen acá apenas el juego empiece a mandar telemetría.',
+    routeRemainingLabel: 'Falta',
+    routeDurationLabel: 'Tiempo',
+    routeArrivalLabel: 'Llegada',
+    routeReset: 'Borrar la ruta del mapa',
     cardTrip: 'Viaje',
     cardTruck: 'Camión',
     cardSession: 'Sesión',
@@ -1530,13 +1538,19 @@ function ensureMapInitialized() {
     pixelRatio: liteMode ? 1 : undefined,
     maxZoom: liteMode ? 15 : undefined,
   });
-  map.on('dragstart', () => { autoFollow = false; });
+  map.on('dragstart', pauseMapFollow);
+  map.on('dragend', scheduleMapFollow);
+  map.on('moveend', scheduleMapFollow);
+  map.on('rotatestart', (e) => { if (e.originalEvent) pauseMapFollow(); });
+  map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
+  map.on('zoom', updateTruckArrowSize);
   // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
   // zoom dinamico (si no, el proximo tick lo pisa y parece que "no se puede
   // tocar") - se reactiva con el boton de recentrar. originalEvent solo esta
   // presente cuando el zoom lo dispara una interaccion real (rueda/pellizco/
   // doble click), no nuestros propios easeTo/jumpTo programaticos.
-  map.on('zoomstart', (e) => { if (e.originalEvent) navAutoZoomPaused = true; });
+  map.on('zoomstart', (e) => { if (e.originalEvent) { navAutoZoomPaused = true; pauseMapFollow(); } });
+  map.on('zoomend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   map.on('click', (e) => {
     if (!waypointMode || !fromLngLat) return;
     pendingWaypoint = { lngLat: [e.lngLat.lng, e.lngLat.lat], pos: fromLngLat(e.lngLat.lng, e.lngLat.lat), label: null };
@@ -2372,7 +2386,23 @@ function findRoute(startXY, endXY) {
 // el GPS del juego), la empresa de destino exacta (token empresa + ciudad
 // via POIs), el centro de la ciudad de destino (Cities.json), o - sin
 // trabajo - el ultimo waypoint puesto a mano (ej. "combustible mas cercano").
+// Ruta borrada a mano: se recuerda de que viaje era para no volver a
+// dibujarla hasta que cambie el trabajo (PR #1 de Vladimir Kutkovoy).
+let dismissedRouteIdentity = null;
+let routeProgressState = { key: null, total: 0 };
+let routeSummaryEtaSeconds = null;
+
+function routeIdentity(data) {
+  return JSON.stringify([data.game, data.citySrc, data.cityDst, data.companySrcId,
+    data.companyDstId, data.onJob, data.isCargoLoaded, data.cargo]);
+}
+
 function resolveRouteTarget(data) {
+  if (dismissedRouteIdentity === routeIdentity(data)) return null;
+  return resolveRawRouteTarget(data);
+}
+
+function resolveRawRouteTarget(data) {
   // Trabajo tomado pero carga todavia no enganchada: hay que ir a buscarla.
   // Empresa exacta si esta en los POIs; si no, el centro de la ciudad de
   // ORIGEN (antes caia al destino, que es justo a donde no hay que ir aun).
@@ -2395,6 +2425,65 @@ function resolveRouteTarget(data) {
     return { x: last.pos[0], z: last.pos[1], kind: 'waypoint', key: 'wp-only' };
   }
   return null;
+}
+
+function resetDisplayedRoute() {
+  dismissedRouteIdentity = lastData ? routeIdentity(lastData) : null;
+  clearWaypoint();
+  setWaypointMode(false);
+  currentRouteWorldPoints = null;
+  routeProgressState = { key: null, total: 0 };
+  for (const id of ['route', 'route-next', 'route-ferry']) {
+    if (map && map.getSource(id)) map.getSource(id).setData(emptyLineString());
+  }
+  if (destMarker) { destMarker.remove(); destMarker = null; }
+  document.getElementById('navPanel').style.display = 'none';
+  renderRouteSummary(null);
+  if (typeof convoyOnRouteChanged === 'function') convoyOnRouteChanged();
+}
+
+function renderRouteSummary(view) {
+  const panel = document.getElementById('routeSummary');
+  if (!panel) return;
+  panel.hidden = !view;
+  document.getElementById('mapPanel').classList.toggle('hasRouteSummary', !!view);
+  if (!view) return;
+  const bar = document.getElementById('routeProgressBar');
+  bar.style.width = `${view.percent}%`;
+  bar.parentElement.title = `${Math.round(view.percent)}%`;
+  document.getElementById('routeRemaining').textContent = view.remaining;
+  document.getElementById('routeDuration').textContent = view.duration;
+  document.getElementById('routeArrival').textContent = view.arrival;
+}
+
+// Resumen de la ruta arriba del mapa: barra de progreso, lo que falta, el
+// tiempo real restante y la hora de llegada estimada (PR #1).
+function updateRouteSummary(data) {
+  const target = resolveRouteTarget(data);
+  if (!target) { routeProgressState = { key: null, total: 0 }; renderRouteSummary(null); return; }
+  // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
+  // sobre la ruta que dibujamos nosotros.
+  const manual = waypoints.some(wp => !wp.inGame) || target.kind === 'waypoint';
+  const remainingKm = manual
+    ? (currentRouteWorldPoints ? sumPathDistanceMeters(currentRouteWorldPoints) * distanceScale() / 1000 : null)
+    : (Number.isFinite(data.routeDistanceKm) ? Math.max(0, data.routeDistanceKm) : null);
+  const key = routeIdentity(data) + target.key;
+  if (routeProgressState.key !== key) routeProgressState = { key, total: 0 };
+  if (remainingKm != null) routeProgressState.total = Math.max(routeProgressState.total, remainingKm);
+  const percent = remainingKm == null || routeProgressState.total <= 0 ? 0
+    : Math.max(0, Math.min(100, (1 - remainingKm / routeProgressState.total) * 100));
+  const seconds = manual
+    ? (remainingKm != null && lastKnownAvgSpeedKmh > 0 ? remainingKm / lastKnownAvgSpeedKmh * 3600 : null)
+    : (remainingKm === 0 ? 0 : routeSummaryEtaSeconds);
+  renderRouteSummary({
+    percent,
+    remaining: remainingKm == null ? '--'
+      : `${(useImperial ? remainingKm * KM_TO_MI : remainingKm).toFixed(1)} ${useImperial ? 'mi' : 'km'}`,
+    duration: seconds != null && Number.isFinite(seconds) ? formatSeconds(seconds) : '--',
+    arrival: seconds != null && Number.isFinite(seconds)
+      ? new Date(Date.now() + seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '--',
+  });
 }
 
 // Parte la lista de puntos de la ruta en (a) tramos por tierra y (b) tramos
@@ -2576,8 +2665,14 @@ async function loadGameMap(game) {
     truckArrowEl = document.createElement('div');
     truckArrowEl.className = 'truckArrow';
     el.appendChild(truckArrowEl);
-    truckMarker = new maplibregl.Marker({ element: el }).setLngLat(mapInfo.origin).addTo(map);
+    // rotationAlignment/pitchAlignment 'map': MapLibre compensa la rotacion y
+    // la inclinacion de la camara, asi que alcanza con darle el rumbo
+    // geografico y la flecha queda bien en modo nav y fuera de el (del PR #1
+    // de Vladimir Kutkovoy; antes se rotaba el div a mano y con el mapa
+    // rotado o en 3D apuntaba mal).
+    truckMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map', rotation: lastHeadingDeg }).setLngLat(mapInfo.origin).addTo(map);
   }
+  updateTruckArrowSize();
 
   document.getElementById('mapHint').textContent = mapInfo.label;
   // Los tiles siguen bajando en segundo plano; la barra se va cuando la
@@ -2602,7 +2697,41 @@ function setMapLoading(stepKey) {
 }
 
 let lastWorldPos = null;
-let autoFollow = true; // se desactiva si el usuario arrastra el mapa a mano, se reactiva con el boton de recentrar
+// Seguimiento de camara: se corta cuando el usuario mueve el mapa a mano y
+// vuelve solo unos segundos despues de soltarlo (antes habia que apretar
+// Recentrar si o si; idea del PR #1 de Vladimir Kutkovoy). El boton sigue
+// estando para volver en el acto.
+let autoFollow = true;
+let mapFollowTimer = null;
+const MAP_FOLLOW_DELAY_MS = 10000;
+
+function pauseMapFollow() {
+  clearTimeout(mapFollowTimer);
+  mapFollowTimer = null;
+  autoFollow = false;
+}
+
+function resumeMapFollow() {
+  clearTimeout(mapFollowTimer);
+  mapFollowTimer = null;
+  autoFollow = true;
+  if (map && truckMarker) {
+    // Fuera del modo nav ademas se endereza el mapa (norte arriba) por si lo
+    // rotaron a mano; en modo nav el bearing lo pisa el proximo tick.
+    map.jumpTo(navMode ? { center: truckMarker.getLngLat() } : { center: truckMarker.getLngLat(), bearing: 0 });
+  }
+}
+
+function scheduleMapFollow() {
+  clearTimeout(mapFollowTimer);
+  if (autoFollow) return;
+  // En el mapa en vivo el arrastre suelta al conductor fijado a proposito:
+  // ahi no se vuelve solo (ver livemap.js).
+  if (conn.spectator) return;
+  // Esperar a que termine todo el gesto (arrastrar + pellizcar cuenta como uno).
+  if (map && (map.isMoving() || map.isZooming() || map.isRotating())) return;
+  mapFollowTimer = setTimeout(resumeMapFollow, MAP_FOLLOW_DELAY_MS);
+}
 const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es un teleport (job asignado, garage, etc.), no un tramo manejado
 
 // Modo navegacion: mapa heading-up (rota con el camion, como un GPS real) en
@@ -2653,15 +2782,13 @@ function setNavMode(on) {
   navAutoZoomPaused = false;
   const btn = document.getElementById('navToggleBtn');
   if (on) {
-    autoFollow = true;
+    resumeMapFollow();
     if (map) map.dragRotate.disable(); // el rumbo lo manejamos nosotros segun el heading, no rotacion manual
     btn.classList.add('active');
-    if (truckArrowEl) truckArrowEl.style.transform = 'rotate(0deg)'; // el mapa ya rota, el camion siempre "para arriba"
   } else {
     if (map) map.dragRotate.enable();
     btn.classList.remove('active');
     document.getElementById('navPanel').style.display = 'none';
-    if (truckArrowEl) truckArrowEl.style.transform = `rotate(${lastHeadingDeg}deg)`;
   }
   applyNavCamera();
 }
@@ -2755,6 +2882,10 @@ function findUpcomingTurn() {
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 function updateNavPanel(turn) {
+  if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
+    document.getElementById('navPanel').style.display = 'none';
+    return;
+  }
   const panel = document.getElementById('navPanel');
   const nextLine = nextCityName ? `<span class="navNext">${t('navNextCity')}: ${nextCityName}</span>` : '';
   if (turn) {
@@ -2781,6 +2912,15 @@ function updateNavPanel(turn) {
 // (probado antes) generaba saltos molestos justo en intersecciones/enlaces,
 // que es donde mas importa ver el contexto completo, no menos.
 const NAV_FIXED_ZOOM = 10;
+// La flecha se achica al alejarse y crece al acercarse: alejado tapaba media
+// ciudad. Solo escala el div interno; la posicion y el rumbo los maneja
+// MapLibre (PR #1).
+function updateTruckArrowSize() {
+  if (!map || !truckArrowEl) return;
+  const scale = Math.max(0.6, Math.min(1.2, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12));
+  truckArrowEl.style.transform = `scale(${scale})`;
+}
+
 function navTargetZoom(turn) {
   return nav3d ? NAV_FIXED_ZOOM + 0.7 : NAV_FIXED_ZOOM;
 }
@@ -3002,9 +3142,7 @@ function updateMap(position, game) {
         headingRefWorld = { x: position.x, z: position.z };
       }
       lastHeadingDeg = angleDeg;
-      // En modo navegacion el mapa ya rota al heading (ver mas abajo), asi
-      // que la flecha se deja apuntando siempre "para arriba" en pantalla.
-      if (truckArrowEl) truckArrowEl.style.transform = navMode ? 'rotate(0deg)' : `rotate(${angleDeg}deg)`;
+      if (truckMarker) truckMarker.setRotation(angleDeg);
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
@@ -3338,6 +3476,7 @@ function updateHud(data) {
 
   updateWaypointRoute(data);
   const realEtaSeconds = computeRealEtaSeconds(data);
+  routeSummaryEtaSeconds = realEtaSeconds;
   document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');
 
   // Proximo descanso obligatorio (fatiga): el SDK manda MINUTOS de juego
@@ -3653,15 +3792,10 @@ document.getElementById('updateBannerClose').addEventListener('click', () => {
   document.getElementById('updateBanner').style.display = 'none';
 });
 
+document.getElementById('routeResetBtn').addEventListener('click', resetDisplayedRoute);
 document.getElementById('recenterBtn').addEventListener('click', () => {
-  autoFollow = true;
   navAutoZoomPaused = false;
-  if (map && truckMarker) {
-    // Fuera del modo nav, ademas de centrar se endereza el mapa (norte
-    // arriba) por si el usuario lo roto a mano; en modo nav el bearing lo
-    // pisa el proximo tick con el heading real, no hace falta tocarlo aca.
-    map.jumpTo(navMode ? { center: truckMarker.getLngLat() } : { center: truckMarker.getLngLat(), bearing: 0 });
-  }
+  resumeMapFollow();
 });
 
 let reconnectTimer = null;
@@ -4196,6 +4330,7 @@ function handleTelemetry(data) {
   updateHud(data);
   updateMap(data.position || {}, data.game);
   updateDestinationMarker(data);
+  updateRouteSummary(data);
   checkUpdateBanner(data.clientVersion);
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a

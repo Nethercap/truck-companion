@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260922o" />
+<link rel="stylesheet" href="app.css?v=20260922p" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -229,6 +229,18 @@
       <div id="convoyEdgeLayer" class="convoyEdgeLayer"></div>
       <button id="convoyMsgBtn" class="mapBtn" style="display:none" data-i18n-title="convoyMsgBtn" title="Quick message to the convoy">💬</button>
       <div id="convoyMsgPop" class="convoyMsgPop" style="display:none"></div>
+      <!-- Resumen de la ruta (PR #1 de Vladimir Kutkovoy): progreso, lo que
+           falta, tiempo restante y hora de llegada, con un boton para sacar
+           la ruta del mapa. -->
+      <div id="routeSummary" class="routeSummary" hidden>
+        <div class="routeProgressTrack"><div id="routeProgressBar" class="routeProgressBar"></div></div>
+        <div class="routeSummaryRow">
+          <span class="routeStat"><b id="routeRemaining">--</b> <span data-i18n="routeRemainingLabel">Left</span></span>
+          <span class="routeStat"><b id="routeDuration">--</b> <span data-i18n="routeDurationLabel">Time</span></span>
+          <span class="routeStat"><b id="routeArrival">--</b> <span data-i18n="routeArrivalLabel">Arrival</span></span>
+          <button id="routeResetBtn" class="routeResetBtn" data-i18n-title="routeReset" title="Clear the route from the map">✕</button>
+        </div>
+      </div>
       <div id="bottomRightHud" class="bottomRightHud">
         <div id="miniHudExtra" class="miniHudExtra"></div>
       </div>
@@ -504,10 +516,10 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260922o"></script>
-<script src="i18n.js?v=20260922o"></script>
-<script src="app.js?v=20260922o"></script>
-<script src="convoy.js?v=20260922o"></script>
-<script src="livemap.js?v=20260922o"></script>
+<script src="pure.js?v=20260922p"></script>
+<script src="i18n.js?v=20260922p"></script>
+<script src="app.js?v=20260922p"></script>
+<script src="convoy.js?v=20260922p"></script>
+<script src="livemap.js?v=20260922p"></script>
 </body>
 </html>
