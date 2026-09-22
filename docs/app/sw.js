@@ -1,4 +1,4 @@
-const CACHE_NAME = 'truckdash-v37';
+const CACHE_NAME = 'truckdash-v38';
 const APP_SHELL = [
   './',
   './index.html',

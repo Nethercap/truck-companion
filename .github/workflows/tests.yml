@@ -36,3 +36,6 @@ jobs:
         with:
           node-version: '20'
       - run: node --test docs/app/test_pure.js
+      # Un apostrofo sin escapar en una traduccion rompio todo el script
+      # inline de la landing en produccion sin que nada fallara (22-09-2026).
+      - run: python tools/check_inline_js.py

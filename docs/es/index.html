@@ -242,6 +242,16 @@
   .note strong { color: var(--text); }
 
   .compareWrap { overflow-x: auto; margin-top: 1.5rem; border-radius: 12px; border: 1px solid var(--border); }
+  /* En celular estas tablas se ven a medias (325 de 560 px) y nada avisaba
+     que seguian a la derecha: degradado en el borde mientras falte scroll. */
+  .scrollHintWrap { position: relative; }
+  .scrollHintWrap::after {
+    content: ''; position: absolute; top: 1px; right: 0; bottom: 1px; width: 2.5rem;
+    pointer-events: none; opacity: 0; transition: opacity 0.2s ease;
+    background: linear-gradient(to right, rgba(11,13,16,0), var(--bg));
+    border-radius: 0 12px 12px 0;
+  }
+  .scrollHintWrap.hasMore::after { opacity: 1; }
   .compare { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--panel); min-width: 560px; }
   .compare th, .compare td { padding: 0.65rem 0.9rem; text-align: left; border-bottom: 1px solid var(--border); }
   .compare th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -266,7 +276,10 @@
   .carouselTrack { display: flex; transition: transform 0.3s ease; }
   .carouselSlide { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; gap: 0.5rem; }
   .slideCaption { margin: 0; font-size: 0.85rem; color: var(--muted); max-width: 40rem; }
-  .carouselSlide img { max-height: 480px; max-width: 100%; width: auto; height: auto; border-radius: 10px; border: 1px solid var(--border); cursor: zoom-in; }
+  .carouselSlide img { max-height: 480px; max-width: 100%; width: auto; height: auto; border-radius: 10px; border: 1px solid var(--border); cursor: zoom-in; background: var(--panel-alt); }
+  /* Altura reservada: las capturas son lazy y sin esto el bloque colapsaba a
+     nada mientras cargaban (hueco negro de media pantalla al scrollear). */
+  .carouselViewport { min-height: 520px; }
   .carouselArrow {
     flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
     background: var(--panel); color: var(--text); font-size: 1.5rem; line-height: 1;
@@ -309,6 +322,18 @@
   @media (max-width: 640px) {
     .latestJobsTable th, .latestJobsTable td { white-space: normal; padding: 0.4rem 0.4rem; }
     .latestJobsTable .colTruck, .latestJobsTable .colGame, .latestJobsTable .colDistance { display: none; }
+  }
+
+  /* En celular varios textos quedaban en 10.9-12.5 px (chapitas, encabezados
+     de tabla, los <code> de los pasos): piso de ~13 px. */
+  @media (max-width: 720px) {
+    .carouselViewport { min-height: 500px; }
+    .modList .tag, .featureCard .tag { font-size: 0.8rem; }
+    .ctaNote { font-size: 0.85rem; }
+    .step code, .trustCard code { font-size: 0.9em; }
+    .latestJobsTable { font-size: 0.88rem; }
+    .latestJobsTable th { font-size: 0.8rem; }
+    .compare th { font-size: 0.82rem; }
   }
 
   .contactRow { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-top: 1rem; font-size: 0.95rem; }
@@ -531,7 +556,7 @@
       <div class="communityCard" id="latestJobs" hidden>
         <h3 data-i18n="latestJobsTitle">Últimos trabajos entregados</h3>
         <p class="latestJobsTitle" data-i18n="latestJobsSub">En vivo, de los camioneros de Truck Dash ahora mismo.</p>
-        <div class="latestJobsTableWrap">
+        <div class="latestJobsTableWrap scrollHintWrap">
           <table class="latestJobsTable">
             <thead>
               <tr>
@@ -552,7 +577,7 @@
   <section id="compare">
     <h2 data-i18n="compareTitle">Lo que las apps de GPS pagas cobran, <span class="accent">acá es gratis</span></h2>
     <p class="sectionIntro" data-i18n="compareIntro">La mayoría de las apps de GPS para simuladores de camiones dan un plan gratis limitado y ponen los límites de ruteo, los waypoints y sacar la publicidad detrás de una suscripción. Truck Dash no tiene planes.</p>
-    <div class="compareWrap">
+    <div class="compareWrap scrollHintWrap">
       <table class="compare">
         <thead>
           <tr>
@@ -794,7 +819,7 @@ const TRANSLATIONS = {
     faqQ1: 'Is it really free? What\'s the catch?',
     faqA1: 'No catch. No account, no ads, no routing limits, no Pro tier. Everything is open source. If donations are ever added they\'ll be optional and won\'t unlock anything.',
     faqQ2: 'Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?',
-    faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it's a false positive — the source and the build log are public, and a free code signing certificate for open source is in progress. Meanwhile you can add an exclusion or run the client from source.',
+    faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive — the source and the build log are public, and a free code signing certificate for open source is in progress. Meanwhile you can add an exclusion or run the client from source.',
     faqQ3: 'Does my phone need to be on the same Wi-Fi as my PC?',
     faqA3: 'No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type. If you ARE on the same Wi-Fi, the client also offers a direct LAN mode (scan a QR code in its Setup window) with the lowest latency, no code and no internet needed.',
     faqQ4: 'Does it work with ProMods, Coast to Coast or other map mods?',
@@ -1100,6 +1125,26 @@ sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', closeSide
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('open');
 });
+
+// Pista de scroll de las tablas anchas (ver .scrollHintWrap): se apaga sola
+// cuando no queda nada por ver a la derecha.
+function updateScrollHints() {
+  document.querySelectorAll('.scrollHintWrap').forEach(el => {
+    el.classList.toggle('hasMore', el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+  });
+}
+// La tabla de ultimas entregas se llena despues (fetch), asi que no alcanza
+// con mirar una vez: se observa el tamano de cada contenedor y su contenido.
+const scrollHintObserver = new ResizeObserver(updateScrollHints);
+document.querySelectorAll('.scrollHintWrap').forEach(el => {
+  scrollHintObserver.observe(el);
+  if (el.firstElementChild) scrollHintObserver.observe(el.firstElementChild);
+});
+window.addEventListener('resize', updateScrollHints);
+document.addEventListener('scroll', e => {
+  if (e.target instanceof Element && e.target.classList.contains('scrollHintWrap')) updateScrollHints();
+}, true);
+updateScrollHints();
 
 function openLightbox(src) {
   document.getElementById('lightboxImg').src = src;

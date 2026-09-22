@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260922l" />
+<link rel="stylesheet" href="app.css?v=20260922m" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -275,7 +275,7 @@
       </div>
     </div>
 
-    <div id="infoPanel">
+    <div id="infoPanel" class="noData">
      <div class="swipeHint" id="swipeHint">›</div>
      <div class="panelTabs" id="panelTabs">
        <button class="panelTab active" data-view="data" data-i18n="tabData">Data</button>
@@ -302,6 +302,12 @@
           <div id="fuelRangeLine">-</div>
           <div id="fuelAvgLine">-</div>
         </div>
+      </div>
+
+      <div id="panelEmpty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 14h9V8H2zM11 10h4l3 3v1h-7z"/><circle cx="5" cy="16.5" r="1.6"/><circle cx="15" cy="16.5" r="1.6"/></svg>
+        <span class="emptyTitle" data-i18n="panelEmptyTitle">Waiting for the game</span>
+        <span data-i18n="panelEmptyBody">Trip, truck and session data show up here as soon as the game starts sending telemetry.</span>
       </div>
 
       <div class="card">
@@ -498,10 +504,10 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="pure.js?v=20260922l"></script>
-<script src="i18n.js?v=20260922l"></script>
-<script src="app.js?v=20260922l"></script>
-<script src="convoy.js?v=20260922l"></script>
-<script src="livemap.js?v=20260922l"></script>
+<script src="pure.js?v=20260922m"></script>
+<script src="i18n.js?v=20260922m"></script>
+<script src="app.js?v=20260922m"></script>
+<script src="convoy.js?v=20260922m"></script>
+<script src="livemap.js?v=20260922m"></script>
 </body>
 </html>

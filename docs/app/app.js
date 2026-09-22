@@ -209,6 +209,8 @@ const TRANSLATIONS = {
     emptyWaitingTruckBody: 'Get in the truck (leave the menus) and the dashboard will start.',
     emptyReconnectTitle: 'Reconnecting…',
     emptyReconnectBody: 'Lost the connection to the server. Retrying automatically.',
+    panelEmptyTitle: 'Waiting for the game',
+    panelEmptyBody: 'Trip, truck and session data show up here as soon as the game starts sending telemetry.',
     cardTrip: 'Trip',
     cardTruck: 'Truck',
     cardSession: 'Session',
@@ -524,6 +526,8 @@ const TRANSLATIONS = {
     emptyWaitingTruckBody: 'Subite al camión (salí de los menús) y el tablero arranca.',
     emptyReconnectTitle: 'Reconectando…',
     emptyReconnectBody: 'Se perdió la conexión con el servidor. Reintentando solo.',
+    panelEmptyTitle: 'Esperando al juego',
+    panelEmptyBody: 'Los datos del viaje, el camión y la sesión aparecen acá apenas el juego empiece a mandar telemetría.',
     cardTrip: 'Viaje',
     cardTruck: 'Camión',
     cardSession: 'Sesión',
@@ -665,6 +669,15 @@ function applyTranslations() {
     el.title = t(el.getAttribute('data-i18n-title'));
   });
   if (!ws) statusEl.textContent = t('notConnected');
+  markLongCmdLabels();
+}
+
+// Etiquetas de la botonera que no entran en el ancho del boton ("Infotainment",
+// "Limpiaparabrisas"): media letra menos antes que dejar que se partan al medio.
+function markLongCmdLabels() {
+  document.querySelectorAll('.cmdBtn span:not(.keyCap):not(.cmdEditBadge):not(.plus)').forEach(el => {
+    el.classList.toggle('long', el.textContent.trim().length > 10);
+  });
 }
 
 function setLanguage(lang) {
@@ -880,6 +893,19 @@ function formatMoney(amount, currency) {
   return CURRENCY_SUFFIX.has(currency) ? `${n} ${symbol}` : `${symbol}${n}`;
 }
 // "$61,158" o "€12,345 · ≈ £10,604" si la moneda local es otra y hay tasas.
+// Igual que moneyLine pero con la conversion en un segundo renglon chico:
+// "$61.158" + "~ AR$92.480.506" debajo, en vez de todo junto partiendo la fila.
+function moneyHtml(amount, game) {
+  const gc = gameCurrency(game);
+  const main = escapeHtml(formatMoney(amount, gc));
+  const lc = localCurrency();
+  if (lc && lc !== gc && amount) {
+    const conv = convertMoney(amount, gc, lc);
+    if (conv != null) return `${main}<span class="subValue">≈ ${escapeHtml(formatMoney(conv, lc))}</span>`;
+  }
+  return main;
+}
+
 function moneyLine(amount, game) {
   const gc = gameCurrency(game);
   let text = formatMoney(amount, gc);
@@ -3323,12 +3349,12 @@ function updateHud(data) {
   if (restMin != null && restMin > 0 && restMin < 24 * 60) {
     restRow.hidden = false;
     const realSec = (restMin * 60) / measuredTimeScale(data);
-    document.getElementById('restStop').textContent = `${formatSeconds(restMin * 60)} · ≈ ${formatSeconds(realSec)} ${t('realShort')}`;
+    document.getElementById('restStop').innerHTML = `${escapeHtml(formatSeconds(restMin * 60))}<span class="subValue">≈ ${escapeHtml(formatSeconds(realSec))} ${escapeHtml(t('realShort'))}</span>`;
   } else {
     restRow.hidden = true;
   }
 
-  document.getElementById('jobIncome').textContent = data.jobIncome ? moneyLine(data.jobIncome, data.game) : '-';
+  document.getElementById('jobIncome').innerHTML = data.jobIncome ? moneyHtml(data.jobIncome, data.game) : '-';
 
   // Combustible: fuel/fuelCapacity vienen en unidades del juego (litros o
   // galones segun el pais del camion), pero el porcentaje da igual la unidad.
@@ -3914,6 +3940,7 @@ function renderCustomButtons() {
     add.innerHTML = `<span class="plus">+</span><span></span>`;
     add.querySelectorAll('span')[1].textContent = t('customBtnAdd');
     add.title = t('customBtnAdd');
+    markLongCmdLabels();
     add.addEventListener('click', () => openCustomBtnModal(null));
     grid.appendChild(add);
   }
@@ -4139,6 +4166,10 @@ function fuelFigures(data) {
 
 function handleTelemetry(data) {
   trackFuel(data);
+  // Con el primer dato real se cambian las tarjetas por el estado vacio (ver
+  // #panelEmpty): antes el panel era una columna de guiones hasta que el
+  // jugador se subia al camion.
+  document.getElementById('infoPanel').classList.remove('noData');
   conn.clientConnected = true;
   // Si la telemetria vuelve (menu -> camion) hay que redibujar el chip y
   // sacar la tarjeta "Ya casi" aunque el status ya diga live: el aviso de
@@ -4279,6 +4310,12 @@ function positionTourTooltip(target) {
   const margin = 12;
   let left = rect.right + margin;
   let top = rect.top;
+  // Objetivos del borde derecho (barra superior): primero se prueba a la
+  // izquierda, si no el globo caia justo encima de la velocidad y del panel.
+  if (left + tooltip.offsetWidth > window.innerWidth - margin
+      && rect.left - tooltip.offsetWidth - margin >= margin) {
+    left = rect.left - tooltip.offsetWidth - margin;
+  }
   // Si no entra a la derecha, se pone debajo (o arriba si tampoco entra abajo).
   if (left + tooltip.offsetWidth > window.innerWidth - margin) {
     left = Math.max(margin, Math.min(rect.left, window.innerWidth - tooltip.offsetWidth - margin));

@@ -68,7 +68,7 @@
   .iconBtn svg { width: 18px; height: 18px; }
   .iconBtn.discord { color: #8ea1ff; }
   .iconBtn.discord:hover { background: #5865F2; color: #fff; border-color: #5865F2; }
-  .langSelect { width: auto; padding: 0 0.4rem; -webkit-appearance: none; appearance: none; text-transform: uppercase; }
+  .langSelect { padding: 0 0.15rem; -webkit-appearance: none; appearance: none; text-transform: uppercase; text-align: center; text-align-last: center; }
   .langSelect option { text-transform: none; color: #111; }
   @media (max-width: 640px) {
     .iconBtn.secondary { display: none; }
@@ -372,7 +372,7 @@
      placeCommandsPanel() en el script). */
   .cmdGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
     gap: 0.6rem;
     padding: 0.6rem;
   }
@@ -384,8 +384,13 @@
     line-height: 1.15;
   }
   .cmdBtn svg { width: 24px; height: 24px; flex-shrink: 0; }
-  /* Etiquetas largas de una sola palabra (idiomas) no deben salirse del boton. */
-  .cmdBtn span { max-width: 100%; overflow-wrap: anywhere; }
+  /* Etiquetas largas de una sola palabra (idiomas) no deben salirse del boton.
+     Con overflow-wrap:anywhere se partian a la mitad ("Infotainme|nt"); con
+     break-word + hyphens:auto solo se cortan si no entran, y con guion. */
+  .cmdBtn span { max-width: 100%; overflow-wrap: break-word; hyphens: auto; }
+  /* Palabras largas sin punto de corte natural ("Infotainment",
+     "Limpiaparabrisas"): media letra menos antes que partirlas al medio. */
+  .cmdBtn span.long { font-size: 0.6rem; letter-spacing: -0.01em; }
   .cmdBtn:hover { border-color: #555; }
   /* Botones custom: una "tecla" dibujada con el nombre de la tecla, y un
      lapiz chiquito en la esquina para editarlo/borrarlo. */
@@ -456,6 +461,15 @@
        los botones de la derecha, con salto de linea, en vez de centrado y
        sin cortar (se montaba sobre la velocidad). */
     .navPanel { left: 7.4rem; right: 4rem; transform: none; white-space: normal; font-size: 0.88rem; padding: 0.45rem 0.7rem; }
+    /* El combustible como columna a la derecha quedaba en ~82 px: cada dato
+       ocupaba dos renglones ("Combustible" / "79%") contra el borde. En
+       vertical va como una fila compacta debajo de la velocidad. */
+    /* Mas especificidad que las reglas base de .fuelStack, que estan mas
+       abajo en el archivo y si no ganan por orden. */
+    #infoPanel .speedRow { flex-wrap: wrap; row-gap: 0.4rem; }
+    #infoPanel .fuelStack { flex-direction: row; flex-wrap: wrap; align-items: baseline; width: 100%; margin-left: 0; text-align: left; gap: 0 0.55rem; }
+    #infoPanel .fuelStack > div + div::before { content: '·'; margin-right: 0.55rem; opacity: 0.55; }
+    #infoPanel #fuelAvgLine { min-height: 0; }
     .layout { flex-direction: column; }
     .rowWrap { flex-direction: column; }
     #mapPanel { flex: 1 1 auto; min-height: 0; }
@@ -507,6 +521,22 @@
      el resto de las columnas del speedRow saltaba de posicion al cambiar. */
   #fuelAvgLine { min-height: 2.4em; line-height: 1.2; }
   .cruiseSpeed { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+
+  /* Segunda linea de una fila: la conversion de moneda y el equivalente en
+     tiempo real. Antes iban pegados con " . " en el mismo renglon y la fila
+     entera (etiqueta incluida) se partia en dos. */
+  .subValue { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 400; margin-top: 0.05rem; }
+
+  /* Antes de que llegue el primer dato de telemetria el panel era una
+     columna de guiones, que parece roto. Mientras tanto se muestra un bloque
+     corto que dice que falta; las tarjetas aparecen con el primer tick. */
+  #panelEmpty { display: none; padding: 1.1rem 0.5rem; text-align: center; color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
+  #panelEmpty .emptyTitle { display: block; color: var(--text); font-weight: 600; font-size: 0.92rem; margin-bottom: 0.25rem; }
+  #panelEmpty svg { width: 30px; height: 30px; opacity: 0.45; margin-bottom: 0.35rem; }
+  #infoPanel.noData #infoPageContent .card { display: none; }
+  /* Los tres guiones del combustible tambien sobran mientras no hay datos. */
+  #infoPanel.noData .fuelStack { display: none; }
+  #infoPanel.noData #panelEmpty { display: block; }
 
   /* Panel de info agrupado en tarjetas (Trip / Truck / Session) en vez de
      una lista plana de filas todas iguales. */
