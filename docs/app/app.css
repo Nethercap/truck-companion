@@ -229,7 +229,7 @@
   .routeResetBtn:hover { background: rgba(255,255,255,0.12); color: #fff; }
   /* Que el resumen no tape el mini-HUD ni el cartel del mapa. */
   #mapPanel.hasRouteSummary .bottomRightHud { bottom: 4.6rem; }
-  #mapPanel.hasRouteSummary .mapHint { bottom: 0.15rem; font-size: 0.62rem; }
+  #mapPanel.hasRouteSummary .mapHint { bottom: 4.3rem; font-size: 0.62rem; }
   #recenterBtn { top: 0.6rem; left: 0.6rem; }
   #fullscreenBtn { top: 3.9rem; left: 0.6rem; }
   #navToggleBtn { top: 7.2rem; left: 0.6rem; }
