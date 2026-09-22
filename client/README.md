@@ -76,6 +76,34 @@ anyway**. Every release is built by GitHub Actions from the tagged source and
 lists the SHA-256 of the files so you can verify what you downloaded — or
 just run it from source (below).
 
+### Antivirus flags TruckDash.exe (false positive)
+
+Some engines flag the `.exe`, especially after you enable "start with
+Windows". It is a **false positive** caused by how the client is packaged,
+not by what it does: a PyInstaller one-file executable unpacks itself into a
+temp folder at startup and is not code-signed, which is exactly the shape
+heuristic/ML engines look for. Everything the client does is in this repo,
+the build runs on GitHub's runners (not on anyone's PC) and each release
+publishes the SHA-256 of the file.
+
+What we do about it: the executable now carries proper version metadata and
+is no longer UPX-compressed (both are known heuristic triggers), and a code
+signing certificate through [SignPath](https://signpath.org/) for open
+source projects is in progress — a signed build is what actually removes
+these warnings for good.
+
+What you can do meanwhile:
+
+- Add an exclusion for `TruckDash.exe` in your antivirus, **or**
+- run the client from source with Python (below) — same program, no
+  packaged `.exe` involved, **or**
+- report the false positive to your vendor, which also helps everyone else:
+  [Microsoft](https://www.microsoft.com/en-us/wdsi/filesubmission),
+  [Avast/AVG](https://www.avast.com/false-positive-file-form.php),
+  [Bitdefender](https://www.bitdefender.com/consumer/support/answer/29358/),
+  [ESET](https://support.eset.com/en/kb141), most other vendors have a
+  similar form.
+
 ### Manual plugin install
 
 If you'd rather copy the plugin yourself: grab it from

@@ -67,7 +67,7 @@ jobs:
             - `TruckDash-windows.zip`: `${{ env.ZIP_SHA256 }}`
             - `TruckDash.exe`: `${{ env.EXE_SHA256 }}`
 
-            Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". The client is open source, needs no admin rights and only reads the game's telemetry.
+            Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". Some antivirus engines flag the file for the same reason (an unsigned one-file PyInstaller executable that unpacks itself at startup) — it is a false positive; the source and this build log are public, and a code signing certificate for open source projects is in progress. The client is open source, needs no admin rights and only reads the game's telemetry.
       - name: Announce on Discord
         # Embed en el canal de releases del Discord. Solo si el secret
         # DISCORD_RELEASES_WEBHOOK existe (repo → Settings → Secrets → Actions).

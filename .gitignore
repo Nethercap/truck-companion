@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 client/build/
 client/dist/
+client/version_info.txt
 
 docs/maps/
 client/settings.json

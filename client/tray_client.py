@@ -377,12 +377,8 @@ class SetupWindow:
             return
         self.lan_url_label.configure(text=url, fg=BLUE)
         try:
-            import qrcode
             from PIL import ImageTk
-            qr = qrcode.QRCode(box_size=3, border=1)
-            qr.add_data(url)
-            qr.make(fit=True)
-            img = qr.make_image(fill_color="#f2f3f5", back_color=BG).convert("RGB")
+            img = local_server.qr_image(url)
             self._qr_photo = ImageTk.PhotoImage(img)
             self.qr_label.configure(image=self._qr_photo)
         except Exception:

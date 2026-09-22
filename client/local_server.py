@@ -235,3 +235,21 @@ class LocalServer:
         ob = self._outboxes.pop(viewer, None)
         if ob is not None:
             ob.close()
+
+
+def qr_image(url: str, box_size: int = 3):
+    """QR de la URL de LAN, en modulos OSCUROS sobre fondo CLARO y con la zona
+    silenciosa de 4 modulos que pide la norma.
+
+    Antes se dibujaba al reves (claro sobre el gris oscuro del panel) porque
+    quedaba lindo con el tema de la ventana: la camara de Samsung (y la de
+    varios Android) no lee un QR invertido y la de otros telefonos si, asi que
+    parecia un QR "roto" al azar (issue #3). Un lector tiene que poder asumir
+    oscuro = 1.
+    """
+    import qrcode
+
+    qr = qrcode.QRCode(box_size=box_size, border=4)
+    qr.add_data(url)
+    qr.make(fit=True)
+    return qr.make_image(fill_color="black", back_color="white").convert("RGB")

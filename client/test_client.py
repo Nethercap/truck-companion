@@ -340,3 +340,15 @@ def test_detect_map_mods_reforma_roex_gu():
     assert client.detect_map_mods([{"file": "161Hybrid2v3.scs", "name": "161Hybrid2v3"}]) == {**NO_MODS, "roextended": True}
     gu = [{"file": "GU - Grand Utopia (v1.20c).scs", "name": "Grand Utopia"}]
     assert client.detect_map_mods(gu) == {**NO_MODS, "grand_utopia": True}
+
+
+def test_qr_image_is_dark_on_light_with_quiet_zone():
+    """Issue #3: el QR salia invertido (claro sobre oscuro) y la camara de
+    Samsung no lo leia. Esquina = zona silenciosa clara, centro del patron de
+    posicion = oscuro."""
+    import local_server
+
+    img = local_server.qr_image("http://192.168.1.50:27765", box_size=4)
+    assert img.getpixel((0, 0)) == (255, 255, 255)          # zona silenciosa
+    assert img.getpixel((4 * 6, 4 * 6)) == (0, 0, 0)        # centro del ojo (modulo 6,6)
+    assert img.size[0] >= 4 * (21 + 8)                      # borde de 4 modulos por lado
