@@ -3666,13 +3666,16 @@ document.getElementById('recenterBtn').addEventListener('click', () => {
 
 let reconnectTimer = null;
 const RECONNECT_DELAY_MS = 3000;
+// El codigo llego en la URL (el cliente abre el navegador asi, y en el celular
+// ese link se guarda como marcador) y no lo tipeo alguien a mano.
+let codeFromLink = false;
 
 // Estado de la conexion mostrado en el chip de la barra, la linea de detalle
 // (#status) y el empty state sobre el mapa. Combina lo que sabe el viewer
 // (socket abierto o no), lo que dice el backend (hay un cliente local
 // conectado con este codigo?) y el diagnostico que manda el cliente
 // (client_status: waiting_game / plugin_missing / waiting_truck / live).
-const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false, spectator: false };
+const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false, spectator: false, waitingClient: false };
 
 function connectionView() {
   return connectionViewFor(conn);
@@ -3755,7 +3758,7 @@ document.getElementById('changeCodeBtn').addEventListener('click', () => {
   if (conn.demo) { location.href = location.pathname; return; }
   clearTimeout(reconnectTimer);
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
-  conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false; conn.everOpen = false;
+  conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false; conn.everOpen = false; conn.waitingClient = false;
   renderConnectionUi();
   document.getElementById('code').focus();
 });
@@ -4211,6 +4214,7 @@ function connectWs(backend, code, options = {}) {
     hideReconnectBanner();
     conn.socket = 'open';
     conn.everOpen = true;
+    conn.waitingClient = false;
     renderConnectionUi();
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
     sendCurrencyPref(); // idem: la moneda para el post de Discord
@@ -4255,6 +4259,17 @@ function connectWs(backend, code, options = {}) {
     // reconectar en pocos segundos - se sigue reintentando. Si nunca se
     // conecto, es un codigo mal tipeado o vencido: se avisa y se para.
     if (ev && ev.code === 4404 && !conn.everOpen) {
+      // Codigo que viene de un link guardado (el .exe abre el navegador con
+      // ?code=..., y en el celular ese link queda de marcador): que el
+      // backend no lo conozca solo quiere decir que el cliente de la PC
+      // todavia no arranco, asi que se espera igual que cuando se cae. Un
+      // codigo tipeado a mano si avisa enseguida que esta mal.
+      if (options.remembered) {
+        conn.waitingClient = true; conn.invalidCode = false;
+        renderConnectionUi();
+        reconnectTimer = setTimeout(() => connectWs(backend, code, options), RECONNECT_DELAY_MS);
+        return;
+      }
       conn.socket = 'open'; conn.invalidCode = true;
       renderConnectionUi();
       return;
@@ -4285,7 +4300,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   currentRouteWorldPoints = null;
   if (map && map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
   if (map && map.getSource('route')) map.getSource('route').setData(emptyLineString());
-  connectWs(backend, code);
+  connectWs(backend, code, { remembered: codeFromLink });
 });
 
 // Tour rapido de onboarding - se muestra solo la primera vez (localStorage),
@@ -4525,6 +4540,7 @@ buildSpeedTicks();
   }
   if (code) {
     document.getElementById('code').value = code.toUpperCase();
+    codeFromLink = true;   // ver connectWs: se espera al cliente en vez de "codigo invalido"
     document.getElementById('connectBtn').click();
   }
 })();

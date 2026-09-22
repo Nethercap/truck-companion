@@ -9,6 +9,7 @@ import io
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -70,6 +71,31 @@ def in_temp_location(path: str | None = None) -> bool:
         if path == base or path.startswith(base + os.sep):
             return True
     return os.sep + "temp" + os.sep in path
+
+
+# El codigo de pairing se reusa entre arranques: asi la web guardada en el
+# celular/tablet (trucksim-dash.com/app/?code=XXXXXXXX) sirve para siempre y
+# no hay que escanear un QR nuevo cada vez que se abre el juego (pedido de
+# Cobra, Discord 22-09-2026). Si alguien lo ve (stream, captura), el boton
+# "Codigo nuevo" de la ventana de Setup lo rota.
+PAIRING_CODE_RE = re.compile(r"^[A-Z0-9]{8}$")
+
+
+def saved_pairing_code() -> str | None:
+    code = (load_settings().get("pairing_code") or "").strip().upper()
+    return code if PAIRING_CODE_RE.match(code) else None
+
+
+def save_pairing_code(code: str) -> None:
+    settings = load_settings()
+    settings["pairing_code"] = code
+    save_settings(settings)
+
+
+def forget_pairing_code() -> None:
+    settings = load_settings()
+    if settings.pop("pairing_code", None) is not None:
+        save_settings(settings)
 
 
 def autostart_command() -> str | None:

@@ -243,6 +243,7 @@ class SetupWindow:
         self.code_label = self.label(code_row, "-", font=("Consolas", 14, "bold"), fg=BLUE)
         self.code_label.pack(side="left")
         self.button(code_row, T("copy"), self.copy_code).pack(side="left", padx=(10, 4))
+        self.button(code_row, T("new_code"), self.new_code).pack(side="left", padx=4)
         self.button(code_row, T("open_dashboard"), self.open_dashboard, primary=True).pack(side="left", padx=4)
         self.label(status_frame, T("phone_hint"), fg=MUTED, wraplength=520).pack(anchor="w")
 
@@ -366,6 +367,17 @@ class SetupWindow:
         ok = win_integration.set_autostart(self.autostart_var.get())
         if not ok:
             self.autostart_var.set(win_integration.is_autostart_enabled())
+
+    def new_code(self):
+        """Olvida el codigo guardado y reinicia: el link viejo deja de servir.
+        Para cuando el codigo se filtro (stream, captura) o se quiere cortar
+        el acceso de un dispositivo."""
+        win_integration.forget_pairing_code()
+        exe = win_integration.exe_path()
+        if exe:
+            win_integration.relaunch_and_exit(exe, stop_callback=lambda: state.icon and state.icon.stop())
+        else:
+            self.flash(T("new_code_restart"), ORANGE)
 
     def copy_code(self):
         if state.code:
@@ -818,11 +830,14 @@ async def run_client(backend_url: str, fixed_code: str | None):
     cloud = CloudLink(backend_url, "", keybinds)
     telemetry_task = asyncio.create_task(telemetry_loop(cloud, local))
 
-    code = fixed_code
+    # El mismo codigo de siempre si ya hay uno guardado: el link del celular
+    # sigue funcionando entre arranques (ver win_integration.saved_pairing_code).
+    code = fixed_code or win_integration.saved_pairing_code()
     while code is None:
         state.set_cloud("connecting")
         try:
             code = await asyncio.to_thread(client_lib.request_pairing_code, backend_url)
+            win_integration.save_pairing_code(code)
         except Exception:
             logging.exception("Failed to get pairing code")
             state.set_cloud("offline")

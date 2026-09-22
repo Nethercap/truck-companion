@@ -368,3 +368,19 @@ def test_in_temp_location_detects_zip_extraction(monkeypatch, tmp_path):
     assert win_integration.in_temp_location(r"C:\Games\TruckDash\TruckDash.exe") is False
     assert win_integration.in_temp_location(r"D:\Temp\TruckDash.exe") is True  # cualquier carpeta "Temp"
     assert win_integration.in_temp_location(None) is False
+
+
+def test_pairing_code_is_reused_between_runs(monkeypatch, tmp_path):
+    """Pedido de Discord: el link guardado en el celular tiene que seguir
+    sirviendo, asi que el codigo se guarda y se reusa (solo si es valido)."""
+    import win_integration
+
+    monkeypatch.setattr(win_integration, "settings_path", lambda: str(tmp_path / "settings.json"))
+    assert win_integration.saved_pairing_code() is None
+    win_integration.save_pairing_code("AB12CD34")
+    assert win_integration.saved_pairing_code() == "AB12CD34"
+    win_integration.save_pairing_code("no-es-un-codigo")
+    assert win_integration.saved_pairing_code() is None      # basura guardada = se pide uno nuevo
+    win_integration.save_pairing_code("AB12CD34")
+    win_integration.forget_pairing_code()
+    assert win_integration.saved_pairing_code() is None

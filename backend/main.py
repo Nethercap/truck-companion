@@ -1328,6 +1328,12 @@ async def ws_viewer(websocket: WebSocket, code: str):
 
     session = sessions.get(code)
     if session is None:
+        # Se acepta y recien despues se cierra: si se cierra antes del accept,
+        # el handshake se rechaza y el WebSocket del navegador reporta 1006
+        # sin el codigo, asi que la web no podia distinguir "codigo invalido"
+        # de "se corto la conexion" (y el link guardado del celular no sabia
+        # que solo faltaba abrir el cliente en la PC).
+        await websocket.accept()
         await websocket.close(code=4404, reason="codigo de pairing invalido o expirado")
         return
 

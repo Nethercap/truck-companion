@@ -447,10 +447,15 @@ def test_client_with_malformed_code_is_rejected(client, main):
 
 
 def test_viewer_with_unknown_code_is_still_rejected(client, main):
+    """Se acepta y recien ahi se cierra con 4404. Cerrando antes del accept el
+    handshake queda rechazado y el WebSocket del navegador reporta 1006 sin el
+    codigo, asi que la web no podia distinguir "codigo invalido" de "se corto"
+    (ni saber que al link guardado del celular solo le falta que abran el
+    cliente en la PC)."""
     from starlette.websockets import WebSocketDisconnect
     with pytest.raises(WebSocketDisconnect) as exc:
-        with client.websocket_connect("/ws/live/ZZZZ9999"):
-            pass
+        with client.websocket_connect("/ws/live/ZZZZ9999") as ws:
+            ws.receive_text()
     assert exc.value.code == 4404
     assert "ZZZZ9999" not in main.sessions
 

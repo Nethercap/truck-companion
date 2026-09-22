@@ -82,6 +82,7 @@ function formatTurnDistanceImperial(m) {
 // Devuelve claves de i18n, no texto - app.js las traduce. Puro para poder
 // testearlo (test_pure.js) - es la parte con mas combinaciones de la app.
 //   conn = { socket: 'idle'|'connecting'|'open'|'closed', demo, invalidCode,
+//            waitingClient (link guardado, cliente de la PC apagado),
 //            clientConnected: null|bool, clientStatus: {status}|null,
 //            hasTelemetry, paused }
 function connectionViewFor(conn) {
@@ -89,6 +90,10 @@ function connectionViewFor(conn) {
   if (conn.demo) return { chip: 'chipDemo', cls: 'info', detail: 'detailDemo', empty: null, live: true };
   if (conn.spectator) return { chip: 'chipSpectator', cls: 'info', detail: 'detailSpectator', empty: null, live: true };
   if (conn.invalidCode) return { chip: 'chipInvalidCode', cls: 'err', detail: 'detailInvalidCode', empty: null };
+  // Link guardado (?code=...) con el cliente de la PC apagado: el backend no
+  // conoce la sesion todavia y se reintenta cada pocos segundos. Sin esto la
+  // tablet parpadeaba entre "Conectando" y "Se perdio la conexion".
+  if (conn.waitingClient) return { chip: 'chipNoClient', cls: 'err', detail: 'detailNoClient', empty: ['emptyNoClientTitle', 'emptyNoClientBody', '💻', true] };
   if (conn.socket === 'connecting') return { chip: 'chipConnecting', cls: '', detail: null, empty: null };
   if (conn.socket === 'closed') return { chip: 'chipReconnecting', cls: 'err', detail: null, empty: ['emptyReconnectTitle', 'emptyReconnectBody', '📡'] };
   if (conn.clientConnected === false) return { chip: 'chipNoClient', cls: 'err', detail: 'detailNoClient', empty: ['emptyNoClientTitle', 'emptyNoClientBody', '💻', true] };
