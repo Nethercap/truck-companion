@@ -64,6 +64,17 @@ live), your pairing code for the phone, an option to **start Truck Dash with
 Windows** (the dashboard then opens automatically when the game starts), and
 one-click updates when a new version is out.
 
+### The link on your phone keeps working
+
+The pairing code is saved and reused, so the dashboard link the client opens
+(`trucksim-dash.com/app/?code=...`) can be bookmarked on your phone or tablet
+once and it will keep working: open the bookmark, start Truck Dash on the PC,
+and it connects on its own. If the page loads before the PC client is up it
+just says "client not connected" and keeps waiting.
+
+If the code leaks (a stream, a screenshot), use **New code** in the Setup
+window: Truck Dash restarts with a fresh code and the old links stop working.
+
 ### Same Wi-Fi? LAN mode
 
 If your phone or tablet is on the same Wi-Fi as the PC, the Setup window
