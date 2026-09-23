@@ -20,9 +20,10 @@ import threading
 import time
 import uuid
 
-# Lo completa Tomas con el ID de la aplicacion de Discord (Developer Portal ->
-# New Application). Vacio = la funcion queda desactivada y ni se intenta.
-APPLICATION_ID = ""
+# ID de la aplicacion de Discord (Developer Portal -> Truck Dash). Es publico:
+# no es token ni secreto, viaja en el handshake y cualquiera que mire un perfil
+# con la actividad puesta lo ve. Vacio = la funcion queda desactivada.
+APPLICATION_ID = "1552382197401657404"
 
 OP_HANDSHAKE = 0
 OP_FRAME = 1
