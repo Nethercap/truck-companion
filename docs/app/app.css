@@ -274,11 +274,16 @@
      (los botones no, si no se dispararia la accion al soltarlos) y se marca
      con un contorno para que se vea que es lo que se arrastra. */
   .mapBtnGroup.moved { position: absolute; z-index: 1000; }
-  body.editLayout .mapBtnGroup {
-    pointer-events: auto; touch-action: none; cursor: grab;
-    outline: 2px dashed var(--accent); outline-offset: 5px; border-radius: 14px;
+  body.editLayout .mapBtnGroup { pointer-events: auto; }
+  /* En modo acomodar, cada boton se arrastra solo: tiene que recibir el
+     puntero (el click lo come swallowClick) y no arrancar un scroll. */
+  body.editLayout .mapBtn { touch-action: none; cursor: grab; outline: 2px dashed var(--accent); outline-offset: 2px; }
+  .layoutGrip {
+    display: none; align-items: center; justify-content: center;
+    width: 30px; height: 18px; border-radius: 9px; cursor: grab; touch-action: none;
+    background: var(--accent); color: #fff; font-size: 0.7rem; line-height: 1;
   }
-  body.editLayout .mapBtnGroup .mapBtn { pointer-events: none; }
+  body.editLayout .layoutGrip { display: flex; }
   .layoutBar {
     position: absolute; left: 50%; transform: translateX(-50%); bottom: 1rem; z-index: 2000;
     display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;

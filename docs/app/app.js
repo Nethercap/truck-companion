@@ -17,7 +17,7 @@ const TRANSLATIONS = {
     settingsDarkButtons: 'Dark buttons, to match the dark map',
     settingsFadeButtons: 'Fade them out while driving and bring them back on touch',
     settingsMoveButtons: 'Move the buttons',
-    layoutHint: 'Drag the buttons where you want them',
+    layoutHint: 'Drag a button to move it on its own, or the handle to move the whole group',
     layoutReset: 'Reset',
     layoutDone: 'Done',
     settingsBaseTitle: 'Base map:',
@@ -350,7 +350,7 @@ const TRANSLATIONS = {
     settingsDarkButtons: 'Botones oscuros, para que peguen con el mapa oscuro',
     settingsFadeButtons: 'Que se desvanezcan mientras manejás y vuelvan al tocar',
     settingsMoveButtons: 'Mover los botones',
-    layoutHint: 'Arrastrá los botones a donde quieras',
+    layoutHint: 'Arrastrá un botón para moverlo solo, o el asa para mover todo el grupo',
     layoutReset: 'Restablecer',
     layoutDone: 'Listo',
     settingsBaseTitle: 'Mapa base:',
@@ -778,10 +778,19 @@ const _savedSettings = loadSettings();
 // Mapa base real: prendido salvo en modo liviano (son ~1 MB mas de descarga
 // la primera vez y unas capas mas que dibujar).
 let realBase = _savedSettings.realBase === undefined ? !_savedSettings.liteMode : !!_savedSettings.realBase;
-let darkButtons = !!_savedSettings.darkButtons;
-let fadeButtons = !!_savedSettings.fadeButtons;
-// { mapLeftControls: {x, y}, topRightBtns: {x, y} } en % del mapa.
-let btnLayout = (_savedSettings.btnLayout && typeof _savedSettings.btnLayout === 'object') ? _savedSettings.btnLayout : {};
+// Los dos vienen prendidos: los botones blancos sobre el mapa oscuro le
+// resultaban fuertes a varios, y en el telefono son muchos a la vez.
+let darkButtons = _savedSettings.darkButtons === undefined ? true : !!_savedSettings.darkButtons;
+let fadeButtons = _savedSettings.fadeButtons === undefined ? true : !!_savedSettings.fadeButtons;
+// { groups: { mapLeftControls: {x, y} }, buttons: { poiBtn: {x, y} } }, en %
+// del mapa. La primera version guardaba solo los grupos, en el primer nivel:
+// si aparece asi, se migra en vez de tirarlo.
+let btnLayout = normalizeBtnLayout(_savedSettings.btnLayout);
+function normalizeBtnLayout(raw) {
+  if (!raw || typeof raw !== 'object') return { groups: {}, buttons: {} };
+  if (raw.groups || raw.buttons) return { groups: raw.groups || {}, buttons: raw.buttons || {} };
+  return { groups: raw, buttons: {} };
+}
 const liteMode = !!_savedSettings.liteMode;
 const liteNoRouting = liteMode && !!_savedSettings.liteNoRouting;
 if (liteMode) document.documentElement.classList.add('lite');
@@ -1548,41 +1557,61 @@ for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
 applyButtonPrefs();
 
 // --- Botones movibles -------------------------------------------------------
-// Se mueven de a grupos (la columna de la izquierda, y el par de la derecha).
-// Al moverse salen de su lugar en el flujo y pasan a colgar del mapa como
-// absolutos; se guarda la posicion en % para que aguante rotar la pantalla.
+// Se puede mover cada boton por separado, o el grupo entero (la columna de la
+// izquierda, o el par de la derecha) agarrandolo del asa que aparece mientras
+// se acomodan. Lo que se mueve sale de su lugar en el flujo y pasa a colgar
+// del mapa como absoluto; la posicion se guarda en % para que aguante rotar
+// la pantalla o cambiar de tamano la ventana.
 const BTN_GROUP_IDS = ['mapLeftControls', 'topRightBtns'];
-const btnGroupHome = new Map(); // id -> donde estaba, para el boton de reset
+const btnHome = new Map(); // id -> donde estaba, para el boton de restablecer
 
-function rememberBtnGroupHome(el) {
-  if (btnGroupHome.has(el.id)) return;
-  btnGroupHome.set(el.id, { parent: el.parentNode, next: el.nextSibling });
+function movableButtonIds() {
+  return BTN_GROUP_IDS.flatMap(id => {
+    const g = document.getElementById(id);
+    return g ? [...g.querySelectorAll('.mapBtn')].map(b => b.id).filter(Boolean) : [];
+  });
+}
+
+// Los ids se juntan una sola vez, al arrancar: despues algunos botones ya no
+// estan adentro del grupo (los que se movieron) y la lista quedaria coja.
+let movableIds = null;
+function allMovableIds() {
+  if (!movableIds) movableIds = [...new Set([...movableButtonIds(), ...Object.keys(btnLayout.buttons)])];
+  return movableIds;
+}
+
+function rememberHome(el) {
+  if (!el || btnHome.has(el.id)) return;
+  btnHome.set(el.id, { parent: el.parentNode, next: el.nextSibling });
+}
+
+function placeMoved(el, pos) {
+  const panel = document.getElementById('mapPanel');
+  if (!panel || !el) return;
+  if (el.parentNode !== panel) panel.appendChild(el);
+  el.classList.add('moved');
+  el.style.left = `${pos.x}%`;
+  el.style.top = `${pos.y}%`;
+  el.style.right = 'auto';
+  el.style.bottom = 'auto';
 }
 
 function applyBtnLayout() {
-  const panel = document.getElementById('mapPanel');
-  if (!panel) return;
-  for (const id of BTN_GROUP_IDS) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    rememberBtnGroupHome(el);
-    const pos = btnLayout[id];
-    if (!pos) continue;
-    if (el.parentNode !== panel) panel.appendChild(el);
-    el.classList.add('moved');
-    el.style.left = `${pos.x}%`;
-    el.style.top = `${pos.y}%`;
-    el.style.right = 'auto';
-    el.style.bottom = 'auto';
-  }
+  if (!document.getElementById('mapPanel')) return;
+  for (const id of BTN_GROUP_IDS) rememberHome(document.getElementById(id));
+  for (const id of allMovableIds()) rememberHome(document.getElementById(id));
+  for (const [id, pos] of Object.entries(btnLayout.groups)) placeMoved(document.getElementById(id), pos);
+  for (const [id, pos] of Object.entries(btnLayout.buttons)) placeMoved(document.getElementById(id), pos);
 }
 
 function resetBtnLayout() {
-  btnLayout = {};
+  btnLayout = { groups: {}, buttons: {} };
   saveSettings();
-  for (const id of BTN_GROUP_IDS) {
+  // De adentro hacia afuera: si se devolviera primero el grupo, los botones
+  // que volvieran despues entrarian en un padre que ya se movio.
+  for (const id of [...allMovableIds(), ...BTN_GROUP_IDS]) {
     const el = document.getElementById(id);
-    const home = btnGroupHome.get(id);
+    const home = btnHome.get(id);
     if (!el || !home) continue;
     el.classList.remove('moved');
     el.style.left = el.style.top = el.style.right = el.style.bottom = '';
@@ -1590,22 +1619,26 @@ function resetBtnLayout() {
   }
 }
 
-function startBtnGroupDrag(ev) {
-  const el = ev.currentTarget;
+function startLayoutDrag(ev) {
+  const el = ev.currentTarget.classList.contains('layoutGrip')
+    ? ev.currentTarget.parentNode
+    : ev.currentTarget;
   const panel = document.getElementById('mapPanel');
   if (!panel) return;
   ev.preventDefault();
+  ev.stopPropagation();
   const box = el.getBoundingClientRect();
   const area = panel.getBoundingClientRect();
   const grabX = ev.clientX - box.left;
   const grabY = ev.clientY - box.top;
+  const target = ev.currentTarget;
   if (el.parentNode !== panel) panel.appendChild(el);
   el.classList.add('moved');
-  el.setPointerCapture(ev.pointerId);
+  target.setPointerCapture(ev.pointerId);
 
   const move = (e) => {
-    // Clavado adentro del mapa: si se pudiera soltar afuera, el grupo
-    // quedaria inalcanzable y solo se recuperaria con Restablecer.
+    // Clavado adentro del mapa: si se pudiera soltar afuera, quedaria
+    // inalcanzable y solo se recuperaria con Restablecer.
     const x = Math.min(Math.max(e.clientX - area.left - grabX, 0), Math.max(0, area.width - box.width));
     const y = Math.min(Math.max(e.clientY - area.top - grabY, 0), Math.max(0, area.height - box.height));
     el.style.left = `${(x / area.width) * 100}%`;
@@ -1614,26 +1647,54 @@ function startBtnGroupDrag(ev) {
     el.style.bottom = 'auto';
   };
   const up = () => {
-    el.removeEventListener('pointermove', move);
-    el.removeEventListener('pointerup', up);
-    el.removeEventListener('pointercancel', up);
-    btnLayout[el.id] = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
+    target.removeEventListener('pointermove', move);
+    target.removeEventListener('pointerup', up);
+    target.removeEventListener('pointercancel', up);
+    const where = BTN_GROUP_IDS.includes(el.id) ? btnLayout.groups : btnLayout.buttons;
+    where[el.id] = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
     saveSettings();
   };
-  el.addEventListener('pointermove', move);
-  el.addEventListener('pointerup', up);
-  el.addEventListener('pointercancel', up);
+  target.addEventListener('pointermove', move);
+  target.addEventListener('pointerup', up);
+  target.addEventListener('pointercancel', up);
+}
+
+// Mientras se acomodan, tocar un boton no tiene que disparar su accion.
+function swallowClick(e) {
+  if (e.target.closest('#layoutBar')) return;
+  if (e.target.closest('.mapBtn') || e.target.closest('.layoutGrip')) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
 }
 
 function setLayoutEdit(on) {
   document.body.classList.toggle('editLayout', on);
   document.getElementById('layoutBar').style.display = on ? 'flex' : 'none';
+  document.removeEventListener('click', swallowClick, true);
+  if (on) document.addEventListener('click', swallowClick, true);
+
   for (const id of BTN_GROUP_IDS) {
+    const group = document.getElementById(id);
+    if (!group) continue;
+    rememberHome(group);
+    let grip = group.querySelector(':scope > .layoutGrip');
+    if (on && !grip) {
+      grip = document.createElement('div');
+      grip.className = 'layoutGrip';
+      grip.textContent = '⠿';
+      group.insertBefore(grip, group.firstChild);
+      grip.addEventListener('pointerdown', startLayoutDrag);
+    } else if (!on && grip) {
+      grip.remove();
+    }
+  }
+  for (const id of allMovableIds()) {
     const el = document.getElementById(id);
     if (!el) continue;
-    rememberBtnGroupHome(el);
-    if (on) el.addEventListener('pointerdown', startBtnGroupDrag);
-    else el.removeEventListener('pointerdown', startBtnGroupDrag);
+    rememberHome(el);
+    if (on) el.addEventListener('pointerdown', startLayoutDrag);
+    else el.removeEventListener('pointerdown', startLayoutDrag);
   }
   if (on) wakeButtons();
 }
