@@ -39,3 +39,6 @@ jobs:
       # Un apostrofo sin escapar en una traduccion rompio todo el script
       # inline de la landing en produccion sin que nada fallara (22-09-2026).
       - run: python tools/check_inline_js.py
+      # docs/app/variants.js se genera del manifest: si alguien edita uno sin
+      # regenerar el otro, la app publica versiones de mapa que no existen.
+      - run: python tools/build_variants_js.py --check

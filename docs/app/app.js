@@ -1238,151 +1238,35 @@ const REMOTE_MAP_BASE = 'https://maps.trucksim-dash.com';
 // Last-Modified (dias), asi que sin esto un mapa regenerado (ej. ProMods
 // nuevo) podia tardar en verse aunque ya estuviera subido. Subir el
 // numero de la variante que se regenero.
-const MAP_DATA_VERSION = { ats: '20260922c', ats_c2c: '20260922c', ats_promods: '20260922c', ats_c2c_promods: '20260922c', ats_reforma: '20260922c', ats_reforma_c2c_promods: '20260922c', ets2: '20260922c', ets2_promods: '20260922c', ets2_promods_rusmap: '20260922c', ets2_promods_roex: '20260922c', ets2_promods_rusmap_roex: '20260922c', ets2_gu: '20260922c', ets2_tmp: '20260922c' };
 // Una variante sin entrada en MAP_DATA_VERSION esta cableada pero todavia no
 // publicada en R2 (ej. Roextended a la espera de sus paquetes Def/Models):
 // no se ofrece en Ajustes y la auto-deteccion cae a la mas parecida.
 function publishedVariant(v, fallback) { return MAP_DATA_VERSION[v] ? v : fallback; }
-// Centro aproximado de Grand Utopia en la proyeccion de ets2 (se ajusta al publicar).
-const GU_ORIGIN = [-44.5, 42];
-const GAME_MAPS = {
-  ats: {
-    assetsDir: `${REMOTE_MAP_BASE}/ats`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats.pmtiles`,
-    sourceLayer: 'ats',
-    label: 'American Truck Simulator',
-    toLngLat: atsToLngLat,
-    fromLngLat: atsFromLngLat,
-    origin: [-96, 39],
-  },
-  // Mismo juego/proyeccion que "ats", pero generado incluyendo el mod de
-  // mapa Coast to Coast (rutas/ciudades nuevas). Usuarios sin el mod
-  // instalado no deben usar este mapa: verian rutas que en su copia del
-  // juego no existen y el A* podria calcular caminos que no pueden tomar -
-  // por eso es opt-in via el selector de mods en Mods (ver atsMod) en vez
-  // de auto-detectarse (el SDK de telemetria no informa mods instalados).
-  ats_c2c: {
-    assetsDir: `${REMOTE_MAP_BASE}/ats_c2c`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_c2c.pmtiles`,
-    sourceLayer: 'ats',
-    label: 'American Truck Simulator + Coast to Coast',
-    toLngLat: atsToLngLat,
-    fromLngLat: atsFromLngLat,
-    origin: [-96, 39],
-  },
-  ats_promods: {
-    assetsDir: `${REMOTE_MAP_BASE}/ats_promods`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_promods.pmtiles`,
-    sourceLayer: 'ats',
-    label: 'American Truck Simulator + ProMods Canada',
-    toLngLat: atsToLngLat,
-    fromLngLat: atsFromLngLat,
-    origin: [-96, 39],
-  },
-  // Coast to Coast + ProMods Canada juntos (C2C abajo, ProMods Canada
-  // arriba, como recomienda ProMods). Misma proyeccion que ats.
-  ats_c2c_promods: {
-    assetsDir: `${REMOTE_MAP_BASE}/ats_c2c_promods`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_c2c_promods.pmtiles`,
-    sourceLayer: 'ats',
-    label: 'American Truck Simulator + Coast to Coast + ProMods Canada',
-    toLngLat: atsToLngLat,
-    fromLngLat: atsFromLngLat,
-    origin: [-96, 39],
-  },
-  // Reforma (Mexico) + Mega Resources + Sierra Nevada Remake.
-  ats_reforma: {
-    assetsDir: `${REMOTE_MAP_BASE}/ats_reforma`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_reforma.pmtiles`,
-    sourceLayer: 'ats',
-    label: 'American Truck Simulator + Reforma',
-    toLngLat: atsToLngLat,
-    fromLngLat: atsFromLngLat,
-    origin: [-102, 33],
-  },
-  // "Todo": Coast to Coast + ProMods Canada + Reforma (+ OtherMaps Patch).
-  ats_reforma_c2c_promods: {
-    assetsDir: `${REMOTE_MAP_BASE}/ats_reforma_c2c_promods`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ats_reforma_c2c_promods.pmtiles`,
-    sourceLayer: 'ats',
-    label: 'American Truck Simulator + Coast to Coast + ProMods Canada + Reforma',
-    toLngLat: atsToLngLat,
-    fromLngLat: atsFromLngLat,
-    origin: [-98, 36],
-  },
-  ets2: {
-    assetsDir: `${REMOTE_MAP_BASE}/ets2`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2.pmtiles`,
-    sourceLayer: 'ets2',
-    label: 'Euro Truck Simulator 2',
-    toLngLat: ets2ToLngLat,
-    fromLngLat: ets2FromLngLat,
-    origin: [15, 50],
-  },
-  // Mismo criterio que ats_c2c: opt-in via toggle en Mods, no auto-detectable.
-  ets2_promods: {
-    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods.pmtiles`,
-    sourceLayer: 'ets2',
-    label: 'Euro Truck Simulator 2 + ProMods (Europe + addons)',
-    toLngLat: ets2ToLngLat,
-    fromLngLat: ets2FromLngLat,
-    origin: [15, 50],
-  },
-  // ProMods + RusMap (Rusia europea y Bielorrusia) unidos por el conector
-  // oficial ProMods-RusMap. Misma proyeccion/coordenadas que ets2.
-  ets2_promods_rusmap: {
-    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods_rusmap`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods_rusmap.pmtiles`,
-    sourceLayer: 'ets2',
-    label: 'Euro Truck Simulator 2 + ProMods + RusMap',
-    toLngLat: ets2ToLngLat,
-    fromLngLat: ets2FromLngLat,
-    origin: [15, 50],
-  },
-  // Roextended edicion Hybrid (corre sobre ProMods) + conector ROEX-PM.
-  ets2_promods_roex: {
-    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods_roex`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods_roex.pmtiles`,
-    sourceLayer: 'ets2',
-    label: 'Euro Truck Simulator 2 + ProMods + Roextended',
-    toLngLat: ets2ToLngLat,
-    fromLngLat: ets2FromLngLat,
-    origin: [20, 47],
-  },
-  ets2_promods_rusmap_roex: {
-    assetsDir: `${REMOTE_MAP_BASE}/ets2_promods_rusmap_roex`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_promods_rusmap_roex.pmtiles`,
-    sourceLayer: 'ets2',
-    label: 'Euro Truck Simulator 2 + ProMods + RusMap + Roextended',
-    toLngLat: ets2ToLngLat,
-    fromLngLat: ets2FromLngLat,
-    origin: [20, 47],
-  },
-  // TruckersMP: juego base + sede "TruckersMP HQ" (4 sectores cerca de
-  // Duisburg) + prefabs/carteles de la ruta Calais-Duisburg. Se detecta por
-  // los archivos .mp que el launcher monta (aparecen en game.log.txt).
-  ets2_tmp: {
-    assetsDir: `${REMOTE_MAP_BASE}/ets2_tmp`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_tmp.pmtiles`,
-    sourceLayer: 'ets2',
-    label: 'Euro Truck Simulator 2 + TruckersMP',
-    toLngLat: ets2ToLngLat,
-    fromLngLat: ets2FromLngLat,
-    origin: [15, 50],
-  },
-  // Grand Utopia: mapa standalone (reemplaza Europa; perfil propio en el
-  // juego). Misma proyeccion que ets2, queda al oeste de Europa.
-  ets2_gu: {
-    assetsDir: `${REMOTE_MAP_BASE}/ets2_gu`,
-    pmtilesUrl: `${REMOTE_MAP_BASE}/vector/ets2_gu.pmtiles`,
-    sourceLayer: 'ets2',
-    label: 'Euro Truck Simulator 2 + Grand Utopia',
-    toLngLat: guToLngLat,
-    fromLngLat: guFromLngLat,
-    origin: GU_ORIGIN,
-  },
+// Proyecciones: el unico dato de una variante que es codigo y no tabla. Las
+// de ATS y ETS2 son las del juego; Grand Utopia es un mapa standalone que cae
+// en la zona del hack de UK, por eso tiene la suya (ver ets2ToLngLatImpl).
+const PROJECTIONS = {
+  ats: { toLngLat: atsToLngLat, fromLngLat: atsFromLngLat },
+  ets2: { toLngLat: ets2ToLngLat, fromLngLat: ets2FromLngLat },
+  gu: { toLngLat: guToLngLat, fromLngLat: guFromLngLat },
 };
+
+// El resto de cada variante (etiqueta, juego, centro del mapa, que mods trae)
+// sale de VARIANT_META, que genera tools/build_variants_js.py desde
+// docs/data/map-manifest.json: publicar una variante es tocar el manifest y
+// regenerar, no editar cinco lugares. Ojo: las variantes con mods son opt-in
+// (el SDK no informa que mods hay instalados, lo detecta el cliente leyendo
+// game.log); usar el mapa equivocado muestra rutas que en esa copia del juego
+// no existen.
+const GAME_MAPS = Object.fromEntries(Object.entries(VARIANT_META).map(([name, meta]) => [name, {
+  assetsDir: `${REMOTE_MAP_BASE}/${name}`,
+  pmtilesUrl: `${REMOTE_MAP_BASE}/vector/${name}.pmtiles`,
+  sourceLayer: meta.game,
+  label: meta.label,
+  toLngLat: PROJECTIONS[meta.projection].toLngLat,
+  fromLngLat: PROJECTIONS[meta.projection].fromLngLat,
+  origin: meta.origin,
+}]));
 
 // Conversion de coordenadas de juego (x,z) a lng/lat WGS84 real, con el mismo
 // algoritmo (proyeccion Lambert Conformal Conic) que usa truckermudgeon/maps

@@ -1,6 +1,6 @@
 {
   "_comment": "Fuente de verdad de los datos de mapa publicados. Se edita a mano al publicar una variante (ver mod-integration-pipeline/README.md en D:/ets2-companion). tools/check_map_mods.py lo lee, consulta las versiones upstream donde se puede y escribe map-mods-status.json; admin.html muestra ambos.",
-  "updated": "2026-09-22",
+  "updated": "2026-09-23",
   "r2Base": "https://maps.trucksim-dash.com",
   "variants": {
     "ats": {
@@ -8,7 +8,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [],
       "files": [
         "vector/ats.pmtiles",
@@ -16,6 +16,11 @@
         "ats/route-graph-ats.bin",
         "ats/Cities.json",
         "ats/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator",
+      "origin": [
+        -96,
+        39
       ]
     },
     "ats_c2c": {
@@ -23,7 +28,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "c2c"
       ],
@@ -33,6 +38,11 @@
         "ats_c2c/route-graph-ats_c2c.bin",
         "ats_c2c/Cities.json",
         "ats_c2c/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator + Coast to Coast",
+      "origin": [
+        -96,
+        39
       ]
     },
     "ats_promods": {
@@ -40,7 +50,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "promods_canada"
       ],
@@ -50,6 +60,11 @@
         "ats_promods/route-graph-ats_promods.bin",
         "ats_promods/Cities.json",
         "ats_promods/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator + ProMods Canada",
+      "origin": [
+        -96,
+        39
       ]
     },
     "ats_c2c_promods": {
@@ -57,7 +72,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "c2c",
         "promods_canada"
@@ -68,6 +83,11 @@
         "ats_c2c_promods/route-graph-ats_c2c_promods.bin",
         "ats_c2c_promods/Cities.json",
         "ats_c2c_promods/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator + Coast to Coast + ProMods Canada",
+      "origin": [
+        -96,
+        39
       ]
     },
     "ats_reforma": {
@@ -75,7 +95,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "reforma",
         "reforma_mega_resources",
@@ -87,6 +107,11 @@
         "ats_reforma/route-graph-ats_reforma.bin",
         "ats_reforma/Cities.json",
         "ats_reforma/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator + Reforma",
+      "origin": [
+        -102,
+        33
       ]
     },
     "ats_reforma_c2c_promods": {
@@ -94,7 +119,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "c2c",
         "promods_canada",
@@ -109,6 +134,11 @@
         "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.bin",
         "ats_reforma_c2c_promods/Cities.json",
         "ats_reforma_c2c_promods/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator + Coast to Coast + ProMods Canada + Reforma",
+      "origin": [
+        -98,
+        36
       ]
     },
     "ets2": {
@@ -116,7 +146,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [],
       "files": [
         "vector/ets2.pmtiles",
@@ -124,6 +154,11 @@
         "ets2/route-graph-ets2.bin",
         "ets2/Cities.json",
         "ets2/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2",
+      "origin": [
+        15,
+        50
       ]
     },
     "ets2_promods": {
@@ -131,7 +166,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "promods",
         "promods_me",
@@ -144,6 +179,11 @@
         "ets2_promods/route-graph-ets2_promods.bin",
         "ets2_promods/Cities.json",
         "ets2_promods/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + ProMods (Europe + addons)",
+      "origin": [
+        15,
+        50
       ]
     },
     "ets2_promods_rusmap": {
@@ -151,7 +191,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "promods",
         "promods_me",
@@ -166,6 +206,11 @@
         "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.bin",
         "ets2_promods_rusmap/Cities.json",
         "ets2_promods_rusmap/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + ProMods + RusMap",
+      "origin": [
+        15,
+        50
       ]
     },
     "ets2_promods_roex": {
@@ -173,7 +218,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "promods",
         "promods_me",
@@ -187,6 +232,11 @@
         "ets2_promods_roex/route-graph-ets2_promods_roex.bin",
         "ets2_promods_roex/Cities.json",
         "ets2_promods_roex/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + ProMods + Roextended",
+      "origin": [
+        20,
+        47
       ]
     },
     "ets2_promods_rusmap_roex": {
@@ -194,7 +244,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "promods",
         "promods_me",
@@ -211,6 +261,11 @@
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.bin",
         "ets2_promods_rusmap_roex/Cities.json",
         "ets2_promods_rusmap_roex/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + ProMods + RusMap + Roextended",
+      "origin": [
+        20,
+        47
       ]
     },
     "ets2_gu": {
@@ -218,7 +273,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "grand_utopia"
       ],
@@ -228,6 +283,11 @@
         "ets2_gu/route-graph-ets2_gu.bin",
         "ets2_gu/Cities.json",
         "ets2_gu/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + Grand Utopia",
+      "origin": [
+        -44.5,
+        42
       ]
     },
     "ets2_tmp": {
@@ -235,7 +295,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-22",
-      "mapDataVersion": "20260922b",
+      "mapDataVersion": "20260922c",
       "mods": [
         "truckersmp"
       ],
@@ -245,6 +305,11 @@
         "ets2_tmp/route-graph-ets2_tmp.bin",
         "ets2_tmp/Cities.json",
         "ets2_tmp/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + TruckersMP",
+      "origin": [
+        15,
+        50
       ]
     }
   },
