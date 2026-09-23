@@ -34,7 +34,11 @@ def main():
         page = browser.new_page(viewport={"width": WIDTH, "height": HEIGHT}, device_scale_factor=1)
         # Sin tour y en ingles, decidido ANTES de que cargue la app (el tour
         # arranca solo en la primera visita y el idioma se lee al inicio).
-        page.add_init_script("localStorage.setItem('truckdash_tour_seen', '1'); localStorage.setItem('truckdash_lang', 'en');")
+        # fadeButtons viene prendido de fabrica y en la grabacion no hay quien
+        # toque la pantalla: los botones se apagaban a los 6 segundos y el
+        # resto del clip se veian a medio borrar.
+        page.add_init_script("localStorage.setItem('truckdash_tour_seen', '1'); localStorage.setItem('truckdash_lang', 'en');"
+                             " localStorage.setItem('truckdash_settings', JSON.stringify({ fadeButtons: false }));")
         page.goto(f"{BASE}/app/?demo=1", wait_until="load")
         # Esperar a que la demo arranque (posicion + ruta calculada) y a que
         # bajen los tiles.
