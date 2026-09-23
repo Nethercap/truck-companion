@@ -4,12 +4,14 @@ Integracion con Windows del cliente: inicio automatico con la sesion
 auto-update (bajar el zip nuevo, reemplazar el .exe y relanzar).
 """
 
+import ctypes
 import hashlib
 import io
 import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -20,6 +22,11 @@ from urllib.request import urlopen
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE_NAME = "TruckDash"
 AUTOSTART_FLAG = "--autostart"
+# Modo ayudante del .exe nuevo: no levanta nada, solo reemplaza y relanza.
+FINISH_UPDATE_FLAG = "--finish-update"
+STAGED_SUFFIX = ".new.exe"
+UPDATE_COPY_TRIES = 40
+UPDATE_COPY_WAIT = 0.5
 
 
 def base_dir() -> str:
@@ -179,26 +186,33 @@ def set_autostart(enabled: bool) -> bool:
         return False
 
 
+def staged_exe_path() -> str | None:
+    """Donde se deja el .exe nuevo mientras se actualiza: al lado del actual,
+    para que el reemplazo final sea en el mismo disco."""
+    exe = exe_path()
+    return os.path.splitext(exe)[0] + STAGED_SUFFIX if exe else None
+
+
 def cleanup_old_exe() -> None:
-    # Despues de un auto-update, el .exe viejo queda renombrado al lado (no
-    # se puede borrar un .exe mientras corre) - se limpia en el proximo inicio.
+    # Despues de un auto-update quedan al lado el .exe viejo renombrado (de
+    # la forma anterior de actualizar) y el .new.exe que hizo de ayudante:
+    # ninguno de los dos se puede borrar mientras corre, se limpian en el
+    # proximo inicio.
     exe = exe_path()
     if not exe:
         return
-    old = exe + ".old"
-    if os.path.exists(old):
-        try:
-            os.remove(old)
-        except OSError:
-            pass
+    for leftover in (exe + ".old", staged_exe_path()):
+        if leftover and os.path.exists(leftover):
+            try:
+                os.remove(leftover)
+            except OSError:
+                pass
 
 
-def download_and_apply_update(download_url: str, expected_sha256: str | None, progress=None) -> str:
-    """Baja el zip del release, saca TruckDash.exe, lo pone en el lugar del
-    actual (renombrando el actual a .old) y relanza. Devuelve la ruta del
-    .exe nuevo. Levanta una excepcion con mensaje legible si algo falla, sin
-    dejar el .exe actual roto (solo se toca al final, cuando ya se verifico
-    el nuevo)."""
+def stage_update(download_url: str, expected_sha256: str | None, progress=None) -> str:
+    """Baja el zip, verifica el hash, saca TruckDash.exe y lo deja al lado del
+    actual como TruckDash.new.exe. No toca el .exe que esta corriendo: si algo
+    falla aca, la instalacion sigue intacta."""
     exe = exe_path()
     if not exe:
         raise RuntimeError("Auto-update only works with the packaged TruckDash.exe")
@@ -221,23 +235,84 @@ def download_and_apply_update(download_url: str, expected_sha256: str | None, pr
             raise RuntimeError("TruckDash.exe not found inside the downloaded zip")
         new_exe_bytes = zf.read(members[0])
 
-    tmp_dir = tempfile.mkdtemp(prefix="truckdash-update-")
-    new_exe_tmp = os.path.join(tmp_dir, "TruckDash.exe")
-    with open(new_exe_tmp, "wb") as f:
-        f.write(new_exe_bytes)
-
-    if progress:
-        progress("installing")
-    old = exe + ".old"
-    if os.path.exists(old):
-        os.remove(old)
-    os.rename(exe, old)
+    staged = staged_exe_path()
     try:
-        os.replace(new_exe_tmp, exe)
-    except OSError:
-        os.rename(old, exe)  # volver atras, el actual sigue sano
-        raise
-    return exe
+        with open(staged, "wb") as f:
+            f.write(new_exe_bytes)
+    except OSError as exc:
+        # Carpeta de solo lectura (Archivos de programa sin admin, por ej.):
+        # se cae aca, antes de haber tocado nada.
+        raise RuntimeError(f"Could not write {staged}: {exc}") from exc
+    return staged
+
+
+_SYNCHRONIZE = 0x00100000
+
+
+def wait_for_process(pid: int, timeout: float = 120.0) -> bool:
+    """Espera a que ese PID termine de verdad. Con un sleep fijo el .exe
+    viejo podia seguir vivo y el reemplazo fallaba igual."""
+    try:
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    except (AttributeError, OSError):
+        time.sleep(2.0)  # fuera de Windows (tests): no hay a quien esperar
+        return True
+    k32.OpenProcess.restype = ctypes.c_void_p
+    k32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    k32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    k32.CloseHandle.argtypes = [ctypes.c_void_p]
+    handle = k32.OpenProcess(_SYNCHRONIZE, False, int(pid))
+    if not handle:
+        return True  # ya no existe
+    try:
+        return k32.WaitForSingleObject(ctypes.c_void_p(handle), int(timeout * 1000)) == 0
+    finally:
+        k32.CloseHandle(ctypes.c_void_p(handle))
+
+
+def start_updater(staged: str, relaunch_args: list[str] | None = None) -> None:
+    """Lanza el .exe nuevo en modo ayudante y le pasa el PID de este proceso
+    para que espere a que muera antes de reemplazarlo."""
+    target = exe_path()
+    args = [staged, FINISH_UPDATE_FLAG, "--target", target, "--wait-pid", str(os.getpid())]
+    args += list(relaunch_args or [])
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    subprocess.Popen(args, close_fds=True, env=child_environment(),
+                     cwd=os.path.dirname(target), creationflags=flags)
+
+
+def finish_update(target: str, wait_pid: int | None, relaunch_args: list[str] | None = None) -> int:
+    """Corre dentro del .exe nuevo, lanzado como ayudante. No toma el mutex de
+    instancia unica ni levanta nada: espera, reemplaza y arranca el
+    definitivo."""
+    if not target:
+        logging.error("finish_update sin --target")
+        return 2
+    if wait_pid:
+        if not wait_for_process(wait_pid):
+            logging.warning("El proceso %s no termino a tiempo, se intenta igual", wait_pid)
+    source = exe_path() or sys.executable
+    last_error = None
+    for attempt in range(UPDATE_COPY_TRIES):
+        try:
+            shutil.copy2(source, target)
+            last_error = None
+            break
+        except OSError as exc:
+            # Tipicamente el antivirus todavia tiene el archivo tomado: se
+            # reintenta en vez de quedarse esperando para siempre.
+            last_error = exc
+            if attempt == 0:
+                logging.info("No se pudo reemplazar todavia (%s), reintentando", exc)
+            time.sleep(UPDATE_COPY_WAIT)
+    if last_error is not None:
+        logging.error("No se pudo reemplazar %s: %s", target, last_error)
+        return 1
+    logging.info("Actualizacion aplicada sobre %s, arrancando", target)
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    subprocess.Popen([target, *(relaunch_args or [])], close_fds=True, env=child_environment(),
+                     cwd=os.path.dirname(target), creationflags=flags)
+    return 0
 
 
 def child_environment() -> dict:
@@ -252,6 +327,21 @@ def child_environment() -> dict:
 
 
 RELAUNCH_FLAG = "--relaunch"
+
+
+def stop_and_exit(stop_callback=None) -> None:
+    """Cierra este proceso, ordenadamente si se puede. Con stop_callback (ej.
+    parar el icono de la bandeja) el bootloader de PyInstaller limpia su
+    carpeta temporal sin quejarse; si en 5 s no termino, se fuerza."""
+    if stop_callback:
+        import threading
+        threading.Timer(5.0, lambda: os._exit(0)).start()
+        try:
+            stop_callback()
+            return
+        except Exception:
+            pass
+    os._exit(0)
 
 
 def relaunch_and_exit(exe: str, extra_args: list[str] | None = None, stop_callback=None) -> None:

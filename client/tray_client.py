@@ -458,10 +458,14 @@ class SetupWindow:
 
         def _run():
             try:
-                exe = win_integration.download_and_apply_update(url, sha, progress)
+                staged = win_integration.stage_update(url, sha, progress)
                 progress("restarting")
-                time.sleep(0.5)
-                win_integration.relaunch_and_exit(exe, [win_integration.AUTOSTART_FLAG] if state.autostart_mode else None, stop_callback=lambda: state.icon and state.icon.stop())
+                time.sleep(0.4)
+                # El reemplazo lo hace el .exe nuevo desde afuera: este
+                # proceso solo se va, que es la condicion para que el
+                # archivo se pueda pisar.
+                win_integration.start_updater(staged, [win_integration.AUTOSTART_FLAG] if state.autostart_mode else None)
+                win_integration.stop_and_exit(stop_callback=lambda: state.icon and state.icon.stop())
             except Exception as exc:
                 logging.exception("Update failed")
                 self.root.after(0, lambda: (self.update_label.configure(text=T("update_failed", err=exc)), self.update_button.configure(state="normal")))
@@ -956,13 +960,24 @@ def main():
     parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="Web URL to open (for local development)")
     parser.add_argument("--autostart", action="store_true", help="Launched by Windows startup: no setup window, browser opens when the game starts")
     parser.add_argument("--apply-update", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--finish-update", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--target", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--wait-pid", type=int, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--relaunch", action="store_true", help=argparse.SUPPRESS)  # relanzado por la instancia anterior: esperar a que suelte el mutex  # URL de un zip: aplica la actualizacion y relanza (para probar el flujo real)
     args = parser.parse_args()
 
+    # Modo ayudante: lo lanza la version vieja y lo unico que hace es esperar
+    # a que muera, pisarla y arrancar la nueva. Va antes que todo lo demas, y
+    # sobre todo antes del mutex de instancia unica: no es una instancia.
+    if args.finish_update:
+        relaunch = [win_integration.AUTOSTART_FLAG] if args.autostart else None
+        return win_integration.finish_update(args.target, args.wait_pid, relaunch)
+
     if args.apply_update:
         logging.info("Applying update from %s (test flag)", args.apply_update)
-        new_exe = win_integration.download_and_apply_update(args.apply_update, None, progress=lambda k: logging.info("update: %s", k))
-        win_integration.relaunch_and_exit(new_exe)
+        staged = win_integration.stage_update(args.apply_update, None, progress=lambda k: logging.info("update: %s", k))
+        win_integration.start_updater(staged)
+        win_integration.stop_and_exit()
         return
 
     # Issue #4: una sola instancia. Un segundo doble clic trae al frente la

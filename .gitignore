@@ -12,3 +12,4 @@ client/truckdash.log
 
 # Config local del preview de Claude Code
 .claude/
+.e2e-update/

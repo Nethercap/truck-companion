@@ -98,42 +98,127 @@ def test_resolve_bin_dir_accepts_game_root_bin_or_win_x64(tmp_path):
     assert plugin_installer.game_for_bin_dir(expected) == "ats"
 
 
-def test_download_and_apply_update_verifies_sha_and_swaps_exe(tmp_path, monkeypatch):
-    exe = tmp_path / "TruckDash.exe"
-    exe.write_bytes(b"old exe")
-    monkeypatch.setattr(win_integration, "exe_path", lambda: str(exe))
-
+def _fake_zip():
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("TruckDash/TruckDash.exe", b"new exe")
-    zip_bytes = buf.getvalue()
+    return buf.getvalue()
 
+
+def _fake_urlopen(monkeypatch, payload):
     class FakeResp:
         def __enter__(self):
             return self
+
         def __exit__(self, *a):
             return False
+
         def read(self):
-            return zip_bytes
+            return payload
 
     monkeypatch.setattr(win_integration, "urlopen", lambda url, timeout=0: FakeResp())
 
+
+def test_stage_update_verifies_sha_and_leaves_the_running_exe_alone(tmp_path, monkeypatch):
+    exe = tmp_path / "TruckDash.exe"
+    exe.write_bytes(b"old exe")
+    monkeypatch.setattr(win_integration, "exe_path", lambda: str(exe))
+    zip_bytes = _fake_zip()
+    _fake_urlopen(monkeypatch, zip_bytes)
+
     try:
-        win_integration.download_and_apply_update("https://x/y.zip", "0" * 64)
+        win_integration.stage_update("https://x/y.zip", "0" * 64)
     except RuntimeError as exc:
         assert "SHA-256" in str(exc)
     else:
         raise AssertionError("expected SHA mismatch to abort")
-    assert exe.read_bytes() == b"old exe"  # no se toco
+    assert exe.read_bytes() == b"old exe"
+    assert not (tmp_path / "TruckDash.new.exe").exists()
 
-    good_sha = hashlib.sha256(zip_bytes).hexdigest()
-    result = win_integration.download_and_apply_update("https://x/y.zip", good_sha)
-    assert result == str(exe)
+    staged = win_integration.stage_update("https://x/y.zip", hashlib.sha256(zip_bytes).hexdigest())
+    assert staged == str(tmp_path / "TruckDash.new.exe")
+    # Lo nuevo queda al lado; el que corre sigue intacto hasta que lo pise el
+    # ayudante desde afuera.
+    assert (tmp_path / "TruckDash.new.exe").read_bytes() == b"new exe"
+    assert exe.read_bytes() == b"old exe"
+
+
+def test_finish_update_replaces_the_target_and_launches_it(tmp_path, monkeypatch):
+    exe = tmp_path / "TruckDash.exe"
+    exe.write_bytes(b"old exe")
+    staged = tmp_path / "TruckDash.new.exe"
+    staged.write_bytes(b"new exe")
+    monkeypatch.setattr(win_integration, "exe_path", lambda: str(staged))
+
+    waited = []
+    monkeypatch.setattr(win_integration, "wait_for_process", lambda pid, timeout=0: waited.append(pid) or True)
+    launched = []
+    monkeypatch.setattr(win_integration.subprocess, "Popen", lambda args, **kw: launched.append(args))
+
+    assert win_integration.finish_update(str(exe), 4321, ["--autostart"]) == 0
+    assert waited == [4321]           # espera al viejo, no duerme un rato fijo
     assert exe.read_bytes() == b"new exe"
-    assert (tmp_path / "TruckDash.exe.old").read_bytes() == b"old exe"
+    assert launched == [[str(exe), "--autostart"]]
+
+
+def test_finish_update_retries_while_the_file_is_locked(tmp_path, monkeypatch):
+    exe = tmp_path / "TruckDash.exe"
+    exe.write_bytes(b"old exe")
+    staged = tmp_path / "TruckDash.new.exe"
+    staged.write_bytes(b"new exe")
+    monkeypatch.setattr(win_integration, "exe_path", lambda: str(staged))
+    monkeypatch.setattr(win_integration, "wait_for_process", lambda pid, timeout=0: True)
+    monkeypatch.setattr(win_integration, "UPDATE_COPY_WAIT", 0)
+    monkeypatch.setattr(win_integration.subprocess, "Popen", lambda args, **kw: None)
+
+    real_copy = win_integration.shutil.copy2
+    intentos = []
+
+    def flaky(src, dst):
+        intentos.append(1)
+        if len(intentos) < 3:
+            raise PermissionError("el antivirus lo tiene tomado")
+        return real_copy(src, dst)
+
+    monkeypatch.setattr(win_integration.shutil, "copy2", flaky)
+    assert win_integration.finish_update(str(exe), None) == 0
+    assert len(intentos) == 3
+    assert exe.read_bytes() == b"new exe"
+
+
+def test_finish_update_gives_up_instead_of_hanging(tmp_path, monkeypatch):
+    exe = tmp_path / "TruckDash.exe"
+    exe.write_bytes(b"old exe")
+    staged = tmp_path / "TruckDash.new.exe"
+    staged.write_bytes(b"new exe")
+    monkeypatch.setattr(win_integration, "exe_path", lambda: str(staged))
+    monkeypatch.setattr(win_integration, "wait_for_process", lambda pid, timeout=0: True)
+    monkeypatch.setattr(win_integration, "UPDATE_COPY_WAIT", 0)
+    monkeypatch.setattr(win_integration, "UPDATE_COPY_TRIES", 3)
+    launched = []
+    monkeypatch.setattr(win_integration.subprocess, "Popen", lambda args, **kw: launched.append(args))
+
+    def always_locked(src, dst):
+        raise PermissionError("nunca se suelta")
+
+    monkeypatch.setattr(win_integration.shutil, "copy2", always_locked)
+    # Devuelve error en vez de quedarse esperando, y no arranca nada roto.
+    assert win_integration.finish_update(str(exe), None) == 1
+    assert exe.read_bytes() == b"old exe"
+    assert launched == []
+
+
+def test_cleanup_removes_both_leftovers(tmp_path, monkeypatch):
+    exe = tmp_path / "TruckDash.exe"
+    exe.write_bytes(b"exe")
+    monkeypatch.setattr(win_integration, "exe_path", lambda: str(exe))
+    (tmp_path / "TruckDash.exe.old").write_bytes(b"viejo")
+    (tmp_path / "TruckDash.new.exe").write_bytes(b"ayudante")
 
     win_integration.cleanup_old_exe()
     assert not (tmp_path / "TruckDash.exe.old").exists()
+    assert not (tmp_path / "TruckDash.new.exe").exists()
+    assert exe.exists()
 
 
 def test_child_environment_drops_pyinstaller_internals(monkeypatch):
