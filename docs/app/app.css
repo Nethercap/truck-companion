@@ -353,6 +353,8 @@
     background: #23262c; color: var(--text); cursor: pointer; font-size: 0.85rem;
   }
   .settingsLinkBtn:hover { border-color: #555; }
+  /* El link al roadmap es un <a> con la misma pinta que los botones. */
+  .settingsLinkA { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }
   .waypointModalButtons { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem; }
   .waypointModalButtons button {
     padding: 0.55rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem;

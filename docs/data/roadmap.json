@@ -1,0 +1,138 @@
+{
+  "updated": "2026-09-22",
+  "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped.",
+  "items": [
+    {
+      "id": "base-map",
+      "status": "planned",
+      "en": {
+        "title": "Real base map",
+        "body": "Water, terrain and land cover under the roads, taken from the game's own map data, with a toggle so low-end devices can keep the light version."
+      },
+      "es": {
+        "title": "Mapa base real",
+        "body": "Agua, relieve y terreno debajo de las rutas, sacados de los datos del propio juego, con un interruptor para que los equipos modestos sigan con la versión liviana."
+      }
+    },
+    {
+      "id": "obs-overlay",
+      "status": "planned",
+      "en": {
+        "title": "OBS overlay for streamers",
+        "body": "A browser-source URL with speed, speed limit, next turn and route, on a transparent background, ready to drop into a scene."
+      },
+      "es": {
+        "title": "Overlay para streamers (OBS)",
+        "body": "Una URL de browser-source con velocidad, límite, próximo giro y ruta, con fondo transparente, lista para poner en una escena."
+      }
+    },
+    {
+      "id": "discord-presence",
+      "status": "planned",
+      "en": {
+        "title": "Discord status",
+        "body": "Your Discord profile shows the current run while you drive: origin, destination and distance left. Off by default."
+      },
+      "es": {
+        "title": "Estado de Discord",
+        "body": "Tu perfil de Discord muestra el viaje en curso mientras manejás: origen, destino y lo que falta. Apagado por defecto."
+      }
+    },
+    {
+      "id": "linux",
+      "status": "planned",
+      "en": {
+        "title": "Linux support",
+        "body": "A native client for the Linux builds of both games, and for Proton. Same dashboard, no Windows needed."
+      },
+      "es": {
+        "title": "Soporte para Linux",
+        "body": "Un cliente nativo para las versiones Linux de los dos juegos, y para Proton. El mismo tablero, sin necesidad de Windows."
+      }
+    },
+    {
+      "id": "accounts",
+      "status": "exploring",
+      "en": {
+        "title": "Optional account",
+        "body": "Sign in with Discord, Steam or Google only if you want your trip history and totals on every device. Truck Dash keeps working without an account, as it does today."
+      },
+      "es": {
+        "title": "Cuenta opcional",
+        "body": "Entrar con Discord, Steam o Google solo si querés tu historial y tus totales en todos los dispositivos. Truck Dash va a seguir funcionando sin cuenta, como hoy."
+      }
+    },
+    {
+      "id": "vtc",
+      "status": "exploring",
+      "en": {
+        "title": "VTC mode",
+        "body": "Persistent groups with a dispatcher view of everyone on the road and a delivery feed for the company's Discord. Built on top of optional accounts."
+      },
+      "es": {
+        "title": "Modo VTC",
+        "body": "Grupos permanentes con una vista de despachante para ver a todos en la ruta y un feed de entregas para el Discord de la empresa. Va arriba de las cuentas opcionales."
+      }
+    },
+    {
+      "id": "lane-routing",
+      "status": "exploring",
+      "en": {
+        "title": "Lane-level junctions",
+        "body": "Routing through the real lane curves inside junctions and interchanges, instead of the straight approximation used today. Better geometry and no impossible turns."
+      },
+      "es": {
+        "title": "Cruces carril por carril",
+        "body": "Rutear por las curvas reales de cada carril dentro de cruces y enlaces, en vez de la aproximación recta de hoy. Mejor geometría y sin giros imposibles."
+      }
+    },
+    {
+      "id": "truckersmp-nearby",
+      "status": "blocked",
+      "en": {
+        "title": "TruckersMP trucks near you",
+        "body": "Seeing other TruckersMP players around you on the map. TruckersMP has no public API for positions, so this needs their go-ahead first: we are not going to scrape it."
+      },
+      "es": {
+        "title": "Camiones de TruckersMP cerca tuyo",
+        "body": "Ver en el mapa a otros jugadores de TruckersMP alrededor. TruckersMP no tiene una API pública de posiciones, así que primero hace falta su permiso: no lo vamos a scrapear."
+      }
+    },
+    {
+      "id": "shipped-live-map",
+      "status": "shipped",
+      "en": {
+        "title": "Public live map",
+        "body": "Everyone sharing their position, on one map per map variant, no account needed."
+      },
+      "es": {
+        "title": "Mapa en vivo público",
+        "body": "Todos los que comparten su posición, en un mapa por variante, sin cuenta."
+      }
+    },
+    {
+      "id": "shipped-convoy",
+      "status": "shipped",
+      "en": {
+        "title": "Convoy (beta)",
+        "body": "A six-letter code to share a run with friends: everyone on the same map, quick messages and follow the leader."
+      },
+      "es": {
+        "title": "Convoy (beta)",
+        "body": "Un código de seis letras para compartir el viaje: todos en el mismo mapa, mensajes rápidos y seguir al líder."
+      }
+    },
+    {
+      "id": "shipped-mods",
+      "status": "shipped",
+      "en": {
+        "title": "13 map variants",
+        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia and TruckersMP, detected automatically."
+      },
+      "es": {
+        "title": "13 variantes de mapa",
+        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia y TruckersMP, detectadas solas."
+      }
+    }
+  ]
+}

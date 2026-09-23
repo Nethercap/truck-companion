@@ -209,6 +209,7 @@ const TRANSLATIONS = {
     emptyWaitingTruckBody: 'Get in the truck (leave the menus) and the dashboard will start.',
     emptyReconnectTitle: 'Reconnecting…',
     emptyReconnectBody: 'Lost the connection to the server. Retrying automatically.',
+    roadmapLink: "What's next (roadmap)",
     panelEmptyTitle: 'Waiting for the game',
     panelEmptyBody: 'Trip, truck and session data show up here as soon as the game starts sending telemetry.',
     gameClock: 'Game time',
@@ -531,6 +532,7 @@ const TRANSLATIONS = {
     emptyWaitingTruckBody: 'Subite al camión (salí de los menús) y el tablero arranca.',
     emptyReconnectTitle: 'Reconectando…',
     emptyReconnectBody: 'Se perdió la conexión con el servidor. Reintentando solo.',
+    roadmapLink: 'Qué viene (roadmap)',
     panelEmptyTitle: 'Esperando al juego',
     panelEmptyBody: 'Los datos del viaje, el camión y la sesión aparecen acá apenas el juego empiece a mandar telemetría.',
     gameClock: 'Hora del juego',
@@ -680,6 +682,9 @@ function applyTranslations() {
   });
   if (!ws) statusEl.textContent = t('notConnected');
   markLongCmdLabels();
+  // La landing tiene su propia pagina en espanol; el resto va a la inglesa.
+  const roadmapLink = document.getElementById('roadmapLink');
+  if (roadmapLink) roadmapLink.href = `https://trucksim-dash.com/${currentLang === 'es' ? 'es/' : ''}#roadmap`;
 }
 
 // Etiquetas de la botonera que no entran en el ancho del boton ("Infotainment",
