@@ -18,7 +18,6 @@ const TRANSLATIONS = {
     settingsFadeButtons: 'Fade them out while driving and bring them back on touch',
     settingsMoveButtons: 'Move the buttons',
     layoutGrid: 'Grid',
-    layoutFlip: 'Move this bar to the other side',
     layoutHint: 'Drag whatever you want to move; the handle moves a whole button group',
     layoutExtras: 'Extra info',
     layoutReset: 'Reset',
@@ -355,7 +354,6 @@ const TRANSLATIONS = {
     settingsFadeButtons: 'Que se desvanezcan mientras manejás y vuelvan al tocar',
     settingsMoveButtons: 'Mover los botones',
     layoutGrid: 'Grilla',
-    layoutFlip: 'Pasar esta barra al otro lado',
     layoutHint: 'Arrastrá lo que quieras mover; el asa mueve todo un grupo de botones',
     layoutExtras: 'Datos extra',
     layoutReset: 'Restablecer',
@@ -1175,11 +1173,6 @@ document.getElementById('setMoveButtonsBtn').addEventListener('click', () => {
   setLayoutEdit(true);
 });
 document.getElementById('layoutDoneBtn').addEventListener('click', () => setLayoutEdit(false));
-// La barra tapa lo que este en ese borde: en vertical el mini-HUD queda
-// justo abajo y no se lo podia agarrar sin girar el telefono.
-document.getElementById('layoutFlipBtn').addEventListener('click', () => {
-  document.body.classList.toggle('layoutBarTop');
-});
 document.getElementById('layoutGridChk').addEventListener('change', (e) => {
   layoutGrid = e.target.checked;
   saveSettings();

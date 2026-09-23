@@ -299,32 +299,29 @@
   body.editLayout .movable:empty::after { content: attr(data-placeholder); opacity: 0.75; }
   /* En el telefono, con la ayuda y los dos botones en una sola fila, el texto
      caia en una columna de seis renglones: la ayuda va en su propio renglon. */
+  /* Pegada arriba y fuera del mapa: dentro del mapa siempre terminaba
+     tapando el boton o el panel que se queria agarrar. */
   .layoutBar {
-    position: absolute; left: 50%; transform: translateX(-50%); bottom: 1rem; z-index: 2000;
-    max-width: calc(100% - 1rem); flex-wrap: wrap; justify-content: center;
+    position: sticky; top: 0; z-index: 2000;
+    flex-wrap: wrap; justify-content: center;
     display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;
     background: rgba(23, 26, 31, 0.95); color: #fff; padding: 0.5rem 0.8rem;
-    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    border-radius: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    border-bottom: 1px solid var(--accent);
   }
-  .layoutBar > span { flex: 1 1 100%; text-align: center; }
+  /* Con lugar, todo en un renglon; en pantalla angosta la ayuda se va sola
+     al de arriba. */
+  .layoutBar > span { flex: 1 1 auto; text-align: center; min-width: 14rem; }
   .layoutBar .layoutBarGrid { display: flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
   /* settingsLinkBtn es width:100% porque vive en una columna: aca los tres
      tienen que compartir un renglon o la barra ocupa media pantalla. */
   .layoutBar .settingsLinkBtn { width: auto; flex: 0 1 auto; padding: 0.4rem 0.8rem; }
-  #layoutFlipBtn { font-size: 1rem; line-height: 1; padding: 0.3rem 0.6rem; }
-  body.layoutBarTop .layoutBar { bottom: auto; top: calc(0.6rem + env(safe-area-inset-top, 0px)); }
   /* Grilla de alineacion, solo mientras se acomoda. Va encima del mapa pero
      debajo de los botones (z-index 1000), y no recibe clicks. */
   body.editLayout.layoutGridOn #mapPanel::before {
     content: ''; position: absolute; inset: 0; z-index: 900; pointer-events: none;
     background-image: repeating-linear-gradient(to right, rgba(255,255,255,0.10) 0 1px, transparent 1px 16px),
                       repeating-linear-gradient(to bottom, rgba(255,255,255,0.10) 0 1px, transparent 1px 16px);
-  }
-  /* Absoluta y centrada con transform, la barra se encoge al ancho del
-     contenido y la ayuda vuelve a caer en columna: en pantalla angosta se
-     clava a los dos bordes y ahi si ocupa el ancho. */
-  @media (max-width: 600px) {
-    .layoutBar { left: 0.5rem; right: 0.5rem; transform: none; max-width: none; }
   }
 
   /* Panel de indicaciones del modo navegacion - giro/distancia genericos
