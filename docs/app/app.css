@@ -307,6 +307,19 @@
     border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
   }
   .layoutBar > span { flex: 1 1 100%; text-align: center; }
+  .layoutBar .layoutBarGrid { display: flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  /* settingsLinkBtn es width:100% porque vive en una columna: aca los tres
+     tienen que compartir un renglon o la barra ocupa media pantalla. */
+  .layoutBar .settingsLinkBtn { width: auto; flex: 0 1 auto; padding: 0.4rem 0.8rem; }
+  #layoutFlipBtn { font-size: 1rem; line-height: 1; padding: 0.3rem 0.6rem; }
+  body.layoutBarTop .layoutBar { bottom: auto; top: calc(0.6rem + env(safe-area-inset-top, 0px)); }
+  /* Grilla de alineacion, solo mientras se acomoda. Va encima del mapa pero
+     debajo de los botones (z-index 1000), y no recibe clicks. */
+  body.editLayout.layoutGridOn #mapPanel::before {
+    content: ''; position: absolute; inset: 0; z-index: 900; pointer-events: none;
+    background-image: repeating-linear-gradient(to right, rgba(255,255,255,0.10) 0 1px, transparent 1px 16px),
+                      repeating-linear-gradient(to bottom, rgba(255,255,255,0.10) 0 1px, transparent 1px 16px);
+  }
   /* Absoluta y centrada con transform, la barra se encoge al ancho del
      contenido y la ayuda vuelve a caer en columna: en pantalla angosta se
      clava a los dos bordes y ahi si ocupa el ancho. */

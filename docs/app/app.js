@@ -17,6 +17,8 @@ const TRANSLATIONS = {
     settingsDarkButtons: 'Dark buttons, to match the dark map',
     settingsFadeButtons: 'Fade them out while driving and bring them back on touch',
     settingsMoveButtons: 'Move the buttons',
+    layoutGrid: 'Grid',
+    layoutFlip: 'Move this bar to the other side',
     layoutHint: 'Drag whatever you want to move; the handle moves a whole button group',
     layoutExtras: 'Extra info',
     layoutReset: 'Reset',
@@ -352,6 +354,8 @@ const TRANSLATIONS = {
     settingsDarkButtons: 'Botones oscuros, para que peguen con el mapa oscuro',
     settingsFadeButtons: 'Que se desvanezcan mientras manejás y vuelvan al tocar',
     settingsMoveButtons: 'Mover los botones',
+    layoutGrid: 'Grilla',
+    layoutFlip: 'Pasar esta barra al otro lado',
     layoutHint: 'Arrastrá lo que quieras mover; el asa mueve todo un grupo de botones',
     layoutExtras: 'Datos extra',
     layoutReset: 'Restablecer',
@@ -770,7 +774,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -790,6 +794,7 @@ let fadeButtons = _savedSettings.fadeButtons === undefined ? true : !!_savedSett
 // del mapa. La primera version guardaba solo los grupos, en el primer nivel:
 // si aparece asi, se migra en vez de tirarlo.
 let btnLayout = normalizeBtnLayout(_savedSettings.btnLayout);
+let layoutGrid = _savedSettings.layoutGrid !== false;
 function normalizeBtnLayout(raw) {
   const empty = { groups: {}, buttons: {}, panels: {} };
   if (!raw || typeof raw !== 'object') return empty;
@@ -1170,6 +1175,16 @@ document.getElementById('setMoveButtonsBtn').addEventListener('click', () => {
   setLayoutEdit(true);
 });
 document.getElementById('layoutDoneBtn').addEventListener('click', () => setLayoutEdit(false));
+// La barra tapa lo que este en ese borde: en vertical el mini-HUD queda
+// justo abajo y no se lo podia agarrar sin girar el telefono.
+document.getElementById('layoutFlipBtn').addEventListener('click', () => {
+  document.body.classList.toggle('layoutBarTop');
+});
+document.getElementById('layoutGridChk').addEventListener('change', (e) => {
+  layoutGrid = e.target.checked;
+  saveSettings();
+  applyLayoutGrid();
+});
 document.getElementById('layoutResetBtn').addEventListener('click', resetBtnLayout);
 document.getElementById('setDarkButtons').addEventListener('change', (e) => {
   darkButtons = e.target.checked;
@@ -1570,6 +1585,14 @@ applyButtonPrefs();
 // del mapa como absoluto; la posicion se guarda en % para que aguante rotar
 // la pantalla o cambiar de tamano la ventana.
 const BTN_GROUP_IDS = ['mapLeftControls', 'topRightBtns'];
+// Cuanto hay que mover el dedo para que cuente como arrastre y no como toque.
+const LAYOUT_DRAG_SLOP_PX = 5;
+// Grilla de alineacion: pega las posiciones a multiplos de esto, asi dos
+// botones puestos a ojo quedan en linea y con la misma separacion. Con 12 el
+// margen para acertar la misma fila era de 6 px y dos botones dejados casi
+// igual caian en celdas distintas; 16 da 8 px de margen y va mejor con
+// botones de 44. Tiene que coincidir con el paso del degradado de app.css.
+const LAYOUT_GRID_PX = 16;
 // Los paneles del mapa se mueven igual que los botones. Se los agarra
 // directamente (no tienen asa): son uno solo cada uno.
 const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel'];
@@ -1655,25 +1678,50 @@ function startLayoutDrag(ev) {
   const grabX = ev.clientX - box.left;
   const grabY = ev.clientY - box.top;
   const target = ev.currentTarget;
-  if (el.parentNode !== panel) panel.appendChild(el);
-  el.classList.add('moved');
+  const from = { x: ev.clientX, y: ev.clientY };
+  // Nada se saca de su lugar hasta que el dedo se mueve de verdad: al
+  // hacerlo en el pointerdown, un simple toque dejaba al boton absoluto sin
+  // left/top, que es la esquina de abajo a la izquierda del mapa, y encima
+  // guardaba NaN.
+  let dragging = false;
   target.setPointerCapture(ev.pointerId);
 
-  const move = (e) => {
+  const place = (e) => {
+    const maxX = Math.max(0, area.width - box.width);
+    const maxY = Math.max(0, area.height - box.height);
+    let x = e.clientX - area.left - grabX;
+    let y = e.clientY - area.top - grabY;
+    if (layoutGrid) {
+      x = Math.round(x / LAYOUT_GRID_PX) * LAYOUT_GRID_PX;
+      y = Math.round(y / LAYOUT_GRID_PX) * LAYOUT_GRID_PX;
+    }
     // Clavado adentro del mapa: si se pudiera soltar afuera, quedaria
     // inalcanzable y solo se recuperaria con Restablecer.
-    const x = Math.min(Math.max(e.clientX - area.left - grabX, 0), Math.max(0, area.width - box.width));
-    const y = Math.min(Math.max(e.clientY - area.top - grabY, 0), Math.max(0, area.height - box.height));
+    x = Math.min(Math.max(x, 0), maxX);
+    y = Math.min(Math.max(y, 0), maxY);
     el.style.left = `${(x / area.width) * 100}%`;
     el.style.top = `${(y / area.height) * 100}%`;
     el.style.right = 'auto';
     el.style.bottom = 'auto';
   };
+
+  const move = (e) => {
+    if (!dragging) {
+      if (Math.hypot(e.clientX - from.x, e.clientY - from.y) < LAYOUT_DRAG_SLOP_PX) return;
+      dragging = true;
+      if (el.parentNode !== panel) panel.appendChild(el);
+      el.classList.add('moved');
+    }
+    place(e);
+  };
   const up = () => {
     target.removeEventListener('pointermove', move);
     target.removeEventListener('pointerup', up);
     target.removeEventListener('pointercancel', up);
-    layoutBucket(el.id)[el.id] = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
+    if (!dragging) return; // fue un toque, no se movio nada
+    const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+    if (!isFinite(x) || !isFinite(y)) return;
+    layoutBucket(el.id)[el.id] = { x, y };
     saveSettings();
   };
   target.addEventListener('pointermove', move);
@@ -1690,8 +1738,15 @@ function swallowClick(e) {
   }
 }
 
+function applyLayoutGrid() {
+  document.body.classList.toggle('layoutGridOn', layoutGrid);
+  const chk = document.getElementById('layoutGridChk');
+  if (chk) chk.checked = layoutGrid;
+}
+
 function setLayoutEdit(on) {
   document.body.classList.toggle('editLayout', on);
+  if (on) applyLayoutGrid();
   document.getElementById('layoutBar').style.display = on ? 'flex' : 'none';
   document.removeEventListener('click', swallowClick, true);
   if (on) document.addEventListener('click', swallowClick, true);

@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<link rel="stylesheet" href="app.css?v=20260923f" />
+<link rel="stylesheet" href="app.css?v=20260923g" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -271,7 +271,9 @@
       <div id="navPanel" class="navPanel" style="display:none;"></div>
 
       <div id="layoutBar" class="layoutBar" style="display:none">
-        <span data-i18n="layoutHint">Drag the buttons where you want them</span>
+        <span data-i18n="layoutHint">Drag whatever you want to move; the handle moves a whole button group</span>
+        <label class="layoutBarGrid"><input type="checkbox" id="layoutGridChk" checked /> <span data-i18n="layoutGrid">Grid</span></label>
+        <button id="layoutFlipBtn" class="settingsLinkBtn" data-i18n-title="layoutFlip" title="Move this bar to the other side">⇅</button>
         <button id="layoutResetBtn" class="settingsLinkBtn" data-i18n="layoutReset">Reset</button>
         <button id="layoutDoneBtn" class="settingsLinkBtn" data-i18n="layoutDone">Done</button>
       </div>
@@ -539,11 +541,11 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/proj4@2.15.0/dist/proj4.js"></script>
-<script src="variants.js?v=20260923f"></script>
-<script src="pure.js?v=20260923f"></script>
-<script src="i18n.js?v=20260923f"></script>
-<script src="app.js?v=20260923f"></script>
-<script src="convoy.js?v=20260923f"></script>
-<script src="livemap.js?v=20260923f"></script>
+<script src="variants.js?v=20260923g"></script>
+<script src="pure.js?v=20260923g"></script>
+<script src="i18n.js?v=20260923g"></script>
+<script src="app.js?v=20260923g"></script>
+<script src="convoy.js?v=20260923g"></script>
+<script src="livemap.js?v=20260923g"></script>
 </body>
 </html>
