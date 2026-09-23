@@ -7,8 +7,8 @@
       "label": "American Truck Simulator",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [],
       "files": [
         "vector/ats.pmtiles",
@@ -27,8 +27,8 @@
       "label": "ATS + Coast to Coast",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "c2c"
       ],
@@ -49,8 +49,8 @@
       "label": "ATS + ProMods Canada",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "promods_canada"
       ],
@@ -71,8 +71,8 @@
       "label": "ATS + Coast to Coast + ProMods Canada",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "c2c",
         "promods_canada"
@@ -94,8 +94,8 @@
       "label": "ATS + Reforma (+ Mega Resources + Sierra Nevada)",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "reforma",
         "reforma_mega_resources",
@@ -118,8 +118,8 @@
       "label": "ATS + Coast to Coast + ProMods Canada + Reforma",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "c2c",
         "promods_canada",
@@ -145,8 +145,8 @@
       "label": "Euro Truck Simulator 2",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [],
       "files": [
         "vector/ets2.pmtiles",
@@ -165,8 +165,8 @@
       "label": "ETS2 + ProMods Europe (+ Middle East, The Maghreb, The Great Steppe)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "promods",
         "promods_me",
@@ -190,8 +190,8 @@
       "label": "ETS2 + ProMods + RusMap (connector 2.84/2.61)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "promods",
         "promods_me",
@@ -217,8 +217,8 @@
       "label": "ETS2 + ProMods + Roextended (Hybrid)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "promods",
         "promods_me",
@@ -243,8 +243,8 @@
       "label": "ETS2 + ProMods + RusMap + Roextended (Hybrid)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "promods",
         "promods_me",
@@ -272,8 +272,8 @@
       "label": "ETS2 + Grand Utopia (standalone)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "grand_utopia"
       ],
@@ -294,8 +294,8 @@
       "label": "ETS2 + TruckersMP (HQ + CD road)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-22",
-      "mapDataVersion": "20260922c",
+      "built": "2026-09-23",
+      "mapDataVersion": "20260923",
       "mods": [
         "truckersmp"
       ],

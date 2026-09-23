@@ -2,19 +2,19 @@
 // No editar a mano: se regenera al publicar o actualizar una variante.
 // Fuente: manifest del 2026-09-23.
 const MAP_DATA_VERSION = {
-  "ats": "20260922c",
-  "ats_c2c": "20260922c",
-  "ats_promods": "20260922c",
-  "ats_c2c_promods": "20260922c",
-  "ats_reforma": "20260922c",
-  "ats_reforma_c2c_promods": "20260922c",
-  "ets2": "20260922c",
-  "ets2_promods": "20260922c",
-  "ets2_promods_rusmap": "20260922c",
-  "ets2_promods_roex": "20260922c",
-  "ets2_promods_rusmap_roex": "20260922c",
-  "ets2_gu": "20260922c",
-  "ets2_tmp": "20260922c"
+  "ats": "20260923",
+  "ats_c2c": "20260923",
+  "ats_promods": "20260923",
+  "ats_c2c_promods": "20260923",
+  "ats_reforma": "20260923",
+  "ats_reforma_c2c_promods": "20260923",
+  "ets2": "20260923",
+  "ets2_promods": "20260923",
+  "ets2_promods_rusmap": "20260923",
+  "ets2_promods_roex": "20260923",
+  "ets2_promods_rusmap_roex": "20260923",
+  "ets2_gu": "20260923",
+  "ets2_tmp": "20260923"
 };
 
 // Metadatos por variante: etiqueta, juego, que proyeccion usa, que valor
