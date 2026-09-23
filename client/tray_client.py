@@ -30,6 +30,7 @@ import pystray
 from PIL import Image, ImageDraw
 
 import client as client_lib
+import discord_presence
 import local_server
 import plugin_installer
 import win_integration
@@ -74,6 +75,8 @@ class AppState:
         self.update_available = None  # (version, download_url, sha256) o None
         self.installs = []  # ver plugin_installer.find_game_installs()
         self.local: local_server.LocalServer | None = None  # modo LAN (ver local_server.py)
+        # Rich Presence de Discord: se prende desde Ajustes, apagado por defecto.
+        self.discord = discord_presence.DiscordPresence()
 
     def status_text(self) -> str:
         text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
@@ -286,6 +289,16 @@ class SetupWindow:
             chk.configure(state="disabled")
             self.label(options, T("autostart_packaged_only"), fg=MUTED).pack(anchor="w")
 
+        # Rich Presence: apagado por defecto, lo que se publica lo ve cualquiera
+        # que mire el perfil (ver discord_presence.py).
+        self.discord_var = tk.BooleanVar(value=bool(win_integration.load_settings().get("discord_presence")))
+        dchk = tk.Checkbutton(options, text=T("discord_presence"), variable=self.discord_var,
+                              command=self.toggle_discord, bg=BG, fg=FG, selectcolor="#262b33",
+                              activebackground=BG, activeforeground=FG, wraplength=520, justify="left")
+        dchk.pack(anchor="w", pady=(2, 0))
+        if not discord_presence.APPLICATION_ID:
+            dchk.configure(state="disabled")
+
         # --- Update ---
         self.update_frame = tk.Frame(self.root, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
@@ -357,6 +370,13 @@ class SetupWindow:
             self.flash_label = self.label(self.games_frame, "", wraplength=520)
             self.flash_label.pack(anchor="w", pady=(4, 0))
         self.flash_label.configure(text=text, fg=color)
+
+    def toggle_discord(self):
+        enabled = bool(self.discord_var.get())
+        settings = win_integration.load_settings()
+        settings["discord_presence"] = enabled
+        win_integration.save_settings(settings)
+        state.discord.set_enabled(enabled)
 
     def toggle_autostart(self):
         if self.autostart_var.get() and win_integration.in_temp_location():
@@ -494,6 +514,9 @@ def show_log_location(icon, item):
 
 
 def quit_app(icon, item):
+    # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
+    # que el proceso murio.
+    state.discord.close()
     icon.stop()
 
 
@@ -787,6 +810,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             game = payload.get("game")
             if state.set_status("live", game):
                 open_web_ui()  # en modo autostart, recien aca (juego detectado) se abre el navegador
+            state.discord.update(payload)
             text = json.dumps(payload)
             now_send = time.time()
             if now_send - last_cloud_send >= client_lib.CLOUD_SEND_INTERVAL_SECONDS or client_lib.payload_has_event(payload):
@@ -805,6 +829,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 telemetry_ready = False
                 inactive_since = None
                 state.set_status("waiting_game")
+                state.discord.update(None)
             else:
                 state.set_status("waiting_truck")
         await publish_status()
@@ -949,6 +974,7 @@ def main():
         return
 
     local_server.on_show_setup = open_setup_window
+    state.discord.set_enabled(bool(win_integration.load_settings().get("discord_presence")))
     win_integration.cleanup_old_exe()
     state.web_url = args.web_url
     state.backend_url = args.backend

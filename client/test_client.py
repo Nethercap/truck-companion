@@ -410,3 +410,42 @@ def test_relaunch_passes_the_wait_flag(monkeypatch):
     monkeypatch.setattr(win_integration.os, "_exit", lambda code: None)
     win_integration.relaunch_and_exit(r"C:\TruckDash\TruckDash.exe", ["--autostart"])
     assert launched["cmd"][1:] == ["--autostart", win_integration.RELAUNCH_FLAG]
+
+
+def test_discord_activity_from_telemetry():
+    """Rich Presence: lo que ve la gente en el perfil. Sin juego no se publica
+    nada, y en pausa no se muestra el viaje como si siguiera andando."""
+    import discord_presence as dp
+
+    act = dp.activity_from_telemetry(
+        {"game": "ats", "citySrc": "Salt Lake City", "cityDst": "Las Vegas",
+         "cargo": "Bulldozer", "routeDistanceKm": 712.4}, started_at=1000)
+    assert act["details"] == "Salt Lake City \u2192 Las Vegas"
+    assert "712" in act["state"] and "Bulldozer" in act["state"]
+    assert act["assets"]["small_image"] == "ats"
+    assert act["timestamps"] == {"start": 1000}
+
+    assert dp.activity_from_telemetry({"game": None}) is None
+    assert dp.activity_from_telemetry(None) is None
+    pausada = dp.activity_from_telemetry({"game": "ets2", "cityDst": "Praha", "paused": True})
+    assert "Praha" in pausada["details"] and "km" not in pausada["state"]
+
+
+def test_discord_frame_encoding():
+    import struct
+    import discord_presence as dp
+
+    frame = dp.encode_frame(dp.OP_HANDSHAKE, {"v": 1, "client_id": "123"})
+    op, length = struct.unpack("<II", frame[:8])
+    assert op == dp.OP_HANDSHAKE and length == len(frame) - 8
+    assert b'"client_id": "123"' in frame
+
+
+def test_discord_stays_quiet_without_application_id():
+    """Sin ID configurado no se abre ningun hilo ni se toca el pipe."""
+    import discord_presence as dp
+
+    presence = dp.DiscordPresence(application_id="")
+    presence.set_enabled(True)
+    assert presence._thread is None
+    presence.close()

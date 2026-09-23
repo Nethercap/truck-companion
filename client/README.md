@@ -75,6 +75,15 @@ just says "client not connected" and keeps waiting.
 If the code leaks (a stream, a screenshot), use **New code** in the Setup
 window: Truck Dash restarts with a fresh code and the old links stop working.
 
+### Show your trip on Discord
+
+Optional, off by default: Settings in the Setup window has a checkbox that
+publishes the current run to your Discord profile through Rich Presence
+(origin, destination, cargo and distance left, plus how long you have been
+driving). It talks to the Discord app running on the same PC over its local
+pipe: no account, no login, nothing leaves your machine other than what your
+Discord friends see on your profile. Turn it off and it stops immediately.
+
 ### Same Wi-Fi? LAN mode
 
 If your phone or tablet is on the same Wi-Fi as the PC, the Setup window
