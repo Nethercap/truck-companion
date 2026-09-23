@@ -678,7 +678,7 @@
   .waypointKind { color: var(--muted); font-size: 0.68rem; }
   /* Sin position:relative: pisaria el position:absolute que MapLibre le pone
      al marcador y el div pasaria a ocupar todo el ancho del mapa. */
-  .waypointMarkerWrap { width: 24px; height: 24px; }
+  .waypointMarkerWrap { cursor: pointer; width: 24px; height: 24px; }
   .waypointBadge { position: absolute; top: -4px; right: -8px; width: 15px; height: 15px; border-radius: 50%; background: #1a1002; color: #ffb020; font-size: 0.62rem; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 1px solid #ffb020; }
   .mapBtnBadge { position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; border-radius: 9px; background: #ffb020; color: #1a1002; font-size: 0.66rem; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
   .poiPanel { width: min(420px, 94vw); }

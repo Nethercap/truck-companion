@@ -299,6 +299,7 @@ const TRANSLATIONS = {
     tourDownload: 'No client yet? Download it from trucksim-dash.com, run it, and it will show you a pairing code.',
     waypointInGameShort: '(also in-game)',
     waypointAppOnlyShort: '(app only)',
+    waypointTapToRemove: 'Tap to remove this waypoint',
     waypointClearAll: 'Clear all',
     waypointsLabel: 'Waypoints',
     waypointReachedToast: '📍 Reached: {name}',
@@ -633,6 +634,7 @@ const TRANSLATIONS = {
     tourDownload: '¿Todavía no tenés el cliente? Bajalo de trucksim-dash.com, abrilo, y te muestra un código de pairing.',
     waypointInGameShort: '(también en el juego)',
     waypointAppOnlyShort: '(solo app)',
+    waypointTapToRemove: 'Tocá para quitar este waypoint',
     waypointClearAll: 'Quitar todos',
     waypointsLabel: 'Waypoints',
     waypointReachedToast: '📍 Llegaste: {name}',
@@ -1991,6 +1993,15 @@ function makeWaypointMarker(lngLat, index) {
   const el = document.createElement('div');
   el.innerHTML = MARKER_SVG.waypoint + `<span class="waypointBadge">${index + 1}</span>`;
   el.className = 'waypointMarkerWrap';
+  el.title = t('waypointTapToRemove');
+  // Tocarlo lo quita, como en el mapa del juego. El indice se busca al
+  // momento del click: si se borro otro antes, el que tenia al crearse ya no
+  // sirve.
+  el.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const i = waypoints.findIndex(w => w.marker && w.marker.getElement() === el);
+    if (i >= 0) removeWaypoint(i);
+  });
   return new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(lngLat).addTo(map);
 }
 
