@@ -28,7 +28,7 @@
     },
     {
       "id": "discord-presence",
-      "status": "building",
+      "status": "shipped",
       "en": {
         "title": "Discord status",
         "body": "Your Discord profile shows the current run while you drive: origin, destination and distance left. Off by default."
