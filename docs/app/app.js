@@ -13,6 +13,16 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Show in mini-HUD (when info panel is hidden):',
     settingsLiveTitle: 'Other players nearby:',
     settingsLiveShare: 'Share my position: see other drivers and appear on the public live map (anonymous)',
+    settingsButtonsTitle: 'Map buttons:',
+    settingsDarkButtons: 'Dark buttons, to match the dark map',
+    settingsFadeButtons: 'Fade them out while driving and bring them back on touch',
+    settingsMoveButtons: 'Move the buttons',
+    layoutHint: 'Drag the buttons where you want them',
+    layoutReset: 'Reset',
+    layoutDone: 'Done',
+    settingsBaseTitle: 'Base map:',
+    settingsRealBase: 'Real base map: coastline, lakes, rivers and built-up areas under the roads',
+    settingsRealBaseHint: 'Map data from Natural Earth. Adds about 1 MB the first time. Grand Utopia has no real base map: it is a standalone map.',
     settingsLiteTitle: 'Lite mode (old phones / tablets):',
     settingsLiteMode: 'Lite mode: lower-resolution rendering, no animations or 3D, fewer labels, no road names in directions',
     settingsLiteNoRouting: 'Also skip routing (no route line, turn-by-turn or real ETA) — saves the most memory',
@@ -336,6 +346,16 @@ const TRANSLATIONS = {
     settingsMiniHudTitle: 'Mostrar en el mini-HUD (con el panel de info oculto):',
     settingsLiveTitle: 'Otros jugadores cerca:',
     settingsLiveShare: 'Compartir mi posición: ver a otros conductores y aparecer en el mapa en vivo público (anónimo)',
+    settingsButtonsTitle: 'Botones del mapa:',
+    settingsDarkButtons: 'Botones oscuros, para que peguen con el mapa oscuro',
+    settingsFadeButtons: 'Que se desvanezcan mientras manejás y vuelvan al tocar',
+    settingsMoveButtons: 'Mover los botones',
+    layoutHint: 'Arrastrá los botones a donde quieras',
+    layoutReset: 'Restablecer',
+    layoutDone: 'Listo',
+    settingsBaseTitle: 'Mapa base:',
+    settingsRealBase: 'Mapa base real: costa, lagos, ríos y zonas urbanas debajo de las rutas',
+    settingsRealBaseHint: 'Datos de Natural Earth. Son ~1 MB más la primera vez. Grand Utopia no tiene mapa base real: es un mapa aparte.',
     settingsLiteTitle: 'Modo liviano (celulares / tablets viejos):',
     settingsLiteMode: 'Modo liviano: render a menor resolución, sin animaciones ni 3D, menos etiquetas, sin nombres de ruta en las indicaciones',
     settingsLiteNoRouting: 'Además sin ruteo (sin línea de ruta, indicaciones ni ETA real) — es lo que más memoria ahorra',
@@ -746,7 +766,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -755,6 +775,13 @@ const _savedSettings = loadSettings();
 // ruta, sin 3D, POIs desde z9 y sin nombres de ruta. liteNoRouting ademas no
 // carga el grafo (10-27 MB de JSON = ~150 MB de objetos), que es lo que
 // tumba la pestana en tablets con poca RAM: queda posicion + HUD + botonera.
+// Mapa base real: prendido salvo en modo liviano (son ~1 MB mas de descarga
+// la primera vez y unas capas mas que dibujar).
+let realBase = _savedSettings.realBase === undefined ? !_savedSettings.liteMode : !!_savedSettings.realBase;
+let darkButtons = !!_savedSettings.darkButtons;
+let fadeButtons = !!_savedSettings.fadeButtons;
+// { mapLeftControls: {x, y}, topRightBtns: {x, y} } en % del mapa.
+let btnLayout = (_savedSettings.btnLayout && typeof _savedSettings.btnLayout === 'object') ? _savedSettings.btnLayout : {};
 const liteMode = !!_savedSettings.liteMode;
 const liteNoRouting = liteMode && !!_savedSettings.liteNoRouting;
 if (liteMode) document.documentElement.classList.add('lite');
@@ -1012,6 +1039,9 @@ function initSettingsUi() {
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
+  document.getElementById('setDarkButtons').checked = darkButtons;
+  document.getElementById('setFadeButtons').checked = fadeButtons;
+  document.getElementById('setRealBase').checked = realBase;
   document.getElementById('setLiteMode').checked = liteMode;
   document.getElementById('setLiteNoRouting').checked = liteNoRouting;
   document.getElementById('setLiteNoRouting').disabled = !liteMode;
@@ -1119,6 +1149,27 @@ function saveLiteAndReload(mode, noRouting) {
   showToast(t('settingsLiteReload'), 'info', 1500);
   setTimeout(() => location.reload(), 600);
 }
+document.getElementById('setMoveButtonsBtn').addEventListener('click', () => {
+  document.getElementById('settingsModal').style.display = 'none';
+  setLayoutEdit(true);
+});
+document.getElementById('layoutDoneBtn').addEventListener('click', () => setLayoutEdit(false));
+document.getElementById('layoutResetBtn').addEventListener('click', resetBtnLayout);
+document.getElementById('setDarkButtons').addEventListener('change', (e) => {
+  darkButtons = e.target.checked;
+  saveSettings();
+  applyButtonPrefs();
+});
+document.getElementById('setFadeButtons').addEventListener('change', (e) => {
+  fadeButtons = e.target.checked;
+  saveSettings();
+  applyButtonPrefs();
+});
+document.getElementById('setRealBase').addEventListener('change', (e) => {
+  realBase = e.target.checked;
+  saveSettings();
+  applyBaseMap();
+});
 document.getElementById('setLiteMode').addEventListener('change', (e) => {
   saveLiteAndReload(e.target.checked, e.target.checked && document.getElementById('setLiteNoRouting').checked);
 });
@@ -1251,6 +1302,23 @@ const PROJECTIONS = {
   gu: { toLngLat: guToLngLat, fromLngLat: guFromLngLat },
 };
 
+// Mapa base real: costa, lagos, rios y zonas urbanas debajo de las rutas.
+// El juego no trae nada de eso - sus mapArea son motas pegadas a las rutas,
+// no hay costa ni agua -, pero la proyeccion de arriba manda las coordenadas
+// del juego a lng/lat de verdad, asi que la geografia real cae justo donde
+// van las rutas. Los datos son de Natural Earth (dominio publico) y hay un
+// archivo por juego, compartido por las 13 variantes: agregar un mod de mapa
+// no obliga a regenerarlo (ver build_basemap.py). Grand Utopia queda afuera:
+// su proyeccion lo deja en medio del Atlantico, donde no hay tierra real.
+const BASEMAP_BY_PROJECTION = { ats: 'usa', ets2: 'europe', gu: null };
+const BASEMAP_VERSION = '20260923';
+const BASE_LAYER_IDS = ['base-land', 'base-urban', 'base-lake', 'base-river'];
+// Con el mapa base apagado el fondo es el gris de siempre; con el prendido el
+// fondo pasa a ser el mar y la tierra se pinta con ese mismo gris, asi lo
+// unico que cambia es que aparece el agua.
+const MAP_BG_FLAT = '#2b2f36';
+const MAP_BG_WATER = '#16283f';
+
 // El resto de cada variante (etiqueta, juego, centro del mapa, que mods trae)
 // sale de VARIANT_META, que genera tools/build_variants_js.py desde
 // docs/data/map-manifest.json: publicar una variante es tocar el manifest y
@@ -1266,6 +1334,7 @@ const GAME_MAPS = Object.fromEntries(Object.entries(VARIANT_META).map(([name, me
   toLngLat: PROJECTIONS[meta.projection].toLngLat,
   fromLngLat: PROJECTIONS[meta.projection].fromLngLat,
   origin: meta.origin,
+  basemap: BASEMAP_BY_PROJECTION[meta.projection],
 }]));
 
 // Conversion de coordenadas de juego (x,z) a lng/lat WGS84 real, con el mismo
@@ -1405,6 +1474,170 @@ function buildVecLayers(sourceLayer) {
       paint: { 'text-color': '#ffffff', 'text-halo-color': '#000', 'text-halo-width': 1.4 } },
   ];
 }
+
+// Se dibujan en este orden y todas van debajo de las capas del juego.
+function buildBaseLayers() {
+  return [
+    { id: 'base-land', type: 'fill', source: 'base', filter: ['==', ['get', 'k'], 'land'],
+      paint: { 'fill-color': MAP_BG_FLAT } },
+    { id: 'base-urban', type: 'fill', source: 'base', filter: ['==', ['get', 'k'], 'urban'],
+      paint: { 'fill-color': '#343a44' } },
+    { id: 'base-lake', type: 'fill', source: 'base', filter: ['==', ['get', 'k'], 'lake'],
+      paint: { 'fill-color': MAP_BG_WATER } },
+    { id: 'base-river', type: 'line', source: 'base', filter: ['==', ['get', 'k'], 'river'],
+      paint: { 'line-color': '#1e3350', 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 0.4, 10, 2] } },
+  ];
+}
+
+// Prende o apaga el mapa base sin recargar. Se llama al cargar un juego y
+// cada vez que se toca el interruptor de Ajustes.
+function applyBaseMap() {
+  // mapReady y no isStyleLoaded(): al cargar un juego el estilo todavia
+  // tiene tiles y sprites en vuelo, isStyleLoaded() da false y el mapa base
+  // no se agregaba nunca.
+  if (!map || !mapReady) return;
+  for (const id of BASE_LAYER_IDS) { if (map.getLayer(id)) map.removeLayer(id); }
+  if (map.getSource('base')) map.removeSource('base');
+  const name = realBase && currentGame ? GAME_MAPS[currentGame]?.basemap : null;
+  map.setPaintProperty('bg', 'background-color', name ? MAP_BG_WATER : MAP_BG_FLAT);
+  if (!name) return;
+  map.addSource('base', { type: 'geojson', data: `${REMOTE_MAP_BASE}/basemap/${name}.geojson?v=${BASEMAP_VERSION}` });
+  // Antes de 'mapArea' (la capa mas baja del juego) para que el mapa base
+  // quede debajo de todo; si las capas del juego todavia no estan, antes del
+  // trail, que es el ancla que usa el resto.
+  const before = map.getLayer('mapArea') ? 'mapArea' : 'trail-line';
+  for (const layer of buildBaseLayers()) {
+    try { map.addLayer(layer, before); } catch (err) { console.error('No se pudo agregar la capa', layer.id, err); }
+  }
+}
+
+// El cartel con el mapa/mods cargados aparece al cambiar de mapa y se apaga
+// solo: sirve para confirmar que agarro la variante correcta, no para tenerlo
+// encima del mini-HUD todo el viaje.
+const MAP_HINT_VISIBLE_MS = 12000;
+let mapHintTimer = null;
+function showMapHint(label) {
+  const el = document.getElementById('mapHint');
+  if (!el) return;
+  if (label) el.textContent = label;
+  el.classList.remove('faded');
+  clearTimeout(mapHintTimer);
+  mapHintTimer = setTimeout(() => el.classList.add('faded'), MAP_HINT_VISIBLE_MS);
+}
+
+// Botones del mapa: oscuros y/o desvanecidos mientras no se los toca. Las dos
+// cosas son opt-in (Ajustes) y no cambian nada de la logica del mapa.
+const BTN_IDLE_MS = 6000;
+let btnIdleTimer = null;
+function wakeButtons() {
+  if (!fadeButtons) return;
+  document.body.classList.remove('btnsIdle');
+  clearTimeout(btnIdleTimer);
+  btnIdleTimer = setTimeout(() => document.body.classList.add('btnsIdle'), BTN_IDLE_MS);
+}
+function applyButtonPrefs() {
+  document.body.classList.toggle('darkBtns', darkButtons);
+  document.body.classList.toggle('fadeBtns', fadeButtons);
+  clearTimeout(btnIdleTimer);
+  document.body.classList.remove('btnsIdle');
+  if (fadeButtons) wakeButtons();
+}
+for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
+  window.addEventListener(ev, wakeButtons, { passive: true });
+}
+applyButtonPrefs();
+
+// --- Botones movibles -------------------------------------------------------
+// Se mueven de a grupos (la columna de la izquierda, y el par de la derecha).
+// Al moverse salen de su lugar en el flujo y pasan a colgar del mapa como
+// absolutos; se guarda la posicion en % para que aguante rotar la pantalla.
+const BTN_GROUP_IDS = ['mapLeftControls', 'topRightBtns'];
+const btnGroupHome = new Map(); // id -> donde estaba, para el boton de reset
+
+function rememberBtnGroupHome(el) {
+  if (btnGroupHome.has(el.id)) return;
+  btnGroupHome.set(el.id, { parent: el.parentNode, next: el.nextSibling });
+}
+
+function applyBtnLayout() {
+  const panel = document.getElementById('mapPanel');
+  if (!panel) return;
+  for (const id of BTN_GROUP_IDS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    rememberBtnGroupHome(el);
+    const pos = btnLayout[id];
+    if (!pos) continue;
+    if (el.parentNode !== panel) panel.appendChild(el);
+    el.classList.add('moved');
+    el.style.left = `${pos.x}%`;
+    el.style.top = `${pos.y}%`;
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+  }
+}
+
+function resetBtnLayout() {
+  btnLayout = {};
+  saveSettings();
+  for (const id of BTN_GROUP_IDS) {
+    const el = document.getElementById(id);
+    const home = btnGroupHome.get(id);
+    if (!el || !home) continue;
+    el.classList.remove('moved');
+    el.style.left = el.style.top = el.style.right = el.style.bottom = '';
+    home.parent.insertBefore(el, home.next);
+  }
+}
+
+function startBtnGroupDrag(ev) {
+  const el = ev.currentTarget;
+  const panel = document.getElementById('mapPanel');
+  if (!panel) return;
+  ev.preventDefault();
+  const box = el.getBoundingClientRect();
+  const area = panel.getBoundingClientRect();
+  const grabX = ev.clientX - box.left;
+  const grabY = ev.clientY - box.top;
+  if (el.parentNode !== panel) panel.appendChild(el);
+  el.classList.add('moved');
+  el.setPointerCapture(ev.pointerId);
+
+  const move = (e) => {
+    // Clavado adentro del mapa: si se pudiera soltar afuera, el grupo
+    // quedaria inalcanzable y solo se recuperaria con Restablecer.
+    const x = Math.min(Math.max(e.clientX - area.left - grabX, 0), Math.max(0, area.width - box.width));
+    const y = Math.min(Math.max(e.clientY - area.top - grabY, 0), Math.max(0, area.height - box.height));
+    el.style.left = `${(x / area.width) * 100}%`;
+    el.style.top = `${(y / area.height) * 100}%`;
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+  };
+  const up = () => {
+    el.removeEventListener('pointermove', move);
+    el.removeEventListener('pointerup', up);
+    el.removeEventListener('pointercancel', up);
+    btnLayout[el.id] = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
+    saveSettings();
+  };
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+}
+
+function setLayoutEdit(on) {
+  document.body.classList.toggle('editLayout', on);
+  document.getElementById('layoutBar').style.display = on ? 'flex' : 'none';
+  for (const id of BTN_GROUP_IDS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    rememberBtnGroupHome(el);
+    if (on) el.addEventListener('pointerdown', startBtnGroupDrag);
+    else el.removeEventListener('pointerdown', startBtnGroupDrag);
+  }
+  if (on) wakeButtons();
+}
+applyBtnLayout();
 
 function ensureMapInitialized() {
   if (map) return;
@@ -2548,6 +2781,7 @@ async function loadGameMap(game) {
   for (const layer of buildVecLayers(mapInfo.sourceLayer)) {
     try { map.addLayer(layer, 'trail-line'); } catch (err) { console.error('No se pudo agregar la capa', layer.id, err); }
   }
+  applyBaseMap();
 
   map.jumpTo({ center: mapInfo.origin, zoom: 5 });
 
@@ -2566,7 +2800,7 @@ async function loadGameMap(game) {
   }
   updateTruckArrowSize();
 
-  document.getElementById('mapHint').textContent = mapInfo.label;
+  showMapHint(mapInfo.label);
   // Los tiles siguen bajando en segundo plano; la barra se va cuando la
   // primera pasada de render termina (o a los 4 s como tope, por si el
   // evento no llega).
@@ -3064,7 +3298,13 @@ function updateMap(position, game) {
   // Camara: un unico llamado por tick que combina centro+zoom+bearing segun
   // corresponda, en vez de varios llamados peleandose entre si.
   const turn = navMode ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
-  if (navMode) {
+  if (navMode && !autoFollow) {
+    // El usuario esta tocando el mapa (arrastrar, pellizcar, rotar): la
+    // camara no se toca hasta que scheduleMapFollow vuelva a engancharla.
+    // Sin esto, cada tick disparaba un easeTo que cancelaba el gesto y el
+    // pellizco para hacer zoom no llegaba a agarrar.
+    updateNavPanel(turn);
+  } else if (navMode) {
     updateNavPanel(turn);
     // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
     // seguimos actualizando centro/bearing hasta que recentre.

@@ -153,7 +153,10 @@
   }
   .mapSpinner { width: 12px; height: 12px; border: 2px solid #444; border-top-color: var(--accent); border-radius: 50%; animation: mapSpin 0.8s linear infinite; }
   @keyframes mapSpin { to { transform: rotate(360deg); } }
-  .mapHint { position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; }
+  .mapHint { position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; transition: opacity 0.6s ease; }
+  /* Que mapa/mods estan cargados se mira una vez, al arrancar: despues es un
+     cartel de mas que ademas se pisa con el mini-HUD cuando tiene la ETA. */
+  .mapHint.faded { opacity: 0; pointer-events: none; }
 
   /* Banner grande y parpadeante cuando se corta la conexion - a diferencia
      del texto chico de #status, esto se nota de un vistazo aunque estes
@@ -209,6 +212,13 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
   .mapBtn:hover { background: #eee; }
+  /* Opcionales (Ajustes): los botones blancos sobre el mapa oscuro le
+     resultaban demasiado fuertes a mas de uno, y en el telefono son muchos a
+     la vez. Con .faded siguen andando: cambia la opacidad, no el click. */
+  body.darkBtns .mapBtn { background: #1b1f27; color: #e9edf3; box-shadow: 0 1px 4px rgba(0,0,0,0.55); }
+  body.darkBtns .mapBtn:hover { background: #262c36; }
+  body.fadeBtns .mapBtn { transition: opacity 0.5s ease; }
+  body.fadeBtns.btnsIdle .mapBtn { opacity: 0.25; }
 
   /* Resumen de la ruta, abajo al centro del mapa (PR #1). */
   .routeSummary {
@@ -235,7 +245,8 @@
      dejan huecos ni se pisan. Antes cada uno tenia su top absoluto y el 3D
      colgaba al costado del de navegacion. */
   .mapLeftControls {
-    position: absolute; top: 0.6rem; left: 0.6rem; z-index: 1000;
+    position: absolute; top: calc(0.6rem + env(safe-area-inset-top, 0px));
+    left: calc(0.6rem + env(safe-area-inset-left, 0px)); z-index: 1000;
     display: flex; flex-direction: column; gap: 0.5rem;
     max-height: calc(100% - 1.2rem); pointer-events: none;
   }
@@ -252,10 +263,28 @@
      crece (mas lineas opcionales activadas en Settings) el boton se corre
      solo hacia abajo en vez de superponerse. */
   #topRightControls {
-    position: absolute; top: 0.6rem; right: 0.6rem; z-index: 1000;
+    position: absolute; top: calc(0.6rem + env(safe-area-inset-top, 0px));
+    right: calc(0.6rem + env(safe-area-inset-right, 0px)); z-index: 1000;
     display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;
   }
   #topRightControls .mapBtn { position: static; }
+  #topRightBtns { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+
+  /* Botones movibles: mientras se acomodan, el grupo entero agarra el puntero
+     (los botones no, si no se dispararia la accion al soltarlos) y se marca
+     con un contorno para que se vea que es lo que se arrastra. */
+  .mapBtnGroup.moved { position: absolute; z-index: 1000; }
+  body.editLayout .mapBtnGroup {
+    pointer-events: auto; touch-action: none; cursor: grab;
+    outline: 2px dashed var(--accent); outline-offset: 5px; border-radius: 14px;
+  }
+  body.editLayout .mapBtnGroup .mapBtn { pointer-events: none; }
+  .layoutBar {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 1rem; z-index: 2000;
+    display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;
+    background: rgba(23, 26, 31, 0.95); color: #fff; padding: 0.5rem 0.8rem;
+    border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
 
   /* Panel de indicaciones del modo navegacion - giro/distancia genericos
      calculados de la curvatura de la ruta ya calculada, sin nombres de
@@ -264,8 +293,11 @@
   .roadBadge.mini { margin-top: 0.3rem; }
   .navNext { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 500; margin-top: 0.1rem; }
   .mapBtn .btnText { font-size: 0.72rem; font-weight: 800; }
+  /* En pantalla completa este panel quedaba justo abajo del recorte de la
+     camara de algunos telefonos: se baja lo que diga la zona segura. */
   .navPanel {
-    position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%);
+    position: absolute; top: calc(0.6rem + env(safe-area-inset-top, 0px));
+    left: 50%; transform: translateX(-50%);
     z-index: 1200; background: rgba(23, 26, 31, 0.92); color: #fff;
     padding: 0.5rem 1rem; border-radius: 10px; font-size: 0.95rem;
     font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
