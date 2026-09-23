@@ -17,7 +17,8 @@ const TRANSLATIONS = {
     settingsDarkButtons: 'Dark buttons, to match the dark map',
     settingsFadeButtons: 'Fade them out while driving and bring them back on touch',
     settingsMoveButtons: 'Move the buttons',
-    layoutHint: 'Drag a button to move it on its own, or the handle to move the whole group',
+    layoutHint: 'Drag whatever you want to move; the handle moves a whole button group',
+    layoutExtras: 'Extra info',
     layoutReset: 'Reset',
     layoutDone: 'Done',
     settingsBaseTitle: 'Base map:',
@@ -350,7 +351,8 @@ const TRANSLATIONS = {
     settingsDarkButtons: 'Botones oscuros, para que peguen con el mapa oscuro',
     settingsFadeButtons: 'Que se desvanezcan mientras manejás y vuelvan al tocar',
     settingsMoveButtons: 'Mover los botones',
-    layoutHint: 'Arrastrá un botón para moverlo solo, o el asa para mover todo el grupo',
+    layoutHint: 'Arrastrá lo que quieras mover; el asa mueve todo un grupo de botones',
+    layoutExtras: 'Datos extra',
     layoutReset: 'Restablecer',
     layoutDone: 'Listo',
     settingsBaseTitle: 'Mapa base:',
@@ -787,9 +789,12 @@ let fadeButtons = _savedSettings.fadeButtons === undefined ? true : !!_savedSett
 // si aparece asi, se migra en vez de tirarlo.
 let btnLayout = normalizeBtnLayout(_savedSettings.btnLayout);
 function normalizeBtnLayout(raw) {
-  if (!raw || typeof raw !== 'object') return { groups: {}, buttons: {} };
-  if (raw.groups || raw.buttons) return { groups: raw.groups || {}, buttons: raw.buttons || {} };
-  return { groups: raw, buttons: {} };
+  const empty = { groups: {}, buttons: {}, panels: {} };
+  if (!raw || typeof raw !== 'object') return empty;
+  if (raw.groups || raw.buttons || raw.panels) {
+    return { groups: raw.groups || {}, buttons: raw.buttons || {}, panels: raw.panels || {} };
+  }
+  return { ...empty, groups: raw };
 }
 const liteMode = !!_savedSettings.liteMode;
 const liteNoRouting = liteMode && !!_savedSettings.liteNoRouting;
@@ -1563,6 +1568,13 @@ applyButtonPrefs();
 // del mapa como absoluto; la posicion se guarda en % para que aguante rotar
 // la pantalla o cambiar de tamano la ventana.
 const BTN_GROUP_IDS = ['mapLeftControls', 'topRightBtns'];
+// Los paneles del mapa se mueven igual que los botones. Se los agarra
+// directamente (no tienen asa): son uno solo cada uno.
+const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel'];
+// Fuera de modo acomodar estos paneles aparecen y desaparecen segun lo que
+// pase en el viaje; mientras se acomodan se muestran siempre, y los que se
+// llenan en vivo llevan un texto de muestra para que se vea el tamano.
+const PANEL_PLACEHOLDER = { navPanel: 'settingsGpsDirections', miniHudExtra: 'layoutExtras' };
 const btnHome = new Map(); // id -> donde estaba, para el boton de restablecer
 
 function movableButtonIds() {
@@ -1596,20 +1608,28 @@ function placeMoved(el, pos) {
   el.style.bottom = 'auto';
 }
 
+function layoutBucket(id) {
+  if (BTN_GROUP_IDS.includes(id)) return btnLayout.groups;
+  if (MOVABLE_PANEL_IDS.includes(id)) return btnLayout.panels;
+  return btnLayout.buttons;
+}
+
 function applyBtnLayout() {
   if (!document.getElementById('mapPanel')) return;
-  for (const id of BTN_GROUP_IDS) rememberHome(document.getElementById(id));
-  for (const id of allMovableIds()) rememberHome(document.getElementById(id));
-  for (const [id, pos] of Object.entries(btnLayout.groups)) placeMoved(document.getElementById(id), pos);
-  for (const [id, pos] of Object.entries(btnLayout.buttons)) placeMoved(document.getElementById(id), pos);
+  for (const id of [...BTN_GROUP_IDS, ...MOVABLE_PANEL_IDS, ...allMovableIds()]) {
+    rememberHome(document.getElementById(id));
+  }
+  for (const part of [btnLayout.groups, btnLayout.buttons, btnLayout.panels]) {
+    for (const [id, pos] of Object.entries(part)) placeMoved(document.getElementById(id), pos);
+  }
 }
 
 function resetBtnLayout() {
-  btnLayout = { groups: {}, buttons: {} };
+  btnLayout = { groups: {}, buttons: {}, panels: {} };
   saveSettings();
   // De adentro hacia afuera: si se devolviera primero el grupo, los botones
   // que volvieran despues entrarian en un padre que ya se movio.
-  for (const id of [...allMovableIds(), ...BTN_GROUP_IDS]) {
+  for (const id of [...allMovableIds(), ...MOVABLE_PANEL_IDS, ...BTN_GROUP_IDS]) {
     const el = document.getElementById(id);
     const home = btnHome.get(id);
     if (!el || !home) continue;
@@ -1617,6 +1637,7 @@ function resetBtnLayout() {
     el.style.left = el.style.top = el.style.right = el.style.bottom = '';
     home.parent.insertBefore(el, home.next);
   }
+  placeMiniHud();
 }
 
 function startLayoutDrag(ev) {
@@ -1650,8 +1671,7 @@ function startLayoutDrag(ev) {
     target.removeEventListener('pointermove', move);
     target.removeEventListener('pointerup', up);
     target.removeEventListener('pointercancel', up);
-    const where = BTN_GROUP_IDS.includes(el.id) ? btnLayout.groups : btnLayout.buttons;
-    where[el.id] = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
+    layoutBucket(el.id)[el.id] = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
     saveSettings();
   };
   target.addEventListener('pointermove', move);
@@ -1662,7 +1682,7 @@ function startLayoutDrag(ev) {
 // Mientras se acomodan, tocar un boton no tiene que disparar su accion.
 function swallowClick(e) {
   if (e.target.closest('#layoutBar')) return;
-  if (e.target.closest('.mapBtn') || e.target.closest('.layoutGrip')) {
+  if (e.target.closest('.mapBtn') || e.target.closest('.layoutGrip') || e.target.closest('.movable')) {
     e.preventDefault();
     e.stopPropagation();
   }
@@ -1689,16 +1709,61 @@ function setLayoutEdit(on) {
       grip.remove();
     }
   }
-  for (const id of allMovableIds()) {
+  for (const id of [...allMovableIds(), ...MOVABLE_PANEL_IDS]) {
     const el = document.getElementById(id);
     if (!el) continue;
     rememberHome(el);
+    el.classList.toggle('movable', on);
     if (on) el.addEventListener('pointerdown', startLayoutDrag);
     else el.removeEventListener('pointerdown', startLayoutDrag);
+  }
+  for (const [id, key] of Object.entries(PANEL_PLACEHOLDER)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    // Por atributo y no como texto: el tick de telemetria reescribe el
+    // contenido de estos paneles y se comia el texto de muestra.
+    if (on) el.dataset.placeholder = t(key);
+    else delete el.dataset.placeholder;
   }
   if (on) wakeButtons();
 }
 applyBtnLayout();
+
+// En pantalla tactil, mantener apretado cualquiera de estas cosas abre el modo
+// acomodar: en el telefono no hay forma de adivinar que se pueden mover, y
+// Ajustes queda lejos. Con mouse no: ahi el menu ya esta a mano y un click
+// largo sin querer seria una sorpresa.
+const LONG_PRESS_MS = 600;
+const LONG_PRESS_SLOP_PX = 10;
+const LONG_PRESS_SELECTOR = '#mapPanel .mapBtn, #miniHud, #miniHudExtra, #navPanel';
+let longPressTimer = null;
+let longPressFrom = null;
+
+function cancelLongPress() {
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+  longPressFrom = null;
+}
+
+document.addEventListener('pointerdown', (ev) => {
+  if (ev.pointerType === 'mouse' || document.body.classList.contains('editLayout')) return;
+  if (!ev.target.closest || !ev.target.closest(LONG_PRESS_SELECTOR)) return;
+  longPressFrom = { x: ev.clientX, y: ev.clientY };
+  clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    cancelLongPress();
+    setLayoutEdit(true);
+    // El click que viene al soltar lo come swallowClick, asi que abrir el
+    // modo no dispara ademas la accion del boton.
+    navigator.vibrate?.(30);
+  }, LONG_PRESS_MS);
+}, true);
+
+document.addEventListener('pointermove', (ev) => {
+  if (!longPressFrom) return;
+  if (Math.hypot(ev.clientX - longPressFrom.x, ev.clientY - longPressFrom.y) > LONG_PRESS_SLOP_PX) cancelLongPress();
+}, true);
+for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, cancelLongPress, true);
 
 function ensureMapInitialized() {
   if (map) return;
@@ -2985,6 +3050,9 @@ function setNavMode(on) {
 const portraitMq = window.matchMedia('(max-width: 900px) and (orientation: portrait)');
 function placeMiniHud() {
   const hud = document.getElementById('miniHud');
+  // Si el usuario lo puso en otro lado, es suyo: no se lo movemos al girar la
+  // pantalla ni al arrancar.
+  if (hud && hud.classList.contains('moved')) return;
   const target = portraitMq.matches ? document.getElementById('bottomRightHud') : document.getElementById('topRightControls');
   if (hud && hud.parentElement !== target) target.insertBefore(hud, target.firstChild);
 }

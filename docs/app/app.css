@@ -284,11 +284,34 @@
     background: var(--accent); color: #fff; font-size: 0.7rem; line-height: 1;
   }
   body.editLayout .layoutGrip { display: flex; }
+
+  /* Paneles movibles: el mini-HUD, la caja de datos extra y las indicaciones
+     del GPS. Mientras se acomodan se muestran aunque no haya viaje en curso,
+     que si no no habria nada que agarrar. */
+  #miniHud.moved, #miniHudExtra.moved, #navPanel.moved { position: absolute; z-index: 1200; }
+  #navPanel.moved { transform: none; left: auto; }
+  body.editLayout #miniHud, body.editLayout #miniHudExtra { display: flex !important; }
+  body.editLayout #navPanel { display: block !important; }
+  body.editLayout .movable { touch-action: none; cursor: grab; outline: 2px dashed var(--accent); outline-offset: 3px; }
+  /* Vacios no se podrian agarrar: mientras se acomodan tienen un tamano
+     minimo y muestran de que panel se trata. */
+  body.editLayout #miniHudExtra, body.editLayout #navPanel { min-width: 130px; min-height: 26px; }
+  body.editLayout .movable:empty::after { content: attr(data-placeholder); opacity: 0.75; }
+  /* En el telefono, con la ayuda y los dos botones en una sola fila, el texto
+     caia en una columna de seis renglones: la ayuda va en su propio renglon. */
   .layoutBar {
     position: absolute; left: 50%; transform: translateX(-50%); bottom: 1rem; z-index: 2000;
+    max-width: calc(100% - 1rem); flex-wrap: wrap; justify-content: center;
     display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;
     background: rgba(23, 26, 31, 0.95); color: #fff; padding: 0.5rem 0.8rem;
     border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .layoutBar > span { flex: 1 1 100%; text-align: center; }
+  /* Absoluta y centrada con transform, la barra se encoge al ancho del
+     contenido y la ayuda vuelve a caer en columna: en pantalla angosta se
+     clava a los dos bordes y ahi si ocupa el ancho. */
+  @media (max-width: 600px) {
+    .layoutBar { left: 0.5rem; right: 0.5rem; transform: none; max-width: none; }
   }
 
   /* Panel de indicaciones del modo navegacion - giro/distancia genericos
