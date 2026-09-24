@@ -819,7 +819,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             inactive_since = None
             client_lib.update_job_snapshot(raw)
             payload = client_lib.build_payload(raw)
-            client_lib.attach_job_snapshot_if_finished(payload)
+            client_lib.attach_job_snapshot_if_finished(payload, raw)
             game = payload.get("game")
             if state.set_status("live", game):
                 open_web_ui()  # en modo autostart, recien aca (juego detectado) se abre el navegador

@@ -629,3 +629,41 @@ def test_el_payload_lleva_el_rumbo():
     assert payload["heading"] == 270.0
     # Sin el campo el payload igual sale, con heading en None.
     assert client.build_payload({"coordinateX": 1})["heading"] is None
+
+
+def test_el_payload_lleva_de_que_mercado_salio_el_trabajo():
+    """De que mercado salio el trabajo decide si el SDK informa o no la
+    empresa de destino, y sin empresa la web cae al centro de la ciudad.
+    Teniendo el dato se puede explicar la diferencia en vez de que parezca
+    un destino equivocado."""
+    p = client.build_payload({"jobMarket": "cargo_market", "specialJob": True,
+                              "plannedDistanceKm": 1557, "coordinateX": 0})
+    assert p["jobMarket"] == "cargo_market"
+    assert p["specialJob"] is True
+    assert p["plannedDistanceKm"] == 1557
+    vacio = client.build_payload({"coordinateX": 0})
+    assert vacio["jobMarket"] is None and vacio["specialJob"] is False
+
+
+def test_la_entrega_adjunta_los_detalles_del_tick():
+    """jobDeliveredCargoDamage y compania solo tienen valor en el momento del
+    pulso: el juego los llena justo al entregar."""
+    client._last_event_state.update({"jobDelivered": False, "jobCancelled": False})
+    client.update_job_snapshot({"onJob": True, "cityDst": "Pärnu", "citySrc": "Tromsø",
+                                "cargo": "Luxury Yacht", "jobMarket": "cargo_market",
+                                "specialJob": True})
+    payload = {"event": {"jobDelivered": True}}
+    client.attach_job_snapshot_if_finished(payload, {"jobDeliveredCargoDamage": 0.25,
+                                                     "jobDeliveredEarnedXp": 340,
+                                                     "jobDeliveredDeliveryTime": 90})
+    e = payload["event"]
+    assert e["jobDst"] == "Pärnu" and e["jobCargo"] == "Luxury Yacht"
+    assert e["jobMarket"] == "cargo_market" and e["jobSpecial"] is True
+    assert e["jobCargoDamage"] == 0.25 and e["jobEarnedXp"] == 340
+
+    # Sin el raw no se inventan los detalles, pero el resto sigue saliendo.
+    client._last_event_state.update({"jobDelivered": False, "jobCancelled": False})
+    payload2 = {"event": {"jobDelivered": True}}
+    client.attach_job_snapshot_if_finished(payload2)
+    assert payload2["event"]["jobDst"] == "Pärnu"
+    assert "jobCargoDamage" not in payload2["event"]

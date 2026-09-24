@@ -47,7 +47,12 @@ FACILITY_CODES = {
     "service_ico": "s",
     "garage_large_ico": "r",
     "dealer_ico": "d",
+    # Dos tokens para lo mismo, y el juego les dibuja el MISMO icono: en ETS2
+    # hay 17 weigh_station_ico y 34 weigh_ico, y solo 4 de los segundos estan
+    # cerca de uno de los primeros. Con uno solo en la lista, dos tercios de
+    # las basculas no aparecian ni en el mapa ni en la busqueda.
     "weigh_station_ico": "w",
+    "weigh_ico": "w",
 }
 
 
@@ -64,7 +69,10 @@ def build(variant, folder, prefix):
     seen = set()
     for p in pois:
         x, z = round(p["x"]), round(p["y"])
-        if p.get("type") == "facility" and p.get("icon") in FACILITY_CODES:
+        # Se filtra por ICONO y no por tipo: weigh_ico viene como type="road"
+        # (es el cartel de la bascula al costado de la ruta, no un prefab con
+        # playa), y con el filtro por tipo se caian los 34 de ETS2.
+        if p.get("type") != "company" and p.get("icon") in FACILITY_CODES:
             key = (x, z, p["icon"])
             if key in seen:
                 continue

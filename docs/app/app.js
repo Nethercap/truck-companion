@@ -1453,6 +1453,11 @@ let toLngLat = null; // funcion (x,z) => [lng,lat] del juego actual
 let fromLngLat = null; // funcion (lng,lat) => [x,z] del juego actual - inversa, para ubicar un waypoint
 let currentGame = null;
 let citiesByName = {}; // Name (localizado o nativo) -> {Name, X, Y, Token, Native?}
+// La lista completa, sin colapsar. citiesByName se arma pisando, asi que con
+// dos ciudades del mismo nombre solo sobrevive una: en ATS pasa 8 veces, y el
+// DLC de South Dakota sumo Aberdeen SD a 99 km de Aberdeen WA. Quien recorra
+// ciudades (la de al lado, la proxima de la ruta) tiene que usar esta.
+let citiesAll = [];
 let citiesByToken = {}; // token del juego -> misma entrada
 const trailWorld = []; // [[lng,lat], ...]
 const MAX_TRAIL_POINTS = 1000;
@@ -1910,7 +1915,14 @@ function ensureMapInitialized() {
 // El campo "sprite" del dato trae cientos de tokens distintos (carteles de
 // ruta, iconos de empresas individuales, etc.) - solo cargamos los que nos
 // interesan mostrar como POI generico.
-const POI_ICONS = ['gas_ico', 'service_ico', 'weigh_station_ico', 'parking_ico', 'toll_ico', 'garage_large_ico', 'dealer_ico', 'recruitment_ico', 'viewpoint'];
+// Ojo con los tokens duplicados: el juego usa dos nombres para la bascula
+// (weigh_station_ico y weigh_ico) y les dibuja el mismo icono. Con uno solo
+// aca, dos tercios de las basculas de ETS2 no se veian. Mismo patron que
+// tenian los puertos de ferry.
+const POI_ICONS = ['gas_ico', 'service_ico', 'weigh_station_ico', 'weigh_ico', 'parking_ico', 'toll_ico', 'garage_large_ico', 'dealer_ico', 'recruitment_ico', 'viewpoint',
+  // Fronteras (159 en ETS2, donde importan bastante) y miradores con foto,
+  // que son lugares DISTINTOS de los 'viewpoint': de 186, solo 2 coinciden.
+  'border_ico', 'photo_sight_captured'];
 // Puertos de ferry y terminales de tren. Van en su propia capa (ferry-poi),
 // pero la imagen se carga por el mismo camino que las demas.
 const FERRY_ICONS = ['port_overlay', 'train_ico'];
@@ -1935,8 +1947,9 @@ async function loadCities(mapInfo) {
     const list = await res.json();
     citiesByName = {};
     citiesByToken = {};
+    citiesAll = list;
     for (const c of list) {
-      citiesByName[c.Name] = c;
+      if (!citiesByName[c.Name]) citiesByName[c.Name] = c;
       // Nombre nativo (ej. "Москва" ademas de "Moscow"): la telemetria manda
       // el nombre en el idioma del juego del jugador, asi que se acepta
       // cualquiera de los dos; el mapa muestra siempre c.Name.
@@ -1946,12 +1959,31 @@ async function loadCities(mapInfo) {
   } catch (err) {
     citiesByName = {};
     citiesByToken = {};
+    citiesAll = [];
   }
 }
 // Ciudad por id del juego (cityDstId/citySrcId de la telemetria) y si no por
 // nombre: el id no depende del idioma, el nombre si.
 function findCity(id, name) {
-  return (id && citiesByToken[id]) || (name && citiesByName[name]) || null;
+  const porToken = id && citiesByToken[id];
+  if (porToken) return porToken;
+  if (!name) return null;
+  // Buscar por nombre es el camino degradado (el id no matcheo), y ademas
+  // puede ser ambiguo: en ATS hay 8 nombres repetidos. Entre varias con el
+  // mismo nombre se elige la mas cercana al camion, que es lo mejor que se
+  // puede hacer sin el id. OJO: para un destino lejano puede errarle; por
+  // eso el id siempre manda.
+  const candidatas = citiesAll.filter(c => c.Name === name || c.Native === name);
+  if (candidatas.length <= 1) return candidatas[0] || citiesByName[name] || null;
+  const ref = lastWorldPos;
+  if (!ref) return candidatas[0];
+  let mejor = candidatas[0];
+  let mejorDist = Infinity;
+  for (const c of candidatas) {
+    const d = Math.hypot(c.X - ref.x, c.Y - ref.z);
+    if (d < mejorDist) { mejorDist = d; mejor = c; }
+  }
+  return mejor;
 }
 
 // Nombres reales extraidos de los carteles del juego (ver extract_road_names.py
@@ -2331,8 +2363,7 @@ function formatPoiDistance(rawMeters) {
 const NEAR_CITY_M = 4000;
 function nearestCityName(x, z) {
   let best = null, bestDist = NEAR_CITY_M;
-  for (const [name, c] of Object.entries(citiesByName)) {
-    if (name !== c.Name) continue; // alias por nombre nativo: misma ciudad
+  for (const c of citiesAll) {
     const d = Math.hypot(c.X - x, c.Y - z);
     if (d < bestDist) { bestDist = d; best = c.Name; }
   }
@@ -2800,7 +2831,8 @@ function resolveRawRouteTarget(data) {
       || findCompanyPoiByName(data.companyDst, data.cityDstId);
     if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${company.token}@${company.city}` };
     const city = findCity(data.cityDstId, data.cityDst);
-    if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}`, approx: true };
+    if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}`,
+                       approx: true, market: data.specialJob ? 'special_transport' : (data.jobMarket || null) };
   }
   if (waypoints.length) {
     const last = waypoints[waypoints.length - 1];
@@ -2943,7 +2975,12 @@ function updateDestinationMarker(data) {
       // centro de la ciudad". Sin eso, un error de 900 m se lee como un
       // destino equivocado.
       el.className = target.approx ? 'destMarkerWrap approx' : 'destMarkerWrap';
-      if (target.approx) el.title = t('destApproxHint');
+      // Se agrega de que mercado salio el trabajo cuando el cliente lo manda:
+      // es justo el dato que explica por que el juego no informo la empresa,
+      // y asi el proximo reporte ya viene con la respuesta adentro.
+      if (target.approx) {
+        el.title = t('destApproxHint') + (target.market ? ` (${target.market})` : '');
+      }
       destMarker = new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat(destLngLat).addTo(map);
       destMarker._kind = target.kind;
       destMarker._approx = !!target.approx;
@@ -3369,8 +3406,7 @@ function updateNextCity(x, z) {
     const pts = currentRouteWorldPoints;
     const step = Math.max(1, Math.floor(pts.length / 400));
     let bestIdx = Infinity;
-    for (const [name, c] of Object.entries(citiesByName)) {
-      if (name !== c.Name) continue; // alias por nombre nativo: misma ciudad
+    for (const c of citiesAll) {
       if (Math.hypot(c.X - x, c.Y - z) < 2000) continue; // ciudad actual
       for (let i = 0; i < pts.length; i += step) {
         if (i >= bestIdx) break;

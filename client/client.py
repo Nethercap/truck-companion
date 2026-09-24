@@ -566,6 +566,15 @@ def build_payload(raw: dict) -> dict:
         # tokens internos (ej. "wal_mkt", "kansas_city"): la web los cruza
         # con los POIs del mapa para rutear a la empresa exacta de
         # carga/descarga en vez de al centro de la ciudad.
+        # De que mercado salio el trabajo ("quick_job", "cargo_market",
+        # "external_contracts"...) y si es transporte especial. Importa
+        # porque de eso depende que el SDK informe o no la empresa de
+        # destino: sin empresa, la web cae al centro de la ciudad, que en
+        # Longyearbyen son 908 m. Teniendo el mercado se puede explicar la
+        # diferencia en vez de que parezca un destino equivocado.
+        "jobMarket": raw.get("jobMarket") or None,
+        "specialJob": bool(raw.get("specialJob")),
+        "plannedDistanceKm": raw.get("plannedDistanceKm") or None,
         "companySrc": raw.get("compSrc") or None,
         "companySrcId": raw.get("compSrcId") or None,
         "citySrcId": raw.get("citySrcId") or None,
@@ -670,7 +679,8 @@ def build_payload(raw: dict) -> dict:
 # despues como sugiere la doc del plugin. Por eso se cachea el ultimo snapshot
 # valido mientras el trabajo esta activo (onJob=True) y se lo pega al evento
 # recien en el momento de la entrega/cancelacion.
-_last_job_snapshot = {"citySrc": None, "cityDst": None, "truckBrand": None, "truckName": None, "cargo": None}
+_last_job_snapshot = {"citySrc": None, "cityDst": None, "truckBrand": None, "truckName": None,
+                      "cargo": None, "jobMarket": None, "specialJob": False}
 
 
 def update_job_snapshot(raw: dict):
@@ -682,6 +692,8 @@ def update_job_snapshot(raw: dict):
             "truckBrand": raw.get("truckBrand") or None,
             "truckName": raw.get("truckName") or None,
             "cargo": raw.get("cargo") or None,
+            "jobMarket": raw.get("jobMarket") or None,
+            "specialJob": bool(raw.get("specialJob")),
         }
 
 
@@ -703,7 +715,7 @@ def edge_filter_job_events(payload: dict) -> None:
         event[key] = current and previous is False
 
 
-def attach_job_snapshot_if_finished(payload: dict):
+def attach_job_snapshot_if_finished(payload: dict, raw: dict | None = None):
     edge_filter_job_events(payload)
     event = payload.get("event") or {}
     if event.get("jobDelivered") or event.get("jobCancelled"):
@@ -712,6 +724,17 @@ def attach_job_snapshot_if_finished(payload: dict):
         event["jobTruckBrand"] = _last_job_snapshot["truckBrand"]
         event["jobTruckName"] = _last_job_snapshot["truckName"]
         event["jobCargo"] = _last_job_snapshot["cargo"]
+        # .get y no [] a proposito: el snapshot puede venir de una version
+        # anterior o estar incompleto, y esto corre en el evento de entrega,
+        # que es justo el que no puede romperse.
+        event["jobMarket"] = _last_job_snapshot.get("jobMarket")
+        event["jobSpecial"] = _last_job_snapshot.get("specialJob", False)
+        # Estos tres solo valen en el momento del pulso: el juego los llena
+        # justo al entregar, antes vienen en cero.
+        if raw:
+            event["jobCargoDamage"] = raw.get("jobDeliveredCargoDamage")
+            event["jobEarnedXp"] = raw.get("jobDeliveredEarnedXp")
+            event["jobDeliveryTime"] = raw.get("jobDeliveredDeliveryTime")
 
 
 EVENT_FLAGS = ("jobDelivered", "jobCancelled", "tollgate", "fined", "ferry", "train")
@@ -791,7 +814,7 @@ async def run(backend_ws_url: str, code: str):
                         if raw.get("sdkActive"):
                             update_job_snapshot(raw)
                             payload = build_payload(raw)
-                            attach_job_snapshot_if_finished(payload)
+                            attach_job_snapshot_if_finished(payload, raw)
                             await ws.send(json.dumps(payload))
                         await asyncio.sleep(CLOUD_SEND_INTERVAL_SECONDS)
                 finally:
