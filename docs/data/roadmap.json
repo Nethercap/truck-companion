@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-23",
+  "updated": "2026-09-24",
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped.",
   "items": [
     {
@@ -76,14 +76,14 @@
     },
     {
       "id": "lane-routing",
-      "status": "building",
+      "status": "shipped",
       "en": {
         "title": "Lane-level junctions",
-        "body": "The route now follows the real lane curves through junctions and interchanges instead of cutting straight across them. Still to come: honouring which turns each junction actually allows."
+        "body": "The route follows the real lane curves through junctions and interchanges instead of cutting straight across them, and it no longer sends you through turns the game does not allow."
       },
       "es": {
         "title": "Cruces carril por carril",
-        "body": "La ruta ya sigue las curvas reales de los carriles dentro de cruces y enlaces, en vez de cruzarlos derecho por arriba. Falta que respete qué giros permite cada cruce."
+        "body": "La ruta sigue las curvas reales de los carriles dentro de cruces y enlaces, en vez de cruzarlos derecho por arriba, y ya no te manda por giros que el juego no permite."
       }
     },
     {
