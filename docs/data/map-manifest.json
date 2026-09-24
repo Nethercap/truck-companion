@@ -6,9 +6,9 @@
     "ats": {
       "label": "American Truck Simulator",
       "game": "ats",
-      "gameVersion": "1.61.1",
+      "gameVersion": "1.61.2.0",
       "built": "2026-09-24",
-      "mapDataVersion": "20260924",
+      "mapDataVersion": "20260924b",
       "mods": [],
       "files": [
         "vector/ats.pmtiles",
@@ -48,9 +48,9 @@
     "ats_promods": {
       "label": "ATS + ProMods Canada",
       "game": "ats",
-      "gameVersion": "1.61.1",
+      "gameVersion": "1.61.2.0",
       "built": "2026-09-24",
-      "mapDataVersion": "20260924",
+      "mapDataVersion": "20260924b",
       "mods": [
         "promods_canada"
       ],
@@ -93,9 +93,9 @@
     "ats_reforma": {
       "label": "ATS + Reforma (+ Mega Resources + Sierra Nevada)",
       "game": "ats",
-      "gameVersion": "1.61.1",
+      "gameVersion": "1.61.2.0",
       "built": "2026-09-24",
-      "mapDataVersion": "20260924",
+      "mapDataVersion": "20260924b",
       "mods": [
         "reforma",
         "reforma_mega_resources",
