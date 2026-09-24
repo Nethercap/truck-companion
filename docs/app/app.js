@@ -1461,7 +1461,7 @@ function emptyLineString() {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'road-local', 'road-divided', 'road-freeway', 'poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
@@ -1472,6 +1472,15 @@ function buildVecLayers(sourceLayer) {
       paint: { 'fill-color': ['match', ['get', 'color'], 0, '#454b54', 1, '#575e68', 2, '#1c1f24', 3, '#3d5238', '#454b54'], 'fill-opacity': 0.95 } },
     { id: 'prefab', type: 'fill', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'prefab'],
       paint: { 'fill-color': '#4a5058', 'fill-opacity': 0.95 } },
+    // Cruces de ferry y de tren (el Eurotunel): el juego los dibuja en su
+    // mapa y son la unica forma de llegar a varios destinos, asi que sirve
+    // verlos aunque no haya ruta activa. Punteado y apagado para que no se
+    // confundan con la ruta, que usa el mismo azul pero opaco.
+    { id: 'ferry-line', type: 'line', source: 'vec', 'source-layer': L,
+      filter: ['in', ['get', 'type'], ['literal', ['ferry', 'train']]],
+      layout: { 'line-cap': 'round' },
+      paint: { 'line-color': '#5a9ec4', 'line-opacity': 0.55, 'line-dasharray': [2, 2],
+               'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 2.5] } },
     { id: 'road-local', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'local']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
@@ -1485,8 +1494,17 @@ function buildVecLayers(sourceLayer) {
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
     { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
-      filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]]],
+      filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]], ['!', ['in', ['get', 'poiType'], ['literal', ['ferry', 'train']]]]],
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
+    // minzoom 7 y no menos: el filtro de tippecanoe (tiles_light_filter.json)
+    // solo guarda ciudades, paises, carreteras y las LINEAS de ferry por
+    // debajo de z7; los puertos son type=poi y ahi se podan. Si algun dia se
+    // regeneran los tiles con los puertos incluidos, bajar este numero.
+    { id: 'ferry-poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: 7,
+      filter: ['in', ['get', 'poiType'], ['literal', ['ferry', 'train']]],
+      layout: { 'icon-image': ['get', 'sprite'],
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 9, 0.8],
+                'icon-allow-overlap': true, 'icon-ignore-placement': true } },
     { id: 'exit-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'exit'], minzoom: 10,
       layout: { 'text-field': ['concat', 'Exit ', ['get', 'name']], 'text-size': 11 },
       paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
@@ -1889,10 +1907,13 @@ function ensureMapInitialized() {
 // ruta, iconos de empresas individuales, etc.) - solo cargamos los que nos
 // interesan mostrar como POI generico.
 const POI_ICONS = ['gas_ico', 'service_ico', 'weigh_station_ico', 'parking_ico', 'toll_ico', 'garage_large_ico', 'dealer_ico', 'recruitment_ico', 'viewpoint'];
+// Puertos de ferry y terminales de tren. Van en su propia capa (ferry-poi),
+// pero la imagen se carga por el mismo camino que las demas.
+const FERRY_ICONS = ['port_overlay', 'train_ico'];
 const POI_ICON_BASE = `${REMOTE_MAP_BASE}/vector/icons`;
 
 async function loadPoiIcons() {
-  for (const name of POI_ICONS) {
+  for (const name of POI_ICONS.concat(FERRY_ICONS)) {
     if (map.hasImage(name)) continue;
     try {
       const res = await map.loadImage(`${POI_ICON_BASE}/${name}.png`);
