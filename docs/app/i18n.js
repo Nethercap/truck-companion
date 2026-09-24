@@ -3,6 +3,8 @@
 // Se cargan antes que app.js y se mezclan en TRANSLATIONS al arrancar.
 const TRANSLATIONS_EXTRA = {
   de: {
+    destApprox: "Ungefähr: Das Spiel nannte keine Firma, dies ist das Stadtzentrum.",
+    destApproxHint: "Das Spiel hat für diesen Auftrag keine Zielfirma gemeldet, daher zeigt die Flagge das Stadtzentrum.",
     convoyTitle: 'Konvoi',
     convoyCardsTitle: 'Konvoi',
     convoyIntro: 'Teile einen Code mit Freunden: alle sehen sich auf der Karte und in einem Karten-Karussell. Jeder mit eigenem Spiel und Client – keine gemeinsame Sitzung nötig.',
@@ -335,6 +337,8 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Noch keinen Client? Lade ihn von trucksim-dash.com, starte ihn, und er zeigt dir einen Pairing-Code.',
   },
   fr: {
+    destApprox: "Approximatif : le jeu n'a pas indiqué l'entreprise, ceci est le centre-ville.",
+    destApproxHint: "Le jeu n'a pas communiqué l'entreprise de destination pour ce travail, le drapeau indique donc le centre-ville.",
     convoyTitle: 'Convoi',
     convoyCardsTitle: 'Convoi',
     convoyIntro: 'Partage un code avec tes amis : tout le monde se voit sur la carte et dans un carrousel de cartes. Chacun avec son jeu et son client, pas besoin d\'être dans la même session.',
@@ -667,6 +671,8 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Pas encore le client ? Télécharge-le sur trucksim-dash.com, lance-le, et il t\'affichera un code d\'appairage.',
   },
   pt: {
+    destApprox: "Aproximado: o jogo não informou a empresa, este é o centro da cidade.",
+    destApproxHint: "O jogo não informou a empresa de destino desta viagem, então a bandeira mostra o centro da cidade.",
     convoyTitle: 'Comboio',
     convoyCardsTitle: 'Comboio',
     convoyIntro: 'Compartilhe um código com amigos: todos se veem no mapa e num carrossel de cartões. Cada um com seu jogo e seu cliente, sem precisar estar na mesma sessão.',
@@ -999,6 +1005,8 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Ainda não tem o cliente? Baixe em trucksim-dash.com, abra, e ele mostra um código de pareamento.',
   },
   pl: {
+    destApprox: "Orientacyjnie: gra nie podała firmy, to jest centrum miasta.",
+    destApproxHint: "Gra nie podała firmy docelowej dla tego zlecenia, więc flaga pokazuje centrum miasta.",
     convoyTitle: 'Konwój',
     convoyCardsTitle: 'Konwój',
     convoyIntro: 'Podziel się kodem ze znajomymi: wszyscy widzą się na mapie i w karuzeli kart. Każdy ze swoją grą i klientem, bez wspólnej sesji.',
@@ -1331,6 +1339,8 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Nie masz jeszcze klienta? Pobierz go z trucksim-dash.com, uruchom, a pokaże ci kod parowania.',
   },
   tr: {
+    destApprox: "Yaklaşık: oyun firmayı bildirmedi, burası şehir merkezi.",
+    destApproxHint: "Oyun bu iş için varış firmasını bildirmedi, bu yüzden bayrak şehir merkezini gösteriyor.",
     convoyTitle: 'Konvoy',
     convoyCardsTitle: 'Konvoy',
     convoyIntro: 'Arkadaşlarınla bir kod paylaş: herkes haritada ve kart karuselinde birbirini görür. Herkes kendi oyunu ve istemcisiyle, aynı oturumda olmaya gerek yok.',
@@ -1663,6 +1673,8 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'İstemcin yok mu? trucksim-dash.com\'dan indir, çalıştır, sana bir eşleştirme kodu gösterecek.',
   },
   ru: {
+    destApprox: "Приблизительно: игра не сообщила компанию, это центр города.",
+    destApproxHint: "Игра не сообщила компанию назначения для этого рейса, поэтому флаг показывает центр города.",
     convoyTitle: 'Конвой',
     convoyCardsTitle: 'Конвой',
     convoyIntro: 'Поделитесь кодом с друзьями: все видят друг друга на карте и в карусели карточек. У каждого своя игра и свой клиент, общая сессия не нужна.',

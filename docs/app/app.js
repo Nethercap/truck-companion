@@ -225,6 +225,8 @@ const TRANSLATIONS = {
     panelEmptyTitle: 'Waiting for the game',
     panelEmptyBody: 'Trip, truck and session data show up here as soon as the game starts sending telemetry.',
     gameClock: 'Game time',
+    destApprox: 'Approximate: the game did not say which company, this is the city center.',
+    destApproxHint: 'The game did not report the destination company for this job, so the flag shows the city center.',
     routeRemainingLabel: 'Left',
     routeDurationLabel: 'Time',
     routeArrivalLabel: 'Arrival',
@@ -561,6 +563,8 @@ const TRANSLATIONS = {
     panelEmptyTitle: 'Esperando al juego',
     panelEmptyBody: 'Los datos del viaje, el camión y la sesión aparecen acá apenas el juego empiece a mandar telemetría.',
     gameClock: 'Hora del juego',
+    destApprox: 'Aproximado: el juego no dijo la empresa, esto es el centro de la ciudad.',
+    destApproxHint: 'El juego no informó la empresa de destino de este viaje, así que la bandera muestra el centro de la ciudad.',
     routeRemainingLabel: 'Falta',
     routeDurationLabel: 'Tiempo',
     routeArrivalLabel: 'Llegada',
@@ -2240,11 +2244,54 @@ function poiVariantNow() {
   return currentGame || (lastData ? resolveEffectiveGame(lastData.game) : null);
 }
 
+// Distancia maxima entre una empresa y el centro de la ciudad a la que
+// pertenece. Medido sobre los datos del parser: en ETS2 vainilla la mas
+// alejada esta a 8,6 km y el percentil 99 es 5 km, asi que 15 km ya es
+// seguro otra ciudad.
+const COMPANY_CITY_MAX_M = 15000;
+
+function companyPoiAt(hit) {
+  return hit ? { x: hit[0], z: hit[1], token: hit[2], label: hit[3], city: hit[4] } : null;
+}
+
+// El SDK no siempre manda el ID de la empresa de destino: en los contratos
+// externos (Cargo Market) y en el transporte especial suele venir vacio
+// aunque el NOMBRE visible si llegue. Antes ese nombre se descartaba y la
+// bandera se iba al centro de la ciudad, a casi un kilometro del muelle
+// (reportado con un viaje a Longyearbyen: 908 m). Se busca dentro de la
+// ciudad de destino nada mas: si el juego esta en un idioma que traduce los
+// nombres de empresa y no hay match, el peor caso sigue siendo el centro de
+// la ciudad y nunca una empresa de otro lado.
+function findCompanyPoiByName(name, cityToken) {
+  if (!pois || !name || !cityToken) return null;
+  const buscado = String(name).trim().toLowerCase();
+  if (!buscado) return null;
+  return companyPoiAt(pois.companies.find(
+    c => c[4] === cityToken && (c[3] || '').trim().toLowerCase() === buscado));
+}
+
 function findCompanyPoi(token, cityToken) {
   if (!pois || !token) return null;
-  const hit = pois.companies.find(c => c[2] === token && (!cityToken || c[4] === cityToken))
-    || pois.companies.find(c => c[2] === token);
-  return hit ? { x: hit[0], z: hit[1], label: hit[3], city: hit[4] } : null;
+  const exacta = pois.companies.find(c => c[2] === token && c[4] === cityToken);
+  if (exacta) return companyPoiAt(exacta);
+  // Sin ciudad no hay con que desempatar: se toma la primera y listo.
+  if (!cityToken) return companyPoiAt(pois.companies.find(c => c[2] === token));
+  // Con ciudad, "la primera con ese token" es una trampa: el 97% de las
+  // empresas de ETS2 tienen su marca en varias ciudades, asi que esa linea
+  // podia mandar la bandera a la sucursal de otra ciudad, hasta 200 km lejos,
+  // sin decir nada. Se busca la mas cercana al destino y, si no hay ninguna
+  // plausible, se devuelve null para que el llamador caiga al centro de la
+  // ciudad correcta, que es un error mucho mas chico y mucho menos confuso.
+  const city = findCity(cityToken, null);
+  if (!city) return null;
+  let mejor = null;
+  let mejorDist = Infinity;
+  for (const c of pois.companies) {
+    if (c[2] !== token) continue;
+    const d = Math.hypot(c[0] - city.X, c[1] - city.Y);
+    if (d < mejorDist) { mejorDist = d; mejor = c; }
+  }
+  return mejorDist <= COMPANY_CITY_MAX_M ? companyPoiAt(mejor) : null;
 }
 
 function nearestFacilities(code, x, z, limit) {
@@ -2740,16 +2787,20 @@ function resolveRawRouteTarget(data) {
   // Clientes < 1.3.1 no mandan onJob/isCargoLoaded/companySrcId y quedan
   // con la ruta al destino - por eso el aviso de actualizacion.
   if (data.onJob && data.isCargoLoaded === false) {
-    const pickup = data.companySrcId ? findCompanyPoi(data.companySrcId, data.citySrcId) : null;
-    if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${data.companySrcId}@${data.citySrcId}` };
+    const pickup = (data.companySrcId ? findCompanyPoi(data.companySrcId, data.citySrcId) : null)
+      || findCompanyPoiByName(data.companySrc, data.citySrcId);
+    if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${pickup.token}@${pickup.city}` };
     const srcCity = findCity(data.citySrcId, data.citySrc);
-    if (srcCity) return { x: srcCity.X, z: srcCity.Y, kind: 'pickup', key: `pickupcity:${data.citySrc}` };
+    // approx: esto es el centro del pueblo, no el lugar de carga. Se marca
+    // para poder decirlo en pantalla en vez de fingir precision.
+    if (srcCity) return { x: srcCity.X, z: srcCity.Y, kind: 'pickup', key: `pickupcity:${data.citySrc}`, approx: true };
   }
   if (data.cityDst) {
-    const company = data.companyDstId ? findCompanyPoi(data.companyDstId, data.cityDstId) : null;
-    if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${data.companyDstId}@${data.cityDstId}` };
+    const company = (data.companyDstId ? findCompanyPoi(data.companyDstId, data.cityDstId) : null)
+      || findCompanyPoiByName(data.companyDst, data.cityDstId);
+    if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${company.token}@${company.city}` };
     const city = findCity(data.cityDstId, data.cityDst);
-    if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}` };
+    if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}`, approx: true };
   }
   if (waypoints.length) {
     const last = waypoints[waypoints.length - 1];
@@ -2785,6 +2836,13 @@ function renderRouteSummary(view) {
   document.getElementById('routeRemaining').textContent = view.remaining;
   document.getElementById('routeDuration').textContent = view.duration;
   document.getElementById('routeArrival').textContent = view.arrival;
+  // Cuando el destino es el centro de la ciudad y no la empresa, se dice.
+  // Un error de ~900 m sin explicacion se lee como un destino equivocado.
+  const aviso = document.getElementById('routeApprox');
+  if (aviso) {
+    aviso.hidden = !view.approx;
+    if (view.approx) aviso.textContent = t('destApprox');
+  }
 }
 
 // Resumen de la ruta arriba del mapa: barra de progreso, lo que falta, el
@@ -2807,6 +2865,7 @@ function updateRouteSummary(data) {
     ? (remainingKm != null && lastKnownAvgSpeedKmh > 0 ? remainingKm / lastKnownAvgSpeedKmh * 3600 : null)
     : (remainingKm === 0 ? 0 : routeSummaryEtaSeconds);
   renderRouteSummary({
+    approx: !!target.approx,
     percent,
     remaining: remainingKm == null ? '--'
       : `${(useImperial ? remainingKm * KM_TO_MI : remainingKm).toFixed(1)} ${useImperial ? 'mi' : 'km'}`,
@@ -2872,12 +2931,22 @@ function updateDestinationMarker(data) {
     // El ultimo waypoint ya tiene su propio marcador - no duplicar bandera.
     if (destMarker) { destMarker.remove(); destMarker = null; }
   } else {
-    if (destMarker && destMarker._kind !== target.kind) { destMarker.remove(); destMarker = null; }
+    if (destMarker && (destMarker._kind !== target.kind || destMarker._approx !== !!target.approx)) {
+      destMarker.remove();
+      destMarker = null;
+    }
     if (!destMarker) {
       const el = document.createElement('div');
       el.innerHTML = target.kind === 'pickup' ? MARKER_SVG.pickup : MARKER_SVG.dest;
+      // Bandera tenue cuando no sabemos la empresa: el usuario tiene que
+      // poder distinguir "tu destino es aca" de "no se donde es, te dejo el
+      // centro de la ciudad". Sin eso, un error de 900 m se lee como un
+      // destino equivocado.
+      el.className = target.approx ? 'destMarkerWrap approx' : 'destMarkerWrap';
+      if (target.approx) el.title = t('destApproxHint');
       destMarker = new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat(destLngLat).addTo(map);
       destMarker._kind = target.kind;
+      destMarker._approx = !!target.approx;
     } else {
       destMarker.setLngLat(destLngLat);
     }
