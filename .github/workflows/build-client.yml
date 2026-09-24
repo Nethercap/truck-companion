@@ -102,3 +102,57 @@ jobs:
             })
           } | ConvertTo-Json -Depth 6
           Invoke-RestMethod -Method Post -Uri $env:DISCORD_RELEASES_WEBHOOK -ContentType "application/json" -Body $payload
+
+  build-linux:
+    # Se compila en la LTS mas vieja que soportamos, a proposito: el binario de
+    # PyInstaller queda atado a la glibc de la maquina donde se arma, y la de
+    # 22.04 (2.35) anda en Ubuntu 22.04+, Debian 12+, Mint 21+, Zorin 17+,
+    # Fedora 35+ y cualquier Arch actual. Compilar en la ultima dejaria afuera
+    # a la mitad de esa lista sin que nadie se entere hasta que lo reporten.
+    #
+    # Por ahora solo sube el artefacto de la corrida, NO lo adjunta al Release:
+    # todavia no hay una sola confirmacion de que el cliente hable con el juego
+    # en Linux, y publicarlo como descarga oficial diria lo contrario. Cuando
+    # un tester confirme, se agrega aca el paso de release.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install system packages
+        # tkinter para la ventana de Setup, y las libs de X11 que usan
+        # python-xlib (teclas por XTEST y ventana del juego) y el backend
+        # Xorg de pystray para el icono de la bandeja.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk libxtst6 libxss1
+      - name: Install dependencies
+        run: pip install -r client/requirements.txt
+      - name: Run client tests
+        run: |
+          pip install pytest
+          python -m pytest client/test_client.py client/test_plugin_installer.py -q
+      - name: Build TruckDash
+        working-directory: client
+        run: pyinstaller TruckDash.spec
+      - name: Package tarball and checksums
+        working-directory: client
+        run: |
+          mkdir -p release
+          cp dist/TruckDash release/TruckDash
+          cp README.md README.es.md release/
+          tar -czf TruckDash-linux-x86_64.tar.gz -C release .
+          tgz=$(sha256sum TruckDash-linux-x86_64.tar.gz | cut -d" " -f1)
+          bin=$(sha256sum dist/TruckDash | cut -d" " -f1)
+          echo "$tgz  TruckDash-linux-x86_64.tar.gz" > SHA256SUMS-linux.txt
+          echo "$bin  TruckDash" >> SHA256SUMS-linux.txt
+          cat SHA256SUMS-linux.txt
+          echo "glibc de la maquina que compilo:"
+          ldd --version | head -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TruckDash-linux
+          path: |
+            client/TruckDash-linux-x86_64.tar.gz
+            client/SHA256SUMS-linux.txt

@@ -71,20 +71,29 @@ def in_temp_location(path: str | None = None) -> bool:
     Registrarlo en el arranque desde ahi es doblemente malo: la ruta desaparece
     cuando se limpia el temporal, y "programa en carpeta temporal que se agrega
     a la clave Run" es justo el patron que Windows Defender marca como
-    Behavior:Win32/Persistence.A!ml (reportado en el issue #2)."""
+    Behavior:Win32/Persistence.A!ml (reportado en el issue #2).
+
+    En Linux el problema es el mismo con otro disfraz: un AppImage corrido
+    desde /tmp deja de existir cuando se limpia el temporal, y el .desktop de
+    autostart queda apuntando a la nada.
+    """
     path = path or exe_path()
     if not path:
         return False
     path = os.path.normcase(os.path.abspath(path))
     candidates = [os.environ.get("TEMP"), os.environ.get("TMP"),
-                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp")]
+                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp"),
+                  os.environ.get("TMPDIR"), tempfile.gettempdir()]
     for base in candidates:
         if not base:
             continue
         base = os.path.normcase(os.path.abspath(base))
         if path == base or path.startswith(base + os.sep):
             return True
-    return os.sep + "temp" + os.sep in path
+    # Red de seguridad para rutas que no salen de las variables de entorno.
+    # normcase solo pasa a minuscula en Windows, asi que aca se hace a mano.
+    bajo = path.lower()
+    return any(f"{os.sep}{nombre}{os.sep}" in bajo for nombre in ("temp", "tmp"))
 
 
 # Una sola instancia a la vez (issue #4): dos clientes leyendo la misma

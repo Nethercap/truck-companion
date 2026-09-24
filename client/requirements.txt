@@ -4,5 +4,9 @@ pystray
 pillow
 pyinstaller
 truststore
-pydirectinput
 qrcode
+# Solo Windows: manda las teclas al juego por scancodes de DirectInput.
+pydirectinput; sys_platform == "win32"
+# Solo Linux: XTEST para mandar teclas y X11 para encontrar la ventana del
+# juego. pystray tambien lo usa para su backend de bandeja en Xorg.
+python-xlib; sys_platform != "win32"

@@ -369,18 +369,28 @@ def test_qr_image_is_dark_on_light_with_quiet_zone():
 
 def test_in_temp_location_detects_zip_extraction(monkeypatch, tmp_path):
     """Issue #2: abierto desde adentro del zip, Windows lo extrae a %TEMP%\7zXXXX
-    y registrar el arranque desde ahi es lo que Defender marca como persistencia."""
+    y registrar el arranque desde ahi es lo que Defender marca como persistencia.
+    En Linux el equivalente es un AppImage corrido desde /tmp: la ruta que
+    guarda el .desktop de autostart desaparece cuando se limpia el temporal."""
     import win_integration
 
     temp = tmp_path / "Temp"
     (temp / "7zOC649DA39").mkdir(parents=True)
     monkeypatch.setenv("TEMP", str(temp))
     monkeypatch.setenv("TMP", str(temp))
+    monkeypatch.setenv("TMPDIR", str(temp))
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert win_integration.in_temp_location(str(temp / "7zOC649DA39" / "TruckDash.exe")) is True
-    assert win_integration.in_temp_location(r"C:\Games\TruckDash\TruckDash.exe") is False
-    assert win_integration.in_temp_location(r"D:\Temp\TruckDash.exe") is True  # cualquier carpeta "Temp"
     assert win_integration.in_temp_location(None) is False
+
+    if sys.platform == "win32":
+        assert win_integration.in_temp_location(r"C:\Games\TruckDash\TruckDash.exe") is False
+        assert win_integration.in_temp_location(r"D:\Temp\TruckDash.exe") is True  # cualquier carpeta "Temp"
+    else:
+        # Una ruta con barras invertidas en Linux no es una ruta, es UN nombre
+        # de archivo, asi que las de arriba no probarian nada aca.
+        assert win_integration.in_temp_location("/opt/truckdash/TruckDash") is False
+        assert win_integration.in_temp_location("/tmp/.mount_abc123/TruckDash") is True
 
 
 def test_pairing_code_is_reused_between_runs(monkeypatch, tmp_path):
