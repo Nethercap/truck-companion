@@ -23,8 +23,14 @@ import re
 import sys
 import time
 
-import pydirectinput
-import truck_telemetry
+IS_WINDOWS = sys.platform == "win32"
+if IS_WINDOWS:
+    # Solo Windows: manda teclas al juego. En Linux hace falta otro
+    # camino (XTEST en X11, /dev/uinput en Wayland), todavia sin hacer.
+    import pydirectinput
+else:
+    pydirectinput = None
+import telemetry_compat
 import websockets
 from urllib.request import urlopen, Request
 
@@ -80,9 +86,15 @@ DEFAULT_KEYBINDS = {
 
 GAME_WINDOW_TITLES = ("Euro Truck Simulator 2", "American Truck Simulator")
 
-_user32 = ctypes.windll.user32
-_kernel32 = ctypes.windll.kernel32
-_shell32 = ctypes.windll.shell32
+# En Linux no existen: las cuatro funciones que los usan (buscar la ventana
+# del juego, traerla al frente, mandar teclas) tienen su propio camino y se
+# resuelven aparte. Sin esto el modulo ni siquiera se puede importar.
+if IS_WINDOWS:
+    _user32 = ctypes.windll.user32
+    _kernel32 = ctypes.windll.kernel32
+    _shell32 = ctypes.windll.shell32
+else:
+    _user32 = _kernel32 = _shell32 = None
 
 # Nombre de nuestra accion -> nombre interno que usa SCS en controls.sii
 # (linea "mix <nombre_scs> `...`"). Se saco leyendo un controls.sii real -
@@ -738,7 +750,7 @@ async def receive_commands(ws, keybinds: dict):
 
 
 async def run(backend_ws_url: str, code: str):
-    truck_telemetry.init()
+    telemetry_compat.init()
     print("Conectado al SDK de telemetria del juego.")
     keybinds = load_keybinds()
 
@@ -750,7 +762,7 @@ async def run(backend_ws_url: str, code: str):
                 recv_task = asyncio.create_task(receive_commands(ws, keybinds))
                 try:
                     while True:
-                        raw = truck_telemetry.get_data()
+                        raw = telemetry_compat.get_data()
                         # sdkActive en False significa que el SDK todavia no
                         # sincronizo el primer frame real del juego (justo
                         # despues de init() puede devolver datos viejos/en cero,

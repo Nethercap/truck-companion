@@ -1,5 +1,7 @@
 """Tests de las funciones puras de client.py (sin tocar el SDK/websocket real)."""
 
+import inspect
+
 import client
 
 
@@ -449,3 +451,20 @@ def test_discord_stays_quiet_without_application_id():
     presence.set_enabled(True)
     assert presence._thread is None
     presence.close()
+
+
+def test_telemetry_compat_elige_el_bloque_segun_el_sistema(monkeypatch):
+    """En Windows el bloque tiene nombre de objeto; en Linux es un archivo en
+    /dev/shm. Y en Linux NO se usa multiprocessing.shared_memory, que al
+    cerrar le hace unlink al bloque del plugin y deja al juego publicando en
+    el vacio (comprobado en WSL)."""
+    import telemetry_compat
+
+    assert telemetry_compat.BLOCK_SIZE == 32 * 1024
+    assert telemetry_compat.WINDOWS_NAME == "Local\SCSTelemetry"
+    assert telemetry_compat.LINUX_PATH == "/dev/shm/SCSTelemetry"
+
+    fuente = inspect.getsource(telemetry_compat._open_buffer)
+    rama_linux = fuente.split("if IS_WINDOWS:")[1].split("return _mem.buf")[1]
+    assert "SharedMemory" not in rama_linux, "en Linux hay que mapear el archivo a mano"
+    assert "mmap.mmap" in rama_linux
