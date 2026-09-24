@@ -26,7 +26,16 @@ import urllib.parse
 import webbrowser
 from urllib.request import urlopen
 
-import pystray
+try:
+    import pystray
+    PYSTRAY_ERROR = None
+except Exception as _exc:  # falta GTK, no hay AppIndicator, no hay display...
+    # En Linux la bandeja no esta garantizada: GNOME no tiene uno propio y
+    # depende de una extension, y pystray revienta al IMPORTARSE si no
+    # encuentra backend. Morir ahi seria absurdo: la bandeja es la puerta de
+    # entrada, pero el trabajo lo hacen los hilos de fondo.
+    pystray = None
+    PYSTRAY_ERROR = _exc
 from PIL import Image, ImageDraw
 
 import client as client_lib
@@ -1002,6 +1011,17 @@ def main():
         settings["first_run_done"] = True
         win_integration.save_settings(settings)
         open_setup_window()
+
+    if pystray is None:
+        # Sin bandeja se sigue igual: la ventana de Setup pasa a ser la
+        # interfaz principal y el codigo de pairing se ve ahi. En modo
+        # autostart no hay ventana que mostrar, asi que solo se espera.
+        logging.warning(f"Sin bandeja del sistema ({PYSTRAY_ERROR}); se sigue sin icono.")
+        if args.autostart:
+            threading.Event().wait()
+        else:
+            SetupWindow().run()
+        sys.exit(0)
 
     menu_items = [
         pystray.MenuItem(T("menu_setup"), open_setup_window, default=True),

@@ -126,7 +126,7 @@ jobs:
         # Xorg de pystray para el icono de la bandeja.
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk libxtst6 libxss1
+          sudo apt-get install -y python3-tk libxtst6 libxss1 xvfb
       - name: Install dependencies
         run: pip install -r client/requirements.txt
       - name: Run client tests
@@ -143,15 +143,28 @@ jobs:
         working-directory: client
         run: pyinstaller TruckDash.spec
       - name: Smoke test the binary
+        env:
+          # El runner no tiene escritorio: sin display, pystray no encuentra
+          # backend y falla al importarse. Con xvfb se prueba el camino de
+          # verdad, el que tiene bandeja, en vez del degradado.
+          PYSTRAY_BACKEND: xorg
         # Que compile no es que corra. --help sale por argparse antes de
         # abrir ninguna ventana, pero para llegar ahi tiene que importar todo
         # el programa: es la prueba mas barata de que el empaquetado quedo
         # completo. Sin esto ya se nos escapo un binario sin tkinter.
         working-directory: client
         run: |
-          ./dist/TruckDash --help > smoke.txt 2>&1 || true
-          cat smoke.txt
-          grep -q "usage:" smoke.txt
+          # 1) Con display, que es como corre en la maquina de un usuario.
+          xvfb-run -a ./dist/TruckDash --help > smoke-tray.txt 2>&1 || true
+          cat smoke-tray.txt
+          grep -q "usage:" smoke-tray.txt
+          # 2) Sin display: pystray falla al importarse y el cliente tiene que
+          # seguir vivo igual. Es el caso de GNOME sin la extension de
+          # AppIndicator, que no tiene bandeja, y ahi se cae este binario entero
+          # si el import no esta protegido.
+          env -u DISPLAY ./dist/TruckDash --help > smoke-sin-bandeja.txt 2>&1 || true
+          cat smoke-sin-bandeja.txt
+          grep -q "usage:" smoke-sin-bandeja.txt
       - name: Package tarball and checksums
         working-directory: client
         run: |
