@@ -133,9 +133,25 @@ jobs:
         run: |
           pip install pytest
           python -m pytest client/test_client.py client/test_plugin_installer.py -q
+      - name: Check the build interpreter has tkinter
+        # PyInstaller no falla cuando le falta un modulo: lo anota en el log
+        # y arma el binario igual, que despues muere al arrancar con
+        # ModuleNotFoundError. Lo que no tenga ESTE Python no va a estar en el
+        # binario, asi que se verifica antes y no despues de 3 minutos de build.
+        run: python -c "import tkinter; print('tkinter', tkinter.TkVersion)"
       - name: Build TruckDash
         working-directory: client
         run: pyinstaller TruckDash.spec
+      - name: Smoke test the binary
+        # Que compile no es que corra. --help sale por argparse antes de
+        # abrir ninguna ventana, pero para llegar ahi tiene que importar todo
+        # el programa: es la prueba mas barata de que el empaquetado quedo
+        # completo. Sin esto ya se nos escapo un binario sin tkinter.
+        working-directory: client
+        run: |
+          ./dist/TruckDash --help > smoke.txt 2>&1 || true
+          cat smoke.txt
+          grep -q "usage:" smoke.txt
       - name: Package tarball and checksums
         working-directory: client
         run: |
