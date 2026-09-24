@@ -3143,6 +3143,28 @@ const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es u
 // funcionando bien incluso rotado, asi que no hace falta deshabilitar drag.
 let navMode = false;
 let navAutoZoomPaused = false; // true si el usuario zoomeo a mano en modo nav - se reactiva al recentrar
+// Rumbo del camion. El cliente 1.5.13+ manda el del juego ya en grados de
+// brujula; con clientes viejos se deduce del desplazamiento, que es lo que
+// habia antes. Esa deduccion mide la CUERDA entre dos posiciones, no la
+// tangente, asi que en curvas cerradas y rotondas va atrasada: de ahi el
+// reporte de "no maneja bien los cambios de direccion".
+//
+// Base minima para deducirlo: cuanto mas lento vas, mas corta, porque ir
+// lento es justo cuando estas girando. Fija en 4 m, a 20 km/h el rumbo se
+// actualizaba una vez cada 0,7 s.
+const HEADING_REF_MIN_M = 1.5;
+const HEADING_REF_MAX_M = 4;
+// Suavizado del giro. En recta los cambios son ruido de muestreo y conviene
+// filtrar fuerte; en un giro el cambio es real y filtrar es exactamente lo
+// que hace que la flecha llegue tarde. Por eso el factor sube con el tamano
+// del giro en vez de ser 0,6 siempre.
+const HEADING_SMOOTH_MIN = 0.55;
+const HEADING_SMOOTH_MAX = 0.95;
+const HEADING_SMOOTH_FULL_DEG = 25;
+// Con el rumbo del juego no hay ruido que filtrar, solo los escalones del
+// muestreo: alcanza con un toque de suavizado para que no salte.
+const HEADING_GAME_SMOOTH = 0.8;
+let movedAvgM = 0;
 let lastHeadingDeg = 0;
 let headingRef = null; // ultima posicion (lng/lat) usada como referencia del heading
 let headingRefWorld = { x: 0, z: 0 };
@@ -3501,7 +3523,7 @@ function describeDetectedMods(game) {
   return names.length ? t('modsDetected').replace('{mods}', names.join(' + ')) : t('modsDetectedNone');
 }
 
-function updateMap(position, game) {
+function updateMap(position, game, gameHeadingDeg) {
   if (position.x == null || position.z == null) return;
   loadGameMap(resolveEffectiveGame(game));
   // loadGameMap es async: entre que setea toLngLat y crea el marcador del
@@ -3529,19 +3551,29 @@ function updateMap(position, game) {
       headingRef = null;
       currentRouteTarget = null;
       currentRouteWorldPoints = null;
+    } else if (Number.isFinite(gameHeadingDeg)) {
+      // El juego lo dice: no hay cuerda ni base minima ni espera a moverse.
+      // Anda igual girando parado o yendo marcha atras, dos casos donde
+      // deducirlo del desplazamiento daba el rumbo equivocado.
+      const d = ((gameHeadingDeg - lastHeadingDeg + 540) % 360) - 180;
+      lastHeadingDeg = (lastHeadingDeg + d * HEADING_GAME_SMOOTH + 360) % 360;
+      headingRef = null;
+      if (truckMarker) truckMarker.setRotation(lastHeadingDeg);
     } else if (prevLngLat && movedM > 0.3) {
-      // Heading: bearing geografico real entre la posicion mostrada anterior
-      // y la nueva - estable sin importar la rotacion actual del mapa. Con
-      // ticks de 100 ms el desplazamiento es de pocos metros y el angulo
-      // tiene ruido: se referencia contra un punto de hace >= 4 m y se
-      // suaviza el giro (media angular) para que la camara no tiemble.
+      // Sin rumbo del juego (cliente viejo): se deduce del desplazamiento.
+      // Bearing geografico real entre la posicion mostrada anterior y la
+      // nueva, estable sin importar la rotacion actual del mapa.
       headingRef = headingRef || prevLngLat;
+      movedAvgM = movedAvgM * 0.7 + movedM * 0.3;
+      const refNeeded = Math.min(HEADING_REF_MAX_M, Math.max(HEADING_REF_MIN_M, movedAvgM * 2));
       const refDist = Math.hypot(position.x - headingRefWorld.x, position.z - headingRefWorld.z);
       let angleDeg = lastHeadingDeg;
-      if (refDist >= 4) {
+      if (refDist >= refNeeded) {
         const raw = geoBearingDeg(headingRef[0], headingRef[1], lngLat[0], lngLat[1]);
         let d = ((raw - lastHeadingDeg + 540) % 360) - 180;
-        angleDeg = (lastHeadingDeg + d * 0.6 + 360) % 360;
+        const k = HEADING_SMOOTH_MIN + (HEADING_SMOOTH_MAX - HEADING_SMOOTH_MIN)
+          * Math.min(1, Math.abs(d) / HEADING_SMOOTH_FULL_DEG);
+        angleDeg = (lastHeadingDeg + d * k + 360) % 360;
         headingRef = lngLat;
         headingRefWorld = { x: position.x, z: position.z };
       }
@@ -4753,7 +4785,7 @@ function handleTelemetry(data) {
     renderConnectionUi();
   }
   updateHud(data);
-  updateMap(data.position || {}, data.game);
+  updateMap(data.position || {}, data.game, data.heading);
   updateDestinationMarker(data);
   updateRouteSummary(data);
   checkUpdateBanner(data.clientVersion);

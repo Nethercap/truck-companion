@@ -52,7 +52,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.5.12"
+CLIENT_VERSION = "1.5.13"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
 # son solo el ultimo respaldo si no se pudo detectar nada real - ver
@@ -515,6 +515,29 @@ def request_pairing_code(backend_ws_url: str) -> str:
     return data["code"]
 
 
+def heading_deg(raw: dict):
+    """Rumbo del camion en grados de brujula (0 = norte, sentido horario).
+
+    El SDK lo da en rotationX, en rango <0,1) y ANTIHORARIO: 0 es norte,
+    0.25 oeste, 0.5 sur y 0.75 este (ver scssdk_value.h, y el plugin lo
+    guarda crudo en el offset 3 del bloque). Se convierte aca, que es el
+    unico lugar que toca el SDK, y la web recibe algo que puede usar tal
+    cual como bearing del mapa.
+
+    Antes la web deducia el rumbo del desplazamiento entre dos posiciones.
+    Eso anda bien en recta pero mide la CUERDA de la curva, no la tangente,
+    y encima necesita que el camion se haya movido unos metros: en una
+    rotonda o girando en una esquina la flecha quedaba atrasada.
+    """
+    valor = raw.get("rotationX")
+    if valor is None:
+        return None
+    try:
+        return round((360.0 - (float(valor) % 1.0) * 360.0) % 360.0, 1)
+    except (TypeError, ValueError):
+        return None
+
+
 def build_payload(raw: dict) -> dict:
     speed_kmh = (raw.get("speed") or 0) * 3.6
     # el SDK devuelve speedLimit en m/s igual que speed, hay que convertirlo
@@ -530,6 +553,8 @@ def build_payload(raw: dict) -> dict:
             "y": raw.get("coordinateY"),
             "z": raw.get("coordinateZ"),
         },
+        # Rumbo real del juego, que la web usa en vez de deducirlo.
+        "heading": heading_deg(raw),
         "speedKmh": round(speed_kmh, 1),
         "speedLimitKmh": round(speed_limit_kmh, 1),
         "cargo": raw.get("cargo") or None,

@@ -604,3 +604,28 @@ def test_idioma_desde_el_entorno(monkeypatch):
     # "C" no es un idioma: hay que seguir buscando, no devolver 'c'.
     monkeypatch.setenv("LC_ALL", "C")
     assert i18n.detect_language() == "de"
+
+
+def test_heading_deg_convierte_la_convencion_del_sdk():
+    """El SDK da el rumbo en <0,1) y ANTIHORARIO (0 norte, 0.25 oeste, 0.5 sur,
+    0.75 este; ver scssdk_value.h). El mapa lo quiere en grados de brujula,
+    horario. Invertir el sentido sin querer deja la flecha espejada y es el
+    tipo de error que no se nota hasta que alguien gira."""
+    assert client.heading_deg({"rotationX": 0.0}) == 0.0      # norte
+    assert client.heading_deg({"rotationX": 0.25}) == 270.0   # oeste
+    assert client.heading_deg({"rotationX": 0.5}) == 180.0    # sur
+    assert client.heading_deg({"rotationX": 0.75}) == 90.0    # este
+    assert client.heading_deg({"rotationX": 0.125}) == 315.0  # noroeste
+    # El juego puede mandar valores fuera de <0,1) al dar vueltas: se normaliza.
+    assert client.heading_deg({"rotationX": 1.25}) == 270.0
+    # Y si no viene, no se inventa: la web cae a deducirlo del desplazamiento.
+    assert client.heading_deg({}) is None
+    assert client.heading_deg({"rotationX": None}) is None
+    assert client.heading_deg({"rotationX": "no es un numero"}) is None
+
+
+def test_el_payload_lleva_el_rumbo():
+    payload = client.build_payload({"rotationX": 0.25, "coordinateX": 1, "coordinateZ": 2})
+    assert payload["heading"] == 270.0
+    # Sin el campo el payload igual sale, con heading en None.
+    assert client.build_payload({"coordinateX": 1})["heading"] is None
