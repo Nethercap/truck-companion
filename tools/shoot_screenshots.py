@@ -178,9 +178,22 @@ def main():
         settle(page)
         shot(page, "screenshot-gps-2", size=PHONE_PNG)
 
-        page.evaluate("() => { navAutoZoomPaused = true; map.jumpTo({ zoom: 14.5 }); }")
-        time.sleep(3)
-        settle(page)
+        # El modo navegacion usa un zoom fijo (NAV_FIXED_ZOOM): forzarlo a
+        # mano deja al camion fuera de cuadro, porque la camara lo ubica con
+        # un desplazamiento que en pixeles crece con el zoom. Asi que no se
+        # toca el zoom y se espera a que el GPS anuncie una maniobra de
+        # verdad, que es lo que la captura tiene que mostrar.
+        for intento in range(150):
+            time.sleep(1)
+            listo = page.evaluate("""() => {
+              const t = map.project(truckMarker.getLngLat()), c = map.getCanvas();
+              const panel = (document.getElementById('navPanel').textContent || '').trim();
+              return !!panel && !/straight/i.test(panel) && t.y > 0 && t.y < c.clientHeight;
+            }""")
+            if listo:
+                print(f"  maniobra a la vista despues de {intento + 1} s")
+                break
+        time.sleep(0.8)
         shot(page, "screenshot-gps-3", size=PHONE_PNG)
 
         # 4: la botonera.
