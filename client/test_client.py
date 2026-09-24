@@ -1,8 +1,14 @@
 """Tests de las funciones puras de client.py (sin tocar el SDK/websocket real)."""
 
 import inspect
+import os
+import sys
+import tempfile
 
 import client
+import i18n
+import keys_compat
+import win_integration
 
 
 def test_http_base_url_converts_ws_schemes():
@@ -88,7 +94,7 @@ def test_send_game_command_ignored_when_no_key_assigned(monkeypatch):
 def test_send_game_command_ignored_when_game_window_not_found(monkeypatch):
     monkeypatch.setattr(client, "find_game_window", lambda: None)
     called = []
-    monkeypatch.setattr(client.pydirectinput, "press", lambda key: called.append(key))
+    monkeypatch.setattr(client.keys_compat, "press", lambda key: called.append(key))
     client.send_game_command("toggle_hazards", client.DEFAULT_KEYBINDS)
     assert called == []
 
@@ -98,7 +104,7 @@ def test_send_game_command_presses_key_and_focuses_window(monkeypatch):
     focused = []
     monkeypatch.setattr(client, "bring_window_to_foreground", lambda hwnd: focused.append(hwnd))
     pressed = []
-    monkeypatch.setattr(client.pydirectinput, "press", lambda key: pressed.append(key))
+    monkeypatch.setattr(client.keys_compat, "press", lambda key: pressed.append(key))
     client.send_game_command("toggle_hazards", client.DEFAULT_KEYBINDS)
     assert focused == [12345]
     assert pressed == ["z"]
@@ -307,7 +313,12 @@ def test_parse_custom_key():
     assert client.parse_custom_key("ctrl+") is None
     assert client.parse_custom_key("") is None
     assert client.parse_custom_key(None) is None
-    assert client.parse_custom_key("f24") == ["f24"] and "f24" in client.pydirectinput.KEYBOARD_MAPPING
+    # F24 no viene de fabrica en ninguno de los tres backends: si se acepta
+    # en la lista blanca, los tres tienen que saber mandarla.
+    assert client.parse_custom_key("f24") == ["f24"]
+    assert "f24" in keys_compat.WINDOWS_EXTRA_SCANCODES
+    assert "f24" in keys_compat.LINUX_KEYCODES
+    assert keys_compat.x11_keysym_name("f24") == "F24"
 
 
 def test_is_truckersmp_session():
@@ -394,7 +405,7 @@ def test_single_instance_guard(monkeypatch):
     import uuid
     import win_integration
 
-    monkeypatch.setattr(win_integration, "SINGLE_INSTANCE_MUTEX", f"Local\TruckDashTest-{uuid.uuid4().hex}")
+    monkeypatch.setattr(win_integration, "SINGLE_INSTANCE_MUTEX", rf"Local\TruckDashTest-{uuid.uuid4().hex}")
     monkeypatch.setattr(win_integration, "_single_instance_handle", None)
     assert win_integration.acquire_single_instance() is True
     assert win_integration.acquire_single_instance() is False          # ya tomado
@@ -461,10 +472,125 @@ def test_telemetry_compat_elige_el_bloque_segun_el_sistema(monkeypatch):
     import telemetry_compat
 
     assert telemetry_compat.BLOCK_SIZE == 32 * 1024
-    assert telemetry_compat.WINDOWS_NAME == "Local\SCSTelemetry"
+    assert telemetry_compat.WINDOWS_NAME == r"Local\SCSTelemetry"
     assert telemetry_compat.LINUX_PATH == "/dev/shm/SCSTelemetry"
 
     fuente = inspect.getsource(telemetry_compat._open_buffer)
     rama_linux = fuente.split("if IS_WINDOWS:")[1].split("return _mem.buf")[1]
     assert "SharedMemory" not in rama_linux, "en Linux hay que mapear el archivo a mano"
     assert "mmap.mmap" in rama_linux
+
+
+def test_todas_las_teclas_permitidas_existen_en_los_tres_backends():
+    """La lista blanca de teclas custom es una sola, pero se manda por tres
+    caminos distintos (pydirectinput, XTEST, uinput). Si alguien suma una
+    tecla a la lista y se olvida de mapearla, en Linux fallaria recien
+    cuando un usuario la apriete."""
+    for key in sorted(client.CUSTOM_KEY_ALLOWED | set(client.CUSTOM_KEY_MODIFIERS)):
+        assert key in keys_compat.LINUX_KEYCODES, f"{key} no tiene keycode de Linux"
+        assert keys_compat.x11_keysym_name(key), f"{key} no tiene keysym de X11"
+
+
+def test_los_keycodes_de_linux_no_se_repiten():
+    codigos = list(keys_compat.LINUX_KEYCODES.values())
+    repetidos = {c for c in codigos if codigos.count(c) > 1}
+    assert not repetidos, f"dos teclas comparten codigo: {repetidos}"
+
+
+def test_en_linux_no_se_manda_nada_por_pydirectinput(monkeypatch):
+    """pydirectinput no existe fuera de Windows: el backend de Linux tiene
+    que ser XTEST o uinput, nunca ese."""
+    monkeypatch.setattr(keys_compat, "IS_WINDOWS", False)
+    intentados = []
+
+    class Falla:
+        def __init__(self, *a, **k):
+            intentados.append(self.name)
+            raise RuntimeError("no disponible en el test")
+
+    class XTestFalla(Falla):
+        name = "xtest"
+
+    class UinputFalla(Falla):
+        name = "uinput"
+
+    monkeypatch.setattr(keys_compat, "XTestBackend", XTestFalla)
+    monkeypatch.setattr(keys_compat, "UinputBackend", UinputFalla)
+    monkeypatch.setattr(keys_compat, "_backend", None)
+    monkeypatch.setattr(keys_compat, "_tried", False)
+    monkeypatch.setattr(keys_compat, "_reason", "")
+
+    assert keys_compat.available() is False
+    # XTEST primero (no pide permisos), uinput despues.
+    assert intentados == ["xtest", "uinput"]
+    # El motivo que ve el usuario nombra los dos caminos que fallaron.
+    assert "xtest" in keys_compat.unavailable_reason()
+    assert "uinput" in keys_compat.unavailable_reason()
+    keys_compat._tried = False
+    keys_compat._backend = None
+
+
+# --------------------------------------------------------------------------
+# Integracion con Linux: el inicio automatico es un .desktop y la instancia
+# unica un flock. Se prueba la logica pura, que es igual en los dos sistemas.
+# --------------------------------------------------------------------------
+
+def test_autostart_desktop_respeta_xdg_config_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    ruta = win_integration.autostart_desktop_path()
+    assert ruta == str(tmp_path / "cfg" / "autostart" / "truckdash.desktop")
+    monkeypatch.delenv("XDG_CONFIG_HOME")
+    assert win_integration.autostart_desktop_path().endswith(
+        os.path.join(".config", "autostart", "truckdash.desktop"))
+
+
+def test_autostart_desktop_entry_cita_la_ruta(monkeypatch):
+    """Casi todas las instalaciones de Steam viven en rutas con espacios, y un
+    Exec= sin comillas se parte en dos y no arranca nada."""
+    monkeypatch.setattr(win_integration, "exe_path", lambda: "/home/x/mis apps/Truck Dash.AppImage")
+    entry = win_integration.autostart_desktop_entry()
+    exec_line = [l for l in entry.splitlines() if l.startswith("Exec=")][0]
+    assert "'/home/x/mis apps/Truck Dash.AppImage'" in exec_line
+    assert exec_line.endswith(win_integration.AUTOSTART_FLAG)
+    assert entry.startswith("[Desktop Entry]")
+
+    monkeypatch.setattr(win_integration, "exe_path", lambda: None)
+    assert win_integration.autostart_desktop_entry() is None
+
+
+def test_lock_de_instancia_unica_va_en_el_runtime_dir(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    assert win_integration.single_instance_lock_path() == str(
+        tmp_path / win_integration.SINGLE_INSTANCE_LOCK)
+    # Si la variable apunta a algo que no existe se cae al temporal, no se
+    # revienta: sin lock es preferible dejar arrancar.
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "no-existe"))
+    assert win_integration.runtime_dir() == tempfile.gettempdir()
+
+
+def test_exe_path_prefiere_el_appimage(monkeypatch):
+    """Adentro de un AppImage sys.executable es el binario extraido en el
+    montaje, que desaparece al cerrar; para el inicio automatico hay que
+    guardar la ruta del .AppImage."""
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", "/tmp/.mount_abc/truckdash")
+    monkeypatch.setenv("APPIMAGE", "/home/x/TruckDash.AppImage")
+    assert win_integration.exe_path() == "/home/x/TruckDash.AppImage"
+    monkeypatch.delenv("APPIMAGE")
+    assert win_integration.exe_path() == "/tmp/.mount_abc/truckdash"
+
+
+def test_idioma_desde_el_entorno(monkeypatch):
+    """En Linux el idioma sale del entorno. LANGUAGE puede traer una lista
+    ('pt_BR:pt:en') y manda el primero."""
+    monkeypatch.setattr(i18n.sys, "platform", "linux")
+    for var in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LANGUAGE", "pt_BR:pt:en")
+    assert i18n.detect_language() == "pt"
+    monkeypatch.delenv("LANGUAGE")
+    monkeypatch.setenv("LANG", "de_DE.UTF-8")
+    assert i18n.detect_language() == "de"
+    # "C" no es un idioma: hay que seguir buscando, no devolver 'c'.
+    monkeypatch.setenv("LC_ALL", "C")
+    assert i18n.detect_language() == "de"

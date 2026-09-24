@@ -24,20 +24,11 @@ import sys
 import time
 
 IS_WINDOWS = sys.platform == "win32"
-if IS_WINDOWS:
-    # Solo Windows: manda teclas al juego. En Linux hace falta otro
-    # camino (XTEST en X11, /dev/uinput en Wayland), todavia sin hacer.
-    import pydirectinput
-else:
-    pydirectinput = None
+import keys_compat
 import telemetry_compat
+import window_compat
 import websockets
 from urllib.request import urlopen, Request
-
-# pydirectinput por defecto pausa 0.1s despues de cada tecla (pensado para
-# macros/automatizacion) - para un boton individual eso se siente como
-# lag, no hace falta ese delay aca.
-pydirectinput.PAUSE = 0
 
 # Usa el almacen de certificados nativo de Windows/macOS/Linux para validar
 # TLS, en vez del bundle de certificados que trae empaquetado Python (via
@@ -116,10 +107,10 @@ ACTION_TO_SCS_ACTION = {
 }
 
 # Nombres de tecla que usa SCS en controls.sii -> nombre que espera
-# pydirectinput. No hace falta que sea exhaustivo (solo lo que realmente
+# keys_compat. No hace falta que sea exhaustivo (solo lo que realmente
 # puede terminar asignado a estos comandos), las teclas no listadas se pasan
 # tal cual (funciona para la mayoria de las letras sueltas).
-_SCS_KEY_TO_PYDIRECTINPUT = {
+_SCS_KEY_TO_NOMBRE = {
     "space": "space", "esc": "esc", "tab": "tab", "backspace": "backspace",
     "enter": "enter", "numenter": "enter",
     "del": "delete", "ins": "insert", "home": "home", "end": "end",
@@ -134,15 +125,21 @@ _SCS_KEY_TO_PYDIRECTINPUT = {
     "numplus": "add", "numminus": "subtract", "nummultiply": "multiply", "numslash": "divide",
 }
 for _i in range(10):
-    _SCS_KEY_TO_PYDIRECTINPUT[f"key{_i}"] = str(_i)
+    _SCS_KEY_TO_NOMBRE[f"key{_i}"] = str(_i)
 for _i in range(1, 13):
-    _SCS_KEY_TO_PYDIRECTINPUT[f"f{_i}"] = f"f{_i}"
+    _SCS_KEY_TO_NOMBRE[f"f{_i}"] = f"f{_i}"
 
 _MIX_LINE_RE = re.compile(r'"mix\s+([a-zA-Z0-9_]+)\s+`([^`]*)`"')
 _KEYBOARD_BIND_RE = re.compile(r"keyboard\.([a-zA-Z0-9_]+)")
 
 
 def documents_folder() -> str:
+    """Carpeta donde el juego guarda perfiles y game.log.txt, un nivel
+    arriba de "Euro Truck Simulator 2" / "American Truck Simulator"."""
+    if not IS_WINDOWS:
+        # En Linux nativo no hay "Documentos": el juego escribe en
+        # ~/.local/share, con los mismos nombres de carpeta adentro.
+        return window_compat.data_dir()
     # No asumir "~/Documents" - OneDrive puede redirigir la carpeta de
     # Documentos a otro lado (ej. "OneDrive/Documentos"), y ahi es donde el
     # juego realmente guarda los perfiles.
@@ -267,7 +264,7 @@ def find_controls_sii_files() -> list:
 
 
 def parse_controls_sii(text: str) -> dict:
-    """{accion_scs: tecla_pydirectinput o None} de cada linea 'mix' del
+    """{accion_scs: nombre_de_tecla o None} de cada linea 'mix' del
     controls.sii - solo mira el primer binding de teclado de cada una,
     ignora binds de joystick/mouse."""
     result = {}
@@ -276,7 +273,7 @@ def parse_controls_sii(text: str) -> dict:
         key_match = _KEYBOARD_BIND_RE.search(expr)
         if key_match:
             scs_key = key_match.group(1)
-            result[action] = _SCS_KEY_TO_PYDIRECTINPUT.get(scs_key, scs_key)
+            result[action] = _SCS_KEY_TO_NOMBRE.get(scs_key, scs_key)
         else:
             result[action] = None
     return result
@@ -345,11 +342,7 @@ def save_keybinds(keybinds: dict) -> None:
 
 
 def find_game_window():
-    for title in GAME_WINDOW_TITLES:
-        hwnd = _user32.FindWindowW(None, title)
-        if hwnd:
-            return hwnd
-    return None
+    return window_compat.find_game_window(GAME_WINDOW_TITLES)
 
 
 _PROCESS_QUERY_INFORMATION = 0x0400
@@ -364,6 +357,8 @@ def running_game_info(hwnd) -> dict | None:
     La heuristica de elevacion: si desde aca (no elevados) no podemos abrir
     el proceso con QUERY_INFORMATION pero si con QUERY_LIMITED, el juego
     corre con mayor integridad que nosotros."""
+    if not IS_WINDOWS:
+        return window_compat.process_info(hwnd)
     pid = ctypes.c_ulong(0)
     _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     if not pid.value:
@@ -402,6 +397,12 @@ def bring_window_to_foreground(hwnd) -> None:
     # combina con AttachThreadInput para maxima confiabilidad. Best-effort:
     # en casos raros Windows igual lo bloquea, no hay forma 100% garantizada
     # sin tocar politicas del sistema.
+    #
+    # En Linux no existe nada de esto: se le pide al gestor de ventanas y
+    # listo (window_compat).
+    if not IS_WINDOWS:
+        window_compat.bring_to_foreground(hwnd)
+        return
     foreground_hwnd = _user32.GetForegroundWindow()
     current_thread_id = _kernel32.GetCurrentThreadId()
     foreground_thread_id = _user32.GetWindowThreadProcessId(foreground_hwnd, None)
@@ -418,12 +419,6 @@ def bring_window_to_foreground(hwnd) -> None:
         _user32.AttachThreadInput(current_thread_id, foreground_thread_id, False)
         _user32.AttachThreadInput(current_thread_id, target_thread_id, False)
 
-
-# Teclas que pydirectinput no trae de fabrica (scancodes DirectInput): el
-# teclado numerico (el juego lo distingue de la fila de numeros) y F13-F24.
-_EXTRA_SCANCODES = {"num0": 0x52, "num1": 0x4F, "num2": 0x50, "num3": 0x51, "num4": 0x4B, "num5": 0x4C, "num6": 0x4D, "num7": 0x47, "num8": 0x48, "num9": 0x49,
-                    "f13": 0x64, "f14": 0x65, "f15": 0x66, "f16": 0x67, "f17": 0x68, "f18": 0x69, "f19": 0x6A, "f20": 0x6B, "f21": 0x6C, "f22": 0x6D, "f23": 0x6E, "f24": 0x6F}
-pydirectinput.KEYBOARD_MAPPING.update(_EXTRA_SCANCODES)
 
 # Botones custom de la web: la tecla viaja con el comando ("ctrl+shift+f5"),
 # se valida contra esta lista blanca (nada de Win, nada de Alt+F4) y se
@@ -466,12 +461,12 @@ def send_custom_key(spec) -> str:
         bring_window_to_foreground(hwnd)
         mods, key = combo[:-1], combo[-1]
         for m in mods:
-            pydirectinput.keyDown(m)
+            keys_compat.key_down(m)
         try:
-            pydirectinput.press(key)
+            keys_compat.press(key)
         finally:
             for m in reversed(mods):
-                pydirectinput.keyUp(m)
+                keys_compat.key_up(m)
         return "ok"
     except Exception as exc:
         logging.warning(f"No se pudo enviar la tecla custom '{spec}': {exc}")
@@ -492,7 +487,7 @@ def send_game_command(action: str, keybinds: dict) -> str:
         return "no_window"
     try:
         bring_window_to_foreground(hwnd)
-        pydirectinput.press(key)
+        keys_compat.press(key)
         return "ok"
     except Exception as exc:
         logging.warning(f"No se pudo enviar el comando '{action}' (tecla '{key}'): {exc}")

@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -34,7 +35,12 @@ def base_dir() -> str:
 
 
 def exe_path() -> str | None:
-    return sys.executable if getattr(sys, "frozen", False) else None
+    if not getattr(sys, "frozen", False):
+        return None
+    # En un AppImage sys.executable es el binario de adentro del montaje, que
+    # deja de existir al cerrar el programa; el que sirve para volver a
+    # arrancarlo es el .AppImage, y esa ruta la pasa el runtime en APPIMAGE.
+    return os.environ.get("APPIMAGE") or sys.executable
 
 
 def settings_path() -> str:
@@ -97,7 +103,7 @@ def acquire_single_instance(wait_seconds: float = 0.0) -> bool:
     el proceso viejo sigue vivo unos segundos mas)."""
     global _single_instance_handle
     if os.name != "nt":
-        return True
+        return _acquire_single_instance_posix(wait_seconds)
     import ctypes
     # use_last_error: GetLastError() de ctypes.windll se pisa con el de
     # cualquier otra llamada intermedia y devolvia basura.
@@ -115,6 +121,52 @@ def acquire_single_instance(wait_seconds: float = 0.0) -> bool:
         if handle:
             kernel32.CloseHandle(handle)
         if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.25)
+
+
+# En Linux no hay mutex con nombre, pero un flock exclusivo hace lo mismo y
+# tiene la propiedad que importa: lo suelta el kernel cuando el proceso muere,
+# asi que un cierre abrupto (o un kill -9) no deja trabado el arranque
+# siguiente. El archivo vive en XDG_RUNTIME_DIR, que es por usuario y lo limpia
+# el sistema al cerrar sesion.
+SINGLE_INSTANCE_LOCK = "truckdash-single-instance.lock"
+
+
+def runtime_dir() -> str:
+    base = os.environ.get("XDG_RUNTIME_DIR")
+    if base and os.path.isdir(base):
+        return base
+    return tempfile.gettempdir()
+
+
+def single_instance_lock_path() -> str:
+    return os.path.join(runtime_dir(), SINGLE_INSTANCE_LOCK)
+
+
+def _acquire_single_instance_posix(wait_seconds: float = 0.0) -> bool:
+    global _single_instance_handle
+    import fcntl
+    path = single_instance_lock_path()
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError as exc:
+        # Sin donde escribir el lock no se puede decidir: mejor dejar arrancar
+        # que trabar al usuario por un permiso raro.
+        logging.warning(f"No se pudo abrir {path} ({exc}), se sigue sin instancia unica")
+        return True
+    deadline = time.monotonic() + max(0.0, wait_seconds)
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            os.ftruncate(fd, 0)
+            os.write(fd, str(os.getpid()).encode())
+            _single_instance_handle = fd  # no se cierra: vive con el proceso
+            return True
+        except OSError:
+            pass
+        if time.monotonic() >= deadline:
+            os.close(fd)
             return False
         time.sleep(0.25)
 
@@ -151,7 +203,55 @@ def autostart_command() -> str | None:
     return f'"{exe}" {AUTOSTART_FLAG}'
 
 
+AUTOSTART_DESKTOP_NAME = "truckdash.desktop"
+
+
+def autostart_desktop_path() -> str:
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(base, "autostart", AUTOSTART_DESKTOP_NAME)
+
+
+def autostart_desktop_entry() -> str | None:
+    exe = exe_path()
+    if not exe:
+        return None
+    return (
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=Truck Dash\n"
+        "Comment=Dashboard y GPS para ETS2/ATS\n"
+        f"Exec={shlex.quote(exe)} {AUTOSTART_FLAG}\n"
+        "Terminal=false\n"
+        "NoDisplay=true\n"
+        "X-GNOME-Autostart-enabled=true\n"
+    )
+
+
+def _is_autostart_enabled_posix() -> bool:
+    return os.path.isfile(autostart_desktop_path())
+
+
+def _set_autostart_posix(enabled: bool) -> bool:
+    path = autostart_desktop_path()
+    try:
+        if enabled:
+            entry = autostart_desktop_entry()
+            if not entry:
+                return False
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(entry)
+        elif os.path.exists(path):
+            os.remove(path)
+        return True
+    except OSError as exc:
+        logging.warning(f"No se pudo cambiar el inicio automatico ({exc})")
+        return False
+
+
 def is_autostart_enabled() -> bool:
+    if os.name != "nt":
+        return _is_autostart_enabled_posix()
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
@@ -167,6 +267,8 @@ def set_autostart(enabled: bool) -> bool:
     if enabled and in_temp_location():
         logging.warning("Inicio automatico no registrado: el .exe corre desde una carpeta temporal")
         return False
+    if os.name != "nt":
+        return _set_autostart_posix(enabled)
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:

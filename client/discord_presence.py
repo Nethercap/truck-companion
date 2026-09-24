@@ -1,14 +1,15 @@
 """Muestra el viaje en curso en el perfil de Discord (Rich Presence).
 
-Es puro cliente: Discord escucha en un named pipe local
-(\\\\.\\pipe\\discord-ipc-0 .. -9) y acepta tramas de 8 bytes de cabecera
+Es puro cliente: Discord escucha en un canal local (en Windows los named
+pipes \\\\.\\pipe\\discord-ipc-0 .. -9, en Linux sockets unix
+en XDG_RUNTIME_DIR) y acepta tramas de 8 bytes de cabecera
 (opcode y largo, little endian) mas un JSON. No hay backend, ni login, ni
 secreto: alcanza con el Application ID, que es publico.
 
 Apagado por defecto: lo que se publica (origen, destino, carga) lo ve
 cualquiera que mire el perfil.
 
-Si Discord no esta abierto no pasa nada: no hay pipe, se reintenta cada tanto
+Si Discord no esta abierto no pasa nada: no hay canal, se reintenta cada tanto
 y el cliente sigue igual.
 """
 
@@ -98,6 +99,58 @@ def activity_from_telemetry(data: dict, started_at: float | None = None) -> dict
     return activity
 
 
+class _SocketPipe:
+    """Socket unix con la misma cara que el archivo del named pipe de
+    Windows, para que el resto del codigo no tenga que saber en cual esta.
+    read(n) devuelve n bytes, o lo que haya si se corta, igual que el pipe."""
+
+    def __init__(self, sock):
+        self._sock = sock
+
+    def write(self, data):
+        self._sock.sendall(data)
+
+    def read(self, n):
+        buf = b""
+        while len(buf) < n:
+            chunk = self._sock.recv(n - len(buf))
+            if not chunk:
+                break
+            buf += chunk
+        return buf
+
+    def close(self):
+        self._sock.close()
+
+
+def ipc_paths() -> list:
+    """Donde escucha Discord, en orden. En Windows son named pipes; en Linux,
+    sockets unix en XDG_RUNTIME_DIR - y Flatpak y Snap los meten cada uno en
+    su propia subcarpeta debajo de esa misma base."""
+    if os.name == "nt":
+        return [rf"\\.\pipe\discord-ipc-{i}" for i in range(10)]
+    base = os.environ.get("XDG_RUNTIME_DIR") or os.environ.get("TMPDIR") or "/tmp"
+    subdirs = ("", "app/com.discordapp.Discord", "app/com.discordapp.DiscordCanary",
+               "snap.discord", "snap.discord-canary")
+    return [os.path.join(base, sub, f"discord-ipc-{i}")
+            for sub in subdirs for i in range(10)]
+
+
+def open_ipc(path):
+    """Abre el canal de Discord. El objeto que devuelve sabe write/read/close."""
+    if os.name == "nt":
+        return open(path, "r+b", buffering=0)
+    import socket
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(2.0)
+    try:
+        sock.connect(path)
+    except OSError:
+        sock.close()
+        raise
+    return _SocketPipe(sock)
+
+
 class DiscordPresence:
     """Mantiene la conexion con Discord en un hilo aparte. update() solo deja
     el ultimo estado; el hilo se encarga de conectar, reconectar y respetar el
@@ -142,10 +195,9 @@ class DiscordPresence:
 
     # --------------------------------------------------------------- interno
     def _connect(self) -> bool:
-        for i in range(10):
-            path = rf"\\.\pipe\discord-ipc-{i}"
+        for path in ipc_paths():
             try:
-                pipe = open(path, "r+b", buffering=0)
+                pipe = open_ipc(path)
             except OSError:
                 continue
             try:

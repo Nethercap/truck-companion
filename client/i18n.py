@@ -6,6 +6,8 @@ ingles. Uso: from i18n import T; T("copy"); T("update_available", new="1.4.0", c
 """
 
 import locale
+import sys
+import os
 
 _STRINGS = {
     "en": {
@@ -686,12 +688,23 @@ _STRINGS = {
 def detect_language() -> str:
     """Idioma de la interfaz de Windows del usuario (no el del sistema ni el
     formato regional), reducido a los que tenemos; 'en' si no hay match."""
-    try:
-        import ctypes
-        langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
-        name = locale.windows_locale.get(langid, "")
-    except Exception:
-        name = ""
+    name = ""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+            name = locale.windows_locale.get(langid, "")
+        except Exception:
+            name = ""
+    else:
+        # En Linux el idioma de la interfaz sale del entorno, en el orden que
+        # manda POSIX. LANGUAGE puede traer varios separados por dos puntos
+        # ("pt_BR:pt:en"); el primero es el que el usuario prefiere.
+        for var in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
+            valor = os.environ.get(var) or ""
+            if valor and valor not in ("C", "POSIX"):
+                name = valor.split(":")[0]
+                break
     if not name:
         try:
             name = locale.getlocale()[0] or ""
