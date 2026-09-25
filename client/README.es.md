@@ -151,6 +151,10 @@ export STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/TuPrefijo"; export STEAM_COMPAT_CL
 Si usas algun envoltorio, va al final, por ejemplo
 `exec gamescope -W 1920 -H 1080 -r 120 -- %command%`.
 
+Probado con **GE-Proton11-7**. El nombre de la carpeta dentro de
+`compatibilitytools.d/` es el de tu build de Proton; el ejemplo de arriba usa
+el de la maquina donde se probo.
+
 Detalles de esa instalacion:
 
 - El plugin se instala normal. Proton corre la version Windows del juego, asi
