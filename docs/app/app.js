@@ -686,12 +686,15 @@ if (typeof TRANSLATIONS_EXTRA !== 'undefined') Object.assign(TRANSLATIONS, TRANS
 
 const LANG_KEY = 'truckdash_lang';
 function detectLanguage() {
+  // Ingles por defecto, a proposito, y NO el idioma del navegador: es el
+  // idioma del producto y la referencia de todas las traducciones. Lo unico
+  // que lo cambia es haber elegido uno a mano (aca o en /account/, las dos
+  // pantallas guardan en la misma clave), porque eso si es una decision.
   try {
     const saved = localStorage.getItem(LANG_KEY);
     if (saved && TRANSLATIONS[saved]) return saved;
   } catch (e) {}
-  const nav = (navigator.language || 'en').toLowerCase().slice(0, 2);
-  return TRANSLATIONS[nav] ? nav : 'en';
+  return 'en';
 }
 let currentLang = detectLanguage();
 function t(key, ...args) {
