@@ -81,14 +81,95 @@ def _ventanas():
         return []
 
 
-def find_game_window(titulos):
-    """Handle de la primera ventana cuyo titulo este en `titulos`, o None."""
-    if IS_WINDOWS:
-        import ctypes
-        for titulo in titulos:
-            hwnd = ctypes.windll.user32.FindWindowW(None, titulo)
-            if hwnd:
+# Ejecutables de los juegos. Es la senal mas confiable para reconocer la
+# ventana: el titulo lo cambian Proton, TruckersMP, los mods y el idioma del
+# juego, pero el nombre del .exe no.
+GAME_EXES = ("eurotrucks2.exe", "amtrucks.exe")
+
+
+def _windows_top_level():
+    """[(hwnd, titulo, exe_en_minuscula)] de las ventanas visibles."""
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    salida = []
+
+    CALLBACK = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+    def visitar(hwnd, _lparam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        largo = user32.GetWindowTextLengthW(hwnd)
+        titulo = ""
+        if largo:
+            buf = ctypes.create_unicode_buffer(largo + 1)
+            user32.GetWindowTextW(hwnd, buf, largo + 1)
+            titulo = buf.value
+        exe = ""
+        try:
+            pid = wintypes.DWORD(0)
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value:
+                # QUERY_LIMITED_INFORMATION alcanza y no necesita permisos
+                # especiales, a diferencia de QUERY_INFORMATION.
+                handle = kernel32.OpenProcess(0x1000, False, pid.value)
+                if handle:
+                    try:
+                        buf = ctypes.create_unicode_buffer(1024)
+                        size = wintypes.DWORD(1024)
+                        if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                            exe = os.path.basename(buf.value).lower()
+                    finally:
+                        kernel32.CloseHandle(handle)
+        except Exception:
+            pass
+        salida.append((hwnd, titulo, exe))
+        return True
+
+    user32.EnumWindows(CALLBACK(visitar), 0)
+    return salida
+
+
+
+def match_game_window(ventanas, titulos):
+    """Elige la ventana del juego de [(hwnd, titulo, exe)], o None.
+
+    Primero por ejecutable, que es lo unico que no cambia; despues por
+    titulo, aceptando que tenga algo alrededor (TruckersMP le agrega cosas).
+    """
+    for hwnd, _titulo, exe in ventanas:
+        if exe in GAME_EXES:
+            return hwnd
+    for hwnd, titulo, _exe in ventanas:
+        for esperado in titulos:
+            if titulo and esperado and (titulo == esperado or esperado in titulo):
                 return hwnd
+    return None
+
+
+def find_game_window(titulos):
+    """Handle de la ventana del juego, o None.
+
+    No se usa FindWindowW porque compara el titulo EXACTO y el titulo no es
+    confiable: Proton, TruckersMP, los mods y el idioma del juego lo cambian.
+    Se recorren las ventanas y se acepta por nombre del ejecutable primero,
+    que es lo unico que no cambia, y por titulo despues.
+    """
+    if IS_WINDOWS:
+        try:
+            ventanas = _windows_top_level()
+        except Exception as exc:
+            logging.warning(f"No se pudo listar las ventanas ({exc})")
+            return None
+        hwnd = match_game_window(ventanas, titulos)
+        if hwnd:
+            return hwnd
+        # Sin match, el log tiene que decir QUE se vio: es la diferencia entre
+        # "el titulo cambio" y "la ventana no esta en este escritorio", que es
+        # lo que hay que saber para el proximo reporte.
+        vistas = [f"{t!r}/{e}" for _h, t, e in ventanas if t or e][:12]
+        logging.info(f"Ventana del juego no encontrada entre {len(ventanas)} ventanas: {vistas}")
         return None
     if _get_display() is None:
         return None

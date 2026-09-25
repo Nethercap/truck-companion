@@ -9,6 +9,7 @@ import client
 import i18n
 import keys_compat
 import win_integration
+import window_compat
 
 
 def test_http_base_url_converts_ws_schemes():
@@ -667,3 +668,36 @@ def test_la_entrega_adjunta_los_detalles_del_tick():
     client.attach_job_snapshot_if_finished(payload2)
     assert payload2["event"]["jobDst"] == "Pärnu"
     assert "jobCargoDamage" not in payload2["event"]
+
+
+TITULOS = ("Euro Truck Simulator 2", "American Truck Simulator")
+
+
+def test_la_ventana_del_juego_se_reconoce_por_el_ejecutable():
+    """El titulo lo cambian Proton, TruckersMP, los mods y el idioma del
+    juego; el nombre del .exe no. Por eso manda el ejecutable."""
+    ventanas = [
+        (1, "Discord", "discord.exe"),
+        (2, "", "eurotrucks2.exe"),          # sin titulo y aun asi es el juego
+        (3, "Euro Truck Simulator 2", "otracosa.exe"),
+    ]
+    assert window_compat.match_game_window(ventanas, TITULOS) == 2
+
+
+def test_la_ventana_se_reconoce_aunque_el_titulo_tenga_cosas_alrededor():
+    """TruckersMP y varios mods le agregan texto al titulo, y FindWindowW
+    comparaba exacto: la ventana estaba ahi y deciamos que no."""
+    for titulo in ("Euro Truck Simulator 2",
+                   "Euro Truck Simulator 2 - TruckersMP",
+                   "[MP] Euro Truck Simulator 2 1.61"):
+        ventanas = [(1, "Firefox", "firefox.exe"), (7, titulo, "")]
+        assert window_compat.match_game_window(ventanas, TITULOS) == 7, titulo
+
+
+def test_no_se_confunde_con_otra_ventana_que_hable_de_camiones():
+    ventanas = [
+        (1, "Trucky Mods Manager", "trucky mods manager.exe"),
+        (2, "ETS2 - YouTube - Firefox", "firefox.exe"),
+    ]
+    assert window_compat.match_game_window(ventanas, TITULOS) is None
+    assert window_compat.match_game_window([], TITULOS) is None
