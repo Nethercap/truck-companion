@@ -28,6 +28,24 @@ jobs:
       - run: python -m pip install pytest
       - run: python -m pytest client/ -v
 
+  # El cliente tambien corre en Linux (bajo Proton, y algun dia nativo), y
+  # ahi hay cosas que en Windows no se ven: las rutas distinguen mayusculas y
+  # no hay winreg. Hasta ahora esto solo se probaba al publicar un tag, asi
+  # que un test roto se descubria recien en el release, y se pasaron dos asi.
+  client-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # xvfb para que las pruebas de la ventana de Setup corran de verdad en
+      # vez de saltearse por falta de pantalla.
+      - run: sudo apt-get update && sudo apt-get install -y python3-tk libxtst6 libxss1 xvfb
+      - run: pip install -r client/requirements.txt
+      - run: python -m pip install pytest
+      - run: xvfb-run -a python -m pytest client/ -v
+
   web:
     runs-on: ubuntu-latest
     steps:

@@ -245,7 +245,13 @@ def test_same_dir_reconoce_la_misma_carpeta_por_dos_rutas(tmp_path):
     # un ".." en el medio y con otra capitalizacion.
     otra = os.path.join(str(tmp_path), "Euro Truck Simulator 2", "bin", "..", "bin", "win_x64")
     assert plugin_installer.same_dir(str(real), otra) is True
-    assert plugin_installer.same_dir(str(real), str(real).upper()) is True
+    # Capitalizacion distinta: solo es la misma carpeta si el sistema de
+    # archivos no distingue mayusculas. En Linux SI las distingue, y ahi dos
+    # rutas que difieren en capitalizacion son dos carpetas distintas de
+    # verdad: darlas por iguales seria el error, no el acierto. Se pregunta
+    # por el sistema de archivos en vez de por el sistema operativo.
+    sin_distinguir = os.path.exists(str(real).upper())
+    assert plugin_installer.same_dir(str(real), str(real).upper()) is sin_distinguir
     # Y dos carpetas distintas siguen siendo distintas.
     otra_real = tmp_path / "American Truck Simulator" / "bin" / "win_x64"
     otra_real.mkdir(parents=True)
