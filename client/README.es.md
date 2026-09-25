@@ -164,6 +164,14 @@ Detalles de esa instalacion:
   Wine llega a la misma carpeta por mas de un camino.
 - El tablero puede tardar un poco mas en cargar el mapa en el celular que en
   la PC. Eso es la descarga de los datos del mapa, no el prefijo.
+- Al cerrar el juego, Steam lo sigue mostrando como "Running" y no te deja
+  volver a lanzarlo hasta que cierres tambien Truck Dash. Es por la misma
+  razon por la que el cliente tiene que vivir en el prefijo del juego: hay un
+  wineserver por prefijo y no termina hasta que se va el ultimo proceso de
+  Wine, asi que el wrapper de Proton que lanzo Steam se queda esperando.
+  Desde 1.5.15 el cliente se cierra solo cuando se cierra el juego, que es lo
+  que suelta el prefijo. Es una casilla en Setup, activada por defecto solo
+  bajo Proton.
 
 **La version nativa de Linux del juego** es otra historia: necesita un plugin
 de telemetria compilado para Linux, que existe como build de prueba pero

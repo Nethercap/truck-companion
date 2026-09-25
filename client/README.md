@@ -220,6 +220,13 @@ Notes from that setup:
   folder through more than one path.
 - The dashboard may take a bit longer to load the map on a phone than on the
   PC. That is the map data download, not the prefix.
+- When you close the game, Steam keeps showing it as "Running" and will not
+  let you launch it again until you also close Truck Dash. That is the same
+  reason the client has to live in the game's prefix: there is one wineserver
+  per prefix, and it does not end until the last Wine process does, so the
+  Proton wrapper Steam launched keeps waiting. From 1.5.15 the client closes
+  itself when the game closes, which is what releases the prefix. It is a
+  checkbox in Setup, on by default only under Proton.
 
 **Native Linux builds of the game** are a different story: they need a
 Linux build of the telemetry plugin, which exists as a test build but has

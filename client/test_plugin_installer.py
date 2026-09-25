@@ -329,3 +329,53 @@ def test_describe_install_marca_el_origen(tmp_path):
     mano = plugin_installer.describe_install("ats", str(bin_dir), origen="manual")
     assert auto["origen"] == "steam"
     assert mano["origen"] == "manual"
+
+
+def test_quit_on_game_close_por_defecto_solo_bajo_proton(monkeypatch):
+    """Bajo Proton hay un wineserver por prefijo y no termina hasta que se va
+    el ultimo proceso de Wine. Como el cliente tiene que vivir en el prefijo
+    del juego, mientras siga abierto Steam muestra el juego como "Running" y
+    no deja volver a lanzarlo. En Windows no pasa y quedarse en la bandeja es
+    lo que conviene."""
+    monkeypatch.setattr(win_integration, "load_settings", lambda: {})
+    monkeypatch.setattr(win_integration, "is_wine", lambda: True)
+    assert win_integration.quit_on_game_close_enabled() is True
+    monkeypatch.setattr(win_integration, "is_wine", lambda: False)
+    assert win_integration.quit_on_game_close_enabled() is False
+
+
+def test_quit_on_game_close_respeta_lo_que_eligio_el_usuario(monkeypatch):
+    """Elegido a mano gana sobre el default, en los dos sentidos."""
+    monkeypatch.setattr(win_integration, "is_wine", lambda: True)
+    monkeypatch.setattr(win_integration, "load_settings",
+                        lambda: {"quit_on_game_close": False})
+    assert win_integration.quit_on_game_close_enabled() is False
+    monkeypatch.setattr(win_integration, "is_wine", lambda: False)
+    monkeypatch.setattr(win_integration, "load_settings",
+                        lambda: {"quit_on_game_close": True})
+    assert win_integration.quit_on_game_close_enabled() is True
+
+
+def test_is_wine_detecta_por_ntdll(monkeypatch):
+    """Wine agrega wine_get_version a ntdll; Windows no la tiene."""
+    import ctypes
+
+    class FalsoNtdll:
+        wine_get_version = lambda self: "9.0"  # noqa: E731
+
+    class FalsoWindll:
+        ntdll = FalsoNtdll()
+
+    monkeypatch.setattr(win_integration, "_es_wine", None)
+    monkeypatch.setattr(ctypes, "windll", FalsoWindll(), raising=False)
+    assert win_integration.is_wine() is True
+
+    class SinWine:
+        pass
+
+    class WindllWindows:
+        ntdll = SinWine()
+
+    monkeypatch.setattr(win_integration, "_es_wine", None)
+    monkeypatch.setattr(ctypes, "windll", WindllWindows(), raising=False)
+    assert win_integration.is_wine() is False

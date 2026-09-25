@@ -173,3 +173,39 @@ def _textos(widget):
         except tk.TclError:
             pass
     return salida
+
+
+def test_la_opcion_de_cerrar_con_el_juego_se_guarda(ventana, monkeypatch):
+    """El default depende de si corre bajo Proton, pero destildarla tiene que
+    quedar guardado igual."""
+    v, guardados = ventana
+    v.quit_var.set(False)
+    v.toggle_quit_on_game_close()
+    assert guardados.get("quit_on_game_close") is False
+    v.quit_var.set(True)
+    v.toggle_quit_on_game_close()
+    assert guardados.get("quit_on_game_close") is True
+
+
+def test_apagar_cierra_discord_y_el_icono(monkeypatch):
+    """Se llama desde el hilo de asyncio cuando se cierra el juego, y tiene
+    que funcionar igual sin bandeja (Linux sin GTK)."""
+    llamadas = []
+    monkeypatch.setattr(tray_client.state.discord, "close",
+                        lambda: llamadas.append("discord"))
+    monkeypatch.setattr(tray_client.win_integration, "stop_and_exit",
+                        lambda cb=None: llamadas.append(("salir", cb is not None)))
+
+    class Icono:
+        def stop(self):
+            llamadas.append("icono")
+
+    monkeypatch.setattr(tray_client.state, "icon", Icono())
+    tray_client.apagar()
+    assert llamadas == ["discord", ("salir", True)]
+
+    # Sin bandeja tambien tiene que salir.
+    llamadas.clear()
+    monkeypatch.setattr(tray_client.state, "icon", None)
+    tray_client.apagar()
+    assert llamadas == ["discord", ("salir", False)]

@@ -313,6 +313,16 @@ class SetupWindow:
         if not discord_presence.APPLICATION_ID:
             dchk.configure(state="disabled")
 
+        # Bajo Proton el cliente retiene el wineserver del prefijo y Steam
+        # sigue viendo el juego como "Running". Por eso viene activado ahi y
+        # apagado en Windows, donde quedarse en la bandeja es lo mejor.
+        self.quit_var = tk.BooleanVar(value=win_integration.quit_on_game_close_enabled())
+        qchk = tk.Checkbutton(options, text=T("quit_on_game_close"), variable=self.quit_var,
+                              command=self.toggle_quit_on_game_close, bg=BG, fg=FG,
+                              selectcolor="#262b33", activebackground=BG, activeforeground=FG,
+                              wraplength=520, justify="left")
+        qchk.pack(anchor="w", pady=(2, 0))
+
         # --- Update ---
         self.update_frame = tk.Frame(self.root, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
@@ -388,6 +398,9 @@ class SetupWindow:
             logging.info("Removed game folder %s from Setup", install["bin_dir"])
             self.flash(T("folder_removed"), MUTED)
         self.render_installs()
+
+    def toggle_quit_on_game_close(self):
+        win_integration.set_quit_on_game_close(self.quit_var.get())
 
     def add_game_folder(self):
         chosen = filedialog.askdirectory(title=T("pick_folder_title"))
@@ -564,6 +577,18 @@ def show_log_location(icon, item):
         os.startfile(os.path.dirname(LOG_PATH))
     except Exception:
         pass
+
+
+def apagar() -> None:
+    """Cierra la aplicacion desde cualquier hilo.
+
+    quit_app sirve solo desde el menu de la bandeja (recibe el icono). Esto
+    lo llama tambien el loop de telemetria, que corre en el hilo de asyncio,
+    y tiene que funcionar igual sin bandeja (Linux sin GTK).
+    """
+    state.discord.close()
+    icono = state.icon
+    win_integration.stop_and_exit(icono.stop if icono is not None else None)
 
 
 def quit_app(icon, item):
@@ -889,6 +914,15 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 inactive_since = None
                 state.set_status("waiting_game")
                 state.discord.update(None)
+                # Llegar hasta aca implica que el juego estuvo corriendo:
+                # truck_telemetry.init() solo funciona si el plugin creo la
+                # memoria compartida. Asi que esto es "el juego se cerro", no
+                # "nunca arranco".
+                if win_integration.quit_on_game_close_enabled():
+                    logging.info("El juego se cerro y esta activo el cierre "
+                                 "automatico: saliendo para soltar el prefijo")
+                    apagar()
+                    return
             else:
                 state.set_status("waiting_truck")
         await publish_status()

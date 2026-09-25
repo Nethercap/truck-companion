@@ -47,6 +47,51 @@ def settings_path() -> str:
     return os.path.join(base_dir(), "settings.json")
 
 
+_es_wine = None
+
+
+def is_wine() -> bool:
+    """Si este .exe corre bajo Wine/Proton en vez de Windows de verdad.
+
+    Wine agrega wine_get_version a ntdll; Windows no la tiene. Es la forma
+    que usa el propio proyecto Wine para que un programa se entere.
+    """
+    global _es_wine
+    if _es_wine is None:
+        try:
+            import ctypes
+            ctypes.windll.ntdll.wine_get_version
+            _es_wine = True
+        except Exception:
+            _es_wine = False
+    return _es_wine
+
+
+def quit_on_game_close_enabled() -> bool:
+    """Si hay que cerrar Truck Dash cuando se cierra el juego.
+
+    Por defecto solo bajo Proton, y ahi por una razon concreta: hay un
+    wineserver por prefijo y no termina hasta que se va el ultimo proceso de
+    Wine. Como el cliente tiene que vivir en el prefijo del juego para leer
+    la memoria compartida, mientras siga abierto el wineserver sigue vivo, el
+    wrapper de Proton que lanzo Steam sigue esperandolo, y Steam muestra el
+    juego como "Running" y no deja volver a lanzarlo.
+
+    En Windows no pasa nada de esto y quedarse en la bandeja es lo que
+    conviene: asi detecta solo el proximo arranque del juego.
+    """
+    valor = load_settings().get("quit_on_game_close")
+    if valor is None:
+        return is_wine()
+    return bool(valor)
+
+
+def set_quit_on_game_close(activo: bool) -> None:
+    settings = load_settings()
+    settings["quit_on_game_close"] = bool(activo)
+    save_settings(settings)
+
+
 def load_settings() -> dict:
     try:
         with open(settings_path(), encoding="utf-8") as f:
