@@ -28,7 +28,7 @@ jobs:
       - name: Run client tests
         run: |
           pip install pytest
-          python -m pytest client/test_client.py client/test_plugin_installer.py -q
+          python -m pytest client/ -q
       - name: Build TruckDash.exe
         working-directory: client
         run: pyinstaller TruckDash.spec
@@ -132,7 +132,7 @@ jobs:
       - name: Run client tests
         run: |
           pip install pytest
-          python -m pytest client/test_client.py client/test_plugin_installer.py -q
+          python -m pytest client/ -q
       - name: Check the build interpreter has tkinter
         # PyInstaller no falla cuando le falta un modulo: lo anota en el log
         # y arma el binario igual, que despues muere al arrancar con

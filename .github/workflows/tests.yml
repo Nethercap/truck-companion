@@ -26,7 +26,7 @@ jobs:
           python-version: '3.12'
       - run: pip install -r client/requirements.txt
       - run: python -m pip install pytest
-      - run: python -m pytest client/test_client.py client/test_plugin_installer.py -v
+      - run: python -m pytest client/ -v
 
   web:
     runs-on: ubuntu-latest
