@@ -115,6 +115,57 @@ probabilidad:
    sincroniza. Verificá que la fecha y hora sean realmente correctas (no
    solo que esté en "automático").
 
+### Linux (con Proton)
+
+El cliente anda bajo Proton y ya hay un tester con todo funcionando:
+instalacion del plugin, codigo de pairing y modo LAN. Todavia no hay una
+version nativa de Linux.
+
+La regla que importa: **el cliente tiene que correr en el mismo prefijo de
+Proton que el juego.** La telemetria que lee es un bloque de memoria
+compartida con nombre, y en Wine esos nombres viven en el wineserver de cada
+prefijo. Un cliente en otro prefijo no ve nada: ni error ni datos, silencio.
+
+**Primero el juego, despues el cliente.** Steam corre una sola cosa por
+prefijo a la vez, asi que lanzar los dos juntos desde Steam no funciona.
+
+Se arma un lanzador `.desktop` apuntando a tu prefijo y a tu Proton, y se usa
+una vez que el juego ya esta abierto:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Truck Dash
+Exec=env STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/TuPrefijo" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe"
+Terminal=false
+Categories=Game;
+```
+
+Si preferis lanzar todo de una desde Steam, va esto en las opciones de inicio
+del juego. El sleep le da tiempo al juego a levantar el prefijo primero:
+
+```
+export STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/TuPrefijo"; export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"; (sleep 20 && "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe") & exec %command%
+```
+
+Si usas algun envoltorio, va al final, por ejemplo
+`exec gamescope -W 1920 -H 1080 -r 120 -- %command%`.
+
+Detalles de esa instalacion:
+
+- El plugin se instala normal. Proton corre la version Windows del juego, asi
+  que el `.dll` de Windows es el archivo correcto.
+- Si la lista de juegos muestra el mismo juego dos veces, actualiza a 1.5.14
+  o mas nuevo: las versiones anteriores comparaban las rutas como texto, y
+  Wine llega a la misma carpeta por mas de un camino.
+- El tablero puede tardar un poco mas en cargar el mapa en el celular que en
+  la PC. Eso es la descarga de los datos del mapa, no el prefijo.
+
+**La version nativa de Linux del juego** es otra historia: necesita un plugin
+de telemetria compilado para Linux, que existe como build de prueba pero
+todavia nadie confirmo contra el juego, y no hay cliente nativo. Si jugas la
+nativa y queres ayudar a probar, abri un issue.
+
 ## Compilarlo vos mismo
 
 Si preferís no correr un `.exe` precompilado, podés correr el cliente

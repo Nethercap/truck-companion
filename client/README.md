@@ -170,6 +170,58 @@ likelihood:
    turned on, it can drift if it hasn't synced in a while. Double-check the
    date and time are actually correct (not just set to "automatic").
 
+### Linux (through Proton)
+
+The client runs under Proton and a tester has it working, including plugin
+install, the pairing code and LAN mode. There is no native Linux build yet.
+
+The one rule that matters: **the client has to run in the same Proton prefix
+as the game.** The telemetry it reads is a named shared memory block, and
+under Wine those names live in the per prefix wineserver. A client in a
+different prefix sees nothing at all: no error, no data, just silence.
+
+**Start the game first, then the client.** Steam only runs one thing per
+prefix at a time, so launching both through Steam at once does not work.
+
+Create a `.desktop` launcher pointing at your prefix and your Proton build,
+then use it after the game is up:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Truck Dash
+Exec=env STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/YourPrefix" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe"
+Terminal=false
+Categories=Game;
+```
+
+If you would rather launch everything in one go from Steam, put this in the
+game's launch options instead. The sleep gives the game time to bring the
+prefix up first:
+
+```
+export STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/YourPrefix"; export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"; (sleep 20 && "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe") & exec %command%
+```
+
+Add your own wrapper at the end if you use one, for example
+`exec gamescope -W 1920 -H 1080 -r 120 -- %command%`.
+
+Notes from that setup:
+
+- The plugin installs normally. Proton runs the Windows build of the game,
+  so the Windows `.dll` is the right file and the usual "Plugin installed"
+  check applies.
+- If the game list shows the same game twice, update to 1.5.14 or newer:
+  older versions compared folder paths as text, and Wine reaches the same
+  folder through more than one path.
+- The dashboard may take a bit longer to load the map on a phone than on the
+  PC. That is the map data download, not the prefix.
+
+**Native Linux builds of the game** are a different story: they need a
+Linux build of the telemetry plugin, which exists as a test build but has
+not been confirmed against the game yet, and there is no native client. If
+you play the native build and want to help test, open an issue.
+
 ## Building it yourself
 
 If you'd rather not run a pre-built `.exe`, you can run the client directly

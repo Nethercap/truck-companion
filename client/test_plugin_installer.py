@@ -230,3 +230,30 @@ def test_child_environment_drops_pyinstaller_internals(monkeypatch):
     assert "_MEIPASS2" not in env
     assert not any(k.startswith("_PYI_") for k in env)
     assert env["PATH_KEEP_ME"] == "1"
+
+
+def test_same_dir_reconoce_la_misma_carpeta_por_dos_rutas(tmp_path):
+    """Bajo Proton, Wine expone la misma carpeta de Linux por Z:\ y por
+    cualquier letra mapeada. Comparando cadenas, la deteccion automatica y la
+    carpeta agregada a mano daban dos entradas del mismo juego: un tester
+    quedo con 4 para 2 juegos."""
+    import os
+    real = tmp_path / "Euro Truck Simulator 2" / "bin" / "win_x64"
+    real.mkdir(parents=True)
+    assert plugin_installer.same_dir(str(real), str(real)) is True
+    # La misma carpeta escrita distinto: con separadores redundantes, con
+    # un ".." en el medio y con otra capitalizacion.
+    otra = os.path.join(str(tmp_path), "Euro Truck Simulator 2", "bin", "..", "bin", "win_x64")
+    assert plugin_installer.same_dir(str(real), otra) is True
+    assert plugin_installer.same_dir(str(real), str(real).upper()) is True
+    # Y dos carpetas distintas siguen siendo distintas.
+    otra_real = tmp_path / "American Truck Simulator" / "bin" / "win_x64"
+    otra_real.mkdir(parents=True)
+    assert plugin_installer.same_dir(str(real), str(otra_real)) is False
+
+
+def test_same_dir_no_explota_con_rutas_que_no_existen():
+    """samefile necesita que los dos existan; si no, se cae a comparar texto
+    en vez de tirar una excepcion en medio del listado de juegos."""
+    assert plugin_installer.same_dir("/no/existe/a", "/no/existe/b") is False
+    assert plugin_installer.same_dir("/no/existe/a", "/no/existe/a") is True

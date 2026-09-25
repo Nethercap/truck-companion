@@ -121,7 +121,7 @@ class AppState:
             self.installs = []
         # Carpetas agregadas a mano (instalaciones fuera de Steam)
         for bin_dir in win_integration.load_settings().get("extra_game_dirs", []):
-            if os.path.isdir(bin_dir) and not any(i["bin_dir"].lower() == bin_dir.lower() for i in self.installs):
+            if os.path.isdir(bin_dir) and not any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in self.installs):
                 self.installs.append(plugin_installer.describe_install(plugin_installer.game_for_bin_dir(bin_dir), bin_dir))
         return self.installs
 
@@ -366,7 +366,11 @@ class SetupWindow:
             return
         settings = win_integration.load_settings()
         extra = settings.setdefault("extra_game_dirs", [])
-        if bin_dir not in extra:
+        # Ni repetida dentro de la lista, ni una que la deteccion automatica
+        # ya encuentra sola: en los dos casos terminaba duplicando la entrada.
+        ya_esta = any(plugin_installer.same_dir(x, bin_dir) for x in extra) \
+            or any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in self.installs)
+        if not ya_esta:
             extra.append(bin_dir)
             win_integration.save_settings(settings)
         self.render_installs()

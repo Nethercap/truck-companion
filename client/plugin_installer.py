@@ -108,6 +108,22 @@ def plugin_state(bin_dir: str) -> str:
     return "installed" if sha256_of(path) == PLUGIN_DLL_SHA256 else "outdated"
 
 
+def same_dir(a: str, b: str) -> bool:
+    """Si dos rutas apuntan al MISMO directorio, aunque se escriban distinto.
+
+    Comparar cadenas no alcanza: bajo Proton, Wine expone la misma carpeta de
+    Linux por Z:\\ y por cualquier letra mapeada, asi que la deteccion
+    automatica y la carpeta agregada a mano daban dos entradas para un solo
+    juego (reportado por un tester con 4 entradas para 2 juegos). samefile
+    compara el archivo de verdad; si el sistema no puede decirlo, se cae a la
+    comparacion de texto de siempre.
+    """
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
 def find_game_installs() -> list[dict]:
     """[{game, name, bin_dir, plugin_path, state}, ...] para cada juego
     encontrado en alguna biblioteca de Steam."""
@@ -115,7 +131,7 @@ def find_game_installs() -> list[dict]:
     for lib in steam_library_paths():
         for game, name in GAMES.items():
             bin_dir = os.path.join(lib, "steamapps", "common", name, "bin", "win_x64")
-            if os.path.isdir(bin_dir) and not any(f["bin_dir"].lower() == bin_dir.lower() for f in found):
+            if os.path.isdir(bin_dir) and not any(same_dir(f["bin_dir"], bin_dir) for f in found):
                 found.append(describe_install(game, bin_dir))
     return found
 
