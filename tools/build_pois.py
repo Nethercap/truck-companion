@@ -64,6 +64,13 @@ def build(variant, folder, prefix):
         return
     with open(path, encoding="utf-8") as f:
         pois = json.load(f)
+    # Puntos de trabajo por empresa. Si el archivo no esta (variante todavia
+    # no procesada en esta maquina), se cae al icono y no se rompe nada.
+    work_points = {}
+    wp_path = os.path.join(PARSER_ROOT, f"company-points-{variant}.json")
+    if os.path.exists(wp_path):
+        with open(wp_path, encoding="utf-8") as f:
+            work_points = json.load(f)
     facilities = []
     companies = []
     seen = set()
@@ -79,7 +86,17 @@ def build(variant, folder, prefix):
             seen.add(key)
             facilities.append([x, z, FACILITY_CODES[p["icon"]]])
         elif p.get("type") == "company" and p.get("icon"):
-            companies.append([x, z, p["icon"], p.get("label") or p["icon"], p.get("cityToken") or ""])
+            # La posicion que se guarda NO es la del icono sino la del centro
+            # de los puntos de trabajo del prefab (muelles de descarga y
+            # lugares de trailer), que es adonde el juego te manda de verdad.
+            # El icono se equivoca por 53 m de mediana y hasta 214 m; el
+            # centro, por 29 m, y gana en el 99% de las empresas. Lo calcula
+            # build_company_points.py, que vive en el pipeline porque necesita
+            # prefabs, descripciones y nodos (cientos de MB).
+            ciudad = p.get("cityToken") or ""
+            punto = work_points.get(f'{p["icon"]}|{ciudad}')
+            px, pz = (punto[0], punto[1]) if punto else (x, z)
+            companies.append([px, pz, p["icon"], p.get("label") or p["icon"], ciudad])
     cities = {}
     try:
         with open(os.path.join(PARSER_ROOT, folder, f"{prefix}-cities.json"), encoding="utf-8") as f:
