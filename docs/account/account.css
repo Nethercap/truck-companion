@@ -67,9 +67,12 @@ h2 { font-size: 0.95rem; margin: 0 0 0.6rem; color: var(--muted); font-weight: 6
 .btn.primary:hover:not(:disabled) { background: #57adff; }
 .btn.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
 .btn.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.12); }
-.btn.discord { background: #5865f2; border-color: #5865f2; color: #fff; font-weight: 600; width: 100%; padding: 0.7rem 1rem; }
+.btn.proveedor { width: 100%; padding: 0.7rem 1rem; font-weight: 600; margin-bottom: 0.6rem; }
+.btn.proveedor svg { width: 1.2em; height: 1.2em; }
+.btn.discord { background: #5865f2; border-color: #5865f2; color: #fff; }
 .btn.discord:hover { background: #6b75f5; }
-.btn.discord svg { width: 1.2em; height: 1.2em; }
+.btn.google { background: #fff; border-color: #dadce0; color: #1f1f1f; }
+.btn.google:hover { background: #f1f3f4; }
 .btn.link { background: none; border: none; color: var(--accent); padding: 0.2rem 0.4rem; }
 
 form { margin: 1rem 0; }
