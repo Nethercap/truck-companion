@@ -233,7 +233,7 @@ def test_child_environment_drops_pyinstaller_internals(monkeypatch):
 
 
 def test_same_dir_reconoce_la_misma_carpeta_por_dos_rutas(tmp_path):
-    """Bajo Proton, Wine expone la misma carpeta de Linux por Z:\ y por
+    r"""Bajo Proton, Wine expone la misma carpeta de Linux por Z:\ y por
     cualquier letra mapeada. Comparando cadenas, la deteccion automatica y la
     carpeta agregada a mano daban dos entradas del mismo juego: un tester
     quedo con 4 para 2 juegos."""
@@ -257,3 +257,75 @@ def test_same_dir_no_explota_con_rutas_que_no_existen():
     en vez de tirar una excepcion en medio del listado de juegos."""
     assert plugin_installer.same_dir("/no/existe/a", "/no/existe/b") is False
     assert plugin_installer.same_dir("/no/existe/a", "/no/existe/a") is True
+
+
+def _fake_install(raiz, nombre, con_exe=True, con_plugin=False):
+    """Arma <raiz>/steamapps/common/<nombre>/bin/win_x64 y devuelve esa ruta."""
+    bin_dir = raiz / "steamapps" / "common" / nombre / "bin" / "win_x64"
+    bin_dir.mkdir(parents=True)
+    if con_exe:
+        exe = "eurotrucks2.exe" if "Euro" in nombre else "amtrucks.exe"
+        (bin_dir / exe).write_bytes(b"MZ")
+    if con_plugin:
+        (bin_dir / "plugins").mkdir()
+        (bin_dir / "plugins" / plugin_installer.PLUGIN_DLL_NAME).write_bytes(b"dll")
+    return bin_dir
+
+
+def test_tiene_ejecutable_distingue_una_carpeta_fantasma(tmp_path):
+    r"""Al desinstalar, Steam borra lo suyo pero NO la carpeta plugins\ que
+    creamos nosotros, asi que el arbol sobrevive. Esa copia no es un juego."""
+    viva = _fake_install(tmp_path, "American Truck Simulator")
+    fantasma = _fake_install(tmp_path / "vieja", "American Truck Simulator",
+                             con_exe=False, con_plugin=True)
+    assert os.path.isdir(str(fantasma))  # el directorio existe igual
+    assert plugin_installer.tiene_ejecutable(str(viva)) is True
+    assert plugin_installer.tiene_ejecutable(str(fantasma)) is False
+
+
+def test_find_game_installs_ignora_las_carpetas_sin_juego(tmp_path, monkeypatch):
+    """Es el reporte de Kesh: ATS listado varias veces, una de ellas una copia
+    que ya no esta instalada."""
+    buena = tmp_path / "biblioteca"
+    vieja = tmp_path / "vieja"
+    _fake_install(buena, "American Truck Simulator")
+    _fake_install(vieja, "American Truck Simulator", con_exe=False, con_plugin=True)
+    monkeypatch.setattr(plugin_installer, "steam_library_paths",
+                        lambda: [str(buena), str(vieja)])
+    encontrados = plugin_installer.find_game_installs()
+    assert len(encontrados) == 1
+    assert plugin_installer.same_dir(
+        encontrados[0]["bin_dir"],
+        str(buena / "steamapps" / "common" / "American Truck Simulator" / "bin" / "win_x64"))
+
+
+def test_find_game_installs_no_repite_la_misma_biblioteca(tmp_path, monkeypatch):
+    """La raiz de Steam aparece por el registro y otra vez en el .vdf."""
+    lib = tmp_path / "Steam"
+    _fake_install(lib, "American Truck Simulator")
+    _fake_install(lib, "Euro Truck Simulator 2")
+    monkeypatch.setattr(plugin_installer, "steam_library_paths",
+                        lambda: [str(lib), str(lib), os.path.join(str(lib), "otra", "..")])
+    encontrados = plugin_installer.find_game_installs()
+    assert sorted(i["game"] for i in encontrados) == ["ats", "ets2"]
+
+
+def test_find_game_installs_si_acepta_dos_copias_de_verdad(tmp_path, monkeypatch):
+    """Dos instalaciones reales en bibliotecas distintas son dos entradas
+    legitimas: lo que se saca son las fantasma, no las repetidas de verdad."""
+    a, b = tmp_path / "a", tmp_path / "b"
+    _fake_install(a, "American Truck Simulator")
+    _fake_install(b, "American Truck Simulator")
+    monkeypatch.setattr(plugin_installer, "steam_library_paths", lambda: [str(a), str(b)])
+    encontrados = plugin_installer.find_game_installs()
+    assert len(encontrados) == 2
+    # Y como se llaman igual, la UI necesita la carpeta para distinguirlas.
+    assert encontrados[0]["bin_dir"] != encontrados[1]["bin_dir"]
+
+
+def test_describe_install_marca_el_origen(tmp_path):
+    bin_dir = _fake_install(tmp_path, "American Truck Simulator")
+    auto = plugin_installer.describe_install("ats", str(bin_dir))
+    mano = plugin_installer.describe_install("ats", str(bin_dir), origen="manual")
+    assert auto["origen"] == "steam"
+    assert mano["origen"] == "manual"

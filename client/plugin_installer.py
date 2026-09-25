@@ -124,25 +124,45 @@ def same_dir(a: str, b: str) -> bool:
         return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
+GAME_EXES = ("eurotrucks2.exe", "amtrucks.exe")
+
+
+def tiene_ejecutable(bin_dir: str) -> bool:
+    """Si en esa carpeta hay de verdad un juego.
+
+    No alcanza con que el directorio exista. Al desinstalar, Steam borra lo
+    que bajo el, pero NO la carpeta plugins\\ que creamos nosotros, asi
+    arbol sobrevive con nuestro .dll adentro: la copia fantasma seguia
+    apareciendo en Setup, y encima como "Plugin installed", al lado de la
+    instalacion de verdad.
+    """
+    return any(os.path.exists(os.path.join(bin_dir, exe)) for exe in GAME_EXES)
+
+
 def find_game_installs() -> list[dict]:
-    """[{game, name, bin_dir, plugin_path, state}, ...] para cada juego
-    encontrado en alguna biblioteca de Steam."""
+    """[{game, name, bin_dir, plugin_path, state, origen}, ...] para cada
+    juego encontrado en alguna biblioteca de Steam."""
     found = []
     for lib in steam_library_paths():
         for game, name in GAMES.items():
             bin_dir = os.path.join(lib, "steamapps", "common", name, "bin", "win_x64")
-            if os.path.isdir(bin_dir) and not any(same_dir(f["bin_dir"], bin_dir) for f in found):
+            if (tiene_ejecutable(bin_dir)
+                    and not any(same_dir(f["bin_dir"], bin_dir) for f in found)):
                 found.append(describe_install(game, bin_dir))
     return found
 
 
-def describe_install(game: str, bin_dir: str) -> dict:
+def describe_install(game: str, bin_dir: str, origen: str = "steam") -> dict:
+    """origen: 'steam' si la encontro la deteccion automatica, 'manual' si la
+    agrego el usuario o el diagnostico. Solo las de 'manual' se pueden quitar
+    desde Setup: las de Steam volverian a aparecer en el siguiente re-scan."""
     return {
         "game": game,
         "name": GAMES.get(game, game),
         "bin_dir": bin_dir,
         "plugin_path": plugin_path_for(bin_dir),
         "state": plugin_state(bin_dir),
+        "origen": origen,
     }
 
 
@@ -173,9 +193,8 @@ def looks_like_game_bin_dir(path: str) -> bool:
 def resolve_bin_dir(path: str) -> str | None:
     candidates = [path, os.path.join(path, "win_x64"), os.path.join(path, "bin", "win_x64")]
     for candidate in candidates:
-        for exe in ("eurotrucks2.exe", "amtrucks.exe"):
-            if os.path.exists(os.path.join(candidate, exe)):
-                return os.path.normpath(candidate)
+        if tiene_ejecutable(candidate):
+            return os.path.normpath(candidate)
     return None
 
 

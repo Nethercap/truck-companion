@@ -121,8 +121,13 @@ class AppState:
             self.installs = []
         # Carpetas agregadas a mano (instalaciones fuera de Steam)
         for bin_dir in win_integration.load_settings().get("extra_game_dirs", []):
-            if os.path.isdir(bin_dir) and not any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in self.installs):
-                self.installs.append(plugin_installer.describe_install(plugin_installer.game_for_bin_dir(bin_dir), bin_dir))
+            # tiene_ejecutable y no isdir: una carpeta que quedo vacia tras
+            # desinstalar el juego no es una instalacion, y mostrarla solo
+            # suma una fila que no se puede usar.
+            if (plugin_installer.tiene_ejecutable(bin_dir)
+                    and not any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in self.installs)):
+                self.installs.append(plugin_installer.describe_install(
+                    plugin_installer.game_for_bin_dir(bin_dir), bin_dir, origen="manual"))
         return self.installs
 
     def any_plugin_installed(self) -> bool:
@@ -331,6 +336,12 @@ class SetupWindow:
         if not installs:
             self.label(self.games_body, T("no_steam_install"), fg=MUTED, wraplength=520).pack(anchor="w")
             return
+        # Mas de una copia del mismo juego es normal (dos bibliotecas de
+        # Steam, una carpeta movida, la version de 32 bits). Cuando pasa, dos
+        # filas con el mismo nombre no se pueden distinguir, asi que en ese
+        # caso se muestra la carpeta de cada una.
+        repetidos = {n for n in (i["name"] for i in installs)
+                     if [x["name"] for x in installs].count(n) > 1}
         for install in installs:
             row = tk.Frame(self.games_body, bg=BG)
             row.pack(fill="x", pady=2)
@@ -343,6 +354,14 @@ class SetupWindow:
             else:
                 self.label(row, T("plugin_not_installed"), fg=RED).pack(side="left")
                 self.button(row, T("install_plugin"), lambda i=install: self.install_for(i), primary=True).pack(side="left", padx=8)
+            # Quitar solo las agregadas a mano: una de Steam volveria a
+            # aparecer en el proximo re-scan y el boton mentiria.
+            if install.get("origen") == "manual":
+                self.button(row, T("remove_folder"),
+                            lambda i=install: self.remove_game_folder(i)).pack(side="left", padx=4)
+            if install["name"] in repetidos:
+                self.label(self.games_body, install["bin_dir"], fg=MUTED,
+                           wraplength=520, font=("Segoe UI", 8)).pack(anchor="w", padx=(8, 0))
 
     def install_for(self, install):
         try:
@@ -354,6 +373,20 @@ class SetupWindow:
         except Exception as exc:
             logging.exception("Plugin install failed")
             self.flash(T("install_error", err=exc), RED)
+        self.render_installs()
+
+    def remove_game_folder(self, install):
+        """Saca una carpeta agregada a mano. Es la salida cuando queda una
+        entrada de una copia del juego que ya no esta o que nunca sirvio."""
+        settings = win_integration.load_settings()
+        extra = settings.get("extra_game_dirs", [])
+        quedan = [x for x in extra
+                  if not plugin_installer.same_dir(x, install["bin_dir"])]
+        if len(quedan) != len(extra):
+            settings["extra_game_dirs"] = quedan
+            win_integration.save_settings(settings)
+            logging.info("Removed game folder %s from Setup", install["bin_dir"])
+            self.flash(T("folder_removed"), MUTED)
         self.render_installs()
 
     def add_game_folder(self):
@@ -368,8 +401,11 @@ class SetupWindow:
         extra = settings.setdefault("extra_game_dirs", [])
         # Ni repetida dentro de la lista, ni una que la deteccion automatica
         # ya encuentra sola: en los dos casos terminaba duplicando la entrada.
+        # state.installs y no self.installs: la lista vive en AppState. Con
+        # self.installs esto tiraba AttributeError, que en un build sin
+        # consola no se ve, asi que el boton parecia no hacer nada.
         ya_esta = any(plugin_installer.same_dir(x, bin_dir) for x in extra) \
-            or any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in self.installs)
+            or any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in state.installs)
         if not ya_esta:
             extra.append(bin_dir)
             win_integration.save_settings(settings)
@@ -686,7 +722,7 @@ def diagnose_running_game(hwnd) -> str | None:
         return None
     if not info or not info.get("exe_path"):
         return None
-    bin_dir = os.path.dirname(info["exe_path"])
+    bin_dir = os.path.normpath(os.path.dirname(info["exe_path"]))
     if plugin_installer.plugin_state(bin_dir) == "missing":
         # Copia del juego distinta a las detectadas por Steam (Epic, otra
         # biblioteca, carpeta movida): se suma a la lista de Setup para que el
@@ -695,7 +731,13 @@ def diagnose_running_game(hwnd) -> str | None:
             _diagnosed_dirs.add(bin_dir)
             settings = win_integration.load_settings()
             extra = settings.setdefault("extra_game_dirs", [])
-            if bin_dir not in extra and not any(i["bin_dir"].lower() == bin_dir.lower() for i in state.installs):
+            # same_dir y no comparacion de texto: la misma carpeta llega
+            # escrita distinto segun de donde salga (ruta del proceso, Steam,
+            # una junction), y comparando cadenas se agregaba igual y
+            # aparecia una segunda vez en Setup.
+            ya_esta = any(plugin_installer.same_dir(x, bin_dir) for x in extra) \
+                or any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in state.installs)
+            if not ya_esta:
                 extra.append(bin_dir)
                 win_integration.save_settings(settings)
                 state.refresh_installs()
