@@ -1,0 +1,129 @@
+/* Pantalla de cuenta. Mismas variables que la app (docs/app/app.css) para que
+   no parezca otro producto, pero con layout propio: la app es una sola vista
+   sin scroll y esto es una pagina normal. */
+:root {
+  --bg: #0d0f12;
+  --panel: #171a1f;
+  --accent: #3b9eff;
+  --danger: #ff4d4d;
+  --warn: #ffb23b;
+  --ok: #4caf50;
+  --text: #eee;
+  --muted: #9aa4b2;
+  --line: #2a2f37;
+}
+* { box-sizing: border-box; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 0 1rem 3rem;
+  line-height: 1.5;
+}
+
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; max-width: 640px; margin: 0 auto; padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex; align-items: center; gap: 0.5rem;
+  color: var(--text); text-decoration: none; font-weight: 600;
+}
+.brand img { height: 1.4em; width: 1.4em; }
+
+#langSelect {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 0.3rem 0.5rem;
+}
+
+main { max-width: 640px; margin: 0 auto; }
+
+h1 { font-size: 1.4rem; margin: 1.5rem 0 0.5rem; }
+h2 { font-size: 0.95rem; margin: 0 0 0.6rem; color: var(--muted); font-weight: 600; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 1rem; margin: 1rem 0;
+}
+
+.row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: #262b33; color: var(--text); border: 1px solid var(--line);
+  border-radius: 8px; padding: 0.55rem 1rem; font-size: 0.95rem;
+  cursor: pointer; font-family: inherit;
+}
+.btn:hover:not(:disabled) { background: #2f353e; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: #57adff; }
+.btn.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+.btn.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.12); }
+.btn.discord { background: #5865f2; border-color: #5865f2; color: #fff; font-weight: 600; width: 100%; padding: 0.7rem 1rem; }
+.btn.discord:hover { background: #6b75f5; }
+.btn.discord svg { width: 1.2em; height: 1.2em; }
+.btn.link { background: none; border: none; color: var(--accent); padding: 0.2rem 0.4rem; }
+
+form { margin: 1rem 0; }
+label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
+input[type="text"], #usernameInput {
+  width: 100%; font-size: 1rem; padding: 0.55rem 0.7rem;
+  background: var(--panel); border: 1px solid var(--line);
+  color: var(--text); border-radius: 8px; font-family: inherit;
+}
+#usernameInput:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.hint { min-height: 1.4em; font-size: 0.85rem; margin: 0.4rem 0 0.8rem; color: var(--muted); }
+.hint.ok { color: var(--ok); }
+.hint.bad { color: var(--danger); }
+
+.check { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-size: 0.95rem; margin-bottom: 0.4rem; }
+.check input { width: 1.1em; height: 1.1em; accent-color: var(--accent); }
+
+.notice { border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.9rem; margin: 1rem 0; }
+.notice.danger { background: rgba(255, 77, 77, 0.12); border: 1px solid var(--danger); }
+.notice.warn { background: rgba(255, 178, 59, 0.12); border: 1px solid var(--warn); }
+
+.who { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; }
+.who img { width: 64px; height: 64px; border-radius: 50%; background: var(--panel); }
+.who h1 { margin: 0; }
+
+.logins, .sessions { list-style: none; margin: 0; padding: 0; }
+.logins li, .sessions li {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--line);
+}
+.logins li:last-child, .sessions li:last-child { border-bottom: none; }
+.sessions .when { color: var(--muted); font-size: 0.85rem; }
+.tag { font-size: 0.75rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0.05rem 0.5rem; }
+
+.loading { text-align: center; color: var(--muted); padding: 3rem 0; }
+
+#toastContainer {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3000;
+  display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;
+}
+.toast {
+  background: var(--panel); border: 1px solid var(--line); color: var(--text);
+  padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  opacity: 0; transform: translateY(-10px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.ok { border-color: var(--ok); }
+.toast.bad { border-color: var(--danger); }
+
+@media (max-width: 480px) {
+  h1 { font-size: 1.2rem; }
+  .row { flex-direction: column; align-items: stretch; }
+  .row .btn { width: 100%; }
+}

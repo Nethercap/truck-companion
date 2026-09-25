@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!-- noindex: es una pantalla de cuenta, no tiene nada que buscar en Google. -->
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Truck Dash — Account</title>
+<link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
+<meta name="theme-color" content="#0d0f12" />
+<link rel="stylesheet" href="account.css?v=20260925a" />
+</head>
+<body>
+<div id="toastContainer"></div>
+
+<header class="top">
+  <a class="brand" href="/">
+    <img src="../app/assets/logo.svg" alt="" /> Truck Dash
+  </a>
+  <select id="langSelect" aria-label="Language"></select>
+</header>
+
+<main id="main" hidden>
+
+  <!-- Error de la vuelta del proveedor. Se llena desde ?auth_error= -->
+  <p class="notice danger" id="authError" hidden></p>
+
+  <!-- ------------------------------------------------ sin sesion -->
+  <section id="viewSignIn" hidden>
+    <h1 data-i18n="signInTitle">Sign in</h1>
+    <p class="muted" data-i18n="signInIntro"></p>
+    <button class="btn discord" id="btnDiscord">
+      <svg viewBox="0 0 127 96" aria-hidden="true"><path fill="currentColor" d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15ZM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69Zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69Z"/></svg>
+      <span data-i18n="signInDiscord">Continue with Discord</span>
+    </button>
+    <p class="muted small" data-i18n="signInSoon"></p>
+    <p class="muted small" data-i18n="signInFree"></p>
+  </section>
+
+  <!-- ------------------------------------------------ elegir nombre -->
+  <section id="viewUsername" hidden>
+    <h1 data-i18n="pickUsernameTitle">Choose your username</h1>
+    <p class="muted" data-i18n="pickUsernameIntro"></p>
+    <form id="usernameForm" autocomplete="off">
+      <label for="usernameInput" data-i18n="usernameLabel">Username</label>
+      <input id="usernameInput" maxlength="20" autocapitalize="none" spellcheck="false" />
+      <p class="hint" id="usernameHint"></p>
+      <button class="btn primary" id="btnSaveUsername" type="submit" data-i18n="save">Save</button>
+    </form>
+    <p class="muted small" data-i18n="usernameRules"></p>
+  </section>
+
+  <!-- ------------------------------------------------ cuenta -->
+  <section id="viewAccount" hidden>
+    <div class="who">
+      <img id="avatar" alt="" />
+      <div>
+        <h1 id="displayName"></h1>
+        <p class="muted small" id="memberSince"></p>
+      </div>
+    </div>
+
+    <p class="notice warn" id="recoveryWarning" hidden></p>
+
+    <section class="card">
+      <h2 data-i18n="usernameLabel">Username</h2>
+      <div class="row">
+        <span id="currentUsername" class="mono"></span>
+        <button class="btn" id="btnChangeUsername" data-i18n="change">Change</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 data-i18n="loginsTitle">Sign-in methods</h2>
+      <ul class="logins" id="loginsList"></ul>
+    </section>
+
+    <section class="card">
+      <h2 data-i18n="privacyTitle">Public profile</h2>
+      <label class="check">
+        <input type="checkbox" id="publicToggle" />
+        <span data-i18n="privacyLabel"></span>
+      </label>
+      <p class="muted small" data-i18n="privacyHint"></p>
+    </section>
+
+    <section class="card">
+      <h2 data-i18n="sessionsTitle">Open sessions</h2>
+      <ul class="sessions" id="sessionsList"></ul>
+      <button class="btn" id="btnSignOutAll" data-i18n="signOutAll">Sign out everywhere</button>
+    </section>
+
+    <button class="btn danger" id="btnSignOut" data-i18n="signOut">Sign out</button>
+  </section>
+</main>
+
+<p class="loading" id="loading" data-i18n="loading">Loading...</p>
+<p class="notice danger" id="offline" hidden data-i18n="offline"></p>
+
+<!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
+     asi el navegador lo reusa y los dos se bumpean juntos. -->
+<script src="../app/i18n.js?v=20260925b"></script>
+<script src="account.js?v=20260925a"></script>
+</body>
+</html>
