@@ -91,6 +91,22 @@
     </section>
 
     <button class="btn danger" id="btnSignOut" data-i18n="signOut">Sign out</button>
+
+    <section class="card">
+      <h2 data-i18n="dataTitle">Your data</h2>
+      <button class="btn" id="btnExport" data-i18n="exportData">Download my data</button>
+      <p class="muted small" data-i18n="exportHint"></p>
+      <hr />
+      <p class="muted small" data-i18n="deleteWarning"></p>
+      <button class="btn danger" id="btnDelete" data-i18n="deleteAccount">Delete account</button>
+      <div id="deleteConfirm" hidden>
+        <label for="deleteInput" id="deleteConfirmLabel"></label>
+        <input id="deleteInput" autocapitalize="none" spellcheck="false" />
+        <p class="hint" id="deleteHint"></p>
+        <button class="btn danger" id="btnDeleteConfirm" data-i18n="deleteForGood">Delete for good</button>
+        <button class="btn" id="btnDeleteCancel" data-i18n="cancel">Cancel</button>
+      </div>
+    </section>
   </section>
 </main>
 

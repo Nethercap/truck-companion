@@ -4,6 +4,14 @@
 const TRANSLATIONS_EXTRA = {
   de: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    dataTitle: 'Deine Daten',
+    exportData: 'Meine Daten herunterladen',
+    exportHint: 'Eine JSON-Datei mit allem, was dieses Konto enthält.',
+    deleteWarning: 'Beim Löschen verschwinden dein Konto und alles darin, auf allen Geräten. Das lässt sich nicht rückgängig machen.',
+    deleteAccount: 'Konto löschen',
+    deleteForGood: 'Endgültig löschen',
+    confirmacion_no_coincide: 'Das stimmt nicht überein.',
+    deleteConfirmLabel: (n) => 'Tippe ' + n + ' zur Bestätigung',
     memberSince: (f) => 'Fahrer seit ' + f,
     signedOutAll: (n) => n + ' Sitzungen geschlossen.',
     cooldownLeft: (n) => 'Du kannst deinen Namen in ' + n + (n === 1 ? ' Tag wieder ändern.' : ' Tagen wieder ändern.'),
@@ -397,6 +405,14 @@ const TRANSLATIONS_EXTRA = {
   },
   fr: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    dataTitle: 'Tes données',
+    exportData: 'Télécharger mes données',
+    exportHint: 'Un fichier JSON avec tout ce que contient ce compte.',
+    deleteWarning: 'La suppression efface ton compte et tout ce qu\'il contient, sur tous tes appareils. C\'est irréversible.',
+    deleteAccount: 'Supprimer le compte',
+    deleteForGood: 'Supprimer définitivement',
+    confirmacion_no_coincide: 'Cela ne correspond pas.',
+    deleteConfirmLabel: (n) => 'Tape ' + n + ' pour confirmer',
     memberSince: (f) => 'Chauffeur depuis ' + f,
     signedOutAll: (n) => n + ' sessions fermées.',
     cooldownLeft: (n) => 'Tu pourras changer de nom dans ' + n + (n === 1 ? ' jour.' : ' jours.'),
@@ -790,6 +806,14 @@ const TRANSLATIONS_EXTRA = {
   },
   pt: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    dataTitle: 'Seus dados',
+    exportData: 'Baixar meus dados',
+    exportHint: 'Um arquivo JSON com tudo o que esta conta guarda.',
+    deleteWarning: 'Excluir remove sua conta e tudo o que há nela, em todos os aparelhos. Não dá para desfazer.',
+    deleteAccount: 'Excluir a conta',
+    deleteForGood: 'Excluir definitivamente',
+    confirmacion_no_coincide: 'Não confere.',
+    deleteConfirmLabel: (n) => 'Digite ' + n + ' para confirmar',
     memberSince: (f) => 'Motorista desde ' + f,
     signedOutAll: (n) => n + ' sessões encerradas.',
     cooldownLeft: (n) => 'Você poderá mudar o nome de novo em ' + n + (n === 1 ? ' dia.' : ' dias.'),
@@ -1183,6 +1207,14 @@ const TRANSLATIONS_EXTRA = {
   },
   pl: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    dataTitle: 'Twoje dane',
+    exportData: 'Pobierz moje dane',
+    exportHint: 'Plik JSON ze wszystkim, co zawiera to konto.',
+    deleteWarning: 'Usunięcie kasuje Twoje konto i całą jego zawartość, na wszystkich urządzeniach. Tego nie da się cofnąć.',
+    deleteAccount: 'Usuń konto',
+    deleteForGood: 'Usuń na zawsze',
+    confirmacion_no_coincide: 'To się nie zgadza.',
+    deleteConfirmLabel: (n) => 'Wpisz ' + n + ', aby potwierdzić',
     memberSince: (f) => 'Kierowca od ' + f,
     signedOutAll: (n) => 'Zamknięto sesje: ' + n,
     cooldownLeft: (n) => 'Nazwę będzie można zmienić za ' + n + (n === 1 ? ' dzień.' : ' dni.'),
@@ -1576,6 +1608,14 @@ const TRANSLATIONS_EXTRA = {
   },
   tr: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    dataTitle: 'Verilerin',
+    exportData: 'Verilerimi indir',
+    exportHint: 'Bu hesapta tutulan her şeyi içeren bir JSON dosyası.',
+    deleteWarning: 'Silmek hesabını ve içindeki her şeyi tüm cihazlardan kaldırır. Geri alınamaz.',
+    deleteAccount: 'Hesabı sil',
+    deleteForGood: 'Kalıcı olarak sil',
+    confirmacion_no_coincide: 'Eşleşmiyor.',
+    deleteConfirmLabel: (n) => 'Onaylamak için ' + n + ' yaz',
     memberSince: (f) => f + ' tarihinden beri sürücü',
     signedOutAll: (n) => n + ' oturum kapatıldı.',
     cooldownLeft: (n) => 'Adını ' + n + ' gün sonra tekrar değiştirebilirsin.',
@@ -1969,6 +2009,14 @@ const TRANSLATIONS_EXTRA = {
   },
   ru: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    dataTitle: 'Ваши данные',
+    exportData: 'Скачать мои данные',
+    exportHint: 'Файл JSON со всем, что хранит этот аккаунт.',
+    deleteWarning: 'Удаление стирает аккаунт и всё его содержимое на всех устройствах. Отменить нельзя.',
+    deleteAccount: 'Удалить аккаунт',
+    deleteForGood: 'Удалить навсегда',
+    confirmacion_no_coincide: 'Не совпадает.',
+    deleteConfirmLabel: (n) => 'Введите ' + n + ' для подтверждения',
     memberSince: (f) => 'Водитель с ' + f,
     signedOutAll: (n) => 'Закрыто сеансов: ' + n,
     cooldownLeft: (n) => 'Сменить имя снова можно через ' + n + ' дн.',

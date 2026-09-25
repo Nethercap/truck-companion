@@ -79,6 +79,14 @@
       signedOutAll: (n) => 'Closed ' + n + ' sessions.',
       memberSince: (f) => 'Driver since ' + f,
       savedOk: 'Saved',
+      dataTitle: 'Your data',
+      exportData: 'Download my data',
+      exportHint: 'A JSON file with everything this account holds.',
+      deleteWarning: 'Deleting removes your account and everything in it, on every device. It cannot be undone.',
+      deleteAccount: 'Delete account',
+      deleteForGood: 'Delete for good',
+      deleteConfirmLabel: (n) => 'Type ' + n + ' to confirm',
+      confirmacion_no_coincide: 'That does not match.',
       recoveryWarning: 'Steam is your only sign-in method, and Steam gives us no email. If you lose access to it, there is no way back into this account. Link a second method.',
       cooldownLeft: (n) => 'You can change your name again in ' + n + (n === 1 ? ' day.' : ' days.'),
       // Motivos que devuelve la API. La clave es la misma de un lado y del otro.
@@ -140,6 +148,14 @@
       signedOutAll: (n) => 'Se cerraron ' + n + ' sesiones.',
       memberSince: (f) => 'Camionero desde ' + f,
       savedOk: 'Guardado',
+      dataTitle: 'Tus datos',
+      exportData: 'Descargar mis datos',
+      exportHint: 'Un archivo JSON con todo lo que guarda esta cuenta.',
+      deleteWarning: 'Borrar elimina tu cuenta y todo lo que tiene adentro, en todos los dispositivos. No se puede deshacer.',
+      deleteAccount: 'Borrar la cuenta',
+      deleteForGood: 'Borrar definitivamente',
+      deleteConfirmLabel: (n) => 'Escribi ' + n + ' para confirmar',
+      confirmacion_no_coincide: 'No coincide.',
       recoveryWarning: 'Steam es tu unica forma de entrar, y Steam no nos da ningun mail. Si perdes el acceso, no hay manera de volver a esta cuenta. Vincula una segunda forma.',
       cooldownLeft: (n) => 'Vas a poder cambiarlo de nuevo en ' + n + (n === 1 ? ' dia.' : ' dias.'),
       username_required: 'Escribi un nombre.',
@@ -399,6 +415,7 @@
     $('publicToggle').checked = !!usuario.is_public;
     pintarLogins();
     pintarSesiones();
+    mostrarConfirmacionDeBorrado(false);
     mostrarVista('viewAccount');
   }
 
@@ -425,6 +442,49 @@
     if (!ok) { avisar(t(datos.error || 'error'), 'bad'); return; }
     avisar(t('signedOutAll', datos.cerradas || 0), 'ok');
     usuario = null;
+    mostrarVista('viewSignIn');
+  }
+
+  async function exportarDatos() {
+    const { ok, datos } = await pedir('/user/export');
+    if (!ok) { avisar(t(datos.error || 'error'), 'bad'); return; }
+    // Se arma y descarga en el navegador: el archivo nunca pasa por otro lado.
+    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'truckdash-' + (usuario.username || 'cuenta') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function nombreDeConfirmacion() {
+    // Sin nombre elegido no hay nada que escribir, asi que se pide DELETE.
+    return usuario && usuario.username ? usuario.username : 'DELETE';
+  }
+
+  function mostrarConfirmacionDeBorrado(mostrar) {
+    $('deleteConfirm').hidden = !mostrar;
+    $('btnDelete').hidden = mostrar;
+    if (mostrar) {
+      $('deleteConfirmLabel').textContent = t('deleteConfirmLabel', nombreDeConfirmacion());
+      $('deleteInput').value = '';
+      $('deleteHint').textContent = '';
+      $('deleteInput').focus();
+    }
+  }
+
+  async function borrarCuenta() {
+    const { ok, datos } = await pedir('/user/account', {
+      method: 'DELETE', body: { confirmacion: $('deleteInput').value.trim() }
+    });
+    if (!ok) {
+      $('deleteHint').textContent = t(datos.error || 'error');
+      $('deleteHint').className = 'hint bad';
+      return;
+    }
+    usuario = null;
+    mostrarConfirmacionDeBorrado(false);
     mostrarVista('viewSignIn');
   }
 
@@ -506,6 +566,10 @@
     $('publicToggle').addEventListener('change', cambiarPrivacidad);
     $('btnSignOut').addEventListener('click', cerrarSesion);
     $('btnSignOutAll').addEventListener('click', cerrarTodas);
+    $('btnExport').addEventListener('click', exportarDatos);
+    $('btnDelete').addEventListener('click', () => mostrarConfirmacionDeBorrado(true));
+    $('btnDeleteCancel').addEventListener('click', () => mostrarConfirmacionDeBorrado(false));
+    $('btnDeleteConfirm').addEventListener('click', borrarCuenta);
     cargar();
   }
 
