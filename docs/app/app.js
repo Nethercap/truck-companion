@@ -3489,9 +3489,19 @@ function moveAnimMs() {
 // funcion tambien movia la camara en cada frame (~60/s) con jumpTo(), lo que
 // se peleaba con el easeTo() del modo navegacion y de paso le ganaba a
 // cualquier intento de arrastrar el mapa a mano.
-function animateTruckTo(fromLngLat, toPos) {
+function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
   if (moveAnimFrameId) cancelAnimationFrame(moveAnimFrameId);
-  if (liteMode) { truckMarker.setLngLat(toPos); moveAnimFrameId = null; return; } // sin interpolar por frame
+  // El giro se interpola con la MISMA duracion y la misma rampa lineal que
+  // usa el easeTo de la camara para su bearing. Si la flecha salta y el mapa
+  // gira progresivamente, los dos nunca coinciden y la flecha se ve torcida
+  // respecto de la ruta aunque el rumbo sea correcto.
+  const deltaHeading = ((toHeading - fromHeading + 540) % 360) - 180;
+  if (liteMode) {
+    truckMarker.setLngLat(toPos);
+    truckMarker.setRotation(toHeading);
+    moveAnimFrameId = null;
+    return; // sin interpolar por frame
+  }
   const start = performance.now();
   function step(now) {
     const t = Math.min(1, (now - start) / moveAnimMs());
@@ -3500,6 +3510,15 @@ function animateTruckTo(fromLngLat, toPos) {
       fromLngLat[1] + (toPos[1] - fromLngLat[1]) * t,
     ];
     truckMarker.setLngLat(cur);
+    // En modo navegacion la camara ESTA alineada al rumbo, asi que la flecha
+    // tiene que apuntar arriba. Leerlo del bearing real del mapa en vez de
+    // interpolar por nuestra cuenta elimina el desfasaje: las dos animaciones
+    // (la nuestra y la de MapLibre) no corren al mismo ritmo, y esos pocos
+    // grados de diferencia se ven como la flecha torcida respecto de la ruta.
+    const alineadaAlMapa = navMode && autoFollow;
+    truckMarker.setRotation(alineadaAlMapa
+      ? map.getBearing()
+      : (fromHeading + deltaHeading * t + 360) % 360);
     moveAnimFrameId = t < 1 ? requestAnimationFrame(step) : null;
   }
   moveAnimFrameId = requestAnimationFrame(step);
@@ -3570,6 +3589,9 @@ function updateMap(position, game, gameHeadingDeg) {
   const lngLat = toLngLat(position.x, position.z);
   const prevWorldPos = lastWorldPos;
   const prevLngLat = lastDisplayedLngLat;
+  // Rumbo con el que empieza el tick: el marcador se interpola desde aca
+  // hasta el nuevo, con la misma rampa que usa la camara para su bearing.
+  const headingAtTickStart = lastHeadingDeg;
   let justJumped = false;
 
   if (prevWorldPos) {
@@ -3594,7 +3616,6 @@ function updateMap(position, game, gameHeadingDeg) {
       const d = ((gameHeadingDeg - lastHeadingDeg + 540) % 360) - 180;
       lastHeadingDeg = (lastHeadingDeg + d * HEADING_GAME_SMOOTH + 360) % 360;
       headingRef = null;
-      if (truckMarker) truckMarker.setRotation(lastHeadingDeg);
     } else if (prevLngLat && movedM > 0.3) {
       // Sin rumbo del juego (cliente viejo): se deduce del desplazamiento.
       // Bearing geografico real entre la posicion mostrada anterior y la
@@ -3614,7 +3635,6 @@ function updateMap(position, game, gameHeadingDeg) {
         headingRefWorld = { x: position.x, z: position.z };
       }
       lastHeadingDeg = angleDeg;
-      if (truckMarker) truckMarker.setRotation(angleDeg);
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
@@ -3635,9 +3655,10 @@ function updateMap(position, game, gameHeadingDeg) {
   }
 
   if (!justJumped && prevLngLat) {
-    animateTruckTo(prevLngLat, lngLat);
+    animateTruckTo(prevLngLat, lngLat, headingAtTickStart, lastHeadingDeg);
   } else {
     truckMarker.setLngLat(lngLat);
+    truckMarker.setRotation(lastHeadingDeg);
   }
   lastDisplayedLngLat = lngLat;
 
