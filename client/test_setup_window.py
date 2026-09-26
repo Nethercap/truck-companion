@@ -56,6 +56,10 @@ def ventana(monkeypatch, tmp_path, raiz):
 
     monkeypatch.setattr(plugin_installer, "find_game_installs", lambda: [])
     v = tray_client.SetupWindow()
+    # La seccion de cuenta esta apagada hasta que el cliente mande viajes,
+    # asi que las pruebas la construyen a mano: lo que se prueba es que
+    # funcione cuando se encienda, no que este visible hoy.
+    v.build_account_section()
     # Cada test arranca con la lista compartida vacia.
     tray_client.state.installs = []
     yield v, guardados

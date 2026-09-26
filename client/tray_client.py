@@ -205,6 +205,13 @@ PAUSA_APROBACION = 3  # segundos entre consultas al vincular
 # equivocarse para abajo es cerrarse encima de alguien que esta jugando.
 GRACIA_CIERRE = 60
 
+# La seccion de cuenta esta escrita y probada, pero apagada hasta que el
+# cliente mande viajes de verdad. Hoy el texto dice "vincula y tus viajes
+# quedan guardados", y mientras no se manden seria mentira: alguien
+# vincularia su cuenta y no pasaria nada. Se enciende junto con el
+# acumulador, no antes.
+CUENTAS_VISIBLES = False
+
 
 def debe_cerrarse(vio_el_juego: bool, opcion_activa: bool,
                   sin_memoria_desde: float | None, ahora: float) -> bool:
@@ -363,19 +370,10 @@ class SetupWindow:
         # --- Cuenta ---
         # Opcional a proposito: todo el cliente funciona sin vincular nada, y
         # esto solo agrega que los viajes queden guardados.
-        cuenta = self.section(T("sec_account"))
-        self.account_label = self.label(cuenta, "", wraplength=520)
-        self.account_label.pack(anchor="w")
-        fila_cuenta = tk.Frame(cuenta, bg=BG)
-        fila_cuenta.pack(anchor="w", pady=(6, 0))
-        self.account_button = self.button(fila_cuenta, T("account_link"),
-                                          self.link_account, primary=True)
-        self.account_button.pack(side="left")
-        self.account_code = self.label(fila_cuenta, "", font=("Consolas", 16, "bold"),
-                                       fg=BLUE)
-        self.account_code.pack(side="left", padx=12)
-        self.refresh_account()
+        if CUENTAS_VISIBLES:
+            self.build_account_section()
 
+        # --- Update ---
         # --- Update ---
         self.update_frame = tk.Frame(self.root, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
@@ -451,6 +449,19 @@ class SetupWindow:
             logging.info("Removed game folder %s from Setup", install["bin_dir"])
             self.flash(T("folder_removed"), MUTED)
         self.render_installs()
+
+    def build_account_section(self):
+        cuenta = self.section(T("sec_account"))
+        self.account_label = self.label(cuenta, "", wraplength=520)
+        self.account_label.pack(anchor="w")
+        fila = tk.Frame(cuenta, bg=BG)
+        fila.pack(anchor="w", pady=(6, 0))
+        self.account_button = self.button(fila, T("account_link"),
+                                          self.link_account, primary=True)
+        self.account_button.pack(side="left")
+        self.account_code = self.label(fila, "", font=("Consolas", 16, "bold"), fg=BLUE)
+        self.account_code.pack(side="left", padx=12)
+        self.refresh_account()
 
     def _bombear_cola(self):
         """Corre en el hilo principal lo que dejaron los hilos de fondo."""
