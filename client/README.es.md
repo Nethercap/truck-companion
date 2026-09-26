@@ -67,9 +67,31 @@ Si tu celular o tablet está en la misma WiFi que la PC, la ventana de Setup
 también muestra una **dirección LAN** (con un código QR para escanear). Eso
 abre el tablero servido directo por el cliente (`http://<ip-de-tu-pc>:27765/app/`)
 con un WebSocket directo — la menor latencia, sin código de pairing, y sigue
-funcionando aunque se corte internet. Windows puede preguntar una vez si
-permitís TruckDash en el firewall (redes privadas) — tocá Permitir. El modo
-cloud con código sigue funcionando al mismo tiempo.
+funcionando aunque se corte internet. El modo cloud con código sigue
+funcionando al mismo tiempo.
+
+**El modo LAN usa dos puertos y hacen falta los dos abiertos:**
+
+| puerto | para qué | si está cerrado |
+|---|---|---|
+| 27765 (HTTP) | sirve la página del tablero | la página no carga |
+| 27766 (WebSocket) | manda la telemetría en vivo | la página carga y queda vacía |
+
+La segunda fila es la que confunde: con solo el 27765 abierto, el tablero
+aparece y se queda sin datos, que parece un cliente roto y no un puerto
+cerrado.
+
+En Windows suele ser automático: pregunta una vez si permitís TruckDash en
+el firewall para redes privadas, y Permitir cubre los dos. En Linux hay que
+abrirlos a mano, por ejemplo:
+
+```bash
+sudo ufw allow 27765/tcp
+sudo ufw allow 27766/tcp
+```
+
+Los dos se pueden cambiar con las variables de entorno
+`TRUCKDASH_HTTP_PORT` y `TRUCKDASH_WS_PORT` si esos números chocan con algo.
 
 ### Windows SmartScreen ("aplicación no reconocida")
 

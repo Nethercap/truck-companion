@@ -323,6 +323,11 @@ class SetupWindow:
         lan_btns = tk.Frame(lan_text, bg=BG)
         lan_btns.pack(anchor="w", pady=(6, 0))
         self.button(lan_btns, T("copy_address"), self.copy_lan_url).pack(side="left")
+        # Los dos puertos, aca y no solo en el README: es donde esta la
+        # persona cuando el tablero carga y se queda vacio, que parece un
+        # cliente roto y no un puerto cerrado.
+        self.label(lan_frame, T("lan_ports"), fg=MUTED, wraplength=520).pack(
+            anchor="w", pady=(6, 0))
         self.button(lan_btns, T("open_here"), self.open_lan_here).pack(side="left", padx=6)
         self.render_lan()
 

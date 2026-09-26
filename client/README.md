@@ -90,9 +90,31 @@ If your phone or tablet is on the same Wi-Fi as the PC, the Setup window
 also shows a **LAN address** (with a QR code to scan). That opens the
 dashboard served directly by the client (`http://<your-pc-ip>:27765/app/`)
 with a direct WebSocket link — lowest latency, no pairing code, and it keeps
-working even if your internet drops. Windows may ask once to allow
-TruckDash through the firewall (private networks) — click Allow. The cloud
-mode with the pairing code keeps working at the same time.
+working even if your internet drops. The cloud mode with the pairing code
+keeps working at the same time.
+
+**LAN mode uses two ports, and you need both open:**
+
+| port | what it does | what happens if it is closed |
+|---|---|---|
+| 27765 (HTTP) | serves the dashboard page | the page does not load at all |
+| 27766 (WebSocket) | sends the live telemetry | the page loads but stays empty |
+
+That second row is the confusing one: with only 27765 open, the dashboard
+appears and then sits there with no data, which looks like the client is
+broken rather than like a closed port.
+
+On Windows this is usually automatic: it asks once to allow TruckDash
+through the firewall on private networks, and Allow covers both. On Linux
+you have to open them yourself, for example:
+
+```bash
+sudo ufw allow 27765/tcp
+sudo ufw allow 27766/tcp
+```
+
+Both can be changed with the `TRUCKDASH_HTTP_PORT` and `TRUCKDASH_WS_PORT`
+environment variables if those numbers clash with something else.
 
 ### Windows SmartScreen ("unrecognized app")
 
