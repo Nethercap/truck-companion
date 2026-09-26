@@ -118,6 +118,12 @@ jobs:
               echo "Sigue caido y ya hay aviso (issue #$abierto). No se repite."
               exit 0
             fi
+            # gh issue create falla si la etiqueta no existe, y la primera
+            # vez no existe: se perderia justo el primer aviso, que es el
+            # que importa. --force la crea o la deja como esta.
+            gh label create "$ETIQUETA" --repo "$REPO" --color B60205 \
+              --description "Abierto por el chequeo automatico de servicios" \
+              --force >/dev/null
             cuerpo=$(printf 'Chequeo automatico: no responden.\n\n%s\nSe cierra solo cuando vuelvan.' "$CAIDOS")
             numero=$(gh issue create --repo "$REPO" --label "$ETIQUETA" \
                        --title "Servicio caido" --body "$cuerpo" \
