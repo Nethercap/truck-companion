@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import sys
+import queue
 import threading
 import time
 import tkinter as tk
@@ -41,6 +42,7 @@ from PIL import Image, ImageDraw
 import client as client_lib
 import discord_presence
 import local_server
+import account
 import plugin_installer
 import win_integration
 from i18n import T
@@ -190,6 +192,7 @@ _setup_window_lock = threading.Lock()
 BG = "#14171c"
 FG = "#f2f3f5"
 MUTED = "#9aa4b2"
+PAUSA_APROBACION = 3  # segundos entre consultas al vincular
 BLUE = "#3b9eff"
 GREEN = "#4caf50"
 ORANGE = "#ff8a3d"
@@ -225,7 +228,12 @@ class SetupWindow:
         self.root.attributes("-topmost", True)
         self.root.after(300, lambda: self.root.attributes("-topmost", False))
         self.install_rows = []
+        # Los hilos no tocan Tk: dejan una funcion aca y la corre el hilo
+        # principal. root.after() desde otro hilo no es seguro, y falla de
+        # una forma que en un build sin consola no se ve nunca.
+        self._cola = queue.Queue()
         self.build()
+        self._bombear_cola()
 
     def label(self, parent, text, **kw):
         opts = dict(bg=BG, fg=FG, anchor="w", justify="left")
@@ -323,6 +331,22 @@ class SetupWindow:
                               wraplength=520, justify="left")
         qchk.pack(anchor="w", pady=(2, 0))
 
+        # --- Cuenta ---
+        # Opcional a proposito: todo el cliente funciona sin vincular nada, y
+        # esto solo agrega que los viajes queden guardados.
+        cuenta = self.section(T("sec_account"))
+        self.account_label = self.label(cuenta, "", wraplength=520)
+        self.account_label.pack(anchor="w")
+        fila_cuenta = tk.Frame(cuenta, bg=BG)
+        fila_cuenta.pack(anchor="w", pady=(6, 0))
+        self.account_button = self.button(fila_cuenta, T("account_link"),
+                                          self.link_account, primary=True)
+        self.account_button.pack(side="left")
+        self.account_code = self.label(fila_cuenta, "", font=("Consolas", 16, "bold"),
+                                       fg=BLUE)
+        self.account_code.pack(side="left", padx=12)
+        self.refresh_account()
+
         # --- Update ---
         self.update_frame = tk.Frame(self.root, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
@@ -398,6 +422,124 @@ class SetupWindow:
             logging.info("Removed game folder %s from Setup", install["bin_dir"])
             self.flash(T("folder_removed"), MUTED)
         self.render_installs()
+
+    def _bombear_cola(self):
+        """Corre en el hilo principal lo que dejaron los hilos de fondo."""
+        try:
+            while True:
+                try:
+                    tarea = self._cola.get_nowait()
+                except queue.Empty:
+                    break
+                try:
+                    tarea()
+                except Exception:
+                    logging.exception("Fallo una tarea de la cola de la ventana")
+        finally:
+            try:
+                self.root.after(100, self._bombear_cola)
+            except tk.TclError:
+                pass  # la ventana se cerro
+
+    def en_ventana(self, funcion):
+        """Lo que quiera tocar la ventana desde un hilo pasa por aca."""
+        self._cola.put(funcion)
+
+    def refresh_account(self):
+        """Muestra con que cuenta esta vinculado, si lo esta.
+
+        Se consulta en un hilo: la API puede tardar o no estar, y la ventana
+        no puede quedarse colgada por eso.
+        """
+        token = account.token_guardado(win_integration.load_settings())
+        if not token:
+            self.account_label.configure(text=T("account_none"))
+            self.account_button.configure(text=T("account_link"), state="normal")
+            return
+        self.account_label.configure(text=T("account_checking"))
+
+        def consultar():
+            usuario = account.quien_soy(token, win_integration.load_settings())
+            def pintar():
+                if usuario:
+                    nombre = usuario.get("username") or T("account_no_name")
+                    self.account_label.configure(text=T("account_linked", name=nombre))
+                    self.account_button.configure(text=T("account_unlink"), state="normal")
+                else:
+                    # Puede ser que el token ya no valga o que no haya
+                    # internet. No se borra nada: borrarlo por un corte de
+                    # wifi obligaria a vincular de nuevo cada vez.
+                    self.account_label.configure(text=T("account_unreachable"))
+                    self.account_button.configure(text=T("account_unlink"), state="normal")
+            self.en_ventana(pintar)
+
+        threading.Thread(target=consultar, daemon=True).start()
+
+    def link_account(self):
+        """Pide un codigo y espera a que lo aprueben desde la web."""
+        settings = win_integration.load_settings()
+        if account.token_guardado(settings):
+            # El boton dice "desvincular" cuando ya hay cuenta. Solo borra el
+            # token de esta PC; la sesion se corta del todo desde la web.
+            settings.pop(account.CLAVE_TOKEN, None)
+            win_integration.save_settings(settings)
+            self.account_code.configure(text="")
+            self.flash(T("account_unlinked"), MUTED)
+            self.refresh_account()
+            return
+
+        self.account_button.configure(state="disabled")
+        self.account_label.configure(text=T("account_asking"))
+
+        def pedir():
+            import socket
+            pedido = account.pedir_codigo(socket.gethostname() or "Truck Dash",
+                                          win_integration.load_settings())
+            if not pedido:
+                self.en_ventana(lambda: (
+                    self.account_label.configure(text=T("account_unreachable")),
+                    self.account_button.configure(state="normal")))
+                return
+
+            def mostrar():
+                self.account_code.configure(text=pedido["code"])
+                self.account_label.configure(text=T("account_enter_code", url=pedido["url"]))
+                webbrowser.open(pedido["url"])
+            self.en_ventana(mostrar)
+            self.esperar_aprobacion(pedido)
+
+        threading.Thread(target=pedir, daemon=True).start()
+
+    def esperar_aprobacion(self, pedido):
+        """Pregunta cada tres segundos hasta que lo aprueben o se venza.
+
+        Corre en el hilo que ya venia del boton, y todo lo que toca la
+        ventana pasa por root.after: Tk no es seguro desde otro hilo.
+        """
+        import time
+        limite = time.time() + pedido.get("expires_in", 600)
+        while time.time() < limite:
+            time.sleep(PAUSA_APROBACION)
+            estado, token = account.consultar_codigo(
+                pedido["secret"], win_integration.load_settings())
+            if estado == "sin_red":
+                continue  # un corte no es un rechazo: se sigue esperando
+            if estado == "listo":
+                settings = win_integration.load_settings()
+                settings[account.CLAVE_TOKEN] = token
+                win_integration.save_settings(settings)
+                logging.info("Cuenta vinculada")
+                self.en_ventana(lambda: (
+                    self.account_code.configure(text=""),
+                    self.flash(T("account_ok"), GREEN),
+                    self.refresh_account()))
+                return
+            if estado == "vencido":
+                break
+        self.en_ventana(lambda: (
+            self.account_code.configure(text=""),
+            self.account_label.configure(text=T("account_expired")),
+            self.account_button.configure(state="normal")))
 
     def toggle_quit_on_game_close(self):
         win_integration.set_quit_on_game_close(self.quit_var.get())
