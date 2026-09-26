@@ -1,0 +1,136 @@
+name: Chequeo de servicios
+
+# El 26-09-2026 el relay estuvo caido y nos enteramos de casualidad, porque
+# justo alguien estaba llamando a un endpoint. Sin esto, lo siguiente es que
+# lo reporte un usuario en Discord un rato despues.
+#
+# Dos cosas que este chequeo hace a proposito:
+#
+# - **Reintenta antes de gritar.** Un fallo suelto es casi siempre un
+#   redeploy o un hipo de red. Se prueba tres veces espaciadas y solo cuenta
+#   si fallan las tres.
+# - **Avisa una vez por incidente, no una vez por corrida.** Se usa un issue
+#   abierto como memoria: si ya hay uno, no se vuelve a avisar; cuando todo
+#   vuelve, se cierra y se avisa la recuperacion. Sin esto, una caida de una
+#   hora serian seis mensajes iguales y se aprende a ignorarlos.
+
+on:
+  schedule:
+    # Cada 10 minutos. GitHub no garantiza puntualidad en los programados y
+    # bajo carga se atrasan, asi que esto detecta "en decenas de minutos",
+    # no en diez exactos. Alcanza de sobra contra enterarse por un usuario.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  ETIQUETA: servicio-caido
+
+jobs:
+  chequear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probar los servicios
+        id: probar
+        run: |
+          set -uo pipefail
+
+          # nombre|url|texto que tiene que aparecer en la respuesta
+          SERVICIOS=(
+            "Relay de telemetria|https://truck-companion-production.up.railway.app/health|\"status\":\"ok\""
+            "API de cuentas|https://api.trucksim-dash.com/health|\"ok\":true"
+            "Web|https://trucksim-dash.com/|Truck Dash"
+          )
+
+          probar() {
+            # Tres intentos espaciados: un fallo suelto casi siempre es un
+            # redeploy en curso, no una caida.
+            local url="$1" esperado="$2" cuerpo
+            for intento in 1 2 3; do
+              if cuerpo=$(curl -sS --max-time 20 \
+                   -A "truckdash-uptime (+https://trucksim-dash.com)" "$url" 2>/dev/null); then
+                # Se compara con `case` y no con `printf | grep -q`: grep -q
+                # corta apenas encuentra, printf se come un SIGPIPE al seguir
+                # escribiendo, y con pipefail la tuberia entera da error. Solo
+                # pasa con respuestas grandes, asi que la web (97 KB) daba
+                # caida siempre y el JSON chico no. Un aviso que grita cada
+                # diez minutos se aprende a ignorar, que es peor que no tenerlo.
+                case "$cuerpo" in
+                  *"$esperado"*) return 0 ;;
+                esac
+              fi
+              [ "$intento" -lt 3 ] && sleep 20
+            done
+            return 1
+          }
+
+          caidos=""
+          for entrada in "${SERVICIOS[@]}"; do
+            nombre="${entrada%%|*}"
+            resto="${entrada#*|}"
+            url="${resto%%|*}"
+            esperado="${resto#*|}"
+            if probar "$url" "$esperado"; then
+              echo "ok    $nombre"
+            else
+              echo "CAIDO $nombre ($url)"
+              caidos="${caidos}- **${nombre}** — ${url}"$'\n'
+            fi
+          done
+
+          {
+            echo "caidos<<FIN"
+            printf '%s' "$caidos"
+            echo "FIN"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Avisar o dar por recuperado
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Preferentemente un canal propio de avisos. Si no existe, cae al de
+          # releases, que lo leen los usuarios: un aviso de caida ahi evita la
+          # tanda de "a alguien mas no le anda?", pero conviene separarlo.
+          WEBHOOK_AVISOS: ${{ secrets.DISCORD_ALERTS_WEBHOOK }}
+          WEBHOOK_RELEASES: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+          CAIDOS: ${{ steps.probar.outputs.caidos }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          WEBHOOK="${WEBHOOK_AVISOS:-$WEBHOOK_RELEASES}"
+
+          # El issue abierto es la memoria entre corridas: sin el, cada
+          # corrida volveria a avisar lo mismo.
+          abierto=$(gh issue list --repo "$REPO" --label "$ETIQUETA" \
+                      --state open --limit 1 --json number --jq '.[0].number // empty')
+
+          avisar() {
+            [ -n "$WEBHOOK" ] || { echo "Sin webhook configurado, solo queda el issue"; return 0; }
+            jq -n --arg c "$1" --argjson color "$2" \
+              '{username:"Truck Dash status", embeds:[{description:$c, color:$color}]}' \
+              | curl -sS -H "Content-Type: application/json" -d @- "$WEBHOOK" >/dev/null
+          }
+
+          if [ -n "${CAIDOS//[$'\n\r\t ']/}" ]; then
+            if [ -n "$abierto" ]; then
+              echo "Sigue caido y ya hay aviso (issue #$abierto). No se repite."
+              exit 0
+            fi
+            cuerpo=$(printf 'Chequeo automatico: no responden.\n\n%s\nSe cierra solo cuando vuelvan.' "$CAIDOS")
+            numero=$(gh issue create --repo "$REPO" --label "$ETIQUETA" \
+                       --title "Servicio caido" --body "$cuerpo" \
+                       | grep -oE '[0-9]+$')
+            echo "Abierto el issue #$numero"
+            avisar "$(printf '**Servicio caido**\n\n%s' "$CAIDOS")" 15548997
+          else
+            if [ -n "$abierto" ]; then
+              gh issue close "$abierto" --repo "$REPO" \
+                --comment "El chequeo automatico volvio a pasar."
+              echo "Cerrado el issue #$abierto"
+              avisar "**Todo volvio a funcionar.**" 5763719
+            else
+              echo "Todo bien."
+            fi
+          fi
