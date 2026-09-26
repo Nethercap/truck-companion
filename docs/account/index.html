@@ -89,6 +89,19 @@
     </section>
 
     <section class="card">
+      <h2 data-i18n="deviceTitle">Link this PC</h2>
+      <p class="muted small" data-i18n="deviceHint"></p>
+      <form id="deviceForm" autocomplete="off">
+        <label for="deviceInput" data-i18n="deviceCodeLabel">Code</label>
+        <input id="deviceInput" maxlength="9" autocapitalize="characters"
+               spellcheck="false" placeholder="ABCD-1234" />
+        <p class="hint" id="deviceHintMsg"></p>
+        <button class="btn primary" id="btnDeviceApprove" type="submit"
+                data-i18n="deviceApprove">Link</button>
+      </form>
+    </section>
+
+    <section class="card">
       <h2 data-i18n="sessionsTitle">Open sessions</h2>
       <ul class="sessions" id="sessionsList"></ul>
       <button class="btn" id="btnSignOutAll" data-i18n="signOutAll">Sign out everywhere</button>

@@ -82,6 +82,13 @@
       signedOutAll: (n) => 'Closed ' + n + ' sessions.',
       memberSince: (f) => 'Driver since ' + f,
       savedOk: 'Saved',
+      deviceTitle: 'Link this PC',
+      deviceHint: 'Truck Dash on your PC shows a code. Type it here so your trips are saved to this account.',
+      deviceCodeLabel: 'Code',
+      deviceApprove: 'Link',
+      deviceLinked: (n) => n + ' is now linked to your account.',
+      codigo_invalido_o_vencido: 'That code is not valid, or it expired. Ask for a new one in the app.',
+      codigo_ya_usado: 'That code was already used.',
       dataTitle: 'Your data',
       exportData: 'Download my data',
       exportHint: 'A JSON file with everything this account holds.',
@@ -154,6 +161,13 @@
       signedOutAll: (n) => 'Se cerraron ' + n + ' sesiones.',
       memberSince: (f) => 'Camionero desde ' + f,
       savedOk: 'Guardado',
+      deviceTitle: 'Vincular esta PC',
+      deviceHint: 'Truck Dash en tu PC muestra un codigo. Escribilo aca para que tus viajes queden en esta cuenta.',
+      deviceCodeLabel: 'Codigo',
+      deviceApprove: 'Vincular',
+      deviceLinked: (n) => n + ' quedo vinculada a tu cuenta.',
+      codigo_invalido_o_vencido: 'Ese codigo no es valido, o se vencio. Pedi uno nuevo en la aplicacion.',
+      codigo_ya_usado: 'Ese codigo ya se uso.',
       dataTitle: 'Tus datos',
       exportData: 'Descargar mis datos',
       exportHint: 'Un archivo JSON con todo lo que guarda esta cuenta.',
@@ -474,6 +488,39 @@
     mostrarVista('viewSignIn');
   }
 
+  async function vincularDispositivo(evento) {
+    evento.preventDefault();
+    const code = $('deviceInput').value.trim();
+    if (!code) return;
+    const hint = $('deviceHintMsg');
+    const boton = $('btnDeviceApprove');
+    boton.disabled = true;
+
+    // Primero se mira QUE se esta por vincular. Aprobar a ciegas un codigo
+    // que alguien te dicto por telefono es como aprobarlo sin leerlo.
+    const previo = await pedir('/user/device/' + encodeURIComponent(code));
+    if (!previo.ok) {
+      boton.disabled = false;
+      hint.textContent = t(previo.datos.error || 'error');
+      hint.className = 'hint bad';
+      return;
+    }
+
+    const { ok, datos } = await pedir('/user/device/approve', {
+      method: 'POST', body: { code }
+    });
+    boton.disabled = false;
+    if (!ok) {
+      hint.textContent = t(datos.error || 'error');
+      hint.className = 'hint bad';
+      return;
+    }
+    hint.textContent = '';
+    $('deviceInput').value = '';
+    avisar(t('deviceLinked', previo.datos.device_name || 'Truck Dash'), 'ok');
+    pintarSesiones();
+  }
+
   async function exportarDatos() {
     const { ok, datos } = await pedir('/user/export');
     if (!ok) { avisar(t(datos.error || 'error'), 'bad'); return; }
@@ -599,6 +646,7 @@
     $('publicToggle').addEventListener('change', cambiarPrivacidad);
     $('btnSignOut').addEventListener('click', cerrarSesion);
     $('btnSignOutAll').addEventListener('click', cerrarTodas);
+    $('deviceForm').addEventListener('submit', vincularDispositivo);
     $('btnExport').addEventListener('click', exportarDatos);
     $('btnDelete').addEventListener('click', () => mostrarConfirmacionDeBorrado(true));
     $('btnDeleteCancel').addEventListener('click', () => mostrarConfirmacionDeBorrado(false));

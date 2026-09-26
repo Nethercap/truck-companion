@@ -4,6 +4,13 @@
 const TRANSLATIONS_EXTRA = {
   de: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    deviceTitle: 'Diesen PC verknüpfen',
+    deviceHint: 'Truck Dash auf deinem PC zeigt einen Code. Gib ihn hier ein, damit deine Fahrten in diesem Konto landen.',
+    deviceCodeLabel: 'Code',
+    deviceApprove: 'Verknüpfen',
+    codigo_invalido_o_vencido: 'Dieser Code ist ungültig oder abgelaufen. Lass dir in der App einen neuen geben.',
+    codigo_ya_usado: 'Dieser Code wurde bereits benutzt.',
+    deviceLinked: (n) => n + ' ist jetzt mit deinem Konto verknüpft.',
     save: 'Speichern',
     signInGoogle: 'Mit Google fortfahren',
     signInSoon: 'Weitere Anmeldemethoden kommen noch.',
@@ -406,6 +413,13 @@ const TRANSLATIONS_EXTRA = {
   },
   fr: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    deviceTitle: 'Lier ce PC',
+    deviceHint: 'Truck Dash sur ton PC affiche un code. Saisis-le ici pour que tes trajets soient enregistrés sur ce compte.',
+    deviceCodeLabel: 'Code',
+    deviceApprove: 'Lier',
+    codigo_invalido_o_vencido: 'Ce code n\'est pas valide, ou il a expiré. Demandes-en un nouveau dans l\'application.',
+    codigo_ya_usado: 'Ce code a déjà été utilisé.',
+    deviceLinked: (n) => n + ' est maintenant lié à ton compte.',
     save: 'Enregistrer',
     signInGoogle: 'Continuer avec Google',
     signInSoon: 'D\'autres moyens de connexion arrivent.',
@@ -808,6 +822,13 @@ const TRANSLATIONS_EXTRA = {
   },
   pt: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    deviceTitle: 'Vincular este PC',
+    deviceHint: 'O Truck Dash no seu PC mostra um código. Digite-o aqui para que suas viagens fiquem nesta conta.',
+    deviceCodeLabel: 'Código',
+    deviceApprove: 'Vincular',
+    codigo_invalido_o_vencido: 'Esse código não é válido, ou expirou. Peça um novo no aplicativo.',
+    codigo_ya_usado: 'Esse código já foi usado.',
+    deviceLinked: (n) => n + ' está vinculado à sua conta.',
     save: 'Salvar',
     signInGoogle: 'Continuar com Google',
     signInSoon: 'Mais formas de entrar estão a caminho.',
@@ -1210,6 +1231,13 @@ const TRANSLATIONS_EXTRA = {
   },
   pl: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    deviceTitle: 'Powiąż ten komputer',
+    deviceHint: 'Truck Dash na Twoim komputerze pokazuje kod. Wpisz go tutaj, aby trasy trafiały na to konto.',
+    deviceCodeLabel: 'Kod',
+    deviceApprove: 'Powiąż',
+    codigo_invalido_o_vencido: 'Ten kod jest nieprawidłowy albo wygasł. Poproś o nowy w aplikacji.',
+    codigo_ya_usado: 'Ten kod został już użyty.',
+    deviceLinked: (n) => n + ' jest teraz powiązany z Twoim kontem.',
     save: 'Zapisz',
     signInGoogle: 'Kontynuuj przez Google',
     signInSoon: 'Więcej sposobów logowania jest w drodze.',
@@ -1612,6 +1640,13 @@ const TRANSLATIONS_EXTRA = {
   },
   tr: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    deviceTitle: 'Bu bilgisayarı bağla',
+    deviceHint: 'Bilgisayarındaki Truck Dash bir kod gösteriyor. Seferlerin bu hesaba kaydedilsin diye kodu buraya yaz.',
+    deviceCodeLabel: 'Kod',
+    deviceApprove: 'Bağla',
+    codigo_invalido_o_vencido: 'Bu kod geçerli değil ya da süresi doldu. Uygulamadan yeni bir tane iste.',
+    codigo_ya_usado: 'Bu kod zaten kullanıldı.',
+    deviceLinked: (n) => n + ' artık hesabına bağlı.',
     save: 'Kaydet',
     signInGoogle: 'Google ile devam et',
     signInSoon: 'Daha fazla giriş yöntemi yolda.',
@@ -2014,6 +2049,13 @@ const TRANSLATIONS_EXTRA = {
   },
   ru: {
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
+    deviceTitle: 'Привязать этот ПК',
+    deviceHint: 'Truck Dash на вашем ПК показывает код. Введите его здесь, чтобы рейсы сохранялись в этом аккаунте.',
+    deviceCodeLabel: 'Код',
+    deviceApprove: 'Привязать',
+    codigo_invalido_o_vencido: 'Этот код недействителен или истёк. Запросите новый в приложении.',
+    codigo_ya_usado: 'Этот код уже использован.',
+    deviceLinked: (n) => n + ' привязан к вашему аккаунту.',
     save: 'Сохранить',
     signInGoogle: 'Продолжить через Google',
     signInSoon: 'Скоро появятся другие способы входа.',

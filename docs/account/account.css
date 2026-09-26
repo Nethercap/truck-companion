@@ -142,3 +142,12 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
 
 .legal a { color: var(--muted); text-decoration: underline; }
 .legal a:hover { color: var(--accent); }
+
+#deviceInput {
+  width: 100%; max-width: 12rem; font-size: 1.2rem; letter-spacing: 0.15em;
+  text-transform: uppercase; padding: 0.55rem 0.7rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--bg); border: 1px solid var(--line);
+  color: var(--text); border-radius: 8px;
+}
+#deviceInput:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
