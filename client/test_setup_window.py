@@ -301,3 +301,51 @@ def _esperar(v, condicion, segundos=10):
             return
         time.sleep(0.05)
     raise AssertionError("no se cumplio a tiempo")
+
+
+# --------------------------------------------- cierre automatico (Proton)
+# Regresion de 1.5.15: el cliente se cerraba con el juego abierto. Reportado
+# en Linux, donde pegaba siempre bajo gamescope.
+
+def test_no_se_cierra_si_el_juego_nunca_estuvo_abierto():
+    """Quien lo deja en el inicio de Windows lo tiene corriendo antes que el
+    juego. Cerrarse al minuto seria apagarse antes de que nadie juegue."""
+    assert tray_client.debe_cerrarse(False, True, 0, 10_000) is False
+
+
+def test_no_se_cierra_si_la_opcion_esta_apagada():
+    assert tray_client.debe_cerrarse(True, False, 0, 10_000) is False
+
+
+def test_no_se_cierra_mientras_la_memoria_compartida_esta():
+    """Es el bug reportado. Mientras el plugin siga publicando, el juego
+    esta abierto, aunque sdkActive este en falso por estar en un menu o en
+    una estacion de servicio, y aunque no se encuentre la ventana."""
+    assert tray_client.debe_cerrarse(True, True, None, 10_000) is False
+
+
+def test_no_se_cierra_por_una_ausencia_corta():
+    """La memoria aparece y desaparece entre cargas de partida."""
+    ahora = 10_000
+    assert tray_client.debe_cerrarse(True, True, ahora - 5, ahora) is False
+    assert tray_client.debe_cerrarse(True, True, ahora - tray_client.GRACIA_CIERRE + 1,
+                                     ahora) is False
+
+
+def test_se_cierra_cuando_la_memoria_falta_hace_rato():
+    ahora = 10_000
+    assert tray_client.debe_cerrarse(True, True, ahora - tray_client.GRACIA_CIERRE - 1,
+                                     ahora) is True
+
+
+def test_el_cierre_se_decide_donde_la_evidencia_es_buena():
+    """La regresion no fue la regla sino DONDE estaba: colgada de sdkActive y
+    de encontrar la ventana, que solo dicen "no hay frame ahora mismo". Esta
+    prueba fija que la decision viva en la rama donde init() fallo, o sea
+    donde la memoria compartida no esta."""
+    import inspect
+    fuente = inspect.getsource(tray_client.telemetry_loop)
+    antes_de_sdkactive = fuente.split('if raw.get("sdkActive")')[0]
+    despues = fuente.split('if raw.get("sdkActive")')[1]
+    assert "apagar()" in antes_de_sdkactive, "el cierre salio de la rama de init()"
+    assert "apagar()" not in despues, "el cierre volvio a la rama de sdkActive"

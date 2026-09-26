@@ -226,7 +226,9 @@ Notes from that setup:
   per prefix, and it does not end until the last Wine process does, so the
   Proton wrapper Steam launched keeps waiting. From 1.5.15 the client closes
   itself when the game closes, which is what releases the prefix. It is a
-  checkbox in Setup, on by default only under Proton.
+  checkbox in Setup, on by default only under Proton. It waits until the
+  telemetry shared memory has been gone for a minute, so being in a menu or
+  paused does not count as closing the game.
 
 **Native Linux builds of the game** are a different story: they need a
 Linux build of the telemetry plugin, which exists as a test build but has

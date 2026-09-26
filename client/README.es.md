@@ -171,7 +171,8 @@ Detalles de esa instalacion:
   Wine, asi que el wrapper de Proton que lanzo Steam se queda esperando.
   Desde 1.5.15 el cliente se cierra solo cuando se cierra el juego, que es lo
   que suelta el prefijo. Es una casilla en Setup, activada por defecto solo
-  bajo Proton.
+  bajo Proton. Espera a que la memoria compartida de la telemetria lleve un
+  minuto ausente, asi estar en un menu o en pausa no cuenta como cerrar.
 
 **La version nativa de Linux del juego** es otra historia: necesita un plugin
 de telemetria compilado para Linux, que existe como build de prueba pero

@@ -73,6 +73,11 @@ CLOUD_KEYS = ("connecting", "connected", "offline", "reconnecting")
 class AppState:
     def __init__(self):
         self.status = "starting"  # estado de la telemetria (ver STATUS_TEXT)
+        # Si el juego estuvo abierto en esta corrida. Sin esto, el cierre
+        # automatico apagaria el cliente al minuto de arrancarlo con el juego
+        # todavia cerrado, que es justo lo que hace quien lo deja en el inicio
+        # de Windows.
+        self.vio_el_juego = False
         self.status_detail: str | None = None  # diagnostico fino (ingles) cuando status == plugin_missing
         self.map_mods: dict | None = None  # {'ets2': {promods,..}|None, 'ats': {...}|None} leido de game.log.txt
         self.map_mods_read_at = 0.0
@@ -193,6 +198,30 @@ BG = "#14171c"
 FG = "#f2f3f5"
 MUTED = "#9aa4b2"
 PAUSA_APROBACION = 3  # segundos entre consultas al vincular
+
+# Cuanto tiene que estar ausente la memoria compartida para dar el juego por
+# cerrado. Es holgado a proposito: el costo de equivocarse para arriba es
+# esperar un minuto de mas antes de soltar el prefijo de Proton, y el de
+# equivocarse para abajo es cerrarse encima de alguien que esta jugando.
+GRACIA_CIERRE = 60
+
+
+def debe_cerrarse(vio_el_juego: bool, opcion_activa: bool,
+                  sin_memoria_desde: float | None, ahora: float) -> bool:
+    """Si corresponde cerrar el cliente porque el juego se fue.
+
+    Las tres condiciones tienen que darse juntas, y cada una tapa una forma
+    distinta de cerrarse cuando no hay que hacerlo:
+
+    - El juego estuvo abierto en esta corrida. Si no, el cliente dejado en el
+      inicio de Windows se apagaria solo al minuto, antes de que nadie juegue.
+    - La opcion esta activa. Viene prendida solo bajo Proton.
+    - La memoria compartida lleva un rato ausente. Que falte UN momento no
+      alcanza: aparece y desaparece entre cargas de partida.
+    """
+    if not (vio_el_juego and opcion_activa) or sin_memoria_desde is None:
+        return False
+    return (ahora - sin_memoria_desde) > GRACIA_CIERRE
 BLUE = "#3b9eff"
 GREEN = "#4caf50"
 ORANGE = "#ff8a3d"
@@ -1005,6 +1034,8 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             await cloud.send(msg)
             await local.broadcast(msg, is_status=True)
 
+    sin_memoria_desde = None
+
     while True:
         if not telemetry_ready:
             try:
@@ -1017,8 +1048,25 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                     logging.info("Telemetry unavailable: %s", new_status)
                 state.set_status(new_status)
                 await publish_status()
+
+                # El juego se fue de verdad: cuando se cierra, el plugin
+                # desmapea la memoria compartida y init() deja de funcionar.
+                # Mientras init() ande, el juego esta ahi aunque estemos en un
+                # menu y aunque la ventana no se encuentre.
+                if sin_memoria_desde is None:
+                    sin_memoria_desde = time.time()
+                if debe_cerrarse(state.vio_el_juego,
+                                 win_integration.quit_on_game_close_enabled(),
+                                 sin_memoria_desde, time.time()):
+                    logging.info("El juego se cerro (la memoria compartida no esta "
+                                 "hace %ss) y esta activo el cierre automatico: "
+                                 "saliendo para soltar el prefijo", GRACIA_CIERRE)
+                    apagar()
+                    return
                 await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
                 continue
+            sin_memoria_desde = None
+            state.vio_el_juego = True
 
         try:
             raw = truck_telemetry.get_data()
@@ -1056,15 +1104,14 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 inactive_since = None
                 state.set_status("waiting_game")
                 state.discord.update(None)
-                # Llegar hasta aca implica que el juego estuvo corriendo:
-                # truck_telemetry.init() solo funciona si el plugin creo la
-                # memoria compartida. Asi que esto es "el juego se cerro", no
-                # "nunca arranco".
-                if win_integration.quit_on_game_close_enabled():
-                    logging.info("El juego se cerro y esta activo el cierre "
-                                 "automatico: saliendo para soltar el prefijo")
-                    apagar()
-                    return
+                # OJO: aca NO se cierra la aplicacion. Que sdkActive este en
+                # falso y que no se encuentre la ventana significa "no hay
+                # frame del juego ahora mismo", que pasa en un menu, en pausa
+                # o con el camion parado en una estacion. Bajo gamescope la
+                # ventana ademas no se encuentra nunca. Cerrarse aca dejaba
+                # sin cliente a alguien que estaba jugando.
+                # El cierre real se decide mas abajo, cuando la memoria
+                # compartida desaparece: eso solo pasa si el juego se fue.
             else:
                 state.set_status("waiting_truck")
         await publish_status()
