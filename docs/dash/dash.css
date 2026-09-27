@@ -77,6 +77,9 @@
   min-height: 0;
   overflow-y: auto;
 }
+/* Sin viaje no hay tarjeta de llegada. Si la fila la sigue nombrando, el
+   lugar queda reservado y vacio; el resto se corre y ocupa el ancho. */
+.dGrid.sinViaje { grid-template-areas: "drive" "fuel" "truck" "strip"; }
 .dCard {
   background: var(--d-panel);
   border-radius: 3px;
@@ -101,6 +104,19 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas: "drive drive" "eta fuel" "truck truck" "strip strip";
   }
+  .dGrid.sinViaje { grid-template-areas: "drive drive" "fuel fuel" "truck truck" "strip strip"; }
+}
+/* Vertical grande: el mismo problema que en apaisado, pero a nivel pagina.
+   Con la formula comun una tablet de 1024x1366 se quedaba en el tope de
+   19 px y el tablero ocupaba la mitad de arriba de la pantalla. Aca la
+   unidad tambien sale del alto, con un techo por ancho: en vertical las
+   columnas son angostas y si se agranda de mas el texto envuelve, la
+   pagina crece y termina desbordando en vez de llenarse. Va ANTES del
+   bloque apaisado para que a 5/4 justo mande el de apaisado.
+   Los telefonos (menos de 34rem, una sola columna) no entran aca: ya
+   venian usando el 78-86 % del alto. */
+@media (min-width: 34rem) and (max-aspect-ratio: 5/4) {
+  .dashRoot { --d-unit: calc(clamp(13.5px, min(2.1vh, 2.9vw), 40px) * var(--d-scale)); }
 }
 /* Cuatro columnas cuando la pantalla es ancha Y baja. El corte mira la
    proporcion y no solo el ancho: un telefono apaisado mide 844x390, que en
@@ -123,6 +139,10 @@
     grid-template-rows: auto auto;
     align-content: space-between;
   }
+  .dGrid.sinViaje {
+    grid-template-columns: 1.15fr minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "drive fuel truck" "strip strip strip";
+  }
   .dEndCityBig { font-size: 2em; }
 }
 /* Monitor: la sesion y el vehiculo dejan de compartir columna. */
@@ -136,7 +156,7 @@
 /* Se permite que la marcha caiga abajo: con el tablero grande en una
    ventana angosta, velocidad + limite + marcha no entran en un renglon
    y antes el bloque de la marcha se salia de la tarjeta. */
-.dSpeedRow { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
+.dSpeedRow { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; max-width: 22em; }
 .dSpeed { font-size: 3.1em; font-weight: 600; line-height: 0.95; font-variant-numeric: tabular-nums; }
 .dSpeedUnit { font-size: 0.68em; color: var(--d-muted); }
 .dLimit {
@@ -155,7 +175,9 @@
 .dRpmBar { display: block; height: 100%; width: 0; background: var(--d-accent); border-radius: 1em; }
 .dRpmBar.dRpm-high { background: var(--d-bad); }
 
-.dIndicators { display: flex; flex-wrap: wrap; gap: 0.3em; }
+/* Rejilla y no flujo libre: asi los iconos caen en columnas parejas y el
+   renglon incompleto queda alineado con los de arriba. */
+.dIndicators { display: grid; grid-template-columns: repeat(auto-fit, minmax(1.9em, 1fr)); gap: 0.3em; justify-items: center; }
 .dInd {
   width: 1.9em; height: 1.9em; border-radius: 2px;
   display: flex; align-items: center; justify-content: center;
@@ -237,13 +259,19 @@
 
 /* --- la franja de abajo --- */
 .dStrip {
-  background: var(--d-panel); border-radius: 3px; padding: 0.5em 0.75em;
+  background: var(--d-panel); border-radius: 3px; padding: 0.5em 0.9em;
   display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap;
 }
 .dStripCargo { min-width: 0; }
 .dStripCargo[hidden] { display: none; }
 .dStripBig { font-size: 1em; font-weight: 600; }
-.dStrip .dMetrics { display: flex; gap: 1.2em; margin-left: auto; }
+/* Los numeros envuelven entre ellos antes de empujar el boton a un
+   renglon propio, que lo dejaba solo abajo a la izquierda. */
+.dStrip .dMetrics { display: flex; gap: 0.35em 1.2em; margin-left: auto; flex-wrap: wrap; }
+/* Sin carga no hay nada a la izquierda: los numeros arrancan ahi en vez de
+   quedar todos apretados contra el borde derecho. */
+.dStripCargo[hidden] ~ .dMetrics { margin-left: 0; }
+.dStripCargo[hidden] ~ .dReset { margin-left: auto; }
 .dStrip .dReset { flex-shrink: 0; }
 .dMetric { min-width: 0; }
 .dMetricValue { font-size: 1.05em; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -252,11 +280,18 @@
 /* Las barras de desgaste van juntas en una fila: cinco numeros al lado de
    cinco etiquetas era una planilla. La afirmacion de arriba dice cual es la
    peor, que es lo unico que hay que saber de un vistazo. */
-.dWearRow { display: flex; gap: 0.25em; margin-bottom: 0.35em; }
+/* Tantas piezas por renglon como entren: con el numero al lado, cinco en
+   una columna angosta dejaban la barra en veinte pixeles. */
+.dWearRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.2em, 1fr)); gap: 0.3em 0.7em; margin-bottom: 0.35em; }
 .dWearRow[hidden] { display: none; }
 .dWearRow-trailer { opacity: 0.75; }
+.dWear { display: flex; align-items: center; gap: 0.4em; min-width: 0; }
+.dWear[hidden] { display: none; }
 .dWearTrack { flex: 1; height: 0.35em; background: var(--d-line); border-radius: 1em; overflow: hidden; }
 .dWearTrack[hidden] { display: none; }
+.dWearPct { font-size: 0.64em; color: var(--d-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dWearPct.regular { color: var(--d-warn); }
+.dWearPct.mal { color: var(--d-bad); }
 .dWearBar { display: block; height: 100%; width: 0; border-radius: 1em; background: var(--d-ok); }
 .dWearBar.regular { background: var(--d-warn); }
 .dWearBar.mal { background: var(--d-bad); }

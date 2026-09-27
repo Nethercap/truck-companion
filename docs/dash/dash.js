@@ -118,9 +118,13 @@ function createDashPanel({ root, money, imperial, lang }) {
     guardar(id, box.appendChild(el('div', 'dMetricValue', '-')));
     box.appendChild(el('div', 'dMetricLabel')).dataset.i18n = claveEtiqueta;
   }
+  // Barra mas numero: la barra sola dice que algo esta peor que el resto
+  // pero no cuanto, y una puntita de color puede ser un 5 % o un 35 %.
   function barraDesgaste(padre, id) {
-    const pista = padre.appendChild(el('span', 'dWearTrack'));
+    const celda = padre.appendChild(el('span', 'dWear'));
+    const pista = celda.appendChild(el('span', 'dWearTrack'));
     guardar(id, pista.appendChild(el('span', 'dWearBar')));
+    guardar(id + 'Pct', celda.appendChild(el('span', 'dWearPct')));
   }
 
   root.classList.add('dashRoot');
@@ -217,7 +221,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     render();
   });
 
-  const grilla = el('main', 'dGrid');
+  const grilla = guardar('grilla', el('main', 'dGrid'));
   grilla.append(conduccion, llegada, nafta, camion, franja);
   root.append(cinta, grilla);
 
@@ -229,7 +233,7 @@ function createDashPanel({ root, money, imperial, lang }) {
   }
   function dist(km) {
     if (km == null || !isFinite(km)) return null;
-    return mi() ? num(km * KM_TO_MI) + ' mi' : num(km) + ' km';
+    return mi() ? num(km * KM_TO_MI) + '\u00a0mi' : num(km) + '\u00a0km';
   }
   function vel(kmh) {
     if (kmh == null || !isFinite(kmh)) return null;
@@ -247,8 +251,8 @@ function createDashPanel({ root, money, imperial, lang }) {
     const total = Math.round(segundos / 60);
     const h = Math.floor(total / 60), m = total % 60;
     return h >= 1
-      ? h + ' ' + t('hourShort') + ' ' + String(m).padStart(2, '0') + ' ' + t('minShort')
-      : m + ' ' + t('minShort');
+      ? h + '\u00a0' + t('hourShort') + ' ' + String(m).padStart(2, '0') + '\u00a0' + t('minShort')
+      : m + '\u00a0' + t('minShort');
   }
   function hm(segundos) {
     if (segundos == null || !isFinite(segundos) || segundos < 0) return null;
@@ -291,6 +295,9 @@ function createDashPanel({ root, money, imperial, lang }) {
     if (!d || !visible) return;
     const s = escalaActual();
     const enViaje = !!(d.onJob && d.cityDst);
+    // Sin viaje no hay cinta ni tarjeta de llegada. Esconderlas no alcanza:
+    // la columna seguia reservada y quedaba un hueco negro en el medio.
+    refs.grilla.classList.toggle('sinViaje', !enViaje);
     const restanteKm = enViaje ? d.routeDistanceKm : null;
     const viajeJuegoSeg = enViaje && d.routeTimeSeconds > 0 ? d.routeTimeSeconds : null;
     const realSeg = viajeJuegoSeg != null ? viajeJuegoSeg / s : null;
@@ -462,15 +469,17 @@ function createDashPanel({ root, money, imperial, lang }) {
     }
 
     const linea = [];
-    if (d.fuel != null) linea.push(num(d.fuel) + ' l' + (pct != null ? ' · ' + num(pct) + ' %' : ''));
-    if (alcance != null) linea.push(dist(alcance) + ' ' + t('rangeWord'));
+    if (d.fuel != null) linea.push(num(d.fuel) + '\u00a0l' + (pct != null ? ' · ' + num(pct) + '\u00a0%' : ''));
+    // Sin destino la afirmacion YA es la autonomia; repetirla abajo es decir
+    // el mismo numero dos veces en la misma tarjeta.
+    if (alcance != null && restanteKm != null) linea.push(dist(alcance) + ' ' + t('rangeWord'));
     texto('fuelLine', linea.join(' · ') || null);
 
     const consumo = combustible.avgLPer100() || d.fuelAvgConsumption || null;
     const bajo = [];
-    if (consumo != null) bajo.push(mi() ? num(235.215 / consumo, 1) + ' mpg' : num(consumo, 1) + ' l/100');
+    if (consumo != null) bajo.push(mi() ? num(235.215 / consumo, 1) + '\u00a0mpg' : num(consumo, 1) + '\u00a0l/100');
     if (d.adblue != null && d.adblueCapacity) {
-      bajo.push(t('adblueLabel') + ' ' + num(d.adblue / d.adblueCapacity * 100) + ' %');
+      bajo.push(t('adblueLabel') + ' ' + num(d.adblue / d.adblueCapacity * 100) + '\u00a0%');
     }
     texto('fuelDim', bajo.join(' · ') || null);
     refs.fuelDim.classList.toggle('alerta', !!(d.mechanicalWarnings || {}).adblue);
@@ -495,22 +504,22 @@ function createDashPanel({ root, money, imperial, lang }) {
 
     const partes = [[d.truckBrand, d.truckName].filter(Boolean).join(' ') || null];
     if (d.odometerKm != null) partes.push(dist(d.odometerKm));
-    if (d.cargoDamage) partes.push(t('cargoDamage') + ' ' + num(d.cargoDamage * 100, 1) + ' %');
+    if (d.cargoDamage) partes.push(t('cargoDamage') + ' ' + num(d.cargoDamage * 100, 1) + '\u00a0%');
     texto('truckLine', partes.filter(Boolean).join(' · ') || null);
     refs.truckLine.classList.toggle('alerta', d.cargoDamage > 0.02);
 
     const alertas = d.mechanicalWarnings || {};
-    medidor('oilTemp', d.oilTemperature, (v) => num(v) + ' °C', d.oilTemperature > 125);
-    medidor('waterTemp', d.waterTemperature, (v) => num(v) + ' °C', alertas.waterTemperature);
-    medidor('brakeTemp', d.brakeTemperature, (v) => num(v) + ' °C', d.brakeTemperature > 300);
-    medidor('airPressure', d.airPressure, (v) => num(v) + ' psi', alertas.airPressure);
-    medidor('oilPressure', d.oilPressure, (v) => num(v) + ' psi', alertas.oilPressure);
-    medidor('battery', d.batteryVoltage, (v) => num(v, 1) + ' V', alertas.batteryVoltage);
+    medidor('oilTemp', d.oilTemperature, (v) => num(v) + '\u00a0°C', d.oilTemperature > 125);
+    medidor('waterTemp', d.waterTemperature, (v) => num(v) + '\u00a0°C', alertas.waterTemperature);
+    medidor('brakeTemp', d.brakeTemperature, (v) => num(v) + '\u00a0°C', d.brakeTemperature > 300);
+    medidor('airPressure', d.airPressure, (v) => num(v) + '\u00a0psi', alertas.airPressure);
+    medidor('oilPressure', d.oilPressure, (v) => num(v) + '\u00a0psi', alertas.oilPressure);
+    medidor('battery', d.batteryVoltage, (v) => num(v, 1) + '\u00a0V', alertas.batteryVoltage);
   }
 
   function renderFranja(d, enViaje) {
     const partes = [];
-    if (d.cargoMassKg) partes.push(num(d.cargoMassKg / 1000, 1) + ' t');
+    if (d.cargoMassKg) partes.push(num(d.cargoMassKg / 1000, 1) + '\u00a0t');
     if (d.plannedDistanceKm) partes.push(t('routeLength') + ' ' + dist(d.plannedDistanceKm));
     refs.cargoBox.hidden = !enViaje;
     texto('cargo', enViaje ? (d.cargo || t('noCargo')) : null);
@@ -522,7 +531,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     texto('sAvg', st.avgSpeedKmh == null ? '-'
       : vel(st.avgSpeedKmh) + (st.topSpeedKmh ? ' · ' + t('topSpeed') + ' ' + vel(st.topSpeedKmh) : ''));
     texto('sFuel', st.fuelUsedL < 1 ? '-'
-      : num(st.fuelUsedL) + ' l' + (st.fuelPer100Km ? ' · ' + num(st.fuelPer100Km, 1) : ''));
+      : num(st.fuelUsedL) + '\u00a0l' + (st.fuelPer100Km ? ' · ' + num(st.fuelPer100Km, 1) : ''));
     texto('sNet', st.netProfit ? plata(st.netProfit) : '0');
     refs.resetBtn.title = st.startedAt ? t('sessionSince', reloj(new Date(st.startedAt * 1000))) : '';
   }
@@ -533,7 +542,13 @@ function createDashPanel({ root, money, imperial, lang }) {
     const pct = valor == null ? null : valor * 100;
     barra.style.width = (pct || 0).toFixed(1) + '%';
     barra.className = 'dWearBar' + (pct == null ? '' : pct >= 40 ? ' mal' : pct >= 10 ? ' regular' : ' bien');
-    barra.parentNode.hidden = pct == null;
+    const celda = barra.parentNode.parentNode;
+    celda.hidden = pct == null;
+    const numero = refs[id + 'Pct'];
+    if (numero) {
+      numero.textContent = pct == null ? '' : num(pct) + '\u00a0%';
+      numero.className = 'dWearPct' + (pct == null ? '' : pct >= 40 ? ' mal' : pct >= 10 ? ' regular' : '');
+    }
   }
   function medidor(id, valor, formato, alerta) {
     const box = refs[id + 'Box'];
