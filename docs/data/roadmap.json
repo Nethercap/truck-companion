@@ -175,11 +175,11 @@
       "status": "exploring",
       "en": {
         "title": "Overlay inside the game",
-        "body": "The dashboard drawn on top of the game, for people playing on one screen who do not want a second device. Asked for on Reddit. Two things decide whether we build it: it needs the game in borderless window rather than exclusive fullscreen, and we want to be sure an overlay is fine with TruckersMP before shipping one."
+        "body": "The dashboard drawn on top of the game, for people playing on one screen who do not want a second device. Asked for on Reddit. The catch is not permission, it is space: an overlay needs the game in a borderless window rather than exclusive fullscreen, and it takes back the screen room that a second device is there to save."
       },
       "es": {
         "title": "Overlay dentro del juego",
-        "body": "El tablero dibujado encima del juego, para quien juega en una sola pantalla y no quiere un segundo dispositivo. Lo pidieron en Reddit. Dos cosas deciden si lo hacemos: necesita el juego en ventana sin bordes y no en pantalla completa exclusiva, y queremos estar seguros de que un overlay no trae problemas en TruckersMP antes de publicarlo."
+        "body": "El tablero dibujado encima del juego, para quien juega en una sola pantalla y no quiere un segundo dispositivo. Lo pidieron en Reddit. El problema no es el permiso sino el lugar: un overlay necesita el juego en ventana sin bordes y no en pantalla completa exclusiva, y le saca al juego el espacio que el segundo dispositivo justamente ahorra."
       }
     }
   ]
