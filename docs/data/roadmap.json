@@ -145,6 +145,42 @@
         "title": "13 variantes de mapa",
         "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia y TruckersMP, detectadas solas."
       }
+    },
+    {
+      "id": "tts-directions",
+      "status": "exploring",
+      "en": {
+        "title": "Spoken directions",
+        "body": "Turn-by-turn read out loud so you can keep your eyes on the road. The bar is high on purpose: the game's own GPS already talks, so this only earns its place if it sounds natural and pronounces road and city names properly. Finding a voice that does that is the part we have to solve first."
+      },
+      "es": {
+        "title": "Indicaciones habladas",
+        "body": "Las indicaciones de giro dichas en voz alta, para no sacar la vista de la ruta. La vara está alta a propósito: el GPS del juego ya habla, así que esto solo se gana su lugar si suena natural y pronuncia bien los nombres de rutas y ciudades. Encontrar una voz que haga eso es lo primero que hay que resolver."
+      }
+    },
+    {
+      "id": "voice-commands",
+      "status": "exploring",
+      "en": {
+        "title": "Voice commands",
+        "body": "Say “wipers on” instead of reaching for the phone. The same actions the button box already does, triggered by voice, with your hands on the wheel."
+      },
+      "es": {
+        "title": "Comandos por voz",
+        "body": "Decir “prendé el limpiaparabrisas” en vez de estirarte hasta el celular. Las mismas acciones que ya hace la botonera, activadas por voz y con las manos en el volante."
+      }
+    },
+    {
+      "id": "ingame-overlay",
+      "status": "exploring",
+      "en": {
+        "title": "Overlay inside the game",
+        "body": "The dashboard drawn on top of the game, for people playing on one screen who do not want a second device. Asked for on Reddit. Two things decide whether we build it: it needs the game in borderless window rather than exclusive fullscreen, and we want to be sure an overlay is fine with TruckersMP before shipping one."
+      },
+      "es": {
+        "title": "Overlay dentro del juego",
+        "body": "El tablero dibujado encima del juego, para quien juega en una sola pantalla y no quiere un segundo dispositivo. Lo pidieron en Reddit. Dos cosas deciden si lo hacemos: necesita el juego en ventana sin bordes y no en pantalla completa exclusiva, y queremos estar seguros de que un overlay no trae problemas en TruckersMP antes de publicarlo."
+      }
     }
   ]
 }

@@ -1257,7 +1257,7 @@ function renderRoadmap() {
     updated.textContent = new Date(roadmapData.updated + 'T12:00:00Z').toLocaleDateString(currentLang, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 }
-fetch('/data/roadmap.json?v=1').then(r => r.ok ? r.json() : null).then(data => {
+fetch('/data/roadmap.json?v=2').then(r => r.ok ? r.json() : null).then(data => {
   if (!data) return;
   roadmapData = data;
   renderRoadmap();
