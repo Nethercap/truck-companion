@@ -398,6 +398,15 @@ test('sessionStats: cargar combustible no cuenta como consumo negativo', () => {
   s.push({ ts: 3, game: 'ets2', fuel: 600, odometerKm: 10, speedKmh: 0 });  // cargo
   s.push({ ts: 4, game: 'ets2', fuel: 597, odometerKm: 10, speedKmh: 0 });
   assert.ok(Math.abs(s.state().fuelUsedL - 8) < 1e-6, String(s.state().fuelUsedL));
+  // Y una carga CHICA tambien es carga. Sin este caso, un tope por valor
+  // absoluto ("cualquier cambio menor a 20 l es consumo") pasaba los tests
+  // contando diez litros cargados como diez gastados. Lo encontro la
+  // version de Python del mismo acumulador (client/test_accumulator.py).
+  const otro = createSessionStats();
+  [100, 95, 105, 103].forEach((litros, i) => {
+    otro.push({ ts: i + 1, game: 'ets2', fuel: litros, odometerKm: 10, speedKmh: 0 });
+  });
+  assert.ok(Math.abs(otro.state().fuelUsedL - 7) < 1e-6, String(otro.state().fuelUsedL));
 });
 
 test('sessionStats: un ferry no suma kilometros manejados', () => {
