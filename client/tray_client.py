@@ -209,12 +209,16 @@ PAUSA_APROBACION = 3  # segundos entre consultas al vincular
 # equivocarse para abajo es cerrarse encima de alguien que esta jugando.
 GRACIA_CIERRE = 60
 
-# La seccion de cuenta esta escrita y probada, pero apagada hasta que el
-# cliente mande viajes de verdad. Hoy el texto dice "vincula y tus viajes
-# quedan guardados", y mientras no se manden seria mentira: alguien
-# vincularia su cuenta y no pasaria nada. Se enciende junto con el
-# acumulador, no antes.
-CUENTAS_VISIBLES = False
+# La seccion de cuenta esta escrita y probada, pero apagada hasta haber
+# manejado de verdad con ella y comprobado que los kilometros del perfil
+# coinciden con los del juego. Anunciar viajes guardados y que los numeros
+# esten corridos es peor que no tenerlos.
+#
+# Se puede prender sin tocar el codigo:
+#     set TRUCKDASH_CUENTAS=1  (Windows)   export TRUCKDASH_CUENTAS=1 (Linux)
+# Asi la prueba no pasa por editar un archivo que despues hay que acordarse
+# de volver atras antes de publicar.
+CUENTAS_VISIBLES = os.environ.get("TRUCKDASH_CUENTAS") == "1"
 
 
 def debe_cerrarse(vio_el_juego: bool, opcion_activa: bool,
