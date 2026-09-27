@@ -404,7 +404,7 @@ const TRANSLATIONS = {
   },
   es: {
     deadlineIn: (x) => 'vence en ' + x,
-    fuelEnoughTo: (c) => 'Alcanza hasta ' + c,
+    fuelEnoughTo: (c) => 'Combustible hasta ' + c,
     rangeIs: (d) => d + ' de autonomía',
     rangeWord: 'de autonomía',
     refuelHere: 'carga acá',
@@ -428,7 +428,7 @@ const TRANSLATIONS = {
     untilRest: 'Hasta el descanso obligatorio',
     sleepNone: 'Llegás sin dormir',
     sleepNeeded: 'Un descanso antes de llegar',
-    fuelShort: 'Hay que cargar antes de llegar',
+    fuelShort: 'Hay que cargar combustible antes de llegar',
     adblueLabel: 'AdBlue',
     routeLength: 'Ruta',
     perKm: 'por km',

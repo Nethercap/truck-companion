@@ -4,7 +4,7 @@
 const TRANSLATIONS_EXTRA = {
   de: {
     deadlineIn: (x) => 'fällig in ' + x,
-    fuelEnoughTo: (c) => 'Reicht bis ' + c,
+    fuelEnoughTo: (c) => 'Kraftstoff reicht bis ' + c,
     rangeIs: (d) => d + ' Reichweite',
     rangeWord: 'Reichweite',
     refuelHere: 'hier tanken',
@@ -468,7 +468,7 @@ const TRANSLATIONS_EXTRA = {
   },
   fr: {
     deadlineIn: (x) => 'échéance dans ' + x,
-    fuelEnoughTo: (c) => "Assez jusqu'à " + c,
+    fuelEnoughTo: (c) => "Carburant suffisant jusqu'à " + c,
     rangeIs: (d) => d + " d'autonomie",
     rangeWord: "d'autonomie",
     refuelHere: 'plein ici',
@@ -932,7 +932,7 @@ const TRANSLATIONS_EXTRA = {
   },
   pt: {
     deadlineIn: (x) => 'vence em ' + x,
-    fuelEnoughTo: (c) => 'Dá até ' + c,
+    fuelEnoughTo: (c) => 'Combustível até ' + c,
     rangeIs: (d) => d + ' de autonomia',
     rangeWord: 'de autonomia',
     refuelHere: 'abastecer aqui',
@@ -1396,7 +1396,7 @@ const TRANSLATIONS_EXTRA = {
   },
   pl: {
     deadlineIn: (x) => 'termin za ' + x,
-    fuelEnoughTo: (c) => 'Wystarczy do ' + c,
+    fuelEnoughTo: (c) => 'Paliwa wystarczy do ' + c,
     rangeIs: (d) => d + ' zasięgu',
     rangeWord: 'zasięgu',
     refuelHere: 'tu tankowanie',
@@ -1860,7 +1860,7 @@ const TRANSLATIONS_EXTRA = {
   },
   tr: {
     deadlineIn: (x) => x + ' içinde teslim',
-    fuelEnoughTo: (c) => c + ' için yeterli',
+    fuelEnoughTo: (c) => c + ' için yakıt yeterli',
     rangeIs: (d) => d + ' menzil',
     rangeWord: 'menzil',
     refuelHere: 'yakıt burada',
@@ -2324,7 +2324,7 @@ const TRANSLATIONS_EXTRA = {
   },
   ru: {
     deadlineIn: (x) => 'срок через ' + x,
-    fuelEnoughTo: (c) => 'Хватит до ' + c,
+    fuelEnoughTo: (c) => 'Топлива хватит до ' + c,
     rangeIs: (d) => d + ' запаса хода',
     rangeWord: 'запаса хода',
     refuelHere: 'заправка здесь',
