@@ -151,11 +151,11 @@
       "status": "exploring",
       "en": {
         "title": "Spoken directions",
-        "body": "Turn-by-turn read out loud so you can keep your eyes on the road. The bar is high on purpose: the game's own GPS already talks, so this only earns its place if it sounds natural and pronounces road and city names properly. Finding a voice that does that is the part we have to solve first."
+        "body": "Turn-by-turn read out loud so you can keep your eyes on the road. The game's own voice is poor enough that most people turn it off, so this replaces it rather than doubling up. It only earns its place if it sounds natural and pronounces road and city names properly, and finding a voice that does that is the actual work."
       },
       "es": {
         "title": "Indicaciones habladas",
-        "body": "Las indicaciones de giro dichas en voz alta, para no sacar la vista de la ruta. La vara está alta a propósito: el GPS del juego ya habla, así que esto solo se gana su lugar si suena natural y pronuncia bien los nombres de rutas y ciudades. Encontrar una voz que haga eso es lo primero que hay que resolver."
+        "body": "Las indicaciones de giro dichas en voz alta, para no sacar la vista de la ruta. La voz del juego es lo bastante mala como para que la mayoría la apague, así que esto la reemplaza en vez de duplicarla. Solo se gana el lugar si suena natural y pronuncia bien los nombres de rutas y ciudades, y encontrar esa voz es el trabajo de verdad."
       }
     },
     {
