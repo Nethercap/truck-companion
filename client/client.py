@@ -538,6 +538,43 @@ def heading_deg(raw: dict):
         return None
 
 
+def trailers_enganchados(raw: dict) -> list:
+    """Los remolques realmente enganchados, en orden. El SDK reserva diez
+    ranuras (dobles y triples australianos); las vacias vienen llenas de
+    ceros, que no es lo mismo que "sin dano"."""
+    return [t for t in (raw.get("trailer") or []) if isinstance(t, dict) and t.get("attached")]
+
+
+def trailer_wear(raw: dict):
+    """Desgaste del remolque, del primero enganchado. None sin remolque:
+    la web esconde la fila en vez de mostrar tres ceros que parecen un
+    remolque impecable."""
+    enganchados = trailers_enganchados(raw)
+    if not enganchados:
+        return None
+    primero = enganchados[0]
+    return {
+        "chassis": primero.get("wearChassis"),
+        "wheels": primero.get("wearWheels"),
+        "body": primero.get("wearBody"),
+    }
+
+
+def cargo_damage(raw: dict):
+    """El peor dano entre los remolques enganchados: con un doble, el pago
+    lo castiga el que llego peor, no el primero."""
+    valores = [t.get("cargoDamage") for t in trailers_enganchados(raw)
+               if t.get("cargoDamage") is not None]
+    return max(valores) if valores else None
+
+
+# OJO con los nombres de las alertas: en el bloque del plugin
+# airPressureWarning, oilPressureWarning, waterTemperatureWarning y
+# batteryVoltageWarning aparecen DOS veces, primero como float (el umbral
+# configurado del camion) y despues como bool (si esta sonando ahora). El
+# parser arma un dict, asi que gana el ultimo y raw.get() devuelve el bool,
+# que es el que queremos. Si algun dia el orden cambia, esto pasa a ser un
+# numero y "hay alerta" queda en true para siempre.
 def build_payload(raw: dict) -> dict:
     speed_kmh = (raw.get("speed") or 0) * 3.6
     # el SDK devuelve speedLimit en m/s igual que speed, hay que convertirlo
@@ -631,6 +668,9 @@ def build_payload(raw: dict) -> dict:
             "beacon": raw.get("lightsBeacon"),
             "blinkerLeft": raw.get("blinkerLeftOn"),
             "blinkerRight": raw.get("blinkerRightOn"),
+            "parking": raw.get("lightsParking"),
+            "brake": raw.get("lightsBrake"),
+            "reverse": raw.get("lightsReverse"),
         },
         "wipers": raw.get("wipers"),
         # Estados usados para resaltar los botones de comandos como activos
@@ -639,19 +679,35 @@ def build_payload(raw: dict) -> dict:
         "parkingBrake": raw.get("parkBrake"),
         "differentialLock": raw.get("differentialLock"),
         "liftAxle": raw.get("liftAxleIndicator"),
+        "motorBrake": raw.get("motorBrake"),
+        # El retarder va de 0 al total de pasos que tenga el camion: solo
+        # "2" no dice nada, hace falta saber si es 2 de 3 o 2 de 5.
+        "retarder": raw.get("retarderBrake"),
+        "retarderSteps": raw.get("retarderStepCount"),
         "trailerAttached": bool((raw.get("trailer") or [{}])[0].get("attached")),
+        "trailerWear": trailer_wear(raw),
+        # Dano de la carga EN VIVO. Hasta ahora solo se sabia al entregar,
+        # que es tarde: es lo unico que se puede corregir manejando.
+        "cargoDamage": cargo_damage(raw),
         # el SDK no tiene alerta dedicada de temperatura de aceite, solo de
-        # presion de aire/agua/bateria - la de aceite se infiere en la web
-        # con un umbral simple sobre oilTemperature.
+        # presion de aire/aceite/agua/bateria - la de aceite se infiere en
+        # la web con un umbral simple sobre oilTemperature.
         "mechanicalWarnings": {
             "airPressure": raw.get("airPressureWarning"),
             "waterTemperature": raw.get("waterTemperatureWarning"),
             "batteryVoltage": raw.get("batteryVoltageWarning"),
+            "oilPressure": raw.get("oilPressureWarning"),
+            "fuel": raw.get("fuelWarning"),
+            "adblue": raw.get("adblueWarning"),
         },
         "airPressure": raw.get("airPressure"),
+        "oilPressure": raw.get("oilPressure"),
         "waterTemperature": raw.get("waterTemperature"),
         "oilTemperature": raw.get("oilTemperature"),
+        "brakeTemperature": raw.get("brakeTemperature"),
         "batteryVoltage": raw.get("batteryVoltage"),
+        "adblue": raw.get("adblue"),
+        "adblueCapacity": raw.get("adblueCapacity"),
         "event": {
             "tollgate": raw.get("tollgate"),
             "tollgatePayAmount": raw.get("tollgatePayAmount"),

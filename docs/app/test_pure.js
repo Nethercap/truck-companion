@@ -1,7 +1,8 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes } = require('./pure.js');
+const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+  createSessionStats } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -325,4 +326,130 @@ test('gameClockFromMinutes: time_abs del SDK a dia de la semana y hora', () => {
   assert.deepEqual(gameClockFromMinutes(1440 * 9 + 60), { dayIndex: 2, hours: 1, minutes: 0 }); // da la vuelta la semana
   assert.equal(gameClockFromMinutes(null), null);
   assert.equal(gameClockFromMinutes(-5), null);
+});
+
+test('timeScale: mediana de lo medido, y null hasta tener dos muestras', () => {
+  const ts = createTimeScale({ minSampleSeconds: 30 });
+  ts.push(1000, 0);
+  assert.equal(ts.value(), null);
+  // 19 minutos de juego por minuto real (la escala de ETS2 manejando).
+  for (let i = 1; i <= 4; i++) ts.push(1000 + i * 19, i * 60);
+  assert.ok(Math.abs(ts.value() - 19) < 1e-6, String(ts.value()));
+  // Una pausa larga mete una muestra absurda: la mediana no se mueve.
+  ts.push(1000 + 4 * 19, 60 * 60);
+  assert.ok(Math.abs(ts.value() - 19) < 1e-6, String(ts.value()));
+});
+
+test('timeScale: no muestrea mas seguido que minSampleSeconds', () => {
+  const ts = createTimeScale({ minSampleSeconds: 30 });
+  for (let i = 0; i < 20; i++) ts.push(1000 + i, i);  // un tick por segundo
+  assert.equal(ts.value(), null);
+});
+
+// Un viaje sintetico: 10 minutos reales a 80 km/h de velocidad de juego, con
+// escala 19x. Sirve para las dos cuentas que se confunden facil.
+function conducir(stats, { minutosReales = 10, kmh = 80, escala = 19, limite = 90, t0 = 1000, odo = 500000, fuel = 400 } = {}) {
+  const pasos = minutosReales * 60;  // un tick por segundo
+  let km = odo, litros = fuel;
+  for (let i = 0; i <= pasos; i++) {
+    km += kmh * (escala / 3600);   // el odometro corre en tiempo de juego
+    litros -= 0.139;               // unos 33 L/100km
+    stats.push({
+      ts: t0 + i, game: 'ets2', speedKmh: kmh, speedLimitKmh: limite,
+      odometerKm: km, fuel: litros, gameTimeMinutes: 600 + i * (escala / 60),
+      truckBrand: 'Scania', truckName: 'S',
+    });
+  }
+}
+
+test('sessionStats: la velocidad promedio se mide en horas de juego, no reales', () => {
+  const s = createSessionStats();
+  conducir(s, { minutosReales: 10, kmh: 80, escala: 19 });
+  const st = s.state();
+  // 10 min reales x 19 = 190 min de juego = 3.17 h de juego a 80 km/h.
+  assert.ok(Math.abs(st.kmDriven - 253.3) < 1, String(st.kmDriven));
+  assert.ok(Math.abs(st.avgSpeedKmh - 80) < 1, String(st.avgSpeedKmh));
+  // El tiempo al volante si es real: 10 minutos.
+  assert.ok(Math.abs(st.wheelSeconds - 600) < 2, String(st.wheelSeconds));
+});
+
+test('sessionStats: cambiar de camion no resta kilometros ni inventa consumo', () => {
+  const s = createSessionStats();
+  conducir(s, { minutosReales: 2, odo: 500000, fuel: 400 });
+  const antes = s.state().kmDriven;
+  const litrosAntes = s.state().fuelUsedL;
+  // Otro camion, odometro en 12 y el tanque lleno: ni km negativos ni
+  // litros de golpe.
+  s.push({ ts: 5000, game: 'ets2', truckBrand: 'Volvo', truckName: 'FH',
+           odometerKm: 12, fuel: 900, speedKmh: 0 });
+  s.push({ ts: 5001, game: 'ets2', truckBrand: 'Volvo', truckName: 'FH',
+           odometerKm: 12.01, fuel: 899.99, speedKmh: 50, speedLimitKmh: 90,
+           gameTimeMinutes: 700 });
+  const st = s.state();
+  assert.ok(st.kmDriven >= antes, String(st.kmDriven) + ' < ' + String(antes));
+  assert.ok(st.kmDriven < antes + 1, String(st.kmDriven));
+  assert.ok(st.fuelUsedL - litrosAntes < 0.1, String(st.fuelUsedL - litrosAntes));
+});
+
+test('sessionStats: cargar combustible no cuenta como consumo negativo', () => {
+  const s = createSessionStats();
+  s.push({ ts: 1, game: 'ets2', fuel: 100, odometerKm: 10, speedKmh: 0 });
+  s.push({ ts: 2, game: 'ets2', fuel: 95, odometerKm: 10, speedKmh: 0 });
+  s.push({ ts: 3, game: 'ets2', fuel: 600, odometerKm: 10, speedKmh: 0 });  // cargo
+  s.push({ ts: 4, game: 'ets2', fuel: 597, odometerKm: 10, speedKmh: 0 });
+  assert.ok(Math.abs(s.state().fuelUsedL - 8) < 1e-6, String(s.state().fuelUsedL));
+});
+
+test('sessionStats: un ferry no suma kilometros manejados', () => {
+  const s = createSessionStats();
+  s.push({ ts: 1, game: 'ets2', odometerKm: 1000, speedKmh: 0 });
+  s.push({ ts: 2, game: 'ets2', odometerKm: 1000.02, speedKmh: 60, speedLimitKmh: 90, gameTimeMinutes: 100 });
+  // El ferry deja el camion 140 km mas alla sin que nadie haya manejado.
+  s.push({ ts: 3, game: 'ets2', odometerKm: 1140, speedKmh: 0 });
+  assert.ok(s.state().kmDriven < 1, String(s.state().kmDriven));
+});
+
+test('sessionStats: tiempo por encima del limite, con tolerancia', () => {
+  const s = createSessionStats({ overLimitToleranceKmh: 2 });
+  for (let i = 0; i < 10; i++) s.push({ ts: 100 + i, game: 'ets2', speedKmh: 91, speedLimitKmh: 90, odometerKm: 1 });
+  assert.equal(s.state().overLimitSeconds, 0);  // 1 km/h de mas no es exceso
+  for (let i = 10; i < 20; i++) s.push({ ts: 100 + i, game: 'ets2', speedKmh: 110, speedLimitKmh: 90, odometerKm: 1 });
+  assert.ok(Math.abs(s.state().overLimitSeconds - 10) < 1.5, String(s.state().overLimitSeconds));
+  assert.ok(s.state().topSpeedKmh === 110);
+});
+
+test('sessionStats: peajes, multas y entregas se cuentan una vez por evento', () => {
+  const s = createSessionStats();
+  const base = { ts: 0, game: 'ets2', speedKmh: 0, odometerKm: 1 };
+  // El flag del SDK queda en true varios ticks: no son tres peajes.
+  for (let i = 1; i <= 3; i++) s.push({ ...base, ts: i, event: { tollgate: true, tollgatePayAmount: 12 } });
+  s.push({ ...base, ts: 4, event: {} });
+  s.push({ ...base, ts: 5, event: { tollgate: true, tollgatePayAmount: 12 } });
+  s.push({ ...base, ts: 6, event: { fined: true, fineAmount: 300 } });
+  s.push({ ...base, ts: 7, event: { jobDelivered: true, jobDeliveredRevenue: 5000, jobSrc: 'Berlin', jobDst: 'Praga' } });
+  const st = s.state();
+  assert.equal(st.tolls.count, 2);
+  assert.equal(st.tolls.amount, 24);
+  assert.equal(st.fines.count, 1);
+  assert.equal(st.jobs.amount, 5000);
+  assert.equal(st.netProfit, 5000 - 300 - 24);
+});
+
+test('sessionStats: cambiar de juego empieza una sesion nueva', () => {
+  const s = createSessionStats();
+  s.push({ ts: 1, game: 'ets2', speedKmh: 0, odometerKm: 1, event: { fined: true, fineAmount: 500 } });
+  assert.equal(s.state().fines.amount, 500);
+  s.push({ ts: 2, game: 'ats', speedKmh: 0, odometerKm: 1 });
+  assert.equal(s.state().fines.amount, 0);
+  assert.equal(s.state().game, 'ats');
+});
+
+test('sessionStats: una reconexion larga no regala kilometros', () => {
+  const s = createSessionStats({ maxGapSeconds: 10 });
+  s.push({ ts: 1, game: 'ets2', odometerKm: 1000, speedKmh: 80, speedLimitKmh: 90 });
+  // Media hora sin datos y 40 km mas en el odometro: no se vieron manejar.
+  s.push({ ts: 1800, game: 'ets2', odometerKm: 1040, speedKmh: 80, speedLimitKmh: 90 });
+  assert.ok(s.state().kmDriven < 1, String(s.state().kmDriven));
+  // Y el tiempo al volante suma como mucho el hueco maximo, no media hora.
+  assert.ok(s.state().wheelSeconds <= 10, String(s.state().wheelSeconds));
 });

@@ -1,0 +1,76 @@
+/* Cascara de la pagina del panel: barra de arriba, pantalla de codigo y
+   estado de conexion. Lo que dibuja el tablero esta en dash.css, que la app
+   tambien usa. */
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #0d0f12;
+  color: #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* viewport-fit=cover mas esto: en pantalla completa y apaisado, la muesca
+     del telefono se come la primera columna. */
+  padding: max(0.5rem, env(safe-area-inset-top)) max(0.6rem, env(safe-area-inset-right))
+           max(0.5rem, env(safe-area-inset-bottom)) max(0.6rem, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.pageTop { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; flex-wrap: wrap; }
+.pageActions { display: flex; align-items: center; gap: 0.3rem; margin-left: auto; }
+.sizeGroup { display: flex; gap: 0.15rem; }
+.pageBtn {
+  background: #171a1f; border: 1px solid #272c33; color: #9aa4b2;
+  border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.8rem;
+  cursor: pointer; text-decoration: none; line-height: 1.2;
+}
+.pageBtn:hover { color: #eee; }
+.pageBtn.active { color: #eee; border-color: #3b9eff; }
+select.pageBtn { padding: 0.3rem 0.2rem; }
+
+.statusChip {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-size: 0.8rem; font-weight: 600;
+  background: #171a1f; border: 1px solid #272c33; border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+}
+.statusDot { width: 9px; height: 9px; border-radius: 50%; background: #666; flex-shrink: 0; }
+.statusChip.live .statusDot { background: #4caf50; box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.25); }
+.statusChip.warn .statusDot { background: #ffb020; }
+.statusChip.err .statusDot { background: #ff4d4d; }
+.statusChip.info .statusDot { background: #3b9eff; }
+
+.gate { margin: auto; max-width: 26rem; text-align: center; padding: 1rem; }
+.gate[hidden] { display: none; }
+.gateTitle { display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 1.3rem; margin: 0 0 0.6rem; }
+.gateTitle img { height: 1.3em; width: 1.3em; }
+.gateHint { color: #9aa4b2; font-size: 0.9rem; margin: 0 0 1rem; line-height: 1.5; }
+.gateRow { display: flex; gap: 0.4rem; justify-content: center; }
+.gateRow input {
+  background: #171a1f; border: 1px solid #272c33; color: #eee;
+  border-radius: 6px; padding: 0.5rem 0.7rem; font-size: 1rem;
+  width: 9rem; letter-spacing: 0.1em; font-weight: 600;
+}
+.gateRow button {
+  background: #3b9eff; border: none; color: #fff; font-weight: 600;
+  border-radius: 6px; padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer;
+}
+.gateNote { color: #ff4d4d; font-size: 0.85rem; min-height: 1.2em; }
+
+.waiting { margin: auto; color: #9aa4b2; font-size: 1rem; text-align: center; padding: 1rem; }
+.waiting[hidden] { display: none; }
+
+/* createDashPanel le pone .dashRoot a este mismo elemento, que trae su
+   propio display:flex en columna. */
+#panel { flex: 1; min-height: 0; }
+#panel[hidden] { display: none; }
+
+/* En un telefono apaisado la barra de arriba se lleva 40 px de 390. */
+@media (max-height: 27rem) {
+  body { gap: 0.3rem; padding-top: max(0.25rem, env(safe-area-inset-top)); }
+  .pageBtn { padding: 0.15rem 0.45rem; font-size: 0.72rem; }
+  .statusChip { padding: 0.15rem 0.6rem; font-size: 0.72rem; }
+}

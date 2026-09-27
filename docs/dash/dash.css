@@ -1,0 +1,226 @@
+/* Panel de tablero. Lo usa la pagina de docs/dash/ y tambien la app, que lo
+   muestra a pantalla completa sobre el mapa; por eso todo cuelga de
+   .dashRoot y nada toca body ni :root desde aca. */
+
+.dashRoot {
+  /* Todo el panel escala con una sola variable: es un tablero que se mira a
+     distinta distancia segun donde este apoyado el dispositivo, y el control
+     de tamano solo cambia esto. */
+  --d-scale: 1;
+  --d-unit: calc(clamp(12px, 0.55vw + 0.5vh + 7px, 19px) * var(--d-scale));
+  --d-gap: calc(var(--d-unit) * 0.55);
+  --d-panel: #171a1f;
+  --d-line: #272c33;
+  --d-muted: #9aa4b2;
+  --d-accent: #3b9eff;
+  --d-ok: #7cc243;
+  --d-warn: #ffb020;
+  --d-bad: #ff4d4d;
+  font-size: var(--d-unit);
+  display: flex;
+  flex-direction: column;
+  gap: var(--d-gap);
+  min-height: 0;
+  color: #eee;
+}
+
+/* --- franja de ruta --- */
+.dRoute {
+  border: 2px solid var(--d-accent);
+  border-radius: 0.6em;
+  padding: 0.5em 0.8em;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4em 1em;
+  flex-shrink: 0;
+}
+.dRouteWhere { min-width: 0; }
+.dRouteFrom, .dRouteCompanies {
+  font-size: 0.75em; color: var(--d-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dRouteFrom:empty, .dRouteCompanies:empty { display: none; }
+.dRouteTo {
+  font-size: 1.9em; font-weight: 600; line-height: 1.05;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dRouteStats { display: flex; gap: 1.1em; justify-content: space-between; }
+.dProgress { grid-column: 1 / -1; height: 0.25em; background: var(--d-line); border-radius: 1em; }
+.dProgressBar { height: 100%; width: 0; background: var(--d-accent); border-radius: 1em; transition: width 0.4s linear; }
+
+.dMetric { text-align: right; }
+.dMetricValue { font-size: 1.6em; font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.dMetricLabel { font-size: 0.68em; color: var(--d-muted); }
+
+/* --- grilla --- */
+.dGrid {
+  display: grid;
+  gap: var(--d-gap);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "drive" "plan" "job" "truck" "session";
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.dCard {
+  background: var(--d-panel);
+  border-radius: 0.6em;
+  padding: 0.6em 0.75em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+  min-width: 0;
+}
+.dCardHead { display: flex; justify-content: space-between; align-items: center; }
+.dCardTitle { font-size: 0.7em; color: var(--d-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.dReset {
+  background: none; border: 1px solid var(--d-line); color: var(--d-muted);
+  border-radius: 0.4em; font-size: 0.68em; padding: 0.15em 0.6em; cursor: pointer;
+}
+.dReset:hover { color: #eee; border-color: var(--d-muted); }
+
+/* Dos columnas en cuanto hay lugar; la conduccion ocupa el ancho entero
+   porque la velocidad es lo unico que se mira de reojo manejando. */
+@media (min-width: 34rem) {
+  .dRoute { grid-template-columns: minmax(0, 1fr) auto; }
+  .dRouteStats { justify-content: flex-end; }
+  .dGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "drive drive" "plan job" "truck session";
+  }
+}
+/* Cuatro columnas cuando la pantalla es ancha Y baja. El corte mira la
+   proporcion y no solo el ancho: un telefono apaisado mide 844x390, que en
+   rem es "angosto" pero tiene 390 px de alto y en dos columnas no entra
+   nada; una tablet vertical de 1024x1366 es mas ancha en rem y ahi cuatro
+   columnas desperdiciarian todo el alto. */
+@media (min-width: 52rem) and (min-aspect-ratio: 5/4) {
+  .dGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+      "drive plan truck session"
+      "drive job  truck session";
+    grid-template-rows: auto 1fr;
+  }
+  .dRouteTo { font-size: 2.4em; }
+}
+/* Monitor: la sesion y el vehiculo dejan de compartir columna. */
+@media (min-width: 95rem) and (min-aspect-ratio: 5/4) {
+  .dGrid {
+    grid-template-columns: 1.15fr 1fr 1fr 1fr;
+    grid-template-areas: "drive plan job truck" "drive plan job session";
+  }
+}
+
+/* --- conduccion --- */
+.dSpeedRow { display: flex; align-items: center; gap: 0.6em; }
+.dSpeed { font-size: 3.1em; font-weight: 600; line-height: 0.95; font-variant-numeric: tabular-nums; }
+.dSpeedUnit { font-size: 0.68em; color: var(--d-muted); }
+.dLimit {
+  width: 2.6em; height: 2.6em; border-radius: 50%;
+  background: #fff; color: #111; border: 0.28em solid var(--d-bad);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1em; font-weight: 700; flex-shrink: 0;
+}
+.dLimit-off { opacity: 0.25; }
+.dLimit-over { box-shadow: 0 0 0 0.25em rgba(255, 77, 77, 0.35); }
+.dGearBox { margin-left: auto; text-align: right; min-width: 4.5em; }
+.dGear { font-size: 1.5em; font-weight: 600; line-height: 1; }
+.dCruise { font-size: 0.75em; color: var(--d-ok); }
+.dCruise[hidden] { display: none; }
+.dRpm { height: 0.28em; background: var(--d-line); border-radius: 1em; margin-top: 0.3em; }
+.dRpmBar { display: block; height: 100%; width: 0; background: var(--d-accent); border-radius: 1em; }
+.dRpmBar.dRpm-high { background: var(--d-bad); }
+
+.dIndicators { display: flex; flex-wrap: wrap; gap: 0.3em; }
+.dInd {
+  width: 1.9em; height: 1.9em; border-radius: 0.35em;
+  display: flex; align-items: center; justify-content: center;
+  background: #10131700; border: 1px solid var(--d-line);
+  color: #565d68;
+}
+.dInd[hidden] { display: none; }
+.dInd svg { width: 1.2em; height: 1.2em; }
+.dInd.on { color: var(--d-accent); border-color: var(--d-accent); background: rgba(59, 158, 255, 0.14); }
+.dInd-beamHigh.on, .dInd-parking.on { color: #6fb7ff; }
+.dInd-hazards.on, .dInd-parkingBrake.on { color: var(--d-bad); border-color: var(--d-bad); background: rgba(255, 77, 77, 0.14); }
+.dInd-beacon.on { color: var(--d-warn); border-color: var(--d-warn); background: rgba(255, 176, 32, 0.14); }
+/* Los guinos parpadean de verdad: apagado y encendido no alcanzan para algo
+   que en el camion siempre se mueve. */
+.dInd-blinkerLeft.on, .dInd-blinkerRight.on {
+  color: var(--d-ok); border-color: var(--d-ok); background: rgba(124, 194, 67, 0.14);
+  animation: dBlink 0.7s steps(1, end) infinite;
+}
+@keyframes dBlink { 50% { opacity: 0.25; } }
+/* El retarder muestra en que paso esta: "2" solo no dice si es de tres o
+   de cinco. */
+.dInd-retarder { position: relative; }
+.dInd-retarder[data-level]::after {
+  content: attr(data-level);
+  position: absolute; bottom: -0.15em; right: -0.15em;
+  font-size: 0.5em; background: var(--d-accent); color: #04223f;
+  border-radius: 0.5em; padding: 0 0.3em; font-weight: 700;
+}
+
+/* --- filas etiqueta/valor --- */
+.dRows { display: flex; flex-direction: column; }
+.dRow {
+  display: flex; justify-content: space-between; gap: 0.6em;
+  font-size: 0.85em; padding: 0.18em 0; border-top: 1px solid var(--d-line);
+}
+.dRow[hidden] { display: none; }
+.dRows .dRow:first-child { border-top: none; }
+.dLabel { color: var(--d-muted); white-space: nowrap; }
+.dValue { font-variant-numeric: tabular-nums; text-align: right; }
+.dRow.alerta .dValue { color: var(--d-bad); font-weight: 600; }
+
+.dBig { margin-bottom: 0.1em; }
+.dBigValue { font-size: 1.35em; font-weight: 600; line-height: 1.15; }
+.dBigSub { font-size: 0.72em; color: var(--d-muted); }
+.dBigSub:empty { display: none; }
+.dPay { font-size: 1.25em; font-weight: 600; margin-top: 0.25em; }
+.dPay:empty { display: none; }
+
+.dVerdict { font-size: 0.8em; font-weight: 600; }
+.dVerdict[hidden] { display: none; }
+.dVerdict.bien { color: var(--d-ok); }
+.dVerdict.mal { color: var(--d-warn); }
+
+/* --- desgaste --- */
+.dWear { display: flex; flex-direction: column; gap: 0.22em; }
+.dWear[hidden] { display: none; }
+.dWearTitle { font-size: 0.68em; color: var(--d-muted); margin-top: 0.2em; }
+.dWearRow { display: flex; align-items: center; gap: 0.45em; font-size: 0.78em; }
+.dWearLabel { color: var(--d-muted); flex: 0 0 6.6em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dWearTrack { flex: 1; height: 0.35em; background: var(--d-line); border-radius: 1em; overflow: hidden; }
+.dWearBar { display: block; height: 100%; width: 0; border-radius: 1em; background: var(--d-ok); }
+.dWearBar.regular { background: var(--d-warn); }
+.dWearBar.mal { background: var(--d-bad); }
+.dWearValue { flex: 0 0 2.6em; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- medidores --- */
+.dGauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35em; margin-top: 0.2em; }
+.dGauge { min-width: 0; }
+.dGauge[hidden] { display: none; }
+.dGaugeValue { font-size: 0.95em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dGaugeLabel { font-size: 0.64em; color: var(--d-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dGauge.alerta .dGaugeValue { color: var(--d-bad); }
+
+/* --- sesion --- */
+.dSince { font-size: 0.68em; color: var(--d-muted); }
+.dMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35em; }
+.dMetrics .dMetric { text-align: left; }
+.dMetrics .dMetricValue { font-size: 1.15em; }
+
+/* Pantallas bajas (telefono apaisado): la franja de ruta y los numeros
+   grandes se achican para dejarle el alto a las tarjetas, que es donde esta
+   el dato. */
+@media (max-height: 27rem) {
+  .dRoute { padding: 0.25em 0.7em; gap: 0.2em 1em; }
+  .dRouteTo { font-size: 1.5em; }
+  .dMetricValue { font-size: 1.25em; }
+  .dSpeed { font-size: 2.4em; }
+  .dCard { padding: 0.45em 0.6em; gap: 0.3em; }
+}

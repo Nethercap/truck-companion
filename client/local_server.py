@@ -38,8 +38,17 @@ HTTP_PORT = int(os.environ.get("TRUCKDASH_HTTP_PORT", 27765))
 WS_PORT = int(os.environ.get("TRUCKDASH_WS_PORT", 27766))
 WEB_ORIGIN = "https://trucksim-dash.com"
 WEB_FILES = [
-    "app/index.html", "app/app.js", "app/app.css", "app/i18n.js", "app/pure.js",
-    "app/manifest.json", "app/assets/logo.svg", "app/assets/icon-192.png", "app/assets/icon-512.png",
+    "app/index.html", "app/app.js", "app/app.css", "app/i18n.js", "app/i18n_en_es.js",
+    "app/pure.js", "app/manifest.json",
+    # Estos tres faltaban desde siempre: en LAN se bajaban al vuelo si habia
+    # internet, y sin internet la app quedaba sin variantes de mapa, sin
+    # convoy y sin mapa en vivo. Justo lo que el modo LAN promete resolver.
+    "app/variants.js", "app/convoy.js", "app/livemap.js",
+    "app/assets/logo.svg", "app/assets/icon-192.png", "app/assets/icon-512.png",
+    # El panel de tablero: la app lo muestra a pantalla completa y
+    # ademas se sirve solo en /dash/ para un segundo dispositivo.
+    "dash/index.html", "dash/dash.js", "dash/dash.css", "dash/page.js",
+    "dash/page.css", "dash/manifest.json",
 ]
 
 
@@ -47,6 +56,7 @@ def cache_dir() -> str:
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     path = os.path.join(base, "TruckDash", "webcache")
     os.makedirs(os.path.join(path, "app", "assets"), exist_ok=True)
+    os.makedirs(os.path.join(path, "dash"), exist_ok=True)
     return path
 
 
@@ -105,13 +115,15 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
         # Se redirige a /app/?local=1. Idea y codigo original: Vladimir
         # Kutkovoy (PR #1).
         url = urlsplit(self.path)
-        if url.path in ("/", "/app", "/app/", "/app/index.html"):
+        base = "/dash/" if url.path.startswith("/dash") else "/app/"
+        if url.path in ("/", "/app", "/app/", "/app/index.html",
+                        "/dash", "/dash/", "/dash/index.html"):
             query = parse_qs(url.query, keep_blank_values=True)
             needs_local = not any(k in query for k in self.CONNECT_PARAMS)
-            if url.path in ("/", "/app") or needs_local:
+            if url.path in ("/", "/app", "/dash") or needs_local:
                 if needs_local:
                     query["local"] = ["1"]
-                location = "/app/" + ("?" + urlencode(query, doseq=True) if query else "")
+                location = base + ("?" + urlencode(query, doseq=True) if query else "")
                 self.send_response(302)
                 self.send_header("Location", location)
                 self.send_header("Content-Length", "0")
@@ -132,7 +144,9 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
             return
         if path in ("/", "/app", "/app/"):
             path = "/app/index.html"
-        if path.startswith("/app/") or path.startswith("/data/"):
+        if path == "/dash" or path == "/dash/":
+            path = "/dash/index.html"
+        if path.startswith("/app/") or path.startswith("/dash/") or path.startswith("/data/"):
             rel = path.lstrip("/")
             local_path = os.path.join(cache_dir(), rel.replace("/", os.sep))
             if _refresh_file(rel, local_path):

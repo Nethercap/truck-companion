@@ -701,3 +701,94 @@ def test_no_se_confunde_con_otra_ventana_que_hable_de_camiones():
     ]
     assert window_compat.match_game_window(ventanas, TITULOS) is None
     assert window_compat.match_game_window([], TITULOS) is None
+
+
+def test_trailer_wear_none_without_trailer():
+    # Sin remolque el SDK devuelve las ranuras en cero, que no es lo mismo
+    # que un remolque impecable: la web esconde la fila.
+    assert client.trailer_wear({"trailer": [{"attached": False, "wearChassis": 0.0}]}) is None
+    assert client.trailer_wear({}) is None
+    assert client.cargo_damage({"trailer": [{"attached": False, "cargoDamage": 0.0}]}) is None
+
+
+def test_trailer_wear_reads_the_first_attached_trailer():
+    raw = {"trailer": [
+        {"attached": True, "wearChassis": 0.12, "wearWheels": 0.03, "wearBody": 0.01},
+        {"attached": False, "wearChassis": 0.99},
+    ]}
+    assert client.trailer_wear(raw) == {"chassis": 0.12, "wheels": 0.03, "body": 0.01}
+
+
+def test_cargo_damage_takes_the_worst_of_a_double():
+    # Con un doble el pago lo castiga el remolque que llego peor.
+    raw = {"trailer": [
+        {"attached": True, "cargoDamage": 0.04},
+        {"attached": True, "cargoDamage": 0.31},
+    ]}
+    assert client.cargo_damage(raw) == 0.31
+
+
+def test_build_payload_forwards_the_panel_fields():
+    # Estaban en el bloque del plugin desde siempre; faltaba reenviarlos.
+    raw = {
+        "adblue": 42.0, "adblueCapacity": 80.0, "oilPressure": 54.0,
+        "brakeTemperature": 31.0, "retarderBrake": 2, "retarderStepCount": 3,
+        "motorBrake": True, "lightsParking": True, "lightsBrake": False,
+        "lightsReverse": False, "adblueWarning": False, "oilPressureWarning": True,
+        "fuelWarning": True,
+        "trailer": [{"attached": True, "wearChassis": 0.2, "wearWheels": 0.1,
+                     "wearBody": 0.05, "cargoDamage": 0.07}],
+    }
+    payload = client.build_payload(raw)
+    assert payload["adblue"] == 42.0
+    assert payload["oilPressure"] == 54.0
+    assert payload["brakeTemperature"] == 31.0
+    assert payload["retarder"] == 2 and payload["retarderSteps"] == 3
+    assert payload["motorBrake"] is True
+    assert payload["lights"]["parking"] is True
+    assert payload["mechanicalWarnings"]["oilPressure"] is True
+    assert payload["mechanicalWarnings"]["fuel"] is True
+    assert payload["trailerWear"]["chassis"] == 0.2
+    assert payload["cargoDamage"] == 0.07
+
+
+def test_build_payload_panel_fields_absent_stay_none():
+    # Un bloque sin esos campos (plugin viejo) no puede romper el payload ni
+    # inventar ceros: la web esconde lo que no llega.
+    payload = client.build_payload({})
+    for campo in ("adblue", "oilPressure", "brakeTemperature", "retarder",
+                  "trailerWear", "cargoDamage"):
+        assert payload[campo] is None, campo
+
+
+def test_lan_server_serves_every_file_the_pages_load():
+    # El modo LAN sirve una lista fija de archivos. Agregar un .js a la web y
+    # olvidarse de la lista deja el tablero roto SOLO en LAN, que es donde
+    # nadie prueba: la pagina carga y el script falta. Paso con
+    # i18n_en_es.js. Esto lo cruza contra lo que el HTML pide de verdad.
+    import re
+    import local_server
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    servidos = set(local_server.WEB_FILES)
+    faltan = []
+    for pagina, carpeta in (("docs/app/index.html", "app"), ("docs/dash/index.html", "dash")):
+        html = open(os.path.join(raiz, pagina.replace("/", os.sep)), encoding="utf-8").read()
+        for ref in re.findall(r'(?:src|href)="([^"]+)"', html):
+            if ref.startswith(("http", "//", "#", "data:")):
+                continue
+            rel = ref.split("?", 1)[0]
+            # Los ../ se resuelven contra la carpeta de la pagina.
+            partes = (carpeta + "/" + rel).split("/")
+            limpio = []
+            for p in partes:
+                if p == "..":
+                    limpio.pop()
+                elif p not in ("", "."):
+                    limpio.append(p)
+            destino = "/".join(limpio)
+            if not destino.endswith((".js", ".css", ".json", ".svg", ".png")):
+                continue
+            if destino not in servidos:
+                faltan.append(pagina + " -> " + destino)
+    assert not faltan, "no estan en WEB_FILES: " + ", ".join(faltan)

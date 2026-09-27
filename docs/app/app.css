@@ -804,3 +804,22 @@
   text-align: center;
 }
 
+
+  /* Panel a pantalla completa sobre el mapa. Tapa todo a proposito: es un
+     tablero, no una tarjeta flotante, y se mira de reojo. */
+  .dashOverlay {
+    position: fixed; inset: 0; z-index: 2400;
+    background: var(--bg);
+    display: flex; flex-direction: column; gap: 0.4rem;
+    padding: max(0.5rem, env(safe-area-inset-top)) max(0.6rem, env(safe-area-inset-right))
+             max(0.5rem, env(safe-area-inset-bottom)) max(0.6rem, env(safe-area-inset-left));
+  }
+  .dashOverlay[hidden] { display: none; }
+  .dashOverlayBar { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+  .dashOverlayTitle { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+  /* El display:none de .iconBtn.secondary en pantallas angostas esconde las
+     acciones de la barra de arriba, que quedan en Ajustes. Aca no hay
+     Ajustes al que ir, asi que se vuelven a mostrar. */
+  .dashOverlayBar .sizeGroup { display: flex; gap: 0.15rem; margin-left: auto; }
+  .dashOverlayBar .iconBtn.secondary { display: inline-flex; }
+  #dashOverlayPanel { flex: 1; min-height: 0; }

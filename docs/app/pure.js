@@ -303,6 +303,191 @@ function gameClockFromMinutes(totalMinutes) {
   return { dayIndex: Math.floor(minutes / 1440) % 7, hours: Math.floor(minuteOfDay / 60), minutes: minuteOfDay % 60 };
 }
 
+// Escala de tiempo del juego: minutos de juego por minuto real. Se mide en
+// vivo comparando time_abs contra el reloj real, porque no es constante (el
+// juego la baja cuando el camion esta detenido) ni igual en los dos mapas.
+// La usan el ETA real de la app y las conversiones del panel (docs/dash/):
+// el SDK da el descanso y el vencimiento del trabajo en tiempo de juego, y
+// lo unico que le sirve a quien mira la pantalla es cuanto es eso en su
+// reloj. Mediana y no promedio: una pausa mete una muestra absurda y la
+// mediana la ignora sola.
+function createTimeScale({ minSampleSeconds = 30, maxSamples = 10, minScale = 1, maxScale = 60 } = {}) {
+  let samples = [];
+  let last = null;
+  return {
+    push(gameTimeMinutes, ts) {
+      if (gameTimeMinutes == null || ts == null) return;
+      if (!last) { last = { ts, gameMin: gameTimeMinutes }; return; }
+      if (ts - last.ts < minSampleSeconds) return;
+      const scale = (gameTimeMinutes - last.gameMin) / ((ts - last.ts) / 60);
+      if (scale > minScale && scale < maxScale) samples.push(scale);
+      if (samples.length > maxSamples) samples.shift();
+      last = { ts, gameMin: gameTimeMinutes };
+    },
+    // null mientras no haya dos muestras: quien llama decide con que caer
+    // (la app usa la escala nominal del mapa).
+    value() {
+      if (samples.length < 2) return null;
+      const sorted = [...samples].sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)];
+    },
+    reset() { samples = []; last = null; },
+  };
+}
+
+// Estadisticas de la sesion del panel (docs/dash/): kilometros, tiempo al
+// volante, ganancia neta, combustible y un registro de lo que fue pasando.
+// Todo se calcula aca a partir de los ticks - el SDK no lleva ninguna de
+// estas cuentas.
+//
+// Cuatro decisiones que cambian lo que se lee en pantalla:
+//
+// - **La velocidad promedio se divide por horas de JUEGO, no reales.** 88 km
+//   a 48 km/h son 1,8 horas de juego y unos seis minutos tuyos; dividirlos
+//   por los reales daria 750 km/h. El tiempo al volante, en cambio, si es
+//   real: es cuanto rato estuviste ahi sentado.
+// - **Los kilometros salen del odometro por diferencias**, no de restar el
+//   final menos el inicial: cambiar de camion reinicia el odometro y la
+//   resta simple daba un total negativo.
+// - **El combustible gastado suma solo las bajas del tanque.** Una subida es
+//   haber cargado, no consumo negativo.
+// - **Un salto grande entre dos ticks no se cuenta.** Un ferry, un viaje
+//   rapido o una reconexion mueven el odometro decenas de kilometros sin
+//   que nadie haya manejado. Se prefiere quedarse corto: un numero de menos
+//   se nota menos que un numero inventado.
+function createSessionStats({ maxGapSeconds = 10, overLimitToleranceKmh = 2,
+                              maxSpeedKmh = 200, maxGameScale = 25 } = {}) {
+  let s;
+
+  function fresh(game, startedAt) {
+    return {
+      game: game || null, startedAt: startedAt != null ? startedAt : null, lastTs: null,
+      kmDriven: 0, wheelSeconds: 0, gameDrivingMinutes: 0, overLimitSeconds: 0, topSpeedKmh: 0,
+      fuelUsedL: 0, odoLast: null, fuelLast: null, truckKey: null, gameTimeLast: null,
+      jobs: { count: 0, amount: 0 }, cancelled: { count: 0, amount: 0 },
+      fines: { count: 0, amount: 0 }, tolls: { count: 0, amount: 0 }, ferries: { count: 0, amount: 0 },
+      prev: { tollgate: false, fined: false, ferry: false, train: false, jobDelivered: false, jobCancelled: false },
+    };
+  }
+  s = fresh();
+
+  function trackEvents(data, ts) {
+    const e = data.event || {};
+    const money = (v) => v || 0;
+    if (e.tollgate && !s.prev.tollgate) {
+      s.tolls.count++; s.tolls.amount += money(e.tollgatePayAmount);
+    }
+    if (e.fined && !s.prev.fined) {
+      s.fines.count++; s.fines.amount += money(e.fineAmount);
+    }
+    if (e.ferry && !s.prev.ferry) {
+      s.ferries.count++; s.ferries.amount += money(e.ferryPayAmount);
+    }
+    if (e.train && !s.prev.train) {
+      s.ferries.count++; s.ferries.amount += money(e.trainPayAmount);
+    }
+    if (e.jobDelivered && !s.prev.jobDelivered) {
+      s.jobs.count++; s.jobs.amount += money(e.jobDeliveredRevenue);
+    }
+    if (e.jobCancelled && !s.prev.jobCancelled) {
+      s.cancelled.count++; s.cancelled.amount += money(e.jobCancelledPenalty);
+    }
+    s.prev = {
+      tollgate: !!e.tollgate, fined: !!e.fined, ferry: !!e.ferry, train: !!e.train,
+      jobDelivered: !!e.jobDelivered, jobCancelled: !!e.jobCancelled,
+    };
+  }
+
+  return {
+    reset(game, ts) {
+      s = fresh(game, ts);
+    },
+    push(data) {
+      const ts = data && data.ts;
+      if (ts == null) return;
+      // Cambiar de juego es empezar de cero: las multas de ETS2 no son parte
+      // de una sesion de ATS (ver el mismo criterio en app.js).
+      if (data.game && s.game && data.game !== s.game) this.reset(data.game, ts);
+      if (s.startedAt == null) s.startedAt = ts;
+      if (data.game && !s.game) s.game = data.game;
+
+      const dt = s.lastTs == null ? 0 : Math.min(Math.max(ts - s.lastTs, 0), maxGapSeconds);
+      s.lastTs = ts;
+
+      const truckKey = [data.game, data.truckBrand, data.truckName].join('|');
+      const otroCamion = s.truckKey != null && truckKey !== s.truckKey;
+      s.truckKey = truckKey;
+
+      // Cuanto tiempo DE JUEGO paso en este tick. Es lo que acota cuanto
+      // pudo avanzar el odometro, y no los segundos reales: el reloj del
+      // juego corre unas 19 veces mas rapido, asi que a 80 km/h el odometro
+      // sube 0,42 km por segundo tuyo. Un tope calculado con tiempo real
+      // rechazaria como teletransporte un avance perfectamente normal.
+      // Un salto de mas de una hora de juego no es manejar: es dormir,
+      // tomarse un ferry o viajar rapido.
+      let avanceJuegoMin = null;
+      if (data.gameTimeMinutes != null) {
+        if (s.gameTimeLast != null) {
+          const salto = data.gameTimeMinutes - s.gameTimeLast;
+          if (salto > 0 && salto < 60) avanceJuegoMin = salto;
+        }
+        s.gameTimeLast = data.gameTimeMinutes;
+      }
+      // Sin reloj del juego (cliente viejo) se asume la escala mas rapida.
+      const horasDeJuego = avanceJuegoMin != null ? avanceJuegoMin / 60 : (dt / 3600) * maxGameScale;
+
+      if (data.odometerKm != null) {
+        if (s.odoLast != null && !otroCamion) {
+          const avance = data.odometerKm - s.odoLast;
+          // Lo maximo que se pudo haber manejado en ese hueco, con margen.
+          if (avance > 0 && avance <= horasDeJuego * maxSpeedKmh + 0.05) s.kmDriven += avance;
+        }
+        s.odoLast = data.odometerKm;
+      }
+
+      const speed = data.speedKmh || 0;
+      const moving = !data.paused && speed > 1;
+      if (moving) {
+        s.wheelSeconds += dt;
+        if (avanceJuegoMin != null) s.gameDrivingMinutes += avanceJuegoMin;
+        if (data.speedLimitKmh > 0 && speed > data.speedLimitKmh + overLimitToleranceKmh) s.overLimitSeconds += dt;
+      }
+      if (!data.paused && speed > s.topSpeedKmh && speed < maxSpeedKmh) s.topSpeedKmh = speed;
+
+      if (data.fuel != null) {
+        if (s.fuelLast != null && !otroCamion) {
+          const bajo = s.fuelLast - data.fuel;
+          if (bajo > 0 && bajo < 20) s.fuelUsedL += bajo;
+        }
+        s.fuelLast = data.fuel;
+      }
+
+      trackEvents(data, ts);
+    },
+    state() {
+      const horasJuego = s.gameDrivingMinutes / 60;
+      const horasReales = s.startedAt != null && s.lastTs != null ? (s.lastTs - s.startedAt) / 3600 : 0;
+      const neto = s.jobs.amount - s.fines.amount - s.tolls.amount - s.ferries.amount - s.cancelled.amount;
+      return {
+        game: s.game, startedAt: s.startedAt, lastTs: s.lastTs,
+        kmDriven: s.kmDriven, wheelSeconds: s.wheelSeconds, elapsedSeconds: horasReales * 3600,
+        overLimitSeconds: s.overLimitSeconds,
+        overLimitRatio: s.wheelSeconds > 0 ? s.overLimitSeconds / s.wheelSeconds : 0,
+        topSpeedKmh: s.topSpeedKmh,
+        // Con menos de un kilometro el promedio es ruido, no una medicion.
+        avgSpeedKmh: horasJuego > 0 && s.kmDriven >= 1 ? s.kmDriven / horasJuego : null,
+        fuelUsedL: s.fuelUsedL,
+        fuelPer100Km: s.kmDriven >= 1 && s.fuelUsedL > 0 ? s.fuelUsedL / s.kmDriven * 100 : null,
+        netProfit: neto,
+        // Antes de cinco minutos la extrapolacion dice cualquier cosa.
+        profitPerHour: horasReales >= 5 / 60 ? neto / horasReales : null,
+        jobs: { ...s.jobs }, cancelled: { ...s.cancelled }, fines: { ...s.fines },
+        tolls: { ...s.tolls }, ferries: { ...s.ferries },
+      };
+    },
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes };
+  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats };
 }

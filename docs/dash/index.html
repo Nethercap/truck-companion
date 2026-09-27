@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Truck Dash – Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0d0f12" />
+<link rel="apple-touch-icon" href="../app/assets/icon-192.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="dash.css?v=20260927a" />
+<link rel="stylesheet" href="page.css?v=20260927a" />
+</head>
+<body>
+  <div class="pageTop">
+    <div class="statusChip" id="statusChip">
+      <span class="statusDot" id="statusDot"></span>
+      <span id="statusText"></span>
+    </div>
+    <div class="pageActions">
+      <button class="pageBtn" id="unitBtn" data-i18n-title="toggleUnits">km</button>
+      <select class="pageBtn" id="langSelect" data-i18n-title="toggleLanguage">
+        <option value="en">EN</option>
+        <option value="es">ES</option>
+        <option value="de">DE</option>
+        <option value="fr">FR</option>
+        <option value="pt">PT</option>
+        <option value="pl">PL</option>
+        <option value="tr">TR</option>
+        <option value="ru">RU</option>
+      </select>
+      <div class="sizeGroup" data-i18n-title="dashSize">
+        <button class="pageBtn" data-scale="0.85">S</button>
+        <button class="pageBtn" data-scale="1">M</button>
+        <button class="pageBtn" data-scale="1.2">L</button>
+      </div>
+      <a class="pageBtn" id="gpsLink" href="../app/" data-i18n="dashOpenGps">GPS map</a>
+      <button class="pageBtn" id="fullscreenBtn" data-i18n-title="toggleFullscreen">⛶</button>
+    </div>
+  </div>
+
+  <div class="gate" id="gate">
+    <h1 class="gateTitle"><img src="../app/assets/logo.svg" alt="" /> <span data-i18n="dashTitle">Dashboard</span></h1>
+    <p class="gateHint" data-i18n="dashConnectHint"></p>
+    <div class="gateRow">
+      <input id="codeInput" data-i18n-placeholder="pairingCode" maxlength="8" autocapitalize="characters" style="text-transform:uppercase" />
+      <button id="connectBtn" data-i18n="connect">Connect</button>
+    </div>
+    <p class="gateNote" id="gateNote"></p>
+  </div>
+
+  <div class="waiting" id="waiting" hidden><span id="waitingText"></span></div>
+  <div id="panel" hidden></div>
+
+<script src="../app/i18n.js?v=20260927a"></script>
+<script src="../app/i18n_en_es.js?v=20260927a"></script>
+<script src="../app/pure.js?v=20260927a"></script>
+<script src="dash.js?v=20260927a"></script>
+<script src="page.js?v=20260927a"></script>
+</body>
+</html>
