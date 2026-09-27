@@ -69,6 +69,10 @@ const DASH_DESGASTE_SANO = 5;
 // a parar, depende de a que velocidad sigas. Un punto prometeria una
 // precision que no tenemos; una franja dice "por esta zona".
 const DASH_ANCHO_MARCA = 12;
+// Aire minimo entre las dos leyendas, en px. Sin esto "descanso aca" y
+// "carga aca" se tocan cuando las dos paradas caen cerca, que es
+// justamente cuando hay que leerlas bien.
+const DASH_AIRE_MARCAS = 10;
 
 function createDashPanel({ root, money, imperial, lang }) {
   const KM_TO_MI = 0.621371;
@@ -329,6 +333,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     marca('bandFuel', 'markFuel', hecho,
           alcance != null && restanteKm ? alcance / restanteKm : null,
           t('refuelHere'));
+    separarMarcas();
   }
 
   // Coloca una franja sobre el tramo que falta. Una fraccion de 1 o mas
@@ -346,6 +351,23 @@ function createDashPanel({ root, money, imperial, lang }) {
     banda.style.width = DASH_ANCHO_MARCA + '%';
     leyenda.style.left = izquierda + '%';
     leyenda.textContent = etiqueta;
+  }
+
+  // Las dos leyendas se ubican cada una contra su propia parada, asi que
+  // nada impide que se pisen. Se separan despues de escribirlas, que es
+  // cuando se sabe lo que miden: el mismo texto mide distinto en cada
+  // idioma. Primero se corre la de la derecha, que es la que tiene lugar
+  // libre hacia afuera; si llego al borde, lo que falta lo cede la otra.
+  function separarMarcas() {
+    const rest = refs.markRest, fuel = refs.markFuel;
+    if (rest.hidden || fuel.hidden) return;
+    const ancho = rest.parentElement.clientWidth;
+    const [izq, der] = rest.offsetLeft <= fuel.offsetLeft ? [rest, fuel] : [fuel, rest];
+    const solape = izq.offsetLeft + izq.offsetWidth + DASH_AIRE_MARCAS - der.offsetLeft;
+    if (solape <= 0) return;
+    const lugar = Math.max(0, Math.min(solape, ancho - der.offsetWidth - der.offsetLeft));
+    if (lugar > 0) der.style.left = (der.offsetLeft + lugar) + 'px';
+    if (lugar < solape) izq.style.left = Math.max(0, izq.offsetLeft - (solape - lugar)) + 'px';
   }
 
   function renderConduccion(d) {
