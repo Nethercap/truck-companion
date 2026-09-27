@@ -118,6 +118,21 @@
 @media (min-width: 34rem) and (max-aspect-ratio: 5/4) {
   .dashRoot { --d-unit: calc(clamp(13.5px, min(2.1vh, 2.9vw), 40px) * var(--d-scale)); }
 }
+/* En vertical las tres columnas de la cinta son angostas y el renglon de
+   abajo se comia la hora de llegada con puntos suspensivos. Aca envuelve:
+   en vertical el alto es lo que sobra, y perder el dato es peor que una
+   cinta un poco mas alta. En apaisado sigue recortando, que ahi el alto es
+   justo lo que falta. */
+@media (max-aspect-ratio: 5/4) {
+  .dEndSub { white-space: normal; overflow: visible; overflow-wrap: break-word; }
+  /* El nombre de la ciudad tambien envuelve, pero hasta dos renglones: es
+     el texto mas grande de la cinta y "Klagenfurt am Worthersee" en una
+     columna angosta se comia cuatro. */
+  .dEndCity {
+    white-space: normal; overflow-wrap: break-word; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+}
 /* Cuatro columnas cuando la pantalla es ancha Y baja. El corte mira la
    proporcion y no solo el ancho: un telefono apaisado mide 844x390, que en
    rem es "angosto" pero tiene 390 px de alto y en dos columnas no entra
@@ -265,14 +280,12 @@
 .dStripCargo { min-width: 0; }
 .dStripCargo[hidden] { display: none; }
 .dStripBig { font-size: 1em; font-weight: 600; }
-/* Los numeros envuelven entre ellos antes de empujar el boton a un
-   renglon propio, que lo dejaba solo abajo a la izquierda. */
-.dStrip .dMetrics { display: flex; gap: 0.35em 1.2em; margin-left: auto; flex-wrap: wrap; }
-/* Sin carga no hay nada a la izquierda: los numeros arrancan ahi en vez de
-   quedar todos apretados contra el borde derecho. */
-.dStripCargo[hidden] ~ .dMetrics { margin-left: 0; }
-.dStripCargo[hidden] ~ .dReset { margin-left: auto; }
-.dStrip .dReset { flex-shrink: 0; }
+/* Los numeros se quedan con el lugar del medio y envuelven entre ellos: si
+   empujaran al boton, el boton se caia a un renglon propio y quedaba solo
+   abajo a la izquierda. El boton se ancla a la derecha el, no ellos, asi
+   que sin carga los numeros arrancan a la izquierda solos. */
+.dStrip .dMetrics { display: flex; gap: 0.35em 1.2em; flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+.dStrip .dReset { flex-shrink: 0; margin-left: auto; }
 .dMetric { min-width: 0; }
 .dMetricValue { font-size: 1.05em; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dMetricLabel { font-size: 0.64em; color: var(--d-muted); white-space: nowrap; }
