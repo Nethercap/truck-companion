@@ -73,7 +73,11 @@
   gap: var(--d-gap);
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "drive" "eta" "fuel" "truck" "strip";
-  align-content: start;
+  /* Las filas se estiran para ocupar el alto. Con align-content:start el
+     panel dejaba un cuarto de pantalla en negro abajo, en vertical y en
+     apaisado: un tablero con la pantalla a medio usar parece sin
+     terminar. Cuando el contenido no entra, el overflow lo resuelve. */
+  align-content: stretch;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -84,6 +88,10 @@
 .dCard {
   background: var(--d-panel);
   border-radius: 3px;
+  /* El contenido queda agrupado arriba y es el MARCO el que se estira
+     para llenar el alto (ver align-content en .dGrid). Repartirlo con
+     space-between separaba tres lineas a lo largo de media pantalla y la
+     tarjeta se leia desarmada. */
   padding: 0.6em 0.75em;
   display: flex;
   flex-direction: column;

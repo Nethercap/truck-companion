@@ -1,7 +1,19 @@
 {
-  "updated": "2026-09-24",
+  "updated": "2026-09-27",
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped.",
   "items": [
+    {
+      "id": "shipped-dash-panel",
+      "status": "shipped",
+      "en": {
+        "title": "Full dashboard panel",
+        "body": "Speed, fuel, rest, damage and session totals on a second screen, or over the map on the one you have. Portrait and landscape."
+      },
+      "es": {
+        "title": "Panel de tablero completo",
+        "body": "Velocidad, combustible, descanso, daños y totales de la sesión en una segunda pantalla, o encima del mapa en la que ya tenés. Vertical y horizontal."
+      }
+    },
     {
       "id": "base-map",
       "status": "shipped",

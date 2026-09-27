@@ -490,6 +490,11 @@
         <p data-i18n="featGpsBody">Heading-up view that rotates as you drive, with turn-by-turn directions and the name of the road you're turning onto — like a real sat-nav.</p>
       </div>
       <div class="featureCard">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0"/><path d="M3 12v4h18v-4"/><path d="M12 12l4-3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></div>
+        <h3 data-i18n="featPanelTitle">Full dashboard panel</h3>
+        <p data-i18n="featPanelBody">Speed, fuel, rest, damage and what the session added up to, on a second phone or monitor while the map stays on the first. One device, one button: it covers the map and comes back instantly.</p>
+      </div>
+      <div class="featureCard">
         <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
         <h3 data-i18n="featWaypointsTitle">Multi-stop waypoints</h3>
         <p data-i18n="featWaypointsBody">Tap the map or pick a place to route through it. Numbered stops clear themselves as you reach them, and the route recalculates if you stray.</p>
@@ -549,6 +554,8 @@
           <div class="carouselTrack" id="carouselTrack">
             <div class="carouselSlide"><img src="/assets/demo.webp" alt="Truck Dash in navigation mode: the map rotates with the truck, turn prompt, speed and cruise readout" width="720" height="450" onclick="openLightbox(this.src)" /><p class="slideCaption"><span data-i18n="slideDemo">Live: GPS mode with turn-by-turn prompts, speed limit and cruise control.</span> <a href="/app/?demo=1" data-i18n="slideDemoLink">Try the demo →</a></p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-dashboard.webp" alt="Truck Dash live dashboard on desktop" width="1916" height="1200" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideDashboard">Desktop: real map, live route and every truck stat in one view.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-panel-landscape.webp" alt="Truck Dash dashboard panel on a second monitor: trip ribbon with the rest stop marked, arrival verdict, fuel and truck damage" width="2732" height="1536" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption"><span data-i18n="slidePanelWide">Second screen: the whole trip on a ribbon, whether you arrive before the deadline and whether the fuel lasts.</span> <a href="/dash/?demo=1" data-i18n="slideDemoLink">Try the demo &rarr;</a></p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-panel-portrait.webp" alt="Truck Dash dashboard panel on a phone in portrait, with speed, arrival, fuel and damage stacked" width="860" height="1864" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slidePanelTall">The same panel on a phone: it lays itself out for portrait, and never loads the map.</p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-waypoints.webp" alt="Route through two numbered waypoints near Cheyenne with fuel and rest stops on the map" width="801" height="556" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideWaypoints">Multi-stop routing: numbered waypoints that clear themselves as you reach them.</p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-find-nearby.webp" alt="Find nearby panel listing fuel stations sorted by distance" width="840" height="1020" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideFindNearby">Find nearby: fuel, rest areas, service, garages and companies, sorted by distance.</p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-gps-2.webp" alt="Truck Dash GPS navigation mode with speed limit" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideGps">Phone in GPS mode: heading-up map, speed limit and cruise readout.</p></div>
@@ -797,6 +804,8 @@ const TRANSLATIONS = {
     featGpsBody: 'Heading-up view that rotates as you drive, with turn-by-turn directions and the name of the road you\'re turning onto — like a real sat-nav.',
     featWaypointsTitle: 'Multi-stop waypoints',
     featWaypointsBody: 'Tap the map or pick a place to route through it. Numbered stops clear themselves as you reach them, and the route recalculates if you stray.',
+    featPanelTitle: 'Full dashboard panel',
+    featPanelBody: 'Speed, fuel, rest, damage and what the session added up to, on a second phone or monitor while the map stays on the first. It works out whether you arrive before the deadline and whether the fuel lasts, instead of leaving you two numbers to subtract.',
     featPoiTitle: 'Find fuel, rest &amp; service',
     featPoiBody: 'Search gas stations, rest areas, service shops and garages, and get the nearest one routed in one tap.',
     featSpeedTitle: 'Speed, limits &amp; cruise',
@@ -830,6 +839,8 @@ const TRANSLATIONS = {
     slideDemo: 'Live: GPS mode with turn-by-turn prompts, speed limit and cruise control.',
     slideDemoLink: 'Try the demo →',
     slideDashboard: 'Desktop: real map, live route and every truck stat in one view.',
+    slidePanelWide: 'Second screen: the whole trip on a ribbon, whether you arrive before the deadline and whether the fuel lasts.',
+    slidePanelTall: 'The same panel on a phone: it lays itself out for portrait, and never loads the map.',
     slideWaypoints: 'Multi-stop routing: numbered waypoints that clear themselves as you reach them.',
     slideFindNearby: 'Find nearby: fuel, rest areas, service, garages and companies, sorted by distance.',
     slideGps: 'Phone in GPS mode: heading-up map, speed limit and cruise readout.',
@@ -966,6 +977,8 @@ const TRANSLATIONS = {
     featGpsBody: 'Vista que rota con tu rumbo mientras manejás, con indicaciones de giro y el nombre de la ruta a la que doblás — como un GPS de verdad.',
     featWaypointsTitle: 'Waypoints con paradas',
     featWaypointsBody: 'Tocá el mapa o elegí un lugar para pasar por ahí. Las paradas numeradas se quitan solas cuando llegás, y la ruta se recalcula si te desviás.',
+    featPanelTitle: 'Panel de tablero completo',
+    featPanelBody: 'Velocidad, combustible, descanso, daños y cómo viene la sesión, en un segundo celular o monitor mientras el mapa sigue en el primero. Te dice si llegás antes del vencimiento y si te alcanza la nafta, en vez de dejarte dos números para restar.',
     featPoiTitle: 'Encontrá combustible, descanso y taller',
     featPoiBody: 'Buscá estaciones de servicio, áreas de descanso, talleres y garages, y ruteá a la más cercana con un toque.',
     featSpeedTitle: 'Velocidad, límites y crucero',
@@ -999,6 +1012,8 @@ const TRANSLATIONS = {
     slideDemo: 'En vivo: modo GPS con indicaciones giro a giro, límite de velocidad y crucero.',
     slideDemoLink: 'Probá la demo →',
     slideDashboard: 'Escritorio: mapa real, ruta en vivo y todos los datos del camión en una sola vista.',
+    slidePanelWide: 'Segunda pantalla: el viaje entero en una cinta, si llegás antes del vencimiento y si te alcanza la nafta.',
+    slidePanelTall: 'El mismo panel en el celular: se acomoda solo al vertical, y nunca carga el mapa.',
     slideWaypoints: 'Rutas con paradas: waypoints numerados que se quitan solos cuando llegás.',
     slideFindNearby: 'Buscar cerca: combustible, áreas de descanso, talleres, garages y empresas, ordenados por distancia.',
     slideGps: 'Celular en modo GPS: mapa orientado al rumbo, límite de velocidad y crucero.',

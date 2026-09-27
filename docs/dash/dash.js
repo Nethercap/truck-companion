@@ -600,7 +600,11 @@ function createDashPanel({ root, money, imperial, lang }) {
 
     const st = sesion.state();
     texto('sKm', dist(st.kmDriven) || '-');
-    texto('sWheel', hm(st.wheelSeconds) || '-');
+    // Debajo del minuto se muestran segundos: un cronometro en 0:00
+    // mientras estas manejando parece roto, y es lo que ve todo el mundo
+    // en su primer minuto.
+    texto('sWheel', st.wheelSeconds < 60
+      ? Math.round(st.wheelSeconds) + ' s' : hm(st.wheelSeconds));
     texto('sAvg', st.avgSpeedKmh == null ? '-'
       : vel(st.avgSpeedKmh) + (st.topSpeedKmh ? ' · ' + t('topSpeed') + ' ' + vel(st.topSpeedKmh) : ''));
     texto('sFuel', st.fuelUsedL < 1 ? '-'
