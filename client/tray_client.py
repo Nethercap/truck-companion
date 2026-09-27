@@ -43,6 +43,7 @@ import client as client_lib
 import discord_presence
 import local_server
 import account
+import account_sync
 import plugin_installer
 import win_integration
 from i18n import T
@@ -78,6 +79,9 @@ class AppState:
         # todavia cerrado, que es justo lo que hace quien lo deja en el inicio
         # de Windows.
         self.vio_el_juego = False
+        # Acumulador + cola de la cuenta. Sin cuenta vinculada no
+        # acumula nada; ver account_sync.
+        self.cuenta = account_sync.Sincronizador()
         self.status_detail: str | None = None  # diagnostico fino (ingles) cuando status == plugin_missing
         self.map_mods: dict | None = None  # {'ets2': {promods,..}|None, 'ats': {...}|None} leido de game.log.txt
         self.map_mods_read_at = 0.0
@@ -773,6 +777,9 @@ def apagar() -> None:
     lo llama tambien el loop de telemetria, que corre en el hilo de asyncio,
     y tiene que funcionar igual sin bandeja (Linux sin GTK).
     """
+    # Antes de irse: la sesion de manejo se cierra y queda en la cola.
+    # Lo que no se llegue a mandar sale en el proximo arranque.
+    state.cuenta.cerrar_sesion()
     state.discord.close()
     icono = state.icon
     win_integration.stop_and_exit(icono.stop if icono is not None else None)
@@ -1101,6 +1108,10 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             if state.set_status("live", game):
                 open_web_ui()  # en modo autostart, recien aca (juego detectado) se abre el navegador
             state.discord.update(payload)
+            # La cuenta se alimenta del MISMO payload que va al tablero, no
+            # del bloque crudo: si se calcularan de fuentes distintas,
+            # terminarian mostrando dos numeros para el mismo viaje.
+            state.cuenta.tick(payload, raw)
             text = json.dumps(payload)
             now_send = time.time()
             if now_send - last_cloud_send >= client_lib.CLOUD_SEND_INTERVAL_SECONDS or client_lib.payload_has_event(payload):
@@ -1120,6 +1131,10 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 inactive_since = None
                 state.set_status("waiting_game")
                 state.discord.update(None)
+                # Se cerro el juego: la sesion de manejo termino. El viaje
+                # no se cierra, porque cerrar el juego no entrega nada: el
+                # servidor lo dara por abandonado si nunca vuelve.
+                state.cuenta.cerrar_sesion()
                 # OJO: aca NO se cierra la aplicacion. Que sdkActive este en
                 # falso y que no se encuentre la ventana significa "no hay
                 # frame del juego ahora mismo", que pasa en un menu, en pausa
@@ -1153,6 +1168,10 @@ async def run_client(backend_url: str, fixed_code: str | None):
     # LAN igual y descarta el envio cloud mientras tanto.
     cloud = CloudLink(backend_url, "", keybinds)
     telemetry_task = asyncio.create_task(telemetry_loop(cloud, local))
+    # Vacia la cola de la cuenta cada tanto. Aparte del bucle de
+    # telemetria a proposito: que la API este caida no puede frenar
+    # el tablero.
+    cuenta_task = asyncio.create_task(account_sync.bucle(state.cuenta))
 
     # El mismo codigo de siempre si ya hay uno guardado: el link del celular
     # sigue funcionando entre arranques (ver win_integration.saved_pairing_code).
@@ -1177,6 +1196,7 @@ async def run_client(backend_url: str, fixed_code: str | None):
         await cloud.run()
     finally:
         telemetry_task.cancel()
+        cuenta_task.cancel()
 
 
 _loop: asyncio.AbstractEventLoop | None = None
