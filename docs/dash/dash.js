@@ -62,6 +62,9 @@ const DASH_TRAILER_WEAR = [['chassis', 'chassis'], ['wheels', 'wheels'], ['body'
 // manejando). Se usa hasta que createTimeScale junte dos muestras propias.
 const DASH_NOMINAL_SCALE = { ets2: 19, ats: 20 };
 
+// Moneda del juego, para los numeros que no llevan conversion.
+const DASH_SIMBOLO = { ets2: '\u20ac', ats: '$' };
+
 // Por debajo de esto el camion esta sano y no hay nada que decir de el.
 const DASH_DESGASTE_SANO = 5;
 // Escala de danio en porcentaje. Cuatro escalones y no dos: entre el
@@ -121,9 +124,19 @@ function createDashPanel({ root, money, imperial, lang }) {
     return card;
   }
   function metrica(padre, id, claveEtiqueta) {
-    const box = padre.appendChild(el('div', 'dMetric'));
+    const box = guardar(id + 'Box', padre.appendChild(el('div', 'dMetric')));
     guardar(id, box.appendChild(el('div', 'dMetricValue', '-')));
     box.appendChild(el('div', 'dMetricLabel')).dataset.i18n = claveEtiqueta;
+  }
+  // Metrica que solo aparece cuando paso algo. Casi ninguna sesion tiene
+  // multas, y cinco ceros al lado de los numeros que si importan son
+  // ruido: es la misma regla que esconde la tarjeta de llegada cuando no
+  // hay trabajo.
+  function metricaSiHay(id, valor) {
+    const box = refs[id + 'Box'];
+    if (!box) return;
+    box.hidden = valor == null;
+    if (valor != null) refs[id].textContent = valor;
   }
   // Nombre y numero, cada pieza en su marco. La barra no decia de que
   // pieza hablaba ni cuanto era: una puntita de color puede ser un 5 % o
@@ -237,6 +250,13 @@ function createDashPanel({ root, money, imperial, lang }) {
   metrica(metricas, 'sWheel', 'atWheel');
   metrica(metricas, 'sAvg', 'avgSpeed');
   metrica(metricas, 'sFuel', 'fuelUsed');
+  // Estas cinco solo se dibujan cuando pasaron. Van antes del neto porque
+  // son lo que lo explica.
+  metrica(metricas, 'sOver', 'overLimit');
+  metrica(metricas, 'sJobs', 'jobsDone');
+  metrica(metricas, 'sTolls', 'tolls');
+  metrica(metricas, 'sFines', 'fines');
+  metrica(metricas, 'sFerries', 'ferryTrain');
   metrica(metricas, 'sNet', 'netProfit');
   const reset = guardar('resetBtn', franja.appendChild(el('button', 'dReset')));
   reset.dataset.i18n = 'sessionReset';
@@ -245,9 +265,11 @@ function createDashPanel({ root, money, imperial, lang }) {
     render();
   });
 
+  const esperando = guardar('esperando', el('div', 'dWaiting'));
+  esperando.dataset.i18n = 'panelEmptyTitle';
   const grilla = guardar('grilla', el('main', 'dGrid'));
   grilla.append(conduccion, llegada, nafta, camion, franja);
-  root.append(cinta, grilla);
+  root.append(cinta, esperando, grilla);
 
   // --- formato ---
   const idioma = () => (lang ? lang() : 'en');
@@ -290,6 +312,13 @@ function createDashPanel({ root, money, imperial, lang }) {
     const c = gameClockFromMinutes(minutos);
     return c ? String(c.hours).padStart(2, '0') + ':' + String(c.minutes).padStart(2, '0') : null;
   }
+  // Sin conversion: para los numeros que acompañan, no para el titular.
+  // El signo va ANTES del simbolo: "-$1.542" y no "$-1.542".
+  function plataSimple(monto) {
+    if (monto == null) return null;
+    const simbolo = DASH_SIMBOLO[ultimo && ultimo.game] || '$';
+    return (monto < 0 ? '-' : '') + simbolo + num(Math.abs(monto));
+  }
   function plata(monto) {
     if (monto == null) return null;
     return money ? money(monto, ultimo && ultimo.game) : num(monto);
@@ -316,6 +345,12 @@ function createDashPanel({ root, money, imperial, lang }) {
 
   function render() {
     const d = ultimo;
+    // Sin telemetria todavia: se dice, en vez de mostrar el esqueleto con
+    // guiones. La pagina suelta tiene su propia pantalla de espera; adentro
+    // de la app no habia ninguna.
+    refs.esperando.hidden = !!d;
+    refs.grilla.hidden = !d;
+    refs.cinta.hidden = !d;
     if (!d || !visible) return;
     const s = escalaActual();
     const enViaje = !!(d.onJob && d.cityDst);
@@ -457,12 +492,16 @@ function createDashPanel({ root, money, imperial, lang }) {
     texto('etaClaim', margen >= 0 ? t('deadlineEarly', dur(margen)) : t('deadlineLate', dur(-margen)),
           margen >= 0 ? 'bien' : 'mal');
     const partes = [];
-    if (d.jobDeadlineSeconds != null) partes.push(t('jobDeadline') + ' ' + dur(d.jobDeadlineSeconds));
+    if (d.jobDeadlineSeconds != null) partes.push(t('deadlineIn', dur(d.jobDeadlineSeconds)));
     if (realSeg != null) partes.push(t('arrivalLabel') + ' ' + reloj(new Date(Date.now() + realSeg * 1000)));
     texto('etaLine', partes.join(' · ') || null);
+    // El total va con la conversion a la moneda local si el anfitrion la
+    // hace; el precio por km NO. Es un numero para comparar trabajos entre
+    // si, y convertirlo dejaba la linea en tres renglones de digitos:
+    // "$61.158 · ~AR$93.202.557 · $67 · ~AR$102.106 per km".
     const pago = d.jobIncome ? plata(d.jobIncome) : null;
     const porKm = d.jobIncome && d.plannedDistanceKm
-      ? plata(Math.round(d.jobIncome / d.plannedDistanceKm)) + ' ' + t('perKm') : null;
+      ? plataSimple(Math.round(d.jobIncome / d.plannedDistanceKm)) + ' ' + t('perKm') : null;
     texto('etaPay', [pago, porKm].filter(Boolean).join(' · ') || null);
   }
 
@@ -566,7 +605,14 @@ function createDashPanel({ root, money, imperial, lang }) {
       : vel(st.avgSpeedKmh) + (st.topSpeedKmh ? ' · ' + t('topSpeed') + ' ' + vel(st.topSpeedKmh) : ''));
     texto('sFuel', st.fuelUsedL < 1 ? '-'
       : num(st.fuelUsedL) + '\u00a0l' + (st.fuelPer100Km ? ' · ' + num(st.fuelPer100Km, 1) : ''));
-    texto('sNet', st.netProfit ? plata(st.netProfit) : '0');
+    // Un minuto de exceso es redondeo del velocimetro, no manejar rapido.
+    metricaSiHay('sOver', st.overLimitSeconds >= 60
+      ? hm(st.overLimitSeconds) + ' · ' + num(st.overLimitRatio * 100) + '\u00a0%' : null);
+    metricaSiHay('sJobs', st.jobs.count ? String(st.jobs.count) : null);
+    metricaSiHay('sTolls', st.tolls.count ? plataSimple(st.tolls.amount) : null);
+    metricaSiHay('sFines', st.fines.count ? plataSimple(st.fines.amount) : null);
+    metricaSiHay('sFerries', st.ferries.count ? plataSimple(st.ferries.amount) : null);
+    texto('sNet', st.netProfit ? plataSimple(st.netProfit) : '0');
     refs.resetBtn.title = st.startedAt ? t('sessionSince', reloj(new Date(st.startedAt * 1000))) : '';
   }
 
