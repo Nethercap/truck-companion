@@ -24,41 +24,50 @@
   color: #eee;
 }
 
-/* --- franja de ruta --- */
-.dRoute {
+/* --- la cinta: el viaje entero, con el descanso y la carga encima --- */
+.dRibbon {
   border: 2px solid var(--d-accent);
   border-radius: 3px;
-  padding: 0.5em 0.8em;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: center;
-  gap: 0.4em 1em;
+  padding: 0.55em 0.9em 0.45em;
   flex-shrink: 0;
 }
-.dRouteWhere { min-width: 0; }
-.dRouteFrom, .dRouteCompanies {
-  font-size: 0.75em; color: var(--d-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.dRouteFrom:empty, .dRouteCompanies:empty { display: none; }
-.dRouteTo {
-  font-size: 1.9em; font-weight: 600; line-height: 1.05;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.dRouteStats { display: flex; gap: 1.1em; justify-content: space-between; }
-.dProgress { grid-column: 1 / -1; height: 0.25em; background: var(--d-line); border-radius: 1em; }
-.dProgressBar { height: 100%; width: 0; background: var(--d-accent); border-radius: 1em; transition: width 0.4s linear; }
+.dRibbon[hidden] { display: none; }
+.dEnds { display: flex; align-items: flex-end; gap: 1em; }
+.dFrom, .dTo { min-width: 0; flex: 1 1 0; }
+.dTo { text-align: right; }
+.dMiddle { text-align: center; flex-shrink: 0; }
+.dEndCity { font-size: 0.9em; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dEndCityBig { font-size: 1.6em; line-height: 1.05; }
+.dEndSub { font-size: 0.7em; color: var(--d-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dEndSub[hidden], .dEndCity[hidden] { display: none; }
+.dRemaining { font-size: 1.9em; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 
-.dMetric { text-align: right; }
-.dMetricValue { font-size: 1.6em; font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; }
-.dMetricLabel { font-size: 0.68em; color: var(--d-muted); }
+.dTrack { position: relative; height: 1.1em; margin-top: 0.5em; }
+.dRail { position: absolute; top: 0.4em; left: 0; right: 0; height: 0.3em; background: var(--d-line); border-radius: 1em; }
+.dDone { position: absolute; top: 0.4em; left: 0; width: 0; height: 0.3em; background: var(--d-accent); border-radius: 1em; transition: width 0.4s linear; }
+/* Franja y no punto: no sabemos en que kilometro exacto vas a parar, y un
+   punto prometeria una precision que no tenemos. */
+.dBand { position: absolute; top: 0.28em; height: 0.55em; border-radius: 1em; opacity: 0.4; }
+.dBand[hidden] { display: none; }
+.dBand-rest { background: var(--d-warn); }
+.dBand-fuel { background: var(--d-ok); }
+.dTruck {
+  position: absolute; top: 0.05em; width: 1em; height: 1em; border-radius: 50%;
+  background: var(--d-accent); border: 0.18em solid var(--d-panel);
+  transform: translateX(-50%); transition: left 0.4s linear;
+}
+.dMarks { position: relative; height: 1em; font-size: 0.68em; }
+.dMark { position: absolute; white-space: nowrap; }
+.dMark[hidden] { display: none; }
+.dMark-rest { color: var(--d-warn); }
+.dMark-fuel { color: var(--d-ok); }
 
 /* --- grilla --- */
 .dGrid {
   display: grid;
   gap: var(--d-gap);
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "drive" "plan" "job" "truck" "session";
+  grid-template-areas: "drive" "eta" "fuel" "truck" "strip";
   align-content: start;
   flex: 1 1 auto;
   min-height: 0;
@@ -84,11 +93,9 @@
 /* Dos columnas en cuanto hay lugar; la conduccion ocupa el ancho entero
    porque la velocidad es lo unico que se mira de reojo manejando. */
 @media (min-width: 34rem) {
-  .dRoute { grid-template-columns: minmax(0, 1fr) auto; }
-  .dRouteStats { justify-content: flex-end; }
   .dGrid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "drive drive" "plan job" "truck session";
+    grid-template-areas: "drive drive" "eta fuel" "truck truck" "strip strip";
   }
 }
 /* Cuatro columnas cuando la pantalla es ancha Y baja. El corte mira la
@@ -98,19 +105,16 @@
    columnas desperdiciarian todo el alto. */
 @media (min-width: 52rem) and (min-aspect-ratio: 5/4) {
   .dGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-template-areas:
-      "drive plan truck session"
-      "drive job  truck session";
-    grid-template-rows: auto 1fr;
+    grid-template-columns: 1.15fr repeat(3, minmax(0, 1fr));
+    grid-template-areas: "drive eta fuel truck" "strip strip strip strip";
+    grid-template-rows: 1fr auto;
   }
-  .dRouteTo { font-size: 2.4em; }
+  .dEndCityBig { font-size: 2em; }
 }
 /* Monitor: la sesion y el vehiculo dejan de compartir columna. */
 @media (min-width: 95rem) and (min-aspect-ratio: 5/4) {
   .dGrid {
-    grid-template-columns: 1.15fr 1fr 1fr 1fr;
-    grid-template-areas: "drive plan job truck" "drive plan job session";
+    grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -188,18 +192,6 @@
 .dVerdict.bien { color: var(--d-ok); }
 .dVerdict.mal { color: var(--d-warn); }
 
-/* --- desgaste --- */
-.dWear { display: flex; flex-direction: column; gap: 0.22em; }
-.dWear[hidden] { display: none; }
-.dWearTitle { font-size: 0.68em; color: var(--d-muted); margin-top: 0.2em; }
-.dWearRow { display: flex; align-items: center; gap: 0.45em; font-size: 0.78em; }
-.dWearLabel { color: var(--d-muted); flex: 0 0 6.6em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dWearTrack { flex: 1; height: 0.35em; background: var(--d-line); border-radius: 1em; overflow: hidden; }
-.dWearBar { display: block; height: 100%; width: 0; border-radius: 1em; background: var(--d-ok); }
-.dWearBar.regular { background: var(--d-warn); }
-.dWearBar.mal { background: var(--d-bad); }
-.dWearValue { flex: 0 0 2.6em; text-align: right; font-variant-numeric: tabular-nums; }
-
 /* --- medidores --- */
 .dGauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35em; margin-top: 0.2em; }
 .dGauge { min-width: 0; }
@@ -208,19 +200,41 @@
 .dGaugeLabel { font-size: 0.64em; color: var(--d-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dGauge.alerta .dGaugeValue { color: var(--d-bad); }
 
-/* --- sesion --- */
-.dSince { font-size: 0.68em; color: var(--d-muted); }
-.dMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35em; }
-.dMetrics .dMetric { text-align: left; }
-.dMetrics .dMetricValue { font-size: 1.15em; }
 
-/* Pantallas bajas (telefono apaisado): la franja de ruta y los numeros
-   grandes se achican para dejarle el alto a las tarjetas, que es donde esta
-   el dato. */
-@media (max-height: 27rem) {
-  .dRoute { padding: 0.25em 0.7em; gap: 0.2em 1em; }
-  .dRouteTo { font-size: 1.5em; }
-  .dMetricValue { font-size: 1.25em; }
-  .dSpeed { font-size: 2.4em; }
-  .dCard { padding: 0.45em 0.6em; gap: 0.3em; }
+
+/* --- las afirmaciones: primero la conclusion, despues lo que la sostiene --- */
+.dClaim { font-size: 1.15em; font-weight: 600; line-height: 1.2; margin-bottom: 0.3em; }
+.dSecondClaim { font-size: 0.85em; font-weight: 600; margin-bottom: 0.3em; }
+.dClaim[hidden], .dSecondClaim[hidden], .dLine[hidden], .dStripBig[hidden] { display: none; }
+.dClaim.bien, .dSecondClaim.bien { color: var(--d-ok); }
+.dClaim.mal, .dSecondClaim.mal { color: var(--d-warn); }
+.dLine { font-size: 0.78em; color: var(--d-muted); }
+.dLine.dDim { color: #565d68; }
+.dLine.alerta { color: var(--d-bad); }
+.dCard[hidden] { display: none; }
+
+/* --- la franja de abajo --- */
+.dStrip {
+  background: var(--d-panel); border-radius: 3px; padding: 0.5em 0.75em;
+  display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap;
 }
+.dStripCargo { min-width: 0; }
+.dStripCargo[hidden] { display: none; }
+.dStripBig { font-size: 1em; font-weight: 600; }
+.dStrip .dMetrics { display: flex; gap: 1.2em; margin-left: auto; }
+.dStrip .dReset { flex-shrink: 0; }
+.dMetric { min-width: 0; }
+.dMetricValue { font-size: 1.05em; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dMetricLabel { font-size: 0.64em; color: var(--d-muted); white-space: nowrap; }
+
+/* Las barras de desgaste van juntas en una fila: cinco numeros al lado de
+   cinco etiquetas era una planilla. La afirmacion de arriba dice cual es la
+   peor, que es lo unico que hay que saber de un vistazo. */
+.dWearRow { display: flex; gap: 0.25em; margin-bottom: 0.35em; }
+.dWearRow[hidden] { display: none; }
+.dWearRow-trailer { opacity: 0.75; }
+.dWearTrack { flex: 1; height: 0.35em; background: var(--d-line); border-radius: 1em; overflow: hidden; }
+.dWearTrack[hidden] { display: none; }
+.dWearBar { display: block; height: 100%; width: 0; border-radius: 1em; background: var(--d-ok); }
+.dWearBar.regular { background: var(--d-warn); }
+.dWearBar.mal { background: var(--d-bad); }

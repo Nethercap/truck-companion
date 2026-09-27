@@ -9,6 +9,16 @@
 //    alterna entre mapa y tablero al instante, sin recargar el mapa ni el
 //    grafo de rutas, que es lo que tarda.
 //
+// **El panel afirma, no lista.** La cinta de arriba es el viaje entero con
+// el descanso y la carga marcados encima, y cada tarjeta empieza por la
+// conclusion ("Llegada 3 h 50 min antes") en vez de por la etiqueta de un
+// subsistema. Los numeros que la sostienen quedan abajo y chicos. No es
+// una decision estetica: la cuenta de si llegas a tiempo hoy la hace la
+// persona restando dos numeros de dos tarjetas distintas.
+//
+// **Lo que no tiene respuesta no se muestra.** Sin trabajo no hay cinta ni
+// tarjeta de llegada: una afirmacion vacia es peor que ninguna.
+//
 // Lo unico que necesita del anfitrion son las tres cosas que dependen de
 // donde este: como formatear plata, si el usuario eligio millas y en que
 // idioma esta.
@@ -42,9 +52,6 @@ const DASH_INDICATORS = [
   ['liftAxle', 'cmdLiftAxle'], ['trailerAttached', 'cmdTrailer'],
 ];
 
-// Piezas que muestran barra de desgaste. Las del remolque se esconden
-// enteras cuando no hay remolque enganchado: tres ceros parecen un
-// remolque impecable y no es lo mismo que no tener remolque.
 const DASH_WEAR = [
   ['engine', 'engine'], ['transmission', 'transmission'], ['cabin', 'cabin'],
   ['chassis', 'chassis'], ['wheels', 'wheels'],
@@ -55,6 +62,14 @@ const DASH_TRAILER_WEAR = [['chassis', 'chassis'], ['wheels', 'wheels'], ['body'
 // manejando). Se usa hasta que createTimeScale junte dos muestras propias.
 const DASH_NOMINAL_SCALE = { ets2: 19, ats: 20 };
 
+// Por debajo de esto el camion esta sano y no hay nada que decir de el.
+const DASH_DESGASTE_SANO = 5;
+// Ancho de las marcas de la cinta, en porcentaje del largo total. Son una
+// franja y no un punto a proposito: no sabemos en que kilometro exacto vas
+// a parar, depende de a que velocidad sigas. Un punto prometeria una
+// precision que no tenemos; una franja dice "por esta zona".
+const DASH_ANCHO_MARCA = 12;
+
 function createDashPanel({ root, money, imperial, lang }) {
   const KM_TO_MI = 0.621371;
   const escala = createTimeScale();
@@ -63,11 +78,12 @@ function createDashPanel({ root, money, imperial, lang }) {
   let ultimo = null;
   // Adentro de la app el panel vive escondido detras del mapa. Sigue
   // acumulando la sesion igual (si no, alternar de vista perderia los
-  // kilometros), pero no dibuja: son cincuenta escrituras al DOM por tick
+  // kilometros), pero no dibuja: son decenas de escrituras al DOM por tick
   // que nadie esta mirando.
   let visible = true;
 
-  // --- helpers de armado ---
+  const refs = {};
+
   function el(tag, cls, text) {
     const node = document.createElement(tag);
     if (cls) node.className = cls;
@@ -85,197 +101,121 @@ function createDashPanel({ root, money, imperial, lang }) {
     node.innerHTML = paths;
     return node;
   }
-  // Fila "etiqueta ....... valor". Devuelve la fila para poder esconderla.
-  function fila(padre, claveEtiqueta, id) {
-    const row = el('div', 'dRow');
-    row.appendChild(el('span', 'dLabel', ''));
-    row.firstChild.dataset.i18n = claveEtiqueta;
-    const valor = el('span', 'dValue', '-');
-    row.appendChild(valor);
-    padre.appendChild(row);
-    refs[id] = valor;
-    refs[id + 'Row'] = row;
-    return row;
-  }
-  function tarjeta(area, claveTitulo, extra) {
+  function guardar(id, node) { refs[id] = node; return node; }
+  // Tarjeta sin titulo: el titulo seria repetir con una etiqueta lo que la
+  // afirmacion ya dice.
+  function tarjeta(area) {
     const card = el('section', 'dCard dCard-' + area);
     card.style.gridArea = area;
-    const head = el('div', 'dCardHead');
-    const titulo = el('span', 'dCardTitle', '');
-    titulo.dataset.i18n = claveTitulo;
-    head.appendChild(titulo);
-    if (extra) head.appendChild(extra);
-    card.appendChild(head);
     return card;
   }
-  // Dato grande con su etiqueta chica debajo.
   function metrica(padre, id, claveEtiqueta) {
-    const box = el('div', 'dMetric');
-    const valor = el('div', 'dMetricValue', '-');
-    const etiqueta = el('div', 'dMetricLabel', '');
-    etiqueta.dataset.i18n = claveEtiqueta;
-    box.appendChild(valor);
-    box.appendChild(etiqueta);
-    padre.appendChild(box);
-    refs[id] = valor;
-    return box;
+    const box = padre.appendChild(el('div', 'dMetric'));
+    guardar(id, box.appendChild(el('div', 'dMetricValue', '-')));
+    box.appendChild(el('div', 'dMetricLabel')).dataset.i18n = claveEtiqueta;
+  }
+  function barraDesgaste(padre, id) {
+    const pista = padre.appendChild(el('span', 'dWearTrack'));
+    guardar(id, pista.appendChild(el('span', 'dWearBar')));
   }
 
-  const refs = {};
   root.classList.add('dashRoot');
   root.textContent = '';
 
-  // --- franja de ruta ---
-  const franja = el('header', 'dRoute');
-  const destino = el('div', 'dRouteWhere');
-  refs.from = el('div', 'dRouteFrom', '');
-  refs.to = el('div', 'dRouteTo', '');
-  refs.companies = el('div', 'dRouteCompanies', '');
-  destino.append(refs.from, refs.to, refs.companies);
-  const franjaStats = el('div', 'dRouteStats');
-  franja.append(destino, franjaStats);
-  metrica(franjaStats, 'remaining', 'remainingLabel');
-  metrica(franjaStats, 'etaReal', 'etaReal');
-  metrica(franjaStats, 'arrival', 'arrivalLabel');
-  metrica(franjaStats, 'arrivalGame', 'inGameShort');
-  const pista = el('div', 'dProgress');
-  refs.progress = el('div', 'dProgressBar');
-  pista.appendChild(refs.progress);
-  franja.appendChild(pista);
+  // --- la cinta ---
+  const cinta = guardar('cinta', el('header', 'dRibbon'));
+  const puntas = cinta.appendChild(el('div', 'dEnds'));
+  const desde = puntas.appendChild(el('div', 'dFrom'));
+  guardar('fromCity', desde.appendChild(el('div', 'dEndCity')));
+  guardar('fromCompany', desde.appendChild(el('div', 'dEndSub')));
+  const medio = puntas.appendChild(el('div', 'dMiddle'));
+  guardar('remaining', medio.appendChild(el('div', 'dRemaining', '--')));
+  guardar('remainingSub', medio.appendChild(el('div', 'dEndSub')));
+  const hasta = puntas.appendChild(el('div', 'dTo'));
+  guardar('toCity', hasta.appendChild(el('div', 'dEndCity dEndCityBig')));
+  guardar('toCompany', hasta.appendChild(el('div', 'dEndSub')));
+
+  const via = cinta.appendChild(el('div', 'dTrack'));
+  via.appendChild(el('div', 'dRail'));
+  guardar('done', via.appendChild(el('div', 'dDone')));
+  guardar('bandRest', via.appendChild(el('div', 'dBand dBand-rest')));
+  guardar('bandFuel', via.appendChild(el('div', 'dBand dBand-fuel')));
+  guardar('truck', via.appendChild(el('div', 'dTruck')));
+  const marcas = cinta.appendChild(el('div', 'dMarks'));
+  guardar('markRest', marcas.appendChild(el('span', 'dMark dMark-rest')));
+  guardar('markFuel', marcas.appendChild(el('span', 'dMark dMark-fuel')));
 
   // --- conduccion ---
-  const conduccion = tarjeta('drive', 'cardDriving');
-  const velFila = el('div', 'dSpeedRow');
-  refs.limit = el('div', 'dLimit', '--');
-  const velBox = el('div', 'dSpeedBox');
-  refs.speed = el('div', 'dSpeed', '--');
-  refs.speedUnit = el('div', 'dSpeedUnit', 'km/h');
-  velBox.append(refs.speed, refs.speedUnit);
-  const marchaBox = el('div', 'dGearBox');
-  refs.gear = el('div', 'dGear', 'N');
-  refs.cruise = el('div', 'dCruise', '');
-  const rpmPista = el('div', 'dRpm');
-  refs.rpm = el('div', 'dRpmBar');
-  rpmPista.appendChild(refs.rpm);
-  marchaBox.append(refs.gear, refs.cruise, rpmPista);
-  velFila.append(velBox, refs.limit, marchaBox);
-  conduccion.appendChild(velFila);
-
-  refs.indicators = el('div', 'dIndicators');
+  const conduccion = tarjeta('drive');
+  const velFila = conduccion.appendChild(el('div', 'dSpeedRow'));
+  const velBox = velFila.appendChild(el('div', 'dSpeedBox'));
+  guardar('speed', velBox.appendChild(el('div', 'dSpeed', '--')));
+  guardar('speedUnit', velBox.appendChild(el('div', 'dSpeedUnit', 'km/h')));
+  guardar('limit', velFila.appendChild(el('div', 'dLimit', '--')));
+  const marchaBox = velFila.appendChild(el('div', 'dGearBox'));
+  guardar('gear', marchaBox.appendChild(el('div', 'dGear', 'N')));
+  guardar('cruise', marchaBox.appendChild(el('div', 'dCruise')));
+  guardar('rpm', marchaBox.appendChild(el('div', 'dRpm')).appendChild(el('div', 'dRpmBar')));
+  const indicadores = conduccion.appendChild(el('div', 'dIndicators'));
   for (const [clave, titulo] of DASH_INDICATORS) {
     const chip = el('span', 'dInd dInd-' + clave);
     chip.dataset.i18nTitle = titulo;
     chip.appendChild(svg(DASH_ICONS[clave]));
-    refs.indicators.appendChild(chip);
-    refs['ind_' + clave] = chip;
+    indicadores.appendChild(guardar('ind_' + clave, chip));
   }
-  conduccion.appendChild(refs.indicators);
 
-  const bloqueFuel = el('div', 'dRows');
-  fila(bloqueFuel, 'fuel', 'fuel');
-  fila(bloqueFuel, 'range', 'range');
-  fila(bloqueFuel, 'avgConsumption', 'consumption');
-  fila(bloqueFuel, 'adblueLabel', 'adblue');
-  conduccion.appendChild(bloqueFuel);
+  // --- llegada ---
+  const llegada = guardar('cardEta', tarjeta('eta'));
+  guardar('etaClaim', llegada.appendChild(el('div', 'dClaim')));
+  guardar('etaLine', llegada.appendChild(el('div', 'dLine')));
+  guardar('etaPay', llegada.appendChild(el('div', 'dLine dDim')));
 
-  // --- descanso y plan ---
-  const plan = tarjeta('plan', 'cardPlan');
-  const restBox = el('div', 'dBig');
-  refs.rest = el('div', 'dBigValue', '-');
-  refs.restSub = el('div', 'dBigSub', '');
-  restBox.append(refs.rest, refs.restSub);
-  plan.appendChild(restBox);
-  const planRows = el('div', 'dRows');
-  fila(planRows, 'gameClock', 'gameClock');
-  refs.sleepVerdict = el('div', 'dVerdict');
-  refs.fuelVerdict = el('div', 'dVerdict');
-  plan.append(planRows, refs.sleepVerdict, refs.fuelVerdict);
+  // --- combustible y descanso ---
+  const nafta = tarjeta('fuel');
+  guardar('fuelClaim', nafta.appendChild(el('div', 'dClaim')));
+  guardar('restClaim', nafta.appendChild(el('div', 'dSecondClaim')));
+  guardar('fuelLine', nafta.appendChild(el('div', 'dLine')));
+  guardar('fuelDim', nafta.appendChild(el('div', 'dLine dDim')));
 
-  // --- trabajo ---
-  const trabajo = tarjeta('job', 'cardJob');
-  refs.cargo = el('div', 'dBigValue', '-');
-  refs.cargoSub = el('div', 'dBigSub', '');
-  refs.pay = el('div', 'dPay', '-');
-  refs.payPerKm = el('div', 'dBigSub', '');
-  trabajo.append(refs.cargo, refs.cargoSub, refs.pay, refs.payPerKm);
-  const jobRows = el('div', 'dRows');
-  fila(jobRows, 'jobDeadline', 'deadline');
-  fila(jobRows, 'cargoDamage', 'cargoDamage');
-  trabajo.appendChild(jobRows);
-  refs.deadlineVerdict = el('div', 'dVerdict');
-  trabajo.appendChild(refs.deadlineVerdict);
-
-  // --- vehiculo ---
-  const vehiculo = tarjeta('truck', 'cardTruck');
-  refs.truck = el('div', 'dBigValue', '-');
-  refs.odometer = el('div', 'dBigSub', '');
-  vehiculo.append(refs.truck, refs.odometer);
-  const desgaste = el('div', 'dWear');
-  for (const [pieza, clave] of DASH_WEAR) barraDesgaste(desgaste, 'wear_' + pieza, clave);
-  vehiculo.appendChild(desgaste);
-  refs.trailerWear = el('div', 'dWear dTrailerWear');
-  const tituloRemolque = el('div', 'dWearTitle', '');
-  tituloRemolque.dataset.i18n = 'cmdTrailer';
-  refs.trailerWear.appendChild(tituloRemolque);
-  for (const [pieza, clave] of DASH_TRAILER_WEAR) barraDesgaste(refs.trailerWear, 'twear_' + pieza, clave);
-  vehiculo.appendChild(refs.trailerWear);
-  const medidores = el('div', 'dGauges');
+  // --- camion ---
+  const camion = tarjeta('truck');
+  guardar('wearClaim', camion.appendChild(el('div', 'dClaim')));
+  const barras = camion.appendChild(el('div', 'dWearRow'));
+  for (const [pieza] of DASH_WEAR) barraDesgaste(barras, 'wear_' + pieza);
+  const barrasRemolque = guardar('trailerWear', camion.appendChild(el('div', 'dWearRow dWearRow-trailer')));
+  for (const [pieza] of DASH_TRAILER_WEAR) barraDesgaste(barrasRemolque, 'twear_' + pieza);
+  guardar('truckLine', camion.appendChild(el('div', 'dLine')));
+  const medidores = camion.appendChild(el('div', 'dGauges'));
   for (const [id, clave] of [['oilTemp', 'oilTempLabel'], ['waterTemp', 'waterTempLabel'],
                              ['brakeTemp', 'brakeTempLabel'], ['airPressure', 'airPressureLabel'],
                              ['oilPressure', 'oilPressureLabel'], ['battery', 'batteryLabel']]) {
-    const box = el('div', 'dGauge');
-    const valor = el('div', 'dGaugeValue', '-');
-    const etiqueta = el('div', 'dGaugeLabel', '');
-    etiqueta.dataset.i18n = clave;
-    box.append(valor, etiqueta);
-    medidores.appendChild(box);
-    refs[id] = valor;
-    refs[id + 'Box'] = box;
-  }
-  vehiculo.appendChild(medidores);
-
-  function barraDesgaste(padre, id, claveEtiqueta) {
-    const row = el('div', 'dWearRow');
-    const etiqueta = el('span', 'dWearLabel', '');
-    etiqueta.dataset.i18n = claveEtiqueta;
-    const pista = el('span', 'dWearTrack');
-    const barra = el('span', 'dWearBar');
-    pista.appendChild(barra);
-    const valor = el('span', 'dWearValue', '-');
-    row.append(etiqueta, pista, valor);
-    padre.appendChild(row);
-    refs[id] = { bar: barra, value: valor };
+    const box = guardar(id + 'Box', medidores.appendChild(el('div', 'dGauge')));
+    guardar(id, box.appendChild(el('div', 'dGaugeValue', '-')));
+    box.appendChild(el('div', 'dGaugeLabel')).dataset.i18n = clave;
   }
 
-  // --- sesion ---
-  refs.resetBtn = el('button', 'dReset', '');
-  refs.resetBtn.dataset.i18n = 'sessionReset';
-  refs.resetBtn.addEventListener('click', () => {
+  // --- la franja de abajo ---
+  const franja = el('footer', 'dStrip');
+  franja.style.gridArea = 'strip';
+  const carga = guardar('cargoBox', franja.appendChild(el('div', 'dStripCargo')));
+  guardar('cargo', carga.appendChild(el('div', 'dStripBig')));
+  guardar('cargoSub', carga.appendChild(el('div', 'dEndSub')));
+  const metricas = franja.appendChild(el('div', 'dMetrics'));
+  metrica(metricas, 'sKm', 'drivenLabel');
+  metrica(metricas, 'sWheel', 'atWheel');
+  metrica(metricas, 'sAvg', 'avgSpeed');
+  metrica(metricas, 'sFuel', 'fuelUsed');
+  metrica(metricas, 'sNet', 'netProfit');
+  const reset = guardar('resetBtn', franja.appendChild(el('button', 'dReset')));
+  reset.dataset.i18n = 'sessionReset';
+  reset.addEventListener('click', () => {
     sesion.reset(ultimo && ultimo.game, ultimo && ultimo.ts);
     render();
   });
-  const sesionCard = tarjeta('session', 'cardSession', refs.resetBtn);
-  refs.since = el('div', 'dSince', '');
-  sesionCard.appendChild(refs.since);
-  const metricas = el('div', 'dMetrics');
-  metrica(metricas, 'sKm', 'drivenLabel');
-  metrica(metricas, 'sWheel', 'atWheel');
-  metrica(metricas, 'sNet', 'netProfit');
-  sesionCard.appendChild(metricas);
-  const sesionRows = el('div', 'dRows');
-  fila(sesionRows, 'avgSpeed', 'sAvg');
-  fila(sesionRows, 'fuelUsed', 'sFuel');
-  fila(sesionRows, 'overLimit', 'sOver');
-  fila(sesionRows, 'perHour', 'sPerHour');
-  fila(sesionRows, 'jobsDone', 'sJobs');
-  fila(sesionRows, 'fines', 'sFines');
-  fila(sesionRows, 'tolls', 'sTolls');
-  fila(sesionRows, 'ferryTrain', 'sFerries');
-  sesionCard.appendChild(sesionRows);
 
   const grilla = el('main', 'dGrid');
-  grilla.append(conduccion, plan, trabajo, vehiculo, sesionCard);
-  root.append(franja, grilla);
+  grilla.append(conduccion, llegada, nafta, camion, franja);
+  root.append(cinta, grilla);
 
   // --- formato ---
   const idioma = () => (lang ? lang() : 'en');
@@ -291,14 +231,13 @@ function createDashPanel({ root, money, imperial, lang }) {
     if (kmh == null || !isFinite(kmh)) return null;
     return num(mi() ? kmh * KM_TO_MI : kmh);
   }
-  // "9 h 33 min" para tiempos largos, "33 min" para los cortos. Sin
-  // segundos: en un tablero que se mira de reojo son ruido.
+  // "9 h 33 min" para lo largo, "33 min" para lo corto. Sin segundos: en un
+  // tablero que se mira de reojo son ruido.
   function dur(segundos) {
     if (segundos == null || !isFinite(segundos) || segundos < 0) return null;
     const total = Math.round(segundos / 60);
     const h = Math.floor(total / 60), m = total % 60;
-    if (h >= 1) return h + ' h ' + String(m).padStart(2, '0') + ' min';
-    return m + ' min';
+    return h >= 1 ? h + ' h ' + String(m).padStart(2, '0') + ' min' : m + ' min';
   }
   function hm(segundos) {
     if (segundos == null || !isFinite(segundos) || segundos < 0) return null;
@@ -308,64 +247,118 @@ function createDashPanel({ root, money, imperial, lang }) {
   function reloj(fecha) {
     return fecha.toLocaleTimeString(idioma(), { hour: '2-digit', minute: '2-digit' });
   }
-  function poner(id, texto) {
-    const node = refs[id];
-    if (!node) return;
-    node.textContent = texto == null ? '-' : texto;
-    const row = refs[id + 'Row'];
-    if (row) row.hidden = texto == null;
+  function relojJuego(minutos) {
+    const c = gameClockFromMinutes(minutos);
+    return c ? String(c.hours).padStart(2, '0') + ':' + String(c.minutes).padStart(2, '0') : null;
   }
   function plata(monto) {
     if (monto == null) return null;
     return money ? money(monto, ultimo && ultimo.game) : num(monto);
   }
-
-  // Minutos de juego por minuto real. Hasta tener medicion propia se usa la
-  // nominal del mapa, que es la que aplica el juego manejando.
+  // null esconde el elemento: es como se saca lo que no tiene respuesta.
+  function texto(id, valor, clase) {
+    const node = refs[id];
+    if (!node) return;
+    node.textContent = valor == null ? '' : valor;
+    node.hidden = valor == null;
+    if (clase !== undefined) {
+      node.classList.toggle('bien', clase === 'bien');
+      node.classList.toggle('mal', clase === 'mal');
+    }
+  }
   function escalaActual() {
     const medido = escala.value();
-    if (medido != null) return medido;
-    return DASH_NOMINAL_SCALE[ultimo && ultimo.game] || 19;
+    return medido != null ? medido : (DASH_NOMINAL_SCALE[ultimo && ultimo.game] || 19);
+  }
+  function autonomia(d) {
+    const medido = combustible.avgLPer100();
+    return medido && d.fuel != null ? d.fuel / medido * 100 : d.fuelRangeKm;
   }
 
   function render() {
     const d = ultimo;
     if (!d || !visible) return;
     const s = escalaActual();
-
-    // --- franja ---
     const enViaje = !!(d.onJob && d.cityDst);
-    refs.from.textContent = enViaje && d.citySrc ? d.citySrc + ' →' : '';
-    refs.to.textContent = enViaje ? d.cityDst : t('dashNoJob');
-    refs.companies.textContent = enViaje && d.companySrc && d.companyDst
-      ? d.companySrc + ' → ' + d.companyDst : '';
     const restanteKm = enViaje ? d.routeDistanceKm : null;
-    poner('remaining', dist(restanteKm));
-    // routeTimeSeconds son segundos DE JUEGO: pasados a reloj de pared con
-    // la escala medida. Es el unico numero que sirve para decidir si te da
-    // el tiempo antes de cenar.
-    const realSeg = d.routeTimeSeconds > 0 ? d.routeTimeSeconds / s : null;
-    poner('etaReal', hm(realSeg));
-    poner('arrival', realSeg != null ? reloj(new Date(Date.now() + realSeg * 1000)) : null);
-    const relojJuego = gameClockFromMinutes(d.gameTimeMinutes);
-    const llegadaJuego = relojJuego && d.routeTimeSeconds > 0
-      ? gameClockFromMinutes(d.gameTimeMinutes + d.routeTimeSeconds / 60) : null;
-    poner('arrivalGame', llegadaJuego
-      ? String(llegadaJuego.hours).padStart(2, '0') + ':' + String(llegadaJuego.minutes).padStart(2, '0') : null);
-    const total = d.plannedDistanceKm;
-    const hecho = total && restanteKm != null ? Math.max(0, Math.min(1, 1 - restanteKm / total)) : 0;
-    refs.progress.style.width = (hecho * 100).toFixed(1) + '%';
+    const viajeJuegoSeg = enViaje && d.routeTimeSeconds > 0 ? d.routeTimeSeconds : null;
+    const realSeg = viajeJuegoSeg != null ? viajeJuegoSeg / s : null;
+    renderCinta(d, enViaje, restanteKm, realSeg, viajeJuegoSeg);
+    renderConduccion(d);
+    renderLlegada(d, enViaje, realSeg, viajeJuegoSeg);
+    renderCombustible(d, restanteKm, viajeJuegoSeg, s);
+    renderCamion(d);
+    renderFranja(d, enViaje);
+  }
 
-    // --- conduccion ---
-    poner('speed', vel(d.speedKmh) || '--');
+  function renderCinta(d, enViaje, restanteKm, realSeg, viajeJuegoSeg) {
+    // Sin destino no hay viaje que dibujar: la cinta entera desaparece en
+    // vez de quedar como un riel vacio que no dice nada.
+    refs.cinta.hidden = !enViaje;
+    if (!enViaje) return;
+    texto('fromCity', d.citySrc || '');
+    texto('fromCompany', d.companySrc || null);
+    texto('toCity', d.cityDst);
+    texto('remaining', dist(restanteKm) || '--');
+    const partes = [t('remainingLabel')];
+    if (realSeg != null) partes.push(hm(realSeg) + ' ' + t('realShort'));
+    texto('remainingSub', partes.join(' · '));
+    const llegadaReal = realSeg != null ? reloj(new Date(Date.now() + realSeg * 1000)) : null;
+    const enJuego = viajeJuegoSeg != null && d.gameTimeMinutes != null
+      ? relojJuego(d.gameTimeMinutes + viajeJuegoSeg / 60) : null;
+    texto('toCompany', [d.companyDst,
+                        llegadaReal ? t('arrivalLabel') + ' ' + llegadaReal : null,
+                        enJuego ? enJuego + ' ' + t('inGameShort') : null]
+      .filter(Boolean).join(' · ') || null);
+
+    const total = d.plannedDistanceKm;
+    const hecho = total && restanteKm != null
+      ? Math.max(0, Math.min(1, 1 - restanteKm / total)) : 0;
+    refs.done.style.width = (hecho * 100).toFixed(1) + '%';
+    refs.truck.style.left = (hecho * 100).toFixed(1) + '%';
+
+    // El descanso y la carga se ubican sobre lo que FALTA, cada uno con la
+    // unidad del tramo que representa: el descanso en tiempo de juego
+    // contra el tiempo de juego que queda, la carga en kilometros contra
+    // los kilometros que quedan.
+    const descansoSeg = d.restStopMinutes != null ? d.restStopMinutes * 60 : null;
+    marca('bandRest', 'markRest', hecho,
+          descansoSeg != null && viajeJuegoSeg ? descansoSeg / viajeJuegoSeg : null,
+          t('restHere'));
+    const alcance = autonomia(d);
+    marca('bandFuel', 'markFuel', hecho,
+          alcance != null && restanteKm ? alcance / restanteKm : null,
+          t('refuelHere'));
+  }
+
+  // Coloca una franja sobre el tramo que falta. Una fraccion de 1 o mas
+  // quiere decir que eso pasa despues de llegar, asi que no se dibuja.
+  function marca(idBanda, idTexto, hecho, fraccion, etiqueta) {
+    const banda = refs[idBanda], leyenda = refs[idTexto];
+    if (fraccion == null || !isFinite(fraccion) || fraccion >= 1 || fraccion < 0) {
+      banda.hidden = leyenda.hidden = true;
+      return;
+    }
+    const centro = (hecho + (1 - hecho) * fraccion) * 100;
+    const izquierda = Math.max(0, Math.min(100 - DASH_ANCHO_MARCA, centro - DASH_ANCHO_MARCA / 2));
+    banda.hidden = leyenda.hidden = false;
+    banda.style.left = izquierda + '%';
+    banda.style.width = DASH_ANCHO_MARCA + '%';
+    leyenda.style.left = izquierda + '%';
+    leyenda.textContent = etiqueta;
+  }
+
+  function renderConduccion(d) {
+    texto('speed', vel(d.speedKmh) || '--');
     refs.speedUnit.textContent = mi() ? 'mph' : 'km/h';
     const limite = d.speedLimitKmh > 0 ? vel(d.speedLimitKmh) : null;
     refs.limit.textContent = limite || '--';
     refs.limit.classList.toggle('dLimit-off', !limite);
     refs.limit.classList.toggle('dLimit-over', !!limite && d.speedKmh > d.speedLimitKmh + 2);
-    refs.gear.textContent = d.gear === 0 || d.gear == null ? 'N' : (d.gear < 0 ? 'R' + (d.gear < -1 ? Math.abs(d.gear) : '') : String(d.gear));
-    refs.cruise.textContent = d.cruiseControl && d.cruiseControlSpeedKmh > 0 ? vel(d.cruiseControlSpeedKmh) : '';
-    refs.cruise.hidden = !refs.cruise.textContent;
+    refs.gear.textContent = d.gear === 0 || d.gear == null
+      ? 'N' : (d.gear < 0 ? 'R' : String(d.gear));
+    texto('cruise', d.cruiseControl && d.cruiseControlSpeedKmh > 0
+      ? vel(d.cruiseControlSpeedKmh) : null);
     const rpmMax = d.engineRpmMax || 2500;
     refs.rpm.style.width = Math.max(0, Math.min(100, (d.engineRpm || 0) / rpmMax * 100)).toFixed(0) + '%';
     refs.rpm.classList.toggle('dRpm-high', (d.engineRpm || 0) > rpmMax * 0.85);
@@ -376,9 +369,8 @@ function createDashPanel({ root, money, imperial, lang }) {
       blinkerLeft: luces.blinkerLeft, blinkerRight: luces.blinkerRight,
       hazards: luces.hazards, beacon: luces.beacon, wipers: d.wipers,
       motorBrake: d.motorBrake,
-      // Un camion sin retarder informa cero pasos. Mostrarle un icono que
-      // nunca se va a prender es exactamente el mobiliario que sacamos:
-      // undefined lo esconde.
+      // Un camion sin retarder informa cero pasos. Un icono que nunca se va
+      // a prender es mobiliario: undefined lo esconde.
       retarder: d.retarderSteps > 0 ? d.retarder > 0 : undefined,
       differentialLock: d.differentialLock, parkingBrake: d.parkingBrake,
       liftAxle: d.liftAxle, trailerAttached: d.trailerAttached,
@@ -395,70 +387,88 @@ function createDashPanel({ root, money, imperial, lang }) {
     } else {
       delete refs.ind_retarder.dataset.level;
     }
+  }
 
-    const medido = combustible.avgLPer100();
-    const consumo = medido || d.fuelAvgConsumption || null;
-    const alcance = medido && d.fuel != null ? d.fuel / medido * 100 : d.fuelRangeKm;
-    const pct = d.fuel != null && d.fuelCapacity ? d.fuel / d.fuelCapacity * 100 : null;
-    poner('fuel', d.fuel == null ? null : num(d.fuel) + ' l' + (pct != null ? ' · ' + num(pct) + ' %' : ''));
-    poner('range', dist(alcance));
-    poner('consumption', consumo == null ? null
-      : (mi() ? num(235.215 / consumo, 1) + ' mpg' : num(consumo, 1) + ' l/100'));
-    const adblueMax = d.adblueCapacity;
-    poner('adblue', d.adblue == null ? null
-      : num(d.adblue) + ' l' + (adblueMax ? ' · ' + num(d.adblue / adblueMax * 100) + ' %' : ''));
-    marcarAlerta('adblue', (d.mechanicalWarnings || {}).adblue);
-
-    // --- descanso y plan ---
-    // restStopMinutes son minutos DE JUEGO hasta el descanso obligatorio.
-    const descansoJuegoSeg = d.restStopMinutes != null ? d.restStopMinutes * 60 : null;
-    poner('rest', dur(descansoJuegoSeg));
-    refs.restSub.textContent = descansoJuegoSeg == null ? ''
-      : t('untilRest') + ' · ' + hm(descansoJuegoSeg / s) + ' ' + t('realShort');
-    poner('gameClock', relojJuego
-      ? new Date(Date.UTC(2024, 0, 1 + relojJuego.dayIndex)).toLocaleDateString(idioma(), { weekday: 'short', timeZone: 'UTC' })
-        + ' ' + String(relojJuego.hours).padStart(2, '0') + ':' + String(relojJuego.minutes).padStart(2, '0')
-      : null);
-
-    // Veredictos: la cuenta que hoy hay que hacer de cabeza mirando dos
-    // numeros distintos.
-    const viajeJuegoSeg = enViaje && d.routeTimeSeconds > 0 ? d.routeTimeSeconds : null;
-    veredicto('sleepVerdict', viajeJuegoSeg == null || descansoJuegoSeg == null ? null
-      : descansoJuegoSeg > viajeJuegoSeg
-        ? { texto: t('sleepNone'), bien: true }
-        : { texto: t('sleepNeeded'), bien: false });
-    veredicto('fuelVerdict', restanteKm == null || alcance == null ? null
-      : alcance > restanteKm * 1.08
-        ? { texto: t('fuelEnough'), bien: true }
-        : { texto: t('fuelShort'), bien: false });
-
-    // --- trabajo ---
-    refs.cargo.textContent = enViaje ? (d.cargo || t('noCargo')) : t('dashNoJob');
-    const partes = [];
-    if (d.cargoMassKg) partes.push(num(d.cargoMassKg / 1000, 1) + ' t');
-    if (d.plannedDistanceKm) partes.push(t('routeLength') + ' ' + dist(d.plannedDistanceKm));
-    refs.cargoSub.textContent = enViaje ? partes.join(' · ') : '';
-    refs.pay.textContent = enViaje && d.jobIncome ? plata(d.jobIncome) : '';
-    refs.payPerKm.textContent = enViaje && d.jobIncome && d.plannedDistanceKm
-      ? plata(Math.round(d.jobIncome / d.plannedDistanceKm)) + ' ' + t('perKm') : '';
-    poner('deadline', enViaje ? dur(d.jobDeadlineSeconds) : null);
-    poner('cargoDamage', d.cargoDamage ? num(d.cargoDamage * 100, 1) + ' %' : null);
-    marcarAlerta('cargoDamage', d.cargoDamage > 0.02);
+  function renderLlegada(d, enViaje, realSeg, viajeJuegoSeg) {
     const margen = enViaje && d.jobDeadlineSeconds != null && viajeJuegoSeg != null
       ? d.jobDeadlineSeconds - viajeJuegoSeg : null;
-    veredicto('deadlineVerdict', margen == null ? null
-      : margen >= 0
-        ? { texto: t('deadlineEarly', dur(margen)), bien: true }
-        : { texto: t('deadlineLate', dur(-margen)), bien: false });
+    refs.cardEta.hidden = margen == null;
+    if (margen == null) return;
+    texto('etaClaim', margen >= 0 ? t('deadlineEarly', dur(margen)) : t('deadlineLate', dur(-margen)),
+          margen >= 0 ? 'bien' : 'mal');
+    const partes = [];
+    if (d.jobDeadlineSeconds != null) partes.push(t('jobDeadline') + ' ' + dur(d.jobDeadlineSeconds));
+    if (realSeg != null) partes.push(t('arrivalLabel') + ' ' + reloj(new Date(Date.now() + realSeg * 1000)));
+    texto('etaLine', partes.join(' · ') || null);
+    const pago = d.jobIncome ? plata(d.jobIncome) : null;
+    const porKm = d.jobIncome && d.plannedDistanceKm
+      ? plata(Math.round(d.jobIncome / d.plannedDistanceKm)) + ' ' + t('perKm') : null;
+    texto('etaPay', [pago, porKm].filter(Boolean).join(' · ') || null);
+  }
 
-    // --- vehiculo ---
-    refs.truck.textContent = [d.truckBrand, d.truckName].filter(Boolean).join(' ') || '-';
-    refs.odometer.textContent = d.odometerKm != null ? dist(d.odometerKm) : '';
+  function renderCombustible(d, restanteKm, viajeJuegoSeg, s) {
+    const alcance = autonomia(d);
+    const pct = d.fuel != null && d.fuelCapacity ? d.fuel / d.fuelCapacity * 100 : null;
+    if (restanteKm != null && alcance != null) {
+      const suficiente = alcance > restanteKm * 1.08;
+      texto('fuelClaim', suficiente ? t('fuelEnoughTo', d.cityDst) : t('fuelShort'),
+            suficiente ? 'bien' : 'mal');
+    } else if (alcance != null) {
+      // Sin destino no hay con que comparar: se dice la autonomia y ya.
+      texto('fuelClaim', t('rangeIs', dist(alcance)), null);
+    } else {
+      texto('fuelClaim', null);
+    }
+
+    const descansoSeg = d.restStopMinutes != null ? d.restStopMinutes * 60 : null;
+    if (descansoSeg != null && viajeJuegoSeg != null) {
+      const sinDormir = descansoSeg > viajeJuegoSeg;
+      texto('restClaim', sinDormir ? t('sleepNone') : t('sleepNeeded'),
+            sinDormir ? 'bien' : 'mal');
+    } else if (descansoSeg != null) {
+      texto('restClaim', t('untilRest') + ' ' + dur(descansoSeg) + ' · '
+        + hm(descansoSeg / s) + ' ' + t('realShort'), null);
+    } else {
+      texto('restClaim', null);
+    }
+
+    const linea = [];
+    if (d.fuel != null) linea.push(num(d.fuel) + ' l' + (pct != null ? ' · ' + num(pct) + ' %' : ''));
+    if (alcance != null) linea.push(dist(alcance) + ' ' + t('rangeWord'));
+    texto('fuelLine', linea.join(' · ') || null);
+
+    const consumo = combustible.avgLPer100() || d.fuelAvgConsumption || null;
+    const bajo = [];
+    if (consumo != null) bajo.push(mi() ? num(235.215 / consumo, 1) + ' mpg' : num(consumo, 1) + ' l/100');
+    if (d.adblue != null && d.adblueCapacity) {
+      bajo.push(t('adblueLabel') + ' ' + num(d.adblue / d.adblueCapacity * 100) + ' %');
+    }
+    texto('fuelDim', bajo.join(' · ') || null);
+    refs.fuelDim.classList.toggle('alerta', !!(d.mechanicalWarnings || {}).adblue);
+  }
+
+  function renderCamion(d) {
     const wear = d.wear || {};
-    for (const [pieza] of DASH_WEAR) ponerDesgaste('wear_' + pieza, wear[pieza]);
+    let peor = null, peorPct = -1;
+    for (const [pieza, clave] of DASH_WEAR) {
+      const valor = wear[pieza];
+      ponerDesgaste('wear_' + pieza, valor);
+      if (valor != null && valor * 100 > peorPct) { peorPct = valor * 100; peor = clave; }
+    }
+    if (peor == null) texto('wearClaim', null);
+    else if (peorPct < DASH_DESGASTE_SANO) texto('wearClaim', t('truckFine'), 'bien');
+    else texto('wearClaim', t('wearWorst', t(peor), Math.round(peorPct)),
+               peorPct >= 40 ? 'mal' : null);
+
     const remolque = d.trailerWear;
     refs.trailerWear.hidden = !remolque;
     if (remolque) for (const [pieza] of DASH_TRAILER_WEAR) ponerDesgaste('twear_' + pieza, remolque[pieza]);
+
+    const partes = [[d.truckBrand, d.truckName].filter(Boolean).join(' ') || null];
+    if (d.odometerKm != null) partes.push(dist(d.odometerKm));
+    if (d.cargoDamage) partes.push(t('cargoDamage') + ' ' + num(d.cargoDamage * 100, 1) + ' %');
+    texto('truckLine', partes.filter(Boolean).join(' · ') || null);
+    refs.truckLine.classList.toggle('alerta', d.cargoDamage > 0.02);
 
     const alertas = d.mechanicalWarnings || {};
     medidor('oilTemp', d.oilTemperature, (v) => num(v) + ' °C', d.oilTemperature > 125);
@@ -467,46 +477,34 @@ function createDashPanel({ root, money, imperial, lang }) {
     medidor('airPressure', d.airPressure, (v) => num(v) + ' psi', alertas.airPressure);
     medidor('oilPressure', d.oilPressure, (v) => num(v) + ' psi', alertas.oilPressure);
     medidor('battery', d.batteryVoltage, (v) => num(v, 1) + ' V', alertas.batteryVoltage);
+  }
 
-    // --- sesion ---
+  function renderFranja(d, enViaje) {
+    const partes = [];
+    if (d.cargoMassKg) partes.push(num(d.cargoMassKg / 1000, 1) + ' t');
+    if (d.plannedDistanceKm) partes.push(t('routeLength') + ' ' + dist(d.plannedDistanceKm));
+    refs.cargoBox.hidden = !enViaje;
+    texto('cargo', enViaje ? (d.cargo || t('noCargo')) : null);
+    texto('cargoSub', partes.join(' · ') || null);
+
     const st = sesion.state();
-    refs.since.textContent = st.startedAt ? t('sessionSince', reloj(new Date(st.startedAt * 1000))) : '';
-    poner('sKm', dist(st.kmDriven));
-    poner('sWheel', hm(st.wheelSeconds));
-    poner('sNet', st.netProfit ? plata(st.netProfit) : '0');
-    poner('sAvg', st.avgSpeedKmh == null ? null
-      : vel(st.avgSpeedKmh) + (mi() ? ' mph' : ' km/h')
-        + (st.topSpeedKmh ? ' · ' + t('topSpeed') + ' ' + vel(st.topSpeedKmh) : ''));
-    poner('sFuel', st.fuelUsedL < 1 ? null
-      : num(st.fuelUsedL) + ' l' + (st.fuelPer100Km ? ' · ' + num(st.fuelPer100Km, 1) + ' l/100' : ''));
-    poner('sOver', st.overLimitSeconds < 60 ? null
-      : hm(st.overLimitSeconds) + ' · ' + num(st.overLimitRatio * 100) + ' %');
-    poner('sPerHour', st.profitPerHour == null ? null : plata(Math.round(st.profitPerHour)));
-    poner('sJobs', st.jobs.count ? st.jobs.count + ' · ' + plata(st.jobs.amount) : null);
-    poner('sFines', st.fines.count ? st.fines.count + ' · ' + plata(st.fines.amount) : null);
-    poner('sTolls', st.tolls.count ? st.tolls.count + ' · ' + plata(st.tolls.amount) : null);
-    poner('sFerries', st.ferries.count ? st.ferries.count + ' · ' + plata(st.ferries.amount) : null);
+    texto('sKm', dist(st.kmDriven) || '-');
+    texto('sWheel', hm(st.wheelSeconds) || '-');
+    texto('sAvg', st.avgSpeedKmh == null ? '-'
+      : vel(st.avgSpeedKmh) + (st.topSpeedKmh ? ' · ' + t('topSpeed') + ' ' + vel(st.topSpeedKmh) : ''));
+    texto('sFuel', st.fuelUsedL < 1 ? '-'
+      : num(st.fuelUsedL) + ' l' + (st.fuelPer100Km ? ' · ' + num(st.fuelPer100Km, 1) : ''));
+    texto('sNet', st.netProfit ? plata(st.netProfit) : '0');
+    refs.resetBtn.title = st.startedAt ? t('sessionSince', reloj(new Date(st.startedAt * 1000))) : '';
   }
 
-  function veredicto(id, valor) {
-    const node = refs[id];
-    node.hidden = !valor;
-    if (!valor) return;
-    node.textContent = valor.texto;
-    node.classList.toggle('bien', valor.bien);
-    node.classList.toggle('mal', !valor.bien);
-  }
-  function marcarAlerta(id, activa) {
-    const row = refs[id + 'Row'];
-    if (row) row.classList.toggle('alerta', !!activa);
-  }
   function ponerDesgaste(id, valor) {
-    const ref = refs[id];
-    if (!ref) return;
+    const barra = refs[id];
+    if (!barra) return;
     const pct = valor == null ? null : valor * 100;
-    ref.value.textContent = pct == null ? '-' : Math.round(pct) + ' %';
-    ref.bar.style.width = (pct || 0).toFixed(1) + '%';
-    ref.bar.className = 'dWearBar' + (pct == null ? '' : pct >= 40 ? ' mal' : pct >= 10 ? ' regular' : ' bien');
+    barra.style.width = (pct || 0).toFixed(1) + '%';
+    barra.className = 'dWearBar' + (pct == null ? '' : pct >= 40 ? ' mal' : pct >= 10 ? ' regular' : ' bien');
+    barra.parentNode.hidden = pct == null;
   }
   function medidor(id, valor, formato, alerta) {
     const box = refs[id + 'Box'];
@@ -517,7 +515,6 @@ function createDashPanel({ root, money, imperial, lang }) {
   }
 
   return {
-    // Traduce todo lo que se marco con data-i18n al idioma actual.
     applyTranslations() {
       root.querySelectorAll('[data-i18n]').forEach(n => { n.textContent = t(n.dataset.i18n); });
       root.querySelectorAll('[data-i18n-title]').forEach(n => { n.title = t(n.dataset.i18nTitle); });
@@ -530,10 +527,8 @@ function createDashPanel({ root, money, imperial, lang }) {
       combustible.push(data.odometerKm, data.fuel, [data.game, data.truckBrand, data.truckName].join('|'));
       render();
     },
-    // La app lo llama al abrir y cerrar la pantalla completa.
-    setVisible(v) { visible = !!v; if (v) render(); },
-    // El anfitrion la llama al cambiar de unidades o de idioma.
     refresh() { render(); },
+    setVisible(v) { visible = !!v; if (v) render(); },
     resetSession() { sesion.reset(ultimo && ultimo.game, ultimo && ultimo.ts); render(); },
     hasData() { return ultimo != null; },
   };
