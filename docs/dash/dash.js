@@ -375,7 +375,11 @@ function createDashPanel({ root, money, imperial, lang }) {
       beamLow: luces.beamLow, beamHigh: luces.beamHigh, parking: luces.parking,
       blinkerLeft: luces.blinkerLeft, blinkerRight: luces.blinkerRight,
       hazards: luces.hazards, beacon: luces.beacon, wipers: d.wipers,
-      motorBrake: d.motorBrake, retarder: d.retarder > 0,
+      motorBrake: d.motorBrake,
+      // Un camion sin retarder informa cero pasos. Mostrarle un icono que
+      // nunca se va a prender es exactamente el mobiliario que sacamos:
+      // undefined lo esconde.
+      retarder: d.retarderSteps > 0 ? d.retarder > 0 : undefined,
       differentialLock: d.differentialLock, parkingBrake: d.parkingBrake,
       liftAxle: d.liftAxle, trailerAttached: d.trailerAttached,
     };
