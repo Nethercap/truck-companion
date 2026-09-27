@@ -312,7 +312,10 @@
    distingue por el gris, como antes se distinguia la fila. */
 .dWearRow-trailer { display: contents; }
 .dWearRow-trailer[hidden] { display: none; }
-.dWearRow-trailer .dWear { opacity: 0.75; }
+.dWearIcon {
+  width: 0.85em; height: 0.85em; flex-shrink: 0; vertical-align: -0.1em;
+  margin-right: 0.25em; color: var(--d-muted);
+}
 /* Nombre y numero en la misma linea, y el marco lo mas bajo posible: con
    remolque son ocho, y en la grilla de cuatro columnas la tarjeta tiene
    unos diez em de ancho y el alto justo. Apilar el nombre arriba del
@@ -323,7 +326,11 @@
   border: 1px solid var(--d-line); border-radius: 2px; padding: 0.05em 0.35em; min-width: 0;
 }
 .dWear[hidden] { display: none; }
-.dWearName { font-size: 0.62em; color: var(--d-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dWearName {
+  font-size: 0.62em; color: var(--d-muted);
+  display: flex; align-items: center; min-width: 0;
+}
+.dWearName > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* El color lo lleva el numero: es el dato, y asi la fila no se vuelve un
    semaforo de cinco marcos de colores. */
 .dWearPct { font-size: 0.78em; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }

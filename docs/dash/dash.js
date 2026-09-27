@@ -128,9 +128,18 @@ function createDashPanel({ root, money, imperial, lang }) {
   // Nombre y numero, cada pieza en su marco. La barra no decia de que
   // pieza hablaba ni cuanto era: una puntita de color puede ser un 5 % o
   // un 35 %, y el titular nombra una sola pieza, la peor.
-  function chipDesgaste(padre, id, clave) {
+  function chipDesgaste(padre, id, clave, esRemolque) {
     const chip = padre.appendChild(el('span', 'dWear'));
-    chip.appendChild(el('span', 'dWearName')).dataset.i18n = clave;
+    const nombre = chip.appendChild(el('span', 'dWearName'));
+    if (esRemolque) {
+      // Sin esto el remolque sale como "Chassis 8 %" al lado del "Chassis
+      // 4 %" del camion y no hay forma de saber cual es cual. El nombre
+      // completo no entra en la columna, asi que el icono hace de prefijo
+      // y el titulo del chip lo dice en palabras.
+      nombre.appendChild(svg(DASH_ICONS.trailerAttached)).classList.add('dWearIcon');
+      chip.dataset.i18nTitle = 'cmdTrailer';
+    }
+    nombre.appendChild(el('span')).dataset.i18n = clave;
     guardar(id, chip.appendChild(el('span', 'dWearPct')));
   }
   function nivelDesgaste(pct) {
@@ -206,7 +215,7 @@ function createDashPanel({ root, money, imperial, lang }) {
   // renglones donde ocho entran en cuatro, y esos 34 px eran los que
   // desbordaban la tarjeta en una tablet apaisada.
   const barrasRemolque = guardar('trailerWear', barras.appendChild(el('div', 'dWearRow-trailer')));
-  for (const [pieza, clave] of DASH_TRAILER_WEAR) chipDesgaste(barrasRemolque, 'twear_' + pieza, clave);
+  for (const [pieza, clave] of DASH_TRAILER_WEAR) chipDesgaste(barrasRemolque, 'twear_' + pieza, clave, true);
   guardar('truckLine', camion.appendChild(el('div', 'dLine')));
   const medidores = camion.appendChild(el('div', 'dGauges'));
   for (const [id, clave] of [['oilTemp', 'oilTempLabel'], ['waterTemp', 'waterTempLabel'],
@@ -502,20 +511,30 @@ function createDashPanel({ root, money, imperial, lang }) {
 
   function renderCamion(d) {
     const wear = d.wear || {};
+    const remolque = d.trailerWear;
+    refs.trailerWear.hidden = !remolque;
+
+    // La peor pieza de las dos listas, no solo del camion: el titular
+    // decia "Ruedas al 11 %" con un "14 %" del remolque a la vista, y un
+    // titular contradicho por un numero visible no sirve para nada.
     let peor = null, peorPct = -1;
+    const mirar = (valor, etiqueta) => {
+      if (valor != null && valor * 100 > peorPct) { peorPct = valor * 100; peor = etiqueta; }
+    };
     for (const [pieza, clave] of DASH_WEAR) {
-      const valor = wear[pieza];
-      ponerDesgaste('wear_' + pieza, valor);
-      if (valor != null && valor * 100 > peorPct) { peorPct = valor * 100; peor = clave; }
+      ponerDesgaste('wear_' + pieza, wear[pieza]);
+      mirar(wear[pieza], t(clave));
+    }
+    if (remolque) {
+      for (const [pieza, clave] of DASH_TRAILER_WEAR) {
+        ponerDesgaste('twear_' + pieza, remolque[pieza]);
+        mirar(remolque[pieza], t('cmdTrailer') + ' \u00b7 ' + t(clave));
+      }
     }
     if (peor == null) texto('wearClaim', null);
     else if (peorPct < DASH_DESGASTE_SANO) texto('wearClaim', t('truckFine'), 'bien');
-    else texto('wearClaim', t('wearWorst', t(peor), Math.round(peorPct)),
+    else texto('wearClaim', t('wearWorst', peor, Math.round(peorPct)),
                peorPct >= DASH_DESGASTE_AVISA ? 'mal' : null);
-
-    const remolque = d.trailerWear;
-    refs.trailerWear.hidden = !remolque;
-    if (remolque) for (const [pieza] of DASH_TRAILER_WEAR) ponerDesgaste('twear_' + pieza, remolque[pieza]);
 
     const partes = [[d.truckBrand, d.truckName].filter(Boolean).join(' ') || null];
     if (d.odometerKm != null) partes.push(dist(d.odometerKm));
