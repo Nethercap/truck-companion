@@ -64,6 +64,13 @@ const DASH_NOMINAL_SCALE = { ets2: 19, ats: 20 };
 
 // Por debajo de esto el camion esta sano y no hay nada que decir de el.
 const DASH_DESGASTE_SANO = 5;
+// Escala de danio en porcentaje. Cuatro escalones y no dos: entre el
+// camion sano y el que hay que llevar al taller hay un rango largo donde
+// lo unico que se quiere saber es para que lado va. El color lo lleva el
+// numero, que es el dato; el nombre de la pieza queda en gris.
+const DASH_DESGASTE_ESCALA = [[10, 'bien'], [25, 'medio'], [50, 'alto']];
+// A partir de 'alto' la afirmacion de arriba tambien se pinta.
+const DASH_DESGASTE_AVISA = 25;
 // Ancho de las marcas de la cinta, en porcentaje del largo total. Son una
 // franja y no un punto a proposito: no sabemos en que kilometro exacto vas
 // a parar, depende de a que velocidad sigas. Un punto prometeria una
@@ -118,13 +125,17 @@ function createDashPanel({ root, money, imperial, lang }) {
     guardar(id, box.appendChild(el('div', 'dMetricValue', '-')));
     box.appendChild(el('div', 'dMetricLabel')).dataset.i18n = claveEtiqueta;
   }
-  // Barra mas numero: la barra sola dice que algo esta peor que el resto
-  // pero no cuanto, y una puntita de color puede ser un 5 % o un 35 %.
-  function barraDesgaste(padre, id) {
-    const celda = padre.appendChild(el('span', 'dWear'));
-    const pista = celda.appendChild(el('span', 'dWearTrack'));
-    guardar(id, pista.appendChild(el('span', 'dWearBar')));
-    guardar(id + 'Pct', celda.appendChild(el('span', 'dWearPct')));
+  // Nombre y numero, cada pieza en su marco. La barra no decia de que
+  // pieza hablaba ni cuanto era: una puntita de color puede ser un 5 % o
+  // un 35 %, y el titular nombra una sola pieza, la peor.
+  function chipDesgaste(padre, id, clave) {
+    const chip = padre.appendChild(el('span', 'dWear'));
+    chip.appendChild(el('span', 'dWearName')).dataset.i18n = clave;
+    guardar(id, chip.appendChild(el('span', 'dWearPct')));
+  }
+  function nivelDesgaste(pct) {
+    for (const [tope, nivel] of DASH_DESGASTE_ESCALA) if (pct < tope) return nivel;
+    return 'mal';
   }
 
   root.classList.add('dashRoot');
@@ -189,9 +200,13 @@ function createDashPanel({ root, money, imperial, lang }) {
   const camion = tarjeta('truck');
   guardar('wearClaim', camion.appendChild(el('div', 'dClaim')));
   const barras = camion.appendChild(el('div', 'dWearRow'));
-  for (const [pieza] of DASH_WEAR) barraDesgaste(barras, 'wear_' + pieza);
-  const barrasRemolque = guardar('trailerWear', camion.appendChild(el('div', 'dWearRow dWearRow-trailer')));
-  for (const [pieza] of DASH_TRAILER_WEAR) barraDesgaste(barrasRemolque, 'twear_' + pieza);
+  for (const [pieza, clave] of DASH_WEAR) chipDesgaste(barras, 'wear_' + pieza, clave);
+  // El remolque va adentro de la misma grilla (display: contents), no en
+  // una segunda: en dos columnas, cinco piezas y tres dejaban 3+2 = cinco
+  // renglones donde ocho entran en cuatro, y esos 34 px eran los que
+  // desbordaban la tarjeta en una tablet apaisada.
+  const barrasRemolque = guardar('trailerWear', barras.appendChild(el('div', 'dWearRow-trailer')));
+  for (const [pieza, clave] of DASH_TRAILER_WEAR) chipDesgaste(barrasRemolque, 'twear_' + pieza, clave);
   guardar('truckLine', camion.appendChild(el('div', 'dLine')));
   const medidores = camion.appendChild(el('div', 'dGauges'));
   for (const [id, clave] of [['oilTemp', 'oilTempLabel'], ['waterTemp', 'waterTempLabel'],
@@ -496,7 +511,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     if (peor == null) texto('wearClaim', null);
     else if (peorPct < DASH_DESGASTE_SANO) texto('wearClaim', t('truckFine'), 'bien');
     else texto('wearClaim', t('wearWorst', t(peor), Math.round(peorPct)),
-               peorPct >= 40 ? 'mal' : null);
+               peorPct >= DASH_DESGASTE_AVISA ? 'mal' : null);
 
     const remolque = d.trailerWear;
     refs.trailerWear.hidden = !remolque;
@@ -537,18 +552,15 @@ function createDashPanel({ root, money, imperial, lang }) {
   }
 
   function ponerDesgaste(id, valor) {
-    const barra = refs[id];
-    if (!barra) return;
+    const numero = refs[id];
+    if (!numero) return;
     const pct = valor == null ? null : valor * 100;
-    barra.style.width = (pct || 0).toFixed(1) + '%';
-    barra.className = 'dWearBar' + (pct == null ? '' : pct >= 40 ? ' mal' : pct >= 10 ? ' regular' : ' bien');
-    const celda = barra.parentNode.parentNode;
-    celda.hidden = pct == null;
-    const numero = refs[id + 'Pct'];
-    if (numero) {
-      numero.textContent = pct == null ? '' : num(pct) + '\u00a0%';
-      numero.className = 'dWearPct' + (pct == null ? '' : pct >= 40 ? ' mal' : pct >= 10 ? ' regular' : '');
-    }
+    // La pieza que el cliente no informa no existe: el marco se va entero,
+    // que es mejor que un marco con un guion adentro.
+    numero.parentNode.hidden = pct == null;
+    if (pct == null) return;
+    numero.textContent = num(pct) + '\u00a0%';
+    numero.className = 'dWearPct ' + nivelDesgaste(pct);
   }
   function medidor(id, valor, formato, alerta) {
     const box = refs[id + 'Box'];

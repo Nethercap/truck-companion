@@ -14,6 +14,7 @@
   --d-muted: #9aa4b2;
   --d-accent: #3b9eff;
   --d-ok: #7cc243;
+  --d-mid: #e8cf3f;
   --d-warn: #ffb020;
   --d-bad: #ff4d4d;
   font-size: var(--d-unit);
@@ -250,7 +251,11 @@
 /* Tres columnas si entran; si no, las que entren. Con "132 psi" en una
    sola linea, tres columnas fijas cortaban el numero en las pantallas
    mas chicas. */
-.dGauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.4em, 1fr)); gap: 0.35em; margin-top: 0.2em; }
+/* El minimo es lo que mide "132 psi" y nada mas: con 4,2 em una tarjeta
+   se quedaba en UNA columna y los seis medidores ocupaban seis
+   renglones: es lo que desbordaba la tarjeta del camion en una tablet
+   apaisada. */
+.dGauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(3.9em, 1fr)); gap: 0.35em; margin-top: 0.2em; }
 .dGauge { min-width: 0; }
 .dGauge[hidden] { display: none; }
 /* Numero y unidad no se separan: con el tablero grande "132 psi" partia
@@ -275,7 +280,7 @@
 /* --- la franja de abajo --- */
 .dStrip {
   background: var(--d-panel); border-radius: 3px; padding: 0.5em 0.9em;
-  display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 0.9em; flex-wrap: wrap;
 }
 .dStripCargo { min-width: 0; }
 .dStripCargo[hidden] { display: none; }
@@ -284,7 +289,7 @@
    empujaran al boton, el boton se caia a un renglon propio y quedaba solo
    abajo a la izquierda. El boton se ancla a la derecha el, no ellos, asi
    que sin carga los numeros arrancan a la izquierda solos. */
-.dStrip .dMetrics { display: flex; gap: 0.35em 1.2em; flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+.dStrip .dMetrics { display: flex; gap: 0.35em 0.9em; flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
 .dStrip .dReset { flex-shrink: 0; margin-left: auto; }
 .dMetric { min-width: 0; }
 .dMetricValue { font-size: 1.05em; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -293,18 +298,51 @@
 /* Las barras de desgaste van juntas en una fila: cinco numeros al lado de
    cinco etiquetas era una planilla. La afirmacion de arriba dice cual es la
    peor, que es lo unico que hay que saber de un vistazo. */
-/* Tantas piezas por renglon como entren: con el numero al lado, cinco en
-   una columna angosta dejaban la barra en veinte pixeles. */
-.dWearRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.2em, 1fr)); gap: 0.3em 0.7em; margin-bottom: 0.35em; }
+/* Cada pieza en su marco, con su nombre y su numero. Tantas por renglon
+   como entren: en una columna angosta caen de a dos. */
+/* Cada marco mide lo que dice y se acomodan solos. Con una grilla de
+   columnas iguales hay que elegir entre columnas anchas (un marco por
+   renglon en apaisado, y la tarjeta se pasa de alto) o angostas (entran,
+   pero "Transmision" se recorta en todas las pantallas). Midiendo cada
+   uno por su cuenta entran los que entren en cada renglon, sin recortar
+   ninguno: en vertical son dos renglones y en apaisado cuatro. */
+.dWearRow { display: flex; flex-wrap: wrap; gap: 0.2em; margin-bottom: 0.35em; }
 .dWearRow[hidden] { display: none; }
-.dWearRow-trailer { opacity: 0.75; }
-.dWear { display: flex; align-items: center; gap: 0.4em; min-width: 0; }
+/* El remolque comparte la grilla con el camion, no abre una segunda. Se
+   distingue por el gris, como antes se distinguia la fila. */
+.dWearRow-trailer { display: contents; }
+.dWearRow-trailer[hidden] { display: none; }
+.dWearRow-trailer .dWear { opacity: 0.75; }
+/* Nombre y numero en la misma linea, y el marco lo mas bajo posible: con
+   remolque son ocho, y en la grilla de cuatro columnas la tarjeta tiene
+   unos diez em de ancho y el alto justo. Apilar el nombre arriba del
+   numero no recortaba ninguno, pero duplicaba el alto de la fila y la
+   tarjeta se pasaba en las pantallas mas chicas. */
+.dWear {
+  display: flex; align-items: baseline; gap: 0.35em; max-width: 100%;
+  border: 1px solid var(--d-line); border-radius: 2px; padding: 0.05em 0.35em; min-width: 0;
+}
 .dWear[hidden] { display: none; }
-.dWearTrack { flex: 1; height: 0.35em; background: var(--d-line); border-radius: 1em; overflow: hidden; }
-.dWearTrack[hidden] { display: none; }
-.dWearPct { font-size: 0.64em; color: var(--d-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dWearPct.regular { color: var(--d-warn); }
+.dWearName { font-size: 0.62em; color: var(--d-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* El color lo lleva el numero: es el dato, y asi la fila no se vuelve un
+   semaforo de cinco marcos de colores. */
+.dWearPct { font-size: 0.78em; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dWearPct.bien { color: var(--d-ok); }
+.dWearPct.medio { color: var(--d-mid); }
+.dWearPct.alto { color: var(--d-warn); }
 .dWearPct.mal { color: var(--d-bad); }
-.dWearBar { display: block; height: 100%; width: 0; border-radius: 1em; background: var(--d-ok); }
-.dWearBar.regular { background: var(--d-warn); }
-.dWearBar.mal { background: var(--d-bad); }
+
+/* El ancho de la tarjeta del camion, medido en em, sale de la proporcion
+   de la pantalla y no de sus pixeles: son cuatro columnas y la unidad es
+   3vh, asi que da unos 8 em por cada punto de proporcion. En 16:9 son
+   catorce em y los ocho marcos entran midiendo cada uno lo que dice; en
+   4:3 son once y no entran: ahi van en columnas iguales, de a dos, con el
+   nombre recortado, que es el unico modo de que las ocho piezas entren en
+   el alto que hay. Esa banda -de 5/4 a 8/5- es la unica que recorta:
+   monitores, telefonos apaisados y todo lo vertical muestran el nombre
+   entero.
+   Va al final del archivo a proposito: pisa la regla general, que en el
+   orden del documento viene despues. */
+@media (min-width: 52rem) and (min-aspect-ratio: 5/4) and (max-aspect-ratio: 8/5) {
+  .dWearRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.2em, 1fr)); }
+}
