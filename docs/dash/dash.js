@@ -237,11 +237,18 @@ function createDashPanel({ root, money, imperial, lang }) {
   }
   // "9 h 33 min" para lo largo, "33 min" para lo corto. Sin segundos: en un
   // tablero que se mira de reojo son ruido.
+  //
+  // Las abreviaturas salen del idioma: la duracion entro al titular de las
+  // tarjetas ("Llegada 3 h 00 min tarde") y un "h" ingles en medio de una
+  // frase en ruso o en turco canta. Van abreviadas y no completas porque
+  // comparten renglon con el resto de la afirmacion.
   function dur(segundos) {
     if (segundos == null || !isFinite(segundos) || segundos < 0) return null;
     const total = Math.round(segundos / 60);
     const h = Math.floor(total / 60), m = total % 60;
-    return h >= 1 ? h + ' h ' + String(m).padStart(2, '0') + ' min' : m + ' min';
+    return h >= 1
+      ? h + ' ' + t('hourShort') + ' ' + String(m).padStart(2, '0') + ' ' + t('minShort')
+      : m + ' ' + t('minShort');
   }
   function hm(segundos) {
     if (segundos == null || !isFinite(segundos) || segundos < 0) return null;

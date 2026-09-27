@@ -46,11 +46,15 @@
 .dRail { position: absolute; top: 0.4em; left: 0; right: 0; height: 0.3em; background: var(--d-line); border-radius: 1em; }
 .dDone { position: absolute; top: 0.4em; left: 0; width: 0; height: 0.3em; background: var(--d-accent); border-radius: 1em; transition: width 0.4s linear; }
 /* Franja y no punto: no sabemos en que kilometro exacto vas a parar, y un
-   punto prometeria una precision que no tenemos. */
-.dBand { position: absolute; top: 0.28em; height: 0.55em; border-radius: 1em; opacity: 0.4; }
+   punto prometeria una precision que no tenemos.
+   Una arriba del riel y la otra abajo, en carriles propios: cuando las dos
+   paradas caen cerca se superponian y la de abajo tapaba a la de arriba,
+   que es justo cuando hay que ver que son dos cosas distintas. Separadas
+   no necesitan transparencia para dejar ver el riel, asi que se ven mejor. */
+.dBand { position: absolute; height: 0.22em; border-radius: 1em; opacity: 0.85; }
 .dBand[hidden] { display: none; }
-.dBand-rest { background: var(--d-warn); }
-.dBand-fuel { background: var(--d-ok); }
+.dBand-rest { top: 0.08em; background: var(--d-warn); }
+.dBand-fuel { top: 0.8em; background: var(--d-ok); }
 .dTruck {
   position: absolute; top: 0.05em; width: 1em; height: 1em; border-radius: 50%;
   background: var(--d-accent); border: 0.18em solid var(--d-panel);
@@ -104,10 +108,20 @@
    nada; una tablet vertical de 1024x1366 es mas ancha en rem y ahi cuatro
    columnas desperdiciarian todo el alto. */
 @media (min-width: 52rem) and (min-aspect-ratio: 5/4) {
+  /* Aca el alto es lo que aprieta: una sola fila de tarjetas, la cinta
+     arriba y la franja abajo. Por eso la unidad sale del alto de la
+     pantalla y no del ancho, que sobra. Con la formula comun un monitor de
+     1080 se quedaba en el tope de 19 px y el tablero ocupaba un tercio de
+     la pantalla, con las tarjetas vacias por dentro. */
+  .dashRoot { --d-unit: calc(clamp(13.5px, 3vh, 40px) * var(--d-scale)); }
   .dGrid {
     grid-template-columns: 1.15fr repeat(3, minmax(0, 1fr));
     grid-template-areas: "drive eta fuel truck" "strip strip strip strip";
-    grid-template-rows: 1fr auto;
+    /* Las tarjetas miden lo que mide lo que dicen. Estirarlas dejaba el
+       texto arriba y un pozo negro abajo dentro de cada una; el hueco que
+       sobra va una sola vez, entre las tarjetas y la franja. */
+    grid-template-rows: auto auto;
+    align-content: space-between;
   }
   .dEndCityBig { font-size: 2em; }
 }
@@ -119,7 +133,10 @@
 }
 
 /* --- conduccion --- */
-.dSpeedRow { display: flex; align-items: center; gap: 0.6em; }
+/* Se permite que la marcha caiga abajo: con el tablero grande en una
+   ventana angosta, velocidad + limite + marcha no entran en un renglon
+   y antes el bloque de la marcha se salia de la tarjeta. */
+.dSpeedRow { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; }
 .dSpeed { font-size: 3.1em; font-weight: 600; line-height: 0.95; font-variant-numeric: tabular-nums; }
 .dSpeedUnit { font-size: 0.68em; color: var(--d-muted); }
 .dLimit {
@@ -193,10 +210,15 @@
 .dVerdict.mal { color: var(--d-warn); }
 
 /* --- medidores --- */
-.dGauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35em; margin-top: 0.2em; }
+/* Tres columnas si entran; si no, las que entren. Con "132 psi" en una
+   sola linea, tres columnas fijas cortaban el numero en las pantallas
+   mas chicas. */
+.dGauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.4em, 1fr)); gap: 0.35em; margin-top: 0.2em; }
 .dGauge { min-width: 0; }
 .dGauge[hidden] { display: none; }
-.dGaugeValue { font-size: 0.95em; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Numero y unidad no se separan: con el tablero grande "132 psi" partia
+   el renglon y quedaba el 132 arriba del psi. */
+.dGaugeValue { font-size: 0.95em; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dGaugeLabel { font-size: 0.64em; color: var(--d-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dGauge.alerta .dGaugeValue { color: var(--d-bad); }
 
