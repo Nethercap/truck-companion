@@ -115,40 +115,14 @@ function connect(code) {
   };
 }
 
-// --- demo: telemetria sintetica, sin mapa ni backend ---
+// --- demo: la misma telemetria sintetica que usa el mapa (pure.js) ---
 function startDemo() {
   conn.socket = 'open';
   conn.demo = true;
   gate.hidden = true;
-  let i = 0, restante = 169, combustible = 420, odo = 1498201, juego = 1440 + 700;
+  const demo = createDemoTelemetry();
   demoTimer = setInterval(() => {
-    i++;
-    const kmh = 79 + Math.sin(i / 9) * 6;
-    const paso = kmh * 19 / 3600;          // km por segundo real
-    restante = Math.max(0, restante - paso);
-    odo += paso;
-    combustible = Math.max(0, combustible - paso * 0.33);
-    juego += 19 / 60;
-    panel.update({
-      ts: Date.now() / 1000, game: 'ets2', paused: false, onJob: true,
-      citySrc: 'Stockholm', cityDst: 'Falun', companySrc: 'Norrsken', companyDst: 'Norrfood',
-      cargo: 'Apples', cargoMassKg: 20200, jobIncome: 19269, plannedDistanceKm: 255,
-      routeDistanceKm: restante, routeTimeSeconds: restante / kmh * 3600,
-      jobDeadlineSeconds: 5.9 * 3600, restStopMinutes: 573, gameTimeMinutes: juego,
-      speedKmh: kmh, speedLimitKmh: 80, cruiseControl: true, cruiseControlSpeedKmh: 81,
-      engineRpm: 1027 + Math.sin(i / 9) * 120, engineRpmMax: 2500, gear: 6,
-      truckBrand: 'Scania', truckName: 'S', odometerKm: odo,
-      fuel: combustible, fuelCapacity: 600, fuelRangeKm: 308, fuelAvgConsumption: 50.3,
-      wear: { engine: 0.004, transmission: 0.03, cabin: 0.12, chassis: 0.15, wheels: 0.51 },
-      trailerWear: { chassis: 0.004, wheels: 0.11, body: 0.0 }, cargoDamage: 0.003,
-      lights: { beamLow: true, beamHigh: false, parking: true, beacon: false, hazards: false,
-                blinkerLeft: i % 14 < 5, blinkerRight: false },
-      wipers: true, motorBrake: false, retarder: 0, retarderSteps: 3,
-      differentialLock: false, parkingBrake: false, liftAxle: false, trailerAttached: true,
-      airPressure: 139, oilPressure: 54, waterTemperature: 78, oilTemperature: 92,
-      brakeTemperature: 31, batteryVoltage: 27, adblue: 18, adblueCapacity: 80,
-      mechanicalWarnings: {}, event: {},
-    });
+    panel.update(demo.next());
     conn.hasTelemetry = true;
     renderStatus();
   }, 1000);

@@ -3257,6 +3257,15 @@ function updateHud(data) {
   document.getElementById('cityDst').textContent = data.cityDst || '?';
   const truckLabel = [data.truckBrand, data.truckName].filter(Boolean).join(' ');
   document.getElementById('truck').textContent = truckLabel || '-';
+  // Odometro: es el numero que el juego muestra en el tablero y el unico
+  // que dice cuanto lleva encima ese camion.
+  const odoRow = document.getElementById('odometerRow');
+  odoRow.hidden = data.odometerKm == null;
+  if (data.odometerKm != null) {
+    const odo = useImperial ? data.odometerKm * KM_TO_MI : data.odometerKm;
+    document.getElementById('odometer').textContent =
+      Math.round(odo).toLocaleString(currentLang) + (useImperial ? ' mi' : ' km');
+  }
   if (data.cargo) {
     const cargoWeightText = data.cargoMassKg ? ` (${(data.cargoMassKg / 1000).toFixed(1)} TN)` : '';
     document.getElementById('cargo').textContent = `${data.cargo}${cargoWeightText}`;
@@ -4352,13 +4361,10 @@ if (!localStorage.getItem('truckdash_tour_seen')) {
 // indicaciones funcionando sin bajar nada. Usa el mismo camino que la
 // telemetria real (handleTelemetry) - lo unico falso es el origen del payload.
 // ---------------------------------------------------------------------------
-const DEMO_ROUTE = { game: 'ats', from: 'Salt Lake City', to: 'Las Vegas', cargo: 'Bulldozer', cargoMassKg: 18189, truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158 };
-const DEMO_SPEED_MS = 26; // ~94 km/h
-const DEMO_TIME_SCALE = 6; // 6x mas rapido que en tiempo real, para que pasen cosas
+// DEMO_ROUTE y el generador de telemetria viven en pure.js: el panel de
+// docs/dash/ usa exactamente los mismos datos, asi que alternar entre mapa
+// y tablero muestra el mismo viaje.
 const DEMO_TICK_MS = 250; // misma tasa que el cliente 1.5+ por el relay (4 Hz)
-// El mapa del juego esta a escala ~1:20: el juego muestra distancias/ETA
-// multiplicadas, y la telemetria real tambien (routeDistance viene ya
-// escalado). La demo hace lo mismo para que los numeros se vean normales.
 const DEMO_DISTANCE_SCALE = 20;
 let demoTimer = null;
 
@@ -4384,11 +4390,6 @@ function runDemo() {
   const path = findRoute([a.X, a.Y], [b.X, b.Y]);
   if (!path || path.length < 2) { showToast('Demo route unavailable', 'danger'); return; }
   const total = sumPathDistanceMeters(path);
-  let travelled = 0;
-  let fuel = 0.82;
-  let odometer = 184220;
-  let tick = 0;
-  const speedNoise = () => DEMO_SPEED_MS * 3.6 + Math.sin(tick / 28) * 4;
 
   const pointAt = (dist) => {
     let acc = 0;
@@ -4403,55 +4404,18 @@ function runDemo() {
     return path[path.length - 1];
   };
 
+  // El largo real de la ruta calculada, a la escala del juego: asi la demo
+  // del panel y la del mapa dicen los mismos kilometros.
+  const demo = createDemoTelemetry({
+    tickMs: DEMO_TICK_MS,
+    totalKm: (total / 1000) * DEMO_DISTANCE_SCALE,
+  });
+
   const step = () => {
-    tick++;
-    travelled += DEMO_SPEED_MS * DEMO_TIME_SCALE * (DEMO_TICK_MS / 1000);
-    if (travelled >= total) travelled = 0; // vuelve a empezar
-    const [x, z] = pointAt(travelled);
-    const remainingKm = ((total - travelled) / 1000) * DEMO_DISTANCE_SCALE;
-    fuel = Math.max(0.05, fuel - 0.00012 * DEMO_TIME_SCALE * (DEMO_TICK_MS / 1000));
-    odometer += (DEMO_SPEED_MS * DEMO_TIME_SCALE * DEMO_DISTANCE_SCALE * (DEMO_TICK_MS / 1000)) / 1000;
-    const speedKmh = speedNoise();
-    handleTelemetry({
-      ts: Date.now() / 1000,
-      clientVersion: '9.9.9',
-      paused: false,
-      game: DEMO_ROUTE.game,
-      position: { x, y: 0, z },
-      speedKmh,
-      speedLimitKmh: Math.floor(tick / 160) % 3 === 0 ? 88.5 : 104.6,
-      cargo: DEMO_ROUTE.cargo,
-      cargoMassKg: DEMO_ROUTE.cargoMassKg,
-      citySrc: DEMO_ROUTE.from,
-      cityDst: DEMO_ROUTE.to,
-      onJob: true,
-      isCargoLoaded: true,
-      routeDistanceKm: remainingKm,
-      routeTimeSeconds: (remainingKm * 1000) / DEMO_SPEED_MS,
-      gameTimeMinutes: Math.floor((Date.now() / 1000) * DEMO_DISTANCE_SCALE / 60),
-      restStopMinutes: 6 * 60 + 40,
-      jobDeadlineSeconds: 3600 * 9,
-      truckBrand: DEMO_ROUTE.truckBrand,
-      truckName: DEMO_ROUTE.truckName,
-      odometerKm: odometer,
-      fuel: fuel * 600,
-      fuelCapacity: 600,
-      fuelRangeKm: fuel * 600 / 0.38,
-      wear: { engine: 0.03, transmission: 0.02, cabin: 0.06, chassis: 0.04, wheels: 0.11 },
-      jobIncome: DEMO_ROUTE.jobIncome,
-      fuelAvgConsumption: 38,
-      cruiseControl: true,
-      cruiseControlSpeedKmh: 94,
-      lights: { beamLow: true },
-      engineRpm: 1250 + Math.sin(tick / 20) * 120,
-      engineRpmMax: 2500,
-      gear: 12,
-      engineEnabled: true,
-      parkingBrake: false,
-      trailerAttached: true,
-      mechanicalWarnings: {},
-      event: {},
-    });
+    const data = demo.next();
+    const [x, z] = pointAt(demo.progress() * total);
+    data.position = { x, y: 0, z };
+    handleTelemetry(data);
   };
   step();
   demoTimer = setInterval(step, DEMO_TICK_MS);

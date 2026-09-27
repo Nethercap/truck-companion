@@ -67,6 +67,34 @@ def main():
             )
         )
 
+        # Campos nuevos del panel. Se imprimen con la unidad que asumimos al
+        # reenviarlos (psi para las presiones, Celsius para las
+        # temperaturas, litros para el AdBlue): eso viene del encabezado del
+        # plugin, no de haberlo visto. Si aca sale 9.6 donde esperamos 139,
+        # el plugin da bar y el panel estaria mostrando un numero
+        # equivocado con toda confianza.
+        remolques = [t for t in (data.get("trailer") or []) if t.get("attached")]
+        print(
+            "    aceite={oilp} psi aire={airp} psi frenos={brakes} C "
+            "adblue={adblue} l de {adbluemax} retarder={ret}/{rets} "
+            "frenoMotor={mb} luces(pos/freno/atras)={lp}/{lb}/{lr} "
+            "remolque={rem} danoCarga={dano}".format(
+                oilp=data.get("oilPressure"),
+                airp=data.get("airPressure"),
+                brakes=data.get("brakeTemperature"),
+                adblue=data.get("adblue"),
+                adbluemax=data.get("adblueCapacity"),
+                ret=data.get("retarderBrake"),
+                rets=data.get("retarderStepCount"),
+                mb=data.get("motorBrake"),
+                lp=data.get("lightsParking"),
+                lb=data.get("lightsBrake"),
+                lr=data.get("lightsReverse"),
+                rem=[(t.get("wearChassis"), t.get("wearWheels"), t.get("wearBody")) for t in remolques],
+                dano=[t.get("cargoDamage") for t in remolques],
+            )
+        )
+
         time.sleep(1)
 
 

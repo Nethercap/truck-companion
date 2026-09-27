@@ -3,6 +3,7 @@
 // Se cargan antes que app.js y se mezclan en TRANSLATIONS al arrancar.
 const TRANSLATIONS_EXTRA = {
   de: {
+    odometer: 'Kilometerstand',
     dashSecondDeviceTitle: 'Armaturenbrett auf einem anderen Gerät:',
     dashCopyLink: 'Link zum Armaturenbrett kopieren',
     // --- panel de tablero (docs/dash/)
@@ -461,6 +462,7 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Noch keinen Client? Lade ihn von trucksim-dash.com, starte ihn, und er zeigt dir einen Pairing-Code.',
   },
   fr: {
+    odometer: 'Compteur',
     dashSecondDeviceTitle: 'Tableau de bord sur un autre appareil :',
     dashCopyLink: 'Copier le lien du tableau de bord',
     // --- panel de tablero (docs/dash/)
@@ -919,6 +921,7 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Pas encore le client ? Télécharge-le sur trucksim-dash.com, lance-le, et il t\'affichera un code d\'appairage.',
   },
   pt: {
+    odometer: 'Hodômetro',
     dashSecondDeviceTitle: 'Painel em outro aparelho:',
     dashCopyLink: 'Copiar o link do painel',
     // --- panel de tablero (docs/dash/)
@@ -1377,6 +1380,7 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Ainda não tem o cliente? Baixe em trucksim-dash.com, abra, e ele mostra um código de pareamento.',
   },
   pl: {
+    odometer: 'Licznik',
     dashSecondDeviceTitle: 'Deska rozdzielcza na innym urządzeniu:',
     dashCopyLink: 'Skopiuj link do deski rozdzielczej',
     // --- panel de tablero (docs/dash/)
@@ -1835,6 +1839,7 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'Nie masz jeszcze klienta? Pobierz go z trucksim-dash.com, uruchom, a pokaże ci kod parowania.',
   },
   tr: {
+    odometer: 'Kilometre sayacı',
     dashSecondDeviceTitle: 'Başka bir cihazda gösterge paneli:',
     dashCopyLink: 'Panel bağlantısını kopyala',
     // --- panel de tablero (docs/dash/)
@@ -2293,6 +2298,7 @@ const TRANSLATIONS_EXTRA = {
     tourDownload: 'İstemcin yok mu? trucksim-dash.com\'dan indir, çalıştır, sana bir eşleştirme kodu gösterecek.',
   },
   ru: {
+    odometer: 'Одометр',
     dashSecondDeviceTitle: 'Панель приборов на другом устройстве:',
     dashCopyLink: 'Скопировать ссылку на панель',
     // --- panel de tablero (docs/dash/)

@@ -27,7 +27,7 @@
 /* --- franja de ruta --- */
 .dRoute {
   border: 2px solid var(--d-accent);
-  border-radius: 0.6em;
+  border-radius: 3px;
   padding: 0.5em 0.8em;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -66,7 +66,7 @@
 }
 .dCard {
   background: var(--d-panel);
-  border-radius: 0.6em;
+  border-radius: 3px;
   padding: 0.6em 0.75em;
   display: flex;
   flex-direction: column;
@@ -77,7 +77,7 @@
 .dCardTitle { font-size: 0.7em; color: var(--d-muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .dReset {
   background: none; border: 1px solid var(--d-line); color: var(--d-muted);
-  border-radius: 0.4em; font-size: 0.68em; padding: 0.15em 0.6em; cursor: pointer;
+  border-radius: 2px; font-size: 0.68em; padding: 0.15em 0.6em; cursor: pointer;
 }
 .dReset:hover { color: #eee; border-color: var(--d-muted); }
 
@@ -136,7 +136,7 @@
 
 .dIndicators { display: flex; flex-wrap: wrap; gap: 0.3em; }
 .dInd {
-  width: 1.9em; height: 1.9em; border-radius: 0.35em;
+  width: 1.9em; height: 1.9em; border-radius: 2px;
   display: flex; align-items: center; justify-content: center;
   background: #10131700; border: 1px solid var(--d-line);
   color: #565d68;
@@ -161,7 +161,7 @@
   content: attr(data-level);
   position: absolute; bottom: -0.15em; right: -0.15em;
   font-size: 0.5em; background: var(--d-accent); color: #04223f;
-  border-radius: 0.5em; padding: 0 0.3em; font-weight: 700;
+  border-radius: 2px; padding: 0 0.3em; font-weight: 700;
 }
 
 /* --- filas etiqueta/valor --- */

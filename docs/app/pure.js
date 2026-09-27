@@ -488,6 +488,123 @@ function createSessionStats({ maxGapSeconds = 10, overLimitToleranceKmh = 2,
   };
 }
 
+// Viaje de la demo. Vive aca y no en app.js porque lo usan las dos vistas:
+// el mapa (que le agrega la posicion sobre la ruta) y el panel de
+// docs/dash/. Cuando estaban separados mostraban viajes distintos, y
+// alternar de una a otra parecia otro juego.
+const DEMO_ROUTE = {
+  game: 'ats', from: 'Salt Lake City', to: 'Las Vegas',
+  companyFrom: 'Charged Industries', companyTo: 'Sierra Nevada',
+  cargo: 'Bulldozer', cargoMassKg: 18189,
+  truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158,
+};
+
+// Telemetria sintetica, un tick por llamada a next(). Es un adelanto
+// rapido (timeScale), pero COHERENTE consigo mismo: los kilometros que
+// suma el odometro son los que se recorren a la velocidad que muestra el
+// velocimetro en el tiempo de juego que avanza el reloj, y el combustible
+// baja segun esos kilometros. Antes cada uno iba a su ritmo; nada los
+// cruzaba hasta que el panel empezo a calcular consumo y promedio, y le
+// salian 166 l/100km y 29 km/h.
+//
+// El mapa del juego esta a escala ~1:20 y la telemetria real ya viene
+// multiplicada, asi que la demo hace lo mismo (distanceScale) para que los
+// numeros se vean normales.
+function createDemoTelemetry(opts) {
+  const o = Object.assign({
+    tickMs: 250,          // misma tasa que el cliente por el relay (4 Hz)
+    timeScale: 6,         // 6x mas rapido que el tiempo real, para que pasen cosas
+    distanceScale: 20,
+    speedMs: 26,          // ~94 km/h
+    tankL: 600,
+    lPer100: 32,
+    totalKm: 680,         // largo del viaje; la app pasa el de su ruta real
+  }, opts || {});
+  let tick = 0, travelledKm = 0;
+  let odometer = 184220;
+  let fuelL = 0.82 * o.tankL;
+  let gameMinutes = 2 * 1440 + 21 * 60;  // miercoles 21:00 en el juego
+  return {
+    // Cuanto del viaje va hecho, 0..1: la app lo usa para ubicar el camion
+    // sobre su ruta.
+    progress() { return o.totalKm ? travelledKm / o.totalKm : 0; },
+    next() {
+      tick++;
+      const dtSec = o.tickMs / 1000;
+      const speedKmh = o.speedMs * 3.6 + Math.sin(tick / 28) * 4;
+      const kmTick = o.speedMs * o.timeScale * o.distanceScale * dtSec / 1000;
+      travelledKm += kmTick;
+      if (travelledKm >= o.totalKm) travelledKm = 0;  // vuelve a empezar
+      odometer += kmTick;
+      gameMinutes += kmTick / speedKmh * 60;
+      fuelL -= kmTick * o.lPer100 / 100;
+      // Con el tanque vacio la demo dejaria de gastar y el consumo medido
+      // se iria cayendo solo. Carga sola, como haria cualquiera.
+      if (fuelL < o.tankL * 0.08) fuelL = o.tankL;
+      const remainingKm = Math.max(0, o.totalKm - travelledKm);
+      // Un tablero con una sola luz prendida no muestra nada: los guinos,
+      // el limpiaparabrisas y el retarder van y vienen.
+      const ciclo = tick % 240;
+      return {
+        ts: Date.now() / 1000,
+        clientVersion: '9.9.9',
+        paused: false,
+        game: DEMO_ROUTE.game,
+        speedKmh,
+        speedLimitKmh: Math.floor(tick / 160) % 3 === 0 ? 88.5 : 104.6,
+        cargo: DEMO_ROUTE.cargo,
+        cargoMassKg: DEMO_ROUTE.cargoMassKg,
+        citySrc: DEMO_ROUTE.from,
+        cityDst: DEMO_ROUTE.to,
+        companySrc: DEMO_ROUTE.companyFrom,
+        companyDst: DEMO_ROUTE.companyTo,
+        onJob: true,
+        isCargoLoaded: true,
+        plannedDistanceKm: o.totalKm,
+        routeDistanceKm: remainingKm,
+        routeTimeSeconds: remainingKm / speedKmh * 3600,
+        gameTimeMinutes: gameMinutes,
+        restStopMinutes: 6 * 60 + 40,
+        jobDeadlineSeconds: 3600 * 9,
+        truckBrand: DEMO_ROUTE.truckBrand,
+        truckName: DEMO_ROUTE.truckName,
+        odometerKm: odometer,
+        fuel: fuelL,
+        fuelCapacity: o.tankL,
+        fuelRangeKm: fuelL / o.lPer100 * 100,
+        fuelAvgConsumption: o.lPer100,
+        adblue: 46, adblueCapacity: 80,
+        wear: { engine: 0.03, transmission: 0.02, cabin: 0.06, chassis: 0.04, wheels: 0.11 },
+        trailerWear: { chassis: 0.08, wheels: 0.14, body: 0.01 },
+        cargoDamage: 0.004,
+        jobIncome: DEMO_ROUTE.jobIncome,
+        cruiseControl: true,
+        cruiseControlSpeedKmh: 94,
+        lights: {
+          beamLow: true, beamHigh: false, parking: true, beacon: false, hazards: false,
+          blinkerLeft: ciclo < 40, blinkerRight: ciclo >= 120 && ciclo < 160,
+        },
+        wipers: ciclo >= 60 && ciclo < 180,
+        motorBrake: ciclo >= 200,
+        retarder: ciclo >= 200 ? 2 : 0, retarderSteps: 3,
+        differentialLock: false,
+        liftAxle: false,
+        engineRpm: 1250 + Math.sin(tick / 20) * 120,
+        engineRpmMax: 2500,
+        gear: 12,
+        engineEnabled: true,
+        parkingBrake: false,
+        trailerAttached: true,
+        airPressure: 132, oilPressure: 51, batteryVoltage: 27.4,
+        waterTemperature: 81, oilTemperature: 94, brakeTemperature: 38,
+        mechanicalWarnings: {},
+        event: {},
+      };
+    },
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats };
+  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+    createDemoTelemetry, DEMO_ROUTE };
 }

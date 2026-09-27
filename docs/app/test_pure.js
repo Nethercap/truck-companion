@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
-  createSessionStats } = require('./pure.js');
+  createSessionStats, createDemoTelemetry } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -452,4 +452,23 @@ test('sessionStats: una reconexion larga no regala kilometros', () => {
   assert.ok(s.state().kmDriven < 1, String(s.state().kmDriven));
   // Y el tiempo al volante suma como mucho el hueco maximo, no media hora.
   assert.ok(s.state().wheelSeconds <= 10, String(s.state().wheelSeconds));
+});
+
+test('demo: los kilometros, el reloj del juego y el consumo cierran entre si', () => {
+  // El bug que encontro el panel: el odometro avanzaba a un ritmo, el
+  // reloj del juego a otro y el combustible a un tercero. Nada los cruzaba,
+  // asi que la demo mostraba 166 l/100km y 29 km/h de promedio.
+  const demo = createDemoTelemetry({ totalKm: 5000 });
+  const stats = createSessionStats();
+  let t = 1000;
+  for (let i = 0; i < 2000; i++) {
+    const data = demo.next();
+    data.ts = t; t += 0.25;
+    stats.push(data);
+  }
+  const st = stats.state();
+  // La velocidad promedio tiene que dar la del velocimetro (~94 km/h)...
+  assert.ok(Math.abs(st.avgSpeedKmh - 94) < 3, 'promedio: ' + st.avgSpeedKmh);
+  // ...y el consumo, el configurado.
+  assert.ok(Math.abs(st.fuelPer100Km - 32) < 1, 'consumo: ' + st.fuelPer100Km);
 });

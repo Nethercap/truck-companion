@@ -9,6 +9,7 @@
 
 const TRANSLATIONS = {
   en: {
+    odometer: 'Odometer',
     dashSecondDeviceTitle: 'Dashboard on another device:',
     dashCopyLink: 'Copy the panel link',
     // --- panel de tablero (docs/dash/). Las etiquetas que el panel comparte
@@ -397,6 +398,7 @@ const TRANSLATIONS = {
     mapLoadingTiles: 'Loading map: tiles…',
   },
   es: {
+    odometer: 'Odómetro',
     dashSecondDeviceTitle: 'Tablero en otro dispositivo:',
     dashCopyLink: 'Copiar el link del panel',
     // --- panel de tablero (docs/dash/)
