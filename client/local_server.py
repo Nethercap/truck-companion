@@ -45,6 +45,9 @@ WEB_FILES = [
     # convoy y sin mapa en vivo. Justo lo que el modo LAN promete resolver.
     "app/variants.js", "app/convoy.js", "app/livemap.js",
     "app/assets/logo.svg", "app/assets/icon-192.png", "app/assets/icon-512.png",
+    # El mapa. Antes venian de jsDelivr y en LAN sin internet no habia mapa.
+    "app/vendor/maplibre-gl-4.7.1.js", "app/vendor/maplibre-gl-4.7.1.css",
+    "app/vendor/pmtiles-3.2.0.js", "app/vendor/proj4-2.15.0.js",
     # El panel de tablero: la app lo muestra a pantalla completa y
     # ademas se sirve solo en /dash/ para un segundo dispositivo.
     "dash/index.html", "dash/dash.js", "dash/dash.css", "dash/page.js",
@@ -56,6 +59,7 @@ def cache_dir() -> str:
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     path = os.path.join(base, "TruckDash", "webcache")
     os.makedirs(os.path.join(path, "app", "assets"), exist_ok=True)
+    os.makedirs(os.path.join(path, "app", "vendor"), exist_ok=True)
     os.makedirs(os.path.join(path, "dash"), exist_ok=True)
     return path
 
@@ -75,10 +79,16 @@ def refresh_web_cache() -> bool:
     target = cache_dir()
     ok = 0
     for rel in WEB_FILES:
+        local = os.path.join(target, rel.replace("/", os.sep))
+        # Las librerias llevan la version en el nombre y no cambian nunca:
+        # no hace falta volver a bajar un mega en cada arranque.
+        if rel.startswith("app/vendor/") and os.path.exists(local):
+            ok += 1
+            continue
         try:
             with urlopen(f"{WEB_ORIGIN}/{rel}", timeout=15) as resp:
                 data = resp.read()
-            with open(os.path.join(target, rel.replace("/", os.sep)), "wb") as f:
+            with open(local, "wb") as f:
                 f.write(data)
             ok += 1
         except Exception as exc:

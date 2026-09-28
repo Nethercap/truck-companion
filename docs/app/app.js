@@ -4375,8 +4375,12 @@ function startDemo() {
   document.getElementById('code').value = 'DEMO';
   renderConnectionUi();
   loadGameMap(DEMO_ROUTE.game);
+  // Sin tope, si los datos del mapa no llegaban la demo esperaba para
+  // siempre sin decir nada.
+  const giveUpAt = Date.now() + 30000;
   const waitAssets = () => {
     if (!mapReady || !routeGraph || !citiesByName[DEMO_ROUTE.from] || !citiesByName[DEMO_ROUTE.to] || !truckMarker) {
+      if (Date.now() > giveUpAt) { showToast('Demo route unavailable', 'danger'); return; }
       demoTimer = setTimeout(waitAssets, 500);
       return;
     }
