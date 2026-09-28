@@ -151,3 +151,35 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
   color: var(--text); border-radius: 8px;
 }
 #deviceInput:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* --- viajes -------------------------------------------------------------
+   Las tarjetas de arriba son formularios; esta es una lista larga, asi que
+   las filas se separan con una linea y no con aire. */
+.totals { display: flex; flex-wrap: wrap; gap: 1.2rem; margin-bottom: 1rem; }
+/* hidden pierde contra un display propio, asi que hay que decirlo. */
+.totals[hidden], .btn[hidden] { display: none; }
+.totals .tot b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.totals .tot span { font-size: 0.75rem; color: var(--muted); }
+
+.trips { list-style: none; margin: 0; padding: 0; }
+.trips li { padding: 0.7rem 0; border-bottom: 1px solid var(--line); }
+.trips li:last-child { border-bottom: none; }
+.trips .route { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-weight: 600; }
+.trips .sub { font-size: 0.85rem; color: var(--muted); margin-top: 0.15rem; }
+.trips .foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.trips .tag { color: var(--muted); border-color: var(--line); }
+.trips .tag.open { color: var(--accent); border-color: var(--accent); }
+.trips .tag.ontime { color: var(--ok); border-color: var(--ok); }
+.trips .tag.late { color: var(--warn); border-color: var(--warn); }
+#tripsEmpty { margin: 0; }
+#btnMoreTrips { margin-top: 0.8rem; }
+
+/* Borrar un viaje no es la accion principal de la fila: boton de texto y no
+   uno de los grandes, que son para lo que la persona vino a hacer. */
+.linkish {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--muted); font: inherit; font-size: 0.85rem; text-decoration: underline;
+}
+.linkish:hover { color: var(--text); }
+.linkish.armado { color: var(--danger); }
+.linkish:disabled { opacity: 0.5; cursor: default; }

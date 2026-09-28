@@ -48,6 +48,27 @@
   // mismo archivo que usa la app, para no tener dos lugares con traducciones.
   const TRANSLATIONS = {
     en: {
+      tripsTitle: 'Your trips',
+      tripsEmpty: 'Nothing here yet. Link this PC to Truck Dash and your trips will show up on their own as you drive.',
+      tripsEmptyDriven: 'No trips saved yet. Driving without a job counts in your totals, but it is not a trip.',
+      tripsMore: 'Show more',
+      tripUnnamed: 'Trip',
+      tripOpen: 'driving now',
+      tripOnTime: 'on time',
+      tripLate: 'late',
+      tripCancelled: 'cancelled',
+      tripAbandoned: 'unfinished',
+      tripModded: 'modded economy',
+      tripTracked: (d) => 'we tracked ' + d,
+      tripWheel: (h) => h + ' at the wheel',
+      tripTop: (v) => 'top ' + v,
+      tripFuel: 'Fuel',
+      tripTolls: 'Tolls',
+      tripFines: 'Fines',
+      tripFerries: 'Ferries',
+      tripDamage: 'Damage',
+      tripRemove: 'Remove',
+      tripRemoveSure: 'Remove for good?',
       loading: 'Loading...',
       offline: "Can't reach the account service right now. Try again in a minute.",
       signInTitle: 'Sign in',
@@ -127,6 +148,27 @@
       error: 'Something went wrong. Try again.'
     },
     es: {
+      tripsTitle: 'Tus viajes',
+      tripsEmpty: 'Todavia no hay nada. Vincula esta PC a Truck Dash y tus viajes van a ir apareciendo solos mientras manejas.',
+      tripsEmptyDriven: 'Todavia no hay viajes guardados. Manejar sin carga suma a tus totales, pero no es un viaje.',
+      tripsMore: 'Ver mas',
+      tripUnnamed: 'Viaje',
+      tripOpen: 'manejando ahora',
+      tripOnTime: 'a tiempo',
+      tripLate: 'tarde',
+      tripCancelled: 'cancelado',
+      tripAbandoned: 'sin terminar',
+      tripModded: 'economia modeada',
+      tripTracked: (d) => 'rastreamos ' + d,
+      tripWheel: (h) => h + ' al volante',
+      tripTop: (v) => 'maxima ' + v,
+      tripFuel: 'Combustible',
+      tripTolls: 'Peajes',
+      tripFines: 'Multas',
+      tripFerries: 'Ferries',
+      tripDamage: 'Daño',
+      tripRemove: 'Borrar',
+      tripRemoveSure: '¿Borrar para siempre?',
       loading: 'Cargando...',
       offline: 'No se puede contactar al servicio de cuentas. Proba de nuevo en un minuto.',
       signInTitle: 'Entrar',
@@ -458,6 +500,7 @@
     $('publicToggle').checked = !!usuario.is_public;
     pintarLogins();
     pintarSesiones();
+    mostrarViajes();
     mostrarConfirmacionDeBorrado(false);
     mostrarVista('viewAccount');
   }
@@ -477,6 +520,7 @@
   async function cerrarSesion() {
     await pedir('/auth/logout', { method: 'POST' });
     usuario = null;
+    olvidarViajes();
     mostrarVista('viewSignIn');
   }
 
@@ -485,6 +529,7 @@
     if (!ok) { avisar(t(datos.error || 'error'), 'bad'); return; }
     avisar(t('signedOutAll', datos.cerradas || 0), 'ok');
     usuario = null;
+    olvidarViajes();
     mostrarVista('viewSignIn');
   }
 
@@ -636,6 +681,243 @@
     });
   }
 
+  // ------------------------------------------------------------- viajes
+  // Los totales salen de /sessions/totals y NO de sumar los viajes: los
+  // kilometros de un viaje tambien son kilometros de sesion, asi que sumar
+  // las dos tablas los cuenta dos veces. El backend tiene esa ruta
+  // justamente para que esa cuenta se haga en un solo lugar.
+  const VIAJES_POR_PAGINA = 10;
+  let viajes = [];      // lo ya traido, para repintar sin volver a pedir
+  let totales = [];
+  let hayMasViajes = false;
+  let viajesPedidos = false;
+
+  // Las unidades son las que eligio en la app: mismo dominio, misma clave,
+  // misma preferencia. Aca no hay donde cambiarlas a proposito, para no
+  // terminar con dos interruptores que dicen cosas distintas.
+  function imperial() {
+    try {
+      const cfg = JSON.parse(localStorage.getItem('truckdash_settings')) || {};
+      return !!cfg.useImperial;
+    } catch (e) { return false; }
+  }
+
+  function numero(valor, decimales) {
+    return valor.toLocaleString(idioma, { maximumFractionDigits: decimales || 0 });
+  }
+  function distancia(km) {
+    if (km == null) return null;
+    return imperial() ? numero(km * 0.621371) + ' mi' : numero(km) + ' km';
+  }
+  function velocidad(kmh) {
+    if (kmh == null) return null;
+    return imperial() ? numero(kmh * 0.621371) + ' mph' : numero(kmh) + ' km/h';
+  }
+  function volumen(litros) {
+    if (litros == null) return null;
+    return imperial() ? numero(litros * 0.264172) + ' gal' : numero(litros) + ' L';
+  }
+  function masa(kg) {
+    if (kg == null) return null;
+    return imperial() ? numero(kg * 2.20462) + ' lb' : numero(kg / 1000, 1) + ' t';
+  }
+  function duracion(horas) {
+    if (horas == null) return null;
+    const min = Math.round(horas * 60);
+    if (min < 60) return min + ' min';
+    return Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0');
+  }
+  function plata(monto, moneda) {
+    // Sin convertir: el dinero del juego es del juego, y dos economias no se
+    // comparan aunque las dos digan "EUR".
+    if (monto == null) return null;
+    return numero(monto) + (moneda ? ' ' + moneda : '');
+  }
+
+  function linea(partes) {
+    const div = document.createElement('div');
+    div.className = 'sub';
+    div.textContent = partes.filter(Boolean).join(' \u00b7 ');
+    return div;
+  }
+
+  function etiqueta(clase, texto) {
+    const span = document.createElement('span');
+    span.className = 'tag ' + clase;
+    span.textContent = texto;
+    return span;
+  }
+
+  function pintarTotales() {
+    const caja = $('tripTotals');
+    caja.innerHTML = '';
+    // Por juego y nunca sumados entre si: mezclar ETS2 con ATS no le dice
+    // nada a nadie.
+    totales.forEach((tot) => {
+      const item = document.createElement('div');
+      item.className = 'tot';
+      const grande = document.createElement('b');
+      grande.textContent = distancia(tot.distance_km) || '-';
+      const chico = document.createElement('span');
+      chico.textContent = [
+        (tot.game || '').toUpperCase(),
+        t('tripWheel', duracion(tot.real_hours) || '0 min'),
+        tot.max_speed ? t('tripTop', velocidad(tot.max_speed)) : null
+      ].filter(Boolean).join(' \u00b7 ');
+      item.appendChild(grande);
+      item.appendChild(chico);
+      caja.appendChild(item);
+    });
+    caja.hidden = totales.length === 0;
+    pintarVacio();
+  }
+
+  function botonBorrar(viaje) {
+    // Dos pasos y no un confirm() del navegador: un viaje lleva por donde
+    // pasaste y a que hora, asi que poder sacar uno solo es parte de que los
+    // datos sean tuyos, pero no con un click distraido.
+    const boton = document.createElement('button');
+    boton.className = 'linkish';
+    boton.textContent = t('tripRemove');
+    let armado = false;
+    const desarmar = () => {
+      armado = false;
+      boton.textContent = t('tripRemove');
+      boton.classList.remove('armado');
+    };
+    boton.addEventListener('click', async () => {
+      if (!armado) {
+        armado = true;
+        boton.textContent = t('tripRemoveSure');
+        boton.classList.add('armado');
+        setTimeout(() => { if (armado) desarmar(); }, 5000);
+        return;
+      }
+      boton.disabled = true;
+      const { ok, status, datos } = await pedir('/trips/' + viaje.id, { method: 'DELETE' });
+      // Un 404 es que ya no estaba: el resultado que se pidio, no un error.
+      if (!ok && status !== 404) {
+        boton.disabled = false;
+        desarmar();
+        avisar(t(datos.error || 'error'), 'bad');
+        return;
+      }
+      viajes = viajes.filter((v) => v.id !== viaje.id);
+      pintarViajes();
+      avisar(t('savedOk'), 'ok');
+    });
+    return boton;
+  }
+
+  function filaViaje(v) {
+    const li = document.createElement('li');
+
+    const ruta = document.createElement('div');
+    ruta.className = 'route';
+    ruta.textContent = [v.city_src, v.city_dst].filter(Boolean).join(' \u2192 ') || t('tripUnnamed');
+    if (v.status === 'in_progress') ruta.appendChild(etiqueta('open', t('tripOpen')));
+    else if (v.status === 'cancelled') ruta.appendChild(etiqueta('late', t('tripCancelled')));
+    else if (v.status === 'abandoned') ruta.appendChild(etiqueta('', t('tripAbandoned')));
+    else if (v.on_time === true) ruta.appendChild(etiqueta('ontime', t('tripOnTime')));
+    else if (v.on_time === false) ruta.appendChild(etiqueta('late', t('tripLate')));
+    // La economia modeada se muestra y no se esconde: un viaje de 900 000
+    // euros con un mod de dinero no es comparable con el resto.
+    if (v.modded) ruta.appendChild(etiqueta('', t('tripModded')));
+    li.appendChild(ruta);
+
+    const principal = [];
+    if (v.cargo) principal.push(v.cargo);
+    if (v.cargo_mass) principal.push(masa(v.cargo_mass));
+    // Las tres distancias son distintas a proposito: la del juego es la del
+    // viaje, la nuestra es cuanto vimos. Solo se aclara cuando difieren de
+    // verdad (manejo un rato con el cliente cerrado), para no llenar de
+    // parentesis los viajes normales.
+    const delJuego = v.distance_game_km, nuestra = v.distance_tracked_km;
+    if (delJuego) {
+      principal.push(distancia(delJuego));
+      if (nuestra && Math.abs(nuestra - delJuego) / delJuego > 0.1) {
+        principal.push(t('tripTracked', distancia(nuestra)));
+      }
+    } else if (nuestra) {
+      principal.push(t('tripTracked', distancia(nuestra)));
+    }
+    if (v.real_hours) principal.push(duracion(v.real_hours));
+    if (v.revenue) principal.push(plata(v.revenue, v.currency));
+    li.appendChild(linea(principal));
+
+    // Lo que el viaje costo aparte del sueldo. Si no se muestra nunca, nadie
+    // se entera de que un dia deja de llegar.
+    const extra = [];
+    if (v.fuel_used) extra.push(t('tripFuel') + ' ' + volumen(v.fuel_used));
+    if (v.tolls) extra.push(t('tripTolls') + ' ' + plata(v.tolls, v.currency));
+    if (v.fines) extra.push(t('tripFines') + ' ' + plata(v.fines, v.currency));
+    if (v.ferries) extra.push(t('tripFerries') + ' ' + plata(v.ferries, v.currency));
+    if (v.damage_delta) extra.push(t('tripDamage') + ' +' + numero(v.damage_delta, 1) + ' %');
+    if (extra.length) li.appendChild(linea(extra));
+
+    const pie = document.createElement('div');
+    pie.className = 'sub foot';
+    const cuando = document.createElement('span');
+    cuando.textContent = fechaHora(v.delivered_at || v.started_at);
+    pie.appendChild(cuando);
+    pie.appendChild(botonBorrar(v));
+    li.appendChild(pie);
+    return li;
+  }
+
+  function pintarVacio() {
+    // Con totales pero sin viajes no hay nada que vincular: manejo sin carga.
+    // Lo pintan pintarViajes() y pintarTotales() porque las dos peticiones
+    // vuelven en cualquier orden.
+    const cartel = $('tripsEmpty');
+    cartel.hidden = viajes.length > 0;
+    cartel.textContent = t(totales.length ? 'tripsEmptyDriven' : 'tripsEmpty');
+  }
+
+  function pintarViajes() {
+    const lista = $('tripsList');
+    lista.innerHTML = '';
+    viajes.forEach((v) => lista.appendChild(filaViaje(v)));
+    pintarVacio();
+    $('btnMoreTrips').hidden = !hayMasViajes;
+  }
+
+  async function traerViajes(mas) {
+    const desde = mas ? viajes.length : 0;
+    const { ok, datos } = await pedir('/trips?limite=' + VIAJES_POR_PAGINA + '&desde=' + desde);
+    if (!ok) return;   // sin viajes la pantalla sigue siendo util
+    const nuevos = datos.trips || [];
+    viajes = mas ? viajes.concat(nuevos) : nuevos;
+    hayMasViajes = nuevos.length === VIAJES_POR_PAGINA;
+    pintarViajes();
+    $('cardTrips').hidden = false;
+  }
+
+  async function traerTotales() {
+    const { ok, datos } = await pedir('/sessions/totals');
+    if (!ok) return;
+    totales = datos.totals || [];
+    pintarTotales();
+  }
+
+  function mostrarViajes() {
+    // pintarCuenta() se vuelve a llamar al cambiar de idioma: ahi alcanza con
+    // repintar lo que ya tenemos, sin pedir todo de nuevo ni perder las
+    // paginas que la persona ya abrio.
+    if (viajesPedidos) { pintarViajes(); pintarTotales(); return; }
+    viajesPedidos = true;
+    traerViajes(false);
+    traerTotales();
+  }
+
+  function olvidarViajes() {
+    viajes = [];
+    totales = [];
+    hayMasViajes = false;
+    viajesPedidos = false;
+    $('cardTrips').hidden = true;
+  }
+
   function iniciar() {
     armarSelectorDeIdioma();
     aplicarIdioma();
@@ -648,6 +930,7 @@
     $('btnSignOutAll').addEventListener('click', cerrarTodas);
     $('deviceForm').addEventListener('submit', vincularDispositivo);
     $('btnExport').addEventListener('click', exportarDatos);
+    $('btnMoreTrips').addEventListener('click', () => traerViajes(true));
     $('btnDelete').addEventListener('click', () => mostrarConfirmacionDeBorrado(true));
     $('btnDeleteCancel').addEventListener('click', () => mostrarConfirmacionDeBorrado(false));
     $('btnDeleteConfirm').addEventListener('click', borrarCuenta);
