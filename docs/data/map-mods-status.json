@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-21T16:56:18Z",
+  "checkedAt": "2026-09-28T17:41:41Z",
   "mods": {
     "c2c": {
       "ours": "2.23.61.0",
@@ -47,14 +47,14 @@
       "ours": "2.61",
       "upstream": null,
       "status": "unknown",
-      "error": "TimeoutError: The read operation timed out",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=332124"
     },
     "reforma": {
       "ours": "2.9.9.160",
       "upstream": null,
       "status": "unknown",
-      "error": "TimeoutError: The read operation timed out",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=316081"
     },
     "roextended": {
@@ -119,32 +119,31 @@
       "files": {
         "vector/ats.pmtiles": {
           "ok": true,
-          "bytes": 44429442,
-          "lastModified": "Mon, 21 Sep 2026 14:41:34 GMT"
+          "bytes": 46174424,
+          "lastModified": "Thu, 24 Sep 2026 17:50:58 GMT"
         },
         "ats/route-graph-ats.json": {
-          "ok": true,
-          "bytes": 14854993,
-          "lastModified": "Sat, 19 Sep 2026 19:52:58 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ats/route-graph-ats.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:18 GMT"
+          "lastModified": "Thu, 24 Sep 2026 17:50:43 GMT"
         },
         "ats/Cities.json": {
           "ok": true,
-          "bytes": 23613,
-          "lastModified": "Mon, 21 Sep 2026 16:54:28 GMT"
+          "bytes": 24771,
+          "lastModified": "Thu, 24 Sep 2026 17:50:41 GMT"
         },
         "ats/road-names.json": {
           "ok": true,
-          "bytes": 919793,
-          "lastModified": "Mon, 07 Sep 2026 00:08:48 GMT"
+          "bytes": 951461,
+          "lastModified": "Thu, 24 Sep 2026 17:50:22 GMT"
         }
       },
-      "totalBytes": 60227841,
-      "allOk": true
+      "totalBytes": 47150656,
+      "allOk": false
     },
     "ats_c2c": {
       "files": {
@@ -154,59 +153,57 @@
           "lastModified": "Mon, 21 Sep 2026 14:41:50 GMT"
         },
         "ats_c2c/route-graph-ats_c2c.json": {
-          "ok": true,
-          "bytes": 17624525,
-          "lastModified": "Mon, 21 Sep 2026 01:38:10 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ats_c2c/route-graph-ats_c2c.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:19 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:05:30 GMT"
         },
         "ats_c2c/Cities.json": {
           "ok": true,
           "bytes": 33976,
-          "lastModified": "Mon, 21 Sep 2026 16:54:50 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:05:29 GMT"
         },
         "ats_c2c/road-names.json": {
           "ok": true,
           "bytes": 972446,
-          "lastModified": "Mon, 21 Sep 2026 01:38:12 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:05:32 GMT"
         }
       },
-      "totalBytes": 74543667,
-      "allOk": true
+      "totalBytes": 56919142,
+      "allOk": false
     },
     "ats_promods": {
       "files": {
         "vector/ats_promods.pmtiles": {
           "ok": true,
-          "bytes": 46784923,
-          "lastModified": "Mon, 21 Sep 2026 14:42:13 GMT"
+          "bytes": 48567629,
+          "lastModified": "Thu, 24 Sep 2026 17:58:22 GMT"
         },
         "ats_promods/route-graph-ats_promods.json": {
-          "ok": true,
-          "bytes": 15777248,
-          "lastModified": "Sat, 19 Sep 2026 19:53:28 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ats_promods/route-graph-ats_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:26 GMT"
+          "lastModified": "Thu, 24 Sep 2026 17:57:45 GMT"
         },
         "ats_promods/Cities.json": {
           "ok": true,
-          "bytes": 26275,
-          "lastModified": "Mon, 21 Sep 2026 16:54:30 GMT"
+          "bytes": 27433,
+          "lastModified": "Thu, 24 Sep 2026 17:58:12 GMT"
         },
         "ats_promods/road-names.json": {
           "ok": true,
-          "bytes": 920025,
-          "lastModified": "Tue, 15 Sep 2026 15:41:11 GMT"
+          "bytes": 951693,
+          "lastModified": "Thu, 24 Sep 2026 17:58:26 GMT"
         }
       },
-      "totalBytes": 63508471,
-      "allOk": true
+      "totalBytes": 49546755,
+      "allOk": false
     },
     "ats_c2c_promods": {
       "files": {
@@ -216,59 +213,57 @@
           "lastModified": "Mon, 21 Sep 2026 14:42:24 GMT"
         },
         "ats_c2c_promods/route-graph-ats_c2c_promods.json": {
-          "ok": true,
-          "bytes": 18546780,
-          "lastModified": "Mon, 21 Sep 2026 01:39:21 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ats_c2c_promods/route-graph-ats_c2c_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:18 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:05:38 GMT"
         },
         "ats_c2c_promods/Cities.json": {
           "ok": true,
           "bytes": 36638,
-          "lastModified": "Mon, 21 Sep 2026 16:55:11 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:05:58 GMT"
         },
         "ats_c2c_promods/road-names.json": {
           "ok": true,
           "bytes": 972678,
-          "lastModified": "Mon, 21 Sep 2026 01:39:20 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:05:44 GMT"
         }
       },
-      "totalBytes": 77705697,
-      "allOk": true
+      "totalBytes": 59158917,
+      "allOk": false
     },
     "ats_reforma": {
       "files": {
         "vector/ats_reforma.pmtiles": {
           "ok": true,
-          "bytes": 58005665,
-          "lastModified": "Mon, 21 Sep 2026 14:41:34 GMT"
+          "bytes": 59736883,
+          "lastModified": "Thu, 24 Sep 2026 18:09:22 GMT"
         },
         "ats_reforma/route-graph-ats_reforma.json": {
-          "ok": true,
-          "bytes": 21166360,
-          "lastModified": "Mon, 21 Sep 2026 02:45:08 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ats_reforma/route-graph-ats_reforma.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:18 GMT"
+          "lastModified": "Thu, 24 Sep 2026 18:09:17 GMT"
         },
         "ats_reforma/Cities.json": {
           "ok": true,
-          "bytes": 38094,
-          "lastModified": "Mon, 21 Sep 2026 16:54:50 GMT"
+          "bytes": 39252,
+          "lastModified": "Thu, 24 Sep 2026 18:09:44 GMT"
         },
         "ats_reforma/road-names.json": {
           "ok": true,
-          "bytes": 919304,
-          "lastModified": "Mon, 21 Sep 2026 02:45:02 GMT"
+          "bytes": 950972,
+          "lastModified": "Thu, 24 Sep 2026 18:09:17 GMT"
         }
       },
-      "totalBytes": 80129423,
-      "allOk": true
+      "totalBytes": 60727107,
+      "allOk": false
     },
     "ats_reforma_c2c_promods": {
       "files": {
@@ -278,28 +273,27 @@
           "lastModified": "Mon, 21 Sep 2026 14:41:54 GMT"
         },
         "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.json": {
-          "ok": true,
-          "bytes": 24858383,
-          "lastModified": "Mon, 21 Sep 2026 02:52:26 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:18 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:03 GMT"
         },
         "ats_reforma_c2c_promods/Cities.json": {
           "ok": true,
           "bytes": 51119,
-          "lastModified": "Mon, 21 Sep 2026 16:54:30 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:03 GMT"
         },
         "ats_reforma_c2c_promods/road-names.json": {
           "ok": true,
           "bytes": 972189,
-          "lastModified": "Mon, 21 Sep 2026 02:52:43 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:03 GMT"
         }
       },
-      "totalBytes": 97767848,
-      "allOk": true
+      "totalBytes": 72909465,
+      "allOk": false
     },
     "ets2": {
       "files": {
@@ -309,28 +303,27 @@
           "lastModified": "Mon, 21 Sep 2026 14:41:44 GMT"
         },
         "ets2/route-graph-ets2.json": {
-          "ok": true,
-          "bytes": 17143712,
-          "lastModified": "Sat, 19 Sep 2026 19:52:58 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ets2/route-graph-ets2.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:19 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:09 GMT"
         },
         "ets2/Cities.json": {
           "ok": true,
           "bytes": 30901,
-          "lastModified": "Mon, 21 Sep 2026 16:54:33 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:47 GMT"
         },
         "ets2/road-names.json": {
           "ok": true,
           "bytes": 3215409,
-          "lastModified": "Mon, 07 Sep 2026 00:09:16 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:06 GMT"
         }
       },
-      "totalBytes": 79824240,
-      "allOk": true
+      "totalBytes": 62680528,
+      "allOk": false
     },
     "ets2_promods": {
       "files": {
@@ -340,28 +333,27 @@
           "lastModified": "Mon, 21 Sep 2026 16:54:55 GMT"
         },
         "ets2_promods/route-graph-ets2_promods.json": {
-          "ok": true,
-          "bytes": 24955091,
-          "lastModified": "Mon, 21 Sep 2026 16:54:47 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ets2_promods/route-graph-ets2_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 16:54:46 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:50 GMT"
         },
         "ets2_promods/Cities.json": {
           "ok": true,
           "bytes": 69608,
-          "lastModified": "Mon, 21 Sep 2026 16:54:31 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:50 GMT"
         },
         "ets2_promods/road-names.json": {
           "ok": true,
           "bytes": 5060806,
-          "lastModified": "Mon, 21 Sep 2026 16:54:36 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:56 GMT"
         }
       },
-      "totalBytes": 113651241,
-      "allOk": true
+      "totalBytes": 88696150,
+      "allOk": false
     },
     "ets2_promods_rusmap": {
       "files": {
@@ -371,28 +363,27 @@
           "lastModified": "Mon, 21 Sep 2026 16:54:53 GMT"
         },
         "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.json": {
-          "ok": true,
-          "bytes": 27031667,
-          "lastModified": "Mon, 21 Sep 2026 16:55:12 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 16:54:31 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:58 GMT"
         },
         "ets2_promods_rusmap/Cities.json": {
           "ok": true,
           "bytes": 78703,
-          "lastModified": "Mon, 21 Sep 2026 16:54:45 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:58 GMT"
         },
         "ets2_promods_rusmap/road-names.json": {
           "ok": true,
           "bytes": 5116919,
-          "lastModified": "Mon, 21 Sep 2026 16:55:10 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:06:58 GMT"
         }
       },
-      "totalBytes": 124412249,
-      "allOk": true
+      "totalBytes": 97380582,
+      "allOk": false
     },
     "ets2_promods_roex": {
       "files": {
@@ -402,28 +393,27 @@
           "lastModified": "Mon, 21 Sep 2026 16:54:59 GMT"
         },
         "ets2_promods_roex/route-graph-ets2_promods_roex.json": {
-          "ok": true,
-          "bytes": 25238985,
-          "lastModified": "Mon, 21 Sep 2026 16:54:37 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ets2_promods_roex/route-graph-ets2_promods_roex.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 16:54:51 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:02 GMT"
         },
         "ets2_promods_roex/Cities.json": {
           "ok": true,
           "bytes": 70088,
-          "lastModified": "Mon, 21 Sep 2026 16:54:44 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:00 GMT"
         },
         "ets2_promods_roex/road-names.json": {
           "ok": true,
           "bytes": 5108907,
-          "lastModified": "Mon, 21 Sep 2026 16:54:35 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:00 GMT"
         }
       },
-      "totalBytes": 115185413,
-      "allOk": true
+      "totalBytes": 89946428,
+      "allOk": false
     },
     "ets2_promods_rusmap_roex": {
       "files": {
@@ -433,28 +423,27 @@
           "lastModified": "Mon, 21 Sep 2026 16:55:13 GMT"
         },
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.json": {
-          "ok": true,
-          "bytes": 26838455,
-          "lastModified": "Mon, 21 Sep 2026 16:54:54 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 16:54:36 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:04 GMT"
         },
         "ets2_promods_rusmap_roex/Cities.json": {
           "ok": true,
           "bytes": 79421,
-          "lastModified": "Mon, 21 Sep 2026 16:55:11 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:05 GMT"
         },
         "ets2_promods_rusmap_roex/road-names.json": {
           "ok": true,
           "bytes": 5145503,
-          "lastModified": "Mon, 21 Sep 2026 16:54:57 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:12 GMT"
         }
       },
-      "totalBytes": 123723959,
-      "allOk": true
+      "totalBytes": 96885504,
+      "allOk": false
     },
     "ets2_gu": {
       "files": {
@@ -464,28 +453,27 @@
           "lastModified": "Mon, 21 Sep 2026 14:41:38 GMT"
         },
         "ets2_gu/route-graph-ets2_gu.json": {
-          "ok": true,
-          "bytes": 2610733,
-          "lastModified": "Mon, 21 Sep 2026 13:02:36 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ets2_gu/route-graph-ets2_gu.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:39:19 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:38 GMT"
         },
         "ets2_gu/Cities.json": {
           "ok": true,
           "bytes": 9119,
-          "lastModified": "Mon, 21 Sep 2026 16:54:30 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:17 GMT"
         },
         "ets2_gu/road-names.json": {
           "ok": true,
           "bytes": 461832,
-          "lastModified": "Mon, 21 Sep 2026 13:02:12 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:14 GMT"
         }
       },
-      "totalBytes": 11766865,
-      "allOk": true
+      "totalBytes": 9156132,
+      "allOk": false
     },
     "ets2_tmp": {
       "files": {
@@ -495,28 +483,27 @@
           "lastModified": "Mon, 21 Sep 2026 14:42:04 GMT"
         },
         "ets2_tmp/route-graph-ets2_tmp.json": {
-          "ok": true,
-          "bytes": 17255433,
-          "lastModified": "Mon, 21 Sep 2026 12:53:46 GMT"
+          "ok": false,
+          "error": "HTTPError: HTTP Error 404: Not Found"
         },
         "ets2_tmp/route-graph-ets2_tmp.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 21 Sep 2026 14:40:00 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:40 GMT"
         },
         "ets2_tmp/Cities.json": {
           "ok": true,
           "bytes": 30990,
-          "lastModified": "Mon, 21 Sep 2026 16:54:31 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:43 GMT"
         },
         "ets2_tmp/road-names.json": {
           "ok": true,
           "bytes": 3214090,
-          "lastModified": "Mon, 21 Sep 2026 12:53:29 GMT"
+          "lastModified": "Thu, 24 Sep 2026 12:07:43 GMT"
         }
       },
-      "totalBytes": 79875796,
-      "allOk": true
+      "totalBytes": 62620363,
+      "allOk": false
     }
   }
 }
