@@ -116,7 +116,7 @@ def _fake_urlopen(monkeypatch, payload):
         def read(self):
             return payload
 
-    monkeypatch.setattr(win_integration, "urlopen", lambda url, timeout=0: FakeResp())
+    monkeypatch.setattr(win_integration.red, "abrir", lambda url, timeout=0: FakeResp())
 
 
 def test_stage_update_verifies_sha_and_leaves_the_running_exe_alone(tmp_path, monkeypatch):

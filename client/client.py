@@ -28,7 +28,9 @@ import keys_compat
 import telemetry_compat
 import window_compat
 import websockets
-from urllib.request import urlopen, Request
+from urllib.request import Request
+
+import red
 
 # Usa el almacen de certificados nativo de Windows/macOS/Linux para validar
 # TLS, en vez del bundle de certificados que trae empaquetado Python (via
@@ -510,7 +512,7 @@ def is_newer_version(a: str, b: str) -> bool:
 def request_pairing_code(backend_ws_url: str) -> str:
     url = http_base_url(backend_ws_url) + "/pair/new"
     req = Request(url, method="POST")
-    with urlopen(req, timeout=10) as resp:
+    with red.abrir(req, timeout=10) as resp:
         data = json.loads(resp.read())
     return data["code"]
 
@@ -854,9 +856,12 @@ async def run(backend_ws_url: str, code: str):
     keybinds = load_keybinds()
 
     url = f"{backend_ws_url}/ws/client/{code}"
+    ruta = red.Ruta(url)
     while True:
+        conecto = False
         try:
-            async with websockets.connect(url) as ws:
+            async with websockets.connect(url, **ruta.opciones()) as ws:
+                conecto = True
                 print(f"Conectado al backend. Codigo de pairing: {code}")
                 recv_task = asyncio.create_task(receive_commands(ws, keybinds))
                 try:
@@ -876,9 +881,13 @@ async def run(backend_ws_url: str, code: str):
                 finally:
                     recv_task.cancel()
         except (websockets.ConnectionClosed, OSError) as exc:
+            if not conecto:
+                ruta.fallo_al_conectar()
             print(f"Conexion perdida ({exc}). Reintentando en {RECONNECT_DELAY_SECONDS}s...")
             await asyncio.sleep(RECONNECT_DELAY_SECONDS)
         except Exception as exc:
+            if not conecto:
+                ruta.fallo_al_conectar()
             print(f"Error leyendo telemetria (juego cerrado?): {exc}")
             await asyncio.sleep(RECONNECT_DELAY_SECONDS)
 

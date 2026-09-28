@@ -16,6 +16,8 @@ import logging
 import urllib.error
 import urllib.request
 
+import red
+
 API_POR_DEFECTO = "https://api.trucksim-dash.com"
 
 # Cortos a proposito: esto corre al lado del bucle de telemetria y nada aca
@@ -42,7 +44,7 @@ def _pedir(url: str, cuerpo: dict | None = None, token: str | None = None,
     req = urllib.request.Request(url, data=datos, headers=cabeceras,
                                  method=metodo or ("POST" if datos is not None else "GET"))
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        with red.abrir(req, timeout=TIMEOUT) as r:
             return r.status, json.loads(r.read().decode("utf-8") or "{}")
     except urllib.error.HTTPError as e:
         try:

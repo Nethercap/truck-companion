@@ -1,5 +1,8 @@
 truck_telemetry
-websockets
+# 15 o mas: desde ahi usa el proxy del sistema y acepta proxy=None, que
+# red.py necesita para el reintento directo. El techo, para que una version
+# nueva no cambie como se conecta sin que nadie lo pruebe.
+websockets>=15,<18
 pystray
 pillow
 pyinstaller

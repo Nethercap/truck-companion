@@ -18,7 +18,8 @@ import sys
 import time
 import tempfile
 import zipfile
-from urllib.request import urlopen
+
+import red
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE_NAME = "TruckDash"
@@ -397,7 +398,7 @@ def stage_update(download_url: str, expected_sha256: str | None, progress=None) 
 
     if progress:
         progress("downloading")
-    with urlopen(download_url, timeout=60) as resp:
+    with red.abrir(download_url, timeout=60) as resp:
         data = resp.read()
 
     if expected_sha256:

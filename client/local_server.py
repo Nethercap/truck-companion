@@ -29,7 +29,8 @@ import os
 import socket
 import threading
 from urllib.parse import parse_qs, urlencode, urlsplit
-from urllib.request import urlopen
+
+import red
 
 import client as client_lib
 
@@ -86,7 +87,7 @@ def refresh_web_cache() -> bool:
             ok += 1
             continue
         try:
-            with urlopen(f"{WEB_ORIGIN}/{rel}", timeout=15) as resp:
+            with red.abrir(f"{WEB_ORIGIN}/{rel}", timeout=15) as resp:
                 data = resp.read()
             with open(local, "wb") as f:
                 f.write(data)
@@ -182,7 +183,7 @@ def _refresh_file(rel: str, local_path: str) -> bool:
     if ".." in rel:
         return False
     try:
-        with urlopen(f"{WEB_ORIGIN}/{rel}", timeout=6) as resp:
+        with red.abrir(f"{WEB_ORIGIN}/{rel}", timeout=6) as resp:
             data = resp.read()
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         with open(local_path, "wb") as f:

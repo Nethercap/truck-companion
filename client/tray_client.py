@@ -27,6 +27,8 @@ import urllib.parse
 import webbrowser
 from urllib.request import urlopen
 
+import red
+
 try:
     import pystray
     PYSTRAY_ERROR = None
@@ -858,7 +860,7 @@ def check_for_update(backend_url: str):
     o (None, None, None) si esta al dia o fallo la consulta (no es critico)."""
     try:
         url = client_lib.http_base_url(backend_url) + "/version"
-        with urlopen(url, timeout=10) as resp:
+        with red.abrir(url, timeout=10) as resp:
             data = json.loads(resp.read())
         latest = data.get("latest_client_version")
         if latest and client_lib.is_newer_version(latest, client_lib.CLIENT_VERSION):
@@ -1043,9 +1045,14 @@ class CloudLink:
     async def run(self):
         import websockets
 
+        # Una sola ruta por link: lo que aprendio (proxy o directo) sirve
+        # para los reintentos siguientes.
+        ruta = red.Ruta(self.url)
         while True:
+            conecto = False
             try:
-                async with websockets.connect(self.url) as ws:
+                async with websockets.connect(self.url, **ruta.opciones()) as ws:
+                    conecto = True
                     self.ws = ws
                     state.set_cloud("connected")
                     logging.info("Connected to backend")
@@ -1057,6 +1064,8 @@ class CloudLink:
                 logging.exception("Unexpected error in backend link")
             finally:
                 self.ws = None
+                if not conecto:
+                    ruta.fallo_al_conectar()
             state.set_cloud("reconnecting")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
 
