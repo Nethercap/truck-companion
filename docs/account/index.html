@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20260927f" />
+<link rel="stylesheet" href="account.css?v=20260927g" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -82,6 +82,11 @@
       <button class="btn" id="btnMoreTrips" hidden data-i18n="tripsMore">Show more</button>
     </section>
 
+    <section class="card" id="cardStats" hidden>
+      <h2 data-i18n="statsTitle">Your stats</h2>
+      <div id="statsBody"></div>
+    </section>
+
     <section class="card">
       <h2 data-i18n="loginsTitle">Sign-in methods</h2>
       <ul class="logins" id="loginsList"></ul>
@@ -140,7 +145,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20260927f"></script>
-<script src="account.js?v=20260927f"></script>
+<script src="../app/i18n.js?v=20260927g"></script>
+<script src="account.js?v=20260927g"></script>
 </body>
 </html>

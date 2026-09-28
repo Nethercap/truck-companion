@@ -183,3 +183,29 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
 .linkish:hover { color: var(--text); }
 .linkish.armado { color: var(--danger); }
 .linkish:disabled { opacity: 0.5; cursor: default; }
+
+/* --- estadisticas y detalle -------------------------------------------- */
+.juego + .juego { margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+.juego h3 { font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+            color: var(--accent); margin: 0 0 0.6rem; }
+.cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.8rem 1rem; }
+.cifras div b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.cifras div span { font-size: 0.72rem; color: var(--muted); }
+.juego .renglon { font-size: 0.85rem; color: var(--muted); margin-top: 0.7rem; }
+.juego .renglon b { color: var(--text); font-weight: 600; }
+.juego .aviso { font-size: 0.8rem; color: var(--warn); margin-top: 0.6rem; }
+
+.detalle { margin: 0.6rem 0 0.2rem; }
+/* El alto manda y el ancho sale de la forma del recorrido (se la pone
+   el guion con aspect-ratio): un viaje de este a oeste queda ancho y
+   bajo, y uno de norte a sur, angosto y alto. Con un alto fijo y ancho
+   completo, casi todos quedaban perdidos en el medio de una franja. */
+.detalle .ruta { display: block; margin: 0.3rem auto 0.5rem;
+                 height: 230px; width: auto; max-width: 100%; }
+.detalle .ruta .traza { fill: none; stroke: var(--accent); stroke-width: 2;
+                        stroke-linejoin: round; stroke-linecap: round; }
+.detalle .ruta .hueco { fill: none; stroke: var(--muted); stroke-width: 1.5;
+                        stroke-dasharray: 4 4; }
+.detalle .ruta .punta { fill: var(--accent); }
+.detalle .ruta .punta.fin { fill: var(--ok); }
+.acciones { display: flex; gap: 1rem; }

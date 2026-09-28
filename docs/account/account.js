@@ -48,6 +48,27 @@
   // mismo archivo que usa la app, para no tener dos lugares con traducciones.
   const TRANSLATIONS = {
     en: {
+      statsTitle: 'Your stats',
+      statsTrips: 'Trips',
+      statsDelivered: 'Delivered',
+      statsOnTime: 'On time',
+      statsLate: 'Late',
+      statsUnfinished: 'Unfinished',
+      statsDistance: 'In trips',
+      statsWheel: 'At the wheel',
+      statsTopSpeed: 'Top speed',
+      statsDamage: 'Avg damage',
+      statsEarned: 'Earned',
+      statsCountries: 'Countries',
+      statsLongest: 'Longest trip',
+      statsModded: (n) => n + ' with a modded economy, left out of the money.',
+      tripDetails: 'Details',
+      tripPlanned: 'Planned',
+      tripTruck: 'Truck',
+      tripAvgSpeed: 'Avg speed',
+      tripGameTime: 'Game time',
+      tripRouteGaps: 'Dashed where the client was closed.',
+      tripNoRoute: 'No route was recorded for this trip.',
       tripsTitle: 'Your trips',
       tripsEmpty: 'Nothing here yet. Link this PC to Truck Dash and your trips will show up on their own as you drive.',
       tripsEmptyDriven: 'No trips saved yet. Driving without a job counts in your totals, but it is not a trip.',
@@ -148,6 +169,27 @@
       error: 'Something went wrong. Try again.'
     },
     es: {
+      statsTitle: 'Tus estadisticas',
+      statsTrips: 'Viajes',
+      statsDelivered: 'Entregados',
+      statsOnTime: 'A tiempo',
+      statsLate: 'Tarde',
+      statsUnfinished: 'Sin terminar',
+      statsDistance: 'En viajes',
+      statsWheel: 'Al volante',
+      statsTopSpeed: 'Maxima',
+      statsDamage: 'Daño promedio',
+      statsEarned: 'Ganado',
+      statsCountries: 'Paises',
+      statsLongest: 'Viaje mas largo',
+      statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
+      tripDetails: 'Detalle',
+      tripPlanned: 'Planeado',
+      tripTruck: 'Camion',
+      tripAvgSpeed: 'Promedio',
+      tripGameTime: 'Tiempo de juego',
+      tripRouteGaps: 'Punteado donde el cliente estuvo cerrado.',
+      tripNoRoute: 'De este viaje no se guardo el recorrido.',
       tripsTitle: 'Tus viajes',
       tripsEmpty: 'Todavia no hay nada. Vincula esta PC a Truck Dash y tus viajes van a ir apareciendo solos mientras manejas.',
       tripsEmptyDriven: 'Todavia no hay viajes guardados. Manejar sin carga suma a tus totales, pero no es un viaje.',
@@ -681,6 +723,107 @@
     });
   }
 
+  // -------------------------------------------------------- estadisticas
+  // El resumen lo calcula el servidor: la web ve los viajes de a diez, asi
+  // que sumar aca daria el resumen de la primera pagina y lo llamaria "tus
+  // estadisticas".
+  let resumen = [];
+  let resumenPedido = false;
+
+  function cifra(valor, etiqueta) {
+    if (valor == null) return null;
+    const caja = document.createElement('div');
+    const b = document.createElement('b');
+    b.textContent = valor;
+    const s = document.createElement('span');
+    s.textContent = etiqueta;
+    caja.appendChild(b);
+    caja.appendChild(s);
+    return caja;
+  }
+
+  function renglon(partes) {
+    // Sin nada que decir no hay renglon: si no, un viaje sin velocidad
+    // media ni paises dejaba una linea vacia ocupando lugar.
+    const texto = partes.filter(Boolean).join(' \u00b7 ');
+    if (!texto) return null;
+    const div = document.createElement('div');
+    div.className = 'renglon';
+    div.textContent = texto;
+    return div;
+  }
+
+  function sumar(caja, nodo) {
+    if (nodo) caja.appendChild(nodo);
+  }
+
+  function bloqueJuego(s) {
+    const caja = document.createElement('div');
+    caja.className = 'juego';
+    const titulo = document.createElement('h3');
+    titulo.textContent = (s.game || '').toUpperCase();
+    caja.appendChild(titulo);
+
+    const cifras = document.createElement('div');
+    cifras.className = 'cifras';
+    [
+      cifra(numero(s.trips), t('statsTrips')),
+      cifra(numero(s.delivered), t('statsDelivered')),
+      s.on_time ? cifra(numero(s.on_time), t('statsOnTime')) : null,
+      s.late ? cifra(numero(s.late), t('statsLate')) : null,
+      s.unfinished ? cifra(numero(s.unfinished), t('statsUnfinished')) : null,
+      cifra(distancia(s.distance_km), t('statsDistance')),
+      cifra(duracion(s.real_hours), t('statsWheel')),
+      s.max_speed ? cifra(velocidad(s.max_speed), t('statsTopSpeed')) : null,
+      s.damage_avg ? cifra(numero(s.damage_avg, 1) + ' %', t('statsDamage')) : null,
+      s.fuel_used ? cifra(volumen(s.fuel_used), t('tripFuel')) : null
+    ].filter(Boolean).forEach((c) => cifras.appendChild(c));
+    caja.appendChild(cifras);
+
+    // La plata, por moneda: sumar euros con libras no da nada.
+    (s.money || []).forEach((m) => {
+      sumar(caja, renglon([
+        t('statsEarned') + ' ' + plata(m.revenue, m.currency),
+        m.tolls ? t('tripTolls') + ' ' + plata(m.tolls, m.currency) : null,
+        m.fines ? t('tripFines') + ' ' + plata(m.fines, m.currency) : null,
+        m.ferries ? t('tripFerries') + ' ' + plata(m.ferries, m.currency) : null
+      ]));
+    });
+    // Por que la plata no cierra con la cantidad de viajes.
+    if (s.modded) {
+      const aviso = document.createElement('div');
+      aviso.className = 'aviso';
+      aviso.textContent = t('statsModded', numero(s.modded));
+      caja.appendChild(aviso);
+    }
+
+    if ((s.countries || []).length) {
+      sumar(caja, renglon([t('statsCountries') + ' ' + s.countries.join(' ')]));
+    }
+    if (s.longest) {
+      const donde = [s.longest.city_src, s.longest.city_dst].filter(Boolean).join(' \u2192 ');
+      sumar(caja, renglon([
+        t('statsLongest') + ' ' + (donde || t('tripUnnamed')),
+        distancia(s.longest.distance_km)
+      ]));
+    }
+    return caja;
+  }
+
+  function pintarResumen() {
+    const cuerpo = $('statsBody');
+    cuerpo.innerHTML = '';
+    resumen.forEach((s) => cuerpo.appendChild(bloqueJuego(s)));
+    $('cardStats').hidden = resumen.length === 0;
+  }
+
+  async function traerResumen() {
+    const { ok, datos } = await pedir('/trips/stats');
+    if (!ok) return;
+    resumen = datos.stats || [];
+    pintarResumen();
+  }
+
   // ------------------------------------------------------------- viajes
   // Los totales salen de /sessions/totals y NO de sumar los viajes: los
   // kilometros de un viaje tambien son kilometros de sesion, asi que sumar
@@ -860,8 +1003,17 @@
     const cuando = document.createElement('span');
     cuando.textContent = fechaHora(v.delivered_at || v.started_at);
     pie.appendChild(cuando);
-    pie.appendChild(botonBorrar(v));
+    const acciones = document.createElement('div');
+    acciones.className = 'acciones';
+    const detalle = document.createElement('button');
+    detalle.className = 'linkish';
+    detalle.textContent = t('tripDetails');
+    detalle.addEventListener('click', () => alternarDetalle(v));
+    acciones.appendChild(detalle);
+    acciones.appendChild(botonBorrar(v));
+    pie.appendChild(acciones);
     li.appendChild(pie);
+    if (v._abierto) li.appendChild(panelDetalle(v));
     return li;
   }
 
@@ -872,6 +1024,108 @@
     const cartel = $('tripsEmpty');
     cartel.hidden = viajes.length > 0;
     cartel.textContent = t(totales.length ? 'tripsEmptyDriven' : 'tripsEmpty');
+  }
+
+  // ------------------------------------------------------- detalle del viaje
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function dibujarRecorrido(segmentos) {
+    // El recorrido es un array de SEGMENTOS, no una linea sola: manejar con
+    // el cliente cerrado deja un agujero, y ese agujero va punteado. Unir
+    // los extremos con una recta seria dibujar un tramo que nunca manejo.
+    const puntos = [];
+    segmentos.forEach((seg) => seg.forEach((p) => puntos.push(p)));
+    if (puntos.length < 2) return null;
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    puntos.forEach((p) => {
+      if (p[0] < minX) minX = p[0];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
+    });
+    const ancho = (maxX - minX) || 1, alto = (maxY - minY) || 1;
+    const aire = Math.max(ancho, alto) * 0.06;
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'ruta');
+    // La z del juego crece hacia el sur y la y del SVG hacia abajo, asi que
+    // el norte queda arriba sin dar vuelta nada.
+    svg.setAttribute('viewBox',
+      [minX - aire, minY - aire, ancho + aire * 2, alto + aire * 2].join(' '));
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    // La forma del recorrido decide el ancho; el alto lo pone el CSS.
+    svg.style.aspectRatio = (ancho + aire * 2) + ' / ' + (alto + aire * 2);
+
+    const linea = (clase, puntos2) => {
+      const el = document.createElementNS(SVG_NS, 'polyline');
+      el.setAttribute('class', clase);
+      el.setAttribute('points', puntos2.map((p) => p[0] + ',' + p[1]).join(' '));
+      // Sin esto el grosor se escala con el viewBox y un viaje corto sale
+      // con una linea finita y uno largo con una gruesa.
+      el.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(el);
+    };
+    segmentos.forEach((seg, i) => {
+      if (seg.length > 1) linea('traza', seg);
+      const previo = segmentos[i - 1];
+      if (previo && previo.length && seg.length) {
+        linea('hueco', [previo[previo.length - 1], seg[0]]);
+      }
+    });
+    [[puntos[0], ''], [puntos[puntos.length - 1], ' fin']].forEach(([p, extra]) => {
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('class', 'punta' + extra);
+      c.setAttribute('cx', p[0]);
+      c.setAttribute('cy', p[1]);
+      c.setAttribute('r', Math.max(ancho, alto) / 90);
+      svg.appendChild(c);
+    });
+    return svg;
+  }
+
+  function panelDetalle(v) {
+    const caja = document.createElement('div');
+    caja.className = 'detalle';
+    const d = v._detalle;
+    if (!d) { sumar(caja, renglon([t('loading')])); return caja; }
+
+    const dibujo = dibujarRecorrido(d.route || []);
+    if (dibujo) {
+      caja.appendChild(dibujo);
+      // Solo se aclara si hay hueco: en un viaje entero no hay nada que
+      // explicar.
+      if ((d.route || []).length > 1) sumar(caja, renglon([t('tripRouteGaps')]));
+    } else {
+      sumar(caja, renglon([t('tripNoRoute')]));
+    }
+
+    const empresas = [d.company_src, d.company_dst].filter(Boolean).join(' \u2192 ');
+    if (empresas) sumar(caja, renglon([empresas]));
+    sumar(caja, renglon([
+      d.truck_name || d.truck_brand ? t('tripTruck') + ' ' + [d.truck_brand, d.truck_name].filter(Boolean).join(' ') : null,
+      d.distance_planned_km ? t('tripPlanned') + ' ' + distancia(d.distance_planned_km) : null,
+      d.distance_tracked_km ? t('tripTracked', distancia(d.distance_tracked_km)) : null
+    ]));
+    sumar(caja, renglon([
+      d.avg_speed ? t('tripAvgSpeed') + ' ' + velocidad(d.avg_speed) : null,
+      d.max_speed ? t('statsTopSpeed') + ' ' + velocidad(d.max_speed) : null,
+      d.game_hours ? t('tripGameTime') + ' ' + duracion(d.game_hours) : null,
+      (d.countries || []).length ? d.countries.join(' ') : null
+    ]));
+    return caja;
+  }
+
+  async function alternarDetalle(v) {
+    v._abierto = !v._abierto;
+    pintarViajes();
+    if (!v._abierto || v._detalle) return;
+    // El recorrido son un par de KB por viaje, asi que se pide solo cuando
+    // alguien lo abre, y una sola vez.
+    const { ok, datos } = await pedir('/trips/' + v.id);
+    if (!ok) { v._abierto = false; pintarViajes(); return; }
+    v._detalle = datos.trip;
+    pintarViajes();
   }
 
   function pintarViajes() {
@@ -904,10 +1158,11 @@
     // pintarCuenta() se vuelve a llamar al cambiar de idioma: ahi alcanza con
     // repintar lo que ya tenemos, sin pedir todo de nuevo ni perder las
     // paginas que la persona ya abrio.
-    if (viajesPedidos) { pintarViajes(); pintarTotales(); return; }
+    if (viajesPedidos) { pintarViajes(); pintarTotales(); pintarResumen(); return; }
     viajesPedidos = true;
     traerViajes(false);
     traerTotales();
+    traerResumen();
   }
 
   function olvidarViajes() {
@@ -915,7 +1170,9 @@
     totales = [];
     hayMasViajes = false;
     viajesPedidos = false;
+    resumen = [];
     $('cardTrips').hidden = true;
+    $('cardStats').hidden = true;
   }
 
   function iniciar() {
