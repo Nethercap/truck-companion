@@ -67,11 +67,11 @@
       "status": "planned",
       "en": {
         "title": "Linux support",
-        "body": "A native client for the Linux builds of both games, and for Proton. Same dashboard, no Windows needed."
+        "body": "Running the Windows client inside the game's Proton prefix already works today, plugin install included, and is documented in the client README. What is missing is a native client, and it only helps the native Linux builds of the games: under Proton the game publishes its telemetry inside the Wine prefix, not where a native client looks for it."
       },
       "es": {
         "title": "Soporte para Linux",
-        "body": "Un cliente nativo para las versiones Linux de los dos juegos, y para Proton. El mismo tablero, sin necesidad de Windows."
+        "body": "Correr el cliente de Windows adentro del prefijo de Proton del juego ya funciona hoy, con la instalación del plugin incluida, y está documentado en el README del cliente. Lo que falta es un cliente nativo, y sirve solo para los builds nativos de Linux de los juegos: bajo Proton el juego publica su telemetría adentro del prefijo de Wine, no donde un cliente nativo la busca."
       }
     },
     {
