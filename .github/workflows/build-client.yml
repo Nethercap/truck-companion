@@ -145,10 +145,22 @@ jobs:
     # Fedora 35+ y cualquier Arch actual. Compilar en la ultima dejaria afuera
     # a la mitad de esa lista sin que nadie se entere hasta que lo reporten.
     #
-    # Por ahora solo sube el artefacto de la corrida, NO lo adjunta al Release:
-    # todavia no hay una sola confirmacion de que el cliente hable con el juego
-    # en Linux, y publicarlo como descarga oficial diria lo contrario. Cuando
-    # un tester confirme, se agrega aca el paso de release.
+    # Sube el artefacto de la corrida, NO lo adjunta al Release, y esto NO es
+    # "hasta que alguien confirme". Lo de abajo salio del issue #6 (28-09-2026)
+    # y conviene tenerlo escrito antes de que a alguien le parezca un olvido:
+    #
+    # El binario nativo solo sirve para los builds NATIVOS de Linux de los
+    # juegos, y casi nadie los usa: son viejos, van por OpenGL y tienen mal
+    # soporte de mods, asi que en Linux se juega el build de Windows bajo
+    # Proton. Y ahi un cliente nativo no llega a la telemetria: el plugin
+    # publica adentro del prefijo de Wine, no en /dev/shm/SCSTelemetry, que es
+    # donde mira telemetry_compat en Linux. Encima el .so del plugin nativo ni
+    # lo empaquetamos; solo viaja el .dll.
+    #
+    # El camino que SI anda en Linux es el cliente de Windows adentro del
+    # prefijo del juego, documentado en client/README.md, y ese ya se publica
+    # como la descarga normal. El build de aca queda como canario de que el
+    # codigo sigue empaquetando y arrancando en Linux.
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
