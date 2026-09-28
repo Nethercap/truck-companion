@@ -3,6 +3,18 @@
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped.",
   "items": [
     {
+      "id": "shipped-tmp-events",
+      "status": "shipped",
+      "en": {
+        "title": "TruckersMP events",
+        "body": "Convoys and events from TruckersMP on the live map page: what is running now and what is coming, each with the time in your own timezone. Public data from their API, asked for once and cached on our side rather than by every visitor."
+      },
+      "es": {
+        "title": "Eventos de TruckersMP",
+        "body": "Los convoyes y eventos de TruckersMP en la página del mapa en vivo: lo que está pasando y lo que viene, cada uno con la hora en tu propia zona. Datos públicos de su API, pedidos una vez y cacheados de nuestro lado en vez de por cada visitante."
+      }
+    },
+    {
       "id": "shipped-dash-panel",
       "status": "shipped",
       "en": {
