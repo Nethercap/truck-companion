@@ -118,7 +118,9 @@ jobs:
           if (-not $env:DISCORD_RELEASES_WEBHOOK) { Write-Host "DISCORD_RELEASES_WEBHOOK not set, skipping announcement"; exit 0 }
           $tag = $env:TAG
           # Notas: el cuerpo del ultimo commit del tag (la primera linea es el titulo).
-          $lines = (git log -1 --format=%B "$tag") -split "`n" | Where-Object { $_ -notmatch '^Co-Authored-By' }
+          # Las lineas de atribucion (Co-Authored-By, Claude-Session) son para
+          # el repo, no para el anuncio.
+          $lines = (git log -1 --format=%B "$tag") -split "`n" | Where-Object { $_ -notmatch '^(Co-Authored-By|Claude-Session):' }
           $title = $lines[0]
           $body = (($lines | Select-Object -Skip 1) -join "`n").Trim()
           if ($body.Length -gt 1500) { $body = $body.Substring(0, 1500) + "..." }
