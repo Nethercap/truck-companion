@@ -209,3 +209,25 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
 .detalle .ruta .punta { fill: var(--accent); }
 .detalle .ruta .punta.fin { fill: var(--ok); }
 .acciones { display: flex; gap: 1rem; }
+
+/* --- banderas de los paises --------------------------------------------
+   Chromium en Windows NO dibuja las banderas de emoji: muestra las dos
+   letras en un recuadro, y ahi esta la mayor parte de la gente que abre
+   esto desde la PC donde juega. Microsoft no las pone en su fuente y
+   Chromium no piensa traer las suyas, asi que la unica salida es una
+   fuente aparte.
+
+   Se descarga SOLO cuando hace falta: la clase la pone el guion despues de
+   medir en un canvas si el navegador las dibuja. Firefox, macOS, Android e
+   iOS ya las dibujan y no bajan estos 78 KB. */
+@font-face {
+  font-family: 'Banderas';
+  src: url('../assets/TwemojiCountryFlags.woff2') format('woff2');
+  unicode-range: U+1F1E6-1F1FF;
+  font-display: swap;
+}
+.paises { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin-top: 0.7rem; }
+.paises .etq { font-size: 0.85rem; color: var(--muted); margin-right: 0.15rem; }
+.paises .bandera { font-size: 1.3rem; line-height: 1.15; cursor: default; }
+.sin-banderas .paises .bandera { font-family: 'Banderas', system-ui, sans-serif; }
+.paises .tag { color: var(--muted); border-color: var(--line); }

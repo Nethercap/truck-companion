@@ -110,6 +110,12 @@ it is approved, releases are unsigned and each one lists its SHA-256).
 MIT License (see [`LICENSE`](LICENSE)). The bundled SCS telemetry plugin
 (`client/vendor/scs-telemetry.dll`) is by RenCloud, also MIT.
 
+The country flag font used on the account page
+(`docs/assets/TwemojiCountryFlags.woff2`) is a subset of Twemoji Mozilla,
+from [country-flag-emoji-polyfill](https://github.com/talkjs/country-flag-emoji-polyfill);
+Twemoji is by Twitter, CC-BY 4.0. It exists because Chromium on Windows
+does not draw flag emoji.
+
 This project reads only what the SCS Telemetry SDK exposes and does not
 modify the game in any way. All source code — client, backend, and web — is
 in this repository for anyone to review.

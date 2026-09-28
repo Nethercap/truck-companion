@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-27",
+  "updated": "2026-09-28",
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped.",
   "items": [
     {
@@ -84,6 +84,18 @@
       "es": {
         "title": "Cuenta opcional",
         "body": "Entrar con Discord, Steam o Google solo si querés tu historial y tus totales en todos los dispositivos. Truck Dash va a seguir funcionando sin cuenta, como hoy."
+      }
+    },
+    {
+      "id": "stats-charts",
+      "status": "planned",
+      "en": {
+        "title": "Stats charts and trends",
+        "body": "Your driving by week and by month, and not only a running total: kilometres, hours, deliveries and money over time, so you can see whether you are driving more or less than last month and how a season went. Per game, on top of optional accounts."
+      },
+      "es": {
+        "title": "Gráficos y tendencias de las estadísticas",
+        "body": "Lo que manejaste por semana y por mes, y no solo el total acumulado: kilómetros, horas, entregas y plata a lo largo del tiempo, para ver si venís manejando más o menos que el mes pasado y cómo fue una temporada. Por juego, arriba de las cuentas opcionales."
       }
     },
     {

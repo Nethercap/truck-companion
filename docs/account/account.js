@@ -723,6 +723,72 @@
     });
   }
 
+  // ------------------------------------------------------------ banderas
+  // Chromium en Windows no dibuja las banderas de emoji, y ahi esta la mayor
+  // parte de la gente que abre esto desde la PC donde juega. Se mide una vez
+  // y, si no las dibuja, la hoja de estilos engancha una fuente que si.
+  function dibujaBanderas() {
+    try {
+      const ctx = document.createElement('canvas').getContext('2d');
+      if (!ctx) return true;   // sin canvas no se puede saber: no molestar
+      ctx.font = '32px sans-serif';
+      // Si las dibuja, el par es UN glifo y mide como un emoji solo. Si no,
+      // son dos letras sueltas en sus recuadros y mide el doble.
+      const par = ctx.measureText('\u{1F1E6}\u{1F1E8}').width;
+      const una = ctx.measureText('\u{1F1E6}').width;
+      return par < una * 1.8;
+    } catch (e) { return true; }
+  }
+
+  function banderaDe(codigo) {
+    // Los indicadores regionales son las dos letras corridas a U+1F1E6.
+    if (!/^[A-Za-z]{2}$/.test(codigo)) return null;
+    const cc = codigo.toUpperCase();
+    return String.fromCodePoint(0x1F1E6 + cc.charCodeAt(0) - 65,
+                                0x1F1E6 + cc.charCodeAt(1) - 65);
+  }
+
+  let nombresDePais = null;
+  function nombreDePais(codigo) {
+    // Los sabe el navegador en los ocho idiomas. Una tabla propia serian
+    // ocho listas de doscientos paises para mantener a mano.
+    try {
+      if (!nombresDePais || nombresDePais.idioma !== idioma) {
+        nombresDePais = {
+          idioma: idioma,
+          nombres: new Intl.DisplayNames([idioma], { type: 'region' })
+        };
+      }
+      return nombresDePais.nombres.of(codigo.toUpperCase()) || codigo;
+    } catch (e) { return codigo; }
+  }
+
+  function listaDePaises(codigos, etiqueta) {
+    const caja = document.createElement('div');
+    caja.className = 'paises';
+    if (etiqueta) {
+      const etq = document.createElement('span');
+      etq.className = 'etq';
+      etq.textContent = etiqueta;
+      caja.appendChild(etq);
+    }
+    codigos.forEach((codigo) => {
+      const bandera = banderaDe(codigo);
+      const nombre = nombreDePais(codigo);
+      const span = document.createElement('span');
+      // Un codigo que no sea de dos letras (un mod raro) sigue saliendo como
+      // texto: mejor eso que un recuadro vacio.
+      span.className = bandera ? 'bandera' : 'tag';
+      span.textContent = bandera || codigo.toUpperCase();
+      span.title = nombre;
+      // Una bandera sola no le dice nada a un lector de pantalla.
+      span.setAttribute('role', 'img');
+      span.setAttribute('aria-label', nombre);
+      caja.appendChild(span);
+    });
+    return caja;
+  }
+
   // -------------------------------------------------------- estadisticas
   // El resumen lo calcula el servidor: la web ve los viajes de a diez, asi
   // que sumar aca daria el resumen de la primera pagina y lo llamaria "tus
@@ -798,7 +864,7 @@
     }
 
     if ((s.countries || []).length) {
-      sumar(caja, renglon([t('statsCountries') + ' ' + s.countries.join(' ')]));
+      caja.appendChild(listaDePaises(s.countries, t('statsCountries')));
     }
     if (s.longest) {
       const donde = [s.longest.city_src, s.longest.city_dst].filter(Boolean).join(' \u2192 ');
@@ -1110,9 +1176,9 @@
     sumar(caja, renglon([
       d.avg_speed ? t('tripAvgSpeed') + ' ' + velocidad(d.avg_speed) : null,
       d.max_speed ? t('statsTopSpeed') + ' ' + velocidad(d.max_speed) : null,
-      d.game_hours ? t('tripGameTime') + ' ' + duracion(d.game_hours) : null,
-      (d.countries || []).length ? d.countries.join(' ') : null
+      d.game_hours ? t('tripGameTime') + ' ' + duracion(d.game_hours) : null
     ]));
+    if ((d.countries || []).length) caja.appendChild(listaDePaises(d.countries));
     return caja;
   }
 
@@ -1176,6 +1242,7 @@
   }
 
   function iniciar() {
+    if (!dibujaBanderas()) document.documentElement.classList.add('sin-banderas');
     armarSelectorDeIdioma();
     aplicarIdioma();
     mostrarErrorDeVuelta();
