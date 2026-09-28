@@ -816,3 +816,70 @@ def test_set_live_share_stores_trimmed_nick_and_clears_when_disabled(client, mai
         ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": False}))
         _time.sleep(0.05)
         assert session.live_nick is None
+
+
+# --------------------------------------------------------- eventos TruckersMP
+
+def test_evento_tmp_se_recorta_y_marca_la_hora_como_utc(main):
+    """Las horas de TruckersMP vienen sin zona y SON UTC (lo dice la pagina
+    de cada evento, no la documentacion). Sin la Z el navegador las lee como
+    hora local y el convoy aparece una o dos horas corrido."""
+    crudo = {
+        "id": 1, "name": "Convoy", "game": "ETS2",
+        "event_type": {"key": "convoy", "name": "Convoy"},
+        "server": {"id": 37, "name": "Event Server"},
+        "departure": {"location": "Container Port", "city": "Mannheim"},
+        "arrive": {"location": "Slots", "city": "Liege"},
+        "meetup_at": "2026-10-03 16:00:00", "start_at": "2026-10-03 17:00:00",
+        "attendances": {"confirmed": 100}, "dlcs": [], "language": "English",
+        "url": "/events/1-convoy", "description": "x" * 5000, "rule": "y" * 5000,
+    }
+    e = main._tmp_evento(crudo)
+    assert e["start_at"] == "2026-10-03T17:00:00Z"
+    assert e["meetup_at"] == "2026-10-03T16:00:00Z"
+    assert e["from_city"] == "Mannheim"
+    assert e["url"] == "https://truckersmp.com/events/1-convoy"
+    # Lo pesado no se reenvia: son la mayor parte de los 70 KB del original.
+    assert "description" not in e and "rule" not in e
+
+
+def test_los_eventos_de_promods_cuentan_como_ets2(main):
+    """El campo game trae "ETS2 - ProMods". Filtrar por igualdad exacta los
+    descartaba en silencio, justo una variante que soportamos."""
+    base = {"id": 2, "departure": {}, "arrive": {}, "server": {}, "attendances": {}}
+    assert main._tmp_evento({**base, "game": "ETS2 - ProMods"})["game"] == "ets2"
+    assert main._tmp_evento({**base, "game": "ETS2 - ProMods"})["game_label"] == "ETS2 - ProMods"
+    assert main._tmp_evento({**base, "game": "ETS2"})["game"] == "ets2"
+    assert main._tmp_evento({**base, "game": "ATS"})["game"] == "ats"
+
+
+def test_el_punto_de_encuentro_es_texto_libre_y_no_un_tipo(main):
+    """departure.location describe donde juntarse dentro de la ciudad
+    ("Slots", "Container Port"); NO dice si es una ciudad. La ciudad viene
+    aparte y viene siempre."""
+    e = main._tmp_evento({"id": 3, "game": "ETS2", "server": {}, "attendances": {},
+                          "departure": {"location": "Slots", "city": "Calais"},
+                          "arrive": {"location": "City", "city": "Duisburg"}})
+    assert e["from_city"] == "Calais"
+    assert e["from_spot"] == "Slots"
+
+
+def test_si_la_api_de_tmp_falla_no_se_pierde_lo_ultimo_bueno(main, monkeypatch):
+    """Que se caiga su API no tiene por que vaciarnos la lista."""
+    main._tmp_events_cache = {"events": {"today": []}, "fetched_at": 0}
+    monkeypatch.setattr(main, "_fetch_tmp_events", lambda: None)
+    main._refresh_tmp_events_blocking()
+    assert main._tmp_events_cache is not None
+
+
+def test_tmp_events_filtra_por_juego(main, client, monkeypatch):
+    def falso():
+        return {"events": {"today": [
+            {"id": 1, "game": "ets2", "name": "A"},
+            {"id": 2, "game": "ats", "name": "B"},
+        ]}, "fetched_at": 9e9}
+    monkeypatch.setattr(main, "get_tmp_events", falso)
+    r = client.get("/tmp/events?game=ats")
+    assert r.status_code == 200
+    assert [e["id"] for e in r.json()["events"]["today"]] == [2]
+    assert client.get("/tmp/events").json()["events"]["today"][0]["id"] == 1

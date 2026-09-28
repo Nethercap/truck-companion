@@ -654,10 +654,156 @@ async def ws_live_map(websocket: WebSocket, variant: str):
         outbox.close()
 
 
+# --------------------------------------------------------------- eventos TMP
+
+# Convoyes y eventos de TruckersMP. Se piden desde ACA y no desde el
+# navegador por dos razones, y la segunda importa aunque la primera se
+# arregle: su API no manda cabeceras CORS, y asi hacemos una consulta cada
+# diez minutos para todos en vez de una por cada persona que abre la web.
+#
+# Ellos publican "Cache-Control: max-age=60", o sea que cachear esta bien
+# visto; diez minutos es holgado para algo que cambia por hora. La respuesta
+# cruda son 70 KB con veintidos eventos: se recorta a lo que se muestra.
+#
+# **Las horas vienen sin zona y son UTC.** No lo dice la documentacion; lo
+# dice la pagina de cada evento, que rotula "UTC" al lado de la hora
+# (verificado el 27-09-2026). Se marcan explicitamente con Z al reenviarlas
+# para que el navegador no las interprete como hora local, que correria un
+# convoy una o dos horas segun donde este cada uno.
+TMP_EVENTS_URL = "https://api.truckersmp.com/v2/events"
+TMP_EVENTS_TTL_SECONDS = 600
+TMP_EVENTS_TIMEOUT = 10
+# Lo que se muestra de cada evento. Todo lo demas (descripcion, reglas,
+# banners, mapas) se descarta: son la mayor parte de los 70 KB.
+_tmp_events_cache: Optional[dict] = None
+_tmp_events_lock = threading.Lock()
+_tmp_events_refreshing = False
+
+
+def _tmp_hora(valor) -> Optional[str]:
+    """'2026-10-03 17:00:00' -> '2026-10-03T17:00:00Z'."""
+    if not isinstance(valor, str) or len(valor) < 19:
+        return None
+    return valor[:10] + "T" + valor[11:19] + "Z"
+
+
+def _tmp_evento(crudo: dict) -> Optional[dict]:
+    if not isinstance(crudo, dict) or not crudo.get("id"):
+        return None
+    salida = crudo.get("departure") or {}
+    llegada = crudo.get("arrive") or {}
+    servidor = crudo.get("server") or {}
+    asistencia = crudo.get("attendances") or {}
+    return {
+        "id": crudo.get("id"),
+        "name": crudo.get("name"),
+        # Viene "ETS2", "ATS" o "ETS2 - ProMods". Se guarda el juego base
+        # para filtrar y la etiqueta completa para mostrar: filtrar por
+        # igualdad exacta descartaba en silencio los eventos de ProMods.
+        "game": "ats" if (crudo.get("game") or "").upper().startswith("ATS") else "ets2",
+        "game_label": crudo.get("game"),
+        "type": ((crudo.get("event_type") or {}).get("name")),
+        "start_at": _tmp_hora(crudo.get("start_at")),
+        "meetup_at": _tmp_hora(crudo.get("meetup_at")),
+        # La ciudad viene siempre (22 de 22 al probarlo). "location" NO es
+        # un tipo sino el punto de encuentro adentro de la ciudad, en texto
+        # libre: "Slots", "Container Port", "BOZEMAN descanso". Sirve para
+        # mostrarlo, no para decidir nada. Si se puede rutear o no lo decide
+        # la web, que es la que sabe que ciudades tiene en su mapa.
+        "from_city": salida.get("city"),
+        "from_spot": salida.get("location"),
+        "to_city": llegada.get("city"),
+        "to_spot": llegada.get("location"),
+        "server": servidor.get("name"),
+        "language": crudo.get("language"),
+        "dlcs": list((crudo.get("dlcs") or {}).values()) if isinstance(crudo.get("dlcs"), dict) else (crudo.get("dlcs") or []),
+        "confirmed": asistencia.get("confirmed"),
+        "url": "https://truckersmp.com" + (crudo.get("url") or ""),
+    }
+
+
+def _fetch_tmp_events() -> Optional[dict]:
+    try:
+        req = urllib.request.Request(
+            TMP_EVENTS_URL,
+            headers={"User-Agent": "TruckDash/1.0 (+https://trucksim-dash.com)"})
+        with urllib.request.urlopen(req, timeout=TMP_EVENTS_TIMEOUT) as resp:
+            datos = json.loads(resp.read())
+    except Exception as exc:
+        logging.warning(f"tmp events: {exc}")
+        return None
+    if datos.get("error"):
+        logging.warning(f"tmp events: la API respondio error: {datos.get('descriptor')}")
+        return None
+    respuesta = datos.get("response") or {}
+    secciones = {}
+    for clave in ("now", "today", "upcoming", "featured"):
+        lista = respuesta.get(clave)
+        if not isinstance(lista, list):
+            continue
+        secciones[clave] = [e for e in (_tmp_evento(x) for x in lista) if e]
+    if not secciones:
+        return None
+    return {"events": secciones, "fetched_at": time.time()}
+
+
+def _refresh_tmp_events_blocking():
+    global _tmp_events_cache, _tmp_events_refreshing
+    fresh = _fetch_tmp_events()
+    with _tmp_events_lock:
+        _tmp_events_refreshing = False
+        # Si fallo, se conserva lo ultimo bueno: que su API se caiga no tiene
+        # por que vaciarnos la lista.
+        if fresh is not None:
+            _tmp_events_cache = fresh
+
+
+def get_tmp_events() -> Optional[dict]:
+    """Lo cacheado. Si esta vencido se devuelve igual y se refresca aparte,
+    para no colgar el request en una API de terceros."""
+    global _tmp_events_refreshing
+    with _tmp_events_lock:
+        cached = _tmp_events_cache
+        vencido = cached is None or time.time() - cached["fetched_at"] > TMP_EVENTS_TTL_SECONDS
+        if vencido and not _tmp_events_refreshing:
+            _tmp_events_refreshing = True
+            if cached is not None:
+                threading.Thread(target=_refresh_tmp_events_blocking, daemon=True).start()
+    if cached is None:
+        _refresh_tmp_events_blocking()
+        with _tmp_events_lock:
+            cached = _tmp_events_cache
+    return cached
+
+
+@app.get("/tmp/events")
+def tmp_events(response: Response, game: Optional[str] = None):
+    """Eventos de TruckersMP, recortados y cacheados.
+
+    Fuente: https://truckersmp.com — datos publicos de su API, sin
+    autenticacion. Las horas salen en UTC con Z explicita.
+    """
+    # La mitad del TTL: el navegador no vuelve a preguntar todo el tiempo y
+    # aun asi ve un refresco nuevo con poco retraso.
+    response.headers["Cache-Control"] = "public, max-age=300"
+    datos = get_tmp_events()
+    if datos is None:
+        raise HTTPException(status_code=503, detail="tmp events unavailable")
+    secciones = datos["events"]
+    if game:
+        g = game.lower()
+        secciones = {k: [e for e in v if e["game"] == g] for k, v in secciones.items()}
+    return {"events": secciones, "fetched_at": datos["fetched_at"],
+            "source": "https://truckersmp.com"}
+
+
 @app.on_event("startup")
 async def start_background_tasks():
     asyncio.create_task(broadcast_live_positions_loop())
     asyncio.create_task(convoy_tick_loop())
+    # Se precarga para que el primero que abra el mapa en vivo no espere el
+    # ida y vuelta a la API de TruckersMP.
+    asyncio.create_task(asyncio.to_thread(_refresh_tmp_events_blocking))
 
 
 CODE_ALPHABET = string.ascii_uppercase + string.digits
