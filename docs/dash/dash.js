@@ -312,6 +312,9 @@ function createDashPanel({ root, money, imperial, lang }) {
     const c = gameClockFromMinutes(minutos);
     return c ? String(c.hours).padStart(2, '0') + ':' + String(c.minutes).padStart(2, '0') : null;
   }
+  function consumoTexto(lPor100) {
+    return mi() ? num(235.215 / lPor100, 1) + '\u00a0mpg' : num(lPor100, 1) + '\u00a0l/100';
+  }
   // Sin conversion: para los numeros que acompañan, no para el titular.
   // El signo va ANTES del simbolo: "-$1.542" y no "$-1.542".
   function plataSimple(monto) {
@@ -362,7 +365,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     const realSeg = viajeJuegoSeg != null ? viajeJuegoSeg / s : null;
     renderCinta(d, enViaje, restanteKm, realSeg, viajeJuegoSeg);
     renderConduccion(d);
-    renderLlegada(d, enViaje, realSeg, viajeJuegoSeg);
+    renderLlegada(d, enViaje, viajeJuegoSeg);
     renderCombustible(d, restanteKm, viajeJuegoSeg, s);
     renderCamion(d);
     renderFranja(d, enViaje);
@@ -484,7 +487,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     }
   }
 
-  function renderLlegada(d, enViaje, realSeg, viajeJuegoSeg) {
+  function renderLlegada(d, enViaje, viajeJuegoSeg) {
     const margen = enViaje && d.jobDeadlineSeconds != null && viajeJuegoSeg != null
       ? d.jobDeadlineSeconds - viajeJuegoSeg : null;
     refs.cardEta.hidden = margen == null;
@@ -492,8 +495,9 @@ function createDashPanel({ root, money, imperial, lang }) {
     texto('etaClaim', margen >= 0 ? t('deadlineEarly', dur(margen)) : t('deadlineLate', dur(-margen)),
           margen >= 0 ? 'bien' : 'mal');
     const partes = [];
+    // La hora de llegada no va aca: la cinta de arriba ya la dice, y esta
+    // tarjeta solo aparece cuando la cinta esta a la vista.
     if (d.jobDeadlineSeconds != null) partes.push(t('deadlineIn', dur(d.jobDeadlineSeconds)));
-    if (realSeg != null) partes.push(t('arrivalLabel') + ' ' + reloj(new Date(Date.now() + realSeg * 1000)));
     texto('etaLine', partes.join(' · ') || null);
     // El total va con la conversion a la moneda local si el anfitrion la
     // hace; el precio por km NO. Es un numero para comparar trabajos entre
@@ -540,7 +544,7 @@ function createDashPanel({ root, money, imperial, lang }) {
 
     const consumo = combustible.avgLPer100() || d.fuelAvgConsumption || null;
     const bajo = [];
-    if (consumo != null) bajo.push(mi() ? num(235.215 / consumo, 1) + '\u00a0mpg' : num(consumo, 1) + '\u00a0l/100');
+    if (consumo != null) bajo.push(consumoTexto(consumo));
     if (d.adblue != null && d.adblueCapacity) {
       bajo.push(t('adblueLabel') + ' ' + num(d.adblue / d.adblueCapacity * 100) + '\u00a0%');
     }
@@ -608,7 +612,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     texto('sAvg', st.avgSpeedKmh == null ? '-'
       : vel(st.avgSpeedKmh) + (st.topSpeedKmh ? ' · ' + t('topSpeed') + ' ' + vel(st.topSpeedKmh) : ''));
     texto('sFuel', st.fuelUsedL < 1 ? '-'
-      : num(st.fuelUsedL) + '\u00a0l' + (st.fuelPer100Km ? ' · ' + num(st.fuelPer100Km, 1) : ''));
+      : num(st.fuelUsedL) + '\u00a0l' + (st.fuelPer100Km ? ' · ' + consumoTexto(st.fuelPer100Km) : ''));
     // Un minuto de exceso es redondeo del velocimetro, no manejar rapido.
     metricaSiHay('sOver', st.overLimitSeconds >= 60
       ? hm(st.overLimitSeconds) + ' · ' + num(st.overLimitRatio * 100) + '\u00a0%' : null);
@@ -616,7 +620,9 @@ function createDashPanel({ root, money, imperial, lang }) {
     metricaSiHay('sTolls', st.tolls.count ? plataSimple(st.tolls.amount) : null);
     metricaSiHay('sFines', st.fines.count ? plataSimple(st.fines.amount) : null);
     metricaSiHay('sFerries', st.ferries.count ? plataSimple(st.ferries.amount) : null);
-    texto('sNet', st.netProfit ? plataSimple(st.netProfit) : '0');
+    // Con el simbolo aunque sea cero: un "0" suelto al lado de "neto" no
+    // dice que es plata.
+    texto('sNet', plataSimple(st.netProfit || 0));
     refs.resetBtn.title = st.startedAt ? t('sessionSince', reloj(new Date(st.startedAt * 1000))) : '';
   }
 
