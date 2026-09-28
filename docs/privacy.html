@@ -31,7 +31,7 @@
 <header><img src="/assets/logo.svg" alt="" /> <a href="/" style="color:var(--text)">Truck Dash</a></header>
 <main>
   <h1>Privacy policy</h1>
-  <p class="updated">Last updated: 25 September 2026</p>
+  <p class="updated">Last updated: 28 September 2026</p>
 
   <p>Truck Dash is a free, open-source companion for Euro Truck Simulator 2 and American Truck Simulator. It is designed to handle as little data as possible. This page explains exactly what it reads, sends and stores.</p>
   <p><strong>An account is optional.</strong> Without one, everything works as it always has and nothing about you is stored on our servers. If you do create one, the section below says exactly what it holds.</p>
@@ -45,7 +45,7 @@
   <div class="box">The client never reads, modifies or uploads any other file on your computer. It does not need administrator rights. It writes only its own settings (<code>keybinds.json</code>) and a log file next to the executable.</div>
 
   <h2>What is sent to the server</h2>
-  <p>The client sends live telemetry over an encrypted WebSocket to a small relay server (hosted on Railway), tagged only with a random 8-character pairing code. The server forwards it to the browser(s) connected with the same code. Telemetry is <strong>not stored</strong>; it exists in memory only while your session is open.</p>
+  <p>The client sends live telemetry over an encrypted WebSocket to a small relay server (hosted on Railway), tagged only with a random 8-character pairing code. The server forwards it to the browser(s) connected with the same code. Telemetry is <strong>not stored</strong>; it exists in memory only while your session is open. The one exception is your own driving history, and only if you link the client to an account (see below).</p>
   <p>No name, email, Steam ID, IP-based profile, hardware ID or any other identifier is collected. Your IP address is seen by the server like by any website you visit, and is used only for basic abuse rate-limiting in memory.</p>
 
   <h2>What is stored</h2>
@@ -70,7 +70,9 @@
     <li>The email address the provider reports, if it is verified. It is kept as a <strong>contact detail only</strong>: it is never a way to sign in, and it is never used to link two accounts together.</li>
     <li>Whether your profile is public. <strong>It is private by default</strong> and turning it on is an explicit choice.</li>
     <li>Your open sessions: a random token, when each started and expires, and the browser identification string, so you can recognise your devices and close the ones you do not want.</li>
+    <li><strong>Your driving, only if you link the Windows client to the account.</strong> Each time you drive: the game and map, when you started and stopped, the distance, the in-game and real time, top speed and fuel used. Each job: the cities, companies, cargo and its weight, the pay, the planned distance and the one the game reports on delivery, tolls, ferries and fines, how much the truck wore down, whether it was delivered or cancelled, and the route you drove, simplified to a few hundred points. Positions are coordinates on the game's map, not your real location.</li>
   </ul>
+  <p>Until you link the client, it records nothing at all, not even on your own computer. Unlinking it in the client's Setup window stops it. What was already recorded stays in the account until you delete the account, and it is part of the data download.</p>
   <div class="box">Accounts are never linked by email address. Signing in with a second provider adds it to the account you are already signed into, and only if you ask for it.</div>
   <p>The database runs on Railway and is backed up once a day. Backups are encrypted and kept for at most seven days.</p>
 
