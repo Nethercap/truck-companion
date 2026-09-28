@@ -122,7 +122,13 @@
       note: 'Las posiciones se comparten de forma anónima (id de sesión, camión, carga y viaje — sin nombre salvo que pongas un apodo) y solo mientras la app está abierta. Se apaga en Ajustes → "Compartir mi posición". <a href="/privacy.html">Privacidad</a>',
       madeWith: 'Datos de mapa posibles gracias a las herramientas de TruckerMudgeon' },
   };
-  let lang = params.get('lang') || localStorage.getItem('truckdash_lang') || (navigator.language || 'en').slice(0, 2);
+  // Ingles por defecto, y NO el idioma del navegador: es el idioma del
+  // producto, y el resto (la app, la cuenta) ya funciona asi. Con el
+  // navigator.language de antes, alguien en Argentina o en España abria el
+  // mapa en vivo en castellano sin haberlo elegido y el resto del producto
+  // en ingles. Lo unico que lo cambia es elegirlo, aca o en la app: las dos
+  // guardan en la misma clave.
+  let lang = params.get('lang') || localStorage.getItem('truckdash_lang') || 'en';
   if (!I18N[lang]) lang = 'en';
   const t = (k) => I18N[lang][k] || I18N.en[k] || k;
   function applyLang() {
