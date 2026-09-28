@@ -380,6 +380,17 @@ class SetupWindow:
                               wraplength=520, justify="left")
         qchk.pack(anchor="w", pady=(2, 0))
 
+        # Prendido por defecto. Se apaga para quien abre el tablero en el
+        # celular o en otra PC: ahi la ventana en la maquina donde juega no
+        # aporta nada, y bajo gamescope ademas le roba el foco al juego, que
+        # deja de recibir teclas hasta que hace clic de vuelta (issue #6).
+        self.dashboard_var = tk.BooleanVar(value=win_integration.open_dashboard_enabled())
+        bchk = tk.Checkbutton(options, text=T("open_dashboard_on_start"), variable=self.dashboard_var,
+                              command=self.toggle_open_dashboard, bg=BG, fg=FG,
+                              selectcolor="#262b33", activebackground=BG, activeforeground=FG,
+                              wraplength=520, justify="left")
+        bchk.pack(anchor="w", pady=(2, 0))
+
         # --- Cuenta ---
         # Opcional a proposito: todo el cliente funciona sin vincular nada, y
         # esto solo agrega que los viajes queden guardados.
@@ -597,6 +608,9 @@ class SetupWindow:
     def toggle_quit_on_game_close(self):
         win_integration.set_quit_on_game_close(self.quit_var.get())
 
+    def toggle_open_dashboard(self):
+        win_integration.set_open_dashboard(self.dashboard_var.get())
+
     def add_game_folder(self):
         chosen = filedialog.askdirectory(title=T("pick_folder_title"))
         if not chosen:
@@ -808,6 +822,13 @@ def build_web_url() -> str | None:
 
 def open_web_ui():
     global _browser_opened
+    # Quien lo abre en el celular o en otra PC no necesita ninguna ventana en
+    # la maquina donde juega, y bajo gamescope esa ventana le roba el foco al
+    # juego, que deja de recibir teclas hasta que hace clic de vuelta
+    # (issue #6). Se consulta cada vez y no una sola: la casilla se puede
+    # apagar con el cliente ya abierto.
+    if not win_integration.open_dashboard_enabled():
+        return
     if _browser_opened:
         return
     _browser_opened = True

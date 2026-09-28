@@ -353,3 +353,26 @@ def test_el_cierre_se_decide_donde_la_evidencia_es_buena():
     despues = fuente.split('if raw.get("sdkActive")')[1]
     assert "apagar()" in antes_de_sdkactive, "el cierre salio de la rama de init()"
     assert "apagar()" not in despues, "el cierre volvio a la rama de sdkActive"
+
+
+def test_el_tablero_no_se_abre_solo_si_la_opcion_esta_apagada(monkeypatch):
+    """Quien abre el tablero en el celular no quiere una ventana abriendose
+    en la maquina donde juega. En Linux con gamescope ademas le roba el foco
+    al juego, que deja de recibir teclas hasta que hace clic de vuelta
+    (issue #6)."""
+    abiertos = []
+    monkeypatch.setattr(tray_client.webbrowser, "open", lambda url: abiertos.append(url))
+    monkeypatch.setattr(tray_client.state, "code", "ABCD-1234")
+    monkeypatch.setattr(tray_client.state, "backend_url", "https://ejemplo")
+    monkeypatch.setattr(tray_client, "_browser_opened", False)
+
+    ajustes = {"open_dashboard": False}
+    monkeypatch.setattr(tray_client.win_integration, "load_settings", lambda: dict(ajustes))
+    tray_client.open_web_ui()
+    assert abiertos == []
+
+    # Sin la clave, el default sigue siendo abrirlo: la opcion es para
+    # apagarlo, no para que haya que prenderlo.
+    ajustes.clear()
+    tray_client.open_web_ui()
+    assert len(abiertos) == 1

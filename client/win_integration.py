@@ -92,6 +92,28 @@ def set_quit_on_game_close(activo: bool) -> None:
     save_settings(settings)
 
 
+def open_dashboard_enabled() -> bool:
+    """Si al arrancar hay que abrir el tablero en el navegador.
+
+    Prendido por defecto: para quien usa Truck Dash en una sola PC, que se
+    abra solo es la mitad de la experiencia. Se puede apagar porque quien lo
+    abre en el celular o en una segunda pantalla no necesita ninguna ventana
+    en la maquina donde juega; y en Linux con gamescope esa ventana le roba
+    el foco al juego, que deja de recibir teclas hasta que hace clic de
+    vuelta (issue #6).
+    """
+    valor = load_settings().get("open_dashboard")
+    if valor is None:
+        return True
+    return bool(valor)
+
+
+def set_open_dashboard(activo: bool) -> None:
+    settings = load_settings()
+    settings["open_dashboard"] = bool(activo)
+    save_settings(settings)
+
+
 def load_settings() -> dict:
     try:
         with open(settings_path(), encoding="utf-8") as f:
