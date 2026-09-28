@@ -239,9 +239,11 @@
     background: transparent; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer;
   }
   .routeResetBtn:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  /* Que el resumen no tape el mini-HUD ni el cartel del mapa. */
-  #mapPanel.hasRouteSummary .bottomRightHud { bottom: 4.6rem; }
-  #mapPanel.hasRouteSummary .mapHint { bottom: 4.3rem; font-size: 0.62rem; }
+  /* Que el resumen no tape el mini-HUD ni el cartel del mapa. El alto lo
+     mide app.js (keepPanelsClearOfRouteSummary): con el aviso de destino
+     aproximado el resumen crece y un valor fijo quedaba corto. */
+  #mapPanel.hasRouteSummary .bottomRightHud { bottom: calc(var(--route-summary-h, 3.3rem) + 2.4rem); }
+  #mapPanel.hasRouteSummary .mapHint { bottom: calc(var(--route-summary-h, 3.3rem) + 1rem); font-size: 0.62rem; }
   /* Columna de botones del mapa: flex, asi los que aparecen y desaparecen
      (3D solo en modo nav, comandos solo en horizontal, 💬 solo en convoy) no
      dejan huecos ni se pisan. Antes cada uno tenia su top absoluto y el 3D
@@ -380,6 +382,8 @@
     font-size: 0.72rem; color: var(--muted); text-align: right;
   }
   .miniHudExtra:empty { display: none; }
+  /* Pegados al mini-HUD cuando este tiene lugar propio: un solo recuadro. */
+  #miniHud > .miniHudExtra { background: none; padding: 0.3rem 0 0; }
   .layout.panelHidden .miniHudExtra:not(:empty), .layout.commandsPageActive .miniHudExtra:not(:empty) { display: flex; }
 
   .settingsOverlay {

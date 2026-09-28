@@ -974,6 +974,19 @@ function applyBtnLayout() {
   for (const part of [btnLayout.groups, btnLayout.buttons, btnLayout.panels]) {
     for (const [id, pos] of Object.entries(part)) placeMoved(document.getElementById(id), pos);
   }
+  placeMiniHudExtra();
+}
+
+// Los datos extra (combustible, autonomia, ETA) van debajo de la velocidad.
+// Si la velocidad tiene lugar propio y los extras no, se van con ella: si se
+// quedaban en la pila de abajo a la derecha, caian justo debajo del mini-HUD
+// que alguien habia llevado a ese rincon y se leian los dos encimados.
+function placeMiniHudExtra() {
+  const hud = document.getElementById('miniHud');
+  const extra = document.getElementById('miniHudExtra');
+  if (!hud || !extra || extra.classList.contains('moved')) return;
+  const target = hud.classList.contains('moved') ? hud : document.getElementById('bottomRightHud');
+  if (target && extra.parentElement !== target) target.appendChild(extra);
 }
 
 function resetBtnLayout() {
@@ -1038,6 +1051,7 @@ function startLayoutDrag(ev) {
       dragging = true;
       if (el.parentNode !== panel) panel.appendChild(el);
       el.classList.add('moved');
+      placeMiniHudExtra();
     }
     place(e);
   };
@@ -2168,6 +2182,7 @@ function renderRouteSummary(view) {
   if (!panel) return;
   panel.hidden = !view;
   document.getElementById('mapPanel').classList.toggle('hasRouteSummary', !!view);
+  keepPanelsClearOfRouteSummary();
   if (!view) return;
   const bar = document.getElementById('routeProgressBar');
   bar.style.width = `${view.percent}%`;
@@ -2570,9 +2585,41 @@ function placeMiniHud() {
   if (hud && hud.classList.contains('moved')) return;
   const target = portraitMq.matches ? document.getElementById('bottomRightHud') : document.getElementById('topRightControls');
   if (hud && hud.parentElement !== target) target.insertBefore(hud, target.firstChild);
+  placeMiniHudExtra();
 }
 if (portraitMq.addEventListener) portraitMq.addEventListener('change', placeMiniHud); else portraitMq.addListener(placeMiniHud);
 placeMiniHud();
+
+// El resumen de ruta no tiene alto fijo: con el aviso de destino
+// aproximado suma dos renglones y tapaba la pila de abajo a la derecha, que
+// estaba corrida un alto fijo. Ahora la pila se corre lo que el resumen mide
+// (--route-summary-h), y un panel que el usuario dejo donde el resumen lo
+// tapa sube lo justo mientras el resumen esta a la vista. Sin tocar la
+// posicion guardada: al cerrar la ruta vuelve a donde lo puso.
+function keepPanelsClearOfRouteSummary() {
+  const panel = document.getElementById('mapPanel');
+  const summary = document.getElementById('routeSummary');
+  if (!panel || !summary) return;
+  const visible = !summary.hidden && summary.offsetHeight > 0;
+  panel.style.setProperty('--route-summary-h', `${visible ? summary.offsetHeight : 0}px`);
+  const sr = summary.getBoundingClientRect();
+  for (const id of MOVABLE_PANEL_IDS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.style.translate = '';
+    if (!visible || !el.classList.contains('moved') || document.body.classList.contains('editLayout')) continue;
+    const r = el.getBoundingClientRect();
+    const overlaps = r.bottom > sr.top && r.top < sr.bottom && r.right > sr.left && r.left < sr.right;
+    if (overlaps) el.style.translate = `0 ${-(r.bottom - sr.top + 8)}px`;
+  }
+}
+if (typeof ResizeObserver === 'function') {
+  const ro = new ResizeObserver(() => keepPanelsClearOfRouteSummary());
+  for (const id of ['mapPanel', 'routeSummary', ...MOVABLE_PANEL_IDS]) {
+    const el = document.getElementById(id);
+    if (el) ro.observe(el);
+  }
+}
 
 document.getElementById('tilt3dBtn').addEventListener('click', () => {
   nav3d = !nav3d;
