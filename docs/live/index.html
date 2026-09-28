@@ -47,6 +47,15 @@
   .section h2 { font-size: 0.85rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.7rem; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
   .grid.base { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .events { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.7rem; }
+  .ev { display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 0.7rem 0.85rem; color: var(--text); transition: border-color 0.15s; }
+  .ev:hover { border-color: var(--blue); text-decoration: none; }
+  .ev .when { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blue); }
+  .ev .when.soon { color: #ffb020; }
+  .ev .name { font-weight: 600; margin: 0.15rem 0 0.3rem; line-height: 1.25; }
+  .ev .route { font-size: 0.85rem; }
+  .ev .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .evNote { font-size: 0.75rem; color: var(--muted); margin-top: 0.6rem; }
   .card { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; color: var(--text); transition: border-color 0.15s, transform 0.15s; }
   .card:hover { border-color: var(--blue); transform: translateY(-2px); text-decoration: none; }
   .card .preview { position: relative; aspect-ratio: 16 / 9; background: radial-gradient(ellipse at 50% 60%, rgba(59,158,255,0.10), transparent 65%), var(--panel-alt); }
@@ -88,6 +97,11 @@
   </div>
   <section class="section"><h2 data-i18n="baseGames">Base games</h2><div class="grid base" id="baseGrid"></div></section>
   <section class="section"><h2 data-i18n="mapMods">Map mods</h2><div class="grid" id="modGrid"></div></section>
+  <section class="section" id="eventsSection" hidden>
+    <h2 data-i18n="eventsTitle">TruckersMP events</h2>
+    <div class="events" id="eventsGrid"></div>
+    <p class="evNote" data-i18n="eventsNote">Public event data from truckersmp.com. Times shown in your timezone.</p>
+  </section>
   <p class="note" data-i18n="note">Positions are shared anonymously (session id, truck, cargo and job — no name unless you set a nickname) and only while the app is open. Drivers can turn it off in Settings → "Share my position". <a href="/privacy.html">Privacy</a></p>
 </main>
 <footer>© 2026 Truck Dash · <a href="/">trucksim-dash.com</a> · <span data-i18n="madeWith">Map data made possible by TruckerMudgeon's map tools</span></footer>
@@ -97,12 +111,12 @@
   const BACKEND = (params.get('backend') || 'https://truck-companion-production.up.railway.app').replace(/^ws/, 'http').replace(/\/$/, '');
   const MAPS = 'https://maps.trucksim-dash.com';
   const I18N = {
-    en: { metaTitle: 'Live Map – Truck Dash drivers online right now (ETS2 & ATS)', brandSub: 'Live Map', navHome: 'Home', navApp: 'Open the app',
+    en: { eventsTitle: 'TruckersMP events', eventsNote: 'Public event data from truckersmp.com. Times in your timezone.', eventsNow: 'happening now', eventsIn: (x) => 'in ' + x, eventsGoing: (n) => n + ' going', metaTitle: 'Live Map – Truck Dash drivers online right now (ETS2 & ATS)', brandSub: 'Live Map', navHome: 'Home', navApp: 'Open the app',
       title: 'Drivers on the road right now', subtitle: "Every Truck Dash driver who shares their position, live on the map they're playing on — base game or map mod. Pick a map to watch.",
       totalLabel: 'drivers online', baseGames: 'Base games', mapMods: 'Map mods', cities: 'cities', online: 'online', noOne: 'nobody right now',
       note: 'Positions are shared anonymously (session id, truck, cargo and job — no name unless you set a nickname) and only while the app is open. Drivers can turn it off in Settings → "Share my position". <a href="/privacy.html">Privacy</a>',
       madeWith: "Map data made possible by TruckerMudgeon's map tools" },
-    es: { metaTitle: 'Mapa en vivo – Conductores de Truck Dash en línea ahora (ETS2 y ATS)', brandSub: 'Mapa en vivo', navHome: 'Inicio', navApp: 'Abrir la app',
+    es: { eventsTitle: 'Eventos de TruckersMP', eventsNote: 'Datos públicos de eventos de truckersmp.com. Horarios en tu zona.', eventsNow: 'ahora mismo', eventsIn: (x) => 'en ' + x, eventsGoing: (n) => n + ' anotados', metaTitle: 'Mapa en vivo – Conductores de Truck Dash en línea ahora (ETS2 y ATS)', brandSub: 'Mapa en vivo', navHome: 'Inicio', navApp: 'Abrir la app',
       title: 'Camioneros en ruta ahora mismo', subtitle: 'Todos los conductores de Truck Dash que comparten su posición, en vivo sobre el mapa en el que juegan — juego base o mod de mapa. Elegí un mapa para mirar.',
       totalLabel: 'conductores en línea', baseGames: 'Juegos base', mapMods: 'Mods de mapa', cities: 'ciudades', online: 'en línea', noOne: 'nadie ahora mismo',
       note: 'Las posiciones se comparten de forma anónima (id de sesión, camión, carga y viaje — sin nombre salvo que pongas un apodo) y solo mientras la app está abierta. Se apaga en Ajustes → "Compartir mi posición". <a href="/privacy.html">Privacidad</a>',
@@ -192,6 +206,74 @@
   buildCards();
   refreshCounts();
   setInterval(refreshCounts, 15000);
+
+  // --- Eventos de TruckersMP -------------------------------------------
+  // Los datos salen de nuestro relay, que los cachea diez minutos para
+  // todos: la API de ellos no manda CORS y ademas no tiene sentido que
+  // cada visitante le pegue por su cuenta. Las horas llegan en UTC con Z,
+  // asi que Date las convierte sola a la zona de quien mira.
+  const EVENTOS_MAX = 8;
+
+  function cuando(iso) {
+    // Ojo: la funcion de traduccion de esta pagina se llama t(), asi que
+    // la fecha no puede llamarse t o la tapa.
+    const t_ = new Date(iso);
+    if (isNaN(t_)) return null;
+    const faltan = (t_ - Date.now()) / 60000;
+    // Solo interesa lo que esta por pasar; lo de la semana que viene se ve
+    // en su web.
+    if (faltan < -180 || faltan > 60 * 24 * 7) return null;
+    const fmt = t_.toLocaleString(lang, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    if (faltan < 0) return { txt: t('eventsNow'), pronto: true, orden: faltan };
+    if (faltan < 60) return { txt: t('eventsIn')(Math.round(faltan) + ' min'), pronto: true, orden: faltan };
+    if (faltan < 60 * 12) return { txt: t('eventsIn')(Math.round(faltan / 60) + ' h'), pronto: false, orden: faltan };
+    return { txt: fmt, pronto: false, orden: faltan };
+  }
+
+  async function cargarEventos() {
+    let datos;
+    try {
+      const r = await fetch(`${BACKEND}/tmp/events`, { cache: 'no-store' });
+      if (!r.ok) return;
+      datos = await r.json();
+    } catch (e) { return; }   // sin eventos la pagina funciona igual
+    const vistos = new Set();
+    const lista = [];
+    for (const clave of ['now', 'today', 'upcoming']) {
+      for (const ev of (datos.events && datos.events[clave]) || []) {
+        if (vistos.has(ev.id)) continue;
+        const c = cuando(ev.start_at);
+        if (!c) continue;
+        vistos.add(ev.id);
+        lista.push({ ev, c });
+      }
+    }
+    if (!lista.length) return;
+    lista.sort((a, b) => a.c.orden - b.c.orden);
+
+    const grid = document.getElementById('eventsGrid');
+    grid.innerHTML = '';
+    for (const { ev, c } of lista.slice(0, EVENTOS_MAX)) {
+      const a = document.createElement('a');
+      a.className = 'ev';
+      a.href = ev.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      const ruta = [ev.from_city, ev.to_city].filter(Boolean).join(' \u2192 ');
+      const meta = [ev.game_label, ev.server, ev.confirmed ? t('eventsGoing')(ev.confirmed) : null]
+        .filter(Boolean).join(' \u00b7 ');
+      a.innerHTML = `<div class="when${c.pronto ? ' soon' : ''}"></div>`
+        + '<div class="name"></div><div class="route"></div><div class="meta"></div>';
+      a.children[0].textContent = c.txt;
+      a.children[1].textContent = ev.name || '';
+      a.children[2].textContent = ruta;
+      a.children[3].textContent = meta;
+      grid.appendChild(a);
+    }
+    document.getElementById('eventsSection').hidden = false;
+  }
+  cargarEventos();
+
 })();
 </script>
 </body>
