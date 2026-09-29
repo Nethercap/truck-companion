@@ -89,6 +89,7 @@ class AppState:
         self.map_mods_read_at = 0.0
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
+        self.vehicle = None  # "Marca Modelo" mientras esta en vivo, para el log
         self.code = None
         self.icon = None
         self.backend_url = None
@@ -112,10 +113,17 @@ class AppState:
             code_part = f" - code {self.code}" if self.code else ""
             self.icon.title = f"Truck Dash{code_part} - {self.status_text()}"
 
-    def set_status(self, status: str, game: str | None = None):
+    def set_status(self, status: str, game: str | None = None, vehicle: str | None = None):
         changed = status != self.status or game != self.game
+        # Una linea por cambio, no por frame: sin esto un log no dice si el
+        # tablero llego a estar en vivo ni con que vehiculo (los autos de
+        # ATS 1.61 usan los mismos canales que el camion).
+        if changed or vehicle != self.vehicle:
+            detalle = ", ".join(p for p in (game, vehicle) if p)
+            logging.info("Status: %s%s", status, f" ({detalle})" if detalle else "")
         self.status = status
         self.game = game
+        self.vehicle = vehicle
         self.refresh_title()
         return changed
 
@@ -1154,7 +1162,8 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             payload = client_lib.build_payload(raw)
             client_lib.attach_job_snapshot_if_finished(payload, raw)
             game = payload.get("game")
-            if state.set_status("live", game):
+            vehiculo = " ".join(p for p in (payload.get("truckBrand"), payload.get("truckName")) if p) or None
+            if state.set_status("live", game, vehiculo):
                 open_web_ui()  # en modo autostart, recien aca (juego detectado) se abre el navegador
             state.discord.update(payload)
             # La cuenta se alimenta del MISMO payload que va al tablero, no

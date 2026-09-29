@@ -398,3 +398,31 @@ def test_con_winget_el_aviso_da_el_comando_en_vez_de_actualizar(monkeypatch, tmp
         assert v.root.clipboard_get() == "winget upgrade Nethercap.TruckDash"
     finally:
         v.root.destroy()
+
+
+# ------------------------------------------------------- estado en el log
+# Un log de usuario no decia si el tablero llego a estar en vivo ni con que
+# vehiculo, justo cuando ATS 1.61 agrego autos manejables.
+
+def test_el_log_anota_cada_cambio_de_estado_y_de_vehiculo(caplog):
+    import logging
+    s = tray_client.AppState()
+    with caplog.at_level(logging.INFO):
+        s.set_status("live", "ats", "Peterbilt 389")
+        s.set_status("live", "ats", "Peterbilt 389")  # mismo frame: nada
+        s.set_status("live", "ats", "Ford Bronco")    # cambio de vehiculo
+        s.set_status("waiting_truck")
+    lineas = [r.getMessage() for r in caplog.records if r.getMessage().startswith("Status:")]
+    assert lineas == [
+        "Status: live (ats, Peterbilt 389)",
+        "Status: live (ats, Ford Bronco)",
+        "Status: waiting_truck",
+    ]
+
+
+def test_cambiar_de_vehiculo_no_cuenta_como_cambio_de_estado():
+    """El valor que devuelve decide abrir el navegador al entrar en vivo:
+    pasar del camion al auto no lo tiene que abrir otra vez."""
+    s = tray_client.AppState()
+    assert s.set_status("live", "ats", "Peterbilt 389") is True
+    assert s.set_status("live", "ats", "Ford Bronco") is False
