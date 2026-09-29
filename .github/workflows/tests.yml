@@ -27,6 +27,9 @@ jobs:
       - run: pip install -r client/requirements.txt
       - run: python -m pip install pytest
       - run: python -m pytest client/ -v
+      # El plugin (plugin/) no se compila en cada push, solo con "Build
+      # plugin": esto avisa en el momento si un cambio no compila.
+      - run: powershell -File plugin/build.ps1 -OutDir "$env:RUNNER_TEMP\plugin"
 
   # El cliente tambien corre en Linux (bajo Proton, y algun dia nativo), y
   # ahi hay cosas que en Windows no se ven: las rutas distinguen mayusculas y

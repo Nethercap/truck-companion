@@ -1,0 +1,47 @@
+name: Build plugin
+
+# Compila el plugin de telemetria (plugin/, fork de RenCloud/scs-sdk-plugin)
+# en un runner limpio y commitea la DLL en client/vendor/ junto con su hash
+# en client/plugin_installer.py. Asi la DLL que el cliente instala en la
+# carpeta del juego de cada usuario sale de este log, igual que el .exe, y
+# no de la PC de nadie.
+#
+# Se corre a mano ("Run workflow") despues de cambiar algo en plugin/. No se
+# compila en cada release a proposito: cada version de Visual Studio da otros
+# bytes, y un hash nuevo hace que Setup le pida a todos reinstalar el plugin
+# y reiniciar el juego sin que nada haya cambiado.
+#
+# El push lo hace el token de Actions, que no dispara otros workflows: los
+# tests de ese commit corren con el siguiente push.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build scs-telemetry.dll
+        run: powershell -File plugin/build.ps1 -OutDir "$env:RUNNER_TEMP\plugin"
+      - name: Pin it in the client
+        run: python tools/pin_plugin.py "$env:RUNNER_TEMP\plugin\scs-telemetry.dll"
+      - name: Check the client still passes its plugin tests
+        run: |
+          pip install -r client/requirements.txt pytest
+          python -m pytest client/test_plugin_installer.py -q
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/vendor/scs-telemetry.dll client/plugin_installer.py
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { Write-Host "La DLL no cambio, nada que commitear"; exit 0 }
+          git commit -m "plugin: DLL compilada en Actions desde plugin/" -m "Corrida: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          git push origin "HEAD:$env:GITHUB_REF_NAME"

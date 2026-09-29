@@ -1,11 +1,15 @@
 # Vendored third-party files
 
-- `scs-telemetry.dll` — SCS SDK telemetry plugin (Win64) by RenCloud,
-  release V.1.12.1, MIT License (see `LICENSE-scs-sdk-plugin.txt`).
-  Source: https://github.com/RenCloud/scs-sdk-plugin
+- `scs-telemetry.dll` — SCS SDK telemetry plugin (Win64), MIT License (see
+  `LICENSE-scs-sdk-plugin.txt`). It is Truck Dash's fork of
+  [RenCloud/scs-sdk-plugin](https://github.com/RenCloud/scs-sdk-plugin)
+  V.1.12.1, with the car jobs of ATS 1.61; the source and the list of
+  changes are in `plugin/` at the root of this repository.
 
   The Truck Dash client bundles this file so it can install it into the
-  game's `bin\win_x64\plugins\` folder for the user with one click. To
-  update it, download the new release zip, copy `Win64/scs-telemetry.dll`
-  here and update `PLUGIN_DLL_VERSION` / `PLUGIN_DLL_SHA256` in
-  `client/plugin_installer.py`.
+  game's `bin\win_x64\plugins\` folder for the user with one click.
+
+  It is built by GitHub Actions, not on anyone's PC: after changing
+  `plugin/`, run the "Build plugin" workflow. It compiles the DLL, copies it
+  here and updates `PLUGIN_DLL_SHA256` in `client/plugin_installer.py`
+  (`tools/pin_plugin.py`). Bump `PLUGIN_DLL_VERSION` there by hand.
