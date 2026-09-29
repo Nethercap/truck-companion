@@ -1931,6 +1931,8 @@ function distanceToRouteMeters(x, z) {
   return best;
 }
 
+const ROUTE_GRAPH_V3_REV = 2;
+
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
   const base = `${mapInfo.assetsDir}/route-graph-${currentGame}`;
@@ -1951,8 +1953,10 @@ async function loadRouteGraph(mapInfo) {
     }
     // Primero el v3 (con la corrida para dibujar la ruta sobre la calzada de
     // la mano por la que se va); si esa variante todavia no lo tiene, el de
-    // siempre, y la ruta se dibuja por el eje como antes.
-    let res = await fetch(`${base}-v3.bin${v}`).catch(() => null);
+    // siempre, y la ruta se dibuja por el eje como antes. `g` cambia cuando
+    // se resube solo el v3 (corridas corregidas, ruteo igual), para no tener
+    // que subir MAP_DATA_VERSION y hacer bajar de nuevo los tiles.
+    let res = await fetch(`${base}-v3.bin${v}&g=${ROUTE_GRAPH_V3_REV}`).catch(() => null);
     if (!res || !res.ok) res = await fetch(`${base}.bin${v}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     routeGraph = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
