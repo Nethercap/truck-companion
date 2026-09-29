@@ -426,3 +426,87 @@ def test_cambiar_de_vehiculo_no_cuenta_como_cambio_de_estado():
     s = tray_client.AppState()
     assert s.set_status("live", "ats", "Peterbilt 389") is True
     assert s.set_status("live", "ats", "Ford Bronco") is False
+
+
+# ------------------------------------------- texto del icono de la bandeja
+# Regresion de 1.5.20: en castellano "plugin_missing" + "Conectado" medía 129
+# caracteres, pystray tiraba ValueError y el bucle de telemetria moria sin
+# dejar rastro. El cliente abierto antes que el juego no lo leia nunca.
+
+class _IconoDeWindows:
+    """Hace lo mismo que pystray en Windows: el titulo va a un WCHAR[128]."""
+    def __init__(self):
+        self._title = ""
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, valor):
+        try:
+            from pystray._util import win32
+        except Exception:
+            win32 = None
+        if win32 is not None:
+            win32.NOTIFYICONDATAW(szTip=valor)  # ValueError si no entra
+        elif len(valor) > 128:
+            raise ValueError(f"string too long ({len(valor)}, maximum length 128)")
+        self._title = valor
+
+
+def test_el_texto_del_icono_entra_en_todos_los_idiomas_y_estados(monkeypatch):
+    import i18n
+    s = tray_client.AppState()
+    s.icon = _IconoDeWindows()
+    s.code = "FIBR765O"
+    for lang in i18n._STRINGS:
+        monkeypatch.setattr(i18n, "LANG", lang)
+        for cloud in tray_client.CLOUD_KEYS:
+            s.set_cloud(cloud)
+            for status in tray_client.STATUS_KEYS:
+                s.set_status(status, "ets2")
+                assert len(s.icon.title) <= tray_client.TITULO_MAX
+
+
+def test_el_texto_recortado_lo_dice():
+    largo = "x" * 200
+    recortado = tray_client.recortar_titulo(largo)
+    assert len(recortado) == tray_client.TITULO_MAX and recortado.endswith("...")
+    assert tray_client.recortar_titulo("corto") == "corto"
+
+
+def test_una_tarea_de_fondo_que_muere_queda_en_el_log(caplog):
+    import asyncio
+    import logging
+
+    async def revienta():
+        raise ValueError("string too long")
+
+    async def principal():
+        t = tray_client.vigilar(asyncio.create_task(revienta()), "telemetria")
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        return t
+
+    with caplog.at_level(logging.ERROR):
+        asyncio.run(principal())
+    errores = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert errores and "telemetria" in errores[0].getMessage()
+    assert "string too long" in str(errores[0].exc_info[1])
+
+
+def test_una_tarea_cancelada_no_es_un_error(caplog):
+    """Al cerrar el cliente las tareas se cancelan: eso no es morir."""
+    import asyncio
+    import logging
+
+    async def principal():
+        t = tray_client.vigilar(asyncio.create_task(asyncio.sleep(10)), "cuenta")
+        await asyncio.sleep(0)
+        t.cancel()
+        await asyncio.sleep(0)
+
+    with caplog.at_level(logging.ERROR):
+        asyncio.run(principal())
+    assert not [r for r in caplog.records if r.levelno == logging.ERROR]

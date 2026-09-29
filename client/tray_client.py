@@ -73,6 +73,29 @@ STATUS_KEYS = ("starting", "waiting_game", "plugin_not_installed", "plugin_missi
 CLOUD_KEYS = ("connecting", "connected", "offline", "reconnecting")
 
 
+# El texto del icono de la bandeja va a un WCHAR[128] de Windows (szTip), y
+# pystray tira ValueError si no entra. Como set_status corre adentro del bucle
+# de telemetria, esa excepcion lo mataba: en castellano, "plugin_missing" +
+# "Conectado" mide 129, y el cliente abierto antes que el juego se quedaba
+# para siempre sin leerlo (29-09-2026).
+TITULO_MAX = 127
+
+
+def recortar_titulo(texto: str) -> str:
+    return texto if len(texto) <= TITULO_MAX else texto[:TITULO_MAX - 3].rstrip() + "..."
+
+
+def vigilar(task: asyncio.Task, nombre: str) -> asyncio.Task:
+    """Deja en el log si una tarea de fondo muere. Con create_task pelado la
+    excepcion queda guardada en la tarea y nadie la ve: el cliente sigue
+    abierto, sin hacer nada y sin decir por que."""
+    def _al_terminar(t: asyncio.Task):
+        if not t.cancelled() and t.exception() is not None:
+            logging.error("La tarea %s murio", nombre, exc_info=t.exception())
+    task.add_done_callback(_al_terminar)
+    return task
+
+
 class AppState:
     def __init__(self):
         self.status = "starting"  # estado de la telemetria (ver STATUS_TEXT)
@@ -111,7 +134,7 @@ class AppState:
     def refresh_title(self):
         if self.icon:
             code_part = f" - code {self.code}" if self.code else ""
-            self.icon.title = f"Truck Dash{code_part} - {self.status_text()}"
+            self.icon.title = recortar_titulo(f"Truck Dash{code_part} - {self.status_text()}")
 
     def set_status(self, status: str, game: str | None = None, vehicle: str | None = None):
         changed = status != self.status or game != self.game
@@ -1225,11 +1248,11 @@ async def run_client(backend_url: str, fixed_code: str | None):
     # Placeholder sin conexion hasta tener codigo: telemetry_loop publica por
     # LAN igual y descarta el envio cloud mientras tanto.
     cloud = CloudLink(backend_url, "", keybinds)
-    telemetry_task = asyncio.create_task(telemetry_loop(cloud, local))
+    telemetry_task = vigilar(asyncio.create_task(telemetry_loop(cloud, local)), "telemetria")
     # Vacia la cola de la cuenta cada tanto. Aparte del bucle de
     # telemetria a proposito: que la API este caida no puede frenar
     # el tablero.
-    cuenta_task = asyncio.create_task(account_sync.bucle(state.cuenta))
+    cuenta_task = vigilar(asyncio.create_task(account_sync.bucle(state.cuenta)), "cuenta")
 
     # El mismo codigo de siempre si ya hay uno guardado: el link del celular
     # sigue funcionando entre arranques (ver win_integration.saved_pairing_code).
