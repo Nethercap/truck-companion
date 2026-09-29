@@ -11,7 +11,11 @@ name: Build client
 # (y opcionalmente `commit`) crea el tag aca adentro y sigue igual que con
 # un tag pusheado. Existe porque las sesiones en la nube pueden pushear
 # ramas pero no tags. El tag queda en `commit`, que tiene que ser el commit
-# de la release: su mensaje es el anuncio de Discord.
+# de la release: su mensaje es el anuncio de Discord. Y tiene que tener los
+# mismos workflows que la rama de la corrida: GitHub no deja que el token de
+# Actions cree un tag en un commit con otro .github/workflows ("without
+# `workflows` permission"). En la practica, el commit de la release es la
+# punta de main y `commit` se deja vacio.
 
 on:
   push:
@@ -23,7 +27,7 @@ on:
         required: false
         default: ''
       commit:
-        description: 'Commit to build and tag. Empty = the branch the run starts from.'
+        description: 'Commit to build and tag. Empty = the tip of the branch. It must have the same workflow files as that branch.'
         required: false
         default: ''
 
