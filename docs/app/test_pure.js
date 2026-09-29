@@ -66,6 +66,20 @@ test('smoothLineCoords: empieza en el primer punto y termina en el ultimo', () =
   assert.ok(Math.abs(last[1] - points[points.length - 1][1]) < 1e-9);
 });
 
+test('smoothLineCoords: con tramos desparejos no hace rizos (salida de un puente)', () => {
+  // Tablero de 59 m, empalme de 11 m que se corre 3 m, autopista de 60 m: la
+  // uniforme volvia para atras y se pasaba de los 3 m, y se veia una muesca
+  const points = [[0, 0], [59, 0], [69.8, 3], [129.5, 3]];
+  const result = smoothLineCoords(points, 8);
+  for (let i = 1; i < result.length; i++) {
+    assert.ok(result[i][0] >= result[i - 1][0] - 1e-9, `vuelve para atras en ${i}`);
+  }
+  // y no se pasa: la uniforme se iba 0,22 m afuera, la centripeta 0,7 m
+  for (const [, y] of result) assert.ok(y >= -1e-9 && y <= 3 + 1e-9, `se pasa: ${y}`);
+  // los tramos rectos quedan rectos (el tablero, en y = 0, hasta la esquina)
+  assert.ok(result.filter(([x]) => x <= 50).every(([, y]) => Math.abs(y) < 1e-9));
+});
+
 test('smoothLineCoords: genera mas puntos que el original (interpolacion)', () => {
   const points = [[0, 0], [1, 1], [2, 0]];
   const result = smoothLineCoords(points, 6);

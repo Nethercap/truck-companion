@@ -16,29 +16,34 @@ function geoBearingDeg(lng1, lat1, lng2, lat2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-// Suaviza visualmente la ruta calculada (spline Catmull-Rom) - el grafo de
-// rutas tiene los nodos bastante espaciados, asi que entre uno y otro es una
-// linea recta, lo que se nota como "quiebres" en las curvas comparado con la
-// geometria real de la calle (que sale de los tiles vectoriales, mucho mas
-// densa). Esto es solo cosmetico: no cambia currentRouteWorldPoints, que se
-// sigue usando tal cual para A*/deteccion de desvio/proximo giro.
+// Suaviza visualmente la ruta calculada: redondea cada esquina con una curva
+// (Bezier cuadratica) entre un punto antes y uno despues del vertice, a lo
+// sumo a la mitad del tramo mas corto. Los tramos rectos quedan rectos, como
+// las lineas del mapa, y como la curva queda adentro del triangulo de la
+// esquina no puede hacer rizos, volver para atras ni pasarse. Antes era una
+// spline Catmull-Rom uniforme, que con tramos de largo muy desparejo (59 m,
+// 11 m, 60 m a la salida de un puente) se pasaba de largo y dibujaba un rizo;
+// la centripeta no hace rizos pero comba los tramos rectos largos. Solo es
+// cosmetico: no cambia currentRouteWorldPoints, que se sigue usando tal cual
+// para A*, desvios y el proximo giro.
 function smoothLineCoords(points, segmentsPerPoint = 6) {
   if (points.length < 3) return points;
   const n = points.length;
   const result = [points[0]];
-  for (let i = 0; i < n - 1; i++) {
-    const p0 = points[i === 0 ? i : i - 1];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2 < n ? i + 2 : n - 1];
-    for (let t = 1; t <= segmentsPerPoint; t++) {
-      const s = t / segmentsPerPoint;
-      const s2 = s * s, s3 = s2 * s;
-      const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * s + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * s2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * s3);
-      const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * s + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * s2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * s3);
-      result.push([x, y]);
+  for (let i = 1; i < n - 1; i++) {
+    const a = points[i - 1], b = points[i], c = points[i + 1];
+    const la = Math.hypot(b[0] - a[0], b[1] - a[1]), lc = Math.hypot(c[0] - b[0], c[1] - b[1]);
+    if (la < 1e-12 || lc < 1e-12) { result.push(b); continue; }
+    const r = Math.min(la, lc) / 2;
+    const p = [b[0] + (a[0] - b[0]) * (r / la), b[1] + (a[1] - b[1]) * (r / la)];
+    const q = [b[0] + (c[0] - b[0]) * (r / lc), b[1] + (c[1] - b[1]) * (r / lc)];
+    result.push(p);
+    for (let k = 1; k <= segmentsPerPoint; k++) {
+      const t = k / segmentsPerPoint, u = 1 - t;
+      result.push([u * u * p[0] + 2 * u * t * b[0] + t * t * q[0], u * u * p[1] + 2 * u * t * b[1] + t * t * q[1]]);
     }
   }
+  result.push(points[n - 1]);
   return result;
 }
 
