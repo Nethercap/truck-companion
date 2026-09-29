@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createSessionStats, createDemoTelemetry } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -517,4 +517,18 @@ test('routeHasLine: solo cuenta una linea que se puede dibujar', () => {
   assert.equal(routeHasLine(multi([[[1, 2]], [[3, 4], [5, 6]]])), true); // tramo por tierra despues de un ferry
   assert.equal(routeHasLine(null), false);
   assert.equal(routeHasLine({ type: 'Feature', geometry: null }), false);
+});
+
+// Zoom del modo navegacion elegido en Ajustes (pedido de usuarios).
+test('zoom de navegacion: valida lo guardado y respeta el rango', () => {
+  assert.equal(navZoomSetting(undefined), NAV_ZOOM_DEFAULT); // nunca se toco
+  assert.equal(NAV_ZOOM_DEFAULT, 10);                        // el que estaba fijo
+  assert.equal(navZoomSetting(11.5), 11.5);
+  assert.equal(navZoomSetting('12'), 12);                    // viene del <input type=range>
+  assert.equal(navZoomSetting(11.3), 11.5);                  // de a 0,5
+  assert.equal(navZoomSetting(3), NAV_ZOOM_MIN);
+  assert.equal(navZoomSetting(40), NAV_ZOOM_MAX);
+  assert.equal(navZoomSetting(NaN), NAV_ZOOM_DEFAULT);
+  assert.equal(navZoomSetting('lejos'), NAV_ZOOM_DEFAULT);
+  assert.equal(navZoomSetting(null), NAV_ZOOM_DEFAULT);
 });

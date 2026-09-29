@@ -83,7 +83,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -128,6 +128,10 @@ const miniHudSettings = Object.assign(
   _savedSettings.miniHud
 );
 let routeColor = _savedSettings.routeColor || '#a30000';
+// Zoom del modo navegacion (Ajustes). Aca arriba con los demas ajustes y no
+// junto a navTargetZoom: saveSettings lo lee, y usar un let antes de su
+// declaracion tumba app.js entero.
+let navZoom = navZoomSetting(_savedSettings.navZoom);
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
 
 // ---------------------------------------------------------------------------
@@ -369,6 +373,7 @@ function initSettingsUi() {
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
+  document.getElementById('setNavZoom').value = navZoom;
   document.getElementById('setDarkButtons').checked = darkButtons;
   document.getElementById('setFadeButtons').checked = fadeButtons;
   document.getElementById('setRealBase').checked = realBase;
@@ -490,6 +495,20 @@ document.getElementById('layoutGridChk').addEventListener('change', (e) => {
   applyLayoutGrid();
 });
 document.getElementById('layoutResetBtn').addEventListener('click', resetBtnLayout);
+// Mientras se arrastra, el mapa ya muestra el zoom nuevo si se esta en modo
+// navegacion: elegir a ciegas y cerrar Ajustes para ver como quedo era
+// probar y errar.
+function applyNavZoom(value) {
+  navZoom = navZoomSetting(value);
+  document.getElementById('setNavZoom').value = navZoom;
+  saveSettings();
+  if (navMode && map) {
+    navAutoZoomPaused = false;
+    map.easeTo({ zoom: navTargetZoom(), duration: 200 });
+  }
+}
+document.getElementById('setNavZoom').addEventListener('input', (e) => applyNavZoom(e.target.value));
+document.getElementById('setNavZoomDefault').addEventListener('click', () => applyNavZoom(NAV_ZOOM_DEFAULT));
 document.getElementById('setDarkButtons').addEventListener('change', (e) => {
   darkButtons = e.target.checked;
   saveSettings();
@@ -2836,8 +2855,10 @@ function updateNavPanel(turn) {
 
 // Zoom fijo en modo navegacion - el acercamiento automatico al doblar
 // (probado antes) generaba saltos molestos justo en intersecciones/enlaces,
-// que es donde mas importa ver el contexto completo, no menos.
-const NAV_FIXED_ZOOM = 10;
+// que es donde mas importa ver el contexto completo, no menos. Fijo pero
+// elegible: cada uno lo pone en Ajustes (navZoom); este es el de referencia
+// para el tamano de la flecha.
+const NAV_FIXED_ZOOM = NAV_ZOOM_DEFAULT;
 // La flecha se achica al alejarse y crece al acercarse: alejado tapaba media
 // ciudad. Solo escala el div interno; la posicion y el rumbo los maneja
 // MapLibre (PR #1).
@@ -2848,7 +2869,7 @@ function updateTruckArrowSize() {
 }
 
 function navTargetZoom(turn) {
-  return nav3d ? NAV_FIXED_ZOOM + 0.7 : NAV_FIXED_ZOOM;
+  return nav3d ? navZoom + 0.7 : navZoom;
 }
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,

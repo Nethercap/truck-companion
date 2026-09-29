@@ -604,6 +604,19 @@ function createDemoTelemetry(opts) {
   };
 }
 
+// Zoom del modo navegacion elegido en Ajustes. 10 es el de siempre (el que
+// estaba fijo); se puede ir de 8 (mas lejos) a 13 (mas cerca), de a 0,5. Lo
+// guardado se valida: un valor roto o de otra version cae al de siempre y no
+// a un mapa ilegible.
+const NAV_ZOOM_DEFAULT = 10;
+const NAV_ZOOM_MIN = 8;
+const NAV_ZOOM_MAX = 13;
+function navZoomSetting(raw) {
+  const z = typeof raw === 'string' ? parseFloat(raw) : raw;
+  if (typeof z !== 'number' || !isFinite(z)) return NAV_ZOOM_DEFAULT;
+  return Math.round(Math.min(NAV_ZOOM_MAX, Math.max(NAV_ZOOM_MIN, z)) * 2) / 2;
+}
+
 // Si el GeoJSON de la ruta tiene algo que dibujar (una LineString o una
 // MultiLineString con al menos un tramo de dos puntos). Con ruta, las
 // autopistas pierden el naranja para que la ruta sea lo unico con color,
@@ -638,6 +651,6 @@ function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth,
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+  module.exports = { navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

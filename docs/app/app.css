@@ -428,6 +428,12 @@
   .settingsSectionTitle { font-size: 0.8rem; color: var(--muted); margin: 1rem 0 0.4rem; }
   .settingsRow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; padding: 0.25rem 0; cursor: pointer; }
   .colorOptions { display: flex; gap: 0.6rem; }
+  /* Zoom del modo navegacion: el deslizador ocupa lo que sobre entre los dos
+     extremos; el boton de volver al de siempre no ocupa todo el ancho como
+     el resto de los settingsLinkBtn. */
+  .navZoomRow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+  .navZoomRow input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); }
+  .navZoomRow .settingsLinkBtn { width: auto; flex: 0 0 auto; padding: 0.3rem 0.6rem; }
   .colorSwatch {
     width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent;
     cursor: pointer; padding: 0;
