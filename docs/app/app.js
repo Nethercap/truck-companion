@@ -774,6 +774,25 @@ function emptyLineString() {
   return { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } };
 }
 
+// Con una ruta dibujada las autopistas dejan el naranja: la ruta roja sobre
+// una autopista naranja casi no se distinguia (reportado en Discord y en
+// Reddit, 29-09-2026). Gris claro, un poco mas que las divididas, para que
+// se sigan leyendo como las rutas grandes. Sin ruta, el mapa queda como era.
+const FREEWAY_COLOR = '#ff8a3d';
+const FREEWAY_COLOR_WITH_ROUTE = '#e3e6ea';
+let routeShown = false;
+
+function setRouteData(data) {
+  if (!map || !map.getSource('route')) return;
+  map.getSource('route').setData(data);
+  const hay = routeHasLine(data);
+  if (hay === routeShown) return;
+  routeShown = hay;
+  if (map.getLayer('road-freeway')) {
+    map.setPaintProperty('road-freeway', 'line-color', hay ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR);
+  }
+}
+
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
@@ -808,7 +827,7 @@ function buildVecLayers(sourceLayer) {
     { id: 'road-freeway', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
+      paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
     { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
       filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]], ['!', ['in', ['get', 'poiType'], ['literal', ['ferry', 'train']]]]],
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
@@ -1295,19 +1314,23 @@ function ensureMapInitialized() {
     mapReady = true;
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
-    // La ruta lleva un borde claro debajo: 3 px de rojo oscuro sobre una
-    // autopista naranja de 10 px se veia como una raya en el medio, no como
-    // "la ruta" (un usuario creyo que la app no ruteaba por la autopista).
+    // La ruta crece con el zoom como las calles, pero siempre un poco mas
+    // ancha que la autopista mas ancha (road-freeway: 1 / 3,5 / 10 px a zoom
+    // 5 / 12 / 17), asi la tapa en vez de ir como una raya por el medio:
+    // "no sigue la calle tan claro como el GPS del juego" (Reddit, 29-09-2026).
+    // Antes era un ancho fijo de 3,5 px. El borde es oscuro para que se
+    // recorte sobre cualquier color de calle; el claro se perdia sobre las
+    // grises.
     map.addSource('route', { type: 'geojson', data: emptyLineString() });
-    if (!liteMode) map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.55 } });
-    map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 3.5, 'line-opacity': 0.95 } });
+    if (!liteMode) map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0d0f12', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 5.5, 12, 9, 17, 18], 'line-opacity': 0.8 } });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3, 12, 5.5, 17, 13], 'line-opacity': 0.95 } });
     // Tramos DESPUES del primer waypoint (waypoint -> destino del trabajo):
     // punteados y mas tenues, para que se distingan de "como llego al
     // waypoint" - si no, la vuelta que hay que dar despues de un area de
     // descanso parecia una ruta absurda hacia el waypoint.
     map.addSource('route-next', { type: 'geojson', data: emptyLineString() });
-    if (!liteMode) map.addLayer({ id: 'route-next-casing', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.3 } });
-    map.addLayer({ id: 'route-next-line', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 0.6, 'line-dasharray': [2, 1.5] } });
+    if (!liteMode) map.addLayer({ id: 'route-next-casing', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0d0f12', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 4.5, 12, 7.5, 17, 15], 'line-opacity': 0.5 } });
+    map.addLayer({ id: 'route-next-line', type: 'line', source: 'route-next', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': routeColor, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 12, 4.5, 17, 11], 'line-opacity': 0.6, 'line-dasharray': [2, 1.5] } });
     map.addSource('route-ferry', { type: 'geojson', data: emptyLineString() });
     map.addLayer({ id: 'route-ferry-line', type: 'line', source: 'route-ferry', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [1.5, 2] } });
     if (pendingGame) { const g = pendingGame; pendingGame = null; loadGameMap(g); }
@@ -2253,7 +2276,8 @@ function resetDisplayedRoute() {
   setWaypointMode(false);
   currentRouteWorldPoints = null;
   routeProgressState = { key: null, total: 0 };
-  for (const id of ['route', 'route-next', 'route-ferry']) {
+  setRouteData(emptyLineString());
+  for (const id of ['route-next', 'route-ferry']) {
     if (map && map.getSource(id)) map.getSource(id).setData(emptyLineString());
   }
   if (destMarker) { destMarker.remove(); destMarker = null; }
@@ -2358,7 +2382,7 @@ function updateDestinationMarker(data) {
   const target = resolveRouteTarget(data);
   if (!target) {
     if (destMarker) { destMarker.remove(); destMarker = null; }
-    if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
+    setRouteData(emptyLineString());
     if (map.getSource('route-next')) map.getSource('route-next').setData(emptyLineString());
     if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
     currentRouteTarget = null;
@@ -2431,13 +2455,13 @@ function updateDestinationMarker(data) {
     if (map.getSource('route')) {
       if (routePoints) {
         const parts = splitRouteForDrawing(routePoints);
-        map.getSource('route').setData(parts.land);
+        setRouteData(parts.land);
         if (map.getSource('route-next')) map.getSource('route-next').setData(parts.next);
         if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(parts.ferry);
       } else {
         // fallback: linea recta si no se encontro ruta
         const lineCoords = [lastDisplayedLngLat, destLngLat].filter(Boolean);
-        map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: lineCoords } });
+        setRouteData({ type: 'Feature', geometry: { type: 'LineString', coordinates: lineCoords } });
         if (map.getSource('route-next')) map.getSource('route-next').setData(emptyLineString());
         if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
       }
@@ -2482,7 +2506,7 @@ async function loadGameMap(game) {
   trailWorld.length = 0;
   lastDisplayedLngLat = null;
   if (map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
-  if (map.getSource('route')) map.getSource('route').setData(emptyLineString());
+  setRouteData(emptyLineString());
   if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
   if (destMarker) { destMarker.remove(); destMarker = null; }
   clearWaypoint();
@@ -2896,7 +2920,7 @@ function trimRouteBehindTruck(x, z) {
   const nextPt = currentRouteWorldPoints[bestIdx + 1];
   currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0], ...currentRouteWorldPoints.slice(bestIdx + 1)];
   const parts = splitRouteForDrawing(currentRouteWorldPoints);
-  map.getSource('route').setData(parts.land);
+  setRouteData(parts.land);
   if (map.getSource('route-next')) map.getSource('route-next').setData(parts.next);
   if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(parts.ferry);
 }
@@ -4397,7 +4421,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   currentRouteTarget = null;
   currentRouteWorldPoints = null;
   if (map && map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
-  if (map && map.getSource('route')) map.getSource('route').setData(emptyLineString());
+  setRouteData(emptyLineString());
   connectWs(backend, code, { remembered: codeFromLink });
 });
 

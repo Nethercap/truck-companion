@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createSessionStats, createDemoTelemetry } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -503,4 +503,18 @@ test('tamano acomodado: sigue a la manija, con topes y sin salirse del mapa', ()
   // medidas rotas no rompen nada: se queda como estaba
   assert.equal(layoutScaleFor({ ...base, startWidth: 0, dx: 50, dy: 0 }), 1);
   assert.equal(layoutScaleFor({ ...base, startScale: 1.4, startHeight: NaN, dx: 50, dy: 0 }), 1.4);
+});
+
+// Con ruta, las autopistas pierden el naranja (setRouteData en app.js).
+test('routeHasLine: solo cuenta una linea que se puede dibujar', () => {
+  const linea = (coords) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+  const multi = (parts) => ({ type: 'Feature', geometry: { type: 'MultiLineString', coordinates: parts } });
+  assert.equal(routeHasLine(linea([])), false);            // emptyLineString()
+  assert.equal(routeHasLine(linea([[1, 2]])), false);      // un punto no es una ruta
+  assert.equal(routeHasLine(linea([[1, 2], [3, 4]])), true);
+  assert.equal(routeHasLine(multi([])), false);
+  assert.equal(routeHasLine(multi([[[1, 2]], []])), false);
+  assert.equal(routeHasLine(multi([[[1, 2]], [[3, 4], [5, 6]]])), true); // tramo por tierra despues de un ferry
+  assert.equal(routeHasLine(null), false);
+  assert.equal(routeHasLine({ type: 'Feature', geometry: null }), false);
 });

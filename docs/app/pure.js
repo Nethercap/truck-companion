@@ -604,6 +604,18 @@ function createDemoTelemetry(opts) {
   };
 }
 
+// Si el GeoJSON de la ruta tiene algo que dibujar (una LineString o una
+// MultiLineString con al menos un tramo de dos puntos). Con ruta, las
+// autopistas pierden el naranja para que la ruta sea lo unico con color,
+// como en el GPS del juego.
+function routeHasLine(feature) {
+  const g = feature && feature.geometry;
+  if (!g || !Array.isArray(g.coordinates)) return false;
+  if (g.type === 'LineString') return g.coordinates.length >= 2;
+  if (g.type === 'MultiLineString') return g.coordinates.some(part => Array.isArray(part) && part.length >= 2);
+  return false;
+}
+
 // Tamano de un elemento acomodado a mano (modo acomodar): la escala nueva
 // sale de cuanto se arrastro la manija de la esquina respecto del ancho con
 // que se empezo. Nunca mas grande de lo que entra entre donde esta y el borde
@@ -626,6 +638,6 @@ function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth,
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+  module.exports = { routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
