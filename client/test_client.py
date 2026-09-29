@@ -5,6 +5,8 @@ import os
 import sys
 import tempfile
 
+import pytest
+
 import client
 import i18n
 import keys_compat
@@ -589,6 +591,52 @@ def test_exe_path_prefiere_el_appimage(monkeypatch):
     assert win_integration.exe_path() == "/home/x/TruckDash.AppImage"
     monkeypatch.delenv("APPIMAGE")
     assert win_integration.exe_path() == "/tmp/.mount_abc/truckdash"
+
+
+def test_reconoce_la_carpeta_de_winget():
+    """Alcance de usuario y de maquina. Una carpeta que solo se llama
+    parecido no cuenta: ahi el autoupdate propio es el unico que hay."""
+    assert win_integration.installed_by_winget(
+        r"C:\Users\x\AppData\Local\Microsoft\WinGet\Packages"
+        r"\Nethercap.TruckDash_Microsoft.Winget.Source_8wekyb3d8bbwe\TruckDash.exe")
+    assert win_integration.installed_by_winget(
+        r"C:\Program Files\WinGet\Packages\Nethercap.TruckDash_Microsoft.Winget.Source_8wekyb3d8bbwe\TruckDash.exe")
+    assert not win_integration.installed_by_winget(r"C:\Users\x\Documents\TruckDash\TruckDash.exe")
+    assert not win_integration.installed_by_winget(r"C:\Users\x\Downloads\winget-packages\TruckDash.exe")
+    assert not win_integration.installed_by_winget(r"D:\Games\Packages\TruckDash.exe")
+
+
+def test_con_winget_no_se_actualiza_solo(monkeypatch):
+    """Si el .exe se pisa solo, winget ve el hash cambiado y despues no deja
+    ni actualizar ni desinstalar sin --force. Tiene que fallar antes de
+    bajar nada."""
+    monkeypatch.setattr(win_integration, "exe_path", lambda: (
+        r"C:\Users\x\AppData\Local\Microsoft\WinGet\Packages\Nethercap.TruckDash_x\TruckDash.exe"))
+    monkeypatch.setattr(win_integration.red, "abrir",
+                        lambda *a, **k: pytest.fail("no deberia bajar nada"))
+    with pytest.raises(RuntimeError, match="winget upgrade Nethercap.TruckDash"):
+        win_integration.stage_update("https://example.invalid/x.zip", None)
+
+
+def test_los_archivos_van_al_lado_del_exe_real_no_del_symlink(monkeypatch, tmp_path):
+    """winget arranca el portable desde un symlink en WinGet\\Links, que
+    comparten todos los paquetes."""
+    real = tmp_path / "Packages" / "TruckDash.exe"
+    real.parent.mkdir()
+    real.write_bytes(b"MZ")
+    links = tmp_path / "Links"
+    links.mkdir()
+    link = links / "truckdash.exe"
+    try:
+        os.symlink(real, link)
+    except (OSError, NotImplementedError):
+        pytest.skip("sin permiso para crear symlinks")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(link))
+    monkeypatch.delenv("APPIMAGE", raising=False)
+    assert os.path.samefile(win_integration.base_dir(), real.parent)
+    assert os.path.samefile(win_integration.exe_path(), real)
+    assert os.path.samefile(os.path.dirname(client.keybinds_path()), real.parent)
 
 
 def test_idioma_desde_el_entorno(monkeypatch):

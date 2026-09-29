@@ -404,7 +404,13 @@ class SetupWindow:
         self.update_frame = tk.Frame(self.root, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
         self.update_label.pack(side="left")
-        self.update_button = self.button(self.update_frame, T("update_now"), self.do_update, primary=True)
+        # Con winget el .exe no se pisa solo (ver installed_by_winget): el
+        # boton copia el comando para actualizar desde una terminal.
+        self.via_winget = win_integration.installed_by_winget()
+        if self.via_winget:
+            self.update_button = self.button(self.update_frame, T("copy"), self.copy_winget_command, primary=True)
+        else:
+            self.update_button = self.button(self.update_frame, T("update_now"), self.do_update, primary=True)
         self.update_button.pack(side="right")
 
         footer = tk.Frame(self.root, bg=BG, padx=16, pady=12)
@@ -720,6 +726,11 @@ class SetupWindow:
                 self.root.after(0, lambda: self.flash(T("up_to_date", v=client_lib.CLIENT_VERSION), GREEN))
         threading.Thread(target=_run, daemon=True).start()
 
+    def copy_winget_command(self):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(win_integration.winget_upgrade_command())
+        self.flash(T("copied"), GREEN)
+
     def do_update(self):
         if not state.update_available:
             return
@@ -760,7 +771,11 @@ class SetupWindow:
         if state.update_available:
             version = state.update_available[0]
             if not self.update_frame.winfo_ismapped():
-                self.update_label.configure(text=T("update_available", new=version, cur=client_lib.CLIENT_VERSION))
+                if self.via_winget:
+                    self.update_label.configure(text=T("update_available_winget", new=version, cur=client_lib.CLIENT_VERSION,
+                                                       cmd=win_integration.winget_upgrade_command()))
+                else:
+                    self.update_label.configure(text=T("update_available", new=version, cur=client_lib.CLIENT_VERSION))
                 self.update_frame.pack(fill="x", before=self.root.winfo_children()[-1])
         try:
             self.root.after(500, self.refresh_status)

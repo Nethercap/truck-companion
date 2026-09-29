@@ -376,3 +376,25 @@ def test_el_tablero_no_se_abre_solo_si_la_opcion_esta_apagada(monkeypatch):
     ajustes.clear()
     tray_client.open_web_ui()
     assert len(abiertos) == 1
+
+
+# ------------------------------------------------------ instalado con winget
+
+def test_con_winget_el_aviso_da_el_comando_en_vez_de_actualizar(monkeypatch, tmp_path, raiz):
+    """El boton de siempre pisaria el .exe y winget despues no deja ni
+    actualizar ni desinstalar. Con winget, el boton copia el comando."""
+    monkeypatch.setattr(tk, "Tk", lambda: tk.Toplevel(raiz))
+    monkeypatch.setattr(tray_client.win_integration, "installed_by_winget", lambda path=None: True)
+    monkeypatch.setattr(tray_client.win_integration, "load_settings", lambda: {})
+    monkeypatch.setattr(plugin_installer, "find_game_installs", lambda: [])
+    monkeypatch.setattr(tray_client.state, "update_available", ("9.9.9", "https://x/y.zip", None))
+    v = tray_client.SetupWindow()
+    try:
+        v.root.update()
+        assert "winget upgrade Nethercap.TruckDash" in v.update_label.cget("text")
+        assert v.update_button.cget("text") == tray_client.T("copy")
+        monkeypatch.setattr(v, "do_update", lambda: pytest.fail("no deberia actualizar"))
+        v.update_button.invoke()
+        assert v.root.clipboard_get() == "winget upgrade Nethercap.TruckDash"
+    finally:
+        v.root.destroy()

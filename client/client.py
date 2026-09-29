@@ -309,7 +309,10 @@ def detect_keybinds_from_controls_sii() -> dict:
 def keybinds_path() -> str:
     # Al lado del .exe (o del script, corriendo desde fuente) - no en el
     # directorio de trabajo actual, que puede variar segun como se lance.
-    base_dir = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
+    exe = sys.executable
+    if getattr(sys, "frozen", False) and os.path.islink(exe):
+        exe = os.path.realpath(exe)  # winget: ver win_integration._executable
+    base_dir = os.path.dirname(exe if getattr(sys, "frozen", False) else os.path.abspath(__file__))
     return os.path.join(base_dir, "keybinds.json")
 
 

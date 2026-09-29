@@ -31,8 +31,20 @@ UPDATE_COPY_TRIES = 40
 UPDATE_COPY_WAIT = 0.5
 
 
+# Id del paquete en winget (manifiestos en microsoft/winget-pkgs).
+WINGET_ID = "Nethercap.TruckDash"
+
+
+def _executable() -> str:
+    # winget arranca los portables desde un symlink en WinGet\Links, una
+    # carpeta que comparten todos los paquetes: los settings, el log y la cola
+    # de la cuenta van al lado del .exe de verdad, no ahi.
+    exe = sys.executable
+    return os.path.realpath(exe) if os.path.islink(exe) else exe
+
+
 def base_dir() -> str:
-    return os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
+    return os.path.dirname(_executable() if getattr(sys, "frozen", False) else os.path.abspath(__file__))
 
 
 def exe_path() -> str | None:
@@ -41,7 +53,24 @@ def exe_path() -> str | None:
     # En un AppImage sys.executable es el binario de adentro del montaje, que
     # deja de existir al cerrar el programa; el que sirve para volver a
     # arrancarlo es el .AppImage, y esa ruta la pasa el runtime en APPIMAGE.
-    return os.environ.get("APPIMAGE") or sys.executable
+    return os.environ.get("APPIMAGE") or _executable()
+
+
+def installed_by_winget(path: str | None = None) -> bool:
+    """Si este .exe lo instalo winget. winget guarda el hash del portable y,
+    si el .exe cambia, despues `winget upgrade` y `winget uninstall` se niegan
+    ("has been modified"): en ese caso el cliente no se actualiza solo.
+    Vive en ...\\WinGet\\Packages\\<id>_<fuente>\\, en LOCALAPPDATA o en
+    Archivos de programa segun el alcance."""
+    path = path or exe_path()
+    if not path:
+        return False
+    partes = [p.lower() for p in re.split(r"[\\/]+", path)]
+    return any(a == "winget" and b == "packages" for a, b in zip(partes, partes[1:]))
+
+
+def winget_upgrade_command() -> str:
+    return f"winget upgrade {WINGET_ID}"
 
 
 def settings_path() -> str:
@@ -395,6 +424,8 @@ def stage_update(download_url: str, expected_sha256: str | None, progress=None) 
     exe = exe_path()
     if not exe:
         raise RuntimeError("Auto-update only works with the packaged TruckDash.exe")
+    if installed_by_winget(exe):
+        raise RuntimeError(f"Installed with winget: update with `{winget_upgrade_command()}`")
 
     if progress:
         progress("downloading")
