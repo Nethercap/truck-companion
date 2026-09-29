@@ -110,6 +110,58 @@ function dropShortExcursions(points, { maxAlong = 150, maxLateral = 20, minLater
   return out;
 }
 
+// Grafo v3: cada punto de la ruta lleva en p[6] cuanto correrlo al dibujarlo
+// (metros; + a la derecha del sentido de marcha, - a la izquierda en paises
+// de mano izquierda). Sale de la corrida con que el mapa dibuja cada calzada:
+// asi la ruta va sobre la calzada de la mano por la que se va y no por el
+// cantero. spreadEdgeShift la reparte a lo largo de una arista, entre la
+// corrida de sus dos puntas, segun la distancia (points[desde] es el nodo de
+// salida). Si el nodo ya trae una corrida, la de la arista anterior, se
+// arranca desde esa y no desde la propia: donde se juntan dos calles con
+// distinto cantero la ruta pasaba de una a otra con un escalon en el nodo;
+// asi se va corriendo a lo largo de la arista nueva.
+function spreadEdgeShift(points, desde, sIni, sFin) {
+  let total = 0;
+  for (let j = desde + 1; j < points.length; j++) {
+    total += Math.hypot(points[j][0] - points[j - 1][0], points[j][1] - points[j - 1][1]);
+  }
+  if (points[desde][6] == null) points[desde][6] = sIni;
+  else sIni = points[desde][6];
+  let acum = 0;
+  for (let j = desde + 1; j < points.length; j++) {
+    acum += Math.hypot(points[j][0] - points[j - 1][0], points[j][1] - points[j - 1][1]);
+    points[j][6] = total > 0 ? sIni + (sFin - sIni) * (acum / total) : sFin;
+  }
+}
+
+// Corre cada punto p[6] metros a la derecha de la direccion de marcha en ese
+// punto. Coordenadas del juego: x al este, y al SUR, asi que la derecha de
+// (dx, dy) es (-dy, dx). Devuelve copias; sin corrida (grafo v2), el punto
+// queda igual. La direccion se mide sobre ventana metros hacia atras y
+// hacia adelante, no con los vecinos pegados: con un tramo de un par de
+// metros en diagonal (un empalme, la punta de la ruta) salia cualquier
+// direccion y el punto se corria para el lado equivocado, con picos y
+// zigzags.
+function routeDrawShift(points, ventana = 15) {
+  const n = points.length;
+  const d = (i, j) => Math.hypot(points[j][0] - points[i][0], points[j][1] - points[i][1]);
+  return points.map((p, i) => {
+    const s = p[6];
+    if (!s) return p;
+    let ia = i, atras = 0;
+    while (ia > 0 && atras < ventana) { atras += d(ia - 1, ia); ia--; }
+    let ib = i, adelante = 0;
+    while (ib < n - 1 && adelante < ventana) { adelante += d(ib, ib + 1); ib++; }
+    const a = points[ia], b = points[ib];
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+    if (L < 1e-6) return p;
+    const q = p.slice();
+    q[0] = p[0] + (-dy / L) * s;
+    q[1] = p[1] + (dx / L) * s;
+    return q;
+  });
+}
+
 // La otra punta del mismo problema: donde las dos manos pasan de tramos
 // separados (cada uno donde esta) a un tramo de doble mano (por el eje), o
 // al reves, la ruta cambia de linea con un escalon corto y cruzado, y no
@@ -761,6 +813,6 @@ function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth,
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+  module.exports = { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

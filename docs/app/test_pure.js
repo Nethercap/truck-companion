@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createSessionStats, createDemoTelemetry } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -599,6 +599,69 @@ test('ruta dibujada: un escalon solo se reparte entre dos lineas paralelas y si 
   // Cambio de linea que ya es suave (4 m en 20 m): no hay nada que repartir
   const suave = [[0, 0], [100, 0], [120, 4], [220, 4]];
   assert.deepEqual(taperShortSteps(suave), suave);
+});
+
+// Grafo v3: la ruta se dibuja sobre la calzada de la mano por la que se va.
+test('corrida de la ruta: hacia la derecha del sentido de marcha', () => {
+  // Coordenadas del juego: x al este, y al sur
+  const este = routeDrawShift([[0, 0, 0, 0, null, 0, 5], [100, 0, 0, 0, null, 0, 5]]);
+  assert.deepEqual(este.map(p => [p[0], p[1]]), [[0, 5], [100, 5]]);          // yendo al este, la derecha es el sur
+  const norte = routeDrawShift([[0, 0, 0, 0, null, 0, 5], [0, -100, 0, 0, null, 0, 5]]);
+  assert.deepEqual(norte.map(p => [p[0], p[1]]), [[5, 0], [5, -100]]);        // yendo al norte, la derecha es el este
+  const izquierda = routeDrawShift([[0, 0, 0, 0, null, 0, -5], [100, 0, 0, 0, null, 0, -5]]);
+  assert.deepEqual(izquierda.map(p => [p[0], p[1]]), [[0, -5], [100, -5]]);   // mano izquierda (Reino Unido)
+  // Sin corrida (grafo v2) no se toca nada, y lo demas del punto viaja igual
+  const v2 = [[0, 0, 1, 0, 7, 2], [100, 0, 0, 1, 8, 2]];
+  assert.deepEqual(routeDrawShift(v2), v2);
+  assert.equal(este[0][5], 0);
+});
+
+test('corrida de la ruta: un tramo cortito en diagonal no da vuelta el lado', () => {
+  // Hacia el este con un quiebre de 2 m en diagonal (un empalme): todos los
+  // puntos tienen que quedar corridos hacia el sur, ninguno para otro lado
+  // (dos tramos de 1,4 m seguidos: con solo los vecinos pegados, el punto
+  // del medio creeria que se va en diagonal)
+  const pts = [[0, 0], [50, 0], [51, 1], [52, 2], [100, 2], [150, 2]].map(([x, y]) => [x, y, 0, 0, null, 0, 5]);
+  const dibujo = routeDrawShift(pts);
+  dibujo.forEach((q, i) => {
+    assert.ok(q[1] - pts[i][1] > 4.9, `punto ${i} corrido ${q[1] - pts[i][1]}`);
+    assert.ok(Math.abs(q[0] - pts[i][0]) < 0.5, `punto ${i} se fue de costado`);
+  });
+});
+
+test('corrida de la ruta: se reparte a lo largo de la arista', () => {
+  const pts = [[0, 0], [25, 0], [100, 0]];
+  spreadEdgeShift(pts, 0, 9.5, 0);
+  assert.deepEqual(pts.map(p => p[6]), [9.5, 9.5 * 0.75, 0]);
+  // El nodo de salida ya traia la corrida de la arista anterior: se respeta
+  const siguiente = [[0, 0, 0, 0, null, 0, 7], [50, 0]];
+  spreadEdgeShift(siguiente, 0, 9.5, 9.5);
+  assert.deepEqual(siguiente.map(p => p[6]), [7, 9.5]);
+  // y se pasa de a poco a la propia, sin escalon en el nodo
+  const tres = [[0, 0, 0, 0, null, 0, 7], [25, 0], [100, 0]];
+  spreadEdgeShift(tres, 0, 9.5, 9.5);
+  assert.deepEqual(tres.map(p => p[6]), [7, 7.625, 9.5]);
+});
+
+test('corrida de la ruta: el puente de la salida 257 queda sobre la calzada y sin gancho', () => {
+  // Nodos reales del grafo de ATS y corridas del v3 (diag_corrida.py):
+  // autopista de 6 carriles +9,5; us_20 del eje al tablero +9,5 -> 0;
+  // tablero 0; us_18 del tablero al eje 0 -> +7; autopista de 4 carriles +7.
+  const nodos = [[-67330.5, -11737.4], [-67445.6, -11561.5], [-67460.1, -11565.3], [-67486.0, -11512.1], [-67479.4, -11503.6], [-67509.6, -11452.1]];
+  const corridas = [[9.5, 9.5], [9.5, 0], [0, 0], [0, 7], [7, 7]];
+  const pts = [[...nodos[0], 0, 0, 0]];
+  corridas.forEach(([a, b], k) => { pts.push([...nodos[k + 1], 0, 0, k + 1]); spreadEdgeShift(pts, pts.length - 2, a, b); });
+  const dibujo = routeDrawShift(pts);
+  const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  // La autopista va 9,5 m corrida, sobre su calzada, no por el eje
+  assert.ok(Math.abs(d(dibujo[0], nodos[0]) - 9.5) < 0.5);
+  // Llegando al puente, el punto corrido ya esta a pocos metros del tablero:
+  // antes, del eje al tablero habia 14 m de golpe
+  assert.ok(d(nodos[1], nodos[2]) > 14);
+  assert.ok(d(dibujo[1], dibujo[2]) < 16 && d(dibujo[1], nodos[2]) < 10, String(d(dibujo[1], nodos[2])));
+  // El tablero se dibuja donde esta
+  assert.deepEqual([dibujo[2][0], dibujo[2][1]], nodos[2]);
+  assert.deepEqual([dibujo[3][0], dibujo[3][1]], nodos[3]);
 });
 
 // Zoom del modo navegacion elegido en Ajustes (pedido de usuarios).

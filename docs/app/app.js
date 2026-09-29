@@ -1949,7 +1949,11 @@ async function loadRouteGraph(mapInfo) {
       routeGraph = buildRouteGraph(routeGraphFromJson(await res.json()));
       return;
     }
-    const res = await fetch(`${base}.bin${v}`);
+    // Primero el v3 (con la corrida para dibujar la ruta sobre la calzada de
+    // la mano por la que se va); si esa variante todavia no lo tiene, el de
+    // siempre, y la ruta se dibuja por el eje como antes.
+    let res = await fetch(`${base}-v3.bin${v}`).catch(() => null);
+    if (!res || !res.ok) res = await fetch(`${base}.bin${v}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     routeGraph = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
   } catch (err) {
@@ -1963,8 +1967,9 @@ async function loadRouteGraph(mapInfo) {
 // secciones alineadas a 4 bytes (ver route_graph_bin.py).
 function decodeRouteGraphBin(buf) {
   const dv = new DataView(buf);
-  if (dv.getUint32(0, false) !== 0x54445247 || dv.getUint32(4, true) !== 2) throw new Error('formato de grafo desconocido');
-  const n = dv.getUint32(8, true), ne = dv.getUint32(12, true), nMid = dv.getUint32(16, true);
+  const version = dv.getUint32(4, true);
+  if (dv.getUint32(0, false) !== 0x54445247 || (version !== 2 && version !== 3)) throw new Error('formato de grafo desconocido');
+  const n = dv.getUint32(8, true), ne = dv.getUint32(12, true), nMid = dv.getUint32(16, true), nComp = dv.getUint32(20, true);
   let off = 24;
   const take = (Ctor, count) => {
     const a = new Ctor(buf, off, count);
@@ -1986,7 +1991,16 @@ function decodeRouteGraphBin(buf) {
     px += midDelta[2 * i]; py += midDelta[2 * i + 1];
     midXY[2 * i] = px / 10; midXY[2 * i + 1] = py / 10;
   }
-  return { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY };
+  // v3: corrida de la ruta dibujada en cada punta de cada arista, en medios
+  // metros con signo (+ a la derecha del sentido de marcha). Va despues de
+  // grado, componente y tamanos de componente, que la web no lee (los arma
+  // buildRouteGraph).
+  let shiftA = null, shiftB = null;
+  if (version === 3) {
+    take(Uint8Array, n); take(Int32Array, n); take(Uint32Array, nComp);
+    shiftA = take(Int8Array, ne); shiftB = take(Int8Array, ne);
+  }
+  return { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB };
 }
 
 // Mismo resultado a partir del JSON viejo {nodes: [[x,y]], edges: [[a,b,m,flags,seg,mid?]]}.
@@ -2014,7 +2028,7 @@ function routeGraphFromJson(data) {
 // flags de arista: bit 1 = ferry/tren, bit 2 = un solo sentido (solo a -> b);
 // sin flags = doble mano.
 function buildRouteGraph(g) {
-  const { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY } = g;
+  const { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA = null, shiftB = null } = g;
   const csr = new Uint32Array(n + 1);
   for (let e = 0; e < ne; e++) { csr[edgeA[e] + 1]++; if (!(edgeF[e] & 2)) csr[edgeB[e] + 1]++; }
   for (let i = 0; i < n; i++) csr[i + 1] += csr[i];
@@ -2061,7 +2075,7 @@ function buildRouteGraph(g) {
   let giantComponent = 0;
   for (let c = 1; c < componentSize.length; c++) if (componentSize[c] > componentSize[giantComponent]) giantComponent = c;
   const graph = {
-    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, degree, componentId, componentSize, giantComponent,
+    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, degree, componentId, componentSize, giantComponent,
     nodeXY: (i) => [nodes[2 * i], nodes[2 * i + 1]],
     // vista "de antes" para detectManeuver y cualquier otro consumidor:
     // adjacency.get(i) -> [[vecino, metros, segundos], ...]
@@ -2218,22 +2232,33 @@ function findRoute(startXY, endXY) {
   // (si la arista los trae): no son cruces (junction 0) ni nodos (indice
   // null), solo geometria para dibujar/proyectar/medir rumbos. Para el
   // sentido inverso de la arista se recorren al reves.
+  // 7mo elemento (grafo v3): cuanto correr ese punto al dibujarlo, en metros,
+  // + a la derecha del sentido de marcha (ver routeDrawShift en pure.js). Se
+  // reparte a lo largo de la arista entre la corrida de sus dos puntas.
+  const { shiftA, shiftB } = routeGraph;
   const out = [];
   for (let k = 0; k < path.length; k++) {
     const i = path[k];
     let ferry = 0;
+    let desde = -1, sIni = 0, sFin = 0;
     if (k > 0) {
       const prev = path[k - 1];
       const d = routeGraph.dirEdge(prev, i);
       if (d !== -1) {
         const e = adjEdge[d];
         ferry = edgeF[e] & 1 ? 1 : 0;
+        if (shiftA) {
+          desde = out.length - 1;
+          sIni = (adjRev[d] ? shiftB[e] : shiftA[e]) / 2;
+          sFin = (adjRev[d] ? shiftA[e] : shiftB[e]) / 2;
+        }
         const m0 = midOff[e], m1 = midOff[e + 1];
         if (adjRev[d]) { for (let m = m1 - 1; m >= m0; m--) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
         else { for (let m = m0; m < m1; m++) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
       }
     }
     out.push([nodes[2 * i], nodes[2 * i + 1], ferry, degree[i] >= 3 ? 1 : 0, i]);
+    if (desde >= 0) spreadEdgeShift(out, desde, sIni, sFin);
   }
   return out;
 }
@@ -2367,6 +2392,8 @@ function updateRouteSummary(data) {
 // pasan a lng/lat: cleanRouteForDrawing mide en metros (saca los ganchos de
 // las calzadas separadas, ver pure.js).
 function splitRouteForDrawing(routePoints) {
+  // Sobre la calzada de la mano por la que se va (grafo v3; con v2, igual).
+  routePoints = routeDrawShift(routePoints);
   const land = [], next = [], ferry = [];
   let current = [];
   let currentLeg = 0;
@@ -2944,7 +2971,7 @@ function trimRouteBehindTruck(x, z) {
   if (routeBehind.length > 8) routeBehind.splice(0, routeBehind.length - 8);
   // El punto interpolado hereda el tramo del nodo que sigue.
   const nextPt = currentRouteWorldPoints[bestIdx + 1];
-  currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0], ...currentRouteWorldPoints.slice(bestIdx + 1)];
+  currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0, nextPt ? nextPt[6] : undefined], ...currentRouteWorldPoints.slice(bestIdx + 1)];
   const parts = splitRouteForDrawing(currentRouteWorldPoints);
   setRouteData(parts.land);
   if (map.getSource('route-next')) map.getSource('route-next').setData(parts.next);
