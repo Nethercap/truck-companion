@@ -192,6 +192,21 @@ likelihood:
    turned on, it can drift if it hasn't synced in a while. Double-check the
    date and time are actually correct (not just set to "automatic").
 
+### Proxy, VPN or ping booster
+
+The game hands its telemetry to Truck Dash through memory on your own PC, so
+a proxy on the game itself doesn't matter. The only part that goes over the
+internet is Truck Dash talking to the relay, and Truck Dash follows the
+Windows proxy settings (or `HTTPS_PROXY`), so a proxy set up for the whole
+system catches it too.
+
+Since 1.5.19 the client tries the connection the way the system says first
+and, if that fails and there is a system proxy, tries again without it. The
+log shows which way it went: a line `System proxy for the relay: ...` at
+startup, and `next attempt goes direct, without the system proxy` when it
+had to skip it. If neither way connects, the log says why on the lines
+right after.
+
 ### Linux (through Proton)
 
 The client runs under Proton and a tester has it working, including plugin

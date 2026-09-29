@@ -137,6 +137,20 @@ probabilidad:
    sincroniza. Verificá que la fecha y hora sean realmente correctas (no
    solo que esté en "automático").
 
+### Proxy, VPN o "ping booster"
+
+El juego le pasa la telemetría a Truck Dash por memoria en tu propia PC,
+así que un proxy puesto sobre el juego no cambia nada. Lo único que va por
+internet es Truck Dash hablando con el relay, y Truck Dash respeta el proxy
+configurado en Windows (o `HTTPS_PROXY`): un proxy puesto para todo el
+sistema lo agarra también.
+
+Desde la 1.5.19 el cliente prueba primero como dice el sistema y, si falla
+y hay un proxy del sistema, prueba sin él. El log dice por dónde fue: una
+línea `System proxy for the relay: ...` al arrancar, y `next attempt goes
+direct, without the system proxy` cuando tuvo que saltearlo. Si no conecta
+de ninguna de las dos formas, las líneas siguientes dicen por qué.
+
 ### Linux (con Proton)
 
 El cliente anda bajo Proton y ya hay un tester con todo funcionando:
