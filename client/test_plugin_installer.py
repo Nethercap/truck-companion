@@ -385,3 +385,124 @@ def test_is_wine_detecta_por_ntdll(monkeypatch):
     monkeypatch.setattr(win_integration, "_es_wine", None)
     monkeypatch.setattr(ctypes, "windll", WindllWindows(), raising=False)
     assert win_integration.is_wine() is False
+
+
+# ------------------------------------------ actualizar el plugin de antes
+# Actualizar el cliente no cambiaba el plugin del juego: solo lo hacia quien
+# abriera Setup y apretara "Reemplazar". Con los trabajos con auto de ATS
+# 1.61 eso dejaba a casi todos con el plugin que no los lee.
+
+def _juego_con_plugin(tmp_path, monkeypatch, instalado: bytes, nombre="game"):
+    nuevo = b"MZ plugin nuevo"
+    vendor = tmp_path / "vendor" / "scs-telemetry.dll"
+    vendor.parent.mkdir(exist_ok=True)
+    vendor.write_bytes(nuevo)
+    monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda: str(vendor))
+    monkeypatch.setattr(plugin_installer, "PLUGIN_DLL_SHA256", hashlib.sha256(nuevo).hexdigest())
+    bin_dir = tmp_path / nombre / "bin" / "win_x64"
+    (bin_dir / "plugins").mkdir(parents=True)
+    (bin_dir / "plugins" / "scs-telemetry.dll").write_bytes(instalado)
+    return plugin_installer.describe_install("ats", str(bin_dir)), nuevo
+
+
+def test_actualiza_solo_el_plugin_que_pusimos_nosotros(tmp_path, monkeypatch):
+    viejo = b"MZ plugin de antes"
+    monkeypatch.setattr(plugin_installer, "PREVIOUS_PLUGIN_SHA256",
+                        frozenset({hashlib.sha256(viejo).hexdigest()}))
+    nuestro, nuevo = _juego_con_plugin(tmp_path, monkeypatch, viejo, "ats")
+    ajeno, _ = _juego_con_plugin(tmp_path, monkeypatch, b"MZ otro plugin", "ets2")
+    assert nuestro["state"] == ajeno["state"] == "outdated"
+
+    hechos = plugin_installer.upgrade_previous_plugins([nuestro, ajeno])
+
+    assert hechos == [nuestro["bin_dir"]]
+    assert open(nuestro["plugin_path"], "rb").read() == nuevo
+    assert nuestro["state"] == "installed"
+    # El de otro origen no se toca: puede ser otra version a proposito.
+    assert open(ajeno["plugin_path"], "rb").read() == b"MZ otro plugin"
+    assert ajeno["state"] == "outdated"
+
+
+def test_con_el_juego_abierto_no_se_actualiza_y_no_deja_basura(tmp_path, monkeypatch):
+    """En Windows la DLL cargada no se puede reemplazar: tiene que quedar la
+    de antes, entera, y reintentarse despues."""
+    viejo = b"MZ plugin de antes"
+    monkeypatch.setattr(plugin_installer, "PREVIOUS_PLUGIN_SHA256",
+                        frozenset({hashlib.sha256(viejo).hexdigest()}))
+    install, _ = _juego_con_plugin(tmp_path, monkeypatch, viejo)
+
+    def en_uso(src, dst):
+        raise PermissionError(5, "Access is denied", dst)
+    monkeypatch.setattr(plugin_installer.os, "replace", en_uso)
+
+    assert plugin_installer.upgrade_previous_plugins([install]) == []
+    assert open(install["plugin_path"], "rb").read() == viejo
+    assert install["state"] == "outdated"
+    assert os.listdir(os.path.dirname(install["plugin_path"])) == ["scs-telemetry.dll"]
+
+
+def test_install_plugin_no_escribe_encima_del_instalado(tmp_path, monkeypatch):
+    """Bajo Proton el juego abierto tiene la DLL mapeada: escribir adentro
+    del mismo archivo lo puede tirar. Tiene que ser un archivo nuevo que
+    reemplaza al otro."""
+    install, nuevo = _juego_con_plugin(tmp_path, monkeypatch, b"MZ plugin de antes")
+    escrituras = []
+    copiar = plugin_installer.shutil.copyfile
+    monkeypatch.setattr(plugin_installer.shutil, "copyfile",
+                        lambda src, dst: escrituras.append(dst) or copiar(src, dst))
+    plugin_installer.install_plugin(install["bin_dir"])
+    assert install["plugin_path"] not in escrituras
+    assert open(install["plugin_path"], "rb").read() == nuevo
+
+
+def test_el_plugin_que_distribuimos_hasta_1_5_20_se_reconoce():
+    # RenCloud 1.12.1: el que tienen instalado todos los que usaron el cliente
+    # hasta la 1.5.20. Si sale de la lista, nadie recibe el plugin nuevo.
+    assert ("1d03dbc7a975e72203c60a7b9998021ceb8800b836bf28a131279979ad386cd4"
+            in plugin_installer.PREVIOUS_PLUGIN_SHA256)
+
+
+# ---------------------------------------------------- tools/pin_plugin.py
+
+def _pin_plugin():
+    import importlib.util
+    ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "pin_plugin.py")
+    spec = importlib.util.spec_from_file_location("pin_plugin", ruta)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_pin_plugin_fija_el_hash_y_guarda_el_anterior(tmp_path):
+    """Con CRLF tambien: es como llega el archivo al runner de Windows."""
+    pin = _pin_plugin()
+    viejo = "a" * 64
+    for salto in ("\n", "\r\n"):
+        fuente = salto.join([
+            f'PLUGIN_DLL_SHA256 = "{viejo}"',
+            "",
+            "PREVIOUS_PLUGIN_SHA256 = frozenset({",
+            '    "b' + "b" * 63 + '",  # otro',
+            "})",
+            "",
+        ])
+        installer = tmp_path / "plugin_installer.py"
+        installer.write_bytes(fuente.encode())
+        dll = tmp_path / "nueva.dll"
+        dll.write_bytes(b"MZ nueva")
+        vendor = tmp_path / "vendor.dll"
+
+        sha = pin.fijar(str(dll), str(vendor), str(installer))
+
+        texto = installer.read_bytes().decode()
+        assert f'PLUGIN_DLL_SHA256 = "{sha}"' in texto
+        previos = texto[texto.index("frozenset({"):]
+        assert f'"{viejo}"' in previos and '"' + "b" * 64 + '"' in previos
+        assert vendor.read_bytes() == b"MZ nueva"
+        # el archivo sigue con un solo tipo de salto
+        assert ("\r\n" in texto) == (salto == "\r\n")
+        assert texto.replace("\r\n", "").count("\n") == 0 or salto == "\n"
+
+        # Fijar la misma DLL de nuevo no duplica nada.
+        pin.fijar(str(dll), str(vendor), str(installer))
+        assert installer.read_bytes().decode().count(f'"{viejo}"') == 1

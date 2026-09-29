@@ -120,6 +120,7 @@ class AppState:
         self.autostart_mode = False  # lanzado por el inicio automatico de Windows
         self.update_available = None  # (version, download_url, sha256) o None
         self.installs = []  # ver plugin_installer.find_game_installs()
+        self.plugins_revisados_at = 0.0  # ver actualizar_plugins_viejos
         self.local: local_server.LocalServer | None = None  # modo LAN (ver local_server.py)
         # Rich Presence de Discord: se prende desde Ajustes, apagado por defecto.
         self.discord = discord_presence.DiscordPresence()
@@ -983,6 +984,22 @@ def open_donate(icon, item):
 # Loop principal: backend + telemetria
 # ---------------------------------------------------------------------------
 
+def actualizar_plugins_viejos(ahora: float | None = None) -> None:
+    """Reemplaza el plugin de los juegos que tengan el de una version anterior
+    del cliente (ver plugin_installer.upgrade_previous_plugins). Corre al
+    arrancar y mientras se espera el juego, como mucho una vez por minuto: con
+    el juego abierto la DLL esta en uso y el reemplazo falla, asi que el
+    momento es con el juego cerrado, y la proxima vez que se abra ya carga
+    el nuevo."""
+    ahora = time.time() if ahora is None else ahora
+    if ahora - state.plugins_revisados_at < 60:
+        return
+    state.plugins_revisados_at = ahora
+    for bin_dir in plugin_installer.upgrade_previous_plugins(state.installs):
+        logging.info("Telemetry plugin updated to v%s in %s",
+                     plugin_installer.PLUGIN_DLL_VERSION, bin_dir)
+
+
 def telemetry_status_when_unavailable() -> str:
     """Por que no hay telemetria: el juego no esta abierto, o esta abierto
     pero el plugin no carga. En ese caso se mira el proceso que corre para
@@ -1150,6 +1167,10 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 if new_status != state.status:
                     logging.info("Telemetry unavailable: %s", new_status)
                 state.set_status(new_status)
+                # Con el juego cerrado: al arrancar sin juego y cada vez que
+                # se cierra (la memoria compartida se va y se cae aca).
+                if new_status == "waiting_game":
+                    actualizar_plugins_viejos()
                 await publish_status()
 
                 # El juego se fue de verdad: cuando se cierra, el plugin

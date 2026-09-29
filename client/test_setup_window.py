@@ -510,3 +510,18 @@ def test_una_tarea_cancelada_no_es_un_error(caplog):
     with caplog.at_level(logging.ERROR):
         asyncio.run(principal())
     assert not [r for r in caplog.records if r.levelno == logging.ERROR]
+
+
+# ------------------------------------------- plugin de una version anterior
+
+def test_el_plugin_viejo_se_revisa_como_mucho_una_vez_por_minuto(monkeypatch):
+    """Se llama en cada vuelta del bucle mientras se espera el juego: sin
+    tope, hasheria las DLLs cada pocos segundos."""
+    llamadas = []
+    monkeypatch.setattr(tray_client.plugin_installer, "upgrade_previous_plugins",
+                        lambda installs: llamadas.append(1) or [])
+    monkeypatch.setattr(tray_client.state, "plugins_revisados_at", 0.0)
+    tray_client.actualizar_plugins_viejos(ahora=1000.0)
+    tray_client.actualizar_plugins_viejos(ahora=1030.0)
+    tray_client.actualizar_plugins_viejos(ahora=1061.0)
+    assert len(llamadas) == 2

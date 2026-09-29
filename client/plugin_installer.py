@@ -15,6 +15,7 @@ cualquier carpeta bin\\win_x64).
 """
 
 import hashlib
+import logging
 import os
 import re
 import shutil
@@ -179,10 +180,55 @@ def install_plugin(bin_dir: str) -> str:
         raise ValueError(f"bundled {PLUGIN_DLL_NAME} does not match the expected SHA-256")
     dst = plugin_path_for(bin_dir)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copyfile(src, dst)
+    # A un temporal y despues un reemplazo de una sola vez, nunca escribiendo
+    # encima del instalado: bajo Proton el juego abierto tiene ese archivo
+    # mapeado en memoria, y pisarlo por adentro lo puede tirar abajo. Asi el
+    # juego sigue con el viejo hasta que se reinicie. En Windows, con el juego
+    # abierto, el reemplazo falla antes de tocar nada.
+    tmp = dst + ".new"
+    try:
+        shutil.copyfile(src, tmp)
+        os.replace(tmp, dst)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
     if sha256_of(dst) != PLUGIN_DLL_SHA256:
         raise OSError(f"copied file at {dst} does not match the expected SHA-256")
     return dst
+
+
+# DLLs que instalaron versiones anteriores del cliente. Si la que esta en el
+# juego es una de estas, la pusimos nosotros y se puede reemplazar sin
+# preguntar. Cualquier otra (otra version del plugin, otro origen) no se
+# toca: Setup la muestra como "otra version" con el boton de reemplazar.
+# tools/pin_plugin.py agrega aca el hash anterior cada vez que fija uno nuevo.
+PREVIOUS_PLUGIN_SHA256 = frozenset({
+    "1d03dbc7a975e72203c60a7b9998021ceb8800b836bf28a131279979ad386cd4",  # RenCloud 1.12.1, hasta el cliente 1.5.20
+})
+
+
+def upgrade_previous_plugins(installs: list[dict]) -> list[str]:
+    """Pone el plugin que trae este cliente en cada juego que tenga uno de una
+    version anterior del cliente. Sin esto, actualizar el cliente no cambia el
+    plugin del juego: solo lo haria quien abra Setup y apriete "Reemplazar".
+
+    Con el juego abierto Windows no deja reemplazar la DLL: esa carpeta queda
+    como estaba y se reintenta la proxima vez. Devuelve las carpetas
+    actualizadas y les deja el estado en "installed"."""
+    actualizados = []
+    for install in installs:
+        if install.get("state") != "outdated":
+            continue
+        if sha256_of(install["plugin_path"]) not in PREVIOUS_PLUGIN_SHA256:
+            continue
+        try:
+            install_plugin(install["bin_dir"])
+        except (OSError, ValueError) as exc:
+            logging.info("Plugin in %s not updated yet (%s)", install["bin_dir"], exc)
+            continue
+        install["state"] = "installed"
+        actualizados.append(install["bin_dir"])
+    return actualizados
 
 
 def looks_like_game_bin_dir(path: str) -> bool:
