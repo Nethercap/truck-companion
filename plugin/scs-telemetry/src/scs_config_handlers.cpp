@@ -124,6 +124,9 @@ const scsConfigHandler_t job_config[] = {
     {SCS_TELEMETRY_CONFIG_ATTRIBUTE_delivery_time, handleJobDeliveryTime},
     {SCS_TELEMETRY_CONFIG_ATTRIBUTE_is_cargo_loaded, handleJobIsCargoLoaded},
     {SCS_TELEMETRY_CONFIG_ATTRIBUTE_job_market, handleJobJobMarket},
+    // ATS 1.61: car and bus jobs name their market after the configuration
+    {"car_job.market", handleJobJobMarket},
+    {"bus_job.market", handleJobJobMarket},
     {SCS_TELEMETRY_CONFIG_ATTRIBUTE_special_job, handleJobSpecialJob},
     {SCS_TELEMETRY_CONFIG_ATTRIBUTE_cargo_unit_count, handleJobUnitCount},
     {SCS_TELEMETRY_CONFIG_ATTRIBUTE_cargo_unit_mass, handleJobUnitMass},

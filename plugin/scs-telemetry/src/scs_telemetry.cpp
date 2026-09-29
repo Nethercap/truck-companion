@@ -341,6 +341,36 @@ scs_timestamp_t timestamp;
 scs_timestamp_t simulatedtimestamp;
 scs_timestamp_t rendertimestamp;
 
+// Job configurations. ATS 1.61 added drivable cars and, with them, the
+// `car_job` and `bus_job` configurations (and their `.delivered` /
+// `.cancelled` gameplay events). They carry the same attributes as `job`, so
+// they are stored in the same fields.
+static const char* const job_config_ids[] = {SCS_TELEMETRY_CONFIG_job,
+                                             "car_job", "bus_job"};
+
+// Id of the configuration that started the current job. The game sends all of
+// them on every change, empty ones included: an empty `car_job` must not end
+// a job that came from `job`, and the other way around.
+static char job_owner[16] = "";
+
+static bool is_job_config(const char* id) {
+  for (auto job_id : job_config_ids) {
+    if (strcmp(id, job_id) == 0) return true;
+  }
+  return false;
+}
+
+// `job.delivered`, `car_job.delivered`, `bus_job.delivered`, and so on.
+static bool is_job_event(const char* id, const char* event) {
+  for (auto job_id : job_config_ids) {
+    const auto len = strlen(job_id);
+    if (strncmp(id, job_id, len) == 0 && id[len] == '.' &&
+        strcmp(id + len + 1, event) == 0)
+      return true;
+  }
+  return false;
+}
+
 static auto clear_job_ticker = 0;
 static auto clear_cancelled_ticker = 0;
 static auto clear_delivered_ticker = 0;
@@ -520,19 +550,20 @@ SCSAPI_VOID telemetry_gameplay(const scs_event_t event,
   // log_events(info);
   // check which type the event has
   gameplayType type = {};
-  if (strcmp(info->id, SCS_TELEMETRY_GAMEPLAY_EVENT_job_cancelled) == 0) {
+  if (is_job_event(info->id, "cancelled")) {
     type = cancelled;
     telem_ptr->special_b.jobCancelled ^= true;
     telem_ptr->gameplay_ui.jobFinishedTime = telem_ptr->common_ui.time_abs;
     telem_ptr->special_b.onJob = false;
     telem_ptr->special_b.jobFinished ^= true;
-  } else if (strcmp(info->id, SCS_TELEMETRY_GAMEPLAY_EVENT_job_delivered) ==
-             0) {
+    job_owner[0] = '\0';
+  } else if (is_job_event(info->id, "delivered")) {
     type = delivered;
     telem_ptr->special_b.jobDelivered ^= true;
     telem_ptr->gameplay_ui.jobFinishedTime = telem_ptr->common_ui.time_abs;
     telem_ptr->special_b.onJob = false;
     telem_ptr->special_b.jobFinished ^= true;
+    job_owner[0] = '\0';
   } else if (strcmp(info->id, SCS_TELEMETRY_GAMEPLAY_EVENT_player_fined) == 0) {
     type = fined;
     telem_ptr->special_b.fined ^= true;
@@ -591,8 +622,19 @@ SCSAPI_VOID telemetry_configuration(const scs_event_t event,
     type = hshifter;
   } else if (strcmp(info->id, SCS_TELEMETRY_CONFIG_truck) == 0) {
     type = truck;
-  } else if (strcmp(info->id, SCS_TELEMETRY_CONFIG_job) == 0) {
+  } else if (is_job_config(info->id)) {
     type = job;
+    // A non-empty job configuration carries the whole job. Clear what the
+    // previous one left behind: a car job does not send every attribute a
+    // truck job does (cargo mass, is_cargo_loaded, special_job).
+    if (info->attributes->name) {
+      set_job_values_zero();
+      telem_ptr->config_b.specialJob = false;
+      // Car and bus jobs have no trailer to pick up and never send
+      // is_cargo_loaded: the cargo travels with the vehicle from the start.
+      telem_ptr->config_b.isCargoLoaded =
+          strcmp(info->id, SCS_TELEMETRY_CONFIG_job) != 0;
+    }
   } else {
     // check if it is trailer with backwards compatibility
     if (check_max_version(13, 0)) {
@@ -642,15 +684,23 @@ SCSAPI_VOID telemetry_configuration(const scs_event_t event,
     }
     is_empty = false;
   }
-  // if id of config is "job" but without element and we are on a job -> we
-  // finished it now
-  if (type == job && is_empty && telem_ptr->special_b.onJob) {
-    telem_ptr->special_b.onJob = false;
-    telem_ptr->special_b.jobFinished ^= true;
-  } else if (!telem_ptr->special_b.onJob && type == job && !is_empty) {
-    // oh hey no job but now we have fields in this array so we start a new job
-    telem_ptr->special_b.onJob = true;
-    telem_ptr->gameplay_ui.jobStartingTime = telem_ptr->common_ui.time_abs;
+  if (type == job) {
+    if (is_empty) {
+      // the configuration that started the job is now empty -> we finished it
+      if (telem_ptr->special_b.onJob && strcmp(job_owner, info->id) == 0) {
+        telem_ptr->special_b.onJob = false;
+        telem_ptr->special_b.jobFinished ^= true;
+        job_owner[0] = '\0';
+      }
+    } else {
+      if (!telem_ptr->special_b.onJob) {
+        // oh hey no job but now we have fields in this array so we start a
+        // new job
+        telem_ptr->special_b.onJob = true;
+        telem_ptr->gameplay_ui.jobStartingTime = telem_ptr->common_ui.time_abs;
+      }
+      strncpy_s(job_owner, info->id, _TRUNCATE);
+    }
   }
 }
 
