@@ -6,11 +6,26 @@ name: Build client
 #
 # Uso: git tag v1.3.0 && git push origin v1.3.0
 # (o "Run workflow" a mano desde Actions para solo verificar que compila)
+#
+# Tambien se puede publicar sin pushear el tag: "Run workflow" con `tag`
+# (y opcionalmente `commit`) crea el tag aca adentro y sigue igual que con
+# un tag pusheado. Existe porque las sesiones en la nube pueden pushear
+# ramas pero no tags. El tag queda en `commit`, que tiene que ser el commit
+# de la release: su mensaje es el anuncio de Discord.
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Publish a release with this tag (v1.2.3). Empty = only check that it builds.'
+        required: false
+        default: ''
+      commit:
+        description: 'Commit to build and tag. Empty = the branch the run starts from.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -18,8 +33,28 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # Vacio cuando no hay release: una corrida manual sin tag solo compila.
+      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+      - name: Create the release tag (manual run)
+        # Solo local por ahora: se pushea recien antes de publicar, para no
+        # dejar un tag sin release si algo falla en el medio.
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "the tag must look like v1.2.3, got '$tag'" }
+          $version = $tag.Substring(1)
+          $line = Select-String -Path client/client.py -Pattern '^CLIENT_VERSION = "(.*)"' | Select-Object -First 1
+          if (-not $line -or $line.Matches[0].Groups[1].Value -ne $version) {
+            throw "client/client.py says $($line.Line), the tag says $version"
+          }
+          git tag $tag
+          git log -1 --format='%h %s' $tag
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -53,10 +88,14 @@ jobs:
           path: |
             client/TruckDash-windows.zip
             client/SHA256SUMS.txt
+      - name: Push the release tag (manual run)
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        run: git push origin "refs/tags/${{ env.RELEASE_TAG }}"
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.RELEASE_TAG != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             client/TruckDash-windows.zip
             client/SHA256SUMS.txt
@@ -82,11 +121,11 @@ jobs:
         # Solo corre si existe el secret ADMIN_KEY (repo -> Settings ->
         # Secrets -> Actions), la misma clave de los endpoints /admin del
         # relay.
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.RELEASE_TAG != ''
         shell: pwsh
         env:
           ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
         run: |
           # El contexto `secrets` no esta disponible en el `if:` de un paso.
           if (-not $env:ADMIN_KEY) { Write-Host "ADMIN_KEY not set, skipping"; exit 0 }
@@ -106,11 +145,11 @@ jobs:
       - name: Announce on Discord
         # Embed en el canal de releases del Discord. Solo si el secret
         # DISCORD_RELEASES_WEBHOOK existe (repo → Settings → Secrets → Actions).
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.RELEASE_TAG != ''
         shell: pwsh
         env:
           DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
           REPO: ${{ github.repository }}
         run: |
           # El contexto `secrets` no esta disponible en el `if:` de un paso, por
