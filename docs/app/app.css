@@ -301,6 +301,19 @@
      minimo y muestran de que panel se trata. */
   body.editLayout #miniHudExtra, body.editLayout #navPanel { min-width: 130px; min-height: 26px; }
   body.editLayout .movable:empty::after { content: attr(data-placeholder); opacity: 0.75; }
+  /* Tamano (style.scale): crece desde la esquina de arriba a la izquierda,
+     que es la que guarda la posicion; asi agrandar no lo corre de lugar. */
+  #mapPanel .moved { transform-origin: 0 0; }
+  /* La esquina de abajo a la derecha es la manija de tamano de los paneles y
+     de los botones sueltos (ver LAYOUT_RESIZE_CORNER_PX): un triangulo la
+     marca. Es fondo y no un pseudo-elemento: ::after ya lo usa el texto de
+     muestra de los paneles vacios. */
+  body.editLayout #miniHud, body.editLayout #miniHudExtra, body.editLayout #navPanel,
+  body.editLayout .mapBtn.moved {
+    background-image: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
+    background-size: 14px 14px; background-position: right bottom; background-repeat: no-repeat;
+  }
+  .layoutGrip.layoutResize { cursor: nwse-resize; font-size: 0.8rem; }
   /* En el telefono, con la ayuda y los dos botones en una sola fila, el texto
      caia en una columna de seis renglones: la ayuda va en su propio renglon. */
   /* Pegada arriba y fuera del mapa: dentro del mapa siempre terminaba

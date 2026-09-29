@@ -604,7 +604,28 @@ function createDemoTelemetry(opts) {
   };
 }
 
+// Tamano de un elemento acomodado a mano (modo acomodar): la escala nueva
+// sale de cuanto se arrastro la manija de la esquina respecto del ancho con
+// que se empezo. Nunca mas grande de lo que entra entre donde esta y el borde
+// del mapa (maxWidth, maxHeight en px desde su esquina de arriba a la
+// izquierda): si se pasara, quedaria cortado y la manija, afuera. Con grilla,
+// en pasos de 5 %.
+const LAYOUT_SCALE_MIN = 0.6;
+const LAYOUT_SCALE_MAX = 2.5;
+function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth, maxHeight, snap }) {
+  if (!(startScale > 0) || !(startWidth > 0) || !(startHeight > 0)) return startScale || 1;
+  // Se sigue al dedo en la direccion que mas se movio: arrastrar en diagonal,
+  // para abajo o para el costado agranda igual.
+  const factor = Math.max((startWidth + dx) / startWidth, (startHeight + dy) / startHeight);
+  let s = startScale * factor;
+  const fits = startScale * Math.min(maxWidth / startWidth, maxHeight / startHeight);
+  s = Math.min(s, LAYOUT_SCALE_MAX, fits);
+  s = Math.max(s, LAYOUT_SCALE_MIN);
+  if (snap) s = Math.round(s * 20) / 20;
+  return Math.round(s * 1000) / 1000;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+  module.exports = { layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

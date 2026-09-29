@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createSessionStats, createDemoTelemetry } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -480,4 +480,27 @@ test('demo: los kilometros, el reloj del juego y el consumo cierran entre si', (
   assert.ok(Math.abs(st.avgSpeedKmh - 94) < 3, 'promedio: ' + st.avgSpeedKmh);
   // ...y el consumo, el configurado.
   assert.ok(Math.abs(st.fuelPer100Km - 32) < 1, 'consumo: ' + st.fuelPer100Km);
+});
+
+// Tamano de los elementos acomodados a mano (pedido de usuarios: poder
+// agrandar la velocidad y las indicaciones, no solo moverlas).
+test('tamano acomodado: sigue a la manija, con topes y sin salirse del mapa', () => {
+  const base = { startScale: 1, startWidth: 100, startHeight: 50, maxWidth: 1000, maxHeight: 1000, snap: false };
+  // arrastrar 50 px a la derecha en un panel de 100 px lo agranda a 1,5
+  assert.equal(layoutScaleFor({ ...base, dx: 50, dy: 0 }), 1.5);
+  // para abajo tambien agranda: 25 px en un alto de 50 es la misma proporcion
+  assert.equal(layoutScaleFor({ ...base, dx: 0, dy: 25 }), 1.5);
+  // parte de la escala que ya tenia: 2 x (80/100) = 1,6
+  assert.equal(layoutScaleFor({ ...base, startScale: 2, startWidth: 100, dx: -20, dy: -10 }), 1.6);
+  // topes
+  assert.equal(layoutScaleFor({ ...base, dx: -95, dy: -45 }), LAYOUT_SCALE_MIN);
+  assert.equal(layoutScaleFor({ ...base, dx: 900, dy: 0 }), LAYOUT_SCALE_MAX);
+  // no mas grande de lo que entra hasta el borde: 130 px de lugar para 100
+  assert.equal(layoutScaleFor({ ...base, dx: 500, dy: 0, maxWidth: 130 }), 1.3);
+  assert.equal(layoutScaleFor({ ...base, dx: 500, dy: 0, maxHeight: 60 }), 1.2);
+  // con grilla, de a 5 %
+  assert.equal(layoutScaleFor({ ...base, dx: 33, dy: 0, snap: true }), 1.35);
+  // medidas rotas no rompen nada: se queda como estaba
+  assert.equal(layoutScaleFor({ ...base, startWidth: 0, dx: 50, dy: 0 }), 1);
+  assert.equal(layoutScaleFor({ ...base, startScale: 1.4, startHeight: NaN, dx: 50, dy: 0 }), 1.4);
 });

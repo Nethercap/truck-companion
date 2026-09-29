@@ -958,6 +958,7 @@ function placeMoved(el, pos) {
   el.style.top = `${pos.y}%`;
   el.style.right = 'auto';
   el.style.bottom = 'auto';
+  el.style.scale = pos.s && pos.s !== 1 ? String(pos.s) : '';
 }
 
 function layoutBucket(id) {
@@ -999,10 +1000,85 @@ function resetBtnLayout() {
     const home = btnHome.get(id);
     if (!el || !home) continue;
     el.classList.remove('moved');
-    el.style.left = el.style.top = el.style.right = el.style.bottom = '';
+    el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.scale = '';
     home.parent.insertBefore(el, home.next);
   }
   placeMiniHud();
+}
+
+// Los paneles y los botones sueltos cambian de tamano agarrados de la
+// esquina de abajo a la derecha (marcada con un triangulo): no pueden llevar
+// una manija propia porque el tick de telemetria les reescribe el contenido.
+// Los grupos tienen la suya al lado de la de mover.
+const LAYOUT_RESIZE_CORNER_PX = 22;
+
+function resizableByCorner(el) {
+  return MOVABLE_PANEL_IDS.includes(el.id) || (el.classList.contains('mapBtn') && el.classList.contains('moved'));
+}
+
+function inResizeCorner(el, ev) {
+  const r = el.getBoundingClientRect();
+  return ev.clientX > r.right - LAYOUT_RESIZE_CORNER_PX && ev.clientY > r.bottom - LAYOUT_RESIZE_CORNER_PX;
+}
+
+// Mientras se acomoda, un elemento se saca de su lugar la primera vez que se
+// lo arrastra o se le cambia el tamano: queda suelto sobre el mapa, en el
+// mismo lugar donde estaba. Agrandado adentro de su pila se encimaria con
+// los vecinos; suelto crece desde su esquina de arriba a la izquierda.
+function detachForLayout(el, panel) {
+  if (el.classList.contains('moved')) return;
+  const box = el.getBoundingClientRect();
+  const area = panel.getBoundingClientRect();
+  if (el.parentNode !== panel) panel.appendChild(el);
+  el.classList.add('moved');
+  el.style.left = `${((box.left - area.left) / area.width) * 100}%`;
+  el.style.top = `${((box.top - area.top) / area.height) * 100}%`;
+  el.style.right = 'auto';
+  el.style.bottom = 'auto';
+  placeMiniHudExtra();
+}
+
+function saveLayoutOf(el) {
+  const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+  if (!isFinite(x) || !isFinite(y)) return;
+  const s = parseFloat(el.style.scale);
+  layoutBucket(el.id)[el.id] = isFinite(s) && s !== 1 ? { x, y, s } : { x, y };
+  saveSettings();
+}
+
+function startLayoutResize(el, ev) {
+  const panel = document.getElementById('mapPanel');
+  if (!panel) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  const target = ev.currentTarget;
+  target.setPointerCapture(ev.pointerId);
+  detachForLayout(el, panel);
+  const box = el.getBoundingClientRect();
+  const area = panel.getBoundingClientRect();
+  const startScale = parseFloat(el.style.scale) || 1;
+  const from = { x: ev.clientX, y: ev.clientY };
+  const move = (e) => {
+    const s = layoutScaleFor({
+      startScale, startWidth: box.width, startHeight: box.height,
+      dx: e.clientX - from.x, dy: e.clientY - from.y,
+      maxWidth: area.right - box.left, maxHeight: area.bottom - box.top, snap: layoutGrid,
+    });
+    el.style.scale = s === 1 ? '' : String(s);
+  };
+  const up = () => {
+    target.removeEventListener('pointermove', move);
+    target.removeEventListener('pointerup', up);
+    target.removeEventListener('pointercancel', up);
+    saveLayoutOf(el);
+  };
+  target.addEventListener('pointermove', move);
+  target.addEventListener('pointerup', up);
+  target.addEventListener('pointercancel', up);
+}
+
+function startGroupResize(ev) {
+  startLayoutResize(ev.currentTarget.parentNode, ev);
 }
 
 function startLayoutDrag(ev) {
@@ -1011,6 +1087,10 @@ function startLayoutDrag(ev) {
     : ev.currentTarget;
   const panel = document.getElementById('mapPanel');
   if (!panel) return;
+  if (resizableByCorner(el) && inResizeCorner(el, ev)) {
+    startLayoutResize(el, ev);
+    return;
+  }
   ev.preventDefault();
   ev.stopPropagation();
   const box = el.getBoundingClientRect();
@@ -1060,10 +1140,7 @@ function startLayoutDrag(ev) {
     target.removeEventListener('pointerup', up);
     target.removeEventListener('pointercancel', up);
     if (!dragging) return; // fue un toque, no se movio nada
-    const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
-    if (!isFinite(x) || !isFinite(y)) return;
-    layoutBucket(el.id)[el.id] = { x, y };
-    saveSettings();
+    saveLayoutOf(el); // con el tamano que ya tenia
   };
   target.addEventListener('pointermove', move);
   target.addEventListener('pointerup', up);
@@ -1097,14 +1174,22 @@ function setLayoutEdit(on) {
     if (!group) continue;
     rememberHome(group);
     let grip = group.querySelector(':scope > .layoutGrip');
+    let resize = group.querySelector(':scope > .layoutResize');
     if (on && !grip) {
       grip = document.createElement('div');
       grip.className = 'layoutGrip';
       grip.textContent = '⠿';
       group.insertBefore(grip, group.firstChild);
       grip.addEventListener('pointerdown', startLayoutDrag);
+      resize = document.createElement('div');
+      resize.className = 'layoutGrip layoutResize';
+      resize.textContent = '⤡';
+      resize.title = t('layoutResize');
+      grip.after(resize);
+      resize.addEventListener('pointerdown', startGroupResize);
     } else if (!on && grip) {
       grip.remove();
+      if (resize) resize.remove();
     }
   }
   for (const id of [...allMovableIds(), ...MOVABLE_PANEL_IDS]) {
