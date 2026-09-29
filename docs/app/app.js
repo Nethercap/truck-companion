@@ -2363,6 +2363,9 @@ function updateRouteSummary(data) {
 // MultiLineString en lng/lat, para pintarlos con estilos distintos.
 // Separa la ruta en: tramo actual (hasta el primer waypoint), tramos
 // siguientes (p[5] > 0: de un waypoint al siguiente / al destino) y ferries.
+// Los tramos se juntan en coordenadas del juego (metros) y recien al final
+// pasan a lng/lat: cleanRouteForDrawing mide en metros (saca los ganchos de
+// las calzadas separadas, ver pure.js).
 function splitRouteForDrawing(routePoints) {
   const land = [], next = [], ferry = [];
   let current = [];
@@ -2370,12 +2373,13 @@ function splitRouteForDrawing(routePoints) {
   const flush = () => { if (current.length > 1) (currentLeg > 0 ? next : land).push(current); };
   for (let k = 0; k < routePoints.length; k++) {
     const p = routePoints[k];
+    const xy = [p[0], p[1]];
     const leg = p[5] != null ? p[5] : currentLeg;
     if (k > 0 && leg !== currentLeg) {
       // cambio de tramo: el punto del waypoint cierra el tramo anterior y abre el siguiente
-      current.push(toLngLat(p[0], p[1]));
+      current.push(xy);
       flush();
-      current = [toLngLat(p[0], p[1])];
+      current = [xy];
       currentLeg = leg;
       continue;
     }
@@ -2383,15 +2387,16 @@ function splitRouteForDrawing(routePoints) {
       flush();
       const prev = routePoints[k - 1];
       ferry.push([toLngLat(prev[0], prev[1]), toLngLat(p[0], p[1])]);
-      current = [toLngLat(p[0], p[1])];
+      current = [xy];
     } else {
-      current.push(toLngLat(p[0], p[1]));
+      current.push(xy);
     }
   }
   flush();
+  const dibujar = (part) => smoothLineCoords(cleanRouteForDrawing(part).map(q => toLngLat(q[0], q[1])));
   return {
-    land: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: land.map(part => smoothLineCoords(part)) } },
-    next: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: next.map(part => smoothLineCoords(part)) } },
+    land: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: land.map(dibujar) } },
+    next: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: next.map(dibujar) } },
     ferry: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: ferry } },
   };
 }

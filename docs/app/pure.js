@@ -42,6 +42,116 @@ function smoothLineCoords(points, segmentsPerPoint = 6) {
   return result;
 }
 
+// Saca del DIBUJO de la ruta los desvios cortos que salen de la linea y
+// vuelven a ella. El grafo lleva los tramos de doble mano por el eje de la
+// calle, pero donde las dos manos se separan un rato (un puente con un
+// tablero por mano, como la I-15 sobre la US-6 en Spanish Fork, ATS) cada
+// una es un tramo propio, dibujado donde esta: la ruta salia del eje, iba
+// 10-14 m al costado y volvia, y el suavizado lo convertia en un rulito.
+// Se reconoce por cuatro cosas, para no tocar nada mas: vuelve a la MISMA
+// linea y sigue en la misma direccion (no es un giro ni un cambio de
+// calle), es corto (maxAlong, maxLateral), la mayor parte corre paralela a
+// la linea (no es una rotonda, que es toda curva) y no es mucho mas largo
+// que la recta. Puntos en metros (x, y del juego). Solo es dibujo: el
+// ruteo, las indicaciones y las distancias usan los puntos de verdad.
+// Un desvio de estos es ABRUPTO: se corre de 0 a varios metros en pocos
+// metros y vuelve igual (maxRamp). Y esta hecho de POCOS tramos rectos
+// (entrada, tablero, salida: maxInterior puntos adentro), mientras que una
+// curva son muchos puntos juntos. Sin esas dos condiciones recortaba
+// curvas, sobre todo las cerradas de las rutas de ETS2.
+function dropShortExcursions(points, { maxAlong = 150, maxLateral = 20, minLateral = 4,
+  backLen = 40, returnTol = 3, minParallel = 0.55, maxDetour = 1.4, maxRamp = 25, maxInterior = 4 } = {}) {
+  const n = points.length;
+  if (n < 4) return points;
+  const d = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const out = [points[0]];
+  let i = 1;
+  while (i < n) {
+    out.push(points[i]);
+    if (i >= n - 2) { i++; continue; }
+    // Direccion de llegada, medida unos metros hacia atras: un tramo solo
+    // puede ser muy corto y apuntar a cualquier lado.
+    let k0 = i - 1, back = 0;
+    while (k0 > 0 && back < backLen) { back += d(points[k0], points[k0 + 1]); k0--; }
+    const ux0 = points[i][0] - points[k0][0], uy0 = points[i][1] - points[k0][1];
+    const ul = Math.hypot(ux0, uy0);
+    if (ul < 1) { i++; continue; }
+    const ux = ux0 / ul, uy = uy0 / ul;
+    const lateral = (p) => ux * (p[1] - points[i][1]) - uy * (p[0] - points[i][0]);
+    const adelante = (p) => ux * (p[0] - points[i][0]) + uy * (p[1] - points[i][1]);
+    let along = 0, paralelo = 0, maxLat = 0, fin = -1;
+    let subida = -1, ultimoAlto = 0; // metros hasta pasar minLateral / ultimo punto por encima
+    for (let k = i + 1; k < n - 1; k++) {
+      const seg = d(points[k - 1], points[k]);
+      along += seg;
+      if (along > maxAlong) break;
+      const lat = Math.abs(lateral(points[k]));
+      if (lat > maxLateral || adelante(points[k]) <= 0) break;
+      if (seg > 0) {
+        const c = Math.abs(ux * (points[k][0] - points[k - 1][0]) + uy * (points[k][1] - points[k - 1][1])) / seg;
+        if (c > 0.95) paralelo += seg;
+      }
+      if (k >= i + 2 && lat <= returnTol && maxLat >= minLateral) {
+        const sig = points[k + 1];
+        const s = d(points[k], sig);
+        const cosSale = s > 0 ? (ux * (sig[0] - points[k][0]) + uy * (sig[1] - points[k][1])) / s : 0;
+        const abrupto = subida <= maxRamp && along - ultimoAlto <= maxRamp && k - i - 1 <= maxInterior;
+        if (abrupto && cosSale > 0.97 && paralelo / along >= minParallel && along / d(points[i], points[k]) <= maxDetour) fin = k;
+        break;
+      }
+      if (lat >= minLateral) {
+        if (subida < 0) subida = along;
+        ultimoAlto = along;
+      }
+      maxLat = Math.max(maxLat, lat);
+    }
+    i = fin > 0 ? fin : i + 1;
+  }
+  return out;
+}
+
+// La otra punta del mismo problema: donde las dos manos pasan de tramos
+// separados (cada uno donde esta) a un tramo de doble mano (por el eje), o
+// al reves, la ruta cambia de linea con un escalon corto y cruzado, y no
+// vuelve. Se reparte a lo largo del tramo vecino mas largo sacando el punto
+// del escalon de ese lado: el cambio de linea queda como una transicion
+// suave en vez de un salto. Solo entre dos tramos largos y paralelos, para
+// no tocar giros de verdad.
+// El reparto se limita a maxTaper metros: el punto del escalon se corre
+// hacia atras sobre su misma linea, no se saca, porque sacarlo lo repartia
+// sobre el tramo vecino entero y con un tramo de 300 m la ruta quedaba un
+// buen trecho fuera de la calle.
+function taperShortSteps(points, { maxStep = 25, minNeighbor = 20, minShift = 3, maxShift = 20, maxTaper = 60 } = {}) {
+  if (points.length < 4) return points;
+  const pts = points.slice();
+  const d = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  for (let k = 1; k + 2 < pts.length; k++) {
+    const a = pts[k - 1], b = pts[k], c = pts[k + 1], e = pts[k + 2];
+    const antes = d(a, b), paso = d(b, c), despues = d(c, e);
+    if (paso > maxStep || paso < 0.5 || antes < minNeighbor || despues < minNeighbor) continue;
+    const u = [(b[0] - a[0]) / antes, (b[1] - a[1]) / antes];
+    const w = [(e[0] - c[0]) / despues, (e[1] - c[1]) / despues];
+    if (u[0] * w[0] + u[1] * w[1] < 0.97) continue;          // las dos lineas, paralelas
+    const cosPaso = (u[0] * (c[0] - b[0]) + u[1] * (c[1] - b[1])) / paso;
+    if (cosPaso > 0.8) continue;                              // el paso va cruzado
+    const corrimiento = Math.abs(u[0] * (c[1] - b[1]) - u[1] * (c[0] - b[0]));
+    if (corrimiento < minShift || corrimiento > maxShift) continue;
+    if (antes >= despues) {
+      const t = Math.min(maxTaper, antes / 2);
+      pts[k] = [b[0] - u[0] * t, b[1] - u[1] * t];
+    } else {
+      const t = Math.min(maxTaper, despues / 2);
+      pts[k + 1] = [c[0] + w[0] * t, c[1] + w[1] * t];
+    }
+  }
+  return pts;
+}
+
+// Todo lo que se le saca al dibujo de la ruta antes de suavizarlo.
+function cleanRouteForDrawing(points) {
+  return taperShortSteps(dropShortExcursions(points));
+}
+
 // Redondea la distancia al proximo giro en escalones cada vez mas finos a
 // medida que te acercas (como un GPS real): >10km redondea a 1km, entre
 // 1-10km a 500m, entre 100m-1km a 100m, y por debajo de 100m a 10m.
@@ -651,6 +761,6 @@ function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth,
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+  module.exports = { dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

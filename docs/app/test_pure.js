@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createSessionStats, createDemoTelemetry } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -517,6 +517,88 @@ test('routeHasLine: solo cuenta una linea que se puede dibujar', () => {
   assert.equal(routeHasLine(multi([[[1, 2]], [[3, 4], [5, 6]]])), true); // tramo por tierra despues de un ferry
   assert.equal(routeHasLine(null), false);
   assert.equal(routeHasLine({ type: 'Feature', geometry: null }), false);
+});
+
+// Dibujo de la ruta: ganchos y escalones donde las dos manos de una
+// autopista se separan (I-15, salida 257 a Spanish Fork, ATS, 29-09-2026).
+// Puntos reales del grafo de ATS (metros del juego).
+const I15_SPANISH_FORK = [[-67297.1, -11792.7], [-67338.2, -11750.3], [-67330.5, -11737.4], [-67357.8, -11705.5], [-67381.9, -11671.1], [-67403.9, -11635.0], [-67424.7, -11598.2], [-67445.6, -11561.5], [-67460.1, -11565.3], [-67486.0, -11512.1], [-67479.4, -11503.6], [-67509.6, -11452.1], [-67598.4, -11300.1], [-67610.9, -11275.3], [-67620.5, -11249.3], [-67627.7, -11222.3], [-67632.9, -11194.5]];
+
+function giroMaximo(pts) {
+  let peor = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = [pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]];
+    const b = [pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]];
+    const c = (a[0] * b[0] + a[1] * b[1]) / (Math.hypot(...a) * Math.hypot(...b));
+    peor = Math.max(peor, Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI);
+  }
+  return peor;
+}
+
+test('ruta dibujada: el gancho del puente de la salida 257 se dibuja derecho', () => {
+  const limpia = cleanRouteForDrawing(I15_SPANISH_FORK);
+  // El tablero del puente (14 y 10 m al costado) no se dibuja; el nodo de
+  // antes, sobre el eje, se queda
+  for (const p of [[-67460.1, -11565.3], [-67486.0, -11512.1]]) {
+    assert.ok(!limpia.some(q => q[0] === p[0] && q[1] === p[1]), `sigue ${p}`);
+  }
+  // Las puntas de la ruta no se tocan nunca
+  assert.deepEqual(limpia[0], I15_SPANISH_FORK[0]);
+  assert.deepEqual(limpia.at(-1), I15_SPANISH_FORK.at(-1));
+  // Antes habia quiebres de casi 80 grados; limpia, ninguno pasa de 30
+  assert.ok(giroMaximo(I15_SPANISH_FORK) > 75);
+  assert.ok(giroMaximo(limpia) < 30, String(giroMaximo(limpia)));
+});
+
+test('ruta dibujada: un escalon se reparte en 60 m como maximo', () => {
+  // Recta, escalon de 12 m al costado en 10 m, y otra recta paralela
+  const pts = [[0, 0], [300, 0], [305, 12], [605, 12]];
+  const limpia = taperShortSteps(pts);
+  assert.equal(limpia.length, 4);
+  assert.deepEqual(limpia[1], [240, 0]);          // 60 m antes, sobre su misma linea
+  assert.deepEqual(limpia[2], [305, 12]);
+  assert.ok(giroMaximo(limpia) < 15);
+});
+
+test('ruta dibujada: la limpieza no toca curvas, rotondas, giros ni rectas', () => {
+  const arco = (cx, cy, r, a0, a1, pasos) => Array.from({ length: pasos + 1 }, (_, k) => {
+    const a = a0 + (a1 - a0) * k / pasos;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  });
+  const recta = [[0, 0], [50, 0], [100, 0], [150, 0], [200, 0]];
+  // Curva en S cerrada, como las de las rutas de ETS2: muchos puntos juntos
+  const s = [[-60, 0], [0, 0], ...arco(0, 40, 40, -Math.PI / 2, 0, 8), ...arco(80, 40, 40, Math.PI, Math.PI / 2, 8), [140, 80]];
+  // Pasar derecho por una rotonda de 20 m de radio
+  const rotonda = [[-80, 0], [-20, 0], ...arco(0, 0, 20, Math.PI, 0, 12).map(([x, y]) => [x, -y]), [20, 0], [80, 0]];
+  // Giro de 90 grados en un cruce
+  const giro = [[0, 0], [100, 0], [110, 5], [115, 15], [115, 100]];
+  for (const [nombre, pts] of [['recta', recta], ['S', s], ['rotonda', rotonda], ['giro', giro]]) {
+    assert.deepEqual(cleanRouteForDrawing(pts), pts, nombre);
+  }
+});
+
+test('ruta dibujada: solo se saca un desvio abrupto, de pocos tramos y que sigue derecho', () => {
+  // Abrupto (en 12 m), de pocos tramos y vuelve a la misma linea: se saca
+  const brusco = [[0, 0], [100, 0], [104, 11], [164, 11], [168, 0], [268, 0]];
+  assert.deepEqual(dropShortExcursions(brusco), [[0, 0], [100, 0], [168, 0], [268, 0]]);
+  // El mismo corrimiento pero en 40 m de subida es una curva: se queda
+  const suave = [[0, 0], [100, 0], [140, 8], [180, 8], [220, 0], [320, 0]];
+  assert.deepEqual(dropShortExcursions(suave), suave);
+  // Abrupto pero hecho de muchos puntos (una curva con geometria): se queda
+  const denso = [[0, 0], [100, 0], [104, 11], ...Array.from({ length: 12 }, (_, k) => [109 + 5 * k, 11]), [168, 0], [268, 0]];
+  assert.deepEqual(dropShortExcursions(denso), denso);
+  // Vuelve a la linea pero dobla: es un giro, no un desvio
+  const dobla = [[0, 0], [100, 0], [104, 11], [164, 11], [168, 0], [168, -100]];
+  assert.deepEqual(dropShortExcursions(dobla), dobla);
+});
+
+test('ruta dibujada: un escalon solo se reparte entre dos lineas paralelas y si es cruzado', () => {
+  // Esquina de 90 grados con un chanfle corto: no es un escalon
+  const esquina = [[0, 0], [100, 0], [108, 8], [108, 100]];
+  assert.deepEqual(taperShortSteps(esquina), esquina);
+  // Cambio de linea que ya es suave (4 m en 20 m): no hay nada que repartir
+  const suave = [[0, 0], [100, 0], [120, 4], [220, 4]];
+  assert.deepEqual(taperShortSteps(suave), suave);
 });
 
 // Zoom del modo navegacion elegido en Ajustes (pedido de usuarios).
