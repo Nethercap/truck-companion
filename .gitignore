@@ -14,3 +14,9 @@ client/truckdash.log
 .claude/
 .e2e-update/
 docs/assets/demo.gif
+
+# Salidas de compilar el plugin (plugin/)
+plugin/scs-telemetry/vs2012/.vs/
+plugin/scs-telemetry/vs2012/x64/
+plugin/scs-telemetry/vs2012/Release/
+plugin/scs-telemetry/vs2012/Debug/
