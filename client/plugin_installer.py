@@ -25,7 +25,7 @@ PLUGIN_DLL_NAME = "scs-telemetry.dll"
 # Fork de RenCloud 1.12.1 con los trabajos con auto de ATS 1.61 (plugin/).
 # La DLL y su hash los escribe el workflow "Build plugin" (tools/pin_plugin.py).
 PLUGIN_DLL_VERSION = "1.12.1-truckdash.1"
-PLUGIN_DLL_SHA256 = "1d03dbc7a975e72203c60a7b9998021ceb8800b836bf28a131279979ad386cd4"
+PLUGIN_DLL_SHA256 = "f38587d658c34c74f6d060f0ede1be607514b7dc0cb6c7a8ab6b7c449d481819"
 
 GAMES = {
     "ets2": "Euro Truck Simulator 2",
