@@ -83,10 +83,14 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
+// El resumen de ruta minimizado a una barrita de progreso. Antes la X de
+// ese panel borraba la ruta, y quien solo queria sacarlo de encima se
+// quedaba sin ruta hasta el proximo trabajo (reporte del 30-09-2026).
+let routeSummaryMin = !!_savedSettings.routeSummaryMin;
 // Modo liviano para dispositivos viejos (opt-in en Ajustes, se aplica al
 // recargar): render a 1x, sin animacion del camion, sin casing/punteado de
 // ruta, sin 3D, POIs desde z9 y sin nombres de ruta. liteNoRouting ademas no
@@ -1305,6 +1309,11 @@ function ensureMapInitialized() {
     center: [0, 20],
     zoom: 1,
     attributionControl: false,
+    // Sin fundido de etiquetas: con la camara siguiendo al camion todo el
+    // tiempo, cada movimiento reubica los carteles y el fundido de 300 ms no
+    // terminaba nunca, asi que MapLibre se seguia pidiendo cuadros a 60 por
+    // segundo aunque la camara ya fuera a 30 (ver FRAME_MIN_MS).
+    fadeDuration: 0,
     // Lite: pintar a 1x en pantallas de alta densidad (hasta 4x menos pixeles).
     pixelRatio: liteMode ? 1 : undefined,
     maxZoom: liteMode ? 15 : undefined,
@@ -2947,6 +2956,13 @@ function updateNextCity(x, z) {
 // la linea saltaba como si ya se hubiera dado la vuelta (reporte de un
 // usuario). El camion avanza < 30 m por tick, asi que la ventana sobra.
 const TRIM_WINDOW_M = 400;
+// El recorte se lleva al dia en cada tick (lo usan las indicaciones y el
+// resumen), pero la linea se vuelve a dibujar a lo sumo una vez por segundo:
+// cada dibujo limpia y suaviza la ruta entera y MapLibre la vuelve a cortar
+// en tiles, y a 4 Hz eso era un cuarto del CPU de la pestana. En un segundo
+// el camion avanza menos de 30 m, que quedan debajo de la flecha y la estela.
+const ROUTE_REDRAW_MS = 1000;
+let routeDrawnAt = 0;
 function trimRouteBehindTruck(x, z) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !map.getSource('route')) return;
   let bestIdx = 0, bestDist = Infinity, bestPoint = null;
@@ -2976,6 +2992,9 @@ function trimRouteBehindTruck(x, z) {
   // El punto interpolado hereda el tramo del nodo que sigue.
   const nextPt = currentRouteWorldPoints[bestIdx + 1];
   currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0, nextPt ? nextPt[6] : undefined], ...currentRouteWorldPoints.slice(bestIdx + 1)];
+  const now = performance.now();
+  if (now - routeDrawnAt < ROUTE_REDRAW_MS) return;
+  routeDrawnAt = now;
   const parts = splitRouteForDrawing(currentRouteWorldPoints);
   setRouteData(parts.land);
   if (map.getSource('route-next')) map.getSource('route-next').setData(parts.next);
@@ -2983,7 +3002,55 @@ function trimRouteBehindTruck(x, z) {
 }
 
 let lastDisplayedLngLat = null; // ultima posicion ya animada del marcador ([lng,lat]), para interpolar el proximo tramo
-let moveAnimFrameId = null;
+// Un solo reloj para lo que se anima entre ticks (el marcador del camion y
+// la camara que lo sigue), a lo sumo 30 cuadros por segundo. Con easeTo()
+// MapLibre redibujaba el mapa entero en cada cuadro de la pantalla todo el
+// tiempo que se manejaba (los ticks llegan cada 250 ms y cada animacion dura
+// casi eso): 60 veces por segundo, 144 con un monitor rapido, y la pestana
+// se llevaba 30-40 % de CPU, mas que el juego (reporte en Brave, 30-09-2026).
+// Los dos en el mismo cuadro: si el marcador se moviera a 60 y el mapa a 30,
+// la flecha temblaria contra la calle.
+const FRAME_MIN_MS = 1000 / 30 - 4; // tolerancia: el rAF no cae exacto
+const frameJobs = new Map(); // nombre -> fn(now), devuelve false al terminar
+let frameRaf = null;
+let frameLast = 0;
+function runFrameJob(name, fn) {
+  frameJobs.set(name, fn);
+  if (!frameRaf) frameRaf = requestAnimationFrame(frameLoop);
+}
+function stopFrameJob(name) { frameJobs.delete(name); }
+function frameLoop(now) {
+  frameRaf = null;
+  if (now - frameLast >= FRAME_MIN_MS) {
+    frameLast = now;
+    for (const [name, fn] of [...frameJobs]) {
+      if (frameJobs.get(name) === fn && !fn(now)) frameJobs.delete(name);
+    }
+  }
+  if (frameJobs.size) frameRaf = requestAnimationFrame(frameLoop);
+}
+
+// La camara que sigue al camion: lo mismo que hacia easeTo (centro, rumbo,
+// zoom e inclinacion con rampa lineal), pero con jumpTo en los cuadros del
+// reloj comun. Se corta sola si el usuario agarra el mapa.
+function followCameraTo(target, ms) {
+  const from = { center: map.getCenter(), bearing: map.getBearing(), zoom: map.getZoom(), pitch: map.getPitch() };
+  const start = performance.now();
+  const dBearing = target.bearing == null ? 0 : ((target.bearing - from.bearing + 540) % 360) - 180;
+  runFrameJob('camera', (now) => {
+    if (!autoFollow) return false;
+    const t = Math.min(1, (now - start) / ms);
+    const cam = {
+      center: [from.center.lng + (target.center[0] - from.center.lng) * t, from.center.lat + (target.center[1] - from.center.lat) * t],
+    };
+    if (target.bearing != null) cam.bearing = from.bearing + dBearing * t;
+    if (target.zoom != null) cam.zoom = from.zoom + (target.zoom - from.zoom) * t;
+    if (target.pitch != null) cam.pitch = from.pitch + (target.pitch - from.pitch) * t;
+    if (target.padding) cam.padding = target.padding;
+    map.jumpTo(cam);
+    return t < 1;
+  });
+}
 // Duracion de la interpolacion entre dos ticks de telemetria: se mide el
 // intervalo real de llegada (1 s con clientes viejos, 250 ms con 1.5+ por el
 // relay, 100 ms en LAN) y se anima un poco menos que eso, asi la posicion
@@ -3010,7 +3077,7 @@ function moveAnimMs() {
 // se peleaba con el easeTo() del modo navegacion y de paso le ganaba a
 // cualquier intento de arrastrar el mapa a mano.
 function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
-  if (moveAnimFrameId) cancelAnimationFrame(moveAnimFrameId);
+  stopFrameJob('truck');
   // El giro se interpola con la MISMA duracion y la misma rampa lineal que
   // usa el easeTo de la camara para su bearing. Si la flecha salta y el mapa
   // gira progresivamente, los dos nunca coinciden y la flecha se ve torcida
@@ -3019,7 +3086,6 @@ function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
   if (liteMode) {
     truckMarker.setLngLat(toPos);
     truckMarker.setRotation(toHeading);
-    moveAnimFrameId = null;
     return; // sin interpolar por frame
   }
   const start = performance.now();
@@ -3039,9 +3105,9 @@ function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
     truckMarker.setRotation(alineadaAlMapa
       ? map.getBearing()
       : (fromHeading + deltaHeading * t + 360) % 360);
-    moveAnimFrameId = t < 1 ? requestAnimationFrame(step) : null;
+    return t < 1;
   }
-  moveAnimFrameId = requestAnimationFrame(step);
+  runFrameJob('truck', step);
 }
 
 function resolveEffectiveGame(game) {
@@ -3165,13 +3231,15 @@ function updateMap(position, game, gameHeadingDeg) {
   // A 10 Hz un punto por tick llenaria el trail en 100 s: solo se agrega
   // si el camion se movio >= 5 m desde el ultimo punto guardado.
   const lastTrail = trailWorldRaw;
+  // Solo cuando suma un punto: cada setData hace que MapLibre vuelva a
+  // cortar la linea entera en tiles, y a 4 Hz eso era trabajo tirado.
   if (!lastTrail || Math.hypot(position.x - lastTrail.x, position.z - lastTrail.z) >= 5) {
     trailWorld.push(lngLat);
     trailWorldRaw = { x: position.x, z: position.z };
     if (trailWorld.length > MAX_TRAIL_POINTS) trailWorld.shift();
-  }
-  if (map.getSource('trail')) {
-    map.getSource('trail').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailWorld } });
+    if (map.getSource('trail')) {
+      map.getSource('trail').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailWorld } });
+    }
   }
 
   if (!justJumped && prevLngLat) {
@@ -3201,14 +3269,16 @@ function updateMap(position, game, gameHeadingDeg) {
     // tercio inferior tienen que viajar con la camara de cada tick.
     const navView = { pitch: nav3d ? 58 : 0, padding: navPadding() };
     if (!justJumped && prevLngLat) {
-      map.easeTo({ center: lngLat, bearing: lastHeadingDeg, duration: moveAnimMs(), easing: t => t, ...zoomOverride, ...navView });
+      followCameraTo({ center: lngLat, bearing: lastHeadingDeg, ...zoomOverride, ...navView }, moveAnimMs());
     } else {
+      stopFrameJob('camera');
       map.jumpTo({ center: lngLat, bearing: lastHeadingDeg, ...zoomOverride, ...navView });
     }
   } else if (autoFollow) {
     if (!justJumped && prevLngLat) {
-      map.easeTo({ center: lngLat, duration: moveAnimMs(), easing: t => t });
+      followCameraTo({ center: lngLat }, moveAnimMs());
     } else {
+      stopFrameJob('camera');
       map.jumpTo({ center: lngLat });
     }
   }
@@ -3824,6 +3894,18 @@ document.getElementById('updateBannerClose').addEventListener('click', () => {
 });
 
 document.getElementById('routeResetBtn').addEventListener('click', resetDisplayedRoute);
+function applyRouteSummaryMin() {
+  document.getElementById('routeSummary').classList.toggle('min', routeSummaryMin);
+  keepPanelsClearOfRouteSummary();
+}
+function setRouteSummaryMin(min) {
+  routeSummaryMin = min;
+  saveSettings();
+  applyRouteSummaryMin();
+}
+document.getElementById('routeMinBtn').addEventListener('click', () => setRouteSummaryMin(true));
+document.getElementById('routeExpandBtn').addEventListener('click', () => setRouteSummaryMin(false));
+applyRouteSummaryMin();
 document.getElementById('recenterBtn').addEventListener('click', () => {
   navAutoZoomPaused = false;
   resumeMapFollow();

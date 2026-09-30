@@ -1,0 +1,92 @@
+/* Guia de uso (docs/guide/). Misma paleta que la app. */
+:root {
+  --bg: #0d0f12;
+  --panel: #171a1f;
+  --panel2: #1d2128;
+  --border: #2a2f37;
+  --accent: #3b9eff;
+  --text: #e9edf3;
+  --muted: #9aa4b2;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+a { color: var(--accent); }
+
+.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+  padding: 0.6rem 1rem; background: rgba(13, 15, 18, 0.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-weight: 700; text-decoration: none; }
+.brand img { width: 1.4rem; height: 1.4rem; }
+.topRight { display: flex; align-items: center; gap: 0.5rem; }
+select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.5rem; font: inherit; font-size: 0.9rem; }
+.btn { display: inline-block; background: var(--accent); color: #fff; font-weight: 600; font-size: 0.9rem; text-decoration: none;
+  padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid var(--accent); }
+.btn.secondary { background: transparent; color: var(--text); border-color: var(--border); }
+.btn:hover { filter: brightness(1.1); }
+.top .btn { padding: 0.3rem 0.7rem; }
+
+main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 2rem; }
+h1 { font-size: 2rem; line-height: 1.2; margin: 0.5rem 0 0.6rem; }
+.lead { color: var(--muted); font-size: 1.05rem; margin: 0 0 1rem; }
+.leadLinks { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1.5rem; }
+
+.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem 1.2rem; margin-bottom: 2rem; }
+.toc h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.4rem; border: 0; padding: 0; }
+.toc ol { margin: 0; padding-left: 1.3rem; columns: 2; column-gap: 2rem; }
+.toc li { break-inside: avoid; }
+.toc a { color: var(--text); text-decoration: none; }
+.toc a:hover { color: var(--accent); }
+
+section { scroll-margin-top: 4rem; margin-bottom: 2.6rem; }
+h2 { font-size: 1.45rem; margin: 0 0 0.7rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.05rem; margin: 1.3rem 0 0.4rem; }
+p { margin: 0 0 0.8rem; }
+ul, ol { margin: 0 0 0.9rem; padding-left: 1.3rem; }
+li { margin: 0.2rem 0; }
+code { background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; padding: 0.05rem 0.35rem; font-size: 0.9em; }
+.tip { background: var(--panel); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 0.6rem 0.9rem; margin: 0 0 0.9rem; }
+.tip p:last-child { margin: 0; }
+
+figure { margin: 1rem 0 1.2rem; }
+figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); cursor: zoom-in; }
+figure.phone img { max-width: 340px; margin: 0 auto; }
+figcaption { color: var(--muted); font-size: 0.85rem; text-align: center; margin-top: 0.4rem; }
+
+/* Leyendas con los iconos reales de la app (guide.js los saca de /app/). */
+.legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.6rem; margin: 0.4rem 0 1.2rem; }
+.legItem { display: flex; gap: 0.8rem; align-items: center; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; }
+.legItem b { display: block; font-size: 0.95rem; line-height: 1.3; }
+.legItem span.d { display: block; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+.ico { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.05rem; }
+.ico svg { width: 20px; height: 20px; }
+.ico.map { border-radius: 50%; background: #fff; color: #111; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.ico.top { width: 38px; height: 38px; border-radius: 8px; border: 1px solid #333; background: var(--panel2); font-size: 0.85rem; }
+.ico.top.discord { color: #8ea1ff; }
+
+.cmdGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 0.5rem; margin: 0.6rem 0 1.2rem; }
+.cmd { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem; min-height: 78px; padding: 0.5rem 0.3rem;
+  background: #23262c; border: 1px solid #333; border-radius: 10px; font-size: 0.78rem; text-align: center; line-height: 1.2; }
+.cmd svg { width: 24px; height: 24px; }
+.cmd.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cmd.add { border-style: dashed; color: var(--muted); }
+
+.chips { list-style: none; padding: 0; }
+.chips li { display: flex; gap: 0.6rem; align-items: baseline; }
+.dot { flex-shrink: 0; width: 0.65rem; height: 0.65rem; border-radius: 50%; background: #f0a030; transform: translateY(0.05rem); }
+.dot.ok { background: #4caf50; }
+.dot.bad { background: #ff4d4d; }
+.dot.info { background: var(--accent); }
+
+.backTop { text-align: right; font-size: 0.9rem; }
+footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1.5rem 1rem 2.5rem; }
+footer a { color: var(--muted); }
+
+.lightbox { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.9); padding: 1rem; cursor: zoom-out; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+
+@media (max-width: 600px) {
+  h1 { font-size: 1.6rem; }
+  .toc ol { columns: 1; }
+  .top .btn { display: none; }
+}

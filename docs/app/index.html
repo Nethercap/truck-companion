@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20260929g" />
-<link rel="stylesheet" href="app.css?v=20260929g" />
+<link rel="stylesheet" href="../dash/dash.css?v=20260930a" />
+<link rel="stylesheet" href="app.css?v=20260930a" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -87,6 +87,7 @@
         </select>
         <button id="setModsBtn" class="settingsLinkBtn" data-i18n="modsTitle">Map mods</button>
         <a class="settingsLinkBtn" href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>
+        <a class="settingsLinkBtn" id="guideLink" href="https://trucksim-dash.com/guide/" target="_blank" rel="noopener" data-i18n="guideLink">User guide</a>
       </div>
 
       <p class="settingsSectionTitle" data-i18n="settingsMiniHudTitle">Show in mini-HUD (when info panel is hidden):</p>
@@ -289,9 +290,12 @@
           <span class="routeStat"><b id="routeRemaining">--</b> <span data-i18n="routeRemainingLabel">Left</span></span>
           <span class="routeStat"><b id="routeDuration">--</b> <span data-i18n="routeDurationLabel">Time</span></span>
           <span class="routeStat"><b id="routeArrival">--</b> <span data-i18n="routeArrivalLabel">Arrival</span></span>
-          <button id="routeResetBtn" class="routeResetBtn" data-i18n-title="routeReset" title="Clear the route from the map">✕</button>
+          <button id="routeResetBtn" class="routeResetBtn" data-i18n-title="routeReset" title="Clear the route from the map"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><path d="M8 19h4.5a3.5 3.5 0 0 0 0-7h-1a3.5 3.5 0 0 1 0-7H16"/><circle cx="18" cy="5" r="2"/><path d="M3 3l18 18"/></svg></button>
+          <button id="routeMinBtn" class="routeResetBtn" data-i18n-title="routeSummaryMin" title="Minimize the route summary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
         <div id="routeApprox" class="routeApprox" hidden></div>
+        <!-- Minimizado queda solo la barra de progreso; tocarla lo abre. -->
+        <button id="routeExpandBtn" class="routeExpandBtn" data-i18n-title="routeSummaryShow" title="Show the route summary"></button>
       </div>
       <div id="bottomRightHud" class="bottomRightHud">
         <div id="miniHudExtra" class="miniHudExtra"></div>
@@ -575,13 +579,13 @@
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20260929g"></script>
-<script src="pure.js?v=20260929g"></script>
-<script src="i18n.js?v=20260929g"></script>
-<script src="i18n_en_es.js?v=20260929g"></script>
-<script src="../dash/dash.js?v=20260929g"></script>
-<script src="app.js?v=20260929g"></script>
-<script src="convoy.js?v=20260929g"></script>
-<script src="livemap.js?v=20260929g"></script>
+<script src="variants.js?v=20260930a"></script>
+<script src="pure.js?v=20260930a"></script>
+<script src="i18n.js?v=20260930a"></script>
+<script src="i18n_en_es.js?v=20260930a"></script>
+<script src="../dash/dash.js?v=20260930a"></script>
+<script src="app.js?v=20260930a"></script>
+<script src="convoy.js?v=20260930a"></script>
+<script src="livemap.js?v=20260930a"></script>
 </body>
 </html>

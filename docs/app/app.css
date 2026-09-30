@@ -234,11 +234,28 @@
   .routeProgressBar { height: 100%; width: 0; background: #4caf50; transition: width 0.6s ease; }
   .routeSummaryRow { display: flex; align-items: center; gap: 0.9rem; font-size: 0.8rem; color: var(--muted); }
   .routeStat b { color: #fff; font-size: 0.95rem; font-weight: 700; margin-right: 0.15rem; }
+  .routeStat b { white-space: nowrap; }
+  /* En un celular no entran los tres datos con su etiqueta al lado y los dos
+     botones: el numero se partia ("862.0 / km"). La etiqueta va debajo. */
+  @media (max-width: 520px) {
+    .routeSummaryRow { gap: 0.7rem; }
+    .routeStat { display: flex; flex-direction: column; line-height: 1.2; }
+    .routeStat b { margin-right: 0; }
+  }
   .routeResetBtn {
     margin-left: auto; width: 30px; height: 30px; flex-shrink: 0; border: 0; border-radius: 50%;
     background: transparent; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer;
   }
   .routeResetBtn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .routeResetBtn + .routeResetBtn { margin-left: 0; }
+  .routeResetBtn svg { display: block; margin: auto; }
+  /* Minimizado: una barrita de progreso y nada mas, para que no tape el mapa.
+     Tocarla (el boton transparente que la cubre) lo vuelve a abrir. */
+  .routeExpandBtn { display: none; position: absolute; inset: 0; border: 0; background: transparent; cursor: pointer; border-radius: inherit; }
+  .routeSummary.min { width: min(180px, calc(100% - 1.2rem)); padding: 0.45rem 0.6rem; }
+  .routeSummary.min .routeSummaryRow, .routeSummary.min .routeApprox { display: none; }
+  .routeSummary.min .routeProgressTrack { margin-bottom: 0; height: 6px; }
+  .routeSummary.min .routeExpandBtn { display: block; }
   /* Que el resumen no tape el mini-HUD ni el cartel del mapa. El alto lo
      mide app.js (keepPanelsClearOfRouteSummary): con el aviso de destino
      aproximado el resumen crece y un valor fijo quedaba corto. */
@@ -631,9 +648,17 @@
     font-size: 1.1rem; font-weight: 800;
     flex-shrink: 0;
   }
-  .limitSign.over { animation: pulse 1s infinite; }
+  /* El pulso de "te pasaste del limite" es un anillo aparte que solo cambia
+     opacidad y escala: eso lo anima la placa de video sola. Animar el
+     box-shadow del cartel obligaba a repintarlo en cada cuadro, justo en
+     los tramos largos por encima del limite. */
+  .limitSign { position: relative; }
+  .limitSign.over::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+    border: 3px solid rgba(255,77,77,0.7); animation: pulse 1s ease-out infinite; will-change: transform, opacity;
+  }
   #jobDeadline.over { color: var(--danger); font-weight: 700; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,77,0.6); } 50% { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
+  @keyframes pulse { 0% { transform: scale(1); opacity: 0.9; } 70%, 100% { transform: scale(1.35); opacity: 0; } }
 
   .cruiseDisplay { display: flex; align-items: center; gap: 0.4rem; color: #4caf50; }
 

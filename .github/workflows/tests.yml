@@ -57,6 +57,9 @@ jobs:
         with:
           node-version: '20'
       - run: node --test docs/app/test_pure.js
+      # La guia cae al ingles clave por clave: sin esto, un texto que falta
+      # en un idioma pasa sin que nadie lo note.
+      - run: node --test docs/guide/test_guide.js
       # Un apostrofo sin escapar en una traduccion rompio todo el script
       # inline de la landing en produccion sin que nada fallara (22-09-2026).
       - run: python tools/check_inline_js.py

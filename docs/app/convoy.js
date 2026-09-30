@@ -598,6 +598,10 @@ function convoyFitMembers() {
 document.addEventListener('DOMContentLoaded', () => {
   convoyWireUi();
   if (window.__convoySpectator) { const sp = window.__convoySpectator; window.__convoySpectator = null; convoyStartSpectator(sp.code, sp.backend); }
-  const hook = () => { if (map) { map.on('move', () => { convoyRenderEdgeIndicators(); }); map.on('rotate', () => convoyRenderMarkers()); } };
+  // Sin convoy no hay nada que dibujar: antes esto media el mapa
+  // (getBoundingClientRect, que fuerza un layout) en cada cuadro de
+  // movimiento aunque nadie estuviera en un convoy.
+  const hayConvoy = () => convoy.members.length || convoy.markers.size || convoy.edges.size;
+  const hook = () => { if (map) { map.on('move', () => { if (hayConvoy()) convoyRenderEdgeIndicators(); }); map.on('rotate', () => { if (hayConvoy()) convoyRenderMarkers(); }); } };
   const iv = setInterval(() => { if (map) { hook(); clearInterval(iv); } }, 500);
 });
