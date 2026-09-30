@@ -172,7 +172,7 @@ prefijo a la vez, asi que lanzar los dos juntos desde Steam no funciona.
 
 En [`linux/`](linux/) hay dos lanzadores listos, uno por juego:
 `truckdash-ets2.desktop` y `truckdash-ats.desktop`. Apuntan al prefijo que
-Steam crea para cada juego (`compatdata/227300` para ETS2, `compatdata/270800`
+Steam crea para cada juego (`compatdata/227300` para ETS2, `compatdata/270880`
 para ATS), asi que andan tal cual si jugas con el prefijo por defecto de
 Steam. Se usan una vez que el juego ya esta abierto.
 

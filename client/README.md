@@ -228,7 +228,7 @@ prefix at a time, so launching both through Steam at once does not work.
 There are two ready-made launchers in [`linux/`](linux/), one per game:
 `truckdash-ets2.desktop` and `truckdash-ats.desktop`. They point at the
 prefix Steam creates for each game (`compatdata/227300` for ETS2,
-`compatdata/270800` for ATS), so they work as is if you play with Steam's
+`compatdata/270880` for ATS), so they work as is if you play with Steam's
 default prefix. Launch one after the game is up.
 
 Paths in a `.desktop` file are not run through a shell, so `$HOME` and `~`
