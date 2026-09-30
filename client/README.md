@@ -220,16 +220,9 @@ different prefix sees nothing at all: no error, no data, just silence.
 **Start the game first, then the client.** Steam only runs one thing per
 prefix at a time, so launching both through Steam at once does not work.
 
-Create a `.desktop` launcher pointing at your prefix and your Proton build,
-then use it after the game is up:
-
-```ini
-[Desktop Entry]
-Type=Application
-Name=Truck Dash
-Exec=env STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/YourPrefix" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe"
-Terminal=false
-Categories=Game;
+Included are two .desktop files, please substitute in your username in the paths as $HOME does not get expanded. then put these into your ~/./local/share/applications and ~/Desktop directories, and don't forget to chmod +x both of them with
+```
+chmod +x truckdash-*
 ```
 
 If you would rather launch everything in one go from Steam, put this in the
@@ -237,7 +230,7 @@ game's launch options instead. The sleep gives the game time to bring the
 prefix up first:
 
 ```
-export STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/YourPrefix"; export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"; (sleep 20 && "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe") & exec %command%
+export STEAM_COMPAT_DATA_PATH="/home/youruser/Prefixes/YourPrefix"; export STEAM_COMPAT_CLIENT_INSTALL_PATH="/home/youruser/.local/share/Steam"; (sleep 20 && "/home/youruser/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "/homme/youruser/truckdash/TruckDash.exe") & exec %command%
 ```
 
 Add your own wrapper at the end if you use one, for example
