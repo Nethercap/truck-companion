@@ -165,20 +165,33 @@ prefijo. Un cliente en otro prefijo no ve nada: ni error ni datos, silencio.
 **Primero el juego, despues el cliente.** Steam corre una sola cosa por
 prefijo a la vez, asi que lanzar los dos juntos desde Steam no funciona.
 
-Se arma un lanzador `.desktop` apuntando a tu prefijo y a tu Proton, y se usa
-una vez que el juego ya esta abierto:
+En [`linux/`](linux/) hay dos lanzadores listos, uno por juego:
+`truckdash-ets2.desktop` y `truckdash-ats.desktop`. Apuntan al prefijo que
+Steam crea para cada juego (`compatdata/227300` para ETS2, `compatdata/270800`
+para ATS), asi que andan tal cual si jugas con el prefijo por defecto de
+Steam. Se usan una vez que el juego ya esta abierto.
 
-```ini
-[Desktop Entry]
-Type=Application
-Name=Truck Dash
-Exec=env STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/TuPrefijo" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe"
-Terminal=false
-Categories=Game;
+Las rutas de un `.desktop` no pasan por un shell, asi que `$HOME` y `~` no se
+expanden: los archivos traen `YOURUSER` en su lugar. Se reemplaza por tu
+usuario y se instalan, desde la carpeta donde los guardaste:
+
+```sh
+sed -i "s/YOURUSER/$USER/g" truckdash-*.desktop
+cp truckdash-*.desktop ~/.local/share/applications/
 ```
 
+Si ademas los queres en el escritorio, copialos a `~/Desktop`, corre
+`chmod +x ~/Desktop/truckdash-*.desktop` y, en GNOME, clic derecho y "Permitir
+lanzar".
+
+Cambia las rutas si las tuyas son otras: un prefijo propio en vez del del
+juego, otro build de Proton, o `TruckDash.exe` en otro lado que no sea
+`~/Documents/truckdash/`.
+
 Si preferis lanzar todo de una desde Steam, va esto en las opciones de inicio
-del juego. El sleep le da tiempo al juego a levantar el prefijo primero:
+del juego. Steam corre esta linea en un shell, asi que aca `$HOME` si anda, y
+como el export vale tambien para el juego, los dos quedan en el mismo prefijo.
+El sleep le da tiempo al juego a levantar el prefijo primero:
 
 ```
 export STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/TuPrefijo"; export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"; (sleep 20 && "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe") & exec %command%
@@ -188,8 +201,8 @@ Si usas algun envoltorio, va al final, por ejemplo
 `exec gamescope -W 1920 -H 1080 -r 120 -- %command%`.
 
 Probado con **GE-Proton11-7**. El nombre de la carpeta dentro de
-`compatibilitytools.d/` es el de tu build de Proton; el ejemplo de arriba usa
-el de la maquina donde se probo.
+`compatibilitytools.d/` es el de tu build de Proton; los ejemplos de arriba
+usan el de la maquina donde se probo.
 
 Detalles de esa instalacion:
 
