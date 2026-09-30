@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createSessionStats, createDemoTelemetry } = require('./pure.js');
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -50,6 +50,60 @@ test('geoBearingDeg: sur puro es 180deg', () => {
 test('geoBearingDeg: oeste puro es ~270deg', () => {
   const bearing = geoBearingDeg(1, 0, 0, 0);
   assert.ok(Math.abs(bearing - 270) < 0.5);
+});
+
+// Proyeccion de juguete: la grilla del juego girada `rotDeg` respecto del
+// norte verdadero, cerca del ecuador (1 grado ~ 111 km, igual en los dos
+// ejes para que sea conforme como la esfera de geoBearingDeg).
+const rotatedGrid = (rotDeg) => (x, z) => {
+  const r = rotDeg * Math.PI / 180;
+  const e = x * Math.cos(r) - z * Math.sin(r); // este, en metros
+  const n = -x * Math.sin(r) - z * Math.cos(r); // norte, en metros
+  return [e / 111195, n / 111195];
+};
+
+test('gridHeadingToGeo: sin convergencia es la identidad', () => {
+  for (const h of [0, 45, 90, 180, 270, 359]) {
+    const g = gridHeadingToGeo(h, 1000, -2000, rotatedGrid(0));
+    assert.ok(Math.abs(((g - h + 540) % 360) - 180) < 0.1, `${h} -> ${g}`);
+  }
+});
+
+test('gridHeadingToGeo: suma la rotacion de la grilla respecto del norte', () => {
+  // Grilla girada 15 grados antihorario: el "norte" del juego apunta a 345.
+  const g = gridHeadingToGeo(0, 0, 0, rotatedGrid(-15));
+  assert.ok(Math.abs(g - 345) < 0.1, String(g));
+  const e = gridHeadingToGeo(90, 0, 0, rotatedGrid(-15));
+  assert.ok(Math.abs(e - 75) < 0.1, String(e));
+});
+
+test('gridHeadingToGeo: ATS en la costa oeste, el norte del juego no es el norte', () => {
+  // Misma proyeccion que usa app.js para ATS. Sobre el meridiano central
+  // (-96) coinciden; en Los Angeles la grilla esta girada ~14 grados.
+  const proj4 = require('./vendor/proj4-2.15.0.js');
+  const R = 6370997, LOD = R * Math.PI / 180, f = [-0.00017706234, 0.000176689948];
+  const p = proj4(`+proj=lcc +R=${R} +lat_1=33 +lat_2=45 +lat_0=39 +lon_0=-96`);
+  const toLngLat = (x, z) => p.inverse([x * f[1] * LOD, z * f[0] * LOD]);
+  const at = (lng, lat) => { const [a, b] = p.forward([lng, lat]); return [a / (f[1] * LOD), b / (f[0] * LOD)]; };
+  const [lax, laz] = at(-118.2, 34);
+  const la = gridHeadingToGeo(0, lax, laz, toLngLat);
+  assert.ok(la > 344 && la < 348, String(la));
+  const [dx, dz] = at(-96, 33);
+  const dallas = gridHeadingToGeo(0, dx, dz, toLngLat);
+  assert.ok(Math.abs(((dallas + 180) % 360) - 180) < 0.5, String(dallas));
+});
+
+test('gridHeadingToGeo: si el punto de adelante cruza un corte, mide hacia atras', () => {
+  const base = rotatedGrid(0);
+  // Todo lo que tiene z < -5 salta 50 km (como el borde del hack de UK).
+  const cut = (x, z) => { const ll = base(x, z); return z < -5 ? [ll[0] + 0.5, ll[1]] : ll; };
+  const g = gridHeadingToGeo(0, 0, 0, cut);
+  assert.ok(Math.abs(((g + 180) % 360) - 180) < 0.1, String(g));
+});
+
+test('gridHeadingToGeo: sin rumbo o sin proyeccion lo devuelve tal cual', () => {
+  assert.equal(gridHeadingToGeo(undefined, 0, 0, rotatedGrid(10)), undefined);
+  assert.equal(gridHeadingToGeo(30, 0, 0, null), 30);
 });
 
 test('smoothLineCoords: devuelve el input sin cambios con menos de 3 puntos', () => {

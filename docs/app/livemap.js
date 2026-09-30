@@ -85,7 +85,8 @@ function liveMapRenderMarkers() {
       entry.marker.setLngLat(lngLat);
     }
     entry.path.setAttribute('fill', liveMapColor(p.id));
-    entry.arrow.style.transform = `rotate(${(p.heading || 0) - bearing}deg)`;
+    // El rumbo viene sobre la grilla del juego: a geografico, como el propio.
+    entry.arrow.style.transform = `rotate(${gridHeadingToGeo(p.heading || 0, p.x, p.z, toLngLat) - bearing}deg)`;
     entry.label.textContent = liveMapName(p);
     entry.el.classList.toggle('paused', !!p.paused);
     entry.el.classList.toggle('followed', p.id === liveMap.followId);
@@ -100,11 +101,12 @@ function liveMapRenderMarkers() {
     else if (f.x != null) {
       const ll = toLngLat(f.x, f.z);
       if (typeof truckMarker !== 'undefined' && truckMarker) truckMarker.setLngLat(ll);
-      if (typeof navMode !== 'undefined' && navMode) lastHeadingDeg = f.heading || 0;
+      const fHeading = gridHeadingToGeo(f.heading || 0, f.x, f.z, toLngLat);
+      if (typeof navMode !== 'undefined' && navMode) lastHeadingDeg = fHeading;
       // no pisar una animacion en curso (el zoom del pin, un "ver todos")
       if (!map.isMoving()) {
         const view = { center: ll, duration: 900, easing: t => t };
-        if (typeof navMode !== 'undefined' && navMode) view.bearing = f.heading || 0;
+        if (typeof navMode !== 'undefined' && navMode) view.bearing = fHeading;
         map.easeTo(view);
       }
     }
