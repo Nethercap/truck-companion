@@ -46,7 +46,7 @@ if IS_WINDOWS:
 # nada y el instalador de plugin queda sin fuente hasta que lo agreguemos.
 datas = [('assets/icon.png', 'assets')]  # icono de la bandeja (logo real)
 if IS_WINDOWS:
-    datas.insert(0, ('vendor/scs-telemetry.dll', 'vendor'))
+    datas.insert(0, ('vendor/truckdash-telemetry.dll', 'vendor'))
 
 a = Analysis(
     ['tray_client.py'],

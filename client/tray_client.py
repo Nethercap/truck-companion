@@ -176,7 +176,8 @@ class AppState:
         return self.installs
 
     def any_plugin_installed(self) -> bool:
-        return any(i["state"] in ("installed", "outdated") for i in self.installs)
+        return any(i["state"] in ("installed", "outdated") or i.get("other_plugin")
+                   for i in self.installs)
 
 
 state = AppState()
@@ -476,6 +477,12 @@ class SetupWindow:
             elif install["state"] == "outdated":
                 self.label(row, T("plugin_other_version"), fg=ORANGE).pack(side="left")
                 self.button(row, T("replace"), lambda i=install: self.install_for(i)).pack(side="left", padx=8)
+            elif install.get("other_plugin"):
+                # Solo un scs-telemetry.dll (de otra app o de un cliente
+                # viejo): hay telemetria, sin los trabajos con auto. El
+                # nuestro se suma al lado; ese no se toca.
+                self.label(row, T("plugin_other_version"), fg=ORANGE).pack(side="left")
+                self.button(row, T("install_plugin"), lambda i=install: self.install_for(i)).pack(side="left", padx=8)
             else:
                 self.label(row, T("plugin_not_installed"), fg=RED).pack(side="left")
                 self.button(row, T("install_plugin"), lambda i=install: self.install_for(i), primary=True).pack(side="left", padx=8)
@@ -985,17 +992,17 @@ def open_donate(icon, item):
 # ---------------------------------------------------------------------------
 
 def actualizar_plugins_viejos(ahora: float | None = None) -> None:
-    """Reemplaza el plugin de los juegos que tengan el de una version anterior
-    del cliente (ver plugin_installer.upgrade_previous_plugins). Corre al
-    arrancar y mientras se espera el juego, como mucho una vez por minuto: con
-    el juego abierto la DLL esta en uso y el reemplazo falla, asi que el
-    momento es con el juego cerrado, y la proxima vez que se abra ya carga
-    el nuevo."""
+    """Pone nuestro plugin en los juegos que tengan uno de una version
+    anterior, o solo el scs-telemetry.dll de otra app o de un cliente viejo
+    (ver plugin_installer.update_own_plugin). Corre al arrancar y mientras se
+    espera el juego, como mucho una vez por minuto: con el juego abierto la
+    DLL esta en uso y el reemplazo falla, asi que el momento es con el juego
+    cerrado, y la proxima vez que se abra ya carga el nuevo."""
     ahora = time.time() if ahora is None else ahora
     if ahora - state.plugins_revisados_at < 60:
         return
     state.plugins_revisados_at = ahora
-    for bin_dir in plugin_installer.upgrade_previous_plugins(state.installs):
+    for bin_dir in plugin_installer.update_own_plugin(state.installs):
         logging.info("Telemetry plugin updated to v%s in %s",
                      plugin_installer.PLUGIN_DLL_VERSION, bin_dir)
 
@@ -1032,7 +1039,8 @@ def diagnose_running_game(hwnd) -> str | None:
     if not info or not info.get("exe_path"):
         return None
     bin_dir = os.path.normpath(os.path.dirname(info["exe_path"]))
-    if plugin_installer.plugin_state(bin_dir) == "missing":
+    if (plugin_installer.plugin_state(bin_dir) == "missing"
+            and not plugin_installer.has_other_plugin(bin_dir)):
         # Copia del juego distinta a las detectadas por Steam (Epic, otra
         # biblioteca, carpeta movida): se suma a la lista de Setup para que el
         # boton "Install plugin" apunte a ESTA.
@@ -1137,7 +1145,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
     """Lee el SDK a 1 Hz y publica cada payload por los dos caminos (cloud y
     LAN). Independiente de si el backend esta accesible: sin internet, el
     modo LAN sigue andando."""
-    import truck_telemetry
+    import telemetry_compat
 
     telemetry_ready = False
     inactive_since = None
@@ -1159,9 +1167,9 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
     while True:
         if not telemetry_ready:
             try:
-                truck_telemetry.init()
+                telemetry_compat.init()
                 telemetry_ready = True
-                logging.info("truck_telemetry.init() succeeded")
+                logging.info("Telemetry opened: %s", telemetry_compat.opened_block())
             except Exception:
                 new_status = telemetry_status_when_unavailable()
                 if new_status != state.status:
@@ -1193,7 +1201,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             state.vio_el_juego = True
 
         try:
-            raw = truck_telemetry.get_data()
+            raw = telemetry_compat.get_data()
         except Exception:
             logging.exception("get_data() failed, re-initializing telemetry")
             telemetry_ready = False
@@ -1228,7 +1236,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             if inactive_since is None:
                 inactive_since = time.time()
             if time.time() - inactive_since > 5 and not client_lib.find_game_window():
-                truck_telemetry.deinit()
+                telemetry_compat.deinit()
                 telemetry_ready = False
                 inactive_since = None
                 state.set_status("waiting_game")

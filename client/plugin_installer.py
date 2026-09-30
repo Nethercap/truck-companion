@@ -1,7 +1,14 @@
 """
 Deteccion de la instalacion de ETS2/ATS e instalacion del plugin de
-telemetria de SCS (scs-telemetry.dll, de RenCloud/scs-sdk-plugin, MIT) en
-bin\\win_x64\\plugins\\ del juego.
+telemetria (truckdash-telemetry.dll, nuestro fork de RenCloud/scs-sdk-plugin,
+MIT; fuente en plugin/) en bin\\win_x64\\plugins\\ del juego.
+
+El plugin va con nombre propio y publica en su propio bloque de memoria
+("TruckDashTelemetry"), al lado de cualquier scs-telemetry.dll que ya tenga
+el juego. El scs-telemetry.dll no se toca nunca: es el de RenCloud y lo
+instalan otras apps. Trucky lo trae en su paquete de Overwolf y, si alguien
+lo cambia, no arranca ("[SECURITY] Package file replaced on disk"); la 1.5.21
+lo reemplazaba por el nuestro y le paso a usuarios de las dos apps.
 
 Antes esto era el paso 1 manual de la landing ("baja el zip, copia SOLO el
 .dll a esta carpeta...") y el lugar donde mas gente se perdia. Ahora el
@@ -21,10 +28,15 @@ import re
 import shutil
 import sys
 
-PLUGIN_DLL_NAME = "scs-telemetry.dll"
+PLUGIN_DLL_NAME = "truckdash-telemetry.dll"
+# El nombre del plugin de RenCloud, que puede haber puesto cualquiera: otra
+# app, el usuario a mano, o un cliente nuestro hasta la 1.5.21. Solo se mira
+# si esta, para saber que el juego ya publica telemetria (en "SCSTelemetry",
+# que el cliente tambien lee).
+OTHER_DLL_NAME = "scs-telemetry.dll"
 # Fork de RenCloud 1.12.1 con los trabajos con auto de ATS 1.61 (plugin/).
 # La DLL y su hash los escribe el workflow "Build plugin" (tools/pin_plugin.py).
-PLUGIN_DLL_VERSION = "1.12.1-truckdash.1"
+PLUGIN_DLL_VERSION = "1.12.1-truckdash.2"
 PLUGIN_DLL_SHA256 = "f38587d658c34c74f6d060f0ede1be607514b7dc0cb6c7a8ab6b7c449d481819"
 
 GAMES = {
@@ -103,12 +115,18 @@ def plugin_path_for(bin_dir: str) -> str:
 
 
 def plugin_state(bin_dir: str) -> str:
-    """'installed' (mismo .dll que traemos), 'outdated' (hay otro .dll, de
-    otra version o de otro origen) o 'missing'."""
+    """Del plugin nuestro: 'installed' (el mismo .dll que traemos),
+    'outdated' (el nuestro, de otra version) o 'missing'."""
     path = plugin_path_for(bin_dir)
     if not os.path.exists(path):
         return "missing"
     return "installed" if sha256_of(path) == PLUGIN_DLL_SHA256 else "outdated"
+
+
+def has_other_plugin(bin_dir: str) -> bool:
+    """Si el juego tiene un scs-telemetry.dll: con ese solo ya hay telemetria,
+    sin los trabajos con auto de ATS 1.61."""
+    return os.path.exists(os.path.join(bin_dir, "plugins", OTHER_DLL_NAME))
 
 
 def same_dir(a: str, b: str) -> bool:
@@ -165,6 +183,7 @@ def describe_install(game: str, bin_dir: str, origen: str = "steam") -> dict:
         "bin_dir": bin_dir,
         "plugin_path": plugin_path_for(bin_dir),
         "state": plugin_state(bin_dir),
+        "other_plugin": has_other_plugin(bin_dir),
         "origen": origen,
     }
 
@@ -197,29 +216,24 @@ def install_plugin(bin_dir: str) -> str:
     return dst
 
 
-# DLLs que instalaron versiones anteriores del cliente. Si la que esta en el
-# juego es una de estas, la pusimos nosotros y se puede reemplazar sin
-# preguntar. Cualquier otra (otra version del plugin, otro origen) no se
-# toca: Setup la muestra como "otra version" con el boton de reemplazar.
-# tools/pin_plugin.py agrega aca el hash anterior cada vez que fija uno nuevo.
-PREVIOUS_PLUGIN_SHA256 = frozenset({
-    "1d03dbc7a975e72203c60a7b9998021ceb8800b836bf28a131279979ad386cd4",  # RenCloud 1.12.1, hasta el cliente 1.5.20
-})
-
-
-def upgrade_previous_plugins(installs: list[dict]) -> list[str]:
-    """Pone el plugin que trae este cliente en cada juego que tenga uno de una
-    version anterior del cliente. Sin esto, actualizar el cliente no cambia el
-    plugin del juego: solo lo haria quien abra Setup y apriete "Reemplazar".
+def update_own_plugin(installs: list[dict]) -> list[str]:
+    """Pone el plugin que trae este cliente donde haga falta, sin preguntar:
+    - donde esta el nuestro de otra version (el archivo lleva nuestro nombre:
+      lo pusimos nosotros);
+    - donde no esta el nuestro pero si un scs-telemetry.dll. Esa persona ya
+      tiene la telemetria andando (con un cliente viejo o con otra app), y
+      sumar un archivo al lado no cambia el de nadie.
+    Donde no hay ningun plugin no se instala nada: eso lo decide el usuario
+    en Setup.
 
     Con el juego abierto Windows no deja reemplazar la DLL: esa carpeta queda
     como estaba y se reintenta la proxima vez. Devuelve las carpetas
     actualizadas y les deja el estado en "installed"."""
     actualizados = []
     for install in installs:
-        if install.get("state") != "outdated":
+        if install.get("state") == "installed":
             continue
-        if sha256_of(install["plugin_path"]) not in PREVIOUS_PLUGIN_SHA256:
+        if install.get("state") == "missing" and not install.get("other_plugin"):
             continue
         try:
             install_plugin(install["bin_dir"])

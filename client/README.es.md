@@ -7,8 +7,9 @@ gratuito para Euro Truck Simulator 2 y American Truck Simulator.
 
 - Lee la telemetría en vivo del juego (posición, velocidad, combustible,
   carga, etc.) a través del **SDK de telemetría oficial de SCS Software**,
-  mediante un segmento de memoria compartida (`Local\SCSTelemetry`) que el
-  propio juego crea cuando el plugin del SDK está instalado.
+  mediante un segmento de memoria compartida que publica el plugin de
+  telemetría adentro del juego (`Local\TruckDashTelemetry` el que instala
+  Truck Dash, `Local\SCSTelemetry` el estándar que usan otras apps).
 - Envía esos datos por una conexión WebSocket a un backend de relay
   (alojado en Railway), que los reenvía a tu navegador en
   [trucksim-dash.com](https://trucksim-dash.com).
@@ -52,8 +53,10 @@ La primera vez se abre una ventana de **Setup & status** (la podés volver a
 abrir cuando quieras desde el ícono de la bandeja). Encuentra tu instalación
 de ETS2 / ATS a través de Steam e instala el plugin del SDK de telemetría de
 SCS en el juego por vos con un click
-(`<juego>\bin\win_x64\plugins\scs-telemetry.dll`). Reiniciá el juego si
-estaba abierto. ¿Instalación fuera de Steam? Usá "Add game folder..." y
+(`<juego>\bin\win_x64\plugins\truckdash-telemetry.dll`). Reiniciá el juego
+si estaba abierto. Nunca toca un `scs-telemetry.dll` que ya esté: otras apps
+(Trucky, por ejemplo) traen ese archivo y revisan que nadie lo cambie, así
+que Truck Dash instala el suyo al lado y andan las dos. ¿Instalación fuera de Steam? Usá "Add game folder..." y
 elegí la carpeta del juego.
 
 La misma ventana muestra el estado en vivo (esperando el juego / arriba del
@@ -109,8 +112,10 @@ Si preferís copiar el plugin vos mismo: bajalo de
 y copiá **solo el archivo `Win64\scs-telemetry.dll`** en la carpeta de
 instalación de tu juego, dentro de `bin\win_x64\plugins\` (creá esa carpeta
 `plugins` si no existe). El error más común es dejar el `.dll` directo en
-`bin\win_x64\` en vez de la subcarpeta `plugins\`. El cliente trae el mismo
-archivo adentro (`vendor/scs-telemetry.dll`, licencia MIT).
+`bin\win_x64\` en vez de la subcarpeta `plugins\`. Ese plugin sirve para
+todo menos los trabajos con auto de ATS; el cliente trae adentro un fork que
+también los lee (`vendor/truckdash-telemetry.dll`, licencia MIT, fuente en
+`plugin/`).
 
 Si el tablero sigue sin mostrar datos, hacé click derecho en el ícono de la
 bandeja y elegí **"Show log file (troubleshooting)"** — te va a decir si el

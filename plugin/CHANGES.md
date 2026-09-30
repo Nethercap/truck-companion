@@ -1,5 +1,14 @@
 # Changes from upstream (RenCloud/scs-sdk-plugin d7216cb)
 
+## Own shared memory block
+
+The block is `Local\TruckDashTelemetry` instead of `Local\SCSTelemetry`,
+and the client installs the DLL as `truckdash-telemetry.dll`. Installing it
+over the upstream `scs-telemetry.dll` broke Trucky, which ships that file
+and checks it. Now both plugins load side by side; with the same block name
+they would overwrite each other's data. The Truck Dash client reads this
+block first and falls back to `Local\SCSTelemetry`.
+
 ## Car and bus jobs (ATS 1.61)
 
 ATS 1.61 lets the player drive cars and take jobs with them (quick job and

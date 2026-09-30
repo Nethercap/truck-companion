@@ -153,6 +153,25 @@ def test_con_dos_copias_del_mismo_juego_se_muestra_la_carpeta(ventana, monkeypat
     assert a in textos and b in textos
 
 
+def test_con_el_plugin_de_otra_app_no_dice_sin_plugin(ventana, monkeypatch, tmp_path):
+    """Solo el scs-telemetry.dll (de Trucky, de un cliente viejo): hay
+    telemetria, asi que ni "sin plugin" ni el aviso de la bandeja. Se ofrece
+    sumar el nuestro al lado."""
+    v, _ = ventana
+    a = _install(tmp_path, "ATS", "American Truck Simulator")
+    os.makedirs(os.path.join(a, "plugins"))
+    with open(os.path.join(a, "plugins", "scs-telemetry.dll"), "wb") as f:
+        f.write(b"MZ de otra app")
+    monkeypatch.setattr(plugin_installer, "find_game_installs",
+                        lambda: [plugin_installer.describe_install("ats", a)])
+    v.render_installs()
+    textos = _textos(v.games_body)
+    assert tray_client.T("plugin_not_installed") not in textos
+    assert tray_client.T("plugin_other_version") in textos
+    assert tray_client.T("install_plugin") in textos
+    assert tray_client.state.any_plugin_installed()
+
+
 def test_con_un_solo_juego_no_se_ensucia_con_la_ruta(ventana, monkeypatch, tmp_path):
     """La carpeta solo aporta cuando hay ambiguedad; si no, es ruido."""
     v, _ = ventana
@@ -518,7 +537,7 @@ def test_el_plugin_viejo_se_revisa_como_mucho_una_vez_por_minuto(monkeypatch):
     """Se llama en cada vuelta del bucle mientras se espera el juego: sin
     tope, hasheria las DLLs cada pocos segundos."""
     llamadas = []
-    monkeypatch.setattr(tray_client.plugin_installer, "upgrade_previous_plugins",
+    monkeypatch.setattr(tray_client.plugin_installer, "update_own_plugin",
                         lambda installs: llamadas.append(1) or [])
     monkeypatch.setattr(tray_client.state, "plugins_revisados_at", 0.0)
     tray_client.actualizar_plugins_viejos(ahora=1000.0)

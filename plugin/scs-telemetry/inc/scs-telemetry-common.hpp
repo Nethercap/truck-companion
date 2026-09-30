@@ -22,7 +22,11 @@
 #endif
 
 #include "scssdk.h"
-#define SCS_PLUGIN_MMF_NAME TEXT("Local\\SCSTelemetry")
+// Truck Dash: its own block, not upstream's "Local\\SCSTelemetry". This DLL
+// is installed next to whatever scs-telemetry.dll the game already has
+// (Trucky and other apps ship upstream's and check that it is untouched), so
+// the two plugins run side by side and must not write to the same block.
+#define SCS_PLUGIN_MMF_NAME TEXT("Local\\TruckDashTelemetry")
 #define SCS_PLUGIN_MMF_SIZE (32*1024)
 /**
  * \brief string size for all strings (most of them) the amount of fields in the shared memory field

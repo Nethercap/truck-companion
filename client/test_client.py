@@ -488,10 +488,46 @@ def test_telemetry_compat_elige_el_bloque_segun_el_sistema(monkeypatch):
     assert telemetry_compat.WINDOWS_NAME == r"Local\SCSTelemetry"
     assert telemetry_compat.LINUX_PATH == "/dev/shm/SCSTelemetry"
 
-    fuente = inspect.getsource(telemetry_compat._open_buffer)
+    fuente = inspect.getsource(telemetry_compat._open_named)
     rama_linux = fuente.split("if IS_WINDOWS:")[1].split("return _mem.buf")[1]
     assert "SharedMemory" not in rama_linux, "en Linux hay que mapear el archivo a mano"
     assert "mmap.mmap" in rama_linux
+
+
+def test_telemetry_compat_prefiere_el_bloque_de_truck_dash(monkeypatch):
+    """Nuestro plugin publica en TruckDashTelemetry, al lado del
+    scs-telemetry.dll de otras apps (Trucky), que sigue en SCSTelemetry. Se
+    lee el nuestro si esta, que trae los trabajos con auto; si no, el de
+    siempre."""
+    import telemetry_compat
+
+    assert telemetry_compat.WINDOWS_NAMES == (r"Local\TruckDashTelemetry", r"Local\SCSTelemetry")
+    assert telemetry_compat.LINUX_PATHS == ("/dev/shm/TruckDashTelemetry", "/dev/shm/SCSTelemetry")
+
+    existen = set()
+    abiertos = []
+
+    def abrir(nombre):
+        if nombre not in existen:
+            raise FileNotFoundError(nombre)
+        abiertos.append(nombre)
+        return b""
+
+    monkeypatch.setattr(telemetry_compat, "_open_named", abrir)
+    nombres = telemetry_compat.WINDOWS_NAMES if telemetry_compat.IS_WINDOWS else telemetry_compat.LINUX_PATHS
+    try:
+        with pytest.raises(FileNotFoundError):
+            telemetry_compat._open_buffer()
+        existen.add(nombres[1])
+        telemetry_compat._open_buffer()
+        assert telemetry_compat.opened_block() == nombres[1]
+        existen.add(nombres[0])
+        telemetry_compat._open_buffer()
+        assert telemetry_compat.opened_block() == nombres[0]
+        assert abiertos == [nombres[1], nombres[0]]
+    finally:
+        telemetry_compat.deinit()
+    assert telemetry_compat.opened_block() is None
 
 
 def test_todas_las_teclas_permitidas_existen_en_los_tres_backends():

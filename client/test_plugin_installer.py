@@ -38,20 +38,27 @@ def test_plugin_state_missing_installed_outdated(tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin" / "win_x64"
     bin_dir.mkdir(parents=True)
     assert plugin_installer.plugin_state(str(bin_dir)) == "missing"
+    assert not plugin_installer.has_other_plugin(str(bin_dir))
 
     plugins = bin_dir / "plugins"
     plugins.mkdir()
-    (plugins / "scs-telemetry.dll").write_bytes(b"something else")
+    # El scs-telemetry.dll de otra app no es el nuestro: solo cuenta como
+    # "hay telemetria".
+    (plugins / "scs-telemetry.dll").write_bytes(b"de otra app")
+    assert plugin_installer.plugin_state(str(bin_dir)) == "missing"
+    assert plugin_installer.has_other_plugin(str(bin_dir))
+
+    (plugins / "truckdash-telemetry.dll").write_bytes(b"something else")
     assert plugin_installer.plugin_state(str(bin_dir)) == "outdated"
 
     real = b"fake dll bytes"
     monkeypatch.setattr(plugin_installer, "PLUGIN_DLL_SHA256", hashlib.sha256(real).hexdigest())
-    (plugins / "scs-telemetry.dll").write_bytes(real)
+    (plugins / "truckdash-telemetry.dll").write_bytes(real)
     assert plugin_installer.plugin_state(str(bin_dir)) == "installed"
 
 
 def test_install_plugin_copies_bundled_dll_and_creates_plugins_dir(tmp_path, monkeypatch):
-    fake_dll = tmp_path / "vendor" / "scs-telemetry.dll"
+    fake_dll = tmp_path / "vendor" / "truckdash-telemetry.dll"
     fake_dll.parent.mkdir()
     fake_dll.write_bytes(b"dll contents")
     monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda: str(fake_dll))
@@ -60,13 +67,13 @@ def test_install_plugin_copies_bundled_dll_and_creates_plugins_dir(tmp_path, mon
     bin_dir = tmp_path / "game" / "bin" / "win_x64"
     bin_dir.mkdir(parents=True)
     installed = plugin_installer.install_plugin(str(bin_dir))
-    assert installed == os.path.join(str(bin_dir), "plugins", "scs-telemetry.dll")
+    assert installed == os.path.join(str(bin_dir), "plugins", "truckdash-telemetry.dll")
     assert open(installed, "rb").read() == b"dll contents"
     assert plugin_installer.plugin_state(str(bin_dir)) == "installed"
 
 
 def test_install_plugin_refuses_tampered_bundled_dll(tmp_path, monkeypatch):
-    fake_dll = tmp_path / "scs-telemetry.dll"
+    fake_dll = tmp_path / "truckdash-telemetry.dll"
     fake_dll.write_bytes(b"tampered")
     monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda: str(fake_dll))
     try:
@@ -83,6 +90,17 @@ def test_bundled_dll_matches_pinned_sha256():
     path = plugin_installer.bundled_dll_path()
     assert os.path.exists(path), path
     assert plugin_installer.sha256_of(path) == plugin_installer.PLUGIN_DLL_SHA256
+
+
+def test_bundled_dll_publica_en_su_propio_bloque():
+    """Nuestra DLL va al lado del scs-telemetry.dll de otras apps: si
+    publicara en "Local\\SCSTelemetry", los dos plugins se pisarian el bloque.
+    El nombre esta en la DLL en UTF-16 (TEXT(...) de SCS_PLUGIN_MMF_NAME).
+    Lo corre tambien "Build plugin" antes de fijar una DLL nueva."""
+    with open(plugin_installer.bundled_dll_path(), "rb") as f:
+        datos = f.read()
+    assert "Local\\TruckDashTelemetry".encode("utf-16-le") in datos
+    assert "Local\\SCSTelemetry".encode("utf-16-le") not in datos
 
 
 def test_resolve_bin_dir_accepts_game_root_bin_or_win_x64(tmp_path):
@@ -387,65 +405,90 @@ def test_is_wine_detecta_por_ntdll(monkeypatch):
     assert win_integration.is_wine() is False
 
 
-# ------------------------------------------ actualizar el plugin de antes
+# ------------------------------------------ actualizar el plugin solo
 # Actualizar el cliente no cambiaba el plugin del juego: solo lo hacia quien
 # abriera Setup y apretara "Reemplazar". Con los trabajos con auto de ATS
-# 1.61 eso dejaba a casi todos con el plugin que no los lee.
+# 1.61 eso dejaba a casi todos con el plugin que no los lee. Pero el
+# scs-telemetry.dll no se toca: la 1.5.21 lo reemplazaba y Trucky, que trae
+# el mismo, dejaba de arrancar.
 
-def _juego_con_plugin(tmp_path, monkeypatch, instalado: bytes, nombre="game"):
+def _juego(tmp_path, monkeypatch, nombre="game", nuestro=None, otro=None):
     nuevo = b"MZ plugin nuevo"
-    vendor = tmp_path / "vendor" / "scs-telemetry.dll"
+    vendor = tmp_path / "vendor" / "truckdash-telemetry.dll"
     vendor.parent.mkdir(exist_ok=True)
     vendor.write_bytes(nuevo)
     monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda: str(vendor))
     monkeypatch.setattr(plugin_installer, "PLUGIN_DLL_SHA256", hashlib.sha256(nuevo).hexdigest())
     bin_dir = tmp_path / nombre / "bin" / "win_x64"
     (bin_dir / "plugins").mkdir(parents=True)
-    (bin_dir / "plugins" / "scs-telemetry.dll").write_bytes(instalado)
+    if nuestro is not None:
+        (bin_dir / "plugins" / "truckdash-telemetry.dll").write_bytes(nuestro)
+    if otro is not None:
+        (bin_dir / "plugins" / "scs-telemetry.dll").write_bytes(otro)
     return plugin_installer.describe_install("ats", str(bin_dir)), nuevo
 
 
-def test_actualiza_solo_el_plugin_que_pusimos_nosotros(tmp_path, monkeypatch):
-    viejo = b"MZ plugin de antes"
-    monkeypatch.setattr(plugin_installer, "PREVIOUS_PLUGIN_SHA256",
-                        frozenset({hashlib.sha256(viejo).hexdigest()}))
-    nuestro, nuevo = _juego_con_plugin(tmp_path, monkeypatch, viejo, "ats")
-    ajeno, _ = _juego_con_plugin(tmp_path, monkeypatch, b"MZ otro plugin", "ets2")
-    assert nuestro["state"] == ajeno["state"] == "outdated"
+def test_actualiza_el_nuestro_y_nunca_toca_el_scs_telemetry(tmp_path, monkeypatch):
+    viejo, _ = _juego(tmp_path, monkeypatch, "viejo", nuestro=b"MZ nuestro de antes")
+    trucky, nuevo = _juego(tmp_path, monkeypatch, "trucky", otro=b"MZ el de Trucky")
+    nada, _ = _juego(tmp_path, monkeypatch, "nada")
+    al_dia, _ = _juego(tmp_path, monkeypatch, "al_dia", nuestro=nuevo, otro=b"MZ el de Trucky")
+    assert viejo["state"] == "outdated"
+    assert trucky["state"] == "missing" and trucky["other_plugin"]
+    assert nada["state"] == "missing" and not nada["other_plugin"]
+    assert al_dia["state"] == "installed"
 
-    hechos = plugin_installer.upgrade_previous_plugins([nuestro, ajeno])
+    hechos = plugin_installer.update_own_plugin([viejo, trucky, nada, al_dia])
 
-    assert hechos == [nuestro["bin_dir"]]
-    assert open(nuestro["plugin_path"], "rb").read() == nuevo
-    assert nuestro["state"] == "installed"
-    # El de otro origen no se toca: puede ser otra version a proposito.
-    assert open(ajeno["plugin_path"], "rb").read() == b"MZ otro plugin"
-    assert ajeno["state"] == "outdated"
+    assert hechos == [viejo["bin_dir"], trucky["bin_dir"]]
+    for install in (viejo, trucky):
+        assert open(install["plugin_path"], "rb").read() == nuevo
+        assert install["state"] == "installed"
+    # El de la otra app sigue igual, byte a byte, al lado del nuestro.
+    otro = os.path.join(trucky["bin_dir"], "plugins", "scs-telemetry.dll")
+    assert open(otro, "rb").read() == b"MZ el de Trucky"
+    assert sorted(os.listdir(os.path.dirname(otro))) == ["scs-telemetry.dll", "truckdash-telemetry.dll"]
+    # Sin ningun plugin no se instala solo: lo decide el usuario en Setup.
+    assert os.listdir(os.path.join(nada["bin_dir"], "plugins")) == []
+    assert nada["state"] == "missing"
+
+
+def test_el_instalador_no_escribe_nunca_el_scs_telemetry(tmp_path, monkeypatch):
+    """Ni con el boton de Setup: install_plugin solo escribe el nuestro."""
+    install, _ = _juego(tmp_path, monkeypatch, otro=b"MZ el de Trucky")
+    escrituras = []
+    copiar = plugin_installer.shutil.copyfile
+    reemplazar = plugin_installer.os.replace
+    monkeypatch.setattr(plugin_installer.shutil, "copyfile",
+                        lambda src, dst: escrituras.append(dst) or copiar(src, dst))
+    monkeypatch.setattr(plugin_installer.os, "replace",
+                        lambda src, dst: escrituras.append(dst) or reemplazar(src, dst))
+    plugin_installer.install_plugin(install["bin_dir"])
+    assert escrituras
+    assert not [e for e in escrituras if os.path.basename(e).startswith("scs-telemetry")]
 
 
 def test_con_el_juego_abierto_no_se_actualiza_y_no_deja_basura(tmp_path, monkeypatch):
     """En Windows la DLL cargada no se puede reemplazar: tiene que quedar la
     de antes, entera, y reintentarse despues."""
     viejo = b"MZ plugin de antes"
-    monkeypatch.setattr(plugin_installer, "PREVIOUS_PLUGIN_SHA256",
-                        frozenset({hashlib.sha256(viejo).hexdigest()}))
-    install, _ = _juego_con_plugin(tmp_path, monkeypatch, viejo)
+    install, _ = _juego(tmp_path, monkeypatch, nuestro=viejo)
 
     def en_uso(src, dst):
         raise PermissionError(5, "Access is denied", dst)
     monkeypatch.setattr(plugin_installer.os, "replace", en_uso)
 
-    assert plugin_installer.upgrade_previous_plugins([install]) == []
+    assert plugin_installer.update_own_plugin([install]) == []
     assert open(install["plugin_path"], "rb").read() == viejo
     assert install["state"] == "outdated"
-    assert os.listdir(os.path.dirname(install["plugin_path"])) == ["scs-telemetry.dll"]
+    assert os.listdir(os.path.dirname(install["plugin_path"])) == ["truckdash-telemetry.dll"]
 
 
 def test_install_plugin_no_escribe_encima_del_instalado(tmp_path, monkeypatch):
     """Bajo Proton el juego abierto tiene la DLL mapeada: escribir adentro
     del mismo archivo lo puede tirar. Tiene que ser un archivo nuevo que
     reemplaza al otro."""
-    install, nuevo = _juego_con_plugin(tmp_path, monkeypatch, b"MZ plugin de antes")
+    install, nuevo = _juego(tmp_path, monkeypatch, nuestro=b"MZ plugin de antes")
     escrituras = []
     copiar = plugin_installer.shutil.copyfile
     monkeypatch.setattr(plugin_installer.shutil, "copyfile",
@@ -453,13 +496,6 @@ def test_install_plugin_no_escribe_encima_del_instalado(tmp_path, monkeypatch):
     plugin_installer.install_plugin(install["bin_dir"])
     assert install["plugin_path"] not in escrituras
     assert open(install["plugin_path"], "rb").read() == nuevo
-
-
-def test_el_plugin_que_distribuimos_hasta_1_5_20_se_reconoce():
-    # RenCloud 1.12.1: el que tienen instalado todos los que usaron el cliente
-    # hasta la 1.5.20. Si sale de la lista, nadie recibe el plugin nuevo.
-    assert ("1d03dbc7a975e72203c60a7b9998021ceb8800b836bf28a131279979ad386cd4"
-            in plugin_installer.PREVIOUS_PLUGIN_SHA256)
 
 
 # ---------------------------------------------------- tools/pin_plugin.py
@@ -473,17 +509,14 @@ def _pin_plugin():
     return mod
 
 
-def test_pin_plugin_fija_el_hash_y_guarda_el_anterior(tmp_path):
+def test_pin_plugin_fija_el_hash(tmp_path):
     """Con CRLF tambien: es como llega el archivo al runner de Windows."""
     pin = _pin_plugin()
     viejo = "a" * 64
     for salto in ("\n", "\r\n"):
         fuente = salto.join([
+            "# algo antes",
             f'PLUGIN_DLL_SHA256 = "{viejo}"',
-            "",
-            "PREVIOUS_PLUGIN_SHA256 = frozenset({",
-            '    "b' + "b" * 63 + '",  # otro',
-            "})",
             "",
         ])
         installer = tmp_path / "plugin_installer.py"
@@ -495,14 +528,10 @@ def test_pin_plugin_fija_el_hash_y_guarda_el_anterior(tmp_path):
         sha = pin.fijar(str(dll), str(vendor), str(installer))
 
         texto = installer.read_bytes().decode()
-        assert f'PLUGIN_DLL_SHA256 = "{sha}"' in texto
-        previos = texto[texto.index("frozenset({"):]
-        assert f'"{viejo}"' in previos and '"' + "b" * 64 + '"' in previos
+        assert texto == fuente.replace(viejo, sha)
         assert vendor.read_bytes() == b"MZ nueva"
-        # el archivo sigue con un solo tipo de salto
-        assert ("\r\n" in texto) == (salto == "\r\n")
-        assert texto.replace("\r\n", "").count("\n") == 0 or salto == "\n"
 
-        # Fijar la misma DLL de nuevo no duplica nada.
-        pin.fijar(str(dll), str(vendor), str(installer))
-        assert installer.read_bytes().decode().count(f'"{viejo}"') == 1
+
+def test_pin_plugin_escribe_la_dll_con_nuestro_nombre():
+    pin = _pin_plugin()
+    assert os.path.basename(pin.VENDOR) == plugin_installer.PLUGIN_DLL_NAME

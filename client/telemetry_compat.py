@@ -12,6 +12,14 @@ lleva puesto el bloque del plugin, dejando al juego publicando en el vacio
 hasta que se reinicie. Comprobado. Por eso aca se mapea el archivo a mano,
 que ademas es menos codigo.
 
+Hay dos bloques posibles. El plugin que instala Truck Dash (plugin/, fork
+de RenCloud) publica en "TruckDashTelemetry"; el de RenCloud, y cualquier
+otro scs-telemetry.dll que ya tenga el juego, en "SCSTelemetry". Son dos
+nombres a proposito: el nuestro se instala AL LADO del scs-telemetry.dll de
+otras apps (Trucky lo trae y protesta si alguien se lo cambia), y los dos
+plugins corren a la vez. Se prefiere el nuestro, que trae los trabajos con
+auto de ATS 1.61; si no esta, el de siempre, que sirve para todo lo demas.
+
 Uso identico al de truck_telemetry:
     telemetry_compat.init()
     datos = telemetry_compat.get_data()
@@ -24,6 +32,10 @@ import sys
 IS_WINDOWS = sys.platform == "win32"
 WINDOWS_NAME = "Local\\SCSTelemetry"
 LINUX_PATH = "/dev/shm/SCSTelemetry"
+# El del plugin de Truck Dash (SCS_PLUGIN_MMF_NAME en plugin/) y despues el
+# de siempre, en orden de preferencia.
+WINDOWS_NAMES = ("Local\\TruckDashTelemetry", WINDOWS_NAME)
+LINUX_PATHS = ("/dev/shm/TruckDashTelemetry", LINUX_PATH)
 BLOCK_SIZE = 32 * 1024  # SCS_PLUGIN_MMF_SIZE
 
 _mem = None      # SharedMemory en Windows
@@ -31,16 +43,32 @@ _map = None      # mmap en Linux
 _fd = None
 _buf = None
 _version = None
+_abierto = None  # nombre del bloque que se abrio
 
 
 def _open_buffer():
-    """Devuelve algo indexable con el contenido del bloque."""
+    """Devuelve algo indexable con el contenido del primer bloque que
+    exista. Si no hay ninguno, levanta la excepcion del ultimo."""
+    global _abierto
+    error = None
+    for nombre in (WINDOWS_NAMES if IS_WINDOWS else LINUX_PATHS):
+        try:
+            buf = _open_named(nombre)
+        except OSError as exc:
+            error = exc
+            continue
+        _abierto = nombre
+        return buf
+    raise error
+
+
+def _open_named(nombre):
     global _mem, _map, _fd
     if IS_WINDOWS:
         from multiprocessing.shared_memory import SharedMemory
-        _mem = SharedMemory(name=WINDOWS_NAME, create=False)
+        _mem = SharedMemory(name=nombre, create=False)
         return _mem.buf
-    _fd = os.open(LINUX_PATH, os.O_RDONLY)
+    _fd = os.open(nombre, os.O_RDONLY)
     # Se devuelve el mmap pelado, no un memoryview: el parser lo lee igual
     # (soporta el protocolo de buffer) y ademas un memoryview vivo impide
     # cerrarlo despues ("cannot close exported pointers exist").
@@ -72,10 +100,16 @@ def get_version_number():
     return _version.get_version_number() if _version is not None else 0
 
 
+def opened_block():
+    """El bloque que se esta leyendo (para el log), o None."""
+    return _abierto
+
+
 def deinit():
-    global _mem, _map, _fd, _buf, _version
+    global _mem, _map, _fd, _buf, _version, _abierto
     _buf = None
     _version = None
+    _abierto = None
     if _mem is not None:
         _mem.close()
         _mem = None
@@ -89,4 +123,4 @@ def deinit():
 
 def block_name():
     """Para los mensajes de error: donde se espera encontrar el bloque."""
-    return WINDOWS_NAME if IS_WINDOWS else LINUX_PATH
+    return " or ".join(WINDOWS_NAMES if IS_WINDOWS else LINUX_PATHS)

@@ -108,7 +108,8 @@ it is approved, releases are unsigned and each one lists its SHA-256).
 ## License / transparency
 
 MIT License (see [`LICENSE`](LICENSE)). The bundled SCS telemetry plugin
-(`client/vendor/scs-telemetry.dll`) is by RenCloud, also MIT.
+(`client/vendor/truckdash-telemetry.dll`) is a fork of RenCloud's, also MIT;
+its source is in [`plugin/`](plugin/).
 
 The country flag font used on the account page
 (`docs/assets/TwemojiCountryFlags.woff2`) is a subset of Twemoji Mozilla,

@@ -1,8 +1,15 @@
 # scs-telemetry (Truck Dash fork)
 
 The SCS SDK telemetry plugin that the Truck Dash client installs into the
-game's `bin\win_x64\plugins\` folder. It publishes the game's telemetry in
-a shared memory block (`Local\SCSTelemetry`) that the client reads.
+game's `bin\win_x64\plugins\` folder, as `truckdash-telemetry.dll`. It
+publishes the game's telemetry in its own shared memory block
+(`Local\TruckDashTelemetry`) that the client reads.
+
+It has its own file name and its own block so it can sit next to the
+upstream `scs-telemetry.dll` that other apps install. Trucky ships that
+file and refuses to start if it has been replaced ("[SECURITY] Package file
+replaced on disk"), which is what happened while client 1.5.21 installed
+this plugin under the upstream name.
 
 This is a fork of [RenCloud/scs-sdk-plugin](https://github.com/RenCloud/scs-sdk-plugin),
 MIT License (see `LICENSE`), taken from upstream commit `d7216cb`
@@ -19,8 +26,7 @@ so a job taken with a car never reached the shared memory: no destination,
 no income, no delivery.
 
 This fork maps them onto the same fields as a truck job. The shared memory
-layout does not change (still revision 12), so anything that reads the
-upstream plugin keeps working. See `CHANGES.md` for the exact list.
+layout does not change (still revision 12): only the block name does. See `CHANGES.md` for the exact list.
 
 ## Building
 

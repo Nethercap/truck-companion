@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build scs-telemetry.dll
+      - name: Build the plugin DLL
         run: powershell -File plugin/build.ps1 -OutDir "$env:RUNNER_TEMP\plugin"
       - name: Pin it in the client
         run: python tools/pin_plugin.py "$env:RUNNER_TEMP\plugin\scs-telemetry.dll"
@@ -40,7 +40,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/vendor/scs-telemetry.dll client/plugin_installer.py
+          git add client/vendor/truckdash-telemetry.dll client/plugin_installer.py
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) { Write-Host "La DLL no cambio, nada que commitear"; exit 0 }
           git commit -m "plugin: DLL compilada en Actions desde plugin/" -m "Corrida: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"

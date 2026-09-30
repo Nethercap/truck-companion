@@ -7,8 +7,9 @@ Euro Truck Simulator 2 and American Truck Simulator.
 
 - It reads live telemetry from the game (position, speed, fuel, cargo, etc.)
   through **SCS Software's official Telemetry SDK**, via a shared-memory
-  segment (`Local\SCSTelemetry`) that the game itself creates when the SDK
-  plugin is installed.
+  segment that the telemetry plugin publishes inside the game
+  (`Local\TruckDashTelemetry` for the plugin Truck Dash installs,
+  `Local\SCSTelemetry` for the standard one other apps use).
 - It sends that data over a WebSocket connection to a relay backend
   (hosted on Railway), which forwards it to your browser at
   [trucksim-dash.com](https://trucksim-dash.com).
@@ -55,8 +56,10 @@ tells you to move it first.
 On first run a **Setup & status** window opens (you can reopen it any time
 from the tray icon). It finds your ETS2 / ATS install through Steam and
 installs the SCS Telemetry SDK plugin into the game for you with one click
-(`<game>\bin\win_x64\plugins\scs-telemetry.dll`). Restart the game if it
-was open. Non-Steam install? Use "Add game folder..." and pick the game's
+(`<game>\bin\win_x64\plugins\truckdash-telemetry.dll`). Restart the game if
+it was open. It never touches an existing `scs-telemetry.dll`: other apps
+(Trucky, for one) ship that file and check that it is unchanged, so Truck
+Dash installs its own plugin next to it and both work. Non-Steam install? Use "Add game folder..." and pick the game's
 folder.
 
 The same window shows the live status (waiting for the game / in the truck /
@@ -167,8 +170,10 @@ If you'd rather copy the plugin yourself: grab it from
 and copy **only the `Win64\scs-telemetry.dll` file** into your game's install
 folder, inside `bin\win_x64\plugins\` (create that `plugins` folder if it
 doesn't exist). The most common mistake is dropping the `.dll` directly into
-`bin\win_x64\` instead of the `plugins\` subfolder. The client bundles the
-same file (`vendor/scs-telemetry.dll`, MIT licensed).
+`bin\win_x64\` instead of the `plugins\` subfolder. That plugin works for
+everything except jobs taken with a car in ATS; the client bundles a fork of
+it that also reads those (`vendor/truckdash-telemetry.dll`, MIT licensed,
+source in `plugin/`).
 
 If the dashboard still shows no data, right-click the tray icon and pick
 **"Show log file (troubleshooting)"** — it'll tell you whether the plugin
