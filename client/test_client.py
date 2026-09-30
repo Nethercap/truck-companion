@@ -876,3 +876,36 @@ def test_lan_server_serves_every_file_the_pages_load():
             if destino not in servidos:
                 faltan.append(pagina + " -> " + destino)
     assert not faltan, "no estan en WEB_FILES: " + ", ".join(faltan)
+
+
+# ---------------------------------------------------------------- changelog
+
+def _changelog_tool():
+    import importlib.util
+    ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "changelog.py")
+    spec = importlib.util.spec_from_file_location("changelog", ruta)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_la_version_del_cliente_tiene_su_changelog():
+    """Cada release lleva su seccion en CHANGELOG.md: de ahi sale el cuerpo
+    de la release en GitHub. Al subir CLIENT_VERSION sin escribirla, esto
+    falla en CI y en el build de la release, antes de publicar nada."""
+    cl = _changelog_tool()
+    with open(cl.CHANGELOG, encoding="utf-8") as f:
+        texto = f.read()
+    cuerpo = cl.seccion(texto, client.CLIENT_VERSION)
+    assert cuerpo, f"CHANGELOG.md no tiene seccion para {client.CLIENT_VERSION}"
+    assert cuerpo.lstrip().startswith("- ")
+
+
+def test_changelog_seccion_corta_en_la_siguiente():
+    cl = _changelog_tool()
+    texto = "# Changelog\n\n## Unreleased\n\n- nada\n\n## 1.2.30 (x)\n\n- treinta\n\n## 1.2.3 (2026-01-01)\n\n- tres\n- otra\n\n## 1.2.2\n\n- dos\n"
+    assert cl.seccion(texto, "v1.2.3") == "- tres\n- otra"
+    assert cl.seccion(texto, "1.2.2") == "- dos"
+    assert cl.seccion(texto, "1.2.30") == "- treinta"
+    assert cl.seccion(texto, "1.2.4") is None
+    assert cl.seccion("## 1.0.0\n\n## 0.9.0\n- x\n", "1.0.0") is None

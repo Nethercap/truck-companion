@@ -95,6 +95,34 @@ jobs:
       - name: Push the release tag (manual run)
         if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
         run: git push origin "refs/tags/${{ env.RELEASE_TAG }}"
+      - name: Write the release notes
+        # El changelog de la version va arriba; test_client.py ya exigio que
+        # exista (ver tools/changelog.py), asi que aca no deberia faltar.
+        if: env.RELEASE_TAG != ''
+        shell: pwsh
+        run: |
+          [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
+          $cambios = (python tools/changelog.py $env:RELEASE_TAG) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "CHANGELOG.md has no section for $env:RELEASE_TAG" }
+          $notas = @"
+          ## What's new
+
+          $cambios
+
+          Full history: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+
+          ## Download
+
+          Built automatically by GitHub Actions from this tag (see the "Build client" workflow run for the full log).
+
+          **SHA-256**
+          - ``TruckDash-windows.zip``: ``$env:ZIP_SHA256``
+          - ``TruckDash.exe``: ``$env:EXE_SHA256``
+
+          Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". Some antivirus engines flag the file for the same reason (an unsigned one-file PyInstaller executable that unpacks itself at startup) — it is a false positive; the source and this build log are public, and a code signing certificate for open source projects is in progress. The client is open source, needs no admin rights and only reads the game's telemetry.
+          "@
+          Set-Content -Path release-notes.md -Value $notas -Encoding utf8
+          Get-Content release-notes.md
       - name: Publish release
         if: env.RELEASE_TAG != ''
         uses: softprops/action-gh-release@v2
@@ -103,14 +131,7 @@ jobs:
           files: |
             client/TruckDash-windows.zip
             client/SHA256SUMS.txt
-          body: |
-            Built automatically by GitHub Actions from this tag (see the "Build client" workflow run for the full log).
-
-            **SHA-256**
-            - `TruckDash-windows.zip`: `${{ env.ZIP_SHA256 }}`
-            - `TruckDash.exe`: `${{ env.EXE_SHA256 }}`
-
-            Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". Some antivirus engines flag the file for the same reason (an unsigned one-file PyInstaller executable that unpacks itself at startup) — it is a false positive; the source and this build log are public, and a code signing certificate for open source projects is in progress. The client is open source, needs no admin rights and only reads the game's telemetry.
+          body_path: release-notes.md
       - name: Tell the relay which version is the latest
         # Sin este paso el Release existe y no lo recibe nadie: el cliente
         # instalado pregunta /version al relay, y el relay sigue devolviendo
