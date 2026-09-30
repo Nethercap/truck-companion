@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Truck Dash (ATS)
+Comment=Truck Dash client for American Truck Simulator (start the game first)
+Exec=env STEAM_COMPAT_DATA_PATH=/home/YOURUSER/.local/share/Steam/steamapps/compatdata/270800 STEAM_COMPAT_CLIENT_INSTALL_PATH=/home/YOURUSER/.local/share/Steam "/home/YOURUSER/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run /home/YOURUSER/Documents/truckdash/TruckDash.exe
+Terminal=false
+Categories=Game;
+StartupNotify=false

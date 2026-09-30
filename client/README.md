@@ -220,25 +220,45 @@ different prefix sees nothing at all: no error, no data, just silence.
 **Start the game first, then the client.** Steam only runs one thing per
 prefix at a time, so launching both through Steam at once does not work.
 
-Included are two .desktop files, please substitute in your username in the paths as $HOME does not get expanded. then put these into your ~/./local/share/applications and ~/Desktop directories, and don't forget to chmod +x both of them with
+There are two ready-made launchers in [`linux/`](linux/), one per game:
+`truckdash-ets2.desktop` and `truckdash-ats.desktop`. They point at the
+prefix Steam creates for each game (`compatdata/227300` for ETS2,
+`compatdata/270800` for ATS), so they work as is if you play with Steam's
+default prefix. Launch one after the game is up.
+
+Paths in a `.desktop` file are not run through a shell, so `$HOME` and `~`
+are not expanded: the files carry `YOURUSER` instead. Replace it with your
+user name and install them, from the folder where you saved them:
+
+```sh
+sed -i "s/YOURUSER/$USER/g" truckdash-*.desktop
+cp truckdash-*.desktop ~/.local/share/applications/
 ```
-chmod +x truckdash-*
-```
+
+If you also want them on the desktop, copy them to `~/Desktop`, run
+`chmod +x ~/Desktop/truckdash-*.desktop` and, on GNOME, right click them and
+pick "Allow Launching".
+
+Change the paths if yours differ: a prefix of your own instead of the
+game's, another Proton build, or `TruckDash.exe` somewhere other than
+`~/Documents/truckdash/`.
 
 If you would rather launch everything in one go from Steam, put this in the
-game's launch options instead. The sleep gives the game time to bring the
-prefix up first:
+game's launch options instead. Steam runs this line through a shell, so
+`$HOME` works here, and since the export applies to the game too, both end
+up in the same prefix. The sleep gives the game time to bring the prefix up
+first:
 
 ```
-export STEAM_COMPAT_DATA_PATH="/home/youruser/Prefixes/YourPrefix"; export STEAM_COMPAT_CLIENT_INSTALL_PATH="/home/youruser/.local/share/Steam"; (sleep 20 && "/home/youruser/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "/homme/youruser/truckdash/TruckDash.exe") & exec %command%
+export STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/YourPrefix"; export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"; (sleep 20 && "$HOME/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton" run "$HOME/Documents/truckdash/TruckDash.exe") & exec %command%
 ```
 
 Add your own wrapper at the end if you use one, for example
 `exec gamescope -W 1920 -H 1080 -r 120 -- %command%`.
 
 Tested with **GE-Proton11-7**. The folder name under
-`compatibilitytools.d/` is whatever your Proton build is called; the example
-above uses the one from the tester's machine.
+`compatibilitytools.d/` is whatever your Proton build is called; the examples
+above use the one from the tester's machine.
 
 Notes from that setup:
 
