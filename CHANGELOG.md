@@ -9,6 +9,9 @@ updates on its own and is not versioned here.
 - Linux: the ready-made ATS launcher pointed at the wrong Proton prefix
   (Steam app ID 270800 instead of 270880), so the client could not see the
   game. Fixed in `client/linux/truckdash-ats.desktop` and the README.
+- Linux: the README explains how to combine the Truck Dash launch options
+  line with your own (mangohud, `PROTON_LOG`, DLL overrides), and that Lutris
+  and protontricks put the client on a different wineserver than the game.
 
 ## 1.5.23 (2026-09-30)
 

@@ -261,6 +261,32 @@ export STEAM_COMPAT_DATA_PATH="$HOME/Prefixes/YourPrefix"; export STEAM_COMPAT_C
 Add your own wrapper at the end if you use one, for example
 `exec gamescope -W 1920 -H 1080 -r 120 -- %command%`.
 
+**If you already have launch options** (mangohud, `PROTON_LOG=1`, DLL
+overrides for a mod), they cannot stay in front of the line. The usual form
+`VAR=x mangohud %command%` works because Steam just appends the game to it;
+with the Truck Dash part in the middle, `mangohud` followed by `(` is a shell
+syntax error and nothing launches, not even the game. Move them instead:
+
+- Variables that both should get (the prefix, `PROTON_LOG`) go in the
+  `export` at the start.
+- Variables and wrappers that are only for the game go after `exec`, through
+  `env`, so they don't reach Truck Dash:
+
+```
+export STEAM_COMPAT_DATA_PATH="$HOME/.local/share/Steam/steamapps/compatdata/270880" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" PROTON_LOG=1; (sleep 20 && "$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton11-7/proton" run "$HOME/Documents/truckdash/TruckDash.exe") & exec env MANGOHUD_CONFIG="fps_limit=60" WINEDLLOVERRIDES="dxgi,dinput8=n,b" mangohud %command%
+```
+
+That one is for ATS (`270880`); for ETS2 use `227300`. With `PROTON_LOG=1`,
+Proton writes `steam-<app id>.log` in your home folder, which is the first
+place to look if the game starts and Truck Dash does not.
+
+**Lutris and protontricks have not worked for this in testing**, even
+pointed at the game's prefix with the same Proton build. They start Wine with
+their own settings, and the client ended up on a different wineserver than
+the game: it ran but never saw the game (its log listed no game window at
+all), or the one started second hung. Launch it with Proton's own
+`proton run`, as above.
+
 Tested with **GE-Proton11-7**. The folder name under
 `compatibilitytools.d/` is whatever your Proton build is called; the examples
 above use the one from the tester's machine.
