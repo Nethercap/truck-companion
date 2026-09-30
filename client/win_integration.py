@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import time
+import webbrowser
 import tempfile
 import zipfile
 
@@ -120,6 +121,37 @@ def set_quit_on_game_close(activo: bool) -> None:
     settings = load_settings()
     settings["quit_on_game_close"] = bool(activo)
     save_settings(settings)
+
+
+def open_in_browser(url: str) -> bool:
+    """Abre la URL en el navegador. Devuelve False si no se pudo lanzar nada,
+    para que el llamador muestre la direccion y la copien a mano.
+
+    Bajo Wine no se usa webbrowser: termina en ShellExecute adentro de este
+    proceso, y bajo Proton eso tiraba abajo el cliente entero, sin traceback
+    (issue #12: se cerraba al tocar "Open dashboard"; en el log, lo ultimo
+    era la ventana sin titulo que crea ShellExecute). Se lanza winebrowser
+    como proceso aparte, que es lo mismo que haria ShellExecute: si Wine se
+    cae ahi, se cae ese proceso y no el cliente.
+    """
+    if not is_wine():
+        logging.info("Opening %s in the browser", url.split("?")[0])
+        return bool(webbrowser.open(url))
+    sistema = os.environ.get("SystemRoot") or os.environ.get("windir") or r"C:\windows"
+    winebrowser = os.path.join(sistema, "system32", "winebrowser.exe")
+    logging.info("Opening %s in the browser (winebrowser)", url.split("?")[0])
+    try:
+        subprocess.Popen(
+            [winebrowser, url],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        )
+    except OSError as exc:
+        logging.warning("Could not start winebrowser (%s)", exc)
+        return False
+    return True
 
 
 def open_dashboard_enabled() -> bool:

@@ -5,6 +5,8 @@ import io
 import os
 import zipfile
 
+import pytest
+
 import plugin_installer
 import win_integration
 
@@ -403,6 +405,52 @@ def test_is_wine_detecta_por_ntdll(monkeypatch):
     monkeypatch.setattr(win_integration, "_es_wine", None)
     monkeypatch.setattr(ctypes, "windll", WindllWindows(), raising=False)
     assert win_integration.is_wine() is False
+
+
+# ------------------------------------------------- abrir el navegador
+# Bajo Proton, webbrowser.open (ShellExecute adentro del proceso) cerraba el
+# cliente entero sin dejar rastro (issue #12).
+
+URL_TABLERO = "https://trucksim-dash.com/app/?backend=wss%3A%2F%2Fx&code=AB12CD34"
+
+
+def test_bajo_wine_el_navegador_se_abre_en_otro_proceso(monkeypatch):
+    lanzados = []
+    monkeypatch.setattr(win_integration, "_es_wine", True)
+    monkeypatch.setattr(win_integration.webbrowser, "open",
+                        lambda *a, **k: pytest.fail("bajo Wine no se usa webbrowser"))
+    monkeypatch.setattr(win_integration.subprocess, "Popen",
+                        lambda args, **kw: lanzados.append((args, kw)))
+    monkeypatch.setenv("SystemRoot", r"C:\windows")
+
+    assert win_integration.open_in_browser(URL_TABLERO) is True
+
+    (args, kw), = lanzados
+    assert os.path.basename(args[0]).lower() == "winebrowser.exe"
+    assert "system32" in args[0].lower()
+    # La URL entera, como un solo argumento: con "&code=" cortado el tablero
+    # abre sin codigo.
+    assert args[1:] == [URL_TABLERO]
+    assert kw.get("stdin") is win_integration.subprocess.DEVNULL
+
+
+def test_bajo_wine_sin_winebrowser_avisa_que_no_se_abrio(monkeypatch):
+    def falla(args, **kw):
+        raise FileNotFoundError(args[0])
+    monkeypatch.setattr(win_integration, "_es_wine", True)
+    monkeypatch.setattr(win_integration.subprocess, "Popen", falla)
+    assert win_integration.open_in_browser(URL_TABLERO) is False
+
+
+def test_en_windows_se_sigue_usando_webbrowser(monkeypatch):
+    abiertos = []
+    monkeypatch.setattr(win_integration, "_es_wine", False)
+    monkeypatch.setattr(win_integration.webbrowser, "open",
+                        lambda url: abiertos.append(url) or True)
+    monkeypatch.setattr(win_integration.subprocess, "Popen",
+                        lambda *a, **k: pytest.fail("en Windows no hace falta otro proceso"))
+    assert win_integration.open_in_browser(URL_TABLERO) is True
+    assert abiertos == [URL_TABLERO]
 
 
 # ------------------------------------------ actualizar el plugin solo

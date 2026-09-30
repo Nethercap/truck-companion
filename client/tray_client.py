@@ -24,7 +24,6 @@ import time
 import tkinter as tk
 from tkinter import filedialog
 import urllib.parse
-import webbrowser
 from urllib.request import urlopen
 
 import red
@@ -224,6 +223,20 @@ def show_text_dialog(title: str, message: str, copy_value: str | None = None):
         root.mainloop()
 
     threading.Thread(target=_show, daemon=True).start()
+
+
+def abrir_navegador(url: str) -> None:
+    """Toda apertura del navegador pasa por aca (ver
+    win_integration.open_in_browser: bajo Proton, webbrowser tiraba abajo el
+    cliente). Si no se pudo lanzar nada, la direccion queda en pantalla y en
+    el portapapeles."""
+    try:
+        abierto = win_integration.open_in_browser(url)
+    except Exception:
+        logging.exception("Could not open the browser")
+        abierto = False
+    if not abierto:
+        show_text_dialog("Truck Dash", T("dlg_open_manually"), copy_value=url)
 
 
 # ---------------------------------------------------------------------------
@@ -615,7 +628,7 @@ class SetupWindow:
             def mostrar():
                 self.account_code.configure(text=pedido["code"])
                 self.account_label.configure(text=T("account_enter_code", url=pedido["url"]))
-                webbrowser.open(pedido["url"])
+                abrir_navegador(pedido["url"])
             self.en_ventana(mostrar)
             self.esperar_aprobacion(pedido)
 
@@ -749,12 +762,12 @@ class SetupWindow:
 
     def open_lan_here(self):
         if state.local and state.local.web_ready:
-            webbrowser.open(f"http://127.0.0.1:{local_server.HTTP_PORT}/app/?local=1")
+            abrir_navegador(f"http://127.0.0.1:{local_server.HTTP_PORT}/app/?local=1")
 
     def open_dashboard(self):
         url = build_web_url()
         if url:
-            webbrowser.open(url)
+            abrir_navegador(url)
 
     def check_updates(self):
         def _run():
@@ -890,13 +903,13 @@ def open_web_ui():
     _browser_opened = True
     url = build_web_url()
     if url:
-        webbrowser.open(url)
+        abrir_navegador(url)
 
 
 def open_web_menu_item(icon, item):
     url = build_web_url()
     if url:
-        webbrowser.open(url)
+        abrir_navegador(url)
     else:
         show_text_dialog("Truck Dash", T("dlg_no_code"))
 
@@ -973,7 +986,7 @@ def report_problem(icon, item):
         "", "Last log lines:", "```", tail.strip(), "```", "</details>",
     ])
     query = urllib.parse.urlencode({"title": "[client] ", "body": body, "labels": "bug"})
-    webbrowser.open(f"https://github.com/Nethercap/truck-companion/issues/new?{query}")
+    abrir_navegador(f"https://github.com/Nethercap/truck-companion/issues/new?{query}")
 
 
 def toggle_autostart_menu_item(icon, item):
@@ -984,7 +997,7 @@ def toggle_autostart_menu_item(icon, item):
 
 
 def open_donate(icon, item):
-    webbrowser.open(DONATE_URL)
+    abrir_navegador(DONATE_URL)
 
 
 # ---------------------------------------------------------------------------

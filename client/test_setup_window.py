@@ -256,7 +256,7 @@ def test_vincular_muestra_el_codigo_y_lo_guarda_cuando_lo_aprueban(ventana, monk
                                                 "expires_in": 600,
                                                 "url": "https://trucksim-dash.com/account/"})
     # Que no abra el navegador de verdad en medio de la prueba.
-    monkeypatch.setattr(tray_client.webbrowser, "open", lambda *a, **k: None)
+    monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda *a, **k: True)
     monkeypatch.setattr(tray_client.account, "consultar_codigo",
                         lambda secret, s=None: ("listo", "token-de-prueba"))
 
@@ -273,7 +273,7 @@ def test_un_corte_de_internet_no_cancela_la_espera(ventana, monkeypatch):
     monkeypatch.setattr(tray_client.account, "pedir_codigo",
                         lambda nombre, s=None: {"code": "ACDE-3456", "secret": "s",
                                                 "expires_in": 600, "url": "http://x/"})
-    monkeypatch.setattr(tray_client.webbrowser, "open", lambda *a, **k: None)
+    monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda *a, **k: True)
 
     respuestas = [("sin_red", None), ("pendiente", None), ("listo", "tok")]
     monkeypatch.setattr(tray_client.account, "consultar_codigo",
@@ -380,7 +380,7 @@ def test_el_tablero_no_se_abre_solo_si_la_opcion_esta_apagada(monkeypatch):
     al juego, que deja de recibir teclas hasta que hace clic de vuelta
     (issue #6)."""
     abiertos = []
-    monkeypatch.setattr(tray_client.webbrowser, "open", lambda url: abiertos.append(url))
+    monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda url: abiertos.append(url) or True)
     monkeypatch.setattr(tray_client.state, "code", "ABCD-1234")
     monkeypatch.setattr(tray_client.state, "backend_url", "https://ejemplo")
     monkeypatch.setattr(tray_client, "_browser_opened", False)
@@ -544,3 +544,19 @@ def test_el_plugin_viejo_se_revisa_como_mucho_una_vez_por_minuto(monkeypatch):
     tray_client.actualizar_plugins_viejos(ahora=1030.0)
     tray_client.actualizar_plugins_viejos(ahora=1061.0)
     assert len(llamadas) == 2
+
+
+def test_si_no_se_abre_el_navegador_la_direccion_queda_a_mano(monkeypatch):
+    """Sin navegador (winebrowser que no arranca) el boton no puede quedar
+    mudo: la direccion se muestra y se copia."""
+    dialogos = []
+    monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda url: False)
+    monkeypatch.setattr(tray_client, "show_text_dialog",
+                        lambda titulo, mensaje, copy_value=None: dialogos.append(copy_value))
+    tray_client.abrir_navegador("https://trucksim-dash.com/app/?code=X")
+    assert dialogos == ["https://trucksim-dash.com/app/?code=X"]
+
+    dialogos.clear()
+    monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda url: True)
+    tray_client.abrir_navegador("https://trucksim-dash.com/app/?code=X")
+    assert dialogos == []
