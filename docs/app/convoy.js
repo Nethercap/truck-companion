@@ -312,7 +312,8 @@ function convoyRenderMarkers() {
     }
     entry.path.setAttribute('fill', convoyColor(m));
     const bearing = map ? map.getBearing() : 0;
-    entry.arrow.style.transform = `rotate(${(m.heading || 0) - bearing}deg)`;
+    // El rumbo viene sobre la grilla del juego: a geografico, como el propio.
+    entry.arrow.style.transform = `rotate(${gridHeadingToGeo(m.heading || 0, m.x, m.z, toLngLat) - bearing}deg)`;
     const tag = myVariant && m.variant && m.variant !== myVariant ? ` <small>${escapeHtml(convoyVariantLabel(m.variant))}</small>` : '';
     entry.label.innerHTML = `${escapeHtml(m.nickname)}${tag}`;
     entry.el.classList.toggle('dim', !!(myVariant && m.variant && m.variant !== myVariant));

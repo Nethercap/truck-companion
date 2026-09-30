@@ -1318,6 +1318,15 @@ function ensureMapInitialized() {
     pixelRatio: liteMode ? 1 : undefined,
     maxZoom: liteMode ? 15 : undefined,
   });
+  // Mientras haya un dedo o el mouse apretado sobre el mapa, la camara que
+  // sigue al camion no se mueve (ver mapGestureActive).
+  const mapCanvas = map.getCanvasContainer();
+  mapCanvas.addEventListener('pointerdown', (e) => mapPointersDown.add(e.pointerId), true);
+  mapCanvas.addEventListener('wheel', () => { mapWheelUntil = performance.now() + 300; }, { capture: true, passive: true });
+  for (const type of ['pointerup', 'pointercancel']) {
+    window.addEventListener(type, (e) => mapPointersDown.delete(e.pointerId), true);
+  }
+  window.addEventListener('blur', () => mapPointersDown.clear());
   map.on('dragstart', pauseMapFollow);
   map.on('dragend', scheduleMapFollow);
   map.on('moveend', scheduleMapFollow);
@@ -3030,6 +3039,17 @@ function frameLoop(now) {
   if (frameJobs.size) frameRaf = requestAnimationFrame(frameLoop);
 }
 
+// Dedos/mouse apretados sobre el mapa y ultima rueda. Hace falta porque
+// jumpTo() arranca con map.stop(), que resetea TODOS los gestos de MapLibre:
+// con la camara haciendo jumpTo en cada cuadro, un arrastre nunca llegaba a
+// los 3 px que necesita para arrancar (ni a disparar el dragstart que pausa
+// el seguimiento), y el mapa no se podia mover. Con easeTo una vez por tick
+// esto no se notaba, porque el reseteo era 4 veces por segundo y no 30.
+const mapPointersDown = new Set();
+let mapWheelUntil = 0;
+function mapGestureActive() {
+  return mapPointersDown.size > 0 || performance.now() < mapWheelUntil;
+}
 // La camara que sigue al camion: lo mismo que hacia easeTo (centro, rumbo,
 // zoom e inclinacion con rampa lineal), pero con jumpTo en los cuadros del
 // reloj comun. Se corta sola si el usuario agarra el mapa.
@@ -3039,6 +3059,9 @@ function followCameraTo(target, ms) {
   const dBearing = target.bearing == null ? 0 : ((target.bearing - from.bearing + 540) % 360) - 180;
   runFrameJob('camera', (now) => {
     if (!autoFollow) return false;
+    // El usuario puede estar por arrastrar o hacer zoom: no pisarle el gesto.
+    // Si era solo un toque, el proximo tick retoma desde donde quedo.
+    if (mapGestureActive()) return true;
     const t = Math.min(1, (now - start) / ms);
     const cam = {
       center: [from.center.lng + (target.center[0] - from.center.lng) * t, from.center.lat + (target.center[1] - from.center.lat) * t],
@@ -3198,8 +3221,12 @@ function updateMap(position, game, gameHeadingDeg) {
     } else if (Number.isFinite(gameHeadingDeg)) {
       // El juego lo dice: no hay cuerda ni base minima ni espera a moverse.
       // Anda igual girando parado o yendo marcha atras, dos casos donde
-      // deducirlo del desplazamiento daba el rumbo equivocado.
-      const d = ((gameHeadingDeg - lastHeadingDeg + 540) % 360) - 180;
+      // deducirlo del desplazamiento daba el rumbo equivocado. Pero lo dice
+      // sobre la grilla de su mapa, no respecto del norte verdadero: sin
+      // pasarlo a geografico la flecha quedaba torcida contra la calle hasta
+      // 17 grados en la costa oeste (ver gridHeadingToGeo).
+      const geoHeading = gridHeadingToGeo(gameHeadingDeg, position.x, position.z, toLngLat);
+      const d = ((geoHeading - lastHeadingDeg + 540) % 360) - 180;
       lastHeadingDeg = (lastHeadingDeg + d * HEADING_GAME_SMOOTH + 360) % 360;
       headingRef = null;
     } else if (prevLngLat && movedM > 0.3) {
@@ -4712,8 +4739,14 @@ function runDemo() {
 
   const step = () => {
     const data = demo.next();
-    const [x, z] = pointAt(demo.progress() * total);
+    const dist = demo.progress() * total;
+    const [x, z] = pointAt(dist);
     data.position = { x, y: 0, z };
+    // Rumbo como lo manda el cliente 1.5.13+: sobre la grilla del juego
+    // (0 = -z), no geografico. Sin esto la demo iba por el camino viejo de
+    // deducirlo y no mostraba la diferencia entre los dos norte.
+    const [ax, az] = pointAt(Math.max(0, dist - 5)), [bx, bz] = pointAt(dist + 5);
+    if (ax !== bx || az !== bz) data.heading = (Math.atan2(bx - ax, -(bz - az)) * 180 / Math.PI + 360) % 360;
     handleTelemetry(data);
   };
   step();

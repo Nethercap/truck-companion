@@ -16,6 +16,32 @@ function geoBearingDeg(lng1, lat1, lng2, lat2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+// Rumbo del juego (brujula sobre la GRILLA del mapa: 0 = -z, 90 = +x) a
+// rumbo geografico real. No son lo mismo: los mapas del juego son una
+// proyeccion conica (Lambert) y ahi los meridianos convergen, asi que el
+// "norte" de la grilla solo coincide con el norte verdadero sobre el meridiano
+// central. En ATS la diferencia es 14 grados en Los Angeles y 17 en Seattle;
+// en ETS2 pasa lo mismo en Portugal o Escocia. Usar el rumbo del juego tal
+// cual dejaba la flecha torcida contra la calle, siempre para el mismo lado.
+// Se resuelve sin formulas de la proyeccion: se proyectan la posicion y un
+// punto unos metros adelante y se mide el bearing entre los dos. Si ese
+// punto cae del otro lado de un corte de la proyeccion (el borde del hack de
+// UK en ETS2) la distancia no cierra, y se mide con un punto hacia atras.
+function gridHeadingToGeo(headingDeg, x, z, toLngLat, stepM = 10) {
+  if (!Number.isFinite(headingDeg) || !toLngLat || x == null || z == null) return headingDeg;
+  const rad = headingDeg * Math.PI / 180;
+  const dx = Math.sin(rad) * stepM, dz = -Math.cos(rad) * stepM;
+  const here = toLngLat(x, z);
+  const metersBetween = (a, b) => {
+    const kx = 111320 * Math.cos(((a[1] + b[1]) / 2) * Math.PI / 180);
+    return Math.hypot((b[0] - a[0]) * kx, (b[1] - a[1]) * 110540);
+  };
+  const ahead = toLngLat(x + dx, z + dz);
+  if (metersBetween(here, ahead) < stepM * 3) return geoBearingDeg(here[0], here[1], ahead[0], ahead[1]);
+  const behind = toLngLat(x - dx, z - dz);
+  return geoBearingDeg(behind[0], behind[1], here[0], here[1]);
+}
+
 // Suaviza visualmente la ruta calculada: redondea cada esquina con una curva
 // (Bezier cuadratica) entre un punto antes y uno despues del vertice, a lo
 // sumo a la mitad del tramo mas corto. Los tramos rectos quedan rectos, como
@@ -818,6 +844,6 @@ function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth,
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+  module.exports = { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
