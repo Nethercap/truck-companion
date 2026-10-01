@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
-  createSessionStats, createDemoTelemetry } = require('./pure.js');
+  createPaceEta, createSessionStats, createDemoTelemetry } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -406,6 +406,60 @@ test('timeScale: mediana de lo medido, y null hasta tener dos muestras', () => {
   // Una pausa larga mete una muestra absurda: la mediana no se mueve.
   ts.push(1000 + 4 * 19, 60 * 60);
   assert.ok(Math.abs(ts.value() - 19) < 1e-6, String(ts.value()));
+});
+
+// Maneja a ritmo parejo: un dato por segundo, kmh de juego, desde t0.
+function andar(pace, { destino = 'Albuquerque', t0 = 0, segundos, kmh, km0 }) {
+  let km = km0;
+  for (let i = 0; i <= segundos; i++) {
+    pace.push(destino, t0 + i, km);
+    km -= kmh / 3600;
+  }
+  return km;
+}
+
+test('paceEta: lo medido sale de la distancia que baja, en segundos reales', () => {
+  const p = createPaceEta();
+  assert.equal(p.measuredSeconds(), null);
+  andar(p, { segundos: 60, kmh: 60, km0: 100 });
+  // A 60 km/h quedan 99 km: 99 minutos.
+  assert.ok(Math.abs(p.measuredSeconds() - 99 * 60) < 10, String(p.measuredSeconds()));
+  assert.ok(Math.abs(p.avgSpeedKmh() - 60) < 0.5);
+});
+
+test('paceEta: el peso de lo medido llega a 0,7 a los 10 min aunque la ventana sea de 5', () => {
+  // El bug: el peso se contaba desde la muestra mas vieja de la ventana y
+  // nunca pasaba de 0,26.
+  const p = createPaceEta();
+  andar(p, { segundos: 15 * 60, kmh: 50, km0: 300 });
+  assert.equal(p.weight(15 * 60), 0.7);
+  assert.equal(p.weight(60), 0);
+  assert.ok(Math.abs(p.weight(360) - 0.35) < 1e-9);
+});
+
+test('paceEta: mas lento que el juego, la llegada se corre (el reporte del 7:30)', () => {
+  const p = createPaceEta();
+  const km = andar(p, { segundos: 20 * 60, kmh: 45, km0: 200 });
+  // El juego supone el limite (90 km/h): la mitad de lo que se tarda de verdad.
+  const juego = km / 90 * 3600;
+  const real = km / 45 * 3600;
+  const est = p.estimate(juego, 20 * 60);
+  assert.ok(est > juego * 1.6 && est < real, `${juego} ${est} ${real}`);
+  // Sin medicion todavia, el del juego; sin el del juego, lo medido.
+  assert.equal(createPaceEta().estimate(juego, 0), juego);
+  assert.equal(p.estimate(null, 20 * 60), p.measuredSeconds());
+});
+
+test('paceEta: parado no inventa horas, y otro destino arranca de cero', () => {
+  const p = createPaceEta();
+  andar(p, { segundos: 120, kmh: 60, km0: 100 });
+  const antes = p.measuredSeconds();
+  // Diez minutos en un peaje: la distancia no baja.
+  for (let i = 1; i <= 600; i++) p.push('Albuquerque', 120 + i, 98);
+  assert.equal(p.measuredSeconds(), antes);
+  p.push('Santa Fe', 800, 50);
+  assert.equal(p.measuredSeconds(), null);
+  assert.equal(p.weight(800), 0);
 });
 
 test('timeScale: no muestrea mas seguido que minSampleSeconds', () => {

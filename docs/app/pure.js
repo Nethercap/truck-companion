@@ -528,6 +528,95 @@ function createTimeScale({ minSampleSeconds = 30, maxSamples = 10, minScale = 1,
   };
 }
 
+// Tiempo que falta al ritmo que se viene manejando, mezclado con el estimado
+// del juego. El del juego (navigation.time) supone que se va al limite todo
+// el camino: en ciudad, con transito o con un camion que no llega al limite,
+// la llegada se corre de a poco y nadie lo nota (reporte de Reddit: decia
+// 7:30, llego a las 9 o 10). Lo medido solo, en cambio, en ciudad a 20 km/h
+// extrapola "5 h" para un viaje de 50 min. Por eso se mezclan: el peso de lo
+// medido arranca a los blendStart segundos de viaje y llega a blendMax a los
+// blendFull.
+//
+// El peso se cuenta desde el PRIMER dato de este destino, no desde la
+// muestra mas vieja de la ventana: la ventana es de 5 min, y contado desde
+// ahi el peso nunca pasaba de 0,26 aunque la cuenta prometia 0,7 a los 10.
+//
+// La usan la app (resumen de ruta, ETA real) y el panel (docs/dash/), en
+// segundos REALES; quien quiera la hora del juego multiplica por la escala.
+function createPaceEta({
+  windowSeconds = 300, minSpanSeconds = 30, recalcSeconds = 5, minSpeedKmh = 5,
+  blendStart = 120, blendFull = 600, blendMax = 0.7,
+} = {}) {
+  let destino;
+  let desde = null;
+  let samples = [];   // { m: segundos en movimiento acumulados, km: lo que falta }
+  let enMovimiento = 0;
+  let previo = null;
+  let valor = null;
+  let ultimoCalculo = null;
+  let velocidad = null;
+  const pace = {
+    // destino: cualquier cosa que cambie cuando cambia el viaje (la ciudad
+    // de destino). ts en segundos.
+    //
+    // El ritmo se mide solo con el tiempo en que la distancia baja. Con el
+    // reloj de pared, diez minutos en un peaje o cargando nafta hacian
+    // bajar el promedio de a poco y el ETA crecia a decenas de horas antes
+    // de que el camion "contara" como parado. El transito lento si cuenta:
+    // ahi la distancia baja, despacio.
+    push(target, ts, remainingKm) {
+      if (ts == null || remainingKm == null || !Number.isFinite(remainingKm)) return;
+      if (target !== destino) { pace.reset(); destino = target; }
+      if (desde == null) desde = ts;
+      let movio = !previo;
+      if (previo) {
+        const dt = ts - previo.ts;
+        const bajo = previo.km - remainingKm;
+        // Si la distancia sube, el juego recalculo la ruta: lo medido hasta
+        // aca era sobre otro camino.
+        if (bajo < -0.5) { samples = []; movio = true; }
+        // Un hueco largo (juego en pausa, conexion caida) no es manejo.
+        else if (bajo > 0 && dt > 0 && dt < 30) { enMovimiento += dt; movio = true; }
+      }
+      previo = { ts, km: remainingKm };
+      // Parado no se guarda nada: si no, una hora estacionado a 10 datos por
+      // segundo juntaba 36.000 muestras que nunca salen de la ventana.
+      if (!movio) return;
+      samples.push({ m: enMovimiento, km: remainingKm });
+      samples = samples.filter(s => enMovimiento - s.m <= windowSeconds);
+      // Un numero que salta en cada dato es mas ruido que informacion.
+      if (ultimoCalculo != null && ts - ultimoCalculo < recalcSeconds) return;
+      if (samples.length < 2) return;
+      const viejo = samples[0];
+      const andando = enMovimiento - viejo.m;
+      if (andando < minSpanSeconds) return;
+      const kmh = (viejo.km - remainingKm) / andando * 3600;
+      if (kmh < minSpeedKmh) return;
+      ultimoCalculo = ts;
+      velocidad = kmh;
+      valor = remainingKm / kmh * 3600;
+    },
+    measuredSeconds() { return valor; },
+    avgSpeedKmh() { return velocidad; },
+    weight(ts) {
+      if (desde == null || ts == null) return 0;
+      return Math.max(0, Math.min(blendMax, (ts - desde - blendStart) / (blendFull - blendStart) * blendMax));
+    },
+    // priorSeconds: el estimado del juego ya pasado a segundos reales.
+    estimate(priorSeconds, ts) {
+      if (valor == null) return priorSeconds;
+      if (priorSeconds == null) return valor;
+      const w = pace.weight(ts);
+      return priorSeconds * (1 - w) + valor * w;
+    },
+    reset() {
+      destino = undefined; desde = null; samples = []; enMovimiento = 0; previo = null;
+      valor = null; ultimoCalculo = null; velocidad = null;
+    },
+  };
+  return pace;
+}
+
 // Estadisticas de la sesion del panel (docs/dash/): kilometros, tiempo al
 // volante, ganancia neta, combustible y un registro de lo que fue pasando.
 // Todo se calcula aca a partir de los ticks - el SDK no lleva ninguna de
@@ -844,6 +933,6 @@ function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth,
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createSessionStats,
+  module.exports = { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

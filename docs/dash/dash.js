@@ -87,6 +87,7 @@ const DASH_AIRE_MARCAS = 10;
 function createDashPanel({ root, money, imperial, lang }) {
   const KM_TO_MI = 0.621371;
   const escala = createTimeScale();
+  const ritmo = createPaceEta();
   const combustible = createFuelTracker();
   const sesion = createSessionStats();
   let ultimo = null;
@@ -361,8 +362,14 @@ function createDashPanel({ root, money, imperial, lang }) {
     // la columna seguia reservada y quedaba un hueco negro en el medio.
     refs.grilla.classList.toggle('sinViaje', !enViaje);
     const restanteKm = enViaje ? d.routeDistanceKm : null;
-    const viajeJuegoSeg = enViaje && d.routeTimeSeconds > 0 ? d.routeTimeSeconds : null;
-    const realSeg = viajeJuegoSeg != null ? viajeJuegoSeg / s : null;
+    // El estimado del juego supone que se va al limite todo el camino; se
+    // corrige con el ritmo al que se viene manejando (createPaceEta, el mismo
+    // de la app). De ahi salen las dos horas de llegada, el margen contra el
+    // vencimiento y si hay que dormir. Antes iba crudo: decia 7:30 y se
+    // llegaba a las 9 o 10 del juego.
+    const juegoCrudoSeg = enViaje && d.routeTimeSeconds > 0 ? d.routeTimeSeconds : null;
+    const realSeg = enViaje ? ritmo.estimate(juegoCrudoSeg != null ? juegoCrudoSeg / s : null, d.ts) : null;
+    const viajeJuegoSeg = realSeg != null ? realSeg * s : null;
     renderCinta(d, enViaje, restanteKm, realSeg, viajeJuegoSeg);
     renderConduccion(d);
     renderLlegada(d, enViaje, viajeJuegoSeg);
@@ -654,6 +661,7 @@ function createDashPanel({ root, money, imperial, lang }) {
     update(data) {
       ultimo = data;
       escala.push(data.gameTimeMinutes, data.ts);
+      if (data.onJob && data.cityDst) ritmo.push(data.cityDst, data.ts, data.routeDistanceKm);
       sesion.push(data);
       combustible.push(data.odometerKm, data.fuel, [data.game, data.truckBrand, data.truckName].join('|'));
       render();

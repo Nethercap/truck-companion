@@ -1585,9 +1585,7 @@ function renumberWaypointMarkers() {
 
 function invalidateRoute() {
   currentRouteTarget = null; // fuerza recalculo de la ruta en el proximo tick
-  etaSamples = [];
-  etaDisplayValue = null;
-  etaLastRecalcTime = null;
+  paceEta.reset();
 }
 
 function addWaypoint(pos, lngLat, inGame, label) {
@@ -3348,19 +3346,10 @@ function updateMiniHudExtra(data) {
   document.getElementById('miniHudExtra').innerHTML = lines.map(l => `<div>${l}</div>`).join('');
 }
 
-// ETA real: en vez del ETA del juego (que corre en tiempo de juego, no en
-// tiempo real - depende de la config de reloj del juego), se calcula
-// distancia_restante / velocidad_promedio_real usando una ventana movil de
-// los ultimos ETA_WINDOW_SECONDS de telemetria real - asi refleja el ritmo
-// real de manejo (paradas, trafico) en vez de una velocidad estandar fija.
-const ETA_WINDOW_SECONDS = 5 * 60;
-const ETA_MIN_SAMPLE_SPAN_SECONDS = 30; // no calcular con muy poca data, da valores erraticos
-const ETA_RECALC_INTERVAL_SECONDS = 5; // cada cuanto se refresca el valor mostrado
-const ETA_MIN_SPEED_KMH = 5; // por debajo de esto (camion parado/casi parado) la division da un ETA absurdo
-let etaSamples = []; // [{ t: data.ts (segundos), distanceKm }, ...]
-let etaSampleTarget = null; // cityDst actual - resetea la ventana si cambia el destino
-let etaDisplayValue = null; // ultimo valor mostrado (se mantiene fijo entre recalculos)
-let etaLastRecalcTime = null;
+// ETA real: el del juego pasado a tiempo real, corregido con el ritmo al que
+// se viene manejando. La cuenta vive en pure.js (createPaceEta, con tests):
+// el panel de docs/dash/ usa la misma.
+const paceEta = createPaceEta();
 
 // Reloj del juego ("Jue 15:17"): el dia de la semana sale del idioma elegido
 // usando una semana de referencia que empieza en lunes (2024-01-01 lo fue).
@@ -3391,56 +3380,18 @@ function measuredTimeScale(data) {
 }
 
 // ETA real = ETA del juego pasado a tiempo real (base) corregido por el ritmo
-// medido (distancia recorrida en los ultimos minutos) a medida que hay datos.
-// Antes era solo lo medido: en ciudad, a 20 km/h, extrapolaba "5 h" para un
-// viaje de 50 min reales y recien se acomodaba en la autopista.
+// medido a medida que hay datos (createPaceEta en pure.js). El ritmo tambien
+// lo usan el ETA "(with waypoint)" y el resumen con waypoints propios.
 function computeRealEtaSeconds(data) {
   if (!data.routeDistanceKm || data.ts == null) return null;
   const scale = measuredTimeScale(data);
   const prior = data.routeTimeSeconds != null && data.routeTimeSeconds > 0 ? data.routeTimeSeconds / scale : null;
-  const measured = computeMeasuredEtaSeconds(data);
-  if (measured == null) return prior;
-  if (prior == null) return measured;
-  // Peso de lo medido: 0 con menos de 2 min de muestras, 0.7 a partir de 10 min.
-  const span = etaSamples.length ? data.ts - etaSamples[0].t : 0;
-  const w = Math.max(0, Math.min(0.7, (span - 120) / (600 - 120) * 0.7));
-  return prior * (1 - w) + measured * w;
-}
-
-function computeMeasuredEtaSeconds(data) {
-  if (!data.routeDistanceKm || data.ts == null) return null;
-  if (data.cityDst !== etaSampleTarget) {
-    etaSampleTarget = data.cityDst;
-    etaSamples = [];
-    etaDisplayValue = null;
-    etaLastRecalcTime = null;
-  }
-  etaSamples.push({ t: data.ts, distanceKm: data.routeDistanceKm });
-  etaSamples = etaSamples.filter(s => data.ts - s.t <= ETA_WINDOW_SECONDS);
-
-  // Solo se refresca el valor mostrado cada ETA_RECALC_INTERVAL_SECONDS - un
-  // numero que salta en cada tick es mas ruido que informacion.
-  if (etaLastRecalcTime != null && data.ts - etaLastRecalcTime < ETA_RECALC_INTERVAL_SECONDS) {
-    return etaDisplayValue;
-  }
-
-  if (etaSamples.length < 2) return etaDisplayValue;
-  const oldest = etaSamples[0];
-  const elapsedSeconds = data.ts - oldest.t;
-  if (elapsedSeconds < ETA_MIN_SAMPLE_SPAN_SECONDS) return etaDisplayValue;
-
-  const distanceCoveredKm = oldest.distanceKm - data.routeDistanceKm;
-  const avgSpeedKmh = (distanceCoveredKm / elapsedSeconds) * 3600;
-  // Camion parado o casi (garage, semaforo, peaje) durante toda la ventana:
-  // la velocidad promedio da casi cero y la division explota a un ETA de
-  // cientos de miles de horas. Se descarta y se mantiene el ultimo valor
-  // valido en vez de mostrar un numero absurdo.
-  if (avgSpeedKmh < ETA_MIN_SPEED_KMH) return etaDisplayValue;
-
-  etaLastRecalcTime = data.ts;
-  etaDisplayValue = (data.routeDistanceKm / avgSpeedKmh) * 3600;
-  lastKnownAvgSpeedKmh = avgSpeedKmh; // reusado por updateWaypointRoute para el ETA "(with waypoint)"
-  return etaDisplayValue;
+  paceEta.push(data.cityDst, data.ts, data.routeDistanceKm);
+  // Se queda el ultimo bueno: despues de borrar la ruta el ritmo vuelve a
+  // medirse de cero, y el ETA con waypoint no tiene por que quedar en blanco.
+  const ritmo = paceEta.avgSpeedKmh();
+  if (ritmo != null) lastKnownAvgSpeedKmh = ritmo;
+  return paceEta.estimate(prior, data.ts);
 }
 
 // Cluster de instrumentos (SVG): velocimetro con arco de 240 grados, rpm,
