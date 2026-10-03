@@ -96,13 +96,29 @@ def simplificar(puntos, epsilon):
     return [p for p, quedarse in zip(puntos, guardar) if quedarse]
 
 
+# Cuanto pesa un cambio de velocidad al simplificar, en metros por km/h. Sin
+# esto, en una recta larga un frenazo desaparecia: el punto no cambia la
+# forma de la linea, pero si el mapa de calor de velocidad.
+PESO_VELOCIDAD_M = 2.0
+
+
 def _distancia_a_recta(punto, a, b):
-    (px, py), (ax, ay), (bx, by) = punto, a, b
+    """Cuanto se aparta el punto de la recta a-b. Con velocidad ([x, z,
+    km/h]), tambien cuanto se aparta su velocidad de la que tendria
+    interpolada en esa recta."""
+    px, py, ax, ay, bx, by = punto[0], punto[1], a[0], a[1], b[0], b[1]
     dx, dy = bx - ax, by - ay
-    if dx == 0 and dy == 0:
-        return math.hypot(px - ax, py - ay)
-    # Area del paralelogramo sobre el largo de la base.
-    return abs(dy * px - dx * py + bx * ay - by * ax) / math.hypot(dx, dy)
+    largo2 = dx * dx + dy * dy
+    if largo2 == 0:
+        geo = math.hypot(px - ax, py - ay)
+    else:
+        # Area del paralelogramo sobre el largo de la base.
+        geo = abs(dy * px - dx * py + bx * ay - by * ax) / math.sqrt(largo2)
+    if len(punto) > 2 and len(a) > 2 and len(b) > 2:
+        t = 0.0 if largo2 == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / largo2))
+        esperada = a[2] + (b[2] - a[2]) * t
+        geo = max(geo, abs(punto[2] - esperada) * PESO_VELOCIDAD_M)
+    return geo
 
 
 def _achicar(segmentos, objetivo=PUNTOS_OBJETIVO):
@@ -410,7 +426,9 @@ class Acumulador:
         x, z = pos.get("x"), pos.get("z")
         if x is None or z is None:
             return
-        punto = [float(x), float(z)]
+        # Con la velocidad, para el mapa de calor del detalle del viaje.
+        velocidad = 0.0 if payload.get("paused") else float(payload.get("speedKmh") or 0.0)
+        punto = [float(x), float(z), int(round(velocidad))]
         previo, previo_ts = v["ultimo_punto"], v["ultimo_punto_ts"]
         corte = previo_ts is None or (ahora - previo_ts) > CORTE_SEGMENTO_S
         if previo is not None and not corte:

@@ -371,3 +371,29 @@ def test_sin_dormir_no_hay_horas_de_sueno():
     acc = accumulator.Acumulador()
     conducir(acc, TRABAJO, segundos=30)
     assert acc.viaje()["sleep_hours"] is None
+
+
+def test_cada_punto_del_recorrido_lleva_la_velocidad():
+    # Para el mapa de calor de velocidad del detalle del viaje.
+    acc = accumulator.Acumulador()
+    for i in range(10):
+        acc.tick(payload(600.0 + i, odometerKm=1.0 + i, fuel=100.0, speedKmh=72.0,
+                         position={"x": i * 100.0, "y": 0.0, "z": 0.0}), TRABAJO, 1000.0 + i)
+    puntos = [p for seg in acc.viaje()["route"] for p in seg]
+    assert len(puntos) == 10 and all(len(p) == 3 and p[2] == 72 for p in puntos)
+    # En pausa, 0: el camion no se mueve aunque el ultimo dato diga 72.
+    acc.tick(payload(611.0, odometerKm=11.0, fuel=100.0, speedKmh=72.0, paused=True,
+                     position={"x": 2000.0, "y": 0.0, "z": 0.0}), TRABAJO, 1011.0)
+    assert acc.viaje()["route"][-1][-1][2] == 0
+
+
+def test_simplificar_no_se_come_un_frenazo_en_una_recta():
+    # 400 puntos en linea recta a 90 km/h salvo un tramo a 20: la forma no
+    # cambia, pero el frenazo tiene que seguir en el mapa de calor.
+    recta = [[i * 50.0, 0.0, 20 if 195 <= i <= 205 else 90] for i in range(400)]
+    achicado = accumulator._achicar([recta], objetivo=30)[0]
+    assert len(achicado) <= 30
+    assert any(p[2] == 20 for p in achicado)
+    # Sin velocidad sigue andando como antes: una recta se reduce a sus puntas.
+    sin = [[i * 50.0, 0.0] for i in range(400)]
+    assert accumulator._achicar([sin], objetivo=30)[0] == [sin[0], sin[-1]]
