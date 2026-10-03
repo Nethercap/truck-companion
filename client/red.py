@@ -23,6 +23,11 @@ from urllib.parse import urlsplit
 # no pudo llegar. Un 404 o un 400 los dio el servidor, y directo seria igual.
 ERRORES_DEL_PROXY = (407, 502, 503, 504)
 
+# Cloudflare, delante de api.trucksim-dash.com, contesta 403 a cualquier
+# pedido con el agente de urllib ("Python-urllib/3.x"): con ese, el cliente
+# no podia vincular la cuenta ni mandar un viaje. client.py le suma la version.
+AGENTE = "TruckDash"
+
 
 def proxy_para(url: str) -> str | None:
     """El proxy que se usaria para url segun el sistema, o None."""
@@ -77,6 +82,7 @@ class Ruta:
 def abrir(pedido, timeout: float):
     """urllib.request.urlopen, y si fallo por la red con un proxy del
     sistema de por medio, una vez mas sin proxy."""
+    pedido = _con_agente(pedido)
     try:
         return urllib.request.urlopen(pedido, timeout=timeout)
     except urllib.error.HTTPError as exc:
@@ -90,6 +96,16 @@ def abrir(pedido, timeout: float):
     logging.warning("Request through the system proxy failed (%s), retrying without it", error)
     directo = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     return directo.open(pedido, timeout=timeout)
+
+
+def _con_agente(pedido) -> urllib.request.Request:
+    """El mismo Request (el reintento tiene que mandar ese, con su cuerpo),
+    con nuestro User-Agent si no trae uno."""
+    if not isinstance(pedido, urllib.request.Request):
+        pedido = urllib.request.Request(pedido)
+    if not pedido.has_header("User-agent"):
+        pedido.add_header("User-Agent", AGENTE)
+    return pedido
 
 
 def _url(pedido) -> str:

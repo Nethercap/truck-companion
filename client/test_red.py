@@ -165,3 +165,33 @@ def test_abrir_acepta_un_request_con_cuerpo(monkeypatch, con_proxy):
     pedido = urllib.request.Request(RELAY_HTTP, data=b"{}", method="POST")
     red.abrir(pedido, timeout=5)
     assert llamadas == [("directo", pedido)]
+
+
+def test_abrir_manda_nuestro_agente_y_no_el_de_urllib(monkeypatch, sin_proxy):
+    # Cloudflare le da 403 a "Python-urllib/3.x" en api.trucksim-dash.com:
+    # sin esto no se podia vincular una cuenta desde el .exe.
+    vistos = []
+
+    def urlopen(pedido, timeout=None):
+        vistos.append(pedido)
+        return _Respuesta(b"ok")
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    red.abrir(RELAY_HTTP, timeout=5)
+    red.abrir(urllib.request.Request(RELAY_HTTP, data=b"{}", method="POST"), timeout=5)
+    for pedido in vistos:
+        assert pedido.get_header("User-agent") == red.AGENTE
+        assert "urllib" not in red.AGENTE.lower()
+
+
+def test_el_agente_lleva_la_version_del_cliente():
+    import client
+    assert red.AGENTE == f"TruckDash/{client.CLIENT_VERSION}"
+
+
+def test_abrir_respeta_un_agente_puesto_a_mano(monkeypatch, sin_proxy):
+    vistos = []
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda pedido, timeout=None: vistos.append(pedido) or _Respuesta(b"ok"))
+    red.abrir(urllib.request.Request(RELAY_HTTP, headers={"User-Agent": "otro"}), timeout=5)
+    assert vistos[0].get_header("User-agent") == "otro"
