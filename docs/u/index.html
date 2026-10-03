@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Truck Dash</title>
+<link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
+<!-- Direccion corta del perfil publico: trucksim-dash.com/u/?nombre. El
+     perfil es la pantalla de cuenta en modo solo lectura (/account/?u=),
+     asi muestra exactamente lo mismo y no hay dos pantallas que mantener. -->
+<script>
+  (function () {
+    var q = location.search.replace(/^\?/, '').split('&')[0].replace(/^u=/, '');
+    var nombre = '';
+    try { nombre = decodeURIComponent(q); } catch (e) { nombre = q; }
+    location.replace('/account/?u=' + encodeURIComponent(nombre));
+  })();
+</script>
+</head>
+<body></body>
+</html>

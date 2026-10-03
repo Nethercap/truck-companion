@@ -13,6 +13,12 @@
   // limpian de la barra de direcciones, asi que leerlos mas tarde devuelve
   // vacio. Es lo que dejaba el formulario sin el nombre sugerido.
   const PARAMS = new URLSearchParams(location.search);
+  // Perfil publico: /account/?u=nombre (la direccion corta /u/?nombre
+  // redirige aca). Es esta misma pantalla en solo lectura, sin entrar, asi
+  // muestra exactamente lo mismo que ve la persona en su cuenta.
+  const PERFIL = (PARAMS.get('u') || '').trim();
+  const modoPublico = !!PERFIL;
+  let perfilPublico = null;
 
   // ------------------------------------------------------------------ API
   const API_POR_DEFECTO = 'https://api.trucksim-dash.com';
@@ -63,6 +69,63 @@
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
       statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
+      navAchievements: "Achievements",
+      achievementsTitle: "Achievements",
+      recentAchTitle: "Recent achievements",
+      achAll: "All achievements",
+      achCount: (n, total) => n + ' of ' + total,
+      achUnlocked: (d) => 'Unlocked ' + d,
+      achLocked: "Locked",
+      achFirst_t: "First delivery",
+      achFirst_d: "Deliver your first job.",
+      achDeliveries_t: (n) => n + ' deliveries',
+      achDeliveries_d: (n) => 'Deliver ' + n + ' jobs.',
+      achKm_t: (d) => d + ' on the road',
+      achKm_d: (d) => 'Drive ' + d + ', with or without a job.',
+      achLong_t: "Long haul",
+      achUltraLong_t: "Across the continent",
+      achLong_d: (d) => 'Deliver a job of ' + d + ' or more.',
+      achCountries_t: (n) => n + ' countries',
+      achCountries_d: (n) => 'Drive through ' + n + ' countries in ETS2.',
+      achStates_t: (n) => n + ' states',
+      achStates_d: (n) => 'Drive through ' + n + ' states in ATS.',
+      achStreak_t: "Always on time",
+      achStreak_d: (n) => n + ' deliveries on time in a row.',
+      achClean_t: "Clean record",
+      achClean_d: (n) => n + ' deliveries in a row without a fine.',
+      achSpotless_t: "Not a scratch",
+      achSpotless_d: (d) => 'Deliver a job of ' + d + ' or more with no damage.',
+      achHeavy_t: "Heavy hauler",
+      achHeavy_d: (m) => 'Deliver a load of ' + m + ' or more.',
+      achFerry_t: "Sea legs",
+      achFerry_d: "Take a ferry or a train during a job.",
+      achPayday_t: "Big payday",
+      achPayday_d: (n) => 'Earn ' + n + ' in a single delivery.',
+      achBoth_t: "Both sides of the ocean",
+      achBoth_d: "Deliver in ETS2 and in ATS.",
+      recordsTitle: "Personal records",
+      recBestPay: "Best pay",
+      recBestAvg: "Best average",
+      recHeaviest: "Heaviest load",
+      recEfficient: "Lowest consumption",
+      fuelByTruckTitle: "Fuel by truck",
+      drivingNow: "Driving now",
+      drivingProgress: (a, b) => a + ' of ' + b,
+      drivingSince: (d) => 'since ' + d,
+      tripMarkCancelled: "Mark as cancelled",
+      tripMarkUnfinished: "Mark as unfinished",
+      tripNoteLabel: "Note",
+      tripNotePlaceholder: "Only you see this.",
+      tripNoteSave: "Save note",
+      estado_invalido: "That status can't be set by hand.",
+      viaje_cerrado: "This trip is already closed.",
+      nota_muy_larga: "The note can be up to 500 characters.",
+      exportCsv: "Export CSV",
+      publicLabel: "Driver profile",
+      publicNotFound: "This profile does not exist or is private.",
+      publicLinkLabel: "Your public profile:",
+      copyLink: "Copy",
+      linkCopied: "Link copied",
       activityTitle: "Activity",
       metricDistance: "Distance",
       metricTrips: "Deliveries",
@@ -233,6 +296,63 @@
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
       statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
+      navAchievements: "Logros",
+      achievementsTitle: "Logros",
+      recentAchTitle: "Ultimos logros",
+      achAll: "Todos los logros",
+      achCount: (n, total) => n + ' de ' + total,
+      achUnlocked: (d) => 'Desbloqueado el ' + d,
+      achLocked: "Bloqueado",
+      achFirst_t: "Primera entrega",
+      achFirst_d: "Entrega tu primer trabajo.",
+      achDeliveries_t: (n) => n + ' entregas',
+      achDeliveries_d: (n) => 'Entrega ' + n + ' trabajos.',
+      achKm_t: (d) => d + ' de ruta',
+      achKm_d: (d) => 'Maneja ' + d + ', con o sin trabajo.',
+      achLong_t: "Larga distancia",
+      achUltraLong_t: "De punta a punta",
+      achLong_d: (d) => 'Entrega un trabajo de ' + d + ' o mas.',
+      achCountries_t: (n) => n + ' paises',
+      achCountries_d: (n) => 'Pasa por ' + n + ' paises en ETS2.',
+      achStates_t: (n) => n + ' estados',
+      achStates_d: (n) => 'Pasa por ' + n + ' estados en ATS.',
+      achStreak_t: "Siempre a tiempo",
+      achStreak_d: (n) => n + ' entregas seguidas a tiempo.',
+      achClean_t: "Sin antecedentes",
+      achClean_d: (n) => n + ' entregas seguidas sin multas.',
+      achSpotless_t: "Ni un rayon",
+      achSpotless_d: (d) => 'Entrega un trabajo de ' + d + ' o mas sin daño.',
+      achHeavy_t: "Carga pesada",
+      achHeavy_d: (m) => 'Entrega una carga de ' + m + ' o mas.',
+      achFerry_t: "Marinero",
+      achFerry_d: "Toma un ferry o un tren durante un trabajo.",
+      achPayday_t: "Dia de cobro",
+      achPayday_d: (n) => 'Gana ' + n + ' en una sola entrega.',
+      achBoth_t: "De los dos lados del charco",
+      achBoth_d: "Entrega en ETS2 y en ATS.",
+      recordsTitle: "Records personales",
+      recBestPay: "Mejor pago",
+      recBestAvg: "Mejor promedio",
+      recHeaviest: "Carga mas pesada",
+      recEfficient: "Menor consumo",
+      fuelByTruckTitle: "Consumo por camion",
+      drivingNow: "Manejando ahora",
+      drivingProgress: (a, b) => a + ' de ' + b,
+      drivingSince: (d) => 'desde ' + d,
+      tripMarkCancelled: "Marcar como cancelado",
+      tripMarkUnfinished: "Marcar como sin terminar",
+      tripNoteLabel: "Nota",
+      tripNotePlaceholder: "Solo la ves vos.",
+      tripNoteSave: "Guardar nota",
+      estado_invalido: "Ese estado no se puede poner a mano.",
+      viaje_cerrado: "Este viaje ya esta cerrado.",
+      nota_muy_larga: "La nota puede tener hasta 500 caracteres.",
+      exportCsv: "Exportar CSV",
+      publicLabel: "Perfil del conductor",
+      publicNotFound: "Este perfil no existe o es privado.",
+      publicLinkLabel: "Tu perfil publico:",
+      copyLink: "Copiar",
+      linkCopied: "Link copiado",
       activityTitle: "Actividad",
       metricDistance: "Distancia",
       metricTrips: "Entregas",
@@ -638,6 +758,7 @@
     $('recoveryWarning').hidden = usuario.puede_recuperarse;
     $('recoveryWarning').textContent = t('recoveryWarning');
     $('publicToggle').checked = !!usuario.is_public;
+    pintarLinkPublico();
     pintarLogins();
     pintarSesiones();
     mostrarViajes();
@@ -655,6 +776,20 @@
     }
     avisar(t('savedOk'), 'ok');
     usuario.is_public = datos.is_public;
+    pintarLinkPublico();
+  }
+
+  function linkPublico() {
+    return location.origin + '/u/?' + encodeURIComponent(usuario.username || '');
+  }
+
+  function pintarLinkPublico() {
+    const visible = !!(usuario && usuario.is_public && usuario.username);
+    $('publicLink').hidden = !visible;
+    if (visible) {
+      $('publicLinkUrl').href = linkPublico();
+      $('publicLinkUrl').textContent = linkPublico().replace(/^https?:\/\//, '');
+    }
   }
 
   async function cerrarSesion() {
@@ -759,6 +894,7 @@
 
   // ------------------------------------------------------------ arranque
   async function cargar() {
+    if (modoPublico) { cargarPublico(); return; }
     const prov = await pedir('/auth/providers');
     if (prov.ok) disponibles = prov.datos.disponibles || [];
     pintarBotonesDeEntrada();
@@ -818,6 +954,7 @@
       aplicarIdioma();
       pintarBotonesDeEntrada();
       if (usuario && usuario.username) pintarCuenta();
+      else if (modoPublico) pintarPublico();
     });
   }
 
@@ -1015,13 +1152,62 @@
     ].filter(Boolean).forEach((l) => tops.appendChild(l));
     if (tops.children.length) caja.appendChild(tops);
 
-    if (s.longest) {
-      const donde = [s.longest.city_src, s.longest.city_dst].filter(Boolean).join(' \u2192 ');
-      sumar(caja, renglon([
-        t('statsLongest') + ' ' + (donde || t('tripUnnamed')),
-        distancia(s.longest.distance_km)
-      ]));
+    // Records personales: cada uno con el viaje que lo marco.
+    const r = s.records || {};
+    const donde = (x) => [x.city_src, x.city_dst].filter(Boolean).join(' \u2192 ') || t('tripUnnamed');
+    const records = [
+      r.best_pay ? [t('recBestPay'), plata(r.best_pay.value, r.best_pay.currency), r.best_pay] : null,
+      s.longest ? [t('statsLongest'), distancia(s.longest.distance_km), s.longest] : null,
+      r.best_avg_speed ? [t('recBestAvg'), velocidad(r.best_avg_speed.value), r.best_avg_speed] : null,
+      r.heaviest ? [t('recHeaviest'), [masa(r.heaviest.value), r.heaviest.cargo].filter(Boolean).join(' \u00b7 '), r.heaviest] : null,
+      r.most_efficient ? [t('recEfficient'), consumo(r.most_efficient.value), r.most_efficient] : null
+    ].filter(Boolean);
+    const bloques = document.createElement('div');
+    bloques.className = 'tops';
+    if (records.length) {
+      const caja2 = document.createElement('div');
+      const h = document.createElement('h4');
+      h.textContent = t('recordsTitle');
+      caja2.appendChild(h);
+      const ul = document.createElement('ul');
+      ul.className = 'records';
+      records.forEach(([rotulo, valor, viaje]) => {
+        const li = document.createElement('li');
+        const b = document.createElement('b');
+        b.textContent = rotulo + ': ' + valor;
+        li.appendChild(b);
+        const sub = document.createElement('span');
+        sub.textContent = ' \u00b7 ' + donde(viaje);
+        li.appendChild(sub);
+        ul.appendChild(li);
+      });
+      caja2.appendChild(ul);
+      bloques.appendChild(caja2);
     }
+    // Consumo por camion, del que menos gasta al que mas: con los km que
+    // midio el cliente, que son en los que se midio el combustible.
+    if ((s.fuel_by_truck || []).length) {
+      const caja3 = document.createElement('div');
+      const h = document.createElement('h4');
+      h.textContent = t('fuelByTruckTitle');
+      caja3.appendChild(h);
+      const ul = document.createElement('ul');
+      ul.className = 'records';
+      s.fuel_by_truck.forEach((c) => {
+        const li = document.createElement('li');
+        li.appendChild(document.createTextNode(c.name + ' \u00b7 '));
+        const b = document.createElement('b');
+        b.textContent = consumo(c.l_per_100km);
+        li.appendChild(b);
+        const sub = document.createElement('span');
+        sub.textContent = ' \u00b7 ' + distancia(c.distance_km);
+        li.appendChild(sub);
+        ul.appendChild(li);
+      });
+      caja3.appendChild(ul);
+      bloques.appendChild(caja3);
+    }
+    if (bloques.children.length) caja.appendChild(bloques);
     return caja;
   }
 
@@ -1079,6 +1265,7 @@
         localStorage.setItem(AJUSTES_APP, JSON.stringify(cfg));
       } catch (e) {}
       if (usuario && usuario.username) pintarCuenta();
+      else if (modoPublico) pintarPublico();
     });
   }
 
@@ -1108,6 +1295,12 @@
     // "9 h" y no "9 h 00": las horas justas son comunes (dormir son 9).
     if (min % 60 === 0) return (min / 60) + ' h';
     return Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0');
+  }
+  function consumo(litrosCada100) {
+    // En millas, mpg (galon de EE. UU.): 235,215 / (l/100 km).
+    if (litrosCada100 == null) return null;
+    return imperial() ? numero(235.215 / litrosCada100, 1) + ' mpg'
+                      : numero(litrosCada100, 1) + ' L/100 km';
   }
   function plata(monto, moneda) {
     // Sin convertir: el dinero del juego es del juego, y dos economias no se
@@ -1227,10 +1420,243 @@
     return caja;
   }
 
+  // --------------------------------------------------------- manejando ahora
+  async function traerActivo() {
+    const { ok, datos } = await pedir('/trips/active');
+    const caja = $('drivingBody');
+    caja.innerHTML = '';
+    const v = ok ? datos.trip : null;
+    $('cardDriving').hidden = !v;
+    if (!v) return;
+    const ruta = document.createElement('div');
+    ruta.className = 'ruta-ahora';
+    ruta.textContent = [v.city_src, v.city_dst].filter(Boolean).join(' \u2192 ') || t('tripUnnamed');
+    caja.appendChild(ruta);
+    sumar(caja, renglon([v.cargo, masa(v.cargo_mass), [v.truck_brand, v.truck_name].filter(Boolean).join(' ')]));
+    // El avance con lo que midio el cliente contra lo planeado: es lo unico
+    // que hay mientras se maneja (la distancia del juego llega al entregar).
+    const hecho = v.distance_tracked_km || 0, total = v.distance_planned_km || 0;
+    if (total) {
+      const barra = document.createElement('div');
+      barra.className = 'barrita';
+      const lleno = document.createElement('i');
+      lleno.style.width = Math.min(100, hecho / total * 100).toFixed(1) + '%';
+      barra.appendChild(lleno);
+      caja.appendChild(barra);
+      sumar(caja, renglon([t('drivingProgress', distancia(hecho), distancia(total)),
+                           t('drivingSince', fechaHora(v.started_at))]));
+    } else {
+      sumar(caja, renglon([t('drivingSince', fechaHora(v.started_at))]));
+    }
+  }
+
+  // ------------------------------------------------------------------ logros
+  // La API dice cuales estan y cuando; el nombre, la descripcion y el icono
+  // los pone la web por el id, en los ocho idiomas.
+  let logros = [];
+  const ICONOS_LOGRO = {
+    entrega: 'M3 7h11v9H3zm11 3h4l3 3v3h-7zM6.5 19a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm11 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
+    ruta: 'M12 2a6 6 0 0 1 6 6c0 4.5-6 11-6 11S6 12.5 6 8a6 6 0 0 1 6-6zm0 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4 21h16v1.5H4z',
+    mundo: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1 2.1A8 8 0 0 0 4.1 11H8c.1-2.6.9-5 3-6.9zm2 0c2.1 1.9 2.9 4.3 3 6.9h3.9A8 8 0 0 0 13 4.1zM10 11h4c-.1-2.3-.8-4.3-2-5.8-1.2 1.5-1.9 3.5-2 5.8zm-5.9 2A8 8 0 0 0 11 19.9c-2.1-1.9-2.9-4.3-3-6.9zm5.9 0c.1 2.3.8 4.3 2 5.8 1.2-1.5 1.9-3.5 2-5.8zm6 0c-.1 2.6-.9 5-3 6.9a8 8 0 0 0 6.9-6.9z',
+    reloj: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1 4v7l5 3 1-1.6-4-2.4V6z',
+    escudo: 'M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5zm-1.2 13.4L17 9.2l-1.4-1.4-4.8 4.8-2.4-2.4L7 11.6z',
+    pesa: 'M6 5h3v14H6zm9 0h3v14h-3zM2 8h3v8H2zm17 0h3v8h-3zM9 11h6v2H9z',
+    barco: 'M4 14h16l-2 6H6zm2-8h5V3h2v3h5v6H6zm2 2v2h8V8z',
+    moneda: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 4h-2v1.1c-1.8.4-3 1.6-3 3.1 0 1.9 1.6 2.7 3.6 3.2 1.6.4 2.1.8 2.1 1.4 0 .7-.8 1.2-1.9 1.2-1.3 0-2-.6-2.1-1.4H7.9c.1 1.7 1.3 2.8 3.1 3.2V19h2v-1.2c1.9-.4 3.1-1.6 3.1-3.2 0-2.2-1.9-2.9-3.8-3.4-1.4-.3-1.9-.7-1.9-1.3s.6-1.1 1.7-1.1c1.1 0 1.7.5 1.8 1.2h1.9c-.1-1.5-1.1-2.6-2.8-3z',
+    dos: 'M2 6h9v12H2zm11 0h9v12h-9zM4 8v8h5V8zm11 0v8h5V8z'
+  };
+
+  function datosDeLogro(l) {
+    // [icono, titulo, descripcion, como mostrar el progreso]
+    const m = /^(deliveries|km|long_haul|countries|states)_(\d+)$/.exec(l.id);
+    if (m) {
+      const n = Number(m[2]);
+      if (m[1] === 'deliveries') {
+        return n === 1 ? ['entrega', t('achFirst_t'), t('achFirst_d'), numero]
+                       : ['entrega', t('achDeliveries_t', numero(n)), t('achDeliveries_d', numero(n)), numero];
+      }
+      if (m[1] === 'km') return ['ruta', t('achKm_t', distancia(n)), t('achKm_d', distancia(n)), distancia];
+      if (m[1] === 'long_haul') {
+        return ['ruta', t(n >= 2500 ? 'achUltraLong_t' : 'achLong_t'), t('achLong_d', distancia(n)), distancia];
+      }
+      if (m[1] === 'countries') return ['mundo', t('achCountries_t', n), t('achCountries_d', n), numero];
+      return ['mundo', t('achStates_t', n), t('achStates_d', n), numero];
+    }
+    const meta = l.progress ? l.progress.goal : 0;
+    switch (l.id) {
+      case 'on_time_streak': return ['reloj', t('achStreak_t'), t('achStreak_d', meta), numero];
+      case 'clean_record': return ['escudo', t('achClean_t'), t('achClean_d', meta), numero];
+      case 'spotless': return ['escudo', t('achSpotless_t'), t('achSpotless_d', distancia(300)), null];
+      case 'heavy_load': return ['pesa', t('achHeavy_t'), t('achHeavy_d', masa(30000)), null];
+      case 'ferry': return ['barco', t('achFerry_t'), t('achFerry_d'), null];
+      case 'big_payday': return ['moneda', t('achPayday_t'), t('achPayday_d', numero(100000)), null];
+      case 'both_games': return ['dos', t('achBoth_t'), t('achBoth_d'), null];
+      default: return ['entrega', l.id, '', null];
+    }
+  }
+
+  function tarjetaLogro(l) {
+    const [icono, titulo, desc, formato] = datosDeLogro(l);
+    const caja = document.createElement('div');
+    caja.className = 'logro' + (l.unlocked_at ? '' : ' bloqueado');
+    const circulo = document.createElement('div');
+    circulo.className = 'icono';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const camino = document.createElementNS(SVG_NS, 'path');
+    camino.setAttribute('d', ICONOS_LOGRO[icono] || ICONOS_LOGRO.entrega);
+    svg.appendChild(camino);
+    circulo.appendChild(svg);
+    caja.appendChild(circulo);
+    const texto = document.createElement('div');
+    const b = document.createElement('b');
+    b.textContent = titulo;
+    texto.appendChild(b);
+    const d = document.createElement('span');
+    d.className = 'desc';
+    d.textContent = desc;
+    texto.appendChild(d);
+    const pie = document.createElement('span');
+    pie.className = 'pie';
+    if (l.unlocked_at) {
+      pie.textContent = t('achUnlocked', fechaCorta(l.unlocked_at));
+    } else if (formato && l.progress && l.progress.goal > 1) {
+      pie.textContent = formato(l.progress.value) + ' / ' + formato(l.progress.goal);
+      const barra = document.createElement('div');
+      barra.className = 'barrita';
+      const lleno = document.createElement('i');
+      lleno.style.width = Math.min(100, l.progress.value / l.progress.goal * 100).toFixed(1) + '%';
+      barra.appendChild(lleno);
+      texto.appendChild(pie);
+      texto.appendChild(barra);
+      caja.appendChild(texto);
+      return caja;
+    } else {
+      pie.textContent = t('achLocked');
+    }
+    texto.appendChild(pie);
+    caja.appendChild(texto);
+    return caja;
+  }
+
+  function ordenarLogros(lista) {
+    // Primero los desbloqueados, del mas nuevo; despues los que faltan, del
+    // que esta mas cerca.
+    const avance = (l) => (l.progress && l.progress.goal ? l.progress.value / l.progress.goal : 0);
+    return lista.slice().sort((a, b) => {
+      if (a.unlocked_at && b.unlocked_at) return b.unlocked_at.localeCompare(a.unlocked_at);
+      if (a.unlocked_at) return -1;
+      if (b.unlocked_at) return 1;
+      return avance(b) - avance(a);
+    });
+  }
+
+  function pintarLogros() {
+    const hechos = logros.filter((l) => l.unlocked_at).length;
+    const grilla = $('achievementsGrid');
+    grilla.innerHTML = '';
+    ordenarLogros(logros).forEach((l) => grilla.appendChild(tarjetaLogro(l)));
+    $('achievementsCount').textContent = t('achCount', hechos, logros.length);
+    // En el resumen, los ultimos cuatro (en el perfil publico, todos).
+    const recientesLogros = ordenarLogros(logros.filter((l) => l.unlocked_at));
+    const muestra = modoPublico ? recientesLogros : recientesLogros.slice(0, 4);
+    const chica = $('recentAchGrid');
+    chica.innerHTML = '';
+    muestra.forEach((l) => chica.appendChild(tarjetaLogro(l)));
+    $('recentAchCount').textContent = modoPublico ? numero(hechos) : t('achCount', hechos, logros.length);
+    $('cardRecentAch').hidden = muestra.length === 0;
+  }
+
+  async function traerLogros() {
+    const { ok, datos } = await pedir('/trips/achievements');
+    if (!ok) return;
+    logros = datos.achievements || [];
+    pintarLogros();
+  }
+
+  // ------------------------------------------------------------- exportar CSV
+  async function exportarCsv() {
+    // Todo el logbook con los filtros que esten puestos, de a 50 (el tope
+    // de la API). Se arma en el navegador: el archivo no pasa por otro lado.
+    const boton = $('btnExportCsv');
+    boton.disabled = true;
+    const todos = [];
+    let total = Infinity;
+    while (todos.length < total) {
+      const consulta = ['limite=50', 'desde=' + todos.length].concat(filtrosDelLogbook());
+      const { ok, datos } = await pedir('/trips?' + consulta.join('&'));
+      if (!ok) { boton.disabled = false; avisar(t('error'), 'bad'); return; }
+      const pagina = datos.trips || [];
+      total = datos.total != null ? datos.total : todos.length + pagina.length;
+      todos.push(...pagina);
+      if (!pagina.length) break;
+    }
+    const columnas = ['started_at', 'delivered_at', 'game', 'status', 'city_src', 'city_dst',
+      'company_src', 'company_dst', 'cargo', 'cargo_mass', 'distance_planned_km',
+      'distance_game_km', 'distance_tracked_km', 'game_hours', 'total_game_hours',
+      'sleep_hours', 'real_hours', 'revenue', 'currency', 'modded', 'fuel_used', 'tolls',
+      'fines', 'ferries', 'damage_delta', 'on_time', 'truck_brand', 'truck_name',
+      'countries', 'note'];
+    const celdaCsv = (valor) => {
+      if (valor == null) return '';
+      const texto = Array.isArray(valor) ? valor.join(' ') : String(valor);
+      return /[",\n\r;]/.test(texto) ? '"' + texto.replace(/"/g, '""') + '"' : texto;
+    };
+    const lineas = [columnas.join(',')].concat(
+      todos.map((v) => columnas.map((c) => celdaCsv(v[c])).join(',')));
+    // La marca BOM es para que Excel lea los acentos como UTF-8.
+    const blob = new Blob(['\ufeff' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'truckdash-logbook.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    boton.disabled = false;
+  }
+
+  // ----------------------------------------------------------- perfil publico
+  function pintarPublico() {
+    const p = perfilPublico;
+    if (!p) return;
+    $('displayName').textContent = p.user.username;
+    $('dashLabel').textContent = t('publicLabel');
+    $('memberSince').textContent = t('memberSince', fecha(p.user.creado));
+    if (p.user.avatar_url) { $('avatar').src = p.user.avatar_url; $('avatar').hidden = false; }
+    else $('avatar').hidden = true;
+    totales = p.totals || [];
+    resumen = p.stats || [];
+    recientes = p.recent || [];
+    logros = p.achievements || [];
+    pintarCinta();
+    pintarRecientes();
+    $('cardRecent').hidden = false;
+    pintarResumen();
+    pintarLogros();
+    document.title = p.user.username + ' \u2014 Truck Dash';
+  }
+
+  async function cargarPublico() {
+    document.documentElement.classList.add('publico');
+    const { ok, status, datos } = await pedir('/public/' + encodeURIComponent(PERFIL));
+    if (!ok) {
+      $('loading').hidden = true;
+      $('offline').hidden = false;
+      $('offline').setAttribute('data-i18n', status === 404 ? 'publicNotFound' : 'offline');
+      $('offline').textContent = t(status === 404 ? 'publicNotFound' : 'offline');
+      return;
+    }
+    perfilPublico = datos;
+    pintarPublico();
+    mostrarVista('viewAccount');
+  }
+
   // ------------------------------------------------------------- paginas
   // Resumen, logbook y ajustes, cada una con su #hash: el link a
   // /account/#logbook abre ahi y el boton de atras del navegador anda.
-  const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook', settings: 'pageSettings' };
+  const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook',
+                    achievements: 'pageAchievements', settings: 'pageSettings' };
   let logbookPedido = false;
 
   function paginaDelHash() {
@@ -1387,11 +1813,18 @@
       celda(fila, duracion(v.real_hours) || '', 'num');
       celda(fila, v.revenue ? plata(v.revenue, v.currency) : '', 'num');
 
-      const abrir = () => alternarDetalle(v, repintar);
-      fila.addEventListener('click', abrir);
-      fila.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); }
-      });
+      // En el perfil publico no se abre el detalle: el recorrido es por
+      // donde pasaste, y un perfil publico no lo da punto a punto.
+      if (!modoPublico) {
+        const abrir = () => alternarDetalle(v, repintar);
+        fila.addEventListener('click', abrir);
+        fila.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); }
+        });
+      } else {
+        fila.removeAttribute('tabindex');
+        fila.removeAttribute('aria-expanded');
+      }
       cuerpo.appendChild(fila);
 
       if (v._abierto) {
@@ -1409,6 +1842,9 @@
           v.ferries ? t('tripFerries') + ' ' + plata(v.ferries, v.currency) : null,
           v.damage_delta ? t('tripDamage') + ' +' + numero(v.damage_delta, 1) + ' %' : null
         ]));
+        // Recien con el detalle: mientras llega, la tabla se redibuja y un
+        // campo de nota a medio escribir se perdia.
+        if (v._detalle) td.appendChild(panelCorreccion(v, repintar));
         const acciones = document.createElement('div');
         acciones.className = 'acciones';
         acciones.appendChild(botonBorrar(v));
@@ -1419,6 +1855,66 @@
     });
     tabla.appendChild(cuerpo);
     return tabla;
+  }
+
+  function panelCorreccion(v, repintar) {
+    // Lo que la persona puede corregir: un viaje que quedo en curso (un
+    // trabajo cancelado que el cliente no vio) y una nota. Entregado a mano
+    // no: eso lo dice el juego, con su distancia y su pago.
+    const caja = document.createElement('div');
+    caja.className = 'correccion';
+    if (v.status === 'in_progress' || v.status === 'abandoned') {
+      const botones = document.createElement('div');
+      botones.className = 'botones';
+      const opciones = v.status === 'in_progress' ? ['cancelled', 'abandoned'] : ['cancelled'];
+      opciones.forEach((estado) => {
+        const b = document.createElement('button');
+        b.className = 'btn chico';
+        b.textContent = t(estado === 'cancelled' ? 'tripMarkCancelled' : 'tripMarkUnfinished');
+        b.addEventListener('click', () => corregirViaje(v, { status: estado }, repintar, b));
+        botones.appendChild(b);
+      });
+      caja.appendChild(botones);
+    }
+    const etiquetaNota = document.createElement('label');
+    etiquetaNota.textContent = t('tripNoteLabel');
+    const area = document.createElement('textarea');
+    area.maxLength = 500;
+    area.placeholder = t('tripNotePlaceholder');
+    // Lo escrito sobrevive a que la tabla se redibuje (llega otro dato, se
+    // abre otro viaje): se guarda en el viaje hasta que se manda.
+    area.value = v._borradorNota != null ? v._borradorNota : (v.note || '');
+    area.addEventListener('input', () => { v._borradorNota = area.value; });
+    etiquetaNota.appendChild(area);
+    caja.appendChild(etiquetaNota);
+    const guardar = document.createElement('button');
+    guardar.className = 'btn chico';
+    guardar.textContent = t('tripNoteSave');
+    guardar.addEventListener('click', () => corregirViaje(v, { note: area.value }, repintar, guardar));
+    const fila = document.createElement('div');
+    fila.className = 'botones';
+    fila.appendChild(guardar);
+    caja.appendChild(fila);
+    return caja;
+  }
+
+  async function corregirViaje(v, cambios, repintar, boton) {
+    boton.disabled = true;
+    const { ok, datos } = await pedir('/trips/' + v.id, { method: 'PATCH', body: cambios });
+    boton.disabled = false;
+    if (!ok) { avisar(t(datos.error || 'error'), 'bad'); return; }
+    if ('note' in cambios) v._borradorNota = null;
+    // El viaje puede estar en las dos tablas: se actualiza en las dos.
+    [viajes, recientes].forEach((lista) => lista.forEach((x) => {
+      if (x.id === v.id) Object.assign(x, datos.trip);
+    }));
+    if (v._detalle) Object.assign(v._detalle, datos.trip);
+    Object.assign(v, datos.trip);
+    repintar();
+    pintarRecientes();
+    avisar(t('savedOk'), 'ok');
+    // Cambiar el estado mueve los numeros (entregas, paises): se piden de nuevo.
+    if (cambios.status) { traerResumen(); traerActivo(); traerLogros(); }
   }
 
   async function alternarDetalle(v, repintar) {
@@ -1778,6 +2274,8 @@
     if (viajesPedidos) {
       pintarCinta(); pintarRecientes(); pintarResumen(); pintarViajes();
       if (actividad.length) pintarActividad();
+      pintarLogros();
+      traerActivo();
       mostrarPagina();
       return;
     }
@@ -1786,6 +2284,8 @@
     traerTotales();
     traerResumen();
     traerActividad();
+    traerActivo();
+    traerLogros();
     mostrarPagina();
   }
 
@@ -1799,6 +2299,9 @@
     logbookPedido = false;
     resumen = [];
     actividad = [];
+    logros = [];
+    $('cardDriving').hidden = true;
+    $('cardRecentAch').hidden = true;
     $('cardRecent').hidden = true;
     $('cardActivity').hidden = true;
     $('cardStats').hidden = true;
@@ -1821,6 +2324,13 @@
     $('deviceForm').addEventListener('submit', vincularDispositivo);
     $('btnExport').addEventListener('click', exportarDatos);
     $('btnMoreTrips').addEventListener('click', () => traerViajes(true));
+    $('btnExportCsv').addEventListener('click', exportarCsv);
+    $('btnCopyPublic').addEventListener('click', () => {
+      try {
+        navigator.clipboard.writeText(linkPublico());
+        avisar(t('linkCopied'), 'ok');
+      } catch (e) { avisar(linkPublico(), 'ok'); }
+    });
     ['filterGame', 'filterStatus'].forEach((id) => {
       $(id).addEventListener('change', () => { viajes = []; traerViajes(false); });
     });
