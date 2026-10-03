@@ -62,6 +62,8 @@
       statsCountries: 'Countries',
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
+      statsOnlyTrips: 'Only driving with a job counts here. The total in Your trips also has driving without one.',
+      totalsAll: 'all driving, with or without a job',
       tripDetails: 'Details',
       tripPlanned: 'Planned',
       tripTruck: 'Truck',
@@ -183,6 +185,8 @@
       statsCountries: 'Paises',
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
+      statsOnlyTrips: 'Aca solo cuenta lo manejado con un trabajo. El total de Tus viajes suma tambien lo manejado sin trabajo.',
+      totalsAll: 'todo lo manejado, con o sin trabajo',
       tripDetails: 'Detalle',
       tripPlanned: 'Planeado',
       tripTruck: 'Camion',
@@ -880,6 +884,12 @@
     const cuerpo = $('statsBody');
     cuerpo.innerHTML = '';
     resumen.forEach((s) => cuerpo.appendChild(bloqueJuego(s)));
+    if (resumen.length) {
+      const nota = document.createElement('div');
+      nota.className = 'nota-stats';
+      nota.textContent = t('statsOnlyTrips');
+      cuerpo.appendChild(nota);
+    }
     $('cardStats').hidden = resumen.length === 0;
   }
 
@@ -970,6 +980,9 @@
       const chico = document.createElement('span');
       chico.textContent = [
         (tot.game || '').toUpperCase(),
+        // Sale de las sesiones, no de los viajes: por eso da mas que las
+        // estadisticas de abajo, y hay que decirlo.
+        t('totalsAll'),
         t('tripWheel', duracion(tot.real_hours) || '0 min'),
         tot.max_speed ? t('tripTop', velocidad(tot.max_speed)) : null
       ].filter(Boolean).join(' \u00b7 ');
