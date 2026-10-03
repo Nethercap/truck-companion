@@ -62,8 +62,39 @@
       statsCountries: 'Countries',
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
-      statsOnlyTrips: 'Only driving with a job counts here. The total in Your trips also has driving without one.',
+      statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
       totalsAll: 'all driving, with or without a job',
+      navOverview: "Overview",
+      navLogbook: "Logbook",
+      navSettings: "Settings",
+      dashLabel: "Driver dashboard",
+      welcomeBack: (n) => 'Welcome back, ' + n + '!',
+      quickDistance: "Distance driven",
+      quickDeliveries: "Deliveries",
+      quickHours: "At the wheel",
+      quickLastSeen: "Last seen",
+      quickOnTime: (n) => n + ' on time',
+      quickSessions: (n) => n + ' sessions',
+      recentTitle: "Recent trips",
+      viewList: "List",
+      viewMap: "Map",
+      openLogbook: "My logbook",
+      logbookTitle: "Logbook",
+      logbookCount: (n) => n === 1 ? '1 trip' : n + ' trips',
+      logbookNoMatch: "No trips match these filters.",
+      filterGame: "Game",
+      filterStatus: "Status",
+      filterAll: "All",
+      filterInProgress: "In progress",
+      filterCancelled: "Cancelled",
+      filterAbandoned: "Unfinished",
+      colDate: "Date",
+      colRoute: "From → To",
+      colDistance: "Distance",
+      colTime: "Time",
+      colPay: "Pay",
+      mapOneGame: (g) => 'Only ' + g + ' trips are drawn here: each game has its own map.',
+      mapEmpty: "These trips have no recorded route yet.",
       tripDetails: 'Details',
       tripPlanned: 'Planned',
       tripTruck: 'Truck',
@@ -185,8 +216,39 @@
       statsCountries: 'Paises',
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
-      statsOnlyTrips: 'Aca solo cuenta lo manejado con un trabajo. El total de Tus viajes suma tambien lo manejado sin trabajo.',
+      statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
       totalsAll: 'todo lo manejado, con o sin trabajo',
+      navOverview: "Resumen",
+      navLogbook: "Bitacora",
+      navSettings: "Ajustes",
+      dashLabel: "Panel del conductor",
+      welcomeBack: (n) => 'Hola de nuevo, ' + n + '!',
+      quickDistance: "Distancia manejada",
+      quickDeliveries: "Entregas",
+      quickHours: "Al volante",
+      quickLastSeen: "Ultimo lugar",
+      quickOnTime: (n) => n + ' a tiempo',
+      quickSessions: (n) => n + ' sesiones',
+      recentTitle: "Ultimos viajes",
+      viewList: "Lista",
+      viewMap: "Mapa",
+      openLogbook: "Mi bitacora",
+      logbookTitle: "Bitacora",
+      logbookCount: (n) => n === 1 ? '1 viaje' : n + ' viajes',
+      logbookNoMatch: "Ningun viaje coincide con estos filtros.",
+      filterGame: "Juego",
+      filterStatus: "Estado",
+      filterAll: "Todos",
+      filterInProgress: "En curso",
+      filterCancelled: "Cancelados",
+      filterAbandoned: "Sin terminar",
+      colDate: "Fecha",
+      colRoute: "Origen → destino",
+      colDistance: "Distancia",
+      colTime: "Tiempo",
+      colPay: "Pago",
+      mapOneGame: (g) => 'Aca solo se dibujan los viajes de ' + g + ': cada juego tiene su mapa.',
+      mapEmpty: "Estos viajes todavia no tienen recorrido guardado.",
       tripDetails: 'Detalle',
       tripPlanned: 'Planeado',
       tripTruck: 'Camion',
@@ -532,7 +594,7 @@
   }
 
   function pintarCuenta() {
-    $('displayName').textContent = usuario.username || '';
+    $('displayName').textContent = t('welcomeBack', usuario.username || '');
     $('currentUsername').textContent = usuario.username || '';
     $('memberSince').textContent = t('memberSince', fecha(usuario.creado));
     if (usuario.avatar_url) {
@@ -898,6 +960,9 @@
     if (!ok) return;
     resumen = datos.stats || [];
     pintarResumen();
+    // Las entregas de la cinta salen de aca: las tres peticiones vuelven en
+    // cualquier orden y cada una repinta lo que le toca.
+    pintarCinta();
   }
 
   // ------------------------------------------------------------- viajes
@@ -905,12 +970,6 @@
   // kilometros de un viaje tambien son kilometros de sesion, asi que sumar
   // las dos tablas los cuenta dos veces. El backend tiene esa ruta
   // justamente para que esa cuenta se haga en un solo lugar.
-  const VIAJES_POR_PAGINA = 10;
-  let viajes = [];      // lo ya traido, para repintar sin volver a pedir
-  let totales = [];
-  let hayMasViajes = false;
-  let viajesPedidos = false;
-
   // Las unidades son las que eligio en la app: mismo dominio, misma clave,
   // misma preferencia. Aca no hay donde cambiarlas a proposito, para no
   // terminar con dos interruptores que dicen cosas distintas.
@@ -967,147 +1026,7 @@
     return span;
   }
 
-  function pintarTotales() {
-    const caja = $('tripTotals');
-    caja.innerHTML = '';
-    // Por juego y nunca sumados entre si: mezclar ETS2 con ATS no le dice
-    // nada a nadie.
-    totales.forEach((tot) => {
-      const item = document.createElement('div');
-      item.className = 'tot';
-      const grande = document.createElement('b');
-      grande.textContent = distancia(tot.distance_km) || '-';
-      const chico = document.createElement('span');
-      chico.textContent = [
-        (tot.game || '').toUpperCase(),
-        // Sale de las sesiones, no de los viajes: por eso da mas que las
-        // estadisticas de abajo, y hay que decirlo.
-        t('totalsAll'),
-        t('tripWheel', duracion(tot.real_hours) || '0 min'),
-        tot.max_speed ? t('tripTop', velocidad(tot.max_speed)) : null
-      ].filter(Boolean).join(' \u00b7 ');
-      item.appendChild(grande);
-      item.appendChild(chico);
-      caja.appendChild(item);
-    });
-    caja.hidden = totales.length === 0;
-    pintarVacio();
-  }
-
-  function botonBorrar(viaje) {
-    // Dos pasos y no un confirm() del navegador: un viaje lleva por donde
-    // pasaste y a que hora, asi que poder sacar uno solo es parte de que los
-    // datos sean tuyos, pero no con un click distraido.
-    const boton = document.createElement('button');
-    boton.className = 'linkish';
-    boton.textContent = t('tripRemove');
-    let armado = false;
-    const desarmar = () => {
-      armado = false;
-      boton.textContent = t('tripRemove');
-      boton.classList.remove('armado');
-    };
-    boton.addEventListener('click', async () => {
-      if (!armado) {
-        armado = true;
-        boton.textContent = t('tripRemoveSure');
-        boton.classList.add('armado');
-        setTimeout(() => { if (armado) desarmar(); }, 5000);
-        return;
-      }
-      boton.disabled = true;
-      const { ok, status, datos } = await pedir('/trips/' + viaje.id, { method: 'DELETE' });
-      // Un 404 es que ya no estaba: el resultado que se pidio, no un error.
-      if (!ok && status !== 404) {
-        boton.disabled = false;
-        desarmar();
-        avisar(t(datos.error || 'error'), 'bad');
-        return;
-      }
-      viajes = viajes.filter((v) => v.id !== viaje.id);
-      pintarViajes();
-      avisar(t('savedOk'), 'ok');
-    });
-    return boton;
-  }
-
-  function filaViaje(v) {
-    const li = document.createElement('li');
-
-    const ruta = document.createElement('div');
-    ruta.className = 'route';
-    ruta.textContent = [v.city_src, v.city_dst].filter(Boolean).join(' \u2192 ') || t('tripUnnamed');
-    if (v.status === 'in_progress') ruta.appendChild(etiqueta('open', t('tripOpen')));
-    else if (v.status === 'cancelled') ruta.appendChild(etiqueta('late', t('tripCancelled')));
-    else if (v.status === 'abandoned') ruta.appendChild(etiqueta('', t('tripAbandoned')));
-    else if (v.on_time === true) ruta.appendChild(etiqueta('ontime', t('tripOnTime')));
-    else if (v.on_time === false) ruta.appendChild(etiqueta('late', t('tripLate')));
-    // La economia modeada se muestra y no se esconde: un viaje de 900 000
-    // euros con un mod de dinero no es comparable con el resto.
-    if (v.modded) ruta.appendChild(etiqueta('', t('tripModded')));
-    li.appendChild(ruta);
-
-    const principal = [];
-    if (v.cargo) principal.push(v.cargo);
-    if (v.cargo_mass) principal.push(masa(v.cargo_mass));
-    // Las tres distancias son distintas a proposito: la del juego es la del
-    // viaje, la nuestra es cuanto vimos. Solo se aclara cuando difieren de
-    // verdad (manejo un rato con el cliente cerrado), para no llenar de
-    // parentesis los viajes normales.
-    const delJuego = v.distance_game_km, nuestra = v.distance_tracked_km;
-    if (delJuego) {
-      principal.push(distancia(delJuego));
-      if (nuestra && Math.abs(nuestra - delJuego) / delJuego > 0.1) {
-        principal.push(t('tripTracked', distancia(nuestra)));
-      }
-    } else if (nuestra) {
-      principal.push(t('tripTracked', distancia(nuestra)));
-    }
-    if (v.real_hours) principal.push(duracion(v.real_hours));
-    if (v.revenue) principal.push(plata(v.revenue, v.currency));
-    li.appendChild(linea(principal));
-
-    // Lo que el viaje costo aparte del sueldo. Si no se muestra nunca, nadie
-    // se entera de que un dia deja de llegar.
-    const extra = [];
-    if (v.fuel_used) extra.push(t('tripFuel') + ' ' + volumen(v.fuel_used));
-    if (v.tolls) extra.push(t('tripTolls') + ' ' + plata(v.tolls, v.currency));
-    if (v.fines) extra.push(t('tripFines') + ' ' + plata(v.fines, v.currency));
-    if (v.ferries) extra.push(t('tripFerries') + ' ' + plata(v.ferries, v.currency));
-    if (v.damage_delta) extra.push(t('tripDamage') + ' +' + numero(v.damage_delta, 1) + ' %');
-    if (extra.length) li.appendChild(linea(extra));
-
-    const pie = document.createElement('div');
-    pie.className = 'sub foot';
-    const cuando = document.createElement('span');
-    cuando.textContent = fechaHora(v.delivered_at || v.started_at);
-    pie.appendChild(cuando);
-    const acciones = document.createElement('div');
-    acciones.className = 'acciones';
-    const detalle = document.createElement('button');
-    detalle.className = 'linkish';
-    detalle.textContent = t('tripDetails');
-    detalle.addEventListener('click', () => alternarDetalle(v));
-    acciones.appendChild(detalle);
-    acciones.appendChild(botonBorrar(v));
-    pie.appendChild(acciones);
-    li.appendChild(pie);
-    if (v._abierto) li.appendChild(panelDetalle(v));
-    return li;
-  }
-
-  function pintarVacio() {
-    // Con totales pero sin viajes no hay nada que vincular: manejo sin carga.
-    // Lo pintan pintarViajes() y pintarTotales() porque las dos peticiones
-    // vuelven en cualquier orden.
-    const cartel = $('tripsEmpty');
-    cartel.hidden = viajes.length > 0;
-    cartel.textContent = t(totales.length ? 'tripsEmptyDriven' : 'tripsEmpty');
-  }
-
   // ------------------------------------------------------- detalle del viaje
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-
   function dibujarRecorrido(segmentos) {
     // El recorrido es un array de SEGMENTOS, no una linea sola: manejar con
     // el cliente cerrado deja un agujero, y ese agujero va punteado. Unir
@@ -1195,63 +1114,503 @@
     return caja;
   }
 
-  async function alternarDetalle(v) {
+  // ------------------------------------------------------------- paginas
+  // Resumen, logbook y ajustes, cada una con su #hash: el link a
+  // /account/#logbook abre ahi y el boton de atras del navegador anda.
+  const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook', settings: 'pageSettings' };
+  let logbookPedido = false;
+
+  function paginaDelHash() {
+    const h = (location.hash || '').replace('#', '');
+    return PAGINAS[h] ? h : 'overview';
+  }
+
+  function mostrarPagina() {
+    const actual = paginaDelHash();
+    Object.keys(PAGINAS).forEach((p) => { $(PAGINAS[p]).hidden = p !== actual; });
+    document.querySelectorAll('#sideNav a').forEach((a) => {
+      const es = a.getAttribute('data-pagina') === actual;
+      a.classList.toggle('activo', es);
+      if (es) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+    // El logbook se pide recien cuando alguien lo abre: el resumen ya trae
+    // los ultimos viajes y la mayoria no pasa de ahi.
+    if (actual === 'logbook' && usuario && !logbookPedido) traerViajes(false);
+  }
+
+  // ---------------------------------------------------- cinta del resumen
+  function fechaCorta(iso) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleDateString(idioma, { day: 'numeric', month: 'short', year: '2-digit' });
+    } catch (e) { return iso.slice(0, 10); }
+  }
+
+  function pintarCinta() {
+    const caja = $('quickStats');
+    caja.innerHTML = '';
+    if (!totales.length && !resumen.length && !recientes.length) { caja.hidden = true; return; }
+    // Kilometros y horas se pueden sumar entre juegos; la plata no (dos
+    // economias distintas), por eso aca no hay plata: va por juego abajo.
+    // La distancia sale de las sesiones, no de los viajes (ver arriba).
+    const suma = (lista, campo) => lista.reduce((a, x) => a + (x[campo] || 0), 0);
+    const ultimo = recientes[0];
+    let lugar = null, cuando = null;
+    if (ultimo) {
+      const enCurso = ultimo.status === 'in_progress';
+      lugar = enCurso ? (ultimo.city_src || ultimo.city_dst) : (ultimo.city_dst || ultimo.city_src);
+      cuando = [(ultimo.game || '').toUpperCase(),
+                enCurso ? t('tripOpen') : fechaCorta(ultimo.delivered_at || ultimo.started_at)]
+        .filter(Boolean).join(' · ');
+    }
+    const aTiempo = suma(resumen, 'on_time');
+    const sesiones = suma(totales, 'sessions');
+    [
+      [distancia(suma(totales, 'distance_km')), t('quickDistance'), t('totalsAll')],
+      [numero(suma(resumen, 'delivered')), t('quickDeliveries'),
+       aTiempo ? t('quickOnTime', numero(aTiempo)) : null],
+      [duracion(suma(totales, 'real_hours')) || '0 min', t('quickHours'),
+       sesiones ? t('quickSessions', numero(sesiones)) : null],
+      [lugar || '-', t('quickLastSeen'), cuando]
+    ].forEach(([valor, rotulo, sub]) => {
+      const div = document.createElement('div');
+      const b = document.createElement('b');
+      b.textContent = valor;
+      b.title = valor;
+      div.appendChild(b);
+      const etq = document.createElement('span');
+      etq.className = 'etq';
+      etq.textContent = rotulo;
+      div.appendChild(etq);
+      if (sub) {
+        const s = document.createElement('span');
+        s.className = 'sub';
+        s.textContent = sub;
+        div.appendChild(s);
+      }
+      caja.appendChild(div);
+    });
+    caja.hidden = false;
+  }
+
+  // ------------------------------------------------------ tabla de viajes
+  // La misma tabla para los ultimos viajes del resumen y para el logbook.
+  // Cada una se repinta con su propia funcion, que se pasa para que abrir el
+  // detalle o borrar un viaje repinte la tabla en la que se hizo.
+  function etiquetaDeEstado(v) {
+    if (v.status === 'in_progress') return etiqueta('open', t('tripOpen'));
+    if (v.status === 'cancelled') return etiqueta('late', t('tripCancelled'));
+    if (v.status === 'abandoned') return etiqueta('gris', t('tripAbandoned'));
+    if (v.on_time === true) return etiqueta('ontime', t('tripOnTime'));
+    if (v.on_time === false) return etiqueta('late', t('tripLate'));
+    return null;
+  }
+
+  function celda(fila, texto, clase) {
+    const td = document.createElement('td');
+    if (clase) td.className = clase;
+    if (texto != null) td.textContent = texto;
+    fila.appendChild(td);
+    return td;
+  }
+
+  function distanciaEnTabla(v) {
+    // Las tres distancias son distintas a proposito: la del viaje es la del
+    // juego. La nuestra solo aparece sola si el juego no dio la suya, y
+    // dicha como lo que es.
+    if (v.distance_game_km) return distancia(v.distance_game_km);
+    if (v.distance_tracked_km) return t('tripTracked', distancia(v.distance_tracked_km));
+    return '';
+  }
+
+  function tablaViajes(lista, repintar) {
+    const tabla = document.createElement('table');
+    tabla.className = 'viajes';
+    const cabeza = document.createElement('thead');
+    const tr = document.createElement('tr');
+    [['colDate', ''], ['colRoute', ''], ['tripTruck', ''],
+     ['colDistance', 'num'], ['colTime', 'num'], ['colPay', 'num']].forEach(([clave, clase]) => {
+      const th = document.createElement('th');
+      th.textContent = t(clave);
+      if (clase) th.className = clase;
+      tr.appendChild(th);
+    });
+    cabeza.appendChild(tr);
+    tabla.appendChild(cabeza);
+
+    const cuerpo = document.createElement('tbody');
+    lista.forEach((v) => {
+      const fila = document.createElement('tr');
+      fila.className = 'fila' + (v._abierto ? ' abierta' : '');
+      fila.tabIndex = 0;
+      fila.setAttribute('aria-expanded', v._abierto ? 'true' : 'false');
+      celda(fila, fechaCorta(v.delivered_at || v.started_at), 'cuando');
+
+      const ruta = celda(fila, null, 'ruta-celda');
+      const chip = document.createElement('span');
+      chip.className = 'juego-chip';
+      chip.textContent = (v.game || '').toUpperCase();
+      ruta.appendChild(chip);
+      ruta.appendChild(document.createTextNode(
+        [v.city_src, v.city_dst].filter(Boolean).join(' → ') || t('tripUnnamed')));
+      const estado = etiquetaDeEstado(v);
+      if (estado) ruta.appendChild(estado);
+      // La economia modeada se muestra y no se esconde: un viaje de 900 000
+      // euros con un mod de dinero no es comparable con el resto.
+      if (v.modded) ruta.appendChild(etiqueta('gris', t('tripModded')));
+      const carga = [v.cargo, masa(v.cargo_mass)].filter(Boolean).join(' · ');
+      if (carga) {
+        const chico = document.createElement('span');
+        chico.className = 'chico-gris';
+        chico.textContent = carga;
+        ruta.appendChild(chico);
+      }
+
+      celda(fila, [v.truck_brand, v.truck_name].filter(Boolean).join(' '), 'oculto-movil camion');
+      celda(fila, distanciaEnTabla(v), 'num');
+      celda(fila, duracion(v.real_hours) || '', 'num');
+      celda(fila, v.revenue ? plata(v.revenue, v.currency) : '', 'num');
+
+      const abrir = () => alternarDetalle(v, repintar);
+      fila.addEventListener('click', abrir);
+      fila.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); }
+      });
+      cuerpo.appendChild(fila);
+
+      if (v._abierto) {
+        const det = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 6;
+        td.className = 'detalle-celda';
+        td.appendChild(panelDetalle(v));
+        // Lo que el viaje costo aparte del sueldo. Si no se muestra nunca,
+        // nadie se entera de que un dia deja de llegar.
+        sumar(td, renglon([
+          v.fuel_used ? t('tripFuel') + ' ' + volumen(v.fuel_used) : null,
+          v.tolls ? t('tripTolls') + ' ' + plata(v.tolls, v.currency) : null,
+          v.fines ? t('tripFines') + ' ' + plata(v.fines, v.currency) : null,
+          v.ferries ? t('tripFerries') + ' ' + plata(v.ferries, v.currency) : null,
+          v.damage_delta ? t('tripDamage') + ' +' + numero(v.damage_delta, 1) + ' %' : null
+        ]));
+        const acciones = document.createElement('div');
+        acciones.className = 'acciones';
+        acciones.appendChild(botonBorrar(v));
+        td.appendChild(acciones);
+        det.appendChild(td);
+        cuerpo.appendChild(det);
+      }
+    });
+    tabla.appendChild(cuerpo);
+    return tabla;
+  }
+
+  async function alternarDetalle(v, repintar) {
     v._abierto = !v._abierto;
-    pintarViajes();
+    repintar();
     if (!v._abierto || v._detalle) return;
-    // El recorrido son un par de KB por viaje, asi que se pide solo cuando
-    // alguien lo abre, y una sola vez.
+    // Los ultimos viajes ya vienen con el recorrido (para el mapa); los del
+    // logbook no, y se pide solo cuando alguien abre uno, una sola vez.
+    if (v.route !== undefined) { v._detalle = v; repintar(); return; }
     const { ok, datos } = await pedir('/trips/' + v.id);
-    if (!ok) { v._abierto = false; pintarViajes(); return; }
+    if (!ok) { v._abierto = false; repintar(); return; }
     v._detalle = datos.trip;
-    pintarViajes();
+    repintar();
+  }
+
+  function botonBorrar(viaje) {
+    // Dos pasos y no un confirm() del navegador: un viaje lleva por donde
+    // pasaste y a que hora, asi que poder sacar uno solo es parte de que los
+    // datos sean tuyos, pero no con un click distraido.
+    const boton = document.createElement('button');
+    boton.className = 'linkish';
+    boton.textContent = t('tripRemove');
+    let armado = false;
+    const desarmar = () => {
+      armado = false;
+      boton.textContent = t('tripRemove');
+      boton.classList.remove('armado');
+    };
+    boton.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!armado) {
+        armado = true;
+        boton.textContent = t('tripRemoveSure');
+        boton.classList.add('armado');
+        setTimeout(() => { if (armado) desarmar(); }, 5000);
+        return;
+      }
+      boton.disabled = true;
+      const { ok, status, datos } = await pedir('/trips/' + viaje.id, { method: 'DELETE' });
+      // Un 404 es que ya no estaba: el resultado que se pidio, no un error.
+      if (!ok && status !== 404) {
+        boton.disabled = false;
+        desarmar();
+        avisar(t(datos.error || 'error'), 'bad');
+        return;
+      }
+      // Puede estar en las dos tablas a la vez: sale de las dos, y el
+      // resumen se vuelve a pedir porque contaba a este viaje.
+      viajes = viajes.filter((v) => v.id !== viaje.id);
+      if (totalLogbook) totalLogbook -= 1;
+      pintarViajes();
+      traerRecientes();
+      traerResumen();
+      avisar(t('savedOk'), 'ok');
+    });
+    return boton;
+  }
+
+  // ------------------------------------------------- mapa de los ultimos
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const COLORES_MAPA = ['#3b9eff', '#ffb23b', '#4caf50', '#e06cff', '#ff6b6b'];
+  const PROPORCION_MAPA = 2;  // la misma que .mapa-viajes .lienzo en el CSS
+
+  function mapaDeViajes(lista) {
+    const conRuta = lista.filter((v) => (v.route || []).some((s) => s.length > 1));
+    if (!conRuta.length) return null;
+    // Un juego solo: cada uno tiene su mapa, y las coordenadas de ETS2 y ATS
+    // dibujadas juntas no significan nada. El que tenga mas viajes para
+    // mostrar; si empatan, el del mas reciente (la lista viene ordenada).
+    const cuantos = {};
+    conRuta.forEach((v) => { cuantos[v.game] = (cuantos[v.game] || 0) + 1; });
+    const juego = conRuta.reduce((mejor, v) =>
+      (cuantos[v.game] > cuantos[mejor] ? v.game : mejor), conRuta[0].game);
+    const delJuego = conRuta.filter((v) => v.game === juego);
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    delJuego.forEach((v) => v.route.forEach((seg) => seg.forEach((p) => {
+      if (p[0] < minX) minX = p[0];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
+    })));
+    // Aire alrededor, y despues el lado corto se estira hasta la proporcion
+    // del lienzo: asi un porcentaje del lienzo es el mismo punto del dibujo.
+    let ancho = (maxX - minX) || 1, alto = (maxY - minY) || 1;
+    const aire = Math.max(ancho, alto) * 0.08;
+    minX -= aire; minY -= aire; ancho += aire * 2; alto += aire * 2;
+    if (ancho / alto < PROPORCION_MAPA) {
+      const nuevo = alto * PROPORCION_MAPA;
+      minX -= (nuevo - ancho) / 2; ancho = nuevo;
+    } else {
+      const nuevo = ancho / PROPORCION_MAPA;
+      minY -= (nuevo - alto) / 2; alto = nuevo;
+    }
+
+    const caja = document.createElement('div');
+    const lienzo = document.createElement('div');
+    lienzo.className = 'lienzo';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    // La z del juego crece hacia el sur y la y del SVG hacia abajo, asi que
+    // el norte queda arriba sin dar vuelta nada.
+    svg.setAttribute('viewBox', [minX, minY, ancho, alto].join(' '));
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('role', 'img');
+    lienzo.appendChild(svg);
+
+    const poli = (clase, puntos, color) => {
+      const el = document.createElementNS(SVG_NS, 'polyline');
+      el.setAttribute('class', clase);
+      el.setAttribute('points', puntos.map((p) => p[0] + ',' + p[1]).join(' '));
+      if (color) el.setAttribute('stroke', color);
+      el.setAttribute('vector-effect', 'non-scaling-stroke');
+      return el;
+    };
+    const ciudades = new Map();
+    // Del mas viejo al mas nuevo, para que el ultimo quede arriba.
+    delJuego.slice().reverse().forEach((v) => {
+      const color = COLORES_MAPA[delJuego.indexOf(v) % COLORES_MAPA.length];
+      const g = document.createElementNS(SVG_NS, 'g');
+      const titulo = document.createElementNS(SVG_NS, 'title');
+      titulo.textContent = [v.city_src, v.city_dst].filter(Boolean).join(' → ');
+      g.appendChild(titulo);
+      v.route.forEach((seg, i) => {
+        if (seg.length > 1) g.appendChild(poli('traza', seg, color));
+        const previo = v.route[i - 1];
+        // Un hueco es manejo con el cliente cerrado: punteado, nunca una
+        // recta que finja un tramo que no vimos.
+        if (previo && previo.length && seg.length) {
+          g.appendChild(poli('hueco', [previo[previo.length - 1], seg[0]]));
+        }
+      });
+      svg.appendChild(g);
+      const puntos = [].concat.apply([], v.route.filter((s) => s.length));
+      if (v.city_src && puntos.length) ciudades.set(v.city_src, puntos[0]);
+      if (v.city_dst && puntos.length) ciudades.set(v.city_dst, puntos[puntos.length - 1]);
+    });
+    ciudades.forEach((p, nombre) => {
+      const c = document.createElementNS(SVG_NS, 'ellipse');
+      c.setAttribute('class', 'ciudad');
+      c.setAttribute('cx', p[0]);
+      c.setAttribute('cy', p[1]);
+      // Con preserveAspectRatio none y la misma proporcion, un circulo de
+      // verdad: radio en x y en y segun el ancho y el alto del dibujo.
+      c.setAttribute('rx', ancho / 260);
+      c.setAttribute('ry', alto / 130);
+      svg.appendChild(c);
+      const lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = nombre;
+      lbl.style.left = ((p[0] - minX) / ancho * 100) + '%';
+      lbl.style.top = ((p[1] - minY) / alto * 100) + '%';
+      lienzo.appendChild(lbl);
+    });
+    svg.setAttribute('aria-label', delJuego.map((v) =>
+      [v.city_src, v.city_dst].filter(Boolean).join(' → ')).join(', '));
+    caja.appendChild(lienzo);
+
+    const leyenda = document.createElement('ul');
+    leyenda.className = 'leyenda';
+    delJuego.forEach((v, i) => {
+      const li = document.createElement('li');
+      const punto = document.createElement('i');
+      punto.style.background = COLORES_MAPA[i % COLORES_MAPA.length];
+      li.appendChild(punto);
+      li.appendChild(document.createTextNode(
+        [[v.city_src, v.city_dst].filter(Boolean).join(' → ') || t('tripUnnamed'),
+         fechaCorta(v.delivered_at || v.started_at)].join(' · ')));
+      leyenda.appendChild(li);
+    });
+    caja.appendChild(leyenda);
+    if (conRuta.length > delJuego.length) {
+      const nota = document.createElement('div');
+      nota.className = 'nota';
+      nota.textContent = t('mapOneGame', juego.toUpperCase());
+      caja.appendChild(nota);
+    }
+    return caja;
+  }
+
+  // ------------------------------------------------------ ultimos viajes
+  const RECIENTES = 5;
+  let recientes = [];
+  let vistaMapa = false;
+
+  function pintarRecientes() {
+    const lista = $('recentList');
+    const mapa = $('recentMap');
+    lista.innerHTML = '';
+    mapa.innerHTML = '';
+    $('btnRecentList').classList.toggle('activo', !vistaMapa);
+    $('btnRecentMap').classList.toggle('activo', vistaMapa);
+    $('btnRecentList').setAttribute('aria-pressed', String(!vistaMapa));
+    $('btnRecentMap').setAttribute('aria-pressed', String(vistaMapa));
+    const vacio = $('recentEmpty');
+    if (!recientes.length) {
+      lista.hidden = true;
+      mapa.hidden = true;
+      vacio.hidden = false;
+      vacio.textContent = t(totales.length ? 'tripsEmptyDriven' : 'tripsEmpty');
+      return;
+    }
+    vacio.hidden = true;
+    if (vistaMapa) {
+      const dibujo = mapaDeViajes(recientes);
+      lista.hidden = true;
+      if (dibujo) {
+        mapa.appendChild(dibujo);
+        mapa.hidden = false;
+      } else {
+        mapa.hidden = true;
+        vacio.hidden = false;
+        vacio.textContent = t('mapEmpty');
+      }
+      return;
+    }
+    mapa.hidden = true;
+    lista.hidden = false;
+    lista.appendChild(tablaViajes(recientes, pintarRecientes));
+  }
+
+  async function traerRecientes() {
+    const { ok, datos } = await pedir('/trips?limite=' + RECIENTES + '&con_recorrido=true');
+    if (!ok) return;   // sin viajes la pantalla sigue siendo util
+    recientes = datos.trips || [];
+    pintarRecientes();
+    pintarCinta();
+    $('cardRecent').hidden = false;
+  }
+
+  // ------------------------------------------------------------ logbook
+  const VIAJES_POR_PAGINA = 10;
+  let viajes = [];      // lo ya traido, para repintar sin volver a pedir
+  let totales = [];
+  let hayMasViajes = false;
+  let totalLogbook = 0;
+  let viajesPedidos = false;
+
+  function filtrosDelLogbook() {
+    const partes = [];
+    if ($('filterGame').value) partes.push('game=' + encodeURIComponent($('filterGame').value));
+    if ($('filterStatus').value) partes.push('status=' + encodeURIComponent($('filterStatus').value));
+    return partes;
   }
 
   function pintarViajes() {
     const lista = $('tripsList');
     lista.innerHTML = '';
-    viajes.forEach((v) => lista.appendChild(filaViaje(v)));
-    pintarVacio();
+    if (viajes.length) lista.appendChild(tablaViajes(viajes, pintarViajes));
+    $('logbookCount').textContent = logbookPedido ? t('logbookCount', totalLogbook) : '';
+    const cartel = $('tripsEmpty');
+    cartel.hidden = !logbookPedido || viajes.length > 0;
+    // Con filtros, "no hay viajes" seria mentira: hay, pero no de esos.
+    cartel.textContent = filtrosDelLogbook().length ? t('logbookNoMatch')
+      : t(totales.length ? 'tripsEmptyDriven' : 'tripsEmpty');
     $('btnMoreTrips').hidden = !hayMasViajes;
   }
 
   async function traerViajes(mas) {
+    logbookPedido = true;
     const desde = mas ? viajes.length : 0;
-    const { ok, datos } = await pedir('/trips?limite=' + VIAJES_POR_PAGINA + '&desde=' + desde);
-    if (!ok) return;   // sin viajes la pantalla sigue siendo util
+    const consulta = ['limite=' + VIAJES_POR_PAGINA, 'desde=' + desde].concat(filtrosDelLogbook());
+    const { ok, datos } = await pedir('/trips?' + consulta.join('&'));
+    if (!ok) return;
     const nuevos = datos.trips || [];
     viajes = mas ? viajes.concat(nuevos) : nuevos;
-    hayMasViajes = nuevos.length === VIAJES_POR_PAGINA;
+    totalLogbook = datos.total != null ? datos.total : viajes.length;
+    hayMasViajes = viajes.length < totalLogbook && nuevos.length === VIAJES_POR_PAGINA;
     pintarViajes();
-    $('cardTrips').hidden = false;
   }
 
   async function traerTotales() {
     const { ok, datos } = await pedir('/sessions/totals');
     if (!ok) return;
     totales = datos.totals || [];
-    pintarTotales();
+    pintarCinta();
+    pintarRecientes();
   }
 
   function mostrarViajes() {
     // pintarCuenta() se vuelve a llamar al cambiar de idioma: ahi alcanza con
     // repintar lo que ya tenemos, sin pedir todo de nuevo ni perder las
     // paginas que la persona ya abrio.
-    if (viajesPedidos) { pintarViajes(); pintarTotales(); pintarResumen(); return; }
+    if (viajesPedidos) {
+      pintarCinta(); pintarRecientes(); pintarResumen(); pintarViajes();
+      mostrarPagina();
+      return;
+    }
     viajesPedidos = true;
-    traerViajes(false);
+    traerRecientes();
     traerTotales();
     traerResumen();
+    mostrarPagina();
   }
 
   function olvidarViajes() {
     viajes = [];
     totales = [];
+    recientes = [];
     hayMasViajes = false;
+    totalLogbook = 0;
     viajesPedidos = false;
+    logbookPedido = false;
     resumen = [];
-    $('cardTrips').hidden = true;
+    $('cardRecent').hidden = true;
     $('cardStats').hidden = true;
+    $('quickStats').hidden = true;
+    $('tripsList').innerHTML = '';
   }
 
   function iniciar() {
@@ -1268,6 +1627,12 @@
     $('deviceForm').addEventListener('submit', vincularDispositivo);
     $('btnExport').addEventListener('click', exportarDatos);
     $('btnMoreTrips').addEventListener('click', () => traerViajes(true));
+    ['filterGame', 'filterStatus'].forEach((id) => {
+      $(id).addEventListener('change', () => { viajes = []; traerViajes(false); });
+    });
+    $('btnRecentList').addEventListener('click', () => { vistaMapa = false; pintarRecientes(); });
+    $('btnRecentMap').addEventListener('click', () => { vistaMapa = true; pintarRecientes(); });
+    window.addEventListener('hashchange', () => { if (usuario) mostrarPagina(); });
     $('btnDelete').addEventListener('click', () => mostrarConfirmacionDeBorrado(true));
     $('btnDeleteCancel').addEventListener('click', () => mostrarConfirmacionDeBorrado(false));
     $('btnDeleteConfirm').addEventListener('click', borrarCuenta);

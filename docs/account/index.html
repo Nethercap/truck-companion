@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261002b" />
+<link rel="stylesheet" href="account.css?v=20261003a" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -56,87 +56,147 @@
 
   <!-- ------------------------------------------------ cuenta -->
   <section id="viewAccount" hidden>
-    <div class="who">
-      <img id="avatar" alt="" />
-      <div>
-        <h1 id="displayName"></h1>
-        <p class="muted small" id="memberSince"></p>
+    <div class="tablero">
+      <!-- Navegacion de la cuenta. En escritorio, columna al costado (como
+           los "quick links" de FSHub); en el celular, pestanas arriba. Cada
+           pagina tiene su #hash, asi el link a "/account/#logbook" abre ahi
+           y el boton de atras del navegador anda. -->
+      <nav class="lado" id="sideNav" aria-label="Account">
+        <a href="#overview" data-pagina="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"/></svg><span data-i18n="navOverview">Overview</span></a>
+        <a href="#logbook" data-pagina="logbook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h11a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm2 4v2h8V6zm0 4v2h8v-2zm0 4v2h5v-2z"/></svg><span data-i18n="navLogbook">Logbook</span></a>
+        <a href="#settings" data-pagina="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg><span data-i18n="navSettings">Settings</span></a>
+      </nav>
+
+      <div class="contenido">
+        <div class="who">
+          <img id="avatar" alt="" />
+          <div>
+            <p class="rotulo" data-i18n="dashLabel">Driver dashboard</p>
+            <h1 id="displayName"></h1>
+            <p class="muted small" id="memberSince"></p>
+          </div>
+        </div>
+
+        <p class="notice warn" id="recoveryWarning" hidden></p>
+
+        <!-- ------------------------------------------ resumen -->
+        <div class="pagina" id="pageOverview">
+          <div class="cinta" id="quickStats" hidden></div>
+
+          <section class="card" id="cardRecent" hidden>
+            <div class="cabecera">
+              <h2 data-i18n="recentTitle">Recent trips</h2>
+              <div class="vistas" role="group">
+                <button class="btn chico activo" id="btnRecentList" data-i18n="viewList">List</button>
+                <button class="btn chico" id="btnRecentMap" data-i18n="viewMap">Map</button>
+              </div>
+              <a class="btn chico" href="#logbook" data-i18n="openLogbook">My logbook</a>
+            </div>
+            <div id="recentList"></div>
+            <div id="recentMap" class="mapa-viajes" hidden></div>
+            <p class="muted small" id="recentEmpty" hidden></p>
+          </section>
+
+          <section class="card" id="cardStats" hidden>
+            <h2 data-i18n="statsTitle">Your stats</h2>
+            <div id="statsBody"></div>
+          </section>
+        </div>
+
+        <!-- ------------------------------------------ logbook -->
+        <div class="pagina" id="pageLogbook" hidden>
+          <section class="card" id="cardTrips">
+            <div class="cabecera">
+              <h2 data-i18n="logbookTitle">Logbook</h2>
+              <span class="muted small" id="logbookCount"></span>
+            </div>
+            <div class="filtros">
+              <label><span data-i18n="filterGame">Game</span>
+                <select id="filterGame">
+                  <option value="" data-i18n="filterAll">All</option>
+                  <option value="ets2">ETS2</option>
+                  <option value="ats">ATS</option>
+                </select>
+              </label>
+              <label><span data-i18n="filterStatus">Status</span>
+                <select id="filterStatus">
+                  <option value="" data-i18n="filterAll">All</option>
+                  <option value="delivered" data-i18n="statsDelivered">Delivered</option>
+                  <option value="in_progress" data-i18n="filterInProgress">In progress</option>
+                  <option value="cancelled" data-i18n="filterCancelled">Cancelled</option>
+                  <option value="abandoned" data-i18n="filterAbandoned">Unfinished</option>
+                </select>
+              </label>
+            </div>
+            <div id="tripsList"></div>
+            <p class="muted small" id="tripsEmpty" hidden data-i18n="tripsEmpty"></p>
+            <button class="btn" id="btnMoreTrips" hidden data-i18n="tripsMore">Show more</button>
+          </section>
+        </div>
+
+        <!-- ------------------------------------------ ajustes -->
+        <div class="pagina" id="pageSettings" hidden>
+          <section class="card">
+            <h2 data-i18n="usernameLabel">Username</h2>
+            <div class="row">
+              <span id="currentUsername" class="mono"></span>
+              <button class="btn" id="btnChangeUsername" data-i18n="change">Change</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2 data-i18n="loginsTitle">Sign-in methods</h2>
+            <ul class="logins" id="loginsList"></ul>
+          </section>
+
+          <section class="card">
+            <h2 data-i18n="privacyTitle">Public profile</h2>
+            <label class="check">
+              <input type="checkbox" id="publicToggle" />
+              <span data-i18n="privacyLabel"></span>
+            </label>
+            <p class="muted small" data-i18n="privacyHint"></p>
+          </section>
+
+          <section class="card">
+            <h2 data-i18n="deviceTitle">Link this PC</h2>
+            <p class="muted small" data-i18n="deviceHint"></p>
+            <form id="deviceForm" autocomplete="off">
+              <label for="deviceInput" data-i18n="deviceCodeLabel">Code</label>
+              <input id="deviceInput" maxlength="9" autocapitalize="characters"
+                     spellcheck="false" placeholder="ABCD-1234" />
+              <p class="hint" id="deviceHintMsg"></p>
+              <button class="btn primary" id="btnDeviceApprove" type="submit"
+                      data-i18n="deviceApprove">Link</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <h2 data-i18n="sessionsTitle">Open sessions</h2>
+            <ul class="sessions" id="sessionsList"></ul>
+            <button class="btn" id="btnSignOutAll" data-i18n="signOutAll">Sign out everywhere</button>
+          </section>
+
+          <button class="btn danger" id="btnSignOut" data-i18n="signOut">Sign out</button>
+
+          <section class="card">
+            <h2 data-i18n="dataTitle">Your data</h2>
+            <button class="btn" id="btnExport" data-i18n="exportData">Download my data</button>
+            <p class="muted small" data-i18n="exportHint"></p>
+            <hr />
+            <p class="muted small" data-i18n="deleteWarning"></p>
+            <button class="btn danger" id="btnDelete" data-i18n="deleteAccount">Delete account</button>
+            <div id="deleteConfirm" hidden>
+              <label for="deleteInput" id="deleteConfirmLabel"></label>
+              <input id="deleteInput" autocapitalize="none" spellcheck="false" />
+              <p class="hint" id="deleteHint"></p>
+              <button class="btn danger" id="btnDeleteConfirm" data-i18n="deleteForGood">Delete for good</button>
+              <button class="btn" id="btnDeleteCancel" data-i18n="cancel">Cancel</button>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
-
-    <p class="notice warn" id="recoveryWarning" hidden></p>
-
-    <section class="card">
-      <h2 data-i18n="usernameLabel">Username</h2>
-      <div class="row">
-        <span id="currentUsername" class="mono"></span>
-        <button class="btn" id="btnChangeUsername" data-i18n="change">Change</button>
-      </div>
-    </section>
-
-    <section class="card" id="cardTrips" hidden>
-      <h2 data-i18n="tripsTitle">Your trips</h2>
-      <div class="totals" id="tripTotals" hidden></div>
-      <ul class="trips" id="tripsList"></ul>
-      <p class="muted small" id="tripsEmpty" hidden data-i18n="tripsEmpty"></p>
-      <button class="btn" id="btnMoreTrips" hidden data-i18n="tripsMore">Show more</button>
-    </section>
-
-    <section class="card" id="cardStats" hidden>
-      <h2 data-i18n="statsTitle">Your stats</h2>
-      <div id="statsBody"></div>
-    </section>
-
-    <section class="card">
-      <h2 data-i18n="loginsTitle">Sign-in methods</h2>
-      <ul class="logins" id="loginsList"></ul>
-    </section>
-
-    <section class="card">
-      <h2 data-i18n="privacyTitle">Public profile</h2>
-      <label class="check">
-        <input type="checkbox" id="publicToggle" />
-        <span data-i18n="privacyLabel"></span>
-      </label>
-      <p class="muted small" data-i18n="privacyHint"></p>
-    </section>
-
-    <section class="card">
-      <h2 data-i18n="deviceTitle">Link this PC</h2>
-      <p class="muted small" data-i18n="deviceHint"></p>
-      <form id="deviceForm" autocomplete="off">
-        <label for="deviceInput" data-i18n="deviceCodeLabel">Code</label>
-        <input id="deviceInput" maxlength="9" autocapitalize="characters"
-               spellcheck="false" placeholder="ABCD-1234" />
-        <p class="hint" id="deviceHintMsg"></p>
-        <button class="btn primary" id="btnDeviceApprove" type="submit"
-                data-i18n="deviceApprove">Link</button>
-      </form>
-    </section>
-
-    <section class="card">
-      <h2 data-i18n="sessionsTitle">Open sessions</h2>
-      <ul class="sessions" id="sessionsList"></ul>
-      <button class="btn" id="btnSignOutAll" data-i18n="signOutAll">Sign out everywhere</button>
-    </section>
-
-    <button class="btn danger" id="btnSignOut" data-i18n="signOut">Sign out</button>
-
-    <section class="card">
-      <h2 data-i18n="dataTitle">Your data</h2>
-      <button class="btn" id="btnExport" data-i18n="exportData">Download my data</button>
-      <p class="muted small" data-i18n="exportHint"></p>
-      <hr />
-      <p class="muted small" data-i18n="deleteWarning"></p>
-      <button class="btn danger" id="btnDelete" data-i18n="deleteAccount">Delete account</button>
-      <div id="deleteConfirm" hidden>
-        <label for="deleteInput" id="deleteConfirmLabel"></label>
-        <input id="deleteInput" autocapitalize="none" spellcheck="false" />
-        <p class="hint" id="deleteHint"></p>
-        <button class="btn danger" id="btnDeleteConfirm" data-i18n="deleteForGood">Delete for good</button>
-        <button class="btn" id="btnDeleteCancel" data-i18n="cancel">Cancel</button>
-      </div>
-    </section>
   </section>
 </main>
 
@@ -145,7 +205,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261002b"></script>
-<script src="account.js?v=20261002b"></script>
+<script src="../app/i18n.js?v=20261003a"></script>
+<script src="account.js?v=20261003a"></script>
 </body>
 </html>
