@@ -545,7 +545,23 @@ class SetupWindow:
         self.account_button.pack(side="left")
         self.account_code = self.label(fila, "", font=("Consolas", 16, "bold"), fg=BLUE)
         self.account_code.pack(side="left", padx=12)
+        # Aparece solo con un codigo a la vista: el que se escribe en la web.
+        self.account_copy = self.button(fila, T("copy"), self.copy_account_code)
         self.refresh_account()
+
+    def set_account_code(self, codigo: str):
+        self.account_code.configure(text=codigo)
+        if codigo:
+            self.account_copy.pack(side="left")
+        else:
+            self.account_copy.pack_forget()
+
+    def copy_account_code(self):
+        codigo = self.account_code.cget("text")
+        if codigo:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(codigo)
+            self.flash(T("copied"), MUTED)
 
     def _bombear_cola(self):
         """Corre en el hilo principal lo que dejaron los hilos de fondo."""
@@ -607,7 +623,7 @@ class SetupWindow:
             # token de esta PC; la sesion se corta del todo desde la web.
             settings.pop(account.CLAVE_TOKEN, None)
             win_integration.save_settings(settings)
-            self.account_code.configure(text="")
+            self.set_account_code("")
             self.flash(T("account_unlinked"), MUTED)
             self.refresh_account()
             return
@@ -626,7 +642,7 @@ class SetupWindow:
                 return
 
             def mostrar():
-                self.account_code.configure(text=pedido["code"])
+                self.set_account_code(pedido["code"])
                 self.account_label.configure(text=T("account_enter_code", url=pedido["url"]))
                 abrir_navegador(pedido["url"])
             self.en_ventana(mostrar)
@@ -654,14 +670,14 @@ class SetupWindow:
                 win_integration.save_settings(settings)
                 logging.info("Cuenta vinculada")
                 self.en_ventana(lambda: (
-                    self.account_code.configure(text=""),
+                    self.set_account_code(""),
                     self.flash(T("account_ok"), GREEN),
                     self.refresh_account()))
                 return
             if estado == "vencido":
                 break
         self.en_ventana(lambda: (
-            self.account_code.configure(text=""),
+            self.set_account_code(""),
             self.account_label.configure(text=T("account_expired")),
             self.account_button.configure(state="normal")))
 

@@ -266,6 +266,27 @@ def test_vincular_muestra_el_codigo_y_lo_guarda_cuando_lo_aprueban(ventana, monk
     assert v.account_code.cget("text") == ""  # se limpia al terminar
 
 
+def test_el_codigo_de_cuenta_se_puede_copiar_mientras_se_ve(ventana, monkeypatch):
+    v, guardados = ventana
+    monkeypatch.setattr(tray_client.account, "pedir_codigo",
+                        lambda nombre, s=None: {"code": "ACDE-3456", "secret": "s",
+                                                "expires_in": 600, "url": "http://x/"})
+    monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda *a, **k: True)
+    respuestas = [("pendiente", None)] * 40 + [("listo", "tok")]
+    monkeypatch.setattr(tray_client.account, "consultar_codigo",
+                        lambda secret, s=None: respuestas.pop(0) if respuestas else ("vencido", None))
+    assert not v.account_copy.winfo_manager()  # sin codigo no hay que copiar
+
+    v.link_account()
+    _esperar(v, lambda: v.account_code.cget("text") == "ACDE-3456")
+    assert v.account_copy.winfo_manager()
+    v.copy_account_code()
+    assert v.root.clipboard_get() == "ACDE-3456"
+
+    _esperar(v, lambda: guardados.get("account_token"), segundos=20)
+    _esperar(v, lambda: not v.account_copy.winfo_manager())
+
+
 def test_un_corte_de_internet_no_cancela_la_espera(ventana, monkeypatch):
     """Sin esto, un parpadeo del wifi haria abandonar la vinculacion justo
     cuando la persona esta yendo al navegador."""
