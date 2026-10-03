@@ -115,6 +115,8 @@
       tripModded: 'modded economy',
       tripTracked: (d) => 'we tracked ' + d,
       tripWheel: (h) => h + ' at the wheel',
+      tripTotalTime: (h) => h + ' in total',
+      tripAsleep: (h) => h + ' asleep',
       tripTop: (v) => 'top ' + v,
       tripFuel: 'Fuel',
       tripTolls: 'Tolls',
@@ -269,6 +271,8 @@
       tripModded: 'economia modeada',
       tripTracked: (d) => 'rastreamos ' + d,
       tripWheel: (h) => h + ' al volante',
+      tripTotalTime: (h) => h + ' en total',
+      tripAsleep: (h) => h + ' durmiendo',
       tripTop: (v) => 'maxima ' + v,
       tripFuel: 'Combustible',
       tripTolls: 'Peajes',
@@ -1003,6 +1007,8 @@
     if (horas == null) return null;
     const min = Math.round(horas * 60);
     if (min < 60) return min + ' min';
+    // "9 h" y no "9 h 00": las horas justas son comunes (dormir son 9).
+    if (min % 60 === 0) return (min / 60) + ' h';
     return Math.floor(min / 60) + ' h ' + String(min % 60).padStart(2, '0');
   }
   function plata(monto, moneda) {
@@ -1105,10 +1111,19 @@
       d.distance_planned_km ? t('tripPlanned') + ' ' + distancia(d.distance_planned_km) : null,
       d.distance_tracked_km ? t('tripTracked', distancia(d.distance_tracked_km)) : null
     ]));
+    // Los tiempos en horas de juego, como los muestra el juego. El total
+    // (de tomar el trabajo a entregarlo) trae paradas y sueno, asi que se
+    // dice cuanto fue durmiendo: si no, 4 h 11 contra 13 h 30 parece un
+    // error. "4 h 11 al volante · 13 h 30 en total, 9 h durmiendo".
+    const total = d.total_game_hours ? t('tripTotalTime', duracion(d.total_game_hours)) : null;
+    const sueno = d.sleep_hours ? t('tripAsleep', duracion(d.sleep_hours)) : null;
+    sumar(caja, renglon([
+      d.game_hours ? t('tripWheel', duracion(d.game_hours)) : null,
+      total && sueno ? total + ', ' + sueno : (total || sueno)
+    ]));
     sumar(caja, renglon([
       d.avg_speed ? t('tripAvgSpeed') + ' ' + velocidad(d.avg_speed) : null,
-      d.max_speed ? t('statsTopSpeed') + ' ' + velocidad(d.max_speed) : null,
-      d.game_hours ? t('tripGameTime') + ' ' + duracion(d.game_hours) : null
+      d.max_speed ? t('statsTopSpeed') + ' ' + velocidad(d.max_speed) : null
     ]));
     if ((d.countries || []).length) caja.appendChild(listaDePaises(d.countries));
     return caja;
