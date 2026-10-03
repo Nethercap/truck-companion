@@ -77,14 +77,14 @@ GUIDE_TEXT.en = {
 <ul>
 <li>Speed, speed limit, road number and cruise control speed.</li>
 <li>Fuel, range and average consumption, measured from your own driving once you have done 15 km (the game's own figure until then).</li>
-<li><b>Trip</b>: origin and destination, cargo, in-game ETA, <b>real ETA</b> in real-world minutes, next city, game time, job deadline, next rest stop and job pay. The pay can also be shown in your own currency.</li>
+<li><b>Trip</b>: origin and destination, cargo, in-game ETA, <b>real ETA</b> in real-world minutes, next city, game time, job deadline, next rest stop with your fatigue and job pay. The pay can also be shown in your own currency.</li>
 <li><b>Truck</b>: model, odometer, wear of each part, and alerts such as low air pressure, high water or oil temperature and low battery voltage.</li>
 <li><b>Session</b>: tolls paid, fines and ferry or train trips, with a Reset button.</li>
 </ul>
 <h3>Gauges tab</h3>
 <p>Speedometer, tachometer with the gear, fuel bar, odometer and range.</p>
 <h3>Mini-HUD</h3>
-<p>Hide the panel with the three lines button and the map takes the whole screen; your speed and the limit stay in a corner. In Settings you choose what else the mini-HUD shows: fuel, range, ETA, distance left, cruise control and GPS directions.</p>`,
+<p>Hide the panel with the three lines button and the map takes the whole screen; your speed and the limit stay in a corner. In Settings you choose what else the mini-HUD shows: fuel, range, ETA, distance left, next rest stop with fatigue, cruise control and GPS directions.</p>`,
     dash: `
 <p>The gauge button in the top bar opens a full screen instrument panel:</p>
 <ul>
@@ -252,14 +252,14 @@ GUIDE_TEXT.es = {
 <ul>
 <li>Velocidad, límite, número de ruta y velocidad del control de crucero.</li>
 <li>Combustible, autonomía y consumo promedio, medido con tu manejo una vez que hiciste 15 km (hasta ahí, el dato del juego).</li>
-<li><b>Viaje</b>: origen y destino, carga, ETA del juego, <b>ETA real</b> en minutos de verdad, próxima ciudad, hora del juego, plazo del trabajo, próximo descanso y paga. La paga también se puede ver en tu moneda.</li>
+<li><b>Viaje</b>: origen y destino, carga, ETA del juego, <b>ETA real</b> en minutos de verdad, próxima ciudad, hora del juego, plazo del trabajo, próximo descanso con tu fatiga y paga. La paga también se puede ver en tu moneda.</li>
 <li><b>Camión</b>: modelo, odómetro, desgaste de cada parte y alertas como poca presión de aire, agua o aceite muy calientes y batería baja.</li>
 <li><b>Sesión</b>: peajes, multas y viajes en ferry o tren, con un botón para reiniciar.</li>
 </ul>
 <h3>Pestaña Relojes</h3>
 <p>Velocímetro, cuentavueltas con la marcha, barra de combustible, odómetro y autonomía.</p>
 <h3>Mini-HUD</h3>
-<p>Ocultá el panel con el botón de las tres rayas y el mapa ocupa toda la pantalla; la velocidad y el límite quedan en un rincón. En Configuración elegís qué más muestra el mini-HUD: combustible, autonomía, ETA, distancia restante, control de crucero e indicaciones del GPS.</p>`,
+<p>Ocultá el panel con el botón de las tres rayas y el mapa ocupa toda la pantalla; la velocidad y el límite quedan en un rincón. En Configuración elegís qué más muestra el mini-HUD: combustible, autonomía, ETA, distancia restante, próximo descanso con la fatiga, control de crucero e indicaciones del GPS.</p>`,
     dash: `
 <p>El botón del velocímetro en la barra de arriba abre un tablero a pantalla completa:</p>
 <ul>

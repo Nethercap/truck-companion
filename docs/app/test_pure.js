@@ -799,3 +799,21 @@ test('zoom de navegacion: valida lo guardado y respeta el rango', () => {
   assert.equal(navZoomSetting('lejos'), NAV_ZOOM_DEFAULT);
   assert.equal(navZoomSetting(null), NAV_ZOOM_DEFAULT);
 });
+
+test('fatiga: lo manejado sobre el intervalo de 11 h, con tope que crece si un mod lo alarga', () => {
+  const { createFatigue, REST_INTERVAL_MINUTES } = require('./pure.js');
+  assert.equal(REST_INTERVAL_MINUTES, 660);
+  const f = createFatigue();
+  assert.equal(f.push(660), 0);          // recien dormido
+  assert.equal(f.push(330), 50);
+  assert.equal(f.push(6 * 60 + 40), 39); // el de la demo: 6 h 40 por delante
+  assert.equal(f.push(1), 100);
+  // Fatiga apagada o sin dato: no hay porcentaje.
+  assert.equal(f.push(0), null);
+  assert.equal(f.push(null), null);
+  assert.equal(f.push(24 * 60), null);
+  // Un mod con 14 h: el tope pasa a ser lo visto, nunca da negativo.
+  const m = createFatigue();
+  assert.equal(m.push(840), 0);
+  assert.equal(m.push(420), 50);
+});

@@ -932,7 +932,26 @@ function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth,
   return Math.round(s * 1000) / 1000;
 }
 
+// Fatiga en %. El SDK no la manda: solo los minutos de juego que faltan para
+// el proximo descanso. El intervalo entero es maximum_driving_time de
+// def/economy_data.sii, 660 minutos (11 h) en los dos juegos. Si un mod lo
+// alarga, el juego manda mas que eso recien dormido, y el mayor valor visto
+// pasa a ser el tope: asi nunca da negativo.
+const REST_INTERVAL_MINUTES = 660;
+function createFatigue(intervalMinutes = REST_INTERVAL_MINUTES) {
+  let max = intervalMinutes;
+  return {
+    // Devuelve 0..100 entero, o null si no hay descanso util (fatiga
+    // apagada: el juego manda 0 o un valor sin sentido).
+    push(restMinutes) {
+      if (restMinutes == null || !(restMinutes > 0) || restMinutes >= 24 * 60) return null;
+      if (restMinutes > max) max = restMinutes;
+      return Math.round(Math.max(0, Math.min(100, (1 - restMinutes / max) * 100)));
+    },
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

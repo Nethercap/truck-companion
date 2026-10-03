@@ -128,7 +128,7 @@ let customButtons = (Array.isArray(_savedSettings.customButtons) ? _savedSetting
   .slice(0, CUSTOM_BUTTONS_MAX)
   .map(b => ({ title: b.title.slice(0, 14), key: b.key.slice(0, 24) }));
 const miniHudSettings = Object.assign(
-  { fuelPct: false, fuelRange: false, eta: false, distance: false, cruise: true, gps: false },
+  { fuelPct: false, fuelRange: false, eta: false, distance: false, cruise: true, gps: false, rest: false },
   _savedSettings.miniHud
 );
 let routeColor = _savedSettings.routeColor || '#a30000';
@@ -374,6 +374,7 @@ function initSettingsUi() {
   document.getElementById('setMiniDistance').checked = miniHudSettings.distance;
   document.getElementById('setMiniCruise').checked = miniHudSettings.cruise;
   document.getElementById('setMiniGps').checked = miniHudSettings.gps;
+  document.getElementById('setMiniRest').checked = miniHudSettings.rest;
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
@@ -579,6 +580,7 @@ const MINI_HUD_CHECKBOXES = {
   setMiniDistance: 'distance',
   setMiniCruise: 'cruise',
   setMiniGps: 'gps',
+  setMiniRest: 'rest',
 };
 for (const [id, key] of Object.entries(MINI_HUD_CHECKBOXES)) {
   document.getElementById(id).addEventListener('change', (e) => {
@@ -3339,6 +3341,8 @@ function updateMiniHudExtra(data) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
     lines.push(`${t('distanceLeft')}: ${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`);
   }
+  const rest = miniHudSettings.rest ? restInfo(data) : null;
+  if (rest) lines.push(`${t('nextRest')}: ${rest.text}`);
   if (miniHudSettings.gps && navMode) {
     const navText = document.getElementById('navPanel').textContent;
     if (navText) lines.push(navText);
@@ -3350,6 +3354,18 @@ function updateMiniHudExtra(data) {
 // se viene manejando. La cuenta vive en pure.js (createPaceEta, con tests):
 // el panel de docs/dash/ usa la misma.
 const paceEta = createPaceEta();
+
+// Proximo descanso y fatiga, lo mismo para el panel y el mini-HUD. El SDK
+// manda MINUTOS de juego (restStopMinutes; restStopSeconds es el nombre
+// viejo del cliente <=1.4.1, tambien en minutos). Con la simulacion de
+// fatiga apagada no significa nada, y createFatigue devuelve null.
+const fatigue = createFatigue();
+function restInfo(data) {
+  const min = data.restStopMinutes != null ? data.restStopMinutes : data.restStopSeconds;
+  const pct = fatigue.push(min);
+  if (pct == null) return null;
+  return { min, pct, text: `${formatSeconds(min * 60)} (${pct}% ${t('fatigue')})` };
+}
 
 // Reloj del juego ("Jue 15:17"): el dia de la semana sale del idioma elegido
 // usando una semana de referencia que empieza en lunes (2024-01-01 lo fue).
@@ -3558,16 +3574,13 @@ function updateHud(data) {
   routeSummaryEtaSeconds = realEtaSeconds;
   document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');
 
-  // Proximo descanso obligatorio (fatiga): el SDK manda MINUTOS de juego
-  // (restStopMinutes; restStopSeconds es el nombre viejo del cliente <=1.4.1,
-  // tambien en minutos). Solo se muestra si el juego manda un valor util -
-  // con la simulacion de fatiga apagada no significa nada.
-  const restMin = data.restStopMinutes != null ? data.restStopMinutes : data.restStopSeconds;
+  // Proximo descanso obligatorio, con la fatiga (ver restInfo).
+  const rest = restInfo(data);
   const restRow = document.getElementById('restStopRow');
-  if (restMin != null && restMin > 0 && restMin < 24 * 60) {
+  if (rest) {
     restRow.hidden = false;
-    const realSec = (restMin * 60) / measuredTimeScale(data);
-    document.getElementById('restStop').innerHTML = `${escapeHtml(formatSeconds(restMin * 60))}<span class="subValue">≈ ${escapeHtml(formatSeconds(realSec))} ${escapeHtml(t('realShort'))}</span>`;
+    const realSec = (rest.min * 60) / measuredTimeScale(data);
+    document.getElementById('restStop').innerHTML = `${escapeHtml(rest.text)}<span class="subValue">≈ ${escapeHtml(formatSeconds(realSec))} ${escapeHtml(t('realShort'))}</span>`;
   } else {
     restRow.hidden = true;
   }

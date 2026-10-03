@@ -74,14 +74,14 @@ GUIDE_TEXT.de = {
 <ul>
 <li>Geschwindigkeit, Tempolimit, Straßennummer und Tempomat-Geschwindigkeit.</li>
 <li>Tankinhalt, Reichweite und Durchschnittsverbrauch, gemessen an deiner eigenen Fahrt, sobald du 15 km gefahren bist (bis dahin der Wert des Spiels).</li>
-<li><b>Fahrt</b>: Start und Ziel, Ladung, ETA in Spielzeit, <b>ETA (real)</b> in echten Minuten, nächste Stadt, Spielzeit, Auftragsfrist, nächste Ruhepause und Auftragslohn. Der Lohn kann auch in deiner Währung angezeigt werden.</li>
+<li><b>Fahrt</b>: Start und Ziel, Ladung, ETA in Spielzeit, <b>ETA (real)</b> in echten Minuten, nächste Stadt, Spielzeit, Auftragsfrist, nächste Ruhepause mit deiner Müdigkeit und Auftragslohn. Der Lohn kann auch in deiner Währung angezeigt werden.</li>
 <li><b>Lkw</b>: Modell, Kilometerstand, Verschleiß jedes Teils und Warnungen wie niedriger Luftdruck, hohe Wasser- oder Öltemperatur und schwache Batterie.</li>
 <li><b>Sitzung</b>: bezahlte Maut, Strafen und Fähr- oder Zugfahrten, mit einem Zurücksetzen-Knopf.</li>
 </ul>
 <h3>Reiter Anzeigen</h3>
 <p>Tacho, Drehzahlmesser mit Gang, Tankbalken, Kilometerstand und Reichweite.</p>
 <h3>Mini-HUD</h3>
-<p>Blende das Panel mit dem Knopf mit den drei Strichen aus und die Karte füllt den ganzen Bildschirm; Geschwindigkeit und Tempolimit bleiben in einer Ecke. In den Einstellungen wählst du, was das Mini-HUD noch zeigt: Tank, Reichweite, ETA, Reststrecke, Tempomat und Navi-Anweisungen.</p>`,
+<p>Blende das Panel mit dem Knopf mit den drei Strichen aus und die Karte füllt den ganzen Bildschirm; Geschwindigkeit und Tempolimit bleiben in einer Ecke. In den Einstellungen wählst du, was das Mini-HUD noch zeigt: Tank, Reichweite, ETA, Reststrecke, nächste Ruhepause mit Müdigkeit, Tempomat und Navi-Anweisungen.</p>`,
     dash: `
 <p>Der Tacho-Knopf in der oberen Leiste öffnet ein Armaturenbrett im Vollbild:</p>
 <ul>
@@ -249,14 +249,14 @@ GUIDE_TEXT.fr = {
 <ul>
 <li>Vitesse, limitation, numéro de route et vitesse du régulateur.</li>
 <li>Carburant, autonomie et consommation moyenne, mesurée sur ta propre conduite dès que tu as fait 15 km (avant, le chiffre du jeu).</li>
-<li><b>Trajet</b> : départ et arrivée, cargaison, ETA en temps de jeu, <b>ETA réelle</b> en vraies minutes, prochaine ville, heure du jeu, échéance du contrat, prochaine pause et paie. La paie peut aussi s'afficher dans ta devise.</li>
+<li><b>Trajet</b> : départ et arrivée, cargaison, ETA en temps de jeu, <b>ETA réelle</b> en vraies minutes, prochaine ville, heure du jeu, échéance du contrat, prochaine pause avec ta fatigue et paie. La paie peut aussi s'afficher dans ta devise.</li>
 <li><b>Camion</b> : modèle, compteur kilométrique, usure de chaque pièce et alertes comme pression d'air basse, eau ou huile trop chaudes et batterie faible.</li>
 <li><b>Session</b> : péages, amendes et trajets en ferry ou en train, avec un bouton Réinitialiser.</li>
 </ul>
 <h3>Onglet Cadrans</h3>
 <p>Compteur de vitesse, compte-tours avec le rapport engagé, jauge de carburant, compteur kilométrique et autonomie.</p>
 <h3>Mini-HUD</h3>
-<p>Masque le panneau avec le bouton à trois traits et la carte prend tout l'écran ; ta vitesse et la limitation restent dans un coin. Dans les Paramètres tu choisis ce que le mini-HUD affiche en plus : carburant, autonomie, ETA, distance restante, régulateur et indications du GPS.</p>`,
+<p>Masque le panneau avec le bouton à trois traits et la carte prend tout l'écran ; ta vitesse et la limitation restent dans un coin. Dans les Paramètres tu choisis ce que le mini-HUD affiche en plus : carburant, autonomie, ETA, distance restante, prochaine pause avec la fatigue, régulateur et indications du GPS.</p>`,
     dash: `
 <p>Le bouton compteur de la barre du haut ouvre un tableau de bord en plein écran :</p>
 <ul>
@@ -424,14 +424,14 @@ GUIDE_TEXT.pt = {
 <ul>
 <li>Velocidade, limite, número da rodovia e velocidade do piloto automático.</li>
 <li>Combustível, autonomia e consumo médio, medido com a sua direção depois de 15 km (até lá, o valor do jogo).</li>
-<li><b>Viagem</b>: origem e destino, carga, ETA no jogo, <b>ETA real</b> em minutos de verdade, próxima cidade, hora do jogo, prazo do frete, próximo descanso e pagamento. O pagamento também pode aparecer na sua moeda.</li>
+<li><b>Viagem</b>: origem e destino, carga, ETA no jogo, <b>ETA real</b> em minutos de verdade, próxima cidade, hora do jogo, prazo do frete, próximo descanso com sua fadiga e pagamento. O pagamento também pode aparecer na sua moeda.</li>
 <li><b>Caminhão</b>: modelo, hodômetro, desgaste de cada peça e alertas como pressão de ar baixa, água ou óleo quentes demais e bateria fraca.</li>
 <li><b>Sessão</b>: pedágios, multas e viagens de balsa ou trem, com um botão para zerar.</li>
 </ul>
 <h3>Aba Painel</h3>
 <p>Velocímetro, conta-giros com a marcha, barra de combustível, hodômetro e autonomia.</p>
 <h3>Mini-HUD</h3>
-<p>Esconda o painel com o botão de três linhas e o mapa ocupa a tela toda; a velocidade e o limite ficam num canto. Nas Configurações você escolhe o que mais o mini-HUD mostra: combustível, autonomia, ETA, distância restante, piloto automático e instruções do GPS.</p>`,
+<p>Esconda o painel com o botão de três linhas e o mapa ocupa a tela toda; a velocidade e o limite ficam num canto. Nas Configurações você escolhe o que mais o mini-HUD mostra: combustível, autonomia, ETA, distância restante, próximo descanso com a fadiga, piloto automático e instruções do GPS.</p>`,
     dash: `
 <p>O botão de velocímetro na barra de cima abre um painel de instrumentos em tela cheia:</p>
 <ul>
@@ -599,14 +599,14 @@ GUIDE_TEXT.pl = {
 <ul>
 <li>Prędkość, ograniczenie, numer drogi i prędkość tempomatu.</li>
 <li>Paliwo, zasięg i średnie spalanie, mierzone na podstawie twojej jazdy po przejechaniu 15 km (do tego czasu wartość z gry).</li>
-<li><b>Trasa</b>: start i cel, ładunek, ETA w czasie gry, <b>ETA rzeczywisty</b> w prawdziwych minutach, następne miasto, czas gry, termin zlecenia, następny odpoczynek i zapłata. Zapłatę można też pokazać w twojej walucie.</li>
+<li><b>Trasa</b>: start i cel, ładunek, ETA w czasie gry, <b>ETA rzeczywisty</b> w prawdziwych minutach, następne miasto, czas gry, termin zlecenia, następny odpoczynek z poziomem zmęczenia i zapłata. Zapłatę można też pokazać w twojej walucie.</li>
 <li><b>Ciężarówka</b>: model, licznik, zużycie każdej części i ostrzeżenia, np. niskie ciśnienie powietrza, za wysoka temperatura wody lub oleju, słaby akumulator.</li>
 <li><b>Sesja</b>: opłaty drogowe, mandaty oraz przeprawy promem lub pociągiem, z przyciskiem Resetuj.</li>
 </ul>
 <h3>Karta Zegary</h3>
 <p>Prędkościomierz, obrotomierz z biegiem, pasek paliwa, licznik i zasięg.</p>
 <h3>Mini-HUD</h3>
-<p>Ukryj panel przyciskiem z trzema kreskami, a mapa zajmie cały ekran; prędkość i ograniczenie zostaną w rogu. W Ustawieniach wybierasz, co jeszcze pokazuje mini-HUD: paliwo, zasięg, ETA, pozostały dystans, tempomat i wskazówki GPS.</p>`,
+<p>Ukryj panel przyciskiem z trzema kreskami, a mapa zajmie cały ekran; prędkość i ograniczenie zostaną w rogu. W Ustawieniach wybierasz, co jeszcze pokazuje mini-HUD: paliwo, zasięg, ETA, pozostały dystans, następny odpoczynek ze zmęczeniem, tempomat i wskazówki GPS.</p>`,
     dash: `
 <p>Przycisk z prędkościomierzem na górnym pasku otwiera deskę rozdzielczą na pełnym ekranie:</p>
 <ul>
@@ -774,14 +774,14 @@ GUIDE_TEXT.tr = {
 <ul>
 <li>Hız, hız sınırı, yol numarası ve hız sabitleyici hızı.</li>
 <li>Yakıt, menzil ve ortalama tüketim; 15 km sürdükten sonra kendi sürüşünden ölçülür (o zamana kadar oyunun değeri).</li>
-<li><b>Yolculuk</b>: çıkış ve varış, yük, oyun içi varış, gerçek dakikalarla <b>gerçek varış</b>, sonraki şehir, oyun saati, iş teslim süresi, sonraki mola ve iş ücreti. Ücret kendi para biriminde de gösterilebilir.</li>
+<li><b>Yolculuk</b>: çıkış ve varış, yük, oyun içi varış, gerçek dakikalarla <b>gerçek varış</b>, sonraki şehir, oyun saati, iş teslim süresi, yorgunluğunla birlikte sonraki mola ve iş ücreti. Ücret kendi para biriminde de gösterilebilir.</li>
 <li><b>Kamyon</b>: model, kilometre sayacı, her parçanın aşınması ve düşük hava basıncı, yüksek su veya yağ sıcaklığı, zayıf akü gibi uyarılar.</li>
 <li><b>Oturum</b>: ödenen geçiş ücretleri, cezalar ve feribot ya da tren yolculukları; sıfırlama düğmesiyle.</li>
 </ul>
 <h3>Göstergeler sekmesi</h3>
 <p>Hız göstergesi, vitesle birlikte devir saati, yakıt çubuğu, kilometre sayacı ve menzil.</p>
 <h3>Mini-HUD</h3>
-<p>Paneli üç çizgili düğmeyle gizle, harita tüm ekranı kaplasın; hızın ve hız sınırı bir köşede kalır. Mini-HUD'un başka neler göstereceğini Ayarlar'da seçersin: yakıt, menzil, varış süresi, kalan mesafe, hız sabitleyici ve GPS yönlendirmeleri.</p>`,
+<p>Paneli üç çizgili düğmeyle gizle, harita tüm ekranı kaplasın; hızın ve hız sınırı bir köşede kalır. Mini-HUD'un başka neler göstereceğini Ayarlar'da seçersin: yakıt, menzil, varış süresi, kalan mesafe, yorgunlukla sonraki mola, hız sabitleyici ve GPS yönlendirmeleri.</p>`,
     dash: `
 <p>Üst çubuktaki gösterge düğmesi tam ekran bir gösterge paneli açar:</p>
 <ul>
@@ -949,14 +949,14 @@ GUIDE_TEXT.ru = {
 <ul>
 <li>Скорость, ограничение скорости, номер дороги и скорость круиз-контроля.</li>
 <li>Топливо, запас хода и средний расход, измеренный по вашей езде после первых 15 км (до этого значение из игры).</li>
-<li><b>Рейс</b>: откуда и куда, груз, ETA по игровому времени, <b>ETA (реальное)</b> в настоящих минутах, следующий город, игровое время, срок заказа, следующий отдых и оплата. Оплату можно показывать и в вашей валюте.</li>
+<li><b>Рейс</b>: откуда и куда, груз, ETA по игровому времени, <b>ETA (реальное)</b> в настоящих минутах, следующий город, игровое время, срок заказа, следующий отдых с уровнем усталости и оплата. Оплату можно показывать и в вашей валюте.</li>
 <li><b>Грузовик</b>: модель, одометр, износ каждой детали и предупреждения: низкое давление воздуха, высокая температура воды или масла, слабый аккумулятор.</li>
 <li><b>Сессия</b>: оплаченные платные дороги, штрафы и поездки на пароме или поезде, с кнопкой сброса.</li>
 </ul>
 <h3>Вкладка «Приборы»</h3>
 <p>Спидометр, тахометр с передачей, полоса топлива, одометр и запас хода.</p>
 <h3>Мини-HUD</h3>
-<p>Скройте панель кнопкой с тремя полосками, и карта займёт весь экран; скорость и ограничение останутся в углу. В настройках вы выбираете, что ещё показывает мини-HUD: топливо, запас хода, ETA, оставшееся расстояние, круиз-контроль и подсказки GPS.</p>`,
+<p>Скройте панель кнопкой с тремя полосками, и карта займёт весь экран; скорость и ограничение останутся в углу. В настройках вы выбираете, что ещё показывает мини-HUD: топливо, запас хода, ETA, оставшееся расстояние, следующий отдых с усталостью, круиз-контроль и подсказки GPS.</p>`,
     dash: `
 <p>Кнопка со спидометром на верхней панели открывает панель приборов на весь экран:</p>
 <ul>
