@@ -135,6 +135,12 @@ class Acumulador:
         # Ultimos valores vistos, para sacar diferencias.
         self._ultimo = {}
         self._trabajo_anterior = None
+        # La huella del ultimo trabajo cerrado. Al llegar el pulso de entrega
+        # o de cancelacion el juego todavia tiene los campos del trabajo
+        # puestos un instante, y sin esto se reabria en el mismo tick: en la
+        # cola la apertura pisaba al cierre (misma clave) y el servidor lo
+        # dejaba en curso. Visto al cancelar un trabajo en ETS2.
+        self._huella_cerrada = None
         self._ultimo_envio_sesion = 0.0
 
     # --- lo que el que envia le pide ---
@@ -266,6 +272,7 @@ class Acumulador:
         self._sesion = None
         self._viaje = None
         self._trabajo_anterior = None
+        self._huella_cerrada = None
         self._ultimo = {}
         return [{"tipo": "session", "datos": datos}]
 
@@ -347,6 +354,7 @@ class Acumulador:
             datos.update(trip_tracker.datos_del_cierre(raw, payload.get("event")))
             acciones.append({"tipo": "trip_close", "datos": datos})
             self._viaje = None
+            self._huella_cerrada = trip_tracker.huella(self._trabajo_anterior or actual)
         elif paso == "cambiado" and self._viaje is not None:
             # Otro trabajo sin pulso de entrega. No se inventa una entrega:
             # se manda lo acumulado y el servidor lo dara por abandonado si
@@ -354,7 +362,10 @@ class Acumulador:
             acciones.append({"tipo": "trip_checkpoint", "datos": self.viaje()})
             self._viaje = None
 
-        if actual is not None and self._viaje is None:
+        if trip_tracker.huella(actual) != self._huella_cerrada:
+            self._huella_cerrada = None
+        if (actual is not None and self._viaje is None
+                and self._huella_cerrada is None):
             self._empezar_viaje(actual, payload, ahora)
             acciones.append({"tipo": "trip_open", "datos": self.viaje()})
         self._trabajo_anterior = actual
@@ -370,6 +381,8 @@ class Acumulador:
             "desgaste_ultimo": dict(payload.get("wear") or {}),
             "segmentos": [], "ultimo_punto": None, "ultimo_punto_ts": None,
             "ultimo_envio": ahora,
+            "truck_brand": payload.get("truckBrand"),
+            "truck_name": payload.get("truckName"),
         }
 
     def _anotar_recorrido(self, payload, ahora):

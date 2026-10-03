@@ -303,3 +303,34 @@ def test_el_viaje_lleva_moneda_y_camion():
     ats.tick(payload(600.0, game="ats", odometerKm=1.0, fuel=1.0),
              dict(TRABAJO, game=2), 1000.0)
     assert ats.viaje()["currency"] == "USD"
+
+
+def test_cancelar_no_reabre_el_mismo_trabajo_en_el_mismo_tick():
+    # Visto en ETS2: al llegar el pulso de cancelacion el juego todavia tenia
+    # los campos del trabajo, el viaje se reabria al instante y en la cola la
+    # apertura pisaba al cierre. El servidor lo dejaba en curso.
+    acc = accumulator.Acumulador()
+    conducir(acc, TRABAJO, segundos=3)
+    cancela = payload(700.0, odometerKm=500001.0, fuel=399.0,
+                      event={"jobCancelled": True})
+    acciones = acc.tick(cancela, TRABAJO, 1010.0)
+    viajes = [a for a in acciones if a["tipo"].startswith("trip")]
+    assert [a["tipo"] for a in viajes] == ["trip_close"]
+    assert viajes[0]["datos"]["status"] == "cancelled"
+    # Un par de lecturas mas con los campos todavia puestos: nada se reabre.
+    for i in range(3):
+        siguiente = acc.tick(payload(701.0 + i, odometerKm=500001.0, fuel=399.0),
+                             TRABAJO, 1011.0 + i)
+        assert not [a for a in siguiente if a["tipo"].startswith("trip")]
+    assert not acc.hay_viaje()
+    # Se vacian y despues se toma otro: ese si abre.
+    acc.tick(payload(710.0, odometerKm=500001.0, fuel=399.0), SIN_TRABAJO, 1020.0)
+    otro = dict(TRABAJO, jobStartingTime=5000, cityDstId="wien", cityDst="Wien")
+    nuevas = acc.tick(payload(711.0, odometerKm=500001.0, fuel=399.0), otro, 1021.0)
+    assert [a["tipo"] for a in nuevas if a["tipo"].startswith("trip")] == ["trip_open"]
+
+
+def test_el_camion_queda_desde_que_se_abre_el_viaje():
+    acc = accumulator.Acumulador()
+    acc.tick(payload(600.0, odometerKm=1.0, fuel=1.0), TRABAJO, 1000.0)
+    assert acc.viaje()["truck_brand"] == "Scania"
