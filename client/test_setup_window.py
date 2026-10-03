@@ -595,6 +595,20 @@ def test_si_no_se_abre_el_navegador_la_direccion_queda_a_mano(monkeypatch):
     assert dialogos == ["https://trucksim-dash.com/app/?code=X"]
 
     dialogos.clear()
+    monkeypatch.setattr(tray_client.win_integration, "is_wine", lambda: False)
     monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda url: True)
     tray_client.abrir_navegador("https://trucksim-dash.com/app/?code=X")
     assert dialogos == []
+
+
+def test_bajo_wine_la_direccion_se_muestra_aunque_arranque_winebrowser(monkeypatch):
+    """winebrowser lanza el navegador de Linux sin esperarlo: que arranque no
+    prueba que se haya abierto nada (Proton con el navegador fuera del
+    contenedor). La direccion tiene que quedar a mano igual."""
+    dialogos = []
+    monkeypatch.setattr(tray_client.win_integration, "is_wine", lambda: True)
+    monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda url: True)
+    monkeypatch.setattr(tray_client, "show_text_dialog",
+                        lambda titulo, mensaje, copy_value=None: dialogos.append((mensaje, copy_value)))
+    tray_client.abrir_navegador("https://trucksim-dash.com/app/?code=X")
+    assert dialogos == [(tray_client.T("dlg_open_if_not_opened"), "https://trucksim-dash.com/app/?code=X")]

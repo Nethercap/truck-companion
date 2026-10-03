@@ -229,7 +229,13 @@ def abrir_navegador(url: str) -> None:
     """Toda apertura del navegador pasa por aca (ver
     win_integration.open_in_browser: bajo Proton, webbrowser tiraba abajo el
     cliente). Si no se pudo lanzar nada, la direccion queda en pantalla y en
-    el portapapeles."""
+    el portapapeles.
+
+    Bajo Wine la direccion se muestra siempre: que winebrowser arranque no
+    dice nada, porque lanza el navegador del lado de Linux sin esperarlo. Con
+    Proton, xdg-open corre adentro del contenedor de Steam y puede no llegar
+    al navegador de la sesion (paso en Reddit con Zen), y el boton quedaba
+    mudo."""
     try:
         abierto = win_integration.open_in_browser(url)
     except Exception:
@@ -237,6 +243,8 @@ def abrir_navegador(url: str) -> None:
         abierto = False
     if not abierto:
         show_text_dialog("Truck Dash", T("dlg_open_manually"), copy_value=url)
+    elif win_integration.is_wine():
+        show_text_dialog("Truck Dash", T("dlg_open_if_not_opened"), copy_value=url)
 
 
 # ---------------------------------------------------------------------------

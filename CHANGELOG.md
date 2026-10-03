@@ -10,6 +10,9 @@ updates on its own and is not versioned here.
   The account service rejected the default Python one, so linking an account
   from Setup always said the service could not be reached.
 - Setup has a Copy button next to the account linking code.
+- Proton: "Open dashboard" now always shows the address, copied, in case
+  the browser does not open. Wine starts the Linux browser without waiting
+  for it, so the client cannot tell whether it worked.
 - Linux: the ready-made ATS launcher pointed at the wrong Proton prefix
   (Steam app ID 270800 instead of 270880), so the client could not see the
   game. Fixed in `client/linux/truckdash-ats.desktop` and the README.
