@@ -63,6 +63,14 @@
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
       statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
+      statsFreeRoam: (d, h) => 'Free roam: ' + d + ' \u00b7 ' + h + ' at the wheel',
+      topCountries: "Most visited countries",
+      topStates: "Most visited states",
+      topTrucks: "Most used trucks",
+      topCargo: "Most hauled cargo",
+      topCompanies: "Most worked companies",
+      topCities: "Most visited cities",
+      topRoutes: "Most repeated routes",
       totalsAll: 'all driving, with or without a job',
       navOverview: "Overview",
       navLogbook: "Logbook",
@@ -76,8 +84,6 @@
       quickOnTime: (n) => n + ' on time',
       quickSessions: (n) => n + ' sessions',
       recentTitle: "Recent trips",
-      viewList: "List",
-      viewMap: "Map",
       openLogbook: "My logbook",
       logbookTitle: "Logbook",
       logbookCount: (n) => n === 1 ? '1 trip' : n + ' trips',
@@ -93,8 +99,6 @@
       colDistance: "Distance",
       colTime: "Time",
       colPay: "Pay",
-      mapOneGame: (g) => 'Only ' + g + ' trips are drawn here: each game has its own map.',
-      mapEmpty: "These trips have no recorded route yet.",
       tripDetails: 'Details',
       tripPlanned: 'Planned',
       tripTruck: 'Truck',
@@ -219,6 +223,14 @@
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
       statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
+      statsFreeRoam: (d, h) => 'Manejo libre: ' + d + ' \u00b7 ' + h + ' al volante',
+      topCountries: "Paises mas visitados",
+      topStates: "Estados mas visitados",
+      topTrucks: "Camiones mas usados",
+      topCargo: "Cargas mas llevadas",
+      topCompanies: "Empresas mas trabajadas",
+      topCities: "Ciudades mas visitadas",
+      topRoutes: "Rutas mas repetidas",
       totalsAll: 'todo lo manejado, con o sin trabajo',
       navOverview: "Resumen",
       navLogbook: "Bitacora",
@@ -232,8 +244,6 @@
       quickOnTime: (n) => n + ' a tiempo',
       quickSessions: (n) => n + ' sesiones',
       recentTitle: "Ultimos viajes",
-      viewList: "Lista",
-      viewMap: "Mapa",
       openLogbook: "Mi bitacora",
       logbookTitle: "Bitacora",
       logbookCount: (n) => n === 1 ? '1 viaje' : n + ' viajes',
@@ -249,8 +259,6 @@
       colDistance: "Distancia",
       colTime: "Tiempo",
       colPay: "Pago",
-      mapOneGame: (g) => 'Aca solo se dibujan los viajes de ' + g + ': cada juego tiene su mapa.',
-      mapEmpty: "Estos viajes todavia no tienen recorrido guardado.",
       tripDetails: 'Detalle',
       tripPlanned: 'Planeado',
       tripTruck: 'Camion',
@@ -866,6 +874,35 @@
   let resumen = [];
   let resumenPedido = false;
 
+  function nombreDeRegion(region, juego) {
+    // En ETS2 es un pais: el nombre lo pone el navegador en el idioma
+    // elegido. En ATS es un estado y viene con su nombre en ingles, que es
+    // como se llaman (y como los muestra el juego). Un pais de un mod sin
+    // codigo (Grand Utopia) va con el nombre que trae.
+    if (!region) return null;
+    if (juego === 'ets2' && region.code) return nombreDePais(region.code);
+    return region.name || region.code || null;
+  }
+
+  function listaTop(titulo, items, texto) {
+    if (!items || !items.length) return null;
+    const caja = document.createElement('div');
+    const h = document.createElement('h4');
+    h.textContent = titulo;
+    caja.appendChild(h);
+    const ol = document.createElement('ol');
+    items.forEach((it) => {
+      const li = document.createElement('li');
+      li.appendChild(document.createTextNode(texto(it)));
+      const cuenta = document.createElement('span');
+      cuenta.textContent = ' \u00b7 ' + t('logbookCount', it.trips);
+      li.appendChild(cuenta);
+      ol.appendChild(li);
+    });
+    caja.appendChild(ol);
+    return caja;
+  }
+
   function cifra(valor, etiqueta) {
     if (valor == null) return null;
     const caja = document.createElement('div');
@@ -916,6 +953,13 @@
     ].filter(Boolean).forEach((c) => cifras.appendChild(c));
     caja.appendChild(cifras);
 
+    // Manejo libre: lo de las sesiones que no fue viaje (ir a buscar la
+    // carga, volver vacio). Lo calcula el servidor.
+    if (s.free && (s.free.distance_km || s.free.real_hours)) {
+      sumar(caja, renglon([t('statsFreeRoam', distancia(s.free.distance_km),
+                             duracion(s.free.real_hours) || '0 min')]));
+    }
+
     // La plata, por moneda: sumar euros con libras no da nada.
     (s.money || []).forEach((m) => {
       sumar(caja, renglon([
@@ -936,6 +980,21 @@
     if ((s.countries || []).length) {
       caja.appendChild(listaDePaises(s.countries, t('statsCountries')));
     }
+    // Lo mas repetido, de a tres.
+    const top = s.top || {};
+    const tops = document.createElement('div');
+    tops.className = 'tops';
+    [
+      listaTop(t(s.game === 'ats' ? 'topStates' : 'topCountries'), top.regions,
+               (r) => nombreDeRegion(r, s.game) || '?'),
+      listaTop(t('topTrucks'), top.trucks, (c) => c.name),
+      listaTop(t('topCargo'), top.cargo, (c) => c.name),
+      listaTop(t('topCompanies'), top.companies, (c) => c.name),
+      listaTop(t('topCities'), top.cities, (c) => c.name),
+      listaTop(t('topRoutes'), top.city_pairs, (r) => r.from + ' \u2192 ' + r.to)
+    ].filter(Boolean).forEach((l) => tops.appendChild(l));
+    if (tops.children.length) caja.appendChild(tops);
+
     if (s.longest) {
       const donde = [s.longest.city_src, s.longest.city_dst].filter(Boolean).join(' \u2192 ');
       sumar(caja, renglon([
@@ -974,14 +1033,33 @@
   // kilometros de un viaje tambien son kilometros de sesion, asi que sumar
   // las dos tablas los cuenta dos veces. El backend tiene esa ruta
   // justamente para que esa cuenta se haga en un solo lugar.
-  // Las unidades son las que eligio en la app: mismo dominio, misma clave,
-  // misma preferencia. Aca no hay donde cambiarlas a proposito, para no
-  // terminar con dos interruptores que dicen cosas distintas.
-  function imperial() {
+  // Las unidades son las de la app: mismo dominio, misma clave, misma
+  // preferencia. Se pueden cambiar desde aca o desde la app, pero es UNA
+  // sola: cambiarla aca la cambia alla, y no hay dos interruptores que
+  // digan cosas distintas.
+  const AJUSTES_APP = 'truckdash_settings';
+  let enMillas = (() => {
     try {
-      const cfg = JSON.parse(localStorage.getItem('truckdash_settings')) || {};
+      const cfg = JSON.parse(localStorage.getItem(AJUSTES_APP)) || {};
       return !!cfg.useImperial;
     } catch (e) { return false; }
+  })();
+  function imperial() { return enMillas; }
+
+  function armarSelectorDeUnidades() {
+    const sel = $('unitSelect');
+    sel.value = enMillas ? 'mi' : 'km';
+    sel.addEventListener('change', () => {
+      enMillas = sel.value === 'mi';
+      try {
+        // Se escribe encima de lo que ya tiene la app: ese objeto guarda
+        // todos sus ajustes, no solo este.
+        const cfg = JSON.parse(localStorage.getItem(AJUSTES_APP)) || {};
+        cfg.useImperial = enMillas;
+        localStorage.setItem(AJUSTES_APP, JSON.stringify(cfg));
+      } catch (e) {}
+      if (usuario && usuario.username) pintarCuenta();
+    });
   }
 
   function numero(valor, decimales) {
@@ -1175,7 +1253,9 @@
     if (ultimo) {
       const enCurso = ultimo.status === 'in_progress';
       lugar = enCurso ? (ultimo.city_src || ultimo.city_dst) : (ultimo.city_dst || ultimo.city_src);
-      cuando = [(ultimo.game || '').toUpperCase(),
+      const region = enCurso ? (ultimo.region_src || ultimo.region_dst)
+                             : (ultimo.region_dst || ultimo.region_src);
+      cuando = [nombreDeRegion(region, ultimo.game), (ultimo.game || '').toUpperCase(),
                 enCurso ? t('tripOpen') : fechaCorta(ultimo.delivered_at || ultimo.started_at)]
         .filter(Boolean).join(' · ');
     }
@@ -1325,9 +1405,8 @@
     v._abierto = !v._abierto;
     repintar();
     if (!v._abierto || v._detalle) return;
-    // Los ultimos viajes ya vienen con el recorrido (para el mapa); los del
-    // logbook no, y se pide solo cuando alguien abre uno, una sola vez.
-    if (v.route !== undefined) { v._detalle = v; repintar(); return; }
+    // El recorrido son un par de KB por viaje, asi que se pide solo cuando
+    // alguien abre uno, y una sola vez.
     const { ok, datos } = await pedir('/trips/' + v.id);
     if (!ok) { v._abierto = false; repintar(); return; }
     v._detalle = datos.trip;
@@ -1377,170 +1456,23 @@
     return boton;
   }
 
-  // ------------------------------------------------- mapa de los ultimos
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const COLORES_MAPA = ['#3b9eff', '#ffb23b', '#4caf50', '#e06cff', '#ff6b6b'];
-  const PROPORCION_MAPA = 2;  // la misma que .mapa-viajes .lienzo en el CSS
-
-  function mapaDeViajes(lista) {
-    const conRuta = lista.filter((v) => (v.route || []).some((s) => s.length > 1));
-    if (!conRuta.length) return null;
-    // Un juego solo: cada uno tiene su mapa, y las coordenadas de ETS2 y ATS
-    // dibujadas juntas no significan nada. El que tenga mas viajes para
-    // mostrar; si empatan, el del mas reciente (la lista viene ordenada).
-    const cuantos = {};
-    conRuta.forEach((v) => { cuantos[v.game] = (cuantos[v.game] || 0) + 1; });
-    const juego = conRuta.reduce((mejor, v) =>
-      (cuantos[v.game] > cuantos[mejor] ? v.game : mejor), conRuta[0].game);
-    const delJuego = conRuta.filter((v) => v.game === juego);
-
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    delJuego.forEach((v) => v.route.forEach((seg) => seg.forEach((p) => {
-      if (p[0] < minX) minX = p[0];
-      if (p[0] > maxX) maxX = p[0];
-      if (p[1] < minY) minY = p[1];
-      if (p[1] > maxY) maxY = p[1];
-    })));
-    // Aire alrededor, y despues el lado corto se estira hasta la proporcion
-    // del lienzo: asi un porcentaje del lienzo es el mismo punto del dibujo.
-    let ancho = (maxX - minX) || 1, alto = (maxY - minY) || 1;
-    const aire = Math.max(ancho, alto) * 0.08;
-    minX -= aire; minY -= aire; ancho += aire * 2; alto += aire * 2;
-    if (ancho / alto < PROPORCION_MAPA) {
-      const nuevo = alto * PROPORCION_MAPA;
-      minX -= (nuevo - ancho) / 2; ancho = nuevo;
-    } else {
-      const nuevo = ancho / PROPORCION_MAPA;
-      minY -= (nuevo - alto) / 2; alto = nuevo;
-    }
-
-    const caja = document.createElement('div');
-    const lienzo = document.createElement('div');
-    lienzo.className = 'lienzo';
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    // La z del juego crece hacia el sur y la y del SVG hacia abajo, asi que
-    // el norte queda arriba sin dar vuelta nada.
-    svg.setAttribute('viewBox', [minX, minY, ancho, alto].join(' '));
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.setAttribute('role', 'img');
-    lienzo.appendChild(svg);
-
-    const poli = (clase, puntos, color) => {
-      const el = document.createElementNS(SVG_NS, 'polyline');
-      el.setAttribute('class', clase);
-      el.setAttribute('points', puntos.map((p) => p[0] + ',' + p[1]).join(' '));
-      if (color) el.setAttribute('stroke', color);
-      el.setAttribute('vector-effect', 'non-scaling-stroke');
-      return el;
-    };
-    const ciudades = new Map();
-    // Del mas viejo al mas nuevo, para que el ultimo quede arriba.
-    delJuego.slice().reverse().forEach((v) => {
-      const color = COLORES_MAPA[delJuego.indexOf(v) % COLORES_MAPA.length];
-      const g = document.createElementNS(SVG_NS, 'g');
-      const titulo = document.createElementNS(SVG_NS, 'title');
-      titulo.textContent = [v.city_src, v.city_dst].filter(Boolean).join(' → ');
-      g.appendChild(titulo);
-      v.route.forEach((seg, i) => {
-        if (seg.length > 1) g.appendChild(poli('traza', seg, color));
-        const previo = v.route[i - 1];
-        // Un hueco es manejo con el cliente cerrado: punteado, nunca una
-        // recta que finja un tramo que no vimos.
-        if (previo && previo.length && seg.length) {
-          g.appendChild(poli('hueco', [previo[previo.length - 1], seg[0]]));
-        }
-      });
-      svg.appendChild(g);
-      const puntos = [].concat.apply([], v.route.filter((s) => s.length));
-      if (v.city_src && puntos.length) ciudades.set(v.city_src, puntos[0]);
-      if (v.city_dst && puntos.length) ciudades.set(v.city_dst, puntos[puntos.length - 1]);
-    });
-    ciudades.forEach((p, nombre) => {
-      const c = document.createElementNS(SVG_NS, 'ellipse');
-      c.setAttribute('class', 'ciudad');
-      c.setAttribute('cx', p[0]);
-      c.setAttribute('cy', p[1]);
-      // Con preserveAspectRatio none y la misma proporcion, un circulo de
-      // verdad: radio en x y en y segun el ancho y el alto del dibujo.
-      c.setAttribute('rx', ancho / 260);
-      c.setAttribute('ry', alto / 130);
-      svg.appendChild(c);
-      const lbl = document.createElement('span');
-      lbl.className = 'lbl';
-      lbl.textContent = nombre;
-      lbl.style.left = ((p[0] - minX) / ancho * 100) + '%';
-      lbl.style.top = ((p[1] - minY) / alto * 100) + '%';
-      lienzo.appendChild(lbl);
-    });
-    svg.setAttribute('aria-label', delJuego.map((v) =>
-      [v.city_src, v.city_dst].filter(Boolean).join(' → ')).join(', '));
-    caja.appendChild(lienzo);
-
-    const leyenda = document.createElement('ul');
-    leyenda.className = 'leyenda';
-    delJuego.forEach((v, i) => {
-      const li = document.createElement('li');
-      const punto = document.createElement('i');
-      punto.style.background = COLORES_MAPA[i % COLORES_MAPA.length];
-      li.appendChild(punto);
-      li.appendChild(document.createTextNode(
-        [[v.city_src, v.city_dst].filter(Boolean).join(' → ') || t('tripUnnamed'),
-         fechaCorta(v.delivered_at || v.started_at)].join(' · ')));
-      leyenda.appendChild(li);
-    });
-    caja.appendChild(leyenda);
-    if (conRuta.length > delJuego.length) {
-      const nota = document.createElement('div');
-      nota.className = 'nota';
-      nota.textContent = t('mapOneGame', juego.toUpperCase());
-      caja.appendChild(nota);
-    }
-    return caja;
-  }
 
   // ------------------------------------------------------ ultimos viajes
   const RECIENTES = 5;
   let recientes = [];
-  let vistaMapa = false;
 
   function pintarRecientes() {
     const lista = $('recentList');
-    const mapa = $('recentMap');
     lista.innerHTML = '';
-    mapa.innerHTML = '';
-    $('btnRecentList').classList.toggle('activo', !vistaMapa);
-    $('btnRecentMap').classList.toggle('activo', vistaMapa);
-    $('btnRecentList').setAttribute('aria-pressed', String(!vistaMapa));
-    $('btnRecentMap').setAttribute('aria-pressed', String(vistaMapa));
     const vacio = $('recentEmpty');
-    if (!recientes.length) {
-      lista.hidden = true;
-      mapa.hidden = true;
-      vacio.hidden = false;
-      vacio.textContent = t(totales.length ? 'tripsEmptyDriven' : 'tripsEmpty');
-      return;
-    }
-    vacio.hidden = true;
-    if (vistaMapa) {
-      const dibujo = mapaDeViajes(recientes);
-      lista.hidden = true;
-      if (dibujo) {
-        mapa.appendChild(dibujo);
-        mapa.hidden = false;
-      } else {
-        mapa.hidden = true;
-        vacio.hidden = false;
-        vacio.textContent = t('mapEmpty');
-      }
-      return;
-    }
-    mapa.hidden = true;
-    lista.hidden = false;
-    lista.appendChild(tablaViajes(recientes, pintarRecientes));
+    vacio.hidden = recientes.length > 0;
+    vacio.textContent = t(totales.length ? 'tripsEmptyDriven' : 'tripsEmpty');
+    if (recientes.length) lista.appendChild(tablaViajes(recientes, pintarRecientes));
   }
 
   async function traerRecientes() {
-    const { ok, datos } = await pedir('/trips?limite=' + RECIENTES + '&con_recorrido=true');
+    const { ok, datos } = await pedir('/trips?limite=' + RECIENTES);
     if (!ok) return;   // sin viajes la pantalla sigue siendo util
     recientes = datos.trips || [];
     pintarRecientes();
@@ -1631,6 +1563,7 @@
   function iniciar() {
     if (!dibujaBanderas()) document.documentElement.classList.add('sin-banderas');
     armarSelectorDeIdioma();
+    armarSelectorDeUnidades();
     aplicarIdioma();
     mostrarErrorDeVuelta();
     $('usernameInput').addEventListener('input', alEscribirNombre);
@@ -1645,8 +1578,6 @@
     ['filterGame', 'filterStatus'].forEach((id) => {
       $(id).addEventListener('change', () => { viajes = []; traerViajes(false); });
     });
-    $('btnRecentList').addEventListener('click', () => { vistaMapa = false; pintarRecientes(); });
-    $('btnRecentMap').addEventListener('click', () => { vistaMapa = true; pintarRecientes(); });
     window.addEventListener('hashchange', () => { if (usuario) mostrarPagina(); });
     $('btnDelete').addEventListener('click', () => mostrarConfirmacionDeBorrado(true));
     $('btnDeleteCancel').addEventListener('click', () => mostrarConfirmacionDeBorrado(false));
