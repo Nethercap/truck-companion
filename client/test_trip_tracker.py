@@ -118,3 +118,12 @@ def test_el_juego_sale_del_nombre_y_cae_en_ets2():
     assert tt.juego({"game": "American Truck Simulator"}) == "ats"
     assert tt.juego({"game": "Euro Truck Simulator 2"}) == "ets2"
     assert tt.juego({}) == "ets2"
+
+
+def test_el_juego_como_numero_del_plugin():
+    # Asi lo manda el bloque de verdad: 2 es ATS. Los tests de arriba usaban
+    # el nombre en texto y no vieron que con el plugin real fallaba siempre.
+    assert tt.juego({"game": 2}) == "ats"
+    assert tt.juego({"game": 1}) == "ets2"
+    d = tt.datos_del_trabajo(dict(CON_TRABAJO, game=2))
+    assert d["game"] == "ats"

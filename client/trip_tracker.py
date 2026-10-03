@@ -57,8 +57,15 @@ def datos_del_trabajo(raw: dict) -> dict | None:
 def juego(raw: dict) -> str:
     """ets2 o ats. El SDK no lo dice directo, pero la telemetria trae el
     nombre del juego; si faltara, ets2 es el mas probable y de todas formas
-    se corrige en el proximo trabajo."""
-    nombre = (raw.get("game") or raw.get("gameName") or "").lower()
+    se corrige en el proximo trabajo.
+
+    El bloque del plugin lo trae como numero (1 ETS2, 2 ATS, igual que
+    build_payload). Con un .lower() pelado, cada lectura con trabajo tiraba
+    AttributeError y el viaje no se abria nunca."""
+    valor = raw.get("game")
+    if isinstance(valor, int):
+        return "ats" if valor == 2 else "ets2"
+    nombre = str(valor or raw.get("gameName") or "").lower()
     if "american" in nombre or nombre == "ats":
         return "ats"
     return "ets2"
