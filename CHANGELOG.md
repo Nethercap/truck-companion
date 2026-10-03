@@ -4,12 +4,8 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.24 (2026-10-03)
 
-- The client now identifies itself as Truck Dash on every web request.
-  The account service rejected the default Python one, so linking an account
-  from Setup always said the service could not be reached.
-- Setup has a Copy button next to the account linking code.
 - Proton: "Open dashboard" now always shows the address, copied, in case
   the browser does not open. Wine starts the Linux browser without waiting
   for it, so the client cannot tell whether it worked.
@@ -19,6 +15,10 @@ updates on its own and is not versioned here.
 - Linux: the README explains how to combine the Truck Dash launch options
   line with your own (mangohud, `PROTON_LOG`, DLL overrides), and that Lutris
   and protontricks put the client on a different wineserver than the game.
+- Groundwork for optional accounts, still switched off: fixes from a test
+  drive in both games (linking from Setup, trips that never opened, the
+  currency, sleep time, a cancelled job that stayed open) and the speed of
+  each point of the route, for the speed map of a trip.
 
 ## 1.5.23 (2026-09-30)
 
