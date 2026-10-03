@@ -334,3 +334,40 @@ def test_el_camion_queda_desde_que_se_abre_el_viaje():
     acc = accumulator.Acumulador()
     acc.tick(payload(600.0, odometerKm=1.0, fuel=1.0), TRABAJO, 1000.0)
     assert acc.viaje()["truck_brand"] == "Scania"
+
+
+def test_dormir_se_mide_aparte_y_no_suma_al_volante():
+    # La prueba de ETS2: 9 h durmiendo en medio del viaje. El juego da
+    # 13 h 30 de viaje; nosotros, lo manejado, y el sueno aparte para
+    # explicar la diferencia.
+    acc = accumulator.Acumulador()
+    base = dict(odometerKm=500000.0, fuel=400.0, restStopMinutes=67)
+    acc.tick(payload(600.0, **base), TRABAJO, 1000.0)
+    acc.tick(payload(601.0, **base), TRABAJO, 1001.0)
+    # Se duerme: el reloj salta 540 min y el descanso vuelve a casi 11 h.
+    acc.tick(payload(1141.0, **dict(base, restStopMinutes=656, speedKmh=0.0)), TRABAJO, 1010.0)
+    v = acc.viaje()
+    assert v["sleep_hours"] == 9.0
+    assert v["game_hours"] < 1     # el salto no es manejo
+    # Manejando el descanso baja: eso no es dormir.
+    acc.tick(payload(1142.0, **dict(base, restStopMinutes=655)), TRABAJO, 1011.0)
+    assert acc.viaje()["sleep_hours"] == 9.0
+
+
+def test_tambien_cuenta_si_el_juego_pasa_el_sueno_de_a_poco():
+    acc = accumulator.Acumulador()
+    reloj, descanso = 600.0, 60
+    acc.tick(payload(reloj, odometerKm=1.0, fuel=1.0, restStopMinutes=descanso,
+                     speedKmh=0.0), TRABAJO, 1000.0)
+    for i in range(9):
+        reloj += 60
+        descanso += 66
+        acc.tick(payload(reloj, odometerKm=1.0, fuel=1.0, restStopMinutes=descanso,
+                         speedKmh=0.0), TRABAJO, 1001.0 + i)
+    assert acc.viaje()["sleep_hours"] == 9.0
+
+
+def test_sin_dormir_no_hay_horas_de_sueno():
+    acc = accumulator.Acumulador()
+    conducir(acc, TRABAJO, segundos=30)
+    assert acc.viaje()["sleep_hours"] is None

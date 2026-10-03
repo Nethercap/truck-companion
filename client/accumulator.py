@@ -196,6 +196,7 @@ class Acumulador:
             "ferries": round(v["ferries"], 2) or None,
             "fines": round(v["fines"], 2) or None,
             "fuel_used": round(v["fuel_used"], 2) or None,
+            "sleep_hours": round(v.get("sleep_minutes", 0.0) / 60, 4) or None,
             "damage_delta": self._dano(),
         }
 
@@ -307,6 +308,19 @@ class Acumulador:
                 minutos = salto
         horas_de_juego = minutos / 60 if minutos is not None else (dt / 3600) * ESCALA_MAXIMA
 
+        # Dormir: avanzo el reloj y SUBIO lo que falta para el proximo
+        # descanso. Manejando o parado ese numero solo baja; sube al dormir
+        # (o en un ferry, que el juego tambien cuenta como descanso). Anda
+        # igual si el juego salta las 9 h de golpe o las pasa de a poco.
+        dormido = 0.0
+        descanso = payload.get("restStopMinutes")
+        if (reloj is not None and anterior.get("reloj") is not None
+                and descanso is not None and anterior.get("descanso") is not None
+                and descanso > anterior["descanso"]):
+            salto_sueno = reloj - anterior["reloj"]
+            if 0 < salto_sueno <= 24 * 60:
+                dormido = float(salto_sueno)
+
         velocidad = payload.get("speedKmh") or 0.0
         moviendose = not payload.get("paused") and velocidad > VELOCIDAD_MINIMA_KMH
 
@@ -329,10 +343,10 @@ class Acumulador:
                 litros = bajo
 
         self._ultimo = {"ts": ahora, "reloj": reloj, "odo": odo,
-                        "fuel": tanque, "camion": camion}
+                        "fuel": tanque, "camion": camion, "descanso": descanso}
         return {"dt": dt if moviendose else 0.0,
                 "minutos": (minutos or 0.0) if moviendose else 0.0,
-                "km": km, "litros": litros,
+                "km": km, "litros": litros, "dormido": dormido,
                 "velocidad": 0.0 if payload.get("paused") else velocidad}
 
     @staticmethod
@@ -341,6 +355,7 @@ class Acumulador:
         destino["real_seconds"] += avance["dt"]
         destino["game_minutes"] += avance["minutos"]
         destino["fuel_used"] += avance["litros"]
+        destino["sleep_minutes"] = destino.get("sleep_minutes", 0.0) + avance.get("dormido", 0.0)
         if avance["velocidad"] < VELOCIDAD_MAXIMA_KMH:
             destino["max_speed"] = max(destino["max_speed"], avance["velocidad"])
 
