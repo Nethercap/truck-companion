@@ -817,6 +817,7 @@ class SetupWindow:
                 # proceso solo se va, que es la condicion para que el
                 # archivo se pueda pisar.
                 win_integration.start_updater(staged, [win_integration.AUTOSTART_FLAG] if state.autostart_mode else None)
+                state.cuenta.cerrar_sesion()
                 win_integration.stop_and_exit(stop_callback=lambda: state.icon and state.icon.stop())
             except Exception as exc:
                 logging.exception("Update failed")
@@ -889,6 +890,9 @@ def apagar() -> None:
 
 
 def quit_app(icon, item):
+    # Salir de la bandeja tambien termina la sesion de manejo, igual que
+    # apagar(); sin esto quedaba abierta en el servidor para siempre.
+    state.cuenta.cerrar_sesion()
     # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
     # que el proceso murio.
     state.discord.close()

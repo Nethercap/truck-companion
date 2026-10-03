@@ -236,6 +236,23 @@ def test_apagar_cierra_discord_y_el_icono(monkeypatch):
     assert llamadas == ["discord", ("salir", False)]
 
 
+def test_salir_de_la_bandeja_cierra_la_sesion_de_manejo(monkeypatch):
+    # Visto en la prueba de manejo: "Salir" no pasaba por apagar() y la
+    # sesion quedaba sin ended_at en el servidor.
+    llamadas = []
+    monkeypatch.setattr(tray_client.state.cuenta, "cerrar_sesion",
+                        lambda: llamadas.append("sesion"))
+    monkeypatch.setattr(tray_client.state.discord, "close",
+                        lambda: llamadas.append("discord"))
+
+    class Icono:
+        def stop(self):
+            llamadas.append("icono")
+
+    tray_client.quit_app(Icono(), None)
+    assert llamadas == ["sesion", "discord", "icono"]
+
+
 # ------------------------------------------------------------------ cuenta
 # La API no se toca nunca en las pruebas: se reemplaza account entero. Lo que
 # se prueba es la ventana, no que urllib sepa hablar.
