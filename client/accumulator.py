@@ -164,6 +164,10 @@ class Acumulador:
         v = self._viaje
         datos = dict(v["datos"])
         datos.update(self._totales_del_viaje())
+        # El ultimo camion visto: al abrir el viaje (por ejemplo al arrancar
+        # el cliente con el trabajo ya tomado) puede no haber llegado todavia.
+        datos["truck_brand"] = v.get("truck_brand")
+        datos["truck_name"] = v.get("truck_name")
         if con_recorrido:
             datos["route"] = _achicar(v["segmentos"])
         return datos
@@ -236,6 +240,9 @@ class Acumulador:
 
         if self._viaje is not None:
             self._sumar(self._viaje, avance, payload)
+            if payload.get("truckBrand"):
+                self._viaje["truck_brand"] = payload["truckBrand"]
+                self._viaje["truck_name"] = payload.get("truckName")
             self._anotar_recorrido(payload, ahora)
             if ahora - self._viaje["ultimo_envio"] >= CHECKPOINT_VIAJE_S:
                 self._viaje["ultimo_envio"] = ahora

@@ -18,6 +18,11 @@ distintos no se confunden y el mismo se reconoce despues de apagar la PC.
 CAMPOS_HUELLA = ("job_started_game_time", "deadline_game_time", "cargo_id",
                  "city_src_id", "city_dst_id")
 
+# El SDK da el pago en la moneda base del juego, sin importar la que la
+# persona eligio para mostrar. Sin moneda, la API deja el viaje fuera de
+# los totales de plata.
+MONEDA = {"ets2": "EUR", "ats": "USD"}
+
 
 def hay_trabajo(raw: dict) -> bool:
     """Si en este momento hay un trabajo tomado.
@@ -34,8 +39,9 @@ def datos_del_trabajo(raw: dict) -> dict | None:
     """Lo que hay que mandarle a la API para abrir el viaje, o None."""
     if not hay_trabajo(raw):
         return None
+    nombre_juego = juego(raw)
     return {
-        "game": juego(raw),
+        "game": nombre_juego,
         # --- huella ---
         "job_started_game_time": _entero(raw.get("jobStartingTime")),
         "deadline_game_time": _entero(raw.get("time_abs_delivery")),
@@ -50,6 +56,7 @@ def datos_del_trabajo(raw: dict) -> dict | None:
         "cargo": raw.get("cargo") or None,
         "cargo_mass": _numero(raw.get("cargoMass")),
         "revenue": _numero(raw.get("jobIncome")),
+        "currency": MONEDA[nombre_juego],
         "distance_planned_km": _numero(raw.get("plannedDistanceKm")),
     }
 

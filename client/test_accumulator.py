@@ -286,3 +286,20 @@ def test_los_checkpoints_no_salen_en_cada_tick():
     sesiones = [a for a in acciones if a["tipo"] == "session"]
     assert 3 <= len(checkpoints) <= 6, len(checkpoints)
     assert 1 <= len(sesiones) <= 3, len(sesiones)
+
+
+def test_el_viaje_lleva_moneda_y_camion():
+    # Sin moneda la API deja el viaje fuera de la plata, y el camion
+    # quedaba vacio: los dos vistos en la prueba de manejo en ATS.
+    acc = accumulator.Acumulador()
+    acc.tick(payload(600.0, odometerKm=500000.0, fuel=400.0, truckBrand=None,
+                     truckName=None), TRABAJO, 1000.0)
+    assert acc.viaje()["truck_brand"] is None  # todavia no llego el camion
+    conducir(acc, TRABAJO, segundos=5, t0=1001.0)
+    datos = acc.viaje()
+    assert datos["currency"] == "EUR"
+    assert (datos["truck_brand"], datos["truck_name"]) == ("Scania", "S")
+    ats = accumulator.Acumulador()
+    ats.tick(payload(600.0, game="ats", odometerKm=1.0, fuel=1.0),
+             dict(TRABAJO, game=2), 1000.0)
+    assert ats.viaje()["currency"] == "USD"
