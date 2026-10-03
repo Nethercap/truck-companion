@@ -69,6 +69,7 @@
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
       statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
+      tripSpeed: "Speed",
       navAchievements: "Achievements",
       achievementsTitle: "Achievements",
       recentAchTitle: "Recent achievements",
@@ -296,6 +297,7 @@
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
       statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
+      tripSpeed: "Velocidad",
       navAchievements: "Logros",
       achievementsTitle: "Logros",
       recentAchTitle: "Ultimos logros",
@@ -1324,6 +1326,37 @@
   }
 
   // ------------------------------------------------------- detalle del viaje
+  // Mapa de calor de velocidad: cada tramo de verde (lento) a rojo (rapido).
+  // La escala es la del propio viaje, hasta el percentil 95: con un tope fijo
+  // un viaje de pueblo saldria todo verde, y con el maximo un pico de un
+  // segundo dejaria todo lo demas en verde.
+  function topeDeVelocidad(segmentos) {
+    const velocidades = [];
+    segmentos.forEach((seg) => seg.forEach((p) => { if (p.length > 2) velocidades.push(p[2]); }));
+    if (velocidades.length < 2) return null;
+    velocidades.sort((a, b) => a - b);
+    return Math.max(30, velocidades[Math.floor(0.95 * (velocidades.length - 1))]);
+  }
+  function colorDeVelocidad(kmh, tope) {
+    const f = Math.max(0, Math.min(1, kmh / tope));
+    return 'hsl(' + Math.round(120 - 120 * f) + ', 80%, 50%)';
+  }
+
+  function leyendaDeVelocidad(tope) {
+    const caja = document.createElement('div');
+    caja.className = 'leyenda-vel';
+    caja.appendChild(document.createTextNode(t('tripSpeed') + ' '));
+    const min = document.createElement('span');
+    min.textContent = velocidad(0);
+    caja.appendChild(min);
+    const barra = document.createElement('i');
+    caja.appendChild(barra);
+    const max = document.createElement('span');
+    max.textContent = velocidad(tope);
+    caja.appendChild(max);
+    return caja;
+  }
+
   function dibujarRecorrido(segmentos) {
     // El recorrido es un array de SEGMENTOS, no una linea sola: manejar con
     // el cliente cerrado deja un agujero, y ese agujero va punteado. Unir
@@ -1361,13 +1394,34 @@
       el.setAttribute('vector-effect', 'non-scaling-stroke');
       svg.appendChild(el);
     };
+    // Con velocidad, tramo por tramo y del color de su velocidad; sin ella
+    // (los viajes de antes de que el cliente la mandara), en azul como
+    // siempre.
+    const tope = topeDeVelocidad(segmentos);
+    const tramos = document.createElementNS(SVG_NS, 'g');
     segmentos.forEach((seg, i) => {
-      if (seg.length > 1) linea('traza', seg);
+      if (seg.length > 1) {
+        if (tope && seg.every((p) => p.length > 2)) {
+          for (let k = 1; k < seg.length; k++) {
+            const a = seg[k - 1], b = seg[k];
+            const el = document.createElementNS(SVG_NS, 'line');
+            el.setAttribute('class', 'tramo');
+            el.setAttribute('x1', a[0]); el.setAttribute('y1', a[1]);
+            el.setAttribute('x2', b[0]); el.setAttribute('y2', b[1]);
+            el.setAttribute('stroke', colorDeVelocidad((a[2] + b[2]) / 2, tope));
+            el.setAttribute('vector-effect', 'non-scaling-stroke');
+            tramos.appendChild(el);
+          }
+        } else {
+          linea('traza', seg);
+        }
+      }
       const previo = segmentos[i - 1];
       if (previo && previo.length && seg.length) {
         linea('hueco', [previo[previo.length - 1], seg[0]]);
       }
     });
+    svg.appendChild(tramos);
     [[puntos[0], ''], [puntos[puntos.length - 1], ' fin']].forEach(([p, extra]) => {
       const c = document.createElementNS(SVG_NS, 'circle');
       c.setAttribute('class', 'punta' + extra);
@@ -1388,6 +1442,8 @@
     const dibujo = dibujarRecorrido(d.route || []);
     if (dibujo) {
       caja.appendChild(dibujo);
+      const tope = topeDeVelocidad(d.route || []);
+      if (tope) caja.appendChild(leyendaDeVelocidad(tope));
       // Solo se aclara si hay hueco: en un viaje entero no hay nada que
       // explicar.
       if ((d.route || []).length > 1) sumar(caja, renglon([t('tripRouteGaps')]));

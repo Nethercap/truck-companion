@@ -213,7 +213,7 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
 .detalle .ruta .hueco { fill: none; stroke: var(--muted); stroke-width: 1.5;
                         stroke-dasharray: 4 4; }
 .detalle .ruta .punta { fill: var(--accent); }
-.detalle .ruta .punta.fin { fill: var(--ok); }
+.detalle .ruta .punta.fin { fill: var(--text); }  /* blanco: el verde es "lento" en el mapa de calor */
 .acciones { display: flex; gap: 1rem; }
 
 /* --- banderas de los paises --------------------------------------------
@@ -424,3 +424,10 @@ table.viajes td.detalle-celda { padding: 0 0.5rem 0.8rem; background: #1d232b; }
 .records { list-style: none; margin: 0; padding: 0; font-size: 0.88rem; }
 .records li { margin: 0.15rem 0; }
 .records li span { color: var(--muted); font-size: 0.8rem; }
+
+/* Mapa de calor de velocidad en el detalle del viaje. */
+.detalle .ruta .tramo { stroke-width: 2.6; stroke-linecap: round; }
+.leyenda-vel { display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+               font-size: 0.75rem; color: var(--muted); margin: 0 0 0.4rem; }
+.leyenda-vel i { display: inline-block; width: 8rem; height: 6px; border-radius: 3px;
+                 background: linear-gradient(90deg, hsl(120, 80%, 50%), hsl(60, 80%, 50%), hsl(0, 80%, 50%)); }
