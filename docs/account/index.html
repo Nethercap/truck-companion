@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261003c" />
+<link rel="stylesheet" href="account.css?v=20261003d" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -96,6 +96,26 @@
             </div>
             <div id="recentList"></div>
             <p class="muted small" id="recentEmpty" hidden></p>
+          </section>
+
+          <section class="card" id="cardActivity" hidden>
+            <div class="cabecera">
+              <h2 data-i18n="activityTitle">Activity</h2>
+              <select id="activityMetric" aria-label="Metric">
+                <option value="distance_km" data-i18n="metricDistance">Distance</option>
+                <option value="trips" data-i18n="metricTrips">Deliveries</option>
+                <option value="real_hours" data-i18n="metricHours">Hours at the wheel</option>
+              </select>
+              <select id="activityPeriod" aria-label="Period">
+                <option value="week" data-i18n="periodWeek">Weekly</option>
+                <option value="month" data-i18n="periodMonth">Monthly</option>
+              </select>
+            </div>
+            <div id="activityChart" class="grafico"></div>
+            <h3 class="sub-titulo" data-i18n="calendarTitle">Days on the road</h3>
+            <div id="activityCalendar" class="calendario"></div>
+            <div id="activityLegend" class="leyenda-cal"></div>
+            <p class="muted small" id="activityEmpty" hidden data-i18n="activityEmpty"></p>
           </section>
 
           <section class="card" id="cardStats" hidden>
@@ -206,7 +226,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261003c"></script>
-<script src="account.js?v=20261003c"></script>
+<script src="../app/i18n.js?v=20261003d"></script>
+<script src="account.js?v=20261003d"></script>
 </body>
 </html>

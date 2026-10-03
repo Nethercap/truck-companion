@@ -63,6 +63,16 @@
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
       statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
+      activityTitle: "Activity",
+      metricDistance: "Distance",
+      metricTrips: "Deliveries",
+      metricHours: "Hours at the wheel",
+      periodWeek: "Weekly",
+      periodMonth: "Monthly",
+      calendarTitle: "Days on the road",
+      calLess: "Less",
+      calMore: "More",
+      activityEmpty: "No driving in the last year yet.",
       statsFreeRoam: (d, h) => 'Free roam: ' + d + ' \u00b7 ' + h + ' at the wheel',
       topCountries: "Most visited countries",
       topStates: "Most visited states",
@@ -223,6 +233,16 @@
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
       statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
+      activityTitle: "Actividad",
+      metricDistance: "Distancia",
+      metricTrips: "Entregas",
+      metricHours: "Horas al volante",
+      periodWeek: "Por semana",
+      periodMonth: "Por mes",
+      calendarTitle: "Dias en la ruta",
+      calLess: "Menos",
+      calMore: "Mas",
+      activityEmpty: "Todavia no hay manejo en el ultimo ano.",
       statsFreeRoam: (d, h) => 'Manejo libre: ' + d + ' \u00b7 ' + h + ' al volante',
       topCountries: "Paises mas visitados",
       topStates: "Estados mas visitados",
@@ -1480,6 +1500,228 @@
     $('cardRecent').hidden = false;
   }
 
+  // ------------------------------------------------------------ actividad
+  // La API la da por dia (en la hora de quien mira); aca se agrupa por
+  // semana o mes para el grafico, y se dibuja tal cual en el calendario.
+  // Distancia y horas son de las sesiones (todo lo manejado), entregas de los
+  // viajes: los dos juegos se suman, porque km y horas si se pueden sumar.
+  let actividad = [];
+  const PERIODOS_GRAFICO = 12;
+  const DIA_MS = 86400000;
+
+  function fechaUTC(iso) {
+    const [a, m, d] = iso.split('-').map(Number);
+    return new Date(Date.UTC(a, m - 1, d));
+  }
+  function isoDe(fecha) { return fecha.toISOString().slice(0, 10); }
+  function lunesDe(fecha) {
+    // Semana de lunes a domingo, como en casi todo el mundo que juega ETS2.
+    const dia = (fecha.getUTCDay() + 6) % 7;
+    return new Date(fecha.getTime() - dia * DIA_MS);
+  }
+  function hoyLocal() {
+    const ahora = new Date();
+    return new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
+  }
+
+  function porDia() {
+    const dias = new Map();
+    actividad.forEach((d) => {
+      const x = dias.get(d.date) || { distance_km: 0, real_hours: 0, trips: 0 };
+      x.distance_km += d.distance_km || 0;
+      x.real_hours += d.real_hours || 0;
+      x.trips += d.trips || 0;
+      dias.set(d.date, x);
+    });
+    return dias;
+  }
+
+  function valorEnTexto(metrica, valor) {
+    if (metrica === 'distance_km') return distancia(valor);
+    if (metrica === 'real_hours') return duracion(valor) || '0 min';
+    return numero(valor);
+  }
+
+  function pintarGrafico(dias) {
+    const caja = $('activityChart');
+    caja.innerHTML = '';
+    const metrica = $('activityMetric').value;
+    const mensual = $('activityPeriod').value === 'month';
+    // Las ultimas 12 semanas o 12 meses, con los vacios en cero: un hueco
+    // en el grafico tambien dice algo.
+    const hoy = hoyLocal();
+    const periodos = [];
+    for (let i = PERIODOS_GRAFICO - 1; i >= 0; i--) {
+      let inicio;
+      if (mensual) inicio = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - i, 1));
+      else inicio = new Date(lunesDe(hoy).getTime() - i * 7 * DIA_MS);
+      periodos.push({ inicio, valor: 0 });
+    }
+    const clave = (f) => (mensual ? isoDe(f).slice(0, 7) : isoDe(lunesDe(f)));
+    const indice = new Map(periodos.map((p, i) => [clave(p.inicio), i]));
+    dias.forEach((x, iso) => {
+      const i = indice.get(clave(fechaUTC(iso)));
+      if (i !== undefined) periodos[i].valor += x[metrica];
+    });
+
+    const maximo = Math.max(...periodos.map((p) => p.valor));
+    // Al ancho real de la tarjeta y no escalado: escalado, en un celular la
+    // letra de las fechas quedaba de 6 px.
+    const ancho = Math.max(300, Math.round(caja.clientWidth || 600));
+    const alto = 170, base = 140, arriba = 18;
+    const angosto = ancho < 480;
+    const paso = ancho / periodos.length;
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + ancho + ' ' + alto);
+    svg.setAttribute('role', 'img');
+    const etiquetaFecha = (f) => (mensual
+      ? f.toLocaleDateString(idioma, { month: 'short', timeZone: 'UTC' })
+      : f.toLocaleDateString(idioma, { day: 'numeric', month: 'short', timeZone: 'UTC' }));
+    svg.setAttribute('aria-label', periodos.map((p) =>
+      etiquetaFecha(p.inicio) + ': ' + valorEnTexto(metrica, p.valor)).join(', '));
+    periodos.forEach((p, i) => {
+      const h = maximo ? (p.valor / maximo) * (base - arriba) : 0;
+      const x = i * paso + paso * 0.18;
+      const barra = document.createElementNS(SVG_NS, 'rect');
+      barra.setAttribute('class', 'barra' + (p.valor ? '' : ' vacia'));
+      barra.setAttribute('x', x);
+      barra.setAttribute('width', paso * 0.64);
+      // Un periodo sin nada igual se ve, como una raya en el piso.
+      barra.setAttribute('y', base - Math.max(h, 1.5));
+      barra.setAttribute('height', Math.max(h, 1.5));
+      barra.setAttribute('rx', 2);
+      const titulo = document.createElementNS(SVG_NS, 'title');
+      titulo.textContent = etiquetaFecha(p.inicio) + ': ' + valorEnTexto(metrica, p.valor);
+      barra.appendChild(titulo);
+      svg.appendChild(barra);
+      if (p.valor && p.valor === maximo) {
+        const tope = document.createElementNS(SVG_NS, 'text');
+        tope.setAttribute('class', 'tope');
+        tope.setAttribute('x', x + paso * 0.32);
+        tope.setAttribute('y', base - h - 5);
+        tope.setAttribute('text-anchor', 'middle');
+        tope.textContent = valorEnTexto(metrica, p.valor);
+        svg.appendChild(tope);
+      }
+      // Una etiqueta si y una no en semanal: doce fechas no entran en un
+      // celular sin pisarse.
+      if ((mensual && !angosto) || i % 2 === (periodos.length - 1) % 2) {
+        const txt = document.createElementNS(SVG_NS, 'text');
+        txt.setAttribute('x', x + paso * 0.32);
+        txt.setAttribute('y', alto - 8);
+        txt.setAttribute('text-anchor', 'middle');
+        txt.textContent = etiquetaFecha(p.inicio);
+        svg.appendChild(txt);
+      }
+    });
+    const piso = document.createElementNS(SVG_NS, 'line');
+    piso.setAttribute('class', 'piso');
+    piso.setAttribute('x1', 0); piso.setAttribute('x2', ancho);
+    piso.setAttribute('y1', base + 0.5); piso.setAttribute('y2', base + 0.5);
+    svg.appendChild(piso);
+    caja.appendChild(svg);
+  }
+
+  function pintarCalendario(dias) {
+    // Un cuadrito por dia del ultimo ano, como el de GitHub: columnas por
+    // semana (de lunes a domingo) y el color segun lo manejado.
+    const caja = $('activityCalendar');
+    caja.innerHTML = '';
+    const hoy = hoyLocal();
+    const semanas = 53;
+    const primero = new Date(lunesDe(hoy).getTime() - (semanas - 1) * 7 * DIA_MS);
+    const kms = [...dias.values()].map((x) => x.distance_km).filter((k) => k > 0).sort((a, b) => a - b);
+    // Cuatro tonos por cuartiles de lo propio: con umbrales fijos, alguien
+    // que maneja 50 km por dia tendria todo en el tono mas bajo.
+    const cuartil = (q) => kms.length ? kms[Math.min(kms.length - 1, Math.floor(q * kms.length))] : 0;
+    const cortes = [cuartil(0.25), cuartil(0.5), cuartil(0.75)];
+    const nivel = (km) => !km ? 0 : km <= cortes[0] ? 1 : km <= cortes[1] ? 2 : km <= cortes[2] ? 3 : 4;
+
+    const lado = 11, aire = 2, izquierda = 0, arriba = 16;
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + (izquierda + semanas * (lado + aire)) + ' ' + (arriba + 7 * (lado + aire)));
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', t('calendarTitle'));
+    let mesAnterior = -1;
+    let ultimaEtiqueta = -10;
+    for (let s = 0; s < semanas; s++) {
+      for (let d = 0; d < 7; d++) {
+        const fecha = new Date(primero.getTime() + (s * 7 + d) * DIA_MS);
+        if (fecha > hoy) continue;
+        const iso = isoDe(fecha);
+        const x = dias.get(iso);
+        const cuadro = document.createElementNS(SVG_NS, 'rect');
+        cuadro.setAttribute('class', 'dia n' + nivel(x ? x.distance_km : 0));
+        cuadro.setAttribute('x', izquierda + s * (lado + aire));
+        cuadro.setAttribute('y', arriba + d * (lado + aire));
+        cuadro.setAttribute('width', lado);
+        cuadro.setAttribute('height', lado);
+        cuadro.setAttribute('rx', 2);
+        const titulo = document.createElementNS(SVG_NS, 'title');
+        const cuando = fecha.toLocaleDateString(idioma, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        titulo.textContent = x && (x.distance_km || x.trips)
+          ? [cuando, distancia(x.distance_km), x.trips ? t('logbookCount', x.trips) : null].filter(Boolean).join(' · ')
+          : cuando;
+        cuadro.appendChild(titulo);
+        svg.appendChild(cuadro);
+        // El nombre del mes arriba de la primera semana que lo empieza.
+        if (d === 0 && fecha.getUTCMonth() !== mesAnterior) {
+          mesAnterior = fecha.getUTCMonth();
+          // Una sola si quedan pegadas (el mes que empieza en la primera
+          // columna y el siguiente, dos semanas despues: "sepoct").
+          if (s < semanas - 2 && s - ultimaEtiqueta >= 3) {
+            ultimaEtiqueta = s;
+            const mes = document.createElementNS(SVG_NS, 'text');
+            mes.setAttribute('x', izquierda + s * (lado + aire));
+            mes.setAttribute('y', 10);
+            mes.textContent = fecha.toLocaleDateString(idioma, { month: 'short', timeZone: 'UTC' });
+            svg.appendChild(mes);
+          }
+        }
+      }
+    }
+    caja.appendChild(svg);
+    // En un celular el ano no entra: se desplaza de costado y arranca
+    // mostrando lo ultimo.
+    requestAnimationFrame(() => { caja.scrollLeft = caja.scrollWidth; });
+    // La leyenda va afuera de lo que se desplaza: adentro, en un celular
+    // quedaba fuera de la vista.
+    const leyenda = $('activityLegend');
+    leyenda.innerHTML = '';
+    leyenda.appendChild(document.createTextNode(t('calLess')));
+    for (let n = 0; n <= 4; n++) {
+      const muestra = document.createElement('i');
+      muestra.className = 'n' + n;
+      leyenda.appendChild(muestra);
+    }
+    leyenda.appendChild(document.createTextNode(t('calMore')));
+  }
+
+  function pintarActividad() {
+    const dias = porDia();
+    const hay = [...dias.values()].some((x) => x.distance_km || x.trips);
+    $('activityEmpty').hidden = hay;
+    $('activityChart').hidden = !hay;
+    $('activityCalendar').hidden = !hay;
+    $('activityLegend').hidden = !hay;
+    if (hay) {
+      pintarGrafico(dias);
+      pintarCalendario(dias);
+    }
+  }
+
+  async function traerActividad() {
+    // getTimezoneOffset da los minutos de la hora local a UTC (Buenos Aires
+    // +180); la API pide lo contrario.
+    const tz = -new Date().getTimezoneOffset();
+    const { ok, datos } = await pedir('/trips/activity?tz=' + tz);
+    if (!ok) return;
+    actividad = datos.days || [];
+    // Primero visible: el grafico se dibuja al ancho de la tarjeta.
+    $('cardActivity').hidden = false;
+    pintarActividad();
+  }
+
   // ------------------------------------------------------------ logbook
   const VIAJES_POR_PAGINA = 10;
   let viajes = [];      // lo ya traido, para repintar sin volver a pedir
@@ -1535,6 +1777,7 @@
     // paginas que la persona ya abrio.
     if (viajesPedidos) {
       pintarCinta(); pintarRecientes(); pintarResumen(); pintarViajes();
+      if (actividad.length) pintarActividad();
       mostrarPagina();
       return;
     }
@@ -1542,6 +1785,7 @@
     traerRecientes();
     traerTotales();
     traerResumen();
+    traerActividad();
     mostrarPagina();
   }
 
@@ -1554,7 +1798,9 @@
     viajesPedidos = false;
     logbookPedido = false;
     resumen = [];
+    actividad = [];
     $('cardRecent').hidden = true;
+    $('cardActivity').hidden = true;
     $('cardStats').hidden = true;
     $('quickStats').hidden = true;
     $('tripsList').innerHTML = '';
@@ -1579,6 +1825,14 @@
       $(id).addEventListener('change', () => { viajes = []; traerViajes(false); });
     });
     window.addEventListener('hashchange', () => { if (usuario) mostrarPagina(); });
+    ['activityMetric', 'activityPeriod'].forEach((id) => {
+      $(id).addEventListener('change', pintarActividad);
+    });
+    let esperaAncho = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(esperaAncho);
+      esperaAncho = setTimeout(() => { if (actividad.length) pintarActividad(); }, 200);
+    });
     $('btnDelete').addEventListener('click', () => mostrarConfirmacionDeBorrado(true));
     $('btnDeleteCancel').addEventListener('click', () => mostrarConfirmacionDeBorrado(false));
     $('btnDeleteConfirm').addEventListener('click', borrarCuenta);

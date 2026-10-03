@@ -346,3 +346,32 @@ table.viajes td.detalle-celda { padding: 0 0.5rem 0.8rem; background: #1d232b; }
 .tops ol { margin: 0; padding-left: 1.2rem; font-size: 0.88rem; }
 .tops li { margin: 0.1rem 0; }
 .tops li span { color: var(--muted); font-size: 0.8rem; }
+
+/* Actividad: barras por semana o mes y el calendario de dias manejados. */
+.cabecera select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 0.3rem 0.5rem; font: inherit; font-size: 0.85rem;
+}
+.grafico svg { display: block; width: 100%; height: auto; }
+.grafico[hidden], .calendario[hidden], .leyenda-cal[hidden] { display: none; }
+.grafico .barra { fill: var(--accent); }
+.grafico .barra.vacia { fill: var(--line); }
+.grafico .barra:hover { fill: #57adff; }
+.grafico text { fill: var(--muted); font-size: 11px; font-family: system-ui, sans-serif; }
+.grafico .tope { fill: var(--text); font-weight: 600; }
+.grafico .piso { stroke: var(--line); }
+.sub-titulo { font-size: 0.78rem; color: var(--muted); font-weight: 600; margin: 1rem 0 0.4rem; }
+.calendario { overflow-x: auto; }
+/* Cuadritos de 11 px como minimo: mas chicos no se distinguen. */
+.calendario svg { display: block; width: 100%; min-width: 660px; height: auto; }
+.calendario text { fill: var(--muted); font-size: 9px; font-family: system-ui, sans-serif; }
+.calendario .dia.n0, .leyenda-cal i.n0 { fill: #1e232a; background: #1e232a; }
+.calendario .dia.n1, .leyenda-cal i.n1 { fill: #12395f; background: #12395f; }
+.calendario .dia.n2, .leyenda-cal i.n2 { fill: #1b5c97; background: #1b5c97; }
+.calendario .dia.n3, .leyenda-cal i.n3 { fill: #2a7fd0; background: #2a7fd0; }
+.calendario .dia.n4, .leyenda-cal i.n4 { fill: #57adff; background: #57adff; }
+.leyenda-cal { display: flex; align-items: center; justify-content: flex-end; gap: 3px;
+               font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
+.leyenda-cal i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.leyenda-cal i:first-of-type { margin-left: 4px; }
+.leyenda-cal i:last-of-type { margin-right: 4px; }
