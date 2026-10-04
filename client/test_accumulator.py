@@ -408,3 +408,61 @@ def test_el_viaje_lleva_el_tramo_y_un_cliente_nuevo_es_otro_tramo():
     dos.tick(payload(700.0, odometerKm=50.0, fuel=1.0), TRABAJO, 2000.0)
     a, b = uno.viaje()["run_id"], dos.viaje()["run_id"]
     assert a and b and a != b
+
+
+
+def _tick(acc, raw, t, odo, **cambios):
+    return acc.tick(payload(600.0 + t, odometerKm=odo, fuel=100.0, **cambios), raw, 1000.0 + t)
+
+
+def test_un_trabajo_que_desaparece_sin_pulso_deja_de_sumar():
+    """La prueba de ATS: la entrega se perdio, el trabajo desaparecio y el
+    viaje del Bronco siguio abierto, tomando el Volvo de despues."""
+    acc = accumulator.Acumulador()
+    for i in range(3):
+        _tick(acc, TRABAJO, i, 100.0 + i)
+    antes = acc.viaje()["distance_tracked_km"]
+    # Sin trabajo y sin pulso, otro camion y kilometros nuevos.
+    _tick(acc, SIN_TRABAJO, 3, 104.0, truckBrand="Volvo", truckName="VNL")
+    _tick(acc, SIN_TRABAJO, 5, 108.0, truckBrand="Volvo", truckName="VNL")
+    v = acc.viaje()
+    assert v["distance_tracked_km"] == antes and v["truck_brand"] == "Scania"
+    # Pasada la gracia se manda lo que tenia y se suelta.
+    acciones = _tick(acc, SIN_TRABAJO, 3 + accumulator.GRACIA_SIN_PULSO_S + 1, 112.0)
+    assert [a["tipo"] for a in acciones if a["tipo"].startswith("trip")] == ["trip_checkpoint"]
+    assert not acc.hay_viaje()
+
+
+def test_el_pulso_que_llega_tarde_igual_cierra():
+    acc = accumulator.Acumulador()
+    _tick(acc, TRABAJO, 0, 100.0)
+    _tick(acc, TRABAJO, 1, 101.0)
+    _tick(acc, SIN_TRABAJO, 2, 101.0)                      # se fue el trabajo
+    acciones = _tick(acc, SIN_TRABAJO, 3, 101.0, event={"jobDelivered": True})
+    cierres = [a for a in acciones if a["tipo"] == "trip_close"]
+    assert cierres and cierres[0]["datos"]["status"] == "delivered"
+
+
+def test_si_vuelve_el_mismo_trabajo_se_retoma_y_si_viene_otro_se_suelta():
+    acc = accumulator.Acumulador()
+    _tick(acc, TRABAJO, 0, 100.0)
+    _tick(acc, SIN_TRABAJO, 1, 100.0)                      # se recarga la partida
+    _tick(acc, TRABAJO, 2, 100.0)                          # y vuelve
+    _tick(acc, TRABAJO, 3, 101.0)
+    assert acc.viaje()["distance_tracked_km"] > 0          # sigue sumando
+    _tick(acc, SIN_TRABAJO, 4, 101.0)
+    otro = dict(TRABAJO, jobStartingTime=5000, cityDstId="wien", cityDst="Wien")
+    acciones = _tick(acc, otro, 5, 101.0)
+    assert [a["tipo"] for a in acciones if a["tipo"].startswith("trip")] == ["trip_checkpoint", "trip_open"]
+
+
+def test_el_mismo_trabajo_reabierto_es_otro_tramo():
+    """Si vuelve despues de la gracia, el viaje se reabre de cero: con el
+    mismo tramo pisaria en la API lo que ya tenia."""
+    acc = accumulator.Acumulador()
+    _tick(acc, TRABAJO, 0, 100.0)
+    primero = acc.viaje()["run_id"]
+    _tick(acc, SIN_TRABAJO, 1, 100.0)
+    _tick(acc, SIN_TRABAJO, 1 + accumulator.GRACIA_SIN_PULSO_S + 1, 100.0)
+    _tick(acc, TRABAJO, 30, 100.0)
+    assert acc.viaje()["run_id"] != primero

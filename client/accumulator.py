@@ -52,6 +52,11 @@ VELOCIDAD_MINIMA_KMH = 1.0
 # Cada cuanto se manda. El viaje mas seguido que la sesion porque es lo que
 # la web muestra en vivo; la sesion solo tiene que sobrevivir a un corte.
 CHECKPOINT_VIAJE_S = 120
+# Cuanto espera un viaje cuyo trabajo desaparecio sin pulso de entrega o
+# cancelacion, por si el pulso llega un instante despues. Mientras tanto no
+# suma nada: si no, siguio sumando el manejo de despues (y hasta el camion
+# siguiente) al trabajo que ya no existia.
+GRACIA_SIN_PULSO_S = 10
 CHECKPOINT_SESION_S = 300
 
 # Recorrido. Se guarda un punto cada tantos metros y se simplifica cuando
@@ -157,6 +162,9 @@ class Acumulador:
         # cola la apertura pisaba al cierre (misma clave) y el servidor lo
         # dejaba en curso. Visto al cancelar un trabajo en ETS2.
         self._huella_cerrada = None
+        # Cada viaje que se abre es un tramo nuevo para la API, aunque sea el
+        # mismo trabajo que vuelve: arranca de cero y no puede pisar al otro.
+        self._tramos_abiertos = 0
         self._ultimo_envio_sesion = 0.0
 
     # --- lo que el que envia le pide ---
@@ -189,8 +197,7 @@ class Acumulador:
         # El tramo: esta tanda del cliente siguiendo el viaje. Si el cliente
         # se cierra y se abre, el tramo nuevo arranca de cero y la API suma los
         # dos en vez de quedarse con el ultimo (antes, 46,6 km pasaban a 1,2).
-        if self._sesion is not None:
-            datos["run_id"] = self._sesion["client_id"]
+        datos["run_id"] = v.get("run_id")
         # El ultimo camion visto: al abrir el viaje (por ejemplo al arrancar
         # el cliente con el trabajo ya tomado) puede no haber llegado todavia.
         datos["truck_brand"] = v.get("truck_brand")
@@ -266,7 +273,8 @@ class Acumulador:
 
         acciones.extend(self._mirar_el_trabajo(payload, raw, ahora))
 
-        if self._viaje is not None:
+        # Un viaje suelto (su trabajo desaparecio sin pulso) no suma nada.
+        if self._viaje is not None and self._viaje.get("suelto_desde") is None:
             self._sumar(self._viaje, avance, payload)
             if payload.get("truckBrand"):
                 self._viaje["truck_brand"] = payload["truckBrand"]
@@ -398,6 +406,26 @@ class Acumulador:
             acciones.append({"tipo": "trip_checkpoint", "datos": self.viaje()})
             self._viaje = None
 
+        # El trabajo desaparecio sin pulso (se cargo otra partida, se salio al
+        # menu, o el pulso se perdio): el viaje queda suelto y deja de sumar.
+        # Si el pulso llega dentro de la gracia, se cierra arriba como
+        # siempre; si vuelve el mismo trabajo, se retoma; si no, se manda lo
+        # que tenia y se suelta.
+        v = self._viaje
+        if v is not None:
+            mismo = actual is not None and trip_tracker.huella(actual) == trip_tracker.huella(v["datos"])
+            if actual is None:
+                if v.get("suelto_desde") is None:
+                    v["suelto_desde"] = ahora
+                elif ahora - v["suelto_desde"] >= GRACIA_SIN_PULSO_S:
+                    acciones.append({"tipo": "trip_checkpoint", "datos": self.viaje()})
+                    self._viaje = None
+            elif mismo:
+                v.pop("suelto_desde", None)
+            else:
+                acciones.append({"tipo": "trip_checkpoint", "datos": self.viaje()})
+                self._viaje = None
+
         if trip_tracker.huella(actual) != self._huella_cerrada:
             self._huella_cerrada = None
         if (actual is not None and self._viaje is None
@@ -408,7 +436,10 @@ class Acumulador:
         return acciones
 
     def _empezar_viaje(self, datos, payload, ahora):
+        self._tramos_abiertos += 1
+        sesion = self._sesion["client_id"] if self._sesion else "sin-sesion"
         self._viaje = {
+            "run_id": f"{sesion}-{self._tramos_abiertos}",
             "datos": datos,
             "distance_km": 0.0, "game_minutes": 0.0, "real_seconds": 0.0,
             "max_speed": 0.0, "fuel_used": 0.0,

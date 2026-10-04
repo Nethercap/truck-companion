@@ -4,6 +4,13 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Accounts (still switched off): a job that disappears without a delivery
+  or cancellation (loading another save, going back to the menu) stops
+  adding to its trip. Before, the trip stayed open and took the driving,
+  and even the truck, that came after.
+
 ## 1.5.25 (2026-10-03)
 
 - Every delivery, cancellation, toll, fine, ferry and train now counts. The
