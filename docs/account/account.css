@@ -436,3 +436,6 @@ table.viajes td.detalle-celda { padding: 0 0.5rem 0.8rem; background: #1d232b; }
 .vincular-pendiente { border-color: var(--accent); }
 .vincular-pendiente .codigo-vincular { font-size: 1.6rem; letter-spacing: 0.15em; margin: 0.4rem 0; }
 .vincular-pendiente .botones { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* Trabajo con auto: la misma etiqueta que el juego, en otro color. */
+table.viajes .juego-chip.auto { color: var(--warn); border-color: var(--warn); }

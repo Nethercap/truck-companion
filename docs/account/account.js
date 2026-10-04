@@ -84,6 +84,14 @@
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
       statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
+      jobKindCar: "car",
+      filterKind: "Type",
+      filterTruck: "Truck",
+      filterCar: "Car",
+      tripVehicle: "Vehicle",
+      statsCarJobs: "Car jobs",
+      achCar_t: "Car delivery",
+      achCar_d: "Deliver a car job.",
       linkPendingTitle: "Link Truck Dash on this PC?",
       linkPendingBody: (n) => 'Truck Dash on "' + n + '" wants to save your trips to this account. Check that this code matches the one shown in Truck Dash:',
       linkSignInFirst: "Sign in to link Truck Dash on your PC. The code waits for you here.",
@@ -315,6 +323,14 @@
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
       statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
+      jobKindCar: "auto",
+      filterKind: "Tipo",
+      filterTruck: "Camion",
+      filterCar: "Auto",
+      tripVehicle: "Vehiculo",
+      statsCarJobs: "Trabajos con auto",
+      achCar_t: "Entrega en auto",
+      achCar_d: "Entrega un trabajo con auto.",
       linkPendingTitle: "Vincular Truck Dash en esta PC?",
       linkPendingBody: (n) => 'Truck Dash en "' + n + '" quiere guardar tus viajes en esta cuenta. Verifica que este codigo sea el mismo que muestra Truck Dash:',
       linkSignInFirst: "Entra para vincular Truck Dash en tu PC. El codigo te espera aca.",
@@ -1182,6 +1198,7 @@
     [
       cifra(numero(s.trips), t('statsTrips')),
       cifra(numero(s.delivered), t('statsDelivered')),
+      s.car_jobs ? cifra(numero(s.car_jobs), t('statsCarJobs')) : null,
       s.on_time ? cifra(numero(s.on_time), t('statsOnTime')) : null,
       s.late ? cifra(numero(s.late), t('statsLate')) : null,
       s.unfinished ? cifra(numero(s.unfinished), t('statsUnfinished')) : null,
@@ -1535,7 +1552,7 @@
     const empresas = [d.company_src, d.company_dst].filter(Boolean).join(' \u2192 ');
     if (empresas) sumar(caja, renglon([empresas]));
     sumar(caja, renglon([
-      d.truck_name || d.truck_brand ? t('tripTruck') + ' ' + [d.truck_brand, d.truck_name].filter(Boolean).join(' ') : null,
+      d.truck_name || d.truck_brand ? t(d.job_kind === 'car' ? 'tripVehicle' : 'tripTruck') + ' ' + [d.truck_brand, d.truck_name].filter(Boolean).join(' ') : null,
       d.distance_planned_km ? t('tripPlanned') + ' ' + distancia(d.distance_planned_km) : null,
       d.distance_tracked_km ? t('tripTracked', distancia(d.distance_tracked_km)) : null
     ]));
@@ -1600,7 +1617,8 @@
     pesa: 'M6 5h3v14H6zm9 0h3v14h-3zM2 8h3v8H2zm17 0h3v8h-3zM9 11h6v2H9z',
     barco: 'M4 14h16l-2 6H6zm2-8h5V3h2v3h5v6H6zm2 2v2h8V8z',
     moneda: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 4h-2v1.1c-1.8.4-3 1.6-3 3.1 0 1.9 1.6 2.7 3.6 3.2 1.6.4 2.1.8 2.1 1.4 0 .7-.8 1.2-1.9 1.2-1.3 0-2-.6-2.1-1.4H7.9c.1 1.7 1.3 2.8 3.1 3.2V19h2v-1.2c1.9-.4 3.1-1.6 3.1-3.2 0-2.2-1.9-2.9-3.8-3.4-1.4-.3-1.9-.7-1.9-1.3s.6-1.1 1.7-1.1c1.1 0 1.7.5 1.8 1.2h1.9c-.1-1.5-1.1-2.6-2.8-3z',
-    dos: 'M2 6h9v12H2zm11 0h9v12h-9zM4 8v8h5V8zm11 0v8h5V8z'
+    dos: 'M2 6h9v12H2zm11 0h9v12h-9zM4 8v8h5V8zm11 0v8h5V8z',
+    auto: 'M5 11l1.6-4.5A2 2 0 0 1 8.5 5h7a2 2 0 0 1 1.9 1.5L19 11a2 2 0 0 1 2 2v4h-2v1.5a1.5 1.5 0 0 1-3 0V17H8v1.5a1.5 1.5 0 0 1-3 0V17H3v-4a2 2 0 0 1 2-2zm2.1 0h9.8l-1.1-3.4a1 1 0 0 0-.9-.6h-5.8a1 1 0 0 0-.9.6zM6.5 15a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zm11 0a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z'
   };
 
   function datosDeLogro(l) {
@@ -1628,6 +1646,7 @@
       case 'ferry': return ['barco', t('achFerry_t'), t('achFerry_d'), null];
       case 'big_payday': return ['moneda', t('achPayday_t'), t('achPayday_d', numero(100000)), null];
       case 'both_games': return ['dos', t('achBoth_t'), t('achBoth_d'), null];
+      case 'car_job': return ['auto', t('achCar_t'), t('achCar_d'), null];
       default: return ['entrega', l.id, '', null];
     }
   }
@@ -1729,7 +1748,7 @@
       todos.push(...pagina);
       if (!pagina.length) break;
     }
-    const columnas = ['started_at', 'delivered_at', 'game', 'status', 'city_src', 'city_dst',
+    const columnas = ['started_at', 'delivered_at', 'game', 'job_kind', 'status', 'city_src', 'city_dst',
       'company_src', 'company_dst', 'cargo', 'cargo_mass', 'distance_planned_km',
       'distance_game_km', 'distance_tracked_km', 'game_hours', 'total_game_hours',
       'sleep_hours', 'real_hours', 'revenue', 'currency', 'modded', 'fuel_used', 'tolls',
@@ -1907,7 +1926,8 @@
     tabla.className = 'viajes';
     const cabeza = document.createElement('thead');
     const tr = document.createElement('tr');
-    [['colDate', ''], ['colRoute', ''], ['tripTruck', ''],
+    // "Vehiculo" y no "camion": en un trabajo con auto ahi va el auto.
+    [['colDate', ''], ['colRoute', ''], ['tripVehicle', ''],
      ['colDistance', 'num'], ['colTime', 'num'], ['colPay', 'num']].forEach(([clave, clase]) => {
       const th = document.createElement('th');
       th.textContent = t(clave);
@@ -1930,6 +1950,14 @@
       chip.className = 'juego-chip';
       chip.textContent = (v.game || '').toUpperCase();
       ruta.appendChild(chip);
+      // Trabajo con auto (ATS 1.61): lo deduce la API, porque llega sin peso
+      // de carga. Se marca para que no parezca un viaje de camion raro.
+      if (v.job_kind === 'car') {
+        const auto = document.createElement('span');
+        auto.className = 'juego-chip auto';
+        auto.textContent = t('jobKindCar');
+        ruta.appendChild(auto);
+      }
       ruta.appendChild(document.createTextNode(
         [v.city_src, v.city_dst].filter(Boolean).join(' → ') || t('tripUnnamed')));
       const estado = etiquetaDeEstado(v);
@@ -2367,6 +2395,7 @@
     const partes = [];
     if ($('filterGame').value) partes.push('game=' + encodeURIComponent($('filterGame').value));
     if ($('filterStatus').value) partes.push('status=' + encodeURIComponent($('filterStatus').value));
+    if ($('filterKind').value) partes.push('kind=' + encodeURIComponent($('filterKind').value));
     return partes;
   }
 
@@ -2470,7 +2499,7 @@
         avisar(t('linkCopied'), 'ok');
       } catch (e) { avisar(linkPublico(), 'ok'); }
     });
-    ['filterGame', 'filterStatus'].forEach((id) => {
+    ['filterGame', 'filterStatus', 'filterKind'].forEach((id) => {
       $(id).addEventListener('change', () => { viajes = []; traerViajes(false); });
     });
     window.addEventListener('hashchange', () => { if (usuario) mostrarPagina(); });
