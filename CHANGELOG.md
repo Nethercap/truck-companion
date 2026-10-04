@@ -4,6 +4,12 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Accounts (still switched off): Link account opens the browser with the
+  code already filled in. You confirm there, after checking that the code
+  matches the one in Truck Dash, instead of typing it.
+
 ## 1.5.24 (2026-10-03)
 
 - Proton: "Open dashboard" now always shows the address, copied, in case

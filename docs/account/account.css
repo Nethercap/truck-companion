@@ -431,3 +431,8 @@ table.viajes td.detalle-celda { padding: 0 0.5rem 0.8rem; background: #1d232b; }
                font-size: 0.75rem; color: var(--muted); margin: 0 0 0.4rem; }
 .leyenda-vel i { display: inline-block; width: 8rem; height: 6px; border-radius: 3px;
                  background: linear-gradient(90deg, hsl(120, 80%, 50%), hsl(60, 80%, 50%), hsl(0, 80%, 50%)); }
+
+/* Vincular la PC desde el link del cliente. */
+.vincular-pendiente { border-color: var(--accent); }
+.vincular-pendiente .codigo-vincular { font-size: 1.6rem; letter-spacing: 0.15em; margin: 0.4rem 0; }
+.vincular-pendiente .botones { display: flex; flex-wrap: wrap; gap: 0.5rem; }

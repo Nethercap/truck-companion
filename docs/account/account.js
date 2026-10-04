@@ -18,6 +18,21 @@
   // muestra exactamente lo mismo que ve la persona en su cuenta.
   const PERFIL = (PARAMS.get('u') || '').trim();
   const modoPublico = !!PERFIL;
+
+  // Vincular la PC desde el link que abre el cliente: /account/?link=CODIGO.
+  // Se guarda en la sesion del navegador porque, si hay que entrar primero,
+  // la vuelta de Discord o Google llega sin el parametro.
+  const CLAVE_LINK = 'truckdash_link_pendiente';
+  function linkPendiente() {
+    try { return sessionStorage.getItem(CLAVE_LINK); } catch (e) { return null; }
+  }
+  function guardarLinkPendiente(codigo) {
+    try {
+      if (codigo) sessionStorage.setItem(CLAVE_LINK, codigo);
+      else sessionStorage.removeItem(CLAVE_LINK);
+    } catch (e) {}
+  }
+  if (PARAMS.get('link')) guardarLinkPendiente(PARAMS.get('link').trim().toUpperCase());
   let perfilPublico = null;
 
   // ------------------------------------------------------------------ API
@@ -69,6 +84,9 @@
       statsLongest: 'Longest trip',
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
       statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
+      linkPendingTitle: "Link Truck Dash on this PC?",
+      linkPendingBody: (n) => 'Truck Dash on "' + n + '" wants to save your trips to this account. Check that this code matches the one shown in Truck Dash:',
+      linkSignInFirst: "Sign in to link Truck Dash on your PC. The code waits for you here.",
       tripSpeed: "Speed",
       navAchievements: "Achievements",
       achievementsTitle: "Achievements",
@@ -297,6 +315,9 @@
       statsLongest: 'Viaje mas largo',
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
       statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
+      linkPendingTitle: "Vincular Truck Dash en esta PC?",
+      linkPendingBody: (n) => 'Truck Dash en "' + n + '" quiere guardar tus viajes en esta cuenta. Verifica que este codigo sea el mismo que muestra Truck Dash:',
+      linkSignInFirst: "Entra para vincular Truck Dash en tu PC. El codigo te espera aca.",
       tripSpeed: "Velocidad",
       navAchievements: "Logros",
       achievementsTitle: "Logros",
@@ -761,6 +782,7 @@
     $('recoveryWarning').textContent = t('recoveryWarning');
     $('publicToggle').checked = !!usuario.is_public;
     pintarLinkPublico();
+    mostrarVinculoPendiente();
     pintarLogins();
     pintarSesiones();
     mostrarViajes();
@@ -808,6 +830,59 @@
     usuario = null;
     olvidarViajes();
     mostrarVista('viewSignIn');
+  }
+
+  // ------------------------------------------- vincular desde el link
+  // El link del cliente trae el codigo, pero NO vincula solo: si lo hiciera,
+  // alguien podria arrancar una vinculacion en su PC, mandarte el link y
+  // quedarse con un token de tu cuenta con que lo abras. Se muestra el
+  // nombre de la PC y el codigo, para compararlo con el de Truck Dash, y se
+  // pide confirmar.
+  let vinculoMostrado = null;
+
+  async function mostrarVinculoPendiente() {
+    const codigo = linkPendiente();
+    const tarjeta = $('cardLinkPending');
+    if (!codigo) { tarjeta.hidden = true; return; }
+    if (vinculoMostrado === codigo && !tarjeta.hidden) return;
+    vinculoMostrado = codigo;
+    const previo = await pedir('/user/device/' + encodeURIComponent(codigo));
+    if (!previo.ok) {
+      // Vencido o ya usado: se dice y se olvida, no queda dando vueltas.
+      guardarLinkPendiente(null);
+      tarjeta.hidden = true;
+      avisar(t(previo.datos.error || 'error'), 'bad');
+      return;
+    }
+    $('linkPendingBody').textContent = t('linkPendingBody', previo.datos.device_name || 'Truck Dash');
+    $('linkPendingCode').textContent = codigo;
+    $('linkPendingHint').textContent = '';
+    tarjeta.hidden = false;
+    tarjeta.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+
+  async function aprobarVinculoPendiente() {
+    const codigo = linkPendiente();
+    if (!codigo) return;
+    const boton = $('btnLinkApprove');
+    boton.disabled = true;
+    const previo = await pedir('/user/device/' + encodeURIComponent(codigo));
+    const { ok, datos } = await pedir('/user/device/approve', { method: 'POST', body: { code: codigo } });
+    boton.disabled = false;
+    if (!ok) {
+      $('linkPendingHint').textContent = t(datos.error || 'error');
+      $('linkPendingHint').className = 'hint bad';
+      return;
+    }
+    guardarLinkPendiente(null);
+    $('cardLinkPending').hidden = true;
+    avisar(t('deviceLinked', (previo.ok && previo.datos.device_name) || 'Truck Dash'), 'ok');
+    pintarSesiones();
+  }
+
+  function cancelarVinculoPendiente() {
+    guardarLinkPendiente(null);
+    $('cardLinkPending').hidden = true;
   }
 
   async function vincularDispositivo(evento) {
@@ -908,7 +983,13 @@
       return;
     }
     usuario = datos.usuario;
-    if (!usuario) { mostrarVista('viewSignIn'); return; }
+    if (!usuario) {
+      // Vino a vincular la PC sin haber entrado: se le dice por que tiene
+      // que entrar, y el codigo espera en la sesion.
+      $('linkSignInNotice').hidden = !linkPendiente();
+      mostrarVista('viewSignIn');
+      return;
+    }
     if (!usuario.username) {
       pedirNombre(PARAMS.get('sugerido') || '');
       return;
@@ -932,7 +1013,7 @@
     // el formulario vacio otra vez.
     const limpios = new URLSearchParams(PARAMS.toString());
     let toco = false;
-    ['auth_error', 'sugerido', 'vinculado', 'nuevo'].forEach((clave) => {
+    ['auth_error', 'sugerido', 'vinculado', 'nuevo', 'link'].forEach((clave) => {
       if (limpios.has(clave)) { limpios.delete(clave); toco = true; }
     });
     if (toco) {
@@ -2381,6 +2462,8 @@
     $('btnExport').addEventListener('click', exportarDatos);
     $('btnMoreTrips').addEventListener('click', () => traerViajes(true));
     $('btnExportCsv').addEventListener('click', exportarCsv);
+    $('btnLinkApprove').addEventListener('click', aprobarVinculoPendiente);
+    $('btnLinkCancel').addEventListener('click', cancelarVinculoPendiente);
     $('btnCopyPublic').addEventListener('click', () => {
       try {
         navigator.clipboard.writeText(linkPublico());
