@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.25 (2026-10-03)
 
 - Every delivery, cancellation, toll, fine, ferry and train now counts. The
   telemetry plugin flips a switch on each of these events instead of sending
