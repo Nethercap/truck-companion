@@ -253,7 +253,7 @@ def test_attach_job_snapshot_if_finished_attaches_on_delivered_or_cancelled():
     # Primero un tick sin evento (estado conocido = false), despues la entrega:
     # una entrega vista en el primer tick del proceso es un flag heredado, no
     # se adjunta nada (ver edge_filter_job_events).
-    client._last_event_state.update({"jobDelivered": None, "jobCancelled": None})
+    client.reset_event_state()
     client.attach_job_snapshot_if_finished({"event": {"jobDelivered": False, "jobCancelled": False}})
     payload = {"event": {"jobDelivered": True}}
     client.attach_job_snapshot_if_finished(payload)
@@ -263,22 +263,57 @@ def test_attach_job_snapshot_if_finished_attaches_on_delivered_or_cancelled():
 
 
 def test_attach_job_snapshot_if_finished_noop_when_no_event():
+    # Sin heredar el estado del test anterior: con la marca que se invierte,
+    # pasar de true a false SI es una entrega.
+    client.reset_event_state()
+    client.attach_job_snapshot_if_finished({"event": {"jobDelivered": False, "jobCancelled": False}})
     payload = {"event": {"jobDelivered": False, "jobCancelled": False}}
     client.attach_job_snapshot_if_finished(payload)
     assert "jobSrc" not in payload["event"]
 
 
-def test_job_delivered_sent_only_on_rising_edge_never_on_first_tick():
-    client._last_event_state.update({"jobDelivered": None, "jobCancelled": None})
+def test_cada_cambio_de_la_marca_es_una_entrega_y_nunca_el_primer_tick():
+    """El plugin INVIERTE la marca en cada entrega (^= true): la primera la
+    pone en true, la segunda en false. Las dos son entregas."""
+    client.reset_event_state()
     def tick(delivered):
         payload = {"event": {"jobDelivered": delivered, "jobCancelled": False}}
         client.attach_job_snapshot_if_finished(payload)
         return payload["event"]["jobDelivered"]
-    assert tick(True) is False    # flag heredado de antes de arrancar: no es una entrega nueva
+    assert tick(True) is False    # marca heredada de antes de arrancar: no es una entrega nueva
     assert tick(True) is False
-    assert tick(False) is False
-    assert tick(True) is True     # transicion real
-    assert tick(True) is False    # sigue en true: no se repite
+    assert tick(False) is True    # segunda entrega de la partida: true -> false
+    assert tick(False) is False   # un solo tick, es un pulso
+    assert tick(True) is True     # tercera
+
+
+def test_las_multas_y_los_peajes_tambien_se_invierten():
+    client.reset_event_state()
+    def tick(**marcas):
+        payload = {"event": dict({"tollgate": False, "fined": False}, **marcas)}
+        client.edge_filter_job_events(payload)
+        return payload["event"]
+    tick()
+    assert tick(tollgate=True)["tollgate"] is True
+    assert tick(tollgate=True)["tollgate"] is False
+    assert tick(tollgate=False)["tollgate"] is True     # el segundo peaje
+    assert tick(tollgate=False, fined=True)["fined"] is True
+
+
+def test_reabrir_la_telemetria_no_inventa_una_entrega():
+    """El juego reiniciado deja todo en false: si el estado anterior era true,
+    eso no es un cambio de verdad."""
+    client.reset_event_state()
+    def tick(delivered):
+        payload = {"event": {"jobDelivered": delivered}}
+        client.edge_filter_job_events(payload)
+        return payload["event"]["jobDelivered"]
+    tick(False)
+    assert tick(True) is True
+    client.reset_event_state()           # se cerro y se abrio el juego
+    assert tick(False) is False          # el primer tick solo fija el estado
+    assert tick(False) is False          # y quieto no hay nada
+    assert tick(True) is True            # la primera entrega de la partida nueva
 
 
 SAMPLE_LOG = (

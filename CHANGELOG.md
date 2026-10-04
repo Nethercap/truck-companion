@@ -6,6 +6,11 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Every delivery, cancellation, toll, fine, ferry and train now counts. The
+  telemetry plugin flips a switch on each of these events instead of sending
+  a pulse, and Truck Dash only noticed the switch going on: the second
+  delivery of a game session, and every other toll or fine, went unseen. The
+  dashboard's session totals and the "job delivered" notice missed them too.
 - Accounts (still switched off): Link account opens the browser with the
   code already filled in. You confirm there, after checking that the code
   matches the one in Truck Dash, instead of typing it.

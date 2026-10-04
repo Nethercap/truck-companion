@@ -1209,6 +1209,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
         if not telemetry_ready:
             try:
                 telemetry_compat.init()
+                client_lib.reset_event_state()
                 telemetry_ready = True
                 logging.info("Telemetry opened: %s", telemetry_compat.opened_block())
             except Exception:

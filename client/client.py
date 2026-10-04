@@ -759,22 +759,38 @@ def update_job_snapshot(raw: dict):
         }
 
 
-# jobDelivered/jobCancelled NO son un pulso de un frame en la memoria
-# compartida: el plugin los deja en true hasta que el juego los limpia (minutos,
-# hasta el proximo trabajo). Si se mandaran tal cual, cada reconexion del
-# cliente o reinicio del backend volveria a "entregar" el mismo trabajo. Se
-# manda true solo en la transicion false -> true vista por este proceso; el
-# primer tick despues de arrancar solo fija el estado (None = desconocido).
-_last_event_state = {"jobDelivered": None, "jobCancelled": None}
+# Las marcas de evento del plugin (entrega, cancelacion, multa, peaje,
+# ferry, tren) NO son un pulso: el plugin las INVIERTE en cada evento
+# (`special_b.jobDelivered ^= true`), asi que la primera entrega la pone en
+# true y la segunda en false. Contar solo el paso a true perdia un evento de
+# cada dos: en la prueba de ATS, la segunda entrega de la partida no cerro el
+# viaje, y la web perdia la mitad de los peajes y multas.
+# Se manda true durante un tick por cada CAMBIO visto por este proceso, y
+# nada mas: asi la web y el acumulador, que esperan un pulso, reciben uno. El
+# primer tick despues de abrir la telemetria solo fija el estado (None =
+# desconocido): la marca puede venir invertida de antes, y al reiniciarse el
+# juego la memoria vuelve a false sin que haya pasado nada.
+PULSE_FLAGS = ("jobDelivered", "jobCancelled", "tollgate", "fined", "ferry", "train")
+_last_event_state = {k: None for k in PULSE_FLAGS}
+
+
+def reset_event_state() -> None:
+    """Al abrir (o reabrir) la telemetria: el estado de las marcas vuelve a
+    desconocido. Sin esto, el juego reiniciado (todo en false) se leeria
+    como un cambio, y por lo tanto como una entrega."""
+    for k in PULSE_FLAGS:
+        _last_event_state[k] = None
 
 
 def edge_filter_job_events(payload: dict) -> None:
     event = payload.get("event") or {}
-    for key in ("jobDelivered", "jobCancelled"):
+    for key in PULSE_FLAGS:
+        if key not in event:
+            continue
         current = bool(event.get(key))
         previous = _last_event_state[key]
         _last_event_state[key] = current
-        event[key] = current and previous is False
+        event[key] = previous is not None and current != previous
 
 
 def attach_job_snapshot_if_finished(payload: dict, raw: dict | None = None):
@@ -856,6 +872,7 @@ async def receive_commands(ws, keybinds: dict):
 
 async def run(backend_ws_url: str, code: str):
     telemetry_compat.init()
+    reset_event_state()
     print("Conectado al SDK de telemetria del juego.")
     keybinds = load_keybinds()
 
