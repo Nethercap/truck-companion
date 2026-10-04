@@ -10,6 +10,9 @@ updates on its own and is not versioned here.
   or cancellation (loading another save, going back to the menu) stops
   adding to its trip. Before, the trip stayed open and took the driving,
   and even the truck, that came after.
+- Accounts (still switched off): a jump in the route (a quick job taking
+  you to the company, a ferry or train arrival, fast travel) is no longer
+  drawn as a straight line you drove.
 
 ## 1.5.25 (2026-10-03)
 

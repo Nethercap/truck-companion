@@ -69,6 +69,16 @@ PUNTOS_MAXIMOS_VIVOS = 1200
 # manejo con el cliente cerrado y unir los extremos con una recta seria
 # dibujar un tramo que nunca se hizo.
 CORTE_SEGMENTO_S = 30
+# Un salto mas largo que esto entre dos puntos seguidos no es manejo: es un
+# teletransporte (un quick job te lleva a la empresa, la llegada de un ferry
+# o un tren, viaje rapido, cargar una partida). Los puntos se anotan cada 50 m,
+# asi que a cualquier velocidad real dos seguidos quedan muy por debajo.
+SALTO_MAXIMO_M = 1500
+# Un salto mas largo que esto entre dos puntos seguidos no es manejo: es un
+# teletransporte (un quick job te lleva a la empresa, la llegada de un ferry
+# o un tren, viaje rapido, cargar una partida). Los puntos se anotan cada 50 m,
+# asi que a cualquier velocidad real dos seguidos quedan muy por debajo.
+SALTO_MAXIMO_M = 1500
 
 PIEZAS_CAMION = ("engine", "transmission", "cabin", "chassis", "wheels")
 
@@ -467,9 +477,18 @@ class Acumulador:
         punto = [float(x), float(z), int(round(velocidad))]
         previo, previo_ts = v["ultimo_punto"], v["ultimo_punto_ts"]
         corte = previo_ts is None or (ahora - previo_ts) > CORTE_SEGMENTO_S
-        if previo is not None and not corte:
-            if math.hypot(punto[0] - previo[0], punto[1] - previo[1]) < PASO_RECORRIDO_M:
+        if previo is not None:
+            paso = math.hypot(punto[0] - previo[0], punto[1] - previo[1])
+            if not corte and paso < PASO_RECORRIDO_M:
                 return
+            if paso > SALTO_MAXIMO_M:
+                # Un teletransporte: no se dibuja como manejado. Si el punto
+                # de antes estaba solo, era de antes del salto (en la prueba
+                # de ATS, el lugar de donde salio el quick job, a 22 km) y se
+                # descarta; si no, el recorrido se corta ahi.
+                if v["segmentos"] and len(v["segmentos"][-1]) == 1:
+                    v["segmentos"].pop()
+                corte = True
         if corte or not v["segmentos"]:
             v["segmentos"].append([])
         v["segmentos"][-1].append(punto)

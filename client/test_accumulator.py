@@ -466,3 +466,32 @@ def test_el_mismo_trabajo_reabierto_es_otro_tramo():
     _tick(acc, SIN_TRABAJO, 1 + accumulator.GRACIA_SIN_PULSO_S + 1, 100.0)
     _tick(acc, TRABAJO, 30, 100.0)
     assert acc.viaje()["run_id"] != primero
+
+
+
+def _ir(acc, t, x, z=0.0):
+    acc.tick(payload(600.0 + t, odometerKm=100.0 + t, fuel=100.0, speedKmh=60.0,
+                     position={"x": x, "y": 0.0, "z": z}), TRABAJO, 1000.0 + t)
+
+
+def test_el_salto_de_un_quick_job_no_se_dibuja_como_manejado():
+    """La prueba de ATS: el primer punto del viaje era el lugar de donde
+    salio el quick job, a 22 km de la empresa, y el mapa unia los dos con
+    una recta."""
+    acc = accumulator.Acumulador()
+    _ir(acc, 0, -62066.0)                          # antes del salto, solo
+    for i in range(1, 6):
+        _ir(acc, i, -40000.0 + i * 100)             # ya en la empresa
+    ruta = acc.viaje()["route"]
+    assert len(ruta) == 1 and ruta[0][0][0] == -39900.0
+
+
+def test_un_salto_a_mitad_de_viaje_corta_el_recorrido():
+    """Llegar en ferry o en tren: dos tramos manejados, sin unirlos."""
+    acc = accumulator.Acumulador()
+    for i in range(5):
+        _ir(acc, i, i * 100.0)
+    for i in range(5, 10):
+        _ir(acc, i, 50000.0 + i * 100)
+    ruta = acc.viaje()["route"]
+    assert [len(s) for s in ruta] == [5, 5]

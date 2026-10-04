@@ -204,7 +204,7 @@
       tripTruck: 'Truck',
       tripAvgSpeed: 'Avg speed',
       tripGameTime: 'Game time',
-      tripRouteGaps: 'Dashed where the client was closed.',
+      tripRouteGaps: 'Dashed where the route was not followed: Truck Dash closed, or a jump (quick job, ferry, train).',
       tripNoRoute: 'No route was recorded for this trip.',
       tripsTitle: 'Your trips',
       tripsEmpty: 'Nothing here yet. Link this PC to Truck Dash and your trips will show up on their own as you drive.',
@@ -443,7 +443,7 @@
       tripTruck: 'Camion',
       tripAvgSpeed: 'Promedio',
       tripGameTime: 'Tiempo de juego',
-      tripRouteGaps: 'Punteado donde el cliente estuvo cerrado.',
+      tripRouteGaps: 'Punteado donde no se siguio el recorrido: Truck Dash cerrado, o un salto (quick job, ferry, tren).',
       tripNoRoute: 'De este viaje no se guardo el recorrido.',
       tripsTitle: 'Tus viajes',
       tripsEmpty: 'Todavia no hay nada. Vincula esta PC a Truck Dash y tus viajes van a ir apareciendo solos mientras manejas.',
@@ -1455,10 +1455,39 @@
     return caja;
   }
 
-  function dibujarRecorrido(segmentos) {
+  // Un salto de mas de 1,5 km entre dos puntos seguidos no es manejo: es un
+  // teletransporte (quick job, ferry, tren, viaje rapido). El cliente ya no
+  // los une, pero los viajes guardados antes si: aca se cortan al dibujar, y
+  // un punto suelto antes del salto (de donde salio el quick job) se saca.
+  const SALTO_MAXIMO_M = 1500;
+  function cortarSaltos(segmentos) {
+    const salida = [];
+    segmentos.forEach((seg) => {
+      let actual = [];
+      seg.forEach((p) => {
+        const previo = actual[actual.length - 1];
+        if (previo && Math.hypot(p[0] - previo[0], p[1] - previo[1]) > SALTO_MAXIMO_M) {
+          if (actual.length > 1) salida.push(actual);
+          actual = [];
+        }
+        actual.push(p);
+      });
+      if (actual.length) salida.push(actual);
+    });
+    // Un punto solo al principio, lejos de todo lo demas, es de antes de
+    // empezar: dibujarlo dejaba una punta azul a 22 km del viaje.
+    if (salida.length > 1 && salida[0].length === 1) {
+      const a = salida[0][0], b = salida[1][0];
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) > SALTO_MAXIMO_M) salida.shift();
+    }
+    return salida;
+  }
+
+  function dibujarRecorrido(segmentosCrudos) {
     // El recorrido es un array de SEGMENTOS, no una linea sola: manejar con
     // el cliente cerrado deja un agujero, y ese agujero va punteado. Unir
     // los extremos con una recta seria dibujar un tramo que nunca manejo.
+    const segmentos = cortarSaltos(segmentosCrudos);
     const puntos = [];
     segmentos.forEach((seg) => seg.forEach((p) => puntos.push(p)));
     if (puntos.length < 2) return null;
@@ -1540,11 +1569,11 @@
     const dibujo = dibujarRecorrido(d.route || []);
     if (dibujo) {
       caja.appendChild(dibujo);
-      const tope = topeDeVelocidad(d.route || []);
+      const tope = topeDeVelocidad(cortarSaltos(d.route || []));
       if (tope) caja.appendChild(leyendaDeVelocidad(tope));
       // Solo se aclara si hay hueco: en un viaje entero no hay nada que
       // explicar.
-      if ((d.route || []).length > 1) sumar(caja, renglon([t('tripRouteGaps')]));
+      if (cortarSaltos(d.route || []).length > 1) sumar(caja, renglon([t('tripRouteGaps')]));
     } else {
       sumar(caja, renglon([t('tripNoRoute')]));
     }
