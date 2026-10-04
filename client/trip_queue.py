@@ -43,7 +43,10 @@ def clave_de(accion: dict) -> str:
     datos = accion.get("datos") or {}
     if accion.get("tipo") == "session":
         return "session:" + str(datos.get("client_id"))
-    return "trip:" + "|".join(str(datos.get(c)) for c in trip_tracker.CAMPOS_HUELLA)
+    # Con el tramo: lo que quedo sin mandar del tramo anterior (el cliente se
+    # cerro antes de vaciar la cola) no lo pisa el primero del nuevo.
+    return ("trip:" + "|".join(str(datos.get(c)) for c in trip_tracker.CAMPOS_HUELLA)
+            + "|" + str(datos.get("run_id")))
 
 
 class Cola:

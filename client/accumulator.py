@@ -186,6 +186,11 @@ class Acumulador:
         v = self._viaje
         datos = dict(v["datos"])
         datos.update(self._totales_del_viaje())
+        # El tramo: esta tanda del cliente siguiendo el viaje. Si el cliente
+        # se cierra y se abre, el tramo nuevo arranca de cero y la API suma los
+        # dos en vez de quedarse con el ultimo (antes, 46,6 km pasaban a 1,2).
+        if self._sesion is not None:
+            datos["run_id"] = self._sesion["client_id"]
         # El ultimo camion visto: al abrir el viaje (por ejemplo al arrancar
         # el cliente con el trabajo ya tomado) puede no haber llegado todavia.
         datos["truck_brand"] = v.get("truck_brand")

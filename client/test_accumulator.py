@@ -397,3 +397,14 @@ def test_simplificar_no_se_come_un_frenazo_en_una_recta():
     # Sin velocidad sigue andando como antes: una recta se reduce a sus puntas.
     sin = [[i * 50.0, 0.0] for i in range(400)]
     assert accumulator._achicar([sin], objetivo=30)[0] == [sin[0], sin[-1]]
+
+
+def test_el_viaje_lleva_el_tramo_y_un_cliente_nuevo_es_otro_tramo():
+    # Cerrar y abrir el cliente es otro Acumulador: otro tramo, para que la
+    # API sume los dos en vez de quedarse con el ultimo.
+    uno = accumulator.Acumulador()
+    uno.tick(payload(600.0, odometerKm=1.0, fuel=1.0), TRABAJO, 1000.0)
+    dos = accumulator.Acumulador()
+    dos.tick(payload(700.0, odometerKm=50.0, fuel=1.0), TRABAJO, 2000.0)
+    a, b = uno.viaje()["run_id"], dos.viaje()["run_id"]
+    assert a and b and a != b

@@ -14,6 +14,8 @@ updates on its own and is not versioned here.
 - Accounts (still switched off): Link account opens the browser with the
   code already filled in. You confirm there, after checking that the code
   matches the one in Truck Dash, instead of typing it.
+- Accounts (still switched off): closing and reopening Truck Dash in the
+  middle of a trip no longer resets its distance and route.
 
 ## 1.5.24 (2026-10-03)
 

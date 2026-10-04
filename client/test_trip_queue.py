@@ -246,3 +246,14 @@ def test_si_el_viaje_ya_no_existe_se_vuelve_a_abrir(tmp_path):
     c.encolar(viaje())
     enviador.drenar("tok", "https://api")
     assert enviador._ids == {}
+
+
+def test_dos_tramos_del_mismo_viaje_no_se_pisan_en_la_cola(tmp_path):
+    """Lo pendiente del tramo anterior (el cliente se cerro antes de mandarlo)
+    no lo reemplaza el primer checkpoint del tramo nuevo."""
+    cola = trip_queue.Cola(str(tmp_path / "cola.json"))
+    base = {"job_started_game_time": 1, "deadline_game_time": 2, "cargo_id": "x",
+            "city_src_id": "a", "city_dst_id": "b"}
+    cola.encolar({"tipo": "trip_checkpoint", "datos": dict(base, run_id="r1", distance_tracked_km=46.6)})
+    cola.encolar({"tipo": "trip_checkpoint", "datos": dict(base, run_id="r2", distance_tracked_km=1.2)})
+    assert [e["datos"]["distance_tracked_km"] for e in cola.pendientes()] == [46.6, 1.2]
