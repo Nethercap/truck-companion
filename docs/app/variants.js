@@ -1,6 +1,6 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-09-29.
+// Fuente: manifest del 2026-10-05.
 const MAP_DATA_VERSION = {
   "ats": "20260929",
   "ats_c2c": "20260929",
@@ -14,6 +14,8 @@ const MAP_DATA_VERSION = {
   "ets2_promods_roex": "20260929",
   "ets2_promods_rusmap_roex": "20260929",
   "ets2_gu": "20260929",
+  "ets2_eugu": "20261005",
+  "ets2_promods_eugu": "20261005",
   "ets2_tmp": "20260929"
 };
 
@@ -197,6 +199,38 @@ const VARIANT_META = {
     "manual": "gu",
     "mods": [
       "grand_utopia"
+    ]
+  },
+  "ets2_eugu": {
+    "label": "Euro Truck Simulator 2 + European Grand Utopia",
+    "game": "ets2",
+    "projection": "ets2",
+    "origin": [
+      15,
+      50
+    ],
+    "manual": null,
+    "mods": [
+      "grand_utopia",
+      "eu_grand_utopia"
+    ]
+  },
+  "ets2_promods_eugu": {
+    "label": "Euro Truck Simulator 2 + ProMods + European Grand Utopia",
+    "game": "ets2",
+    "projection": "ets2",
+    "origin": [
+      15,
+      50
+    ],
+    "manual": null,
+    "mods": [
+      "promods",
+      "promods_me",
+      "promods_maghreb",
+      "promods_tgs",
+      "grand_utopia",
+      "eu_grand_utopia"
     ]
   },
   "ets2_tmp": {

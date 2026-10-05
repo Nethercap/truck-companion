@@ -3146,8 +3146,8 @@ function resolveEffectiveGame(game) {
     if (g === 'ats' && det.c2c) return 'ats_c2c';
     // European Grand Utopia pega el archipielago a Europa (y pide el Grand
     // Utopia original cargado, asi que grand_utopia tambien viene en true):
-    // es Europa, no el mapa standalone. Mientras no haya variante propia, la
-    // de Europa que corresponda: faltan las islas, pero el resto esta bien.
+    // es Europa, no el mapa standalone. Las variantes eugu traen Europa con
+    // el archipielago; si una no estuviera publicada, la de Europa sin islas.
     if (g === 'ets2' && det.eu_grand_utopia) {
       return det.promods ? publishedVariant('ets2_promods_eugu', 'ets2_promods')
                          : publishedVariant('ets2_eugu', 'ets2');
