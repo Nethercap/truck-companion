@@ -3144,6 +3144,14 @@ function resolveEffectiveGame(game) {
     if (g === 'ats' && det.c2c && det.promods_canada) return 'ats_c2c_promods';
     if (g === 'ats' && det.promods_canada) return 'ats_promods';
     if (g === 'ats' && det.c2c) return 'ats_c2c';
+    // European Grand Utopia pega el archipielago a Europa (y pide el Grand
+    // Utopia original cargado, asi que grand_utopia tambien viene en true):
+    // es Europa, no el mapa standalone. Mientras no haya variante propia, la
+    // de Europa que corresponda: faltan las islas, pero el resto esta bien.
+    if (g === 'ets2' && det.eu_grand_utopia) {
+      return det.promods ? publishedVariant('ets2_promods_eugu', 'ets2_promods')
+                         : publishedVariant('ets2_eugu', 'ets2');
+    }
     // Grand Utopia es standalone: si esta activo, el perfil es de ese mapa.
     if (g === 'ets2' && det.grand_utopia) return 'ets2_gu';
     if (g === 'ets2' && det.roextended && det.rusmap) return publishedVariant('ets2_promods_rusmap_roex', 'ets2_promods_rusmap');
@@ -3179,7 +3187,8 @@ function describeDetectedMods(game) {
   if (det.promods) names.push('ProMods');
   if (det.rusmap) names.push('RusMap');
   if (det.roextended) names.push('Roextended');
-  if (det.grand_utopia) names.push('Grand Utopia');
+  if (det.eu_grand_utopia) names.push('European Grand Utopia');
+  else if (det.grand_utopia) names.push('Grand Utopia');
   if (det.truckersmp) names.push('TruckersMP');
   if (det.promods_canada) names.push('ProMods Canada');
   if (det.c2c) names.push('Coast to Coast');

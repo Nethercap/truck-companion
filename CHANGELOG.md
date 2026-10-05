@@ -6,6 +6,10 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- European Grand Utopia (the mod that adds the Grand Utopia archipelago to
+  the Europe map) is now recognised on its own. Before, the dashboard
+  loaded the standalone Grand Utopia map, a different map altogether; now
+  it uses Europe (vanilla or ProMods), without the islands for now.
 - Accounts (still switched off): a job that disappears without a delivery
   or cancellation (loading another save, going back to the menu) stops
   adding to its trip. Before, the trip stayed open and took the driving,

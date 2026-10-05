@@ -338,7 +338,7 @@ def test_parse_active_mods_none_without_list():
     assert client.parse_active_mods("00:00:01 : [hashfs] base.scs: Created") is None
 
 
-NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "truckersmp": False}
+NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "truckersmp": False}
 
 
 def test_parse_custom_key():
@@ -944,3 +944,20 @@ def test_changelog_seccion_corta_en_la_siguiente():
     assert cl.seccion(texto, "1.2.30") == "- treinta"
     assert cl.seccion(texto, "1.2.4") is None
     assert cl.seccion("## 1.0.0\n\n## 0.9.0\n- x\n", "1.0.0") is None
+
+
+def test_european_grand_utopia_no_es_el_standalone():
+    """Con European Grand Utopia se cargan el y el Grand Utopia original: la
+    marca aparte es la que le dice a la web que es Europa, no el mapa de
+    Grand Utopia solo."""
+    eugu = [{"file": "European Grand Utopia v1.12 by Adyox.scs", "name": "European Grand Utopia"},
+            {"file": "GU - Grand Utopia (v1.20d).scs", "name": "Grand Utopia"}]
+    assert client.detect_map_mods(eugu) == {**NO_MODS, "grand_utopia": True, "eu_grand_utopia": True}
+    con_promods = eugu + [
+        {"file": "European Grand Utopia v1.12 for Promods by Adyox.scs",
+         "name": "European Grand Utopia for Promods"},
+        {"file": "promods-def-v284.scs", "name": "ProMods Definition"}]
+    banderas = client.detect_map_mods(con_promods)
+    assert banderas["eu_grand_utopia"] and banderas["promods"]
+    solo = [{"file": "GU - Grand Utopia (v1.20d).scs", "name": "Grand Utopia"}]
+    assert client.detect_map_mods(solo)["eu_grand_utopia"] is False
