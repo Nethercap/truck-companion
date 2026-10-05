@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.26 (2026-10-05)
 
 - European Grand Utopia (the mod that adds the Grand Utopia archipelago to
   the Europe map) is now recognised on its own. Before, the dashboard
