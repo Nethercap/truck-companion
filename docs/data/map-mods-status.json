@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-28T17:41:41Z",
+  "checkedAt": "2026-10-05T18:32:33Z",
   "mods": {
     "c2c": {
       "ours": "2.23.61.0",
@@ -101,10 +101,17 @@
     },
     "grand_utopia": {
       "ours": "1.20c",
-      "upstream": "1.20c",
-      "status": "ok",
+      "upstream": "1.20d",
+      "status": "outdated",
       "error": null,
       "source": "https://truckymods.io/euro-truck-simulator-2/maps/grand-utopia-map"
+    },
+    "eu_grand_utopia": {
+      "ours": "1.12",
+      "upstream": "1.12",
+      "status": "ok",
+      "error": null,
+      "source": "https://truckymods.io/euro-truck-simulator-2/maps/european-grand-utopia"
     },
     "truckersmp": {
       "ours": "launcher 1.3.19 (2026-09-21)",
@@ -129,7 +136,7 @@
         "ats/route-graph-ats.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 17:50:43 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:03 GMT"
         },
         "ats/Cities.json": {
           "ok": true,
@@ -159,7 +166,7 @@
         "ats_c2c/route-graph-ats_c2c.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:05:30 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:03 GMT"
         },
         "ats_c2c/Cities.json": {
           "ok": true,
@@ -189,7 +196,7 @@
         "ats_promods/route-graph-ats_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 17:57:45 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:18 GMT"
         },
         "ats_promods/Cities.json": {
           "ok": true,
@@ -219,7 +226,7 @@
         "ats_c2c_promods/route-graph-ats_c2c_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:05:38 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:18 GMT"
         },
         "ats_c2c_promods/Cities.json": {
           "ok": true,
@@ -249,7 +256,7 @@
         "ats_reforma/route-graph-ats_reforma.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 18:09:17 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:39 GMT"
         },
         "ats_reforma/Cities.json": {
           "ok": true,
@@ -279,7 +286,7 @@
         "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:06:03 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:24 GMT"
         },
         "ats_reforma_c2c_promods/Cities.json": {
           "ok": true,
@@ -309,7 +316,7 @@
         "ets2/route-graph-ets2.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:06:09 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:03 GMT"
         },
         "ets2/Cities.json": {
           "ok": true,
@@ -339,7 +346,7 @@
         "ets2_promods/route-graph-ets2_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:06:50 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:11 GMT"
         },
         "ets2_promods/Cities.json": {
           "ok": true,
@@ -369,7 +376,7 @@
         "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:06:58 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:04 GMT"
         },
         "ets2_promods_rusmap/Cities.json": {
           "ok": true,
@@ -399,7 +406,7 @@
         "ets2_promods_roex/route-graph-ets2_promods_roex.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:07:02 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:31 GMT"
         },
         "ets2_promods_roex/Cities.json": {
           "ok": true,
@@ -429,7 +436,7 @@
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:07:04 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:06 GMT"
         },
         "ets2_promods_rusmap_roex/Cities.json": {
           "ok": true,
@@ -459,7 +466,7 @@
         "ets2_gu/route-graph-ets2_gu.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:07:38 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:45 GMT"
         },
         "ets2_gu/Cities.json": {
           "ok": true,
@@ -475,6 +482,58 @@
       "totalBytes": 9156132,
       "allOk": false
     },
+    "ets2_eugu": {
+      "files": {
+        "vector/ets2_eugu.pmtiles": {
+          "ok": true,
+          "bytes": 69054730,
+          "lastModified": "Mon, 05 Oct 2026 15:21:33 GMT"
+        },
+        "ets2_eugu/route-graph-ets2_eugu.bin": {
+          "ok": true,
+          "bytes": 0,
+          "lastModified": "Mon, 05 Oct 2026 15:21:25 GMT"
+        },
+        "ets2_eugu/Cities.json": {
+          "ok": true,
+          "bytes": 42009,
+          "lastModified": "Mon, 05 Oct 2026 15:21:30 GMT"
+        },
+        "ets2_eugu/road-names.json": {
+          "ok": true,
+          "bytes": 3675713,
+          "lastModified": "Mon, 05 Oct 2026 15:21:11 GMT"
+        }
+      },
+      "totalBytes": 72772452,
+      "allOk": true
+    },
+    "ets2_promods_eugu": {
+      "files": {
+        "vector/ets2_promods_eugu.pmtiles": {
+          "ok": true,
+          "bytes": 92942843,
+          "lastModified": "Mon, 05 Oct 2026 15:22:39 GMT"
+        },
+        "ets2_promods_eugu/route-graph-ets2_promods_eugu.bin": {
+          "ok": true,
+          "bytes": 0,
+          "lastModified": "Mon, 05 Oct 2026 15:21:35 GMT"
+        },
+        "ets2_promods_eugu/Cities.json": {
+          "ok": true,
+          "bytes": 78727,
+          "lastModified": "Mon, 05 Oct 2026 15:21:42 GMT"
+        },
+        "ets2_promods_eugu/road-names.json": {
+          "ok": true,
+          "bytes": 5520601,
+          "lastModified": "Mon, 05 Oct 2026 15:21:38 GMT"
+        }
+      },
+      "totalBytes": 98542171,
+      "allOk": true
+    },
     "ets2_tmp": {
       "files": {
         "vector/ets2_tmp.pmtiles": {
@@ -489,7 +548,7 @@
         "ets2_tmp/route-graph-ets2_tmp.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Thu, 24 Sep 2026 12:07:40 GMT"
+          "lastModified": "Tue, 29 Sep 2026 19:40:45 GMT"
         },
         "ets2_tmp/Cities.json": {
           "ok": true,
