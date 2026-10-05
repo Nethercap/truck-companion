@@ -3137,6 +3137,14 @@ function resolveEffectiveGame(game) {
   const g = game || 'ats';
   const det = modsAuto && detectedMods ? detectedMods[g] : null;
   if (det) {
+    // European Grand Utopia (Adyox) pone la isla al noroeste de UK dentro del
+    // mapa de Europa, vanilla o ProMods. Trae tambien el mod de Grand Utopia,
+    // asi que det.grand_utopia viene prendido, pero NO es el standalone: sus
+    // coordenadas son las de Europa. Se busca la variante "<base>_egu"; si
+    // esa combinacion no esta publicada, la de Europa sin la isla (Europa se
+    // ve bien, la isla queda fuera del mapa) y nunca ets2_gu.
+    const egu = g === 'ets2' && det.european_grand_utopia;
+    const withEgu = v => (egu ? publishedVariant(v + '_egu', v) : v);
     // Reforma con cualquiera de los otros dos mapas usa el pack "todo" (es
     // un superconjunto: rutas de mas en Canada/costa, nunca de menos).
     if (g === 'ats' && det.reforma && (det.c2c || det.promods_canada)) return 'ats_reforma_c2c_promods';
@@ -3145,17 +3153,17 @@ function resolveEffectiveGame(game) {
     if (g === 'ats' && det.promods_canada) return 'ats_promods';
     if (g === 'ats' && det.c2c) return 'ats_c2c';
     // Grand Utopia es standalone: si esta activo, el perfil es de ese mapa.
-    if (g === 'ets2' && det.grand_utopia) return 'ets2_gu';
-    if (g === 'ets2' && det.roextended && det.rusmap) return publishedVariant('ets2_promods_rusmap_roex', 'ets2_promods_rusmap');
+    if (g === 'ets2' && det.grand_utopia && !egu) return 'ets2_gu';
+    if (g === 'ets2' && det.roextended && det.rusmap) return withEgu(publishedVariant('ets2_promods_rusmap_roex', 'ets2_promods_rusmap'));
     // Roextended sin ProMods (edicion standalone) no tiene variante propia;
     // la Hybrid es lo mas parecido.
-    if (g === 'ets2' && det.roextended) return publishedVariant('ets2_promods_roex', 'ets2_promods');
-    if (g === 'ets2' && det.promods && det.rusmap) return 'ets2_promods_rusmap';
-    if (g === 'ets2' && det.promods) return 'ets2_promods';
+    if (g === 'ets2' && det.roextended) return withEgu(publishedVariant('ets2_promods_roex', 'ets2_promods'));
+    if (g === 'ets2' && det.promods && det.rusmap) return withEgu('ets2_promods_rusmap');
+    if (g === 'ets2' && det.promods) return withEgu('ets2_promods');
     // TruckersMP sin mods de mapa: juego base + sede TMP + CD road. En su
     // servidor ProMods gana ProMods (la sede no esta en ese pack, es minimo).
     if (g === 'ets2' && det.truckersmp) return publishedVariant('ets2_tmp', 'ets2');
-    return g;
+    return withEgu(g);
   }
   if (g === 'ats' && atsMod === 'reforma_c2c_promods_canada') return 'ats_reforma_c2c_promods';
   if (g === 'ats' && atsMod === 'reforma') return 'ats_reforma';
@@ -3179,7 +3187,8 @@ function describeDetectedMods(game) {
   if (det.promods) names.push('ProMods');
   if (det.rusmap) names.push('RusMap');
   if (det.roextended) names.push('Roextended');
-  if (det.grand_utopia) names.push('Grand Utopia');
+  if (det.european_grand_utopia) names.push('European Grand Utopia');
+  else if (det.grand_utopia) names.push('Grand Utopia');
   if (det.truckersmp) names.push('TruckersMP');
   if (det.promods_canada) names.push('ProMods Canada');
   if (det.c2c) names.push('Coast to Coast');

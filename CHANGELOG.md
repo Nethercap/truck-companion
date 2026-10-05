@@ -13,6 +13,9 @@ updates on its own and is not versioned here.
 - Accounts (still switched off): a jump in the route (a quick job taking
   you to the company, a ferry or train arrival, fast travel) is no longer
   drawn as a straight line you drove.
+- Detects European Grand Utopia (the Grand Utopia island added northwest
+  of the UK, on vanilla ETS2 or ProMods). Before, the web took it for the
+  standalone Grand Utopia map and showed the wrong map.
 
 ## 1.5.25 (2026-10-03)
 

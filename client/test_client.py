@@ -338,7 +338,7 @@ def test_parse_active_mods_none_without_list():
     assert client.parse_active_mods("00:00:01 : [hashfs] base.scs: Created") is None
 
 
-NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "truckersmp": False}
+NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "european_grand_utopia": False, "truckersmp": False}
 
 
 def test_parse_custom_key():
@@ -391,6 +391,9 @@ def test_detect_map_mods_reforma_roex_gu():
     assert client.detect_map_mods([{"file": "161Hybrid2v3.scs", "name": "161Hybrid2v3"}]) == {**NO_MODS, "roextended": True}
     gu = [{"file": "GU - Grand Utopia (v1.20c).scs", "name": "Grand Utopia"}]
     assert client.detect_map_mods(gu) == {**NO_MODS, "grand_utopia": True}
+    egu = gu + [{"file": "European Grand Utopia v1.12.scs", "name": "European Grand Utopia"},
+                {"file": "promods-eu-map-v284.scs", "name": "ProMods Europe"}]
+    assert client.detect_map_mods(egu) == {**NO_MODS, "grand_utopia": True, "european_grand_utopia": True, "promods": True}
 
 
 def test_qr_image_is_dark_on_light_with_quiet_zone():

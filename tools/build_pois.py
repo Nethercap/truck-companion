@@ -38,6 +38,8 @@ VARIANTS = {
     "ets2_promods_roex": ("parser-output-ets2_promods_roex", "europe"),  # ProMods + Roextended Hybrid 1.61 v3 + ROEX53PMME284
     "ets2_promods_rusmap_roex": ("parser-output-ets2_promods_rusmap_roex", "europe"),  # + RusMap + ROEX53RM261
     "ets2_gu": ("parser-output-ets2_gu", "europe"),  # Grand Utopia 1.20c (standalone)
+    "ets2_egu": ("parser-output-ets2_egu", "europe"),  # Grand Utopia 1.20d + European Grand Utopia 1.12 (isla al NO de UK)
+    "ets2_promods_egu": ("parser-output-ets2_promods_egu", "europe"),  # ProMods 2.84 + addons + GU 1.20d + EGU 1.12
     "ets2_tmp": ("parser-output-ets2_tmp", "europe"),  # TruckersMP (sede TMP + CD road)
 }
 

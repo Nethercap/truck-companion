@@ -290,6 +290,56 @@
         42
       ]
     },
+    "ets2_egu": {
+      "label": "ETS2 + European Grand Utopia",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "planned": true,
+      "plannedNote": "Isla de Grand Utopia al noroeste de UK (EGU 1.12 de Adyox + Grand Utopia 1.20d). Falta parsear en D:/ets2-companion; mientras tanto la web cae a ets2.",
+      "mods": [
+        "grand_utopia",
+        "european_grand_utopia"
+      ],
+      "files": [
+        "vector/ets2_egu.pmtiles",
+        "ets2_egu/route-graph-ets2_egu.json",
+        "ets2_egu/route-graph-ets2_egu.bin",
+        "ets2_egu/Cities.json",
+        "ets2_egu/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + European Grand Utopia",
+      "origin": [
+        -2,
+        52
+      ]
+    },
+    "ets2_promods_egu": {
+      "label": "ETS2 + ProMods + European Grand Utopia",
+      "game": "ets2",
+      "gameVersion": "1.61.1",
+      "planned": true,
+      "plannedNote": "Isla de Grand Utopia al noroeste de UK (EGU 1.12 de Adyox + Grand Utopia 1.20d). Falta parsear en D:/ets2-companion; mientras tanto la web cae a ets2_promods.",
+      "mods": [
+        "promods",
+        "promods_me",
+        "promods_maghreb",
+        "promods_tgs",
+        "grand_utopia",
+        "european_grand_utopia"
+      ],
+      "files": [
+        "vector/ets2_promods_egu.pmtiles",
+        "ets2_promods_egu/route-graph-ets2_promods_egu.json",
+        "ets2_promods_egu/route-graph-ets2_promods_egu.bin",
+        "ets2_promods_egu/Cities.json",
+        "ets2_promods_egu/road-names.json"
+      ],
+      "appLabel": "Euro Truck Simulator 2 + ProMods (Europe + addons) + European Grand Utopia",
+      "origin": [
+        -2,
+        52
+      ]
+    },
     "ets2_tmp": {
       "label": "ETS2 + TruckersMP (HQ + CD road)",
       "game": "ets2",
@@ -451,6 +501,17 @@
         "url": "https://truckymods.io/euro-truck-simulator-2/maps/grand-utopia-map",
         "pattern": "badge-light-primary[^>]*>(\\d+\\.\\d+[a-z]?)<",
         "note": "badges de version en el historial de TruckyMods (la mas alta gana)"
+      }
+    },
+    "european_grand_utopia": {
+      "name": "European Grand Utopia",
+      "game": "ets2",
+      "version": "1.12",
+      "homepage": "https://truckymods.io/euro-truck-simulator-2/maps/european-grand-utopia",
+      "check": {
+        "url": "https://truckymods.io/euro-truck-simulator-2/maps/european-grand-utopia",
+        "pattern": "badge-light-primary[^>]*>(\\d+\\.\\d+[a-z]?)<",
+        "note": "mismo patron que Grand Utopia en TruckyMods (sin verificar contra esta pagina)"
       }
     },
     "truckersmp": {
