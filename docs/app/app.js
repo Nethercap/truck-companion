@@ -419,6 +419,10 @@ function initModsUi() {
   document.getElementById('setProModsRoex').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_roex;
   document.getElementById('setProModsRusMapRoex').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_rusmap_roex;
   document.getElementById('setGrandUtopia').checked = ets2Mod === 'gu';
+  document.getElementById('setEuGrandUtopia').checked = ets2Mod === 'eugu';
+  document.getElementById('setProModsEuGrandUtopia').checked = ets2Mod === 'promods_eugu';
+  document.getElementById('setEuGrandUtopia').closest('label').hidden = !MAP_DATA_VERSION.ets2_eugu;
+  document.getElementById('setProModsEuGrandUtopia').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_eugu;
   document.getElementById('setTruckersMP').checked = ets2Mod === 'tmp';
   document.getElementById('setTruckersMP').closest('label').hidden = !MAP_DATA_VERSION.ets2_tmp;
 }
@@ -3171,6 +3175,8 @@ function resolveEffectiveGame(game) {
   if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
   if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
   if (g === 'ets2' && ets2Mod === 'gu') return 'ets2_gu';
+  if (g === 'ets2' && ets2Mod === 'eugu') return publishedVariant('ets2_eugu', 'ets2');
+  if (g === 'ets2' && ets2Mod === 'promods_eugu') return publishedVariant('ets2_promods_eugu', 'ets2_promods');
   if (g === 'ets2' && ets2Mod === 'tmp') return publishedVariant('ets2_tmp', 'ets2');
   if (g === 'ets2' && ets2Mod === 'promods_rusmap_roex') return publishedVariant('ets2_promods_rusmap_roex', 'ets2_promods_rusmap');
   if (g === 'ets2' && ets2Mod === 'promods_roex') return publishedVariant('ets2_promods_roex', 'ets2_promods');
