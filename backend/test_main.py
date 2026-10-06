@@ -309,6 +309,52 @@ def test_broadcast_live_positions_filters_by_variant_and_excludes_self(main):
     asyncio.run(run())
 
 
+def test_broadcast_live_positions_recorta_a_cada_uno_sin_romper_el_json(main):
+    """El mensaje de cada sesion se arma recortando la lista compartida:
+    tiene que salir JSON valido con todos menos uno mismo, sea el primero,
+    uno del medio, el ultimo o el unico del mapa."""
+    import asyncio
+
+    class FakeWs:
+        def __init__(self):
+            self.sent = []
+
+        async def send_text(self, text):
+            self.sent.append(text)
+
+    async def run():
+        ahora = main.time.time()
+        grupo = []
+        for i, codigo in enumerate(["AAAAAAAA", "BBBBBBBB", "CCCCCCCC"]):
+            s = main.Session(codigo)
+            s.share_position = True
+            s.map_variant = "ets2"
+            s.last_position = {"x": 1000.123456789 * (i + 1), "z": -2.0 * i, "ts": ahora}
+            s.viewer_ws_list = [FakeWs()]
+            grupo.append(s)
+        solo = main.Session("DDDDDDDD")
+        solo.share_position = True
+        solo.map_variant = "ats"
+        solo.last_position = {"x": 5.0, "z": 5.0, "ts": ahora}
+        solo.viewer_ws_list = [FakeWs()]
+
+        main.sessions.update({s.code: s for s in grupo + [solo]})
+        main.broadcast_live_positions()
+        await asyncio.sleep(0)
+
+        for s in grupo:
+            (texto,) = s.viewer_ws_list[0].sent
+            body = main.json.loads(texto)
+            assert body["type"] == "live_players"
+            assert [p["id"] for p in body["players"]] == [
+                o.public_id for o in grupo if o is not s]
+        primero = main.json.loads(grupo[1].viewer_ws_list[0].sent[0])["players"][0]
+        assert primero == {"id": grupo[0].public_id, "x": 1000.1, "z": 0.0}
+        assert main.json.loads(solo.viewer_ws_list[0].sent[0])["players"] == []
+
+    asyncio.run(run())
+
+
 def test_broadcast_live_positions_excludes_not_sharing_and_stale(main):
     import asyncio
 

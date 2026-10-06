@@ -197,6 +197,19 @@ def test_una_entrada_rechazada_no_tapa_la_cola(tmp_path):
     assert len(c) == 0
 
 
+def test_un_429_no_descarta_nada(tmp_path):
+    """La API de cuentas responde 429 al pasar sus limites por cuenta (viajes
+    por dia, pedidos por minuto) contando con que el cliente lo reintente: a
+    alguien honesto que los toque lo demora, no le borra el viaje."""
+    c = cola(tmp_path)
+    c.encolar(viaje())
+    api = ApiFalsa(por_defecto=(429, {"error": "demasiados_pedidos"}))
+    resumen = trip_queue.Enviador(c, api).drenar("tok", "https://api")
+    assert resumen["descartados"] == 0
+    assert len(c) == 1
+    assert 429 not in trip_queue.SIN_REINTENTO
+
+
 def test_un_500_no_descarta_nada(tmp_path):
     """La API caida un rato no es lo mismo que la API diciendo que no."""
     c = cola(tmp_path)
