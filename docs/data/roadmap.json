@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-28",
+  "updated": "2026-10-06",
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped.",
   "items": [
     {
@@ -76,26 +76,26 @@
     },
     {
       "id": "accounts",
-      "status": "exploring",
+      "status": "shipped",
       "en": {
         "title": "Optional account",
-        "body": "Sign in with Discord, Steam or Google only if you want your trip history and totals on every device. Truck Dash keeps working without an account, as it does today."
+        "body": "Sign in with Discord, Google or email and link the client: every job is kept with its route, pay, fuel and times, on any device. Nothing is saved until you link it, and Truck Dash works the same without an account."
       },
       "es": {
         "title": "Cuenta opcional",
-        "body": "Entrar con Discord, Steam o Google solo si querés tu historial y tus totales en todos los dispositivos. Truck Dash va a seguir funcionando sin cuenta, como hoy."
+        "body": "Entrás con Discord, Google o mail y vinculás el cliente: cada trabajo queda guardado con su ruta, paga, combustible y tiempos, en cualquier dispositivo. No se guarda nada hasta que lo vinculás, y Truck Dash anda igual sin cuenta."
       }
     },
     {
       "id": "stats-charts",
-      "status": "planned",
+      "status": "shipped",
       "en": {
-        "title": "Stats charts and trends",
-        "body": "Your driving by week and by month, and not only a running total: kilometres, hours, deliveries and money over time, so you can see whether you are driving more or less than last month and how a season went. Per game, on top of optional accounts."
+        "title": "Stats, charts and achievements",
+        "body": "Your driving by week and by month, a calendar of the days you drove, records, the countries and states you crossed, your top trucks, cargoes and routes, and achievements. Per game, in your optional account."
       },
       "es": {
-        "title": "Gráficos y tendencias de las estadísticas",
-        "body": "Lo que manejaste por semana y por mes, y no solo el total acumulado: kilómetros, horas, entregas y plata a lo largo del tiempo, para ver si venís manejando más o menos que el mes pasado y cómo fue una temporada. Por juego, arriba de las cuentas opcionales."
+        "title": "Estadísticas, gráficos y logros",
+        "body": "Lo que manejaste por semana y por mes, un calendario de los días que manejaste, récords, los países y estados que cruzaste, tus camiones, cargas y rutas más usados, y logros. Por juego, en tu cuenta opcional."
       }
     },
     {
@@ -162,24 +162,24 @@
       "id": "shipped-mods",
       "status": "shipped",
       "en": {
-        "title": "13 map variants",
-        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia and TruckersMP, detected automatically."
+        "title": "15 map variants",
+        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia, European Grand Utopia and TruckersMP, detected automatically."
       },
       "es": {
-        "title": "13 variantes de mapa",
-        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia y TruckersMP, detectadas solas."
+        "title": "15 variantes de mapa",
+        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia, European Grand Utopia y TruckersMP, detectadas solas."
       }
     },
     {
       "id": "tts-directions",
-      "status": "exploring",
+      "status": "shipped",
       "en": {
         "title": "Spoken directions",
-        "body": "Turn-by-turn read out loud so you can keep your eyes on the road. The game's own voice is poor enough that most people turn it off, so this replaces it rather than doubling up. It only earns its place if it sounds natural and pronounces road and city names properly, and finding a voice that does that is the actual work."
+        "body": "Turn-by-turn read out loud in navigation mode: a heads-up before each turn, again at the turn, and on arrival. Natural recorded voices in 8 languages, two to choose from in English and Spanish, and no road names, so nothing gets mispronounced."
       },
       "es": {
         "title": "Indicaciones habladas",
-        "body": "Las indicaciones de giro dichas en voz alta, para no sacar la vista de la ruta. La voz del juego es lo bastante mala como para que la mayoría la apague, así que esto la reemplaza en vez de duplicarla. Solo se gana el lugar si suena natural y pronuncia bien los nombres de rutas y ciudades, y encontrar esa voz es el trabajo de verdad."
+        "body": "Las indicaciones de giro en voz alta en modo navegación: un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, dos para elegir en inglés y en español, y sin nombres de rutas, así nada se pronuncia mal."
       }
     },
     {

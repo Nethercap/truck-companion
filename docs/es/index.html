@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title data-i18n-text="metaTitle">Truck Dash – GPS y tablero en vivo gratis para ETS2 y ATS</title>
-<meta name="description" data-i18n-content="metaDescription" content="Convertí tu celular o segundo monitor en un GPS real para Euro Truck Simulator 2 y American Truck Simulator. Mapa en vivo, indicaciones de giro, estado del camión y botonera. 100% gratis, sin cuenta obligatoria, código abierto." />
+<meta name="description" data-i18n-content="metaDescription" content="Convertí tu celular o segundo monitor en un GPS real para Euro Truck Simulator 2 y American Truck Simulator. Mapa en vivo, indicaciones de giro habladas, estado del camión, botonera e historial de viajes opcional. 100% gratis, sin cuenta obligatoria, código abierto." />
 <link rel="canonical" href="https://trucksim-dash.com/es/" data-canonical />
 <link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
 <link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
@@ -552,6 +552,16 @@
         <h3 data-i18n="featMobileTitle">Cualquier pantalla, en cualquier lado</h3>
         <p data-i18n="featMobileBody">Celular, tablet o segundo monitor, vertical u horizontal. Agregalo a la pantalla de inicio como una app. El celular puede estar con datos móviles — no hace falta la misma WiFi. Arrastrá cualquier botón o panel a donde te sirva: en pantalla táctil, mantené apretado uno para empezar.</p>
       </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></div>
+        <h3 data-i18n="featVoiceTitle">Indicaciones habladas <span class="tag">nuevo</span></h3>
+        <p data-i18n="featVoiceBody">Las indicaciones de giro en voz alta: un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, sin nombres de rutas mal pronunciados. Apagada por defecto, un interruptor en Ajustes.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+        <h3 data-i18n="featStatsTitle">Historial de viajes y estadísticas <span class="tag">nuevo</span></h3>
+        <p data-i18n="featStatsBody">Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, actividad por semana y por mes, récords y logros, y un perfil público solo si querés. <a href="#accounts">Más abajo</a>.</p>
+      </div>
     </div>
 
     <div class="screenshotWrap">
@@ -587,9 +597,9 @@
         <p data-i18n="accountsBody">Vinculá el cliente a una cuenta gratis y cada trabajo que manejás queda guardado: el recorrido en un mapa, con colores por velocidad, y la distancia, la plata, el combustible, los peajes, las multas, el daño y los tiempos.</p>
         <ul class="accountsList">
           <li data-i18n="accountsLi1">Un logbook que podés filtrar y exportar a CSV</li>
-          <li data-i18n="accountsLi2">Estadísticas por juego, récords y logros</li>
+          <li data-i18n="accountsLi2">Estadísticas por juego: actividad por semana y por mes, récords y logros</li>
           <li data-i18n="accountsLi3">Los países y estados por los que pasaste</li>
-          <li data-i18n="accountsLi4">Privado por defecto. Entrás con Discord, Google o mail</li>
+          <li data-i18n="accountsLi4">Privado por defecto, con perfil público solo si querés. Entrás con Discord, Google o mail</li>
         </ul>
         <div class="ctaRow">
           <a class="cta" href="/account/" data-i18n="accountsCta">Crear una cuenta gratis</a>
@@ -781,7 +791,7 @@ const DONATE_URL = 'https://tecito.app/truckdash';
 const TRANSLATIONS = {
   en: {
     metaTitle: 'Truck Dash – Free GPS & Live Dashboard for ETS2 and ATS',
-    metaDescription: 'Turn your phone or second screen into a real GPS for Euro Truck Simulator 2 and American Truck Simulator. Live map, turn-by-turn directions, truck vitals and a button box. 100% free, no account needed, open source.',
+    metaDescription: 'Turn your phone or second screen into a real GPS for Euro Truck Simulator 2 and American Truck Simulator. Live map, spoken turn-by-turn directions, truck vitals, a button box and optional trip history. 100% free, no account needed, open source.',
     ogTitle: 'Truck Dash – Free GPS & Live Dashboard for ETS2 and ATS',
     ogDescription: 'Real map, turn-by-turn directions, truck vitals and a button box on your phone or second screen. Free, no account needed, open source.',
     brandSub: 'Truck-Sim Companion',
@@ -805,9 +815,9 @@ const TRANSLATIONS = {
     accountsTitle: 'Your trips, saved. <span class="accent">If you want.</span>',
     accountsBody: 'Link the client to a free account and every job you drive is kept: the route on a map, colored by speed, with distance, pay, fuel, tolls, fines, damage and times.',
     accountsLi1: 'A logbook you can filter and export to CSV',
-    accountsLi2: 'Stats for each game, records and achievements',
+    accountsLi2: 'Stats for each game: activity by week and month, records and achievements',
     accountsLi3: 'The countries and states you drove through',
-    accountsLi4: 'Private by default. Sign in with Discord, Google or email',
+    accountsLi4: 'Private by default, with a public profile only if you want one. Sign in with Discord, Google or email',
     accountsCta: 'Create a free account',
     accountsHow: 'How it works',
     accountsNote: 'Optional: everything else works without an account, and nothing is saved until you link it.',
@@ -868,6 +878,11 @@ const TRANSLATIONS = {
     featConvoyTitle: 'Convoy with friends <span class="tag">beta</span>',
     featConvoyBody: "Each of you drives in your own game — no TruckersMP, nothing to install. Share a 6-letter code and see everyone as arrows on the map, with speed, cargo, ETA and how far behind the leader they are. Follow the leader's destination with one tap, send quick messages, or share a spectator link for anyone to watch from a phone.",
     tagBeta: 'beta',
+    tagNew: 'new',
+    featVoiceTitle: 'Spoken directions <span class="tag">new</span>',
+    featVoiceBody: 'Turn-by-turn read out loud: a heads-up before each turn, again at the turn, and when you arrive. Natural recorded voices in 8 languages, with no road names to mispronounce. Off by default, one switch in Settings.',
+    featStatsTitle: 'Trip history &amp; stats <span class="tag">new</span>',
+    featStatsBody: 'With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, activity by week and month, records and achievements, and a public profile only if you want one. <a href="#accounts">More below</a>.',
     modsAtsTitle: 'American Truck Simulator',
     modsEts2Title: 'Euro Truck Simulator 2',
     modsC2CNote: 'new roads and cities across the US',
@@ -964,7 +979,7 @@ const TRANSLATIONS = {
   },
   es: {
     metaTitle: 'Truck Dash – GPS y tablero en vivo gratis para ETS2 y ATS',
-    metaDescription: 'Convertí tu celular o segundo monitor en un GPS real para Euro Truck Simulator 2 y American Truck Simulator. Mapa en vivo, indicaciones de giro, estado del camión y botonera. 100% gratis, sin cuenta obligatoria, código abierto.',
+    metaDescription: 'Convertí tu celular o segundo monitor en un GPS real para Euro Truck Simulator 2 y American Truck Simulator. Mapa en vivo, indicaciones de giro habladas, estado del camión, botonera e historial de viajes opcional. 100% gratis, sin cuenta obligatoria, código abierto.',
     ogTitle: 'Truck Dash – GPS y tablero en vivo gratis para ETS2 y ATS',
     ogDescription: 'Mapa real, indicaciones de giro, estado del camión y botonera en tu celular o segundo monitor. Gratis, sin cuenta obligatoria, código abierto.',
     brandSub: 'Companion de Truck-Sim',
@@ -988,9 +1003,9 @@ const TRANSLATIONS = {
     accountsTitle: 'Tus viajes, guardados. <span class="accent">Si querés.</span>',
     accountsBody: 'Vinculá el cliente a una cuenta gratis y cada trabajo que manejás queda guardado: el recorrido en un mapa, con colores por velocidad, y la distancia, la plata, el combustible, los peajes, las multas, el daño y los tiempos.',
     accountsLi1: 'Un logbook que podés filtrar y exportar a CSV',
-    accountsLi2: 'Estadísticas por juego, récords y logros',
+    accountsLi2: 'Estadísticas por juego: actividad por semana y por mes, récords y logros',
     accountsLi3: 'Los países y estados por los que pasaste',
-    accountsLi4: 'Privado por defecto. Entrás con Discord, Google o mail',
+    accountsLi4: 'Privado por defecto, con perfil público solo si querés. Entrás con Discord, Google o mail',
     accountsCta: 'Crear una cuenta gratis',
     accountsHow: 'Cómo funciona',
     accountsNote: 'Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.',
@@ -1051,6 +1066,11 @@ const TRANSLATIONS = {
     featConvoyTitle: 'Convoy con amigos <span class="tag">beta</span>',
     featConvoyBody: 'Cada uno maneja en su propio juego — sin TruckersMP, sin instalar nada. Compartís un código de 6 letras y ven a todos como flechas en el mapa, con velocidad, carga, ETA y a cuánto van del líder. Seguí el destino del líder con un toque, mandá mensajes rápidos o compartí un link de espectador para que cualquiera mire desde el celular.',
     tagBeta: 'beta',
+    tagNew: 'nuevo',
+    featVoiceTitle: 'Indicaciones habladas <span class="tag">nuevo</span>',
+    featVoiceBody: 'Las indicaciones de giro en voz alta: un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, sin nombres de rutas mal pronunciados. Apagada por defecto, un interruptor en Ajustes.',
+    featStatsTitle: 'Historial de viajes y estadísticas <span class="tag">nuevo</span>',
+    featStatsBody: 'Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, actividad por semana y por mes, récords y logros, y un perfil público solo si querés. <a href="#accounts">Más abajo</a>.',
     modsAtsTitle: 'American Truck Simulator',
     modsEts2Title: 'Euro Truck Simulator 2',
     modsC2CNote: 'rutas y ciudades nuevas por todo EE. UU.',
@@ -1316,7 +1336,7 @@ function renderRoadmap() {
     updated.textContent = new Date(roadmapData.updated + 'T12:00:00Z').toLocaleDateString(currentLang, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 }
-fetch('/data/roadmap.json?v=4').then(r => r.ok ? r.json() : null).then(data => {
+fetch('/data/roadmap.json?v=5').then(r => r.ok ? r.json() : null).then(data => {
   if (!data) return;
   roadmapData = data;
   renderRoadmap();
