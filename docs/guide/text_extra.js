@@ -20,6 +20,7 @@ GUIDE_TEXT.de = {
     settings: 'Einstellungen und die obere Leiste',
     convoy: 'Konvoi (Beta)',
     client: 'Der Client auf deinem PC',
+    account: 'Dein Konto (optional)',
   },
   legend: { gps: 'Kartenschaltflächen', settings: 'Obere Leiste' },
   cap: {
@@ -140,6 +141,21 @@ GUIDE_TEXT.de = {
 <li><b>Logdatei anzeigen</b> und <b>Problem melden</b>.</li>
 </ul>
 <div class="tip"><p>Klappt etwas nicht? Frag auf unserem <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> und häng die Logdatei an: Die meisten Probleme sind in ein paar Nachrichten gelöst.</p></div>`,
+    account: `
+<p>Ein Konto speichert deinen Fahrtverlauf: jeden Auftrag, den du fährst, mit seiner Route auf einer Karte. Es ist optional und kostenlos, und alles andere in Truck Dash funktioniert auch ohne.</p>
+<ol>
+<li>Melde dich auf <a href="/account/">trucksim-dash.com/account</a> mit Discord, Google oder einer E-Mail und einem Passwort an. Bei E-Mail schicken wir dir einen 6-stelligen Code zur Bestätigung.</li>
+<li>Öffne im Client <b>Einrichtung &amp; Status</b> und klicke auf <b>Konto verknüpfen</b>. Im Browser öffnet sich eine Seite: bestätigen, und der Client ist verknüpft.</li>
+</ol>
+<p>Ab dann wird jeder Auftrag beim Abliefern oder Stornieren gespeichert: die Route nach Geschwindigkeit eingefärbt, die Strecke (die des Spiels und die gemessene), Lohn, Kraftstoff, Maut, Bußgelder, Schaden, Fahrzeit und Schlafstunden, pünktlich oder verspätet, und die Länder oder Staaten, durch die du gefahren bist. In deinem Konto findest du das Fahrtenbuch (mit CSV-Export), Statistiken pro Spiel, Rekorde und Erfolge. <b>Mein Konto</b> im Tray-Menü bringt dich dorthin.</p>
+<h3>Gut zu wissen</h3>
+<ul>
+<li>Gespeichert wird erst, wenn du den Client verknüpfst. Dein Profil ist privat, außer du machst es in den <b>Einstellungen</b> öffentlich.</li>
+<li>Lieferst du einen Auftrag bei geschlossenem Truck Dash ab, sehen wir die Lieferung nicht und die Fahrt gilt als <b>unvollständig</b>. Du kannst sie als storniert markieren, aber eine Lieferung kann nur das Spiel melden.</li>
+<li>Eine Weile kein Internet? Nichts geht verloren: Der Client behält die Fahrt und schickt sie, sobald du wieder online bist.</li>
+<li>Aufträge mit einem Geld-Mod werden markiert und nicht zu deinen Geldsummen gezählt.</li>
+<li>In den <b>Einstellungen</b> kannst du alle deine Daten herunterladen oder dein Konto löschen.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -196,6 +212,7 @@ GUIDE_TEXT.fr = {
     settings: 'Paramètres et barre du haut',
     convoy: 'Convoi (bêta)',
     client: 'Le client sur ton PC',
+    account: 'Votre compte (facultatif)',
   },
   legend: { gps: 'Boutons de la carte', settings: 'Barre du haut' },
   cap: {
@@ -316,6 +333,21 @@ GUIDE_TEXT.fr = {
 <li><b>Voir le fichier journal</b> et <b>Signaler un problème</b>.</li>
 </ul>
 <div class="tip"><p>Quelque chose ne marche pas ? Demande sur notre <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> en joignant le fichier journal : la plupart des problèmes se règlent en quelques messages.</p></div>`,
+    account: `
+<p>Un compte garde votre historique de conduite : chaque mission que vous faites, avec son itinéraire sur une carte. Il est facultatif et gratuit, et tout le reste de Truck Dash fonctionne pareil sans compte.</p>
+<ol>
+<li>Connectez-vous sur <a href="/account/">trucksim-dash.com/account</a> avec Discord, Google, ou un e-mail et un mot de passe. Avec un e-mail, nous vous envoyons un code à 6 chiffres pour le confirmer.</li>
+<li>Dans le client, ouvrez <b>Configuration et état</b> et cliquez sur <b>Lier un compte</b>. Une page s'ouvre dans le navigateur : confirmez, et le client est lié.</li>
+</ol>
+<p>Dès lors, chaque mission est enregistrée à la livraison ou à l'annulation : l'itinéraire coloré selon la vitesse, la distance (celle du jeu et celle mesurée), la paie, le carburant, les péages, les amendes, les dégâts, le temps de conduite et les heures de sommeil, à l'heure ou en retard, et les pays ou États traversés. Votre compte contient le carnet de route (avec export CSV), des statistiques par jeu, des records et des succès. <b>Mon compte</b>, dans le menu de la zone de notification, vous y mène.</p>
+<h3>Bon à savoir</h3>
+<ul>
+<li>Rien n'est enregistré avant de lier le client. Votre profil est privé, sauf si vous le rendez public dans les <b>Paramètres</b>.</li>
+<li>Si vous livrez une mission avec Truck Dash fermé, nous ne voyons pas la livraison et le trajet apparaît comme <b>inachevé</b>. Vous pouvez le marquer comme annulé, mais seul le jeu peut signaler une livraison.</li>
+<li>Pas d'internet pendant un moment ? Rien n'est perdu : le client garde le trajet et l'envoie dès que vous êtes de nouveau en ligne.</li>
+<li>Les missions avec un mod d'argent sont marquées et exclues de vos totaux d'argent.</li>
+<li>Dans les <b>Paramètres</b>, vous pouvez télécharger toutes vos données ou supprimer votre compte.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -372,6 +404,7 @@ GUIDE_TEXT.pt = {
     settings: 'Configurações e a barra de cima',
     convoy: 'Comboio (beta)',
     client: 'O cliente no seu PC',
+    account: 'Sua conta (opcional)',
   },
   legend: { gps: 'Botões do mapa', settings: 'Barra de cima' },
   cap: {
@@ -492,6 +525,21 @@ GUIDE_TEXT.pt = {
 <li><b>Ver arquivo de log</b> e <b>Relatar um problema</b>.</li>
 </ul>
 <div class="tip"><p>Algo não funciona? Pergunte no nosso <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> e anexe o arquivo de log: a maioria dos problemas se resolve em poucas mensagens.</p></div>`,
+    account: `
+<p>Uma conta guarda seu histórico de direção: cada entrega que você faz, com a rota num mapa. É opcional e grátis, e todo o resto do Truck Dash funciona igual sem ela.</p>
+<ol>
+<li>Entre em <a href="/account/">trucksim-dash.com/account</a> com Discord, Google, ou um e-mail e uma senha. Com e-mail, enviamos um código de 6 dígitos para confirmar o endereço.</li>
+<li>No cliente, abra <b>Configuração e status</b> e clique em <b>Vincular conta</b>. Uma página abre no navegador: confirme, e o cliente fica vinculado.</li>
+</ol>
+<p>A partir daí, cada entrega é salva quando você entrega ou cancela: a rota colorida pela velocidade, a distância (a do jogo e a que medimos), o pagamento, o combustível, os pedágios, as multas, o dano, o tempo ao volante e as horas de sono, se chegou no prazo ou atrasado, e os países ou estados por onde passou. Sua conta tem o diário de bordo (com exportação CSV), estatísticas por jogo, recordes e conquistas. <b>Minha conta</b>, no menu da bandeja, leva você até lá.</p>
+<h3>Bom saber</h3>
+<ul>
+<li>Nada é salvo até você vincular o cliente. Seu perfil é privado, a menos que você o torne público em <b>Configurações</b>.</li>
+<li>Se você entregar com o Truck Dash fechado, não vemos a entrega e a viagem aparece como <b>sem terminar</b>. Você pode marcá-la como cancelada, mas só o jogo pode informar uma entrega.</li>
+<li>Ficou sem internet um tempo? Nada se perde: o cliente guarda a viagem e envia quando a conexão voltar.</li>
+<li>Entregas com um mod de dinheiro ficam marcadas e fora dos seus totais de dinheiro.</li>
+<li>Em <b>Configurações</b> você pode baixar todos os seus dados ou excluir a conta.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -548,6 +596,7 @@ GUIDE_TEXT.pl = {
     settings: 'Ustawienia i górny pasek',
     convoy: 'Konwój (beta)',
     client: 'Klient na twoim PC',
+    account: 'Twoje konto (opcjonalne)',
   },
   legend: { gps: 'Przyciski mapy', settings: 'Górny pasek' },
   cap: {
@@ -668,6 +717,21 @@ GUIDE_TEXT.pl = {
 <li><b>Pokaż plik dziennika</b> i <b>Zgłoś problem</b>.</li>
 </ul>
 <div class="tip"><p>Coś nie działa? Zapytaj na naszym <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discordzie</a> i dołącz plik dziennika: większość problemów rozwiązujemy w kilku wiadomościach.</p></div>`,
+    account: `
+<p>Konto przechowuje historię twojej jazdy: każde zlecenie, które wykonasz, z trasą na mapie. Jest opcjonalne i darmowe, a cała reszta Truck Dash działa tak samo bez niego.</p>
+<ol>
+<li>Zaloguj się na <a href="/account/">trucksim-dash.com/account</a> przez Discord, Google albo e-mail i hasło. Przy e-mailu wysyłamy 6-cyfrowy kod do potwierdzenia adresu.</li>
+<li>W kliencie otwórz <b>Konfiguracja i stan</b> i kliknij <b>Powiąż konto</b>. W przeglądarce otworzy się strona: potwierdź i klient jest powiązany.</li>
+</ol>
+<p>Od tej chwili każde zlecenie zapisuje się przy dostarczeniu lub anulowaniu: trasa pokolorowana według prędkości, dystans (z gry i zmierzony przez nas), zarobek, paliwo, opłaty drogowe, mandaty, uszkodzenia, czas jazdy i godziny snu, na czas czy spóźnione, oraz kraje lub stany, przez które jechałeś. Na koncie masz dziennik (z eksportem do CSV), statystyki dla każdej gry, rekordy i osiągnięcia. <b>Moje konto</b> w menu w zasobniku prowadzi prosto tam.</p>
+<h3>Warto wiedzieć</h3>
+<ul>
+<li>Nic nie jest zapisywane, dopóki nie powiążesz klienta. Twój profil jest prywatny, chyba że udostępnisz go publicznie w <b>Ustawieniach</b>.</li>
+<li>Jeśli dostarczysz zlecenie przy zamkniętym Truck Dash, nie widzimy dostarczenia i trasa jest oznaczona jako <b>niedokończona</b>. Możesz oznaczyć ją jako anulowaną, ale dostarczenie może zgłosić tylko gra.</li>
+<li>Nie masz przez chwilę internetu? Nic nie ginie: klient zachowuje trasę i wysyła ją, gdy wrócisz do sieci.</li>
+<li>Zlecenia z modem pieniędzy są oznaczone i nie wliczają się do sum pieniędzy.</li>
+<li>W <b>Ustawieniach</b> możesz pobrać wszystkie swoje dane albo usunąć konto.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -724,6 +788,7 @@ GUIDE_TEXT.tr = {
     settings: 'Ayarlar ve üst çubuk',
     convoy: 'Konvoy (beta)',
     client: 'Bilgisayarındaki istemci',
+    account: 'Hesabın (isteğe bağlı)',
   },
   legend: { gps: 'Harita düğmeleri', settings: 'Üst çubuk' },
   cap: {
@@ -844,6 +909,21 @@ GUIDE_TEXT.tr = {
 <li><b>Günlük dosyasını göster</b> ve <b>Sorun bildir</b>.</li>
 </ul>
 <div class="tip"><p>Bir şey çalışmıyor mu? <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> sunucumuzda sor ve günlük dosyasını ekle: sorunların çoğu birkaç mesajda çözülür.</p></div>`,
+    account: `
+<p>Bir hesap sürüş geçmişini saklar: sürdüğün her iş, haritadaki rotasıyla. İsteğe bağlı ve ücretsizdir; Truck Dash'in geri kalanı hesapsız da aynı şekilde çalışır.</p>
+<ol>
+<li><a href="/account/">trucksim-dash.com/account</a> adresinde Discord, Google veya bir e-posta ve şifreyle giriş yap. E-postayla giriş yaparsan adresi doğrulamak için 6 haneli bir kod göndeririz.</li>
+<li>İstemcide <b>Kurulum ve durum</b>u aç ve <b>Hesap bağla</b>ya tıkla. Tarayıcıda bir sayfa açılır: onayla, istemci bağlanmış olur.</li>
+</ol>
+<p>Bundan sonra her iş teslim ettiğinde veya iptal ettiğinde kaydedilir: hıza göre renklendirilmiş rota, mesafe (oyununki ve bizim ölçtüğümüz), kazanç, yakıt, geçiş ücretleri, cezalar, hasar, sürüş süresi ve uyku saatleri, zamanında mı geç mi, ve geçtiğin ülkeler veya eyaletler. Hesabında seyir defteri (CSV dışa aktarma ile), her oyun için istatistikler, rekorlar ve başarımlar var. Sistem tepsisi menüsündeki <b>Hesabım</b> seni oraya götürür.</p>
+<h3>Bilmekte fayda var</h3>
+<ul>
+<li>İstemciyi bağlayana kadar hiçbir şey kaydedilmez. Profilin, <b>Ayarlar</b>'dan herkese açık yapmadığın sürece gizlidir.</li>
+<li>Bir işi Truck Dash kapalıyken teslim edersen teslimatı göremeyiz ve sefer <b>tamamlanmadı</b> olarak görünür. İptal edildi olarak işaretleyebilirsin, ama teslimatı yalnızca oyun bildirebilir.</li>
+<li>Bir süre internetin mi yok? Hiçbir şey kaybolmaz: istemci seferi saklar ve bağlantı gelince gönderir.</li>
+<li>Para modu kullanılan işler işaretlenir ve para toplamlarına katılmaz.</li>
+<li><b>Ayarlar</b>'dan tüm verilerini indirebilir veya hesabını silebilirsin.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -900,6 +980,7 @@ GUIDE_TEXT.ru = {
     settings: 'Настройки и верхняя панель',
     convoy: 'Конвой (бета)',
     client: 'Клиент на вашем ПК',
+    account: 'Ваш аккаунт (необязательно)',
   },
   legend: { gps: 'Кнопки на карте', settings: 'Верхняя панель' },
   cap: {
@@ -1020,6 +1101,21 @@ GUIDE_TEXT.ru = {
 <li><b>Показать файл журнала</b> и <b>Сообщить о проблеме</b>.</li>
 </ul>
 <div class="tip"><p>Что-то не работает? Спросите в нашем <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> и приложите файл журнала: большинство проблем решается за пару сообщений.</p></div>`,
+    account: `
+<p>Аккаунт хранит историю ваших поездок: каждый рейс с маршрутом на карте. Он необязателен и бесплатен, а всё остальное в Truck Dash работает так же и без него.</p>
+<ol>
+<li>Войдите на <a href="/account/">trucksim-dash.com/account</a> через Discord, Google или почту и пароль. При входе по почте мы пришлём 6-значный код для подтверждения адреса.</li>
+<li>В клиенте откройте <b>Настройка и состояние</b> и нажмите <b>Привязать аккаунт</b>. В браузере откроется страница: подтвердите, и клиент привязан.</li>
+</ol>
+<p>С этого момента каждый рейс сохраняется при доставке или отмене: маршрут, раскрашенный по скорости, расстояние (по игре и измеренное нами), оплата, топливо, платные дороги, штрафы, повреждения, время за рулём и часы сна, вовремя или с опозданием, а также страны или штаты, через которые вы проехали. В аккаунте есть журнал (с экспортом в CSV), статистика по каждой игре, рекорды и достижения. <b>Мой аккаунт</b> в меню трея ведёт прямо туда.</p>
+<h3>Полезно знать</h3>
+<ul>
+<li>Ничего не сохраняется, пока вы не привяжете клиент. Профиль закрыт, если вы не сделаете его публичным в <b>Настройках</b>.</li>
+<li>Если вы доставили груз при закрытом Truck Dash, мы не видим доставку, и рейс отображается как <b>не завершён</b>. Его можно отметить как отменённый, но о доставке может сообщить только игра.</li>
+<li>Пропал интернет? Ничего не теряется: клиент сохраняет рейс и отправит его, когда связь вернётся.</li>
+<li>Рейсы с модом на деньги помечаются и не входят в денежные итоги.</li>
+<li>В <b>Настройках</b> можно скачать все свои данные или удалить аккаунт.</li>
+</ul>`,
   },
   b2: {
     buttons: `

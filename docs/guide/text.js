@@ -23,6 +23,7 @@ GUIDE_TEXT.en = {
     settings: 'Settings and the top bar',
     convoy: 'Convoy (beta)',
     client: 'The client on your PC',
+    account: 'Your account (optional)',
   },
   legend: { gps: 'Map buttons', settings: 'Top bar' },
   cap: {
@@ -143,6 +144,21 @@ GUIDE_TEXT.en = {
 <li><b>Show log file</b> and <b>Report a problem</b>.</li>
 </ul>
 <div class="tip"><p>Something not working? Ask in our <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> and attach the log file: most problems are solved in a couple of messages.</p></div>`,
+    account: `
+<p>An account keeps your driving history: every job you drive, with its route on a map. It is optional and free, and everything else in Truck Dash works the same without one.</p>
+<ol>
+<li>Sign in at <a href="/account/">trucksim-dash.com/account</a> with Discord, Google, or an email and a password. With email we send you a 6-digit code to confirm the address.</li>
+<li>In the client, open <b>Setup &amp; status</b> and click <b>Link account</b>. A page opens in your browser: confirm, and the client is linked.</li>
+</ol>
+<p>From then on every job is saved when you deliver or cancel it: the route colored by speed, the distance (the game's and what we tracked), pay, fuel, tolls, fines, damage, driving time and hours asleep, on time or late, and the countries or states you drove through. Your account has the logbook (with CSV export), stats for each game, records and achievements. <b>My account</b> in the tray menu takes you there.</p>
+<h3>Good to know</h3>
+<ul>
+<li>Nothing is saved until you link the client. Your profile is private unless you make it public in <b>Settings</b>.</li>
+<li>If you deliver a job with Truck Dash closed, we cannot see the delivery and the trip shows as <b>unfinished</b>. You can mark it as cancelled, but only the game can report a delivery.</li>
+<li>No internet for a while? Nothing is lost: the client keeps the trip and sends it when you are back online.</li>
+<li>Jobs with a money mod are marked and left out of your money totals.</li>
+<li>In <b>Settings</b> you can download all your data or delete your account.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -199,6 +215,7 @@ GUIDE_TEXT.es = {
     settings: 'Configuración y la barra de arriba',
     convoy: 'Convoy (beta)',
     client: 'El cliente de la PC',
+    account: 'Tu cuenta (opcional)',
   },
   legend: { gps: 'Botones del mapa', settings: 'Barra de arriba' },
   cap: {
@@ -319,6 +336,21 @@ GUIDE_TEXT.es = {
 <li><b>Ver archivo de log</b> y <b>Reportar un problema</b>.</li>
 </ul>
 <div class="tip"><p>¿Algo no anda? Preguntá en nuestro <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> y adjuntá el archivo de log: la mayoría de los problemas se resuelven en un par de mensajes.</p></div>`,
+    account: `
+<p>Una cuenta guarda tu historial de manejo: cada trabajo que hacés, con su recorrido en un mapa. Es opcional y gratis, y todo lo demás de Truck Dash funciona igual sin ella.</p>
+<ol>
+<li>Entrá en <a href="/account/">trucksim-dash.com/account</a> con Discord, Google, o un mail y una contraseña. Con mail te mandamos un código de 6 cifras para confirmarlo.</li>
+<li>En el cliente, abrí <b>Configuración y estado</b> y tocá <b>Vincular cuenta</b>. Se abre una página en el navegador: confirmá, y el cliente queda vinculado.</li>
+</ol>
+<p>Desde ahí, cada trabajo se guarda cuando lo entregás o lo cancelás: el recorrido con colores por velocidad, la distancia (la del juego y la que medimos), la plata, el combustible, los peajes, las multas, el daño, el tiempo al volante y las horas de sueño, si llegaste a tiempo o tarde, y los países o estados por los que pasaste. En tu cuenta tenés el logbook (con exportación a CSV), estadísticas por juego, récords y logros. <b>Mi cuenta</b>, en el menú de la bandeja, te lleva ahí.</p>
+<h3>Para tener en cuenta</h3>
+<ul>
+<li>No se guarda nada hasta que vinculás el cliente. Tu perfil es privado, salvo que lo hagas público en <b>Ajustes</b>.</li>
+<li>Si entregás un trabajo con Truck Dash cerrado, no vemos la entrega y el viaje figura <b>sin terminar</b>. Lo podés marcar como cancelado, pero una entrega solo la puede informar el juego.</li>
+<li>¿Te quedaste sin internet un rato? No se pierde nada: el cliente guarda el viaje y lo manda cuando vuelve la conexión.</li>
+<li>Los trabajos con un mod de dinero quedan marcados y afuera de los totales de plata.</li>
+<li>En <b>Ajustes</b> podés bajar todos tus datos o borrar la cuenta.</li>
+</ul>`,
   },
   b2: {
     buttons: `
