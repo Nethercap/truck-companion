@@ -540,6 +540,10 @@ def sharing_sessions(now: float) -> list["Session"]:
     ]
 
 
+def _decimetro(valor):
+    return round(valor, 1) if isinstance(valor, float) else valor
+
+
 def broadcast_live_positions():
     now = time.time()
     sharing = sharing_sessions(now)
@@ -550,15 +554,40 @@ def broadcast_live_positions():
     for s in sharing:
         by_variant[s.map_variant].append(s)
 
+    # Cada jugador se serializa UNA vez por tick y por variante, se arma la
+    # lista entera una vez, y el mensaje de cada sesion es esa lista con su
+    # propio pedazo recortado (por posicion: es copiar memoria, no recorrer
+    # la lista en Python). Antes se armaban N listas de N dicts y N
+    # json.dumps por tick: con 1000 conductores en el mismo mapa el tick
+    # tardaba ~2 s, cada 2 s, con el event loop tomado (el relay entero
+    # dejaba de reenviar telemetria). La forma del mensaje es la misma: la
+    # web no se entera.
+    por_variante: dict[str, tuple[str, dict[str, tuple[int, int]]]] = {}
+    for variant, group in by_variant.items():
+        lista, lugares, largo = [], {}, 0
+        for s in group:
+            # Al decimetro: la telemetria trae doubles con 15 cifras y cada
+            # mensaje lleva a TODOS los demas, asi que cada digito de mas se
+            # paga N veces por tick. En el mapa no se ve la diferencia.
+            pedazo = json.dumps({"id": s.public_id, "x": _decimetro(s.last_position["x"]),
+                                 "z": _decimetro(s.last_position["z"])})
+            if lista:
+                largo += 2  # el ", " que lo separa del anterior
+            lugares[s.code] = (largo, largo + len(pedazo))
+            largo += len(pedazo)
+            lista.append(pedazo)
+        por_variante[variant] = (", ".join(lista), lugares)
+
     for session in sharing:
         if not session.viewer_ws_list:
             continue
-        peers = [
-            {"id": s.public_id, "x": s.last_position["x"], "z": s.last_position["z"]}
-            for s in by_variant[session.map_variant]
-            if s.code != session.code
-        ]
-        message = json.dumps({"type": "live_players", "players": peers})
+        todos, lugares = por_variante[session.map_variant]
+        desde, hasta = lugares[session.code]
+        if desde == 0:
+            peers = todos[hasta + 2:]          # el primero: se va con el ", " que lo sigue
+        else:
+            peers = todos[:desde - 2] + todos[hasta:]  # los demas: con el ", " que los precede
+        message = '{"type": "live_players", "players": [' + peers + ']}'
         for viewer in list(session.viewer_ws_list):
             asyncio.create_task(_safe_send(viewer, message))
 
