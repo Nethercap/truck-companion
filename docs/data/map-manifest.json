@@ -27,8 +27,8 @@
       "label": "ATS + Coast to Coast",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "built": "2026-10-05",
+      "mapDataVersion": "20261005",
       "mods": [
         "c2c"
       ],
@@ -71,8 +71,8 @@
       "label": "ATS + Coast to Coast + ProMods Canada",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "built": "2026-10-05",
+      "mapDataVersion": "20261005",
       "mods": [
         "c2c",
         "promods_canada"
@@ -118,8 +118,8 @@
       "label": "ATS + Coast to Coast + ProMods Canada + Reforma",
       "game": "ats",
       "gameVersion": "1.61.1",
-      "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "built": "2026-10-05",
+      "mapDataVersion": "20261005",
       "mods": [
         "c2c",
         "promods_canada",
@@ -365,7 +365,7 @@
     "c2c": {
       "name": "Coast to Coast",
       "game": "ats",
-      "version": "2.23.61.0",
+      "version": "2.24.61.0",
       "homepage": "https://truckymods.io/american-truck-simulator/maps/coast-to-coast",
       "check": {
         "url": "https://forum.scssoft.com/viewtopic.php?t=202317",

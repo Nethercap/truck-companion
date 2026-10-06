@@ -27,9 +27,9 @@ OUT_DIR = os.path.join(ROOT, "docs", "data")
 # variante de mapa en la web -> (carpeta del parser, prefijo)
 VARIANTS = {
     "ats": ("parser-output-ats", "usa"),
-    "ats_c2c": ("parser-output-ats_c2c", "usa"),  # Coast to Coast 2.23.61.0
+    "ats_c2c": ("parser-output-ats_c2c", "usa"),  # Coast to Coast 2.24.61.0
     "ats_promods": ("parser-output-ats-promods-v164", "usa"),
-    "ats_c2c_promods": ("parser-output-ats_c2c_promods", "usa"),  # C2C 2.23.61.0 + ProMods Canada 1.64
+    "ats_c2c_promods": ("parser-output-ats_c2c_promods", "usa"),  # C2C 2.24.61.0 + ProMods Canada 1.64
     "ats_reforma": ("parser-output-ats_reforma", "usa"),  # Reforma 2.9.9.160 + Mega Resources + Sierra Nevada 1.16
     "ats_reforma_c2c_promods": ("parser-output-ats_reforma_c2c_promods", "usa"),  # + C2C + ProMods Canada + OtherMaps Patch 37
     "ets2": ("parser-output-ets2", "europe"),

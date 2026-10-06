@@ -3,11 +3,11 @@
 // Fuente: manifest del 2026-10-05.
 const MAP_DATA_VERSION = {
   "ats": "20260929",
-  "ats_c2c": "20260929",
+  "ats_c2c": "20261005",
   "ats_promods": "20260929",
-  "ats_c2c_promods": "20260929",
+  "ats_c2c_promods": "20261005",
   "ats_reforma": "20260929",
-  "ats_reforma_c2c_promods": "20260929",
+  "ats_reforma_c2c_promods": "20261005",
   "ets2": "20260929",
   "ets2_promods": "20260929",
   "ets2_promods_rusmap": "20260929",
