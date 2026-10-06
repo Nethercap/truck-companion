@@ -59,7 +59,8 @@ const TRANSLATIONS_EXTRA = {
     blinkers: 'Blinker',
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
     deviceTitle: 'Diesen PC verknüpfen',
-    deviceHint: 'Truck Dash auf deinem PC zeigt einen Code. Gib ihn hier ein, damit deine Fahrten in diesem Konto landen.',
+    deviceHint: 'Öffne in Truck Dash auf deinem PC "Einrichtung & Status" und klicke auf "Konto verknüpfen": Dort steht ein Code wie ABCD-1234. Gib ihn hier ein, damit deine Fahrten in diesem Konto gespeichert werden. Es ist nicht der 8-stellige Kopplungscode für das Dashboard.',
+    devicePairingCode: 'Das sieht nach dem Kopplungscode für das Dashboard aus. Hier brauchst du den Kontocode: In "Einrichtung & Status" auf "Konto verknüpfen" klicken.',
     deviceCodeLabel: 'Code',
     deviceApprove: 'Verknüpfen',
     codigo_invalido_o_vencido: 'Dieser Code ist ungültig oder abgelaufen. Lass dir in der App einen neuen geben.',
@@ -730,7 +731,8 @@ const TRANSLATIONS_EXTRA = {
     blinkers: 'Clignotants',
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
     deviceTitle: 'Lier ce PC',
-    deviceHint: 'Truck Dash sur ton PC affiche un code. Saisis-le ici pour que tes trajets soient enregistrés sur ce compte.',
+    deviceHint: 'Dans Truck Dash sur votre PC, ouvrez « Configuration et état » et cliquez sur « Lier un compte » : un code comme ABCD-1234 s\'affiche. Saisissez-le ici pour que vos trajets soient enregistrés dans ce compte. Ce n\'est pas le code d\'appairage à 8 caractères du tableau de bord.',
+    devicePairingCode: 'Cela ressemble au code d\'appairage du tableau de bord. Ici, il faut le code du compte : dans « Configuration et état », cliquez sur « Lier un compte ».',
     deviceCodeLabel: 'Code',
     deviceApprove: 'Lier',
     codigo_invalido_o_vencido: 'Ce code n\'est pas valide, ou il a expiré. Demandes-en un nouveau dans l\'application.',
@@ -1401,7 +1403,8 @@ const TRANSLATIONS_EXTRA = {
     blinkers: 'Setas',
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
     deviceTitle: 'Vincular este PC',
-    deviceHint: 'O Truck Dash no seu PC mostra um código. Digite-o aqui para que suas viagens fiquem nesta conta.',
+    deviceHint: 'No Truck Dash do seu PC, abra "Configuração e status" e clique em "Vincular conta": aparece um código como ABCD-1234. Digite-o aqui para que suas viagens fiquem salvas nesta conta. Não é o código de pareamento de 8 caracteres do painel.',
+    devicePairingCode: 'Isso parece o código de pareamento do painel. Aqui vai o código da conta: em "Configuração e status", clique em "Vincular conta".',
     deviceCodeLabel: 'Código',
     deviceApprove: 'Vincular',
     codigo_invalido_o_vencido: 'Esse código não é válido, ou expirou. Peça um novo no aplicativo.',
@@ -2072,7 +2075,8 @@ const TRANSLATIONS_EXTRA = {
     blinkers: 'Kierunkowskazy',
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
     deviceTitle: 'Powiąż ten komputer',
-    deviceHint: 'Truck Dash na Twoim komputerze pokazuje kod. Wpisz go tutaj, aby trasy trafiały na to konto.',
+    deviceHint: 'W Truck Dash na komputerze otwórz "Konfiguracja i stan" i kliknij "Powiąż konto": pojawi się kod w rodzaju ABCD-1234. Wpisz go tutaj, aby twoje trasy zapisywały się na tym koncie. To nie jest 8-znakowy kod parowania do panelu.',
+    devicePairingCode: 'To wygląda na kod parowania do panelu. Tutaj potrzebny jest kod konta: w "Konfiguracja i stan" kliknij "Powiąż konto".',
     deviceCodeLabel: 'Kod',
     deviceApprove: 'Powiąż',
     codigo_invalido_o_vencido: 'Ten kod jest nieprawidłowy albo wygasł. Poproś o nowy w aplikacji.',
@@ -2743,7 +2747,8 @@ const TRANSLATIONS_EXTRA = {
     blinkers: 'Sinyaller',
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
     deviceTitle: 'Bu bilgisayarı bağla',
-    deviceHint: 'Bilgisayarındaki Truck Dash bir kod gösteriyor. Seferlerin bu hesaba kaydedilsin diye kodu buraya yaz.',
+    deviceHint: 'Bilgisayarındaki Truck Dash\'te "Kurulum ve durum"u aç ve "Hesap bağla"ya tıkla: ABCD-1234 gibi bir kod gösterir. Seferlerinin bu hesaba kaydedilmesi için buraya yaz. Bu, gösterge paneli için kullandığın 8 karakterli eşleştirme kodu değildir.',
+    devicePairingCode: 'Bu, gösterge paneli eşleştirme koduna benziyor. Burada hesap kodu gerekiyor: "Kurulum ve durum"da "Hesap bağla"ya tıkla.',
     deviceCodeLabel: 'Kod',
     deviceApprove: 'Bağla',
     codigo_invalido_o_vencido: 'Bu kod geçerli değil ya da süresi doldu. Uygulamadan yeni bir tane iste.',
@@ -3414,7 +3419,8 @@ const TRANSLATIONS_EXTRA = {
     blinkers: 'Поворотники',
     // --- pantalla de cuenta (docs/account/). EN y ES viven en account.js.
     deviceTitle: 'Привязать этот ПК',
-    deviceHint: 'Truck Dash на вашем ПК показывает код. Введите его здесь, чтобы рейсы сохранялись в этом аккаунте.',
+    deviceHint: 'В Truck Dash на компьютере откройте «Настройка и состояние» и нажмите «Привязать аккаунт»: появится код вида ABCD-1234. Введите его здесь, чтобы рейсы сохранялись в этом аккаунте. Это не 8-символьный код подключения панели.',
+    devicePairingCode: 'Похоже, это код подключения панели. Здесь нужен код аккаунта: в «Настройка и состояние» нажмите «Привязать аккаунт».',
     deviceCodeLabel: 'Код',
     deviceApprove: 'Привязать',
     codigo_invalido_o_vencido: 'Этот код недействителен или истёк. Запросите новый в приложении.',

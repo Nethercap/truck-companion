@@ -299,7 +299,8 @@
       memberSince: (f) => 'Driver since ' + f,
       savedOk: 'Saved',
       deviceTitle: 'Link this PC',
-      deviceHint: 'Truck Dash on your PC shows a code. Type it here so your trips are saved to this account.',
+      deviceHint: 'In Truck Dash on your PC, open "Setup & status" and click "Link account": it shows a code like ABCD-1234. Type it here so your trips are saved to this account. It is not the 8-character pairing code you use for the dashboard.',
+      devicePairingCode: 'That looks like the pairing code for the dashboard. Here you need the account code: in "Setup & status", click "Link account".',
       deviceCodeLabel: 'Code',
       deviceApprove: 'Link',
       deviceLinked: (n) => n + ' is now linked to your account.',
@@ -573,7 +574,8 @@
       memberSince: (f) => 'Camionero desde ' + f,
       savedOk: 'Guardado',
       deviceTitle: 'Vincular esta PC',
-      deviceHint: 'Truck Dash en tu PC muestra un codigo. Escribilo aca para que tus viajes queden en esta cuenta.',
+      deviceHint: 'En Truck Dash en tu PC, abrí "Configuración y estado" y tocá "Vincular cuenta": muestra un código como ABCD-1234. Escribilo acá para que tus viajes queden en esta cuenta. No es el código de 8 caracteres con el que conectás el tablero.',
+      devicePairingCode: 'Ese parece el código para conectar el tablero. Acá va el de la cuenta: en "Configuración y estado", tocá "Vincular cuenta".',
       deviceCodeLabel: 'Codigo',
       deviceApprove: 'Vincular',
       deviceLinked: (n) => n + ' quedo vinculada a tu cuenta.',
@@ -1106,6 +1108,16 @@
     if (!code) return;
     const hint = $('deviceHintMsg');
     const boton = $('btnDeviceApprove');
+    // El cliente muestra dos codigos y es facil pegar el que no es: el de
+    // conectar el tablero usa letras que el de la cuenta nunca tiene (B, I,
+    // O, S, 0, 1, 2...; ver devices.ALFABETO en la API). Se dice cual falta
+    // en vez del "no vale o vencio" de siempre.
+    const limpio = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (limpio.length === 8 && /[^ACDEFHJKLMNPQRTVWXY3-9]/.test(limpio)) {
+      hint.textContent = t('devicePairingCode');
+      hint.className = 'hint bad';
+      return;
+    }
     boton.disabled = true;
 
     // Primero se mira QUE se esta por vincular. Aprobar a ciegas un codigo

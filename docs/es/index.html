@@ -165,6 +165,13 @@
   .cta.secondary { background: var(--panel-alt); border: 1px solid var(--border); color: var(--text); }
   .cta.secondary:hover { border-color: var(--blue); background: var(--panel-alt); }
   .teaBtn { background: #3b82f6; }
+  nav.desktopNav a.signInLink, #sidebar a.signInLink { border: 1px solid var(--blue); color: var(--blue); border-radius: 8px; padding: 0.3rem 0.8rem; }
+  nav.desktopNav a.signInLink:hover { background: rgba(59,158,255,0.12); }
+  .accountsGrid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 2.2rem; align-items: center; margin-top: 1.2rem; }
+  .accountsGrid p { color: #d7dbe0; }
+  .accountsList { margin: 0.8rem 0 1.4rem; padding-left: 1.2rem; color: #d7dbe0; line-height: 1.7; }
+  .accountsShot { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); cursor: zoom-in; }
+  @media (max-width: 860px) { .accountsGrid { grid-template-columns: 1fr; } }
   .teaBtn:hover { background: #2f6fd6; }
   .teaBtn svg { width: 1.2em; height: 1.2em; }
   .ctaNote { font-size: 0.78rem; color: var(--muted); margin: 0.6rem 0 0; }
@@ -387,6 +394,7 @@
     <a href="#faq" data-i18n="navFaq">Preguntas</a>
     <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
     <a href="/live/" data-i18n="navLive">Mapa en vivo</a>
+    <a class="signInLink" href="/account/" data-i18n="navSignIn">Entrar</a>
     <a class="langBtn" data-lang-link href="/">EN</a>
   </nav>
   <button class="menuBtn" id="menuBtn" aria-label="Menu">☰</button>
@@ -403,6 +411,7 @@
   <a href="#faq" data-i18n="navFaq">Preguntas</a>
   <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
   <a href="/live/" data-i18n="navLive">Mapa en vivo</a>
+  <a class="signInLink" href="/account/" data-i18n="navSignIn">Entrar</a>
   <a class="langBtn" data-lang-link href="/">EN</a>
 </div>
 
@@ -566,6 +575,29 @@
         <button class="carouselArrow carouselNext" onclick="carouselNav(1)" aria-label="Next screenshot">›</button>
       </div>
       <div class="carouselDots" id="carouselDots"></div>
+    </div>
+  </section>
+
+  <!-- Cuentas: opcionales. Todo texto aca tiene que seguir siendo cierto con
+       la promesa de "sin cuenta obligatoria" del principio. -->
+  <section id="accounts">
+    <h2 data-i18n="accountsTitle">Tus viajes, guardados. <span class="accent">Si querés.</span></h2>
+    <div class="accountsGrid">
+      <div>
+        <p data-i18n="accountsBody">Vinculá el cliente a una cuenta gratis y cada trabajo que manejás queda guardado: el recorrido en un mapa, con colores por velocidad, y la distancia, la plata, el combustible, los peajes, las multas, el daño y los tiempos.</p>
+        <ul class="accountsList">
+          <li data-i18n="accountsLi1">Un logbook que podés filtrar y exportar a CSV</li>
+          <li data-i18n="accountsLi2">Estadísticas por juego, récords y logros</li>
+          <li data-i18n="accountsLi3">Los países y estados por los que pasaste</li>
+          <li data-i18n="accountsLi4">Privado por defecto. Entrás con Discord, Google o mail</li>
+        </ul>
+        <div class="ctaRow">
+          <a class="cta" href="/account/" data-i18n="accountsCta">Crear una cuenta gratis</a>
+          <a class="cta secondary" href="/guide/#account" data-i18n="accountsHow">Cómo funciona</a>
+        </div>
+        <p class="ctaNote" data-i18n="accountsNote">Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.</p>
+      </div>
+      <img class="accountsShot" src="/assets/cuentas-landing.webp" alt="A trip in a Truck Dash account: the route colored by speed, times, countries and costs" width="1600" height="926" loading="lazy" onclick="openLightbox(this.src)" />
     </div>
   </section>
 
@@ -769,6 +801,16 @@ const TRANSLATIONS = {
     roadmapStatusBlocked: 'needs a third party',
     roadmapStatusShipped: 'shipped',
     navLive: 'Live map',
+    navSignIn: 'Sign in',
+    accountsTitle: 'Your trips, saved. <span class="accent">If you want.</span>',
+    accountsBody: 'Link the client to a free account and every job you drive is kept: the route on a map, colored by speed, with distance, pay, fuel, tolls, fines, damage and times.',
+    accountsLi1: 'A logbook you can filter and export to CSV',
+    accountsLi2: 'Stats for each game, records and achievements',
+    accountsLi3: 'The countries and states you drove through',
+    accountsLi4: 'Private by default. Sign in with Discord, Google or email',
+    accountsCta: 'Create a free account',
+    accountsHow: 'How it works',
+    accountsNote: 'Optional: everything else works without an account, and nothing is saved until you link it.',
     navCommunity: 'Community',
     kicker: 'For Euro Truck Simulator 2 &amp; American Truck Simulator',
     heroTitle: 'Your phone is now a <span class="accent">real GPS</span> for your truck sim.',
@@ -942,6 +984,16 @@ const TRANSLATIONS = {
     roadmapStatusBlocked: 'depende de terceros',
     roadmapStatusShipped: 'ya está',
     navLive: 'Mapa en vivo',
+    navSignIn: 'Entrar',
+    accountsTitle: 'Tus viajes, guardados. <span class="accent">Si querés.</span>',
+    accountsBody: 'Vinculá el cliente a una cuenta gratis y cada trabajo que manejás queda guardado: el recorrido en un mapa, con colores por velocidad, y la distancia, la plata, el combustible, los peajes, las multas, el daño y los tiempos.',
+    accountsLi1: 'Un logbook que podés filtrar y exportar a CSV',
+    accountsLi2: 'Estadísticas por juego, récords y logros',
+    accountsLi3: 'Los países y estados por los que pasaste',
+    accountsLi4: 'Privado por defecto. Entrás con Discord, Google o mail',
+    accountsCta: 'Crear una cuenta gratis',
+    accountsHow: 'Cómo funciona',
+    accountsNote: 'Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.',
     navCommunity: 'Comunidad',
     kicker: 'Para Euro Truck Simulator 2 y American Truck Simulator',
     heroTitle: 'Tu celular ahora es un <span class="accent">GPS real</span> para tu simulador de camiones.',
