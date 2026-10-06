@@ -102,6 +102,20 @@ def test_los_numeros_del_cierre_salen_del_evento():
 
     c = tt.datos_del_cierre(SIN_TRABAJO, {"jobCancelled": True})
     assert c["status"] == "cancelled"
+    assert "cancel_penalty" not in c
+
+
+def test_cancelar_manda_la_penalidad():
+    """Prueba en ETS2 del 05-10: Atenas -> Pristina cancelado, 12.000 EUR de
+    penalidad, y la cuenta mostraba el pago ofrecido como si se hubiera
+    cobrado. La penalidad es lo unico que costo ese viaje."""
+    c = tt.datos_del_cierre(SIN_TRABAJO, {"jobCancelled": True,
+                                          "jobCancelledPenalty": 12000})
+    assert c["status"] == "cancelled" and c["cancel_penalty"] == 12000
+    # Una entrega no lleva penalidad aunque el campo venga con algo viejo.
+    d = tt.datos_del_cierre(SIN_TRABAJO, {"jobDelivered": True,
+                                          "jobCancelledPenalty": 12000})
+    assert "cancel_penalty" not in d
 
 
 def test_un_cero_del_sdk_no_es_un_dato():

@@ -166,8 +166,29 @@ def test_cerrar_no_entrega_el_viaje():
     acc = accumulator.Acumulador()
     conducir(acc, raw=TRABAJO, segundos=30)
     acciones = acc.cerrar(2000.0)
-    assert [a["tipo"] for a in acciones] == ["session"]
-    assert acciones[0]["datos"]["ended_at"] is not None
+    assert [a["tipo"] for a in acciones] == ["trip_checkpoint", "session"]
+    assert acciones[-1]["datos"]["ended_at"] is not None
+
+
+def test_cerrar_el_juego_manda_lo_que_el_viaje_llevaba():
+    """Prueba en ATS del 05-10: se cerro el juego a mitad de Bozeman -> Laurel
+    y el viaje se quedo con 12,7 km de unos 20: lo manejado despues del
+    ultimo checkpoint se perdia. Ahora sale como iba, sin cerrarse."""
+    acc = accumulator.Acumulador()
+    salidas = conducir(acc, raw=TRABAJO, segundos=200)
+    ultimo = max((a["datos"]["distance_tracked_km"] for a in salidas
+                  if a["tipo"].startswith("trip")), default=0.0)
+    acciones = acc.cerrar(2000.0)
+    viaje = [a for a in acciones if a["tipo"].startswith("trip")]
+    assert [a["tipo"] for a in viaje] == ["trip_checkpoint"]
+    assert viaje[0]["datos"]["distance_tracked_km"] > ultimo + 30   # 80 s mas a 80 km/h de juego
+    assert acc.hay_viaje() is False
+
+
+def test_cerrar_sin_trabajo_no_inventa_un_viaje():
+    acc = accumulator.Acumulador()
+    conducir(acc, segundos=30)
+    assert [a["tipo"] for a in acc.cerrar(2000.0)] == ["session"]
 
 
 # --- el viaje como capa encima ---------------------------------------------

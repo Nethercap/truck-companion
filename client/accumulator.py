@@ -303,10 +303,16 @@ class Acumulador:
         """El juego se cerro o el cliente se va. Cierra la sesion.
 
         El viaje NO se cierra: que el juego se cierre no entrega nada. Queda
-        en curso y el servidor lo dara por abandonado si nunca vuelve.
+        en curso y el servidor lo dara por abandonado si nunca vuelve. Pero
+        se manda como iba: antes se soltaba sin mas y se perdia lo manejado
+        desde el ultimo checkpoint (prueba en ATS del 05-10: ~8 km de
+        Bozeman -> Laurel, al cerrar el juego a mitad del trabajo).
         """
         if self._sesion is None:
             return []
+        acciones = []
+        if self._viaje is not None:
+            acciones.append({"tipo": "trip_checkpoint", "datos": self.viaje()})
         self._sesion["ended_at"] = iso or _iso(ahora)
         datos = self.sesion()
         self._sesion = None
@@ -314,7 +320,7 @@ class Acumulador:
         self._trabajo_anterior = None
         self._huella_cerrada = None
         self._ultimo = {}
-        return [{"tipo": "session", "datos": datos}]
+        return acciones + [{"tipo": "session", "datos": datos}]
 
     # --- adentro ---
 

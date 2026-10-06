@@ -4,6 +4,16 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Accounts (still switched off): closing the game in the middle of a job no
+  longer loses the driving since the last save of the trip, up to two
+  minutes of distance, route and fuel. The trip is sent as it was before
+  the client lets go of it.
+- Accounts (still switched off): cancelling a job sends the penalty the
+  game charged, so the account shows what the cancellation cost instead of
+  the pay that was offered and never collected.
+
 ## 1.5.26 (2026-10-05)
 
 - European Grand Utopia (the mod that adds the Grand Utopia archipelago to

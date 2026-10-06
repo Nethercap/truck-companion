@@ -131,6 +131,11 @@ def datos_del_cierre(raw: dict, evento: dict | None = None) -> dict:
         datos["revenue"] = _numero(evento.get("jobDeliveredRevenue"))
     if evento.get("jobDeliveredDistanceKm") is not None:
         datos["distance_game_km"] = _numero(evento.get("jobDeliveredDistanceKm"))
+    # Cancelar cuesta plata, y es lo unico que costo ese viaje: sin esto la
+    # cuenta mostraba el pago ofrecido de un trabajo que no se cobro.
+    penalidad = _numero(evento.get("jobCancelledPenalty"))
+    if datos["status"] == "cancelled" and penalidad is not None:
+        datos["cancel_penalty"] = penalidad
     # A tiempo o tarde lo decide el servidor comparando con el deadline que
     # ya tiene guardado: aca solo se le dice cuando se entrego.
     entrega = raw.get("time_abs")
