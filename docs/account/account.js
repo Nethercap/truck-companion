@@ -206,6 +206,7 @@
       tripGameTime: 'Game time',
       tripRouteGaps: 'Dashed where the route was not followed: Truck Dash closed, or a jump (quick job, ferry, train).',
       tripNoRoute: 'No route was recorded for this trip.',
+      tripTrimmed: 'This trip went past the storage limit, so part of its route or of the distance we tracked was not saved. The delivery, the pay and the in-game distance are complete.',
       tripsTitle: 'Your trips',
       tripsEmpty: 'Nothing here yet. Link this PC to Truck Dash and your trips will show up on their own as you drive.',
       tripsEmptyDriven: 'No trips saved yet. Driving without a job counts in your totals, but it is not a trip.',
@@ -445,6 +446,7 @@
       tripGameTime: 'Tiempo de juego',
       tripRouteGaps: 'Punteado donde no se siguio el recorrido: Truck Dash cerrado, o un salto (quick job, ferry, tren).',
       tripNoRoute: 'De este viaje no se guardo el recorrido.',
+      tripTrimmed: 'Este viaje paso el limite de lo que se guarda, asi que falta parte del recorrido o de la distancia que rastreamos. La entrega, el pago y la distancia del juego estan completos.',
       tripsTitle: 'Tus viajes',
       tripsEmpty: 'Todavia no hay nada. Vincula esta PC a Truck Dash y tus viajes van a ir apareciendo solos mientras manejas.',
       tripsEmptyDriven: 'Todavia no hay viajes guardados. Manejar sin carga suma a tus totales, pero no es un viaje.',
@@ -938,7 +940,9 @@
     const { ok, datos } = await pedir('/user/export');
     if (!ok) { avisar(t(datos.error || 'error'), 'bad'); return; }
     // Se arma y descarga en el navegador: el archivo nunca pasa por otro lado.
-    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    // Sin sangria: trae el recorrido de cada viaje, y con sangria cada
+    // coordenada ocupa su propia linea y el archivo pesa varias veces mas.
+    const blob = new Blob([JSON.stringify(datos)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1577,6 +1581,9 @@
     } else {
       sumar(caja, renglon([t('tripNoRoute')]));
     }
+    // Paso un tope del servidor (tramos o puntos): se dice que falta, para
+    // que un hueco en el mapa o unos km de menos no parezcan un error.
+    if (d.trimmed) sumar(caja, renglon([t('tripTrimmed')]));
 
     const empresas = [d.company_src, d.company_dst].filter(Boolean).join(' \u2192 ');
     if (empresas) sumar(caja, renglon([empresas]));
@@ -1782,7 +1789,7 @@
       'distance_game_km', 'distance_tracked_km', 'game_hours', 'total_game_hours',
       'sleep_hours', 'real_hours', 'revenue', 'currency', 'modded', 'fuel_used', 'tolls',
       'fines', 'ferries', 'damage_delta', 'on_time', 'truck_brand', 'truck_name',
-      'countries', 'note'];
+      'countries', 'note', 'trimmed'];
     const celdaCsv = (valor) => {
       if (valor == null) return '';
       const texto = Array.isArray(valor) ? valor.join(' ') : String(valor);
