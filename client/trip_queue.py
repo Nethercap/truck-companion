@@ -158,8 +158,9 @@ class Enviador:
                 self.cola.quitar(entrada["clave"])
                 resumen["descartados"] += 1
             else:
-                # 0 (sin red) o 5xx: se deja para la proxima.
+                # 0 (sin red), 429 o 5xx: se deja para la proxima.
                 resumen["sin_conexion"] = True
+                resumen["codigo"] = codigo
                 break
         return resumen
 

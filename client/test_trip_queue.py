@@ -210,6 +210,16 @@ def test_un_429_no_descarta_nada(tmp_path):
     assert 429 not in trip_queue.SIN_REINTENTO
 
 
+def test_el_resumen_dice_que_respondio_la_api(tmp_path):
+    """Para el log: un 5xx o un 429 se distinguen de no tener red (0)."""
+    c = cola(tmp_path)
+    c.encolar(viaje())
+    resumen = trip_queue.Enviador(c, ApiFalsa(por_defecto=(502, {}))).drenar("tok", "https://api")
+    assert resumen["sin_conexion"] and resumen["codigo"] == 502
+    resumen = trip_queue.Enviador(c, ApiFalsa(por_defecto=(0, {}))).drenar("tok", "https://api")
+    assert resumen["codigo"] == 0 and len(c) == 1
+
+
 def test_un_500_no_descarta_nada(tmp_path):
     """La API caida un rato no es lo mismo que la API diciendo que no."""
     c = cola(tmp_path)

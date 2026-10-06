@@ -96,6 +96,13 @@ class Sincronizador:
             if resumen.get("enviados"):
                 logging.info("Cuenta: %s enviados, %s pendientes",
                              resumen["enviados"], len(self._cola))
+            # Una respuesta de error de la API (429, 5xx) queda en el log; sin
+            # red (0) no, que seria una linea por minuto mientras falte
+            # internet. Antes no quedaba nada: dos fallos en la prueba del
+            # 05-10 no se pudieron atribuir a la API ni a la red.
+            if resumen.get("codigo"):
+                logging.info("Cuenta: la API respondio %s, se reintenta (%s pendientes)",
+                             resumen["codigo"], len(self._cola))
             if resumen.get("token_invalido"):
                 logging.info("Cuenta: el token ya no vale, se espera a vincular de nuevo")
             return resumen

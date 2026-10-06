@@ -13,6 +13,8 @@ updates on its own and is not versioned here.
 - Accounts (still switched off): cancelling a job sends the penalty the
   game charged, so the account shows what the cancellation cost instead of
   the pay that was offered and never collected.
+- Accounts (still switched off): when the accounts server answers with an
+  error, the log says which one. Sending is retried as before.
 
 ## 1.5.26 (2026-10-05)
 
