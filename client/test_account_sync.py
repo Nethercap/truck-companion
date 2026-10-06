@@ -161,3 +161,32 @@ def test_lo_pendiente_sobrevive_a_cerrar_el_cliente(tmp_path, monkeypatch):
     sync.cerrar_sesion()
     # Otro arranque del cliente, con el mismo archivo.
     assert account_sync.Sincronizador(ruta=ruta).pendientes() == 1
+
+
+def test_apagadas_desde_el_relay_no_se_acumula_ni_se_manda_y_la_cola_queda(tmp_path, monkeypatch):
+    """El interruptor remoto: si algo sale mal con las cuentas, se cortan en
+    todas las PCs sin release. Lo que ya estaba en la cola no se tira."""
+    pedidos = []
+
+    def falso(url, cuerpo=None, token=None, metodo=None):
+        pedidos.append(url)
+        return 200, {"trip": {"id": "t1"}}
+
+    settings = {"account_token": "tok"}
+    monkeypatch.setattr(win_integration, "load_settings", lambda: dict(settings))
+    reloj = {"t": 1000.0}
+    sync = account_sync.Sincronizador(ruta=str(tmp_path / "cola.json"), pedir=falso,
+                                      ahora=lambda: reloj["t"])
+    conducir(sync, reloj, 30)
+    settings["accounts_remote"] = False
+    reloj["t"] += account_sync.INTERVALO_TOKEN_S + 1
+    conducir(sync, reloj, 30)
+    assert sync._acumulador is None          # cerro lo que llevaba
+    quedan = sync.pendientes()
+    assert quedan >= 1
+    assert asyncio.run(sync.drenar()) == {} and pedidos == []
+    conducir(sync, reloj, 30)
+    assert sync.pendientes() == quedan       # apagadas no suma nada nuevo
+    # Prendidas de nuevo: se manda lo guardado.
+    settings["accounts_remote"] = True
+    assert asyncio.run(sync.drenar())["enviados"] >= 1

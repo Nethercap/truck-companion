@@ -516,3 +516,19 @@ def test_un_salto_a_mitad_de_viaje_corta_el_recorrido():
         _ir(acc, i, 50000.0 + i * 100)
     ruta = acc.viaje()["route"]
     assert [len(s) for s in ruta] == [5, 5]
+
+
+def test_sin_hora_de_inicio_manda_desde_cuando_lo_vio():
+    """Con el juego recien abierto o en un trabajo especial, el plugin da el
+    inicio en 0: el viaje lleva la hora de juego en que aparecio, para que la
+    cuenta muestre un total aproximado en vez de nada."""
+    acc = accumulator.Acumulador()
+    sin_inicio = dict(TRABAJO, jobStartingTime=0)
+    salidas = conducir(acc, raw=sin_inicio, segundos=5)
+    apertura = [a for a in salidas if a["tipo"] == "trip_open"][0]["datos"]
+    assert apertura["job_started_game_time"] in (None, 0)
+    assert apertura["first_seen_game_time"] > 0
+    # Con inicio de verdad no hace falta.
+    acc2 = accumulator.Acumulador()
+    salidas = conducir(acc2, raw=TRABAJO, segundos=5)
+    assert "first_seen_game_time" not in [a for a in salidas if a["tipo"] == "trip_open"][0]["datos"]

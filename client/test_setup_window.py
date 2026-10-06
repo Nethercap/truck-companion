@@ -652,3 +652,38 @@ def test_bajo_wine_la_direccion_se_muestra_aunque_arranque_winebrowser(monkeypat
                         lambda titulo, mensaje, copy_value=None: dialogos.append((mensaje, copy_value)))
     tray_client.abrir_navegador("https://trucksim-dash.com/app/?code=X")
     assert dialogos == [(tray_client.T("dlg_open_if_not_opened"), "https://trucksim-dash.com/app/?code=X")]
+
+
+def test_el_interruptor_del_relay_se_guarda_solo_si_cambia(monkeypatch):
+    guardados = {}
+    escrituras = []
+    monkeypatch.setattr(tray_client.win_integration, "load_settings", lambda: dict(guardados))
+
+    def _save(s):
+        escrituras.append(dict(s))
+        guardados.clear()
+        guardados.update(s)
+    monkeypatch.setattr(tray_client.win_integration, "save_settings", _save)
+
+    tray_client.aplicar_interruptor({"latest_client_version": "1.5.27"})   # relay viejo
+    tray_client.aplicar_interruptor({"accounts": True})                    # ya estaban
+    assert escrituras == [] and tray_client.cuentas_visibles()
+    tray_client.aplicar_interruptor({"accounts": False})
+    assert guardados["accounts_remote"] is False and not tray_client.cuentas_visibles()
+    tray_client.aplicar_interruptor({"accounts": "no"})                    # basura: nada
+    assert len(escrituras) == 1
+    tray_client.aplicar_interruptor({"accounts": True})
+    assert tray_client.cuentas_visibles()
+
+
+def test_apagadas_desde_el_relay_setup_no_muestra_la_cuenta(monkeypatch, raiz):
+    monkeypatch.setattr(tk, "Tk", lambda: tk.Toplevel(raiz))
+    monkeypatch.setattr(tray_client.win_integration, "load_settings",
+                        lambda: {"accounts_remote": False})
+    monkeypatch.setattr(plugin_installer, "find_game_installs", lambda: [])
+    v = tray_client.SetupWindow()
+    try:
+        assert not hasattr(v, "account_label")
+        assert tray_client.anunciar_cuentas(type("I", (), {"notify": lambda *a: None})()) is False
+    finally:
+        v.root.destroy()

@@ -25,6 +25,14 @@ API_POR_DEFECTO = "https://api.trucksim-dash.com"
 TIMEOUT = 8
 
 CLAVE_TOKEN = "account_token"
+# Lo ultimo que dijo el relay sobre si las cuentas estan prendidas (ver
+# backend /version). Se guarda para que un relay caido no las prenda ni las
+# apague: vale lo ultimo que se supo, y sin dato, prendidas.
+CLAVE_INTERRUPTOR = "accounts_remote"
+
+
+def cuentas_encendidas(settings: dict | None) -> bool:
+    return (settings or {}).get(CLAVE_INTERRUPTOR, True) is not False
 CLAVE_API = "accounts_url"
 
 

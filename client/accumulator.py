@@ -212,6 +212,10 @@ class Acumulador:
         # el cliente con el trabajo ya tomado) puede no haber llegado todavia.
         datos["truck_brand"] = v.get("truck_brand")
         datos["truck_name"] = v.get("truck_name")
+        # Cuando el juego da el inicio en 0 (recien abierto, trabajo
+        # especial): desde cuando lo vemos, para un total aproximado.
+        if v.get("visto_desde"):
+            datos["first_seen_game_time"] = v["visto_desde"]
         if con_recorrido:
             datos["route"] = _achicar(v["segmentos"])
         return datos
@@ -467,6 +471,9 @@ class Acumulador:
             "truck_brand": payload.get("truckBrand"),
             "truck_name": payload.get("truckName"),
         }
+        if not datos.get("job_started_game_time"):
+            reloj = payload.get("gameTimeMinutes")
+            self._viaje["visto_desde"] = int(reloj) if reloj else None
 
     def _anotar_recorrido(self, payload, ahora):
         v = self._viaje

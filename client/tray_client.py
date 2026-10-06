@@ -280,6 +280,26 @@ GRACIA_CIERRE = 60
 CUENTAS_VISIBLES = os.environ.get("TRUCKDASH_CUENTAS", "1") != "0"
 
 
+def cuentas_visibles() -> bool:
+    """Prendidas en este build y no apagadas desde el relay (ver
+    aplicar_interruptor)."""
+    return CUENTAS_VISIBLES and account.cuentas_encendidas(win_integration.load_settings())
+
+
+def aplicar_interruptor(data: dict) -> None:
+    """Lo que dice /version del relay sobre las cuentas. Solo se escribe si
+    cambio, y un relay viejo (sin el campo) no toca nada."""
+    valor = data.get("accounts") if isinstance(data, dict) else None
+    if not isinstance(valor, bool):
+        return
+    settings = win_integration.load_settings()
+    if account.cuentas_encendidas(settings) == valor:
+        return
+    settings[account.CLAVE_INTERRUPTOR] = valor
+    win_integration.save_settings(settings)
+    logging.info("Cuentas %s desde el relay", "encendidas" if valor else "apagadas")
+
+
 def debe_cerrarse(vio_el_juego: bool, opcion_activa: bool,
                   sin_memoria_desde: float | None, ahora: float) -> bool:
     """Si corresponde cerrar el cliente porque el juego se fue.
@@ -318,7 +338,7 @@ def anunciar_cuentas(icon) -> bool:
     instala ve la explicacion en Setup, que se abre sola la primera vez.
     Devuelve si aviso."""
     settings = win_integration.load_settings()
-    if (not CUENTAS_VISIBLES or settings.get("accounts_announced")
+    if (not cuentas_visibles() or settings.get("accounts_announced")
             or account.token_guardado(settings) or not settings.get("first_run_done")):
         return False
     settings["accounts_announced"] = True
@@ -407,7 +427,7 @@ class SetupWindow:
         # Opcional a proposito: todo el cliente funciona sin vincular nada, y
         # esto solo agrega que los viajes queden guardados. Va arriba, despues
         # del estado: es lo nuevo, y abajo de las opciones nadie la veia.
-        if CUENTAS_VISIBLES:
+        if cuentas_visibles():
             self.build_account_section()
 
         # --- Modo LAN ---
@@ -1019,12 +1039,21 @@ def check_for_update(backend_url: str):
         url = client_lib.http_base_url(backend_url) + "/version"
         with red.abrir(url, timeout=10) as resp:
             data = json.loads(resp.read())
+        aplicar_interruptor(data)
         latest = data.get("latest_client_version")
         if latest and client_lib.is_newer_version(latest, client_lib.CLIENT_VERSION):
             return latest, data.get("download_url"), data.get("sha256")
     except Exception:
         logging.exception("Failed to check for updates")
     return None, None, None
+
+
+async def vigilar_interruptor(backend_url: str, cada_s: float = 1800) -> None:
+    """Vuelve a mirar /version cada 30 minutos: apagar las cuentas desde el
+    relay tiene que llegar tambien a quien deja el cliente abierto dias."""
+    while True:
+        await asyncio.sleep(cada_s)
+        await asyncio.to_thread(check_for_update, backend_url)
 
 
 def check_for_update_silent(backend_url: str):
@@ -1404,6 +1433,7 @@ async def run_client(backend_url: str, fixed_code: str | None):
     if not state.autostart_mode:
         open_web_ui()
     asyncio.create_task(asyncio.to_thread(check_for_update_silent, backend_url))
+    vigilar(asyncio.create_task(vigilar_interruptor(backend_url)), "interruptor de cuentas")
 
     cloud.url = f"{backend_url}/ws/client/{code}"
     try:
@@ -1545,7 +1575,8 @@ def main():
     menu_items = [
         pystray.MenuItem(T("menu_setup"), open_setup_window, default=True),
         pystray.MenuItem(T("menu_open_dashboard"), open_web_menu_item),
-        pystray.MenuItem(T("menu_account"), open_account_menu_item, visible=CUENTAS_VISIBLES),
+        pystray.MenuItem(T("menu_account"), open_account_menu_item,
+                         visible=lambda item: cuentas_visibles()),
         pystray.MenuItem(T("menu_show_code"), show_code_notification),
         pystray.MenuItem(T("menu_lan"), show_lan_menu_item),
         pystray.MenuItem(T("menu_disconnect"), disconnect_session),

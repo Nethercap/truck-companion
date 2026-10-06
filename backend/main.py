@@ -1304,6 +1304,11 @@ def version():
         # SHA-256 del zip del release (publicado junto al release). El cliente
         # lo verifica antes de auto-actualizarse; si no esta, actualiza igual.
         "sha256": stats.get("latest_client_sha256"),
+        # Interruptor de las cuentas en los clientes (1.5.27+). Prendido salvo
+        # que se apague con /admin/stats/seed {"accounts_enabled": false}:
+        # asi un problema con las cuentas se corta en todas las PCs sin sacar
+        # otra version. El cliente lo consulta al arrancar y cada 30 minutos.
+        "accounts": stats.get("accounts_enabled", True) is not False,
     }
 
 
@@ -1358,6 +1363,8 @@ def stats_seed(payload: dict, x_admin_key: Optional[str] = Header(default=None))
             elif key == "latest_jobs" and isinstance(value, list):
                 stats[key] = value[:LATEST_JOBS_MAX]
             elif key in ("latest_client_version", "latest_client_sha256") and isinstance(value, str):
+                stats[key] = value
+            elif key == "accounts_enabled" and isinstance(value, bool):
                 stats[key] = value
         _save_stats()
         return stats

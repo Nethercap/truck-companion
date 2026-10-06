@@ -53,6 +53,7 @@ class Sincronizador:
         self._enviador = trip_queue.Enviador(self._cola, pedir)
         self._acumulador = None
         self._token = None
+        self._encendidas = True
         self._base = account.API_POR_DEFECTO
         self._token_leido = 0.0
 
@@ -63,9 +64,10 @@ class Sincronizador:
         try:
             ahora = self._ahora()
             self._refrescar_token(ahora)
-            if not self._token:
-                # Sin cuenta no se acumula. Si habia algo a medias, se cierra
-                # y queda en la cola para cuando se vuelva a vincular.
+            if not self._token or not self._encendidas:
+                # Sin cuenta (o con las cuentas apagadas desde el relay) no se
+                # acumula. Si habia algo a medias, se cierra y queda en la
+                # cola para cuando se vuelva a vincular o a prender.
                 if self._acumulador is not None:
                     self._encolar(self._acumulador.cerrar(ahora))
                     self._acumulador = None
@@ -89,7 +91,8 @@ class Sincronizador:
         """Vacia la cola en otro hilo. Nunca levanta."""
         try:
             self._refrescar_token(self._ahora(), forzar=True)
-            if not self._token or not len(self._cola):
+            if not self._token or not self._encendidas or not len(self._cola):
+                # Apagadas: la cola se guarda tal cual, no se manda ni se tira.
                 return {}
             resumen = await asyncio.to_thread(
                 self._enviador.drenar, self._token, self._base)
@@ -121,6 +124,7 @@ class Sincronizador:
         self._token_leido = ahora
         settings = win_integration.load_settings()
         self._token = account.token_guardado(settings)
+        self._encendidas = account.cuentas_encendidas(settings)
         self._base = account.base_api(settings)
 
     def _encolar(self, acciones):

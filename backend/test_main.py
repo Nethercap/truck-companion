@@ -929,3 +929,19 @@ def test_tmp_events_filtra_por_juego(main, client, monkeypatch):
     assert r.status_code == 200
     assert [e["id"] for e in r.json()["events"]["today"]] == [2]
     assert client.get("/tmp/events").json()["events"]["today"][0]["id"] == 1
+
+
+def test_version_dice_si_las_cuentas_estan_prendidas(client, main):
+    """El interruptor de las cuentas: prendido por defecto, se apaga con la
+    admin key y llega a todos los clientes en su proxima consulta."""
+    assert client.get("/version").json()["accounts"] is True
+    client.post("/admin/stats/seed", json={"accounts_enabled": False},
+                headers={"X-Admin-Key": "test-admin-key"})
+    assert client.get("/version").json()["accounts"] is False
+    # Solo un booleano: un texto no lo apaga ni lo prende por error.
+    client.post("/admin/stats/seed", json={"accounts_enabled": "si"},
+                headers={"X-Admin-Key": "test-admin-key"})
+    assert client.get("/version").json()["accounts"] is False
+    client.post("/admin/stats/seed", json={"accounts_enabled": True},
+                headers={"X-Admin-Key": "test-admin-key"})
+    assert client.get("/version").json()["accounts"] is True
