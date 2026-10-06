@@ -945,3 +945,48 @@ def test_version_dice_si_las_cuentas_estan_prendidas(client, main):
     client.post("/admin/stats/seed", json={"accounts_enabled": True},
                 headers={"X-Admin-Key": "test-admin-key"})
     assert client.get("/version").json()["accounts"] is True
+
+
+
+# --------------------------------------------------------- rutas en el mapa en vivo
+
+def test_clean_live_route_valida_y_recorta(main):
+    assert main.clean_live_route([[1.4, 2.6], [3, 4]]) == [[1, 3], [3, 4]]
+    assert main.clean_live_route([[1, 2]]) is None                 # un punto no es ruta
+    assert main.clean_live_route("nada") is None
+    assert main.clean_live_route([[1, 2], ["x", 3]]) is None
+    assert main.clean_live_route([[1, 2], [float("nan"), 3]]) is None
+    largo = [[i, i] for i in range(main.LIVE_ROUTE_MAX_POINTS + 50)]
+    assert len(main.clean_live_route(largo)) == main.LIVE_ROUTE_MAX_POINTS
+
+
+def test_live_route_llega_al_espectador_y_se_borra_al_dejar_de_compartir(client, main):
+    import time as _time
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as viewer:
+        viewer.send_text(main.json.dumps({"type": "set_live_share", "enabled": True, "mapVariant": "ats"}))
+        _time.sleep(0.05)
+        session = main.sessions[code]
+        session.last_position = {"x": 10.0, "z": 20.0, "ts": main.time.time()}
+        viewer.send_text(main.json.dumps({"type": "live_route", "points": [[0, 0], [100.4, 50.6], [200, 80]]}))
+        _time.sleep(0.05)
+        assert session.live_route == [[0, 0], [100, 51], [200, 80]] and session.live_route_rev == 1
+        # Un espectador que entra despues recibe las posiciones y la ruta vigente
+        with client.websocket_connect("/ws/livemap/ats") as spec:
+            players = main.json.loads(spec.receive_text())
+            assert players["players"][0]["routeRev"] == 1
+            ruta = main.json.loads(spec.receive_text())
+            assert ruta["type"] == "live_route" and ruta["id"] == session.public_id
+            assert ruta["points"][1] == [100, 51]
+            assert code not in main.json.dumps(ruta)
+        # La misma ruta otra vez no suma revision
+        viewer.send_text(main.json.dumps({"type": "live_route", "points": [[0, 0], [100.4, 50.6], [200, 80]]}))
+        _time.sleep(0.05)
+        assert session.live_route_rev == 1
+        viewer.send_text(main.json.dumps({"type": "set_live_share", "enabled": False}))
+        _time.sleep(0.05)
+        assert session.live_route is None
+        # Sin compartir, una ruta nueva no se guarda
+        viewer.send_text(main.json.dumps({"type": "live_route", "points": [[0, 0], [9, 9]]}))
+        _time.sleep(0.05)
+        assert session.live_route is None

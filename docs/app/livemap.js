@@ -4,7 +4,8 @@
 // Reusa el modo espectador del convoy (conn.spectator oculta HUD/botonera) y
 // los mismos marcadores flecha. Se carga despues de app.js y convoy.js.
 
-const liveMap = { variant: null, backend: null, ws: null, players: [], markers: new Map(), needFit: true, ended: false, followId: null };
+const liveMap = { variant: null, backend: null, ws: null, players: [], markers: new Map(), needFit: true, ended: false, followId: null,
+  routes: new Map() }; // id -> { rev, points: [[x, z], ...] }
 const LIVE_MAP_HUES = ['#3b9eff', '#ff8a3d', '#2ad3a4', '#b48cff', '#ffd166', '#ff6b8a', '#6be3ff', '#c5e17a', '#ffa8e8', '#8fd3ff'];
 
 function liveMapColor(id) {
@@ -37,8 +38,22 @@ function liveMapConnect() {
   socket.onopen = () => { conn.socket = 'open'; conn.everOpen = true; renderConnectionUi(); };
   socket.onmessage = (ev) => {
     const data = JSON.parse(ev.data);
+    if (data.type === 'live_route') {
+      if (data.points && data.points.length > 1) liveMap.routes.set(data.id, { rev: data.rev, points: data.points });
+      else liveMap.routes.delete(data.id);
+      liveMapRenderRoutes();
+      return;
+    }
     if (data.type !== 'live_players') return;
     liveMap.players = data.players || [];
+    // Rutas de quien ya no esta, o que dejo de compartirla (routeRev 0).
+    const vivos = new Map(liveMap.players.map(p => [p.id, p]));
+    let cambio = false;
+    for (const id of [...liveMap.routes.keys()]) {
+      const p = vivos.get(id);
+      if (!p || !p.routeRev) { liveMap.routes.delete(id); cambio = true; }
+    }
+    if (cambio) liveMapRenderRoutes();
     liveMapRenderMarkers();
     liveMapRenderPanel();
   };
@@ -113,6 +128,37 @@ function liveMapRenderMarkers() {
   }
 }
 
+// Rutas de cada camion (las que sus duenos comparten): una linea fina del
+// color de su flecha; la del camion fijado, mas gruesa y opaca. Una fuente
+// GeoJSON con todas; se rearma si el estilo se recargo (cambio de variante).
+const LIVE_ROUTES_SOURCE = 'live-routes';
+function liveMapRenderRoutes() {
+  if (!map || !mapReady || !toLngLat || currentGame !== liveMap.variant) return;
+  const features = [];
+  for (const [id, r] of liveMap.routes) {
+    features.push({
+      type: 'Feature',
+      properties: { color: liveMapColor(id), followed: id === liveMap.followId ? 1 : 0 },
+      geometry: { type: 'LineString', coordinates: r.points.map(q => toLngLat(q[0], q[1])) },
+    });
+  }
+  const data = { type: 'FeatureCollection', features };
+  const src = map.getSource(LIVE_ROUTES_SOURCE);
+  if (src) { src.setData(data); return; }
+  map.addSource(LIVE_ROUTES_SOURCE, { type: 'geojson', data });
+  // Debajo de los nombres, para no tapar ciudades.
+  const firstSymbol = (map.getStyle().layers || []).find(l => l.type === 'symbol');
+  map.addLayer({
+    id: 'live-routes-line', type: 'line', source: LIVE_ROUTES_SOURCE,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 5, ['case', ['==', ['get', 'followed'], 1], 3, 1.5], 12, ['case', ['==', ['get', 'followed'], 1], 7, 4]],
+      'line-opacity': ['case', ['==', ['get', 'followed'], 1], 0.95, 0.55],
+    },
+  }, firstSymbol ? firstSymbol.id : undefined);
+}
+
 // Fijar un camion: la camara lo sigue hasta que el usuario arrastre el mapa
 // o lo desfije. Repetir sobre el mismo lo suelta.
 function liveMapFollow(id) {
@@ -130,6 +176,7 @@ function liveMapFollow(id) {
     setNavMode(false); // sin camion fijado el modo nav no tiene a quien seguir
   }
   liveMapRenderMarkers();
+  liveMapRenderRoutes();
   liveMapRenderPanel();
 }
 
@@ -148,19 +195,29 @@ function liveMapRenderPanel() {
   count.textContent = t(n === 1 ? 'liveMapDriversOne' : 'liveMapDrivers').replace('{n}', n);
   if (!n) { list.innerHTML = `<div class="convoyMeta">${escapeHtml(t('liveMapEmpty'))}</div>`; return; }
   list.innerHTML = liveMap.players.map(p => {
+    const left = p.distanceKm > 0 ? liveMapDistance(p.distanceKm) : '';
+    const eta = p.etaSeconds > 0 && typeof formatSeconds === 'function' ? formatSeconds(p.etaSeconds) : '';
     const route = p.citySrc && p.cityDst ? `${escapeHtml(p.citySrc)} → ${escapeHtml(p.cityDst)}` : '';
+    // Lo que falta en un renglon propio: al lado de las ciudades se cortaba.
+    const remaining = [left, eta].filter(Boolean).map(escapeHtml).join(' · ');
     const speed = p.speedKmh != null ? formatSpeedShort(p.speedKmh) : '';
     const status = p.paused ? t('convoyInMenu') : speed;
     const followed = p.id === liveMap.followId;
     return `<div class="liveMapRow${followed ? ' followed' : ''}" data-id="${escapeHtml(p.id)}">
       <span class="convoyDot" style="background:${liveMapColor(p.id)}"></span>
       <div class="liveMapRowBody"><div><span class="convoyName">${escapeHtml(liveMapName(p))}</span>${p.nick && p.truck ? ` <small class="convoyTag">${escapeHtml(p.truck)}</small>` : ''}</div>
-      <div class="convoyMeta">${route || escapeHtml(p.cargo || '')}</div></div>
+      <div class="convoyMeta">${route || escapeHtml(p.cargo || '')}</div>${route && remaining ? `<div class="convoyMeta">${remaining}</div>` : ''}</div>
       <span class="convoyStatus">${escapeHtml(status)}</span>
       <button class="liveMapPin${followed ? ' active' : ''}" data-pin="${escapeHtml(p.id)}" title="${escapeHtml(t(followed ? 'liveMapUnpin' : 'liveMapPin'))}">📌</button></div>`;
   }).join('');
   list.querySelectorAll('.liveMapRow').forEach(row => row.addEventListener('click', () => liveMapFocus(row.dataset.id)));
   list.querySelectorAll('.liveMapPin').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); liveMapFollow(btn.dataset.pin); }));
+}
+
+// Lo que le falta (km del juego, como el GPS del juego), en las unidades de la app.
+function liveMapDistance(km) {
+  const imperial = typeof useImperial !== 'undefined' && useImperial;
+  return imperial ? `${Math.round(km * 0.621371)} mi` : `${Math.round(km)} km`;
 }
 
 // km/h o mph segun las unidades elegidas en la app.
@@ -176,6 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const hook = () => { if (map) { map.on('rotate', () => liveMapRenderMarkers()); map.on('dragstart', () => { if (liveMap.followId) liveMapFollow(null); }); } };
   const iv = setInterval(() => { if (map) { hook(); clearInterval(iv); } }, 500);
   // Marcadores recien cuando el mapa de la variante esta listo (loadGameMap es async).
-  const iv2 = setInterval(() => { if (liveMap.variant && liveMap.players.length && currentGame === liveMap.variant && mapReady) liveMapRenderMarkers(); }, 1000);
+  const iv2 = setInterval(() => {
+    if (!liveMap.variant || currentGame !== liveMap.variant || !mapReady) return;
+    if (liveMap.players.length) liveMapRenderMarkers();
+    // Las rutas pueden llegar antes de que el mapa este listo, y un estilo
+    // recargado se lleva la fuente: se rearma sola.
+    if (liveMap.routes.size && !map.getSource(LIVE_ROUTES_SOURCE)) liveMapRenderRoutes();
+  }, 1000);
   if (!window.__liveMapKeepInterval) window.__liveMapKeepInterval = iv2;
 });

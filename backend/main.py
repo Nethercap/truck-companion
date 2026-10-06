@@ -481,6 +481,11 @@ class Session:
         # Apodo opcional (el de convoy) que se muestra en el mapa en vivo
         # publico; sin apodo el marcador sale anonimo.
         self.live_nick: Optional[str] = None
+        # Ruta que calculo SU web (opt-in aparte, "compartir tambien mi ruta"),
+        # para dibujarla en el mapa en vivo publico. Viaja aparte de las
+        # posiciones, solo cuando cambia (rev), como la del convoy.
+        self.live_route: Optional[list] = None
+        self.live_route_rev = 0
         # Ultimo estado de diagnostico reportado por el cliente local (mensaje
         # "client_status": waiting_game / plugin_missing / live / ...). Se
         # guarda para poder darselo a un viewer que se conecta despues, en vez
@@ -627,8 +632,47 @@ def live_map_player(s: "Session") -> dict:
         "heading": sm.get("heading"), "speedKmh": sm.get("speedKmh"), "paused": sm.get("paused", False),
         "truck": sm.get("truck"), "cargo": sm.get("cargo"),
         "citySrc": sm.get("citySrc"), "cityDst": sm.get("cityDst"),
+        "distanceKm": sm.get("distanceKm"), "etaSeconds": sm.get("etaSeconds"),
         "nick": s.live_nick,
+        # 0 = sin ruta compartida; el espectador borra la que tenga.
+        "routeRev": s.live_route_rev if s.live_route else 0,
     }
+
+
+LIVE_ROUTE_MAX_POINTS = 400
+
+
+def clean_live_route(points) -> Optional[list]:
+    """[[x, z], ...] redondeado a metros, hasta LIVE_ROUTE_MAX_POINTS; None
+    si no es una lista de pares numericos con al menos dos puntos."""
+    if not isinstance(points, list):
+        return None
+    out = []
+    for q in points[:LIVE_ROUTE_MAX_POINTS]:
+        if not (isinstance(q, (list, tuple)) and len(q) >= 2):
+            return None
+        try:
+            x, z = float(q[0]), float(q[1])
+        except (TypeError, ValueError):
+            return None
+        if not (math.isfinite(x) and math.isfinite(z)):
+            return None
+        out.append([round(x), round(z)])
+    return out if len(out) >= 2 else None
+
+
+def live_route_message(s: "Session") -> str:
+    return json.dumps({"type": "live_route", "id": s.public_id, "rev": s.live_route_rev,
+                       "points": s.live_route or []})
+
+
+def live_route_push(s: "Session"):
+    """La ruta nueva a los espectadores de su mapa, sin esperar al tick."""
+    if not s.map_variant:
+        return
+    message = live_route_message(s)
+    for outbox in list(live_map_spectators.get(s.map_variant, {}).values()):
+        outbox.push_control(message)
 
 
 def live_map_message(variant: str, sharing: list["Session"]) -> str:
@@ -672,7 +716,12 @@ async def ws_live_map(websocket: WebSocket, variant: str):
     await websocket.accept()
     outbox = ViewerOutbox(websocket)
     live_map_spectators[variant][websocket] = outbox
-    outbox.push_control(live_map_message(variant, sharing_sessions(time.time())))
+    sharing = sharing_sessions(time.time())
+    outbox.push_control(live_map_message(variant, sharing))
+    # Las rutas vigentes de ese mapa: despues solo llegan cuando cambian.
+    for s in sharing:
+        if s.map_variant == variant and s.live_route:
+            outbox.push_control(live_route_message(s))
     try:
         while True:
             await websocket.receive_text()  # no se espera nada del espectador
@@ -1555,6 +1604,14 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     session.live_nick = clean_live_nick(payload.get("nick")) if session.share_position else None
                     if not session.share_position:
                         session.last_position = None
+                        session.live_route = None
+                elif msg_type == "live_route":
+                    # Sin compartir la posicion no hay mapa donde dibujarla.
+                    nueva = clean_live_route(payload.get("points")) if session.share_position else None
+                    if nueva != session.live_route:
+                        session.live_route = nueva
+                        session.live_route_rev += 1
+                        live_route_push(session)
                 elif msg_type == "set_currency":
                     cur = payload.get("currency")
                     session.viewer_currency = cur.upper() if is_valid_currency(cur) else None

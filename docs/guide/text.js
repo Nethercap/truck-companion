@@ -69,7 +69,7 @@ GUIDE_TEXT.en = {
 <h3>Also on the map</h3>
 <ul>
 <li>The <b>blue line</b> behind the truck is where you have driven.</li>
-<li>With <b>Share my position</b> on, you see other Truck Dash drivers on your map and you appear on the public <a href="/live/">live map</a> as an anonymous driver. You can turn it off in Settings.</li>
+<li>With <b>Share my position</b> on, you see other Truck Dash drivers on your map and you appear on the public <a href="/live/">live map</a> as an anonymous driver, with your route drawn unless you untick <b>Also show my route on the live map</b>. You can turn it off in Settings.</li>
 <li><b>Map mods</b> have their own maps: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia and TruckersMP. The app detects them from the game, or you pick one with the puzzle button.</li>
 </ul>
 <p>Every map button can be moved and resized: long-press one on a phone, or use <b>Move the buttons</b> in Settings.</p>`,
@@ -262,7 +262,7 @@ GUIDE_TEXT.es = {
 <h3>También en el mapa</h3>
 <ul>
 <li>La <b>línea azul</b> detrás del camión es por donde anduviste.</li>
-<li>Con <b>Compartir mi posición</b> prendido ves a otros conductores de Truck Dash en tu mapa y aparecés en el <a href="/live/">mapa en vivo</a> público como un conductor anónimo. Se apaga en Configuración.</li>
+<li>Con <b>Compartir mi posición</b> prendido ves a otros conductores de Truck Dash en tu mapa y aparecés en el <a href="/live/">mapa en vivo</a> público como un conductor anónimo, con tu ruta dibujada salvo que destildes <b>Mostrar también mi ruta en el mapa en vivo</b>. Se apaga en Configuración.</li>
 <li>Los <b>mods de mapa</b> tienen su propio mapa: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia y TruckersMP. La app los detecta desde el juego, o elegís uno con el botón del rompecabezas.</li>
 </ul>
 <p>Todos los botones del mapa se pueden mover y agrandar: dejá apretado uno en el celular, o usá <b>Mover los botones</b> en Configuración.</p>`,

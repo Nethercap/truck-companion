@@ -66,7 +66,7 @@ GUIDE_TEXT.de = {
 <h3>Außerdem auf der Karte</h3>
 <ul>
 <li>Die <b>blaue Linie</b> hinter dem Lkw zeigt, wo du gefahren bist.</li>
-<li>Mit <b>Meine Position teilen</b> siehst du andere Truck-Dash-Fahrer auf deiner Karte und erscheinst anonym auf der öffentlichen <a href="/live/">Live-Karte</a>. Abschalten kannst du das in den Einstellungen.</li>
+<li>Mit <b>Meine Position teilen</b> siehst du andere Truck-Dash-Fahrer auf deiner Karte und erscheinst anonym auf der öffentlichen <a href="/live/">Live-Karte</a>, mit deiner Route, außer du deaktivierst <b>Auch meine Route auf der Live-Karte zeigen</b>. Abschalten kannst du das in den Einstellungen.</li>
 <li><b>Karten-Mods</b> haben eigene Karten: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia und TruckersMP. Die App erkennt sie im Spiel, oder du wählst sie mit dem Puzzle-Knopf.</li>
 </ul>
 <p>Alle Kartenschaltflächen lassen sich verschieben und in der Größe ändern: auf dem Handy lange drücken, oder in den Einstellungen <b>Schaltflächen verschieben</b>.</p>`,
@@ -259,7 +259,7 @@ GUIDE_TEXT.fr = {
 <h3>Aussi sur la carte</h3>
 <ul>
 <li>La <b>ligne bleue</b> derrière le camion montre là où tu es passé.</li>
-<li>Avec <b>Partager ma position</b> activé, tu vois les autres conducteurs Truck Dash sur ta carte et tu apparais de façon anonyme sur la <a href="/live/">carte en direct</a> publique. Ça se désactive dans les Paramètres.</li>
+<li>Avec <b>Partager ma position</b> activé, tu vois les autres conducteurs Truck Dash sur ta carte et tu apparais de façon anonyme sur la <a href="/live/">carte en direct</a> publique, avec ton itinéraire, sauf si tu décoches <b>Afficher aussi mon itinéraire sur la carte en direct</b>. Ça se désactive dans les Paramètres.</li>
 <li>Les <b>mods de carte</b> ont leur propre carte : ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia et TruckersMP. L'appli les détecte depuis le jeu, ou tu en choisis un avec le bouton puzzle.</li>
 </ul>
 <p>Chaque bouton de la carte peut être déplacé et redimensionné : appui long sur téléphone, ou <b>Déplacer les boutons</b> dans les Paramètres.</p>`,
@@ -452,7 +452,7 @@ GUIDE_TEXT.pt = {
 <h3>Também no mapa</h3>
 <ul>
 <li>A <b>linha azul</b> atrás do caminhão mostra por onde você passou.</li>
-<li>Com <b>Compartilhar minha posição</b> ligado, você vê outros motoristas do Truck Dash no seu mapa e aparece como motorista anônimo no <a href="/live/">mapa ao vivo</a> público. Dá para desligar nas Configurações.</li>
+<li>Com <b>Compartilhar minha posição</b> ligado, você vê outros motoristas do Truck Dash no seu mapa e aparece como motorista anônimo no <a href="/live/">mapa ao vivo</a> público, com a sua rota, a menos que desmarque <b>Mostrar também minha rota no mapa ao vivo</b>. Dá para desligar nas Configurações.</li>
 <li>Os <b>mods de mapa</b> têm mapa próprio: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia e TruckersMP. O app detecta pelo jogo, ou você escolhe com o botão do quebra-cabeça.</li>
 </ul>
 <p>Todos os botões do mapa podem ser movidos e redimensionados: segure um no celular, ou use <b>Mover os botões</b> nas Configurações.</p>`,
@@ -645,7 +645,7 @@ GUIDE_TEXT.pl = {
 <h3>Także na mapie</h3>
 <ul>
 <li><b>Niebieska linia</b> za ciężarówką pokazuje, gdzie jechałeś.</li>
-<li>Z włączonym <b>Udostępniaj moją pozycję</b> widzisz innych kierowców Truck Dash na swojej mapie i pojawiasz się anonimowo na publicznej <a href="/live/">mapie na żywo</a>. Możesz to wyłączyć w Ustawieniach.</li>
+<li>Z włączonym <b>Udostępniaj moją pozycję</b> widzisz innych kierowców Truck Dash na swojej mapie i pojawiasz się anonimowo na publicznej <a href="/live/">mapie na żywo</a>, razem z trasą, chyba że odznaczysz <b>Pokazuj też moją trasę na mapie na żywo</b>. Możesz to wyłączyć w Ustawieniach.</li>
 <li><b>Mody map</b> mają własne mapy: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia i TruckersMP. Aplikacja wykrywa je z gry, albo wybierasz jedną przyciskiem z puzzlem.</li>
 </ul>
 <p>Każdy przycisk mapy można przesunąć i zmienić jego rozmiar: przytrzymaj go na telefonie albo użyj <b>Przesuń przyciski</b> w Ustawieniach.</p>`,
@@ -838,7 +838,7 @@ GUIDE_TEXT.tr = {
 <h3>Haritada ayrıca</h3>
 <ul>
 <li>Kamyonun arkasındaki <b>mavi çizgi</b> geçtiğin yolu gösterir.</li>
-<li><b>Konumumu paylaş</b> açıkken haritanda diğer Truck Dash sürücülerini görürsün ve herkese açık <a href="/live/">canlı haritada</a> anonim bir sürücü olarak görünürsün. Ayarlar'dan kapatabilirsin.</li>
+<li><b>Konumumu paylaş</b> açıkken haritanda diğer Truck Dash sürücülerini görürsün ve herkese açık <a href="/live/">canlı haritada</a> anonim bir sürücü olarak, rotanla birlikte görünürsün (<b>Rotamı da canlı haritada göster</b> işaretini kaldırmadıkça). Ayarlar'dan kapatabilirsin.</li>
 <li><b>Harita modlarının</b> kendi haritaları var: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia ve TruckersMP. Uygulama bunları oyundan algılar ya da yapboz düğmesiyle kendin seçersin.</li>
 </ul>
 <p>Tüm harita düğmeleri taşınabilir ve boyutları değiştirilebilir: telefonda birine uzun bas ya da Ayarlar'da <b>Düğmeleri taşı</b> seçeneğini kullan.</p>`,
@@ -1031,7 +1031,7 @@ GUIDE_TEXT.ru = {
 <h3>Ещё на карте</h3>
 <ul>
 <li><b>Синяя линия</b> за грузовиком показывает, где вы проехали.</li>
-<li>С включённым <b>Делиться моей позицией</b> вы видите других водителей Truck Dash на своей карте и анонимно отображаетесь на публичной <a href="/live/">живой карте</a>. Это отключается в настройках.</li>
+<li>С включённым <b>Делиться моей позицией</b> вы видите других водителей Truck Dash на своей карте и анонимно отображаетесь на публичной <a href="/live/">живой карте</a>, вместе с вашим маршрутом, если не снять галочку <b>Показывать и мой маршрут на живой карте</b>. Это отключается в настройках.</li>
 <li>У <b>модов карт</b> свои карты: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia и TruckersMP. Приложение определяет их по игре, или вы выбираете вручную кнопкой с пазлом.</li>
 </ul>
 <p>Любую кнопку на карте можно переместить и изменить её размер: удерживайте её на телефоне или выберите <b>Переместить кнопки</b> в настройках.</p>`,

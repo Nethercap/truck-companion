@@ -84,7 +84,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -141,6 +141,10 @@ let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como 
 // Guia por voz (Ajustes): apagada por defecto, y una voz elegida por idioma
 // ({ en: 'en-joe' }). Aca arriba por lo mismo que navZoom: saveSettings lee.
 let voiceOn = !!_savedSettings.voiceOn;
+// Con "compartir mi posicion" prendido, la ruta tambien se ve en el mapa en
+// vivo publico. Viene prendida (quien comparte ya muestra de donde a donde
+// va); se apaga aparte.
+let liveShareRoute = _savedSettings.liveShareRoute !== false;
 let voiceByLang = (_savedSettings.voiceByLang && typeof _savedSettings.voiceByLang === 'object') ? _savedSettings.voiceByLang : {};
 
 // ---------------------------------------------------------------------------
@@ -383,6 +387,8 @@ function initSettingsUi() {
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
+  document.getElementById('setLiveShareRoute').checked = liveShareRoute;
+  document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
   document.getElementById('setNavZoom').value = navZoom;
   document.getElementById('setVoice').checked = voiceOn;
   loadVoiceCatalog().then(fillVoiceSelect);
@@ -491,6 +497,38 @@ function sendLiveShareState() {
   }
 }
 
+// Ruta propia al mapa en vivo publico (/live/): la misma que se dibuja aca,
+// simplificada, cuando cambia y como mucho cada LIVE_ROUTE_RESEND_MS. Solo
+// con la posicion compartida y la casilla de la ruta prendida; si no, se
+// manda vacia una vez para que desaparezca.
+const LIVE_ROUTE_MAX_POINTS = 400;
+const LIVE_ROUTE_RESEND_MS = 15000;
+let liveRouteSig = null;
+let liveRouteSentAt = 0;
+function sendLiveRoute(force) {
+  if (!ws || ws.readyState !== WebSocket.OPEN || conn.demo || conn.spectator) return;
+  const pts = currentRouteWorldPoints;
+  if (!liveShareEnabled || !liveShareRoute || !lastSentMapVariant || !pts || pts.length < 2) {
+    if (liveRouteSig !== 'none') { liveRouteSig = 'none'; ws.send(JSON.stringify({ type: 'live_route', points: [] })); }
+    return;
+  }
+  const now = Date.now();
+  if (!force && now - liveRouteSentAt < LIVE_ROUTE_RESEND_MS) return;
+  const step = Math.max(1, Math.ceil(pts.length / LIVE_ROUTE_MAX_POINTS));
+  const out = [];
+  for (let i = 0; i < pts.length; i += step) out.push([Math.round(pts[i][0]), Math.round(pts[i][1])]);
+  const last = pts[pts.length - 1];
+  const tail = [Math.round(last[0]), Math.round(last[1])];
+  if (out[out.length - 1][0] !== tail[0] || out[out.length - 1][1] !== tail[1]) {
+    if (out.length >= LIVE_ROUTE_MAX_POINTS) out[out.length - 1] = tail; else out.push(tail);
+  }
+  const sig = `${out.length}|${out[0]}|${out[out.length - 1]}`;
+  liveRouteSentAt = now;
+  if (sig === liveRouteSig) return;
+  liveRouteSig = sig;
+  ws.send(JSON.stringify({ type: 'live_route', points: out }));
+}
+
 // pixelRatio se fija al crear el mapa y el grafo ya esta en memoria: el
 // cambio se aplica recargando la pagina (se guarda antes).
 function saveLiteAndReload(mode, noRouting) {
@@ -565,7 +603,14 @@ document.getElementById('setLiveShare').addEventListener('change', (e) => {
   liveShareEnabled = e.target.checked;
   saveSettings();
   if (!liveShareEnabled) updateLivePlayers([]); // saca los marcadores ajenos ya dibujados
+  document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
   sendLiveShareState();
+  sendLiveRoute(true);
+});
+document.getElementById('setLiveShareRoute').addEventListener('change', (e) => {
+  liveShareRoute = e.target.checked;
+  saveSettings();
+  sendLiveRoute(true);
 });
 document.getElementById('setLiveHideOthers').addEventListener('change', (e) => {
   hideOtherPlayers = e.target.checked;
@@ -2376,6 +2421,7 @@ function resetDisplayedRoute() {
   document.getElementById('navPanel').style.display = 'none';
   renderRouteSummary(null);
   if (typeof convoyOnRouteChanged === 'function') convoyOnRouteChanged();
+  sendLiveRoute(true);
 }
 
 function renderRouteSummary(view) {
@@ -2571,6 +2617,7 @@ function updateDestinationMarker(data) {
     }
     if (!complete) console.warn('Ruta incompleta: algun tramo no se pudo calcular por el grafo');
     if (typeof convoyOnRouteChanged === 'function') convoyOnRouteChanged(); // Convoy: los demas ven mi ruta
+    sendLiveRoute(false); // mapa en vivo: a lo sumo cada LIVE_ROUTE_RESEND_MS
   }
 }
 
@@ -4574,7 +4621,7 @@ function handleTelemetry(data) {
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
   // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
-  if (liveShareEnabled && !conn.local && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) sendLiveShareState();
+  if (liveShareEnabled && !conn.local && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) { sendLiveShareState(); sendLiveRoute(true); }
 }
 
 function connectWs(backend, code, options = {}) {
@@ -4596,6 +4643,7 @@ function connectWs(backend, code, options = {}) {
     conn.waitingClient = false;
     renderConnectionUi();
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
+    liveRouteSig = null; sendLiveRoute(true);
     sendCurrencyPref(); // idem: la moneda para el post de Discord
     if (keybindsModalOpen) requestKeybinds(); // el pedido anterior se pudo haber perdido en el corte
     if (typeof convoyOnSocketOpen === 'function') { convoyOnSocketOpen(); convoyRenderModal(); } // Convoy: volver a entrar tras (re)conectar
