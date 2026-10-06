@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.27 (2026-10-06)
 
 - Accounts are here, optional and free. Link a Truck Dash account from "Setup & status"
   and every job you drive is saved: the route on a map, distance, pay, fuel and time,
@@ -15,17 +15,15 @@ updates on its own and is not versioned here.
   bottom are always reachable on small laptops.
 - "Support Truck Dash" in the tray menu, for anyone who wants to buy me a tea on Tecito.
   It is optional and does not unlock anything.
-- Accounts: special transport jobs, and jobs you continue after reopening the game,
-  now get an approximate total time instead of none.
-- Accounts: closing the game in the middle of a job no
-  longer loses the driving since the last save of the trip, up to two
-  minutes of distance, route and fuel. The trip is sent as it was before
-  the client lets go of it.
-- Accounts: cancelling a job sends the penalty the
-  game charged, so the account shows what the cancellation cost instead of
-  the pay that was offered and never collected.
-- Accounts: when the accounts server answers with an
-  error, the log says which one. Sending is retried as before.
+- Accounts: closing the game in the middle of a job no longer loses the driving since the
+  last save of the trip (up to two minutes of distance, route and fuel).
+- Accounts: cancelling a job records the penalty the game charged, instead of showing the
+  pay that was offered and never collected.
+- Accounts: special transport jobs, and jobs you continue after reopening the game, get an
+  approximate total time instead of none.
+- Accounts: sessions and trips record which map mods were active.
+- Accounts: when the accounts server answers with an error, the log says which one. Sending
+  is retried as before.
 
 ## 1.5.26 (2026-10-05)
 
