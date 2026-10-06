@@ -98,6 +98,7 @@
     $('tocTitle').textContent = tx('toc');
     $('backTop').textContent = tx('backTop');
     $('privacyLink').textContent = tx('privacy');
+    $('supportLink').textContent = tx('support');
     $('langSelect').value = lang;
 
     $('tocList').innerHTML = SECTIONS.map((s) => `<li><a href="#${s.id}">${esc(tx('h', s.id))}</a></li>`).join('');

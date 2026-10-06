@@ -59,7 +59,7 @@ if sys.stderr is None:
 
 DEFAULT_WEB_URL = "https://trucksim-dash.com/app/"
 URL_CUENTA = "https://trucksim-dash.com/account/"
-DONATE_URL = ""  # Ko-fi / GitHub Sponsors - vacio hasta tener uno (el item del menu no aparece)
+DONATE_URL = "https://tecito.app/truckdash"  # Tecito. Vacio, el item "Apoyar" del menu no aparece
 
 LOG_PATH = os.path.join(win_integration.base_dir(), "truckdash.log")
 logging.basicConfig(filename=LOG_PATH, level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

@@ -12,6 +12,7 @@ GUIDE_TEXT.en = {
   toc: 'Contents',
   backTop: 'Back to top',
   privacy: 'Privacy',
+  support: 'Support',
   h: {
     start: 'Getting started',
     status: 'The status chip',
@@ -187,6 +188,7 @@ GUIDE_TEXT.es = {
   toc: 'Contenido',
   backTop: 'Volver arriba',
   privacy: 'Privacidad',
+  support: 'Apoyar',
   h: {
     start: 'Primeros pasos',
     status: 'El indicador de estado',

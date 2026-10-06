@@ -9,6 +9,7 @@ GUIDE_TEXT.de = {
   toc: 'Inhalt',
   backTop: 'Nach oben',
   privacy: 'Datenschutz',
+  support: 'Unterstützen',
   h: {
     start: 'Erste Schritte',
     status: 'Die Statusanzeige',
@@ -184,6 +185,7 @@ GUIDE_TEXT.fr = {
   toc: 'Sommaire',
   backTop: 'Haut de page',
   privacy: 'Confidentialité',
+  support: 'Soutenir',
   h: {
     start: 'Pour commencer',
     status: "L'indicateur d'état",
@@ -359,6 +361,7 @@ GUIDE_TEXT.pt = {
   toc: 'Conteúdo',
   backTop: 'Voltar ao topo',
   privacy: 'Privacidade',
+  support: 'Apoiar',
   h: {
     start: 'Primeiros passos',
     status: 'O indicador de status',
@@ -534,6 +537,7 @@ GUIDE_TEXT.pl = {
   toc: 'Spis treści',
   backTop: 'Do góry',
   privacy: 'Prywatność',
+  support: 'Wesprzyj',
   h: {
     start: 'Pierwsze kroki',
     status: 'Wskaźnik stanu',
@@ -709,6 +713,7 @@ GUIDE_TEXT.tr = {
   toc: 'İçindekiler',
   backTop: 'Başa dön',
   privacy: 'Gizlilik',
+  support: 'Destekle',
   h: {
     start: 'Başlarken',
     status: 'Durum göstergesi',
@@ -884,6 +889,7 @@ GUIDE_TEXT.ru = {
   toc: 'Содержание',
   backTop: 'Наверх',
   privacy: 'Конфиденциальность',
+  support: 'Поддержать',
   h: {
     start: 'Начало работы',
     status: 'Индикатор состояния',

@@ -164,6 +164,9 @@
   .cta:hover { background: #2b8ef0; text-decoration: none; }
   .cta.secondary { background: var(--panel-alt); border: 1px solid var(--border); color: var(--text); }
   .cta.secondary:hover { border-color: var(--blue); background: var(--panel-alt); }
+  .teaBtn { background: #3b82f6; }
+  .teaBtn:hover { background: #2f6fd6; }
+  .teaBtn svg { width: 1.2em; height: 1.2em; }
   .ctaNote { font-size: 0.78rem; color: var(--muted); margin: 0.6rem 0 0; }
   .heroBadges { margin-top: 1.4rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .heroBadges span {
@@ -697,7 +700,7 @@
   <section id="faq">
     <h2 data-i18n="faqTitle">Preguntas frecuentes</h2>
     <div class="faq" id="faqList">
-      <details><summary data-i18n="faqQ1">¿Es realmente gratis? ¿Cuál es la trampa?</summary><p data-i18n="faqA1">No hay trampa. Sin cuenta obligatoria, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si algún día se agregan donaciones, van a ser opcionales y no van a desbloquear nada.</p></details>
+      <details><summary data-i18n="faqQ1">¿Es realmente gratis? ¿Cuál es la trampa?</summary><p data-i18n="faqA1">No hay trampa. Sin cuenta obligatoria, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si querés apoyarlo, podés <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">invitarme un tecito</a>: es opcional y no desbloquea nada.</p></details>
       <details><summary data-i18n="faqQ2">Windows o mi antivirus dicen que el archivo es "no reconocido" o peligroso. ¿Es seguro?</summary><p data-i18n="faqA2">Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python. Algunos antivirus lo marcan por lo mismo (un ejecutable sin firma que se descomprime solo): es un falso positivo — el código y el log de compilación son públicos, y hay un certificado de firma gratuito para proyectos abiertos en trámite. Mientras tanto podés agregar una excepción o correr el cliente desde el código fuente.</p></details>
       <details><summary data-i18n="faqQ3">¿Mi celular tiene que estar en la misma WiFi que la PC?</summary><p data-i18n="faqA3">No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.</p></details>
       <details><summary data-i18n="faqQ4">¿Funciona con ProMods, Coast to Coast u otros mods de mapa?</summary><p data-i18n="faqA4">Sí: ProMods (con RusMap y Roextended), Grand Utopia y TruckersMP para ETS2; Coast to Coast, ProMods Canada y Reforma para ATS — en las combinaciones habituales. El cliente detecta lo que usa tu perfil y la app cambia sola. ¿Querés otro? Pedilo en Discord.</p></details>
@@ -706,6 +709,14 @@
       <details><summary data-i18n="faqQ7">El tablero dice "esperando telemetría". ¿Y ahora?</summary><p data-i18n="faqA7">Tres cosas para revisar: que el plugin de telemetría esté instalado (el cliente lo puede hacer por vos desde el menú de la bandeja), que el juego esté abierto y estés arriba del camión (no en un menú), y que el ícono de la bandeja diga "connected". El menú de la bandeja tiene una opción "Show log file" que dice exactamente qué detectó.</p></details>
       <details><summary data-i18n="faqQ8">¿Puedo usarlo con volante, joystick o en un segundo monitor?</summary><p data-i18n="faqA8">Sí — a Truck Dash no le importa cómo manejás. Abrí el tablero en un navegador en un segundo monitor para un GPS grande, o en un celular apoyado en el escritorio. La botonera funciona desde cualquiera.</p></details>
     </div>
+  </section>
+
+  <!-- Donaciones: un link propio a Tecito y no su script, que cargaria JS
+       de un tercero en el sitio. Lo pide el usuario y no desbloquea nada. -->
+  <section id="support">
+    <h2 data-i18n="supportTitle">Apoyá a Truck Dash</h2>
+    <p data-i18n="supportBody">Truck Dash lo hace una sola persona, y mantenerlo andando cuesta plata: los servidores y el alojamiento de los mapas. Si te sirve, un tecito ayuda a que siga. Es opcional y no desbloquea nada.</p>
+    <a class="cta teaBtn" href="https://tecito.app/truckdash" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg><span data-i18n="teaButton">¡Invitame un tecito!</span></a>
   </section>
 
 </main>
@@ -732,9 +743,8 @@
 
 <script>
 const DEFAULT_LANG = 'es';
-// Link opcional de donaciones (Ko-fi / GitHub Sponsors) - vacio hasta tener uno,
-// el link del footer queda oculto mientras tanto.
-const DONATE_URL = '';
+// Donaciones: Tecito. Si se vacia, el link del pie se esconde solo.
+const DONATE_URL = 'https://tecito.app/truckdash';
 
 const TRANSLATIONS = {
   en: {
@@ -874,7 +884,7 @@ const TRANSLATIONS = {
     modsFooterNote: 'These mods still need to be installed in your game as usual — Truck Dash just knows how to draw the extra roads and route on them. Want another mod supported? Ask on Discord.',
     faqTitle: 'Frequently asked questions',
     faqQ1: 'Is it really free? What\'s the catch?',
-    faqA1: 'No catch. No account needed, no ads, no routing limits, no Pro tier. Everything is open source. If donations are ever added they\'ll be optional and won\'t unlock anything.',
+    faqA1: 'No catch. No account needed, no ads, no routing limits, no Pro tier. Everything is open source. If you want to support it, you can <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">buy me a tea on Tecito</a>: it\'s optional and doesn\'t unlock anything.',
     faqQ2: 'Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?',
     faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive — the source and the build log are public, and a free code signing certificate for open source is in progress. Meanwhile you can add an exclusion or run the client from source.',
     faqQ3: 'Does my phone need to be on the same Wi-Fi as my PC?',
@@ -905,6 +915,9 @@ const TRANSLATIONS = {
     footerApp: 'Open dashboard',
     footerGuide: 'User guide',
     donateLink: 'Support the project',
+    supportTitle: 'Support Truck Dash',
+    supportBody: 'Truck Dash is made by one person, and keeping it running costs money: the servers and the map hosting. If it\'s useful to you, a tea helps keep it going. It\'s optional and it doesn\'t unlock anything.',
+    teaButton: 'Buy me a cup of tea!',
     footerNote: 'an independent fan-made companion tool, not affiliated with SCS Software.',
   },
   es: {
@@ -1044,7 +1057,7 @@ const TRANSLATIONS = {
     modsFooterNote: 'Estos mods hay que tenerlos instalados en el juego como siempre — Truck Dash solo sabe dibujar las rutas extra y rutear por ellas. ¿Querés otro mod? Pedilo en Discord.',
     faqTitle: 'Preguntas frecuentes',
     faqQ1: '¿Es realmente gratis? ¿Cuál es la trampa?',
-    faqA1: 'No hay trampa. Sin cuenta obligatoria, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si algún día se agregan donaciones, van a ser opcionales y no van a desbloquear nada.',
+    faqA1: 'No hay trampa. Sin cuenta obligatoria, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si querés apoyarlo, podés <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">invitarme un tecito</a>: es opcional y no desbloquea nada.',
     faqQ2: 'Windows o mi antivirus dicen que el archivo es "no reconocido" o peligroso. ¿Es seguro?',
     faqA2: 'Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python. Algunos antivirus lo marcan por lo mismo (un ejecutable sin firma que se descomprime solo): es un falso positivo — el código y el log de compilación son públicos, y hay un certificado de firma gratuito para proyectos abiertos en trámite. Mientras tanto podés agregar una excepción o correr el cliente desde el código fuente.',
     faqQ3: '¿Mi celular tiene que estar en la misma WiFi que la PC?',
@@ -1075,6 +1088,9 @@ const TRANSLATIONS = {
     footerApp: 'Abrir el tablero',
     footerGuide: 'Guía de uso',
     donateLink: 'Apoyar el proyecto',
+    supportTitle: 'Apoyá a Truck Dash',
+    supportBody: 'Truck Dash lo hace una sola persona, y mantenerlo andando cuesta plata: los servidores y el alojamiento de los mapas. Si te sirve, un tecito ayuda a que siga. Es opcional y no desbloquea nada.',
+    teaButton: '¡Invitame un tecito!',
     footerNote: 'una herramienta independiente hecha por un fan, sin afiliación con SCS Software.',
   },
 };

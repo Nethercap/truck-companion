@@ -105,6 +105,12 @@ it is approved, releases are unsigned and each one lists its SHA-256).
   — see the [privacy policy](https://trucksim-dash.com/privacy.html) and
   [`client/README.md`](client/README.md) for exactly what it reads and sends.
 
+## Support
+
+Truck Dash is free, with no ads and no paid tier, and it is made by one person. Running it
+costs money (the relay and the map hosting). If it is useful to you, you can
+[buy me a cup of tea on Tecito](https://tecito.app/truckdash). It is optional and does not unlock anything.
+
 ## License / transparency
 
 MIT License (see [`LICENSE`](LICENSE)). The bundled SCS telemetry plugin

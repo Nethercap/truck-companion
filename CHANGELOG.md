@@ -11,6 +11,8 @@ updates on its own and is not versioned here.
   with your logbook, stats, countries and achievements at trucksim-dash.com/account.
   Sign in with Discord, Google or email. Nothing is saved until you link it.
 - "My account" in the tray menu, and a one-time notice for existing users.
+- "Support Truck Dash" in the tray menu, for anyone who wants to buy me a tea on Tecito.
+  It is optional and does not unlock anything.
 - Accounts: special transport jobs, and jobs you continue after reopening the game,
   now get an approximate total time instead of none.
 - Accounts: closing the game in the middle of a job no

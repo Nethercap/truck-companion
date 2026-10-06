@@ -240,6 +240,8 @@
       signInIntro: 'Sign in to keep your trips and your stats across devices.',
       signInDiscord: 'Continue with Discord',
       signInGoogle: 'Continue with Google',
+      supportStats: 'Enjoying your stats? Truck Dash is free and made by one person.',
+      teaButton: 'Buy me a cup of tea!',
       emailOr: 'or with your email',
       emailLabel: 'Email',
       emailPasswordLabel: 'Password',
@@ -512,6 +514,8 @@
       signInIntro: 'Entra para conservar tus viajes y tus estadisticas en todos tus dispositivos.',
       signInDiscord: 'Continuar con Discord',
       signInGoogle: 'Continuar con Google',
+      supportStats: '¿Te gustan tus estadísticas? Truck Dash es gratis y lo hace una sola persona.',
+      teaButton: '¡Invitame un tecito!',
       emailOr: 'o con tu mail',
       emailLabel: 'Mail',
       emailPasswordLabel: 'Contraseña',
@@ -1185,6 +1189,7 @@
   // ------------------------------------------------------------ arranque
   async function cargar() {
     if (modoPublico) { cargarPublico(); return; }
+    $('supportLine').hidden = false;
     const prov = await pedir('/auth/providers');
     if (prov.ok) disponibles = prov.datos.disponibles || [];
     pintarBotonesDeEntrada();

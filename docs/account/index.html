@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261006f" />
+<link rel="stylesheet" href="account.css?v=20261006g" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -180,6 +180,11 @@
           <section class="card" id="cardStats" hidden>
             <h2 data-i18n="statsTitle">Your stats</h2>
             <div id="statsBody"></div>
+            <!-- Una linea, solo en la cuenta propia (no en el perfil publico). -->
+            <p class="muted small apoyo" id="supportLine" hidden>
+              <span data-i18n="supportStats"></span>
+              <a href="https://tecito.app/truckdash" target="_blank" rel="noopener" data-i18n="teaButton">Buy me a cup of tea!</a>
+            </p>
           </section>
         </div>
 
@@ -309,7 +314,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261006f"></script>
-<script src="account.js?v=20261006f"></script>
+<script src="../app/i18n.js?v=20261006g"></script>
+<script src="account.js?v=20261006g"></script>
 </body>
 </html>
