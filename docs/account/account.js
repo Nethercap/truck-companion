@@ -207,6 +207,7 @@
       tripRouteGaps: 'Dashed where the route was not followed: Truck Dash closed, or a jump (quick job, ferry, train).',
       tripNoRoute: 'No route was recorded for this trip.',
       tripTrimmed: 'This trip went past the storage limit, so part of its route or of the distance we tracked was not saved. The delivery, the pay and the in-game distance are complete.',
+      tripAbandonedHelp: 'We stopped hearing from this job without seeing it delivered or cancelled. If you delivered it with Truck Dash closed, or loaded another save, we could not see how it ended. You can mark it as cancelled below; a delivery can only come from the game.',
       tripsTitle: 'Your trips',
       tripsEmpty: 'Nothing here yet. Link this PC to Truck Dash and your trips will show up on their own as you drive.',
       tripsEmptyDriven: 'No trips saved yet. Driving without a job counts in your totals, but it is not a trip.',
@@ -478,6 +479,7 @@
       tripRouteGaps: 'Punteado donde no se siguio el recorrido: Truck Dash cerrado, o un salto (quick job, ferry, tren).',
       tripNoRoute: 'De este viaje no se guardo el recorrido.',
       tripTrimmed: 'Este viaje paso el limite de lo que se guarda, asi que falta parte del recorrido o de la distancia que rastreamos. La entrega, el pago y la distancia del juego estan completos.',
+      tripAbandonedHelp: 'Dejamos de tener noticias de este trabajo sin verlo entregado ni cancelado. Si lo entregaste con Truck Dash cerrado, o cargaste otra partida, no pudimos ver cómo terminó. Abajo lo podés marcar como cancelado; una entrega solo la puede decir el juego.',
       tripsTitle: 'Tus viajes',
       tripsEmpty: 'Todavia no hay nada. Vincula esta PC a Truck Dash y tus viajes van a ir apareciendo solos mientras manejas.',
       tripsEmptyDriven: 'Todavia no hay viajes guardados. Manejar sin carga suma a tus totales, pero no es un viaje.',
@@ -1776,6 +1778,10 @@
     // Paso un tope del servidor (tramos o puntos): se dice que falta, para
     // que un hueco en el mapa o unos km de menos no parezcan un error.
     if (d.trimmed) sumar(caja, renglon([t('tripTrimmed')]));
+    // Abandonado no es un error nuestro ni del jugador: dejamos de verlo. Lo
+    // mas comun es haberlo entregado con el cliente cerrado, y sin esto
+    // llegaba como "entregue y dice abandonado".
+    if (d.status === 'abandoned') sumar(caja, renglon([t('tripAbandonedHelp')]));
 
     const empresas = [d.company_src, d.company_dst].filter(Boolean).join(' \u2192 ');
     if (empresas) sumar(caja, renglon([empresas]));
@@ -1788,7 +1794,10 @@
     // (de tomar el trabajo a entregarlo) trae paradas y sueno, asi que se
     // dice cuanto fue durmiendo: si no, 4 h 11 contra 13 h 30 parece un
     // error. "4 h 11 al volante · 13 h 30 en total, 9 h durmiendo".
-    const total = d.total_game_hours ? t('tripTotalTime', duracion(d.total_game_hours)) : null;
+    // Aproximado cuando el juego no dio la hora de inicio (trabajo especial,
+    // o seguido despues de reabrir el juego): sale de cuando se lo vio.
+    const total = d.total_game_hours
+      ? t('tripTotalTime', (d.total_game_hours_approx ? '≈ ' : '') + duracion(d.total_game_hours)) : null;
     const sueno = d.sleep_hours ? t('tripAsleep', duracion(d.sleep_hours)) : null;
     sumar(caja, renglon([
       d.game_hours ? t('tripWheel', duracion(d.game_hours)) : null,
@@ -1978,7 +1987,7 @@
     }
     const columnas = ['started_at', 'delivered_at', 'game', 'job_kind', 'status', 'city_src', 'city_dst',
       'company_src', 'company_dst', 'cargo', 'cargo_mass', 'distance_planned_km',
-      'distance_game_km', 'distance_tracked_km', 'game_hours', 'total_game_hours',
+      'distance_game_km', 'distance_tracked_km', 'game_hours', 'total_game_hours', 'total_game_hours_approx',
       'sleep_hours', 'real_hours', 'revenue', 'currency', 'modded', 'fuel_used', 'tolls',
       'fines', 'ferries', 'cancel_penalty', 'damage_delta', 'on_time', 'truck_brand', 'truck_name',
       'countries', 'note', 'trimmed'];
