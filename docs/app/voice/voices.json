@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "voices": [
+    { "id": "en-kristin", "lang": "en", "label": "Kristin", "phrases": "en", "file": "en-kristin-v1.json", "model": "en_US-kristin-medium" },
+    { "id": "en-joe", "lang": "en", "label": "Joe", "phrases": "en", "file": "en-joe-v1.json", "model": "en_US-joe-medium" },
+    { "id": "es-daniela", "lang": "es", "label": "Daniela (AR)", "phrases": "es-AR", "file": "es-daniela-v1.json", "model": "es_AR-daniela-high" },
+    { "id": "es-claude", "lang": "es", "label": "Claude (MX)", "phrases": "es-MX", "file": "es-claude-v1.json", "model": "es_MX-claude-high" },
+    { "id": "de-thorsten", "lang": "de", "label": "Thorsten", "phrases": "de", "file": "de-thorsten-v1.json", "model": "de_DE-thorsten-high" },
+    { "id": "fr-siwis", "lang": "fr", "label": "Siwis", "phrases": "fr", "file": "fr-siwis-v1.json", "model": "fr_FR-siwis-medium" },
+    { "id": "pt-cadu", "lang": "pt", "label": "Cadu", "phrases": "pt", "file": "pt-cadu-v1.json", "model": "pt_BR-cadu-medium" },
+    { "id": "pl-gosia", "lang": "pl", "label": "Gosia", "phrases": "pl", "file": "pl-gosia-v1.json", "model": "pl_PL-gosia-medium" },
+    { "id": "ru-dmitri", "lang": "ru", "label": "Dmitri", "phrases": "ru", "file": "ru-dmitri-v1.json", "model": "ru_RU-dmitri-medium" },
+    { "id": "tr-system", "lang": "tr", "label": null, "phrases": "tr", "system": true }
+  ],
+  "phrases": {
+    "en": {
+      "soon_turn_left": "Prepare to turn left.",
+      "soon_turn_right": "Prepare to turn right.",
+      "soon_keep_left": "Prepare to keep left.",
+      "soon_keep_right": "Prepare to keep right.",
+      "turn_left": "Turn left.",
+      "turn_right": "Turn right.",
+      "keep_left": "Keep left.",
+      "keep_right": "Keep right.",
+      "arrive_dest": "You have arrived at your destination.",
+      "arrive_pickup": "You have arrived at the pickup."
+    },
+    "es-AR": {
+      "soon_turn_left": "Más adelante, girá a la izquierda.",
+      "soon_turn_right": "Más adelante, girá a la derecha.",
+      "soon_keep_left": "Más adelante, mantenete a la izquierda.",
+      "soon_keep_right": "Más adelante, mantenete a la derecha.",
+      "turn_left": "Girá a la izquierda.",
+      "turn_right": "Girá a la derecha.",
+      "keep_left": "Mantenete a la izquierda.",
+      "keep_right": "Mantenete a la derecha.",
+      "arrive_dest": "Llegaste a destino.",
+      "arrive_pickup": "Llegaste al lugar de carga."
+    },
+    "es-MX": {
+      "soon_turn_left": "Más adelante, gira a la izquierda.",
+      "soon_turn_right": "Más adelante, gira a la derecha.",
+      "soon_keep_left": "Más adelante, mantente a la izquierda.",
+      "soon_keep_right": "Más adelante, mantente a la derecha.",
+      "turn_left": "Gira a la izquierda.",
+      "turn_right": "Gira a la derecha.",
+      "keep_left": "Mantente a la izquierda.",
+      "keep_right": "Mantente a la derecha.",
+      "arrive_dest": "Has llegado a tu destino.",
+      "arrive_pickup": "Has llegado al punto de carga."
+    },
+    "de": {
+      "soon_turn_left": "Demnächst links abbiegen.",
+      "soon_turn_right": "Demnächst rechts abbiegen.",
+      "soon_keep_left": "Demnächst links halten.",
+      "soon_keep_right": "Demnächst rechts halten.",
+      "turn_left": "Jetzt links abbiegen.",
+      "turn_right": "Jetzt rechts abbiegen.",
+      "keep_left": "Links halten.",
+      "keep_right": "Rechts halten.",
+      "arrive_dest": "Sie haben Ihr Ziel erreicht.",
+      "arrive_pickup": "Sie haben den Abholort erreicht."
+    },
+    "fr": {
+      "soon_turn_left": "Bientôt, tournez à gauche.",
+      "soon_turn_right": "Bientôt, tournez à droite.",
+      "soon_keep_left": "Bientôt, restez à gauche.",
+      "soon_keep_right": "Bientôt, restez à droite.",
+      "turn_left": "Tournez à gauche.",
+      "turn_right": "Tournez à droite.",
+      "keep_left": "Restez à gauche.",
+      "keep_right": "Restez à droite.",
+      "arrive_dest": "Vous êtes arrivé à destination.",
+      "arrive_pickup": "Vous êtes arrivé au lieu de chargement."
+    },
+    "pt": {
+      "soon_turn_left": "Em breve, vire à esquerda.",
+      "soon_turn_right": "Em breve, vire à direita.",
+      "soon_keep_left": "Em breve, mantenha-se à esquerda.",
+      "soon_keep_right": "Em breve, mantenha-se à direita.",
+      "turn_left": "Vire à esquerda.",
+      "turn_right": "Vire à direita.",
+      "keep_left": "Mantenha-se à esquerda.",
+      "keep_right": "Mantenha-se à direita.",
+      "arrive_dest": "Você chegou ao destino.",
+      "arrive_pickup": "Você chegou ao local de carga."
+    },
+    "pl": {
+      "soon_turn_left": "Za chwilę skręć w lewo.",
+      "soon_turn_right": "Za chwilę skręć w prawo.",
+      "soon_keep_left": "Za chwilę trzymaj się lewej.",
+      "soon_keep_right": "Za chwilę trzymaj się prawej.",
+      "turn_left": "Skręć w lewo.",
+      "turn_right": "Skręć w prawo.",
+      "keep_left": "Trzymaj się lewej.",
+      "keep_right": "Trzymaj się prawej.",
+      "arrive_dest": "Dotarłeś do celu.",
+      "arrive_pickup": "Dotarłeś do miejsca załadunku."
+    },
+    "ru": {
+      "soon_turn_left": "Скоро поверните налево.",
+      "soon_turn_right": "Скоро поверните направо.",
+      "soon_keep_left": "Скоро держитесь левее.",
+      "soon_keep_right": "Скоро держитесь правее.",
+      "turn_left": "Поверните налево.",
+      "turn_right": "Поверните направо.",
+      "keep_left": "Держитесь левее.",
+      "keep_right": "Держитесь правее.",
+      "arrive_dest": "Вы прибыли в пункт назначения.",
+      "arrive_pickup": "Вы прибыли к месту погрузки."
+    },
+    "tr": {
+      "soon_turn_left": "Birazdan sola dönün.",
+      "soon_turn_right": "Birazdan sağa dönün.",
+      "soon_keep_left": "Birazdan soldan devam edin.",
+      "soon_keep_right": "Birazdan sağdan devam edin.",
+      "turn_left": "Sola dönün.",
+      "turn_right": "Sağa dönün.",
+      "keep_left": "Soldan devam edin.",
+      "keep_right": "Sağdan devam edin.",
+      "arrive_dest": "Varış noktanıza ulaştınız.",
+      "arrive_pickup": "Yükleme noktasına ulaştınız."
+    }
+  }
+}

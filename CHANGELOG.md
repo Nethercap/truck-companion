@@ -4,6 +4,11 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- LAN mode also keeps the voice guidance files, so spoken directions work on the
+  local network without internet.
+
 ## 1.5.27 (2026-10-06)
 
 - Accounts are here, optional and free. Link a Truck Dash account from "Setup & status"

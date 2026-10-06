@@ -53,6 +53,12 @@ WEB_FILES = [
     # ademas se sirve solo en /dash/ para un segundo dispositivo.
     "dash/index.html", "dash/dash.js", "dash/dash.css", "dash/page.js",
     "dash/page.css", "dash/manifest.json",
+    # Guia por voz: el catalogo y un paquete por voz (la version va en el
+    # nombre, como vendor/: no se vuelven a bajar). Ver tools/build_voice_packs.py.
+    "app/voice/voices.json",
+    "app/voice/en-kristin-v1.json", "app/voice/en-joe-v1.json", "app/voice/es-daniela-v1.json",
+    "app/voice/es-claude-v1.json", "app/voice/de-thorsten-v1.json", "app/voice/fr-siwis-v1.json",
+    "app/voice/pt-cadu-v1.json", "app/voice/pl-gosia-v1.json", "app/voice/ru-dmitri-v1.json",
 ]
 
 
@@ -61,6 +67,7 @@ def cache_dir() -> str:
     path = os.path.join(base, "TruckDash", "webcache")
     os.makedirs(os.path.join(path, "app", "assets"), exist_ok=True)
     os.makedirs(os.path.join(path, "app", "vendor"), exist_ok=True)
+    os.makedirs(os.path.join(path, "app", "voice"), exist_ok=True)
     os.makedirs(os.path.join(path, "dash"), exist_ok=True)
     return path
 
@@ -83,7 +90,8 @@ def refresh_web_cache() -> bool:
         local = os.path.join(target, rel.replace("/", os.sep))
         # Las librerias llevan la version en el nombre y no cambian nunca:
         # no hace falta volver a bajar un mega en cada arranque.
-        if rel.startswith("app/vendor/") and os.path.exists(local):
+        versionado = rel.startswith("app/vendor/") or (rel.startswith("app/voice/") and rel != "app/voice/voices.json")
+        if versionado and os.path.exists(local):
             ok += 1
             continue
         try:

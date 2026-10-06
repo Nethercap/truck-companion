@@ -451,6 +451,9 @@
   .navZoomRow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
   .navZoomRow input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); }
   .navZoomRow .settingsLinkBtn { width: auto; flex: 0 0 auto; padding: 0.3rem 0.6rem; }
+  .voiceRow { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; }
+  .voiceRow .settingsSelect { flex: 1 1 auto; min-width: 0; }
+  .voiceRow .settingsLinkBtn:not(.settingsSelect) { width: auto; flex: 0 0 auto; padding: 0.3rem 0.6rem; }
   .colorSwatch {
     width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent;
     cursor: pointer; padding: 0;

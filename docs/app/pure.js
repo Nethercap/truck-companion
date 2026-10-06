@@ -961,7 +961,72 @@ function createFatigue(intervalMinutes = REST_INTERVAL_MINUTES) {
   };
 }
 
+// Guia por voz: que frase decir y cuando. La voz anterior (17-09, sacada al
+// dia siguiente) leia nombres de rutas y los pronunciaba mal; esta no dice
+// nombres ni numeros: un aviso anticipado ("Prepare to turn right") y otro en
+// el punto ("Turn right"), elegidos por TIEMPO hasta la maniobra y no por
+// distancia, asi no hay que decir km ni millas ni pensar en la escala del
+// mapa. Las frases son claves de docs/app/voice/voices.json.
+//
+// maneuver(turn, speedKmh): turn es lo que devuelve stabilizeManeuver (el
+// mismo cruce conserva su nodo, asi que el id no cambia al acercarse);
+// distanceMeters va en metros del mundo, que el camion recorre a su
+// velocidad real. Parado o casi (un semaforo antes de doblar) se toma una
+// velocidad minima: si no, el aviso no llegaria nunca.
+// arrival(key, kind, remainingKm, totalKm): una vez por destino; solo si la
+// ruta era de mas de minTripKm, para no decir "llegaste" al tomar un trabajo
+// estando ya en la empresa de carga.
+function voiceManeuverKey(turn) {
+  return `${turn.kind === 'fork' ? 'keep' : 'turn'}_${turn.direction === 'left' ? 'left' : 'right'}`;
+}
+function createVoiceGuide(opts = {}) {
+  const soonSec = opts.soonSec != null ? opts.soonSec : 20;
+  const nowSec = opts.nowSec != null ? opts.nowSec : 6;
+  // Un aviso anticipado pegado al del punto no sirve: se dice solo el segundo.
+  const minLeadSec = opts.minLeadSec != null ? opts.minLeadSec : 4;
+  const minSpeedMs = opts.minSpeedMs != null ? opts.minSpeedMs : 5;
+  const arriveKm = opts.arriveKm != null ? opts.arriveKm : 0.3;
+  const minTripKm = opts.minTripKm != null ? opts.minTripKm : 1;
+  let current = null; // { id, soon, now }
+  let arrivedKey = null;
+  return {
+    maneuver(turn, speedKmh) {
+      if (!turn || !turn.node || !Number.isFinite(turn.distanceMeters)) return null;
+      const id = `${turn.kind}|${turn.direction}|${Math.round(turn.node[0])},${Math.round(turn.node[1])}`;
+      if (!current || current.id !== id) current = { id, soon: false, now: false };
+      const speedMs = Math.max(minSpeedMs, (Number(speedKmh) || 0) / 3.6);
+      const seconds = turn.distanceMeters / speedMs;
+      const action = voiceManeuverKey(turn);
+      if (!current.now && seconds <= nowSec) {
+        current.now = current.soon = true;
+        return action;
+      }
+      if (!current.soon && seconds <= soonSec && seconds > nowSec + minLeadSec) {
+        current.soon = true;
+        return `soon_${action}`;
+      }
+      return null;
+    },
+    arrival(key, kind, remainingKm, totalKm) {
+      if (key == null || !Number.isFinite(remainingKm) || key === arrivedKey) return null;
+      if (kind !== 'dest' && kind !== 'pickup') return null;
+      if (remainingKm > arriveKm || !(totalKm >= minTripKm)) return null;
+      arrivedKey = key;
+      return kind === 'pickup' ? 'arrive_pickup' : 'arrive_dest';
+    },
+  };
+}
+
+// La voz a usar segun el idioma de la app y la eleccion guardada (una por
+// idioma). Sin voz para ese idioma, null; con la guardada que ya no existe,
+// la primera del idioma.
+function pickVoice(voices, lang, savedId) {
+  const own = (voices || []).filter(v => v.lang === lang);
+  if (!own.length) return null;
+  return own.find(v => v.id === savedId) || own[0];
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

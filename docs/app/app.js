@@ -41,6 +41,7 @@ function setLanguage(lang) {
   renderConnectionUi();
   renderTripHistory();
   renderWaypointList();
+  fillVoiceSelect();
   if (lastData) updateHud(lastData);
 }
 for (const id of ['langSelect', 'setLangSelect']) {
@@ -83,7 +84,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -137,6 +138,10 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // declaracion tumba app.js entero.
 let navZoom = navZoomSetting(_savedSettings.navZoom);
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
+// Guia por voz (Ajustes): apagada por defecto, y una voz elegida por idioma
+// ({ en: 'en-joe' }). Aca arriba por lo mismo que navZoom: saveSettings lee.
+let voiceOn = !!_savedSettings.voiceOn;
+let voiceByLang = (_savedSettings.voiceByLang && typeof _savedSettings.voiceByLang === 'object') ? _savedSettings.voiceByLang : {};
 
 // ---------------------------------------------------------------------------
 // Pago en la moneda "real" del usuario. El SDK paga en la moneda interna del
@@ -379,6 +384,8 @@ function initSettingsUi() {
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setNavZoom').value = navZoom;
+  document.getElementById('setVoice').checked = voiceOn;
+  loadVoiceCatalog().then(fillVoiceSelect);
   document.getElementById('setDarkButtons').checked = darkButtons;
   document.getElementById('setFadeButtons').checked = fadeButtons;
   document.getElementById('setRealBase').checked = realBase;
@@ -518,6 +525,21 @@ function applyNavZoom(value) {
 }
 document.getElementById('setNavZoom').addEventListener('input', (e) => applyNavZoom(e.target.value));
 document.getElementById('setNavZoomDefault').addEventListener('click', () => applyNavZoom(NAV_ZOOM_DEFAULT));
+document.getElementById('setVoice').addEventListener('change', (e) => {
+  voiceOn = e.target.checked;
+  saveSettings();
+  if (voiceOn) { unlockVoice(); speakVoice('soon_turn_right'); }
+});
+document.getElementById('setVoiceName').addEventListener('change', (e) => {
+  voiceByLang[currentLang] = e.target.value;
+  saveSettings();
+  unlockVoice();
+  speakVoice('soon_turn_right');
+});
+document.getElementById('setVoiceTest').addEventListener('click', () => {
+  unlockVoice();
+  speakVoice('soon_turn_right');
+});
 document.getElementById('setDarkButtons').addEventListener('change', (e) => {
   darkButtons = e.target.checked;
   saveSettings();
@@ -2392,6 +2414,10 @@ function updateRouteSummary(data) {
   const key = routeIdentity(data) + target.key;
   if (routeProgressState.key !== key) routeProgressState = { key, total: 0 };
   if (remainingKm != null) routeProgressState.total = Math.max(routeProgressState.total, remainingKm);
+  if (voiceOn) {
+    const arrived = voiceGuide.arrival(key, target.kind, remainingKm, routeProgressState.total);
+    if (arrived) speakVoice(arrived);
+  }
   const percent = remainingKm == null || routeProgressState.total <= 0 ? 0
     : Math.max(0, Math.min(100, (1 - remainingKm / routeProgressState.total) * 100));
   const seconds = manual
@@ -2911,6 +2937,98 @@ function updateNavPanel(turn) {
   panel.style.display = 'block';
 }
 
+// ---------------------------------------------------------------------------
+// Guia por voz. Que decir y cuando lo decide createVoiceGuide (pure.js); aca
+// solo se carga la voz y se reproduce. Las voces y frases estan en
+// voice/voices.json; cada voz es un paquete con un MP3 por frase
+// (tools/build_voice_packs.py). Turco no tiene voz con licencia libre: lee el
+// mismo texto con la voz del sistema, que en estas frases no tiene nombres
+// que pronunciar mal (por eso se habia sacado la voz anterior, 18-09).
+// ---------------------------------------------------------------------------
+const voiceGuide = createVoiceGuide();
+let voiceCatalog = null;
+let voiceCatalogLoading = null;
+const voicePacks = {}; // id -> promesa del paquete
+let voiceAudio = null;
+// WAV vacio: reproducirlo dentro del toque deja habilitado el audio en
+// Safari (iPhone/iPad), que si no rechaza play() fuera de un gesto. La voz
+// se carga por red despues, y eso ya no cuenta como gesto.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
+function loadVoiceCatalog() {
+  if (voiceCatalog) return Promise.resolve(voiceCatalog);
+  if (!voiceCatalogLoading) {
+    voiceCatalogLoading = fetch('voice/voices.json')
+      .then(r => (r.ok ? r.json() : null))
+      .then(c => { voiceCatalog = c; voiceCatalogLoading = null; return c; })
+      .catch(() => { voiceCatalogLoading = null; return null; });
+  }
+  return voiceCatalogLoading;
+}
+
+function currentVoice() {
+  return voiceCatalog ? pickVoice(voiceCatalog.voices, currentLang, voiceByLang[currentLang]) : null;
+}
+
+function loadVoicePack(voice) {
+  if (!voice || voice.system) return Promise.resolve(null);
+  if (!voicePacks[voice.id]) {
+    voicePacks[voice.id] = fetch(`voice/${voice.file}`)
+      .then(r => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then(p => { if (!p) delete voicePacks[voice.id]; return p; });
+  }
+  return voicePacks[voice.id];
+}
+
+function unlockVoice() {
+  try {
+    if (!voiceAudio) voiceAudio = new Audio();
+    voiceAudio.src = SILENT_WAV;
+    voiceAudio.play().catch(() => {});
+    if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+  } catch (e) { /* sin audio: la guia queda muda */ }
+}
+
+async function speakVoice(key) {
+  const catalog = await loadVoiceCatalog();
+  const voice = currentVoice();
+  if (!catalog || !voice) return;
+  if (voice.system) {
+    const text = (catalog.phrases[voice.phrases] || {})[key];
+    if (!text || !('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = voice.lang;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+    return;
+  }
+  const pack = await loadVoicePack(voice);
+  const src = pack && pack.clips && pack.clips[key];
+  if (!src) return;
+  if (!voiceAudio) voiceAudio = new Audio();
+  voiceAudio.src = src;
+  voiceAudio.play().catch(() => {});
+}
+
+function fillVoiceSelect() {
+  const sel = document.getElementById('setVoiceName');
+  if (!sel) return;
+  const own = voiceCatalog ? voiceCatalog.voices.filter(v => v.lang === currentLang) : [];
+  sel.innerHTML = own.map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.system ? t('settingsVoiceSystem') : v.label)}</option>`).join('');
+  const chosen = currentVoice();
+  if (chosen) sel.value = chosen.id;
+  sel.disabled = own.length < 2;
+}
+
+function voiceManeuverTick(turn) {
+  if (!voiceOn) return;
+  const key = voiceGuide.maneuver(turn, Math.abs(Number(lastData && lastData.speedKmh) || 0));
+  if (key) speakVoice(key);
+}
+
+if (voiceOn) loadVoiceCatalog().then(() => loadVoicePack(currentVoice()));
+
 // Zoom fijo en modo navegacion - el acercamiento automatico al doblar
 // (probado antes) generaba saltos molestos justo en intersecciones/enlaces,
 // que es donde mas importa ver el contexto completo, no menos. Fijo pero
@@ -3295,6 +3413,7 @@ function updateMap(position, game, gameHeadingDeg) {
   // Camara: un unico llamado por tick que combina centro+zoom+bearing segun
   // corresponda, en vez de varios llamados peleandose entre si.
   const turn = navMode ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
+  if (navMode) voiceManeuverTick(turn);
   if (navMode && !autoFollow) {
     // El usuario esta tocando el mapa (arrastrar, pellizcar, rotar): la
     // camara no se toca hasta que scheduleMapFollow vuelva a engancharla.

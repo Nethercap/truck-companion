@@ -116,6 +116,7 @@ GUIDE_TEXT.en = {
 <li><b>Job pay in your currency</b>, next to the game's € or $.</li>
 <li><b>Route line color</b>: red, blue or green.</li>
 <li><b>Map zoom in navigation mode</b>.</li>
+<li><b>Voice guidance</b>: in navigation mode, says each turn ahead of time and again at the turn, plus arrival, without road names. Two voices in English and Spanish; Turkish uses your device's voice.</li>
 <li><b>Remap keys</b> for the button box.</li>
 <li><b>Dashboard on another device</b>: copy its link.</li>
 <li><b>Trip history</b>: your deliveries, saved only on this device.</li>
@@ -308,6 +309,7 @@ GUIDE_TEXT.es = {
 <li><b>Pago del trabajo en tu moneda</b>, al lado de los € o $ del juego.</li>
 <li><b>Color de la línea de ruta</b>: rojo, azul o verde.</li>
 <li><b>Zoom del mapa en modo navegación</b>.</li>
+<li><b>Guía por voz</b>: en modo navegación, avisa cada giro con anticipación y otra vez en el giro, y la llegada, sin nombres de rutas. Dos voces en inglés y en español; en turco usa la voz de tu dispositivo.</li>
 <li><b>Remapear teclas</b> de la botonera.</li>
 <li><b>Tablero en otro dispositivo</b>: copiar el link.</li>
 <li><b>Historial de viajes</b>: tus entregas, guardadas solo en ese dispositivo.</li>

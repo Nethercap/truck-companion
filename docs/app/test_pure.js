@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
-  createPaceEta, createSessionStats, createDemoTelemetry } = require("./pure.js");
+  createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -816,4 +816,60 @@ test('fatiga: lo manejado sobre el intervalo de 11 h, con tope que crece si un m
   const m = createFatigue();
   assert.equal(m.push(840), 0);
   assert.equal(m.push(420), 50);
+});
+
+
+// ---------------------------------------------------------------- voz
+const giro = (dist, extra = {}) => ({ kind: 'turn', direction: 'right', distanceMeters: dist, node: [100, 200], ...extra });
+
+test('voz: aviso anticipado y en el punto, una sola vez cada uno, por tiempo', () => {
+  const v = createVoiceGuide();
+  // 90 km/h = 25 m/s: 800 m son 32 s, todavia nada
+  assert.equal(v.maneuver(giro(800), 90), null);
+  assert.equal(v.maneuver(giro(480), 90), 'soon_turn_right'); // 19 s
+  assert.equal(v.maneuver(giro(400), 90), null);              // ya avisado
+  assert.equal(v.maneuver(giro(140), 90), 'turn_right');      // 5,6 s
+  assert.equal(v.maneuver(giro(60), 90), null);
+});
+
+test('voz: la misma distancia es otro momento a otra velocidad', () => {
+  // 300 m a 90 km/h son 12 s (anticipado); a 30 km/h son 36 s (nada todavia)
+  assert.equal(createVoiceGuide().maneuver(giro(300), 90), 'soon_turn_right');
+  assert.equal(createVoiceGuide().maneuver(giro(300), 30), null);
+});
+
+test('voz: parado antes de doblar igual avisa (velocidad minima)', () => {
+  const v = createVoiceGuide();
+  assert.equal(v.maneuver(giro(25), 0), 'turn_right'); // 25 m / 5 m/s = 5 s
+});
+
+test('voz: si la maniobra aparece cerca, no hay aviso anticipado pegado al del punto', () => {
+  const v = createVoiceGuide();
+  assert.equal(v.maneuver(giro(220), 90), null);            // 8,8 s: entre 6 y 10, se calla
+  assert.equal(v.maneuver(giro(140), 90), 'turn_right');
+});
+
+test('voz: bifurcacion dice "keep"; un cruce nuevo vuelve a avisar', () => {
+  const v = createVoiceGuide();
+  assert.equal(v.maneuver(giro(100, { kind: 'fork', direction: 'left' }), 90), 'keep_left');
+  assert.equal(v.maneuver(giro(450, { node: [900, 900] }), 90), 'soon_turn_right');
+  assert.equal(v.maneuver(null, 90), null);
+});
+
+test('voz: llegada una vez por destino, y no al tomar un trabajo ya en la empresa', () => {
+  const v = createVoiceGuide();
+  assert.equal(v.arrival('job1|dest', 'dest', 5, 120), null);
+  assert.equal(v.arrival('job1|dest', 'dest', 0.2, 120), 'arrive_dest');
+  assert.equal(v.arrival('job1|dest', 'dest', 0.1, 120), null);
+  assert.equal(v.arrival('job2|pickup', 'pickup', 0.1, 0.4), null); // ruta de 400 m: ya estaba ahi
+  assert.equal(v.arrival('job3|pickup', 'pickup', 0.2, 30), 'arrive_pickup');
+  assert.equal(v.arrival('wp', 'waypoint', 0, 30), null);
+});
+
+test('voz: elige la guardada del idioma, si no la primera, y null sin voces', () => {
+  const voices = [{ id: 'en-a', lang: 'en' }, { id: 'en-b', lang: 'en' }, { id: 'es-a', lang: 'es' }];
+  assert.equal(pickVoice(voices, 'en', 'en-b').id, 'en-b');
+  assert.equal(pickVoice(voices, 'en', 'es-a').id, 'en-a');
+  assert.equal(pickVoice(voices, 'en', null).id, 'en-a');
+  assert.equal(pickVoice(voices, 'pl', null), null);
 });

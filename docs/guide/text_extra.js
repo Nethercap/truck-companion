@@ -113,6 +113,7 @@ GUIDE_TEXT.de = {
 <li><b>Auftragslohn in deiner Währung</b>, neben den € oder $ des Spiels.</li>
 <li><b>Farbe der Routenlinie</b>: Rot, Blau oder Grün.</li>
 <li><b>Kartenzoom im Navigationsmodus</b>.</li>
+<li><b>Sprachansagen</b>: im Navigationsmodus wird jede Abbiegung vorher und an der Abbiegung angesagt, dazu die Ankunft, ohne Straßennamen.</li>
 <li><b>Tasten belegen</b> für das Tastenfeld.</li>
 <li><b>Armaturenbrett auf einem anderen Gerät</b>: den Link kopieren.</li>
 <li><b>Fahrtenverlauf</b>: deine Lieferungen, nur auf diesem Gerät gespeichert.</li>
@@ -305,6 +306,7 @@ GUIDE_TEXT.fr = {
 <li><b>Paie dans ta devise</b>, à côté des € ou $ du jeu.</li>
 <li><b>Couleur de l'itinéraire</b> : rouge, bleu ou vert.</li>
 <li><b>Zoom de la carte en mode navigation</b>.</li>
+<li><b>Guidage vocal</b> : en mode navigation, annonce chaque virage à l’avance puis au virage, ainsi que l’arrivée, sans noms de routes.</li>
 <li><b>Réassigner les touches</b> de la boîte à boutons.</li>
 <li><b>Tableau de bord sur un autre appareil</b> : copier son lien.</li>
 <li><b>Historique des trajets</b> : tes livraisons, enregistrées uniquement sur cet appareil.</li>
@@ -497,6 +499,7 @@ GUIDE_TEXT.pt = {
 <li><b>Pagamento na sua moeda</b>, ao lado do € ou $ do jogo.</li>
 <li><b>Cor da linha da rota</b>: vermelho, azul ou verde.</li>
 <li><b>Zoom do mapa no modo navegação</b>.</li>
+<li><b>Orientação por voz</b>: no modo navegação, avisa cada curva com antecedência e de novo na curva, além da chegada, sem nomes de estradas.</li>
 <li><b>Remapear teclas</b> da botoeira.</li>
 <li><b>Painel em outro aparelho</b>: copiar o link.</li>
 <li><b>Histórico de viagens</b>: suas entregas, salvas só neste aparelho.</li>
@@ -689,6 +692,7 @@ GUIDE_TEXT.pl = {
 <li><b>Zapłata w twojej walucie</b>, obok € lub $ z gry.</li>
 <li><b>Kolor linii trasy</b>: czerwony, niebieski lub zielony.</li>
 <li><b>Przybliżenie mapy w trybie nawigacji</b>.</li>
+<li><b>Wskazówki głosowe</b>: w trybie nawigacji zapowiadają każdy skręt z wyprzedzeniem i ponownie przy skręcie, a także przyjazd, bez nazw dróg.</li>
 <li><b>Zmień klawisze</b> przycisków ciężarówki.</li>
 <li><b>Deska rozdzielcza na innym urządzeniu</b>: skopiuj link.</li>
 <li><b>Historia tras</b>: twoje dostawy, zapisane tylko na tym urządzeniu.</li>
@@ -881,6 +885,7 @@ GUIDE_TEXT.tr = {
 <li><b>Kendi para biriminde ücret</b>, oyunun € veya $ değerinin yanında.</li>
 <li><b>Rota çizgisi rengi</b>: kırmızı, mavi veya yeşil.</li>
 <li><b>Navigasyon modunda harita yakınlaştırması</b>.</li>
+<li><b>Sesli yönlendirme</b>: navigasyon modunda her dönüşü önceden ve dönüşte tekrar, ayrıca varışı, yol adları olmadan söyler. Türkçede cihazının sesini kullanır.</li>
 <li>Düğme kutusu için <b>Tuş ata</b>.</li>
 <li><b>Başka bir cihazda gösterge paneli</b>: bağlantısını kopyala.</li>
 <li><b>Yolculuk geçmişi</b>: teslimatların, yalnızca bu cihazda saklanır.</li>
@@ -1073,6 +1078,7 @@ GUIDE_TEXT.ru = {
 <li><b>Оплата в вашей валюте</b> рядом с € или $ из игры.</li>
 <li><b>Цвет линии маршрута</b>: красный, синий или зелёный.</li>
 <li><b>Масштаб карты в режиме навигации</b>.</li>
+<li><b>Голосовые подсказки</b>: в режиме навигации заранее и в момент поворота сообщают о каждом повороте, а также о прибытии, без названий дорог.</li>
 <li><b>Назначить клавиши</b> для кнопок грузовика.</li>
 <li><b>Панель приборов на другом устройстве</b>: скопировать ссылку.</li>
 <li><b>История рейсов</b>: ваши доставки, хранятся только на этом устройстве.</li>
