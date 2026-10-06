@@ -225,6 +225,9 @@
       tripTop: (v) => 'top ' + v,
       tripFuel: 'Fuel',
       tripTolls: 'Tolls',
+      tripPenalty: 'Cancellation penalty',
+      tripOffered: 'Offered',
+      statsPenalties: 'Cancellation penalties',
       tripFines: 'Fines',
       tripFerries: 'Ferries',
       tripDamage: 'Damage',
@@ -465,6 +468,9 @@
       tripTop: (v) => 'maxima ' + v,
       tripFuel: 'Combustible',
       tripTolls: 'Peajes',
+      tripPenalty: 'Penalidad por cancelar',
+      tripOffered: 'Ofrecido',
+      statsPenalties: 'Penalidades por cancelar',
       tripFines: 'Multas',
       tripFerries: 'Ferries',
       tripDamage: 'Daño',
@@ -1227,7 +1233,8 @@
         t('statsEarned') + ' ' + plata(m.revenue, m.currency),
         m.tolls ? t('tripTolls') + ' ' + plata(m.tolls, m.currency) : null,
         m.fines ? t('tripFines') + ' ' + plata(m.fines, m.currency) : null,
-        m.ferries ? t('tripFerries') + ' ' + plata(m.ferries, m.currency) : null
+        m.ferries ? t('tripFerries') + ' ' + plata(m.ferries, m.currency) : null,
+        m.penalties ? t('statsPenalties') + ' ' + plata(m.penalties, m.currency) : null
       ]));
     });
     // Por que la plata no cierra con la cantidad de viajes.
@@ -1788,7 +1795,7 @@
       'company_src', 'company_dst', 'cargo', 'cargo_mass', 'distance_planned_km',
       'distance_game_km', 'distance_tracked_km', 'game_hours', 'total_game_hours',
       'sleep_hours', 'real_hours', 'revenue', 'currency', 'modded', 'fuel_used', 'tolls',
-      'fines', 'ferries', 'damage_delta', 'on_time', 'truck_brand', 'truck_name',
+      'fines', 'ferries', 'cancel_penalty', 'damage_delta', 'on_time', 'truck_brand', 'truck_name',
       'countries', 'note', 'trimmed'];
     const celdaCsv = (valor) => {
       if (valor == null) return '';
@@ -1940,6 +1947,20 @@
     return null;
   }
 
+  // Lo que se cobro, o lo que costo. Un viaje cancelado no cobro el pago
+  // ofrecido: mostrarlo en la columna se leia como plata ganada (Atenas ->
+  // Pristina, 34.790 EUR, cuando cancelar costo 12.000). En curso se muestra
+  // lo ofrecido, que es lo que se va a cobrar.
+  function celdaPago(fila, v) {
+    if (v.status === 'cancelled' || v.status === 'abandoned') {
+      const td = celda(fila, v.cancel_penalty ? '\u2212' + plata(v.cancel_penalty, v.currency) : '',
+                       'num negativo');
+      if (v.cancel_penalty) td.title = t('tripPenalty');
+      return td;
+    }
+    return celda(fila, v.revenue ? plata(v.revenue, v.currency) : '', 'num');
+  }
+
   function celda(fila, texto, clase) {
     const td = document.createElement('td');
     if (clase) td.className = clase;
@@ -2012,7 +2033,7 @@
       celda(fila, [v.truck_brand, v.truck_name].filter(Boolean).join(' '), 'oculto-movil camion');
       celda(fila, distanciaEnTabla(v), 'num');
       celda(fila, duracion(v.real_hours) || '', 'num');
-      celda(fila, v.revenue ? plata(v.revenue, v.currency) : '', 'num');
+      celdaPago(fila, v);
 
       // En el perfil publico no se abre el detalle: el recorrido es por
       // donde pasaste, y un perfil publico no lo da punto a punto.
@@ -2036,7 +2057,10 @@
         td.appendChild(panelDetalle(v));
         // Lo que el viaje costo aparte del sueldo. Si no se muestra nunca,
         // nadie se entera de que un dia deja de llegar.
+        const sinCobrar = v.status === 'cancelled' || v.status === 'abandoned';
         sumar(td, renglon([
+          sinCobrar && v.cancel_penalty ? t('tripPenalty') + ' ' + plata(v.cancel_penalty, v.currency) : null,
+          sinCobrar && v.revenue ? t('tripOffered') + ' ' + plata(v.revenue, v.currency) : null,
           v.fuel_used ? t('tripFuel') + ' ' + volumen(v.fuel_used) : null,
           v.tolls ? t('tripTolls') + ' ' + plata(v.tolls, v.currency) : null,
           v.fines ? t('tripFines') + ' ' + plata(v.fines, v.currency) : null,

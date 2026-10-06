@@ -298,6 +298,7 @@ table.viajes tr.fila { cursor: pointer; }
 table.viajes tr.fila:hover td { background: #1b1f25; }
 table.viajes tr.fila.abierta td { background: #1d232b; border-bottom-color: transparent; }
 table.viajes .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.viajes .negativo { color: var(--danger); }
 table.viajes .camion { white-space: nowrap; }
 /* Una etiqueta partida en dos renglones ("driving / now") no se lee. */
 .tag { white-space: nowrap; }
