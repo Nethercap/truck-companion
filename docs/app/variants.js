@@ -1,6 +1,6 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-10-05.
+// Fuente: manifest del 2026-10-06.
 const MAP_DATA_VERSION = {
   "ats": "20260929",
   "ats_c2c": "20261005",
@@ -13,7 +13,7 @@ const MAP_DATA_VERSION = {
   "ets2_promods_rusmap": "20260929",
   "ets2_promods_roex": "20260929",
   "ets2_promods_rusmap_roex": "20260929",
-  "ets2_gu": "20260929",
+  "ets2_gu": "20261006",
   "ets2_eugu": "20261005",
   "ets2_promods_eugu": "20261005",
   "ets2_tmp": "20260929"

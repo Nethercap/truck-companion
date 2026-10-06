@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-06T16:43:25Z",
+  "checkedAt": "2026-10-06T17:16:56Z",
   "mods": {
     "c2c": {
       "ours": "2.24.61.0",
@@ -100,9 +100,9 @@
       "source": null
     },
     "grand_utopia": {
-      "ours": "1.20c",
+      "ours": "1.20d",
       "upstream": "1.20d",
-      "status": "outdated",
+      "status": "ok",
       "error": null,
       "source": "https://truckymods.io/euro-truck-simulator-2/maps/grand-utopia-map"
     },
@@ -467,31 +467,31 @@
       "files": {
         "vector/ets2_gu.pmtiles": {
           "ok": true,
-          "bytes": 8685181,
-          "lastModified": "Mon, 21 Sep 2026 14:41:38 GMT"
+          "bytes": 8690986,
+          "lastModified": "Tue, 06 Oct 2026 17:16:46 GMT"
         },
         "ets2_gu/route-graph-ets2_gu-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:16 GMT"
+          "lastModified": "Tue, 06 Oct 2026 17:16:37 GMT"
         },
         "ets2_gu/route-graph-ets2_gu.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:45 GMT"
+          "lastModified": "Tue, 06 Oct 2026 17:16:41 GMT"
         },
         "ets2_gu/Cities.json": {
           "ok": true,
           "bytes": 9119,
-          "lastModified": "Thu, 24 Sep 2026 12:07:17 GMT"
+          "lastModified": "Tue, 06 Oct 2026 17:16:37 GMT"
         },
         "ets2_gu/road-names.json": {
           "ok": true,
-          "bytes": 461832,
-          "lastModified": "Thu, 24 Sep 2026 12:07:14 GMT"
+          "bytes": 459796,
+          "lastModified": "Tue, 06 Oct 2026 17:16:37 GMT"
         }
       },
-      "totalBytes": 9156132,
+      "totalBytes": 9159901,
       "allOk": true
     },
     "ets2_eugu": {
