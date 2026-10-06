@@ -2026,7 +2026,10 @@ function distanceToRouteMeters(x, z) {
   return best;
 }
 
-const ROUTE_GRAPH_V3_REV = 2;
+// Se sube al resubir solo los grafos v3 (no mapDataVersion, que haria bajar
+// de nuevo los tiles). 3 = 06-10: cada sentido de un prefab por separado
+// (los giros a la izquierda en un trebol iban por la rampa al reves).
+const ROUTE_GRAPH_V3_REV = 3;
 
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
