@@ -16,6 +16,7 @@
     --blue: #3b9eff;
     --orange: #ff8a3d;
     --danger: #ff4d4d;
+    --ok: #7ee29a;
   }
   * { box-sizing: border-box; }
   body {
@@ -34,31 +35,49 @@
     background: var(--blue); color: #fff; cursor: pointer;
   }
   button:hover { opacity: 0.9; }
-  #status { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
-  #status.err { color: var(--danger); }
-  .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  button:disabled { opacity: 0.35; cursor: default; }
+  .status { font-size: 0.85rem; color: var(--muted); margin: 0.2rem 0 1rem; }
+  .status.err { color: var(--danger); }
+  .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0.8rem 0 1.2rem; }
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
     padding: 1rem 1.4rem; min-width: 160px;
   }
   .card .label { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.3rem; }
   .card .value { font-size: 1.6rem; font-weight: 700; color: var(--orange); }
-  h2 { font-size: 0.95rem; margin: 1.5rem 0 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .card .value.small { font-size: 1.1rem; }
+  .card .value.warn { color: var(--danger); }
+  .card .sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  /* Secciones que se minimizan: <details>, y se recuerda cuales quedaron
+     cerradas (localStorage, por navegador). */
+  details.sec { border: 1px solid var(--border); border-radius: 10px; margin: 0 0 1rem; background: #0e1014; }
+  details.sec > summary {
+    list-style: none; cursor: pointer; padding: 0.7rem 1rem; font-size: 0.95rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; display: flex; gap: 0.6rem; align-items: center;
+  }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary::before { content: '▸'; transition: transform 0.15s; }
+  details.sec[open] > summary::before { transform: rotate(90deg); }
+  details.sec > summary .note { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 0.8rem; }
+  details.sec > .body { padding: 0 1rem 1rem; }
+  h3 { font-size: 0.8rem; margin: 1.2rem 0 0.5rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--panel); border-radius: 8px; overflow: hidden; }
   th, td { padding: 0.5rem 0.7rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
   tbody tr:last-child td { border-bottom: none; }
   .tableWrap { overflow-x: auto; }
-  #content { display: none; }
+  .pager { display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end; margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); }
+  .pager button { padding: 0.2rem 0.6rem; font-size: 0.8rem; background: var(--panel-alt); border: 1px solid var(--border); }
+  .pager[hidden] { display: none; }
   .pill { display: inline-block; font-size: 0.72rem; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
-  .pill.ok { background: #16351f; color: #7ee29a; }
-  .pill.outdated { background: #3a2a10; color: #ffb020; }
-  .pill.unknown, .pill.manual { background: #2a2d33; color: var(--muted); }
+  .pill.ok, .pill.delivered { background: #16351f; color: var(--ok); }
+  .pill.outdated, .pill.in_progress { background: #3a2a10; color: #ffb020; }
+  .pill.unknown, .pill.manual, .pill.abandoned { background: #2a2d33; color: var(--muted); }
   .pill.planned { background: #10253a; color: #7cc0ff; }
-  .pill.missing { background: #3a1414; color: #ff8080; }
-  td.muted { color: var(--muted); font-size: 0.78rem; white-space: normal; }
+  .pill.missing, .pill.cancelled { background: #3a1414; color: #ff8080; }
+  td.muted, .muted { color: var(--muted); font-size: 0.78rem; white-space: normal; }
   a { color: var(--blue); }
-  #mapData { margin-top: 2rem; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
@@ -68,81 +87,172 @@
     <button id="loadBtn">Load stats</button>
     <button id="forgetBtn" style="background:var(--panel-alt);border:1px solid var(--border);">Forget key</button>
   </div>
-  <div id="status">Enter the admin key to load stats.</div>
+  <div class="status" id="status">Enter the admin key to load stats.</div>
 
-  <div id="content">
-    <div class="cards">
-      <div class="card"><div class="label">Active sessions (live)</div><div class="value" id="cardActiveSessions">-</div></div>
-      <div class="card"><div class="label">Total sessions</div><div class="value" id="cardSessions">-</div></div>
-      <div class="card"><div class="label">Jobs delivered</div><div class="value" id="cardJobs">-</div></div>
-      <div class="card"><div class="label">Total revenue</div><div class="value" id="cardRevenue">-</div></div>
+  <!-- ------------------------------------------------ relay (en vivo) -->
+  <details class="sec" data-sec="relay" open id="relaySec" hidden>
+    <summary>Live relay</summary>
+    <div class="body">
+      <div class="cards">
+        <div class="card"><div class="label">Active sessions (live)</div><div class="value" id="cardActiveSessions">-</div></div>
+        <div class="card"><div class="label">Total sessions</div><div class="value" id="cardSessions">-</div></div>
+        <div class="card"><div class="label">Jobs delivered</div><div class="value" id="cardJobs">-</div></div>
+        <div class="card"><div class="label">Total revenue</div><div class="value" id="cardRevenue">-</div></div>
+      </div>
+      <h3>Sessions per day</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Date</th><th>Sessions</th></tr></thead>
+        <tbody id="dailySessionsBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="dailySessionsBody"></div>
+      <h3>Jobs delivered per day</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Date</th><th>Jobs</th></tr></thead>
+        <tbody id="dailyJobsBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="dailyJobsBody"></div>
+      <h3>Latest jobs</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Route</th><th>Truck</th><th>Cargo</th><th>Pay</th><th>Distance</th><th>Game</th></tr></thead>
+        <tbody id="latestJobsBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="latestJobsBody"></div>
     </div>
+  </details>
 
-    <h2>Sessions per day</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>Date</th><th>Sessions</th></tr></thead>
-      <tbody id="dailySessionsBody"></tbody>
-    </table></div>
-
-    <h2>Jobs delivered per day</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>Date</th><th>Jobs</th></tr></thead>
-      <tbody id="dailyJobsBody"></tbody>
-    </table></div>
-
-    <h2>Latest jobs</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>Route</th><th>Truck</th><th>Cargo</th><th>Pay</th><th>Distance</th><th>Game</th></tr></thead>
-      <tbody id="latestJobsBody"></tbody>
-    </table></div>
-  </div>
-
-  <!-- Datos de mapa: no necesita la admin key (lee JSON publicos del sitio y /version) -->
-  <div id="mapData">
-    <h2>Map data <span id="mapDataChecked" style="text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
-    <div class="cards">
-      <div class="card"><div class="label">Latest client (seeded)</div><div class="value" id="cardClientVersion">-</div></div>
-      <div class="card"><div class="label">Map data version</div><div class="value" id="cardMapVersion" style="font-size:1.1rem">-</div></div>
-      <div class="card"><div class="label">Data in R2 (these variants)</div><div class="value" id="cardR2Size" style="font-size:1.1rem">-</div></div>
+  <!-- ------------------------------------------------ cuentas -->
+  <!-- La API de cuentas tiene su propia ADMIN_KEY (Railway, servicio de la
+       API); con el mismo valor que la del relay, una sola clave sirve para
+       las dos secciones. -->
+  <details class="sec" data-sec="accounts" open id="accountsSec" hidden>
+    <summary>Accounts <span class="note" id="accountsNote"></span></summary>
+    <div class="body">
+      <div class="cards">
+        <div class="card"><div class="label">Users</div><div class="value" id="accUsers">-</div><div class="sub" id="accUsersSub"></div></div>
+        <div class="card"><div class="label">Client linked</div><div class="value" id="accLinked">-</div><div class="sub" id="accLogins"></div></div>
+        <div class="card"><div class="label">Driving now</div><div class="value" id="accDriving">-</div><div class="sub">checkpoint in the last 15 min</div></div>
+        <div class="card"><div class="label">Trips</div><div class="value" id="accTrips">-</div><div class="sub" id="accTripsSub"></div></div>
+        <div class="card"><div class="label">Km delivered</div><div class="value small" id="accKm">-</div><div class="sub" id="accSessions"></div></div>
+        <div class="card"><div class="label">Emails, last 24 h</div><div class="value small" id="accMails">-</div><div class="sub">Resend free plan: 100 a day</div></div>
+      </div>
+      <h3>Per day</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Date</th><th>New users</th><th>Trips started</th><th>Delivered</th></tr></thead>
+        <tbody id="accDailyBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="accDailyBody"></div>
+      <h3>Latest trips</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Started</th><th>User</th><th>Game</th><th>Route</th><th>Status</th><th>Km</th><th>Pay</th><th>Map</th><th>Flags</th></tr></thead>
+        <tbody id="accTripsBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="accTripsBody"></div>
+      <h3>Latest users</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Username</th><th>Created</th><th>Last login</th><th>Sign-in</th><th>Client</th><th>Trips</th><th>Public</th></tr></thead>
+        <tbody id="accUsersBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="accUsersBody"></div>
     </div>
-    <h2>Mods</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>Mod</th><th>Game</th><th>Ours</th><th>Upstream</th><th>Status</th><th>Check</th></tr></thead>
-      <tbody id="modsBody"></tbody>
-    </table></div>
-    <h2>Published variants</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>Variant</th><th>Game</th><th>Mods</th><th>Built</th><th>Files</th><th>Size</th><th>R2</th></tr></thead>
-      <tbody id="variantsBody"></tbody>
-    </table></div>
-  </div>
+  </details>
+
+  <!-- ------------------------------------------------ mapas -->
+  <!-- No necesita la admin key: lee JSON publicos del sitio y /version. -->
+  <details class="sec" data-sec="maps" open>
+    <summary>Map data <span class="note" id="mapDataChecked"></span></summary>
+    <div class="body">
+      <div class="cards">
+        <div class="card"><div class="label">Latest client (seeded)</div><div class="value" id="cardClientVersion">-</div></div>
+        <div class="card"><div class="label">Map data version</div><div class="value small" id="cardMapVersion">-</div></div>
+        <div class="card"><div class="label">Data in R2 (these variants)</div><div class="value small" id="cardR2Size">-</div></div>
+      </div>
+      <h3>Mods</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Mod</th><th>Game</th><th>Ours</th><th>Upstream</th><th>Status</th><th>Check</th></tr></thead>
+        <tbody id="modsBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="modsBody"></div>
+      <h3>Published variants</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Variant</th><th>Game</th><th>Mods</th><th>Built</th><th>Files</th><th>Size</th><th>R2</th></tr></thead>
+        <tbody id="variantsBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="variantsBody"></div>
+    </div>
+  </details>
 
 <script>
 const STORAGE_KEY = 'truckdash_admin_key';
-const API_URL = 'https://truck-companion-production.up.railway.app/admin/stats';
+const SECTIONS_KEY = 'truckdash_admin_closed';
+const RELAY_URL = 'https://truck-companion-production.up.railway.app/admin/stats';
+const ACCOUNTS_URL = 'https://api.trucksim-dash.com/admin/stats';
+const PAGE = 10;
 
 const statusEl = document.getElementById('status');
 const keyInput = document.getElementById('adminKey');
-const content = document.getElementById('content');
+const $ = (id) => document.getElementById(id);
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+function fmt(n) { return (n || 0).toLocaleString(); }
+function fecha(iso) { return iso ? iso.slice(0, 16).replace('T', ' ') : '-'; }
 
-function renderDailyTable(bodyId, dailyObj) {
-  const entries = Object.entries(dailyObj || {}).sort((a, b) => b[0].localeCompare(a[0]));
-  document.getElementById(bodyId).innerHTML = entries.length
-    ? entries.map(([date, count]) => `<tr><td>${escapeHtml(date)}</td><td>${count}</td></tr>`).join('')
-    : '<tr><td colspan="2" style="color:var(--muted)">No data yet</td></tr>';
+// ---- secciones: se recuerda cuales quedaron cerradas ----
+function leerCerradas() {
+  try { return JSON.parse(localStorage.getItem(SECTIONS_KEY) || '[]'); } catch (e) { return []; }
 }
+document.querySelectorAll('details.sec').forEach((d) => {
+  if (leerCerradas().includes(d.dataset.sec)) d.open = false;
+  d.addEventListener('toggle', () => {
+    const cerradas = new Set(leerCerradas());
+    if (d.open) cerradas.delete(d.dataset.sec); else cerradas.add(d.dataset.sec);
+    try { localStorage.setItem(SECTIONS_KEY, JSON.stringify([...cerradas])); } catch (e) { /* sin storage */ }
+  });
+});
 
-function renderLatestJobs(jobs) {
-  const tbody = document.getElementById('latestJobsBody');
-  if (!jobs || !jobs.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">No data yet</td></tr>';
-    return;
-  }
-  tbody.innerHTML = jobs.map(j => `
+// ---- tablas paginadas de a 10 ----
+// Cada tabla tiene su <div class="pager" data-for="tbodyId">. Con 10 filas o
+// menos el paginador no se muestra.
+const paginas = {};
+function paginar(tbodyId, filas, vacio, columnas) {
+  paginas[tbodyId] = { filas, pagina: 0, vacio, columnas };
+  pintarPagina(tbodyId);
+}
+function pintarPagina(tbodyId) {
+  const p = paginas[tbodyId];
+  const total = Math.max(1, Math.ceil(p.filas.length / PAGE));
+  p.pagina = Math.min(Math.max(0, p.pagina), total - 1);
+  $(tbodyId).innerHTML = p.filas.length
+    ? p.filas.slice(p.pagina * PAGE, (p.pagina + 1) * PAGE).join('')
+    : `<tr><td colspan="${p.columnas}" style="color:var(--muted)">${p.vacio}</td></tr>`;
+  const pager = document.querySelector(`.pager[data-for="${tbodyId}"]`);
+  pager.hidden = p.filas.length <= PAGE;
+  pager.innerHTML = `<button data-d="-1" ${p.pagina === 0 ? 'disabled' : ''}>‹</button>` +
+    `<span>${p.pagina + 1} / ${total} · ${p.filas.length} rows</span>` +
+    `<button data-d="1" ${p.pagina >= total - 1 ? 'disabled' : ''}>›</button>`;
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.pager button');
+  if (!b) return;
+  const id = b.parentElement.dataset.for;
+  paginas[id].pagina += Number(b.dataset.d);
+  pintarPagina(id);
+});
+
+// ---- relay ----
+function filasDiarias(obj) {
+  return Object.entries(obj || {}).sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, count]) => `<tr><td>${escapeHtml(date)}</td><td>${count}</td></tr>`);
+}
+function pintarRelay(data) {
+  $('cardActiveSessions').textContent = fmt(data.active_sessions);
+  $('cardSessions').textContent = fmt(data.total_sessions);
+  $('cardJobs').textContent = fmt(data.jobs_delivered);
+  $('cardRevenue').textContent = `$${Math.round(data.total_revenue || 0).toLocaleString()}`;
+  paginar('dailySessionsBody', filasDiarias(data.daily), 'No data yet', 2);
+  paginar('dailyJobsBody', filasDiarias(data.daily_jobs), 'No data yet', 2);
+  paginar('latestJobsBody', (data.latest_jobs || []).map(j => `
     <tr>
       <td>${escapeHtml(j.citySrc || '?')} → ${escapeHtml(j.cityDst || '?')}</td>
       <td>${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
@@ -150,46 +260,92 @@ function renderLatestJobs(jobs) {
       <td>$${Math.round(j.revenue || 0).toLocaleString()}</td>
       <td>${Math.round(j.distanceKm || 0)} km</td>
       <td>${escapeHtml((j.game || '-').toUpperCase())}</td>
-    </tr>
-  `).join('');
+    </tr>`), 'No data yet', 6);
+  $('relaySec').hidden = false;
+}
+
+// ---- cuentas ----
+function pintarCuentas(d) {
+  const u = d.users, t = d.trips, st = t.by_status || {};
+  $('accUsers').textContent = fmt(u.total);
+  $('accUsersSub').textContent = `+${fmt(u.last_24h)} today · +${fmt(u.last_7d)} this week · ${fmt(u.public)} public`;
+  $('accLinked').textContent = fmt(u.client_linked);
+  $('accLogins').textContent = Object.entries(u.by_login || {}).filter(([, n]) => n).map(([p, n]) => `${p} ${n}`).join(' · ');
+  $('accDriving').textContent = fmt(t.driving_now);
+  $('accTrips').textContent = fmt(t.total);
+  $('accTripsSub').textContent = `${fmt(st.delivered)} delivered · ${fmt(st.in_progress)} in progress · ` +
+    `${fmt(st.cancelled)} cancelled · ${fmt(st.abandoned)} unfinished · +${fmt(t.last_24h)} today` +
+    (t.trimmed ? ` · ${fmt(t.trimmed)} trimmed` : '') + (t.modded ? ` · ${fmt(t.modded)} modded` : '');
+  $('accKm').textContent = `${fmt(Math.round(t.km_delivered))} km`;
+  $('accSessions').textContent = `${fmt(d.driving_sessions.total)} driving sessions · ${fmt(Math.round(d.driving_sessions.real_hours))} h`;
+  $('accMails').textContent = `${fmt(d.emails_last_24h)} / 100`;
+  $('accMails').classList.toggle('warn', d.emails_last_24h >= 80);
+
+  paginar('accDailyBody', (d.daily || []).map(x =>
+    `<tr><td>${escapeHtml(x.date)}</td><td>${x.users}</td><td>${x.trips}</td><td>${x.delivered}</td></tr>`),
+    'No data yet', 4);
+  paginar('accTripsBody', (d.latest_trips || []).map(v => `
+    <tr>
+      <td>${fecha(v.started_at)}</td>
+      <td>${escapeHtml(v.user || '—')}</td>
+      <td>${escapeHtml((v.game || '').toUpperCase())}</td>
+      <td>${escapeHtml(v.from || '?')} → ${escapeHtml(v.to || '?')}</td>
+      <td><span class="pill ${escapeHtml(v.status)}">${escapeHtml(v.status)}</span></td>
+      <td>${fmt(Math.round(v.km))}</td>
+      <td>${v.revenue ? `${fmt(Math.round(v.revenue))} ${escapeHtml(v.currency || '')}` : '-'}</td>
+      <td class="muted">${escapeHtml(v.map || '-')}</td>
+      <td class="muted">${[v.modded && 'modded', v.trimmed && 'trimmed'].filter(Boolean).join(', ')}</td>
+    </tr>`), 'No trips yet', 9);
+  paginar('accUsersBody', (d.latest_users || []).map(x => `
+    <tr>
+      <td>${escapeHtml(x.username || '(no name yet)')}</td>
+      <td>${fecha(x.created_at)}</td>
+      <td>${fecha(x.last_login_at)}</td>
+      <td>${escapeHtml((x.logins || []).join(', '))}</td>
+      <td>${x.client_linked ? 'yes' : '-'}</td>
+      <td>${fmt(x.trips)}</td>
+      <td>${x.public ? 'yes' : '-'}</td>
+    </tr>`), 'No users yet', 7);
+  $('accountsNote').textContent = '';
+  $('accountsSec').hidden = false;
+}
+
+async function traer(url, key) {
+  const res = await fetch(url, { headers: { 'X-Admin-Key': key } });
+  if (res.status === 403) return { prohibido: true };
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return { datos: await res.json() };
 }
 
 async function loadStats() {
   const key = keyInput.value.trim();
-  if (!key) { statusEl.textContent = 'Enter the admin key to load stats.'; statusEl.className = ''; return; }
-
+  if (!key) { statusEl.textContent = 'Enter the admin key to load stats.'; statusEl.className = 'status'; return; }
   statusEl.textContent = 'Loading...';
-  statusEl.className = '';
-  try {
-    const res = await fetch(API_URL, { headers: { 'X-Admin-Key': key } });
-    if (res.status === 403) {
-      statusEl.textContent = 'Invalid admin key (403).';
-      statusEl.className = 'err';
-      content.style.display = 'none';
-      return;
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    localStorage.setItem(STORAGE_KEY, key);
-    statusEl.textContent = `Loaded at ${new Date().toLocaleTimeString()}.`;
-    statusEl.className = '';
-
-    document.getElementById('cardActiveSessions').textContent = (data.active_sessions || 0).toLocaleString();
-    document.getElementById('cardSessions').textContent = (data.total_sessions || 0).toLocaleString();
-    document.getElementById('cardJobs').textContent = (data.jobs_delivered || 0).toLocaleString();
-    document.getElementById('cardRevenue').textContent = `$${Math.round(data.total_revenue || 0).toLocaleString()}`;
-    renderDailyTable('dailySessionsBody', data.daily);
-    renderDailyTable('dailyJobsBody', data.daily_jobs);
-    renderLatestJobs(data.latest_jobs);
-    content.style.display = 'block';
-  } catch (err) {
-    statusEl.textContent = `Error: ${err.message}`;
-    statusEl.className = 'err';
-  }
+  statusEl.className = 'status';
+  const [relay, cuentas] = await Promise.allSettled([traer(RELAY_URL, key), traer(ACCOUNTS_URL, key)]);
+  const partes = [];
+  if (relay.status === 'fulfilled' && relay.value.datos) { pintarRelay(relay.value.datos); partes.push('relay ok'); }
+  else partes.push(relay.status === 'fulfilled' ? 'relay: invalid key (403)' : `relay: ${relay.reason.message}`);
+  if (cuentas.status === 'fulfilled' && cuentas.value.datos) { pintarCuentas(cuentas.value.datos); partes.push('accounts ok'); }
+  else partes.push(cuentas.status === 'fulfilled'
+    ? 'accounts: invalid key (403), set ADMIN_KEY in the accounts API to the same value'
+    : `accounts: ${cuentas.reason.message}`);
+  const algo = partes.some(p => p.endsWith(' ok'));
+  if (algo) { try { localStorage.setItem(STORAGE_KEY, key); } catch (e) { /* sin storage */ } }
+  statusEl.textContent = `${new Date().toLocaleTimeString()} · ${partes.join(' · ')}`;
+  statusEl.className = 'status' + (partes.every(p => p.endsWith(' ok')) ? '' : ' err');
 }
 
-document.getElementById('loadBtn').addEventListener('click', loadStats);
+$('loadBtn').addEventListener('click', loadStats);
+keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadStats(); });
+$('forgetBtn').addEventListener('click', () => {
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* sin storage */ }
+  keyInput.value = '';
+  $('relaySec').hidden = true;
+  $('accountsSec').hidden = true;
+  statusEl.textContent = 'Key forgotten. Enter the admin key to load stats.';
+  statusEl.className = 'status';
+});
 
 // ---- Datos de mapa (manifest + estado del checker semanal + /version) ----
 const PILL = { ok: 'up to date', outdated: 'OUTDATED', unknown: 'could not check', manual: 'check by hand', planned: 'planned', missing: 'missing files' };
@@ -202,43 +358,36 @@ async function loadMapData() {
       fetch('data/map-mods-status.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : { mods: {}, variants: {} }).catch(() => ({ mods: {}, variants: {} })),
       fetch('https://truck-companion-production.up.railway.app/version').then(r => r.json()).catch(() => null),
     ]);
-    document.getElementById('cardClientVersion').textContent = version ? version.latest_client_version : '-';
+    $('cardClientVersion').textContent = version ? version.latest_client_version : '-';
     const versions = [...new Set(Object.values(manifest.variants).map(v => v.mapDataVersion))];
-    document.getElementById('cardMapVersion').textContent = versions.join(', ');
+    $('cardMapVersion').textContent = versions.join(', ');
     const totalBytes = Object.values(status.variants || {}).reduce((a, v) => a + (v.totalBytes || 0), 0);
-    document.getElementById('cardR2Size').textContent = totalBytes ? mb(totalBytes) : '-';
-    document.getElementById('mapDataChecked').textContent = status.checkedAt ? `· checked ${status.checkedAt.replace('T', ' ').replace('Z', ' UTC')} (weekly)` : '· not checked yet';
+    $('cardR2Size').textContent = totalBytes ? mb(totalBytes) : '-';
+    $('mapDataChecked').textContent = status.checkedAt ? `· checked ${status.checkedAt.replace('T', ' ').replace('Z', ' UTC')} (weekly)` : '· not checked yet';
 
-    document.getElementById('modsBody').innerHTML = Object.entries(manifest.mods).map(([id, mod]) => {
+    paginar('modsBody', Object.entries(manifest.mods).map(([id, mod]) => {
       const st = (status.mods || {})[id] || { status: mod.check ? 'unknown' : 'manual' };
       const s = mod.version ? st.status : 'planned';
       const note = st.error || (mod.check && mod.check.note) || mod.checkNote || '';
       const source = st.source || (mod.check && mod.check.url) || mod.homepage;
       return `<tr><td><a href="${escapeHtml(mod.homepage)}" target="_blank" rel="noopener">${escapeHtml(mod.name)}</a></td><td>${escapeHtml((mod.game || '').toUpperCase())}</td><td>${escapeHtml(mod.version || '—')}</td><td>${escapeHtml(st.upstream || '?')}</td><td>${pill(s)}</td><td class="muted">${source ? `<a href="${escapeHtml(source)}" target="_blank" rel="noopener">source</a> · ` : ''}${escapeHtml(note)}</td></tr>`;
-    }).join('');
+    }), 'No mods', 6);
 
-    document.getElementById('variantsBody').innerHTML = Object.entries(manifest.variants).map(([id, v]) => {
+    paginar('variantsBody', Object.entries(manifest.variants).map(([id, v]) => {
       const st = (status.variants || {})[id];
       const mods = v.mods.map(m => `${manifest.mods[m]?.name || m} ${manifest.mods[m]?.version || ''}`.trim()).join(', ') || 'vanilla';
       const files = st ? Object.entries(st.files).map(([k, f]) => `${f.ok ? '✅' : '❌'} ${k.split('/').pop()}${f.lastModified ? ` (${new Date(f.lastModified).toISOString().slice(0, 10)})` : ''}`).join('<br>') : v.files.map(k => k.split('/').pop()).join('<br>');
       const r2 = v.planned ? pill('planned') : st ? pill(st.allOk ? 'ok' : 'missing') : pill('unknown');
       return `<tr><td><b>${escapeHtml(id)}</b><br><span class="muted">${escapeHtml(v.label)}${v.plannedNote ? `<br>${escapeHtml(v.plannedNote)}` : ''}</span></td><td>${escapeHtml(v.game.toUpperCase())} ${escapeHtml(v.gameVersion || '')}</td><td>${escapeHtml(mods)}</td><td>${escapeHtml(v.built || '-')}</td><td class="muted" style="white-space:nowrap">${files}</td><td>${st ? mb(st.totalBytes) : '-'}</td><td>${r2}</td></tr>`;
-    }).join('');
+    }), 'No variants', 7);
   } catch (err) {
-    document.getElementById('mapDataChecked').textContent = `· error: ${err.message}`;
+    $('mapDataChecked').textContent = `· error: ${err.message}`;
   }
 }
 loadMapData();
-keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadStats(); });
-document.getElementById('forgetBtn').addEventListener('click', () => {
-  localStorage.removeItem(STORAGE_KEY);
-  keyInput.value = '';
-  content.style.display = 'none';
-  statusEl.textContent = 'Key forgotten. Enter the admin key to load stats.';
-  statusEl.className = '';
-});
 
-const savedKey = localStorage.getItem(STORAGE_KEY);
+let savedKey = null;
+try { savedKey = localStorage.getItem(STORAGE_KEY); } catch (e) { /* sin storage */ }
 if (savedKey) {
   keyInput.value = savedKey;
   loadStats();
