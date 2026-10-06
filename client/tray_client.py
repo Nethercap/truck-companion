@@ -383,8 +383,61 @@ class SetupWindow:
         # principal. root.after() desde otro hilo no es seguro, y falla de
         # una forma que en un build sin consola no se ve nunca.
         self._cola = queue.Queue()
+        self._armar_scroll()
         self.build()
         self._bombear_cola()
+
+    # --- scroll ---
+    # Con la seccion de cuenta la ventana pasa los 1000 px, y en una laptop
+    # de 768 se cortaba abajo, justo los botones de actualizar y cerrar. Las
+    # secciones van en un marco con scroll; la barra de actualizacion y el pie
+    # quedan fijos abajo, siempre a la vista. Sin pantalla chica no hay barra.
+
+    def _armar_scroll(self):
+        self.abajo = tk.Frame(self.root, bg=BG)
+        self.abajo.pack(side="bottom", fill="x")
+        marco = tk.Frame(self.root, bg=BG)
+        marco.pack(side="top", fill="both", expand=True)
+        self._canvas = tk.Canvas(marco, bg=BG, highlightthickness=0, bd=0)
+        self._barra = tk.Scrollbar(marco, orient="vertical", command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=self._barra.set)
+        self._canvas.pack(side="left", fill="both", expand=True)
+        self.body = tk.Frame(self._canvas, bg=BG)
+        self._ventana_body = self._canvas.create_window((0, 0), window=self.body, anchor="nw")
+        # El contenido toma el ancho del canvas: el pie (fuera del scroll)
+        # puede ser mas ancho que las secciones, y quedaba una franja vacia.
+        self._canvas.bind("<Configure>", lambda e: self._canvas.itemconfigure(
+            self._ventana_body, width=e.width))
+        self.body.bind("<Configure>", self._ajustar_alto)
+        self.abajo.bind("<Configure>", self._ajustar_alto)
+        # La toplevel esta en los bindtags de todos sus widgets: la rueda
+        # funciona sobre cualquiera. Button-4/5 es la rueda en Linux.
+        self.root.bind("<MouseWheel>", lambda e: self._rueda(-1 if e.delta > 0 else 1))
+        self.root.bind("<Button-4>", lambda e: self._rueda(-1))
+        self.root.bind("<Button-5>", lambda e: self._rueda(1))
+
+    def _alto_disponible(self) -> int:
+        """Lo que entra en la pantalla, descontando barra de tareas y titulo."""
+        return self.root.winfo_screenheight() - 120
+
+    def con_scroll(self) -> bool:
+        return bool(self._barra.winfo_manager())
+
+    def _ajustar_alto(self, _evento=None):
+        ancho, alto = self.body.winfo_reqwidth(), self.body.winfo_reqheight()
+        tope = max(300, self._alto_disponible() - self.abajo.winfo_reqheight())
+        self._canvas.configure(width=ancho, height=min(alto, tope),
+                               scrollregion=(0, 0, ancho, alto))
+        if alto > tope:
+            if not self.con_scroll():
+                self._barra.pack(side="right", fill="y")
+        elif self.con_scroll():
+            self._barra.pack_forget()
+            self._canvas.yview_moveto(0)
+
+    def _rueda(self, pasos):
+        if self.con_scroll():
+            self._canvas.yview_scroll(pasos * 3, "units")
 
     def label(self, parent, text, **kw):
         opts = dict(bg=BG, fg=FG, anchor="w", justify="left")
@@ -398,13 +451,13 @@ class SetupWindow:
         return tk.Button(parent, text=text, **opts)
 
     def section(self, title):
-        frame = tk.Frame(self.root, bg=BG, padx=16, pady=8)
+        frame = tk.Frame(self.body, bg=BG, padx=16, pady=8)
         frame.pack(fill="x")
         self.label(frame, title, fg=ORANGE, font=("Segoe UI", 10, "bold")).pack(anchor="w")
         return frame
 
     def build(self):
-        header = tk.Frame(self.root, bg=BG, padx=16, pady=12)
+        header = tk.Frame(self.body, bg=BG, padx=16, pady=12)
         header.pack(fill="x")
         self.label(header, "Truck Dash", font=("Segoe UI", 16, "bold")).pack(side="left")
         self.label(header, T("tagline"), fg=MUTED).pack(side="left")
@@ -507,7 +560,7 @@ class SetupWindow:
 
         # --- Update ---
         # --- Update ---
-        self.update_frame = tk.Frame(self.root, bg="#1f2a3a", padx=16, pady=8)
+        self.update_frame = tk.Frame(self.abajo, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
         self.update_label.pack(side="left")
         # Con winget el .exe no se pisa solo (ver installed_by_winget): el
@@ -519,7 +572,7 @@ class SetupWindow:
             self.update_button = self.button(self.update_frame, T("update_now"), self.do_update, primary=True)
         self.update_button.pack(side="right")
 
-        footer = tk.Frame(self.root, bg=BG, padx=16, pady=12)
+        footer = self.footer = tk.Frame(self.abajo, bg=BG, padx=16, pady=12)
         footer.pack(fill="x")
         self.button(footer, T("check_updates"), self.check_updates).pack(side="left")
         self.button(footer, T("show_log"), lambda: show_log_location(None, None)).pack(side="left", padx=6)
@@ -935,7 +988,7 @@ class SetupWindow:
                                                        cmd=win_integration.winget_upgrade_command()))
                 else:
                     self.update_label.configure(text=T("update_available", new=version, cur=client_lib.CLIENT_VERSION))
-                self.update_frame.pack(fill="x", before=self.root.winfo_children()[-1])
+                self.update_frame.pack(fill="x", before=self.footer)
         try:
             self.root.after(500, self.refresh_status)
         except tk.TclError:

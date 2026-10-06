@@ -687,3 +687,34 @@ def test_apagadas_desde_el_relay_setup_no_muestra_la_cuenta(monkeypatch, raiz):
         assert tray_client.anunciar_cuentas(type("I", (), {"notify": lambda *a: None})()) is False
     finally:
         v.root.destroy()
+
+
+def test_en_una_pantalla_chica_hay_scroll_y_el_pie_queda_a_la_vista(monkeypatch, raiz):
+    """Con la cuenta, la ventana pasa los 1000 px: en una laptop de 768 se
+    cortaban justo los botones de abajo."""
+    monkeypatch.setattr(tk, "Tk", lambda: tk.Toplevel(raiz))
+    monkeypatch.setattr(tray_client.win_integration, "load_settings", lambda: {})
+    monkeypatch.setattr(plugin_installer, "find_game_installs", lambda: [])
+    monkeypatch.setattr(tray_client.SetupWindow, "_alto_disponible", lambda self: 600)
+    v = tray_client.SetupWindow()
+    try:
+        v.root.update()
+        assert v.con_scroll()
+        assert int(v._canvas.cget("height")) <= 600
+        # El pie no esta adentro de lo que se scrollea.
+        assert v.footer.master is v.abajo
+    finally:
+        v.root.destroy()
+
+
+def test_en_una_pantalla_grande_no_hay_barra(monkeypatch, raiz):
+    monkeypatch.setattr(tk, "Tk", lambda: tk.Toplevel(raiz))
+    monkeypatch.setattr(tray_client.win_integration, "load_settings", lambda: {})
+    monkeypatch.setattr(plugin_installer, "find_game_installs", lambda: [])
+    monkeypatch.setattr(tray_client.SetupWindow, "_alto_disponible", lambda self: 3000)
+    v = tray_client.SetupWindow()
+    try:
+        v.root.update()
+        assert not v.con_scroll()
+    finally:
+        v.root.destroy()
