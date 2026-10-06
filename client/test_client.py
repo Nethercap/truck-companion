@@ -961,3 +961,18 @@ def test_european_grand_utopia_no_es_el_standalone():
     assert banderas["eu_grand_utopia"] and banderas["promods"]
     solo = [{"file": "GU - Grand Utopia (v1.20d).scs", "name": "Grand Utopia"}]
     assert client.detect_map_mods(solo)["eu_grand_utopia"] is False
+
+
+
+def test_active_mod_names_sin_repetidos_recortados_y_con_tope():
+    mods = [
+        {"file": "mapa_sudamerica_v3", "name": "Mapa  Sudamérica", "version": "3.0", "author": "Alguien"},
+        {"file": "otro", "name": "Mapa Sudamérica"},
+        {"file": "solo_archivo", "name": None},
+        {"file": "x", "name": "y" * 200},
+    ]
+    nombres = client.active_mod_names(mods)
+    assert nombres == ["Mapa Sudamérica", "solo_archivo", "y" * client.ACTIVE_MOD_NAME_LEN]
+    assert client.active_mod_names(None) is None
+    muchos = [{"name": f"mod {i}"} for i in range(client.ACTIVE_MOD_NAMES_MAX + 20)]
+    assert len(client.active_mod_names(muchos)) == client.ACTIVE_MOD_NAMES_MAX

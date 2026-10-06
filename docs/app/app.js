@@ -358,6 +358,10 @@ let ets2Mod = _savedSettings.ets2Mod || (_savedSettings.hasProMods ? 'promods' :
 // las opciones manuales quedan como override o para clientes viejos.
 let modsAuto = _savedSettings.modsAuto !== false;
 let detectedMods = null;
+// Nombres de los mods activos por juego ({ets2: [...], ats: [...]}), del
+// client_status. Solo salen de aca si el camion queda fuera del mapa: van en
+// el reporte de "mapa que no conocemos" (sin nada que identifique a nadie).
+let detectedModNames = null;
 // Opt-in de "jugadores en vivo": reciprocidad simple (no compartis -> no ves
 // a nadie), decidido asi porque no hay cuentas ni consentimiento granular.
 // hideOtherPlayers es aparte y solo local (no le dice nada al backend) -
@@ -495,6 +499,17 @@ function sendLiveShareState() {
     saveSettings(); // persiste liveShareV2: el aviso es una sola vez
     showToast(t('liveShareNotice'), 'info', 12000);
   }
+}
+
+// Mapa que no conocemos: una vez por mapa y sesion (el relay tambien lo
+// limita), la variante, la posicion redondeada y los nombres de los mods
+// activos de ese juego. El panel de admin los cuenta: el mod de mapa sale
+// arriba porque esta en todos los reportes de esa zona.
+function sendOffMapReport(x, z) {
+  if (!ws || ws.readyState !== WebSocket.OPEN || conn.demo || conn.spectator || conn.local) return;
+  const game = lastData && lastData.game;
+  const mods = detectedModNames && game && Array.isArray(detectedModNames[game]) ? detectedModNames[game] : null;
+  ws.send(JSON.stringify({ type: 'offmap_report', variant: currentGame, x: Math.round(x), z: Math.round(z), mods }));
 }
 
 // Ruta propia al mapa en vivo publico (/live/): la misma que se dibuja aca,
@@ -3445,6 +3460,7 @@ function updateMap(position, game, gameHeadingDeg) {
     offMapWarnedFor = currentGame;
     const label = (typeof GAME_MAPS !== 'undefined' && GAME_MAPS[currentGame] && GAME_MAPS[currentGame].label) || currentGame;
     showToast(t('offMapNotice').replace('{map}', label), 'info', 20000);
+    sendOffMapReport(position.x, position.z);
   }
   checkWaypointReached(position.x, position.z);
   updateCurrentRoad(position.x, position.z);
@@ -4685,6 +4701,7 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'client_status') {
       conn.clientConnected = true;
       conn.clientStatus = data; // incluye .detail si el cliente lo manda
+      if (data.activeMods !== undefined) detectedModNames = data.activeMods;
       if (data.mapMods !== undefined && JSON.stringify(data.mapMods) !== JSON.stringify(detectedMods)) {
         detectedMods = data.mapMods;
         if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada

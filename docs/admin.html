@@ -124,6 +124,14 @@
         <tbody id="latestJobsBody"></tbody>
       </table></div>
       <div class="pager" data-for="latestJobsBody"></div>
+      <!-- Mapas que no conocemos: reportes de camiones fuera del mapa de su
+           variante, con los mods activos. El mod de mapa sale arriba. -->
+      <h3>Maps we don't know</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Variant</th><th>Reports</th><th>Last</th><th>Area (x, z)</th><th>Most frequent mods</th></tr></thead>
+        <tbody id="offmapBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="offmapBody"></div>
     </div>
   </details>
 
@@ -284,6 +292,15 @@ function pintarRelay(data) {
       <td>${Math.round(j.distanceKm || 0)} km</td>
       <td>${escapeHtml((j.game || '-').toUpperCase())}</td>
     </tr>`), 'No data yet', 6);
+  paginar('offmapBody', Object.entries(data.offmap || {})
+    .sort((a, b) => b[1].reports - a[1].reports)
+    .map(([variant, v]) => {
+      const box = v.box ? `${fmt(Math.round((v.box[0] + v.box[1]) / 2))}, ${fmt(Math.round((v.box[2] + v.box[3]) / 2))}` : '-';
+      const mods = Object.entries(v.mods || {}).sort((a, b) => b[1] - a[1]).slice(0, 8)
+        .map(([n, c]) => `${escapeHtml(n)} <span class="muted">(${c})</span>`).join('<br>');
+      const sin = v.noMods ? `<br><span class="muted">${v.noMods} without a mod list (TruckersMP or older client)</span>` : '';
+      return `<tr><td>${escapeHtml(variant)}</td><td>${fmt(v.reports)}</td><td>${escapeHtml(v.last || '-')}</td><td>${box}</td><td class="muted" style="white-space:normal">${mods || '-'}${sin}</td></tr>`;
+    }), 'No reports yet', 5);
   $('relaySec').hidden = false;
 }
 

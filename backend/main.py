@@ -144,6 +144,60 @@ def _save_stats():
         logging.exception("Failed to persist session stats to R2")
 
 
+# Mapas que no conocemos: la web reporta cuando el camion queda fuera de la
+# caja del mapa de su variante (un mod de mapa sin variante, como los de
+# Sudamerica para ETS2), con los nombres de los mods activos. Se acumula por
+# variante: cuantos reportes, la zona (caja de las posiciones) y cuantas
+# veces aparece cada mod. El mod de mapa sale arriba solo. Sin codigo de
+# emparejamiento ni nada que identifique a la persona.
+OFFMAP_MODS_PER_REPORT = 150
+OFFMAP_MOD_NAME_LEN = 80
+OFFMAP_MODS_KEPT = 300
+
+
+def clean_offmap_report(payload: dict) -> Optional[dict]:
+    variant = payload.get("variant")
+    if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
+        return None
+    try:
+        x, z = float(payload.get("x")), float(payload.get("z"))
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(x) and math.isfinite(z)):
+        return None
+    mods = payload.get("mods")
+    nombres = None
+    if isinstance(mods, list):
+        nombres = []
+        for m in mods[:OFFMAP_MODS_PER_REPORT]:
+            if isinstance(m, str):
+                n = " ".join(m.split())[:OFFMAP_MOD_NAME_LEN]
+                if n and n not in nombres:
+                    nombres.append(n)
+    return {"variant": variant, "x": round(x), "z": round(z), "mods": nombres}
+
+
+def record_offmap_report(report: dict):
+    with _stats_lock:
+        stats = _load_stats()
+        todo = stats.setdefault("offmap", {})
+        v = todo.setdefault(report["variant"], {"reports": 0, "noMods": 0, "box": None, "mods": {}})
+        v["reports"] += 1
+        v["last"] = time.strftime("%Y-%m-%d", time.gmtime())
+        x, z = report["x"], report["z"]
+        b = v.get("box")
+        v["box"] = [x, x, z, z] if not b else [min(b[0], x), max(b[1], x), min(b[2], z), max(b[3], z)]
+        if report["mods"] is None:
+            v["noMods"] += 1
+        else:
+            for n in report["mods"]:
+                v["mods"][n] = v["mods"].get(n, 0) + 1
+            if len(v["mods"]) > OFFMAP_MODS_KEPT:
+                # los que aparecen una vez y nada mas son ruido (camiones, sonidos)
+                v["mods"] = dict(sorted(v["mods"].items(), key=lambda kv: -kv[1])[:OFFMAP_MODS_KEPT])
+        _save_stats()
+
+
 def record_session_started():
     with _stats_lock:
         stats = _load_stats()
@@ -486,6 +540,9 @@ class Session:
         # posiciones, solo cuando cambia (rev), como la del convoy.
         self.live_route: Optional[list] = None
         self.live_route_rev = 0
+        # Variantes para las que esta sesion ya reporto "fuera del mapa":
+        # un reporte por variante y por sesion.
+        self.offmap_reported: set = set()
         # Ultimo estado de diagnostico reportado por el cliente local (mensaje
         # "client_status": waiting_game / plugin_missing / live / ...). Se
         # guarda para poder darselo a un viewer que se conecta despues, en vez
@@ -1612,6 +1669,12 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         session.live_route = nueva
                         session.live_route_rev += 1
                         live_route_push(session)
+                elif msg_type == "offmap_report":
+                    report = clean_offmap_report(payload)
+                    if report and report["variant"] not in session.offmap_reported:
+                        session.offmap_reported.add(report["variant"])
+                        # PUT a R2 bloqueante: en un thread, como las demas stats.
+                        asyncio.create_task(asyncio.to_thread(record_offmap_report, report))
                 elif msg_type == "set_currency":
                     cur = payload.get("currency")
                     session.viewer_currency = cur.upper() if is_valid_currency(cur) else None

@@ -241,6 +241,43 @@ def is_truckersmp_session(log_text: str) -> bool:
     return bool(_TMP_MOUNT_RE.search(log_text))
 
 
+ACTIVE_MOD_NAMES_MAX = 150
+ACTIVE_MOD_NAME_LEN = 80
+
+
+def active_mod_names(mods: list | None) -> list | None:
+    """Nombres de los mods activos, para reportar un mapa que no conocemos
+    (el camion fuera del mapa de su variante): el mod de mapa sale arriba
+    solo, porque esta en todos los reportes de esa zona. Sin autor ni
+    version; sin repetidos; hasta ACTIVE_MOD_NAMES_MAX. None si el log no
+    tiene la lista (por ejemplo en TruckersMP)."""
+    if mods is None:
+        return None
+    out = []
+    for m in mods:
+        nombre = " ".join(str(m.get("name") or m.get("file") or "").split())[:ACTIVE_MOD_NAME_LEN]
+        if nombre and nombre not in out:
+            out.append(nombre)
+        if len(out) >= ACTIVE_MOD_NAMES_MAX:
+            break
+    return out
+
+
+def read_active_mod_names() -> dict:
+    """{'ets2': [nombres] | None, 'ats': [...] | None}, del mismo
+    game.log.txt que read_map_mods."""
+    result = {}
+    for game, path in game_log_paths().items():
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+        except OSError:
+            result[game] = None
+            continue
+        result[game] = active_mod_names(parse_active_mods(text))
+    return result
+
+
 def read_map_mods() -> dict:
     """{'ets2': {...flags} | None, 'ats': {...} | None} - None = sin datos
     (el log no existe o no tiene lista de mods)."""

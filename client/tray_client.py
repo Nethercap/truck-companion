@@ -110,6 +110,9 @@ class AppState:
         self.status_detail: str | None = None  # diagnostico fino (ingles) cuando status == plugin_missing
         self.map_mods: dict | None = None  # {'ets2': {promods,..}|None, 'ats': {...}|None} leido de game.log.txt
         self.map_mods_read_at = 0.0
+        # Nombres de los mods activos por juego: la web los manda al relay
+        # solo si el camion queda fuera del mapa (un mapa que no conocemos).
+        self.active_mods: dict | None = None
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.vehicle = None  # "Marca Modelo" mientras esta en vivo, para el log
@@ -1258,6 +1261,7 @@ def status_message() -> str:
         "clientVersion": client_lib.CLIENT_VERSION,
         "detail": state.status_detail,
         "mapMods": state.map_mods,
+        "activeMods": state.active_mods,
     })
 
 
@@ -1273,6 +1277,13 @@ def refresh_map_mods(force: bool = False) -> bool:
     except Exception:
         logging.exception("read_map_mods failed")
         return False
+    try:
+        nombres = client_lib.read_active_mod_names()
+    except Exception:
+        logging.exception("read_active_mod_names failed")
+        nombres = state.active_mods
+    cambio_nombres = nombres != state.active_mods
+    state.active_mods = nombres
     if mods != state.map_mods:
         state.map_mods = mods
         logging.info("Map mods detected: %s", mods)
@@ -1280,7 +1291,7 @@ def refresh_map_mods(force: bool = False) -> bool:
         if getattr(state, "cuenta", None) is not None:
             state.cuenta.poner_mods(mods)
         return True
-    return False
+    return cambio_nombres
 
 
 class CloudLink:
@@ -1343,7 +1354,8 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
     async def publish_status():
         nonlocal last_status_sent
         refresh_map_mods()
-        key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True))
+        key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True),
+               json.dumps(state.active_mods, sort_keys=True))
         if key != last_status_sent:
             last_status_sent = key
             msg = status_message()

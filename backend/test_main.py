@@ -990,3 +990,40 @@ def test_live_route_llega_al_espectador_y_se_borra_al_dejar_de_compartir(client,
         viewer.send_text(main.json.dumps({"type": "live_route", "points": [[0, 0], [9, 9]]}))
         _time.sleep(0.05)
         assert session.live_route is None
+
+
+
+# --------------------------------------------------------- mapas que no conocemos
+
+def test_clean_offmap_report_valida_y_limpia(main):
+    r = main.clean_offmap_report({"variant": "ets2", "x": -659907.4, "z": 131729.6,
+                                  "mods": ["Mapa  Sudamerica", "Mapa Sudamerica", 7, "x" * 200]})
+    assert r == {"variant": "ets2", "x": -659907, "z": 131730,
+                 "mods": ["Mapa Sudamerica", "x" * main.OFFMAP_MOD_NAME_LEN]}
+    assert main.clean_offmap_report({"variant": "Bad!", "x": 1, "z": 1}) is None
+    assert main.clean_offmap_report({"variant": "ets2", "x": "nan", "z": 1}) is None
+    assert main.clean_offmap_report({"variant": "ets2", "x": 1, "z": 2})["mods"] is None
+
+
+def test_offmap_report_se_acumula_una_vez_por_sesion_y_variante(client, main, monkeypatch):
+    import time as _time
+    monkeypatch.setattr(main, "_stats_cache", {"total_sessions": 0, "daily": {}})
+    monkeypatch.setattr(main, "_save_stats", lambda: None)
+    code = client.post("/pair/new").json()["code"]
+    msg = {"type": "offmap_report", "variant": "ets2", "x": -660000, "z": 131000,
+           "mods": ["Mapa Sudamerica", "Scania sounds"]}
+    with client.websocket_connect(f"/ws/live/{code}") as ws:
+        ws.send_text(main.json.dumps(msg))
+        ws.send_text(main.json.dumps({**msg, "x": -650000}))  # repetido: no cuenta
+        _time.sleep(0.2)
+    code2 = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code2}") as ws:
+        ws.send_text(main.json.dumps({**msg, "x": -670000, "z": 132000, "mods": ["Mapa Sudamerica"]}))
+        ws.send_text(main.json.dumps({"type": "offmap_report", "variant": "ats", "x": 1, "z": 2}))
+        _time.sleep(0.2)
+    off = main._stats_cache["offmap"]
+    assert off["ets2"]["reports"] == 2
+    assert off["ets2"]["mods"] == {"Mapa Sudamerica": 2, "Scania sounds": 1}
+    assert off["ets2"]["box"] == [-670000, -660000, 131000, 132000]
+    assert off["ats"]["reports"] == 1 and off["ats"]["noMods"] == 1
+    assert code not in main.json.dumps(off) and code2 not in main.json.dumps(off)
