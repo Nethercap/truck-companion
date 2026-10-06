@@ -4679,8 +4679,12 @@ function startDemo() {
   // Sin tope, si los datos del mapa no llegaban la demo esperaba para
   // siempre sin decir nada.
   const giveUpAt = Date.now() + 30000;
+  // Los POIs dan las empresas de origen y destino; si tardan, la demo arranca
+  // igual entre los centros de las ciudades.
+  const poisUntil = Date.now() + 8000;
   const waitAssets = () => {
-    if (!mapReady || !routeGraph || !citiesByName[DEMO_ROUTE.from] || !citiesByName[DEMO_ROUTE.to] || !truckMarker) {
+    if (!mapReady || !routeGraph || !citiesByName[DEMO_ROUTE.from] || !citiesByName[DEMO_ROUTE.to] || !truckMarker
+        || (!pois && Date.now() < poisUntil)) {
       if (Date.now() > giveUpAt) { showToast('Demo route unavailable', 'danger'); return; }
       demoTimer = setTimeout(waitAssets, 500);
       return;
@@ -4691,8 +4695,13 @@ function startDemo() {
 }
 
 function runDemo() {
+  // De empresa a empresa, las mismas que manda la telemetria: si el camion
+  // fuera al centro de la ciudad, la ruta dibujada (a la empresa) y el
+  // recorrido de la demo se separarian al final.
   const a = citiesByName[DEMO_ROUTE.from], b = citiesByName[DEMO_ROUTE.to];
-  const path = findRoute([a.X, a.Y], [b.X, b.Y]);
+  const ini = findCompanyPoi(DEMO_ROUTE.companyFromId, DEMO_ROUTE.fromId);
+  const fin = findCompanyPoi(DEMO_ROUTE.companyToId, DEMO_ROUTE.toId);
+  const path = findRoute(ini ? [ini.x, ini.z] : [a.X, a.Y], fin ? [fin.x, fin.z] : [b.X, b.Y]);
   if (!path || path.length < 2) { showToast('Demo route unavailable', 'danger'); return; }
   const total = sumPathDistanceMeters(path);
 

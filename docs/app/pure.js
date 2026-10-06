@@ -774,9 +774,15 @@ function createSessionStats({ maxGapSeconds = 10, overLimitToleranceKmh = 2,
 // el mapa (que le agrega la posicion sobre la ruta) y el panel de
 // docs/dash/. Cuando estaban separados mostraban viajes distintos, y
 // alternar de una a otra parecia otro juego.
+// Con ids, como los manda el juego: sin cityDstId la app no puede buscar la
+// empresa y la demo mostraba "Approximate: the game did not say which
+// company". Las dos empresas estan en pois-ats.json (si no, la ruta cae al
+// centro de la ciudad y vuelve ese aviso).
 const DEMO_ROUTE = {
   game: 'ats', from: 'Salt Lake City', to: 'Las Vegas',
-  companyFrom: 'Charged Industries', companyTo: 'Sierra Nevada',
+  fromId: 'salt_lake', toId: 'las_vegas',
+  companyFrom: 'Coastline Mining', companyTo: 'Bitumen',
+  companyFromId: 'cm_min_svc', companyToId: 'bit_rd_svc',
   cargo: 'Bulldozer', cargoMassKg: 18189,
   truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158,
 };
@@ -838,8 +844,12 @@ function createDemoTelemetry(opts) {
         cargoMassKg: DEMO_ROUTE.cargoMassKg,
         citySrc: DEMO_ROUTE.from,
         cityDst: DEMO_ROUTE.to,
+        citySrcId: DEMO_ROUTE.fromId,
+        cityDstId: DEMO_ROUTE.toId,
         companySrc: DEMO_ROUTE.companyFrom,
         companyDst: DEMO_ROUTE.companyTo,
+        companySrcId: DEMO_ROUTE.companyFromId,
+        companyDstId: DEMO_ROUTE.companyToId,
         onJob: true,
         isCargoLoaded: true,
         plannedDistanceKm: o.totalKm,
