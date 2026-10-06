@@ -88,6 +88,26 @@ input[type="text"], #usernameInput {
 }
 #usernameInput:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* Login con mail */
+.mail-form input {
+  width: 100%; font-size: 1rem; padding: 0.55rem 0.7rem;
+  background: var(--panel); border: 1px solid var(--line);
+  color: var(--text); border-radius: 8px; font-family: inherit;
+}
+.mail-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mail-form input[readonly] { opacity: 0.7; }
+.mail-form label { margin-top: 0.7rem; }
+.mail-form h2 { font-size: 1.1rem; margin: 0 0 0.4rem; }
+.mail-form .btn.primary { width: 100%; }
+.mail-form [hidden] { display: none !important; }
+#emailCodeInput { max-width: 12rem; letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+.mail-links { display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; margin-top: 0.6rem; }
+.divisor { display: flex; align-items: center; gap: 0.6rem; color: var(--muted); font-size: 0.85rem; margin: 0.6rem 0 0; }
+.divisor::before, .divisor::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+.divisor[hidden] { display: none; }
+/* Vincular el mail desde Ajustes: el mismo formulario, sin lo de entrar. */
+.vinculando-mail .solo-entrar { display: none !important; }
+
 .hint { min-height: 1.4em; font-size: 0.85rem; margin: 0.4rem 0 0.8rem; color: var(--muted); }
 .hint.ok { color: var(--ok); }
 .hint.bad { color: var(--danger); }

@@ -239,6 +239,33 @@
       signInIntro: 'Sign in to keep your trips and your stats across devices.',
       signInDiscord: 'Continue with Discord',
       signInGoogle: 'Continue with Google',
+      emailOr: 'or with your email',
+      emailLabel: 'Email',
+      emailPasswordLabel: 'Password',
+      emailNewPasswordLabel: 'New password',
+      emailPasswordRules: 'At least 8 characters.',
+      emailSignIn: 'Sign in',
+      emailCreateAccount: 'Create an account',
+      emailForgot: 'Forgot your password?',
+      emailBackToSignIn: 'Back to sign in',
+      emailSendCode: 'Send code',
+      emailCodeLabel: 'Code from the email',
+      emailCreate: 'Create account',
+      emailSavePassword: 'Save and sign in',
+      emailResend: 'Send another code',
+      emailCodeResent: 'We sent a new code.',
+      emailTitleSignup: 'Create an account',
+      emailTitleReset: 'Choose a new password',
+      emailLinkTitle: 'Add email and password',
+      mail_invalido: 'That does not look like an email address.',
+      codigo_mail_invalido: 'That code is not right. Use the one from the last email.',
+      codigo_mail_vencido: 'That code expired or was tried too many times. Ask for a new one.',
+      contrasena_corta: 'The password needs at least 8 characters.',
+      contrasena_larga: 'The password is too long: 200 characters at most.',
+      credenciales_invalidas: 'Wrong email or password.',
+      emailCodeSent: (m) => 'We sent a 6-digit code to ' + m + '. It is valid for 15 minutes. If that email already has an account, the email tells you instead.',
+      emailResetSent: (m) => 'If ' + m + ' has an account, we sent it a 6-digit code. It is valid for 15 minutes.',
+      demasiados_intentos: (s) => 'Too many tries. Try again in ' + s + '.',
       signInSoon: 'More ways to sign in are coming.',
       signInFree: 'Free, like the rest of Truck Dash. We never post anything on your behalf.',
       termsLink: 'Terms of use',
@@ -482,6 +509,33 @@
       signInIntro: 'Entra para conservar tus viajes y tus estadisticas en todos tus dispositivos.',
       signInDiscord: 'Continuar con Discord',
       signInGoogle: 'Continuar con Google',
+      emailOr: 'o con tu mail',
+      emailLabel: 'Mail',
+      emailPasswordLabel: 'Contraseña',
+      emailNewPasswordLabel: 'Contraseña nueva',
+      emailPasswordRules: 'Al menos 8 caracteres.',
+      emailSignIn: 'Entrar',
+      emailCreateAccount: 'Crear una cuenta',
+      emailForgot: '¿Olvidaste tu contraseña?',
+      emailBackToSignIn: 'Volver a entrar',
+      emailSendCode: 'Mandar código',
+      emailCodeLabel: 'Código del mail',
+      emailCreate: 'Crear cuenta',
+      emailSavePassword: 'Guardar y entrar',
+      emailResend: 'Mandar otro código',
+      emailCodeResent: 'Te mandamos un código nuevo.',
+      emailTitleSignup: 'Crear una cuenta',
+      emailTitleReset: 'Elegir una contraseña nueva',
+      emailLinkTitle: 'Agregar mail y contraseña',
+      mail_invalido: 'Eso no parece un mail.',
+      codigo_mail_invalido: 'Ese código no es. Usá el del último mail.',
+      codigo_mail_vencido: 'Ese código venció o se probó demasiadas veces. Pedí uno nuevo.',
+      contrasena_corta: 'La contraseña necesita al menos 8 caracteres.',
+      contrasena_larga: 'La contraseña es demasiado larga: 200 caracteres como máximo.',
+      credenciales_invalidas: 'Mail o contraseña incorrectos.',
+      emailCodeSent: (m) => 'Te mandamos un código de 6 cifras a ' + m + '. Vale 15 minutos. Si ese mail ya tiene cuenta, el mail te lo dice.',
+      emailResetSent: (m) => 'Si ' + m + ' tiene cuenta, le mandamos un código de 6 cifras. Vale 15 minutos.',
+      demasiados_intentos: (s) => 'Demasiados intentos. Probá de nuevo en ' + s + '.',
       signInSoon: 'Se vienen mas formas de entrar.',
       signInFree: 'Gratis, como todo Truck Dash. Nunca publicamos nada en tu nombre.',
       termsLink: 'Términos de uso',
@@ -655,7 +709,8 @@
   function pintarBotonesDeEntrada() {
     const caja = $('signInButtons');
     caja.innerHTML = '';
-    disponibles.forEach((p) => {
+    // El mail no es un boton: tiene su formulario (ver login con mail).
+    disponibles.filter((p) => p !== 'email').forEach((p) => {
       const b = document.createElement('button');
       b.className = 'btn proveedor ' + p;
       b.innerHTML = (LOGOS[p] || '') + '<span></span>';
@@ -665,6 +720,134 @@
       b.addEventListener('click', () => irAProveedor(p));
       caja.appendChild(b);
     });
+    const conMail = disponibles.indexOf('email') >= 0;
+    $('emailForm').hidden = !conMail;
+    $('signInOr').hidden = !conMail || !caja.children.length;
+    pintarMail();
+  }
+
+  // ------------------------------------------------------ login con mail
+  // Un formulario, tres modos: entrar (mail y contrasena), crear cuenta y
+  // contrasena nueva; los dos ultimos en dos pasos, con un codigo por mail.
+  // La API nunca dice si un mail tiene cuenta, y los textos tampoco: "te
+  // mandamos un codigo" vale para los dos casos.
+  const mail = { modo: 'login', paso: 'mail', vinculando: false };
+  let sugeridoMail = '';
+
+  function pintarMail() {
+    const conCodigo = mail.modo !== 'login';
+    const paso2 = conCodigo && mail.paso === 'codigo';
+    const titulo = mail.vinculando ? t('emailLinkTitle')
+      : mail.modo === 'signup' ? t('emailTitleSignup')
+      : mail.modo === 'reset' ? t('emailTitleReset') : '';
+    $('emailTitle').textContent = titulo;
+    $('emailTitle').hidden = !titulo;
+    $('viewSignIn').classList.toggle('vinculando-mail', mail.vinculando);
+    $('emailInput').readOnly = paso2;
+    $('emailCodeRow').hidden = !paso2;
+    $('emailPasswordRow').hidden = conCodigo && !paso2;
+    $('emailPasswordLabel').textContent = t(mail.modo === 'reset' ? 'emailNewPasswordLabel' : 'emailPasswordLabel');
+    $('emailPasswordInput').autocomplete = mail.modo === 'login' ? 'current-password' : 'new-password';
+    $('emailPasswordRules').hidden = mail.modo === 'login';
+    $('btnEmail').textContent = t(!conCodigo ? 'emailSignIn' : !paso2 ? 'emailSendCode'
+      : mail.modo === 'signup' ? 'emailCreate' : 'emailSavePassword');
+    $('emailToSignup').hidden = mail.modo !== 'login';
+    $('emailToReset').hidden = mail.modo !== 'login';
+    $('emailResend').hidden = !paso2;
+    $('emailToLogin').hidden = mail.modo === 'login' || mail.vinculando;
+    $('emailCancelLink').hidden = !mail.vinculando;
+  }
+
+  function pistaMail(texto, clase) {
+    const h = $('emailHint');
+    h.textContent = texto;
+    h.className = 'hint' + (clase ? ' ' + clase : '');
+  }
+
+  function cambiarModoMail(modo) {
+    mail.modo = modo;
+    mail.paso = 'mail';
+    $('emailCodeInput').value = '';
+    $('emailPasswordInput').value = '';
+    pistaMail('');
+    pintarMail();
+  }
+
+  // Desde Ajustes: agregarle mail y contrasena a la cuenta abierta. La API
+  // vincula en vez de crear otra cuenta porque hay sesion (como con Google).
+  function abrirMail(modo, vinculando) {
+    mail.vinculando = !!vinculando;
+    cambiarModoMail(modo);
+    if (vinculando) {
+      $('emailInput').value = '';
+      mostrarVista('viewSignIn');
+    }
+    $('emailInput').focus();
+  }
+
+  function esperaLegible(segundos) {
+    const s = Math.max(1, Math.round(segundos || 60));
+    return s >= 120 ? Math.ceil(s / 60) + ' min' : s + ' s';
+  }
+
+  function errorDeMail(r) {
+    if (r.status === 429) return t('demasiados_intentos', esperaLegible(r.datos.reintentar_en));
+    return t((r.datos && r.datos.error) || 'error');
+  }
+
+  async function pedirCodigoMail() {
+    const r = await pedir('/auth/email/code', { method: 'POST', body: {
+      email: $('emailInput').value.trim(), purpose: mail.modo, lang: idioma } });
+    if (!r.ok) { pistaMail(errorDeMail(r), 'bad'); return false; }
+    return true;
+  }
+
+  async function enviarMail(evento) {
+    evento.preventDefault();
+    const boton = $('btnEmail');
+    const email = $('emailInput').value.trim();
+    boton.disabled = true;
+    try {
+      if (mail.modo === 'login') {
+        const r = await pedir('/auth/email/login', { method: 'POST', body: {
+          email: email, password: $('emailPasswordInput').value } });
+        if (!r.ok) { pistaMail(errorDeMail(r), 'bad'); return; }
+        cambiarModoMail('login');
+        await cargar();
+        return;
+      }
+      if (mail.paso === 'mail') {
+        if (!(await pedirCodigoMail())) return;
+        mail.paso = 'codigo';
+        pintarMail();
+        pistaMail(t(mail.modo === 'signup' ? 'emailCodeSent' : 'emailResetSent', email));
+        $('emailCodeInput').focus();
+        return;
+      }
+      const ruta = mail.modo === 'signup' ? '/auth/email/signup' : '/auth/email/reset';
+      const r = await pedir(ruta, { method: 'POST', body: { email: email,
+        code: $('emailCodeInput').value.trim(), password: $('emailPasswordInput').value } });
+      if (!r.ok) { pistaMail(errorDeMail(r), 'bad'); return; }
+      if (r.datos.vinculado) avisar(t('savedOk'), 'ok');
+      // Alta nueva: la pantalla de elegir nombre arranca con uno libre,
+      // sacado del mail, igual que con Discord.
+      sugeridoMail = r.datos.sugerido || '';
+      mail.vinculando = false;
+      cambiarModoMail('login');
+      await cargar();
+    } finally {
+      boton.disabled = false;
+    }
+  }
+
+  async function reenviarCodigoMail() {
+    if (await pedirCodigoMail()) pistaMail(t('emailCodeResent'), 'ok');
+  }
+
+  function cancelarVinculoMail() {
+    mail.vinculando = false;
+    cambiarModoMail('login');
+    cargar();
   }
 
   function irAProveedor(proveedor) {
@@ -747,7 +930,7 @@
         const boton = document.createElement('button');
         boton.className = 'btn link';
         boton.textContent = t('link');
-        boton.addEventListener('click', () => irAProveedor(p));
+        boton.addEventListener('click', () => (p === 'email' ? abrirMail('signup', true) : irAProveedor(p)));
         li.appendChild(boton);
       } else {
         const proximamente = document.createElement('span');
@@ -1017,7 +1200,7 @@
       return;
     }
     if (!usuario.username) {
-      pedirNombre(PARAMS.get('sugerido') || '');
+      pedirNombre(PARAMS.get('sugerido') || sugeridoMail || '');
       return;
     }
     pintarCuenta();
@@ -2543,6 +2726,12 @@
     mostrarErrorDeVuelta();
     $('usernameInput').addEventListener('input', alEscribirNombre);
     $('usernameForm').addEventListener('submit', guardarNombre);
+    $('emailForm').addEventListener('submit', enviarMail);
+    $('emailToSignup').addEventListener('click', () => cambiarModoMail('signup'));
+    $('emailToReset').addEventListener('click', () => cambiarModoMail('reset'));
+    $('emailToLogin').addEventListener('click', () => cambiarModoMail('login'));
+    $('emailResend').addEventListener('click', reenviarCodigoMail);
+    $('emailCancelLink').addEventListener('click', cancelarVinculoMail);
     $('btnChangeUsername').addEventListener('click', () => pedirNombre(usuario.username));
     $('publicToggle').addEventListener('change', cambiarPrivacidad);
     $('btnSignOut').addEventListener('click', cerrarSesion);

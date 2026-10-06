@@ -31,7 +31,7 @@
 <header><img src="/assets/logo.svg" alt="" /> <a href="/" style="color:var(--text)">Truck Dash</a></header>
 <main>
   <h1>Privacy policy</h1>
-  <p class="updated">Last updated: 28 September 2026</p>
+  <p class="updated">Last updated: 6 October 2026</p>
 
   <p>Truck Dash is a free, open-source companion for Euro Truck Simulator 2 and American Truck Simulator. It is designed to handle as little data as possible. This page explains exactly what it reads, sends and stores.</p>
   <p><strong>An account is optional.</strong> Without one, everything works as it always has and nothing about you is stored on our servers. If you do create one, the section below says exactly what it holds.</p>
@@ -61,16 +61,17 @@
   </ul>
 
   <h2>Accounts (optional)</h2>
-  <p>An account lets you keep your trips and stats across devices and have a profile. You sign in through another service (Discord today; Google, Steam and email later), so <strong>we never see your password for it</strong>.</p>
+  <p>An account lets you keep your trips and stats across devices and have a profile. You sign in with Discord or Google, where <strong>we never see your password</strong>, or with your email and a password of your own.</p>
   <p>What an account stores:</p>
   <ul>
     <li>A random internal id, your chosen username, and when the account was created and last used.</li>
     <li>The id the sign-in provider gives us (for example your Discord user id), so we recognise you next time. We request only the <code>identify</code> and <code>email</code> scopes.</li>
     <li>Your avatar image URL from that provider, refreshed each time you sign in.</li>
+    <li><strong>If you sign up with email:</strong> your email address, when you confirmed it, and your password stored only as an Argon2id hash, so nobody, us included, can read it back. To confirm the address and to reset a forgotten password we email you a 6-digit code; only a keyed hash of the code is stored, it expires after 15 minutes, and we also note the IP address that asked for it, to limit how many codes can be sent. Codes are erased soon after they expire, or with your account.</li>
     <li>The email address the provider reports, if it is verified. It is kept as a <strong>contact detail only</strong>: it is never a way to sign in, and it is never used to link two accounts together.</li>
     <li>Whether your profile is public. <strong>It is private by default</strong> and turning it on is an explicit choice.</li>
     <li>Your open sessions: a random token, when each started and expires, and the browser identification string, so you can recognise your devices and close the ones you do not want.</li>
-    <li><strong>Your driving, only if you link the Windows client to the account.</strong> Each time you drive: the game and map, when you started and stopped, the distance, the in-game and real time, top speed and fuel used. Each job: the cities, companies, cargo and its weight, the pay, the planned distance and the one the game reports on delivery, tolls, ferries and fines, how much the truck wore down, whether it was delivered or cancelled, and the route you drove, simplified to a few hundred points. Positions are coordinates on the game's map, not your real location.</li>
+    <li><strong>Your driving, only if you link the Windows client to the account.</strong> Each time you drive: the game and map, when you started and stopped, the distance, the in-game and real time, top speed and fuel used. Each job: the cities, companies, cargo and its weight, the pay, the planned distance and the one the game reports on delivery, tolls, ferries and fines, how much the truck wore down, whether it was delivered or cancelled (and the penalty the game charged for cancelling), and the route you drove, simplified to a few hundred points. Positions are coordinates on the game's map, not your real location.</li>
   </ul>
   <p>Until you link the client, it records nothing at all, not even on your own computer. Unlinking it in the client's Setup window stops it. What was already recorded stays in the account until you delete the account, and it is part of the data download.</p>
   <div class="box">Accounts are never linked by email address. Signing in with a second provider adds it to the account you are already signed into, and only if you ask for it.</div>
@@ -84,8 +85,9 @@
   <h2>Third parties</h2>
   <ul>
     <li><a href="https://railway.app" target="_blank" rel="noopener">Railway</a> hosts the relay backend and, for accounts, the database.</li>
-    <li><a href="https://discord.com/" target="_blank" rel="noopener">Discord</a> handles signing in, if you choose to create an account. Discord's own privacy policy applies to what happens on their side.</li>
+    <li><a href="https://discord.com/" target="_blank" rel="noopener">Discord</a> and <a href="https://google.com/" target="_blank" rel="noopener">Google</a> handle signing in, if you choose to sign in with them. Their own privacy policies apply to what happens on their side.</li>
     <li><a href="https://www.cloudflare.com/" target="_blank" rel="noopener">Cloudflare R2</a> hosts the map data.</li>
+    <li><a href="https://resend.com/" target="_blank" rel="noopener">Resend</a> sends the sign-in emails (the 6-digit codes), only if you use email to sign in. It receives your email address and the message.</li>
     <li><a href="https://pages.github.com/" target="_blank" rel="noopener">GitHub Pages</a> hosts this website and the client downloads.</li>
     <li>Delivered jobs are posted to the public Truck Dash Discord server through a webhook.</li>
   </ul>

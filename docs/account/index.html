@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261006c" />
+<link rel="stylesheet" href="account.css?v=20261006d" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -33,15 +33,44 @@
 
   <!-- ------------------------------------------------ sin sesion -->
   <section id="viewSignIn" hidden>
-    <h1 data-i18n="signInTitle">Sign in</h1>
-    <p class="muted" data-i18n="signInIntro"></p>
+    <h1 class="solo-entrar" data-i18n="signInTitle">Sign in</h1>
+    <p class="muted solo-entrar" data-i18n="signInIntro"></p>
     <p class="notice warn" id="linkSignInNotice" hidden data-i18n="linkSignInFirst"></p>
     <!-- Los botones los arma account.js segun lo que devuelva
          /auth/providers: asi encender un proveedor nuevo no necesita
          desplegar la web, y nunca se ofrece uno que no esta configurado. -->
-    <div id="signInButtons"></div>
-    <p class="muted small" data-i18n="signInSoon"></p>
-    <p class="muted small" data-i18n="signInFree"></p>
+    <div id="signInButtons" class="solo-entrar"></div>
+    <!-- Login con mail: aparece si /auth/providers lo ofrece (hace falta la
+         key de Resend en el servidor). Un formulario, tres modos: entrar,
+         crear cuenta y contrasena nueva; los dos ultimos en dos pasos, con un
+         codigo por mail. Desde Ajustes, "Vincular" abre el de crear cuenta. -->
+    <p class="divisor solo-entrar" id="signInOr" hidden data-i18n="emailOr"></p>
+    <form id="emailForm" class="mail-form" hidden novalidate>
+      <h2 id="emailTitle" hidden></h2>
+      <label for="emailInput" data-i18n="emailLabel">Email</label>
+      <input id="emailInput" type="email" autocomplete="email" autocapitalize="none"
+             spellcheck="false" maxlength="254" />
+      <div id="emailCodeRow" hidden>
+        <label for="emailCodeInput" data-i18n="emailCodeLabel">Code</label>
+        <input id="emailCodeInput" inputmode="numeric" autocomplete="one-time-code" maxlength="7" />
+      </div>
+      <div id="emailPasswordRow">
+        <label for="emailPasswordInput" id="emailPasswordLabel">Password</label>
+        <input id="emailPasswordInput" type="password" autocomplete="current-password" maxlength="200" />
+        <p class="muted small" id="emailPasswordRules" data-i18n="emailPasswordRules" hidden></p>
+      </div>
+      <p class="hint" id="emailHint" aria-live="polite"></p>
+      <button class="btn primary" id="btnEmail" type="submit">Sign in</button>
+      <div class="mail-links">
+        <button type="button" class="btn link" id="emailToSignup" data-i18n="emailCreateAccount"></button>
+        <button type="button" class="btn link" id="emailToReset" data-i18n="emailForgot"></button>
+        <button type="button" class="btn link" id="emailResend" data-i18n="emailResend" hidden></button>
+        <button type="button" class="btn link" id="emailToLogin" data-i18n="emailBackToSignIn" hidden></button>
+        <button type="button" class="btn link" id="emailCancelLink" data-i18n="cancel" hidden></button>
+      </div>
+    </form>
+    <p class="muted small solo-entrar" data-i18n="signInSoon"></p>
+    <p class="muted small solo-entrar" data-i18n="signInFree"></p>
     <p class="muted small legal">
       <a href="/terms.html" data-i18n="termsLink">Terms of use</a> ·
       <a href="/privacy.html" data-i18n="privacyLink">Privacy policy</a>
@@ -280,7 +309,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261006c"></script>
-<script src="account.js?v=20261006c"></script>
+<script src="../app/i18n.js?v=20261006d"></script>
+<script src="account.js?v=20261006d"></script>
 </body>
 </html>
