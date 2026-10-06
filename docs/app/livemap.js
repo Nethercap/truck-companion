@@ -15,6 +15,15 @@ function liveMapColor(id) {
 }
 function liveMapName(p) { return p.nick || p.truck || t('liveMapAnon'); }
 
+// Quien esta en un mapa que no conocemos (un mod de mapa sin variante, como
+// los de Sudamerica para ETS2): fuera de la caja del mapa de esta variante.
+// Sin flecha (quedaba en el oceano) y en una seccion aparte de la lista.
+function liveMapOnMap(p) {
+  if (p.x == null) return false;
+  if (currentGame !== liveMap.variant || typeof mapBounds === 'undefined') return true;
+  return insideMapBounds(mapBounds, p.x, p.z);
+}
+
 function liveMapStart(variant, backend) {
   if (typeof GAME_MAPS === 'undefined' || !GAME_MAPS[variant]) { showToast(t('liveMapUnknown'), 'danger', 8000); return; }
   liveMap.variant = variant;
@@ -67,7 +76,7 @@ function liveMapConnect() {
 
 function liveMapFit() {
   if (!map || !toLngLat) return;
-  const pts = liveMap.players.filter(p => p.x != null).map(p => toLngLat(p.x, p.z));
+  const pts = liveMap.players.filter(liveMapOnMap).map(p => toLngLat(p.x, p.z));
   if (!pts.length) return;
   if (pts.length === 1) { map.jumpTo({ center: pts[0], zoom: 8 }); return; }
   const b = pts.reduce((acc, p) => acc.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]));
@@ -80,11 +89,11 @@ function liveMapRenderMarkers() {
   // termina con un jumpTo al origen que pisaria el encuadre).
   const loadingEl = document.getElementById('mapLoading');
   const settled = !loadingEl || loadingEl.style.display === 'none';
-  if (liveMap.needFit && settled && liveMap.players.some(p => p.x != null)) { liveMap.needFit = false; liveMapFit(); }
+  if (liveMap.needFit && settled && liveMap.players.some(liveMapOnMap)) { liveMap.needFit = false; liveMapFit(); }
   const seen = new Set();
   const bearing = map.getBearing();
   for (const p of liveMap.players) {
-    if (p.x == null) continue;
+    if (!liveMapOnMap(p)) continue;
     seen.add(p.id);
     const lngLat = toLngLat(p.x, p.z);
     let entry = liveMap.markers.get(p.id);
@@ -135,7 +144,9 @@ const LIVE_ROUTES_SOURCE = 'live-routes';
 function liveMapRenderRoutes() {
   if (!map || !mapReady || !toLngLat || currentGame !== liveMap.variant) return;
   const features = [];
+  const fuera = new Set(liveMap.players.filter(p => !liveMapOnMap(p)).map(p => p.id));
   for (const [id, r] of liveMap.routes) {
+    if (fuera.has(id)) continue;
     features.push({
       type: 'Feature',
       properties: { color: liveMapColor(id), followed: id === liveMap.followId ? 1 : 0 },
@@ -194,7 +205,9 @@ function liveMapRenderPanel() {
   const n = liveMap.players.length;
   count.textContent = t(n === 1 ? 'liveMapDriversOne' : 'liveMapDrivers').replace('{n}', n);
   if (!n) { list.innerHTML = `<div class="convoyMeta">${escapeHtml(t('liveMapEmpty'))}</div>`; return; }
-  list.innerHTML = liveMap.players.map(p => {
+  const enMapa = liveMap.players.filter(liveMapOnMap);
+  const fuera = liveMap.players.filter(p => !liveMapOnMap(p));
+  list.innerHTML = enMapa.map(p => {
     const left = p.distanceKm > 0 ? liveMapDistance(p.distanceKm) : '';
     const eta = p.etaSeconds > 0 && typeof formatSeconds === 'function' ? formatSeconds(p.etaSeconds) : '';
     const route = p.citySrc && p.cityDst ? `${escapeHtml(p.citySrc)} → ${escapeHtml(p.cityDst)}` : '';
@@ -209,8 +222,14 @@ function liveMapRenderPanel() {
       <div class="convoyMeta">${route || escapeHtml(p.cargo || '')}</div>${route && remaining ? `<div class="convoyMeta">${remaining}</div>` : ''}</div>
       <span class="convoyStatus">${escapeHtml(status)}</span>
       <button class="liveMapPin${followed ? ' active' : ''}" data-pin="${escapeHtml(p.id)}" title="${escapeHtml(t(followed ? 'liveMapUnpin' : 'liveMapPin'))}">📌</button></div>`;
-  }).join('');
-  list.querySelectorAll('.liveMapRow').forEach(row => row.addEventListener('click', () => liveMapFocus(row.dataset.id)));
+  }).join('') + (fuera.length ? `<div class="liveMapOffTitle">${escapeHtml(t('liveMapOffMap'))}</div>` + fuera.map(p => {
+    const route = p.citySrc && p.cityDst ? `${escapeHtml(p.citySrc)} → ${escapeHtml(p.cityDst)}` : escapeHtml(p.cargo || '');
+    return `<div class="liveMapRow liveMapRowOff">
+      <span class="convoyDot" style="background:${liveMapColor(p.id)}"></span>
+      <div class="liveMapRowBody"><div><span class="convoyName">${escapeHtml(liveMapName(p))}</span></div>
+      <div class="convoyMeta">${route}</div></div></div>`;
+  }).join('') : '');
+  list.querySelectorAll('.liveMapRow:not(.liveMapRowOff)').forEach(row => row.addEventListener('click', () => liveMapFocus(row.dataset.id)));
   list.querySelectorAll('.liveMapPin').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); liveMapFollow(btn.dataset.pin); }));
 }
 

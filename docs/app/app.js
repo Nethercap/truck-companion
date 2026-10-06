@@ -861,6 +861,10 @@ let citiesByName = {}; // Name (localizado o nativo) -> {Name, X, Y, Token, Nati
 // DLC de South Dakota sumo Aberdeen SD a 99 km de Aberdeen WA. Quien recorra
 // ciudades (la de al lado, la proxima de la ruta) tiene que usar esta.
 let citiesAll = [];
+// Caja del mapa cargado (de sus ciudades) y para que variante ya se aviso
+// que el camion esta afuera: una vez por mapa y por sesion.
+let mapBounds = null;
+let offMapWarnedFor = null;
 let citiesByToken = {}; // token del juego -> misma entrada
 const trailWorld = []; // [[lng,lat], ...]
 const MAX_TRAIL_POINTS = 1000;
@@ -1487,6 +1491,7 @@ async function loadCities(mapInfo) {
     citiesByName = {};
     citiesByToken = {};
     citiesAll = list;
+    mapBounds = mapBoundsFromCities(list);
     for (const c of list) {
       if (!citiesByName[c.Name]) citiesByName[c.Name] = c;
       // Nombre nativo (ej. "Москва" ademas de "Moscow"): la telemetria manda
@@ -1499,6 +1504,7 @@ async function loadCities(mapInfo) {
     citiesByName = {};
     citiesByToken = {};
     citiesAll = [];
+    mapBounds = null;
   }
 }
 // Ciudad por id del juego (cityDstId/citySrcId de la telemetria) y si no por
@@ -3431,6 +3437,12 @@ function updateMap(position, game, gameHeadingDeg) {
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
+  if (!conn.demo && !conn.spectator && mapBounds && offMapWarnedFor !== currentGame
+      && !insideMapBounds(mapBounds, position.x, position.z)) {
+    offMapWarnedFor = currentGame;
+    const label = (typeof GAME_MAPS !== 'undefined' && GAME_MAPS[currentGame] && GAME_MAPS[currentGame].label) || currentGame;
+    showToast(t('offMapNotice').replace('{map}', label), 'info', 20000);
+  }
   checkWaypointReached(position.x, position.z);
   updateCurrentRoad(position.x, position.z);
   updateNextCity(position.x, position.z);

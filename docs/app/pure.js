@@ -976,6 +976,30 @@ function createFatigue(intervalMinutes = REST_INTERVAL_MINUTES) {
 // arrival(key, kind, remainingKm, totalKm): una vez por destino; solo si la
 // ruta era de mas de minTripKm, para no decir "llegaste" al tomar un trabajo
 // estando ya en la empresa de carga.
+// Caja de un mapa a partir de sus ciudades, con margen (las rutas y los
+// puertos llegan mas alla de la ultima ciudad). Sirve para darse cuenta de
+// que un camion esta en un mapa que no conocemos: los mods de Sudamerica
+// para ETS2, por ejemplo, se arman en el mismo mundo, cientos de km al oeste
+// de Europa, y la flecha quedaba en el medio del Atlantico.
+function mapBoundsFromCities(cities, margin = 0.15) {
+  if (!Array.isArray(cities) || cities.length < 2) return null;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const c of cities) {
+    if (!Number.isFinite(c.X) || !Number.isFinite(c.Y)) continue;
+    minX = Math.min(minX, c.X); maxX = Math.max(maxX, c.X);
+    minZ = Math.min(minZ, c.Y); maxZ = Math.max(maxZ, c.Y);
+  }
+  if (!Number.isFinite(minX) || maxX <= minX || maxZ <= minZ) return null;
+  const mx = (maxX - minX) * margin, mz = (maxZ - minZ) * margin;
+  return { minX: minX - mx, maxX: maxX + mx, minZ: minZ - mz, maxZ: maxZ + mz };
+}
+// Sin caja (ciudades sin cargar) se da por adentro: mejor una flecha de mas
+// que esconder a todos mientras carga el mapa.
+function insideMapBounds(bounds, x, z) {
+  if (!bounds || !Number.isFinite(x) || !Number.isFinite(z)) return true;
+  return x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
+}
+
 function voiceManeuverKey(turn) {
   return `${turn.kind === 'fork' ? 'keep' : 'turn'}_${turn.direction === 'left' ? 'left' : 'right'}`;
 }
@@ -1027,6 +1051,6 @@ function pickVoice(voices, lang, savedId) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

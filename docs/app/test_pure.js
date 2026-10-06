@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
-  createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice } = require("./pure.js");
+  createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice, mapBoundsFromCities, insideMapBounds } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -872,4 +872,16 @@ test('voz: elige la guardada del idioma, si no la primera, y null sin voces', ()
   assert.equal(pickVoice(voices, 'en', 'es-a').id, 'en-a');
   assert.equal(pickVoice(voices, 'en', null).id, 'en-a');
   assert.equal(pickVoice(voices, 'pl', null), null);
+});
+
+
+test('fuera del mapa: la caja sale de las ciudades con margen; sin caja, adentro', () => {
+  const ciudades = [{ X: -90000, Y: -120000 }, { X: 77000, Y: 85000 }, { X: 0, Y: 0 }];
+  const b = mapBoundsFromCities(ciudades);
+  assert.ok(insideMapBounds(b, -9800, 47600));            // Pescara
+  assert.ok(insideMapBounds(b, -100000, 0));              // pasado la ultima ciudad, dentro del margen
+  assert.ok(!insideMapBounds(b, -659907, 131729));        // el mod de Sudamerica, en el Atlantico
+  assert.ok(insideMapBounds(null, -659907, 131729));      // sin ciudades cargadas no se esconde a nadie
+  assert.equal(mapBoundsFromCities([{ X: 1, Y: 1 }]), null);
+  assert.equal(mapBoundsFromCities(null), null);
 });

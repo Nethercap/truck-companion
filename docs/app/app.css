@@ -837,6 +837,8 @@
   body.livemap .card.liveMapCard { display: block !important; }
   .liveMapRow { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; border-top: 1px solid var(--border); cursor: pointer; }
   .liveMapRow:first-child { border-top: none; }
+  .liveMapOffTitle { margin-top: 0.6rem; padding-top: 0.4rem; border-top: 1px solid var(--border); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .liveMapRowOff { cursor: default; opacity: 0.75; }
   .liveMapRow:hover { background: rgba(255,255,255,0.04); }
   .liveMapRowBody { min-width: 0; flex: 1; }
   .liveMapRowBody .convoyMeta { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
