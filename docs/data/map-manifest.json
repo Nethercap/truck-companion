@@ -12,7 +12,7 @@
       "mods": [],
       "files": [
         "vector/ats.pmtiles",
-        "ats/route-graph-ats.json",
+        "ats/route-graph-ats-v3.bin",
         "ats/route-graph-ats.bin",
         "ats/Cities.json",
         "ats/road-names.json"
@@ -34,7 +34,7 @@
       ],
       "files": [
         "vector/ats_c2c.pmtiles",
-        "ats_c2c/route-graph-ats_c2c.json",
+        "ats_c2c/route-graph-ats_c2c-v3.bin",
         "ats_c2c/route-graph-ats_c2c.bin",
         "ats_c2c/Cities.json",
         "ats_c2c/road-names.json"
@@ -56,7 +56,7 @@
       ],
       "files": [
         "vector/ats_promods.pmtiles",
-        "ats_promods/route-graph-ats_promods.json",
+        "ats_promods/route-graph-ats_promods-v3.bin",
         "ats_promods/route-graph-ats_promods.bin",
         "ats_promods/Cities.json",
         "ats_promods/road-names.json"
@@ -79,7 +79,7 @@
       ],
       "files": [
         "vector/ats_c2c_promods.pmtiles",
-        "ats_c2c_promods/route-graph-ats_c2c_promods.json",
+        "ats_c2c_promods/route-graph-ats_c2c_promods-v3.bin",
         "ats_c2c_promods/route-graph-ats_c2c_promods.bin",
         "ats_c2c_promods/Cities.json",
         "ats_c2c_promods/road-names.json"
@@ -103,7 +103,7 @@
       ],
       "files": [
         "vector/ats_reforma.pmtiles",
-        "ats_reforma/route-graph-ats_reforma.json",
+        "ats_reforma/route-graph-ats_reforma-v3.bin",
         "ats_reforma/route-graph-ats_reforma.bin",
         "ats_reforma/Cities.json",
         "ats_reforma/road-names.json"
@@ -130,7 +130,7 @@
       ],
       "files": [
         "vector/ats_reforma_c2c_promods.pmtiles",
-        "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.json",
+        "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods-v3.bin",
         "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.bin",
         "ats_reforma_c2c_promods/Cities.json",
         "ats_reforma_c2c_promods/road-names.json"
@@ -150,7 +150,7 @@
       "mods": [],
       "files": [
         "vector/ets2.pmtiles",
-        "ets2/route-graph-ets2.json",
+        "ets2/route-graph-ets2-v3.bin",
         "ets2/route-graph-ets2.bin",
         "ets2/Cities.json",
         "ets2/road-names.json"
@@ -175,7 +175,7 @@
       ],
       "files": [
         "vector/ets2_promods.pmtiles",
-        "ets2_promods/route-graph-ets2_promods.json",
+        "ets2_promods/route-graph-ets2_promods-v3.bin",
         "ets2_promods/route-graph-ets2_promods.bin",
         "ets2_promods/Cities.json",
         "ets2_promods/road-names.json"
@@ -202,7 +202,7 @@
       ],
       "files": [
         "vector/ets2_promods_rusmap.pmtiles",
-        "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.json",
+        "ets2_promods_rusmap/route-graph-ets2_promods_rusmap-v3.bin",
         "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.bin",
         "ets2_promods_rusmap/Cities.json",
         "ets2_promods_rusmap/road-names.json"
@@ -228,7 +228,7 @@
       ],
       "files": [
         "vector/ets2_promods_roex.pmtiles",
-        "ets2_promods_roex/route-graph-ets2_promods_roex.json",
+        "ets2_promods_roex/route-graph-ets2_promods_roex-v3.bin",
         "ets2_promods_roex/route-graph-ets2_promods_roex.bin",
         "ets2_promods_roex/Cities.json",
         "ets2_promods_roex/road-names.json"
@@ -257,7 +257,7 @@
       ],
       "files": [
         "vector/ets2_promods_rusmap_roex.pmtiles",
-        "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.json",
+        "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex-v3.bin",
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.bin",
         "ets2_promods_rusmap_roex/Cities.json",
         "ets2_promods_rusmap_roex/road-names.json"
@@ -279,7 +279,7 @@
       ],
       "files": [
         "vector/ets2_gu.pmtiles",
-        "ets2_gu/route-graph-ets2_gu.json",
+        "ets2_gu/route-graph-ets2_gu-v3.bin",
         "ets2_gu/route-graph-ets2_gu.bin",
         "ets2_gu/Cities.json",
         "ets2_gu/road-names.json"
@@ -302,6 +302,7 @@
       ],
       "files": [
         "vector/ets2_eugu.pmtiles",
+        "ets2_eugu/route-graph-ets2_eugu-v3.bin",
         "ets2_eugu/route-graph-ets2_eugu.bin",
         "ets2_eugu/Cities.json",
         "ets2_eugu/road-names.json"
@@ -328,6 +329,7 @@
       ],
       "files": [
         "vector/ets2_promods_eugu.pmtiles",
+        "ets2_promods_eugu/route-graph-ets2_promods_eugu-v3.bin",
         "ets2_promods_eugu/route-graph-ets2_promods_eugu.bin",
         "ets2_promods_eugu/Cities.json",
         "ets2_promods_eugu/road-names.json"
@@ -349,7 +351,7 @@
       ],
       "files": [
         "vector/ets2_tmp.pmtiles",
-        "ets2_tmp/route-graph-ets2_tmp.json",
+        "ets2_tmp/route-graph-ets2_tmp-v3.bin",
         "ets2_tmp/route-graph-ets2_tmp.bin",
         "ets2_tmp/Cities.json",
         "ets2_tmp/road-names.json"
