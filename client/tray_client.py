@@ -1276,6 +1276,9 @@ def refresh_map_mods(force: bool = False) -> bool:
     if mods != state.map_mods:
         state.map_mods = mods
         logging.info("Map mods detected: %s", mods)
+        # Para etiquetar la sesion y el viaje de la cuenta con los mods.
+        if getattr(state, "cuenta", None) is not None:
+            state.cuenta.poner_mods(mods)
         return True
     return False
 

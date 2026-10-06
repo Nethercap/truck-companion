@@ -190,3 +190,18 @@ def test_apagadas_desde_el_relay_no_se_acumula_ni_se_manda_y_la_cola_queda(tmp_p
     # Prendidas de nuevo: se manda lo guardado.
     settings["accounts_remote"] = True
     assert asyncio.run(sync.drenar())["enviados"] >= 1
+
+
+def test_la_sesion_y_el_viaje_llevan_los_mods_de_mapa(tmp_path, monkeypatch):
+    """map_variant llegaba siempre vacio: el acumulador se creaba sin nada."""
+    sync, reloj = sincronizador(tmp_path, monkeypatch)
+    sync.poner_mods({"ets2": {"promods": True, "rusmap": False}, "ats": None})
+    trabajo = {"onJob": True, "jobStartingTime": 1000, "time_abs_delivery": 2000,
+               "cargoId": "c", "citySrcId": "a", "cityDstId": "b", "citySrc": "A", "cityDst": "B"}
+    conducir(sync, reloj, 5, raw=trabajo)
+    sync.cerrar_sesion()
+    import json
+    cola = json.load(open(tmp_path / "cola.json", encoding="utf-8"))
+    variantes = {e["tipo"]: e["datos"].get("map_variant") for e in cola}
+    assert variantes["session"] == "promods"
+    assert any(e["datos"].get("map_variant") == "promods" for e in cola if e["tipo"].startswith("trip"))

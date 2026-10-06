@@ -532,3 +532,11 @@ def test_sin_hora_de_inicio_manda_desde_cuando_lo_vio():
     acc2 = accumulator.Acumulador()
     salidas = conducir(acc2, raw=TRABAJO, segundos=5)
     assert "first_seen_game_time" not in [a for a in salidas if a["tipo"] == "trip_open"][0]["datos"]
+
+
+def test_describir_mods():
+    d = accumulator.describir_mods
+    assert d({"ats": {"c2c": True, "promods_canada": True, "reforma": False}}, "ats") == "c2c+promods_canada"
+    assert d({"ats": {"c2c": False}}, "ats") == "vanilla"
+    assert d({"ats": None}, "ats") is None          # todavia no se leyo
+    assert d({}, "ets2") is None and d(None, None) is None

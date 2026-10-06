@@ -155,6 +155,21 @@ def _achicar(segmentos, objetivo=PUNTOS_OBJETIVO):
     return achicados
 
 
+def describir_mods(mods: dict | None, juego: str | None) -> str | None:
+    """Los mods de mapa activos de ese juego, como texto corto para la API:
+    "c2c+promods_canada", o "vanilla" si no hay ninguno. None si todavia no
+    se leyeron (game.log.txt no dijo nada de ese juego).
+
+    No es el id de variante de la web (ats_c2c_promods): esa cuenta la hace
+    la app y repetirla aca seria tener dos lugares que pueden discrepar. Con
+    los mods alcanza para filtrar o explicar un viaje mas adelante."""
+    flags = (mods or {}).get(juego) if juego else None
+    if not isinstance(flags, dict):
+        return None
+    activos = sorted(k for k, v in flags.items() if v)
+    return "+".join(activos)[:64] if activos else "vanilla"
+
+
 class Acumulador:
     """Estado de la sesion actual y del viaje en curso, si hay."""
 
@@ -212,6 +227,8 @@ class Acumulador:
         # el cliente con el trabajo ya tomado) puede no haber llegado todavia.
         datos["truck_brand"] = v.get("truck_brand")
         datos["truck_name"] = v.get("truck_name")
+        if self.map_variant:
+            datos["map_variant"] = self.map_variant
         # Cuando el juego da el inicio en 0 (recien abierto, trabajo
         # especial): desde cuando lo vemos, para un total aproximado.
         if v.get("visto_desde"):

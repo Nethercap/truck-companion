@@ -27,7 +27,7 @@ import time
 import account
 import trip_queue
 import win_integration
-from accumulator import Acumulador
+from accumulator import Acumulador, describir_mods
 
 # Cada cuanto se intenta vaciar la cola. Holgado a proposito: lo que la cola
 # guarda no se pierde, asi que apurarse no gana nada y sumaria un pedido
@@ -54,6 +54,7 @@ class Sincronizador:
         self._acumulador = None
         self._token = None
         self._encendidas = True
+        self._mods = {}
         self._base = account.API_POR_DEFECTO
         self._token_leido = 0.0
 
@@ -74,9 +75,14 @@ class Sincronizador:
                 return
             if self._acumulador is None:
                 self._acumulador = Acumulador()
+            self._acumulador.map_variant = describir_mods(self._mods, payload.get("game"))
             self._encolar(self._acumulador.tick(payload, raw, ahora))
         except Exception:
             logging.exception("El acumulador de la cuenta fallo (se sigue igual)")
+
+    def poner_mods(self, mods: dict | None) -> None:
+        """Los mods de mapa que leyo el cliente (ver refresh_map_mods)."""
+        self._mods = dict(mods or {})
 
     def cerrar_sesion(self) -> None:
         """El juego se cerro o el cliente se va."""
