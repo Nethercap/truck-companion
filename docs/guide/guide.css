@@ -13,7 +13,10 @@ html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
 a { color: var(--accent); }
 
-.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+/* header.top y no .top: los iconos de la barra de arriba de la app usan la
+   clase "top" (.ico.top) y se llevaban el padding de esta barra (quedaban de
+   4 px de ancho). */
+header.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
   padding: 0.6rem 1rem; background: rgba(13, 15, 18, 0.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-weight: 700; text-decoration: none; }
 .brand img { width: 1.4rem; height: 1.4rem; }
@@ -23,7 +26,7 @@ select { background: var(--panel); color: var(--text); border: 1px solid var(--b
   padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid var(--accent); }
 .btn.secondary { background: transparent; color: var(--text); border-color: var(--border); }
 .btn:hover { filter: brightness(1.1); }
-.top .btn { padding: 0.3rem 0.7rem; }
+header.top .btn { padding: 0.3rem 0.7rem; }
 
 main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 2rem; }
 h1 { font-size: 2rem; line-height: 1.2; margin: 0.5rem 0 0.6rem; }
@@ -88,5 +91,5 @@ footer a { color: var(--muted); }
 @media (max-width: 600px) {
   h1 { font-size: 1.6rem; }
   .toc ol { columns: 1; }
-  .top .btn { display: none; }
+  header.top .btn { display: none; }
 }
