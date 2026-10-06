@@ -6,14 +6,19 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
-- Accounts (still switched off): closing the game in the middle of a job no
+- Accounts are here, optional and free. Link a Truck Dash account from "Setup & status"
+  and every job you drive is saved: the route on a map, distance, pay, fuel and time,
+  with your logbook, stats, countries and achievements at trucksim-dash.com/account.
+  Sign in with Discord, Google or email. Nothing is saved until you link it.
+- "My account" in the tray menu, and a one-time notice for existing users.
+- Accounts: closing the game in the middle of a job no
   longer loses the driving since the last save of the trip, up to two
   minutes of distance, route and fuel. The trip is sent as it was before
   the client lets go of it.
-- Accounts (still switched off): cancelling a job sends the penalty the
+- Accounts: cancelling a job sends the penalty the
   game charged, so the account shows what the cancellation cost instead of
   the pay that was offered and never collected.
-- Accounts (still switched off): when the accounts server answers with an
+- Accounts: when the accounts server answers with an
   error, the log says which one. Sending is retried as before.
 
 ## 1.5.26 (2026-10-05)

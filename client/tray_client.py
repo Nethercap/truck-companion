@@ -58,6 +58,7 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
 DEFAULT_WEB_URL = "https://trucksim-dash.com/app/"
+URL_CUENTA = "https://trucksim-dash.com/account/"
 DONATE_URL = ""  # Ko-fi / GitHub Sponsors - vacio hasta tener uno (el item del menu no aparece)
 
 LOG_PATH = os.path.join(win_integration.base_dir(), "truckdash.log")
@@ -274,7 +275,9 @@ GRACIA_CIERRE = 60
 #     set TRUCKDASH_CUENTAS=1  (Windows)   export TRUCKDASH_CUENTAS=1 (Linux)
 # Asi la prueba no pasa por editar un archivo que despues hay que acordarse
 # de volver atras antes de publicar.
-CUENTAS_VISIBLES = os.environ.get("TRUCKDASH_CUENTAS") == "1"
+# Encendidas desde la 1.5.27. TRUCKDASH_CUENTAS=0 las esconde (para probar
+# como se ve el cliente sin ellas).
+CUENTAS_VISIBLES = os.environ.get("TRUCKDASH_CUENTAS", "1") != "0"
 
 
 def debe_cerrarse(vio_el_juego: bool, opcion_activa: bool,
@@ -297,6 +300,34 @@ BLUE = "#3b9eff"
 GREEN = "#4caf50"
 ORANGE = "#ff8a3d"
 RED = "#ff6b6b"
+CARD = "#1a2130"  # el recuadro de la cuenta
+
+
+def open_account_menu_item(icon=None, item=None):
+    """Con cuenta, a la web de la cuenta; sin cuenta, a Setup, que es donde
+    se vincula y donde esta la explicacion."""
+    if account.token_guardado(win_integration.load_settings()):
+        abrir_navegador(URL_CUENTA)
+    else:
+        open_setup_window()
+
+
+def anunciar_cuentas(icon) -> bool:
+    """Una sola vez, a quien ya usaba el cliente antes de las cuentas: un
+    aviso de Windows de que existen y donde se vinculan. Quien recien
+    instala ve la explicacion en Setup, que se abre sola la primera vez.
+    Devuelve si aviso."""
+    settings = win_integration.load_settings()
+    if (not CUENTAS_VISIBLES or settings.get("accounts_announced")
+            or account.token_guardado(settings) or not settings.get("first_run_done")):
+        return False
+    settings["accounts_announced"] = True
+    win_integration.save_settings(settings)
+    try:
+        icon.notify(T("notify_accounts"), "Truck Dash")
+    except Exception as exc:  # bajo Wine o sin soporte de avisos: no pasa nada
+        logging.info("No se pudo mostrar el aviso de cuentas: %s", exc)
+    return True
 
 
 def open_setup_window(icon=None, item=None):
@@ -372,6 +403,13 @@ class SetupWindow:
         self.button(code_row, T("open_dashboard"), self.open_dashboard, primary=True).pack(side="left", padx=4)
         self.label(status_frame, T("phone_hint"), fg=MUTED, wraplength=520).pack(anchor="w")
 
+        # --- Cuenta ---
+        # Opcional a proposito: todo el cliente funciona sin vincular nada, y
+        # esto solo agrega que los viajes queden guardados. Va arriba, despues
+        # del estado: es lo nuevo, y abajo de las opciones nadie la veia.
+        if CUENTAS_VISIBLES:
+            self.build_account_section()
+
         # --- Modo LAN ---
         lan_frame = self.section(T("sec_lan"))
         lan_row = tk.Frame(lan_frame, bg=BG)
@@ -446,12 +484,6 @@ class SetupWindow:
                               selectcolor="#262b33", activebackground=BG, activeforeground=FG,
                               wraplength=520, justify="left")
         bchk.pack(anchor="w", pady=(2, 0))
-
-        # --- Cuenta ---
-        # Opcional a proposito: todo el cliente funciona sin vincular nada, y
-        # esto solo agrega que los viajes queden guardados.
-        if CUENTAS_VISIBLES:
-            self.build_account_section()
 
         # --- Update ---
         # --- Update ---
@@ -544,18 +576,47 @@ class SetupWindow:
 
     def build_account_section(self):
         cuenta = self.section(T("sec_account"))
-        self.account_label = self.label(cuenta, "", wraplength=520)
+        # Recuadro con borde azul: sin vincular, explica en dos lineas que
+        # gana uno; vinculado, queda solo el estado y el boton a la cuenta.
+        caja = tk.Frame(cuenta, bg=CARD, padx=12, pady=10,
+                        highlightbackground=BLUE, highlightthickness=1)
+        caja.pack(fill="x", pady=(4, 0))
+        self.account_pitch_title = self.label(caja, T("account_pitch_title"), bg=CARD,
+                                              font=("Segoe UI", 10, "bold"))
+        self.account_pitch = self.label(caja, T("account_pitch"), bg=CARD, fg=MUTED,
+                                        wraplength=500)
+        self.account_label = self.label(caja, "", bg=CARD, wraplength=500)
         self.account_label.pack(anchor="w")
-        fila = tk.Frame(cuenta, bg=BG)
+        fila = tk.Frame(caja, bg=CARD)
         fila.pack(anchor="w", pady=(6, 0))
         self.account_button = self.button(fila, T("account_link"),
                                           self.link_account, primary=True)
         self.account_button.pack(side="left")
-        self.account_code = self.label(fila, "", font=("Consolas", 16, "bold"), fg=BLUE)
+        # Vinculado: a la cuenta en la web, que es donde estan los viajes.
+        self.account_open = self.button(fila, T("account_open"), self.open_account, primary=True)
+        self.account_code = self.label(fila, "", bg=CARD, font=("Consolas", 16, "bold"), fg=BLUE)
         self.account_code.pack(side="left", padx=12)
         # Aparece solo con un codigo a la vista: el que se escribe en la web.
         self.account_copy = self.button(fila, T("copy"), self.copy_account_code)
         self.refresh_account()
+
+    def _mostrar_pitch(self, ver: bool):
+        """La explicacion solo sin cuenta; vinculado ya no hace falta venderla."""
+        for w in (self.account_pitch_title, self.account_pitch):
+            w.pack_forget()
+        if ver:
+            self.account_pitch_title.pack(anchor="w", before=self.account_label)
+            self.account_pitch.pack(anchor="w", pady=(2, 6), before=self.account_label)
+        # El de ir a la cuenta va primero cuando hay cuenta; desvincular queda
+        # al lado, gris.
+        self.account_open.pack_forget()
+        if not ver:
+            self.account_open.pack(side="left", padx=(0, 6), before=self.account_button)
+        self.account_button.configure(bg="#262b33" if not ver else BLUE,
+                                      activebackground="#333940" if not ver else "#2b8ef0")
+
+    def open_account(self):
+        abrir_navegador(URL_CUENTA)
 
     def set_account_code(self, codigo: str):
         self.account_code.configure(text=codigo)
@@ -600,6 +661,7 @@ class SetupWindow:
         no puede quedarse colgada por eso.
         """
         token = account.token_guardado(win_integration.load_settings())
+        self._mostrar_pitch(not token)
         if not token:
             self.account_label.configure(text=T("account_none"))
             self.account_button.configure(text=T("account_link"), state="normal")
@@ -1483,6 +1545,7 @@ def main():
     menu_items = [
         pystray.MenuItem(T("menu_setup"), open_setup_window, default=True),
         pystray.MenuItem(T("menu_open_dashboard"), open_web_menu_item),
+        pystray.MenuItem(T("menu_account"), open_account_menu_item, visible=CUENTAS_VISIBLES),
         pystray.MenuItem(T("menu_show_code"), show_code_notification),
         pystray.MenuItem(T("menu_lan"), show_lan_menu_item),
         pystray.MenuItem(T("menu_disconnect"), disconnect_session),
@@ -1496,7 +1559,14 @@ def main():
     menu_items.append(pystray.MenuItem(T("menu_quit"), quit_app))
     icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", pystray.Menu(*menu_items))
     state.icon = icon
-    icon.run()
+
+    def _al_mostrar_el_icono(ic):
+        # pystray pide hacerlo visible a mano cuando se le pasa setup.
+        ic.visible = True
+        # El aviso espera unos segundos: recien arrancado Windows lo pierde.
+        threading.Timer(8, lambda: anunciar_cuentas(ic)).start()
+
+    icon.run(setup=_al_mostrar_el_icono)
     sys.exit(0)
 
 

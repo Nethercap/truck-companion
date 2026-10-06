@@ -56,10 +56,10 @@ def ventana(monkeypatch, tmp_path, raiz):
 
     monkeypatch.setattr(plugin_installer, "find_game_installs", lambda: [])
     v = tray_client.SetupWindow()
-    # La seccion de cuenta esta apagada hasta que el cliente mande viajes,
-    # asi que las pruebas la construyen a mano: lo que se prueba es que
-    # funcione cuando se encienda, no que este visible hoy.
-    v.build_account_section()
+    # Desde la 1.5.27 la seccion de cuenta se arma sola; si alguien corre
+    # las pruebas con TRUCKDASH_CUENTAS=0, se arma a mano igual.
+    if not tray_client.CUENTAS_VISIBLES:
+        v.build_account_section()
     # Cada test arranca con la lista compartida vacia.
     tray_client.state.installs = []
     yield v, guardados
@@ -329,6 +329,46 @@ def test_con_cuenta_muestra_el_nombre_y_ofrece_desvincular(ventana, monkeypatch)
     v.refresh_account()
     _esperar(v, lambda: "Netherman" in v.account_label.cget("text"))
     assert v.account_button.cget("text") == tray_client.T("account_unlink")
+    # Vinculado: ya no se explica que es, y aparece el boton a la cuenta.
+    assert not v.account_pitch.winfo_manager()
+    assert v.account_open.winfo_manager()
+
+
+def test_sin_cuenta_explica_que_gana_uno(ventana):
+    v, _ = ventana
+    v.refresh_account()
+    assert v.account_pitch.winfo_manager() and v.account_pitch_title.winfo_manager()
+    assert "trucksim-dash.com/account" in v.account_pitch.cget("text")
+    assert not v.account_open.winfo_manager()
+
+
+def test_las_cuentas_vienen_encendidas():
+    assert tray_client.CUENTAS_VISIBLES
+
+
+class _IconoFalso:
+    def __init__(self):
+        self.avisos = []
+
+    def notify(self, texto, titulo):
+        self.avisos.append(texto)
+
+
+def test_el_aviso_de_cuentas_sale_una_sola_vez_y_solo_a_quien_ya_usaba_el_cliente(monkeypatch):
+    guardados = {"first_run_done": True}
+    monkeypatch.setattr(tray_client.win_integration, "load_settings", lambda: dict(guardados))
+    monkeypatch.setattr(tray_client.win_integration, "save_settings",
+                        lambda s: (guardados.clear(), guardados.update(s)))
+    icono = _IconoFalso()
+    assert tray_client.anunciar_cuentas(icono) is True
+    assert tray_client.anunciar_cuentas(icono) is False
+    assert len(icono.avisos) == 1
+    # Quien recien instala no: Setup se le abre solo y ahi esta la explicacion.
+    guardados.clear()
+    assert tray_client.anunciar_cuentas(_IconoFalso()) is False
+    # Ni quien ya vinculo.
+    guardados.update({"first_run_done": True, "account_token": "tok"})
+    assert tray_client.anunciar_cuentas(_IconoFalso()) is False
 
 
 def test_si_la_api_no_responde_no_se_borra_el_token(ventana, monkeypatch):

@@ -61,7 +61,7 @@ _STRINGS = {
         "sec_options": "OPTIONS",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "ACCOUNT (OPTIONAL)",
-        "account_none": "Not linked. Link a Truck Dash account and your trips get saved and synced. Everything else works without it.",
+        "account_none": 'Not linked.',
         "account_link": "Link account",
         "account_unlink": "Unlink",
         "account_unlinked": "Account unlinked from this PC.",
@@ -115,6 +115,11 @@ _STRINGS = {
         "menu_report": "Report a problem",
         "menu_support": "Support Truck Dash",
         "menu_quit": "Quit",
+        "account_pitch_title": 'New: save your trips (optional, free)',
+        "account_pitch": 'Link a free Truck Dash account and every job you drive is saved: the route on a map, distance, pay, fuel and time. Your logbook, stats, countries and achievements are at trucksim-dash.com/account. Sign in with Discord, Google or email. Nothing is saved until you link it.',
+        "account_open": 'Open my account',
+        "menu_account": 'My account',
+        "notify_accounts": 'New: save your trips with a free account. Open "Setup & status" and click "Link account".',
     },
     "es": {
         "status_starting": "Iniciando...",
@@ -167,7 +172,7 @@ _STRINGS = {
         "sec_options": "OPCIONES",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "CUENTA (OPCIONAL)",
-        "account_none": "Sin vincular. Vinculá una cuenta de Truck Dash y tus viajes quedan guardados y sincronizados. Todo lo demás funciona igual sin eso.",
+        "account_none": 'Sin vincular.',
         "account_link": "Vincular cuenta",
         "account_unlink": "Desvincular",
         "account_unlinked": "Cuenta desvinculada de esta PC.",
@@ -221,6 +226,11 @@ _STRINGS = {
         "menu_report": "Reportar un problema",
         "menu_support": "Apoyar a Truck Dash",
         "menu_quit": "Salir",
+        "account_pitch_title": 'Nuevo: guardá tus viajes (opcional, gratis)',
+        "account_pitch": 'Vinculá una cuenta gratis de Truck Dash y cada trabajo que manejás queda guardado: el recorrido en un mapa, la distancia, la plata, el combustible y el tiempo. Tu logbook, estadísticas, países y logros están en trucksim-dash.com/account. Entrás con Discord, Google o mail. No se guarda nada hasta que la vinculás.',
+        "account_open": 'Abrir mi cuenta',
+        "menu_account": 'Mi cuenta',
+        "notify_accounts": 'Nuevo: guardá tus viajes con una cuenta gratis. Abrí "Configuración y estado" y tocá "Vincular cuenta".',
     },
     "de": {
         "status_starting": "Starte...",
@@ -273,7 +283,7 @@ _STRINGS = {
         "sec_options": "OPTIONEN",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "KONTO (OPTIONAL)",
-        "account_none": "Nicht verknüpft. Verknüpfe ein Truck-Dash-Konto und deine Fahrten werden gespeichert und synchronisiert. Alles andere geht auch ohne.",
+        "account_none": 'Nicht verknüpft.',
         "account_link": "Konto verknüpfen",
         "account_unlink": "Trennen",
         "account_unlinked": "Konto von diesem PC getrennt.",
@@ -327,6 +337,11 @@ _STRINGS = {
         "menu_report": "Problem melden",
         "menu_support": "Truck Dash unterstützen",
         "menu_quit": "Beenden",
+        "account_pitch_title": 'Neu: Fahrten speichern (optional, kostenlos)',
+        "account_pitch": 'Verknüpfe ein kostenloses Truck-Dash-Konto und jeder Auftrag, den du fährst, wird gespeichert: die Route auf einer Karte, Strecke, Lohn, Kraftstoff und Zeit. Fahrtenbuch, Statistiken, Länder und Erfolge findest du auf trucksim-dash.com/account. Anmeldung mit Discord, Google oder E-Mail. Gespeichert wird erst, wenn du es verknüpfst.',
+        "account_open": 'Mein Konto öffnen',
+        "menu_account": 'Mein Konto',
+        "notify_accounts": 'Neu: Speichere deine Fahrten mit einem kostenlosen Konto. Öffne "Einrichtung & Status" und klicke auf "Konto verknüpfen".',
     },
     "fr": {
         "status_starting": "Démarrage...",
@@ -379,7 +394,7 @@ _STRINGS = {
         "sec_options": "OPTIONS",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "COMPTE (OPTIONNEL)",
-        "account_none": "Non lié. Lie un compte Truck Dash et tes trajets seront enregistrés et synchronisés. Tout le reste fonctionne sans.",
+        "account_none": 'Non lié.',
         "account_link": "Lier un compte",
         "account_unlink": "Délier",
         "account_unlinked": "Compte délié de ce PC.",
@@ -433,6 +448,11 @@ _STRINGS = {
         "menu_report": "Signaler un problème",
         "menu_support": "Soutenir Truck Dash",
         "menu_quit": "Quitter",
+        "account_pitch_title": 'Nouveau : enregistre tes trajets (facultatif, gratuit)',
+        "account_pitch": "Lie un compte Truck Dash gratuit et chaque mission que tu conduis est enregistrée : l'itinéraire sur une carte, la distance, la paie, le carburant et le temps. Ton carnet de route, tes statistiques, pays et succès sont sur trucksim-dash.com/account. Connexion avec Discord, Google ou e-mail. Rien n'est enregistré tant que tu ne le lies pas.",
+        "account_open": 'Ouvrir mon compte',
+        "menu_account": 'Mon compte',
+        "notify_accounts": 'Nouveau : enregistre tes trajets avec un compte gratuit. Ouvre "Configuration et état" et clique sur "Lier un compte".',
     },
     "pt": {
         "status_starting": "Iniciando...",
@@ -485,7 +505,7 @@ _STRINGS = {
         "sec_options": "OPÇÕES",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "CONTA (OPCIONAL)",
-        "account_none": "Não vinculada. Vincule uma conta do Truck Dash e suas viagens ficam salvas e sincronizadas. Todo o resto funciona sem isso.",
+        "account_none": 'Não vinculada.',
         "account_link": "Vincular conta",
         "account_unlink": "Desvincular",
         "account_unlinked": "Conta desvinculada deste PC.",
@@ -539,6 +559,11 @@ _STRINGS = {
         "menu_report": "Relatar um problema",
         "menu_support": "Apoiar o Truck Dash",
         "menu_quit": "Sair",
+        "account_pitch_title": 'Novo: salve suas viagens (opcional, grátis)',
+        "account_pitch": 'Vincule uma conta grátis do Truck Dash e cada entrega que você dirige fica salva: a rota num mapa, a distância, o pagamento, o combustível e o tempo. Seu diário de bordo, estatísticas, países e conquistas ficam em trucksim-dash.com/account. Entre com Discord, Google ou e-mail. Nada é salvo até você vincular.',
+        "account_open": 'Abrir minha conta',
+        "menu_account": 'Minha conta',
+        "notify_accounts": 'Novo: salve suas viagens com uma conta grátis. Abra "Configuração e status" e clique em "Vincular conta".',
     },
     "pl": {
         "status_starting": "Uruchamianie...",
@@ -591,7 +616,7 @@ _STRINGS = {
         "sec_options": "OPCJE",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "KONTO (OPCJONALNE)",
-        "account_none": "Niepowiązane. Powiąż konto Truck Dash, a Twoje trasy będą zapisywane i synchronizowane. Cała reszta działa i bez tego.",
+        "account_none": 'Niepowiązane.',
         "account_link": "Powiąż konto",
         "account_unlink": "Odłącz",
         "account_unlinked": "Konto odłączone od tego komputera.",
@@ -645,6 +670,11 @@ _STRINGS = {
         "menu_report": "Zgłoś problem",
         "menu_support": "Wesprzyj Truck Dash",
         "menu_quit": "Zakończ",
+        "account_pitch_title": 'Nowość: zapisuj swoje trasy (opcjonalnie, za darmo)',
+        "account_pitch": 'Powiąż darmowe konto Truck Dash, a każde zlecenie, które przejedziesz, zostanie zapisane: trasa na mapie, dystans, zarobek, paliwo i czas. Dziennik, statystyki, kraje i osiągnięcia znajdziesz na trucksim-dash.com/account. Logowanie przez Discord, Google lub e-mail. Nic nie jest zapisywane, dopóki nie powiążesz konta.',
+        "account_open": 'Otwórz moje konto',
+        "menu_account": 'Moje konto',
+        "notify_accounts": 'Nowość: zapisuj swoje trasy z darmowym kontem. Otwórz "Konfiguracja i stan" i kliknij "Powiąż konto".',
     },
     "tr": {
         "status_starting": "Başlatılıyor...",
@@ -697,7 +727,7 @@ _STRINGS = {
         "sec_options": "SEÇENEKLER",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "HESAP (İSTEĞE BAĞLI)",
-        "account_none": "Bağlı değil. Bir Truck Dash hesabı bağla, seferlerin kaydedilsin ve eşitlensin. Geri kalan her şey bağlamadan da çalışır.",
+        "account_none": 'Bağlı değil.',
         "account_link": "Hesap bağla",
         "account_unlink": "Bağlantıyı kaldır",
         "account_unlinked": "Hesap bu bilgisayardan ayrıldı.",
@@ -751,6 +781,11 @@ _STRINGS = {
         "menu_report": "Sorun bildir",
         "menu_support": "Truck Dash'i destekle",
         "menu_quit": "Çık",
+        "account_pitch_title": 'Yeni: seferlerini kaydet (isteğe bağlı, ücretsiz)',
+        "account_pitch": 'Ücretsiz bir Truck Dash hesabı bağla, sürdüğün her iş kaydedilsin: haritada rota, mesafe, kazanç, yakıt ve süre. Seyir defterin, istatistiklerin, ülkelerin ve başarımların trucksim-dash.com/account adresinde. Discord, Google veya e-posta ile giriş yap. Bağlayana kadar hiçbir şey kaydedilmez.',
+        "account_open": 'Hesabımı aç',
+        "menu_account": 'Hesabım',
+        "notify_accounts": 'Yeni: ücretsiz bir hesapla seferlerini kaydet. "Kurulum ve durum"u aç ve "Hesap bağla"ya tıkla.',
     },
     "ru": {
         "status_starting": "Запуск...",
@@ -803,7 +838,7 @@ _STRINGS = {
         "sec_options": "ПАРАМЕТРЫ",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "АККАУНТ (НЕОБЯЗАТЕЛЬНО)",
-        "account_none": "Не привязан. Привяжите аккаунт Truck Dash, и рейсы будут сохраняться и синхронизироваться. Всё остальное работает и без этого.",
+        "account_none": 'Не привязан.',
         "account_link": "Привязать аккаунт",
         "account_unlink": "Отвязать",
         "account_unlinked": "Аккаунт отвязан от этого ПК.",
@@ -857,6 +892,11 @@ _STRINGS = {
         "menu_report": "Сообщить о проблеме",
         "menu_support": "Поддержать Truck Dash",
         "menu_quit": "Выход",
+        "account_pitch_title": 'Новое: сохраняйте свои рейсы (необязательно, бесплатно)',
+        "account_pitch": 'Привяжите бесплатный аккаунт Truck Dash, и каждый ваш рейс будет сохраняться: маршрут на карте, расстояние, оплата, топливо и время. Журнал, статистика, страны и достижения — на trucksim-dash.com/account. Вход через Discord, Google или почту. Ничего не сохраняется, пока вы не привяжете аккаунт.',
+        "account_open": 'Открыть мой аккаунт',
+        "menu_account": 'Мой аккаунт',
+        "notify_accounts": 'Новое: сохраняйте рейсы с бесплатным аккаунтом. Откройте «Настройка и состояние» и нажмите «Привязать аккаунт».',
     },
 }
 
