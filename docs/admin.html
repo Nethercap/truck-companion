@@ -78,6 +78,13 @@
   td.muted, .muted { color: var(--muted); font-size: 0.78rem; white-space: normal; }
   a { color: var(--blue); }
   [hidden] { display: none !important; }
+  .titleForm { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+  .titleForm input { min-width: 180px; }
+  .titleForm .msg { font-size: 0.82rem; color: var(--muted); }
+  .titleForm .msg.err { color: var(--danger); }
+  .titleForm .msg.ok { color: var(--ok); }
+  .titulo { color: #ffb020; font-size: 0.78rem; }
+  td .linkish { background: none; border: none; padding: 0; color: var(--blue); cursor: pointer; font-size: inherit; }
 </style>
 </head>
 <body>
@@ -147,6 +154,21 @@
         <tbody id="accTripsBody"></tbody>
       </table></div>
       <div class="pager" data-for="accTripsBody"></div>
+      <!-- Titulos de agradecimiento (gente de Discord): el texto lo elige la
+           persona, se carga aca. Sale al lado del nombre en su cuenta y en
+           su perfil publico. Vacio = sacarlo. -->
+      <h3>Titles</h3>
+      <form class="titleForm" id="titleForm" autocomplete="off">
+        <input id="titleUser" placeholder="username" required />
+        <input id="titleText" placeholder="title (empty = remove)" maxlength="32" />
+        <button type="submit" id="titleBtn">Save title</button>
+        <span class="msg" id="titleMsg"></span>
+      </form>
+      <div class="tableWrap" style="margin-top:0.6rem"><table>
+        <thead><tr><th>Username</th><th>Title</th><th></th></tr></thead>
+        <tbody id="accTitlesBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="accTitlesBody"></div>
       <h3>Latest users</h3>
       <div class="tableWrap"><table>
         <thead><tr><th>Username</th><th>Created</th><th>Last login</th><th>Sign-in</th><th>Client</th><th>Trips</th><th>Public</th></tr></thead>
@@ -186,6 +208,7 @@ const STORAGE_KEY = 'truckdash_admin_key';
 const SECTIONS_KEY = 'truckdash_admin_closed';
 const RELAY_URL = 'https://truck-companion-production.up.railway.app/admin/stats';
 const ACCOUNTS_URL = 'https://api.trucksim-dash.com/admin/stats';
+const TITLE_URL = 'https://api.trucksim-dash.com/admin/title';
 const PAGE = 10;
 
 const statusEl = document.getElementById('status');
@@ -298,7 +321,7 @@ function pintarCuentas(d) {
     </tr>`), 'No trips yet', 9);
   paginar('accUsersBody', (d.latest_users || []).map(x => `
     <tr>
-      <td>${escapeHtml(x.username || '(no name yet)')}</td>
+      <td>${escapeHtml(x.username || '(no name yet)')}${x.title ? ` <span class="titulo">★ ${escapeHtml(x.title)}</span>` : ''}</td>
       <td>${fecha(x.created_at)}</td>
       <td>${fecha(x.last_login_at)}</td>
       <td>${escapeHtml((x.logins || []).join(', '))}</td>
@@ -306,6 +329,12 @@ function pintarCuentas(d) {
       <td>${fmt(x.trips)}</td>
       <td>${x.public ? 'yes' : '-'}</td>
     </tr>`), 'No users yet', 7);
+  paginar('accTitlesBody', (d.titled_users || []).map(x => `
+    <tr>
+      <td>${escapeHtml(x.username)}</td>
+      <td class="titulo">★ ${escapeHtml(x.title)}</td>
+      <td><button type="button" class="linkish" data-edit-title="${escapeHtml(x.username)}" data-title="${escapeHtml(x.title)}">edit</button></td>
+    </tr>`), 'Nobody has a title yet', 3);
   $('accountsNote').textContent = '';
   $('accountsSec').hidden = false;
 }
@@ -335,6 +364,38 @@ async function loadStats() {
   statusEl.textContent = `${new Date().toLocaleTimeString()} · ${partes.join(' · ')}`;
   statusEl.className = 'status' + (partes.every(p => p.endsWith(' ok')) ? '' : ' err');
 }
+
+// ---- titulos ----
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-edit-title]');
+  if (!b) return;
+  $('titleUser').value = b.dataset.editTitle;
+  $('titleText').value = b.dataset.title;
+  $('titleText').focus();
+});
+const TITLE_ERRORS = { no_existe: 'no user with that name', titulo_largo: 'too long, 32 characters at most', prohibido: 'invalid key (403)' };
+$('titleForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = $('titleMsg');
+  const key = keyInput.value.trim();
+  const body = { username: $('titleUser').value.trim(), title: $('titleText').value.trim() || null };
+  $('titleBtn').disabled = true;
+  msg.className = 'msg'; msg.textContent = 'Saving...';
+  try {
+    const res = await fetch(TITLE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify(body) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(TITLE_ERRORS[d.error] || `HTTP ${res.status}`);
+    msg.className = 'msg ok';
+    msg.textContent = d.title ? `${d.username}: "${d.title}"` : `${d.username}: title removed`;
+    $('titleText').value = '';
+    const r = await traer(ACCOUNTS_URL, key);
+    if (r.datos) pintarCuentas(r.datos);
+  } catch (err) {
+    msg.className = 'msg err'; msg.textContent = err.message;
+  } finally {
+    $('titleBtn').disabled = false;
+  }
+});
 
 $('loadBtn').addEventListener('click', loadStats);
 keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadStats(); });

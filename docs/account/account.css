@@ -122,6 +122,13 @@ input[type="text"], #usernameInput {
 .who { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; }
 .who img { width: 64px; height: 64px; border-radius: 50%; background: var(--panel); }
 .who h1 { margin: 0; }
+.titulo-usuario {
+  display: inline-flex; align-items: center; gap: 0.3rem; margin: 0.25rem 0 0.1rem;
+  font-size: 0.8rem; font-weight: 600; color: var(--warn);
+  border: 1px solid var(--warn); border-radius: 999px; padding: 0.05rem 0.6rem;
+}
+.titulo-usuario::before { content: '\2605'; }
+.titulo-usuario[hidden] { display: none; }
 
 .logins, .sessions { list-style: none; margin: 0; padding: 0; }
 .logins li, .sessions li {

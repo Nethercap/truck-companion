@@ -985,8 +985,14 @@
     });
   }
 
+  function pintarTitulo(titulo) {
+    $('userTitle').textContent = titulo || '';
+    $('userTitle').hidden = !titulo;
+  }
+
   function pintarCuenta() {
     $('displayName').textContent = t('welcomeBack', usuario.username || '');
+    pintarTitulo(usuario.title);
     $('currentUsername').textContent = usuario.username || '';
     $('memberSince').textContent = t('memberSince', fecha(usuario.creado));
     if (usuario.avatar_url) {
@@ -2031,6 +2037,7 @@
     const p = perfilPublico;
     if (!p) return;
     $('displayName').textContent = p.user.username;
+    pintarTitulo(p.user.title);
     $('dashLabel').textContent = t('publicLabel');
     $('memberSince').textContent = t('memberSince', fecha(p.user.creado));
     if (p.user.avatar_url) { $('avatar').src = p.user.avatar_url; $('avatar').hidden = false; }
