@@ -152,6 +152,7 @@ GUIDE_TEXT.de = {
 <h3>Gut zu wissen</h3>
 <ul>
 <li>Gespeichert wird erst, wenn du den Client verknüpfst. Dein Profil ist privat, außer du machst es in den <b>Einstellungen</b> öffentlich.</li>
+<li>Unter <b>Folge ich</b> kannst du anderen Fahrern über ihren Benutzernamen folgen. Sie müssen zustimmen, und wen du annimmst, sieht deine Fahrten mit Route, wo du gerade fährst und deine Erfolge, auch wenn dein Profil privat ist. Deine Notizen bleiben deine.</li>
 <li>Lieferst du einen Auftrag bei geschlossenem Truck Dash ab, sehen wir die Lieferung nicht und die Fahrt gilt als <b>unvollständig</b>. Du kannst sie als storniert markieren, aber eine Lieferung kann nur das Spiel melden.</li>
 <li>Eine Weile kein Internet? Nichts geht verloren: Der Client behält die Fahrt und schickt sie, sobald du wieder online bist.</li>
 <li>Aufträge mit einem Geld-Mod werden markiert und nicht zu deinen Geldsummen gezählt.</li>
@@ -345,6 +346,7 @@ GUIDE_TEXT.fr = {
 <h3>Bon à savoir</h3>
 <ul>
 <li>Rien n'est enregistré avant de lier le client. Votre profil est privé, sauf si vous le rendez public dans les <b>Paramètres</b>.</li>
+<li>Dans <b>Abonnements</b>, vous pouvez suivre d’autres conducteurs par leur nom d’utilisateur. Il faut leur accord, et les personnes que vous acceptez voient vos trajets avec leur itinéraire, où vous êtes quand vous conduisez et vos succès, même si votre profil est privé. Vos notes restent à vous.</li>
 <li>Si vous livrez une mission avec Truck Dash fermé, nous ne voyons pas la livraison et le trajet apparaît comme <b>inachevé</b>. Vous pouvez le marquer comme annulé, mais seul le jeu peut signaler une livraison.</li>
 <li>Pas d'internet pendant un moment ? Rien n'est perdu : le client garde le trajet et l'envoie dès que vous êtes de nouveau en ligne.</li>
 <li>Les missions avec un mod d'argent sont marquées et exclues de vos totaux d'argent.</li>
@@ -538,6 +540,7 @@ GUIDE_TEXT.pt = {
 <h3>Bom saber</h3>
 <ul>
 <li>Nada é salvo até você vincular o cliente. Seu perfil é privado, a menos que você o torne público em <b>Configurações</b>.</li>
+<li>Em <b>Seguindo</b> você pode seguir outros motoristas pelo nome de usuário. É preciso que aceitem, e quem você aceitar vê suas viagens com a rota, onde você está enquanto dirige e suas conquistas, mesmo com o perfil privado. Suas notas continuam só suas.</li>
 <li>Se você entregar com o Truck Dash fechado, não vemos a entrega e a viagem aparece como <b>sem terminar</b>. Você pode marcá-la como cancelada, mas só o jogo pode informar uma entrega.</li>
 <li>Ficou sem internet um tempo? Nada se perde: o cliente guarda a viagem e envia quando a conexão voltar.</li>
 <li>Entregas com um mod de dinheiro ficam marcadas e fora dos seus totais de dinheiro.</li>
@@ -731,6 +734,7 @@ GUIDE_TEXT.pl = {
 <h3>Warto wiedzieć</h3>
 <ul>
 <li>Nic nie jest zapisywane, dopóki nie powiążesz klienta. Twój profil jest prywatny, chyba że udostępnisz go publicznie w <b>Ustawieniach</b>.</li>
+<li>W <b>Obserwowanych</b> możesz obserwować innych kierowców po nazwie użytkownika. Muszą to zaakceptować, a osoby, które zaakceptujesz, widzą twoje trasy z przebiegiem, gdzie jesteś podczas jazdy i twoje osiągnięcia, nawet przy prywatnym profilu. Notatki zostają tylko twoje.</li>
 <li>Jeśli dostarczysz zlecenie przy zamkniętym Truck Dash, nie widzimy dostarczenia i trasa jest oznaczona jako <b>niedokończona</b>. Możesz oznaczyć ją jako anulowaną, ale dostarczenie może zgłosić tylko gra.</li>
 <li>Nie masz przez chwilę internetu? Nic nie ginie: klient zachowuje trasę i wysyła ją, gdy wrócisz do sieci.</li>
 <li>Zlecenia z modem pieniędzy są oznaczone i nie wliczają się do sum pieniędzy.</li>
@@ -924,6 +928,7 @@ GUIDE_TEXT.tr = {
 <h3>Bilmekte fayda var</h3>
 <ul>
 <li>İstemciyi bağlayana kadar hiçbir şey kaydedilmez. Profilin, <b>Ayarlar</b>'dan herkese açık yapmadığın sürece gizlidir.</li>
+<li><b>Takip</b> bölümünden diğer sürücüleri kullanıcı adıyla takip edebilirsin. Onaylamaları gerekir; kabul ettiğin kişiler profilin gizli olsa bile seferlerini rotalarıyla, sürerken nerede olduğunu ve başarımlarını görür. Notların sende kalır.</li>
 <li>Bir işi Truck Dash kapalıyken teslim edersen teslimatı göremeyiz ve sefer <b>tamamlanmadı</b> olarak görünür. İptal edildi olarak işaretleyebilirsin, ama teslimatı yalnızca oyun bildirebilir.</li>
 <li>Bir süre internetin mi yok? Hiçbir şey kaybolmaz: istemci seferi saklar ve bağlantı gelince gönderir.</li>
 <li>Para modu kullanılan işler işaretlenir ve para toplamlarına katılmaz.</li>
@@ -1117,6 +1122,7 @@ GUIDE_TEXT.ru = {
 <h3>Полезно знать</h3>
 <ul>
 <li>Ничего не сохраняется, пока вы не привяжете клиент. Профиль закрыт, если вы не сделаете его публичным в <b>Настройках</b>.</li>
+<li>В разделе <b>Подписки</b> можно подписаться на других водителей по имени пользователя. Нужно их подтверждение, а те, кого вы приняли, видят ваши рейсы с маршрутом, где вы сейчас едете и ваши достижения, даже если профиль закрыт. Заметки остаются только вашими.</li>
 <li>Если вы доставили груз при закрытом Truck Dash, мы не видим доставку, и рейс отображается как <b>не завершён</b>. Его можно отметить как отменённый, но о доставке может сообщить только игра.</li>
 <li>Пропал интернет? Ничего не теряется: клиент сохраняет рейс и отправит его, когда связь вернётся.</li>
 <li>Рейсы с модом на деньги помечаются и не входят в денежные итоги.</li>

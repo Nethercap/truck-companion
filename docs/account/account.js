@@ -70,12 +70,13 @@
   const TRANSLATIONS = {
     en: {
       statsTitle: 'Your stats',
+      statsTitlePublic: 'Stats',
       statsTrips: 'Trips',
       statsDelivered: 'Delivered',
       statsOnTime: 'On time',
       statsLate: 'Late',
       statsUnfinished: 'Unfinished',
-      statsDistance: 'In trips',
+      statsDistance: "Distance on jobs",
       statsWheel: 'At the wheel',
       statsTopSpeed: 'Top speed',
       statsDamage: 'Avg damage',
@@ -150,7 +151,7 @@
       exportCsv: "Export CSV",
       publicLabel: "Driver profile",
       publicNotFound: "This profile does not exist or is private.",
-      publicLinkLabel: "Your public profile:",
+      publicLinkLabel: "Your profile link:",
       copyLink: "Copy",
       linkCopied: "Link copied",
       activityTitle: "Activity",
@@ -170,6 +171,14 @@
       topCars: "Most used cars",
       fuelByCarTitle: "Fuel by car",
       statsAvgFuel: "Avg consumption",
+      drivingStarted: (r) => 'started ' + r,
+      statsNet: "Net before fuel",
+      tripNoteAdd: "Add a note",
+      publicLinkPrivate: "Your profile is private: people who open this link can ask to follow you, and only those you accept see your trips.",
+      filterSearch: "Search",
+      filterSearchPh: "City, cargo, truck",
+      statsTabTrucks: "Trucks",
+      statsTabCars: "Cars",
       topCargo: "Most hauled cargo",
       topCompanies: "Most worked companies",
       topCities: "Most visited cities",
@@ -276,7 +285,7 @@
       tripFines: 'Fines',
       tripFerries: 'Ferries',
       tripDamage: 'Damage',
-      tripRemove: 'Remove',
+      tripRemove: "Delete trip",
       tripRemoveSure: 'Remove for good?',
       loading: 'Loading...',
       offline: "Can't reach the account service right now. Try again in a minute.",
@@ -389,12 +398,13 @@
     },
     es: {
       statsTitle: 'Tus estadisticas',
+      statsTitlePublic: 'Estadisticas',
       statsTrips: 'Viajes',
       statsDelivered: 'Entregados',
       statsOnTime: 'A tiempo',
       statsLate: 'Tarde',
       statsUnfinished: 'Sin terminar',
-      statsDistance: 'En viajes',
+      statsDistance: "Distancia en trabajos",
       statsWheel: 'Al volante',
       statsTopSpeed: 'Maxima',
       statsDamage: 'Daño promedio',
@@ -469,7 +479,7 @@
       exportCsv: "Exportar CSV",
       publicLabel: "Perfil del conductor",
       publicNotFound: "Este perfil no existe o es privado.",
-      publicLinkLabel: "Tu perfil publico:",
+      publicLinkLabel: "El link a tu perfil:",
       copyLink: "Copiar",
       linkCopied: "Link copiado",
       activityTitle: "Actividad",
@@ -489,6 +499,14 @@
       topCars: "Autos mas usados",
       fuelByCarTitle: "Consumo por auto",
       statsAvgFuel: "Consumo promedio",
+      drivingStarted: (r) => 'empezó ' + r,
+      statsNet: "Neto sin combustible",
+      tripNoteAdd: "Agregar una nota",
+      publicLinkPrivate: "Tu perfil es privado: quien abra este link puede pedir seguirte, y solo los que aceptes ven tus viajes.",
+      filterSearch: "Buscar",
+      filterSearchPh: "Ciudad, carga, camión",
+      statsTabTrucks: "Camiones",
+      statsTabCars: "Autos",
       topCargo: "Cargas mas llevadas",
       topCompanies: "Empresas mas trabajadas",
       topCities: "Ciudades mas visitadas",
@@ -595,7 +613,7 @@
       tripFines: 'Multas',
       tripFerries: 'Ferries',
       tripDamage: 'Daño',
-      tripRemove: 'Borrar',
+      tripRemove: "Borrar viaje",
       tripRemoveSure: '¿Borrar para siempre?',
       loading: 'Cargando...',
       offline: 'No se puede contactar al servicio de cuentas. Proba de nuevo en un minuto.',
@@ -1122,8 +1140,10 @@
   }
 
   function pintarLinkPublico() {
-    const visible = !!(usuario && usuario.is_public && usuario.username);
+    // Tambien con el perfil privado: el link sirve para que te pidan seguirte.
+    const visible = !!(usuario && usuario.username);
     $('publicLink').hidden = !visible;
+    $('publicLinkHint').hidden = !visible || !!usuario.is_public;
     if (visible) {
       $('publicLinkUrl').href = linkPublico();
       $('publicLinkUrl').textContent = linkPublico().replace(/^https?:\/\//, '');
@@ -1499,12 +1519,15 @@
     if (nodo) caja.appendChild(nodo);
   }
 
-  function bloqueJuego(s) {
+  function bloqueJuego(s, conTitulo) {
     const caja = document.createElement('div');
     caja.className = 'juego';
-    const titulo = document.createElement('h3');
-    titulo.textContent = (s.game || '').toUpperCase();
-    caja.appendChild(titulo);
+    // Con dos juegos el nombre ya esta en la solapa.
+    if (conTitulo) {
+      const titulo = document.createElement('h3');
+      titulo.textContent = (s.game || '').toUpperCase();
+      caja.appendChild(titulo);
+    }
 
     const cifras = document.createElement('div');
     cifras.className = 'cifras';
@@ -1539,6 +1562,14 @@
         m.ferries ? t('tripFerries') + ' ' + plata(m.ferries, m.currency) : null,
         m.penalties ? t('statsPenalties') + ' ' + plata(m.penalties, m.currency) : null
       ]));
+      // Lo que quedo despues de peajes, multas, ferries y penalidades. El
+      // combustible no: el juego no dice cuanto se pago.
+      const gastos = (m.tolls || 0) + (m.fines || 0) + (m.ferries || 0) + (m.penalties || 0);
+      if (gastos) {
+        const neto = renglon([t('statsNet') + ' ' + plata(m.revenue - gastos, m.currency)]);
+        neto.classList.add('neto');
+        caja.appendChild(neto);
+      }
     });
     // Por que la plata no cierra con la cantidad de viajes.
     if (s.modded) {
@@ -1551,18 +1582,43 @@
     if ((s.countries || []).length) {
       caja.appendChild(listaDePaises(s.countries, t('statsCountries')));
     }
-    // Lo mas repetido, de a tres.
+    // Lo mas repetido, de a tres. Lugares y empresas son de todo lo
+    // manejado; vehiculo y carga van con cada vehiculo, mas abajo.
     const top = s.top || {};
     const tops = document.createElement('div');
     tops.className = 'tops';
     [
       listaTop(t(s.game === 'ats' ? 'topStates' : 'topCountries'), top.regions,
                (r) => nombreDeRegion(r, s.game) || '?'),
-      listaTop(t('topTrucks'), top.trucks, (c) => c.name),
-      listaTop(t('topCargo'), top.cargo, (c) => c.name),
       listaTop(t('topCompanies'), top.companies, (c) => c.name),
       listaTop(t('topCities'), top.cities, (c) => c.name),
       listaTop(t('topRoutes'), top.city_pairs, (r) => r.from + ' \u2192 ' + r.to)
+    ].filter(Boolean).forEach((l) => tops.appendChild(l));
+    if (tops.children.length) caja.appendChild(tops);
+
+    // Con trabajos con auto (ATS), camiones y autos en dos solapas: otro
+    // vehiculo, otras cargas y otros numeros.
+    if (s.cars && s.cars.trips) {
+      const vista = leerPref(PREF_VEHICULO) === 'cars' ? 'cars' : 'trucks';
+      caja.appendChild(pestanas([['trucks', t('statsTabTrucks')], ['cars', t('statsTabCars')]], vista, (v) => {
+        guardarPref(PREF_VEHICULO, v);
+        pintarResumen();
+      }, 'chicas'));
+      caja.appendChild(vista === 'cars' ? bloqueAutos(s.cars) : parteCamion(s));
+    } else {
+      caja.appendChild(parteCamion(s));
+    }
+    return caja;
+  }
+
+  function parteCamion(s) {
+    const caja = document.createElement('div');
+    const top = s.top || {};
+    const tops = document.createElement('div');
+    tops.className = 'tops';
+    [
+      listaTop(t('topTrucks'), top.trucks, (c) => c.name),
+      listaTop(t('topCargo'), top.cargo, (c) => c.name)
     ].filter(Boolean).forEach((l) => tops.appendChild(l));
     if (tops.children.length) caja.appendChild(tops);
 
@@ -1579,9 +1635,36 @@
     ]));
     sumar(bloques, listaConsumo(t('fuelByTruckTitle'), s.fuel_by_truck));
     if (bloques.children.length) caja.appendChild(bloques);
-    // Los trabajos con auto de ATS, aparte: otro vehiculo y otros numeros.
-    if (s.cars && s.cars.trips) caja.appendChild(bloqueAutos(s.cars));
     return caja;
+  }
+
+  // Botonera de solapas: la de los juegos y la de camion/auto.
+  function pestanas(opciones, actual, alElegir, clase) {
+    const caja = document.createElement('div');
+    caja.className = 'pestanas' + (clase ? ' ' + clase : '');
+    caja.setAttribute('role', 'tablist');
+    opciones.forEach(([valor, texto]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pestana';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', valor === actual ? 'true' : 'false');
+      b.textContent = texto;
+      b.addEventListener('click', () => { if (valor !== actual) alElegir(valor); });
+      caja.appendChild(b);
+    });
+    return caja;
+  }
+
+  // Preferencias de esta pantalla (que solapa mirabas). Sin almacenamiento
+  // (ventana privada) anda igual: solo no se recuerda.
+  const PREF_JUEGO = 'truckdash_stats_game';
+  const PREF_VEHICULO = 'truckdash_stats_vehicle';
+  function leerPref(clave) {
+    try { return localStorage.getItem(clave); } catch (e) { return null; }
+  }
+  function guardarPref(clave, valor) {
+    try { localStorage.setItem(clave, valor); } catch (e) { /* no se recuerda */ }
   }
 
   function listaRecords(filas) {
@@ -1636,11 +1719,6 @@
   function bloqueAutos(c) {
     const caja = document.createElement('div');
     caja.className = 'autos';
-    const titulo = document.createElement('h4');
-    titulo.className = 'titulo-autos';
-    titulo.textContent = t('statsCarJobs');
-    caja.appendChild(titulo);
-
     const cifras = document.createElement('div');
     cifras.className = 'cifras';
     [
@@ -1683,7 +1761,19 @@
   function pintarResumen() {
     const cuerpo = $('statsBody');
     cuerpo.innerHTML = '';
-    resumen.forEach((s) => cuerpo.appendChild(bloqueJuego(s)));
+    // Un juego por vez: los dos juntos eran la mitad de la pagina.
+    if (resumen.length > 1) {
+      const juegos = resumen.map((s) => s.game);
+      const pedido = leerPref(PREF_JUEGO);
+      const actual = juegos.includes(pedido) ? pedido : juegos[0];
+      cuerpo.appendChild(pestanas(resumen.map((s) => [s.game, (s.game || '').toUpperCase()]), actual, (g) => {
+        guardarPref(PREF_JUEGO, g);
+        pintarResumen();
+      }));
+      cuerpo.appendChild(bloqueJuego(resumen.find((s) => s.game === actual), false));
+    } else {
+      resumen.forEach((s) => cuerpo.appendChild(bloqueJuego(s, true)));
+    }
     if (resumen.length) {
       const nota = document.createElement('div');
       nota.className = 'nota-stats';
@@ -1929,6 +2019,39 @@
     return svg;
   }
 
+  // El recorrido solo no dice donde fue: las ciudades van escritas en las
+  // puntas. En HTML encima del SVG y no como texto del SVG, que se escala
+  // con el viewBox y saldria de un tamano distinto en cada viaje. La caja
+  // tiene la misma proporcion que el dibujo, asi los porcentajes calzan.
+  function conNombres(svg, nombres) {
+    const vb = (svg.getAttribute('viewBox') || '').split(' ').map(Number);
+    if (vb.length !== 4 || !vb[2] || !vb[3]) return svg;
+    const caja = document.createElement('div');
+    caja.className = 'mapa-ruta';
+    caja.style.setProperty('--r', String(vb[2] / vb[3]));
+    caja.appendChild(svg);
+    const puntas = svg.querySelectorAll('circle.punta');
+    const lugares = [];
+    nombres.forEach((nombre, i) => {
+      const punta = puntas[i];
+      // Ida y vuelta a la misma ciudad: un solo nombre.
+      if (!nombre || !punta || (i === 1 && nombre === nombres[0])) return;
+      const x = (Number(punta.getAttribute('cx')) - vb[0]) / vb[2] * 100;
+      const y = (Number(punta.getAttribute('cy')) - vb[1]) / vb[3] * 100;
+      const e = document.createElement('span');
+      e.className = 'nombre-punta' + (i ? ' fin' : '');
+      e.textContent = nombre;
+      e.style.left = x.toFixed(2) + '%';
+      e.style.top = y.toFixed(2) + '%';
+      if (x > 55) e.classList.add('izq');
+      // Las dos puntas muy juntas: la segunda va debajo para no taparse.
+      if (lugares.some(([x2, y2]) => Math.abs(x2 - x) < 30 && Math.abs(y2 - y) < 12)) e.classList.add('abajo');
+      lugares.push([x, y]);
+      caja.appendChild(e);
+    });
+    return caja;
+  }
+
   function panelDetalle(v) {
     const caja = document.createElement('div');
     caja.className = 'detalle';
@@ -1937,7 +2060,7 @@
 
     const dibujo = dibujarRecorrido(d.route || []);
     if (dibujo) {
-      caja.appendChild(dibujo);
+      caja.appendChild(conNombres(dibujo, [d.city_src, d.city_dst]));
       const tope = topeDeVelocidad(cortarSaltos(d.route || []));
       if (tope) caja.appendChild(leyendaDeVelocidad(tope));
       // Solo se aclara si hay hueco: en un viaje entero no hay nada que
@@ -2006,9 +2129,9 @@
       barra.appendChild(lleno);
       caja.appendChild(barra);
       sumar(caja, renglon([t('drivingProgress', distancia(hecho), distancia(total)),
-                           t('drivingSince', fechaHora(v.started_at))]));
+                           t('drivingStarted', hace(v.started_at))]));
     } else {
-      sumar(caja, renglon([t('drivingSince', fechaHora(v.started_at))]));
+      sumar(caja, renglon([t('drivingStarted', hace(v.started_at))]));
     }
   }
 
@@ -2187,6 +2310,10 @@
     $('displayName').textContent = p.user.username;
     pintarTitulo(p.user.title);
     $('dashLabel').textContent = t('publicLabel');
+    // Son las de otra persona: "Your stats" no va.
+    const tituloStats = document.querySelector('#cardStats h2');
+    tituloStats.setAttribute('data-i18n', 'statsTitlePublic');
+    tituloStats.textContent = t('statsTitlePublic');
     $('memberSince').textContent = t('memberSince', fecha(p.user.creado));
     if (p.user.avatar_url) { $('avatar').src = p.user.avatar_url; $('avatar').hidden = false; }
     else $('avatar').hidden = true;
@@ -2224,6 +2351,7 @@
           $('profileLive').appendChild(tarjetaVivo(mio.datos.status));
           $('cardProfileLive').hidden = false;
         }
+        if (perfilCompleto && PARAMS.get('trip')) abrirViajeCompartido(PARAMS.get('trip'));
         if (!perfilCompleto) {
           $('cardRecent').hidden = true;
           $('privateLocked').textContent = t('privateLocked', mio.datos.user.username);
@@ -2247,6 +2375,23 @@
     pintarPublico();
     pintarSeguirPerfil();
     mostrarVista('viewAccount');
+  }
+
+  // Desde la actividad de "Siguiendo": el perfil se abre con ese viaje
+  // desplegado, aunque no este entre los ultimos.
+  async function abrirViajeCompartido(id) {
+    let v = recientes.find((x) => x.id === id);
+    if (!v) {
+      const { ok, datos } = await pedir('/follow/trip/' + encodeURIComponent(id));
+      if (!ok) return;
+      v = datos.trip;
+      v._detalle = datos.trip;
+      recientes.unshift(v);
+    }
+    v._abierto = false;
+    await alternarDetalle(v, pintarRecientes);
+    $('cardRecent').hidden = false;
+    $('cardRecent').scrollIntoView({ block: 'start' });
   }
 
   // El boton Seguir del perfil de otro, segun la relacion.
@@ -2480,7 +2625,12 @@
     eventos.forEach((e) => {
       const li = document.createElement('li');
       li.appendChild(avatarDe(e.user));
-      const texto = document.createElement('span');
+      // Entregas, inicios y cancelados llevan al viaje, abierto en su perfil.
+      const texto = document.createElement(e.trip_id ? 'a' : 'span');
+      if (e.trip_id) {
+        texto.className = 'a-viaje';
+        texto.href = '/account/?u=' + encodeURIComponent(e.user.username) + '&trip=' + encodeURIComponent(e.trip_id);
+      }
       const nombre = e.user.username;
       let frase = '';
       let meta = '';
@@ -2542,6 +2692,8 @@
 
   function mostrarPagina() {
     const actual = paginaDelHash();
+    // Fuera del resumen el saludo grande ocupaba un tercio del celular.
+    document.documentElement.dataset.pagina = actual;
     Object.keys(PAGINAS).forEach((p) => { $(PAGINAS[p]).hidden = p !== actual; });
     document.querySelectorAll('#sideNav a').forEach((a) => {
       const es = a.getAttribute('data-pagina') === actual;
@@ -2559,7 +2711,11 @@
   function fechaCorta(iso) {
     if (!iso) return '';
     try {
-      return new Date(iso).toLocaleDateString(idioma, { day: 'numeric', month: 'short', year: '2-digit' });
+      // El ano solo si no es este: "Sep 27" y no "Sep 27, 26".
+      const f = new Date(iso);
+      const opciones = { day: 'numeric', month: 'short' };
+      if (f.getFullYear() !== new Date().getFullYear()) opciones.year = 'numeric';
+      return f.toLocaleDateString(idioma, opciones);
     } catch (e) { return iso.slice(0, 10); }
   }
 
@@ -2783,6 +2939,16 @@
       });
       caja.appendChild(botones);
     }
+    // La nota, cerrada hasta que se la pide: un cuadro de texto abierto en
+    // cada viaje pesaba mas que el viaje.
+    if (!v.note && v._borradorNota == null && !v._notaAbierta) {
+      const abrirNota = document.createElement('button');
+      abrirNota.className = 'linkish';
+      abrirNota.textContent = t('tripNoteAdd');
+      abrirNota.addEventListener('click', () => { v._notaAbierta = 'enfocar'; repintar(); });
+      caja.appendChild(abrirNota);
+      return caja;
+    }
     const etiquetaNota = document.createElement('label');
     etiquetaNota.textContent = t('tripNoteLabel');
     const area = document.createElement('textarea');
@@ -2792,6 +2958,10 @@
     // abre otro viaje): se guarda en el viaje hasta que se manda.
     area.value = v._borradorNota != null ? v._borradorNota : (v.note || '');
     area.addEventListener('input', () => { v._borradorNota = area.value; });
+    if (v._notaAbierta === 'enfocar') {
+      v._notaAbierta = true;
+      requestAnimationFrame(() => area.focus());
+    }
     etiquetaNota.appendChild(area);
     caja.appendChild(etiquetaNota);
     const guardar = document.createElement('button');
@@ -2841,7 +3011,7 @@
     // pasaste y a que hora, asi que poder sacar uno solo es parte de que los
     // datos sean tuyos, pero no con un click distraido.
     const boton = document.createElement('button');
-    boton.className = 'linkish';
+    boton.className = 'btn chico danger';
     boton.textContent = t('tripRemove');
     let armado = false;
     const desarmar = () => {
@@ -3138,6 +3308,8 @@
     if ($('filterGame').value) partes.push('game=' + encodeURIComponent($('filterGame').value));
     if ($('filterStatus').value) partes.push('status=' + encodeURIComponent($('filterStatus').value));
     if ($('filterKind').value) partes.push('kind=' + encodeURIComponent($('filterKind').value));
+    const busqueda = $('filterSearch').value.trim();
+    if (busqueda) partes.push('q=' + encodeURIComponent(busqueda));
     return partes;
   }
 
@@ -3154,12 +3326,17 @@
     $('btnMoreTrips').hidden = !hayMasViajes;
   }
 
+  // Escribiendo en la busqueda salen varios pedidos seguidos y pueden volver
+  // desordenados: vale solo la respuesta del ultimo.
+  let pedidoDeViajes = 0;
+
   async function traerViajes(mas) {
     logbookPedido = true;
+    const numero = ++pedidoDeViajes;
     const desde = mas ? viajes.length : 0;
     const consulta = ['limite=' + VIAJES_POR_PAGINA, 'desde=' + desde].concat(filtrosDelLogbook());
     const { ok, datos } = await pedir('/trips?' + consulta.join('&'));
-    if (!ok) return;
+    if (!ok || numero !== pedidoDeViajes) return;
     const nuevos = datos.trips || [];
     viajes = mas ? viajes.concat(nuevos) : nuevos;
     totalLogbook = datos.total != null ? datos.total : viajes.length;
@@ -3250,6 +3427,11 @@
     });
     ['filterGame', 'filterStatus', 'filterKind'].forEach((id) => {
       $(id).addEventListener('change', () => { viajes = []; traerViajes(false); });
+    });
+    let esperaBusqueda = null;
+    $('filterSearch').addEventListener('input', () => {
+      clearTimeout(esperaBusqueda);
+      esperaBusqueda = setTimeout(() => { viajes = []; traerViajes(false); }, 350);
     });
     window.addEventListener('hashchange', () => { if (usuario) mostrarPagina(); });
     ['activityMetric', 'activityPeriod'].forEach((id) => {

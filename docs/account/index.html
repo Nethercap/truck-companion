@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261006r" />
+<link rel="stylesheet" href="account.css?v=20261006s" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -230,6 +230,10 @@
                   <option value="car" data-i18n="filterCar">Car</option>
                 </select>
               </label>
+              <label class="buscar"><span data-i18n="filterSearch">Search</span>
+                <input type="search" id="filterSearch" maxlength="60" autocomplete="off"
+                       data-i18n-placeholder="filterSearchPh" placeholder="City, cargo, truck" />
+              </label>
             </div>
             <div id="tripsList"></div>
             <p class="muted small" id="tripsEmpty" hidden data-i18n="tripsEmpty"></p>
@@ -311,6 +315,7 @@
               <a id="publicLinkUrl" href="#" target="_blank" rel="noopener"></a>
               <button class="btn chico" id="btnCopyPublic" data-i18n="copyLink">Copy</button>
             </div>
+            <p class="muted small" id="publicLinkHint" data-i18n="publicLinkPrivate" hidden></p>
           </section>
 
           <section class="card">
@@ -360,7 +365,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261006r"></script>
-<script src="account.js?v=20261006r"></script>
+<script src="../app/i18n.js?v=20261006s"></script>
+<script src="account.js?v=20261006s"></script>
 </body>
 </html>

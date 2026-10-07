@@ -155,6 +155,7 @@ GUIDE_TEXT.en = {
 <h3>Good to know</h3>
 <ul>
 <li>Nothing is saved until you link the client. Your profile is private unless you make it public in <b>Settings</b>.</li>
+<li>In <b>Following</b> you can follow other drivers by their username. Following needs their approval, and people you accept see your trips with their routes, where you are while you drive and your achievements, even if your profile is private. Your notes stay yours.</li>
 <li>If you deliver a job with Truck Dash closed, we cannot see the delivery and the trip shows as <b>unfinished</b>. You can mark it as cancelled, but only the game can report a delivery.</li>
 <li>No internet for a while? Nothing is lost: the client keeps the trip and sends it when you are back online.</li>
 <li>Jobs with a money mod are marked and left out of your money totals.</li>
@@ -348,6 +349,7 @@ GUIDE_TEXT.es = {
 <h3>Para tener en cuenta</h3>
 <ul>
 <li>No se guarda nada hasta que vinculás el cliente. Tu perfil es privado, salvo que lo hagas público en <b>Ajustes</b>.</li>
+<li>En <b>Siguiendo</b> podés seguir a otros conductores por su nombre de usuario. Hay que esperar que acepten, y quienes vos aceptes ven tus viajes con su recorrido, dónde estás mientras manejás y tus logros, aunque tu perfil sea privado. Tus notas siguen siendo tuyas.</li>
 <li>Si entregás un trabajo con Truck Dash cerrado, no vemos la entrega y el viaje figura <b>sin terminar</b>. Lo podés marcar como cancelado, pero una entrega solo la puede informar el juego.</li>
 <li>¿Te quedaste sin internet un rato? No se pierde nada: el cliente guarda el viaje y lo manda cuando vuelve la conexión.</li>
 <li>Los trabajos con un mod de dinero quedan marcados y afuera de los totales de plata.</li>

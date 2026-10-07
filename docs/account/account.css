@@ -309,7 +309,7 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
 
 .filtros { display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 0 0 0.8rem; }
 .filtros label { margin: 0; display: flex; align-items: center; gap: 0.4rem; }
-.filtros select {
+.filtros select, .filtros input[type="search"] {
   background: var(--bg); color: var(--text); border: 1px solid var(--line);
   border-radius: 6px; padding: 0.3rem 0.5rem; font: inherit; font-size: 0.85rem;
 }
@@ -487,10 +487,49 @@ ul.feed .meta { color: var(--muted); font-size: 0.85rem; }
 .publico table.viajes tr.fila { cursor: default; }
 .publico table.viajes tr.fila:hover td { background: none; }
 
-/* Trabajos con auto de ATS: un bloque aparte adentro del juego. */
-.autos { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px dashed var(--line); }
-.autos .titulo-autos { margin: 0 0 0.6rem; font-size: 0.8rem; letter-spacing: 0.08em;
-                       text-transform: uppercase; color: var(--warn); }
+/* Solapas de las stats: un juego por vez, y camion o auto en ATS. */
+.pestanas { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.2rem; margin: 0 0 0.9rem;
+            border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.pestana { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 0.85rem;
+           font-weight: 600; padding: 0.35rem 0.9rem; border-radius: 6px; cursor: pointer; }
+.pestana:hover { color: var(--text); }
+.pestana[aria-selected="true"] { background: #1f2630; color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.pestanas.chicas { margin-top: 1.2rem; }
+.pestanas.chicas .pestana { font-size: 0.8rem; padding: 0.25rem 0.75rem; }
+.renglon.neto { color: var(--text); font-weight: 600; }
+
+/* El recorrido con el nombre de las ciudades en las puntas. */
+.detalle .mapa-ruta { position: relative; margin: 0.3rem auto 0.5rem;
+                      width: min(100%, calc(230px * var(--r))); aspect-ratio: var(--r); }
+.detalle .mapa-ruta svg.ruta { display: block; width: 100%; height: 100%; margin: 0; }
+.nombre-punta { position: absolute; transform: translate(8px, -50%); white-space: nowrap; pointer-events: none;
+                font-size: 0.75rem; font-weight: 600; color: var(--text); padding: 0.05rem 0.35rem;
+                border-radius: 4px; background: rgba(13, 17, 23, 0.8); }
+.nombre-punta.izq { transform: translate(calc(-100% - 8px), -50%); }
+.nombre-punta.abajo { transform: translate(8px, 60%); }
+.nombre-punta.izq.abajo { transform: translate(calc(-100% - 8px), 60%); }
+
+/* Borrar el viaje: aparte de la nota y en rojo. */
+.detalle-celda .acciones { margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px solid var(--line); }
+.btn.danger.armado { background: var(--danger); color: #fff; }
+.correccion > .linkish { margin-top: 0.4rem; align-self: flex-start; }
+
+/* Fuera del resumen, el saludo en chico. */
+html[data-pagina]:not(.publico):not([data-pagina="overview"]) .who { margin-top: 1rem; }
+html[data-pagina]:not(.publico):not([data-pagina="overview"]) .who img { width: 36px; height: 36px; }
+html[data-pagina]:not(.publico):not([data-pagina="overview"]) .who h1 { font-size: 1.15rem; }
+html[data-pagina]:not(.publico):not([data-pagina="overview"]) #dashLabel,
+html[data-pagina]:not(.publico):not([data-pagina="overview"]) #memberSince,
+html[data-pagina]:not(.publico):not([data-pagina="overview"]) #userTitle { display: none; }
+
+/* De la actividad de "Siguiendo" al viaje. */
+ul.feed a.a-viaje { color: var(--text); text-decoration: none; }
+ul.feed a.a-viaje:hover { text-decoration: underline; }
+
+/* Buscar en el logbook. */
+label.buscar { flex: 1 1 12rem; }
+label.buscar input { width: 100%; min-width: 0; padding: 0.35rem 0.6rem; }
+label.buscar input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* Records y consumo por camion: una lista corta, sin numeros adelante. */
 .records { list-style: none; margin: 0; padding: 0; font-size: 0.88rem; }
