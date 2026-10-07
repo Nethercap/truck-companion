@@ -991,6 +991,7 @@ def test_la_red_publica_se_detecta_por_la_ip_de_lan(monkeypatch):
         return subprocess.CompletedProcess(args, 0, stdout="Public\r\n", stderr="")
 
     monkeypatch.setattr(local_server.sys, "platform", "win32")
+    monkeypatch.setattr(local_server.win_integration, "is_wine", lambda: False)
     monkeypatch.setattr(local_server.subprocess, "run", correr)
     assert local_server.network_category("172.20.10.2") == "Public"
     assert "'172.20.10.2'" in pedidos[0]
@@ -1004,6 +1005,16 @@ def test_la_categoria_de_red_no_se_pregunta_fuera_de_windows_ni_sin_powershell(m
 
     monkeypatch.setattr(local_server.sys, "platform", "linux")
     assert local_server.network_category("192.168.1.5") is None
+
+    # Proton: el firewall es el de Linux, no se le pregunta a Wine.
+    def no_llamar(*a, **kw):
+        raise AssertionError("bajo Wine no se corre powershell")
+
+    monkeypatch.setattr(local_server.sys, "platform", "win32")
+    monkeypatch.setattr(local_server.win_integration, "is_wine", lambda: True)
+    monkeypatch.setattr(local_server.subprocess, "run", no_llamar)
+    assert local_server.network_category("192.168.1.5") is None
+    monkeypatch.setattr(local_server.win_integration, "is_wine", lambda: False)
 
     def sin_powershell(*a, **kw):
         raise FileNotFoundError("powershell")

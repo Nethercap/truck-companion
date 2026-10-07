@@ -35,6 +35,7 @@ import time
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import red
+import win_integration
 
 import client as client_lib
 
@@ -95,7 +96,9 @@ def network_category(ip: str | None) -> str | None:
     de casa el modo LAN anda; conectado al hotspot la pagina ni carga, y
     Windows no vuelve a preguntar nada.
     """
-    if sys.platform != "win32" or not ip:
+    # Bajo Proton el firewall (si hay) es el de Linux, no el de Windows, y
+    # el powershell de Wine no sabe nada de la red.
+    if sys.platform != "win32" or not ip or win_integration.is_wine():
         return None
     try:
         ip = str(ipaddress.IPv4Address(ip))
@@ -110,7 +113,6 @@ def network_category(ip: str | None) -> str | None:
             capture_output=True, text=True, timeout=15,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
     except (OSError, subprocess.SubprocessError):
-        # Bajo Wine no hay powershell: no se sabe, y no se avisa nada.
         return None
     for categoria in ("Public", "Private", "DomainAuthenticated"):
         if categoria in salida.split():
