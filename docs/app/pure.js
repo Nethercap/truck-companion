@@ -1050,7 +1050,21 @@ function pickVoice(voices, lang, savedId) {
   return own.find(v => v.id === savedId) || own[0];
 }
 
+// Direccion de LAN que manda el cliente en client_status (lanUrl), si es una
+// que se puede ofrecer como link: http a una IPv4 privada, con puerto. Lo que
+// no tenga esa forma (otro esquema, un host con nombre) no se muestra.
+function lanUrlToOffer(status) {
+  const url = status && status.lanUrl;
+  if (typeof url !== 'string' || url.length > 200) return null;
+  const m = /^http:\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})\/[\w\/.?=&-]*$/.exec(url);
+  if (!m) return null;
+  const [a, b, c, d] = m.slice(1, 5).map(Number);
+  if ([a, b, c, d].some(n => n > 255)) return null;
+  const privada = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  return privada ? url : null;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { lanUrlToOffer, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

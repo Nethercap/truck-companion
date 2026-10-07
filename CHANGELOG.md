@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- A LAN shortcut on your phone stops loading when the PC moves to another network (a phone
+  hotspot gives it a different address). The dashboard opened with your pairing code now
+  offers "Switch to LAN" with the current address, and "Setup & status" explains it.
 - LAN mode on a phone hotspot: Windows marks a hotspot as a Public network and its firewall
   blocks LAN mode there without saying anything. "Setup & status" now warns when that
   happens and opens the network settings to switch it to Private.

@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261006s" />
-<link rel="stylesheet" href="app.css?v=20261006s" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261007a" />
+<link rel="stylesheet" href="app.css?v=20261007a" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -276,6 +276,11 @@
     <span id="updateBannerText"></span>
     <a id="updateBannerLink" href="#" target="_blank" rel="noopener" data-i18n="updateBannerLink">Download</a>
     <button id="updateBannerClose" aria-label="Dismiss">✕</button>
+  </div>
+  <div id="lanBanner" class="updateBanner" style="display:none;">
+    <span data-i18n="lanBannerText">On the same Wi-Fi or hotspot as the PC? LAN mode has less delay.</span>
+    <a id="lanBannerLink" href="#" data-i18n="lanBannerLink">Switch to LAN</a>
+    <button id="lanBannerClose" aria-label="Dismiss">✕</button>
   </div>
 
   <!-- Fuera del mapa a proposito: adentro tapaba justo lo que se quiere
@@ -591,13 +596,13 @@
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261006s"></script>
-<script src="pure.js?v=20261006s"></script>
-<script src="i18n.js?v=20261006s"></script>
-<script src="i18n_en_es.js?v=20261006s"></script>
-<script src="../dash/dash.js?v=20261006s"></script>
-<script src="app.js?v=20261006s"></script>
-<script src="convoy.js?v=20261006s"></script>
-<script src="livemap.js?v=20261006s"></script>
+<script src="variants.js?v=20261007a"></script>
+<script src="pure.js?v=20261007a"></script>
+<script src="i18n.js?v=20261007a"></script>
+<script src="i18n_en_es.js?v=20261007a"></script>
+<script src="../dash/dash.js?v=20261007a"></script>
+<script src="app.js?v=20261007a"></script>
+<script src="convoy.js?v=20261007a"></script>
+<script src="livemap.js?v=20261007a"></script>
 </body>
 </html>

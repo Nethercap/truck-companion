@@ -96,6 +96,12 @@ with a direct WebSocket link — lowest latency, no pairing code, and it keeps
 working even if your internet drops. The cloud mode with the pairing code
 keeps working at the same time.
 
+The address belongs to the network: on a different one the PC gets a new IP
+(a phone hotspot hands out its own), so a home-screen shortcut saved with the
+old address stops loading. Scan the QR again on that network, or open the
+dashboard with your pairing code: when the client's LAN mode is on, it shows
+a **Switch to LAN** link with the current address.
+
 **LAN mode uses two ports, and you need both open:**
 
 | port | what it does | what happens if it is closed |

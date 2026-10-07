@@ -995,8 +995,8 @@ class SetupWindow:
             text += "\n" + state.status_detail
         self.status_label.configure(text=text, fg=color)
         self.code_label.configure(text=state.code or "-")
-        lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
-        lan = (lan_url, bool(lan_url) and state.local.public_network())
+        url = lan_url()
+        lan = (url, bool(url) and state.local.public_network())
         if getattr(self, "_last_lan", None) != lan:
             self._last_lan = lan
             self.render_lan(public=lan[1])
@@ -1270,6 +1270,12 @@ def diagnose_running_game(hwnd) -> str | None:
     return DETAIL_NOT_LOADED
 
 
+def lan_url() -> str | None:
+    """La direccion del modo LAN si esta andando, o None."""
+    srv = state.local
+    return srv.url if (srv and srv.web_ready and not srv.error) else None
+
+
 def status_message() -> str:
     return json.dumps({
         "type": "client_status",
@@ -1279,6 +1285,10 @@ def status_message() -> str:
         "detail": state.status_detail,
         "mapMods": state.map_mods,
         "activeMods": state.active_mods,
+        # La web con el codigo ofrece pasar a esta direccion: un acceso
+        # directo guardado con la de LAN deja de andar cuando la PC cambia de
+        # red (con el hotspot del celular le toca otra IP).
+        "lanUrl": lan_url(),
     })
 
 
@@ -1372,7 +1382,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
         nonlocal last_status_sent
         refresh_map_mods()
         key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True),
-               json.dumps(state.active_mods, sort_keys=True))
+               json.dumps(state.active_mods, sort_keys=True), lan_url())
         if key != last_status_sent:
             last_status_sent = key
             msg = status_message()

@@ -442,6 +442,29 @@ def test_viewer_receives_session_state_on_connect_and_when_client_connects(clien
         assert disconnected["client_status"]["status"] == "waiting_game"
 
 
+def test_a_viewer_that_arrives_later_gets_the_client_lan_url(client, main):
+    """El acceso directo de LAN muere cuando la PC cambia de red (el hotspot
+    del celular le da otra IP); la web con el codigo ofrece la direccion de
+    ahora, tambien a quien abre la pagina despues del client_status."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as first:
+        first.receive_text()  # session_state sin cliente
+        with client.websocket_connect(f"/ws/client/{code}") as local_client:
+            first.receive_text()  # session_state con el cliente
+            local_client.send_text(main.json.dumps({"type": "client_status", "status": "live", "game": "ets2", "clientVersion": "1.5.28",
+                                                    "lanUrl": "http://172.20.10.2:27765/app/?local=1"}))
+            first.receive_text()  # reenviado: el backend ya lo proceso
+            with client.websocket_connect(f"/ws/live/{code}") as late:
+                state = main.json.loads(late.receive_text())
+                assert state["client_status"]["lanUrl"] == "http://172.20.10.2:27765/app/?local=1"
+            # Algo que no es texto, o demasiado largo, no se guarda.
+            local_client.send_text(main.json.dumps({"type": "client_status", "status": "live", "lanUrl": "x" * 500}))
+            first.receive_text()
+            with client.websocket_connect(f"/ws/live/{code}") as late:
+                state = main.json.loads(late.receive_text())
+                assert state["client_status"]["lanUrl"] is None
+
+
 def test_cleanup_removes_idle_used_sessions_but_keeps_watched_ones(main):
     import time
 

@@ -4096,6 +4096,30 @@ document.getElementById('updateBannerClose').addEventListener('click', () => {
   document.getElementById('updateBanner').style.display = 'none';
 });
 
+// Saltar de la nube a la LAN. Un acceso directo guardado con la direccion de
+// LAN deja de andar cuando la PC cambia de red (con el hotspot del celular le
+// toca otra IP) y la pagina ni carga; el del codigo anda siempre, y el
+// cliente manda por aca su direccion de LAN de ahora (client_status.lanUrl).
+// Si el celular llega no se puede saber desde aca (una pagina https no puede
+// pedirle nada a http://), asi que se ofrece, y cerrado no vuelve a salir
+// para esa misma direccion.
+const LAN_BANNER_CLOSED_KEY = 'truckdash_lan_banner_closed';
+function renderLanBanner() {
+  const banner = document.getElementById('lanBanner');
+  const url = (!conn.local && !conn.demo && !conn.spectator && conn.clientConnected)
+    ? lanUrlToOffer(conn.clientStatus) : null;
+  let closed = null;
+  try { closed = localStorage.getItem(LAN_BANNER_CLOSED_KEY); } catch (e) {}
+  if (!url || closed === url) { banner.style.display = 'none'; return; }
+  document.getElementById('lanBannerLink').href = url;
+  banner.style.display = 'flex';
+}
+document.getElementById('lanBannerClose').addEventListener('click', () => {
+  const url = document.getElementById('lanBannerLink').getAttribute('href');
+  try { localStorage.setItem(LAN_BANNER_CLOSED_KEY, url); } catch (e) {}
+  document.getElementById('lanBanner').style.display = 'none';
+});
+
 document.getElementById('routeResetBtn').addEventListener('click', resetDisplayedRoute);
 function applyRouteSummaryMin() {
   document.getElementById('routeSummary').classList.toggle('min', routeSummaryMin);
@@ -4162,6 +4186,7 @@ document.addEventListener('visibilitychange', () => {
 
 function renderConnectionUi() {
   const view = connectionView();
+  renderLanBanner();
   updateWakeLock(!!view);
   const chip = document.getElementById('statusChip');
   const group = document.getElementById('connectGroup');

@@ -73,6 +73,12 @@ con un WebSocket directo — la menor latencia, sin código de pairing, y sigue
 funcionando aunque se corte internet. El modo cloud con código sigue
 funcionando al mismo tiempo.
 
+La dirección es de la red: en otra, la PC recibe otra IP (el hotspot del
+celular reparte la suya), así que un acceso directo guardado con la dirección
+vieja deja de cargar. Escaneá el QR de nuevo en esa red, o abrí el tablero con
+tu código de pairing: con el modo LAN del cliente andando, muestra un link
+**Pasar a LAN** con la dirección de ahora.
+
 **El modo LAN usa dos puertos y hacen falta los dos abiertos:**
 
 | puerto | para qué | si está cerrado |

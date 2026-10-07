@@ -1521,7 +1521,11 @@ async def ws_client(websocket: WebSocket, code: str):
             try:
                 payload = json.loads(data)
                 if payload.get("type") == "client_status":
-                    session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion")}
+                    lan_url = payload.get("lanUrl")
+                    session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion"),
+                                                  # La direccion de LAN del cliente, para que la web ofrezca pasar a
+                                                  # LAN tambien a un viewer que llega despues (la web la valida).
+                                                  "lanUrl": lan_url if isinstance(lan_url, str) and len(lan_url) <= 200 else None}
                 # Mensajes de control (client_status, etc.) no son telemetria:
                 # no deben tocar el flanco de jobDelivered. Antes el primer
                 # client_status de cada conexion dejaba el estado en False y el

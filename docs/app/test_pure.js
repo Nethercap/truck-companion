@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
-  createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice, mapBoundsFromCities, insideMapBounds } = require("./pure.js");
+  createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice, mapBoundsFromCities, insideMapBounds, lanUrlToOffer } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -884,4 +884,22 @@ test('fuera del mapa: la caja sale de las ciudades con margen; sin caja, adentro
   assert.ok(insideMapBounds(null, -659907, 131729));      // sin ciudades cargadas no se esconde a nadie
   assert.equal(mapBoundsFromCities([{ X: 1, Y: 1 }]), null);
   assert.equal(mapBoundsFromCities(null), null);
+});
+
+test('lanUrlToOffer: solo la direccion de LAN del cliente, http a una IP privada', () => {
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://172.20.10.2:27765/app/?local=1' }), 'http://172.20.10.2:27765/app/?local=1');
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://192.168.1.50:27765/app/?local=1' }), 'http://192.168.1.50:27765/app/?local=1');
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://10.0.0.7:27765/app/?local=1' }), 'http://10.0.0.7:27765/app/?local=1');
+  // Clientes viejos no lo mandan; el LAN apagado manda null.
+  assert.equal(lanUrlToOffer({ status: 'live' }), null);
+  assert.equal(lanUrlToOffer({ lanUrl: null }), null);
+  assert.equal(lanUrlToOffer(null), null);
+  // Nada que no sea un link a la LAN.
+  assert.equal(lanUrlToOffer({ lanUrl: 'javascript:alert(1)' }), null);
+  assert.equal(lanUrlToOffer({ lanUrl: 'https://192.168.1.50:27765/app/' }), null);
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://evil.example:27765/app/' }), null);
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://8.8.8.8:27765/app/' }), null);
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://172.32.0.1:27765/app/' }), null);
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://192.168.1.300:27765/app/' }), null);
+  assert.equal(lanUrlToOffer({ lanUrl: 'http://192.168.1.5:27765/app/"><script>' }), null);
 });

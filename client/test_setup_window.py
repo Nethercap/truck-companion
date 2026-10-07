@@ -745,3 +745,23 @@ def test_con_la_red_publica_avisa_que_el_firewall_bloquea_el_modo_lan(ventana, m
     v.refresh_status()
     v.root.update()
     assert not v.lan_public_frame.winfo_ismapped()
+
+
+def test_el_estado_lleva_la_direccion_de_lan_solo_si_anda(monkeypatch):
+    """La web con el codigo ofrece pasar a LAN con esta direccion: un acceso
+    directo viejo deja de andar cuando la PC cambia de red (hotspot)."""
+    import json
+
+    class Servidor:
+        error = None
+        web_ready = True
+        url = "http://172.20.10.2:27765/app/?local=1"
+
+    srv = Servidor()
+    monkeypatch.setattr(tray_client.state, "local", srv)
+    assert json.loads(tray_client.status_message())["lanUrl"] == srv.url
+
+    srv.error = "puerto ocupado"
+    assert json.loads(tray_client.status_message())["lanUrl"] is None
+    monkeypatch.setattr(tray_client.state, "local", None)
+    assert json.loads(tray_client.status_message())["lanUrl"] is None
