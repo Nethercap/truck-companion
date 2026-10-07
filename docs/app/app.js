@@ -84,7 +84,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -138,6 +138,10 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // declaracion tumba app.js entero.
 let navZoom = navZoomSetting(_savedSettings.navZoom);
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
+// DLC de mapa destildados por juego ({ ats: ['co'], ets2: [] }): las rutas
+// evitan sus caminos (ver dlcBlockedGuards en pure.js). Se guarda lo
+// destildado y no lo tildado, asi un DLC nuevo arranca prendido.
+let dlcOff = normalizeDlcOff(_savedSettings.dlcOff);
 // Guia por voz (Ajustes): apagada por defecto, y una voz elegida por idioma
 // ({ en: 'en-joe' }). Aca arriba por lo mismo que navZoom: saveSettings lee.
 let voiceOn = !!_savedSettings.voiceOn;
@@ -711,8 +715,57 @@ document.getElementById('modsModal').addEventListener('click', (e) => {
   if (e.target.id === 'modsModal') document.getElementById('modsModal').style.display = 'none';
 });
 
+// DLC de mapa: una casilla por DLC, primero los del juego que se esta
+// jugando. Cada cambio se guarda y la ruta se recalcula en el proximo tick.
+function renderDlcLists() {
+  const caja = document.getElementById('dlcLists');
+  caja.innerHTML = '';
+  const juegos = currentGame && dlcGameOf(currentGame) === 'ats' ? ['ats', 'ets2'] : ['ets2', 'ats'];
+  for (const game of juegos) {
+    const titulo = document.createElement('p');
+    titulo.className = 'settingsSectionTitle';
+    titulo.textContent = game === 'ats' ? 'American Truck Simulator' : 'Euro Truck Simulator 2';
+    caja.appendChild(titulo);
+    const grilla = document.createElement('div');
+    grilla.className = 'dlcGrid';
+    for (const [id, nombre] of DLC_LIST[game]) {
+      const label = document.createElement('label');
+      label.className = 'settingsRow';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !dlcOff[game].includes(id);
+      input.addEventListener('change', () => {
+        const off = new Set(dlcOff[game]);
+        if (input.checked) off.delete(id); else off.add(id);
+        dlcOff = normalizeDlcOff({ ...dlcOff, [game]: [...off] });
+        saveSettings();
+        invalidateRoute();
+      });
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(' ' + nombre));
+      grilla.appendChild(label);
+    }
+    caja.appendChild(grilla);
+  }
+}
+function openDlcModal() {
+  renderDlcLists();
+  document.getElementById('settingsModal').style.display = 'none';
+  document.getElementById('dlcModal').style.display = 'flex';
+}
+document.getElementById('setDlcBtn').addEventListener('click', openDlcModal);
+document.getElementById('dlcCloseBtn').addEventListener('click', () => {
+  document.getElementById('dlcModal').style.display = 'none';
+});
+document.getElementById('dlcModal').addEventListener('click', (e) => {
+  if (e.target.id === 'dlcModal') document.getElementById('dlcModal').style.display = 'none';
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (document.getElementById('dlcModal').style.display === 'flex') {
+    document.getElementById('dlcModal').style.display = 'none';
+  }
   if (document.getElementById('settingsModal').style.display === 'flex') {
     document.getElementById('settingsModal').style.display = 'none';
   }
@@ -1611,6 +1664,8 @@ function nearestRoadName(x, z, maxDist) {
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
 // del output de truckermudgeon/maps. nodes: [[x,y], ...], edges: [[fromIdx, toIdx, weight], ...]
 let routeGraph = null; // typed arrays + CSR, ver buildRouteGraph()
+// La ruta actual pasa por un DLC destildado porque no hay otro camino.
+let routeUsesUncheckedDlc = false;
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
 let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
 const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS) - en interconexiones con rampas paralelas cercanas, 400 tardaba en detectar que se tomo una rampa distinta
@@ -2044,7 +2099,8 @@ function distanceToRouteMeters(x, z) {
 // Se sube al resubir solo los grafos v3 (no mapDataVersion, que haria bajar
 // de nuevo los tiles). 3 = 06-10: cada sentido de un prefab por separado
 // (los giros a la izquierda en un trebol iban por la rampa al reves).
-const ROUTE_GRAPH_V3_REV = 3;
+// 4 = 07-10: el DLC de cada tramo, para evitar los DLC que no tenes.
+const ROUTE_GRAPH_V3_REV = 4;
 
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
@@ -2112,12 +2168,15 @@ function decodeRouteGraphBin(buf) {
   // metros con signo (+ a la derecha del sentido de marcha). Va despues de
   // grado, componente y tamanos de componente, que la web no lee (los arma
   // buildRouteGraph).
-  let shiftA = null, shiftB = null;
+  let shiftA = null, shiftB = null, edgeG = null;
   if (version === 3) {
     take(Uint8Array, n); take(Int32Array, n); take(Uint32Array, nComp);
     shiftA = take(Int8Array, ne); shiftB = take(Int8Array, ne);
+    // Desde el 07-10: el dlcGuard de cada arista, al final. Un grafo de antes
+    // no lo trae y se rutea como siempre, sin filtro de DLC.
+    if (buf.byteLength - off >= ne) edgeG = take(Uint8Array, ne);
   }
-  return { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB };
+  return { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, edgeG };
 }
 
 // Mismo resultado a partir del JSON viejo {nodes: [[x,y]], edges: [[a,b,m,flags,seg,mid?]]}.
@@ -2145,7 +2204,7 @@ function routeGraphFromJson(data) {
 // flags de arista: bit 1 = ferry/tren, bit 2 = un solo sentido (solo a -> b);
 // sin flags = doble mano.
 function buildRouteGraph(g) {
-  const { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA = null, shiftB = null } = g;
+  const { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA = null, shiftB = null, edgeG = null } = g;
   const csr = new Uint32Array(n + 1);
   for (let e = 0; e < ne; e++) { csr[edgeA[e] + 1]++; if (!(edgeF[e] & 2)) csr[edgeB[e] + 1]++; }
   for (let i = 0; i < n; i++) csr[i + 1] += csr[i];
@@ -2192,7 +2251,7 @@ function buildRouteGraph(g) {
   let giantComponent = 0;
   for (let c = 1; c < componentSize.length; c++) if (componentSize[c] > componentSize[giantComponent]) giantComponent = c;
   const graph = {
-    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, degree, componentId, componentSize, giantComponent,
+    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, edgeG, degree, componentId, componentSize, giantComponent,
     nodeXY: (i) => [nodes[2 * i], nodes[2 * i + 1]],
     // vista "de antes" para detectManeuver y cualquier otro consumidor:
     // adjacency.get(i) -> [[vecino, metros, segundos], ...]
@@ -2216,13 +2275,15 @@ function buildRouteGraph(g) {
 // sola componente, pero por las dudas se admite cualquiera de este tamano.
 const MIN_REAL_COMPONENT_NODES = 300;
 
-function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1) {
+// nodeOk: si viene, solo nodos con algun tramo que se pueda usar (DLC).
+function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeOk = null) {
   let best = -1;
   let bestDist = Infinity;
   const nodes = routeGraph.nodes;
   const n = routeGraph.n;
   const compId = routeGraph.componentId, compSize = routeGraph.componentSize, giant = routeGraph.giantComponent;
   for (let i = 0; i < n; i++) {
+    if (nodeOk && !nodeOk[i]) continue;
     const comp = compId[i];
     if (onlyComponent !== -1) {
       if (comp !== onlyComponent) continue;
@@ -2273,19 +2334,60 @@ class MinHeap {
   get size() { return this.items.length; }
 }
 
+// Que tramos se pueden usar segun los DLC: { blocked: Uint8Array(64) por
+// dlcGuard, nodeOk: Uint8Array(n) } para el grafo cargado. conElecciones =
+// false: solo lo no publicado afuera, sin lo que destildo la persona.
+let dlcFilterCache = { graph: null, byKey: new Map() };
+function dlcFilter(conElecciones) {
+  if (!routeGraph || !routeGraph.edgeG) return null;
+  const game = dlcGameOf(currentGame);
+  const off = conElecciones ? dlcOff[game] : [];
+  const key = `${game}|${off.join(',')}`;
+  if (dlcFilterCache.graph !== routeGraph) dlcFilterCache = { graph: routeGraph, byKey: new Map() };
+  if (dlcFilterCache.byKey.has(key)) return dlcFilterCache.byKey.get(key);
+  const blocked = dlcBlockedGuards(game, off);
+  const { n, csr, adjTo, adjEdge, edgeG } = routeGraph;
+  const nodeOk = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    for (let k = csr[i]; k < csr[i + 1]; k++) {
+      if (!blocked[edgeG[adjEdge[k]]]) { nodeOk[i] = 1; nodeOk[adjTo[k]] = 1; }
+    }
+  }
+  const value = { blocked, nodeOk };
+  dlcFilterCache.byKey.set(key, value);
+  return value;
+}
+
+// La ruta con los DLC de la persona. Si no hay camino sin un DLC que
+// destildo (el destino esta adentro, o no hay forma de rodearlo), la de
+// todos los publicados, marcada para avisar. Y si ni asi, como antes del
+// filtro: nunca peor que sin el.
 function findRoute(startXY, endXY) {
   if (!routeGraph) return null;
-  const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, degree, componentId } = routeGraph;
+  const propio = dlcFilter(true);
+  let ruta = findRouteWith(startXY, endXY, propio);
+  if (ruta || !propio) return ruta;
+  if (dlcOff[dlcGameOf(currentGame)].length) {
+    ruta = findRouteWith(startXY, endXY, dlcFilter(false));
+    if (ruta) { ruta.usesUncheckedDlc = true; return ruta; }
+  }
+  return findRouteWith(startXY, endXY, null);
+}
+
+function findRouteWith(startXY, endXY, filtro) {
+  const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
+  const blocked = filtro ? filtro.blocked : null;
+  const nodeOk = filtro ? filtro.nodeOk : null;
   // Origen y destino tienen que caer en la misma componente para que A*
   // encuentre camino: primero el nodo mas cercano en cualquier componente
   // real; si no coinciden (ej. destino en una isla sin ferry en el grafo),
   // se re-snapea el destino dentro de la componente del origen (ruta hasta
   // el punto mas cercano alcanzable, mejor que nada).
-  let startIdx = nearestNodeIndex(startXY[0], startXY[1], 'real');
-  let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real');
+  let startIdx = nearestNodeIndex(startXY[0], startXY[1], 'real', -1, nodeOk);
+  let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real', -1, nodeOk);
   if (startIdx === -1 || endIdx === -1) return null;
   if (componentId[startIdx] !== componentId[endIdx]) {
-    endIdx = nearestNodeIndex(endXY[0], endXY[1], false, componentId[startIdx]);
+    endIdx = nearestNodeIndex(endXY[0], endXY[1], false, componentId[startIdx], nodeOk);
     if (endIdx === -1) return null;
   }
 
@@ -2321,6 +2423,7 @@ function findRoute(startXY, endXY) {
       const neighbor = adjTo[k];
       if (visited[neighbor]) continue;
       const e = adjEdge[k];
+      if (blocked && blocked[edgeG[e]]) continue;
       const tentativeG = g + (byTime ? edgeS[e] : edgeM[e]);
       if (tentativeG < gScore[neighbor]) {
         gScore[neighbor] = tentativeG;
@@ -2465,8 +2568,9 @@ function renderRouteSummary(view) {
   // Un error de ~900 m sin explicacion se lee como un destino equivocado.
   const aviso = document.getElementById('routeApprox');
   if (aviso) {
-    aviso.hidden = !view.approx;
-    if (view.approx) aviso.textContent = t('destApprox');
+    const textos = [view.approx ? t('destApprox') : null, view.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
+    aviso.hidden = !textos.length;
+    if (textos.length) aviso.textContent = textos.join(' ');
   }
 }
 
@@ -2495,6 +2599,7 @@ function updateRouteSummary(data) {
     : (remainingKm === 0 ? 0 : routeSummaryEtaSeconds);
   renderRouteSummary({
     approx: !!target.approx,
+    dlc: routeUsesUncheckedDlc,
     percent,
     remaining: remainingKm == null ? '--'
       : `${(useImperial ? remainingKm * KM_TO_MI : remainingKm).toFixed(1)} ${useImperial ? 'mi' : 'km'}`,
@@ -2614,9 +2719,11 @@ function updateDestinationMarker(data) {
     let routePoints = [];
     let from = [data.position.x, data.position.z];
     let complete = true;
+    routeUsesUncheckedDlc = false;
     legs.forEach((to, legIdx) => {
       let leg = findRoute(from, to);
       if (leg) {
+        if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
         leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
         routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
       } else { complete = false; routePoints.push([from[0], from[1], 0, 0, null, legIdx], [to[0], to[1], 0, 0, null, legIdx]); }

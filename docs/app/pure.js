@@ -1050,7 +1050,81 @@ function pickVoice(voices, lang, savedId) {
   return own.find(v => v.id === savedId) || own[0];
 }
 
+// ------------------------------------------------------------ DLC del mapa
+// Cada tramo del grafo de rutas trae el dlcGuard de su road o prefab: el
+// numero con el que el juego esconde lo de un DLC que no tenes. La tabla
+// numero -> DLC es la del editor de mapas, tomada de truckermudgeon/maps
+// (libs/map/constants.ts). Un numero pide TODOS sus DLC (los de dos son
+// tramos de frontera). Un numero que no esta en la tabla, o que pide un DLC
+// no publicado (Heart of Russia, o fronteras con estados que todavia no
+// salieron: Illinois y Montana tienen), no se usa nunca: el juego tampoco
+// los muestra.
+const DLC_GUARDS = {
+  ats: {
+    0: [], 1: ['nv'], 2: ['az'], 3: ['nm'], 4: ['or'], 5: ['wa'], 6: ['wa', 'or'], 7: ['ut'],
+    8: ['ut', 'nm'], 9: ['id'], 10: ['id', 'or'], 11: ['id', 'ut'], 12: ['id', 'wa'], 13: ['co'],
+    14: ['co', 'nm'], 15: ['co', 'ut'], 16: ['wy'], 17: ['wy', 'co'], 18: ['wy', 'id'], 19: ['wy', 'ut'],
+    20: ['tx'], 21: ['tx', 'nm'], 22: ['mt'], 23: ['mt', 'id'], 24: ['mt', 'wy'], 25: ['ok'],
+    26: ['ok', 'co'], 27: ['ok', 'nm'], 28: ['ok', 'tx'], 29: ['ks'], 30: ['ks', 'co'], 31: ['ks', 'ok'],
+    32: ['ne'], 33: ['ne', 'co'], 34: ['ne', 'ks'], 35: ['ne', 'wy'], 36: ['ar'], 37: ['ar', 'ok'],
+    38: ['ar', 'tx'], 39: ['mo'], 40: ['mo', 'ar'], 41: ['mo', 'ks'], 42: ['mo', 'ne'], 43: ['mo', 'ok'],
+    44: ['ia'], 45: ['ia', 'mo'], 46: ['ia', 'ne'], 47: ['la'], 48: ['la', 'ar'], 49: ['la', 'tx'],
+    50: ['il'], 51: ['il', 'ia'], 52: ['il', 'mo'], 53: ['sd'], 54: ['sd', 'ia'], 55: ['sd', 'mt'],
+    56: ['sd', 'ne'], 57: ['sd', 'wy'],
+  },
+  ets2: {
+    0: [], 1: ['east'], 2: ['north'], 3: ['fr'], 4: ['it'], 5: ['it', 'fr'], 6: ['balt'],
+    7: ['balt', 'east'], 8: ['balt', 'north'], 9: ['blacksea'], 10: ['blacksea', 'east'],
+    11: ['iberia'], 12: ['iberia', 'fr'], 13: ['hor'], 14: ['hor', 'balt'], 15: ['krone'],
+    16: ['wbalkans'], 17: ['wbalkans', 'east'], 18: ['wbalkans', 'balt'], 19: ['feldbinder'],
+    20: ['greece'], 21: ['greece', 'east'], 22: ['greece', 'wbalkans'], 23: ['nordic'],
+    24: ['nordic', 'balt'], 25: ['nordic', 'north'],
+  },
+};
+// Los que se pueden destildar, en orden de salida. Nevada y Arizona vienen
+// con el juego base de ATS: siempre prendidos, no se listan.
+const DLC_LIST = {
+  ats: [['nm', 'New Mexico'], ['or', 'Oregon'], ['wa', 'Washington'], ['ut', 'Utah'], ['id', 'Idaho'],
+    ['co', 'Colorado'], ['wy', 'Wyoming'], ['mt', 'Montana'], ['tx', 'Texas'], ['ok', 'Oklahoma'],
+    ['ks', 'Kansas'], ['ne', 'Nebraska'], ['ar', 'Arkansas'], ['mo', 'Missouri'], ['ia', 'Iowa'],
+    ['la', 'Louisiana'], ['il', 'Illinois'], ['sd', 'South Dakota']],
+  ets2: [['east', 'Going East!'], ['north', 'Scandinavia'], ['fr', 'Vive la France!'], ['it', 'Italia'],
+    ['balt', 'Beyond the Baltic Sea'], ['blacksea', 'Road to the Black Sea'], ['iberia', 'Iberia'],
+    ['wbalkans', 'West Balkans'], ['greece', 'Greece'], ['nordic', 'Nordic Horizons'],
+    ['krone', 'Krone Trailer Pack'], ['feldbinder', 'Feldbinder Trailer Pack']],
+};
+const DLC_ALWAYS = { ats: ['nv', 'az'], ets2: [] };
+
+// 'ats' o 'ets2' a partir de la variante del mapa ('ets2_promods', 'ats_c2c').
+function dlcGameOf(variant) {
+  return String(variant || '').startsWith('ats') ? 'ats' : 'ets2';
+}
+
+// Lo destildado de ese juego, limpio: solo ids que existen, sin repetir.
+function normalizeDlcOff(raw) {
+  const out = { ats: [], ets2: [] };
+  for (const game of ['ats', 'ets2']) {
+    const validos = new Set(DLC_LIST[game].map(d => d[0]));
+    const lista = raw && Array.isArray(raw[game]) ? raw[game] : [];
+    out[game] = [...new Set(lista.filter(id => validos.has(id)))];
+  }
+  return out;
+}
+
+// Uint8Array(64): 1 = ese dlcGuard no se usa. off: los ids destildados.
+function dlcBlockedGuards(game, off) {
+  const tabla = DLC_GUARDS[game] || {};
+  const publicados = new Set(DLC_ALWAYS[game].concat(DLC_LIST[game].map(d => d[0])));
+  const apagados = new Set(off || []);
+  const mask = new Uint8Array(64);
+  for (let g = 0; g < 64; g++) {
+    const dlcs = tabla[g];
+    mask[g] = !dlcs || dlcs.some(id => !publicados.has(id) || apagados.has(id)) ? 1 : 0;
+  }
+  return mask;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

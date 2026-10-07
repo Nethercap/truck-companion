@@ -885,3 +885,40 @@ test('fuera del mapa: la caja sale de las ciudades con margen; sin caja, adentro
   assert.equal(mapBoundsFromCities([{ X: 1, Y: 1 }]), null);
   assert.equal(mapBoundsFromCities(null), null);
 });
+
+test('DLC: un tramo de un DLC destildado no se usa, el de frontera pide los dos', () => {
+  const { dlcBlockedGuards, dlcGameOf, normalizeDlcOff } = require('./pure.js');
+  const todo = dlcBlockedGuards('ats', []);
+  assert.equal(todo[0], 0);            // base
+  assert.equal(todo[1], 0);            // Nevada viene con el juego
+  assert.equal(todo[13], 0);           // Colorado
+  assert.equal(todo[53], 0);           // South Dakota ya salio
+  const sinCo = dlcBlockedGuards('ats', ['co']);
+  assert.equal(sinCo[13], 1);          // Colorado
+  assert.equal(sinCo[17], 1);          // Wyoming + Colorado: pide los dos
+  assert.equal(sinCo[16], 0);          // Wyoming solo
+  assert.equal(sinCo[0], 0);
+});
+
+test('DLC: lo que no esta en la tabla o no se publico no se usa nunca', () => {
+  const { dlcBlockedGuards } = require('./pure.js');
+  const ats = dlcBlockedGuards('ats', []);
+  assert.equal(ats[58], 1);            // Illinois con un estado que no salio
+  assert.equal(ats[59], 1);
+  assert.equal(ats[63], 1);            // fuera de rango (65 recortado)
+  const ets2 = dlcBlockedGuards('ets2', []);
+  assert.equal(ets2[13], 1);           // Heart of Russia
+  assert.equal(ets2[14], 1);
+  assert.equal(ets2[27], 1);           // Alesund: no esta en la tabla
+  assert.equal(ets2[23], 0);           // Nordic Horizons
+  assert.equal(dlcBlockedGuards('ets2', ['nordic', 'north'])[25], 1);
+});
+
+test('DLC: juego de la variante y ajustes guardados limpios', () => {
+  const { dlcGameOf, normalizeDlcOff } = require('./pure.js');
+  assert.equal(dlcGameOf('ats_c2c_promods'), 'ats');
+  assert.equal(dlcGameOf('ets2_promods_eugu'), 'ets2');
+  assert.equal(dlcGameOf(null), 'ets2');
+  assert.deepEqual(normalizeDlcOff({ ats: ['co', 'co', 'xx', 'nv'], ets2: 'iberia' }), { ats: ['co'], ets2: [] });
+  assert.deepEqual(normalizeDlcOff(undefined), { ats: [], ets2: [] });
+});

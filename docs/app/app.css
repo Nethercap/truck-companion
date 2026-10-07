@@ -878,3 +878,6 @@
   .dashOverlayBar .sizeGroup { display: flex; gap: 0.15rem; margin-left: auto; }
   .dashOverlayBar .iconBtn.secondary { display: inline-flex; }
   #dashOverlayPanel { flex: 1; min-height: 0; }
+
+/* DLC de mapa: casillas en columnas para que entren los de ATS. */
+.dlcGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); column-gap: 0.6rem; }
