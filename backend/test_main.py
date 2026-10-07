@@ -1027,3 +1027,10 @@ def test_offmap_report_se_acumula_una_vez_por_sesion_y_variante(client, main, mo
     assert off["ets2"]["box"] == [-670000, -660000, 131000, 132000]
     assert off["ats"]["reports"] == 1 and off["ats"]["noMods"] == 1
     assert code not in main.json.dumps(off) and code2 not in main.json.dumps(off)
+
+
+def test_dlc_de_mapa_del_cliente_saneados(main):
+    assert main.clean_map_dlcs({"ats": ["co", "sd", "co"], "ets2": ["east"]}) == {"ats": ["co", "sd"], "ets2": ["east"]}
+    assert main.clean_map_dlcs({"ats": ["co", "<script>", 3, "x" * 40], "otro": ["a"]}) == {"ats": ["co"]}
+    assert main.clean_map_dlcs({"ats": "co"}) is None
+    assert main.clean_map_dlcs(None) is None

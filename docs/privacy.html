@@ -31,7 +31,7 @@
 <header><img src="/assets/logo.svg" alt="" /> <a href="/" style="color:var(--text)">Truck Dash</a></header>
 <main>
   <h1>Privacy policy</h1>
-  <p class="updated">Last updated: 6 October 2026</p>
+  <p class="updated">Last updated: 7 October 2026</p>
 
   <p>Truck Dash is a free, open-source companion for Euro Truck Simulator 2 and American Truck Simulator. It is designed to handle as little data as possible. This page explains exactly what it reads, sends and stores.</p>
   <p><strong>An account is optional.</strong> Without one, everything works as it always has and nothing about you is stored on our servers. If you do create one, the section below says exactly what it holds.</p>
@@ -41,11 +41,13 @@
     <li><strong>Game telemetry</strong> through SCS Software's official Telemetry SDK (a shared-memory segment the game exposes when the plugin is installed): position, speed, fuel, cargo, job, truck wear and similar in-game values.</li>
     <li><strong>Your in-game key bindings</strong> (<code>controls.sii</code> in the game's profile folder), read-only, so the button box presses the same keys you configured in the game.</li>
     <li><strong>Where the game is installed</strong> (via Steam's library list), only to offer installing the telemetry plugin for you.</li>
+    <li><strong>The game's log</strong> (<code>game.log.txt</code> in your Documents folder), read-only, to see which map mods are active so the dashboard loads the right map.</li>
+    <li><strong>Which map DLCs you have</strong>: the names of the <code>dlc_*.scs</code> files in the game folder (not their contents), so routes avoid the DLCs you don't own.</li>
   </ul>
-  <div class="box">The client never reads, modifies or uploads any other file on your computer. It does not need administrator rights. It writes only its own settings (<code>keybinds.json</code>) and a log file next to the executable.</div>
+  <div class="box">The client never reads, modifies or uploads any other file on your computer, and from the game folder it only looks at file names. It does not need administrator rights. It writes only its own settings (<code>keybinds.json</code>) and a log file next to the executable.</div>
 
   <h2>What is sent to the server</h2>
-  <p>The client sends live telemetry over an encrypted WebSocket to a small relay server (hosted on Railway), tagged only with a random 8-character pairing code. The server forwards it to the browser(s) connected with the same code. Telemetry is <strong>not stored</strong>; it exists in memory only while your session is open. The one exception is your own driving history, and only if you link the client to an account (see below).</p>
+  <p>The client sends live telemetry over an encrypted WebSocket to a small relay server (hosted on Railway), tagged only with a random 8-character pairing code. The server forwards it to the browser(s) connected with the same code. Along with it go the client's status, the map mods and the map DLCs it found, so your dashboard can pick the map and avoid DLCs you don't own. Telemetry is <strong>not stored</strong>; it exists in memory only while your session is open. The one exception is your own driving history, and only if you link the client to an account (see below).</p>
   <p>No name, email, Steam ID, IP-based profile, hardware ID or any other identifier is collected. Your IP address is seen by the server like by any website you visit, and is used only for basic abuse rate-limiting in memory.</p>
 
   <h2>What is stored</h2>

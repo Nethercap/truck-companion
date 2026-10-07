@@ -113,6 +113,10 @@ class AppState:
         # Nombres de los mods activos por juego: la web los manda al relay
         # solo si el camion queda fuera del mapa (un mapa que no conocemos).
         self.active_mods: dict | None = None
+        # DLC de mapa instalados por juego ({'ats': ['co', ...]}), de los
+        # dlc_*.scs de la carpeta del juego: la web los usa para que las
+        # rutas eviten los que no tenes.
+        self.map_dlcs: dict | None = None
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.vehicle = None  # "Marca Modelo" mientras esta en vivo, para el log
@@ -176,6 +180,14 @@ class AppState:
                     and not any(plugin_installer.same_dir(i["bin_dir"], bin_dir) for i in self.installs)):
                 self.installs.append(plugin_installer.describe_install(
                     plugin_installer.game_for_bin_dir(bin_dir), bin_dir, origen="manual"))
+        try:
+            dlcs = client_lib.read_installed_dlcs(self.installs)
+        except Exception:
+            logging.exception("read_installed_dlcs failed")
+            dlcs = self.map_dlcs
+        if dlcs != self.map_dlcs:
+            logging.info("Map DLCs detected: %s", {g: len(v) for g, v in (dlcs or {}).items()})
+        self.map_dlcs = dlcs
         return self.installs
 
     def any_plugin_installed(self) -> bool:
@@ -1262,6 +1274,7 @@ def status_message() -> str:
         "detail": state.status_detail,
         "mapMods": state.map_mods,
         "activeMods": state.active_mods,
+        "mapDlcs": state.map_dlcs,
     })
 
 
@@ -1355,7 +1368,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
         nonlocal last_status_sent
         refresh_map_mods()
         key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True),
-               json.dumps(state.active_mods, sort_keys=True))
+               json.dumps(state.active_mods, sort_keys=True), json.dumps(state.map_dlcs, sort_keys=True))
         if key != last_status_sent:
             last_status_sent = key
             msg = status_message()

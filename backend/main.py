@@ -155,6 +155,22 @@ OFFMAP_MOD_NAME_LEN = 80
 OFFMAP_MODS_KEPT = 300
 
 
+def clean_map_dlcs(valor) -> Optional[dict]:
+    """Los DLC de mapa que el cliente encontro en la carpeta del juego
+    ({'ats': ['co', ...], 'ets2': [...]}). Se guardan con el estado de la
+    sesion para que una pestana que abre despues tambien los reciba (si no,
+    hasta el proximo cambio del cliente no se enteraba). Solo ids cortos y
+    pocos: el relay no confia en lo que llega."""
+    if not isinstance(valor, dict):
+        return None
+    limpio = {}
+    for game in ("ats", "ets2"):
+        lista = valor.get(game)
+        if isinstance(lista, list):
+            limpio[game] = sorted({x for x in lista if isinstance(x, str) and re.fullmatch(r"[a-z]{2,12}", x)})[:40]
+    return limpio or None
+
+
 def clean_offmap_report(payload: dict) -> Optional[dict]:
     variant = payload.get("variant")
     if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
@@ -1521,7 +1537,8 @@ async def ws_client(websocket: WebSocket, code: str):
             try:
                 payload = json.loads(data)
                 if payload.get("type") == "client_status":
-                    session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion")}
+                    session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion"),
+                                                  "mapDlcs": clean_map_dlcs(payload.get("mapDlcs"))}
                 # Mensajes de control (client_status, etc.) no son telemetria:
                 # no deben tocar el flanco de jobDelivered. Antes el primer
                 # client_status de cada conexion dejaba el estado en False y el

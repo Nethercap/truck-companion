@@ -2,6 +2,7 @@
 
 import inspect
 import os
+import pathlib
 import sys
 import tempfile
 
@@ -976,3 +977,25 @@ def test_active_mod_names_sin_repetidos_recortados_y_con_tope():
     assert client.active_mod_names(None) is None
     muchos = [{"name": f"mod {i}"} for i in range(client.ACTIVE_MOD_NAMES_MAX + 20)]
     assert len(client.active_mod_names(muchos)) == client.ACTIVE_MOD_NAMES_MAX
+
+
+def test_dlc_de_mapa_instalados_por_los_archivos_de_la_carpeta(tmp_path):
+    raiz = tmp_path / "American Truck Simulator"
+    (raiz / "bin" / "win_x64").mkdir(parents=True)
+    for nombre in ("dlc_co.scs", "DLC_SD.scs", "dlc_kenworth_w900.scs", "base_map.scs"):
+        (raiz / nombre).write_bytes(b"")
+    assert client.installed_map_dlcs(str(raiz), "ats") == ["co", "sd"]   # sin camiones ni el base
+    assert client.installed_map_dlcs(str(tmp_path / "no-existe"), "ats") is None
+    instalaciones = [{"game": "ats", "bin_dir": str(raiz / "bin" / "win_x64")},
+                     {"game": "ets2", "bin_dir": str(tmp_path / "no-existe" / "bin" / "win_x64")}]
+    # ETS2 sin carpeta legible: no aparece, que no es lo mismo que "ninguno"
+    assert client.read_installed_dlcs(instalaciones) == {"ats": ["co", "sd"]}
+
+
+def test_dlc_de_mapa_los_mismos_ids_que_la_web():
+    """Un id que la web no conoce se pierde en silencio: el DLC quedaria
+    siempre como "no lo tenes"."""
+    pure = (pathlib.Path(__file__).resolve().parent.parent / "docs" / "app" / "pure.js").read_text(encoding="utf-8")
+    for game, archivos in client.MAP_DLC_FILES.items():
+        for dlc_id in archivos.values():
+            assert f"'{dlc_id}'" in pure, (game, dlc_id)

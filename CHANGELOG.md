@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- The client tells the dashboard which map DLCs you have (it looks at the DLC files in the
+  game folder), so routes avoid the states and countries you don't own. You can still pick
+  them by hand in the dashboard: Settings, DLCs.
 - If your truck is outside the map Truck Dash knows (a map mod we don't support yet),
   the client lets the dashboard report which mods you have active, so we can see which
   maps people want. Only then, once per map, and with nothing that identifies you.

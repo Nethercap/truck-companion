@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261006t" />
-<link rel="stylesheet" href="app.css?v=20261006t" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261006u" />
+<link rel="stylesheet" href="app.css?v=20261006u" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -206,6 +206,9 @@
     <div class="settingsPanel">
       <h3 data-i18n="dlcTitle">DLCs</h3>
       <p class="settingsAbout" data-i18n="dlcHint">Uncheck the map DLCs you do not own and routes will avoid their roads. If there is no way around one, the route uses it anyway and tells you.</p>
+      <label class="settingsRow"><input type="radio" name="dlcAuto" id="setDlcAuto" value="auto" /> <span data-i18n="dlcAutoLabel">Automatic: read from the game (needs client 1.5.28 or newer)</span></label>
+      <p class="settingsAbout" id="dlcAutoStatus" style="margin:0 0 0.4rem 1.6rem"></p>
+      <label class="settingsRow"><input type="radio" name="dlcAuto" id="setDlcManual" value="manual" /> <span data-i18n="modsManualLabel">Choose manually</span></label>
       <div id="dlcLists"></div>
       <button id="dlcCloseBtn" data-i18n="close">Close</button>
     </div>
@@ -601,13 +604,13 @@
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261006t"></script>
-<script src="pure.js?v=20261006t"></script>
-<script src="i18n.js?v=20261006t"></script>
-<script src="i18n_en_es.js?v=20261006t"></script>
-<script src="../dash/dash.js?v=20261006t"></script>
-<script src="app.js?v=20261006t"></script>
-<script src="convoy.js?v=20261006t"></script>
-<script src="livemap.js?v=20261006t"></script>
+<script src="variants.js?v=20261006u"></script>
+<script src="pure.js?v=20261006u"></script>
+<script src="i18n.js?v=20261006u"></script>
+<script src="i18n_en_es.js?v=20261006u"></script>
+<script src="../dash/dash.js?v=20261006u"></script>
+<script src="app.js?v=20261006u"></script>
+<script src="convoy.js?v=20261006u"></script>
+<script src="livemap.js?v=20261006u"></script>
 </body>
 </html>

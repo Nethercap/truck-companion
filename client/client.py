@@ -241,6 +241,55 @@ def is_truckersmp_session(log_text: str) -> bool:
     return bool(_TMP_MOUNT_RE.search(log_text))
 
 
+# DLC de mapa: archivo en la carpeta del juego -> id de la web (DLC_LIST en
+# docs/app/pure.js). Steam baja el archivo de un DLC solo si lo tenes (y no
+# lo desactivaste en Steam), asi que con mirar la carpeta alcanza para que
+# las rutas eviten los que no tenes sin preguntar nada. Tabla de
+# truckermudgeon/maps (libs/map/constants.ts) mas South Dakota.
+MAP_DLC_FILES = {
+    "ats": {
+        "dlc_nevada.scs": "nv", "dlc_arizona.scs": "az", "dlc_nm.scs": "nm", "dlc_or.scs": "or",
+        "dlc_wa.scs": "wa", "dlc_ut.scs": "ut", "dlc_id.scs": "id", "dlc_co.scs": "co",
+        "dlc_wy.scs": "wy", "dlc_mt.scs": "mt", "dlc_tx.scs": "tx", "dlc_ok.scs": "ok",
+        "dlc_ks.scs": "ks", "dlc_ne.scs": "ne", "dlc_ar.scs": "ar", "dlc_mo.scs": "mo",
+        "dlc_ia.scs": "ia", "dlc_la.scs": "la", "dlc_il.scs": "il", "dlc_sd.scs": "sd",
+    },
+    "ets2": {
+        "dlc_east.scs": "east", "dlc_north.scs": "north", "dlc_fr.scs": "fr", "dlc_it.scs": "it",
+        "dlc_balt.scs": "balt", "dlc_balkan_e.scs": "blacksea", "dlc_iberia.scs": "iberia",
+        "dlc_balkan_w.scs": "wbalkans", "dlc_greece.scs": "greece", "dlc_polar.scs": "nordic",
+        "dlc_krone.scs": "krone", "dlc_feldbinder.scs": "feldbinder",
+    },
+}
+
+
+def installed_map_dlcs(game_root: str, game: str) -> list | None:
+    """Ids de los DLC de mapa instalados en esa carpeta del juego, ordenados.
+    None si la carpeta no se puede leer (no es lo mismo que no tener ninguno)."""
+    try:
+        nombres = {n.lower() for n in os.listdir(game_root)}
+    except OSError:
+        return None
+    return sorted(i for archivo, i in MAP_DLC_FILES.get(game, {}).items() if archivo in nombres)
+
+
+def read_installed_dlcs(installs: list) -> dict:
+    """{'ats': [ids], 'ets2': [ids]} de las instalaciones encontradas (las de
+    plugin_installer: bin_dir es <juego>/bin/win_x64). Con dos instalaciones
+    del mismo juego, la union. Un juego sin instalacion no aparece."""
+    out = {}
+    for inst in installs or []:
+        game = inst.get("game")
+        if game not in MAP_DLC_FILES or not inst.get("bin_dir"):
+            continue
+        raiz = os.path.dirname(os.path.dirname(os.path.normpath(inst["bin_dir"])))
+        encontrados = installed_map_dlcs(raiz, game)
+        if encontrados is None:
+            continue
+        out[game] = sorted(set(out.get(game, [])) | set(encontrados))
+    return out
+
+
 ACTIVE_MOD_NAMES_MAX = 150
 ACTIVE_MOD_NAME_LEN = 80
 

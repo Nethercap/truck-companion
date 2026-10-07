@@ -84,7 +84,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff, dlcAuto })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -142,6 +142,21 @@ let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como 
 // evitan sus caminos (ver dlcBlockedGuards en pure.js). Se guarda lo
 // destildado y no lo tildado, asi un DLC nuevo arranca prendido.
 let dlcOff = normalizeDlcOff(_savedSettings.dlcOff);
+// Automatico (cliente 1.5.28+): los DLC salen de la carpeta del juego. Por
+// defecto prendido, salvo para quien ya habia destildado algo a mano antes
+// de que existiera (no se le pisa la eleccion).
+let dlcAuto = _savedSettings.dlcAuto !== undefined ? !!_savedSettings.dlcAuto
+  : !(dlcOff.ats.length || dlcOff.ets2.length);
+let detectedDlcs = null; // { ats: [ids], ets2: [ids] } del client_status
+function dlcOffFor(game) {
+  return effectiveDlcOff(game, dlcAuto, detectedDlcs, dlcOff[game]);
+}
+function applyDetectedDlcs(valor) {
+  if (valor === undefined || JSON.stringify(valor) === JSON.stringify(detectedDlcs)) return;
+  detectedDlcs = valor;
+  if (dlcAuto) invalidateRoute();
+  if (document.getElementById('dlcModal').style.display === 'flex') renderDlcLists();
+}
 // Guia por voz (Ajustes): apagada por defecto, y una voz elegida por idioma
 // ({ en: 'en-joe' }). Aca arriba por lo mismo que navZoom: saveSettings lee.
 let voiceOn = !!_savedSettings.voiceOn;
@@ -720,6 +735,15 @@ document.getElementById('modsModal').addEventListener('click', (e) => {
 function renderDlcLists() {
   const caja = document.getElementById('dlcLists');
   caja.innerHTML = '';
+  document.getElementById('setDlcAuto').checked = dlcAuto;
+  document.getElementById('setDlcManual').checked = !dlcAuto;
+  const partes = ['ats', 'ets2'].filter(g => detectedDlcs && Array.isArray(detectedDlcs[g])).map(g => {
+    const total = DLC_LIST[g].length;
+    const tiene = DLC_LIST[g].filter(d => detectedDlcs[g].includes(d[0])).length;
+    return `${g === 'ats' ? 'ATS' : 'ETS2'} ${tiene} / ${total}`;
+  });
+  document.getElementById('dlcAutoStatus').textContent = partes.length ? `${t('dlcDetected')} ${partes.join(' · ')}` : t('dlcAutoWaiting');
+  caja.style.opacity = dlcAuto ? '0.6' : '1';
   const juegos = currentGame && dlcGameOf(currentGame) === 'ats' ? ['ats', 'ets2'] : ['ets2', 'ats'];
   for (const game of juegos) {
     const titulo = document.createElement('p');
@@ -733,7 +757,8 @@ function renderDlcLists() {
       label.className = 'settingsRow';
       const input = document.createElement('input');
       input.type = 'checkbox';
-      input.checked = !dlcOff[game].includes(id);
+      input.checked = !dlcOffFor(game).includes(id);
+      input.disabled = dlcAuto;
       input.addEventListener('change', () => {
         const off = new Set(dlcOff[game]);
         if (input.checked) off.delete(id); else off.add(id);
@@ -754,6 +779,18 @@ function openDlcModal() {
   document.getElementById('dlcModal').style.display = 'flex';
 }
 document.getElementById('setDlcBtn').addEventListener('click', openDlcModal);
+document.querySelectorAll('input[name="dlcAuto"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    const auto = e.target.value === 'auto';
+    // Pasar a manual arranca de lo detectado: la persona corrige uno, no
+    // vuelve a destildar todos.
+    if (!auto && dlcAuto) dlcOff = normalizeDlcOff({ ats: dlcOffFor('ats'), ets2: dlcOffFor('ets2') });
+    dlcAuto = auto;
+    saveSettings();
+    invalidateRoute();
+    renderDlcLists();
+  });
+});
 document.getElementById('dlcCloseBtn').addEventListener('click', () => {
   document.getElementById('dlcModal').style.display = 'none';
 });
@@ -2341,7 +2378,7 @@ let dlcFilterCache = { graph: null, byKey: new Map() };
 function dlcFilter(conElecciones) {
   if (!routeGraph || !routeGraph.edgeG) return null;
   const game = dlcGameOf(currentGame);
-  const off = conElecciones ? dlcOff[game] : [];
+  const off = conElecciones ? dlcOffFor(game) : [];
   const key = `${game}|${off.join(',')}`;
   if (dlcFilterCache.graph !== routeGraph) dlcFilterCache = { graph: routeGraph, byKey: new Map() };
   if (dlcFilterCache.byKey.has(key)) return dlcFilterCache.byKey.get(key);
@@ -2367,7 +2404,7 @@ function findRoute(startXY, endXY) {
   const propio = dlcFilter(true);
   let ruta = findRouteWith(startXY, endXY, propio);
   if (ruta || !propio) return ruta;
-  if (dlcOff[dlcGameOf(currentGame)].length) {
+  if (dlcOffFor(dlcGameOf(currentGame)).length) {
     ruta = findRouteWith(startXY, endXY, dlcFilter(false));
     if (ruta) { ruta.usesUncheckedDlc = true; return ruta; }
   }
@@ -4801,6 +4838,7 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;
+      if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);
       if (!conn.clientConnected) conn.hasTelemetry = false;
       renderConnectionUi();
       return;
@@ -4809,6 +4847,7 @@ function connectWs(backend, code, options = {}) {
       conn.clientConnected = true;
       conn.clientStatus = data; // incluye .detail si el cliente lo manda
       if (data.activeMods !== undefined) detectedModNames = data.activeMods;
+      applyDetectedDlcs(data.mapDlcs);
       if (data.mapMods !== undefined && JSON.stringify(data.mapMods) !== JSON.stringify(detectedMods)) {
         detectedMods = data.mapMods;
         if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada

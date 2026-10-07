@@ -71,7 +71,7 @@ GUIDE_TEXT.en = {
 <li>The <b>blue line</b> behind the truck is where you have driven.</li>
 <li>With <b>Share my position</b> on, you see other Truck Dash drivers on your map and you appear on the public <a href="/live/">live map</a> as an anonymous driver, with your route drawn unless you untick <b>Also show my route on the live map</b>. You can turn it off in Settings.</li>
 <li><b>Map mods</b> have their own maps: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia and TruckersMP. The app detects them from the game, or you pick one with the puzzle button.</li>
-<li><b>DLCs</b> (in Settings): uncheck the map DLCs you do not own and routes avoid their roads. If there is no way around one, the route uses it anyway and says so.</li>
+<li><b>DLCs</b> (in Settings): uncheck the map DLCs you do not own and routes avoid their roads. If there is no way around one, the route uses it anyway and says so. With the client 1.5.28 or newer they are read from your game on their own.</li>
 </ul>
 <p>Every map button can be moved and resized: long-press one on a phone, or use <b>Move the buttons</b> in Settings.</p>`,
     panel: `
@@ -266,7 +266,7 @@ GUIDE_TEXT.es = {
 <li>La <b>línea azul</b> detrás del camión es por donde anduviste.</li>
 <li>Con <b>Compartir mi posición</b> prendido ves a otros conductores de Truck Dash en tu mapa y aparecés en el <a href="/live/">mapa en vivo</a> público como un conductor anónimo, con tu ruta dibujada salvo que destildes <b>Mostrar también mi ruta en el mapa en vivo</b>. Se apaga en Configuración.</li>
 <li>Los <b>mods de mapa</b> tienen su propio mapa: ProMods, Coast to Coast, ProMods Canada, Reforma, RusMap, Roextended, Grand Utopia y TruckersMP. La app los detecta desde el juego, o elegís uno con el botón del rompecabezas.</li>
-<li><b>DLC</b> (en Ajustes): destildá los DLC de mapa que no tenés y las rutas evitan sus caminos. Si no hay forma de rodear uno, la ruta lo usa igual y te avisa.</li>
+<li><b>DLC</b> (en Ajustes): destildá los DLC de mapa que no tenés y las rutas evitan sus caminos. Si no hay forma de rodear uno, la ruta lo usa igual y te avisa. Con el cliente 1.5.28 o más nuevo se leen solos de tu juego.</li>
 </ul>
 <p>Todos los botones del mapa se pueden mover y agrandar: dejá apretado uno en el celular, o usá <b>Mover los botones</b> en Configuración.</p>`,
     panel: `

@@ -922,3 +922,14 @@ test('DLC: juego de la variante y ajustes guardados limpios', () => {
   assert.deepEqual(normalizeDlcOff({ ats: ['co', 'co', 'xx', 'nv'], ets2: 'iberia' }), { ats: ['co'], ets2: [] });
   assert.deepEqual(normalizeDlcOff(undefined), { ats: [], ets2: [] });
 });
+
+test('DLC: automatico usa lo que encontro el cliente; sin datos, todos; manual, lo elegido', () => {
+  const { effectiveDlcOff, DLC_LIST } = require('./pure.js');
+  const todosAts = DLC_LIST.ats.map(d => d[0]);
+  const sinCoNiSd = todosAts.filter(id => id !== 'co' && id !== 'sd');
+  assert.deepEqual(effectiveDlcOff('ats', true, { ats: sinCoNiSd.concat(['nv', 'az']) }, ['tx']), ['co', 'sd']);
+  assert.deepEqual(effectiveDlcOff('ats', true, null, ['tx']), []);              // cliente viejo
+  assert.deepEqual(effectiveDlcOff('ets2', true, { ats: todosAts }, ['it']), []); // ETS2 sin datos
+  assert.deepEqual(effectiveDlcOff('ats', false, { ats: [] }, ['tx']), ['tx']);   // manual
+  assert.equal(effectiveDlcOff('ets2', true, { ets2: [] }).length, DLC_LIST.ets2.length);
+});

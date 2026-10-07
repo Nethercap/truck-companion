@@ -1111,6 +1111,18 @@ function normalizeDlcOff(raw) {
   return out;
 }
 
+// Los DLC que no se usan en ese juego. En automatico, los que el cliente
+// NO encontro en la carpeta del juego (detected: {ats: [ids], ets2: [ids]},
+// del client_status); sin datos del cliente (cliente viejo o desconectado),
+// ninguno: mejor una ruta por un DLC que no tenes, avisada por el juego,
+// que ninguna ruta. En manual, lo que destildo la persona.
+function effectiveDlcOff(game, auto, detected, manualOff) {
+  if (!auto) return manualOff || [];
+  const tiene = detected && Array.isArray(detected[game]) ? detected[game] : null;
+  if (!tiene) return [];
+  return (DLC_LIST[game] || []).map(d => d[0]).filter(id => !tiene.includes(id));
+}
+
 // Uint8Array(64): 1 = ese dlcGuard no se usa. off: los ids destildados.
 function dlcBlockedGuards(game, off) {
   const tabla = DLC_GUARDS[game] || {};
@@ -1125,6 +1137,6 @@ function dlcBlockedGuards(game, off) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
