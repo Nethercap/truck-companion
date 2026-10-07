@@ -487,6 +487,11 @@ ul.feed .meta { color: var(--muted); font-size: 0.85rem; }
 .publico table.viajes tr.fila { cursor: default; }
 .publico table.viajes tr.fila:hover td { background: none; }
 
+/* Trabajos con auto de ATS: un bloque aparte adentro del juego. */
+.autos { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px dashed var(--line); }
+.autos .titulo-autos { margin: 0 0 0.6rem; font-size: 0.8rem; letter-spacing: 0.08em;
+                       text-transform: uppercase; color: var(--warn); }
+
 /* Records y consumo por camion: una lista corta, sin numeros adelante. */
 .records { list-style: none; margin: 0; padding: 0; font-size: 0.88rem; }
 .records li { margin: 0.15rem 0; }

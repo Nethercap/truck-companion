@@ -167,6 +167,9 @@
       topCountries: "Most visited countries",
       topStates: "Most visited states",
       topTrucks: "Most used trucks",
+      topCars: "Most used cars",
+      fuelByCarTitle: "Fuel by car",
+      statsAvgFuel: "Avg consumption",
       topCargo: "Most hauled cargo",
       topCompanies: "Most worked companies",
       topCities: "Most visited cities",
@@ -483,6 +486,9 @@
       topCountries: "Paises mas visitados",
       topStates: "Estados mas visitados",
       topTrucks: "Camiones mas usados",
+      topCars: "Autos mas usados",
+      fuelByCarTitle: "Consumo por auto",
+      statsAvgFuel: "Consumo promedio",
       topCargo: "Cargas mas llevadas",
       topCompanies: "Empresas mas trabajadas",
       topCities: "Ciudades mas visitadas",
@@ -1562,59 +1568,114 @@
 
     // Records personales: cada uno con el viaje que lo marco.
     const r = s.records || {};
-    const donde = (x) => [x.city_src, x.city_dst].filter(Boolean).join(' \u2192 ') || t('tripUnnamed');
-    const records = [
+    const bloques = document.createElement('div');
+    bloques.className = 'tops';
+    sumar(bloques, listaRecords([
       r.best_pay ? [t('recBestPay'), plata(r.best_pay.value, r.best_pay.currency), r.best_pay] : null,
       s.longest ? [t('statsLongest'), distancia(s.longest.distance_km), s.longest] : null,
       r.best_avg_speed ? [t('recBestAvg'), velocidad(r.best_avg_speed.value), r.best_avg_speed] : null,
       r.heaviest ? [t('recHeaviest'), [masa(r.heaviest.value), r.heaviest.cargo].filter(Boolean).join(' \u00b7 '), r.heaviest] : null,
       r.most_efficient ? [t('recEfficient'), consumo(r.most_efficient.value), r.most_efficient] : null
-    ].filter(Boolean);
+    ]));
+    sumar(bloques, listaConsumo(t('fuelByTruckTitle'), s.fuel_by_truck));
+    if (bloques.children.length) caja.appendChild(bloques);
+    // Los trabajos con auto de ATS, aparte: otro vehiculo y otros numeros.
+    if (s.cars && s.cars.trips) caja.appendChild(bloqueAutos(s.cars));
+    return caja;
+  }
+
+  function listaRecords(filas) {
+    const records = filas.filter(Boolean);
+    if (!records.length) return null;
+    const donde = (x) => [x.city_src, x.city_dst].filter(Boolean).join(' \u2192 ') || t('tripUnnamed');
+    const caja = document.createElement('div');
+    const h = document.createElement('h4');
+    h.textContent = t('recordsTitle');
+    caja.appendChild(h);
+    const ul = document.createElement('ul');
+    ul.className = 'records';
+    records.forEach(([rotulo, valor, viaje]) => {
+      const li = document.createElement('li');
+      const b = document.createElement('b');
+      b.textContent = rotulo + ': ' + valor;
+      li.appendChild(b);
+      const sub = document.createElement('span');
+      sub.textContent = ' \u00b7 ' + donde(viaje);
+      li.appendChild(sub);
+      ul.appendChild(li);
+    });
+    caja.appendChild(ul);
+    return caja;
+  }
+
+  // Consumo por vehiculo, del que menos gasta al que mas: con los km que
+  // midio el cliente, que son en los que se midio el combustible.
+  function listaConsumo(titulo, items) {
+    if (!items || !items.length) return null;
+    const caja = document.createElement('div');
+    const h = document.createElement('h4');
+    h.textContent = titulo;
+    caja.appendChild(h);
+    const ul = document.createElement('ul');
+    ul.className = 'records';
+    items.forEach((c) => {
+      const li = document.createElement('li');
+      li.appendChild(document.createTextNode(c.name + ' \u00b7 '));
+      const b = document.createElement('b');
+      b.textContent = consumo(c.l_per_100km);
+      li.appendChild(b);
+      const sub = document.createElement('span');
+      sub.textContent = ' \u00b7 ' + distancia(c.distance_km);
+      li.appendChild(sub);
+      ul.appendChild(li);
+    });
+    caja.appendChild(ul);
+    return caja;
+  }
+
+  function bloqueAutos(c) {
+    const caja = document.createElement('div');
+    caja.className = 'autos';
+    const titulo = document.createElement('h4');
+    titulo.className = 'titulo-autos';
+    titulo.textContent = t('statsCarJobs');
+    caja.appendChild(titulo);
+
+    const cifras = document.createElement('div');
+    cifras.className = 'cifras';
+    [
+      cifra(numero(c.trips), t('statsTrips')),
+      cifra(numero(c.delivered), t('statsDelivered')),
+      c.on_time ? cifra(numero(c.on_time), t('statsOnTime')) : null,
+      cifra(distancia(c.distance_km), t('statsDistance')),
+      cifra(duracion(c.real_hours), t('statsWheel')),
+      c.fuel_used ? cifra(volumen(c.fuel_used), t('tripFuel')) : null,
+      c.l_per_100km ? cifra(consumo(c.l_per_100km), t('statsAvgFuel')) : null
+    ].filter(Boolean).forEach((x) => cifras.appendChild(x));
+    caja.appendChild(cifras);
+
+    (c.money || []).forEach((m) => {
+      sumar(caja, renglon([t('statsEarned') + ' ' + plata(m.revenue, m.currency)]));
+    });
+
+    const top = c.top || {};
+    const tops = document.createElement('div');
+    tops.className = 'tops';
+    [
+      listaTop(t('topCars'), top.vehicles, (x) => x.name),
+      listaTop(t('topCargo'), top.cargo, (x) => x.name)
+    ].filter(Boolean).forEach((l) => tops.appendChild(l));
+    if (tops.children.length) caja.appendChild(tops);
+
+    const r = c.records || {};
     const bloques = document.createElement('div');
     bloques.className = 'tops';
-    if (records.length) {
-      const caja2 = document.createElement('div');
-      const h = document.createElement('h4');
-      h.textContent = t('recordsTitle');
-      caja2.appendChild(h);
-      const ul = document.createElement('ul');
-      ul.className = 'records';
-      records.forEach(([rotulo, valor, viaje]) => {
-        const li = document.createElement('li');
-        const b = document.createElement('b');
-        b.textContent = rotulo + ': ' + valor;
-        li.appendChild(b);
-        const sub = document.createElement('span');
-        sub.textContent = ' \u00b7 ' + donde(viaje);
-        li.appendChild(sub);
-        ul.appendChild(li);
-      });
-      caja2.appendChild(ul);
-      bloques.appendChild(caja2);
-    }
-    // Consumo por camion, del que menos gasta al que mas: con los km que
-    // midio el cliente, que son en los que se midio el combustible.
-    if ((s.fuel_by_truck || []).length) {
-      const caja3 = document.createElement('div');
-      const h = document.createElement('h4');
-      h.textContent = t('fuelByTruckTitle');
-      caja3.appendChild(h);
-      const ul = document.createElement('ul');
-      ul.className = 'records';
-      s.fuel_by_truck.forEach((c) => {
-        const li = document.createElement('li');
-        li.appendChild(document.createTextNode(c.name + ' \u00b7 '));
-        const b = document.createElement('b');
-        b.textContent = consumo(c.l_per_100km);
-        li.appendChild(b);
-        const sub = document.createElement('span');
-        sub.textContent = ' \u00b7 ' + distancia(c.distance_km);
-        li.appendChild(sub);
-        ul.appendChild(li);
-      });
-      caja3.appendChild(ul);
-      bloques.appendChild(caja3);
-    }
+    sumar(bloques, listaRecords([
+      r.best_pay ? [t('recBestPay'), plata(r.best_pay.value, r.best_pay.currency), r.best_pay] : null,
+      r.longest ? [t('statsLongest'), distancia(r.longest.value), r.longest] : null,
+      r.best_avg_speed ? [t('recBestAvg'), velocidad(r.best_avg_speed.value), r.best_avg_speed] : null
+    ]));
+    sumar(bloques, listaConsumo(t('fuelByCarTitle'), c.fuel_by_vehicle));
     if (bloques.children.length) caja.appendChild(bloques);
     return caja;
   }
