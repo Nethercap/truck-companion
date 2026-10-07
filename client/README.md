@@ -116,6 +116,13 @@ sudo ufw allow 27765/tcp
 sudo ufw allow 27766/tcp
 ```
 
+**Works on Wi-Fi but not on your phone's hotspot?** Windows marks every new
+network as *Public*, and the firewall permission it asked for covers only
+*Private* networks, so on a hotspot the dashboard doesn't even load (and
+Windows doesn't ask again). The Setup window says so when it happens. Switch
+that network to Private: Settings → Network & internet → your Wi-Fi (or
+Ethernet, for USB tethering) → Private network.
+
 Both can be changed with the `TRUCKDASH_HTTP_PORT` and `TRUCKDASH_WS_PORT`
 environment variables if those numbers clash with something else.
 

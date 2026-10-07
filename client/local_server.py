@@ -23,11 +23,15 @@ ws:// a una IP de la LAN (mixed content, lo bloquean todos los navegadores)
 import asyncio
 import errno
 import http.server
+import ipaddress
 import json
 import logging
 import os
 import socket
+import subprocess
+import sys
 import threading
+import time
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import red
@@ -79,6 +83,39 @@ def lan_ip() -> str | None:
             return s.getsockname()[0]
     except OSError:
         return None
+
+
+def network_category(ip: str | None) -> str | None:
+    """Windows: como tiene clasificada la red de esa IP ("Public", "Private"
+    o "DomainAuthenticated"). None fuera de Windows o si no se pudo saber.
+
+    Hace falta por los hotspots del celular: Windows marca como Publica toda
+    red nueva, y el permiso del firewall que pide la primera vez cubre solo
+    las privadas (y deja una regla de bloqueo para las publicas). En la WiFi
+    de casa el modo LAN anda; conectado al hotspot la pagina ni carga, y
+    Windows no vuelve a preguntar nada.
+    """
+    if sys.platform != "win32" or not ip:
+        return None
+    try:
+        ip = str(ipaddress.IPv4Address(ip))
+    except ValueError:
+        return None
+    comando = (f"(Get-NetConnectionProfile -InterfaceIndex "
+               f"(Get-NetIPAddress -IPAddress '{ip}' -ErrorAction Stop).InterfaceIndex "
+               f"-ErrorAction Stop).NetworkCategory")
+    try:
+        salida = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", comando],
+            capture_output=True, text=True, timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+    except (OSError, subprocess.SubprocessError):
+        # Bajo Wine no hay powershell: no se sabe, y no se avisa nada.
+        return None
+    for categoria in ("Public", "Private", "DomainAuthenticated"):
+        if categoria in salida.split():
+            return categoria
+    return None
 
 
 def refresh_web_cache() -> bool:
@@ -250,11 +287,40 @@ class LocalServer:
         self.web_ready = False
         self.error: str | None = None
         self.port_in_use = False
+        # Clasificacion de la red de la IP de LAN (ver network_category).
+        self._category_ip: str | None = None
+        self._category: str | None = None
+        self._category_at = 0.0
 
     @property
     def url(self) -> str | None:
         ip = lan_ip()
         return f"http://{ip}:{HTTP_PORT}/app/?local=1" if ip else None
+
+    # Cada cuanto se vuelve a mirar una red publica: quien la pasa a Privada
+    # con la ventana abierta tiene que ver irse el aviso.
+    CATEGORY_RECHECK = 20
+
+    def public_network(self) -> bool:
+        """True si Windows tiene la red de la IP de LAN como Publica. No
+        bloquea (la ventana lo pregunta cada medio segundo): la consulta va
+        en un thread y hasta tener respuesta se asume que no."""
+        ip = lan_ip()
+        vencida = self._category == "Public" and time.monotonic() - self._category_at > self.CATEGORY_RECHECK
+        if ip != self._category_ip or vencida:
+            if ip != self._category_ip:
+                self._category = None
+            self._category_ip = ip
+            self._category_at = time.monotonic()
+            if ip:
+                threading.Thread(target=self._read_category, args=(ip,), daemon=True).start()
+        return self._category == "Public"
+
+    def _read_category(self, ip: str):
+        categoria = network_category(ip)
+        if ip == self._category_ip:
+            self._category = categoria
+            self._category_at = time.monotonic()
 
     async def start(self):
         import websockets

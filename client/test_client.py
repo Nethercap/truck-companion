@@ -2,6 +2,7 @@
 
 import inspect
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -976,3 +977,69 @@ def test_active_mod_names_sin_repetidos_recortados_y_con_tope():
     assert client.active_mod_names(None) is None
     muchos = [{"name": f"mod {i}"} for i in range(client.ACTIVE_MOD_NAMES_MAX + 20)]
     assert len(client.active_mod_names(muchos)) == client.ACTIVE_MOD_NAMES_MAX
+
+
+def test_la_red_publica_se_detecta_por_la_ip_de_lan(monkeypatch):
+    """Hotspot del celular: Windows lo marca como red Publica y el firewall
+    bloquea el modo LAN sin avisar. La ventana tiene que poder decirlo."""
+    import local_server
+
+    pedidos = []
+
+    def correr(args, **kw):
+        pedidos.append(args[-1])
+        return subprocess.CompletedProcess(args, 0, stdout="Public\r\n", stderr="")
+
+    monkeypatch.setattr(local_server.sys, "platform", "win32")
+    monkeypatch.setattr(local_server.subprocess, "run", correr)
+    assert local_server.network_category("172.20.10.2") == "Public"
+    assert "'172.20.10.2'" in pedidos[0]
+    # Lo que no es una IPv4 no llega a powershell.
+    assert local_server.network_category("1'; Remove-Item x; '") is None
+    assert len(pedidos) == 1
+
+
+def test_la_categoria_de_red_no_se_pregunta_fuera_de_windows_ni_sin_powershell(monkeypatch):
+    import local_server
+
+    monkeypatch.setattr(local_server.sys, "platform", "linux")
+    assert local_server.network_category("192.168.1.5") is None
+
+    def sin_powershell(*a, **kw):
+        raise FileNotFoundError("powershell")
+
+    monkeypatch.setattr(local_server.sys, "platform", "win32")
+    monkeypatch.setattr(local_server.subprocess, "run", sin_powershell)
+    assert local_server.network_category("192.168.1.5") is None
+
+
+def test_public_network_no_bloquea_y_se_revisa_al_cambiar_de_red(monkeypatch):
+    import local_server
+
+    class HiloEnElActo:
+        def __init__(self, target, args, daemon):
+            self.target, self.args = target, args
+
+        def start(self):
+            self.target(*self.args)
+
+    categorias = {"192.168.1.5": "Private", "172.20.10.2": "Public"}
+    ip = {"actual": "192.168.1.5"}
+    consultas = []
+    monkeypatch.setattr(local_server.threading, "Thread", HiloEnElActo)
+    monkeypatch.setattr(local_server, "lan_ip", lambda: ip["actual"])
+    monkeypatch.setattr(local_server, "network_category",
+                        lambda i: consultas.append(i) or categorias[i])
+
+    srv = local_server.LocalServer({})
+    assert srv.public_network() is False
+    assert srv.public_network() is False
+    assert consultas == ["192.168.1.5"]  # una vez por red, no cada medio segundo
+
+    ip["actual"] = "172.20.10.2"
+    assert srv.public_network() is True
+
+    # La pasan a Privada con la ventana abierta: el aviso se va.
+    categorias["172.20.10.2"] = "Private"
+    srv._category_at -= srv.CATEGORY_RECHECK + 1
+    assert srv.public_network() is False

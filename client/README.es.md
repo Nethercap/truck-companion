@@ -93,6 +93,13 @@ sudo ufw allow 27765/tcp
 sudo ufw allow 27766/tcp
 ```
 
+**¿Anda en la WiFi pero no con el hotspot del celular?** Windows marca toda
+red nueva como *Pública*, y el permiso del firewall que pidió cubre solo las
+redes *Privadas*: con el hotspot el tablero ni carga (y Windows no vuelve a
+preguntar). La ventana de Configuración lo avisa cuando pasa. Pasá esa red a
+Privada: Configuración → Red e Internet → tu WiFi (o Ethernet, si compartís
+por USB) → Red privada.
+
 Los dos se pueden cambiar con las variables de entorno
 `TRUCKDASH_HTTP_PORT` y `TRUCKDASH_WS_PORT` si esos números chocan con algo.
 

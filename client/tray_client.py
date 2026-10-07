@@ -488,7 +488,7 @@ class SetupWindow:
 
         # --- Modo LAN ---
         lan_frame = self.section(T("sec_lan"))
-        lan_row = tk.Frame(lan_frame, bg=BG)
+        lan_row = self.lan_row = tk.Frame(lan_frame, bg=BG)
         lan_row.pack(anchor="w", pady=(4, 0), fill="x")
         self.qr_label = tk.Label(lan_row, bg=BG)
         self.qr_label.pack(side="left", padx=(0, 12))
@@ -507,6 +507,12 @@ class SetupWindow:
         self.label(lan_frame, T("lan_ports"), fg=MUTED, wraplength=520).pack(
             anchor="w", pady=(6, 0))
         self.button(lan_btns, T("open_here"), self.open_lan_here).pack(side="left", padx=6)
+        # Solo con la red marcada como Publica (el hotspot del celular, casi
+        # siempre): el firewall bloquea el modo LAN sin avisar.
+        self.lan_public_frame = tk.Frame(lan_frame, bg=BG)
+        self.label(self.lan_public_frame, T("lan_public"), fg=ORANGE, wraplength=520).pack(anchor="w")
+        self.button(self.lan_public_frame, T("network_settings"), self.open_network_settings).pack(
+            anchor="w", pady=(4, 0))
         self.render_lan()
 
         # --- Juegos / plugin ---
@@ -893,9 +899,13 @@ class SetupWindow:
             self.root.clipboard_clear()
             self.root.clipboard_append(state.code)
 
-    def render_lan(self):
+    def render_lan(self, public=False):
         srv = state.local
         url = srv.url if srv else None
+        if public and url:
+            self.lan_public_frame.pack(anchor="w", fill="x", pady=(8, 0), after=self.lan_row)
+        else:
+            self.lan_public_frame.pack_forget()
         if not srv or srv.error or not srv.web_ready or not url:
             if not srv:
                 reason = T("lan_starting")
@@ -915,6 +925,12 @@ class SetupWindow:
         except Exception:
             logging.exception("QR render failed")
             self.qr_label.configure(image="", text="")
+
+    def open_network_settings(self):
+        try:
+            os.startfile("ms-settings:network-status")
+        except Exception:
+            logging.exception("No se pudo abrir la configuracion de red")
 
     def copy_lan_url(self):
         url = state.local.url if state.local else None
@@ -980,9 +996,10 @@ class SetupWindow:
         self.status_label.configure(text=text, fg=color)
         self.code_label.configure(text=state.code or "-")
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
-        if getattr(self, "_last_lan_url", "?") != lan_url:
-            self._last_lan_url = lan_url
-            self.render_lan()
+        lan = (lan_url, bool(lan_url) and state.local.public_network())
+        if getattr(self, "_last_lan", None) != lan:
+            self._last_lan = lan
+            self.render_lan(public=lan[1])
         if state.update_available:
             version = state.update_available[0]
             if not self.update_frame.winfo_ismapped():

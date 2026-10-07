@@ -718,3 +718,30 @@ def test_en_una_pantalla_grande_no_hay_barra(monkeypatch, raiz):
         assert not v.con_scroll()
     finally:
         v.root.destroy()
+
+
+def test_con_la_red_publica_avisa_que_el_firewall_bloquea_el_modo_lan(ventana, monkeypatch):
+    """Reporte de Discord: el modo LAN andaba en la WiFi y no con el hotspot
+    del celular. Windows marca el hotspot como red Publica y el permiso del
+    firewall cubre solo las privadas: la ventana tiene que decirlo."""
+    v, _ = ventana
+
+    class Servidor:
+        error = None
+        web_ready = True
+        url = "http://172.20.10.2:27765/app/?local=1"
+        publica = True
+
+        def public_network(self):
+            return self.publica
+
+    srv = Servidor()
+    monkeypatch.setattr(tray_client.state, "local", srv)
+    v.refresh_status()
+    v.root.update()
+    assert v.lan_public_frame.winfo_ismapped()
+
+    srv.publica = False
+    v.refresh_status()
+    v.root.update()
+    assert not v.lan_public_frame.winfo_ismapped()

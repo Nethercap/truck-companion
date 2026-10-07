@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- LAN mode on a phone hotspot: Windows marks a hotspot as a Public network and its firewall
+  blocks LAN mode there without saying anything. "Setup & status" now warns when that
+  happens and opens the network settings to switch it to Private.
 - If your truck is outside the map Truck Dash knows (a map mod we don't support yet),
   the client lets the dashboard report which mods you have active, so we can see which
   maps people want. Only then, once per map, and with nothing that identifies you.
