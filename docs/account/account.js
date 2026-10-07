@@ -174,6 +174,47 @@
       totalsAll: 'all driving, with or without a job',
       navOverview: "Overview",
       navLogbook: "Logbook",
+      navFollowing: 'Following',
+      followTitle: 'Follow someone',
+      followPlaceholder: 'Username',
+      followBtn: 'Follow',
+      followSent: (n) => 'Request sent to ' + n + '. You will see their activity once they accept.',
+      followAlready: (n) => 'You already follow ' + n + '.',
+      followNotFound: 'Nobody with that username.',
+      followTooMany: 'Too many requests today. Try again tomorrow.',
+      followHint: 'Following is one-way and needs approval. When you accept a follower, they see your trips with their routes, where you are while you drive and your achievements, even if your profile is private. Your notes stay yours.',
+      requestsTitle: 'Follow requests',
+      accept: 'Accept',
+      reject: 'Decline',
+      liveTitle: 'Right now',
+      liveEmpty: 'You are not following anyone yet. Follow someone by their username, or from their public profile.',
+      liveDriving: 'Driving',
+      liveNear: (c) => 'near ' + c,
+      liveLast: (r) => 'Last drove ' + r,
+      liveNever: 'No trips yet',
+      feedTitle: 'Recent activity',
+      feedEmpty: 'Nothing from the people you follow in the last 30 days.',
+      feedDelivered: (n, r) => n + ' delivered ' + r,
+      feedStarted: (n, r) => n + ' started ' + r,
+      feedCancelled: (n, r) => n + ' cancelled ' + r,
+      feedAchievement: (n, a) => n + ' unlocked ' + a,
+      followingList: 'You follow',
+      followersList: 'Your followers',
+      outgoingList: 'Requests you sent',
+      blockedList: 'Blocked',
+      listEmpty: 'Nobody yet.',
+      unfollow: 'Unfollow',
+      removeFollower: 'Remove',
+      block: 'Block',
+      unblock: 'Unblock',
+      cancelRequest: 'Cancel request',
+      sureAgain: 'Sure? Click again',
+      followStateFollowing: 'Following',
+      followStatePending: 'Request sent',
+      followsYou: 'Follows you',
+      followsYouPending: (n) => n + ' wants to follow you',
+      privateLocked: (n) => 'This profile is private. Follow ' + n + ' to see their trips once they accept.',
+      signInToFollow: 'Sign in to follow',
       navSettings: "Settings",
       dashLabel: "Driver dashboard",
       welcomeBack: (n) => 'Welcome back, ' + n + '!',
@@ -449,6 +490,47 @@
       totalsAll: 'todo lo manejado, con o sin trabajo',
       navOverview: "Resumen",
       navLogbook: "Bitacora",
+      navFollowing: 'Siguiendo',
+      followTitle: 'Seguir a alguien',
+      followPlaceholder: 'Nombre de usuario',
+      followBtn: 'Seguir',
+      followSent: (n) => 'Solicitud enviada a ' + n + '. Vas a ver su actividad cuando la acepte.',
+      followAlready: (n) => 'Ya seguís a ' + n + '.',
+      followNotFound: 'No hay nadie con ese nombre de usuario.',
+      followTooMany: 'Demasiadas solicitudes por hoy. Probá mañana.',
+      followHint: 'Seguir es en un solo sentido y hay que aceptarlo. Cuando aceptás a alguien, ve tus viajes con su recorrido, dónde estás mientras manejás y tus logros, aunque tu perfil sea privado. Tus notas siguen siendo tuyas.',
+      requestsTitle: 'Solicitudes para seguirte',
+      accept: 'Aceptar',
+      reject: 'Rechazar',
+      liveTitle: 'Ahora',
+      liveEmpty: 'Todavía no seguís a nadie. Seguí a alguien por su nombre de usuario o desde su perfil público.',
+      liveDriving: 'Manejando',
+      liveNear: (c) => 'cerca de ' + c,
+      liveLast: (r) => 'Manejó por última vez ' + r,
+      liveNever: 'Todavía sin viajes',
+      feedTitle: 'Actividad reciente',
+      feedEmpty: 'Nada de la gente que seguís en los últimos 30 días.',
+      feedDelivered: (n, r) => n + ' entregó ' + r,
+      feedStarted: (n, r) => n + ' arrancó ' + r,
+      feedCancelled: (n, r) => n + ' canceló ' + r,
+      feedAchievement: (n, a) => n + ' desbloqueó ' + a,
+      followingList: 'Seguís a',
+      followersList: 'Te siguen',
+      outgoingList: 'Solicitudes que enviaste',
+      blockedList: 'Bloqueados',
+      listEmpty: 'Nadie todavía.',
+      unfollow: 'Dejar de seguir',
+      removeFollower: 'Sacar',
+      block: 'Bloquear',
+      unblock: 'Desbloquear',
+      cancelRequest: 'Retirar solicitud',
+      sureAgain: '¿Seguro? Tocá de nuevo',
+      followStateFollowing: 'Siguiendo',
+      followStatePending: 'Solicitud enviada',
+      followsYou: 'Te sigue',
+      followsYouPending: (n) => n + ' quiere seguirte',
+      privateLocked: (n) => 'Este perfil es privado. Seguí a ' + n + ' para ver sus viajes cuando acepte.',
+      signInToFollow: 'Entrá para seguir',
       navSettings: "Ajustes",
       dashLabel: "Panel del conductor",
       welcomeBack: (n) => 'Hola de nuevo, ' + n + '!',
@@ -661,6 +743,9 @@
     document.documentElement.lang = idioma;
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       el.textContent = t(el.getAttribute('data-i18n'));
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
     });
   }
 
@@ -1231,6 +1316,8 @@
       return;
     }
     pintarCuenta();
+    // Cuantas solicitudes esperan respuesta, para el numerito del menu.
+    pedir('/follow').then((r) => { if (r.ok) pintarBadge((r.datos.requests || []).length); });
   }
 
   function mostrarErrorDeVuelta() {
@@ -2054,8 +2141,39 @@
     document.title = p.user.username + ' \u2014 Truck Dash';
   }
 
+  // Perfil de alguien que sigo (aceptado): se ve todo y los viajes se abren
+  // con el recorrido (/follow/trip). Si no, el perfil publico de siempre.
+  let perfilCompleto = false;
+  let relacionPerfil = null;   // null = sin sesion
+
   async function cargarPublico() {
     document.documentElement.classList.add('publico');
+    const mio = await pedir('/follow/user/' + encodeURIComponent(PERFIL));
+    if (mio.ok && mio.datos.self) { location.href = location.pathname; return; }
+    if (mio.ok) {
+      relacionPerfil = mio.datos.relation || {};
+      perfilCompleto = !!mio.datos.full;
+      if (perfilCompleto || !mio.datos.public) {
+        perfilPublico = perfilCompleto ? mio.datos
+          : { user: mio.datos.user, totals: [], stats: [], recent: [], achievements: [] };
+        pintarPublico();
+        pintarSeguirPerfil();
+        if (perfilCompleto && mio.datos.status) {
+          $('profileLive').innerHTML = '';
+          $('profileLive').appendChild(tarjetaVivo(mio.datos.status));
+          $('cardProfileLive').hidden = false;
+        }
+        if (!perfilCompleto) {
+          $('cardRecent').hidden = true;
+          $('privateLocked').textContent = t('privateLocked', mio.datos.user.username);
+          $('privateLocked').hidden = false;
+        }
+        mostrarVista('viewAccount');
+        return;
+      }
+    } else if (mio.status === 404) {
+      // no existe o hay un bloqueo: lo mismo que un perfil que no es publico
+    }
     const { ok, status, datos } = await pedir('/public/' + encodeURIComponent(PERFIL));
     if (!ok) {
       $('loading').hidden = true;
@@ -2066,14 +2184,294 @@
     }
     perfilPublico = datos;
     pintarPublico();
+    pintarSeguirPerfil();
     mostrarVista('viewAccount');
+  }
+
+  // El boton Seguir del perfil de otro, segun la relacion.
+  function pintarSeguirPerfil() {
+    const caja = $('followBox');
+    caja.innerHTML = '';
+    caja.hidden = false;
+    const nombre = perfilPublico && perfilPublico.user ? perfilPublico.user.username : PERFIL;
+    if (relacionPerfil === null) {
+      const a = document.createElement('a');
+      a.className = 'btn';
+      a.href = location.pathname;
+      a.textContent = t('signInToFollow');
+      caja.appendChild(a);
+      return;
+    }
+    const recargar = () => { location.reload(); };
+    const mio = relacionPerfil.following;
+    if (!mio) {
+      caja.appendChild(botonAccion(t('followBtn'), '/follow/request', nombre, recargar, false, 'primary'));
+    } else if (mio === 'pending') {
+      const e = document.createElement('span');
+      e.className = 'estado';
+      e.textContent = t('followStatePending');
+      caja.appendChild(e);
+      caja.appendChild(botonAccion(t('cancelRequest'), '/follow/unfollow', nombre, recargar, true));
+    } else {
+      const e = document.createElement('span');
+      e.className = 'estado';
+      e.textContent = t('followStateFollowing');
+      caja.appendChild(e);
+      caja.appendChild(botonAccion(t('unfollow'), '/follow/unfollow', nombre, recargar, true));
+    }
+    if (relacionPerfil.follows_me === 'pending') {
+      const e = document.createElement('span');
+      e.className = 'estado';
+      e.textContent = t('followsYouPending', nombre);
+      caja.appendChild(e);
+      caja.appendChild(botonAccion(t('accept'), '/follow/accept', nombre, recargar, false, 'primary'));
+    } else if (relacionPerfil.follows_me === 'accepted') {
+      const e = document.createElement('span');
+      e.className = 'estado';
+      e.textContent = t('followsYou');
+      caja.appendChild(e);
+    }
+  }
+
+  // ------------------------------------------------------------- seguir
+  // Un boton que llama a /follow/<accion> con el nombre. Los que cortan algo
+  // (dejar de seguir, sacar, bloquear) piden un segundo toque.
+  function botonAccion(texto, ruta, nombre, despues, confirmar, clase) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn small' + (clase ? ' ' + clase : '');
+    b.textContent = texto;
+    let armado = false;
+    b.addEventListener('click', async () => {
+      if (confirmar && !armado) {
+        armado = true;
+        b.textContent = t('sureAgain');
+        setTimeout(() => { armado = false; b.textContent = texto; }, 4000);
+        return;
+      }
+      b.disabled = true;
+      const r = await pedir(ruta, { method: 'POST', body: { username: nombre } });
+      b.disabled = false;
+      if (!r.ok) { avisar(t(r.datos.error || 'offline'), 'error'); return; }
+      despues(r);
+    });
+    return b;
+  }
+
+  // "hace 3 minutos", en el idioma de la pantalla.
+  function hace(iso) {
+    if (!iso) return '';
+    const s = (Date.parse(iso) - Date.now()) / 1000;
+    const unidades = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+    try {
+      const fmt = new Intl.RelativeTimeFormat(idioma, { numeric: 'auto' });
+      for (const [u, seg] of unidades) {
+        if (Math.abs(s) >= seg) return fmt.format(Math.round(s / seg), u);
+      }
+      return fmt.format(0, 'minute');
+    } catch (e) { return fecha(iso); }
+  }
+
+  function avatarDe(p) {
+    if (!p.avatar_url) {
+      const letra = document.createElement('span');
+      letra.className = 'letra';
+      letra.setAttribute('aria-hidden', 'true');
+      letra.textContent = (p.username || '?').charAt(0);
+      return letra;
+    }
+    const img = document.createElement('img');
+    img.alt = '';
+    img.src = p.avatar_url;
+    return img;
+  }
+
+  function linkAPerfil(p) {
+    const a = document.createElement('a');
+    a.className = 'nombre';
+    a.href = '/account/?u=' + encodeURIComponent(p.username);
+    a.textContent = p.username;
+    return a;
+  }
+
+  function rutaDe(x) {
+    return [x.city_src || '?', x.city_dst || '?'].join(' \u2192 ');
+  }
+
+  // Tarjeta del estado en vivo: manejando (ruta, ciudad cercana, mapita) o
+  // cuando manejo por ultima vez.
+  function tarjetaVivo(p) {
+    const caja = document.createElement('div');
+    caja.className = 'vivo';
+    const cabeza = document.createElement('div');
+    cabeza.className = 'cabeza';
+    cabeza.appendChild(avatarDe(p));
+    cabeza.appendChild(linkAPerfil(p));
+    if (p.title) {
+      const tit = document.createElement('span');
+      tit.className = 'titulo-usuario';
+      tit.textContent = p.title;
+      cabeza.appendChild(tit);
+    }
+    caja.appendChild(cabeza);
+    const linea = document.createElement('p');
+    linea.className = 'linea-estado' + (p.driving ? ' manejando' : ' muted');
+    if (p.driving && p.trip) {
+      const partes = [t('liveDriving') + ': ' + rutaDe(p.trip)];
+      if (p.near && p.near.city) partes.push(t('liveNear', p.near.city + (p.near.region ? ', ' + p.near.region : '')));
+      partes.push(hace(p.last_seen));
+      linea.textContent = partes.join(' \u00b7 ');
+    } else {
+      linea.textContent = p.last_seen ? t('liveLast', hace(p.last_seen)) : t('liveNever');
+    }
+    caja.appendChild(linea);
+    if (p.driving && p.route && p.route.length > 1) {
+      const dibujo = dibujarRecorrido([p.route]);
+      if (dibujo) {
+        const ultimo = p.route[p.route.length - 1];
+        const punto = document.createElementNS(SVG_NS, 'circle');
+        punto.setAttribute('cx', ultimo[0]);
+        punto.setAttribute('cy', ultimo[1]);
+        // El mapita esta en coordenadas del juego: el radio, relativo al
+        // tamano del recorrido, para que se vea igual en uno corto o largo.
+        const vb = (dibujo.getAttribute('viewBox') || '').split(' ').map(Number);
+        punto.setAttribute('r', String(Math.max(vb[2] || 0, vb[3] || 0) * 0.035 || 6));
+        punto.setAttribute('class', 'aqui');
+        dibujo.appendChild(punto);
+        caja.appendChild(dibujo);
+      }
+    }
+    return caja;
+  }
+
+  let seguirCargando = false;
+  async function traerSeguir() {
+    if (seguirCargando) return;
+    seguirCargando = true;
+    const [listas, vivos, feed] = await Promise.all([pedir('/follow'), pedir('/follow/status'), pedir('/follow/feed')]);
+    seguirCargando = false;
+    if (listas.ok) pintarListas(listas.datos);
+    if (vivos.ok) pintarVivos(vivos.datos.people || []);
+    if (feed.ok) pintarFeed(feed.datos.events || []);
+  }
+
+  function filaPersona(p, botones) {
+    const li = document.createElement('li');
+    li.appendChild(avatarDe(p));
+    li.appendChild(linkAPerfil(p));
+    const acciones = document.createElement('span');
+    acciones.className = 'acciones-fila';
+    botones.forEach((b) => acciones.appendChild(b));
+    li.appendChild(acciones);
+    return li;
+  }
+
+  function pintarLista(id, gente, botones) {
+    const ul = $(id);
+    ul.innerHTML = '';
+    if (!gente.length) {
+      const li = document.createElement('li');
+      li.className = 'muted';
+      li.textContent = t('listEmpty');
+      ul.appendChild(li);
+      return;
+    }
+    gente.forEach((p) => ul.appendChild(filaPersona(p, botones(p))));
+  }
+
+  function pintarListas(d) {
+    const otra = () => traerSeguir();
+    const pedidos = d.requests || [];
+    $('cardRequests').hidden = !pedidos.length;
+    pintarBadge(pedidos.length);
+    pintarLista('requestsList', pedidos, (p) => [
+      botonAccion(t('accept'), '/follow/accept', p.username, otra, false, 'primary'),
+      botonAccion(t('reject'), '/follow/reject', p.username, otra, false),
+      botonAccion(t('block'), '/follow/block', p.username, otra, true)]);
+    pintarLista('followingList', d.following || [], (p) => [
+      botonAccion(t('unfollow'), '/follow/unfollow', p.username, otra, true)]);
+    pintarLista('followersList', d.followers || [], (p) => [
+      botonAccion(t('removeFollower'), '/follow/reject', p.username, otra, true),
+      botonAccion(t('block'), '/follow/block', p.username, otra, true)]);
+    pintarLista('outgoingList', d.outgoing || [], (p) => [
+      botonAccion(t('cancelRequest'), '/follow/unfollow', p.username, otra, false)]);
+    pintarLista('blockedList', d.blocked || [], (p) => [
+      botonAccion(t('unblock'), '/follow/unblock', p.username, otra, false)]);
+  }
+
+  function pintarBadge(n) {
+    const b = $('followBadge');
+    b.textContent = n ? String(n) : '';
+    b.hidden = !n;
+  }
+
+  function pintarVivos(gente) {
+    const caja = $('liveList');
+    caja.innerHTML = '';
+    $('liveEmpty').hidden = gente.length > 0;
+    gente.forEach((p) => caja.appendChild(tarjetaVivo(p)));
+  }
+
+  function pintarFeed(eventos) {
+    const ul = $('feedList');
+    ul.innerHTML = '';
+    $('feedEmpty').hidden = eventos.length > 0;
+    eventos.forEach((e) => {
+      const li = document.createElement('li');
+      li.appendChild(avatarDe(e.user));
+      const texto = document.createElement('span');
+      const nombre = e.user.username;
+      let frase = '';
+      let meta = '';
+      if (e.type === 'delivered') {
+        frase = t('feedDelivered', nombre, rutaDe(e));
+        meta = [e.distance_km ? distancia(e.distance_km) : '', e.on_time ? t('statsOnTime') : ''].filter(Boolean).join(' \u00b7 ');
+      } else if (e.type === 'started') {
+        frase = t('feedStarted', nombre, rutaDe(e));
+      } else if (e.type === 'cancelled') {
+        frase = t('feedCancelled', nombre, rutaDe(e));
+      } else if (e.type === 'achievement') {
+        frase = t('feedAchievement', nombre, datosDeLogro({ id: e.achievement })[1]);
+      }
+      texto.textContent = frase;
+      li.appendChild(texto);
+      if (meta) {
+        const m = document.createElement('span');
+        m.className = 'meta';
+        m.textContent = meta;
+        li.appendChild(m);
+      }
+      const cuando = document.createElement('span');
+      cuando.className = 'cuando';
+      cuando.textContent = hace(e.at);
+      li.appendChild(cuando);
+      ul.appendChild(li);
+    });
+  }
+
+  async function seguirPorNombre(ev) {
+    ev.preventDefault();
+    const nombre = $('followInput').value.trim();
+    if (!nombre) return;
+    const msg = $('followMsg');
+    const r = await pedir('/follow/request', { method: 'POST', body: { username: nombre } });
+    msg.hidden = false;
+    if (r.ok) {
+      const quien = (r.datos.user && r.datos.user.username) || nombre;
+      msg.textContent = r.datos.status === 'accepted' ? t('followAlready', quien) : t('followSent', quien);
+      $('followInput').value = '';
+      traerSeguir();
+    } else {
+      msg.textContent = t({ no_existe: 'followNotFound', demasiadas_solicitudes: 'followTooMany' }[r.datos.error] || r.datos.error || 'offline');
+    }
   }
 
   // ------------------------------------------------------------- paginas
   // Resumen, logbook y ajustes, cada una con su #hash: el link a
   // /account/#logbook abre ahi y el boton de atras del navegador anda.
   const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook',
-                    achievements: 'pageAchievements', settings: 'pageSettings' };
+                    achievements: 'pageAchievements', following: 'pageFollowing',
+                    settings: 'pageSettings' };
   let logbookPedido = false;
 
   function paginaDelHash() {
@@ -2093,6 +2491,7 @@
     // El logbook se pide recien cuando alguien lo abre: el resumen ya trae
     // los ultimos viajes y la mayoria no pasa de ahi.
     if (actual === 'logbook' && usuario && !logbookPedido) traerViajes(false);
+    if (actual === 'following' && usuario) traerSeguir();
   }
 
   // ---------------------------------------------------- cinta del resumen
@@ -2254,8 +2653,9 @@
       celdaPago(fila, v);
 
       // En el perfil publico no se abre el detalle: el recorrido es por
-      // donde pasaste, y un perfil publico no lo da punto a punto.
-      if (!modoPublico) {
+      // donde pasaste, y un perfil publico no lo da punto a punto. Si lo
+      // sigo (aceptado), si: aceptar es dar ese permiso.
+      if (!modoPublico || perfilCompleto) {
         const abrir = () => alternarDetalle(v, repintar);
         fila.addEventListener('click', abrir);
         fila.addEventListener('keydown', (e) => {
@@ -2287,11 +2687,14 @@
         ]));
         // Recien con el detalle: mientras llega, la tabla se redibuja y un
         // campo de nota a medio escribir se perdia.
-        if (v._detalle) td.appendChild(panelCorreccion(v, repintar));
-        const acciones = document.createElement('div');
-        acciones.className = 'acciones';
-        acciones.appendChild(botonBorrar(v));
-        td.appendChild(acciones);
+        // Corregir, la nota y borrar son del dueno del viaje.
+        if (!modoPublico) {
+          if (v._detalle) td.appendChild(panelCorreccion(v, repintar));
+          const acciones = document.createElement('div');
+          acciones.className = 'acciones';
+          acciones.appendChild(botonBorrar(v));
+          td.appendChild(acciones);
+        }
         det.appendChild(td);
         cuerpo.appendChild(det);
       }
@@ -2366,7 +2769,7 @@
     if (!v._abierto || v._detalle) return;
     // El recorrido son un par de KB por viaje, asi que se pide solo cuando
     // alguien abre uno, y una sola vez.
-    const { ok, datos } = await pedir('/trips/' + v.id);
+    const { ok, datos } = await pedir((modoPublico ? '/follow/trip/' : '/trips/') + v.id);
     if (!ok) { v._abierto = false; repintar(); return; }
     v._detalle = datos.trip;
     repintar();
@@ -2775,6 +3178,7 @@
     $('btnExport').addEventListener('click', exportarDatos);
     $('btnMoreTrips').addEventListener('click', () => traerViajes(true));
     $('btnExportCsv').addEventListener('click', exportarCsv);
+    $('followForm').addEventListener('submit', seguirPorNombre);
     $('btnLinkApprove').addEventListener('click', aprobarVinculoPendiente);
     $('btnLinkCancel').addEventListener('click', cancelarVinculoPendiente);
     $('btnCopyPublic').addEventListener('click', () => {
