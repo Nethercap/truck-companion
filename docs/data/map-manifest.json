@@ -90,6 +90,54 @@
         39
       ]
     },
+    "ats_canada": {
+      "label": "ATS + Western/Eastern Canada Expansion",
+      "game": "ats",
+      "gameVersion": "1.61.2.0",
+      "built": "2026-10-08",
+      "mapDataVersion": "20261008",
+      "mods": [
+        "western_canada",
+        "eastern_canada"
+      ],
+      "files": [
+        "vector/ats_canada.pmtiles",
+        "ats_canada/route-graph-ats_canada-v3.bin",
+        "ats_canada/route-graph-ats_canada.bin",
+        "ats_canada/Cities.json",
+        "ats_canada/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator + Western/Eastern Canada",
+      "origin": [
+        -100,
+        45
+      ]
+    },
+    "ats_c2c_canada": {
+      "label": "ATS + Coast to Coast + Western/Eastern Canada Expansion",
+      "game": "ats",
+      "gameVersion": "1.61.2.0",
+      "built": "2026-10-08",
+      "mapDataVersion": "20261008",
+      "mods": [
+        "c2c",
+        "western_canada",
+        "eastern_canada",
+        "cnx_canada_c2c"
+      ],
+      "files": [
+        "vector/ats_c2c_canada.pmtiles",
+        "ats_c2c_canada/route-graph-ats_c2c_canada-v3.bin",
+        "ats_c2c_canada/route-graph-ats_c2c_canada.bin",
+        "ats_c2c_canada/Cities.json",
+        "ats_c2c_canada/road-names.json"
+      ],
+      "appLabel": "American Truck Simulator + Coast to Coast + Western/Eastern Canada",
+      "origin": [
+        -96,
+        42
+      ]
+    },
     "ats_reforma": {
       "label": "ATS + Reforma (+ Mega Resources + Sierra Nevada)",
       "game": "ats",
@@ -521,6 +569,30 @@
       "homepage": "https://truckersmp.com/",
       "check": null,
       "checkNote": "los paquetes .mp del launcher no llevan version: se actualizan solos; regenerar si cambian hq_final/cd_changes"
+    },
+    "western_canada": {
+      "name": "Western Canada Expansion (JacobKazias)",
+      "game": "ats",
+      "version": "1.7.3",
+      "homepage": "",
+      "check": null,
+      "checkNote": "sin pagina oficial conocida (circula por ModLand/AllMods, que son espejos): verificar a mano"
+    },
+    "eastern_canada": {
+      "name": "Eastern Canada Expansion (JacobKazias)",
+      "game": "ats",
+      "version": "1.2.1",
+      "homepage": "",
+      "check": null,
+      "checkNote": "va en sync con Western Canada Expansion; pide Western 1.7.3"
+    },
+    "cnx_canada_c2c": {
+      "name": "Western/Eastern Canada C2C Only Connections",
+      "game": "ats",
+      "version": "1.7.3/1.2.1",
+      "homepage": "",
+      "check": null,
+      "checkNote": "conectores de JacobKazias para Coast to Coast 2.23.61; armado con C2C 2.24.61.0"
     }
   }
 }

@@ -447,6 +447,10 @@ function initModsUi() {
   document.getElementById('setC2CProModsCanada').checked = atsMod === 'c2c_promods_canada';
   document.getElementById('setReforma').checked = atsMod === 'reforma';
   document.getElementById('setReformaAll').checked = atsMod === 'reforma_c2c_promods_canada';
+  document.getElementById('setCanada').checked = atsMod === 'canada';
+  document.getElementById('setC2CCanada').checked = atsMod === 'c2c_canada';
+  document.getElementById('setCanada').closest('label').hidden = !MAP_DATA_VERSION.ats_canada;
+  document.getElementById('setC2CCanada').closest('label').hidden = !MAP_DATA_VERSION.ats_c2c_canada;
   document.getElementById('setEts2ModNone').checked = ets2Mod === 'none';
   document.getElementById('setProMods').checked = ets2Mod === 'promods';
   document.getElementById('setProModsRusMap').checked = ets2Mod === 'promods_rusmap';
@@ -3478,6 +3482,12 @@ function resolveEffectiveGame(game) {
     // un superconjunto: rutas de mas en Canada/costa, nunca de menos).
     if (g === 'ats' && det.reforma && (det.c2c || det.promods_canada)) return 'ats_reforma_c2c_promods';
     if (g === 'ats' && det.reforma) return 'ats_reforma';
+    // Western/Eastern Canada Expansion cubre mas Canada que ProMods Canada:
+    // si estan los dos, gana el de JacobKazias (no hay variante con ambos).
+    if (g === 'ats' && det.canada_expansion) {
+      return det.c2c ? publishedVariant('ats_c2c_canada', 'ats_c2c')
+                     : publishedVariant('ats_canada', 'ats');
+    }
     if (g === 'ats' && det.c2c && det.promods_canada) return 'ats_c2c_promods';
     if (g === 'ats' && det.promods_canada) return 'ats_promods';
     if (g === 'ats' && det.c2c) return 'ats_c2c';
@@ -3504,6 +3514,8 @@ function resolveEffectiveGame(game) {
   }
   if (g === 'ats' && atsMod === 'reforma_c2c_promods_canada') return 'ats_reforma_c2c_promods';
   if (g === 'ats' && atsMod === 'reforma') return 'ats_reforma';
+  if (g === 'ats' && atsMod === 'canada') return publishedVariant('ats_canada', 'ats');
+  if (g === 'ats' && atsMod === 'c2c_canada') return publishedVariant('ats_c2c_canada', 'ats_c2c');
   if (g === 'ats' && atsMod === 'c2c_promods_canada') return 'ats_c2c_promods';
   if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
   if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
@@ -3530,6 +3542,7 @@ function describeDetectedMods(game) {
   else if (det.grand_utopia) names.push('Grand Utopia');
   if (det.truckersmp) names.push('TruckersMP');
   if (det.promods_canada) names.push('ProMods Canada');
+  if (det.canada_expansion) names.push('Western/Eastern Canada');
   if (det.c2c) names.push('Coast to Coast');
   if (det.reforma) names.push('Reforma');
   return names.length ? t('modsDetected').replace('{mods}', names.join(' + ')) : t('modsDetectedNone');

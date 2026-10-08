@@ -339,7 +339,7 @@ def test_parse_active_mods_none_without_list():
     assert client.parse_active_mods("00:00:01 : [hashfs] base.scs: Created") is None
 
 
-NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "truckersmp": False}
+NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "canada_expansion": False, "truckersmp": False}
 
 
 def test_parse_custom_key():
@@ -962,6 +962,21 @@ def test_european_grand_utopia_no_es_el_standalone():
     assert banderas["eu_grand_utopia"] and banderas["promods"]
     solo = [{"file": "GU - Grand Utopia (v1.20d).scs", "name": "Grand Utopia"}]
     assert client.detect_map_mods(solo)["eu_grand_utopia"] is False
+
+
+def test_canada_expansion_no_es_promods_canada():
+    """Western/Eastern Canada Expansion es otro mapa que ProMods Canada: con
+    la misma marca la web elegiria la variante equivocada."""
+    canada = [{"file": "Western_Canada_Expansion_v1.7.3.scs", "name": "Western Canada Expansion v1.7.3"},
+              {"file": "Eastern_Canada_Expansion_v1.2.1.scs", "name": "Eastern Canada Expansion v1.2.1"}]
+    assert client.detect_map_mods(canada) == {**NO_MODS, "canada_expansion": True}
+    # Desde el Workshop el archivo es un numero: alcanza con el nombre
+    assert client.detect_map_mods([{"file": "3301234567", "name": "Eastern Canada Expansion v1.2.1"}])["canada_expansion"]
+    con_c2c = canada + [{"file": "Western_Canada_C2C_Only_Connections_v1.7.3.scs", "name": "Western Canada C2C Only Connections v1.7.3"},
+                        {"file": "Coast_to_Coast_v2.24.61.0.scs", "name": "Coast to Coast v2.24.61.0"}]
+    assert client.detect_map_mods(con_c2c) == {**NO_MODS, "canada_expansion": True, "c2c": True}
+    pm = [{"file": "promods-canada-def-v164.scs", "name": "ProMods Canada Definition"}]
+    assert client.detect_map_mods(pm) == {**NO_MODS, "promods_canada": True}
 
 
 

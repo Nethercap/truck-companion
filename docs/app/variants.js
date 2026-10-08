@@ -6,6 +6,8 @@ const MAP_DATA_VERSION = {
   "ats_c2c": "20261005",
   "ats_promods": "20260929",
   "ats_c2c_promods": "20261005",
+  "ats_canada": "20261008",
+  "ats_c2c_canada": "20261008",
   "ats_reforma": "20261008",
   "ats_reforma_c2c_promods": "20261005",
   "ets2": "20260929",
@@ -71,6 +73,36 @@ const VARIANT_META = {
     "mods": [
       "c2c",
       "promods_canada"
+    ]
+  },
+  "ats_canada": {
+    "label": "American Truck Simulator + Western/Eastern Canada",
+    "game": "ats",
+    "projection": "ats",
+    "origin": [
+      -100,
+      45
+    ],
+    "manual": "canada",
+    "mods": [
+      "western_canada",
+      "eastern_canada"
+    ]
+  },
+  "ats_c2c_canada": {
+    "label": "American Truck Simulator + Coast to Coast + Western/Eastern Canada",
+    "game": "ats",
+    "projection": "ats",
+    "origin": [
+      -96,
+      42
+    ],
+    "manual": "c2c_canada",
+    "mods": [
+      "c2c",
+      "western_canada",
+      "eastern_canada",
+      "cnx_canada_c2c"
     ]
   },
   "ats_reforma": {

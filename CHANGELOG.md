@@ -14,6 +14,8 @@ updates on its own and is not versioned here.
   maps people want. Only then, once per map, and with nothing that identifies you.
 - LAN mode also keeps the voice guidance files, so spoken directions work on the
   local network without internet.
+- The client recognizes Western and Eastern Canada Expansion (with or without their
+  Coast to Coast connections), so the dashboard loads the matching map by itself.
 
 ## 1.5.27 (2026-10-06)
 

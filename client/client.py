@@ -200,7 +200,7 @@ def detect_map_mods(mods: list) -> dict:
     """{promods, promods_canada, c2c} a partir de nombres/archivos de mods.
     ProMods Europa y sus addons (ME, Maghreb, TGS) cuentan como 'promods';
     'ProMods Canada' es el pack de ATS."""
-    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "truckersmp": False}
+    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "canada_expansion": False, "truckersmp": False}
     for mod in mods:
         text = f"{mod.get('file', '')} {mod.get('name', '')}".lower()
         if "promods" in text or "pm-" in text or "cnx-pm" in text:
@@ -226,6 +226,11 @@ def detect_map_mods(mods: list) -> dict:
         # mapa con otra proyeccion.
         if "european grand utopia" in text:
             flags["eu_grand_utopia"] = True
+        # Western/Eastern Canada Expansion (JacobKazias) y sus conectores
+        # ("Western Canada C2C Only Connections"...). No confundir con
+        # ProMods Canada, que no dice "western" ni "eastern".
+        if re.search(r"(western|eastern)[ _-]?canada", text):
+            flags["canada_expansion"] = True
     return flags
 
 
