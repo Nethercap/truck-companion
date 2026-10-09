@@ -2248,6 +2248,7 @@ function openPoiModal() {
 function closePoiModal() { document.getElementById('poiModal').style.display = 'none'; }
 
 document.getElementById('poiBtn').addEventListener('click', openPoiModal);
+initPip();
 document.getElementById('poiCloseBtn').addEventListener('click', closePoiModal);
 document.getElementById('poiModal').addEventListener('click', (e) => { if (e.target.id === 'poiModal') closePoiModal(); });
 document.getElementById('poiSearchInput').addEventListener('input', renderPoiResults);
@@ -3281,12 +3282,111 @@ function findUpcomingTurn() {
 // desde updateMap, con un unico llamado que combina centro+zoom+bearing.
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+// ---------------------------------------------------------------------------
+// Ventana flotante siempre visible (Document Picture-in-Picture, Chrome y
+// Edge 116+): el proximo giro, la velocidad con el limite, lo que falta y la
+// llegada, en una ventanita que queda arriba del juego si este corre en
+// pantalla completa sin bordes (desde la 1.50 ETS2/ATS ya no usan la
+// exclusiva). Es la etapa 0 del overlay: sin instalar nada, y la voz sigue
+// saliendo de esta pagina. Lee lo que ya muestra el tablero (panel de
+// navegacion, mini-HUD, resumen de ruta) en vez de recalcularlo, y se
+// actualiza con cada dato (refreshPip desde handleTelemetry): con el
+// navegador tapado por el juego los temporizadores de la pagina se frenan.
+// ---------------------------------------------------------------------------
+let pipWin = null;
+let pipTurnHtml = null; // el texto del giro, lo arma updateMap en cada dato
+const PIP_CSS = `
+  html, body { margin: 0; height: 100%; background: #14171c; color: #f2f3f5;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  .pip { box-sizing: border-box; height: 100%; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .giro { font-size: clamp(1rem, 6.5vw, 2.4rem); font-weight: 700; line-height: 1.15; flex: 1; display: flex;
+    flex-direction: column; justify-content: center; }
+  .giro .navNext { display: block; font-size: 0.5em; font-weight: 400; color: #9aa4b2; margin-top: 0.2rem; }
+  .fila { display: flex; align-items: center; gap: 0.9rem; font-variant-numeric: tabular-nums; }
+  .vel b { font-size: clamp(1.1rem, 7vw, 2.2rem); }
+  .vel span { color: #9aa4b2; font-size: 0.8rem; margin-left: 0.2rem; }
+  .lim { width: 2.2rem; height: 2.2rem; border-radius: 50%; border: 0.25rem solid #e53935; background: #fff;
+    color: #111; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex: none; }
+  .lim[hidden] { display: none; }
+  .lim.pasado { animation: pipPulso 1s ease-in-out infinite; }
+  @keyframes pipPulso { 50% { box-shadow: 0 0 0 0.35rem rgba(229,57,53,0.45); } }
+  .dato { display: flex; flex-direction: column; margin-left: auto; text-align: right; }
+  .dato + .dato { margin-left: 0; }
+  .dato b { font-size: 1.05rem; }
+  .dato span { color: #9aa4b2; font-size: 0.7rem; }
+`;
+
+function pipSupported() {
+  return 'documentPictureInPicture' in window;
+}
+
+async function openPip() {
+  if (pipWin) { try { pipWin.focus(); } catch (err) { /* nada */ } return; }
+  try {
+    pipWin = await documentPictureInPicture.requestWindow({ width: 380, height: 160 });
+  } catch (err) {
+    console.error('No se pudo abrir la ventana flotante', err);
+    pipWin = null;
+    return;
+  }
+  const d = pipWin.document;
+  d.title = 'Truck Dash';
+  const estilo = d.createElement('style');
+  estilo.textContent = PIP_CSS;
+  d.head.appendChild(estilo);
+  d.body.innerHTML = `<div class="pip">
+      <div class="giro" id="pGiro"></div>
+      <div class="fila">
+        <div class="lim" id="pLim" hidden></div>
+        <div class="vel"><b id="pVel">--</b><span id="pUnidad"></span></div>
+        <div class="dato"><b id="pFalta">--</b><span>${escapeHtml(t('routeRemainingLabel'))}</span></div>
+        <div class="dato"><b id="pLlega">--</b><span>${escapeHtml(t('routeArrivalLabel'))}</span></div>
+      </div>
+    </div>`;
+  pipWin.addEventListener('pagehide', () => { pipWin = null; });
+  refreshPip();
+}
+
+function refreshPip() {
+  if (!pipWin) return;
+  const d = pipWin.document;
+  const $ = (id) => document.getElementById(id);
+  const giro = d.getElementById('pGiro');
+  if (!giro) return;
+  giro.innerHTML = pipTurnHtml || escapeHtml(t('navNoRoute'));
+  d.getElementById('pVel').textContent = $('miniSpeedBig').textContent;
+  d.getElementById('pUnidad').textContent = $('miniSpeedUnitLabel').textContent;
+  const limite = $('miniLimitSign').textContent.trim();
+  const lim = d.getElementById('pLim');
+  lim.hidden = !limite || limite === '--';
+  lim.textContent = limite;
+  const vel = parseFloat($('miniSpeedBig').textContent);
+  lim.classList.toggle('pasado', !lim.hidden && Number.isFinite(vel) && vel > parseFloat(limite) + 2);
+  const resumen = !$('routeSummary').hidden;
+  d.getElementById('pFalta').textContent = resumen ? $('routeRemaining').textContent : '--';
+  d.getElementById('pLlega').textContent = resumen ? $('routeArrival').textContent : '--';
+}
+
+function initPip() {
+  const btn = document.getElementById('pipBtn');
+  if (!btn || !pipSupported()) return;
+  btn.style.display = '';
+  btn.addEventListener('click', openPip);
+}
+
 function updateNavPanel(turn) {
   if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
     document.getElementById('navPanel').style.display = 'none';
     return;
   }
   const panel = document.getElementById('navPanel');
+  panel.innerHTML = navPanelHtml(turn);
+  panel.style.display = 'block';
+}
+
+// El texto del proximo giro: lo usan el panel de navegacion y la ventana
+// flotante (que lo muestra aunque el modo navegacion este apagado).
+function navPanelHtml(turn) {
   const nextLine = nextCityName ? `<span class="navNext">${t('navNextCity')}: ${nextCityName}</span>` : '';
   if (turn) {
     const fork = turn.kind === 'fork';
@@ -3299,13 +3399,10 @@ function updateNavPanel(turn) {
       const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
       ontoText = ` ${preposition} ${turn.nearSign.label}`;
     }
-    panel.innerHTML = `${arrow} ${escapeHtml(dirText)}${escapeHtml(ontoText)} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial)}${nextLine}`;
-  } else if (currentRouteWorldPoints) {
-    panel.innerHTML = `⬆ ${t('navStraight')}${nextLine}`;
-  } else {
-    panel.textContent = `${t('navNoRoute')}`;
+    return `${arrow} ${escapeHtml(dirText)}${escapeHtml(ontoText)} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial)}${nextLine}`;
   }
-  panel.style.display = 'block';
+  if (currentRouteWorldPoints) return `⬆ ${t('navStraight')}${nextLine}`;
+  return escapeHtml(t('navNoRoute'));
 }
 
 // ---------------------------------------------------------------------------
@@ -3807,8 +3904,12 @@ function updateMap(position, game, gameHeadingDeg) {
 
   // Camara: un unico llamado por tick que combina centro+zoom+bearing segun
   // corresponda, en vez de varios llamados peleandose entre si.
-  const turn = navMode ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
-  if (navMode) voiceManeuverTick(turn);
+  // Con la ventana flotante abierta el giro (y la voz) van aunque el modo
+  // navegacion este apagado: es lo que muestra.
+  const guiando = navMode || !!pipWin;
+  const turn = guiando ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
+  if (guiando) voiceManeuverTick(turn);
+  if (pipWin) pipTurnHtml = navPanelHtml(turn);
   if (navMode && !autoFollow) {
     // El usuario esta tocando el mapa (arrastrar, pellizcar, rotar): la
     // camara no se toca hasta que scheduleMapFollow vuelva a engancharla.
@@ -4941,6 +5042,7 @@ function fuelFigures(data) {
 
 function handleTelemetry(data) {
   trackFuel(data);
+  if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
   const enAuto = isDrivingCar(data);
   if (enAuto !== drivingCar) { drivingCar = enAuto; applyVehicleMode(); }
   // Con el primer dato real se cambian las tarjetas por el estado vacio (ver

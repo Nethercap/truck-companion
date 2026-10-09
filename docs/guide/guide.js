@@ -8,7 +8,7 @@
   const LANG_KEY = 'truckdash_lang';  // la misma clave que la app y la cuenta
   const LANGS = ['en', 'es', 'de', 'fr', 'pt', 'pl', 'tr', 'ru'];
 
-  const MAP_BTNS = ['recenterBtn', 'fullscreenBtn', 'navToggleBtn', 'tilt3dBtn', 'waypointBtn',
+  const MAP_BTNS = ['recenterBtn', 'fullscreenBtn', 'navToggleBtn', 'tilt3dBtn', 'waypointBtn', 'pipBtn',
     'commandsToggleBtn', 'convoyMsgBtn', 'panelToggleBtn', 'poiBtn'];
   const TOP_BTNS = ['dashBtn', 'settingsBtn', 'helpBtn', 'unitToggle', 'langSelect', 'modsBtn',
     'convoyBtn', 'discordBtn'];
