@@ -2774,10 +2774,15 @@ function updateRouteSummary(data) {
   if (!target) { routeProgressState = { key: null, total: 0 }; renderRouteSummary(null); return; }
   // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
   // sobre la ruta que dibujamos nosotros.
-  const manual = waypoints.some(wp => !wp.inGame) || target.kind === 'waypoint';
-  const remainingKm = manual
-    ? (currentRouteWorldPoints ? sumPathDistanceMeters(currentRouteWorldPoints) * distanceScale() / 1000 : null)
-    : (Number.isFinite(data.routeDistanceKm) ? Math.max(0, data.routeDistanceKm) : null);
+  const ownKm = currentRouteWorldPoints ? sumPathDistanceMeters(currentRouteWorldPoints) * distanceScale() / 1000 : null;
+  const gameKm = Number.isFinite(data.routeDistanceKm) ? Math.max(0, data.routeDistanceKm) : null;
+  // El GPS del juego en 0 con una ruta nuestra larga: el juego todavia no
+  // tiene ruta (parado en la base, partida recien cargada) y el resumen
+  // decia "falta 0 km, llegas ahora" con el giro a 5 km. Cerca del destino
+  // las dos dan casi 0, por eso el kilometro de margen.
+  const manual = waypoints.some(wp => !wp.inGame) || target.kind === 'waypoint'
+    || (!gameKm && ownKm != null && ownKm > 1);
+  const remainingKm = manual ? ownKm : gameKm;
   const key = routeIdentity(data) + target.key;
   if (routeProgressState.key !== key) routeProgressState = { key, total: 0 };
   if (remainingKm != null) routeProgressState.total = Math.max(routeProgressState.total, remainingKm);
