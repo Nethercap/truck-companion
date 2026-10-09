@@ -1005,7 +1005,7 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'car-parking', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
@@ -1038,8 +1038,13 @@ function buildVecLayers(sourceLayer) {
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
     { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
-      filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]], ['!', ['in', ['get', 'poiType'], ['literal', ['ferry', 'train']]]]],
+      filter: poiLayerFilter(),
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
+    // En auto (ATS) los lugares de descanso son otros: los de camion se
+    // ocultan del 'poi' y van estos, que salen de pois-<variante>.json.
+    { id: 'car-parking', type: 'symbol', source: 'car-parking', minzoom: liteMode ? 9 : 7,
+      layout: { 'icon-image': 'car_parking', 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+                visibility: drivingCar ? 'visible' : 'none' } },
     // Atlas del Road Trip de ATS (Tourist Boards y Points of Interest). No
     // estan en los tiles: salen de pois-<variante>.json a la fuente 'atlas'
     // (ver setAtlasData). Los tourist boards desde mas lejos, como en el
@@ -1549,6 +1554,7 @@ function ensureMapInitialized() {
     mapReady = true;
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
     map.addSource('atlas', { type: 'geojson', data: atlasGeoJson(null) });
+    map.addSource('car-parking', { type: 'geojson', data: atlasGeoJson(null) });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     // La ruta crece con el zoom como las calles, pero siempre un poco mas
     // ancha que la autopista mas ancha (road-freeway: 1 / 3,5 / 10 px a zoom
@@ -1591,9 +1597,21 @@ const POI_ICONS = ['gas_ico', 'service_ico', 'weigh_station_ico', 'weigh_ico', '
 // Puertos de ferry y terminales de tren. Van en su propia capa (ferry-poi),
 // pero la imagen se carga por el mismo camino que las demas.
 const FERRY_ICONS = ['port_overlay', 'train_ico'];
+// En auto, sin los estacionamientos de camion (parking_ico): no se pueden usar.
+let drivingCar = false;
+function poiLayerFilter() {
+  const sprites = drivingCar ? POI_ICONS.filter(n => n !== 'parking_ico') : POI_ICONS;
+  return ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', sprites]], ['!', ['in', ['get', 'poiType'], ['literal', ['ferry', 'train']]]]];
+}
+function applyVehicleMode() {
+  if (!map) return;
+  if (map.getLayer('poi')) map.setFilter('poi', poiLayerFilter());
+  if (map.getLayer('car-parking')) map.setLayoutProperty('car-parking', 'visibility', drivingCar ? 'visible' : 'none');
+  if (document.getElementById('poiModal').style.display === 'flex') renderPoiResults();
+}
 // Iconos del Atlas: los SDF del juego (material/ui/map/tourist_board_completed
 // y point_of_interest_discovered) pasados a PNG con los colores de su .mat.
-const ATLAS_ICONS = ['atlas_tourist_board', 'atlas_poi'];
+const ATLAS_ICONS = ['atlas_tourist_board', 'atlas_poi', 'car_parking'];
 const POI_ICON_BASE = `${REMOTE_MAP_BASE}/vector/icons`;
 
 async function loadPoiIcons() {
@@ -1908,8 +1926,8 @@ function distanceScale() {
   return (currentGame || '').startsWith('ets2') ? 19 : 20;
 }
 
-const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh', a: 'poiCatAtlas' };
-const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️', a: '🧭' };
+const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', c: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh', a: 'poiCatAtlas' };
+const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', c: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️', a: '🧭' };
 let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]], cities: {token: name} }
 let poisVariant = null;
 let poisLoading = null; // promesa en curso, para no disparar dos fetch del mismo archivo
@@ -1953,7 +1971,10 @@ function atlasGeoJson(list) {
 function setAtlasData() {
   const src = map && map.getSource('atlas');
   if (!src) return;
-  src.setData(atlasGeoJson(pois && poisVariant === currentGame && toLngLat ? pois.atlas : null));
+  const vale = pois && poisVariant === currentGame && toLngLat;
+  src.setData(atlasGeoJson(vale ? pois.atlas : null));
+  const autos = map.getSource('car-parking');
+  if (autos) autos.setData(atlasGeoJson(vale ? pois.facilities.filter(f => f[2] === 'c') : null));
 }
 
 function poiVariantNow() {
@@ -2103,7 +2124,9 @@ function renderPoiResults() {
   } else if (query.trim()) {
     results = searchCompanies(query, pos.x, pos.z, 20).map(r => ({ ...r, name: r.label, sub: cityLabel(r.city) }));
   } else {
-    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => r.code === 'a'
+    // En auto, "Area de descanso" son los estacionamientos para auto
+    const codigo = poiCategory === 'p' && drivingCar ? 'c' : poiCategory;
+    results = nearestFacilities(codigo, pos.x, pos.z, 15).map(r => r.code === 'a'
       ? { ...r, sub: [t(r.kind === 't' ? 'atlasTouristBoard' : 'atlasPoi'), nearestCityName(r.x, r.z)].filter(Boolean).join(' · ') }
       : { ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' });
   }
@@ -4836,6 +4859,8 @@ function fuelFigures(data) {
 
 function handleTelemetry(data) {
   trackFuel(data);
+  const enAuto = isDrivingCar(data);
+  if (enAuto !== drivingCar) { drivingCar = enAuto; applyVehicleMode(); }
   // Con el primer dato real se cambian las tarjetas por el estado vacio (ver
   // #panelEmpty): antes el panel era una columna de guiones hasta que el
   // jugador se subia al camion.

@@ -1136,7 +1136,20 @@ function dlcBlockedGuards(game, off) {
   return mask;
 }
 
+// Vas en auto (ATS 1.61, Road Trip)? Los autos usan otros lugares para
+// descansar: en un area de descanso de camiones no se puede estacionar el
+// auto (reporte de Discord, 08-10-2026). La marca la manda el cliente desde
+// la 1.5.28 (truckBrandId); en ATS no hay camiones de estas marcas. Con un
+// cliente viejo queda el trabajo con auto: carga con nombre y sin peso, como
+// lo cuenta la API de cuentas.
+const CAR_BRANDS = ['ford', 'ram', 'dodge', 'chevrolet'];
+function isDrivingCar(data) {
+  if (!data || data.game !== 'ats') return false;
+  if (data.truckBrandId) return CAR_BRANDS.includes(String(data.truckBrandId).toLowerCase());
+  return !!(data.onJob && data.cargo && !data.cargoMassKg);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAR_BRANDS, isDrivingCar, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

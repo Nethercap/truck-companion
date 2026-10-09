@@ -8,7 +8,8 @@ trabajo a partir de compSrcId/citySrcId de la telemetria).
 Formato compacto (coordenadas de juego, redondeadas al metro):
   {
     "facilities": [[x, z, "g"], ...],          # g gas, p parking/rest, s service,
-                                              # r garage, d dealer, w weigh station
+                                              # r garage, d dealer, w weigh station,
+                                              # c estacionamiento para auto (ATS)
     "companies":  [[x, z, "token", "Label", "city_token"], ...],
     "cities":     {"city_token": "City Name", ...},
     "atlas":      [[x, z, "t", "Name"], ...]    # solo ATS: t tourist board,
@@ -68,6 +69,31 @@ FACILITY_CODES = {
 # sale sin nombres en vez de no salir.
 ATLAS_NAMES_PATH = os.path.join(PARSER_ROOT, "atlas-names-ats.json")
 ATLAS_KEY = re.compile(r"(tb|poi)_[a-z]{2}\d+(_\d+)?")
+
+
+# Plazas para auto (ATS 1.61): triggers "parking_car", una por lugar de
+# estacionar. Se agrupan en lugares (~150 m) y se guarda el centro de cada
+# uno. Los "hud_parking" son los de camion, que ya vienen como parking_ico.
+CAR_PARKING_RADIUS_M = 150
+
+
+def car_parking(folder, prefix):
+    path = os.path.join(PARSER_ROOT, folder, f"{prefix}-triggers.json")
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        triggers = json.load(f)
+    grupos = []  # [suma_x, suma_z, n]
+    for t in triggers:
+        if not any(a and a[0] == "parking_car" for a in t.get("actions") or []):
+            continue
+        for g in grupos:
+            if abs(g[0] / g[2] - t["x"]) < CAR_PARKING_RADIUS_M and abs(g[1] / g[2] - t["y"]) < CAR_PARKING_RADIUS_M:
+                g[0] += t["x"]; g[1] += t["y"]; g[2] += 1
+                break
+        else:
+            grupos.append([t["x"], t["y"], 1])
+    return [[round(gx / n), round(gz / n), "c"] for gx, gz, n in grupos]
 
 
 def atlas_items(folder, prefix):
@@ -160,7 +186,7 @@ def build(variant, folder, prefix):
             continue
         grid.setdefault(cell, []).append((x, z))
         deduped.append([x, z, code])
-    facilities = deduped
+    facilities = deduped + car_parking(folder, prefix)
     out = {"facilities": facilities, "companies": companies, "cities": cities}
     atlas = atlas_items(folder, prefix)
     if atlas:
@@ -169,7 +195,8 @@ def build(variant, folder, prefix):
     out_path = os.path.join(OUT_DIR, f"pois-{variant}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-    extra = f", {len(atlas)} atlas" if atlas else ""
+    autos = sum(1 for f in facilities if f[2] == "c")
+    extra = (f", {len(atlas)} atlas" if atlas else "") + (f", {autos} car parking" if autos else "")
     print(f"  {variant}: {len(facilities)} facilities, {len(companies)} companies{extra} -> {os.path.getsize(out_path) // 1024}KB")
 
 

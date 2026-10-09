@@ -746,6 +746,10 @@ def build_payload(raw: dict) -> dict:
             if raw.get("time_abs_delivery") else None
         ),
         "truckBrand": raw.get("truckBrand") or None,
+        # Id interno de la marca ("ford", "kenworth"): en ATS los autos del
+        # Road Trip son de marcas que no hacen camiones, y la web usa eso para
+        # mostrar los estacionamientos para auto en vez de los de camion.
+        "truckBrandId": raw.get("truckBrandId") or None,
         "truckName": raw.get("truckName") or None,
         "odometerKm": raw.get("truckOdometer"),
         "fuel": raw.get("fuel"),

@@ -35,6 +35,12 @@ def test_build_payload_converts_speed_from_ms_to_kmh():
     assert payload["game"] == "ats"
 
 
+def test_build_payload_manda_la_marca_del_vehiculo():
+    """La web distingue auto de camion por la marca (ver isDrivingCar)."""
+    assert client.build_payload({"game": 2, "truckBrandId": "ford"})["truckBrandId"] == "ford"
+    assert client.build_payload({"game": 2, "truckBrandId": ""})["truckBrandId"] is None
+
+
 def test_build_payload_maps_game_enum():
     assert client.build_payload({"game": 0})["game"] is None
     assert client.build_payload({"game": 1})["game"] == "ets2"

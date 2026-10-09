@@ -933,3 +933,15 @@ test('DLC: automatico usa lo que encontro el cliente; sin datos, todos; manual, 
   assert.deepEqual(effectiveDlcOff('ats', false, { ats: [] }, ['tx']), ['tx']);   // manual
   assert.equal(effectiveDlcOff('ets2', true, { ets2: [] }).length, DLC_LIST.ets2.length);
 });
+
+test('isDrivingCar: auto por la marca, y por el trabajo con auto si el cliente es viejo', () => {
+  const { isDrivingCar } = require('./pure.js');
+  assert.equal(isDrivingCar({ game: 'ats', truckBrandId: 'ford' }), true);
+  assert.equal(isDrivingCar({ game: 'ats', truckBrandId: 'kenworth', onJob: true, cargo: 'Ford Bronco', cargoMassKg: 0 }), false);
+  assert.equal(isDrivingCar({ game: 'ets2', truckBrandId: 'ford' }), false);
+  // Cliente sin truckBrandId: trabajo con auto (carga con nombre, sin peso)
+  assert.equal(isDrivingCar({ game: 'ats', onJob: true, cargo: 'Crown Victoria', cargoMassKg: 0 }), true);
+  assert.equal(isDrivingCar({ game: 'ats', onJob: true, cargo: 'Gravel', cargoMassKg: 21000 }), false);
+  assert.equal(isDrivingCar({ game: 'ats', onJob: false }), false);
+  assert.equal(isDrivingCar(null), false);
+});
