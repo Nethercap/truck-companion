@@ -154,7 +154,7 @@ class AppState:
         # Arrastrado en el modo Mover: queda en esa posicion.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))
         # Tecla rapida que prende y apaga el overlay desde el juego.
-        self.overlay_tecla = overlay.TeclaRapida(lambda: set_overlay(not self.overlay.enabled))
+        self.overlay_tecla = overlay.TeclaRapida(lambda: tecla_del_overlay())
 
     def status_text(self) -> str:
         text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
@@ -1424,6 +1424,15 @@ def set_overlay_layout(corner: str | None = None, size: str | None = None, items
 def set_overlay_hotkey(combinacion: str) -> None:
     win_integration.save_overlay_settings(hotkey=combinacion)
     state.overlay_tecla.poner(combinacion)
+
+
+def tecla_del_overlay() -> None:
+    """La tecla rapida, solo con el juego al frente: Ctrl+Shift+O es tambien
+    abrir los favoritos en Chrome y Edge, y prendia o apagaba el overlay (y
+    quedaba guardado) sin que nadie se enterara."""
+    import window_compat
+    if window_compat.game_window_in_front():
+        set_overlay(not state.overlay.enabled)
 
 
 def toggle_overlay_menu_item(icon, item):

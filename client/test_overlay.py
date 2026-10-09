@@ -233,3 +233,17 @@ def test_el_idioma_del_cliente_se_elige():
             assert textos.get("language") and textos.get("language_auto"), lang
     finally:
         i18n.LANG = antes
+
+
+def test_la_tecla_solo_cuenta_con_el_juego_al_frente(monkeypatch):
+    """Ctrl+Shift+O tambien abre los favoritos de Chrome y Edge."""
+    import tray_client
+    import window_compat
+    llamadas = []
+    monkeypatch.setattr(tray_client, "set_overlay", llamadas.append)
+    monkeypatch.setattr(window_compat, "game_window_in_front", lambda: None)
+    tray_client.tecla_del_overlay()
+    assert llamadas == []
+    monkeypatch.setattr(window_compat, "game_window_in_front", lambda: 1234)
+    tray_client.tecla_del_overlay()
+    assert llamadas == [not tray_client.state.overlay.enabled]
