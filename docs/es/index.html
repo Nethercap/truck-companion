@@ -520,6 +520,11 @@
         <p data-i18n="featGpsBody">Vista que rota con tu rumbo mientras manejás, con indicaciones de giro y el nombre de la ruta a la que doblás — como un GPS de verdad.</p>
       </div>
       <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="5" y="7" width="8" height="4" rx="1"/></svg></div>
+        <h3 data-i18n="featOverlayTitle">Overlay en el juego <span class="tag">nuevo</span></h3>
+        <p data-i18n="featOverlayBody">Un recuadro chico arriba del juego con tu velocidad y el límite, el próximo giro, lo que falta y la llegada, para no sacar la vista de la ruta. Los clics pasan a través y nunca le saca el foco al juego. <a href="#overlay">Miralo</a>.</p>
+      </div>
+      <div class="featureCard">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0"/><path d="M3 12v4h18v-4"/><path d="M12 12l4-3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></div>
         <h3 data-i18n="featPanelTitle">Panel de tablero completo</h3>
         <p data-i18n="featPanelBody">Velocidad, combustible, descanso, daños y cómo viene la sesión, en un segundo celular o monitor mientras el mapa sigue en el primero. Te dice si llegás antes del vencimiento y si te alcanza la nafta, en vez de dejarte dos números para restar.</p>
@@ -617,6 +622,27 @@
 
   <!-- Cuentas: opcionales. Todo texto aca tiene que seguir siendo cierto con
        la promesa de "sin cuenta obligatoria" del principio. -->
+  <section id="overlay">
+    <h2 data-i18n="overlayTitle">El GPS, <span class="accent">arriba del juego.</span></h2>
+    <div class="accountsGrid">
+      <div>
+        <p data-i18n="overlayBody">¿No tenés una segunda pantalla a mano, o no querés bajar la vista? El cliente dibuja un recuadro chico sobre ETS2 y ATS mientras manejás.</p>
+        <ul class="accountsList">
+          <li data-i18n="overlayLi1">Velocidad y límite, que titila si te pasás</li>
+          <li data-i18n="overlayLi2">Próximo giro y próxima ciudad, lo que falta y la hora de llegada de tu ruta</li>
+          <li data-i18n="overlayLi3">La llegada en el reloj del juego, para compararla con el plazo de entrega</li>
+          <li data-i18n="overlayLi4">Elegís qué muestra, el tamaño y dónde va. Ctrl+Shift+O lo muestra y lo esconde</li>
+        </ul>
+        <div class="ctaRow">
+          <a class="cta" href="https://github.com/Nethercap/truck-companion/releases/latest" target="_blank" rel="noopener" data-i18n="heroCta">Descargar para Windows</a>
+          <a class="cta secondary" href="/guide/#overlay" data-i18n="overlayHow">Cómo funciona</a>
+        </div>
+        <p class="ctaNote" data-i18n="overlayNote">Windows, con el juego en ventana o en pantalla completa sin bordes. Viene apagado: se prende en la Configuración del cliente.</p>
+      </div>
+      <img class="accountsShot" src="/assets/overlay-ets2.webp" alt="The Truck Dash overlay over Euro Truck Simulator 2: next turn, next city, speed and limit, distance left and arrival times" width="1000" height="565" loading="lazy" onclick="openLightbox(this.src)" />
+    </div>
+  </section>
+
   <section id="accounts">
     <h2 data-i18n="accountsTitle">Tus viajes, guardados. <span class="accent">Si querés.</span></h2>
     <div class="accountsGrid">
@@ -803,6 +829,7 @@
     <div class="footerLinks">
       <a href="/app/" data-i18n="footerApp">Abrir el tablero</a>
       <a href="/guide/" data-i18n="footerGuide">Guía de uso</a>
+      <a href="/press/" data-i18n="footerPress">Kit de prensa</a>
       <a href="#compare" data-i18n="navCompare">Gratis vs pagas</a>
       <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
       <a href="https://github.com/Nethercap/truck-companion" target="_blank" rel="noopener">GitHub</a>
@@ -860,6 +887,16 @@ const TRANSLATIONS = {
     accountsCta: 'Create a free account',
     accountsHow: 'How it works',
     accountsNote: 'Optional: everything else works without an account, and nothing is saved until you link it.',
+    featOverlayTitle: 'In-game overlay <span class="tag">new</span>',
+    featOverlayBody: 'A small panel right on top of the game with your speed and the limit, the next turn, distance left and arrival, so you never look away from the road. Clicks go through it and it never steals focus. <a href="#overlay">See it</a>.',
+    overlayTitle: 'The GPS, <span class="accent">on top of the game.</span>',
+    overlayBody: 'No second screen at hand, or you just don\'t want to look down? The client draws a small panel over ETS2 and ATS while you drive.',
+    overlayLi1: 'Speed and speed limit, blinking when you go over',
+    overlayLi2: 'Next turn and next city, distance left and arrival time from your route',
+    overlayLi3: 'Arrival on the game clock, to check against your delivery deadline',
+    overlayLi4: 'Pick what it shows, its size and where it goes. Ctrl+Shift+O shows and hides it',
+    overlayHow: 'How it works',
+    overlayNote: 'Windows, with the game in a window or in borderless fullscreen. Off by default: turn it on in the client\'s Setup.',
     navCommunity: 'Community',
     kicker: 'For Euro Truck Simulator 2 &amp; American Truck Simulator',
     heroTitle: 'Your phone is now a <span class="accent">real GPS</span> for your truck sim.',
@@ -1020,6 +1057,7 @@ const TRANSLATIONS = {
     colGame: 'Game',
     footerApp: 'Open dashboard',
     footerGuide: 'User guide',
+    footerPress: 'Press kit',
     donateLink: 'Support the project',
     supportTitle: 'Support Truck Dash',
     supportBody: 'Truck Dash is made by one person, and keeping it running costs money: the servers and the map hosting. If it\'s useful to you, a tea helps keep it going. It\'s optional and it doesn\'t unlock anything.',
@@ -1060,6 +1098,16 @@ const TRANSLATIONS = {
     accountsCta: 'Crear una cuenta gratis',
     accountsHow: 'Cómo funciona',
     accountsNote: 'Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.',
+    featOverlayTitle: 'Overlay en el juego <span class="tag">nuevo</span>',
+    featOverlayBody: 'Un recuadro chico arriba del juego con tu velocidad y el límite, el próximo giro, lo que falta y la llegada, para no sacar la vista de la ruta. Los clics pasan a través y nunca le saca el foco al juego. <a href="#overlay">Miralo</a>.',
+    overlayTitle: 'El GPS, <span class="accent">arriba del juego.</span>',
+    overlayBody: '¿No tenés una segunda pantalla a mano, o no querés bajar la vista? El cliente dibuja un recuadro chico sobre ETS2 y ATS mientras manejás.',
+    overlayLi1: 'Velocidad y límite, que titila si te pasás',
+    overlayLi2: 'Próximo giro y próxima ciudad, lo que falta y la hora de llegada de tu ruta',
+    overlayLi3: 'La llegada en el reloj del juego, para compararla con el plazo de entrega',
+    overlayLi4: 'Elegís qué muestra, el tamaño y dónde va. Ctrl+Shift+O lo muestra y lo esconde',
+    overlayHow: 'Cómo funciona',
+    overlayNote: 'Windows, con el juego en ventana o en pantalla completa sin bordes. Viene apagado: se prende en la Configuración del cliente.',
     navCommunity: 'Comunidad',
     kicker: 'Para Euro Truck Simulator 2 y American Truck Simulator',
     heroTitle: 'Tu celular ahora es un <span class="accent">GPS real</span> para tu simulador de camiones.',
@@ -1220,6 +1268,7 @@ const TRANSLATIONS = {
     colGame: 'Juego',
     footerApp: 'Abrir el tablero',
     footerGuide: 'Guía de uso',
+    footerPress: 'Kit de prensa',
     donateLink: 'Apoyar el proyecto',
     supportTitle: 'Apoyá a Truck Dash',
     supportBody: 'Truck Dash lo hace una sola persona, y mantenerlo andando cuesta plata: los servidores y el alojamiento de los mapas. Si te sirve, un tecito ayuda a que siga. Es opcional y no desbloquea nada.',
