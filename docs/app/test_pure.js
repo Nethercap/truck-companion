@@ -604,6 +604,21 @@ test('demo: los kilometros, el reloj del juego y el consumo cierran entre si', (
   assert.ok(Math.abs(st.fuelPer100Km - 32) < 1, 'consumo: ' + st.fuelPer100Km);
 });
 
+test('demo: va al ritmo del juego (un tick de 250 ms son 6,5 m de mapa a 94 km/h)', () => {
+  // A 6x el camion volaba en modo navegacion. 26 m/s * 0,25 s = 6,5 m del
+  // juego = 0,13 km a la escala 1:20.
+  const demo = createDemoTelemetry({ totalKm: 1000 });
+  for (let i = 0; i < 100; i++) demo.next();
+  assert.ok(Math.abs(demo.progress() * 1000 - 13) < 0.5, String(demo.progress() * 1000));
+});
+
+test('demo: puede arrancar mas adelante (para grabar videos)', () => {
+  const demo = createDemoTelemetry({ totalKm: 1000, startKm: 60 });
+  demo.next();
+  assert.ok(Math.abs(demo.progress() * 1000 - 60.13) < 0.05, String(demo.progress() * 1000));
+  assert.ok(createDemoTelemetry({ totalKm: 100, startKm: 250 }).progress() < 1);
+});
+
 // Tamano de los elementos acomodados a mano (pedido de usuarios: poder
 // agrandar la velocidad y las indicaciones, no solo moverlas).
 test('tamano acomodado: sigue a la manija, con topes y sin salirse del mapa', () => {

@@ -5438,9 +5438,14 @@ function runDemo() {
 
   // El largo real de la ruta calculada, a la escala del juego: asi la demo
   // del panel y la del mapa dicen los mismos kilometros.
+  // ?demoKm=60 arranca 60 km mas adelante: a ritmo real, los primeros
+  // minutos son la salida del deposito, y para grabar un video se quiere la
+  // ruta (lo usa marketing/video/grabar.py del taller).
+  const desdeKm = parseFloat(new URLSearchParams(window.location.search).get('demoKm')) || 0;
   const demo = createDemoTelemetry({
     tickMs: DEMO_TICK_MS,
     totalKm: (total / 1000) * DEMO_DISTANCE_SCALE,
+    startKm: desdeKm,
   });
 
   const step = () => {
@@ -5451,7 +5456,12 @@ function runDemo() {
     // Rumbo como lo manda el cliente 1.5.13+: sobre la grilla del juego
     // (0 = -z), no geografico. Sin esto la demo iba por el camino viejo de
     // deducirlo y no mostraba la diferencia entre los dos norte.
-    const [ax, az] = pointAt(Math.max(0, dist - 5)), [bx, bz] = pointAt(dist + 5);
+    // Mirando 15 m para atras y 25 para adelante: con +-5 m la flecha
+    // saltaba en cada curvita del grafo (los cruces son tramos de pocos
+    // metros). Un poco mas adelante que atras compensa el suavizado de la app;
+    // con otro suavizado aca la camara llegaba a ir 45 grados atrasada en un
+    // giro de 90, y con 50 m adelante se adelantaba 40 (medido el 09-10).
+    const [ax, az] = pointAt(Math.max(0, dist - 15)), [bx, bz] = pointAt(dist + 25);
     if (ax !== bx || az !== bz) data.heading = (Math.atan2(bx - ax, -(bz - az)) * 180 / Math.PI + 360) % 360;
     handleTelemetry(data);
   };

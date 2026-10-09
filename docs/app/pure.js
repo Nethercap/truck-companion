@@ -801,15 +801,19 @@ const DEMO_ROUTE = {
 function createDemoTelemetry(opts) {
   const o = Object.assign({
     tickMs: 250,          // misma tasa que el cliente por el relay (4 Hz)
-    timeScale: 6,         // 6x mas rapido que el tiempo real, para que pasen cosas
+    // Al ritmo del juego. Estaba en 6x "para que pasen cosas", pero en modo
+    // navegacion, que esta acercado, el camion volaba (se noto en el video
+    // de YouTube del 09-10): a 1x se ve como manejando de verdad.
+    timeScale: 1,
     distanceScale: 20,
     speedMs: 26,          // ~94 km/h
     tankL: 600,
     lPer100: 32,
     totalKm: 680,         // largo del viaje; la app pasa el de su ruta real
+    startKm: 0,           // desde donde arranca (?demoKm= en la app, para grabar videos)
   }, opts || {});
-  let tick = 0, travelledKm = 0;
-  let odometer = 184220;
+  let tick = 0, travelledKm = Math.max(0, o.startKm % o.totalKm || 0);
+  let odometer = 184220 + travelledKm;
   let fuelL = 0.82 * o.tankL;
   let gameMinutes = 2 * 1440 + 21 * 60;  // miercoles 21:00 en el juego
   return {
