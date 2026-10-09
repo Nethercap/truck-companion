@@ -27,6 +27,11 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://trucksim-dash.com/press/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://trucksim-dash.com/privacy.html</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
