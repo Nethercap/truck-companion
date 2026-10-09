@@ -6,6 +6,12 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- In-game overlay (Windows): a small panel over the game with your speed and the speed
+  limit, plus the next turn, the next city, distance left and arrival when the dashboard
+  has a route (on your phone, a tablet or this PC). It lets clicks through, never takes
+  focus from the game and hides when the game is not in front. Off by default: turn it on
+  in Setup or from the tray menu, and pick its corner and size. Needs the game in a
+  window or in borderless fullscreen.
 - Linux (Proton): Setup finds your games in Steam's Linux libraries (also on other
   drives and with the Flatpak Steam), without the game having to be running first.
 

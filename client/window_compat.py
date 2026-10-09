@@ -87,12 +87,37 @@ def _ventanas():
 GAME_EXES = ("eurotrucks2.exe", "amtrucks.exe")
 
 
+def _exe_de_ventana(hwnd) -> str:
+    """Nombre del .exe (en minuscula) duenio de la ventana, o ""."""
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    try:
+        pid = wintypes.DWORD(0)
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value:
+            # QUERY_LIMITED_INFORMATION alcanza y no necesita permisos
+            # especiales, a diferencia de QUERY_INFORMATION.
+            handle = kernel32.OpenProcess(0x1000, False, pid.value)
+            if handle:
+                try:
+                    buf = ctypes.create_unicode_buffer(1024)
+                    size = wintypes.DWORD(1024)
+                    if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                        return os.path.basename(buf.value).lower()
+                finally:
+                    kernel32.CloseHandle(handle)
+    except Exception:
+        pass
+    return ""
+
+
 def _windows_top_level():
     """[(hwnd, titulo, exe_en_minuscula)] de las ventanas visibles."""
     import ctypes
     from ctypes import wintypes
     user32 = ctypes.windll.user32
-    kernel32 = ctypes.windll.kernel32
     salida = []
 
     CALLBACK = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
@@ -106,29 +131,32 @@ def _windows_top_level():
             buf = ctypes.create_unicode_buffer(largo + 1)
             user32.GetWindowTextW(hwnd, buf, largo + 1)
             titulo = buf.value
-        exe = ""
-        try:
-            pid = wintypes.DWORD(0)
-            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            if pid.value:
-                # QUERY_LIMITED_INFORMATION alcanza y no necesita permisos
-                # especiales, a diferencia de QUERY_INFORMATION.
-                handle = kernel32.OpenProcess(0x1000, False, pid.value)
-                if handle:
-                    try:
-                        buf = ctypes.create_unicode_buffer(1024)
-                        size = wintypes.DWORD(1024)
-                        if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
-                            exe = os.path.basename(buf.value).lower()
-                    finally:
-                        kernel32.CloseHandle(handle)
-        except Exception:
-            pass
-        salida.append((hwnd, titulo, exe))
+        salida.append((hwnd, titulo, _exe_de_ventana(hwnd)))
         return True
 
     user32.EnumWindows(CALLBACK(visitar), 0)
     return salida
+
+
+_ultimo_frente = (None, "")
+
+
+def game_window_in_front():
+    """Handle de la ventana del juego si es la que esta al frente, o None.
+
+    Lo usa el overlay varias veces por segundo: se mira solo la ventana del
+    frente (no se recorren todas) y el .exe se recuerda mientras no cambie.
+    Solo Windows."""
+    global _ultimo_frente
+    if not IS_WINDOWS:
+        return None
+    import ctypes
+    hwnd = ctypes.windll.user32.GetForegroundWindow()
+    if not hwnd:
+        return None
+    if _ultimo_frente[0] != hwnd:
+        _ultimo_frente = (hwnd, _exe_de_ventana(hwnd))
+    return hwnd if _ultimo_frente[1] in GAME_EXES else None
 
 
 

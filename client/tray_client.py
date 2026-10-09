@@ -44,6 +44,7 @@ import client as client_lib
 import discord_presence
 import local_server
 import map_builder
+import overlay
 import account
 import account_sync
 import plugin_installer
@@ -142,6 +143,12 @@ class AppState:
         self.local: local_server.LocalServer | None = None  # modo LAN (ver local_server.py)
         # Rich Presence de Discord: se prende desde Ajustes, apagado por defecto.
         self.discord = discord_presence.DiscordPresence()
+        # Overlay en el juego (overlay.py): apagado por defecto. La ventana
+        # lee la esquina y el tamano de aca, sin ir al disco en cada cuadro.
+        self.overlay_data = overlay.OverlayData()
+        self.overlay_layout = (overlay.DEFAULT_CORNER, overlay.DEFAULT_SIZE)
+        self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
+                                       lambda: (T("overlay_remaining"), T("overlay_arrival")))
 
     def status_text(self) -> str:
         text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
@@ -593,6 +600,35 @@ class SetupWindow:
                               wraplength=520, justify="left")
         bchk.pack(anchor="w", pady=(2, 0))
 
+        # Overlay en el juego (overlay.py). Solo Windows: bajo Wine las
+        # ventanas transparentes que dejan pasar el clic no andan.
+        if win_integration.overlay_supported():
+            self.overlay_var = tk.BooleanVar(value=state.overlay.enabled)
+            ochk = tk.Checkbutton(options, text=T("overlay_option"), variable=self.overlay_var,
+                                  command=self.toggle_overlay, bg=BG, fg=FG,
+                                  selectcolor="#262b33", activebackground=BG, activeforeground=FG,
+                                  wraplength=520, justify="left")
+            ochk.pack(anchor="w", pady=(2, 0))
+            fila = tk.Frame(options, bg=BG)
+            fila.pack(anchor="w", padx=(24, 0), pady=(2, 0))
+            corner, size = state.overlay_layout
+            self.overlay_corner_var = tk.StringVar(value=T(f"pos_{corner}"))
+            self.overlay_size_var = tk.StringVar(value=T(f"size_{size}"))
+            for etiqueta, var, opciones, al_elegir in (
+                (T("overlay_position"), self.overlay_corner_var, [(c, T(f"pos_{c}")) for c in overlay.CORNERS],
+                 lambda c: set_overlay_layout(corner=c)),
+                (T("overlay_size"), self.overlay_size_var, [(k, T(f"size_{k}")) for k in overlay.SIZES],
+                 lambda k: set_overlay_layout(size=k)),
+            ):
+                self.label(fila, etiqueta, fg=MUTED).pack(side="left", padx=(0, 4))
+                por_texto = {texto: clave for clave, texto in opciones}
+                menu = tk.OptionMenu(fila, var, *por_texto,
+                                     command=lambda texto, m=por_texto, f=al_elegir: f(m[texto]))
+                menu.configure(bg="#262b33", fg=FG, activebackground="#2f3540", activeforeground=FG,
+                               highlightthickness=0, bd=0)
+                menu["menu"].configure(bg="#262b33", fg=FG)
+                menu.pack(side="left", padx=(0, 12))
+
         # --- Update ---
         # --- Update ---
         self.update_frame = tk.Frame(self.abajo, bg="#1f2a3a", padx=16, pady=8)
@@ -865,6 +901,9 @@ class SetupWindow:
     def toggle_open_dashboard(self):
         win_integration.set_open_dashboard(self.dashboard_var.get())
 
+    def toggle_overlay(self):
+        set_overlay(self.overlay_var.get())
+
     def add_game_folder(self):
         chosen = filedialog.askdirectory(title=T("pick_folder_title"))
         if not chosen:
@@ -1075,6 +1114,8 @@ class SetupWindow:
             text += "\n" + state.status_detail
         self.status_label.configure(text=text, fg=color)
         self.code_label.configure(text=state.code or "-")
+        if hasattr(self, "overlay_var") and self.overlay_var.get() != state.overlay.enabled:
+            self.overlay_var.set(state.overlay.enabled)  # se toco desde la bandeja
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         if getattr(self, "_last_lan_url", "?") != lan_url:
@@ -1261,6 +1302,23 @@ def report_problem(icon, item):
     abrir_navegador(f"https://github.com/Nethercap/truck-companion/issues/new?{query}")
 
 
+def set_overlay(enabled: bool) -> None:
+    """Prende o apaga el overlay en el juego y lo guarda. El cambio llega a la
+    web con el proximo client_status (publish_status lo mira en cada vuelta)."""
+    win_integration.save_overlay_settings(enabled=bool(enabled))
+    state.overlay.set_enabled(bool(enabled))
+
+
+def set_overlay_layout(corner: str | None = None, size: str | None = None) -> None:
+    actual_corner, actual_size = state.overlay_layout
+    state.overlay_layout = (corner or actual_corner, size or actual_size)
+    win_integration.save_overlay_settings(corner=state.overlay_layout[0], size=state.overlay_layout[1])
+
+
+def toggle_overlay_menu_item(icon, item):
+    set_overlay(not state.overlay.enabled)
+
+
 def toggle_autostart_menu_item(icon, item):
     if not win_integration.is_autostart_enabled() and win_integration.in_temp_location():
         show_text_dialog("Truck Dash", T("autostart_temp_folder"))
@@ -1366,6 +1424,9 @@ def status_message() -> str:
         # sirve en esta misma PC; en otro dispositivo sigue con el de R2).
         "localMaps": local_maps_summary(),
         "localMapPort": local_server.HTTP_PORT if (state.local and not state.local.error) else None,
+        # Con el overlay prendido la web manda el giro y lo que falta
+        # ({"type": "nav_hud"}); apagado no manda nada.
+        "overlay": state.overlay.enabled,
     })
 
 
@@ -1568,7 +1629,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
         refresh_map_mods()
         key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True),
                json.dumps(state.active_mods, sort_keys=True), json.dumps(state.map_dlcs, sort_keys=True),
-               json.dumps(local_maps_summary(), sort_keys=True))
+               json.dumps(local_maps_summary(), sort_keys=True), state.overlay.enabled)
         if key != last_status_sent:
             last_status_sent = key
             msg = status_message()
@@ -1627,6 +1688,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             client_lib.update_job_snapshot(raw)
             payload = client_lib.build_payload(raw)
             client_lib.attach_job_snapshot_if_finished(payload, raw)
+            state.overlay_data.telemetria(payload)
             game = payload.get("game")
             vehiculo = " ".join(p for p in (payload.get("truckBrand"), payload.get("truckName")) if p) or None
             if state.set_status("live", game, vehiculo):
@@ -1829,6 +1891,11 @@ def main():
 
     local_server.on_show_setup = open_setup_window
     client_lib.on_offmap = on_offmap
+    client_lib.on_nav_hud = state.overlay_data.navegacion
+    ajustes_overlay = win_integration.overlay_settings()
+    state.overlay_layout = (ajustes_overlay["corner"], ajustes_overlay["size"])
+    if ajustes_overlay["enabled"]:
+        state.overlay.set_enabled(True)
     state.discord.set_enabled(bool(win_integration.load_settings().get("discord_presence")))
     win_integration.cleanup_old_exe()
     state.web_url = args.web_url
@@ -1861,6 +1928,9 @@ def main():
                          visible=lambda item: cuentas_visibles()),
         pystray.MenuItem(T("menu_show_code"), show_code_notification),
         pystray.MenuItem(T("menu_lan"), show_lan_menu_item),
+        pystray.MenuItem(T("menu_overlay"), toggle_overlay_menu_item,
+                         checked=lambda item: state.overlay.enabled,
+                         visible=win_integration.overlay_supported()),
         pystray.MenuItem(T("menu_disconnect"), disconnect_session),
         pystray.MenuItem(T("menu_autostart"), toggle_autostart_menu_item, checked=lambda item: win_integration.is_autostart_enabled(), enabled=lambda item: win_integration.exe_path() is not None),
         pystray.MenuItem(T("menu_check_updates"), check_for_update_menu_item),

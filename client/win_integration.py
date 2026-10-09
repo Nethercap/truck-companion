@@ -176,6 +176,35 @@ def set_open_dashboard(activo: bool) -> None:
     save_settings(settings)
 
 
+def overlay_supported() -> bool:
+    """El overlay en el juego (overlay.py) usa ventanas de Windows que Wine
+    no reproduce bien (transparencia y clics que pasan): bajo Proton no se
+    ofrece."""
+    return sys.platform == "win32" and not is_wine()
+
+
+def overlay_settings() -> dict:
+    """{'enabled', 'corner', 'size'} del overlay en el juego. Apagado por
+    defecto: es una ventana encima del juego y la tiene que pedir uno."""
+    import overlay
+    s = load_settings()
+    corner = s.get("overlay_corner")
+    size = s.get("overlay_size")
+    return {
+        "enabled": overlay_supported() and bool(s.get("overlay")),
+        "corner": corner if corner in overlay.CORNERS else overlay.DEFAULT_CORNER,
+        "size": size if size in overlay.SIZES else overlay.DEFAULT_SIZE,
+    }
+
+
+def save_overlay_settings(**cambios) -> None:
+    claves = {"enabled": "overlay", "corner": "overlay_corner", "size": "overlay_size"}
+    settings = load_settings()
+    for k, v in cambios.items():
+        settings[claves[k]] = v
+    save_settings(settings)
+
+
 def load_settings() -> dict:
     try:
         with open(settings_path(), encoding="utf-8") as f:

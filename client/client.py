@@ -942,6 +942,10 @@ def payload_has_event(payload: dict) -> bool:
 # conoce ({"type": "offmap", "game": "ats"}), y la bandeja ofrece armar el
 # mapa en la PC (map_builder.py).
 on_offmap = None
+# Lo define la bandeja: el giro, lo que falta y la llegada que calcula la web,
+# como texto ya traducido, para el overlay en el juego (overlay.py). La web lo
+# manda solo si client_status dice que el overlay esta prendido.
+on_nav_hud = None
 
 
 async def handle_control_message(message: str, keybinds: dict, send) -> None:
@@ -967,6 +971,9 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
         elif msg_type == "offmap":
             if on_offmap and payload.get("game") in ("ats", "ets2"):
                 on_offmap(payload["game"])
+        elif msg_type == "nav_hud":
+            if on_nav_hud:
+                on_nav_hud(payload)
         elif msg_type == "set_keybinds":
             incoming = payload.get("data") or {}
             keybinds.update({k: (v or None) for k, v in incoming.items() if k in DEFAULT_KEYBINDS})

@@ -1,0 +1,396 @@
+"""Overlay en el juego: una ventanita arriba del juego, sin bordes, que deja
+pasar los clics y no se lleva el foco.
+
+Es la etapa siguiente a la ventana flotante del navegador (Document
+Picture-in-Picture, en app.js): aquella pide tener el tablero abierto en
+Chrome o Edge en la misma PC, tiene barra de titulo y se come el clic. Esta
+la dibuja el cliente y sirve aunque el tablero este en el celular.
+
+De donde sale cada cosa:
+- velocidad y limite: de la telemetria, en esta PC (10 por segundo);
+- giro, proxima ciudad, lo que falta y la llegada: los calcula la web, que es
+  la que tiene el mapa y la ruta, y los manda como texto ya traducido
+  ({"type": "nav_hud"}, por el relay o directo en LAN). La web solo los manda
+  si el cliente avisa en client_status que el overlay esta prendido;
+- sin web (o si deja de mandar, por ejemplo con el celular bloqueado), lo que
+  falta sale de la ruta del GPS del propio juego, y el giro no se muestra.
+
+Se ve solo con el juego al frente y el camion andando: en el escritorio, en
+otra ventana o con el juego en pausa (menu) se esconde. Funciona con el juego
+en ventana o en pantalla completa sin bordes, que es lo que usan ETS2 y ATS
+desde la 1.50; en pantalla completa exclusiva Windows no deja dibujar encima.
+Solo Windows (bajo Wine/Proton no se ofrece).
+"""
+
+import logging
+import threading
+import time
+
+KM_TO_MI = 0.621371
+
+CORNERS = ("top_left", "top_center", "top_right", "bottom_left", "bottom_right")
+DEFAULT_CORNER = "top_center"
+SIZES = {"s": 0.8, "m": 1.0, "l": 1.3}
+DEFAULT_SIZE = "m"
+
+# Cuanto vale lo que manda la web: el giro dice "en 400 m" y a 90 km/h eso
+# cambia rapido. Si la web deja de mandar (pestana cerrada, celular
+# bloqueado) el giro se saca antes de que mienta.
+NAV_FRESH_SECONDS = 6.0
+# Sin telemetria hace esto, el juego se cerro o se fue al menu principal.
+TELEMETRY_FRESH_SECONDS = 2.0
+
+BG = "#14171c"
+FG = "#f2f3f5"
+MUTED = "#9aa4b2"
+RED = "#e53935"
+
+
+def _texto(valor, largo=160) -> str:
+    """Lo que llega de la web es texto para mostrar, nada mas: se recorta y
+    se descarta lo que no sea str."""
+    if not isinstance(valor, str):
+        return ""
+    return valor.strip()[:largo]
+
+
+def limpiar_nav(msg: dict) -> dict:
+    """El mensaje nav_hud de la web, con solo lo que se usa."""
+    return {
+        "turn": _texto(msg.get("turn")),
+        "next": _texto(msg.get("next")),
+        "remaining": _texto(msg.get("remaining"), 24),
+        "arrival": _texto(msg.get("arrival"), 24),
+        "remainingLabel": _texto(msg.get("remainingLabel"), 24),
+        "arrivalLabel": _texto(msg.get("arrivalLabel"), 24),
+        "imperial": msg.get("imperial") if isinstance(msg.get("imperial"), bool) else None,
+    }
+
+
+def formato_distancia(km: float, imperial: bool) -> str:
+    if imperial:
+        mi = km * KM_TO_MI
+        return f"{mi:.1f} mi" if mi < 10 else f"{round(mi)} mi"
+    return f"{km:.1f} km" if km < 10 else f"{round(km)} km"
+
+
+def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float,
+              ahora: float, imperial_default: bool | None = None,
+              etiqueta_falta: str = "Remaining", etiqueta_llega: str = "Arrival") -> dict | None:
+    """Lo que hay que dibujar, o None si el overlay no tiene que verse.
+
+    tele es el payload que va al tablero (el mismo dict); nav lo ultimo que
+    mando la web (limpiar_nav). Devuelve textos ya formateados: la ventana
+    solo los pinta, asi se puede probar sin abrir nada."""
+    if not tele or ahora - tele_ts > TELEMETRY_FRESH_SECONDS or tele.get("paused"):
+        return None
+    nav_ok = bool(nav) and ahora - nav_ts <= NAV_FRESH_SECONDS
+    if nav and nav.get("imperial") is not None:
+        imperial = nav["imperial"]  # lo que eligio el usuario en la web, aunque ya no mande
+    elif imperial_default is not None:
+        imperial = imperial_default
+    else:
+        imperial = tele.get("game") == "ats"
+
+    factor = KM_TO_MI if imperial else 1.0
+    velocidad = round(abs(tele.get("speedKmh") or 0) * factor)
+    limite_kmh = tele.get("speedLimitKmh") or 0
+    limite = round(limite_kmh * factor) if limite_kmh > 0 else None
+
+    falta = llega = ""
+    if nav_ok and nav.get("remaining"):
+        falta, llega = nav["remaining"], nav.get("arrival", "")
+    else:
+        # El GPS del juego: lo que falta de SU ruta, que es la que el jugador
+        # ve en el juego. La llegada no: routeTimeSeconds es tiempo de juego
+        # y pasarlo a la hora real pide la escala que mide la web.
+        km = tele.get("routeDistanceKm") or 0
+        if km > 0:
+            falta = formato_distancia(km, imperial)
+
+    return {
+        "turn": nav["turn"] if nav_ok else "",
+        "next": nav.get("next", "") if nav_ok else "",
+        "speed": str(velocidad),
+        "unit": "mph" if imperial else "km/h",
+        "limit": str(limite) if limite else "",
+        "over": bool(limite) and velocidad > limite + 2,
+        "remaining": falta,
+        "arrival": llega,
+        "remainingLabel": (nav_ok and nav.get("remainingLabel")) or etiqueta_falta,
+        "arrivalLabel": (nav_ok and nav.get("arrivalLabel")) or etiqueta_llega,
+    }
+
+
+def posicion(rect, ancho: int, alto: int, esquina: str, margen: int) -> tuple[int, int]:
+    """Donde va la ventana adentro del rectangulo (izq, arriba, der, abajo)
+    de la ventana del juego."""
+    izq, arriba, der, abajo = rect
+    if esquina.endswith("left"):
+        x = izq + margen
+    elif esquina.endswith("right"):
+        x = der - margen - ancho
+    else:
+        x = izq + (der - izq - ancho) // 2
+    y = arriba + margen if esquina.startswith("top") else abajo - margen - alto
+    return int(x), int(y)
+
+
+class OverlayData:
+    """Lo ultimo que se sabe, compartido entre el hilo de la telemetria
+    (asyncio) y el de la ventana (tk)."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.tele = None
+        self.tele_ts = 0.0
+        self.nav = None
+        self.nav_ts = 0.0
+
+    def telemetria(self, payload: dict) -> None:
+        with self._lock:
+            self.tele = payload
+            self.tele_ts = time.time()
+
+    def navegacion(self, msg: dict) -> None:
+        with self._lock:
+            self.nav = limpiar_nav(msg)
+            self.nav_ts = time.time()
+
+    def foto(self):
+        with self._lock:
+            return self.tele, self.tele_ts, self.nav, self.nav_ts
+
+
+# --- Win32 -------------------------------------------------------------------
+GWL_EXSTYLE = -20
+WS_EX_TOPMOST = 0x00000008
+WS_EX_TRANSPARENT = 0x00000020
+WS_EX_TOOLWINDOW = 0x00000080
+WS_EX_LAYERED = 0x00080000
+WS_EX_NOACTIVATE = 0x08000000
+SW_HIDE = 0
+SW_SHOWNOACTIVATE = 4
+HWND_TOPMOST = -1
+SWP_NOSIZE = 0x0001
+SWP_NOMOVE = 0x0002
+SWP_NOACTIVATE = 0x0010
+SWP_FRAMECHANGED = 0x0020
+DWMWA_WINDOW_CORNER_PREFERENCE = 33
+DWMWCP_ROUND = 2
+
+
+def _user32():
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    u.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+    u.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+    u.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+    u.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+    u.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                               ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+    u.GetParent.restype = wintypes.HWND
+    u.GetParent.argtypes = [wintypes.HWND]
+    return u
+
+
+def _rect_de(hwnd):
+    import ctypes
+    from ctypes import wintypes
+    r = wintypes.RECT()
+    if not ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(r)):
+        return None
+    return (r.left, r.top, r.right, r.bottom)
+
+
+class Overlay:
+    """La ventana. Corre en su propio hilo con su propio Tk, como la ventana
+    de Setup. set_enabled la crea o la destruye."""
+
+    TICK_MS = 100
+
+    def __init__(self, data: OverlayData, ajustes, etiquetas):
+        self.data = data
+        self.ajustes = ajustes      # () -> (esquina, tamano)
+        self.etiquetas = etiquetas  # () -> (falta, llegada) en el idioma del cliente
+        self._hilo = None
+        self._parar = threading.Event()
+
+    @property
+    def enabled(self) -> bool:
+        return self._hilo is not None and self._hilo.is_alive()
+
+    def set_enabled(self, prender: bool) -> None:
+        if prender and not self.enabled:
+            self._parar.clear()
+            self._hilo = threading.Thread(target=self._correr, name="overlay", daemon=True)
+            self._hilo.start()
+        elif not prender and self._hilo is not None:
+            self._parar.set()
+            self._hilo = None
+
+    def _correr(self):
+        try:
+            _Ventana(self).loop()
+        except Exception:
+            logging.exception("El overlay se cerro por un error")
+
+
+class _Ventana:
+    def __init__(self, overlay: Overlay):
+        import ctypes
+        import tkinter as tk
+
+        self.ov = overlay
+        # Con escalado de Windows (125 %, 150 %) un proceso sin DPI propio se
+        # dibuja chico y Windows lo estira: el texto queda borroso. Solo este
+        # hilo pasa a medir en pixeles reales; Setup sigue como estaba.
+        try:
+            ctypes.windll.user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))  # PER_MONITOR_AWARE_V2
+        except Exception:
+            pass
+        self.tk = tk
+        self.root = tk.Tk()
+        self.root.withdraw()
+        self.root.overrideredirect(True)
+        self.root.configure(bg=BG)
+        self.root.attributes("-topmost", True)
+        self.root.attributes("-alpha", 0.88)
+        self.canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True)
+        # Tk crea la ventana de Windows recien al mostrarla. Se la muestra
+        # fuera de la pantalla para tener el handle y ponerle los estilos, y
+        # desde ahi se muestra y esconde con ShowWindow, que no le saca el
+        # foco al juego (deiconify si).
+        self.root.geometry("10x10+-32000+-32000")
+        self.root.deiconify()
+        self.root.update_idletasks()
+        self.root.update()
+        self.u = _user32()
+        self.hwnd = self.u.GetParent(self.root.winfo_id()) or self.root.winfo_id()
+        ex = self.u.GetWindowLongPtrW(self.hwnd, GWL_EXSTYLE)
+        ex |= WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
+        self.u.SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, ex)
+        self.u.SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+        try:
+            v = ctypes.c_int(DWMWCP_ROUND)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(self.hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+                                                       ctypes.byref(v), ctypes.sizeof(v))
+        except Exception:
+            pass
+        self.u.ShowWindow(self.hwnd, SW_HIDE)
+        self.visible = False
+        self.dibujado = None   # (contenido, escala) de lo que esta en pantalla
+        self.lugar = None      # (x, y, ancho, alto)
+        self.ultimo_topmost = 0.0
+        self.parpadeo = False
+        logging.info("Overlay en el juego prendido")
+
+    def loop(self):
+        self.root.after(self.ov.TICK_MS, self.tick)
+        self.root.mainloop()
+        logging.info("Overlay en el juego apagado")
+
+    def esconder(self):
+        if self.visible:
+            self.u.ShowWindow(self.hwnd, SW_HIDE)
+            self.visible = False
+
+    def tick(self):
+        if self.ov._parar.is_set():
+            self.root.destroy()
+            return
+        try:
+            self._tick()
+        except Exception:
+            logging.exception("Error en el overlay")
+        self.root.after(self.ov.TICK_MS, self.tick)
+
+    def _tick(self):
+        import window_compat
+
+        juego = window_compat.game_window_in_front()
+        if not juego:
+            self.esconder()
+            return
+        tele, tele_ts, nav, nav_ts = self.ov.data.foto()
+        falta, llega = self.ov.etiquetas()
+        datos = contenido(tele, tele_ts, nav, nav_ts, time.time(),
+                          etiqueta_falta=falta, etiqueta_llega=llega)
+        rect = _rect_de(juego)
+        if datos is None or rect is None:
+            self.esconder()
+            return
+        esquina, tamano = self.ov.ajustes()
+        # Todo se mide contra la altura del juego: a 1080 p "m" es la escala 1.
+        escala = max(0.6, (rect[3] - rect[1]) / 1080) * SIZES.get(tamano, 1.0)
+        self.parpadeo = datos["over"] and int(time.monotonic() * 2) % 2 == 0
+        clave = (datos, escala, self.parpadeo)
+        if clave != self.dibujado:
+            ancho, alto = self.dibujar(datos, escala)
+            self.dibujado = clave
+        else:
+            ancho, alto = self.lugar[2], self.lugar[3]
+        x, y = posicion(rect, ancho, alto, esquina, round(24 * escala))
+        self.lugar = (x, y, ancho, alto)
+        # Se compara contra donde esta de verdad: el primer geometry despues
+        # de mostrarla fuera de la pantalla cambia el tamano pero no la mueve.
+        if _rect_de(self.hwnd) != (x, y, x + ancho, y + alto):
+            self.root.geometry(f"{ancho}x{alto}+{x}+{y}")
+            self.u.SetWindowPos(self.hwnd, HWND_TOPMOST, x, y, ancho, alto, SWP_NOACTIVATE)
+        ahora = time.monotonic()
+        if not self.visible:
+            self.u.ShowWindow(self.hwnd, SW_SHOWNOACTIVATE)
+            self.visible = True
+        if ahora - self.ultimo_topmost > 2:
+            # Algunos juegos se ponen arriba de todo al tomar el foco: se
+            # vuelve a pedir cada tanto, sin activar la ventana.
+            self.ultimo_topmost = ahora
+            self.u.SetWindowPos(self.hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+
+    def dibujar(self, d: dict, k: float) -> tuple[int, int]:
+        c = self.canvas
+        c.delete("all")
+        fuente = lambda px, negrita=False: ("Segoe UI", -max(8, round(px * k)), "bold" if negrita else "normal")
+        pad = round(14 * k)
+        ancho = round(420 * k)
+        y = pad
+        if d["turn"]:
+            t = c.create_text(pad, y, text=d["turn"], fill=FG, anchor="nw",
+                              font=fuente(24, True), width=ancho - 2 * pad)
+            y = c.bbox(t)[3] + round(2 * k)
+            if d["next"]:
+                t = c.create_text(pad, y, text=d["next"], fill=MUTED, anchor="nw",
+                                  font=fuente(14), width=ancho - 2 * pad)
+                y = c.bbox(t)[3]
+            y += round(8 * k)
+
+        fila = round(46 * k)
+        medio = y + fila // 2
+        x = pad
+        if d["limit"]:
+            r = fila // 2
+            borde = max(3, round(5 * k))
+            anillo = RED if not (d["over"] and self.parpadeo) else "#ff8a80"
+            c.create_oval(x, medio - r, x + 2 * r, medio + r, fill="#ffffff", outline=anillo, width=borde)
+            c.create_text(x + r, medio, text=d["limit"], fill="#111111",
+                          font=fuente(17 if len(d["limit"]) < 3 else 14, True))
+            x += 2 * r + round(12 * k)
+        v = c.create_text(x, medio, text=d["speed"], fill=RED if d["over"] else FG, anchor="w",
+                          font=fuente(34, True))
+        x = c.bbox(v)[2] + round(4 * k)
+        c.create_text(x, medio + round(6 * k), text=d["unit"], fill=MUTED, anchor="w", font=fuente(13))
+
+        derecha = ancho - pad
+        for valor, etiqueta in ((d["arrival"], d["arrivalLabel"]), (d["remaining"], d["remainingLabel"])):
+            if not valor:
+                continue
+            a = c.create_text(derecha, medio - round(2 * k), text=valor, fill=FG, anchor="se", font=fuente(19, True))
+            b = c.create_text(derecha, medio + round(1 * k), text=etiqueta, fill=MUTED, anchor="ne", font=fuente(11))
+            derecha = min(c.bbox(a)[0], c.bbox(b)[0]) - round(16 * k)
+        alto = y + fila + pad
+        c.configure(width=ancho, height=alto)
+        return ancho, alto

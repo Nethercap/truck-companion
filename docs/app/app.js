@@ -3384,10 +3384,11 @@ function updateNavPanel(turn) {
   panel.style.display = 'block';
 }
 
-// El texto del proximo giro: lo usan el panel de navegacion y la ventana
-// flotante (que lo muestra aunque el modo navegacion este apagado).
-function navPanelHtml(turn) {
-  const nextLine = nextCityName ? `<span class="navNext">${t('navNextCity')}: ${nextCityName}</span>` : '';
+// El texto del proximo giro: lo usan el panel de navegacion, la ventana
+// flotante y el overlay del cliente (los dos ultimos lo muestran aunque el
+// modo navegacion este apagado). Texto plano: cada uno lo escapa o lo pinta.
+function navTurnParts(turn) {
+  const next = nextCityName ? `${t('navNextCity')}: ${nextCityName}` : '';
   if (turn) {
     const fork = turn.kind === 'fork';
     const arrow = fork ? (turn.direction === 'left' ? '↖' : '↗') : (turn.direction === 'left' ? '↰' : '↱');
@@ -3399,10 +3400,59 @@ function navPanelHtml(turn) {
       const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
       ontoText = ` ${preposition} ${turn.nearSign.label}`;
     }
-    return `${arrow} ${escapeHtml(dirText)}${escapeHtml(ontoText)} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial)}${nextLine}`;
+    return { text: `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial)}`, next };
   }
-  if (currentRouteWorldPoints) return `⬆ ${t('navStraight')}${nextLine}`;
-  return escapeHtml(t('navNoRoute'));
+  if (currentRouteWorldPoints) return { text: `⬆ ${t('navStraight')}`, next };
+  return null;
+}
+
+function navPanelHtml(turn) {
+  const parts = navTurnParts(turn);
+  if (!parts) return escapeHtml(t('navNoRoute'));
+  return escapeHtml(parts.text) + (parts.next ? `<span class="navNext">${escapeHtml(parts.next)}</span>` : '');
+}
+
+// ---------------------------------------------------------------------------
+// Overlay en el juego (client/overlay.py): el cliente dibuja una ventanita
+// arriba del juego con la velocidad y el limite, que lee el mismo. El giro,
+// la proxima ciudad, lo que falta y la llegada los calcula esta pagina, asi
+// que se los manda como texto ya traducido. Solo si el cliente avisa en
+// client_status que lo tiene prendido; por el relay o directo en LAN. Cada
+// vez que cambia y, si no cambia, cada 3 s: el cliente saca el giro si pasan
+// 6 s sin noticias (pestana cerrada, celular bloqueado).
+// ---------------------------------------------------------------------------
+let clientOverlayOn = false;
+let overlayTurnParts = null; // lo arma updateMap en cada dato
+let navHudLastSig = '';
+let navHudLastSent = 0;
+const NAV_HUD_MIN_MS = 400;
+const NAV_HUD_KEEPALIVE_MS = 3000;
+
+function sendNavHud() {
+  if (!clientOverlayOn || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const $ = (id) => document.getElementById(id);
+  const resumen = !$('routeSummary').hidden;
+  const msg = {
+    type: 'nav_hud',
+    turn: overlayTurnParts ? overlayTurnParts.text : '',
+    next: overlayTurnParts ? overlayTurnParts.next : '',
+    remaining: resumen ? $('routeRemaining').textContent.trim() : '',
+    arrival: resumen ? $('routeArrival').textContent.trim() : '',
+    remainingLabel: t('routeRemainingLabel'),
+    arrivalLabel: t('routeArrivalLabel'),
+    imperial: !!useImperial,
+  };
+  const sig = JSON.stringify(msg);
+  const now = Date.now();
+  if (sig === navHudLastSig ? now - navHudLastSent < NAV_HUD_KEEPALIVE_MS : now - navHudLastSent < NAV_HUD_MIN_MS) return;
+  navHudLastSig = sig;
+  navHudLastSent = now;
+  ws.send(sig);
+}
+
+function setClientOverlay(on) {
+  clientOverlayOn = !!on;
+  if (!clientOverlayOn) overlayTurnParts = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -3906,10 +3956,13 @@ function updateMap(position, game, gameHeadingDeg) {
   // corresponda, en vez de varios llamados peleandose entre si.
   // Con la ventana flotante abierta el giro (y la voz) van aunque el modo
   // navegacion este apagado: es lo que muestra.
+  // El overlay del cliente tambien necesita el giro, pero no prende la voz:
+  // el tablero puede estar en un celular arriba del escritorio.
   const guiando = navMode || !!pipWin;
-  const turn = guiando ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
+  const turn = (guiando || clientOverlayOn) ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
   if (guiando) voiceManeuverTick(turn);
   if (pipWin) pipTurnHtml = navPanelHtml(turn);
+  if (clientOverlayOn) overlayTurnParts = navTurnParts(turn);
   if (navMode && !autoFollow) {
     // El usuario esta tocando el mapa (arrastrar, pellizcar, rotar): la
     // camara no se toca hasta que scheduleMapFollow vuelva a engancharla.
@@ -5043,6 +5096,7 @@ function fuelFigures(data) {
 function handleTelemetry(data) {
   trackFuel(data);
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
+  if (clientOverlayOn) setTimeout(sendNavHud, 0); // idem
   const enAuto = isDrivingCar(data);
   if (enAuto !== drivingCar) { drivingCar = enAuto; applyVehicleMode(); }
   // Con el primer dato real se cambian las tarjetas por el estado vacio (ver
@@ -5115,6 +5169,7 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;
+      setClientOverlay(data.client_status && data.client_status.overlay);
       if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);
       if (data.client_status) applyLocalMaps(data.client_status.localMaps, data.client_status.localMapPort);
       if (!conn.clientConnected) conn.hasTelemetry = false;
@@ -5124,6 +5179,7 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'client_status') {
       conn.clientConnected = true;
       conn.clientStatus = data; // incluye .detail si el cliente lo manda
+      setClientOverlay(data.overlay);
       if (data.activeMods !== undefined) detectedModNames = data.activeMods;
       applyDetectedDlcs(data.mapDlcs);
       applyLocalMaps(data.localMaps, data.localMapPort);

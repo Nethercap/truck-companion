@@ -743,6 +743,8 @@ def live_map_player(s: "Session") -> dict:
 
 
 LIVE_ROUTE_MAX_POINTS = 400
+# El mensaje del overlay en el juego (web -> cliente): cuatro textos cortos.
+NAV_HUD_MAX_BYTES = 2048
 
 
 def clean_live_route(points) -> Optional[list]:
@@ -1570,7 +1572,8 @@ async def ws_client(websocket: WebSocket, code: str):
                     session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion"),
                                                   "mapDlcs": clean_map_dlcs(payload.get("mapDlcs")),
                                                   "localMaps": clean_local_maps(payload.get("localMaps")),
-                                                  "localMapPort": clean_port(payload.get("localMapPort"))}
+                                                  "localMapPort": clean_port(payload.get("localMapPort")),
+                                                  "overlay": payload.get("overlay") is True}
                 # Mensajes de control (client_status, etc.) no son telemetria:
                 # no deben tocar el flanco de jobDelivered. Antes el primer
                 # client_status de cada conexion dejaba el estado en False y el
@@ -1697,7 +1700,11 @@ async def ws_viewer(websocket: WebSocket, code: str):
                 msg_type = payload.get("type")
                 # "offmap": la web vio el camion fuera del mapa que conoce; el
                 # cliente ofrece armar el mapa en la PC (map_builder.py).
-                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap"):
+                # "nav_hud": el giro y lo que falta para el overlay en el
+                # juego; texto corto, se descarta si viene grande.
+                if msg_type == "nav_hud" and len(data) > NAV_HUD_MAX_BYTES:
+                    continue
+                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "nav_hud"):
                     if session.client_ws is not None:
                         await session.client_ws.send_text(data)
                 elif msg_type == "set_live_share":
