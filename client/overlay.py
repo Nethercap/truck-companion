@@ -32,6 +32,12 @@ CORNERS = ("top_left", "top_center", "top_right", "bottom_left", "bottom_right")
 DEFAULT_CORNER = "top_center"
 SIZES = {"s": 0.8, "m": 1.0, "l": 1.3}
 DEFAULT_SIZE = "m"
+# Lo que se puede elegir mostrar (Setup): el giro con la proxima ciudad, la
+# velocidad con el limite, lo que falta, la hora de llegada real (la de tu
+# reloj, la calcula la web) y la del reloj del juego (la que importa contra
+# el plazo del trabajo).
+ITEMS = ("turn", "speed", "remaining", "arrival", "game_arrival")
+DATOS = ("turn", "speed", "remaining", "arrival", "game_arrival")
 
 # Cuanto vale lo que manda la web: el giro dice "en 400 m" y a 90 km/h eso
 # cambia rapido. Si la web deja de mandar (pestana cerrada, celular
@@ -74,9 +80,24 @@ def formato_distancia(km: float, imperial: bool) -> str:
     return f"{km:.1f} km" if km < 10 else f"{round(km)} km"
 
 
+def llegada_en_juego(tele: dict) -> str:
+    """La hora del reloj del juego a la que se llega por la ruta del GPS del
+    juego ("21:59", con "+1d" si cae otro dia), o "" si el juego no tiene
+    ruta. routeTimeSeconds es tiempo de juego, igual que gameTimeMinutes."""
+    ahora = tele.get("gameTimeMinutes")
+    falta = tele.get("routeTimeSeconds")
+    if not isinstance(ahora, (int, float)) or not isinstance(falta, (int, float)) or falta <= 0:
+        return ""
+    llega = ahora + falta / 60
+    hora = int(llega) % 1440
+    dias = int(llega // 1440) - int(ahora // 1440)
+    return f"{hora // 60:02d}:{hora % 60:02d}" + (f" +{dias}d" if dias > 0 else "")
+
+
 def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float,
               ahora: float, imperial_default: bool | None = None,
-              etiqueta_falta: str = "Remaining", etiqueta_llega: str = "Arrival") -> dict | None:
+              etiqueta_falta: str = "Remaining", etiqueta_llega: str = "Arrival (real)",
+              etiqueta_juego: str = "Arrival (game)", items=ITEMS) -> dict | None:
     """Lo que hay que dibujar, o None si el overlay no tiene que verse.
 
     tele es el payload que va al tablero (el mismo dict); nav lo ultimo que
@@ -108,18 +129,28 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         if km > 0:
             falta = formato_distancia(km, imperial)
 
-    return {
-        "turn": nav["turn"] if nav_ok else "",
-        "next": nav.get("next", "") if nav_ok else "",
-        "speed": str(velocidad),
+    ver_giro, ver_vel = "turn" in items, "speed" in items
+    datos = {
+        "turn": nav["turn"] if nav_ok and ver_giro else "",
+        "next": nav.get("next", "") if nav_ok and ver_giro else "",
+        "speed": str(velocidad) if ver_vel else "",
         "unit": "mph" if imperial else "km/h",
-        "limit": str(limite) if limite else "",
-        "over": bool(limite) and velocidad > limite + 2,
-        "remaining": falta,
-        "arrival": llega,
+        "limit": str(limite) if limite and ver_vel else "",
+        "over": ver_vel and bool(limite) and velocidad > limite + 2,
+        "remaining": falta if "remaining" in items else "",
+        "arrival": llega if "arrival" in items else "",
+        "game_arrival": llegada_en_juego(tele) if "game_arrival" in items else "",
         "remainingLabel": (nav_ok and nav.get("remainingLabel")) or etiqueta_falta,
-        "arrivalLabel": (nav_ok and nav.get("arrivalLabel")) or etiqueta_llega,
+        # Las dos llegadas con su aclaracion, siempre del cliente: la de la
+        # web dice solo "Llegada" y al lado de la del juego se confunden.
+        "arrivalLabel": etiqueta_llega,
+        "gameArrivalLabel": etiqueta_juego,
     }
+    # Nada para mostrar (todo destildado, o solo el giro y no hay ruta): no
+    # se deja un recuadro vacio arriba del juego.
+    if not any(datos[k] for k in DATOS):
+        return None
+    return datos
 
 
 def posicion(rect, ancho: int, alto: int, esquina: str, margen: int) -> tuple[int, int]:
@@ -212,8 +243,8 @@ class Overlay:
 
     def __init__(self, data: OverlayData, ajustes, etiquetas):
         self.data = data
-        self.ajustes = ajustes      # () -> (esquina, tamano)
-        self.etiquetas = etiquetas  # () -> (falta, llegada) en el idioma del cliente
+        self.ajustes = ajustes      # () -> (esquina, tamano, que se muestra)
+        self.etiquetas = etiquetas  # () -> (falta, llegada real, llegada del juego), idioma del cliente
         self._hilo = None
         self._parar = threading.Event()
 
@@ -316,14 +347,14 @@ class _Ventana:
             self.esconder()
             return
         tele, tele_ts, nav, nav_ts = self.ov.data.foto()
-        falta, llega = self.ov.etiquetas()
-        datos = contenido(tele, tele_ts, nav, nav_ts, time.time(),
-                          etiqueta_falta=falta, etiqueta_llega=llega)
+        falta, llega, llega_juego = self.ov.etiquetas()
+        esquina, tamano, items = self.ov.ajustes()
+        datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
+                          etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items)
         rect = _rect_de(juego)
         if datos is None or rect is None:
             self.esconder()
             return
-        esquina, tamano = self.ov.ajustes()
         # Todo se mide contra la altura del juego: a 1080 p "m" es la escala 1.
         escala = max(0.6, (rect[3] - rect[1]) / 1080) * SIZES.get(tamano, 1.0)
         self.parpadeo = datos["over"] and int(time.monotonic() * 2) % 2 == 0
@@ -352,11 +383,27 @@ class _Ventana:
                                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
 
     def dibujar(self, d: dict, k: float) -> tuple[int, int]:
+        from tkinter import font as tkfont
+
         c = self.canvas
         c.delete("all")
         fuente = lambda px, negrita=False: ("Segoe UI", -max(8, round(px * k)), "bold" if negrita else "normal")
+        mide = lambda texto, f: tkfont.Font(root=self.root, font=f).measure(texto)
         pad = round(14 * k)
-        ancho = round(420 * k)
+        sep = round(16 * k)
+        fila = round(46 * k)
+        # De derecha a izquierda: llegada del juego, llegada real, lo que falta.
+        columnas = [(d[v], d[e]) for v, e in (("game_arrival", "gameArrivalLabel"), ("arrival", "arrivalLabel"),
+                                               ("remaining", "remainingLabel")) if d[v]]
+        # El ancho sale de lo que hay que mostrar: con todo prendido no entra
+        # en el minimo y los numeros se pisaban con la velocidad.
+        izquierda = 0
+        if d["limit"]:
+            izquierda += fila + round(12 * k)
+        if d["speed"]:
+            izquierda += mide(d["speed"], fuente(34, True)) + round(4 * k) + mide(d["unit"], fuente(13))
+        derecha_total = sum(max(mide(v, fuente(19, True)), mide(e, fuente(11))) + sep for v, e in columnas)
+        ancho = max(round(420 * k), 2 * pad + izquierda + round(8 * k) + derecha_total)
         y = pad
         if d["turn"]:
             t = c.create_text(pad, y, text=d["turn"], fill=FG, anchor="nw",
@@ -368,7 +415,10 @@ class _Ventana:
                 y = c.bbox(t)[3]
             y += round(8 * k)
 
-        fila = round(46 * k)
+        if not (d["speed"] or columnas):
+            alto = y - round(8 * k) + pad
+            c.configure(width=ancho, height=alto)
+            return ancho, alto
         medio = y + fila // 2
         x = pad
         if d["limit"]:
@@ -379,18 +429,17 @@ class _Ventana:
             c.create_text(x + r, medio, text=d["limit"], fill="#111111",
                           font=fuente(17 if len(d["limit"]) < 3 else 14, True))
             x += 2 * r + round(12 * k)
-        v = c.create_text(x, medio, text=d["speed"], fill=RED if d["over"] else FG, anchor="w",
-                          font=fuente(34, True))
-        x = c.bbox(v)[2] + round(4 * k)
-        c.create_text(x, medio + round(6 * k), text=d["unit"], fill=MUTED, anchor="w", font=fuente(13))
+        if d["speed"]:
+            v = c.create_text(x, medio, text=d["speed"], fill=RED if d["over"] else FG, anchor="w",
+                              font=fuente(34, True))
+            x = c.bbox(v)[2] + round(4 * k)
+            c.create_text(x, medio + round(6 * k), text=d["unit"], fill=MUTED, anchor="w", font=fuente(13))
 
         derecha = ancho - pad
-        for valor, etiqueta in ((d["arrival"], d["arrivalLabel"]), (d["remaining"], d["remainingLabel"])):
-            if not valor:
-                continue
+        for valor, etiqueta in columnas:
             a = c.create_text(derecha, medio - round(2 * k), text=valor, fill=FG, anchor="se", font=fuente(19, True))
             b = c.create_text(derecha, medio + round(1 * k), text=etiqueta, fill=MUTED, anchor="ne", font=fuente(11))
-            derecha = min(c.bbox(a)[0], c.bbox(b)[0]) - round(16 * k)
+            derecha = min(c.bbox(a)[0], c.bbox(b)[0]) - sep
         alto = y + fila + pad
         c.configure(width=ancho, height=alto)
         return ancho, alto

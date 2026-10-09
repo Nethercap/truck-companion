@@ -10,8 +10,10 @@ updates on its own and is not versioned here.
   limit, plus the next turn, the next city, distance left and arrival when the dashboard
   has a route (on your phone, a tablet or this PC). It lets clicks through, never takes
   focus from the game and hides when the game is not in front. Off by default: turn it on
-  in Setup or from the tray menu, and pick its corner and size. Needs the game in a
-  window or in borderless fullscreen.
+  in Setup or from the tray menu, and pick its corner, its size and what it shows. It can
+  also show your arrival time on the game clock, next to the real one. With voice guidance
+  on in the dashboard, the dashboard also speaks the turns while the overlay is on. Needs
+  the game in a window or in borderless fullscreen.
 - Linux (Proton): Setup finds your games in Steam's Linux libraries (also on other
   drives and with the Flatpak Steam), without the game having to be running first.
 

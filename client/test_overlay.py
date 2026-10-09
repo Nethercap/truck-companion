@@ -63,6 +63,31 @@ def test_sin_web_lo_que_falta_sale_del_gps_del_juego():
     assert d["remaining"] == "5.0 mi"
 
 
+def test_solo_se_muestra_lo_elegido():
+    d = overlay.contenido(tele(), 100, nav(), 99, 100, items=("speed",))
+    assert d["speed"] == "88" and d["limit"] == "80"
+    assert d["turn"] == d["next"] == d["remaining"] == d["arrival"] == d["game_arrival"] == ""
+    d = overlay.contenido(tele(), 100, nav(), 99, 100, items=("turn", "arrival"))
+    assert d["speed"] == d["limit"] == "" and d["over"] is False and d["turn"] and d["arrival"] == "14:32"
+    # Solo el giro y la web no manda: no queda un recuadro vacio.
+    assert overlay.contenido(tele(), 100, None, 0, 100, items=("turn",)) is None
+    assert overlay.contenido(tele(), 100, nav(), 99, 100, items=()) is None
+
+
+def test_llegada_en_el_reloj_del_juego():
+    # Miercoles 21:30 de juego y faltan 2 h 15 de juego por el GPS del juego.
+    ahora = 2 * 1440 + 21 * 60 + 30
+    d = overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=135 * 60), 100, None, 0, 100,
+                          etiqueta_juego="Llegada (juego)")
+    assert (d["game_arrival"], d["gameArrivalLabel"]) == ("23:45", "Llegada (juego)")
+    d = overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=4 * 3600), 100, None, 0, 100)
+    assert d["game_arrival"] == "01:30 +1d"
+    assert overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=0), 100, None, 0, 100)["game_arrival"] == ""
+    # La llegada real lleva siempre la etiqueta del cliente, no la de la web.
+    d = overlay.contenido(tele(), 100, nav(arrivalLabel="Arrival"), 99, 100, etiqueta_llega="Llegada (real)")
+    assert d["arrivalLabel"] == "Llegada (real)"
+
+
 def test_lo_que_llega_de_la_web_se_limpia():
     n = overlay.limpiar_nav({"turn": 5, "next": "x" * 500, "imperial": "si", "remaining": None})
     assert n["turn"] == "" and len(n["next"]) == 160 and n["imperial"] is None and n["remaining"] == ""
@@ -83,10 +108,13 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
     import win_integration
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: True)
     monkeypatch.setattr(win_integration, "load_settings", lambda: {})
-    assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": "m"}
+    assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": "m",
+                                                  "items": overlay.ITEMS}
     monkeypatch.setattr(win_integration, "load_settings",
-                        lambda: {"overlay": True, "overlay_corner": "middle", "overlay_size": "l"})
-    assert win_integration.overlay_settings() == {"enabled": True, "corner": "top_center", "size": "l"}
+                        lambda: {"overlay": True, "overlay_corner": "middle", "overlay_size": "l",
+                                 "overlay_items": ["arrival", "inventado", "speed"]})
+    assert win_integration.overlay_settings() == {"enabled": True, "corner": "top_center", "size": "l",
+                                                  "items": ("speed", "arrival")}
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: False)
     assert win_integration.overlay_settings()["enabled"] is False
 
@@ -94,8 +122,9 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
 def test_textos_en_los_ocho_idiomas():
     import i18n
     claves = ["overlay_option", "overlay_position", "overlay_size", "menu_overlay",
-              "overlay_remaining", "overlay_arrival"]
+              "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show"]
     claves += [f"pos_{c}" for c in overlay.CORNERS] + [f"size_{k}" for k in overlay.SIZES]
+    claves += [f"item_{k}" for k in overlay.ITEMS]
     for lang, textos in i18n._STRINGS.items():
         faltan = [k for k in claves if not textos.get(k)]
         assert not faltan, (lang, faltan)

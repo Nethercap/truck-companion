@@ -3961,10 +3961,11 @@ function updateMap(position, game, gameHeadingDeg) {
   // corresponda, en vez de varios llamados peleandose entre si.
   // Con la ventana flotante abierta el giro (y la voz) van aunque el modo
   // navegacion este apagado: es lo que muestra.
-  // El overlay del cliente tambien necesita el giro, pero no prende la voz:
-  // el tablero puede estar en un celular arriba del escritorio.
-  const guiando = navMode || !!pipWin;
-  const turn = (guiando || clientOverlayOn) ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
+  // El overlay del cliente tambien guia: el giro va a la ventana del juego y,
+  // si la voz esta prendida en Ajustes, se dice desde este dispositivo (el
+  // celular o la PC donde este abierto el tablero).
+  const guiando = navMode || !!pipWin || clientOverlayOn;
+  const turn = guiando ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
   if (guiando) voiceManeuverTick(turn);
   if (pipWin) pipTurnHtml = navPanelHtml(turn);
   if (clientOverlayOn) overlayTurnParts = navTurnParts(turn);

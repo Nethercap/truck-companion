@@ -184,24 +184,29 @@ def overlay_supported() -> bool:
 
 
 def overlay_settings() -> dict:
-    """{'enabled', 'corner', 'size'} del overlay en el juego. Apagado por
-    defecto: es una ventana encima del juego y la tiene que pedir uno."""
+    """{'enabled', 'corner', 'size', 'items'} del overlay en el juego.
+    Apagado por defecto: es una ventana encima del juego y la tiene que pedir
+    uno. Sin 'items' guardado se muestra todo."""
     import overlay
     s = load_settings()
     corner = s.get("overlay_corner")
     size = s.get("overlay_size")
+    items = s.get("overlay_items")
     return {
         "enabled": overlay_supported() and bool(s.get("overlay")),
         "corner": corner if corner in overlay.CORNERS else overlay.DEFAULT_CORNER,
         "size": size if size in overlay.SIZES else overlay.DEFAULT_SIZE,
+        "items": (tuple(i for i in overlay.ITEMS if i in items) if isinstance(items, list)
+                  else overlay.ITEMS),
     }
 
 
 def save_overlay_settings(**cambios) -> None:
-    claves = {"enabled": "overlay", "corner": "overlay_corner", "size": "overlay_size"}
+    claves = {"enabled": "overlay", "corner": "overlay_corner", "size": "overlay_size",
+              "items": "overlay_items"}
     settings = load_settings()
     for k, v in cambios.items():
-        settings[claves[k]] = v
+        settings[claves[k]] = list(v) if k == "items" else v
     save_settings(settings)
 
 

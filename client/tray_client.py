@@ -146,9 +146,10 @@ class AppState:
         # Overlay en el juego (overlay.py): apagado por defecto. La ventana
         # lee la esquina y el tamano de aca, sin ir al disco en cada cuadro.
         self.overlay_data = overlay.OverlayData()
-        self.overlay_layout = (overlay.DEFAULT_CORNER, overlay.DEFAULT_SIZE)
+        self.overlay_layout = (overlay.DEFAULT_CORNER, overlay.DEFAULT_SIZE, overlay.ITEMS)
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
-                                       lambda: (T("overlay_remaining"), T("overlay_arrival")))
+                                       lambda: (T("overlay_remaining"), T("overlay_arrival"),
+                                                T("overlay_arrival_game")))
 
     def status_text(self) -> str:
         text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
@@ -611,7 +612,7 @@ class SetupWindow:
             ochk.pack(anchor="w", pady=(2, 0))
             fila = tk.Frame(options, bg=BG)
             fila.pack(anchor="w", padx=(24, 0), pady=(2, 0))
-            corner, size = state.overlay_layout
+            corner, size, items = state.overlay_layout
             self.overlay_corner_var = tk.StringVar(value=T(f"pos_{corner}"))
             self.overlay_size_var = tk.StringVar(value=T(f"size_{size}"))
             for etiqueta, var, opciones, al_elegir in (
@@ -628,6 +629,19 @@ class SetupWindow:
                                highlightthickness=0, bd=0)
                 menu["menu"].configure(bg="#262b33", fg=FG)
                 menu.pack(side="left", padx=(0, 12))
+            # Que se muestra: cada parte se prende o apaga por separado.
+            fila = tk.Frame(options, bg=BG)
+            fila.pack(anchor="w", padx=(24, 0), pady=(2, 0))
+            self.label(fila, T("overlay_show"), fg=MUTED).pack(side="left", anchor="n", padx=(0, 4), pady=(2, 0))
+            grilla = tk.Frame(fila, bg=BG)
+            grilla.pack(side="left")
+            self.overlay_item_vars = {}
+            for i, clave in enumerate(overlay.ITEMS):
+                var = tk.BooleanVar(value=clave in items)
+                self.overlay_item_vars[clave] = var
+                tk.Checkbutton(grilla, text=T(f"item_{clave}"), variable=var, command=self.change_overlay_items,
+                               bg=BG, fg=FG, selectcolor="#262b33", activebackground=BG,
+                               activeforeground=FG).grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 6))
 
         # --- Update ---
         # --- Update ---
@@ -903,6 +917,9 @@ class SetupWindow:
 
     def toggle_overlay(self):
         set_overlay(self.overlay_var.get())
+
+    def change_overlay_items(self):
+        set_overlay_layout(items=[k for k in overlay.ITEMS if self.overlay_item_vars[k].get()])
 
     def add_game_folder(self):
         chosen = filedialog.askdirectory(title=T("pick_folder_title"))
@@ -1309,10 +1326,12 @@ def set_overlay(enabled: bool) -> None:
     state.overlay.set_enabled(bool(enabled))
 
 
-def set_overlay_layout(corner: str | None = None, size: str | None = None) -> None:
-    actual_corner, actual_size = state.overlay_layout
-    state.overlay_layout = (corner or actual_corner, size or actual_size)
-    win_integration.save_overlay_settings(corner=state.overlay_layout[0], size=state.overlay_layout[1])
+def set_overlay_layout(corner: str | None = None, size: str | None = None, items=None) -> None:
+    actual_corner, actual_size, actual_items = state.overlay_layout
+    state.overlay_layout = (corner or actual_corner, size or actual_size,
+                            tuple(items) if items is not None else actual_items)
+    corner, size, items = state.overlay_layout
+    win_integration.save_overlay_settings(corner=corner, size=size, items=items)
 
 
 def toggle_overlay_menu_item(icon, item):
@@ -1893,7 +1912,7 @@ def main():
     client_lib.on_offmap = on_offmap
     client_lib.on_nav_hud = state.overlay_data.navegacion
     ajustes_overlay = win_integration.overlay_settings()
-    state.overlay_layout = (ajustes_overlay["corner"], ajustes_overlay["size"])
+    state.overlay_layout = (ajustes_overlay["corner"], ajustes_overlay["size"], ajustes_overlay["items"])
     if ajustes_overlay["enabled"]:
         state.overlay.set_enabled(True)
     state.discord.set_enabled(bool(win_integration.load_settings().get("discord_presence")))
