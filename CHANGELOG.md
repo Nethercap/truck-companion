@@ -4,6 +4,11 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Linux (Proton): Setup finds your games in Steam's Linux libraries (also on other
+  drives and with the Flatpak Steam), without the game having to be running first.
+
 ## 1.5.28 (2026-10-09)
 
 - Build my map: if your truck drives off the map Truck Dash knows (a map mod we don't

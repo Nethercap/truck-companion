@@ -83,30 +83,65 @@ def find_steam_path() -> str | None:
     return None
 
 
+def unix_a_wine(ruta: str) -> str:
+    """/home/x/... -> Z:\\home\\x\\... : Wine monta la raiz de Linux en Z:."""
+    if ruta.startswith("/"):
+        return "Z:" + ruta.replace("/", "\\")
+    return ruta
+
+
+def linux_steam_roots(env=None, existe=os.path.isdir) -> list[str]:
+    """Bajo Proton, el Steam de Linux visto desde Wine. El del registro es uno
+    de mentira dentro del prefijo, sin juegos: sin esto la instalacion solo
+    aparecia con el juego ya abierto (issue #7, Nobara). Proton pasa la
+    carpeta de Steam y la del prefijo (STEAM_COMPAT_CLIENT_INSTALL_PATH,
+    STEAM_COMPAT_DATA_PATH, que vive en <biblioteca>/steamapps/compatdata/<id>)
+    y el HOME de Linux; en Windows ninguna existe como carpeta."""
+    env = os.environ if env is None else env
+    candidatas = []
+    if env.get("STEAM_COMPAT_CLIENT_INSTALL_PATH", "").startswith("/"):
+        candidatas.append(env["STEAM_COMPAT_CLIENT_INSTALL_PATH"].rstrip("/"))
+    datos = env.get("STEAM_COMPAT_DATA_PATH", "").rstrip("/")
+    if datos.startswith("/") and "/steamapps/compatdata/" in datos:
+        candidatas.append(datos.split("/steamapps/compatdata/")[0])
+    home = env.get("HOME", "")
+    if home.startswith("/"):
+        for sub in (".local/share/Steam", ".steam/steam", ".var/app/com.valvesoftware.Steam/.local/share/Steam"):
+            candidatas.append(home.rstrip("/") + "/" + sub)
+    raices = []
+    for c in candidatas:
+        ruta = unix_a_wine(c)
+        if ruta not in raices and existe(ruta):
+            raices.append(ruta)
+    return raices
+
+
 def parse_libraryfolders(text: str) -> list[str]:
     """Rutas de todas las bibliotecas de Steam listadas en libraryfolders.vdf
     (el formato usa backslashes escapados: "D:\\\\Games\\\\Steam")."""
     paths = []
     for raw in _LIBRARY_PATH_RE.findall(text):
-        path = os.path.normpath(raw.replace("\\\\", "\\"))
+        # El vdf de Steam para Linux trae rutas de Linux: van por Z: de Wine.
+        path = os.path.normpath(unix_a_wine(raw.replace("\\\\", "\\")))
         if path not in paths:
             paths.append(path)
     return paths
 
 
 def steam_library_paths() -> list[str]:
-    steam = find_steam_path()
-    if not steam:
-        return []
-    libs = [steam]
-    vdf = os.path.join(steam, "steamapps", "libraryfolders.vdf")
-    try:
-        with open(vdf, encoding="utf-8", errors="ignore") as f:
-            for path in parse_libraryfolders(f.read()):
-                if path not in libs:
-                    libs.append(path)
-    except OSError:
-        pass
+    raices = [r for r in [find_steam_path()] if r] + linux_steam_roots()
+    libs = []
+    for steam in raices:
+        if steam not in libs:
+            libs.append(steam)
+        vdf = os.path.join(steam, "steamapps", "libraryfolders.vdf")
+        try:
+            with open(vdf, encoding="utf-8", errors="ignore") as f:
+                for path in parse_libraryfolders(f.read()):
+                    if path not in libs:
+                        libs.append(path)
+        except OSError:
+            pass
     return libs
 
 

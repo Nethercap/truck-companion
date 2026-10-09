@@ -583,3 +583,35 @@ def test_pin_plugin_fija_el_hash(tmp_path):
 def test_pin_plugin_escribe_la_dll_con_nuestro_nombre():
     pin = _pin_plugin()
     assert os.path.basename(pin.VENDOR) == plugin_installer.PLUGIN_DLL_NAME
+
+
+def test_rutas_de_linux_vistas_desde_wine():
+    assert plugin_installer.unix_a_wine("/run/media/tw/SSD") == r"Z:\run\media\tw\SSD"
+    assert plugin_installer.unix_a_wine(r"D:\Games") == r"D:\Games"
+
+
+def test_el_vdf_de_steam_para_linux_trae_rutas_de_linux():
+    vdf = '"path"\t\t"/run/media/tw/Games/SteamLibrary"\n"path"\t\t"D:\\\\Games\\\\Steam"'
+    rutas = plugin_installer.parse_libraryfolders(vdf)
+    assert os.path.normpath(r"Z:\run\media\tw\Games\SteamLibrary") in rutas
+    assert os.path.normpath(r"D:\Games\Steam") in rutas
+
+
+def test_bajo_proton_se_busca_el_steam_de_linux():
+    """Issue #7 (Nobara): el Steam del registro de Wine no tiene los juegos."""
+    env = {"HOME": "/home/tw",
+           "STEAM_COMPAT_CLIENT_INSTALL_PATH": "/home/tw/.local/share/Steam",
+           "STEAM_COMPAT_DATA_PATH": "/run/media/tw/G/SteamLibrary/steamapps/compatdata/270880"}
+    raices = plugin_installer.linux_steam_roots(env, existe=lambda r: True)
+    assert raices[0] == r"Z:\home\tw\.local\share\Steam"
+    assert r"Z:\run\media\tw\G\SteamLibrary" in raices
+    assert r"Z:\home\tw\.steam\steam" in raices
+    assert len(raices) == len(set(raices))
+    # Solo las que existen
+    assert plugin_installer.linux_steam_roots(env, existe=lambda r: r.endswith("SteamLibrary")) == [r"Z:\run\media\tw\G\SteamLibrary"]
+
+
+def test_en_windows_no_se_suman_rutas_de_linux():
+    assert plugin_installer.linux_steam_roots({"HOME": r"C:\Users\x"}, existe=lambda r: True) == []
+    assert plugin_installer.linux_steam_roots({}, existe=lambda r: True) == []
+
