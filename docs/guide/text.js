@@ -65,7 +65,7 @@ GUIDE_TEXT.en = {
 <li><b>No</b>: the app works out its own distance and time through it, shown as <i>via waypoint</i> under the ETAs.</li>
 </ul>
 <h3>Find nearby</h3>
-<p>The magnifier looks for fuel stations, rest areas, service shops, garages, truck dealers and weigh stations around you, or any company or city. Tap a result and the route goes through it. <b>Nearest fuel station</b> is a single tap.</p>
+<p>The magnifier looks for fuel stations, rest areas, service shops, garages, truck dealers and weigh stations around you, or any company or city. Tap a result and the route goes through it. <b>Nearest fuel station</b> is a single tap. In ATS, <b>Atlas</b> lists the Road Trip Tourist Boards and Points of Interest, which also show on the map.</p>
 <h3>Also on the map</h3>
 <ul>
 <li>The <b>blue line</b> behind the truck is where you have driven.</li>
@@ -260,7 +260,7 @@ GUIDE_TEXT.es = {
 <li><b>No</b>: la app calcula su propia distancia y tiempo pasando por ese punto, y los muestra como <i>por el waypoint</i> debajo de los ETA.</li>
 </ul>
 <h3>Buscar cerca</h3>
-<p>La lupa busca estaciones de servicio, áreas de descanso, talleres, garajes, concesionarios y balanzas cerca tuyo, o cualquier empresa o ciudad. Tocá un resultado y la ruta pasa por ahí. <b>Estación de servicio más cercana</b> es un solo toque.</p>
+<p>La lupa busca estaciones de servicio, áreas de descanso, talleres, garajes, concesionarios y balanzas cerca tuyo, o cualquier empresa o ciudad. Tocá un resultado y la ruta pasa por ahí. <b>Estación de servicio más cercana</b> es un solo toque. En ATS, <b>Atlas</b> muestra los carteles turísticos y puntos de interés del Road Trip, que también se ven en el mapa.</p>
 <h3>También en el mapa</h3>
 <ul>
 <li>La <b>línea azul</b> detrás del camión es por donde anduviste.</li>

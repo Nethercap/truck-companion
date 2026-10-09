@@ -58,7 +58,7 @@ def sprites_de_la_web():
         src = f.read()
     import re
     sprites = set()
-    for nombre in ("POI_ICONS", "FERRY_ICONS"):
+    for nombre in ("POI_ICONS", "FERRY_ICONS", "ATLAS_ICONS"):
         m = re.search(rf"const {nombre} = \[(.*?)\];", src, re.S)
         if m:
             sprites |= set(re.findall(r"'([^']+)'", m.group(1)))

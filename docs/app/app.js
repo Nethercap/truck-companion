@@ -1005,7 +1005,7 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
@@ -1040,6 +1040,18 @@ function buildVecLayers(sourceLayer) {
     { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
       filter: ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', POI_ICONS]], ['!', ['in', ['get', 'poiType'], ['literal', ['ferry', 'train']]]]],
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
+    // Atlas del Road Trip de ATS (Tourist Boards y Points of Interest). No
+    // estan en los tiles: salen de pois-<variante>.json a la fuente 'atlas'
+    // (ver setAtlasData). Los tourist boards desde mas lejos, como en el
+    // mapa del juego, que son los destinos del Atlas.
+    { id: 'atlas', type: 'symbol', source: 'atlas', minzoom: 6,
+      filter: ['any', ['==', ['get', 'k'], 't'], ['>=', ['zoom'], 8]],
+      layout: { 'icon-image': ['match', ['get', 'k'], 't', 'atlas_tourist_board', 'atlas_poi'],
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 6, 0.6, 10, 0.85],
+                'icon-allow-overlap': true, 'icon-ignore-placement': true,
+                'text-field': ['step', ['zoom'], '', 9, ['match', ['get', 'k'], 't', ['get', 'name'], ''], 11, ['get', 'name']],
+                'text-size': 11, 'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true },
+      paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
     // minzoom 7 y no menos: el filtro de tippecanoe (tiles_light_filter.json)
     // solo guarda ciudades, paises, carreteras y las LINEAS de ferry por
     // debajo de z7; los puertos son type=poi y ahi se podan. Si algun dia se
@@ -1536,6 +1548,7 @@ function ensureMapInitialized() {
     await loadPoiIcons();
     mapReady = true;
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
+    map.addSource('atlas', { type: 'geojson', data: atlasGeoJson(null) });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     // La ruta crece con el zoom como las calles, pero siempre un poco mas
     // ancha que la autopista mas ancha (road-freeway: 1 / 3,5 / 10 px a zoom
@@ -1578,10 +1591,13 @@ const POI_ICONS = ['gas_ico', 'service_ico', 'weigh_station_ico', 'weigh_ico', '
 // Puertos de ferry y terminales de tren. Van en su propia capa (ferry-poi),
 // pero la imagen se carga por el mismo camino que las demas.
 const FERRY_ICONS = ['port_overlay', 'train_ico'];
+// Iconos del Atlas: los SDF del juego (material/ui/map/tourist_board_completed
+// y point_of_interest_discovered) pasados a PNG con los colores de su .mat.
+const ATLAS_ICONS = ['atlas_tourist_board', 'atlas_poi'];
 const POI_ICON_BASE = `${REMOTE_MAP_BASE}/vector/icons`;
 
 async function loadPoiIcons() {
-  for (const name of POI_ICONS.concat(FERRY_ICONS)) {
+  for (const name of POI_ICONS.concat(FERRY_ICONS, ATLAS_ICONS)) {
     if (map.hasImage(name)) continue;
     try {
       const res = await map.loadImage(`${POI_ICON_BASE}/${name}.png`);
@@ -1892,8 +1908,8 @@ function distanceScale() {
   return (currentGame || '').startsWith('ets2') ? 19 : 20;
 }
 
-const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh' };
-const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️' };
+const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh', a: 'poiCatAtlas' };
+const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️', a: '🧭' };
 let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]], cities: {token: name} }
 let poisVariant = null;
 let poisLoading = null; // promesa en curso, para no disparar dos fetch del mismo archivo
@@ -1911,6 +1927,7 @@ async function loadPois(variant) {
       const res = await fetch(`${POI_BASE}/pois-${variant}.json`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       pois = await res.json();
+      setAtlasData();
     } catch (err) {
       pois = null;
       poisError = String(err);
@@ -1924,6 +1941,19 @@ async function loadPois(variant) {
     return pois;
   })();
   return poisLoading;
+}
+
+// Atlas en el mapa: solo con los POIs de la variante que se esta mostrando
+// (loadPois corre en paralelo al cambio de juego y puede llegar antes o
+// despues de que toLngLat apunte al juego nuevo).
+function atlasGeoJson(list) {
+  return { type: 'FeatureCollection', features: (list || []).map(([x, z, k, name]) => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: toLngLat(x, z) }, properties: { k, name } })) };
+}
+function setAtlasData() {
+  const src = map && map.getSource('atlas');
+  if (!src) return;
+  src.setData(atlasGeoJson(pois && poisVariant === currentGame && toLngLat ? pois.atlas : null));
 }
 
 function poiVariantNow() {
@@ -1983,6 +2013,15 @@ function findCompanyPoi(token, cityToken) {
 function nearestFacilities(code, x, z, limit) {
   if (!pois) return [];
   const out = [];
+  if (code === 'a') {
+    // Atlas (ATS): lugares con nombre propio, los tourist boards y los
+    // points of interest juntos, del mas cercano al mas lejano.
+    for (const [ax, az, kind, name] of pois.atlas || []) {
+      out.push({ x: ax, z: az, code, kind, name, dist: Math.hypot(ax - x, az - z) });
+    }
+    out.sort((a, b) => a.dist - b.dist);
+    return out.slice(0, limit);
+  }
   for (const f of pois.facilities) {
     if (f[2] !== code) continue;
     out.push({ x: f[0], z: f[1], code, dist: Math.hypot(f[0] - x, f[1] - z) });
@@ -2032,6 +2071,7 @@ function cityLabel(token) {
 function renderPoiResults() {
   const list = document.getElementById('poiResults');
   const pos = lastWorldPos;
+  updateAtlasChip();
   if (!pois) {
     if (poisError || (!poisLoading && !poiVariantNow())) {
       list.innerHTML = `<div class="poiEmpty">${t('poiLoadFailed')}</div><button class="poiItem" id="poiRetryBtn">${t('poiRetry')}</button>`;
@@ -2063,7 +2103,9 @@ function renderPoiResults() {
   } else if (query.trim()) {
     results = searchCompanies(query, pos.x, pos.z, 20).map(r => ({ ...r, name: r.label, sub: cityLabel(r.city) }));
   } else {
-    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => ({ ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' }));
+    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => r.code === 'a'
+      ? { ...r, sub: [t(r.kind === 't' ? 'atlasTouristBoard' : 'atlasPoi'), nearestCityName(r.x, r.z)].filter(Boolean).join(' · ') }
+      : { ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' });
   }
   if (!results.length) { list.innerHTML = `<div class="poiEmpty">${t('poiNoResults')}</div>`; return; }
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2078,6 +2120,18 @@ function renderPoiResults() {
     addPoiWaypoint([r.x, r.z], r.sub ? `${r.name} (${r.sub})` : r.name);
     closePoiModal();
   }));
+}
+
+// El chip del Atlas solo existe en ATS (y en las variantes cuyo mapa lo trae).
+function updateAtlasChip() {
+  const chip = document.querySelector('.poiChip[data-code="a"]');
+  if (!chip) return;
+  const hay = !!(pois && pois.atlas && pois.atlas.length);
+  chip.hidden = !hay;
+  if (!hay && poiCategory === 'a') {
+    poiCategory = 'g';
+    document.querySelectorAll('.poiChip').forEach(c => c.classList.toggle('active', c.dataset.code === 'g'));
+  }
 }
 
 function fillPoiCityList() {
@@ -2846,6 +2900,7 @@ async function loadGameMap(game) {
   for (const layer of buildVecLayers(mapInfo.sourceLayer)) {
     try { map.addLayer(layer, 'trail-line'); } catch (err) { console.error('No se pudo agregar la capa', layer.id, err); }
   }
+  setAtlasData();
   applyBaseMap();
 
   map.jumpTo({ center: mapInfo.origin, zoom: 5 });

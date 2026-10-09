@@ -62,7 +62,7 @@ GUIDE_TEXT.de = {
 <li><b>Nein</b>: Die App berechnet eigene Strecke und Zeit über den Punkt und zeigt sie als <i>über Wegpunkt</i> unter den ETAs.</li>
 </ul>
 <h3>In der Nähe suchen</h3>
-<p>Die Lupe findet Tankstellen, Rastplätze, Werkstätten, Garagen, Lkw-Händler und Waagen in deiner Nähe, oder jede Firma und Stadt. Tippe auf ein Ergebnis und die Route führt dort vorbei. <b>Nächste Tankstelle</b> ist ein einziger Tipp.</p>
+<p>Die Lupe findet Tankstellen, Rastplätze, Werkstätten, Garagen, Lkw-Händler und Waagen in deiner Nähe, oder jede Firma und Stadt. Tippe auf ein Ergebnis und die Route führt dort vorbei. <b>Nächste Tankstelle</b> ist ein einziger Tipp. In ATS zeigt <b>Atlas</b> die Touristen-Tafeln und interessanten Orte von Road Trip, die auch auf der Karte erscheinen.</p>
 <h3>Außerdem auf der Karte</h3>
 <ul>
 <li>Die <b>blaue Linie</b> hinter dem Lkw zeigt, wo du gefahren bist.</li>
@@ -257,7 +257,7 @@ GUIDE_TEXT.fr = {
 <li><b>Non</b> : l'appli calcule sa propre distance et son propre temps via ce point, affichés comme <i>via point de passage</i> sous les ETA.</li>
 </ul>
 <h3>Chercher à proximité</h3>
-<p>La loupe trouve les stations-service, aires de repos, ateliers, garages, concessionnaires et stations de pesage autour de toi, ou n'importe quelle entreprise ou ville. Touche un résultat et l'itinéraire y passe. <b>Station-service la plus proche</b> tient en un seul geste.</p>
+<p>La loupe trouve les stations-service, aires de repos, ateliers, garages, concessionnaires et stations de pesage autour de toi, ou n'importe quelle entreprise ou ville. Touche un résultat et l'itinéraire y passe. <b>Station-service la plus proche</b> tient en un seul geste. Dans ATS, <b>Atlas</b> liste les panneaux touristiques et points d’intérêt de Road Trip, aussi visibles sur la carte.</p>
 <h3>Aussi sur la carte</h3>
 <ul>
 <li>La <b>ligne bleue</b> derrière le camion montre là où tu es passé.</li>
@@ -452,7 +452,7 @@ GUIDE_TEXT.pt = {
 <li><b>Não</b>: o app calcula a própria distância e tempo passando pelo ponto, mostrados como <i>via waypoint</i> embaixo dos ETAs.</li>
 </ul>
 <h3>Buscar por perto</h3>
-<p>A lupa encontra postos, áreas de descanso, oficinas, garagens, concessionárias e balanças perto de você, ou qualquer empresa ou cidade. Toque num resultado e a rota passa por ali. <b>Posto mais próximo</b> é um toque só.</p>
+<p>A lupa encontra postos, áreas de descanso, oficinas, garagens, concessionárias e balanças perto de você, ou qualquer empresa ou cidade. Toque num resultado e a rota passa por ali. <b>Posto mais próximo</b> é um toque só. No ATS, <b>Atlas</b> lista as placas turísticas e pontos de interesse do Road Trip, que também aparecem no mapa.</p>
 <h3>Também no mapa</h3>
 <ul>
 <li>A <b>linha azul</b> atrás do caminhão mostra por onde você passou.</li>
@@ -647,7 +647,7 @@ GUIDE_TEXT.pl = {
 <li><b>Nie</b>: aplikacja liczy własny dystans i czas przez ten punkt i pokazuje je jako <i>przez punkt trasy</i> pod ETA.</li>
 </ul>
 <h3>Szukaj w pobliżu</h3>
-<p>Lupa znajduje stacje paliw, parkingi, serwisy, garaże, dealerów ciężarówek i wagi w pobliżu, albo dowolną firmę czy miasto. Dotknij wyniku, a trasa poprowadzi przez to miejsce. <b>Najbliższa stacja paliw</b> to jedno dotknięcie.</p>
+<p>Lupa znajduje stacje paliw, parkingi, serwisy, garaże, dealerów ciężarówek i wagi w pobliżu, albo dowolną firmę czy miasto. Dotknij wyniku, a trasa poprowadzi przez to miejsce. <b>Najbliższa stacja paliw</b> to jedno dotknięcie. W ATS <b>Atlas</b> pokazuje tablice turystyczne i ciekawe miejsca z Road Trip, widoczne też na mapie.</p>
 <h3>Także na mapie</h3>
 <ul>
 <li><b>Niebieska linia</b> za ciężarówką pokazuje, gdzie jechałeś.</li>
@@ -842,7 +842,7 @@ GUIDE_TEXT.tr = {
 <li><b>Hayır</b>: uygulama o noktadan geçen kendi mesafe ve süresini hesaplar ve varış sürelerinin altında <i>ara nokta üzerinden</i> olarak gösterir.</li>
 </ul>
 <h3>Yakında ara</h3>
-<p>Büyüteç yakınındaki benzin istasyonlarını, dinlenme alanlarını, servisleri, garajları, kamyon bayilerini ve kantarları, ya da herhangi bir şirketi veya şehri bulur. Bir sonuca dokun, rota oradan geçsin. <b>En yakın benzin istasyonu</b> tek dokunuş.</p>
+<p>Büyüteç yakınındaki benzin istasyonlarını, dinlenme alanlarını, servisleri, garajları, kamyon bayilerini ve kantarları, ya da herhangi bir şirketi veya şehri bulur. Bir sonuca dokun, rota oradan geçsin. <b>En yakın benzin istasyonu</b> tek dokunuş. ATS’de <b>Atlas</b>, Road Trip’in turist panolarını ve ilgi çekici yerlerini listeler; bunlar haritada da görünür.</p>
 <h3>Haritada ayrıca</h3>
 <ul>
 <li>Kamyonun arkasındaki <b>mavi çizgi</b> geçtiğin yolu gösterir.</li>
@@ -1037,7 +1037,7 @@ GUIDE_TEXT.ru = {
 <li><b>Нет</b>: приложение само считает расстояние и время через точку и показывает их как <i>через путевую точку</i> под ETA.</li>
 </ul>
 <h3>Найти рядом</h3>
-<p>Лупа находит заправки, стоянки для отдыха, сервисы, гаражи, дилеров грузовиков и весовые пункты рядом с вами, а также любую компанию или город. Нажмите на результат, и маршрут пройдёт через это место. <b>Ближайшая заправка</b> находится одним нажатием.</p>
+<p>Лупа находит заправки, стоянки для отдыха, сервисы, гаражи, дилеров грузовиков и весовые пункты рядом с вами, а также любую компанию или город. Нажмите на результат, и маршрут пройдёт через это место. <b>Ближайшая заправка</b> находится одним нажатием. В ATS раздел <b>Атлас</b> показывает туристические стенды и достопримечательности Road Trip, они видны и на карте.</p>
 <h3>Ещё на карте</h3>
 <ul>
 <li><b>Синяя линия</b> за грузовиком показывает, где вы проехали.</li>

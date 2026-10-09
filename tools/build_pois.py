@@ -10,7 +10,9 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
     "facilities": [[x, z, "g"], ...],          # g gas, p parking/rest, s service,
                                               # r garage, d dealer, w weigh station
     "companies":  [[x, z, "token", "Label", "city_token"], ...],
-    "cities":     {"city_token": "City Name", ...}
+    "cities":     {"city_token": "City Name", ...},
+    "atlas":      [[x, z, "t", "Name"], ...]    # solo ATS: t tourist board,
+                                              # o point of interest (Road Trip)
   }
 
 Uso (rutas relativas a D:\\ets2-companion, ver VARIANTS):
@@ -19,6 +21,7 @@ Uso (rutas relativas a D:\\ets2-companion, ver VARIANTS):
 
 import json
 import os
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PARSER_ROOT = os.path.dirname(ROOT)  # D:\ets2-companion
@@ -58,6 +61,43 @@ FACILITY_CODES = {
     "weigh_station_ico": "w",
     "weigh_ico": "w",
 }
+
+
+# Nombres del Atlas (clave del locale -> texto en ingles). Los arma
+# build_atlas_names.py del taller desde locale.scs; sin el archivo, el Atlas
+# sale sin nombres en vez de no salir.
+ATLAS_NAMES_PATH = os.path.join(PARSER_ROOT, "atlas-names-ats.json")
+ATLAS_KEY = re.compile(r"(tb|poi)_[a-z]{2}\d+(_\d+)?")
+
+
+def atlas_items(folder, prefix):
+    """Tourist Boards y Points of Interest del Atlas (Road Trip de ATS). El
+    parser los saca como cutscenes: la accion "rt_tb" o "rt_poi" dice que son
+    y el ultimo tag es la clave del nombre ("tb_ca1", "poi_ca1_01")."""
+    path = os.path.join(PARSER_ROOT, folder, f"{prefix}-cutscenes.json")
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        cutscenes = json.load(f)
+    names = {}
+    if os.path.exists(ATLAS_NAMES_PATH):
+        with open(ATLAS_NAMES_PATH, encoding="utf-8") as f:
+            names = json.load(f)
+    out = []
+    for c in cutscenes:
+        params = c.get("actionStringParams") or []
+        kind = "t" if "rt_tb" in params else "o" if "rt_poi" in params else None
+        if not kind or not c.get("tags"):
+            continue
+        key = c["tags"][-1]
+        # Solo las claves del Atlas de SCS: un mod de ETS2 usa la misma accion
+        # con otra clave ("poi_tag_sw01") y no es un lugar del Atlas.
+        if not ATLAS_KEY.fullmatch(key):
+            continue
+        out.append([round(c["x"]), round(c["y"]), kind, names.get(key, key)])
+    # Los tourist boards primero: son los destinos del Atlas
+    out.sort(key=lambda a: (a[2] != "t", a[3]))
+    return out
 
 
 def build(variant, folder, prefix):
@@ -122,11 +162,15 @@ def build(variant, folder, prefix):
         deduped.append([x, z, code])
     facilities = deduped
     out = {"facilities": facilities, "companies": companies, "cities": cities}
+    atlas = atlas_items(folder, prefix)
+    if atlas:
+        out["atlas"] = atlas
     os.makedirs(OUT_DIR, exist_ok=True)
     out_path = os.path.join(OUT_DIR, f"pois-{variant}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"  {variant}: {len(facilities)} facilities, {len(companies)} companies -> {os.path.getsize(out_path) // 1024}KB")
+    extra = f", {len(atlas)} atlas" if atlas else ""
+    print(f"  {variant}: {len(facilities)} facilities, {len(companies)} companies{extra} -> {os.path.getsize(out_path) // 1024}KB")
 
 
 if __name__ == "__main__":
