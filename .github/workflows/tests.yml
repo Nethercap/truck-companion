@@ -70,3 +70,18 @@ jobs:
       # .js sueltos, que es donde viven las traducciones. Un apostrofo sin
       # escapar en una de ellas rompe el archivo entero y con el la pagina.
       - run: for f in $(git ls-files 'docs/*.js' 'docs/**/*.js'); do node --check "$f" || exit 1; done
+
+  # La web abierta en un navegador de verdad: la demo de ATS con los datos de
+  # mapa de produccion (R2), el aviso sin WebGL y las demas paginas sin
+  # errores de JavaScript. Los tests de arriba prueban la logica, pero un
+  # error al arrancar app.js dejaba el tablero muerto sin que nada fallara.
+  web-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tools/smoke_web.py
