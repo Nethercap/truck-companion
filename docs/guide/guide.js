@@ -29,6 +29,7 @@
     { id: 'settings', legend: TOP_BTNS, kind: 'top' },
     { id: 'convoy' },
     { id: 'client' },
+    { id: 'overlay', fig: 'overlay' },
     { id: 'account' },
   ];
 

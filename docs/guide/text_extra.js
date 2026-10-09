@@ -20,6 +20,7 @@ GUIDE_TEXT.de = {
     settings: 'Einstellungen und die obere Leiste',
     convoy: 'Konvoi (Beta)',
     client: 'Der Client auf deinem PC',
+    overlay: 'Das Overlay im Spiel',
     account: 'Dein Konto (optional)',
   },
   legend: { gps: 'Kartenschaltflächen', settings: 'Obere Leiste' },
@@ -27,6 +28,7 @@ GUIDE_TEXT.de = {
     map: 'Querformat: die Karte mit der Route, das Infopanel und das Tastenfeld.',
     phone: 'Navigationsmodus auf dem Handy.',
     dash: 'Das Armaturenbrett im Vollbild.',
+    overlay: 'Das Overlay über ETS2: nächste Abbiegung, Tempo und Limit, Restweg und Ankunft in Echtzeit und auf der Spieluhr.',
   },
   b: {
     start: `
@@ -137,12 +139,23 @@ GUIDE_TEXT.de = {
 <p>Rechtsklick auf das Symbol in der Taskleiste, neben der Uhr:</p>
 <ul>
 <li><b>Einrichtung &amp; Status</b>: der Pairing-Code, die Adresse fürs gleiche WLAN mit QR-Code, das Plugin für jedes Spiel (Steam-Installationen werden selbst gefunden; <b>Spielordner hinzufügen</b> für den Rest) und die Optionen.</li>
-<li><b>Optionen</b>: mit Windows starten (öffnet das Armaturenbrett, wenn das Spiel startet), deine Tour im Discord-Profil zeigen, Truck Dash schließen, wenn das Spiel beendet wird, und das Armaturenbrett beim Start im Browser öffnen.</li>
+<li><b>Optionen</b>: mit Windows starten (öffnet das Armaturenbrett, wenn das Spiel startet), deine Tour im Discord-Profil zeigen, Truck Dash schließen, wenn das Spiel beendet wird, und das Armaturenbrett beim Start im Browser öffnen. Dort stellst du auch die Sprache des Clients ein (sonst folgt sie Windows).</li>
 <li><b>Pairing-Code anzeigen</b>, und <b>Trennen</b>, das dir einen neuen Code gibt.</li>
 <li><b>Nach Updates suchen</b>. Client und App melden sich auch, wenn eine neue Version da ist.</li>
 <li><b>Logdatei anzeigen</b> und <b>Problem melden</b>.</li>
 </ul>
 <div class="tip"><p>Klappt etwas nicht? Frag auf unserem <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> und häng die Logdatei an: Die meisten Probleme sind in ein paar Nachrichten gelöst.</p></div>`,
+    overlay: `
+<p>Ein kleines Feld, das der Client über das Spiel legt: das Wichtigste, ohne den Blick von der Straße zu nehmen. Nur unter Windows, mit dem Spiel im Fenster oder im randlosen Vollbild.</p>
+<ul>
+<li><b>Tempo und Tempolimit</b>, direkt aus dem Spiel. Das Limit blinkt, wenn du zu schnell bist.</li>
+<li><b>Nächste Abbiegung und nächste Stadt</b>, <b>Restweg</b> und <b>Ankunft</b> in Echtzeit. Das kommt vom Armaturenbrett, lass es also mit einer Route offen (Handy, Tablet oder dieser PC). Ohne es kommt der Restweg vom Navi des Spiels.</li>
+<li><b>Ankunft auf der Spieluhr</b>, zum Vergleich mit der Lieferfrist. Das geht auch ohne Armaturenbrett.</li>
+</ul>
+<h3>Einschalten</h3>
+<p>In <b>Einrichtung &amp; Status</b>, Abschnitt <b>Overlay im Spiel</b>, oder im Menü des Tray-Symbols. Im Spiel blendest du es mit <b>Strg+Umschalt+O</b> ein und aus (anderes Kürzel oder keins wählbar).</p>
+<p>Im selben Abschnitt wählst du die <b>Position</b> (eine Ecke, oder <b>Verschieben</b>, um es mit der Maus irgendwohin zu ziehen, dann <b>Fertig</b>), die <b>Größe</b> und <b>was es zeigt</b>. Die Texte folgen der Sprache des Armaturenbretts.</p>
+<div class="tip"><p>Es nimmt dem Spiel nie den Fokus, und Klicks gehen hindurch. Es verschwindet, wenn du das Spiel verlässt oder pausierst. Mit eingeschalteter Sprachansage in den Einstellungen des Armaturenbretts sagt das Armaturenbrett die Abbiegungen auch an, solange das Overlay an ist.</p></div>`,
     account: `
 <p>Ein Konto speichert deinen Fahrtverlauf: jeden Auftrag, den du fährst, mit seiner Route auf einer Karte. Es ist optional und kostenlos, und alles andere in Truck Dash funktioniert auch ohne.</p>
 <ol>
@@ -216,6 +229,7 @@ GUIDE_TEXT.fr = {
     settings: 'Paramètres et barre du haut',
     convoy: 'Convoi (bêta)',
     client: 'Le client sur ton PC',
+    overlay: "L'overlay en jeu",
     account: 'Votre compte (facultatif)',
   },
   legend: { gps: 'Boutons de la carte', settings: 'Barre du haut' },
@@ -223,6 +237,7 @@ GUIDE_TEXT.fr = {
     map: "En paysage : la carte avec l'itinéraire, le panneau d'infos et la boîte à boutons.",
     phone: 'Le mode navigation sur un téléphone.',
     dash: 'Le tableau de bord en plein écran.',
+    overlay: "L'overlay sur ETS2 : prochain virage, vitesse et limite, distance restante, et arrivée en temps réel et à l'horloge du jeu.",
   },
   b: {
     start: `
@@ -333,12 +348,23 @@ GUIDE_TEXT.fr = {
 <p>Clic droit sur l'icône de la zone de notification, à côté de l'horloge :</p>
 <ul>
 <li><b>Configuration et état</b> : le code d'appairage, l'adresse pour le même Wi-Fi avec son QR code, le plugin de chaque jeu (les installations Steam sont trouvées toutes seules ; <b>Ajouter le dossier du jeu</b> pour les autres) et les options.</li>
-<li><b>Options</b> : lancer avec Windows (ouvre le tableau de bord au démarrage du jeu), afficher ton trajet sur ton profil Discord, fermer Truck Dash quand le jeu se ferme, et ouvrir le tableau de bord dans le navigateur au démarrage.</li>
+<li><b>Options</b> : lancer avec Windows (ouvre le tableau de bord au démarrage du jeu), afficher ton trajet sur ton profil Discord, fermer Truck Dash quand le jeu se ferme, et ouvrir le tableau de bord dans le navigateur au démarrage. Tu y choisis aussi la langue du client (sinon elle suit celle de Windows).</li>
 <li><b>Afficher le code d'appairage</b>, et <b>Déconnecter</b>, qui te donne un nouveau code.</li>
 <li><b>Rechercher des mises à jour</b>. Le client et l'appli te préviennent aussi quand une nouvelle version sort.</li>
 <li><b>Voir le fichier journal</b> et <b>Signaler un problème</b>.</li>
 </ul>
 <div class="tip"><p>Quelque chose ne marche pas ? Demande sur notre <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> en joignant le fichier journal : la plupart des problèmes se règlent en quelques messages.</p></div>`,
+    overlay: `
+<p>Un petit cadre que le client dessine par-dessus le jeu, pour voir l'essentiel sans quitter la route des yeux. Windows uniquement, avec le jeu en fenêtre ou en plein écran sans bordure.</p>
+<ul>
+<li><b>Vitesse et limitation</b>, directement depuis le jeu. La limite clignote quand tu la dépasses.</li>
+<li><b>Prochain virage et prochaine ville</b>, <b>distance restante</b> et <b>arrivée</b> en temps réel. Ils viennent du tableau de bord : garde-le ouvert avec un itinéraire (téléphone, tablette ou ce PC). Sans lui, la distance restante vient du GPS du jeu.</li>
+<li><b>Arrivée à l'horloge du jeu</b>, à comparer avec le délai de la mission. Elle marche sans le tableau de bord.</li>
+</ul>
+<h3>L'activer</h3>
+<p>Dans <b>Configuration et état</b>, section <b>Overlay en jeu</b>, ou depuis le menu de l'icône. En jeu, <b>Ctrl+Maj+O</b> l'affiche et le cache (tu peux choisir un autre raccourci, ou aucun).</p>
+<p>La même section règle sa <b>position</b> (un coin, ou <b>Déplacer</b> pour le faire glisser à la souris où tu veux, puis <b>Terminé</b>), sa <b>taille</b> et <b>ce qu'il affiche</b>. Ses textes suivent la langue du tableau de bord.</p>
+<div class="tip"><p>Il ne prend jamais le focus du jeu et les clics le traversent. Il se cache quand tu quittes le jeu ou le mets en pause. Avec le guidage vocal activé dans les Réglages du tableau de bord, le tableau de bord annonce aussi les virages tant que l'overlay est actif.</p></div>`,
     account: `
 <p>Un compte garde votre historique de conduite : chaque mission que vous faites, avec son itinéraire sur une carte. Il est facultatif et gratuit, et tout le reste de Truck Dash fonctionne pareil sans compte.</p>
 <ol>
@@ -412,6 +438,7 @@ GUIDE_TEXT.pt = {
     settings: 'Configurações e a barra de cima',
     convoy: 'Comboio (beta)',
     client: 'O cliente no seu PC',
+    overlay: 'O overlay no jogo',
     account: 'Sua conta (opcional)',
   },
   legend: { gps: 'Botões do mapa', settings: 'Barra de cima' },
@@ -419,6 +446,7 @@ GUIDE_TEXT.pt = {
     map: 'Na horizontal: o mapa com a rota, o painel de informações e a botoeira.',
     phone: 'Modo navegação no celular.',
     dash: 'O painel de instrumentos em tela cheia.',
+    overlay: 'O overlay sobre o ETS2: próxima curva, velocidade e limite, distância restante, e chegada no horário real e no relógio do jogo.',
   },
   b: {
     start: `
@@ -529,12 +557,23 @@ GUIDE_TEXT.pt = {
 <p>Clique com o botão direito no ícone da bandeja, ao lado do relógio:</p>
 <ul>
 <li><b>Configuração e status</b>: o código de pareamento, o endereço para a mesma Wi-Fi com o QR code, o plugin de cada jogo (instalações da Steam são encontradas sozinhas; <b>Adicionar pasta do jogo</b> para as outras) e as opções.</li>
-<li><b>Opções</b>: iniciar com o Windows (abre o painel quando o jogo inicia), mostrar sua viagem no seu perfil do Discord, fechar o Truck Dash quando o jogo fechar, e abrir o painel no navegador ao iniciar.</li>
+<li><b>Opções</b>: iniciar com o Windows (abre o painel quando o jogo inicia), mostrar sua viagem no seu perfil do Discord, fechar o Truck Dash quando o jogo fechar, e abrir o painel no navegador ao iniciar. Ali também fica o idioma do cliente (segue o do Windows, a menos que você escolha outro).</li>
 <li><b>Mostrar código de pareamento</b>, e <b>Desconectar</b>, que te dá um código novo.</li>
 <li><b>Verificar atualizações</b>. O cliente e o app também avisam quando sai uma versão nova.</li>
 <li><b>Ver arquivo de log</b> e <b>Relatar um problema</b>.</li>
 </ul>
 <div class="tip"><p>Algo não funciona? Pergunte no nosso <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> e anexe o arquivo de log: a maioria dos problemas se resolve em poucas mensagens.</p></div>`,
+    overlay: `
+<p>Um quadro que o cliente desenha sobre o jogo, para ver o essencial sem tirar os olhos da estrada. Só no Windows, com o jogo em janela ou em tela cheia sem bordas.</p>
+<ul>
+<li><b>Velocidade e limite</b>, direto do jogo. O limite pisca quando você passa dele.</li>
+<li><b>Próxima curva e próxima cidade</b>, <b>distância restante</b> e <b>chegada</b> no horário real. Vêm do painel, então deixe-o aberto com uma rota (celular, tablet ou este PC). Sem ele, a distância restante vem do GPS do próprio jogo.</li>
+<li><b>Chegada no relógio do jogo</b>, para comparar com o prazo da entrega. Esta funciona sem o painel.</li>
+</ul>
+<h3>Como ligar</h3>
+<p>Em <b>Configuração e status</b>, seção <b>Overlay no jogo</b>, ou pelo menu da bandeja. No jogo, <b>Ctrl+Shift+O</b> mostra e esconde (dá para escolher outro atalho, ou nenhum).</p>
+<p>Na mesma seção você escolhe a <b>posição</b> (um canto, ou <b>Mover</b> para arrastar com o mouse para onde quiser e depois <b>Pronto</b>), o <b>tamanho</b> e <b>o que ele mostra</b>. Os textos seguem o idioma do painel.</p>
+<div class="tip"><p>Ele nunca tira o foco do jogo e os cliques passam através dele. Some quando você sai do jogo ou pausa. Com a orientação por voz ligada nas Configurações do painel, o painel também fala as curvas enquanto o overlay está ligado.</p></div>`,
     account: `
 <p>Uma conta guarda seu histórico de direção: cada entrega que você faz, com a rota num mapa. É opcional e grátis, e todo o resto do Truck Dash funciona igual sem ela.</p>
 <ol>
@@ -608,6 +647,7 @@ GUIDE_TEXT.pl = {
     settings: 'Ustawienia i górny pasek',
     convoy: 'Konwój (beta)',
     client: 'Klient na twoim PC',
+    overlay: 'Nakładka w grze',
     account: 'Twoje konto (opcjonalne)',
   },
   legend: { gps: 'Przyciski mapy', settings: 'Górny pasek' },
@@ -615,6 +655,7 @@ GUIDE_TEXT.pl = {
     map: 'Poziomo: mapa z trasą, panel informacji i przyciski ciężarówki.',
     phone: 'Tryb nawigacji na telefonie.',
     dash: 'Deska rozdzielcza na pełnym ekranie.',
+    overlay: 'Nakładka nad ETS2: następny skręt, prędkość i limit, pozostały dystans oraz przyjazd w czasie rzeczywistym i według zegara gry.',
   },
   b: {
     start: `
@@ -725,12 +766,23 @@ GUIDE_TEXT.pl = {
 <p>Kliknij prawym przyciskiem ikonę w zasobniku, obok zegara:</p>
 <ul>
 <li><b>Konfiguracja i stan</b>: kod parowania, adres dla tej samej sieci Wi-Fi z kodem QR, wtyczka dla każdej gry (instalacje ze Steam są wykrywane same; <b>Dodaj folder gry</b> dla pozostałych) i opcje.</li>
-<li><b>Opcje</b>: uruchamiaj z Windows (otwiera deskę rozdzielczą, gdy startuje gra), pokazuj trasę w profilu Discord, zamykaj Truck Dash razem z grą i otwieraj deskę rozdzielczą w przeglądarce przy starcie.</li>
+<li><b>Opcje</b>: uruchamiaj z Windows (otwiera deskę rozdzielczą, gdy startuje gra), pokazuj trasę w profilu Discord, zamykaj Truck Dash razem z grą i otwieraj deskę rozdzielczą w przeglądarce przy starcie. Tam też wybierzesz język klienta (domyślnie taki jak w Windows).</li>
 <li><b>Pokaż kod parowania</b>, oraz <b>Rozłącz</b>, które daje nowy kod.</li>
 <li><b>Sprawdź aktualizacje</b>. Klient i aplikacja same też dają znać o nowej wersji.</li>
 <li><b>Pokaż plik dziennika</b> i <b>Zgłoś problem</b>.</li>
 </ul>
 <div class="tip"><p>Coś nie działa? Zapytaj na naszym <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discordzie</a> i dołącz plik dziennika: większość problemów rozwiązujemy w kilku wiadomościach.</p></div>`,
+    overlay: `
+<p>Małe okienko, które klient rysuje nad grą: to, co najważniejsze, bez odrywania wzroku od drogi. Tylko Windows, z grą w oknie lub w pełnym ekranie bez ramek.</p>
+<ul>
+<li><b>Prędkość i ograniczenie</b>, prosto z gry. Limit miga, gdy go przekroczysz.</li>
+<li><b>Następny skręt i następne miasto</b>, <b>pozostały dystans</b> i <b>przyjazd</b> w czasie rzeczywistym. Pochodzą z pulpitu, więc miej go otwartego z trasą (telefon, tablet lub ten PC). Bez niego pozostały dystans bierze się z GPS gry.</li>
+<li><b>Przyjazd według zegara gry</b>, do porównania z terminem zlecenia. Działa bez pulpitu.</li>
+</ul>
+<h3>Włączanie</h3>
+<p>W <b>Konfiguracja i stan</b>, sekcja <b>Nakładka w grze</b>, albo z menu ikony w zasobniku. W grze <b>Ctrl+Shift+O</b> ją pokazuje i ukrywa (możesz wybrać inny skrót albo żaden).</p>
+<p>W tej samej sekcji ustawisz <b>położenie</b> (róg ekranu albo <b>Przesuń</b>, żeby przeciągnąć ją myszą w dowolne miejsce, a potem <b>Gotowe</b>), <b>rozmiar</b> i <b>co pokazuje</b>. Jej teksty są w języku pulpitu.</p>
+<div class="tip"><p>Nigdy nie zabiera grze fokusu, a kliknięcia przez nią przechodzą. Znika, gdy wychodzisz z gry albo ją pauzujesz. Z włączonymi wskazówkami głosowymi w Ustawieniach pulpitu pulpit mówi też o skrętach, gdy nakładka jest włączona.</p></div>`,
     account: `
 <p>Konto przechowuje historię twojej jazdy: każde zlecenie, które wykonasz, z trasą na mapie. Jest opcjonalne i darmowe, a cała reszta Truck Dash działa tak samo bez niego.</p>
 <ol>
@@ -804,6 +856,7 @@ GUIDE_TEXT.tr = {
     settings: 'Ayarlar ve üst çubuk',
     convoy: 'Konvoy (beta)',
     client: 'Bilgisayarındaki istemci',
+    overlay: 'Oyun içi katman',
     account: 'Hesabın (isteğe bağlı)',
   },
   legend: { gps: 'Harita düğmeleri', settings: 'Üst çubuk' },
@@ -811,6 +864,7 @@ GUIDE_TEXT.tr = {
     map: 'Yatay: rotalı harita, bilgi paneli ve düğme kutusu.',
     phone: 'Telefonda navigasyon modu.',
     dash: 'Tam ekran gösterge paneli.',
+    overlay: 'ETS2 üzerinde katman: sonraki dönüş, hız ve sınır, kalan mesafe, gerçek saatle ve oyun saatiyle varış.',
   },
   b: {
     start: `
@@ -921,12 +975,23 @@ GUIDE_TEXT.tr = {
 <p>Saatin yanındaki tepsi simgesine sağ tıkla:</p>
 <ul>
 <li><b>Kurulum ve durum</b>: eşleştirme kodu, QR koduyla aynı Wi-Fi adresi, her oyun için eklenti (Steam kurulumları kendiliğinden bulunur; diğerleri için <b>Oyun klasörü ekle</b>) ve seçenekler.</li>
-<li><b>Seçenekler</b>: Windows ile başlat (oyun başlayınca gösterge panelini açar), yolculuğunu Discord profilinde göster, oyun kapanınca Truck Dash'i kapat ve açılışta gösterge panelini tarayıcıda aç.</li>
+<li><b>Seçenekler</b>: Windows ile başlat (oyun başlayınca gösterge panelini açar), yolculuğunu Discord profilinde göster, oyun kapanınca Truck Dash'i kapat ve açılışta gösterge panelini tarayıcıda aç. İstemcinin dili de oradan seçilir (seçmezsen Windows'unkini kullanır).</li>
 <li><b>Eşleştirme kodunu göster</b> ve sana yeni bir kod veren <b>Bağlantıyı kes</b>.</li>
 <li><b>Güncellemeleri denetle</b>. İstemci ve uygulama yeni bir sürüm çıktığında da haber verir.</li>
 <li><b>Günlük dosyasını göster</b> ve <b>Sorun bildir</b>.</li>
 </ul>
 <div class="tip"><p>Bir şey çalışmıyor mu? <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> sunucumuzda sor ve günlük dosyasını ekle: sorunların çoğu birkaç mesajda çözülür.</p></div>`,
+    overlay: `
+<p>İstemcinin oyunun üzerine çizdiği küçük bir kutu: gözünü yoldan ayırmadan önemli bilgiler. Yalnızca Windows'ta, oyun pencerede veya kenarlıksız tam ekrandayken.</p>
+<ul>
+<li><b>Hız ve hız sınırı</b>, doğrudan oyundan. Sınırı aşınca sınır işareti yanıp söner.</li>
+<li><b>Sonraki dönüş ve sonraki şehir</b>, <b>kalan mesafe</b> ve gerçek saatle <b>varış</b>. Bunlar panodan gelir, bu yüzden panoyu bir rotayla açık tut (telefon, tablet veya bu PC). Pano yoksa kalan mesafe oyunun kendi GPS'inden gelir.</li>
+<li><b>Oyun saatine göre varış</b>, işin teslim süresiyle karşılaştırmak için. Bu, pano olmadan da çalışır.</li>
+</ul>
+<h3>Açmak için</h3>
+<p><b>Kurulum ve durum</b> içinde <b>Oyun içi katman</b> bölümünden ya da tepsi menüsünden. Oyunda <b>Ctrl+Shift+O</b> onu gösterir ve gizler (başka bir kısayol seçebilir ya da hiç kullanmayabilirsin).</p>
+<p>Aynı bölümde <b>konumunu</b> (bir köşe ya da fareyle istediğin yere sürüklemek için <b>Taşı</b>, sonra <b>Tamam</b>), <b>boyutunu</b> ve <b>neyi gösterdiğini</b> seçersin. Yazıları panonun dilini izler.</p>
+<div class="tip"><p>Oyunun odağını asla almaz ve tıklamalar içinden geçer. Oyundan çıkınca ya da oyunu duraklatınca gizlenir. Panonun Ayarlar'ında sesli yönlendirme açıksa, katman açıkken pano dönüşleri de söyler.</p></div>`,
     account: `
 <p>Bir hesap sürüş geçmişini saklar: sürdüğün her iş, haritadaki rotasıyla. İsteğe bağlı ve ücretsizdir; Truck Dash'in geri kalanı hesapsız da aynı şekilde çalışır.</p>
 <ol>
@@ -1000,6 +1065,7 @@ GUIDE_TEXT.ru = {
     settings: 'Настройки и верхняя панель',
     convoy: 'Конвой (бета)',
     client: 'Клиент на вашем ПК',
+    overlay: 'Оверлей в игре',
     account: 'Ваш аккаунт (необязательно)',
   },
   legend: { gps: 'Кнопки на карте', settings: 'Верхняя панель' },
@@ -1007,6 +1073,7 @@ GUIDE_TEXT.ru = {
     map: 'Горизонтально: карта с маршрутом, панель информации и кнопки грузовика.',
     phone: 'Режим навигации на телефоне.',
     dash: 'Панель приборов на весь экран.',
+    overlay: 'Оверлей поверх ETS2: следующий поворот, скорость и ограничение, оставшееся расстояние и прибытие по реальному времени и по часам игры.',
   },
   b: {
     start: `
@@ -1117,12 +1184,23 @@ GUIDE_TEXT.ru = {
 <p>Щёлкните правой кнопкой по значку в области уведомлений, рядом с часами:</p>
 <ul>
 <li><b>Настройка и состояние</b>: код сопряжения, адрес для той же сети Wi-Fi с QR-кодом, плагин для каждой игры (установки Steam находятся сами; для остальных <b>Добавить папку игры</b>) и параметры.</li>
-<li><b>Параметры</b>: запуск вместе с Windows (открывает панель приборов, когда стартует игра), показ рейса в профиле Discord, закрытие Truck Dash вместе с игрой и открытие панели приборов в браузере при запуске.</li>
+<li><b>Параметры</b>: запуск вместе с Windows (открывает панель приборов, когда стартует игра), показ рейса в профиле Discord, закрытие Truck Dash вместе с игрой и открытие панели приборов в браузере при запуске. Там же выбирается язык клиента (по умолчанию как в Windows).</li>
 <li><b>Показать код сопряжения</b>, и <b>Отключить</b>, что даёт новый код.</li>
 <li><b>Проверить обновления</b>. Клиент и приложение также сообщают о выходе новой версии.</li>
 <li><b>Показать файл журнала</b> и <b>Сообщить о проблеме</b>.</li>
 </ul>
 <div class="tip"><p>Что-то не работает? Спросите в нашем <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> и приложите файл журнала: большинство проблем решается за пару сообщений.</p></div>`,
+    overlay: `
+<p>Небольшое окно, которое клиент рисует поверх игры: главное, не отрывая взгляда от дороги. Только Windows, игра в окне или в полноэкранном режиме без рамки.</p>
+<ul>
+<li><b>Скорость и ограничение скорости</b>, прямо из игры. Знак мигает, когда вы превышаете.</li>
+<li><b>Следующий поворот и следующий город</b>, <b>оставшееся расстояние</b> и <b>прибытие</b> по реальному времени. Это приходит с панели, поэтому держите её открытой с маршрутом (телефон, планшет или этот ПК). Без неё оставшееся расстояние берётся из навигатора игры.</li>
+<li><b>Прибытие по часам игры</b>, чтобы сравнить со сроком заказа. Работает и без панели.</li>
+</ul>
+<h3>Как включить</h3>
+<p>В <b>Настройка и состояние</b>, раздел <b>Оверлей в игре</b>, или в меню значка в трее. В игре <b>Ctrl+Shift+O</b> показывает и скрывает его (можно выбрать другое сочетание или никакое).</p>
+<p>В том же разделе выбираются <b>положение</b> (угол или <b>Переместить</b>, чтобы перетащить его мышью куда угодно, затем <b>Готово</b>), <b>размер</b> и <b>что показывать</b>. Тексты идут на языке панели.</p>
+<div class="tip"><p>Он никогда не забирает фокус у игры, и клики проходят сквозь него. Он скрывается, когда вы выходите из игры или ставите паузу. Если в Настройках панели включены голосовые подсказки, панель проговаривает повороты и при включённом оверлее.</p></div>`,
     account: `
 <p>Аккаунт хранит историю ваших поездок: каждый рейс с маршрутом на карте. Он необязателен и бесплатен, а всё остальное в Truck Dash работает так же и без него.</p>
 <ol>
