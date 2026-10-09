@@ -5,7 +5,8 @@ A free, real-time companion dashboard for **Euro Truck Simulator 2** and
 guidance, speed/limit, cargo, fuel, wear, and more — right in your browser,
 no login required.
 
-**Web app:** [trucksim-dash.com](https://trucksim-dash.com)
+**Web app:** [trucksim-dash.com](https://trucksim-dash.com) ·
+**Video:** [Truck Dash in 60 seconds](https://www.youtube.com/watch?v=HPQEUd-LplY)
 
 ## How it works
 
