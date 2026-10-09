@@ -138,6 +138,29 @@ def _windows_top_level():
     return salida
 
 
+def game_window_by_exe():
+    """La ventana del juego buscada SOLO por el .exe, o None. Sin leer los
+    titulos: GetWindowText a una ventana de este mismo proceso le manda un
+    mensaje a su hilo y espera, y desde el hilo de otra ventana eso se puede
+    trabar (el overlay en modo Mover contra Setup). Solo Windows."""
+    if not IS_WINDOWS:
+        return None
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    encontrada = []
+    CALLBACK = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+    def visitar(hwnd, _lparam):
+        if user32.IsWindowVisible(hwnd) and _exe_de_ventana(hwnd) in GAME_EXES:
+            encontrada.append(hwnd)
+            return False
+        return True
+
+    user32.EnumWindows(CALLBACK(visitar), 0)
+    return encontrada[0] if encontrada else None
+
+
 _ultimo_frente = (None, "")
 
 

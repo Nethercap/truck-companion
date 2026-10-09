@@ -338,6 +338,13 @@ class _Ventana:
             pass
         self.tk = tk
         self.root = tk.Tk()
+        # La primera Tk() del proceso queda como raiz por defecto, y todo lo
+        # que Setup crea sin decir de quien es (BooleanVar, la imagen del QR)
+        # iba a parar a ESTE interprete, en otro hilo: Setup lo esperaba a
+        # el, y en modo Mover este esperaba a Setup (WM_GETTEXT al buscar el
+        # juego). Se trabo el cliente entero (09-10). Esta nunca es la raiz.
+        if getattr(tk, "_default_root", None) is self.root:
+            tk._default_root = None
         self.root.withdraw()
         self.root.overrideredirect(True)
         self.root.configure(bg=BG)
@@ -441,11 +448,13 @@ class _Ventana:
 
     def _juego_para_mover(self):
         """En modo Mover el juego no esta al frente (se toco el boton de
-        Setup): se lo busca entre todas las ventanas, cada 2 s."""
+        Setup): se lo busca entre todas las ventanas, cada 2 s. Solo por el
+        .exe: leer los titulos le manda un mensaje a cada ventana de este
+        mismo proceso (Setup) y espera la respuesta."""
         import window_compat
         cuando, hwnd = self.juego_mover
         if time.monotonic() - cuando > 2:
-            hwnd = window_compat.find_game_window(())
+            hwnd = window_compat.game_window_by_exe()
             self.juego_mover = (time.monotonic(), hwnd)
         return hwnd
 

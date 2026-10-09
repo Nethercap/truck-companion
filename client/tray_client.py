@@ -1090,7 +1090,7 @@ class SetupWindow:
         try:
             from PIL import ImageTk
             img = local_server.qr_image(url)
-            self._qr_photo = ImageTk.PhotoImage(img)
+            self._qr_photo = ImageTk.PhotoImage(img, master=self.root)
             self.qr_label.configure(image=self._qr_photo)
         except Exception:
             logging.exception("QR render failed")
