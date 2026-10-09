@@ -1,43 +1,7 @@
 {
-  "updated": "2026-10-06",
-  "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped.",
+  "updated": "2026-10-09",
+  "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped. Los shipped se muestran aparte en el orden de este archivo: lo mas nuevo primero.",
   "items": [
-    {
-      "id": "shipped-tmp-events",
-      "status": "shipped",
-      "en": {
-        "title": "TruckersMP events",
-        "body": "Convoys and events from TruckersMP on the live map page: what is running now and what is coming, each with the time in your own timezone. Public data from their API, asked for once and cached on our side rather than by every visitor."
-      },
-      "es": {
-        "title": "Eventos de TruckersMP",
-        "body": "Los convoyes y eventos de TruckersMP en la página del mapa en vivo: lo que está pasando y lo que viene, cada uno con la hora en tu propia zona. Datos públicos de su API, pedidos una vez y cacheados de nuestro lado en vez de por cada visitante."
-      }
-    },
-    {
-      "id": "shipped-dash-panel",
-      "status": "shipped",
-      "en": {
-        "title": "Full dashboard panel",
-        "body": "Speed, fuel, rest, damage and session totals on a second screen, or over the map on the one you have. Portrait and landscape."
-      },
-      "es": {
-        "title": "Panel de tablero completo",
-        "body": "Velocidad, combustible, descanso, daños y totales de la sesión en una segunda pantalla, o encima del mapa en la que ya tenés. Vertical y horizontal."
-      }
-    },
-    {
-      "id": "base-map",
-      "status": "shipped",
-      "en": {
-        "title": "Real base map",
-        "body": "Coastline, lakes, rivers and built-up areas under the roads, lined up with the game's own coordinates, with a toggle so low-end devices can keep the light version."
-      },
-      "es": {
-        "title": "Mapa base real",
-        "body": "Costa, lagos, ríos y zonas urbanas debajo de las rutas, alineados con las coordenadas del propio juego, con un interruptor para que los equipos modestos sigan con la versión liviana."
-      }
-    },
     {
       "id": "obs-overlay",
       "status": "planned",
@@ -48,18 +12,6 @@
       "es": {
         "title": "Overlay para streamers (OBS)",
         "body": "Una URL de browser-source con velocidad, límite, próximo giro y ruta, con fondo transparente, lista para poner en una escena."
-      }
-    },
-    {
-      "id": "discord-presence",
-      "status": "shipped",
-      "en": {
-        "title": "Discord status",
-        "body": "Your Discord profile shows the current run while you drive: origin, destination and distance left. Off by default."
-      },
-      "es": {
-        "title": "Estado de Discord",
-        "body": "Tu perfil de Discord muestra el viaje en curso mientras manejás: origen, destino y lo que falta. Apagado por defecto."
       }
     },
     {
@@ -75,30 +27,6 @@
       }
     },
     {
-      "id": "accounts",
-      "status": "shipped",
-      "en": {
-        "title": "Optional account",
-        "body": "Sign in with Discord, Google or email and link the client: every job is kept with its route, pay, fuel and times, on any device. Nothing is saved until you link it, and Truck Dash works the same without an account."
-      },
-      "es": {
-        "title": "Cuenta opcional",
-        "body": "Entrás con Discord, Google o mail y vinculás el cliente: cada trabajo queda guardado con su ruta, paga, combustible y tiempos, en cualquier dispositivo. No se guarda nada hasta que lo vinculás, y Truck Dash anda igual sin cuenta."
-      }
-    },
-    {
-      "id": "stats-charts",
-      "status": "shipped",
-      "en": {
-        "title": "Stats, charts and achievements",
-        "body": "Your driving by week and by month, a calendar of the days you drove, records, the countries and states you crossed, your top trucks, cargoes and routes, and achievements. Per game, in your optional account."
-      },
-      "es": {
-        "title": "Estadísticas, gráficos y logros",
-        "body": "Lo que manejaste por semana y por mes, un calendario de los días que manejaste, récords, los países y estados que cruzaste, tus camiones, cargas y rutas más usados, y logros. Por juego, en tu cuenta opcional."
-      }
-    },
-    {
       "id": "vtc",
       "status": "exploring",
       "en": {
@@ -111,18 +39,6 @@
       }
     },
     {
-      "id": "lane-routing",
-      "status": "shipped",
-      "en": {
-        "title": "Lane-level junctions",
-        "body": "The route follows the real lane curves through junctions and interchanges instead of cutting straight across them, and it no longer sends you through turns the game does not allow."
-      },
-      "es": {
-        "title": "Cruces carril por carril",
-        "body": "La ruta sigue las curvas reales de los carriles dentro de cruces y enlaces, en vez de cruzarlos derecho por arriba, y ya no te manda por giros que el juego no permite."
-      }
-    },
-    {
       "id": "truckersmp-nearby",
       "status": "blocked",
       "en": {
@@ -132,54 +48,6 @@
       "es": {
         "title": "Camiones de TruckersMP cerca tuyo",
         "body": "Ver en el mapa a otros jugadores de TruckersMP alrededor. TruckersMP no tiene una API pública de posiciones, así que primero hace falta su permiso: no lo vamos a scrapear."
-      }
-    },
-    {
-      "id": "shipped-live-map",
-      "status": "shipped",
-      "en": {
-        "title": "Public live map",
-        "body": "Everyone sharing their position, on one map per map variant, no account needed."
-      },
-      "es": {
-        "title": "Mapa en vivo público",
-        "body": "Todos los que comparten su posición, en un mapa por variante, sin cuenta."
-      }
-    },
-    {
-      "id": "shipped-convoy",
-      "status": "shipped",
-      "en": {
-        "title": "Convoy (beta)",
-        "body": "A six-letter code to share a run with friends: everyone on the same map, quick messages and follow the leader."
-      },
-      "es": {
-        "title": "Convoy (beta)",
-        "body": "Un código de seis letras para compartir el viaje: todos en el mismo mapa, mensajes rápidos y seguir al líder."
-      }
-    },
-    {
-      "id": "shipped-mods",
-      "status": "shipped",
-      "en": {
-        "title": "15 map variants",
-        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia, European Grand Utopia and TruckersMP, detected automatically."
-      },
-      "es": {
-        "title": "15 variantes de mapa",
-        "body": "ProMods, RusMap, Coast to Coast, ProMods Canada, Reforma, Roextended, Grand Utopia, European Grand Utopia y TruckersMP, detectadas solas."
-      }
-    },
-    {
-      "id": "tts-directions",
-      "status": "shipped",
-      "en": {
-        "title": "Spoken directions",
-        "body": "Turn-by-turn read out loud in navigation mode: a heads-up before each turn, again at the turn, and on arrival. Natural recorded voices in 8 languages, two to choose from in English and Spanish, and no road names, so nothing gets mispronounced."
-      },
-      "es": {
-        "title": "Indicaciones habladas",
-        "body": "Las indicaciones de giro en voz alta en modo navegación: un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, dos para elegir en inglés y en español, y sin nombres de rutas, así nada se pronuncia mal."
       }
     },
     {
@@ -204,6 +72,186 @@
       "es": {
         "title": "Overlay dentro del juego",
         "body": "El tablero dibujado encima del juego, para quien juega en una sola pantalla y no quiere un segundo dispositivo. Lo pidieron en Reddit. El problema no es el permiso sino el lugar: un overlay necesita el juego en ventana sin bordes y no en pantalla completa exclusiva, y le saca al juego el espacio que el segundo dispositivo justamente ahorra."
+      }
+    },
+    {
+      "id": "dlc-routing",
+      "status": "shipped",
+      "en": {
+        "title": "Routes for the DLCs you own",
+        "body": "Uncheck the map DLCs you do not have and routes go around them. If there is no way around one, the route uses it anyway and says so."
+      },
+      "es": {
+        "title": "Rutas con los DLC que tenés",
+        "body": "Destildás los DLC de mapa que no tenés y las rutas los rodean. Si no hay forma de rodear uno, la ruta pasa igual y te avisa."
+      }
+    },
+    {
+      "id": "road-trip-atlas",
+      "status": "shipped",
+      "en": {
+        "title": "Road Trip atlas in ATS",
+        "body": "Tourist Boards and Points of Interest on the map and in the search, one tap to add them to your route."
+      },
+      "es": {
+        "title": "Atlas del Road Trip en ATS",
+        "body": "Tourist Boards y Points of Interest en el mapa y en el buscador, con un toque para sumarlos a la ruta."
+      }
+    },
+    {
+      "id": "follow-friends",
+      "status": "shipped",
+      "en": {
+        "title": "Follow friends",
+        "body": "Ask to follow someone and, once they accept, see their trips, achievements and where they are driving right now. Blocking is one click."
+      },
+      "es": {
+        "title": "Seguir a amigos",
+        "body": "Pedís seguir a alguien y, cuando te acepta, ves sus viajes, sus logros y por dónde anda manejando. Bloquear es un click."
+      }
+    },
+    {
+      "id": "live-routes",
+      "status": "shipped",
+      "en": {
+        "title": "Routes on the live map",
+        "body": "Drivers who share their position can also share the route they are on: the live map draws it, with the distance left and the arrival time."
+      },
+      "es": {
+        "title": "Rutas en el mapa en vivo",
+        "body": "Quien comparte su posición puede compartir también la ruta que lleva: el mapa en vivo la dibuja, con lo que falta y la hora de llegada."
+      }
+    },
+    {
+      "id": "shipped-mods",
+      "status": "shipped",
+      "en": {
+        "title": "17 map variants",
+        "body": "ProMods, RusMap, Roextended, Grand Utopia, European Grand Utopia and TruckersMP in ETS2; Coast to Coast, ProMods Canada, Western and Eastern Canada Expansion and Reforma in ATS. Detected automatically."
+      },
+      "es": {
+        "title": "17 variantes de mapa",
+        "body": "ProMods, RusMap, Roextended, Grand Utopia, European Grand Utopia y TruckersMP en ETS2; Coast to Coast, ProMods Canada, Western y Eastern Canada Expansion y Reforma en ATS. Detectadas solas."
+      }
+    },
+    {
+      "id": "tts-directions",
+      "status": "shipped",
+      "en": {
+        "title": "Spoken directions",
+        "body": "Turn-by-turn read out loud in navigation mode: a heads-up before each turn, again at the turn, and on arrival. Natural recorded voices in 8 languages, two to choose from in English and Spanish, and no road names, so nothing gets mispronounced."
+      },
+      "es": {
+        "title": "Indicaciones habladas",
+        "body": "Las indicaciones de giro en voz alta en modo navegación: un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, dos para elegir en inglés y en español, y sin nombres de rutas, así nada se pronuncia mal."
+      }
+    },
+    {
+      "id": "stats-charts",
+      "status": "shipped",
+      "en": {
+        "title": "Stats, charts and achievements",
+        "body": "Your driving by week and by month, a calendar of the days you drove, records, the countries and states you crossed, your top trucks, cargoes and routes, and achievements. Per game, in your optional account."
+      },
+      "es": {
+        "title": "Estadísticas, gráficos y logros",
+        "body": "Lo que manejaste por semana y por mes, un calendario de los días que manejaste, récords, los países y estados que cruzaste, tus camiones, cargas y rutas más usados, y logros. Por juego, en tu cuenta opcional."
+      }
+    },
+    {
+      "id": "accounts",
+      "status": "shipped",
+      "en": {
+        "title": "Optional account",
+        "body": "Sign in with Discord, Google or email and link the client: every job is kept with its route, pay, fuel and times, on any device. Nothing is saved until you link it, and Truck Dash works the same without an account."
+      },
+      "es": {
+        "title": "Cuenta opcional",
+        "body": "Entrás con Discord, Google o mail y vinculás el cliente: cada trabajo queda guardado con su ruta, paga, combustible y tiempos, en cualquier dispositivo. No se guarda nada hasta que lo vinculás, y Truck Dash anda igual sin cuenta."
+      }
+    },
+    {
+      "id": "lane-routing",
+      "status": "shipped",
+      "en": {
+        "title": "Lane-level junctions",
+        "body": "The route follows the real lane curves through junctions and interchanges instead of cutting straight across them, and it no longer sends you through turns the game does not allow."
+      },
+      "es": {
+        "title": "Cruces carril por carril",
+        "body": "La ruta sigue las curvas reales de los carriles dentro de cruces y enlaces, en vez de cruzarlos derecho por arriba, y ya no te manda por giros que el juego no permite."
+      }
+    },
+    {
+      "id": "base-map",
+      "status": "shipped",
+      "en": {
+        "title": "Real base map",
+        "body": "Coastline, lakes, rivers and built-up areas under the roads, lined up with the game's own coordinates, with a toggle so low-end devices can keep the light version."
+      },
+      "es": {
+        "title": "Mapa base real",
+        "body": "Costa, lagos, ríos y zonas urbanas debajo de las rutas, alineados con las coordenadas del propio juego, con un interruptor para que los equipos modestos sigan con la versión liviana."
+      }
+    },
+    {
+      "id": "shipped-dash-panel",
+      "status": "shipped",
+      "en": {
+        "title": "Full dashboard panel",
+        "body": "Speed, fuel, rest, damage and session totals on a second screen, or over the map on the one you have. Portrait and landscape."
+      },
+      "es": {
+        "title": "Panel de tablero completo",
+        "body": "Velocidad, combustible, descanso, daños y totales de la sesión en una segunda pantalla, o encima del mapa en la que ya tenés. Vertical y horizontal."
+      }
+    },
+    {
+      "id": "shipped-tmp-events",
+      "status": "shipped",
+      "en": {
+        "title": "TruckersMP events",
+        "body": "Convoys and events from TruckersMP on the live map page: what is running now and what is coming, each with the time in your own timezone. Public data from their API, asked for once and cached on our side rather than by every visitor."
+      },
+      "es": {
+        "title": "Eventos de TruckersMP",
+        "body": "Los convoyes y eventos de TruckersMP en la página del mapa en vivo: lo que está pasando y lo que viene, cada uno con la hora en tu propia zona. Datos públicos de su API, pedidos una vez y cacheados de nuestro lado en vez de por cada visitante."
+      }
+    },
+    {
+      "id": "discord-presence",
+      "status": "shipped",
+      "en": {
+        "title": "Discord status",
+        "body": "Your Discord profile shows the current run while you drive: origin, destination and distance left. Off by default."
+      },
+      "es": {
+        "title": "Estado de Discord",
+        "body": "Tu perfil de Discord muestra el viaje en curso mientras manejás: origen, destino y lo que falta. Apagado por defecto."
+      }
+    },
+    {
+      "id": "shipped-live-map",
+      "status": "shipped",
+      "en": {
+        "title": "Public live map",
+        "body": "Everyone sharing their position, on one map per map variant, no account needed."
+      },
+      "es": {
+        "title": "Mapa en vivo público",
+        "body": "Todos los que comparten su posición, en un mapa por variante, sin cuenta."
+      }
+    },
+    {
+      "id": "shipped-convoy",
+      "status": "shipped",
+      "en": {
+        "title": "Convoy (beta)",
+        "body": "A six-letter code to share a run with friends: everyone on the same map, quick messages and follow the leader."
+      },
+      "es": {
+        "title": "Convoy (beta)",
+        "body": "Un código de seis letras para compartir el viaje: todos en el mismo mapa, mensajes rápidos y seguir al líder."
       }
     }
   ]

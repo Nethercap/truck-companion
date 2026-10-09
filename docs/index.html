@@ -93,8 +93,9 @@
   .brand .name { display: flex; align-items: baseline; gap: 0.5rem; }
   .brand .sub { font-weight: 400; font-size: 0.8rem; color: var(--muted); font-family: system-ui, sans-serif; }
 
+  .brand { white-space: nowrap; }
   nav.desktopNav { display: flex; align-items: center; gap: 1.3rem; }
-  nav.desktopNav a { color: var(--text); font-size: 0.93rem; }
+  nav.desktopNav a { color: var(--text); font-size: 0.93rem; white-space: nowrap; }
   nav.desktopNav a:hover { color: var(--blue); text-decoration: none; }
 
   .langBtn, .menuBtn {
@@ -110,21 +111,32 @@
     background: var(--panel); border-left: 1px solid var(--border);
     padding: 1.5rem; z-index: 200;
     transform: translateX(100%);
-    transition: transform 0.25s ease;
+    /* visibility: cerrado no se puede tabular a sus links ni lo lee un
+       lector de pantalla; espera a que termine de salir para esconderse. */
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
     display: flex; flex-direction: column; gap: 1.2rem;
   }
-  #sidebar.open { transform: translateX(0); }
+  #sidebar.open { transform: translateX(0); visibility: visible; transition: transform 0.25s ease; }
   #sidebarOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 190; display: none; }
   #sidebarOverlay.open { display: block; }
   #sidebar a { color: var(--text); font-size: 1.05rem; }
   #sidebar .closeBtn { align-self: flex-end; background: none; border: none; color: var(--text); font-size: 1.4rem; cursor: pointer; }
 
-  @media (max-width: 860px) {
+  /* Diez links no entran en una tablet ni en una laptop chica: entre 860 y
+     1200 px partian el nombre y los links en dos renglones. Primero se va
+     el subtitulo, despues todo pasa al menu lateral. */
+  @media (max-width: 1240px) { header .brand .sub { display: none; } }
+  @media (max-width: 1080px) {
     nav.desktopNav { display: none; }
     .menuBtn { display: block; }
   }
-  /* En un celular el subtitulo partia el nombre en dos renglones. */
-  @media (max-width: 480px) { .brand .sub { display: none; } }
+  /* En un celular el subtitulo partia el nombre en dos renglones, y los dos
+     botones del hero quedaban apilados con anchos distintos. */
+  @media (max-width: 480px) {
+    .brand .sub { display: none; }
+    .ctaRow .cta { flex: 1 1 100%; justify-content: center; }
+  }
 
   main { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; }
 
@@ -312,7 +324,13 @@
   .roadmapCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; }
   .roadmapCard h3 { margin: 0.4rem 0 0.4rem; font-size: 1.05rem; }
   .roadmapCard p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
-  .roadmapCard.shipped { opacity: 0.75; }
+  .roadmapSub { margin: 2rem 0 0; font-size: 1.25rem; color: var(--muted); }
+  .shippedGrid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.7rem; margin-top: 0.8rem; }
+  .shippedGrid .roadmapCard { padding: 0.75rem 0.9rem; background: transparent; }
+  .shippedGrid .roadmapChip { display: none; }
+  .shippedGrid .roadmapCard h3 { margin-top: 0; font-size: 1rem; }
+  .shippedGrid .roadmapCard h3::before { content: "\2713  "; color: var(--green); }
+  .shippedGrid .roadmapCard p { font-size: 0.84rem; }
   .roadmapChip { display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; border-radius: 999px; padding: 0.1rem 0.55rem; border: 1px solid; }
   .roadmapChip.planned { color: var(--orange); border-color: rgba(255,138,61,0.5); }
   .roadmapChip.exploring { color: var(--blue); border-color: rgba(59,158,255,0.5); }
@@ -467,7 +485,7 @@
       <div class="step">
         <div class="num">2</div>
         <h3 data-i18n="gsStep2Title">Let it set up the game</h3>
-        <p data-i18n="gsStep2Body">On first run, the client finds your ETS2 / ATS install and installs the official SCS telemetry plugin for you with one click. Prefer to do it by hand? The manual steps are in the README.</p>
+        <p data-i18n="gsStep2Body">On first run, the client finds your ETS2 / ATS install and installs its telemetry plugin, built on SCS's official SDK, with one click. It sits next to Trucky or any other telemetry tool without touching them. Prefer to do it by hand? The manual steps are in the README.</p>
         <div class="links">
           <a href="https://github.com/Nethercap/truck-companion/blob/main/client/README.md" target="_blank" rel="noopener" data-i18n="gsStep2Link">Manual plugin install (README)</a>
         </div>
@@ -485,7 +503,6 @@
       <strong data-i18n="smartscreenTitle">Windows says "unrecognized app"?</strong>
       <span data-i18n="smartscreenBody">That's SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn't need admin rights and only reads the game's telemetry. Every release page lists the file's SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.</span>
       <a href="https://github.com/Nethercap/truck-companion/tree/main/client#building-it-yourself" target="_blank" rel="noopener" data-i18n="sourceOptionLink">Run from source →</a>
-      <span class="signpathNote" data-i18n="signpathNote">Code signing for releases is provided by <a href="https://signpath.io" target="_blank" rel="noopener">SignPath.io</a>, certificate by <a href="https://signpath.org" target="_blank" rel="noopener">SignPath Foundation</a> (in progress — see the <a href="https://github.com/Nethercap/truck-companion#code-signing-policy" target="_blank" rel="noopener">code signing policy</a>).</span>
     </div>
   </section>
 
@@ -535,7 +552,7 @@
       <div class="featureCard">
         <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
         <h3 data-i18n="featLiveTitle">Other drivers, live <span class="tag" data-i18n="tagUnique">only here</span></h3>
-        <p data-i18n="featLiveBody">See other Truck Dash drivers on the same game and map as you, moving live — and watch every map from the <a href="/live/">public live map</a>, no account needed. Anonymous (position, truck and job only); one toggle turns it off.</p>
+        <p data-i18n="featLiveBody">See other Truck Dash drivers on the same game and map as you, moving live — and watch every map from the <a href="/live/">public live map</a>, no account needed. Anonymous: position, truck, job and the route you are on. One toggle turns it off, another keeps your route to yourself.</p>
       </div>
       <div class="featureCard">
         <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l4 4v3h-8z"/><circle cx="5" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div>
@@ -560,7 +577,17 @@
       <div class="featureCard">
         <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
         <h3 data-i18n="featStatsTitle">Trip history &amp; stats <span class="tag" data-i18n="tagNew">new</span></h3>
-        <p data-i18n="featStatsBody">With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, activity by week and month, records and achievements, and a public profile only if you want one. <a href="#accounts">More below</a>.</p>
+        <p data-i18n="featStatsBody">With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, activity by week and month, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg></div>
+        <h3 data-i18n="featDlcTitle">Routes for the DLCs you own <span class="tag">new</span></h3>
+        <p data-i18n="featDlcBody">Tell it which map DLCs you have and routes go around the countries and states you don't own. If there is no way around one, the route uses it anyway and tells you.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></div>
+        <h3 data-i18n="featAtlasTitle">Road Trip atlas in ATS <span class="tag">new</span></h3>
+        <p data-i18n="featAtlasBody">The Tourist Boards and Points of Interest of ATS's Road Trip, on the map and in the search: one tap adds the next one to your route.</p>
       </div>
     </div>
 
@@ -599,6 +626,7 @@
           <li data-i18n="accountsLi1">A logbook you can filter and export to CSV</li>
           <li data-i18n="accountsLi2">Stats for each game, records and achievements</li>
           <li data-i18n="accountsLi3">The countries and states you drove through</li>
+          <li data-i18n="accountsLi5">Follow friends: once they accept, you see their trips and where they are driving now</li>
           <li data-i18n="accountsLi4">Private by default. Sign in with Discord, Google or email</li>
         </ul>
         <div class="ctaRow">
@@ -724,6 +752,7 @@
           <li><b>ProMods + RusMap</b> <span class="muted" data-i18n="modsRusMapNote">with the ProMods–RusMap connector</span></li>
           <li><b>ProMods + Roextended</b> <span class="muted" data-i18n="modsRoexNote">Hybrid edition, with or without RusMap</span></li>
           <li><b>Grand Utopia</b> <span class="muted" data-i18n="modsGUNote">standalone map</span></li>
+          <li><b>European Grand Utopia</b> <span class="muted" data-i18n="modsEUGUNote">the Grand Utopia islands joined to Europe, with or without ProMods</span></li>
           <li><b>TruckersMP</b> <span class="muted" data-i18n="modsTMPNote">TruckersMP HQ and the CD road</span></li>
         </ul>
       </div>
@@ -735,6 +764,8 @@
     <h2 data-i18n="roadmapTitle">What's next</h2>
     <p class="sectionIntro" data-i18n="roadmapIntro">Everything here is free when it lands, like the rest. The list comes from what people ask for on Discord and GitHub, so it moves.</p>
     <div class="roadmapGrid" id="roadmapGrid"></div>
+    <h3 class="roadmapSub" id="roadmapShippedTitle" data-i18n="roadmapShippedTitle" hidden>Already shipped</h3>
+    <div class="roadmapGrid shippedGrid" id="roadmapShipped"></div>
     <p class="roadmapFoot">
       <span data-i18n="roadmapUpdated">Updated</span> <span id="roadmapUpdated">-</span> ·
       <a href="https://github.com/Nethercap/truck-companion/issues" target="_blank" rel="noopener" data-i18n="roadmapSuggest">Suggest something</a>
@@ -745,13 +776,15 @@
     <h2 data-i18n="faqTitle">Frequently asked questions</h2>
     <div class="faq" id="faqList">
       <details><summary data-i18n="faqQ1">Is it really free? What's the catch?</summary><p data-i18n="faqA1">No catch. No account needed, no ads, no routing limits, no Pro tier. Everything is open source. If you want to support it, you can <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">buy me a tea on Tecito</a>: it's optional and doesn't unlock anything.</p></details>
-      <details><summary data-i18n="faqQ2">Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?</summary><p data-i18n="faqA2">Yes. SmartScreen shows that warning for any new program that isn't code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game's telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive — the source and the build log are public, and a free code signing certificate for open source is in progress. Meanwhile you can add an exclusion or run the client from source.</p></details>
+      <details><summary data-i18n="faqQ2">Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?</summary><p data-i18n="faqA2">Yes. SmartScreen shows that warning for any new program that isn't code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game's telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive: the source and the build log are public. If yours blocks it, you can add an exclusion or run the client from source.</p></details>
       <details><summary data-i18n="faqQ3">Does my phone need to be on the same Wi-Fi as my PC?</summary><p data-i18n="faqA3">No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type.</p></details>
-      <details><summary data-i18n="faqQ4">Does it work with ProMods, Coast to Coast or other map mods?</summary><p data-i18n="faqA4">Yes: ProMods (with RusMap and Roextended), Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.</p></details>
+      <details><summary data-i18n="faqQ4">Does it work with ProMods, Coast to Coast or other map mods?</summary><p data-i18n="faqA4">Yes: ProMods (with RusMap and Roextended), Grand Utopia, European Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.</p></details>
       <details><summary data-i18n="faqQ5">Does it modify the game, my saves or my achievements?</summary><p data-i18n="faqA5">No. It reads data through SCS Software's official Telemetry SDK, which is a supported, read-only feature of both games. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.</p></details>
       <details><summary data-i18n="faqQ6">What do I need?</summary><p data-i18n="faqA6">A Windows PC running Euro Truck Simulator 2 or American Truck Simulator, and any device with a modern browser for the dashboard: your phone, a tablet, or a second monitor. You can add the dashboard to your home screen so it opens like an app.</p></details>
       <details><summary data-i18n="faqQ7">The dashboard says "waiting for telemetry". What now?</summary><p data-i18n="faqA7">Three things to check: the telemetry plugin is installed (the client can do it for you from the tray menu), the game is open and you're actually in the truck (not in a menu), and the tray icon shows "connected". The tray menu has a "Show log file" option that says exactly what it detected.</p></details>
       <details><summary data-i18n="faqQ8">Can I use it with a steering wheel, controller or on a second monitor?</summary><p data-i18n="faqA8">Yes — Truck Dash doesn't care how you drive. Open the dashboard in a browser on a second monitor for a big GPS view, or on a phone mounted on your desk. The button box works from any of them.</p></details>
+      <details><summary data-i18n="faqQ9">Does it work on Linux or the Steam Deck?</summary><p data-i18n="faqA9">Under Proton, yes: the Windows client runs inside the game's Proton prefix, plugin install and pairing code included. The steps and two ready-made launchers are in the <a href="https://github.com/Nethercap/truck-companion/tree/main/client#linux-through-proton" target="_blank" rel="noopener">client README</a>. The native Linux builds of the games are not supported yet.</p></details>
+      <details><summary data-i18n="faqQ10">Can I use it together with Trucky or other tools?</summary><p data-i18n="faqA10">Yes. Truck Dash installs its own telemetry plugin next to the one Trucky and similar tools use, without replacing or touching it, so both work at the same time.</p></details>
     </div>
   </section>
 
@@ -812,6 +845,7 @@ const TRANSLATIONS = {
     roadmapStatusExploring: 'exploring',
     roadmapStatusBlocked: 'needs a third party',
     roadmapStatusShipped: 'shipped',
+    roadmapShippedTitle: 'Already shipped',
     navLive: 'Live map',
     navSignIn: 'Sign in',
     accountsTitle: 'Your trips, saved. <span class="accent">If you want.</span>',
@@ -820,6 +854,7 @@ const TRANSLATIONS = {
     accountsLi2: 'Stats for each game: activity by week and month, records and achievements',
     accountsLi3: 'The countries and states you drove through',
     accountsLi4: 'Private by default, with a public profile only if you want one. Sign in with Discord, Google or email',
+    accountsLi5: 'Follow friends: once they accept, you see their trips and where they are driving now',
     accountsCta: 'Create a free account',
     accountsHow: 'How it works',
     accountsNote: 'Optional: everything else works without an account, and nothing is saved until you link it.',
@@ -845,7 +880,7 @@ const TRANSLATIONS = {
     gsStep1Body: 'A small portable program for Windows. Unzip it anywhere and run <code>TruckDash.exe</code>. It lives in your system tray.',
     gsStep1Link: 'Download (GitHub Releases)',
     gsStep2Title: 'Let it set up the game',
-    gsStep2Body: 'On first run, the client finds your ETS2 / ATS install and installs the official SCS telemetry plugin for you with one click. Prefer to do it by hand? The manual steps are in the README.',
+    gsStep2Body: 'On first run, the client finds your ETS2 / ATS install and installs its telemetry plugin, built on SCS\'s official SDK, with one click. It sits next to Trucky or any other telemetry tool without touching them. Prefer to do it by hand? The manual steps are in the README.',
     gsStep2Link: 'Manual plugin install (README)',
     gsStep3Title: 'Drive',
     gsStep3Body: 'Open the game. Your browser opens the dashboard already connected. On your phone, go to <code>trucksim-dash.com/app</code> and type the 8-letter code from the tray icon — your phone doesn\'t even need to be on the same Wi-Fi.',
@@ -853,11 +888,14 @@ const TRANSLATIONS = {
     smartscreenTitle: 'Windows says "unrecognized app"?',
     smartscreenBody: 'That\'s SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn\'t need admin rights and only reads the game\'s telemetry. Every release page lists the file\'s SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.',
     sourceOptionLink: 'Run from source →',
-    signpathNote: 'Code signing for releases is provided by <a href="https://signpath.io" target="_blank" rel="noopener">SignPath.io</a>, certificate by <a href="https://signpath.org" target="_blank" rel="noopener">SignPath Foundation</a> (in progress — see the <a href="https://github.com/Nethercap/truck-companion#code-signing-policy" target="_blank" rel="noopener">code signing policy</a>).',
     featuresTitle: 'Everything a truck GPS should do. <span class="accent">And a few things none do.</span>',
     featDiscordTitle: 'Discord status',
     featDiscordBody: 'Your Discord profile can show the run in progress while you drive: where you left from, where you are headed, how far is left and what you are hauling, with a timer. Off by default, one checkbox turns it on.',
     featMapTitle: 'Real map &amp; real routes',
+    featDlcTitle: 'Routes for the DLCs you own <span class="tag">new</span>',
+    featDlcBody: 'Tell it which map DLCs you have and routes go around the countries and states you don\'t own. If there is no way around one, the route uses it anyway and tells you.',
+    featAtlasTitle: 'Road Trip atlas in ATS <span class="tag">new</span>',
+    featAtlasBody: 'The Tourist Boards and Points of Interest of ATS\'s Road Trip, on the map and in the search: one tap adds the next one to your route.',
     featMapBody: "The actual road network of both games, with coastline, lakes, rivers and towns drawn underneath and lined up with the game's own coordinates. Routes are calculated over real roads to your destination, never a straight line.",
     featGpsTitle: 'GPS navigation mode',
     featGpsBody: 'Heading-up view that rotates as you drive, with turn-by-turn directions and the name of the road you\'re turning onto — like a real sat-nav.',
@@ -874,7 +912,7 @@ const TRANSLATIONS = {
     featButtonsTitle: 'Truck button box <span class="tag">only here</span>',
     featButtonsBody: 'Hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers and more — tap on your phone, the client presses the real key. Keys are read from your own in-game controls.',
     featLiveTitle: 'Other drivers, live <span class="tag">only here</span>',
-    featLiveBody: 'See other Truck Dash drivers on the same game and map as you, moving live — and watch every map from the <a href="/live/">public live map</a>, no account needed. Anonymous (position, truck and job only); one toggle turns it off.',
+    featLiveBody: 'See other Truck Dash drivers on the same game and map as you, moving live — and watch every map from the <a href="/live/">public live map</a>, no account needed. Anonymous: position, truck, job and the route you are on. One toggle turns it off, another keeps your route to yourself.',
     featMobileTitle: 'Any screen, anywhere',
     featMobileBody: 'Phone, tablet or second monitor, portrait or landscape. Add it to your home screen like an app. Your phone can be on mobile data — no same-Wi-Fi requirement. Drag any button or panel where it suits you: on a touch screen, press and hold one to start.',
     featConvoyTitle: 'Convoy with friends <span class="tag">beta</span>',
@@ -884,7 +922,7 @@ const TRANSLATIONS = {
     featVoiceTitle: 'Spoken directions <span class="tag">new</span>',
     featVoiceBody: 'Turn-by-turn read out loud: a heads-up before each turn, again at the turn, and when you arrive. Natural recorded voices in 8 languages, with no road names to mispronounce. Off by default, one switch in Settings.',
     featStatsTitle: 'Trip history &amp; stats <span class="tag">new</span>',
-    featStatsBody: 'With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, activity by week and month, records and achievements, and a public profile only if you want one. <a href="#accounts">More below</a>.',
+    featStatsBody: 'With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, activity by week and month, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.',
     modsAtsTitle: 'American Truck Simulator',
     modsEts2Title: 'Euro Truck Simulator 2',
     modsC2CNote: 'new roads and cities across the US',
@@ -897,6 +935,7 @@ const TRANSLATIONS = {
     modsRusMapNote: 'with the ProMods–RusMap connector',
     modsRoexNote: 'Hybrid edition, with or without RusMap',
     modsGUNote: 'standalone map',
+    modsEUGUNote: 'the Grand Utopia islands joined to Europe, with or without ProMods',
     modsTMPNote: 'TruckersMP HQ and the CD road',
     tagUnique: 'only here',
     screenshotCaption: 'This is what it looks like while driving:',
@@ -947,11 +986,11 @@ const TRANSLATIONS = {
     faqQ1: 'Is it really free? What\'s the catch?',
     faqA1: 'No catch. No account needed, no ads, no routing limits, no Pro tier. Everything is open source. If you want to support it, you can <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">buy me a tea on Tecito</a>: it\'s optional and doesn\'t unlock anything.',
     faqQ2: 'Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?',
-    faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive — the source and the build log are public, and a free code signing certificate for open source is in progress. Meanwhile you can add an exclusion or run the client from source.',
+    faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive: the source and the build log are public. If yours blocks it, you can add an exclusion or run the client from source.',
     faqQ3: 'Does my phone need to be on the same Wi-Fi as my PC?',
     faqA3: 'No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type. If you ARE on the same Wi-Fi, the client also offers a direct LAN mode (scan a QR code in its Setup window) with the lowest latency, no code and no internet needed.',
     faqQ4: 'Does it work with ProMods, Coast to Coast or other map mods?',
-    faqA4: 'Yes: ProMods (with RusMap and Roextended), Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.',
+    faqA4: 'Yes: ProMods (with RusMap and Roextended), Grand Utopia, European Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.',
     faqQ5: 'Does it modify the game, my saves or my achievements?',
     faqA5: 'No. It reads data through SCS Software\'s official Telemetry SDK, which is a supported, read-only feature of both games. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.',
     faqQ6: 'What do I need?',
@@ -960,6 +999,10 @@ const TRANSLATIONS = {
     faqA7: 'Three things to check: the telemetry plugin is installed (the client can do it for you from the tray menu), the game is open and you\'re actually in the truck (not in a menu), and the tray icon shows "connected". The tray menu has a "Show log file" option that says exactly what it detected.',
     faqQ8: 'Can I use it with a steering wheel, controller or on a second monitor?',
     faqA8: 'Yes — Truck Dash doesn\'t care how you drive. Open the dashboard in a browser on a second monitor for a big GPS view, or on a phone mounted on your desk. The button box works from any of them.',
+    faqQ9: 'Does it work on Linux or the Steam Deck?',
+    faqA9: 'Under Proton, yes: the Windows client runs inside the game\'s Proton prefix, plugin install and pairing code included. The steps and two ready-made launchers are in the <a href="https://github.com/Nethercap/truck-companion/tree/main/client#linux-through-proton" target="_blank" rel="noopener">client README</a>. The native Linux builds of the games are not supported yet.',
+    faqQ10: 'Can I use it together with Trucky or other tools?',
+    faqA10: 'Yes. Truck Dash installs its own telemetry plugin next to the one Trucky and similar tools use, without replacing or touching it, so both work at the same time.',
     communityTitle: 'Community',
     discordTitle: 'Join the Discord',
     discordBody: 'Every job delivered with Truck Dash is posted live in the server. Ask for help, request a mod, share your rig.',
@@ -1002,6 +1045,7 @@ const TRANSLATIONS = {
     roadmapStatusExploring: 'en estudio',
     roadmapStatusBlocked: 'depende de terceros',
     roadmapStatusShipped: 'ya está',
+    roadmapShippedTitle: 'Ya salió',
     navLive: 'Mapa en vivo',
     navSignIn: 'Entrar',
     accountsTitle: 'Tus viajes, guardados. <span class="accent">Si querés.</span>',
@@ -1010,6 +1054,7 @@ const TRANSLATIONS = {
     accountsLi2: 'Estadísticas por juego: actividad por semana y por mes, récords y logros',
     accountsLi3: 'Los países y estados por los que pasaste',
     accountsLi4: 'Privado por defecto, con perfil público solo si querés. Entrás con Discord, Google o mail',
+    accountsLi5: 'Seguir a amigos: cuando te aceptan, ves sus viajes y por dónde andan manejando',
     accountsCta: 'Crear una cuenta gratis',
     accountsHow: 'Cómo funciona',
     accountsNote: 'Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.',
@@ -1035,7 +1080,7 @@ const TRANSLATIONS = {
     gsStep1Body: 'Un programa chico y portable para Windows. Descomprimilo donde quieras y abrí <code>TruckDash.exe</code>. Vive en la bandeja del sistema.',
     gsStep1Link: 'Descargar (GitHub Releases)',
     gsStep2Title: 'Dejá que configure el juego',
-    gsStep2Body: 'La primera vez, el cliente encuentra tu instalación de ETS2 / ATS e instala el plugin oficial de telemetría de SCS por vos con un click. ¿Preferís hacerlo a mano? Los pasos manuales están en el README.',
+    gsStep2Body: 'La primera vez, el cliente encuentra tu instalación de ETS2 / ATS e instala su plugin de telemetría, hecho sobre el SDK oficial de SCS, con un click. Convive con Trucky o cualquier otra herramienta de telemetría sin tocarlas. ¿Preferís hacerlo a mano? Los pasos manuales están en el README.',
     gsStep2Link: 'Instalación manual del plugin (README)',
     gsStep3Title: 'Manejá',
     gsStep3Body: 'Abrí el juego. Tu navegador abre el tablero ya conectado. Desde el celular, entrá a <code>trucksim-dash.com/app</code> y escribí el código de 8 letras del ícono de la bandeja — ni siquiera hace falta que esté en la misma WiFi.',
@@ -1043,7 +1088,6 @@ const TRANSLATIONS = {
     smartscreenTitle: '¿Windows dice "aplicación no reconocida"?',
     smartscreenBody: 'Es SmartScreen avisando sobre cualquier programa nuevo sin firmar — tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que verifiques lo que bajaste, y siempre podés correrlo directo desde el código fuente.',
     sourceOptionLink: 'Correr desde el código fuente →',
-    signpathNote: 'La firma de código de los releases la provee <a href="https://signpath.io" target="_blank" rel="noopener">SignPath.io</a>, con certificado de <a href="https://signpath.org" target="_blank" rel="noopener">SignPath Foundation</a> (en trámite — ver la <a href="https://github.com/Nethercap/truck-companion#code-signing-policy" target="_blank" rel="noopener">política de firma</a>).',
     featuresTitle: 'Todo lo que un GPS de camión tiene que hacer. <span class="accent">Y algunas cosas que ninguno hace.</span>',
     featDiscordTitle: 'Estado de Discord',
     featDiscordBody: 'Tu perfil de Discord puede mostrar el viaje en curso mientras manejás: de dónde saliste, a dónde vas, cuánto falta y qué llevás, con cronómetro. Apagado por defecto, se prende con una casilla.',
@@ -1064,7 +1108,7 @@ const TRANSLATIONS = {
     featButtonsTitle: 'Botonera del camión <span class="tag">solo acá</span>',
     featButtonsBody: 'Balizas, beacon, freno de mano, motor, trailer, cámara, crucero, luces, limpiaparabrisas y más — tocás en el celular, el cliente aprieta la tecla real. Las teclas se leen de tus propios controles del juego.',
     featLiveTitle: 'Otros camioneros en vivo <span class="tag">solo acá</span>',
-    featLiveBody: 'Mirá a otros usuarios de Truck Dash en el mismo juego y mapa que vos, moviéndose en vivo — y seguí cualquier mapa desde el <a href="/live/">mapa en vivo público</a>, sin cuenta. Anónimo (posición, camión y viaje nada más); se apaga con un toggle.',
+    featLiveBody: 'Mirá a otros usuarios de Truck Dash en el mismo juego y mapa que vos, moviéndose en vivo — y seguí cualquier mapa desde el <a href="/live/">mapa en vivo público</a>, sin cuenta. Anónimo: posición, camión, viaje y la ruta que llevás. Se apaga con un interruptor, y otro deja la ruta solo para vos.',
     featMobileTitle: 'Cualquier pantalla, en cualquier lado',
     featMobileBody: 'Celular, tablet o segundo monitor, vertical u horizontal. Agregalo a la pantalla de inicio como una app. El celular puede estar con datos móviles — no hace falta la misma WiFi. Arrastrá cualquier botón o panel a donde te sirva: en pantalla táctil, mantené apretado uno para empezar.',
     featConvoyTitle: 'Convoy con amigos <span class="tag">beta</span>',
@@ -1074,7 +1118,11 @@ const TRANSLATIONS = {
     featVoiceTitle: 'Indicaciones habladas <span class="tag">nuevo</span>',
     featVoiceBody: 'Las indicaciones de giro en voz alta: un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, sin nombres de rutas mal pronunciados. Apagada por defecto, un interruptor en Ajustes.',
     featStatsTitle: 'Historial de viajes y estadísticas <span class="tag">nuevo</span>',
-    featStatsBody: 'Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, actividad por semana y por mes, récords y logros, y un perfil público solo si querés. <a href="#accounts">Más abajo</a>.',
+    featStatsBody: 'Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, actividad por semana y por mes, récords y logros, amigos para seguir, y un perfil público solo si querés. <a href="#accounts">Más abajo</a>.',
+    featDlcTitle: 'Rutas con los DLC que tenés <span class="tag">nuevo</span>',
+    featDlcBody: 'Marcá qué DLC de mapa tenés y las rutas rodean los países y estados que no. Si no hay forma de rodear uno, la ruta pasa igual y te avisa.',
+    featAtlasTitle: 'Atlas del Road Trip en ATS <span class="tag">nuevo</span>',
+    featAtlasBody: 'Los Tourist Boards y Points of Interest del Road Trip de ATS, en el mapa y en el buscador: con un toque sumás el próximo a tu ruta.',
     modsAtsTitle: 'American Truck Simulator',
     modsEts2Title: 'Euro Truck Simulator 2',
     modsC2CNote: 'rutas y ciudades nuevas por todo EE. UU.',
@@ -1087,6 +1135,7 @@ const TRANSLATIONS = {
     modsRusMapNote: 'con el conector ProMods–RusMap',
     modsRoexNote: 'edición Hybrid, con o sin RusMap',
     modsGUNote: 'mapa standalone',
+    modsEUGUNote: 'las islas de Grand Utopia pegadas a Europa, con o sin ProMods',
     modsTMPNote: 'la sede de TruckersMP y la ruta CD',
     tagUnique: 'solo acá',
     screenshotCaption: 'Así se ve mientras manejás:',
@@ -1137,11 +1186,11 @@ const TRANSLATIONS = {
     faqQ1: '¿Es realmente gratis? ¿Cuál es la trampa?',
     faqA1: 'No hay trampa. Sin cuenta obligatoria, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si querés apoyarlo, podés <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">invitarme un tecito</a>: es opcional y no desbloquea nada.',
     faqQ2: 'Windows o mi antivirus dicen que el archivo es "no reconocido" o peligroso. ¿Es seguro?',
-    faqA2: 'Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python. Algunos antivirus lo marcan por lo mismo (un ejecutable sin firma que se descomprime solo): es un falso positivo — el código y el log de compilación son públicos, y hay un certificado de firma gratuito para proyectos abiertos en trámite. Mientras tanto podés agregar una excepción o correr el cliente desde el código fuente.',
+    faqA2: 'Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python. Algunos antivirus lo marcan por lo mismo (un ejecutable sin firma que se descomprime solo): es un falso positivo: el código y el log de compilación son públicos. Si el tuyo lo bloquea, podés agregar una excepción o correr el cliente desde el código fuente.',
     faqQ3: '¿Mi celular tiene que estar en la misma WiFi que la PC?',
     faqA3: 'No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.',
     faqQ4: '¿Funciona con ProMods, Coast to Coast u otros mods de mapa?',
-    faqA4: 'Sí: ProMods (con RusMap y Roextended), Grand Utopia y TruckersMP para ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion y Reforma para ATS — en las combinaciones habituales. El cliente detecta lo que usa tu perfil y la app cambia sola. ¿Querés otro? Pedilo en Discord.',
+    faqA4: 'Sí: ProMods (con RusMap y Roextended), Grand Utopia, European Grand Utopia y TruckersMP para ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion y Reforma para ATS — en las combinaciones habituales. El cliente detecta lo que usa tu perfil y la app cambia sola. ¿Querés otro? Pedilo en Discord.',
     faqQ5: '¿Modifica el juego, mis partidas o mis logros?',
     faqA5: 'No. Lee los datos a través del SDK de telemetría oficial de SCS Software, que es una función soportada y de solo lectura de ambos juegos. No se escribe nada en el juego, tu perfil ni tus partidas, y los logros no se ven afectados. También funciona junto con TruckersMP.',
     faqQ6: '¿Qué necesito?',
@@ -1150,6 +1199,10 @@ const TRANSLATIONS = {
     faqA7: 'Tres cosas para revisar: que el plugin de telemetría esté instalado (el cliente lo puede hacer por vos desde el menú de la bandeja), que el juego esté abierto y estés arriba del camión (no en un menú), y que el ícono de la bandeja diga "connected". El menú de la bandeja tiene una opción "Show log file" que dice exactamente qué detectó.',
     faqQ8: '¿Puedo usarlo con volante, joystick o en un segundo monitor?',
     faqA8: 'Sí — a Truck Dash no le importa cómo manejás. Abrí el tablero en un navegador en un segundo monitor para un GPS grande, o en un celular apoyado en el escritorio. La botonera funciona desde cualquiera.',
+    faqQ9: '¿Anda en Linux o en la Steam Deck?',
+    faqA9: 'Con Proton, sí: el cliente de Windows corre adentro del prefijo de Proton del juego, con la instalación del plugin y el código de emparejamiento incluidos. Los pasos y dos lanzadores listos están en el <a href="https://github.com/Nethercap/truck-companion/tree/main/client#linux-through-proton" target="_blank" rel="noopener">README del cliente</a>. Los builds nativos de Linux de los juegos todavía no están soportados.',
+    faqQ10: '¿Puedo usarlo junto con Trucky u otras herramientas?',
+    faqA10: 'Sí. Truck Dash instala su propio plugin de telemetría al lado del que usan Trucky y herramientas parecidas, sin reemplazarlo ni tocarlo, así que andan los dos a la vez.',
     communityTitle: 'Comunidad',
     discordTitle: 'Sumate al Discord',
     discordBody: 'Cada trabajo entregado con Truck Dash se publica en vivo en el servidor. Pedí ayuda, pedí un mod, mostrá tu equipo.',
@@ -1192,7 +1245,7 @@ function applyTranslations() {
 // verdad para el texto visible y el que ve Google).
 function buildFaqJsonLd() {
   const items = [];
-  for (let i = 1; i <= 8; i++) {
+  for (let i = 1; i <= 12; i++) {
     const q = t(`faqQ${i}`), a = t(`faqA${i}`);
     if (!q || !a) continue;
     items.push({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } });
@@ -1325,9 +1378,8 @@ updateScrollHints();
 function renderRoadmap() {
   const grid = document.getElementById('roadmapGrid');
   if (!grid || !roadmapData) return;
-  const order = { building: 0, planned: 1, exploring: 2, blocked: 3, shipped: 4 };
-  const items = [...roadmapData.items].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
-  grid.innerHTML = items.map(item => {
+  const order = { building: 0, planned: 1, exploring: 2, blocked: 3 };
+  const card = item => {
     const txt = item[currentLang] || item.en;
     const chipKey = 'roadmapStatus' + item.status.charAt(0).toUpperCase() + item.status.slice(1);
     const chip = (TRANSLATIONS[currentLang] || TRANSLATIONS.en)[chipKey] || item.status;
@@ -1336,13 +1388,20 @@ function renderRoadmap() {
       <h3>${txt.title}</h3>
       <p>${txt.body}</p>
     </div>`;
-  }).join('');
+  };
+  const open = roadmapData.items.filter(i => i.status !== 'shipped')
+    .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+  // Lo hecho, en el orden del JSON (lo mas nuevo arriba), sin la chapita.
+  const shipped = roadmapData.items.filter(i => i.status === 'shipped');
+  grid.innerHTML = open.map(card).join('');
+  document.getElementById('roadmapShipped').innerHTML = shipped.map(card).join('');
+  document.getElementById('roadmapShippedTitle').hidden = !shipped.length;
   const updated = document.getElementById('roadmapUpdated');
   if (updated && roadmapData.updated) {
     updated.textContent = new Date(roadmapData.updated + 'T12:00:00Z').toLocaleDateString(currentLang, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 }
-fetch('/data/roadmap.json?v=5').then(r => r.ok ? r.json() : null).then(data => {
+fetch('/data/roadmap.json?v=6').then(r => r.ok ? r.json() : null).then(data => {
   if (!data) return;
   roadmapData = data;
   renderRoadmap();
