@@ -49,6 +49,7 @@ import account
 import account_sync
 import plugin_installer
 import win_integration
+import i18n
 from i18n import T
 
 # En modo --windowed (sin consola) PyInstaller deja sys.stdout/stderr en None,
@@ -388,6 +389,27 @@ def anunciar_cuentas(icon) -> bool:
     return True
 
 
+def texto_menu(clave: str):
+    """Texto de un item de la bandeja que se traduce al abrir el menu, no al
+    arrancar: asi el idioma elegido en Setup vale enseguida."""
+    return lambda item: T(clave)
+
+
+def set_client_language(codigo: str) -> None:
+    """Idioma del cliente elegido en Setup ("auto" = el de Windows)."""
+    settings = win_integration.load_settings()
+    settings["language"] = codigo
+    win_integration.save_settings(settings)
+    i18n.set_language(codigo)
+    logging.info("Idioma del cliente: %s (%s)", codigo, i18n.LANG)
+    state.refresh_title()
+    if state.icon is not None:
+        try:
+            state.icon.update_menu()
+        except Exception:
+            pass
+
+
 def open_setup_window(icon=None, item=None):
     global _setup_window_open
     with _setup_window_lock:
@@ -400,7 +422,13 @@ def open_setup_window(icon=None, item=None):
 def _setup_window_main():
     global _setup_window_open
     try:
-        SetupWindow().run()
+        # Al cambiar el idioma la ventana se cierra y se vuelve a abrir, ya
+        # escrita en el idioma nuevo.
+        while True:
+            ventana = SetupWindow()
+            ventana.run()
+            if not ventana.reabrir:
+                break
     except Exception:
         logging.exception("Setup window crashed")
     finally:
@@ -411,6 +439,7 @@ def _setup_window_main():
 class SetupWindow:
     def __init__(self):
         self.root = tk.Tk()
+        self.reabrir = False
         self.root.title(T("win_title", v=client_lib.CLIENT_VERSION))
         self.root.configure(bg=BG)
         self.root.resizable(False, False)
@@ -566,6 +595,23 @@ class SetupWindow:
 
         # --- Opciones ---
         options = self.section(T("sec_options"))
+        fila = tk.Frame(options, bg=BG)
+        fila.pack(anchor="w", pady=(4, 2))
+        # "Language" entre parentesis si el cliente esta en otro idioma: quien
+        # lo ve en uno que no entiende igual encuentra donde cambiarlo.
+        etiqueta = T("language") + ("" if i18n.LANG == "en" else " (Language)")
+        self.label(fila, etiqueta, fg=MUTED).pack(side="left", padx=(0, 8))
+        opciones = [("auto", T("language_auto"))] + list(i18n.LANGUAGE_NAMES.items())
+        elegido = win_integration.load_settings().get("language")
+        elegido = elegido if elegido in i18n.LANGUAGE_NAMES else "auto"
+        por_texto = {texto: clave for clave, texto in opciones}
+        self.language_var = tk.StringVar(master=self.root, value=dict(opciones)[elegido])
+        menu = tk.OptionMenu(fila, self.language_var, *por_texto,
+                             command=lambda texto: self.change_language(por_texto[texto]))
+        menu.configure(bg="#262b33", fg=FG, activebackground="#2f3540", activeforeground=FG,
+                       highlightthickness=0, bd=0)
+        menu["menu"].configure(bg="#262b33", fg=FG)
+        menu.pack(side="left")
         self.autostart_var = tk.BooleanVar(value=win_integration.is_autostart_enabled())
         chk = tk.Checkbutton(options, text=T("autostart"), variable=self.autostart_var,
                              command=self.toggle_autostart, bg=BG, fg=FG, selectcolor="#262b33", activebackground=BG, activeforeground=FG)
@@ -942,6 +988,11 @@ class SetupWindow:
             self.overlay_move_hint.pack(anchor="w", pady=(4, 0))
         else:
             self.overlay_move_hint.pack_forget()
+
+    def change_language(self, codigo: str):
+        set_client_language(codigo)
+        self.reabrir = True
+        self.root.destroy()
 
     def toggle_overlay(self):
         set_overlay(self.overlay_var.get())
@@ -1926,6 +1977,8 @@ def main():
     parser.add_argument("--wait-pid", type=int, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--relaunch", action="store_true", help=argparse.SUPPRESS)  # relanzado por la instancia anterior: esperar a que suelte el mutex  # URL de un zip: aplica la actualizacion y relanza (para probar el flujo real)
     args = parser.parse_args()
+    # El idioma elegido en Setup, antes de escribir cualquier texto.
+    i18n.set_language(win_integration.load_settings().get("language"))
 
     # Modo ayudante: lo lanza la version vieja y lo unico que hace es esperar
     # a que muera, pisarla y arrancar la nueva. Va antes que todo lo demas, y
@@ -1985,24 +2038,24 @@ def main():
         sys.exit(0)
 
     menu_items = [
-        pystray.MenuItem(T("menu_setup"), open_setup_window, default=True),
-        pystray.MenuItem(T("menu_open_dashboard"), open_web_menu_item),
-        pystray.MenuItem(T("menu_account"), open_account_menu_item,
+        pystray.MenuItem(texto_menu("menu_setup"), open_setup_window, default=True),
+        pystray.MenuItem(texto_menu("menu_open_dashboard"), open_web_menu_item),
+        pystray.MenuItem(texto_menu("menu_account"), open_account_menu_item,
                          visible=lambda item: cuentas_visibles()),
-        pystray.MenuItem(T("menu_show_code"), show_code_notification),
-        pystray.MenuItem(T("menu_lan"), show_lan_menu_item),
-        pystray.MenuItem(T("menu_overlay"), toggle_overlay_menu_item,
+        pystray.MenuItem(texto_menu("menu_show_code"), show_code_notification),
+        pystray.MenuItem(texto_menu("menu_lan"), show_lan_menu_item),
+        pystray.MenuItem(texto_menu("menu_overlay"), toggle_overlay_menu_item,
                          checked=lambda item: state.overlay.enabled,
                          visible=win_integration.overlay_supported()),
-        pystray.MenuItem(T("menu_disconnect"), disconnect_session),
-        pystray.MenuItem(T("menu_autostart"), toggle_autostart_menu_item, checked=lambda item: win_integration.is_autostart_enabled(), enabled=lambda item: win_integration.exe_path() is not None),
-        pystray.MenuItem(T("menu_check_updates"), check_for_update_menu_item),
-        pystray.MenuItem(T("menu_show_log"), show_log_location),
-        pystray.MenuItem(T("menu_report"), report_problem),
+        pystray.MenuItem(texto_menu("menu_disconnect"), disconnect_session),
+        pystray.MenuItem(texto_menu("menu_autostart"), toggle_autostart_menu_item, checked=lambda item: win_integration.is_autostart_enabled(), enabled=lambda item: win_integration.exe_path() is not None),
+        pystray.MenuItem(texto_menu("menu_check_updates"), check_for_update_menu_item),
+        pystray.MenuItem(texto_menu("menu_show_log"), show_log_location),
+        pystray.MenuItem(texto_menu("menu_report"), report_problem),
     ]
     if DONATE_URL:
-        menu_items.append(pystray.MenuItem(T("menu_support"), open_donate))
-    menu_items.append(pystray.MenuItem(T("menu_quit"), quit_app))
+        menu_items.append(pystray.MenuItem(texto_menu("menu_support"), open_donate))
+    menu_items.append(pystray.MenuItem(texto_menu("menu_quit"), quit_app))
     icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", pystray.Menu(*menu_items))
     state.icon = icon
 

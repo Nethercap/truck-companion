@@ -219,3 +219,17 @@ def test_el_ejemplo_del_modo_mover_respeta_lo_elegido():
     assert d["gameArrivalLabel"] == "J"
     # Con nada elegido igual se ve algo para poder ubicarlo.
     assert overlay.ejemplo((), ("F", "R", "J"))["speed"]
+
+
+def test_el_idioma_del_cliente_se_elige():
+    import i18n
+    antes = i18n.LANG
+    try:
+        assert i18n.set_language("de") == "de" and i18n.T("overlay_move") == "Verschieben"
+        assert i18n.set_language("auto") == i18n.detect_language()
+        assert i18n.set_language("xx") == i18n.detect_language()
+        assert set(i18n.LANGUAGE_NAMES) == set(i18n._STRINGS)
+        for lang, textos in i18n._STRINGS.items():
+            assert textos.get("language") and textos.get("language_auto"), lang
+    finally:
+        i18n.LANG = antes

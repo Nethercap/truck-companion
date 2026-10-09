@@ -6,6 +6,8 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- You can pick the client's language in Setup, Options (it follows Windows by default).
+  Setup and the tray menu switch right away.
 - In-game overlay (Windows): a small panel over the game with your speed and the speed
   limit, plus the next turn, the next city, distance left and arrival when the dashboard
   has a route (on your phone, a tablet or this PC). It lets clicks through, never takes

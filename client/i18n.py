@@ -77,6 +77,8 @@ _STRINGS = {
         "pick_folder_title": "Select the game's install folder (contains bin\\win_x64)",
         "not_game_folder": "That folder doesn't look like an ETS2/ATS install (no eurotrucks2.exe / amtrucks.exe inside bin\\win_x64).",
         "sec_options": "OPTIONS",
+        "language": "Language",
+        "language_auto": "Automatic (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "ACCOUNT (OPTIONAL)",
         "account_none": 'Not linked.',
@@ -235,6 +237,8 @@ _STRINGS = {
         "pick_folder_title": "Elegí la carpeta de instalación del juego (contiene bin\\win_x64)",
         "not_game_folder": "Esa carpeta no parece una instalación de ETS2/ATS (no hay eurotrucks2.exe / amtrucks.exe dentro de bin\\win_x64).",
         "sec_options": "OPCIONES",
+        "language": "Idioma",
+        "language_auto": "Automático (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "CUENTA (OPCIONAL)",
         "account_none": 'Sin vincular.',
@@ -393,6 +397,8 @@ _STRINGS = {
         "pick_folder_title": "Installationsordner des Spiels wählen (enthält bin\\win_x64)",
         "not_game_folder": "Dieser Ordner sieht nicht nach einer ETS2/ATS-Installation aus (keine eurotrucks2.exe / amtrucks.exe in bin\\win_x64).",
         "sec_options": "OPTIONEN",
+        "language": "Sprache",
+        "language_auto": "Automatisch (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "KONTO (OPTIONAL)",
         "account_none": 'Nicht verknüpft.',
@@ -551,6 +557,8 @@ _STRINGS = {
         "pick_folder_title": "Choisis le dossier d'installation du jeu (contient bin\\win_x64)",
         "not_game_folder": "Ce dossier ne ressemble pas à une installation d'ETS2/ATS (pas de eurotrucks2.exe / amtrucks.exe dans bin\\win_x64).",
         "sec_options": "OPTIONS",
+        "language": "Langue",
+        "language_auto": "Automatique (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "COMPTE (OPTIONNEL)",
         "account_none": 'Non lié.',
@@ -709,6 +717,8 @@ _STRINGS = {
         "pick_folder_title": "Escolha a pasta de instalação do jogo (contém bin\\win_x64)",
         "not_game_folder": "Essa pasta não parece uma instalação do ETS2/ATS (sem eurotrucks2.exe / amtrucks.exe dentro de bin\\win_x64).",
         "sec_options": "OPÇÕES",
+        "language": "Idioma",
+        "language_auto": "Automático (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "CONTA (OPCIONAL)",
         "account_none": 'Não vinculada.',
@@ -867,6 +877,8 @@ _STRINGS = {
         "pick_folder_title": "Wybierz folder instalacji gry (zawiera bin\\win_x64)",
         "not_game_folder": "Ten folder nie wygląda na instalację ETS2/ATS (brak eurotrucks2.exe / amtrucks.exe w bin\\win_x64).",
         "sec_options": "OPCJE",
+        "language": "Język",
+        "language_auto": "Automatycznie (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "KONTO (OPCJONALNE)",
         "account_none": 'Niepowiązane.',
@@ -1025,6 +1037,8 @@ _STRINGS = {
         "pick_folder_title": "Oyunun kurulum klasörünü seç (bin\\win_x64 içerir)",
         "not_game_folder": "Bu klasör bir ETS2/ATS kurulumuna benzemiyor (bin\\win_x64 içinde eurotrucks2.exe / amtrucks.exe yok).",
         "sec_options": "SEÇENEKLER",
+        "language": "Dil",
+        "language_auto": "Otomatik (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "HESAP (İSTEĞE BAĞLI)",
         "account_none": 'Bağlı değil.',
@@ -1183,6 +1197,8 @@ _STRINGS = {
         "pick_folder_title": "Выберите папку установки игры (содержит bin\\win_x64)",
         "not_game_folder": "Эта папка не похожа на установку ETS2/ATS (нет eurotrucks2.exe / amtrucks.exe в bin\\win_x64).",
         "sec_options": "ПАРАМЕТРЫ",
+        "language": "Язык",
+        "language_auto": "Автоматически (Windows)",
         # Seccion de cuenta (opcional): vincular esta PC con una cuenta.
         "sec_account": "АККАУНТ (НЕОБЯЗАТЕЛЬНО)",
         "account_none": 'Не привязан.',
@@ -1307,6 +1323,18 @@ def detect_language() -> str:
 
 
 LANG = detect_language()
+
+# Como se llama cada idioma en su propia lengua (selector de Setup).
+LANGUAGE_NAMES = {"en": "English", "es": "Español", "de": "Deutsch", "fr": "Français",
+                  "pt": "Português", "pl": "Polski", "tr": "Türkçe", "ru": "Русский"}
+
+
+def set_language(code: str | None) -> str:
+    """Idioma elegido en Setup; None o "auto" vuelve al de Windows. T() lo
+    lee en cada llamada, asi que vale para todo lo que se escriba despues."""
+    global LANG
+    LANG = code if code in _STRINGS else detect_language()
+    return LANG
 
 
 def T(key: str, **kwargs) -> str:
