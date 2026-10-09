@@ -4,20 +4,20 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.29 (2026-10-09)
 
+- In-game overlay (Windows): a small panel over the game with your speed and the speed
+  limit, the next turn and next city, distance left, and your arrival time both in real
+  time and on the game clock. The turn and the real arrival come from the dashboard
+  (phone, tablet or this PC); speed, limit and the game clock arrival work without it.
+  It lets clicks through, never takes focus from the game and hides when the game is not
+  in front. Off by default: turn it on in Setup, from the tray menu or with Ctrl+Shift+O
+  from inside the game (you can pick another shortcut). It has its own section in Setup:
+  a corner or anywhere you drag it with Move, its size and what it shows. With voice
+  guidance on in the dashboard, the dashboard also speaks the turns while the overlay is
+  on. Needs the game in a window or in borderless fullscreen.
 - You can pick the client's language in Setup, Options (it follows Windows by default).
   Setup and the tray menu switch right away.
-- In-game overlay (Windows): a small panel over the game with your speed and the speed
-  limit, plus the next turn, the next city, distance left and arrival when the dashboard
-  has a route (on your phone, a tablet or this PC). It lets clicks through, never takes
-  focus from the game and hides when the game is not in front. Off by default: turn it on
-  in Setup, from the tray menu or with Ctrl+Shift+O from inside the game (you can pick
-  another shortcut). It has its own section in Setup: choose a corner or drag it anywhere
-  with Move, its size and what it shows. It can
-  also show your arrival time on the game clock, next to the real one. With voice guidance
-  on in the dashboard, the dashboard also speaks the turns while the overlay is on. Needs
-  the game in a window or in borderless fullscreen.
 - Linux (Proton): Setup finds your games in Steam's Linux libraries (also on other
   drives and with the Flatpak Steam), without the game having to be running first.
 
