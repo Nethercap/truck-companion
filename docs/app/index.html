@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261009b" />
-<link rel="stylesheet" href="app.css?v=20261009b" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261009c" />
+<link rel="stylesheet" href="app.css?v=20261009c" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -329,6 +329,11 @@
         <div id="miniHudExtra" class="miniHudExtra"></div>
       </div>
       <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
+      <div class="mapNoWebgl" id="mapNoWebgl" hidden>
+        <b data-i18n="noWebglTitle">The map needs WebGL</b>
+        <p data-i18n="noWebglBody">This browser has WebGL turned off, so the map can't be drawn. Speed, trip, truck and the rest of the dashboard still work.</p>
+        <p class="muted" data-i18n="noWebglFix">To see the map, turn WebGL on (in LibreWolf: about:config, set webgl.disabled to false) or open the dashboard in Chrome, Edge or Firefox.</p>
+      </div>
       <div id="mapLoading" class="mapLoading" style="display:none;"><span class="mapSpinner"></span><span id="mapLoadingText"></span></div>
       <div id="reconnectBanner"></div>
       <div class="mapLeftControls mapBtnGroup" id="mapLeftControls">
@@ -607,13 +612,13 @@
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261009b"></script>
-<script src="pure.js?v=20261009b"></script>
-<script src="i18n.js?v=20261009b"></script>
-<script src="i18n_en_es.js?v=20261009b"></script>
-<script src="../dash/dash.js?v=20261009b"></script>
-<script src="app.js?v=20261009b"></script>
-<script src="convoy.js?v=20261009b"></script>
-<script src="livemap.js?v=20261009b"></script>
+<script src="variants.js?v=20261009c"></script>
+<script src="pure.js?v=20261009c"></script>
+<script src="i18n.js?v=20261009c"></script>
+<script src="i18n_en_es.js?v=20261009c"></script>
+<script src="../dash/dash.js?v=20261009c"></script>
+<script src="app.js?v=20261009c"></script>
+<script src="convoy.js?v=20261009c"></script>
+<script src="livemap.js?v=20261009c"></script>
 </body>
 </html>

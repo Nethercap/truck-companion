@@ -1538,11 +1538,34 @@ document.addEventListener('pointermove', (ev) => {
 }, true);
 for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, cancelLongPress, true);
 
+// Sin WebGL MapLibre no puede crear el mapa (LibreWolf lo trae apagado, y
+// algunas configuraciones de privacidad tambien). La telemetria igual llega
+// y el resto del tablero funciona: se avisa una vez, en el lugar del mapa, y
+// no se reintenta en cada dato.
+let mapUnavailable = false;
+function webglAvailable() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'));
+  } catch (err) {
+    return false;
+  }
+}
+function showNoWebgl(err) {
+  mapUnavailable = true;
+  if (err) console.error('No se pudo crear el mapa', err);
+  document.getElementById('mapNoWebgl').hidden = false;
+  document.getElementById('mapHint').hidden = true;
+  setMapLoading(null);
+}
+
 function ensureMapInitialized() {
-  if (map) return;
+  if (map || mapUnavailable) return;
+  if (!webglAvailable()) { showNoWebgl(); return; }
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile);
-  map = new maplibregl.Map({
+  try {
+    map = new maplibregl.Map({
     container: 'mapCanvas',
     style: {
       version: 8,
@@ -1565,7 +1588,12 @@ function ensureMapInitialized() {
     // Lite: pintar a 1x en pantallas de alta densidad (hasta 4x menos pixeles).
     pixelRatio: liteMode ? 1 : undefined,
     maxZoom: liteMode ? 15 : undefined,
-  });
+    });
+  } catch (err) {
+    map = null;
+    showNoWebgl(err);
+    return;
+  }
   // Mientras haya un dedo o el mouse apretado sobre el mapa, la camara que
   // sigue al camion no se mueve (ver mapGestureActive).
   const mapCanvas = map.getCanvasContainer();
@@ -5177,6 +5205,7 @@ function startDemo() {
   // igual entre los centros de las ciudades.
   const poisUntil = Date.now() + 8000;
   const waitAssets = () => {
+    if (mapUnavailable) return; // sin WebGL no hay mapa ni ruta: el cartel lo explica
     if (!mapReady || !routeGraph || !citiesByName[DEMO_ROUTE.from] || !citiesByName[DEMO_ROUTE.to] || !truckMarker
         || (!pois && Date.now() < poisUntil)) {
       if (Date.now() > giveUpAt) { showToast('Demo route unavailable', 'danger'); return; }

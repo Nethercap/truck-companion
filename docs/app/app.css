@@ -159,6 +159,15 @@
   /* Que mapa/mods estan cargados se mira una vez, al arrancar: despues es un
      cartel de mas que ademas se pisa con el mini-HUD cuando tiene la ETA. */
   .mapHint.faded { opacity: 0; pointer-events: none; }
+  /* Sin WebGL (LibreWolf lo trae apagado): el mapa no se puede dibujar y
+     antes quedaba gris sin explicacion. */
+  .mapNoWebgl { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1100;
+    width: min(26rem, calc(100% - 2rem)); background: rgba(23,26,31,0.96); border: 1px solid #333; border-radius: 10px;
+    padding: 0.9rem 1rem; font-size: 0.85rem; color: var(--text); line-height: 1.4; }
+  .mapNoWebgl[hidden] { display: none; }
+  .mapNoWebgl b { display: block; font-size: 0.95rem; margin-bottom: 0.35rem; }
+  .mapNoWebgl p { margin: 0.35rem 0 0; }
+  .mapNoWebgl .muted { color: var(--muted); font-size: 0.8rem; }
 
   /* Banner grande y parpadeante cuando se corta la conexion - a diferencia
      del texto chico de #status, esto se nota de un vistazo aunque estes
