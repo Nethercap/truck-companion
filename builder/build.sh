@@ -6,7 +6,8 @@
 # Falta node.exe, que agrega el workflow de release (ver build-client.yml).
 #
 # Uso: builder/build.sh [carpeta de salida]   (por defecto builder/dist)
-# Corre en Linux (CI y WSL). Pide git, node >= 20 y npm.
+# Corre en Linux (CI y WSL). Pide git, node >= 24.13 y npm >= 11.6 (los
+# engines de truckermudgeon/maps).
 set -euo pipefail
 
 UPSTREAM_REPO="https://github.com/truckermudgeon/maps.git"

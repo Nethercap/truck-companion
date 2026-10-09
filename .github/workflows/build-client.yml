@@ -42,14 +42,16 @@ jobs:
     # node.exe oficial verificado contra el SHASUMS de nodejs.org.
     runs-on: ubuntu-latest
     env:
-      NODE_WIN_VERSION: '22.12.0'
+      # La misma version con la que se probo el armador en Windows (09-10).
+      NODE_WIN_VERSION: '24.19.0'
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.commit }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          # truckermudgeon/maps pide node >= 24.13 y npm >= 11.6.2 (engines).
+          node-version: '24'
       - name: Build the map builder
         run: bash builder/build.sh "$RUNNER_TEMP/builder"
       - name: Add node.exe for Windows
