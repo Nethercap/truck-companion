@@ -451,15 +451,23 @@ class _Ventana:
 
 
 # --- Tecla rapida ------------------------------------------------------------
-# Prende y apaga el overlay sin salir del juego. Es una tecla global de
-# Windows (RegisterHotKey): anda con el juego al frente, y la combinacion la
-# toma Windows para nosotros, asi que no le llega al juego. Por eso son
-# combinaciones con Ctrl o Alt que ETS2 y ATS no usan por defecto.
+# Prende y apaga el overlay sin salir del juego.
+#
+# No es RegisterHotKey: ETS2 lee el teclado como raw input con las teclas
+# rapidas de otros programas anuladas (RIDEV_NOHOTKEYS), y con el juego al
+# frente no llegaba nunca (probado el 09-10). Tampoco un hook de teclado de
+# bajo nivel: cada tecla del juego pasaria por Python antes de llegarle, y
+# con el GIL ocupado eso es demora al manejar. Se mira el estado del teclado
+# 20 veces por segundo (GetAsyncKeyState), que no depende de como lea el
+# juego. La contra: el juego tambien ve la combinacion, por eso son
+# combinaciones que ETS2 y ATS no usan por defecto.
 HOTKEYS = ("ctrl+shift+o", "ctrl+shift+h", "ctrl+alt+o", "alt+shift+o", "")
 DEFAULT_HOTKEY = "ctrl+shift+o"
-MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_NOREPEAT = 0x1, 0x2, 0x4, 0x4000
-WM_HOTKEY, WM_QUIT = 0x0312, 0x0012
+MOD_ALT, MOD_CONTROL, MOD_SHIFT = 0x1, 0x2, 0x4
 _MODS = {"ctrl": MOD_CONTROL, "alt": MOD_ALT, "shift": MOD_SHIFT}
+# Tecla virtual de cada modificador (cualquiera de los dos lados).
+_VK_MODS = {MOD_CONTROL: 0x11, MOD_ALT: 0x12, MOD_SHIFT: 0x10}
+POLL_SECONDS = 0.05
 
 
 def tecla(combinacion: str) -> tuple[int, int] | None:
@@ -480,56 +488,50 @@ def nombre_tecla(combinacion: str) -> str:
     return "+".join(p.capitalize() if len(p) > 1 else p.upper() for p in combinacion.split("+"))
 
 
+def combinacion_apretada(mods: int, vk: int, abajo) -> bool:
+    """Si esta apretada exactamente esa combinacion. abajo(vk) dice si una
+    tecla virtual esta abajo. Exacta: con Ctrl+Shift+O, Ctrl+Alt+Shift+O no
+    cuenta."""
+    if not abajo(vk):
+        return False
+    return all(abajo(v) == bool(mods & m) for m, v in _VK_MODS.items())
+
+
 class TeclaRapida:
-    """Escucha una combinacion global en su propio hilo (RegisterHotKey avisa
-    al hilo que la registro). poner() la cambia; "" la saca."""
+    """Mira una combinacion en su propio hilo y llama a al_apretar una vez
+    por apretada (al bajar, no mientras se mantiene). poner() la cambia;
+    "" la saca."""
 
     def __init__(self, al_apretar):
         self.al_apretar = al_apretar
         self._hilo = None
-        self._id_hilo = None
+        self._parar = None
         self.actual = ""
 
     def poner(self, combinacion: str) -> None:
-        self._sacar()
+        if self._parar is not None:
+            self._parar.set()
+        self._hilo = self._parar = None
         self.actual = combinacion if tecla(combinacion) else ""
         if not self.actual:
             return
-        listo = threading.Event()
-        self._hilo = threading.Thread(target=self._escuchar, args=(self.actual, listo),
+        self._parar = threading.Event()
+        self._hilo = threading.Thread(target=self._mirar, args=(self.actual, self._parar),
                                       name="tecla-overlay", daemon=True)
         self._hilo.start()
-        listo.wait(2)
+        logging.info("Tecla del overlay: %s", nombre_tecla(self.actual))
 
-    def _sacar(self) -> None:
-        if self._hilo is not None and self._id_hilo:
-            import ctypes
-            ctypes.windll.user32.PostThreadMessageW(self._id_hilo, WM_QUIT, 0, 0)
-            self._hilo.join(2)
-        self._hilo = None
-        self._id_hilo = None
-
-    def _escuchar(self, combinacion: str, listo: threading.Event) -> None:
+    def _mirar(self, combinacion: str, parar: threading.Event) -> None:
         import ctypes
-        from ctypes import wintypes
-        u = ctypes.windll.user32
-        self._id_hilo = ctypes.windll.kernel32.GetCurrentThreadId()
+        estado = ctypes.windll.user32.GetAsyncKeyState
+        abajo = lambda vk: bool(estado(vk) & 0x8000)
         mods, vk = tecla(combinacion)
-        ok = u.RegisterHotKey(None, 1, mods | MOD_NOREPEAT, vk)
-        listo.set()
-        if not ok:
-            # Otro programa ya la tiene: queda en el log y no se reintenta.
-            logging.warning("No se pudo registrar la tecla del overlay %s (la usa otro programa)",
-                            nombre_tecla(combinacion))
-            return
-        logging.info("Tecla del overlay: %s", nombre_tecla(combinacion))
-        msg = wintypes.MSG()
-        try:
-            while u.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
-                if msg.message == WM_HOTKEY:
-                    try:
-                        self.al_apretar()
-                    except Exception:
-                        logging.exception("Error al usar la tecla del overlay")
-        finally:
-            u.UnregisterHotKey(None, 1)
+        antes = combinacion_apretada(mods, vk, abajo)  # si ya estaba apretada al arrancar, no cuenta
+        while not parar.wait(POLL_SECONDS):
+            ahora = combinacion_apretada(mods, vk, abajo)
+            if ahora and not antes:
+                try:
+                    self.al_apretar()
+                except Exception:
+                    logging.exception("Error al usar la tecla del overlay")
+            antes = ahora

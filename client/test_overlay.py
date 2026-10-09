@@ -169,3 +169,14 @@ def test_apagar_no_destruye_la_ventana():
     assert ov.enabled is False
     ov.set_enabled(True)
     assert ov.enabled is True and arrancados == [1]
+
+
+def test_la_combinacion_tiene_que_ser_exacta():
+    mods, vk = overlay.tecla("ctrl+shift+o")
+    CTRL, ALT, SHIFT = 0x11, 0x12, 0x10
+    def con(*teclas):
+        return lambda v: v in teclas
+    assert overlay.combinacion_apretada(mods, vk, con(CTRL, SHIFT, vk))
+    assert not overlay.combinacion_apretada(mods, vk, con(CTRL, vk))            # falta Shift
+    assert not overlay.combinacion_apretada(mods, vk, con(CTRL, SHIFT, ALT, vk))  # Alt de mas
+    assert not overlay.combinacion_apretada(mods, vk, con(CTRL, SHIFT))         # falta la O
