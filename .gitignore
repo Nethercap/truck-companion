@@ -21,3 +21,6 @@ plugin/scs-telemetry/vs2012/.vs/
 plugin/scs-telemetry/vs2012/x64/
 plugin/scs-telemetry/vs2012/Release/
 plugin/scs-telemetry/vs2012/Debug/
+
+# Armador de mapas armado en local (builder/build.sh)
+builder/dist/

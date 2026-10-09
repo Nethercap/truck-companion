@@ -119,6 +119,19 @@ sudo ufw allow 27766/tcp
 Both can be changed with the `TRUCKDASH_HTTP_PORT` and `TRUCKDASH_WS_PORT`
 environment variables if those numbers clash with something else.
 
+### Map mods we don't have: Build my map
+
+If your truck drives off the map Truck Dash knows, the dashboard tells the
+client, and Setup offers **Build my map**: it builds the map from your game
+and your active mods, on your PC. Close the game first (it needs up to 7 GB
+of memory) and give it about five minutes. The first time it downloads the
+map builder (about 40 MB) from this same release and checks its SHA-256.
+
+The map is saved in `%LOCALAPPDATA%\TruckDash\maps\` and used while the same
+mods are active. It shows on that PC and on your Wi-Fi in LAN mode; a phone
+connected with the pairing code from somewhere else keeps the map from our
+servers. The builder is GPL-3.0, see [`builder/`](../builder/).
+
 ### Windows SmartScreen ("unrecognized app")
 
 The `.exe` is not code-signed (certificates cost money), so the first time

@@ -442,6 +442,18 @@ def test_viewer_receives_session_state_on_connect_and_when_client_connects(clien
         assert disconnected["client_status"]["status"] == "waiting_game"
 
 
+def test_el_aviso_de_fuera_del_mapa_llega_al_cliente(client, main):
+    """La web avisa "offmap" y el cliente ofrece armar el mapa en la PC."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as viewer:
+        viewer.receive_text()
+        with client.websocket_connect(f"/ws/client/{code}") as local_client:
+            viewer.receive_text()
+            aviso = {"type": "offmap", "game": "ats"}
+            viewer.send_text(main.json.dumps(aviso))
+            assert main.json.loads(local_client.receive_text()) == aviso
+
+
 def test_cleanup_removes_idle_used_sessions_but_keeps_watched_ones(main):
     import time
 
@@ -1034,3 +1046,15 @@ def test_dlc_de_mapa_del_cliente_saneados(main):
     assert main.clean_map_dlcs({"ats": ["co", "<script>", 3, "x" * 40], "otro": ["a"]}) == {"ats": ["co"]}
     assert main.clean_map_dlcs({"ats": "co"}) is None
     assert main.clean_map_dlcs(None) is None
+
+
+def test_mapas_armados_del_cliente_saneados(main):
+    bueno = {"ats": {"variant": "local_ats", "fingerprint": "17445ca6a572", "built": "2026-10-09T00:08:24",
+                     "cities": 563, "mods": ["Western Canada Expansion"]}}
+    assert main.clean_local_maps(bueno) == bueno
+    assert main.clean_local_maps({"ats": {"variant": "ets2", "fingerprint": "abcdef"}}) is None
+    assert main.clean_local_maps({"ats": {"variant": "local_ats", "fingerprint": "<script>"}}) is None
+    assert main.clean_local_maps({"nope": bueno["ats"]}) is None
+    assert main.clean_local_maps("x") is None
+    assert main.clean_port(27765) == 27765
+    assert main.clean_port("27765") is None and main.clean_port(80) is None

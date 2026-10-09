@@ -1,0 +1,3212 @@
+diff --git a/package-lock.json b/package-lock.json
+index 5efe419..367ecab 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -15,6 +15,10 @@
+         "packages/guis/*",
+         "packages/libs/*"
+       ],
++      "dependencies": {
++        "geojson-vt": "^4.0.3",
++        "vt-pbf": "^3.1.3"
++      },
+       "devDependencies": {
+         "@eslint/eslintrc": "^3.3.1",
+         "@eslint/js": "^9.35.0",
+@@ -5895,6 +5899,10 @@
+         "typescript": ">=5.7.2"
+       }
+     },
++    "node_modules/@truckdash/builder": {
++      "resolved": "packages/clis/truckdash-builder",
++      "link": true
++    },
+     "node_modules/@truckermudgeon/base": {
+       "resolved": "packages/libs/base",
+       "link": true
+@@ -10051,6 +10059,12 @@
+         "node": ">=6.9.0"
+       }
+     },
++    "node_modules/geojson-vt": {
++      "version": "4.0.3",
++      "resolved": "https://registry.npmjs.org/geojson-vt/-/geojson-vt-4.0.3.tgz",
++      "integrity": "sha512-jR1MwkLaZGa8Zftct9ZFruyWFrdl9ZyD2OliXNy9Qq5bBPeg5wHVpBQF9p5GjnicSDQqvBVpysxTPKmWdsfWMA==",
++      "license": "ISC"
++    },
+     "node_modules/get-caller-file": {
+       "version": "2.0.5",
+       "resolved": "https://registry.npmjs.org/get-caller-file/-/get-caller-file-2.0.5.tgz",
+@@ -16319,6 +16333,45 @@
+         "node": ">=14.0.0"
+       }
+     },
++    "node_modules/vt-pbf": {
++      "version": "3.1.3",
++      "resolved": "https://registry.npmjs.org/vt-pbf/-/vt-pbf-3.1.3.tgz",
++      "integrity": "sha512-2LzDFzt0mZKZ9IpVF2r69G9bXaP2Q2sArJCmcCgvfTdCCZzSyz4aCLoQyUilu37Ll56tCblIZrXFIjNUpGIlmA==",
++      "license": "MIT",
++      "dependencies": {
++        "@mapbox/point-geometry": "0.1.0",
++        "@mapbox/vector-tile": "^1.3.1",
++        "pbf": "^3.2.1"
++      }
++    },
++    "node_modules/vt-pbf/node_modules/@mapbox/point-geometry": {
++      "version": "0.1.0",
++      "resolved": "https://registry.npmjs.org/@mapbox/point-geometry/-/point-geometry-0.1.0.tgz",
++      "integrity": "sha512-6j56HdLTwWGO0fJPlrZtdU/B13q8Uwmo18Ck2GnGgN9PCFyKTZ3UbXeEdRFh18i9XQ92eH2VdtpJHpBD3aripQ==",
++      "license": "ISC"
++    },
++    "node_modules/vt-pbf/node_modules/@mapbox/vector-tile": {
++      "version": "1.3.1",
++      "resolved": "https://registry.npmjs.org/@mapbox/vector-tile/-/vector-tile-1.3.1.tgz",
++      "integrity": "sha512-MCEddb8u44/xfQ3oD+Srl/tNcQoqTw3goGk2oLsrFxOTc3dUp+kAnby3PvAeeBYSMSjSPD1nd1AJA6W49WnoUw==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "@mapbox/point-geometry": "~0.1.0"
++      }
++    },
++    "node_modules/vt-pbf/node_modules/pbf": {
++      "version": "3.3.0",
++      "resolved": "https://registry.npmjs.org/pbf/-/pbf-3.3.0.tgz",
++      "integrity": "sha512-XDF38WCH3z5OV/OVa8GKUNtLAyneuzbCisx7QUCF8Q6Nutx0WnJrQe5O+kOtBlLfRNUws98Y58Lblp+NJG5T4Q==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "ieee754": "^1.1.12",
++        "resolve-protobuf-schema": "^2.1.0"
++      },
++      "bin": {
++        "pbf": "bin/pbf"
++      }
++    },
+     "node_modules/w3c-xmlserializer": {
+       "version": "5.0.0",
+       "resolved": "https://registry.npmjs.org/w3c-xmlserializer/-/w3c-xmlserializer-5.0.0.tgz",
+@@ -17409,24 +17462,6 @@
+         "node": "^20.0.0 || >=22.0.0"
+       }
+     },
+-    "packages/apis/telemetry": {
+-      "name": "@truckermudgeon/telemetry",
+-      "version": "0.0.0",
+-      "extraneous": true,
+-      "license": "GPL-3.0-or-later",
+-      "dependencies": {
+-        "@trpc/server": "^10.45.2",
+-        "tsx": "^4.7.0",
+-        "ws": "^8.18.0"
+-      },
+-      "devDependencies": {
+-        "@types/ws": "^8.5.13",
+-        "typescript": "^5.9.2"
+-      },
+-      "optionalDependencies": {
+-        "trucksim-telemetry": "^0.19.1"
+-      }
+-    },
+     "packages/apps/demo": {
+       "name": "@truckermudgeon/demo-app",
+       "version": "0.0.0",
+@@ -18016,6 +18051,16 @@
+       "integrity": "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==",
+       "license": "MIT"
+     },
++    "packages/clis/truckdash-builder": {
++      "name": "@truckdash/builder",
++      "version": "0.0.0",
++      "license": "GPL-3.0-or-later",
++      "dependencies": {
++        "geojson-vt": "^4.0.2",
++        "pmtiles": "^4.4.0",
++        "vt-pbf": "^3.1.3"
++      }
++    },
+     "packages/guis/navigator": {
+       "name": "@truckermudgeon/navigator-client-gui",
+       "version": "0.0.0",
+@@ -18639,15 +18684,6 @@
+         }
+       }
+     },
+-    "packages/libs/api": {
+-      "name": "@truckermudgeon/api",
+-      "version": "0.0.0",
+-      "extraneous": true,
+-      "license": "GPL-3.0-or-later",
+-      "devDependencies": {
+-        "typescript": "^5.4.2"
+-      }
+-    },
+     "packages/libs/base": {
+       "name": "@truckermudgeon/base",
+       "version": "0.0.0",
+diff --git a/package.json b/package.json
+index 0bde4a8..52e1c34 100644
+--- a/package.json
++++ b/package.json
+@@ -42,5 +42,9 @@
+       "prettier --write"
+     ],
+     "**/*": "prettier --write --ignore-unknown"
++  },
++  "dependencies": {
++    "geojson-vt": "^4.0.3",
++    "vt-pbf": "^3.1.3"
+   }
+ }
+diff --git a/packages/clis/generator/geo-json/map.ts b/packages/clis/generator/geo-json/map.ts
+index eb72759..92559e5 100644
+--- a/packages/clis/generator/geo-json/map.ts
++++ b/packages/clis/generator/geo-json/map.ts
+@@ -259,13 +259,24 @@ export function convertToMapGeoJson(
+ 
+   logger.log('creating roads and quadtree of prefab-adjacent roads...');
+   const roadFeatures: RoadFeature[] = [];
++  const missingRoadLooks = new Set<string>();
+   for (const r of roads.values()) {
+-    const fs = roadToFeature(
+-      r,
+-      assertExists(roadLooks.get(r.roadLookToken)),
+-      nodes,
+-      dividerFeatures,
+-    );
++    // Mods (Roextended) traen roads cuyo road look no esta en ningun
++    // def/world/road_look.*.sii que hayamos leido: se saltea ese tramo con
++    // un aviso en vez de abortar todo el mapa.
++    const roadLook = roadLooks.get(r.roadLookToken);
++    if (!roadLook) {
++      if (!missingRoadLooks.has(r.roadLookToken)) {
++        missingRoadLooks.add(r.roadLookToken);
++        logger.warn(
++          'unknown road look',
++          r.roadLookToken,
++          '- skipping its roads',
++        );
++      }
++      continue;
++    }
++    const fs = roadToFeature(r, roadLook, nodes, dividerFeatures);
+     for (const f of fs) {
+       roadFeatures.push(f);
+       if (prefabNodeUids.has(r.startNodeUid)) {
+@@ -334,7 +345,14 @@ export function convertToMapGeoJson(
+   const prefabAndRoadFeatures: (PrefabFeature | RoadFeature)[] = [];
+ 
+   for (const p of prefabs.values()) {
+-    const comps = assertExists(prefabComponents.get(p.token));
++    // Prefabs cuyo def no pudimos leer (ver comentario analogo en
++    // map-files-parser.ts sobre mods como ProMods con paquetes en formato
++    // no soportado) no tienen entrada en prefabComponents/prefabDescriptions -
++    // se saltea ese prefab puntual en vez de abortar todo el geojson.
++    const comps = prefabComponents.get(p.token);
++    if (!comps) {
++      continue;
++    }
+     if (!options.skipCoalescing && comps.isVJunction) {
+       vJunctionList.add(p);
+       continue;
+@@ -581,7 +599,17 @@ export function convertToMapGeoJson(
+         .toLowerCase();
+ 
+     rankedCities = cities.values().map(c => {
+-      const country = assertExists(countries.get(c.countryToken));
++      const country = countries.get(c.countryToken);
++      if (!country) {
++        // Pais faltante (def de un paquete de mod que no pudimos leer
++        // completo) - mismo fallback que el caso "unknown country" de abajo.
++        logger.warn('unknown country token for city', c.name, c.countryToken);
++        return {
++          ...c,
++          scaleRank: 10,
++          capital: 0,
++        };
++      }
+       const isoA2 = ets2IsoA2.get(country.code) ?? country.code;
+       const countryCities = citiesByCountryIsoA2.get(isoA2);
+       if (countryCities == null) {
+@@ -733,9 +761,18 @@ function createTrafficFeatures(
+       continue;
+     }
+ 
+-    const pd = assertExists(prefabDescriptions.get(p.token));
++    const pd = prefabDescriptions.get(p.token);
++    if (!pd) {
++      continue;
++    }
+     if (pd.path.includes('/roadwork/')) {
+-      assert(p.nodeUids.length === 2);
++      // Algunos prefabs de mods (ej. Coast to Coast) reusan el mismo path de
++      // roadwork/rail-crossing vainilla pero con una topologia de nodos
++      // distinta a la esperada - se saltea el punto de trafico en vez de
++      // abortar todo el geojson por un prefab no critico.
++      if (p.nodeUids.length !== 2) {
++        continue;
++      }
+       const nodePoints = p.nodeUids.map(nid => assertExists(nodes.get(nid)));
+       features.push(
+         turf.point(midPoint(nodePoints[0], nodePoints[1]), {
+@@ -750,7 +787,9 @@ function createTrafficFeatures(
+       (map === 'usa' && pd.path.includes('_xrail_')) ||
+       (map === 'europe' && /[_/]rail\d_x_road/.test(pd.path))
+     ) {
+-      assert(p.nodeUids.length >= 4);
++      if (p.nodeUids.length < 4) {
++        continue;
++      }
+       const nodePoints = p.nodeUids.map(nid => assertExists(nodes.get(nid)));
+       features.push(
+         turf.point(center(getExtent(nodePoints)), {
+@@ -846,13 +885,17 @@ function createExitFeatures(
+ 
+   logger.info(likelySigns.length, 'likely exit signs');
+   return likelySigns.map(sign => {
+-    assert(
+-      sign.textItems.length === 1,
+-      'multiple text items: ' +
+-        sign.textItems.join(',') +
+-        '\n' +
+-        JSON.stringify(sign, null, 2),
+-    );
++    if (sign.textItems.length !== 1) {
++      // Algunos carteles de mods (ej. Coast to Coast) traen mas de un item
++      // que matchea el patron de numero de salida (ej. "2" y "213" separados,
++      // en vez de un unico "213") - nos quedamos con el primero en vez de
++      // abortar todo el geojson por un cartel no critico.
++      logger.warn(
++        'exit sign with multiple text items, using first:',
++        sign.textItems.join(','),
++      );
++      sign = { ...sign, textItems: [sign.textItems[0]] };
++    }
+     const exitText = sign.textItems[0].replaceAll(/EXIT|\s/g, '');
+     const { x, y } = assertExists(nodes.get(sign.nodeUid));
+     return turf.point([x, y], { type: 'exit', name: exitText });
+@@ -1086,8 +1129,12 @@ function ferryToFeature(
+         return { ferry, country: undefined };
+       }
+ 
++      // countries.get puede no encontrar nada si el pais de la ciudad vive
++      // en un paquete de mod que no pudimos leer completo (ver comentarios
++      // similares mas arriba) - se deja sin pais en vez de abortar (ya hay
++      // un warning general un poco mas abajo para country == null).
+       const country = cities.has(ferry.token)
+-        ? assertExists(countries.get(cities.get(ferry.token)!.countryToken))
++        ? countries.get(cities.get(ferry.token)!.countryToken)
+         : countriesFallback.get(ferry.name);
+       if (!country) {
+         logger.warn('could not find country info for', ferry.name, ferry.token);
+@@ -1194,7 +1241,15 @@ function poiToFeature(poi: Poi): PoiFeature {
+   if (isLabeledPoi(poi)) {
+     poiName = poi.label;
+   } else if (poi.type === 'facility' && poi.icon === 'dealer_ico') {
+-    poiName = toDealerLabel(poi.prefabPath);
++    // Algunos mods (ej. ProMods) tienen prefabs de dealer con una estructura
++    // de carpetas propia que no matchea el patron "/truck_dealer/..." que
++    // asume toDealerLabel - se deja sin label en vez de abortar el geojson
++    // por un nombre de POI cosmetico.
++    try {
++      poiName = toDealerLabel(poi.prefabPath);
++    } catch (err) {
++      logger.warn('could not derive dealer label for', poi.prefabPath, err);
++    }
+   }
+ 
+   return point([poi.x, poi.y], {
+@@ -1341,21 +1396,25 @@ function prefabToFeatures(
+       .find(n => distance(n, point) < 10);
+ 
+   return [
+-    ...polygons.map<PrefabFeature>((poly, i) => {
+-      const txPoints = poly.points.map(tx);
+-      // Polygon coordinates need to end where they start.
+-      txPoints.push(txPoints[0]);
+-      return {
+-        ...polygon([txPoints], {
+-          type: 'prefab',
+-          dlcGuard: prefab.dlcGuard,
+-          secret: prefab.secret ?? false,
+-          zIndex: poly.zIndex,
+-          color: poly.color,
+-        }),
+-        id: prefab.uid.toString(16) + 'poly' + i,
+-      };
+-    }),
++    // Prefabs de mods (Roextended) traen algun poligono degenerado de 1-2
++    // puntos; turf exige anillos de 4+ posiciones, se saltean.
++    ...polygons
++      .filter(poly => poly.points.length >= 3)
++      .map<PrefabFeature>((poly, i) => {
++        const txPoints = poly.points.map(tx);
++        // Polygon coordinates need to end where they start.
++        txPoints.push(txPoints[0]);
++        return {
++          ...polygon([txPoints], {
++            type: 'prefab',
++            dlcGuard: prefab.dlcGuard,
++            secret: prefab.secret ?? false,
++            zIndex: poly.zIndex,
++            color: poly.color,
++          }),
++          id: prefab.uid.toString(16) + 'poly' + i,
++        };
++      }),
+     ...roadStrings.map<RoadFeature>((road, i) => {
+       const txPoints = road.points.map(tx);
+       let nearestRoadType: RoadType = 'unknown';
+diff --git a/packages/clis/parser/game-files/cityhash.ts b/packages/clis/parser/game-files/cityhash.ts
+new file mode 100755
+index 0000000..e0b2d29
+--- /dev/null
++++ b/packages/clis/parser/game-files/cityhash.ts
+@@ -0,0 +1,133 @@
++// CityHash64 (la version de cityhash/city.cc, la que usa HashFS para ubicar
++// cada archivo) en TypeScript con BigInt. Reemplaza al modulo nativo cuando
++// el parser corre en la PC de quien juega: un .node compilado para Linux no
++// carga en Windows, y asi el armador es un solo .js para cualquier sistema.
++// Se comprueba contra el nativo en cityhash.test.ts.
++
++const M = (1n << 64n) - 1n;
++const k0 = 0xc3a5c85c97cb3127n;
++const k1 = 0xb492b66fbe98f273n;
++const k2 = 0x9ae16a3b2f90404fn;
++const k3 = 0xc949d7c7509e6557n;
++const kMul = 0x9ddfea08eb382d69n;
++
++const mul = (a: bigint, b: bigint) => (a * b) & M;
++const add = (...xs: bigint[]) => xs.reduce((s, x) => s + x, 0n) & M;
++const sub = (a: bigint, b: bigint) => (a - b) & M;
++const rot = (v: bigint, s: number) =>
++  s === 0 ? v : ((v >> BigInt(s)) | (v << BigInt(64 - s))) & M;
++const shiftMix = (v: bigint) => v ^ (v >> 47n);
++
++function hash128to64(lo: bigint, hi: bigint): bigint {
++  let a = mul(lo ^ hi, kMul);
++  a ^= a >> 47n;
++  let b = mul(hi ^ a, kMul);
++  b ^= b >> 47n;
++  return mul(b, kMul);
++}
++const hashLen16 = (u: bigint, v: bigint) => hash128to64(u, v);
++
++export function city64(texto: string): bigint {
++  const s = Buffer.from(texto, 'utf8');
++  const f64 = (p: number) => s.readBigUInt64LE(p);
++  const f32 = (p: number) => BigInt(s.readUInt32LE(p));
++  const len = s.length;
++  const L = BigInt(len);
++
++  if (len <= 16) {
++    if (len > 8) {
++      const a = f64(0);
++      const b = f64(len - 8);
++      return hashLen16(a, rot(add(b, L), len % 64)) ^ b;
++    }
++    if (len >= 4) {
++      const a = f32(0);
++      return hashLen16(add(L, (a << 3n) & M), f32(len - 4));
++    }
++    if (len > 0) {
++      const a = BigInt(s[0]);
++      const b = BigInt(s[len >> 1]);
++      const c = BigInt(s[len - 1]);
++      const y = (a + (b << 8n)) & 0xffffffffn;
++      const z = (L + (c << 2n)) & 0xffffffffn;
++      return mul(shiftMix(mul(y, k2) ^ mul(z, k3)), k2);
++    }
++    return k2;
++  }
++  if (len <= 32) {
++    const a = mul(f64(0), k1);
++    const b = f64(8);
++    const c = mul(f64(len - 8), k2);
++    const d = mul(f64(len - 16), k0);
++    return hashLen16(
++      add(rot(sub(a, b), 43), rot(c, 30), d),
++      (sub(add(a, rot(b ^ k3, 20)), c) + L) & M,
++    );
++  }
++  if (len <= 64) {
++    let z = f64(24);
++    let a = add(f64(0), mul(add(L, f64(len - 16)), k0));
++    let b = rot(add(a, z), 52);
++    let c = rot(a, 37);
++    a = add(a, f64(8));
++    c = add(c, rot(a, 7));
++    a = add(a, f64(16));
++    const vf = add(a, z);
++    const vs = add(b, rot(a, 31), c);
++    a = add(f64(16), f64(len - 32));
++    z = f64(len - 8);
++    b = rot(add(a, z), 52);
++    c = rot(a, 37);
++    a = add(a, f64(len - 24));
++    c = add(c, rot(a, 7));
++    a = add(a, f64(len - 16));
++    const wf = add(a, z);
++    const ws = add(b, rot(a, 31), c);
++    const r = shiftMix(add(mul(add(vf, ws), k2), mul(add(wf, vs), k0)));
++    return mul(shiftMix(add(mul(r, k0), vs)), k2);
++  }
++
++  const weak = (
++    w: bigint,
++    x: bigint,
++    y: bigint,
++    z: bigint,
++    a: bigint,
++    b: bigint,
++  ): [bigint, bigint] => {
++    a = add(a, w);
++    b = rot(add(b, a, z), 21);
++    const c = a;
++    a = add(a, x);
++    a = add(a, y);
++    b = add(b, rot(a, 44));
++    return [add(a, z), add(b, c)];
++  };
++  const weakAt = (p: number, a: bigint, b: bigint) =>
++    weak(f64(p), f64(p + 8), f64(p + 16), f64(p + 24), a, b);
++
++  let x = f64(len - 40);
++  let y = add(f64(len - 16), f64(len - 56));
++  let z = hashLen16(add(f64(len - 48), L), f64(len - 24));
++  let v = weakAt(len - 64, L, z);
++  let w = weakAt(len - 32, add(y, k1), x);
++  x = add(mul(x, k1), f64(0));
++  let resto = (len - 1) & ~63;
++  let p = 0;
++  do {
++    x = mul(rot(add(x, y, v[0], f64(p + 8)), 37), k1);
++    y = mul(rot(add(y, v[1], f64(p + 48)), 42), k1);
++    x ^= w[1];
++    y = add(y, v[0], f64(p + 40));
++    z = mul(rot(add(z, w[0]), 33), k1);
++    v = weakAt(p, mul(v[1], k1), add(x, w[0]));
++    w = weakAt(p + 32, add(z, w[1]), add(y, f64(p + 16)));
++    [z, x] = [x, z];
++    p += 64;
++    resto -= 64;
++  } while (resto !== 0);
++  return hashLen16(
++    add(hashLen16(v[0], w[0]), mul(shiftMix(y), k1), z),
++    add(hashLen16(v[1], w[1]), x),
++  );
++}
+diff --git a/packages/clis/parser/game-files/convert-sii-to-json.ts b/packages/clis/parser/game-files/convert-sii-to-json.ts
+index ece847d..8b709b6 100644
+--- a/packages/clis/parser/game-files/convert-sii-to-json.ts
++++ b/packages/clis/parser/game-files/convert-sii-to-json.ts
+@@ -66,9 +66,49 @@ export function convertSiiToJson<T>(
+   if (validate(json)) {
+     return json;
+   }
++
++  // Algunos mods (ej. Coast to Coast) usan valores tipo token con espacios
++  // en vez de guion bajo (ej. "cargo.Duck Calls" en vez de "cargo.duck_calls")
++  // - el juego los acepta tal cual, pero los patrones de nuestro schema
++  // (pensados para tokens vainilla, sin espacios) los rechazan. Antes de
++  // tirar el archivo entero, se prueba una vez mas reemplazando espacios por
++  // "_" en los valores tipo "prefijo.resto-con-espacios" y revalidando.
++  const sanitized = sanitizeTokensWithSpaces(json);
++  if (validate(sanitized)) {
++    logger.warn(
++      'sanitized spaces in token-like values for',
++      siiPath,
++      '(replaced with "_")',
++    );
++    return sanitized;
++  }
++
+   logger.error('error validating', siiPath);
+   console.log(JSON.stringify(json, null, 2));
+   logger.error(ajv.errorsText(validate.errors));
+   logger.error(validate.errors);
+   throw new Error();
+ }
++
++// Camina el objeto recursivamente y reemplaza espacios por "_" en cualquier
++// string con forma "algo.algo-con-espacios" (asumido token, ya que texto
++// libre real - nombres de ciudad, etc. - no suele tener esa forma con punto).
++function sanitizeTokensWithSpaces(value: unknown): unknown {
++  if (typeof value === 'string') {
++    return /^[0-9a-zA-Z_.]+\.[^"]* [^"]*$/.test(value)
++      ? value.replace(/ /g, '_')
++      : value;
++  }
++  if (Array.isArray(value)) {
++    return value.map(sanitizeTokensWithSpaces);
++  }
++  if (value !== null && typeof value === 'object') {
++    return Object.fromEntries(
++      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
++        k,
++        sanitizeTokensWithSpaces(v),
++      ]),
++    );
++  }
++  return value;
++}
+diff --git a/packages/clis/parser/game-files/def-parser.ts b/packages/clis/parser/game-files/def-parser.ts
+index 4094551..e63aa42 100644
+--- a/packages/clis/parser/game-files/def-parser.ts
++++ b/packages/clis/parser/game-files/def-parser.ts
+@@ -101,7 +101,18 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+     p: (t: T, e: Entries) => U | undefined,
+     m: Map<string, U & { dlcGuard: number }>,
+   ) => {
+-    const t = convertSiiToJson(path, entries, schema);
++    // Algunos mods (grandes overhauls de mapa como Coast to Coast) traen
++    // archivos def con datos que no siguen las convenciones vainilla que
++    // asumen estos schemas estrictos (tokens con mayusculas, espacios, etc.
++    // - el juego los tolera, nuestro validador AJV no). En vez de abortar
++    // todo el parseo por un archivo de mod raro, se lo saltea con un warning.
++    let t: T;
++    try {
++      t = convertSiiToJson(path, entries, schema);
++    } catch (err) {
++      logger.warn('skipping', path, '- failed to parse/validate:', err);
++      return;
++    }
+     const u = p(t, entries);
+     if (u) {
+       m.set(u.token, { ...u, dlcGuard });
+@@ -135,17 +146,39 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+       if (f.startsWith('city.')) {
+         processAndAdd(path, dlcGuard, CitySiiSchema, processCityJson, cities);
+       } else if (f.startsWith('country.')) {
+-        const partialCountry = processCountryJson(
+-          convertSiiToJson(path, entries, CountrySiiSchema),
+-        );
++        // Ver comentario en processAndAdd sobre mods con overrides parciales
++        // (ej. Coast to Coast agrega un .sii adicional para algunos estados
++        // que solo pisa un par de campos, sin los requeridos por el schema
++        // vainilla) - si falla, se saltea y se conserva lo que ya se haya
++        // cargado antes para ese pais desde el archivo vainilla completo.
++        let countryJson;
++        try {
++          countryJson = convertSiiToJson(path, entries, CountrySiiSchema);
++        } catch (err) {
++          logger.warn('skipping', path, '- failed to parse/validate:', err);
++          continue;
++        }
++        const partialCountry = processCountryJson(countryJson);
+         if (partialCountry) {
+-          const truckSpeedLimits = processSpeedLimitJson(
+-            convertSiiToJson(
+-              path.replace('.sui', '/speed_limits.sii'),
+-              entries,
+-              SpeedLimitSiiSchema,
+-            ),
+-          );
++          // Mismo criterio: si speed_limits.sii del mod no valida (ej.
++          // ProMods 2.84 Gibraltar sin maxLimit para camiones), el pais se
++          // carga igual sin limites en vez de abortar toda la corrida.
++          let truckSpeedLimits: SpeedLimits = {} as SpeedLimits;
++          try {
++            truckSpeedLimits = processSpeedLimitJson(
++              convertSiiToJson(
++                path.replace('.sui', '/speed_limits.sii'),
++                entries,
++                SpeedLimitSiiSchema,
++              ),
++            );
++          } catch (err) {
++            logger.warn(
++              'skipping speed limits for',
++              path,
++              '- failed to parse/validate',
++            );
++          }
+           countries.set(partialCountry.token, {
+             ...partialCountry,
+             truckSpeedLimits,
+@@ -234,29 +267,44 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+       continue;
+     }
+ 
+-    if (f.startsWith('prefab.')) {
+-      const json = convertSiiToJson(`def/world/${f}`, entries, PrefabSiiSchema);
+-      processPrefabJson(json, entries).forEach((v, k) => prefabs.set(k, v));
+-    } else if (f.startsWith('model')) {
+-      const json = convertSiiToJson(`def/world/${f}`, entries, ModelSiiSchema);
+-      const { buildings, vegetation: _vegetation } = processModelJson(
+-        json,
+-        entries,
+-      );
+-      buildings.forEach((v, k) => models.set(k, v));
+-      _vegetation.forEach(v => vegetation.add(v));
+-    } else if (f.startsWith('sign')) {
+-      const json = convertSiiToJson(`def/world/${f}`, entries, SignSiiSchema);
+-      processSignJson(json).forEach((v, k) => signs.set(k, v));
+-    } else if (f.startsWith('road_look.')) {
+-      const json = convertSiiToJson(
+-        `def/world/${f}`,
+-        entries,
+-        RoadLookSiiSchema,
+-      );
+-      processRoadLookJson(json).forEach((v, k) => roadLooks.set(k, v));
+-    } else {
+-      throw new Error();
++    // Ver comentario en processAndAdd - algunos mods (ProMods) traen algun
++    // .sii con sintaxis invalida o datos que no matchean el schema (ej.
++    // def/world/sign.british_columbia.sii) - se saltea ese archivo puntual.
++    try {
++      if (f.startsWith('prefab.')) {
++        const json = convertSiiToJson(
++          `def/world/${f}`,
++          entries,
++          PrefabSiiSchema,
++        );
++        processPrefabJson(json, entries).forEach((v, k) => prefabs.set(k, v));
++      } else if (f.startsWith('model')) {
++        const json = convertSiiToJson(
++          `def/world/${f}`,
++          entries,
++          ModelSiiSchema,
++        );
++        const { buildings, vegetation: _vegetation } = processModelJson(
++          json,
++          entries,
++        );
++        buildings.forEach((v, k) => models.set(k, v));
++        _vegetation.forEach(v => vegetation.add(v));
++      } else if (f.startsWith('sign')) {
++        const json = convertSiiToJson(`def/world/${f}`, entries, SignSiiSchema);
++        processSignJson(json).forEach((v, k) => signs.set(k, v));
++      } else if (f.startsWith('road_look.')) {
++        const json = convertSiiToJson(
++          `def/world/${f}`,
++          entries,
++          RoadLookSiiSchema,
++        );
++        processRoadLookJson(json).forEach((v, k) => roadLooks.set(k, v));
++      } else {
++        throw new Error();
++      }
++    } catch (err) {
++      logger.warn('skipping def/world/', f, '- failed to parse/validate:', err);
+     }
+   }
+   logger.info('parsed', prefabs.size, 'prefab defs');
+@@ -309,12 +357,24 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+   logger.info('parsed', achievements.size, 'achievements');
+ 
+   const routes = new Map<string, Route>();
++  // Mods pueden anular las rutas de Transporte Especial con un
++  // oversize_offer_data.sii vacio (ProMods 2.84 lo hace a proposito) - no
++  // valida contra el schema; en ese caso simplemente no hay rutas.
++  let oversizeOfferData: OversizeOfferSii | undefined;
+   if (def.files.includes('oversize_offer_data.sii')) {
+-    const oversizeOfferData = convertSiiToJson(
+-      'def/oversize_offer_data.sii',
+-      entries,
+-      OversizeOfferSiiSchema,
+-    );
++    try {
++      oversizeOfferData = convertSiiToJson(
++        'def/oversize_offer_data.sii',
++        entries,
++        OversizeOfferSiiSchema,
++      );
++    } catch (err) {
++      logger.warn(
++        'skipping special transport routes - oversize_offer_data.sii failed to parse/validate',
++      );
++    }
++  }
++  if (oversizeOfferData) {
+     for (const f of def.files) {
+       if (/^route\.(\w+\.)?sii$/.test(f)) {
+         processRouteJson(
+@@ -370,7 +430,9 @@ function processCityJson(obj: CitySii) {
+   return {
+     token: token.split('.')[1],
+     name: rawCity.cityName,
+-    nameLocalized: rawCity.cityNameLocalized,
++    // fallback a cityName si el mod no trae nombre localizado (ver comentario
++    // en CitySiiSchema, sii-schemas.ts)
++    nameLocalized: rawCity.cityNameLocalized ?? rawCity.cityName,
+     countryToken: rawCity.country,
+     population: rawCity.population ?? 0,
+   };
+@@ -449,11 +511,15 @@ function processCompanyJson(
+   );
+   if (editorFolder) {
+     for (const f of editorFolder.files) {
+-      const city = convertSiiToJson(
+-        `def/company/${companyToken}/editor/${f}`,
+-        entries,
+-        CityCompanySiiSchema,
+-      );
++      const editorPath = `def/company/${companyToken}/editor/${f}`;
++      let city;
++      try {
++        city = convertSiiToJson(editorPath, entries, CityCompanySiiSchema);
++      } catch (err) {
++        // ver comentario en processAndAdd sobre mods con datos no vainilla
++        logger.warn('skipping', editorPath, '- failed to parse/validate:', err);
++        continue;
++      }
+       for (const [, entry] of Object.entries(city.companyDef)) {
+         cityTokens.push(entry.city);
+       }
+@@ -466,11 +532,19 @@ function processCompanyJson(
+     if (directionFolder) {
+       const arr = direction === 'in' ? cargoInTokens : cargoOutTokens;
+       for (const f of directionFolder.files) {
+-        const cargo = convertSiiToJson(
+-          `def/company/${companyToken}/${direction}/${f}`,
+-          entries,
+-          CargoDefSiiSchema,
+-        );
++        const cargoPath = `def/company/${companyToken}/${direction}/${f}`;
++        let cargo;
++        try {
++          cargo = convertSiiToJson(cargoPath, entries, CargoDefSiiSchema);
++        } catch (err) {
++          logger.warn(
++            'skipping',
++            cargoPath,
++            '- failed to parse/validate:',
++            err,
++          );
++          continue;
++        }
+         for (const [, entry] of Object.entries(cargo.cargoDef)) {
+           arr.push(entry.cargo);
+         }
+@@ -530,11 +604,24 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+       logger.warn(`unknown dlc guard for ${dlc} (${f}); falling back to 0`);
+       dlcGuard = 0;
+     }
+-    const json = convertSiiToJson(
+-      `def/ferry/connection/${f}`,
+-      entries,
+-      FerryConnectionSiiSchema,
+-    );
++    // Ver comentario en processAndAdd - algunos mods traen archivos de
++    // conexion de ferry vacios/invalidos (ej. ProMods ATS/Canada).
++    let json;
++    try {
++      json = convertSiiToJson(
++        `def/ferry/connection/${f}`,
++        entries,
++        FerryConnectionSiiSchema,
++      );
++    } catch (err) {
++      logger.warn(
++        'skipping ferry connection',
++        f,
++        '- failed to parse/validate:',
++        err,
++      );
++      continue;
++    }
+     const ferryConnection = json.ferryConnection;
+     const key = Object.keys(ferryConnection)[0];
+     // key is expected to be in form: "conn.source_token.dest_token"
+@@ -589,9 +676,15 @@ function processPrefabJson(
+     return new Map();
+   }
+ 
++  // Los tokens en los sectores binarios son siempre minusculas; algunos mods
++  // (Reforma: prefab.Pmxtot1, prefab.L17701) los escriben con mayusculas en
++  // el .sii y el juego los acepta igual - sin esto quedan como "unknown token".
+   const prefabTuples = Object.entries(prefabModel).map(
+     ([key, o]) =>
+-      [key.split('.')[1], o.prefabDesc.substring(1)] as [string, string],
++      [key.split('.')[1].toLowerCase(), o.prefabDesc.substring(1)] as [
++        string,
++        string,
++      ],
+   );
+   const prefabs = new Map<string, PrefabDescription & { path: string }>();
+   for (const [token, path] of prefabTuples) {
+@@ -600,7 +693,25 @@ function processPrefabJson(
+       logger.warn(`could not find prefab file for ${token}`);
+       continue;
+     }
+-    const ppd = parsePrefabPpd(ppdFile.read());
++    // Algunos .ppd de paquetes viejos de mods (ej. assets de ProMods en
++    // HashFS v1) tienen una variante binaria que esta funcion no espera
++    // (ver "unknown road size" antes de este error) - se saltea ese prefab
++    // puntual (queda sin POIs/geometria de esa interseccion) en vez de
++    // abortar todo el parseo de defs.
++    let ppd;
++    try {
++      ppd = parsePrefabPpd(ppdFile.read());
++    } catch (err) {
++      logger.warn(
++        'skipping prefab ppd for',
++        token,
++        '(',
++        path,
++        ') - failed to parse:',
++        err,
++      );
++      continue;
++    }
+     if (ppd.mapPoints.some(p => p.type === 'polygon')) {
+       // TODO figure out a way to get building footprint information for
+       //  polygons in prefabs that look like buildings.
+diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
+index b65d4c8..59b4220 100644
+--- a/packages/clis/parser/game-files/map-files-parser.ts
++++ b/packages/clis/parser/game-files/map-files-parser.ts
+@@ -54,7 +54,18 @@ import {
+ 
+ export function parseMapFiles(
+   scsFilePaths: string[],
+-  { includeDlc, mode }: { includeDlc: boolean; mode: 'defs' | 'icons' | 'all' },
++  {
++    includeDlc,
++    mode,
++    extraArchives = [],
++  }: {
++    includeDlc: boolean;
++    mode: 'defs' | 'icons' | 'all';
++    extraArchives?: Pick<
++      ScsArchive,
++      'path' | 'isValid' | 'parseEntries' | 'dispose'
++    >[];
++  },
+ ):
+   | {
+       data: 'all';
+@@ -94,6 +105,7 @@ export function parseMapFiles(
+       logger.log('adding', scsSource);
+       return new ScsArchive(p, scsSource);
+     });
++  archives.push(...(extraArchives as typeof archives));
+   const entries = new CombinedEntries(archives);
+   try {
+     const version = parseVersionSii(entries);
+@@ -165,9 +177,23 @@ function parseSectorFiles(entries: Entries): {
+   logger.start(`parsing ${map} sector files...`);
+   const start = Date.now();
+ 
++  // TM_SECTORS_ONLY_MOD=1: mapa standalone (ej. Grand Utopia) - solo se
++  // parsean los sectores que vienen del mod (adaptador de run-with-mod.ts),
++  // los de base_map/DLCs se ignoran aunque compartan la carpeta map/europe.
++  const onlyMod = process.env.TM_SECTORS_ONLY_MOD === '1';
+   const baseFiles = sectorRoot.files.filter(
+-    f => f.endsWith('.base') || f.endsWith('.aux'),
++    f =>
++      (f.endsWith('.base') || f.endsWith('.aux')) &&
++      (!onlyMod ||
++        entries.files.get(`map/${map}/${f}`)?.scsSource === 'coast_to_coast'),
+   );
++  if (onlyMod) {
++    logger.info(
++      'TM_SECTORS_ONLY_MOD: parsing only',
++      baseFiles.length,
++      'mod sector files',
++    );
++  }
+   const bar = new cliProgress.SingleBar(
+     {
+       format: `[{bar}] | {filename} | {value} of {total}`,
+@@ -195,7 +221,26 @@ function parseSectorFiles(entries: Entries): {
+     }
+     const sector = putIfAbsent(sectorKey, { items: [], nodes: [] }, sectors);
+     const baseFile = assertExists(entries.files.get(`map/${map}/${f}`));
+-    const parsedSector = parseSector(baseFile.read(), seenNodeUids);
++    // Algunos mods viejos (ej. ProMods) tienen sectores con una version de
++    // formato binario anterior a la que este parser soporta (907) - intentar
++    // decodificarlos igual con el layout de 907 desalinea la lectura y
++    // termina en un RangeError. Se saltea el sector (se pierde ese tramo del
++    // mapa) en vez de abortar todo el parseo.
++    let parsedSector;
++    try {
++      parsedSector = parseSector(baseFile.read(), seenNodeUids);
++    } catch (err) {
++      logger.warn(
++        'skipping sector',
++        f,
++        '(',
++        baseFile.scsSource,
++        ') - failed to parse:',
++        err,
++      );
++      bar.increment({ filename: f });
++      continue;
++    }
+     sector.items = sector.items.concat(
+       parsedSector.items.map(item =>
+         withDlcGuard(item, map, baseFile.scsSource),
+@@ -284,11 +329,15 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
+       l10nStrings,
+     );
+     for (const f of localeSubdir.files) {
++      // local_module.<mod>.sii: asi traen sus traducciones los mods (RusMap
++      // "moscow" -> "Moscow", ProMods ME, Reforma...). Sin esto las ciudades
++      // de RusMap quedaban con el nombre nativo en cirilico.
+       if (
+         f !== 'local.sii' &&
+         f !== 'local.override.sii' &&
+         f !== 'localization.sui' &&
+-        f !== 'photoalbum.sui'
++        f !== 'photoalbum.sui' &&
++        !(f.startsWith('local_module') && f.endsWith('.sii'))
+       ) {
+         continue;
+       }
+@@ -404,12 +453,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+     // .dds pixel data. Assume that the concrete instance of the FileEntry for
+     // the .tobj file is an ScsArchiveTobjFile, whose .read() returns a complete
+     // header-ful .dds file.
+-    pngs.set(key, parseDds(tobj.read(), sdfAuxData.get(key)));
++    try {
++      pngs.set(key, parseDds(tobj.read(), sdfAuxData.get(key)));
++    } catch (err) {
++      // Iconos que vienen de un adaptador de filesystem generico en vez de un
++      // .scs real (ver run-with-mod.ts) no pasan por la reconstruccion de
++      // header de ScsArchiveTobjFile, asi que algunos no calzan con el
++      // formato esperado por parseDds. No son criticos (la app usa un set
++      // propio de iconos curados), asi que se saltean en vez de abortar todo.
++      logger.warn('skipping icon', tobjPath, '- failed to parse dds:', err);
++      // El icono existe aunque no se pueda dibujar (sin gdeflate, en el
++      // armador de la PC): las empresas y los carteles de ruta se filtran por
++      // icons.has(token), y sin esto se perdian todas. Buffer vacio = sin
++      // imagen; quien escribe los .png los saltea.
++      pngs.set(key, Buffer.alloc(0));
++    }
+   }
+ 
+-  const mapPngs = [0, 1, 2, 3].map(i =>
+-    PNG.sync.read(assertExists(pngs.get(`${map}-map${i}`))),
+-  );
++  // Mosaico del fondo del mapa del juego: opcional. Mods como Reforma pisan
++  // map0-3.tobj y, viniendo del adaptador (sin header DDS), se saltean arriba;
++  // la app no usa este png, asi que no vale abortar el parseo por el.
++  const mapPngBuffers = [0, 1, 2, 3].map(i => pngs.get(`${map}-map${i}`));
++  // Buffer vacio = icono conocido sin imagen (sin gdeflate): tampoco sirve.
++  if (mapPngBuffers.some(b => !b || b.length === 0)) {
++    logger.warn('skipping', `${map}-map4k`, '- some of map0..map3 are missing');
++    return pngs;
++  }
++  const mapPngs = mapPngBuffers.map(b => PNG.sync.read(assertExists(b)));
+   // verify that mapX pngs are square
+   const size = mapPngs[0].width;
+   assert(mapPngs.every(p => p.width === p.height && p.width === size));
+@@ -611,288 +681,317 @@ function postProcess(
+     nodeUid: bigint;
+   }[] = [];
+   for (const item of poifulItems) {
+-    switch (item.type) {
+-      case ItemType.Prefab: {
+-        const prefabDescription = assertExists(defData.prefabs.get(item.token));
+-        const prefabMeta = {
+-          prefabUid: item.uid,
+-          prefabPath: prefabDescription.path,
+-          secret: item.secret,
+-        };
+-        for (const sp of prefabDescription.spawnPoints) {
+-          const [x, y] = toMapPosition(
+-            [sp.x, sp.y],
+-            item,
+-            prefabDescription,
+-            nodesByUid,
+-          );
+-          const pos = {
+-            x,
+-            y,
++    // Con mods grandes (ej. ProMods) algunos items referencian nodos que
++    // vivian en un sector que no pudimos parsear (formato binario viejo, ver
++    // el patch de sectores) - en vez de agregar un chequeo puntual en cada
++    // caso del switch de abajo, se envuelve todo en un try/catch generico y
++    // se saltea el POI individual que haya quedado con una referencia rota.
++    try {
++      switch (item.type) {
++        case ItemType.Prefab: {
++          // Algunos mods (ej. ProMods) referencian prefabs cuyo def vive en un
++          // paquete que no pudimos leer (formato binario viejo no soportado,
++          // ver el patch de sectores mas arriba) - se saltea el POI de ese
++          // prefab puntual en vez de abortar todo el escaneo.
++          const prefabDescription = defData.prefabs.get(item.token);
++          if (!prefabDescription) {
++            logger.warn(
++              'skipping prefab POI scan for unknown token',
++              item.token,
++            );
++            break;
++          }
++          const prefabMeta = {
++            prefabUid: item.uid,
++            prefabPath: prefabDescription.path,
++            secret: item.secret,
+           };
+-          switch (sp.type) {
+-            case SpawnPointType.GasPos:
+-              pois.push({
+-                ...prefabMeta,
+-                ...pos,
+-                type: 'facility',
+-                icon: 'gas_ico',
+-              });
+-              break;
+-            case SpawnPointType.ServicePos:
+-              pois.push({
+-                ...prefabMeta,
+-                ...pos,
+-                type: 'facility',
+-                icon: 'service_ico',
+-              });
+-              break;
+-            case SpawnPointType.WeightStationPos:
+-              pois.push({
+-                ...prefabMeta,
+-                ...pos,
+-                type: 'facility',
+-                icon: 'weigh_station_ico',
+-              });
+-              break;
+-            case SpawnPointType.TruckDealerPos:
+-              pois.push({
+-                ...prefabMeta,
+-                ...pos,
+-                type: 'facility',
+-                icon: 'dealer_ico',
+-              });
+-              break;
+-            case SpawnPointType.BuyPos:
++          for (const sp of prefabDescription.spawnPoints) {
++            const [x, y] = toMapPosition(
++              [sp.x, sp.y],
++              item,
++              prefabDescription,
++              nodesByUid,
++            );
++            const pos = {
++              x,
++              y,
++            };
++            switch (sp.type) {
++              case SpawnPointType.GasPos:
++                pois.push({
++                  ...prefabMeta,
++                  ...pos,
++                  type: 'facility',
++                  icon: 'gas_ico',
++                });
++                break;
++              case SpawnPointType.ServicePos:
++                pois.push({
++                  ...prefabMeta,
++                  ...pos,
++                  type: 'facility',
++                  icon: 'service_ico',
++                });
++                break;
++              case SpawnPointType.WeightStationPos:
++                pois.push({
++                  ...prefabMeta,
++                  ...pos,
++                  type: 'facility',
++                  icon: 'weigh_station_ico',
++                });
++                break;
++              case SpawnPointType.TruckDealerPos:
++                pois.push({
++                  ...prefabMeta,
++                  ...pos,
++                  type: 'facility',
++                  icon: 'dealer_ico',
++                });
++                break;
++              case SpawnPointType.BuyPos:
++                pois.push({
++                  ...prefabMeta,
++                  ...pos,
++                  type: 'facility',
++                  icon: 'garage_large_ico',
++                });
++                break;
++              case SpawnPointType.RecruitmentPos:
++                pois.push({
++                  ...prefabMeta,
++                  ...pos,
++                  type: 'facility',
++                  icon: 'recruitment_ico',
++                });
++                break;
++              default:
++                // TODO exhaustive switch, warn on unknown type.
++                break;
++            }
++          }
++          for (const tp of prefabDescription.triggerPoints) {
++            const [x, y] = toMapPosition(
++              [tp.x, tp.y],
++              item,
++              prefabDescription,
++              nodesByUid,
++            );
++            if (tp.action === 'hud_parking') {
+               pois.push({
+                 ...prefabMeta,
+-                ...pos,
+                 type: 'facility',
+-                icon: 'garage_large_ico',
++                dlcGuard: item.dlcGuard,
++                itemNodeUids: item.nodeUids,
++                fromItemType: 'prefab',
++                x,
++                y,
++                icon: 'parking_ico',
+               });
++            }
++          }
++          break;
++        }
++        case ItemType.MapOverlay: {
++          const { x, y, secret } = item;
++          const mapOverlayMeta = {
++            x,
++            y,
++            secret,
++          };
++          switch (item.overlayType) {
++            case MapOverlayType.Road:
++              if (item.token === '') {
++                // ignore
++              } else if (!icons.has(item.token)) {
++                logger.warn(
++                  `unknown road overlay token "${item.token}". skipping.`,
++                );
++              } else {
++                // TODO look into ets2 road overlays with token 'weigh_ico'.
++                // can they be considered facilities? do they have linked prefabs?
++                pois.push({
++                  ...mapOverlayMeta,
++                  type: 'road',
++                  dlcGuard: item.dlcGuard,
++                  nodeUid: item.nodeUid,
++                  icon: item.token,
++                });
++              }
+               break;
+-            case SpawnPointType.RecruitmentPos:
++            case MapOverlayType.Parking:
+               pois.push({
+-                ...prefabMeta,
+-                ...pos,
++                ...mapOverlayMeta,
+                 type: 'facility',
+-                icon: 'recruitment_ico',
++                dlcGuard: item.dlcGuard,
++                itemNodeUids: [item.nodeUid],
++                icon: 'parking_ico',
++                fromItemType: 'mapOverlay',
+               });
+               break;
+-            default:
+-              // TODO exhaustive switch, warn on unknown type.
+-              break;
+-          }
+-        }
+-        for (const tp of prefabDescription.triggerPoints) {
+-          const [x, y] = toMapPosition(
+-            [tp.x, tp.y],
+-            item,
+-            prefabDescription,
+-            nodesByUid,
+-          );
+-          if (tp.action === 'hud_parking') {
+-            pois.push({
+-              ...prefabMeta,
+-              type: 'facility',
+-              dlcGuard: item.dlcGuard,
+-              itemNodeUids: item.nodeUids,
+-              fromItemType: 'prefab',
+-              x,
+-              y,
+-              icon: 'parking_ico',
+-            });
+-          }
+-        }
+-        break;
+-      }
+-      case ItemType.MapOverlay: {
+-        const { x, y, secret } = item;
+-        const mapOverlayMeta = {
+-          x,
+-          y,
+-          secret,
+-        };
+-        switch (item.overlayType) {
+-          case MapOverlayType.Road:
+-            if (item.token === '') {
+-              // ignore
+-            } else if (!icons.has(item.token)) {
+-              logger.warn(
+-                `unknown road overlay token "${item.token}". skipping.`,
+-              );
+-            } else {
+-              // TODO look into ets2 road overlays with token 'weigh_ico'.
+-              // can they be considered facilities? do they have linked prefabs?
++            case MapOverlayType.Landmark: {
++              const token = `landmark_${item.token}`;
++              let label = l10n.get(token);
++              if (label == null) {
++                const maybeToken: string | undefined = defData.viewpoints
++                  .values()
++                  .filter(vpToken => vpToken.startsWith(token))
++                  .toArray()[0];
++                label = l10n.get(maybeToken);
++                if (label == null) {
++                  logger.warn(
++                    'missing landmark info for item',
++                    item.token,
++                    item.uid.toString(16),
++                  );
++                }
++              }
+               pois.push({
+                 ...mapOverlayMeta,
+-                type: 'road',
++                type: 'landmark',
+                 dlcGuard: item.dlcGuard,
+                 nodeUid: item.nodeUid,
+-                icon: item.token,
++                icon: 'photo_sight_captured',
++                label: label ?? '',
+               });
++              break;
+             }
++          }
++          break;
++        }
++        case ItemType.Company: {
++          const prefabItem = prefabsByUid.get(item.prefabUid);
++          if (!prefabItem) {
++            logger.warn(
++              'unknown prefab uid',
++              item.prefabUid,
++              'for company',
++              item.token,
++              `0x${item.uid.toString(16)}`,
++            );
+             break;
+-          case MapOverlayType.Parking:
+-            pois.push({
+-              ...mapOverlayMeta,
+-              type: 'facility',
+-              dlcGuard: item.dlcGuard,
+-              itemNodeUids: [item.nodeUid],
+-              icon: 'parking_ico',
+-              fromItemType: 'mapOverlay',
+-            });
+-            break;
+-          case MapOverlayType.Landmark: {
+-            const token = `landmark_${item.token}`;
+-            let label = l10n.get(token);
+-            if (label == null) {
+-              const maybeToken: string | undefined = defData.viewpoints
+-                .values()
+-                .filter(vpToken => vpToken.startsWith(token))
+-                .toArray()[0];
+-              label = l10n.get(maybeToken);
+-              if (label == null) {
+-                logger.warn(
+-                  'missing landmark info for item',
+-                  item.token,
+-                  item.uid.toString(16),
+-                );
+-              }
+-            }
+-            pois.push({
+-              ...mapOverlayMeta,
+-              type: 'landmark',
+-              dlcGuard: item.dlcGuard,
++          }
++          if (!icons.has(item.token)) {
++            noPoiCompanies.push({
++              token: item.token,
++              itemUid: item.uid,
+               nodeUid: item.nodeUid,
+-              icon: 'photo_sight_captured',
+-              label: label ?? '',
+             });
+             break;
+           }
+-        }
+-        break;
+-      }
+-      case ItemType.Company: {
+-        const prefabItem = prefabsByUid.get(item.prefabUid);
+-        if (!prefabItem) {
+-          logger.warn(
+-            'unknown prefab uid',
+-            item.prefabUid,
+-            'for company',
+-            item.token,
+-            `0x${item.uid.toString(16)}`,
++
++          // Ver comentario en el caso ItemType.Prefab de arriba.
++          const prefabDescription = defData.prefabs.get(prefabItem.token);
++          if (!prefabDescription) {
++            logger.warn(
++              'skipping company POI scan for unknown prefab token',
++              prefabItem.token,
++            );
++            break;
++          }
++          const companySpawnPos = prefabDescription.spawnPoints.find(
++            p => p.type === SpawnPointType.CompanyPos,
+           );
+-          break;
+-        }
+-        if (!icons.has(item.token)) {
+-          noPoiCompanies.push({
+-            token: item.token,
+-            itemUid: item.uid,
+-            nodeUid: item.nodeUid,
++          let x: number;
++          let y: number;
++          if (companySpawnPos) {
++            [x, y] = toMapPosition(
++              [companySpawnPos.x, companySpawnPos.y],
++              prefabItem,
++              prefabDescription,
++              nodesByUid,
++            );
++          } else {
++            fallbackPoiCompanies.push({
++              token: item.token,
++              itemUid: item.uid,
++              nodeUid: item.nodeUid,
++            });
++            ({ x, y } = assertExists(nodesByUid.get(item.nodeUid)));
++          }
++          const companyName = defData.companies.get(item.token)?.name;
++          if (companyName == null) {
++            logger.warn('unknown company name for token', item.token);
++          }
++          const pos = { x, y };
++          pois.push({
++            ...pos,
++            secret: prefabItem.secret,
++            type: 'company',
++            icon: item.token,
++            label: companyName ?? item.token,
++            cityToken: item.cityToken,
++          });
++          companies.push({
++            ...item,
++            x,
++            y,
+           });
+           break;
+         }
+-
+-        const prefabDescription = assertExists(
+-          defData.prefabs.get(prefabItem.token),
+-        );
+-        const companySpawnPos = prefabDescription.spawnPoints.find(
+-          p => p.type === SpawnPointType.CompanyPos,
+-        );
+-        let x: number;
+-        let y: number;
+-        if (companySpawnPos) {
+-          [x, y] = toMapPosition(
+-            [companySpawnPos.x, companySpawnPos.y],
+-            prefabItem,
+-            prefabDescription,
+-            nodesByUid,
+-          );
+-        } else {
+-          fallbackPoiCompanies.push({
+-            token: item.token,
+-            itemUid: item.uid,
+-            nodeUid: item.nodeUid,
++        case ItemType.Ferry: {
++          const { x, y } = assertExists(nodesByUid.get(item.nodeUid));
++          const pos = { x, y };
++          const ferry = assertExists(defData.ferries.get(item.token));
++          const label = ferry.nameLocalized
++            ? (l10n.get(ferry.nameLocalized.replaceAll('@', '')) ?? ferry.name)
++            : ferry.name;
++          pois.push({
++            ...pos,
++            secret: undefined, // assume there are no secret ferries. otherwise, need to parse ferry's prefab.
++            type: item.train ? 'train' : 'ferry',
++            icon: item.train ? 'train_ico' : 'port_overlay',
++            label,
+           });
+-          ({ x, y } = assertExists(nodesByUid.get(item.nodeUid)));
+-        }
+-        const companyName = defData.companies.get(item.token)?.name;
+-        if (companyName == null) {
+-          logger.warn('unknown company name for token', item.token);
+-        }
+-        const pos = { x, y };
+-        pois.push({
+-          ...pos,
+-          secret: prefabItem.secret,
+-          type: 'company',
+-          icon: item.token,
+-          label: companyName ?? item.token,
+-          cityToken: item.cityToken,
+-        });
+-        companies.push({
+-          ...item,
+-          x,
+-          y,
+-        });
+-        break;
+-      }
+-      case ItemType.Ferry: {
+-        const { x, y } = assertExists(nodesByUid.get(item.nodeUid));
+-        const pos = { x, y };
+-        const ferry = assertExists(defData.ferries.get(item.token));
+-        const label = ferry.nameLocalized
+-          ? (l10n.get(ferry.nameLocalized.replaceAll('@', '')) ?? ferry.name)
+-          : ferry.name;
+-        pois.push({
+-          ...pos,
+-          secret: undefined, // assume there are no secret ferries. otherwise, need to parse ferry's prefab.
+-          type: item.train ? 'train' : 'ferry',
+-          icon: item.train ? 'train_ico' : 'port_overlay',
+-          label,
+-        });
+-        break;
+-      }
+-      case ItemType.Cutscene: {
+-        // a less magical check might be to read actions.stringParams,
+-        // and check that items 0 and 1 are "create" and "viewpoint".
+-        if ((item.flags & 0x00_00_00_ff) !== 0) {
+           break;
+         }
+-        const labelToken = defData.viewpoints.get(item.uid);
+-        const label = l10n.get(labelToken ?? '');
+-        if (label == null) {
+-          logger.warn('missing viewpoint info for item', item.uid.toString(16));
+-        }
+-        const { x, y } = item;
+-        const pos = { x, y };
+-        pois.push({
+-          ...pos,
+-          secret: item.secret,
+-          type: 'viewpoint',
+-          icon: 'viewpoint',
+-          label: label ?? '',
+-        });
+-        break;
+-      }
+-      case ItemType.Trigger: {
+-        const { x, y } = item;
+-        const pos = { x, y };
+-        if (item.actions.find(([key]) => key === 'hud_parking')) {
++        case ItemType.Cutscene: {
++          // a less magical check might be to read actions.stringParams,
++          // and check that items 0 and 1 are "create" and "viewpoint".
++          if ((item.flags & 0x00_00_00_ff) !== 0) {
++            break;
++          }
++          const labelToken = defData.viewpoints.get(item.uid);
++          const label = l10n.get(labelToken ?? '');
++          if (label == null) {
++            logger.warn(
++              'missing viewpoint info for item',
++              item.uid.toString(16),
++            );
++          }
++          const { x, y } = item;
++          const pos = { x, y };
+           pois.push({
+             ...pos,
+             secret: item.secret,
+-            type: 'facility',
+-            dlcGuard: item.dlcGuard,
+-            itemNodeUids: item.nodeUids,
+-            icon: 'parking_ico',
+-            fromItemType: 'trigger',
++            type: 'viewpoint',
++            icon: 'viewpoint',
++            label: label ?? '',
+           });
++          break;
+         }
+-        break;
++        case ItemType.Trigger: {
++          const { x, y } = item;
++          const pos = { x, y };
++          if (item.actions.find(([key]) => key === 'hud_parking')) {
++            pois.push({
++              ...pos,
++              secret: item.secret,
++              type: 'facility',
++              dlcGuard: item.dlcGuard,
++              itemNodeUids: item.nodeUids,
++              icon: 'parking_ico',
++              fromItemType: 'trigger',
++            });
++          }
++          break;
++        }
++        default:
++          throw new UnreachableError(item);
+       }
+-      default:
+-        throw new UnreachableError(item);
++    } catch (err) {
++      logger.warn('skipping poi item due to error:', err);
+     }
+   }
+ 
+@@ -1156,12 +1255,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
+     if (o.nameLocalized && !l10n.has(o.nameLocalized.replaceAll('@', ''))) {
+       logger.warn('no localized name for', o.nameLocalized, `(${o.name})`);
+     }
++    const localized = o.nameLocalized
++      ? (l10n.get(o.nameLocalized.replaceAll('@', '')) ?? o.name)
++      : o.name;
+     return {
+       ...o,
+       nameLocalized: undefined,
+-      name: o.nameLocalized
+-        ? (l10n.get(o.nameLocalized.replaceAll('@', '')) ?? o.name)
+-        : o.name,
++      name: localized,
++      // nombre nativo del def (el que el juego muestra sin traducir), para
++      // que la web pueda matchear el destino en cualquier idioma
++      nameNative: o.name !== localized ? o.name : undefined,
+     };
+   };
+ }
+diff --git a/packages/clis/parser/game-files/prefab-ppd-parser.ts b/packages/clis/parser/game-files/prefab-ppd-parser.ts
+index 10fdc04..46f7831 100644
+--- a/packages/clis/parser/game-files/prefab-ppd-parser.ts
++++ b/packages/clis/parser/game-files/prefab-ppd-parser.ts
+@@ -11,219 +11,230 @@ import { float3, float4, token64 } from './restructure-helpers';
+ // https://github.com/SCSSoftware/BlenderTools/blob/master/addon/io_scs_tools/consts.py
+ // https://github.com/dariowouters/ts-map/blob/master/docs/structures/ppd-template.bt
+ 
+-const Prefab = new r.Struct({
+-  version: r.uint32le,
++// Versiones soportadas. Las secciones se leen por los punteros (offsets) del
++// header, asi que entre la 23, 24 y 25 solo cambia el tamano de dos registros:
++//   - semaphores: la 25 agrega 4 uint32 al final (unknown2)
++//   - spawn points: la 24 agrega un uint32 de flags
++// (layout tomado de sk-zk/TruckLib.Models, Semaphore/SpawnPoint.Deserialize).
++// Mods viejos (RusMap jazzycat = 24, Grand Utopia custom_company = 23) los usan.
++const PPD_VERSIONS = [23, 24, 25] as const;
+ 
+-  numNodes: r.uint32le,
+-  numNavCurves: r.uint32le,
+-  numSigns: r.uint32le,
+-  numSemaphores: r.uint32le,
+-  numSpawnPoints: r.uint32le,
+-  numTerrainPoints: r.uint32le,
+-  numTerrainPointVariants: r.uint32le,
+-  numMapPoints: r.uint32le,
+-  numTriggerPoints: r.uint32le,
+-  numIntersections: r.uint32le,
+-  numNavNodes: r.uint32le,
++function buildPrefabStruct(version: number) {
++  const semaphoreFields = {
++    pos: float3,
++    rot: float4,
++    type: r.uint32le,
++    id: r.uint32le,
++    intervals: float4,
++    cycle: r.floatle,
++    profile: token64,
++    unknown1: new r.Reserved(r.uint32le),
++    ...(version >= 25
++      ? { unknown2: new r.Array(new r.Reserved(r.uint32le), 4) }
++      : {}),
++  };
++  const spawnPointFields = {
++    pos: float3,
++    rot: float4,
++    type: r.uint32le,
++    // new in v24. maybe related to new loading mechanic in Nebraska?
++    ...(version >= 24 ? { unknown: new r.Reserved(r.uint32le) } : {}),
++  };
++  return new r.Struct({
++    version: r.uint32le,
++
++    numNodes: r.uint32le,
++    numNavCurves: r.uint32le,
++    numSigns: r.uint32le,
++    numSemaphores: r.uint32le,
++    numSpawnPoints: r.uint32le,
++    numTerrainPoints: r.uint32le,
++    numTerrainPointVariants: r.uint32le,
++    numMapPoints: r.uint32le,
++    numTriggerPoints: r.uint32le,
++    numIntersections: r.uint32le,
++    numNavNodes: r.uint32le,
+ 
+-  nodes: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        terrainPointIndex: r.uint32le,
+-        terrainPointCount: r.uint32le,
+-        variantIndex: r.uint32le,
+-        variantCount: r.uint32le,
+-        pos: float3,
+-        rot: float3,
+-        inputLanes: new r.Array(r.int32le, 8),
+-        outputLanes: new r.Array(r.int32le, 8),
+-      }),
+-      'numNodes',
++    nodes: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          terrainPointIndex: r.uint32le,
++          terrainPointCount: r.uint32le,
++          variantIndex: r.uint32le,
++          variantCount: r.uint32le,
++          pos: float3,
++          rot: float3,
++          inputLanes: new r.Array(r.int32le, 8),
++          outputLanes: new r.Array(r.int32le, 8),
++        }),
++        'numNodes',
++      ),
+     ),
+-  ),
+-  navCurves: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        token: token64,
+-        flags: r.uint32le,
+-        leadsToNodes: new r.Struct({
+-          // looks like this byte should be treated like the navNode bitfield.
+-          endNode: r.uint8,
+-          endLane: r.uint8,
+-          // looks like this byte should be treated like the navNode bitfield.
+-          startNode: r.uint8,
+-          startLane: r.uint8,
++    navCurves: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          token: token64,
++          flags: r.uint32le,
++          leadsToNodes: new r.Struct({
++            // looks like this byte should be treated like the navNode bitfield.
++            endNode: r.uint8,
++            endLane: r.uint8,
++            // looks like this byte should be treated like the navNode bitfield.
++            startNode: r.uint8,
++            startLane: r.uint8,
++          }),
++          startPos: float3,
++          endPos: float3,
++          startRot: float4,
++          endRot: float4,
++          length: r.floatle,
++          nextLines: new r.Array(r.int32le, 4),
++          prevLines: new r.Array(r.int32le, 4),
++          countNext: r.uint32le, // length of nextLines array, above
++          countPrev: r.uint32le, // length of prevLines array, above
++          semaphoreId: r.int32le,
++          trafficRule: token64,
++          navNodeIndex: r.uint32le,
+         }),
+-        startPos: float3,
+-        endPos: float3,
+-        startRot: float4,
+-        endRot: float4,
+-        length: r.floatle,
+-        nextLines: new r.Array(r.int32le, 4),
+-        prevLines: new r.Array(r.int32le, 4),
+-        countNext: r.uint32le, // length of nextLines array, above
+-        countPrev: r.uint32le, // length of prevLines array, above
+-        semaphoreId: r.int32le,
+-        trafficRule: token64,
+-        navNodeIndex: r.uint32le,
+-      }),
+-      'numNavCurves',
++        'numNavCurves',
++      ),
+     ),
+-  ),
+-  signs: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        name: token64,
+-        pos: float3,
+-        rot: float4,
+-        model: token64,
+-        part: token64,
+-      }),
+-      'numSigns',
++    signs: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          name: token64,
++          pos: float3,
++          rot: float4,
++          model: token64,
++          part: token64,
++        }),
++        'numSigns',
++      ),
++    ),
++    semaphores: new r.Pointer(
++      r.uint32le,
++      new r.Array(new r.Struct(semaphoreFields), 'numSemaphores'),
+     ),
+-  ),
+-  semaphores: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        pos: float3,
+-        rot: float4,
+-        type: r.uint32le,
+-        id: r.uint32le,
+-        intervals: float4,
+-        cycle: r.floatle,
+-        profile: token64,
+-        unknown1: new r.Reserved(r.uint32le),
+-        unknown2: new r.Array(new r.Reserved(r.uint32le), 4),
+-      }),
+-      'numSemaphores',
++    spawnPoints: new r.Pointer(
++      r.uint32le,
++      new r.Array(new r.Struct(spawnPointFields), 'numSpawnPoints'),
+     ),
+-  ),
+-  spawnPoints: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        pos: float3,
+-        rot: float4,
+-        type: r.uint32le,
+-        // new in v24. maybe related to new loading mechanic in Nebraska?
+-        unknown: new r.Reserved(r.uint32le),
+-      }),
+-      'numSpawnPoints',
++    terrainPointPositions: new r.Pointer(
++      r.uint32le,
++      new r.Array(float3, 'numTerrainPoints'),
+     ),
+-  ),
+-  terrainPointPositions: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(float3, 'numTerrainPoints'),
+-  ),
+-  terrainPointNormals: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(float3, 'numTerrainPoints'),
+-  ),
+-  terrainPointVariants: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        attach0: r.uint32le,
+-        attach1: r.uint32le,
+-      }),
+-      'numTerrainPointVariants',
++    terrainPointNormals: new r.Pointer(
++      r.uint32le,
++      new r.Array(float3, 'numTerrainPoints'),
+     ),
+-  ),
+-  mapPoints: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        visualFlags: new r.Struct({
+-          extValue: new r.Reserved(r.uint8),
+-          sizeAndOffset: r.uint8, // first nibble: size, second nibble: offset
+-          paint: new r.Bitfield(r.uint8, [
+-            'roadOver',
+-            'light',
+-            'dark',
+-            'green',
+-            'noOutline',
+-            'noArrow', // only relevant for 'road' map points
+-          ]),
+-          unknown: new r.Reserved(r.uint8),
++    terrainPointVariants: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          attach0: r.uint32le,
++          attach1: r.uint32le,
+         }),
+-        navFlags: new r.Struct({
+-          navNode: new r.Bitfield(r.uint8, [
+-            'node0',
+-            'node1',
+-            'node2',
+-            'node3',
+-            'node4',
+-            'node5',
+-            'node6',
+-            'nodeCustom',
+-          ]),
+-          control: new r.Bitfield(r.uint8, ['isStart', 'isBase', 'isExit']),
+-          unknown: new r.Reserved(r.uint16le),
++        'numTerrainPointVariants',
++      ),
++    ),
++    mapPoints: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          visualFlags: new r.Struct({
++            extValue: new r.Reserved(r.uint8),
++            sizeAndOffset: r.uint8, // first nibble: size, second nibble: offset
++            paint: new r.Bitfield(r.uint8, [
++              'roadOver',
++              'light',
++              'dark',
++              'green',
++              'noOutline',
++              'noArrow', // only relevant for 'road' map points
++            ]),
++            unknown: new r.Reserved(r.uint8),
++          }),
++          navFlags: new r.Struct({
++            navNode: new r.Bitfield(r.uint8, [
++              'node0',
++              'node1',
++              'node2',
++              'node3',
++              'node4',
++              'node5',
++              'node6',
++              'nodeCustom',
++            ]),
++            control: new r.Bitfield(r.uint8, ['isStart', 'isBase', 'isExit']),
++            unknown: new r.Reserved(r.uint16le),
++          }),
++          pos: float3,
++          neighbors: new r.Array(r.int32le, 6),
++          neighborCount: r.uint32le,
+         }),
+-        pos: float3,
+-        neighbors: new r.Array(r.int32le, 6),
+-        neighborCount: r.uint32le,
+-      }),
+-      'numMapPoints',
++        'numMapPoints',
++      ),
+     ),
+-  ),
+-  triggerPoints: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        id: r.uint32le,
+-        action: token64,
+-        range: r.floatle,
+-        resetDelay: r.floatle,
+-        resetDistance: r.floatle,
+-        flags: r.uint32le,
+-        pos: float3,
+-        neighbors: new r.Array(r.int32le, 2),
+-      }),
+-      'numTriggerPoints',
++    triggerPoints: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          id: r.uint32le,
++          action: token64,
++          range: r.floatle,
++          resetDelay: r.floatle,
++          resetDistance: r.floatle,
++          flags: r.uint32le,
++          pos: float3,
++          neighbors: new r.Array(r.int32le, 2),
++        }),
++        'numTriggerPoints',
++      ),
+     ),
+-  ),
+-  intersections: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        curveId: r.uint32le,
+-        pos: r.floatle, // position along curve?
+-        radius: r.floatle,
+-        flags: r.uint32le,
+-      }),
+-      'numIntersections',
++    intersections: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          curveId: r.uint32le,
++          pos: r.floatle, // position along curve?
++          radius: r.floatle,
++          flags: r.uint32le,
++        }),
++        'numIntersections',
++      ),
+     ),
+-  ),
+-  navNodes: new r.Pointer(
+-    r.uint32le,
+-    new r.Array(
+-      new r.Struct({
+-        type: new r.Enum(r.uint8, ['physical', 'ai']),
+-        // if type is physical: the index of the normal node (see nodes array) this navNode ends at.
+-        // if type is ai: the index of the AI curve this navNode ends at.
+-        index: r.uint16le,
+-        connectionCount: r.uint8,
+-        // connections to other nav nodes
+-        connections: new r.Array(
+-          new r.Struct({
+-            // target navNode index
+-            targetNode: r.uint16le,
+-            length: r.floatle,
+-            curveIndicesCount: r.uint8,
+-            curveIndices: new r.Array(r.uint16le, 8),
+-          }),
+-          8,
+-        ), // note: this 8 differs from docs at http://modding.scssoft.com/wiki/Games/ETS2/Modding_guides/1.30#Prefabs, which says it's 4.
+-      }),
+-      'numNavNodes',
++    navNodes: new r.Pointer(
++      r.uint32le,
++      new r.Array(
++        new r.Struct({
++          type: new r.Enum(r.uint8, ['physical', 'ai']),
++          // if type is physical: the index of the normal node (see nodes array) this navNode ends at.
++          // if type is ai: the index of the AI curve this navNode ends at.
++          index: r.uint16le,
++          connectionCount: r.uint8,
++          // connections to other nav nodes
++          connections: new r.Array(
++            new r.Struct({
++              // target navNode index
++              targetNode: r.uint16le,
++              length: r.floatle,
++              curveIndicesCount: r.uint8,
++              curveIndices: new r.Array(r.uint16le, 8),
++            }),
++            8,
++          ), // note: this 8 differs from docs at http://modding.scssoft.com/wiki/Games/ETS2/Modding_guides/1.30#Prefabs, which says it's 4.
++        }),
++        'numNavNodes',
++      ),
+     ),
+-  ),
+-});
++  });
++}
++
++const prefabStructs = new Map<number, ReturnType<typeof buildPrefabStruct>>();
++for (const v of PPD_VERSIONS) prefabStructs.set(v, buildPrefabStruct(v));
+ 
+ const roadSizeToLanes = {
+   0: {
+@@ -282,7 +293,8 @@ const roadOffsetToOffset = {
+ 
+ export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
+   const version = buffer.readUint32LE();
+-  if (version !== 25) {
++  const Prefab = prefabStructs.get(version);
++  if (!Prefab) {
+     logger.error('unknown .ppd file version', version);
+     throw new Error();
+   }
+@@ -306,6 +318,27 @@ export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
+   // make sure that dummy road points are all at the end of the array, so
+   // we can trim them out without affecting map point indices.
+   let seenDummy = false;
++  // Algunos prefabs (garage.ppd vainilla, gasolineras de Reforma, depots de
++  // ProMods Canada) traen puntos "base" en el medio del array: recortarlos
++  // corre los indices de neighbors, y abortar pierde el prefab entero (con
++  // sus spawn points = POIs). Para esos se conservan los puntos base como
++  // roads comunes, que solo agrega alguna linea de mas en el dibujo.
++  let effectiveSkipBaseRoads = skipBaseRoads;
++  if (skipBaseRoads) {
++    const isDummy = (rp: (typeof rawPrefab.mapPoints)[number]) =>
++      (rp.visualFlags.sizeAndOffset & 0x0f) !== 13 &&
++      rp.navFlags.control.isBase;
++    const firstDummy = rawPrefab.mapPoints.findIndex(isDummy);
++    if (
++      firstDummy !== -1 &&
++      rawPrefab.mapPoints.slice(firstDummy).some(rp => !isDummy(rp))
++    ) {
++      logger.warn(
++        'prefab has base road points before other map points; keeping them',
++      );
++      effectiveSkipBaseRoads = false;
++    }
++  }
+   return {
+     nodes: rawPrefab.nodes.map(n => {
+       const [rX, , rZ] = n.rot;
+@@ -358,7 +391,7 @@ export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
+             color,
+             roadOver: !!paint.roadOver,
+           };
+-        } else if (skipBaseRoads && rp.navFlags.control.isBase) {
++        } else if (effectiveSkipBaseRoads && rp.navFlags.control.isBase) {
+           seenDummy = true;
+           return undefined;
+         } else {
+@@ -409,6 +442,7 @@ export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
+     // future fields, useful for routing
+     navCurves: rawPrefab.navCurves.map(rc => {
+       const {
++        flags,
+         navNodeIndex,
+         countNext,
+         countPrev,
+@@ -429,6 +463,8 @@ export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
+         prevLines: rc.prevLines.slice(0, countPrev),
+         semaphoreId: semaphoreId === -1 ? undefined : semaphoreId,
+         trafficRule: trafficRule === '' ? undefined : trafficRule,
++        // Truck Dash: las banderas de la curva (prioridad, giro, prohibida...)
++        flags,
+       };
+     }),
+     navNodes: rawPrefab.navNodes.map(rn => {
+diff --git a/packages/clis/parser/game-files/scs-archive.ts b/packages/clis/parser/game-files/scs-archive.ts
+index 73a4a8f..da33698 100644
+--- a/packages/clis/parser/game-files/scs-archive.ts
++++ b/packages/clis/parser/game-files/scs-archive.ts
+@@ -6,18 +6,33 @@ import type { BaseOf } from 'restructure';
+ import * as r from 'restructure';
+ import zlib from 'zlib';
+ import { logger } from '../logger';
++import { city64 as city64Ts } from './cityhash';
+ import { DdsHeader } from './dds-parser';
+ import { MappedNumber, uint64le } from './restructure-helpers';
+ const require = createRequire(import.meta.url);
+ 
+-// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+-const { city64 } = require('bindings')('cityhash') as {
+-  city64: (s: string) => bigint;
+-};
+-
+-// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+-const { gdeflate } = require('bindings')('gdeflate') as {
+-  gdeflate: (inBuffer: ArrayBuffer, outBuffer: ArrayBuffer) => number;
++// Los modulos nativos si estan (el taller); si no, CityHash64 en TS
++// (cityhash.ts, igual byte a byte) y sin gdeflate. Asi el parser empaquetado
++// corre en Windows sin compilar nada (el armador de mapas en la PC de quien
++// juega). gdeflate solo se usa para texturas: sin el, los iconos se saltean
++// (ver el catch en map-files-parser.ts) y el mapa sale igual.
++type City64 = (s: string) => bigint;
++type GDeflate = (inBuffer: ArrayBuffer, outBuffer: ArrayBuffer) => number;
++function nativo<T>(nombre: string): T | undefined {
++  try {
++    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
++    return require('bindings')(nombre) as T;
++  } catch {
++    return undefined;
++  }
++}
++const city64: City64 =
++  nativo<{ city64: City64 }>('cityhash')?.city64 ?? city64Ts;
++const gdeflateNativo = nativo<{ gdeflate: GDeflate }>('gdeflate')?.gdeflate;
++const gdeflate: GDeflate = (inBuffer, outBuffer) => {
++  if (!gdeflateNativo)
++    throw new Error('gdeflate no esta disponible (textura salteada)');
++  return gdeflateNativo(inBuffer, outBuffer);
+ };
+ 
+ const FileHeader = new r.Struct({
+diff --git a/packages/clis/parser/game-files/sii-schemas.ts b/packages/clis/parser/game-files/sii-schemas.ts
+index b8accdc..564519e 100644
+--- a/packages/clis/parser/game-files/sii-schemas.ts
++++ b/packages/clis/parser/game-files/sii-schemas.ts
+@@ -116,7 +116,7 @@ const numberQuadruple = fixedLengthArray(number, 4);
+ const stringArray = arrayOf(string);
+ const localeToken = stringPattern(/^@@.+@@$/);
+ const token = {
+-  ...stringPattern(/^[0-9a-z_]{1,12}$/),
++  ...stringPattern(/^[0-9a-zA-Z_.]{1,40}$/),
+   // ETS2 has some country and city names (e.g. Hungary, Odense) as capitalized
+   // tokens. Lowercase them so they're valid tokens.
+   transform: ['toLowerCase'],
+@@ -136,7 +136,7 @@ export interface VersionSii {
+   >;
+ }
+ export const VersionSiiSchema: JSONSchemaType<VersionSii> = object({
+-  fsPackSet: patternRecord(/^_nameless(\.[0-9a-z_]{1,12}){2}$/, {
++  fsPackSet: patternRecord(/^_nameless(\.[0-9a-zA-Z_.]{1,40}){2}$/, {
+     application: stringEnum('ats', 'eut2'),
+     version: stringPattern(/^\d+(\.\d+){3}$/),
+   }),
+@@ -152,7 +152,7 @@ export interface RouteSii {
+   >;
+ }
+ export const RouteSiiSchema: JSONSchemaType<RouteSii> = object({
+-  routeData: patternRecord(/^route_data\.[0-9a-z_]{1,12}$/, {
++  routeData: patternRecord(/^route_data\.[0-9a-zA-Z_.]{1,40}$/, {
+     fromCity: token,
+     toCity: token,
+   }),
+@@ -168,9 +168,9 @@ export interface OversizeOfferSii {
+   >;
+ }
+ export const OversizeOfferSiiSchema: JSONSchemaType<OversizeOfferSii> = object({
+-  oversizeOfferData: patternRecord(/^spec_offer\.[0-9a-zA-Z_]{1,12}$/, {
+-    route: stringPattern(/^route_data\.[0-9a-z_]{1,12}$/),
+-    cargo: stringPattern(/^cargo\.[0-9a-z_]{1,12}$/),
++  oversizeOfferData: patternRecord(/^spec_offer\.[0-9a-zA-Z_.]{1,40}$/, {
++    route: stringPattern(/^route_data\.[0-9a-zA-Z_.]{1,40}$/),
++    cargo: stringPattern(/^cargo\.[0-9a-zA-Z_.]{1,40}$/),
+   }),
+ });
+ 
+@@ -320,7 +320,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+     ),
+     achievementDeliveryLogData: nullable(
+       patternRecord(
+-        /^\.achievement\.[0-9a-z_]{1,12}$/,
++        /^\.achievement\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           sourceCompanies: nullable(stringArray),
+           cargos: nullable(stringArray),
+@@ -332,15 +332,15 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+       ),
+     ),
+     achievementDelivery: nullable(
+-      patternRecord(/^\.achievement\.[0-9a-z_]{1,12}$/, {
+-        condition: stringPattern(/^\.[0-9a-z_]{1,12}\.condition$/),
++      patternRecord(/^\.achievement\.[0-9a-zA-Z_.]{1,40}$/, {
++        condition: stringPattern(/^\.[0-9a-zA-Z_.]{1,40}\.condition$/),
+         target: integer,
+         achievementName: string,
+       }),
+     ),
+     achievementDeliveryCompany: nullable(
+       patternRecord(
+-        /^(\.[0-9a-z_]{1,12}){2,4}$/,
++        /^(\.[0-9a-zA-Z_.]{1,40}){2,4}$/,
+         {
+           companyName: token,
+           cityName: nullable(token),
+@@ -351,7 +351,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+     ),
+     achievementEachCompanyData: nullable(
+       patternRecord(
+-        /^\.achievement\.[0-9a-z_]{1,12}$/,
++        /^\.achievement\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           targets: nullable(stringArray),
+           sources: nullable(stringArray),
+@@ -361,20 +361,20 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+       ),
+     ),
+     achievementTriggerData: nullable(
+-      patternRecord(/^\.achievement\.[0-9a-z_]{1,12}$/, {
++      patternRecord(/^\.achievement\.[0-9a-zA-Z_.]{1,40}$/, {
+         triggerParam: string,
+         target: nullableWithDefault(integer, 1),
+         achievementName: string,
+       }),
+     ),
+     achievementDeliverCargoData: nullable(
+-      patternRecord(/^\.achievement\.[0-9a-z_]{1,12}$/, {
++      patternRecord(/^\.achievement\.[0-9a-zA-Z_.]{1,40}$/, {
+         targets: stringArray,
+         achievementName: string,
+       }),
+     ),
+     achievementEachDeliveryPoint: nullable(
+-      patternRecord(/^\.achievement\.[0-9a-z_]{1,12}$/, {
++      patternRecord(/^\.achievement\.[0-9a-zA-Z_.]{1,40}$/, {
+         sources: stringArray,
+         targets: stringArray,
+         achievementName: string,
+@@ -382,7 +382,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+     ),
+     achievementFerryData: nullable(
+       patternRecord(
+-        /^\.achievement\.[0-9a-z_]{1,12}$/,
++        /^\.achievement\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           endpointA: nullable(token),
+           endpointB: nullable(token),
+@@ -393,13 +393,13 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+       ),
+     ),
+     achievementDeliveryPointCity: nullable(
+-      patternRecord(/^(\.[0-9a-z_]{1,12}){3,4}$/, {
++      patternRecord(/^(\.[0-9a-zA-Z_.]{1,40}){3,4}$/, {
+         role: stringEnum('source', 'target'),
+         cityName: token,
+       }),
+     ),
+     achievementLimitData: nullable(
+-      patternRecord(/^\.achievement\.[0-9a-z_]{1,12}$/, {
++      patternRecord(/^\.achievement\.[0-9a-zA-Z_.]{1,40}$/, {
+         achievementName: string,
+       }),
+     ),
+@@ -480,7 +480,7 @@ export interface FerrySii {
+ }
+ export const FerrySiiSchema: JSONSchemaType<FerrySii> = object({
+   ferryData: patternRecord(
+-    /^ferry\.[0-9a-z_]{1,12}$/,
++    /^ferry\.[0-9a-zA-Z_.]{1,40}$/,
+     {
+       ferryName: string,
+       ferryNameLocalized: nullable(localeToken),
+@@ -493,7 +493,7 @@ export interface CompanySii {
+   companyPermanent: Record<string, { name: string }>;
+ }
+ export const CompanySiiSchema: JSONSchemaType<CompanySii> = object({
+-  companyPermanent: patternRecord(/^company\.permanent\.[0-9a-z_]{1,12}$/, {
++  companyPermanent: patternRecord(/^company\.permanent\.[0-9a-zA-Z_.]{1,40}$/, {
+     name: string,
+   }),
+ });
+@@ -524,7 +524,7 @@ export const CountrySiiSchema: JSONSchemaType<CountrySii> = object(
+   {
+     countryData: nullable(
+       patternRecord(
+-        /^country\.data\.[0-9a-z_]{1,12}$/,
++        /^country\.data\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           name: string,
+           nameLocalized: localeToken,
+@@ -558,7 +558,13 @@ export interface CitySii {
+     string,
+     {
+       cityName: string;
+-      cityNameLocalized: string;
++      // Opcional: algunos mods (ej. Coast to Coast) hacen overrides parciales
++      // de ciudades vainilla (solo pin scale/offsets) sin repetir el nombre
++      // localizado, algo que el juego soporta via merge incremental de SII
++      // pero que nuestro parser (que lee cada archivo entero, sin mergear
++      // campo a campo entre el vainilla y el mod) no puede reconstruir - ver
++      // el fallback a cityName en def-parser.ts.
++      cityNameLocalized?: string;
+       country: string;
+       population?: number;
+     }
+@@ -568,14 +574,14 @@ export const CitySiiSchema: JSONSchemaType<CitySii> = object(
+   {
+     cityData: nullable(
+       patternRecord(
+-        /^city\.[0-9a-z_]{1,12}$/,
++        /^city\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           cityName: string,
+-          cityNameLocalized: localeToken,
++          cityNameLocalized: nullable(localeToken),
+           country: token,
+           population: nullable(integer),
+         },
+-        ['cityName', 'cityNameLocalized', 'country'],
++        ['cityName', 'country'],
+       ),
+     ),
+   },
+@@ -601,7 +607,7 @@ export const MileageTargetsSiiSchema: JSONSchemaType<MileageTargetsSii> =
+   object(
+     {
+       mileageTarget: patternRecord(
+-        /^mileage\.[0-9a-z_]{1,12}$/,
++        /^mileage\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           editorName: string,
+           defaultName: string,
+@@ -648,7 +654,7 @@ export interface ViewpointsSii {
+ }
+ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
+   photoAlbumItem: patternRecord(
+-    /^album\.(viewpoints|landmarks)\.[0-9a-z_]{1,12}$/,
++    /^album\.(viewpoints|landmarks)\.[0-9a-zA-Z_.]{1,40}$/,
+     {
+       name: localeToken,
+       dlcId: token,
+@@ -656,7 +662,7 @@ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
+     },
+   ),
+   photoAlbumGroup: patternRecord(
+-    /^album\.(viewpoints|landmarks)\.[0-9a-z_]{1,12}$/,
++    /^album\.(viewpoints|landmarks)\.[0-9a-zA-Z_.]{1,40}$/,
+     {
+       name: localeToken,
+       items: stringArray,
+@@ -679,7 +685,7 @@ interface FerryConnectionSii {
+ export const FerryConnectionSiiSchema: JSONSchemaType<FerryConnectionSii> =
+   object({
+     ferryConnection: patternRecord(
+-      /^conn(\.[0-9a-z_]{1,12}){2}$/,
++      /^conn(\.[0-9a-zA-Z_.]{1,40}){2}$/,
+       {
+         price: number,
+         time: number,
+@@ -705,7 +711,7 @@ export const PrefabSiiSchema: JSONSchemaType<PrefabSii> = object(
+   {
+     prefabModel: nullable(
+       patternRecord(
+-        /^prefab\.[0-9a-z_]{1,12}$/,
++        /^prefab\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           prefabDesc: string,
+           modelDesc: string,
+@@ -725,7 +731,7 @@ export const ModelSiiSchema: JSONSchemaType<ModelSii> = object(
+   {
+     modelDef: nullable(
+       patternRecord(
+-        /^model\.[0-9a-z_]{1,12}$/,
++        /^model\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           modelDesc: nullable(string),
+           vegetationModel: nullable(string),
+@@ -761,7 +767,7 @@ export const RoadLookSiiSchema: JSONSchemaType<RoadLookSii> = object(
+   {
+     roadLook: nullable(
+       patternRecord(
+-        /^road\.[0-9a-z_]{1,12}$/,
++        /^road\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+           name: string,
+           lanesLeft: nullable(stringArray),
+@@ -830,7 +836,11 @@ export interface CityCompanySii {
+   companyDef: Record<string, { city: string }>;
+ }
+ export const CityCompanySiiSchema: JSONSchemaType<CityCompanySii> = object({
+-  companyDef: patternRecord(/^\.[0-9a-z_]{1,12}$/, {
++  // [0-9a-zA-Z_] en vez de [0-9a-zA-Z_]: algunos mods (ej. Coast to Coast) usan
++  // tokens de ciudad con mayusculas (ej. .lonepineMt para "Lonepine Mt"),
++  // que el juego acepta pero el patron original (pensado solo para tokens
++  // vainilla, siempre en minuscula) rechazaba como "additional property".
++  companyDef: patternRecord(/^\.[0-9a-zA-Z_.]{1,40}$/, {
+     city: token,
+   }),
+ });
+@@ -839,9 +849,9 @@ export interface CargoDefSii {
+   cargoDef: Record<string, { cargo: string }>;
+ }
+ export const CargoDefSiiSchema: JSONSchemaType<CargoDefSii> = object({
+-  cargoDef: patternRecord(/^\.[0-9a-z_]{1,12}$/, {
++  cargoDef: patternRecord(/^\.[0-9a-zA-Z_.]{1,40}$/, {
+     // Note: more information (like l18n strings) for `cargo.foo` can be found in defs/cargo/foo.sui.
+-    cargo: stringPattern(/^cargo\.[0-9a-z_]{1,12}$/),
++    cargo: stringPattern(/^cargo\.[0-9a-zA-Z_.]{1,40}$/),
+   }),
+ });
+ 
+@@ -864,7 +874,7 @@ export interface CargoDataSii {
+ }
+ export const CargoDataSiiSchema: JSONSchemaType<CargoDataSii> = object({
+   cargoData: patternRecord(
+-    /^cargo\.[0-9a-z_]{1,12}$/,
++    /^cargo\.[0-9a-zA-Z_.]{1,40}$/,
+     {
+       name: string, // should be `localeToken`, but Valentines cargo :(
+       volume: number,
+@@ -895,9 +905,12 @@ export const SignSiiSchema: JSONSchemaType<SignSii> = object(
+   {
+     signModel: nullable(
+       patternRecord(
+-        /^sign\.[0-9a-z_]{1,12}$/,
++        /^sign\.[0-9a-zA-Z_.]{1,40}$/,
+         {
+-          modelDesc: stringPattern(/^[^.]+\.pmd$/),
++          // Algunos mods (ProMods) tienen nombres de archivo con puntos
++          // internos antes de la extension (ej. "..._3.5t_v01.pmd") - el
++          // patron original solo permitia el punto de ".pmd" final.
++          modelDesc: stringPattern(/\.pmd$/),
+           category: nullable(string),
+           editable: nullable(stringEnum('true', 'false')),
+         },
+diff --git a/packages/clis/parser/game-files/zip-entries.ts b/packages/clis/parser/game-files/zip-entries.ts
+new file mode 100755
+index 0000000..38c046b
+--- /dev/null
++++ b/packages/clis/parser/game-files/zip-entries.ts
+@@ -0,0 +1,144 @@
++// Lector de .scs que son ZIP (Coast to Coast, Grand Utopia, las expansiones
++// de Canada, More European Cities...), con la misma forma que las Entries de
++// scs-archive.ts, para que el parser lea el mod tal como lo bajo la persona,
++// sin extraerlo. Lee solo el indice central al abrir y descomprime cada
++// archivo recien cuando se lo piden: un mod de 250 MB no entra entero en
++// memoria. Ignora el flag de cifrado y el CRC, que algunos mods rompen a
++// proposito para que no se abran (Roextended): el juego tampoco los mira.
++
++import fs from 'fs';
++import zlib from 'zlib';
++
++interface ZipFile {
++  offset: number;
++  compSize: number;
++  method: number;
++}
++
++export class ZipEntries {
++  private readonly fd: number;
++  private readonly fileMap = new Map<string, ZipFile>();
++  private readonly dirMap = new Map<
++    string,
++    { subdirectories: Set<string>; files: Set<string> }
++  >();
++  readonly valid: boolean;
++
++  constructor(
++    readonly path: string,
++    readonly scsSource: string,
++  ) {
++    this.fd = fs.openSync(path, 'r');
++    this.valid = this.readCentralDirectory();
++  }
++
++  private readCentralDirectory(): boolean {
++    const size = fs.fstatSync(this.fd).size;
++    const tail = Math.min(size, 65557);
++    const buf = Buffer.alloc(tail);
++    fs.readSync(this.fd, buf, 0, tail, size - tail);
++    let eocd = -1;
++    for (let i = tail - 22; i >= 0; i--) {
++      if (buf.readUInt32LE(i) === 0x06054b50) {
++        eocd = i;
++        break;
++      }
++    }
++    if (eocd < 0) return false;
++    const count = buf.readUInt16LE(eocd + 10);
++    const cdSize = buf.readUInt32LE(eocd + 12);
++    const cdOffset = buf.readUInt32LE(eocd + 16);
++    const cd = Buffer.alloc(cdSize);
++    fs.readSync(this.fd, cd, 0, cdSize, cdOffset);
++    let p = 0;
++    for (let n = 0; n < count && p + 46 <= cd.length; n++) {
++      if (cd.readUInt32LE(p) !== 0x02014b50) return false;
++      const method = cd.readUInt16LE(p + 10);
++      const compSize = cd.readUInt32LE(p + 20);
++      const nameLen = cd.readUInt16LE(p + 28);
++      const extraLen = cd.readUInt16LE(p + 30);
++      const commentLen = cd.readUInt16LE(p + 32);
++      const offset = cd.readUInt32LE(p + 42);
++      const name = cd
++        .toString('utf8', p + 46, p + 46 + nameLen)
++        .replace(/\\/g, '/')
++        .replace(/^\/+/, '');
++      p += 46 + nameLen + extraLen + commentLen;
++      if (!name || name.endsWith('/')) {
++        if (name) this.ensureDir(name.slice(0, -1));
++        continue;
++      }
++      this.fileMap.set(name, { offset, compSize, method });
++      const slash = name.lastIndexOf('/');
++      const dir = slash < 0 ? '' : name.slice(0, slash);
++      this.ensureDir(dir).files.add(name.slice(slash + 1));
++    }
++    return true;
++  }
++
++  // Los ZIP no siempre traen las carpetas como entradas: se arman de las rutas.
++  private ensureDir(dir: string) {
++    let d = this.dirMap.get(dir);
++    if (!d) {
++      d = { subdirectories: new Set(), files: new Set() };
++      this.dirMap.set(dir, d);
++      if (dir) {
++        const slash = dir.lastIndexOf('/');
++        const parent = slash < 0 ? '' : dir.slice(0, slash);
++        this.ensureDir(parent).subdirectories.add(dir.slice(slash + 1));
++      }
++    }
++    return d;
++  }
++
++  private read(f: ZipFile): Buffer {
++    const head = Buffer.alloc(30);
++    fs.readSync(this.fd, head, 0, 30, f.offset);
++    const start = f.offset + 30 + head.readUInt16LE(26) + head.readUInt16LE(28);
++    const data = Buffer.alloc(f.compSize);
++    fs.readSync(this.fd, data, 0, f.compSize, start);
++    if (f.method === 0) return data;
++    if (f.method === 8) return zlib.inflateRawSync(data);
++    throw new Error(
++      `${this.path}: metodo de compresion ${f.method} no soportado`,
++    );
++  }
++
++  isValid() {
++    return this.valid;
++  }
++
++  dispose() {
++    fs.closeSync(this.fd);
++  }
++
++  parseEntries() {
++    return {
++      directories: {
++        get: (key: string) => {
++          const d = this.dirMap.get(key.replace(/^\/+/, ''));
++          if (!d) return undefined;
++          return {
++            type: 'directory' as const,
++            hash: 0n,
++            scsSource: this.scsSource,
++            subdirectories: [...d.subdirectories],
++            files: [...d.files],
++          };
++        },
++      },
++      files: {
++        get: (key: string) => {
++          const f = this.fileMap.get(key.replace(/^\/+/, ''));
++          if (!f) return undefined;
++          return {
++            type: 'file' as const,
++            hash: 0n,
++            scsSource: this.scsSource,
++            read: () => this.read(f),
++          };
++        },
++      },
++    };
++  }
++}
+diff --git a/packages/clis/parser/index.ts b/packages/clis/parser/index.ts
+index 8a13c01..3ec05a7 100755
+--- a/packages/clis/parser/index.ts
++++ b/packages/clis/parser/index.ts
+@@ -98,6 +98,7 @@ function writeIcons(pngOutputDir: string, icons: Map<string, Buffer>) {
+     fs.mkdirSync(pngOutputDir);
+   }
+   for (const [name, buffer] of icons) {
++    if (buffer.length === 0) continue; // icono conocido pero sin imagen
+     fs.writeFileSync(path.join(pngOutputDir, name + '.png'), buffer);
+   }
+ }
+diff --git a/packages/clis/parser/run-with-mod.ts b/packages/clis/parser/run-with-mod.ts
+new file mode 100755
+index 0000000..1d8a4aa
+--- /dev/null
++++ b/packages/clis/parser/run-with-mod.ts
+@@ -0,0 +1,180 @@
++#!/usr/bin/env -S NODE_OPTIONS=--max-old-space-size=12288 npx tsx
++// Corre el parser de truckermudgeon/maps incluyendo un mod de mapa que viene
++// como carpeta ya extraida en disco (en vez de un .scs real), inyectandolo
++// como un "archivo" mas via el parametro extraArchives que le agregamos a
++// parseMapFiles (ver map-files-parser.ts.orig para el diff exacto del patch).
++//
++// Por que hace falta esto: el .scs de Coast to Coast es en realidad un ZIP
++// plano, no el formato binario HashFS que usa ScsArchive - y aunque lo fuera,
++// parseMapFiles solo agrega archivos de la lista fija de "requiredFiles" +
++// cualquiera que empiece con "dlc" (ver el filtro scsFilePaths.filter(...)),
++// asi que un mod con otro nombre nunca se hubiera sumado de todos modos.
++//
++// Uso:
++//   npx tsx run-with-mod.ts <atsInputDir> <modExtractedDir> <outputDir>
++
++import { writeArrayFile } from '@truckermudgeon/io';
++import type { MapData } from '@truckermudgeon/map/types';
++import fs from 'fs';
++import path from 'path';
++import { parseMapFiles } from './game-files/map-files-parser';
++import { ScsArchive } from './game-files/scs-archive';
++import { ZipEntries } from './game-files/zip-entries';
++import { logger } from './logger';
++
++// Adaptador Entries/DirectoryEntry/FileEntry (misma forma que exporta
++// scs-archive.ts) respaldado por una carpeta ya extraida en disco, en vez de
++// leer un archivo .scs binario. Solo implementa lo que CombinedEntries y el
++// resto del parser realmente usan: directories.get(path)/files.get(path)
++// devolviendo listados de nombres bases y bytes crudos por archivo.
++class DirEntries {
++  private readonly dirMap = new Map<
++    string,
++    { subdirectories: string[]; files: string[] }
++  >();
++  private readonly fileMap = new Map<string, string>(); // path relativo -> path absoluto en disco
++
++  constructor(private readonly root: string) {
++    this.walk(root, '');
++  }
++
++  private walk(absDir: string, relDir: string) {
++    const entries = fs.readdirSync(absDir, { withFileTypes: true });
++    const subdirectories: string[] = [];
++    const files: string[] = [];
++    for (const entry of entries) {
++      if (entry.isDirectory()) {
++        subdirectories.push(entry.name);
++        const childRel = relDir ? `${relDir}/${entry.name}` : entry.name;
++        this.walk(path.join(absDir, entry.name), childRel);
++      } else if (entry.isFile()) {
++        files.push(entry.name);
++        const childRel = relDir ? `${relDir}/${entry.name}` : entry.name;
++        this.fileMap.set(childRel, path.join(absDir, entry.name));
++      }
++    }
++    this.dirMap.set(relDir, { subdirectories, files });
++  }
++
++  get directories() {
++    return {
++      get: (key: string) => {
++        const d = this.dirMap.get(key);
++        if (!d) return undefined;
++        return {
++          type: 'directory' as const,
++          hash: 0n,
++          scsSource: 'coast_to_coast',
++          subdirectories: d.subdirectories,
++          files: d.files,
++        };
++      },
++    };
++  }
++
++  get files() {
++    return {
++      get: (key: string) => {
++        const abs = this.fileMap.get(key);
++        if (!abs) return undefined;
++        return {
++          type: 'file' as const,
++          hash: 0n,
++          scsSource: 'coast_to_coast',
++          read: () => fs.readFileSync(abs),
++        };
++      },
++    };
++  }
++}
++
++// "Archivo" ficticio compatible con lo que CombinedEntries espera de cada
++// elemento de su lista (isValid/parseEntries/dispose) - parseMapFiles llama
++// a estos tres metodos igual que con un ScsArchive real.
++// Un mod puede venir como carpeta ya extraida (el taller) o como el .scs que
++// bajo la persona (su PC): HashFS v2 se abre con el ScsArchive del parser,
++// que es el mismo formato que los archivos del juego, y un ZIP con
++// ZipEntries. Asi no hace falta extraer nada.
++function createModArchive(modPath: string) {
++  if (fs.statSync(modPath).isFile()) {
++    const magic = Buffer.alloc(4);
++    const fd = fs.openSync(modPath, 'r');
++    fs.readSync(fd, magic, 0, 4, 0);
++    fs.closeSync(fd);
++    const source = path.basename(modPath);
++    if (magic.toString('latin1') === 'SCS#')
++      return new ScsArchive(modPath, source);
++    if (magic[0] === 0x50 && magic[1] === 0x4b)
++      return new ZipEntries(modPath, source);
++    throw new Error(
++      `${modPath}: no es un .scs que conozcamos (ni HashFS ni ZIP)`,
++    );
++  }
++  return createDirArchive(modPath);
++}
++
++function createDirArchive(extractedDir: string) {
++  const entries = new DirEntries(extractedDir);
++  return {
++    path: extractedDir,
++    isValid: () => true,
++    parseEntries: () => entries,
++    dispose: () => {
++      // una carpeta no tiene nada que cerrar
++    },
++  };
++}
++
++function main() {
++  const [inputDir, modDirsArg, outputDir] = process.argv.slice(2);
++  if (!inputDir || !modDirsArg || !outputDir) {
++    console.error(
++      'Uso: npx tsx run-with-mod.ts <inputDir> <modExtractedDir1,modExtractedDir2,...> <outputDir>',
++    );
++    process.exit(1);
++  }
++
++  const scsFilePaths = fs
++    .readdirSync(inputDir, { withFileTypes: true })
++    .filter(e => e.isFile() && e.name.endsWith('.scs'))
++    .map(e => path.join(inputDir, e.name));
++
++  // Varios paquetes de un mismo mod (ej. ProMods viene separado en "map" +
++  // "dlcsupport") se pasan separados por coma y se combinan como archivos
++  // independientes - el orden importa para paths duplicados (el ultimo gana,
++  // igual que con .scs reales, ver CombinedEntries.files.get).
++  const modArchives = modDirsArg.split(',').map(createModArchive);
++
++  const result = parseMapFiles(scsFilePaths, {
++    includeDlc: true,
++    mode: 'all',
++    // extraArchives lo agrega nuestro parche de parseMapFiles.
++    extraArchives: modArchives,
++  });
++
++  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
++
++  if (result.data !== 'all') {
++    throw new Error('esperaba mode "all"');
++  }
++  const map = result.map;
++  for (const key of Object.keys(result.mapData)) {
++    const collection = result.mapData[key as keyof MapData];
++    const filename = `${map}-${key}.json`;
++    logger.log('writing', collection.length, `entries to ${filename}...`);
++    writeArrayFile(collection, path.join(outputDir, filename));
++  }
++
++  const pngOutputDir = path.join(outputDir, 'icons');
++  if (!fs.existsSync(pngOutputDir)) fs.mkdirSync(pngOutputDir);
++  logger.log('writing', result.icons.size, `.png files to ${pngOutputDir}...`);
++  for (const [name, buffer] of result.icons) {
++    if (buffer.length === 0) continue; // icono conocido pero sin imagen
++    fs.writeFileSync(path.join(pngOutputDir, name + '.png'), buffer);
++  }
++
++  fs.writeFileSync(path.join(outputDir, `${map}-version.txt`), result.version);
++  logger.success('done.');
++}
++
++main();
+diff --git a/packages/clis/truckdash-builder/package.json b/packages/clis/truckdash-builder/package.json
+new file mode 100644
+index 0000000..e9ea575
+--- /dev/null
++++ b/packages/clis/truckdash-builder/package.json
+@@ -0,0 +1,12 @@
++{
++  "private": true,
++  "name": "@truckdash/builder",
++  "version": "0.0.0",
++  "license": "GPL-3.0-or-later",
++  "type": "module",
++  "dependencies": {
++    "geojson-vt": "^4.0.3",
++    "pmtiles": "^4.4.0",
++    "vt-pbf": "^3.1.3"
++  }
++}
+diff --git a/packages/clis/truckdash-builder/tiles.ts b/packages/clis/truckdash-builder/tiles.ts
+new file mode 100755
+index 0000000..82b2327
+--- /dev/null
++++ b/packages/clis/truckdash-builder/tiles.ts
+@@ -0,0 +1,323 @@
++// Tiles vectoriales (.pmtiles) a partir del GeoJSON del generator, sin
++// tippecanoe (que solo corre en Linux): para armar el mapa con mods en la PC
++// de quien juega. Mismo resultado que el taller en lo que la app usa: una
++// capa con el nombre del juego, zoom 4 a 13, los mismos atributos (-y) y el
++// mismo filtro por zoom (tiles_light_filter.json), tiles comprimidos con gzip.
++//
++// Uso: npx tsx packages/clis/truckdash-builder/tiles.ts <entrada.geojson> <capa> <salida.pmtiles>
++
++import fs from 'fs';
++import geojsonvt from 'geojson-vt';
++import { zxyToTileId } from 'pmtiles';
++import vtpbf from 'vt-pbf';
++import zlib from 'zlib';
++
++const MIN_ZOOM = 4;
++const MAX_ZOOM = 13;
++const EXTENT = 4096;
++// tippecanoe -b 10: 10 pixeles de un tile de 256 -> 160 de 4096.
++const BUFFER = 160;
++// Los -y del taller: el resto de las propiedades no viaja.
++const ATRIBUTOS = [
++  'type',
++  'dlcGuard',
++  'zIndex',
++  'height',
++  'hidden',
++  'secret',
++  'poiType',
++  'poiName',
++  'sprite',
++  'scaleRank',
++  'capital',
++  'roadType',
++  'color',
++  'name',
++];
++
++interface Feature {
++  type: 'Feature';
++  geometry: unknown;
++  properties: Record<string, unknown> | null;
++}
++
++// tiles_light_filter.json: hasta z6 solo ciudades, paises, ferries, trenes,
++// caminos (en z4 sin los locales) y los POI de ferry y tren.
++function visibleEn(zoom: number, p: Record<string, unknown>): boolean {
++  if (zoom >= 7) return true;
++  const type = p.type;
++  if (
++    type === 'city' ||
++    type === 'country' ||
++    type === 'ferry' ||
++    type === 'train'
++  )
++    return true;
++  if (type === 'road' && (zoom >= 5 || p.roadType !== 'local')) return true;
++  return p.poiType === 'ferry' || p.poiType === 'train';
++}
++
++function limpiar(f: Feature): Feature {
++  const props: Record<string, unknown> = {};
++  for (const k of ATRIBUTOS) {
++    const v = f.properties?.[k];
++    if (v !== undefined && v !== null) props[k] = v;
++  }
++  return { type: 'Feature', geometry: f.geometry, properties: props };
++}
++
++function lng2x(lng: number, z: number) {
++  return Math.floor(((lng + 180) / 360) * 2 ** z);
++}
++function lat2y(lat: number, z: number) {
++  const r = (lat * Math.PI) / 180;
++  return Math.floor(
++    ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z,
++  );
++}
++
++function bboxDe(features: Feature[]): [number, number, number, number] {
++  let w = 180,
++    s = 90,
++    e = -180,
++    n = -90;
++  const visitar = (c: unknown): void => {
++    if (Array.isArray(c) && typeof c[0] === 'number') {
++      const [x, y] = c as number[];
++      if (x < w) w = x;
++      if (x > e) e = x;
++      if (y < s) s = y;
++      if (y > n) n = y;
++    } else if (Array.isArray(c)) {
++      for (const x of c) visitar(x);
++    }
++  };
++  for (const f of features)
++    visitar((f.geometry as { coordinates?: unknown })?.coordinates);
++  return [w, s, e, n];
++}
++
++// ---------------------------------------------------------------- PMTiles v3
++function varint(n: number, out: number[]) {
++  while (n >= 0x80) {
++    out.push((n & 0x7f) | 0x80);
++    n = Math.floor(n / 128);
++  }
++  out.push(n);
++}
++
++interface Entrada {
++  tileId: number;
++  offset: number;
++  length: number;
++  runLength: number;
++}
++
++function serializarDirectorio(entradas: Entrada[]): Buffer {
++  const out: number[] = [];
++  varint(entradas.length, out);
++  let ultimo = 0;
++  for (const e of entradas) {
++    varint(e.tileId - ultimo, out);
++    ultimo = e.tileId;
++  }
++  for (const e of entradas) varint(e.runLength, out);
++  for (const e of entradas) varint(e.length, out);
++  entradas.forEach((e, i) => {
++    const prev = entradas[i - 1];
++    if (i > 0 && prev && e.offset === prev.offset + prev.length) varint(0, out);
++    else varint(e.offset + 1, out);
++  });
++  return zlib.gzipSync(Buffer.from(out));
++}
++
++// Raiz chica (entra en los primeros 16 KB) y hojas de a HOJA entradas.
++function directorios(entradas: Entrada[]): { raiz: Buffer; hojas: Buffer } {
++  const directa = serializarDirectorio(entradas);
++  if (directa.length + 127 <= 16384)
++    return { raiz: directa, hojas: Buffer.alloc(0) };
++  for (let hoja = 4096; ; hoja *= 2) {
++    const raices: Entrada[] = [];
++    const partes: Buffer[] = [];
++    let off = 0;
++    for (let i = 0; i < entradas.length; i += hoja) {
++      const b = serializarDirectorio(entradas.slice(i, i + hoja));
++      raices.push({
++        tileId: entradas[i].tileId,
++        offset: off,
++        length: b.length,
++        runLength: 0,
++      });
++      partes.push(b);
++      off += b.length;
++    }
++    const raiz = serializarDirectorio(raices);
++    if (raiz.length + 127 <= 16384)
++      return { raiz, hojas: Buffer.concat(partes) };
++  }
++}
++
++function escribirPmtiles(
++  salida: string,
++  tiles: { tileId: number; data: Buffer }[],
++  meta: object,
++  bbox: [number, number, number, number],
++  minZoom: number,
++  maxZoom: number,
++) {
++  tiles.sort((a, b) => a.tileId - b.tileId);
++  const entradas: Entrada[] = [];
++  let off = 0;
++  for (const t of tiles) {
++    entradas.push({
++      tileId: t.tileId,
++      offset: off,
++      length: t.data.length,
++      runLength: 1,
++    });
++    off += t.data.length;
++  }
++  const { raiz, hojas } = directorios(entradas);
++  const metadata = zlib.gzipSync(Buffer.from(JSON.stringify(meta)));
++  const h = Buffer.alloc(127);
++  h.write('PMTiles', 0, 'latin1');
++  h.writeUInt8(3, 7);
++  const rootOff = 127;
++  const metaOff = rootOff + raiz.length;
++  const leafOff = metaOff + metadata.length;
++  const dataOff = leafOff + hojas.length;
++  const u64 = (pos: number, v: number) => h.writeBigUInt64LE(BigInt(v), pos);
++  u64(8, rootOff);
++  u64(16, raiz.length);
++  u64(24, metaOff);
++  u64(32, metadata.length);
++  u64(40, leafOff);
++  u64(48, hojas.length);
++  u64(56, dataOff);
++  u64(64, off);
++  u64(72, tiles.length);
++  u64(80, entradas.length);
++  u64(88, tiles.length);
++  h.writeUInt8(1, 96); // clustered: los datos van en el orden de los tileId
++  h.writeUInt8(2, 97); // directorios en gzip
++  h.writeUInt8(2, 98); // tiles en gzip
++  h.writeUInt8(1, 99); // mvt
++  h.writeUInt8(minZoom, 100);
++  h.writeUInt8(maxZoom, 101);
++  const e7 = (v: number) => Math.round(v * 1e7);
++  h.writeInt32LE(e7(bbox[0]), 102);
++  h.writeInt32LE(e7(bbox[1]), 106);
++  h.writeInt32LE(e7(bbox[2]), 110);
++  h.writeInt32LE(e7(bbox[3]), 114);
++  h.writeUInt8(minZoom, 118);
++  h.writeInt32LE(e7((bbox[0] + bbox[2]) / 2), 119);
++  h.writeInt32LE(e7((bbox[1] + bbox[3]) / 2), 123);
++  const fd = fs.openSync(salida, 'w');
++  for (const b of [h, raiz, metadata, hojas]) fs.writeSync(fd, b);
++  for (const t of tiles) fs.writeSync(fd, t.data);
++  fs.closeSync(fd);
++}
++
++// -------------------------------------------------------------------- main
++function main() {
++  const [entrada, capa, salida] = process.argv.slice(2);
++  if (!entrada || !capa || !salida) {
++    console.error('Uso: tiles.ts <entrada.geojson> <capa> <salida.pmtiles>');
++    process.exit(1);
++  }
++  const t0 = Date.now();
++  const todo = (
++    JSON.parse(fs.readFileSync(entrada, 'utf8')) as { features: Feature[] }
++  ).features.map(limpiar);
++  const bbox = bboxDe(todo);
++  console.log(
++    `${todo.length} features, bbox ${bbox.map(v => v.toFixed(3)).join(', ')}`,
++  );
++  const opciones = {
++    maxZoom: MAX_ZOOM,
++    indexMaxZoom: 5,
++    indexMaxPoints: 100000,
++    tolerance: 3,
++    extent: EXTENT,
++    buffer: BUFFER,
++  };
++  const fc = (fs2: Feature[]) => ({ type: 'FeatureCollection', features: fs2 });
++  // Un indice por tramo del filtro: z4, z5-6 y z7 en adelante.
++  const indices = [
++    {
++      desde: 4,
++      hasta: 4,
++      index: geojsonvt(
++        fc(todo.filter(f => visibleEn(4, f.properties!))),
++        opciones,
++      ),
++    },
++    {
++      desde: 5,
++      hasta: 6,
++      index: geojsonvt(
++        fc(todo.filter(f => visibleEn(5, f.properties!))),
++        opciones,
++      ),
++    },
++    { desde: 7, hasta: MAX_ZOOM, index: geojsonvt(fc(todo), opciones) },
++  ];
++  const tiles: { tileId: number; data: Buffer }[] = [];
++  const porZoom: Record<number, number> = {};
++  for (const { desde, hasta, index } of indices) {
++    // Al entrar a un indice se recorre toda la caja de ese zoom; despues se
++    // baja solo por los hijos de los tiles que tienen algo.
++    let actuales: [number, number][] = [];
++    const x0 = lng2x(bbox[0], desde),
++      x1 = lng2x(bbox[2], desde);
++    const y0 = lat2y(bbox[3], desde),
++      y1 = lat2y(bbox[1], desde);
++    for (let x = x0; x <= x1; x++)
++      for (let y = y0; y <= y1; y++) actuales.push([x, y]);
++    for (let z = desde; z <= hasta; z++) {
++      const conAlgo: [number, number][] = [];
++      for (const [x, y] of actuales) {
++        const tile = index.getTile(z, x, y);
++        if (!tile?.features.length) continue;
++        const pbf = vtpbf.fromGeojsonVt(
++          { [capa]: tile },
++          { version: 2, extent: EXTENT },
++        );
++        tiles.push({
++          tileId: zxyToTileId(z, x, y),
++          data: zlib.gzipSync(Buffer.from(pbf)),
++        });
++        conAlgo.push([x, y]);
++      }
++      porZoom[z] = conAlgo.length;
++      actuales = [];
++      for (const [x, y] of conAlgo) {
++        actuales.push(
++          [2 * x, 2 * y],
++          [2 * x + 1, 2 * y],
++          [2 * x, 2 * y + 1],
++          [2 * x + 1, 2 * y + 1],
++        );
++      }
++    }
++  }
++  const meta = {
++    name: capa,
++    format: 'pbf',
++    generator: 'truckdash-builder tiles.ts',
++    vector_layers: [
++      {
++        id: capa,
++        minzoom: MIN_ZOOM,
++        maxzoom: MAX_ZOOM,
++        fields: Object.fromEntries(ATRIBUTOS.map(a => [a, 'String'])),
++      },
++    ],
++  };
++  escribirPmtiles(salida, tiles, meta, bbox, MIN_ZOOM, MAX_ZOOM);
++  console.log(
++    `tiles por zoom ${JSON.stringify(porZoom)}; ${tiles.length} en total; ${((Date.now() - t0) / 1000).toFixed(1)} s`,
++  );
++}
++
++main();
+diff --git a/packages/clis/truckdash-builder/tsconfig.json b/packages/clis/truckdash-builder/tsconfig.json
+new file mode 100644
+index 0000000..dc89a62
+--- /dev/null
++++ b/packages/clis/truckdash-builder/tsconfig.json
+@@ -0,0 +1,4 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "include": ["*.ts"]
++}
+diff --git a/packages/clis/truckdash-builder/types.d.ts b/packages/clis/truckdash-builder/types.d.ts
+new file mode 100644
+index 0000000..34b3ab0
+--- /dev/null
++++ b/packages/clis/truckdash-builder/types.d.ts
+@@ -0,0 +1,28 @@
++// Lo justo de geojson-vt y vt-pbf que usa tiles.ts (no traen tipos).
++declare module 'geojson-vt' {
++  interface Tile {
++    features: unknown[];
++  }
++  interface Index {
++    getTile(z: number, x: number, y: number): Tile | null;
++  }
++  interface Options {
++    maxZoom?: number;
++    indexMaxZoom?: number;
++    indexMaxPoints?: number;
++    tolerance?: number;
++    extent?: number;
++    buffer?: number;
++  }
++  export default function geojsonvt(data: unknown, options?: Options): Index;
++}
++
++declare module 'vt-pbf' {
++  const vtpbf: {
++    fromGeojsonVt(
++      layers: Record<string, unknown>,
++      options?: { version?: number; extent?: number },
++    ): Uint8Array;
++  };
++  export default vtpbf;
++}
+diff --git a/packages/libs/map/labels.ts b/packages/libs/map/labels.ts
+index d673fef..18ef19d 100644
+--- a/packages/libs/map/labels.ts
++++ b/packages/libs/map/labels.ts
+@@ -26,7 +26,11 @@ export function toDealerLabel(prefabPath: string): string {
+     case 'volvo':
+       return dealer.charAt(0).toUpperCase() + dealer.slice(1);
+     default:
+-      throw new Error('unknown dealer: ' + dealer);
++      // Algunos mods (ej. ProMods) usan carpetas de dealer propias (ej.
++      // regionales) que no son una de las marcas vainilla de arriba - se usa
++      // el nombre de la carpeta capitalizado en vez de fallar, ya que esto
++      // solo afecta el label cosmetico del POI, no el pathfinding.
++      return dealer.charAt(0).toUpperCase() + dealer.slice(1);
+   }
+ }
+ 
+diff --git a/packages/libs/map/projections.ts b/packages/libs/map/projections.ts
+index d3eff1b..70f9a03 100644
+--- a/packages/libs/map/projections.ts
++++ b/packages/libs/map/projections.ts
+@@ -58,6 +58,10 @@ const ets2 = [
+   `+lon_0=${ets2DefData.mapOrigin[1]}`,
+ ].join(' ');
+ const fromWgs84ToEts2Converter = proj4.default(ets2);
++// TM_NO_UK_HACK=1: mapas standalone (ej. Grand Utopia) cuyos sectores caen en
++// la zona que el hack de abajo trata como UK y cruzan su borde - sin esto el
++// mapa queda partido en dos escalas. La web usa la misma proyeccion sin hack.
++const noUkHack = process.env.TM_NO_UK_HACK === '1';
+ export const fromEts2CoordsToWgs84 = ([x, y]: Position): Position => {
+   const sx = Math.floor(x / 4000);
+   const sy = Math.floor(y / 4000);
+@@ -71,7 +75,7 @@ export const fromEts2CoordsToWgs84 = ([x, y]: Position): Position => {
+   // (-31_100, -5500) as UK coords. Maybe there's a better way to do this, but I
+   // couldn't find any clues in the def files.
+   const calais = [-31100, -5500];
+-  const isUk = sx <= -8 && sy <= -2 && !(sx === -8 && sy === -2);
++  const isUk = !noUkHack && sx <= -8 && sy <= -2 && !(sx === -8 && sy === -2);
+   if (isUk) {
+     x = (x + calais[0] / 2) * ukScaleFactor;
+     y = (y + calais[1] / 2) * ukScaleFactor;
+@@ -101,7 +105,7 @@ export const fromWgs84ToEts2Coords = ([lon, lat]: Position): Position => {
+   const yIfUk = y / ukScaleFactor - calais[1] / 2 + ets2DefData.mapOffset[1];
+   const sx = Math.floor(xIfUk / 4000);
+   const sy = Math.floor(yIfUk / 4000);
+-  const isUk = sx <= -8 && sy <= -2 && !(sx === -8 && sy === -2);
++  const isUk = !noUkHack && sx <= -8 && sy <= -2 && !(sx === -8 && sy === -2);
+ 
+   if (isUk) {
+     x = x / ukScaleFactor - calais[0] / 2;

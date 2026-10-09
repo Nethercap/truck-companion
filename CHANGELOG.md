@@ -6,6 +6,10 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Build my map: if your truck drives off the map Truck Dash knows (a map mod we don't
+  have on our servers), Setup offers to build that map on your PC from the game and your
+  active mods. Close the game first; it takes about 5 minutes. The map shows on that PC
+  and on your Wi-Fi (LAN mode). The builder is a separate, optional download.
 - The client tells the dashboard which map DLCs you have (it looks at the DLC files in the
   game folder), so routes avoid the states and countries you don't own. You can still pick
   them by hand in the dashboard: Settings, DLCs.

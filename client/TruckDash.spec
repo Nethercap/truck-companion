@@ -45,6 +45,9 @@ if IS_WINDOWS:
 # repo (los testers lo instalan a mano con el kit), asi que ahi no se empaqueta
 # nada y el instalador de plugin queda sin fuente hasta que lo agreguemos.
 datas = [('assets/icon.png', 'assets')]  # icono de la bandeja (logo real)
+# Nombres del Atlas para el mapa armado en la PC (mapbuild/pois.py los lee
+# al lado del modulo).
+datas.append(('mapbuild/atlas-names-ats.json', 'mapbuild'))
 if IS_WINDOWS:
     datas.insert(0, ('vendor/truckdash-telemetry.dll', 'vendor'))
 
@@ -53,7 +56,10 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    # mapbuild se importa adentro de map_builder.build_map: se nombra por si
+    # el analisis de PyInstaller no lo sigue.
+    hiddenimports=['mapbuild.build_route_graph', 'mapbuild.route_graph_bin', 'mapbuild.build_cities_json',
+                   'mapbuild.extract_road_names', 'mapbuild.pois'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

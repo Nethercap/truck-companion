@@ -43,6 +43,7 @@ from PIL import Image, ImageDraw
 import client as client_lib
 import discord_presence
 import local_server
+import map_builder
 import account
 import account_sync
 import plugin_installer
@@ -117,6 +118,16 @@ class AppState:
         # dlc_*.scs de la carpeta del juego: la web los usa para que las
         # rutas eviten los que no tenes.
         self.map_dlcs: dict | None = None
+        # Mapa armado en esta PC (map_builder.py). Rutas de los mods montados
+        # por juego, el mapa armado que coincide con ellos, los juegos donde
+        # la web vio el camion fuera del mapa (eso es lo que hace ofrecerlo),
+        # y el armado en curso.
+        self.mounted_mods: dict | None = None
+        self.local_maps: dict = {}
+        self.offmap_games: set = set()
+        self.offmap_notified: set = set()
+        self.map_build: dict | None = None  # {'game', 'step', 'error', 'running'}
+        self.map_build_cancel = threading.Event()
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.vehicle = None  # "Marca Modelo" mientras esta en vivo, para el log
@@ -532,6 +543,15 @@ class SetupWindow:
         self.button(row, T("rescan"), self.rescan).pack(side="left", padx=6)
         self.label(self.games_frame, T("plugin_note", v=plugin_installer.PLUGIN_DLL_VERSION), fg=MUTED, wraplength=520).pack(anchor="w", pady=(6, 0))
 
+        # --- Mapa armado en la PC ---
+        # Solo aparece si hace falta (la web vio el camion fuera del mapa con
+        # mods activos), si ya hay un mapa armado o si se esta armando.
+        self.local_map_frame = self.section(T("sec_local_map"))
+        self.local_map_body = tk.Frame(self.local_map_frame, bg=BG)
+        self.local_map_body.pack(fill="x", pady=(4, 0))
+        self._local_map_sig = None
+        self.render_local_map()
+
         # --- Opciones ---
         options = self.section(T("sec_options"))
         self.autostart_var = tk.BooleanVar(value=win_integration.is_autostart_enabled())
@@ -870,6 +890,70 @@ class SetupWindow:
     def rescan(self):
         self.render_installs()
 
+    def _local_map_signature(self):
+        build = state.map_build or {}
+        return (tuple(sorted((g, m.get("fingerprint")) for g, m in state.local_maps.items())),
+                tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
+                build.get("game"), build.get("step"), build.get("error"), build.get("running"))
+
+    def render_local_map(self):
+        sig = self._local_map_signature()
+        if sig == self._local_map_sig:
+            return
+        self._local_map_sig = sig
+        for child in self.local_map_body.winfo_children():
+            child.destroy()
+        build = state.map_build or {}
+        filas = 0
+        for game in ("ats", "ets2"):
+            nombre = GAME_LABELS.get(game, game)
+            if build.get("game") == game and build.get("running"):
+                fila = tk.Frame(self.local_map_body, bg=BG)
+                fila.pack(fill="x", pady=2)
+                self.label(fila, T(f"local_map_step_{build.get('step')}"), fg=BLUE).pack(side="left")
+                self.button(fila, T("local_map_cancel"), state.map_build_cancel.set).pack(side="left", padx=8)
+            elif game in state.local_maps:
+                man = state.local_maps[game]
+                self.label(self.local_map_body, T("local_map_ready", game=nombre, cities=man.get("cities", "?"),
+                                                  date=str(man.get("built", ""))[:10]),
+                           fg=GREEN, wraplength=520).pack(anchor="w", pady=2)
+            elif needs_map_build(game):
+                self.label(self.local_map_body, T("local_map_needed", game=nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
+                self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
+                self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g),
+                            primary=True).pack(anchor="w")
+            else:
+                continue
+            filas += 1
+            if build.get("game") == game and build.get("step") == "error":
+                self.label(self.local_map_body, T("local_map_error", err=build.get("error")), fg=RED,
+                           wraplength=520).pack(anchor="w", pady=(4, 0))
+            elif build.get("game") == game and build.get("step") == "cancelled":
+                self.label(self.local_map_body, T("local_map_cancelled"), fg=MUTED).pack(anchor="w", pady=(4, 0))
+        if filas:
+            if not self.local_map_frame.winfo_ismapped():
+                self.local_map_frame.pack(fill="x", after=self.games_frame)
+        else:
+            self.local_map_frame.pack_forget()
+
+    def build_my_map(self, game):
+        if map_builder.game_running():
+            self.flash_local_map(T("local_map_game_running"), RED)
+            return
+        libre = map_builder.free_memory_gb()
+        if libre is not None and libre < map_builder.MIN_FREE_GB:
+            from tkinter import messagebox
+            if not messagebox.askyesno("Truck Dash", T("local_map_low_memory", free=f"{libre:.1f}"), parent=self.root):
+                return
+        if not game_dir_for(game):
+            self.flash_local_map(T("local_map_no_game_dir", game=GAME_LABELS.get(game, game)), RED)
+            return
+        start_map_build(game)
+        self.render_local_map()
+
+    def flash_local_map(self, text, color):
+        self.label(self.local_map_body, text, fg=color, wraplength=520).pack(anchor="w", pady=(4, 0))
+
     def flash(self, text, color):
         if not hasattr(self, "flash_label"):
             self.flash_label = self.label(self.games_frame, "", wraplength=520)
@@ -991,6 +1075,7 @@ class SetupWindow:
             text += "\n" + state.status_detail
         self.status_label.configure(text=text, fg=color)
         self.code_label.configure(text=state.code or "-")
+        self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         if getattr(self, "_last_lan_url", "?") != lan_url:
             self._last_lan_url = lan_url
@@ -1275,7 +1360,18 @@ def status_message() -> str:
         "mapMods": state.map_mods,
         "activeMods": state.active_mods,
         "mapDlcs": state.map_dlcs,
+        # Mapas armados en esta PC que coinciden con los mods activos. La web
+        # los lee de /localmap/ del servidor local: en modo LAN del mismo
+        # origen, y con el codigo de emparejamiento desde 127.0.0.1 (solo
+        # sirve en esta misma PC; en otro dispositivo sigue con el de R2).
+        "localMaps": local_maps_summary(),
+        "localMapPort": local_server.HTTP_PORT if (state.local and not state.local.error) else None,
     })
+
+
+def local_maps_summary() -> dict:
+    return {g: {k: m.get(k) for k in ("variant", "fingerprint", "built", "cities", "mods")}
+            for g, m in state.local_maps.items()}
 
 
 def refresh_map_mods(force: bool = False) -> bool:
@@ -1297,6 +1393,11 @@ def refresh_map_mods(force: bool = False) -> bool:
         nombres = state.active_mods
     cambio_nombres = nombres != state.active_mods
     state.active_mods = nombres
+    try:
+        state.mounted_mods = client_lib.read_mounted_mods()
+    except Exception:
+        logging.exception("read_mounted_mods failed")
+    cambio_nombres = refresh_local_maps() or cambio_nombres
     if mods != state.map_mods:
         state.map_mods = mods
         logging.info("Map mods detected: %s", mods)
@@ -1305,6 +1406,104 @@ def refresh_map_mods(force: bool = False) -> bool:
             state.cuenta.poner_mods(mods)
         return True
     return cambio_nombres
+
+
+# ---------------------------------------------------------------------------
+# Mapa armado en la PC ("Build my map", ver map_builder.py)
+# ---------------------------------------------------------------------------
+
+def game_dir_for(game: str) -> str | None:
+    """Carpeta del juego (la de los .scs) a partir de bin/win_x64."""
+    for install in state.installs:
+        if install.get("game") == game:
+            return os.path.dirname(os.path.dirname(install["bin_dir"]))
+    return None
+
+
+def refresh_local_maps() -> bool:
+    """Que mapa armado sirve para los mods activos ahora (huella igual). Le
+    dice al servidor local que carpeta servir. Devuelve True si cambio."""
+    nuevos = {}
+    for game, rutas in (state.mounted_mods or {}).items():
+        carpeta = game_dir_for(game)
+        if not rutas or not carpeta:
+            continue
+        try:
+            man = map_builder.built_map(game, map_builder.fingerprint(game, carpeta, rutas))
+        except Exception:
+            logging.exception("built_map failed")
+            man = None
+        if man:
+            nuevos[game] = man
+    cambio = {g: m.get("fingerprint") for g, m in nuevos.items()} != \
+        {g: m.get("fingerprint") for g, m in state.local_maps.items()}
+    state.local_maps = nuevos
+    local_server.local_map_dirs.clear()
+    local_server.local_map_dirs.update({g: m["dir"] for g, m in nuevos.items()})
+    if cambio:
+        logging.info("Local maps in use: %s", {g: m.get("fingerprint") for g, m in nuevos.items()} or "none")
+    return cambio
+
+
+def needs_map_build(game: str) -> bool:
+    """Se ofrece armar el mapa si la web vio el camion fuera del mapa, hay
+    mods activos y no hay ya un mapa armado para ellos."""
+    return (game in state.offmap_games and game not in state.local_maps
+            and bool((state.mounted_mods or {}).get(game)) and game_dir_for(game) is not None)
+
+
+def on_offmap(game: str):
+    """La web avisa que el camion quedo fuera del mapa que conoce."""
+    if game in state.offmap_games:
+        return
+    state.offmap_games.add(game)
+    logging.info("Dashboard reports the truck off the known %s map", game)
+    if needs_map_build(game) and game not in state.offmap_notified and state.icon:
+        state.offmap_notified.add(game)
+        try:
+            state.icon.notify(T("notify_local_map"), "Truck Dash")
+        except Exception as exc:
+            logging.info("No se pudo mostrar el aviso del mapa: %s", exc)
+
+
+def start_map_build(game: str) -> bool:
+    """Arma el mapa en un hilo. False si ya hay uno en curso."""
+    if state.map_build and state.map_build.get("running"):
+        return False
+    rutas = list((state.mounted_mods or {}).get(game) or [])
+    carpeta = game_dir_for(game)
+    nombres = list((state.active_mods or {}).get(game) or [])
+    state.map_build_cancel.clear()
+    state.map_build = {"game": game, "step": "download", "error": None, "running": True}
+
+    def paso(nombre):
+        state.map_build["step"] = nombre
+
+    def correr():
+        try:
+            map_builder.build_map(game, carpeta, rutas, client_lib.CLIENT_VERSION, progress=paso,
+                                  cancel=state.map_build_cancel, mod_names=nombres)
+            refresh_local_maps()
+            state.map_build = {"game": game, "step": "done", "error": None, "running": False}
+        except map_builder.BuildCancelled:
+            logging.info("Map build cancelled")
+            state.map_build = {"game": game, "step": "cancelled", "error": None, "running": False}
+        except Exception as exc:
+            logging.exception("Map build failed")
+            state.map_build = {"game": game, "step": "error", "error": str(exc), "running": False}
+
+    threading.Thread(target=vigilar_hilo(correr, "map build"), daemon=True).start()
+    return True
+
+
+def vigilar_hilo(funcion, nombre):
+    """Que una excepcion en un hilo deje rastro en el log."""
+    def envuelta():
+        try:
+            funcion()
+        except Exception:
+            logging.exception("Thread %s died", nombre)
+    return envuelta
 
 
 class CloudLink:
@@ -1368,7 +1567,8 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
         nonlocal last_status_sent
         refresh_map_mods()
         key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True),
-               json.dumps(state.active_mods, sort_keys=True), json.dumps(state.map_dlcs, sort_keys=True))
+               json.dumps(state.active_mods, sort_keys=True), json.dumps(state.map_dlcs, sort_keys=True),
+               json.dumps(local_maps_summary(), sort_keys=True))
         if key != last_status_sent:
             last_status_sent = key
             msg = status_message()
@@ -1628,6 +1828,7 @@ def main():
         return
 
     local_server.on_show_setup = open_setup_window
+    client_lib.on_offmap = on_offmap
     state.discord.set_enabled(bool(win_integration.load_settings().get("discord_presence")))
     win_integration.cleanup_old_exe()
     state.web_url = args.web_url

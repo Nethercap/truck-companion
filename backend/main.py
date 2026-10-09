@@ -171,6 +171,36 @@ def clean_map_dlcs(valor) -> Optional[dict]:
     return limpio or None
 
 
+def clean_local_maps(valor) -> Optional[dict]:
+    """Mapas armados en la PC del cliente ("Build my map"): por juego, la
+    variante, la huella, cuando y cuantas ciudades. La web los lee del
+    servidor local del cliente; aca solo se guardan para la pestana que abre
+    despues. Igual que con los DLC, no se confia en lo que llega."""
+    if not isinstance(valor, dict):
+        return None
+    limpio = {}
+    for game in ("ats", "ets2"):
+        m = valor.get(game)
+        if not isinstance(m, dict) or m.get("variant") != f"local_{game}":
+            continue
+        huella = m.get("fingerprint")
+        if not isinstance(huella, str) or not re.fullmatch(r"[0-9a-f]{6,16}", huella):
+            continue
+        mods = m.get("mods") if isinstance(m.get("mods"), list) else []
+        limpio[game] = {
+            "variant": f"local_{game}",
+            "fingerprint": huella,
+            "built": str(m.get("built") or "")[:20],
+            "cities": m.get("cities") if isinstance(m.get("cities"), int) else None,
+            "mods": [x[:80] for x in mods if isinstance(x, str)][:40],
+        }
+    return limpio or None
+
+
+def clean_port(valor) -> Optional[int]:
+    return valor if isinstance(valor, int) and 1024 <= valor <= 65535 else None
+
+
 def clean_offmap_report(payload: dict) -> Optional[dict]:
     variant = payload.get("variant")
     if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
@@ -1538,7 +1568,9 @@ async def ws_client(websocket: WebSocket, code: str):
                 payload = json.loads(data)
                 if payload.get("type") == "client_status":
                     session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion"),
-                                                  "mapDlcs": clean_map_dlcs(payload.get("mapDlcs"))}
+                                                  "mapDlcs": clean_map_dlcs(payload.get("mapDlcs")),
+                                                  "localMaps": clean_local_maps(payload.get("localMaps")),
+                                                  "localMapPort": clean_port(payload.get("localMapPort"))}
                 # Mensajes de control (client_status, etc.) no son telemetria:
                 # no deben tocar el flanco de jobDelivered. Antes el primer
                 # client_status de cada conexion dejaba el estado en False y el
@@ -1663,7 +1695,9 @@ async def ws_viewer(websocket: WebSocket, code: str):
             try:
                 payload = json.loads(data)
                 msg_type = payload.get("type")
-                if msg_type in ("command", "get_keybinds", "set_keybinds"):
+                # "offmap": la web vio el camion fuera del mapa que conoce; el
+                # cliente ofrece armar el mapa en la PC (map_builder.py).
+                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap"):
                     if session.client_ws is not None:
                         await session.client_ws.send_text(data)
                 elif msg_type == "set_live_share":

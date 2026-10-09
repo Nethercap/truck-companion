@@ -35,7 +35,45 @@ permissions:
   contents: write
 
 jobs:
+  map-builder:
+    # El armador de "Build my map" (builder/, GPL): se baja aparte, solo
+    # quien lo usa, de la release de su version. Se arma desde el codigo de
+    # truckermudgeon/maps en un commit fijo + builder/truckdash.patch, con el
+    # node.exe oficial verificado contra el SHASUMS de nodejs.org.
+    runs-on: ubuntu-latest
+    env:
+      NODE_WIN_VERSION: '22.12.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build the map builder
+        run: bash builder/build.sh "$RUNNER_TEMP/builder"
+      - name: Add node.exe for Windows
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          base="https://nodejs.org/dist/v$NODE_WIN_VERSION"
+          zip="node-v$NODE_WIN_VERSION-win-x64.zip"
+          curl -fsSLO "$base/$zip"
+          curl -fsSL "$base/SHASUMS256.txt" | grep " $zip\$" | sha256sum -c -
+          unzip -q "$zip"
+          dest="$RUNNER_TEMP/builder/truckdash-map-builder"
+          cp "node-v$NODE_WIN_VERSION-win-x64/node.exe" "$dest/node.exe"
+          cp "node-v$NODE_WIN_VERSION-win-x64/LICENSE" "$dest/NODE-LICENSE.txt"
+          version=$(sed -n 's/^CLIENT_VERSION = "\(.*\)"/\1/p' "$GITHUB_WORKSPACE/client/client.py")
+          (cd "$RUNNER_TEMP/builder" && zip -qr "$GITHUB_WORKSPACE/TruckDash-MapBuilder-$version.zip" truckdash-map-builder)
+          ls -la "$GITHUB_WORKSPACE"/TruckDash-MapBuilder-*.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TruckDash-MapBuilder
+          path: TruckDash-MapBuilder-*.zip
+
   build:
+    needs: map-builder
     runs-on: windows-latest
     env:
       # Vacio cuando no hay release: una corrida manual sin tag solo compila.
@@ -71,6 +109,10 @@ jobs:
       - name: Build TruckDash.exe
         working-directory: client
         run: pyinstaller TruckDash.spec
+      - uses: actions/download-artifact@v4
+        with:
+          name: TruckDash-MapBuilder
+          path: client
       - name: Package zip and checksums
         shell: pwsh
         working-directory: client
@@ -82,7 +124,10 @@ jobs:
           Compress-Archive -Path release/* -DestinationPath TruckDash-windows.zip -Force
           $zip = (Get-FileHash TruckDash-windows.zip -Algorithm SHA256).Hash.ToLower()
           $exe = (Get-FileHash dist/TruckDash.exe -Algorithm SHA256).Hash.ToLower()
-          "$zip  TruckDash-windows.zip`n$exe  TruckDash.exe" | Set-Content -Encoding ascii SHA256SUMS.txt
+          # El armador de mapas: el cliente lo baja de aca y lo verifica con esta linea.
+          $builder = Get-ChildItem TruckDash-MapBuilder-*.zip | Select-Object -First 1
+          $mb = (Get-FileHash $builder.FullName -Algorithm SHA256).Hash.ToLower()
+          "$zip  TruckDash-windows.zip`n$exe  TruckDash.exe`n$mb  $($builder.Name)" | Set-Content -Encoding ascii SHA256SUMS.txt
           Get-Content SHA256SUMS.txt
           "ZIP_SHA256=$zip" >> $env:GITHUB_ENV
           "EXE_SHA256=$exe" >> $env:GITHUB_ENV
@@ -119,6 +164,8 @@ jobs:
           - ``TruckDash-windows.zip``: ``$env:ZIP_SHA256``
           - ``TruckDash.exe``: ``$env:EXE_SHA256``
 
+          ``TruckDash-MapBuilder-*.zip`` is optional: the client downloads it by itself, only if you use "Build my map" for map mods that are not on our servers. It is GPL-3.0 (built from truckermudgeon/maps with our patch; source in [builder/](https://github.com/${{ github.repository }}/tree/main/builder)).
+
           Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". Some antivirus engines flag the file for the same reason (an unsigned one-file PyInstaller executable that unpacks itself at startup) — it is a false positive; the source and this build log are public, and a code signing certificate for open source projects is in progress. The client is open source, needs no admin rights and only reads the game's telemetry.
           "@
           Set-Content -Path release-notes.md -Value $notas -Encoding utf8
@@ -131,6 +178,7 @@ jobs:
           files: |
             client/TruckDash-windows.zip
             client/SHA256SUMS.txt
+            client/TruckDash-MapBuilder-*.zip
           body_path: release-notes.md
       - name: Tell the relay which version is the latest
         # Sin este paso el Release existe y no lo recibe nadie: el cliente

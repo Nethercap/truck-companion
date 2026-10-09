@@ -877,6 +877,51 @@ const GAME_MAPS = Object.fromEntries(Object.entries(VARIANT_META).map(([name, me
   basemap: BASEMAP_BY_PROJECTION[meta.projection],
 }]));
 
+// Mapas armados en la PC del cliente ("Build my map", client/map_builder.py).
+// El cliente dice en client_status cuales hay ({ats: {variant: 'local_ats',
+// fingerprint, ...}}) y los sirve en /localmap/<juego>/ con los mismos nombres
+// de archivo que una variante de R2. En modo LAN se leen del mismo origen; con
+// el codigo, de 127.0.0.1 (solo en la misma PC: en el celular no llega, se
+// prueba antes y se sigue con el de R2).
+let localMaps = {};          // juego -> datos del cliente, solo los que se pudieron leer
+let localMapsSig = null;
+function localMapRoot(game, port) {
+  const base = conn.local ? '' : (port ? `http://127.0.0.1:${port}` : null);
+  return base === null ? null : `${base}/localmap/${game}`;
+}
+async function applyLocalMaps(maps, port) {
+  const sig = JSON.stringify([maps || null, port || null, conn.local]);
+  if (sig === localMapsSig) return;
+  localMapsSig = sig;
+  const usables = {};
+  for (const game of ['ats', 'ets2']) {
+    const m = maps && maps[game];
+    const root = m && localMapRoot(game, port);
+    if (!m || !root || m.variant !== `local_${game}` || !GAME_MAPS[game]) continue;
+    try {
+      const res = await fetch(`${root}/${m.variant}/Cities.json?v=${m.fingerprint}`, { method: 'HEAD' });
+      if (!res.ok) continue;
+    } catch (err) {
+      continue; // otro dispositivo, o el servidor local apagado
+    }
+    if (sig !== localMapsSig) return; // llego otro estado mientras se probaba
+    const vainilla = GAME_MAPS[game];
+    GAME_MAPS[m.variant] = Object.assign({}, vainilla, {
+      assetsDir: `${root}/${m.variant}`,
+      pmtilesUrl: `${root}/vector/${m.variant}.pmtiles`,
+      label: `${vainilla.label} (${t('localMapLabel')})`,
+      poisUrl: `${root}/pois-${m.variant}.json`,
+    });
+    MAP_DATA_VERSION[m.variant] = m.fingerprint;
+    usables[game] = m;
+  }
+  const antes = JSON.stringify(localMaps);
+  localMaps = usables;
+  // Si cambio el mapa que corresponde, se recarga (como al detectar mods).
+  if (antes !== JSON.stringify(usables) && modsAuto && lastData && currentGame
+      && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null;
+}
+
 // Conversion de coordenadas de juego (x,z) a lng/lat WGS84 real, con el mismo
 // algoritmo (proyeccion Lambert Conformal Conic) que usa truckermudgeon/maps
 // para generar los tiles vectoriales - asi el camion cae en el lugar correcto
@@ -1942,7 +1987,8 @@ async function loadPois(variant) {
   poisError = null;
   poisLoading = (async () => {
     try {
-      const res = await fetch(`${POI_BASE}/pois-${variant}.json`);
+      const propio = GAME_MAPS[variant] && GAME_MAPS[variant].poisUrl;
+      const res = await fetch(propio ? `${propio}?v=${MAP_DATA_VERSION[variant] || ''}` : `${POI_BASE}/pois-${variant}.json`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       pois = await res.json();
       setAtlasData();
@@ -3554,6 +3600,9 @@ function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
 
 function resolveEffectiveGame(game) {
   const g = game || 'ats';
+  // Armado en la PC para los mods activos: se armo justo porque el de R2 no
+  // alcanzaba, asi que va primero.
+  if (modsAuto && localMaps[g]) return localMaps[g].variant;
   const det = modsAuto && detectedMods ? detectedMods[g] : null;
   if (det) {
     // Reforma con cualquiera de los otros dos mapas usa el pack "todo" (es
@@ -3696,6 +3745,11 @@ function updateMap(position, game, gameHeadingDeg) {
     const label = (typeof GAME_MAPS !== 'undefined' && GAME_MAPS[currentGame] && GAME_MAPS[currentGame].label) || currentGame;
     showToast(t('offMapNotice').replace('{map}', label), 'info', 20000);
     sendOffMapReport(position.x, position.z);
+    // Al cliente (por el relay o directo en LAN): con mods activos ofrece
+    // armar el mapa en la PC ("Build my map").
+    if (ws && ws.readyState === WebSocket.OPEN && lastData && lastData.game) {
+      ws.send(JSON.stringify({ type: 'offmap', game: lastData.game }));
+    }
   }
   checkWaypointReached(position.x, position.z);
   updateCurrentRoad(position.x, position.z);
@@ -4932,6 +4986,7 @@ function connectWs(backend, code, options = {}) {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;
       if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);
+      if (data.client_status) applyLocalMaps(data.client_status.localMaps, data.client_status.localMapPort);
       if (!conn.clientConnected) conn.hasTelemetry = false;
       renderConnectionUi();
       return;
@@ -4941,6 +4996,7 @@ function connectWs(backend, code, options = {}) {
       conn.clientStatus = data; // incluye .detail si el cliente lo manda
       if (data.activeMods !== undefined) detectedModNames = data.activeMods;
       applyDetectedDlcs(data.mapDlcs);
+      applyLocalMaps(data.localMaps, data.localMapPort);
       if (data.mapMods !== undefined && JSON.stringify(data.mapMods) !== JSON.stringify(detectedMods)) {
         detectedMods = data.mapMods;
         if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada

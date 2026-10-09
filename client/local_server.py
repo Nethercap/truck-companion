@@ -112,6 +112,13 @@ def refresh_web_cache() -> bool:
 on_show_setup = None
 
 
+# Mapa armado en esta PC ("Build my map", ver map_builder.py): juego ->
+# carpeta. Lo actualiza la bandeja cuando hay un mapa que coincide con los
+# mods activos. Se sirve en /localmap/<juego>/... con los mismos nombres de
+# archivo que una variante de R2.
+local_map_dirs: dict = {}
+
+
 class _StaticHandler(http.server.SimpleHTTPRequestHandler):
     """Sirve la web app y los datos (/data/*.json) pidiendolos primero al
     sitio (asi el modo LAN corre siempre la version actual de la web sin
@@ -124,7 +131,80 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
     # Parametros que ya dicen como conectarse: si viene alguno, no se toca.
     CONNECT_PARAMS = ("local", "demo", "code", "backend", "live", "convoy")
 
+    def do_OPTIONS(self):
+        # Preflight de Chrome para una pagina publica (trucksim-dash.com) que
+        # le pide algo a 127.0.0.1: sin Allow-Private-Network lo corta.
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Range")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_HEAD(self):
+        if self.path.startswith("/localmap/"):
+            self._serve_local_map(head=True)
+            return
+        super().do_HEAD()
+
+    def _serve_local_map(self, head: bool = False):
+        """Archivos del mapa armado, con rangos (pmtiles pide de a pedazos y
+        SimpleHTTPRequestHandler no sabe responder 206)."""
+        partes = self.path.split("?", 1)[0].split("/")[2:]  # ['ats', 'vector', 'local_ats.pmtiles']
+        base = local_map_dirs.get(partes[0]) if partes else None
+        rel = "/".join(partes[1:])
+        if not base or not rel or ".." in partes:
+            self.send_error(404)
+            return
+        ruta = os.path.normpath(os.path.join(base, *partes[1:]))
+        if not ruta.startswith(os.path.normpath(base) + os.sep) or not os.path.isfile(ruta):
+            self.send_error(404)
+            return
+        total = os.path.getsize(ruta)
+        inicio, fin = 0, total - 1
+        rango = self.headers.get("Range")
+        if rango and rango.startswith("bytes="):
+            try:
+                a, b = rango[6:].split(",")[0].split("-")
+                if a:
+                    inicio, fin = int(a), (int(b) if b else total - 1)
+                else:
+                    inicio, fin = max(0, total - int(b)), total - 1
+                fin = min(fin, total - 1)
+            except ValueError:
+                inicio, fin = 0, total - 1
+            if inicio > fin:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{total}")
+                self.end_headers()
+                return
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {inicio}-{fin}/{total}")
+        else:
+            self.send_response(200)
+        tipo = "application/json" if ruta.endswith(".json") else "application/octet-stream"
+        self.send_header("Content-Type", tipo)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(fin - inicio + 1))
+        self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.end_headers()
+        if head:
+            return
+        with open(ruta, "rb") as f:
+            f.seek(inicio)
+            falta = fin - inicio + 1
+            while falta > 0:
+                bloque = f.read(min(1 << 16, falta))
+                if not bloque:
+                    break
+                self.wfile.write(bloque)
+                falta -= len(bloque)
+
     def do_GET(self):
+        if self.path.startswith("/localmap/"):
+            self._serve_local_map()
+            return
         # Los archivos se referencian con ?v=... para cache-busting - el query
         # se ignora. "/" y "/app" van al index.
         path = self.path.split("?", 1)[0]

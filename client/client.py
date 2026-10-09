@@ -332,6 +332,20 @@ def read_active_mod_names() -> dict:
     return result
 
 
+def read_mounted_mods() -> dict:
+    """{'ets2': [rutas] | None, 'ats': [...] | None}: los archivos de los mods
+    del perfil cargado, del mismo game.log.txt (ver map_builder)."""
+    import map_builder
+    result = {}
+    for game, path in game_log_paths().items():
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                result[game] = map_builder.mounted_mod_paths(f.read())
+        except OSError:
+            result[game] = None
+    return result
+
+
 def read_map_mods() -> dict:
     """{'ets2': {...flags} | None, 'ats': {...} | None} - None = sin datos
     (el log no existe o no tiene lista de mods)."""
@@ -924,6 +938,12 @@ def payload_has_event(payload: dict) -> bool:
     return any(event.get(k) for k in EVENT_FLAGS)
 
 
+# Lo define la bandeja: la web avisa que el camion esta fuera del mapa que
+# conoce ({"type": "offmap", "game": "ats"}), y la bandeja ofrece armar el
+# mapa en la PC (map_builder.py).
+on_offmap = None
+
+
 async def handle_control_message(message: str, keybinds: dict, send) -> None:
     """Procesa un mensaje de control de la web (comando de botonera, get/set
     de keybinds) y responde via `send` (coroutine que manda un str). Lo usan
@@ -944,6 +964,9 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
             live = dict(keybinds)
             live.update({a: k for a, k in detected.items() if k})
             await send(json.dumps({"type": "keybinds", "data": live}))
+        elif msg_type == "offmap":
+            if on_offmap and payload.get("game") in ("ats", "ets2"):
+                on_offmap(payload["game"])
         elif msg_type == "set_keybinds":
             incoming = payload.get("data") or {}
             keybinds.update({k: (v or None) for k, v in incoming.items() if k in DEFAULT_KEYBINDS})

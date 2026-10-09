@@ -1,20 +1,9 @@
 """
-Genera docs/data/pois-<variante>.json a partir del output del parser de
-truckermudgeon/maps (<prefijo>-pois.json): estaciones de servicio, areas de
-descanso, talleres, garages, concesionarias, basculas, y las empresas
-(con token + ciudad, para ubicar el punto exacto de carga/descarga de un
-trabajo a partir de compSrcId/citySrcId de la telemetria).
-
-Formato compacto (coordenadas de juego, redondeadas al metro):
-  {
-    "facilities": [[x, z, "g"], ...],          # g gas, p parking/rest, s service,
-                                              # r garage, d dealer, w weigh station,
-                                              # c estacionamiento para auto (ATS)
-    "companies":  [[x, z, "token", "Label", "city_token"], ...],
-    "cities":     {"city_token": "City Name", ...},
-    "atlas":      [[x, z, "t", "Name"], ...]    # solo ATS: t tourist board,
-                                              # o point of interest (Road Trip)
-  }
+Genera docs/data/pois-<variante>.json para cada variante de R2 a partir del
+output del parser de truckermudgeon/maps. La logica vive en
+client/mapbuild/pois.py, que el cliente usa tambien para el mapa armado en la
+PC; aca solo se recorren las variantes y se suman los puntos de trabajo de
+las empresas (company-points-<variante>.json del taller).
 
 Uso (rutas relativas a D:\\ets2-companion, ver VARIANTS):
   python tools/build_pois.py
@@ -22,11 +11,15 @@ Uso (rutas relativas a D:\\ets2-companion, ver VARIANTS):
 
 import json
 import os
-import re
+import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PARSER_ROOT = os.path.dirname(ROOT)  # D:\ets2-companion
 OUT_DIR = os.path.join(ROOT, "docs", "data")
+
+sys.path.insert(0, os.path.join(ROOT, "client"))
+from mapbuild import pois as mapbuild_pois  # noqa: E402
+from mapbuild.pois import FACILITY_CODES  # noqa: E402,F401  (lo importa check_map_data.py)
 
 # variante de mapa en la web -> (carpeta del parser, prefijo)
 VARIANTS = {
@@ -49,91 +42,8 @@ VARIANTS = {
     "ets2_tmp": ("parser-output-ets2_tmp", "europe"),  # TruckersMP (sede TMP + CD road)
 }
 
-FACILITY_CODES = {
-    "gas_ico": "g",
-    "parking_ico": "p",
-    "service_ico": "s",
-    "garage_large_ico": "r",
-    "dealer_ico": "d",
-    # Dos tokens para lo mismo, y el juego les dibuja el MISMO icono: en ETS2
-    # hay 17 weigh_station_ico y 34 weigh_ico, y solo 4 de los segundos estan
-    # cerca de uno de los primeros. Con uno solo en la lista, dos tercios de
-    # las basculas no aparecian ni en el mapa ni en la busqueda.
-    "weigh_station_ico": "w",
-    "weigh_ico": "w",
-}
-
-
-# Nombres del Atlas (clave del locale -> texto en ingles). Los arma
-# build_atlas_names.py del taller desde locale.scs; sin el archivo, el Atlas
-# sale sin nombres en vez de no salir.
-ATLAS_NAMES_PATH = os.path.join(PARSER_ROOT, "atlas-names-ats.json")
-ATLAS_KEY = re.compile(r"(tb|poi)_[a-z]{2}\d+(_\d+)?")
-
-
-# Plazas para auto (ATS 1.61): triggers "parking_car", una por lugar de
-# estacionar. Se agrupan en lugares (~150 m) y se guarda el centro de cada
-# uno. Los "hud_parking" son los de camion, que ya vienen como parking_ico.
-CAR_PARKING_RADIUS_M = 150
-
-
-def car_parking(folder, prefix):
-    path = os.path.join(PARSER_ROOT, folder, f"{prefix}-triggers.json")
-    if not os.path.exists(path):
-        return []
-    with open(path, encoding="utf-8") as f:
-        triggers = json.load(f)
-    grupos = []  # [suma_x, suma_z, n]
-    for t in triggers:
-        if not any(a and a[0] == "parking_car" for a in t.get("actions") or []):
-            continue
-        for g in grupos:
-            if abs(g[0] / g[2] - t["x"]) < CAR_PARKING_RADIUS_M and abs(g[1] / g[2] - t["y"]) < CAR_PARKING_RADIUS_M:
-                g[0] += t["x"]; g[1] += t["y"]; g[2] += 1
-                break
-        else:
-            grupos.append([t["x"], t["y"], 1])
-    return [[round(gx / n), round(gz / n), "c"] for gx, gz, n in grupos]
-
-
-def atlas_items(folder, prefix):
-    """Tourist Boards y Points of Interest del Atlas (Road Trip de ATS). El
-    parser los saca como cutscenes: la accion "rt_tb" o "rt_poi" dice que son
-    y el ultimo tag es la clave del nombre ("tb_ca1", "poi_ca1_01")."""
-    path = os.path.join(PARSER_ROOT, folder, f"{prefix}-cutscenes.json")
-    if not os.path.exists(path):
-        return []
-    with open(path, encoding="utf-8") as f:
-        cutscenes = json.load(f)
-    names = {}
-    if os.path.exists(ATLAS_NAMES_PATH):
-        with open(ATLAS_NAMES_PATH, encoding="utf-8") as f:
-            names = json.load(f)
-    out = []
-    for c in cutscenes:
-        params = c.get("actionStringParams") or []
-        kind = "t" if "rt_tb" in params else "o" if "rt_poi" in params else None
-        if not kind or not c.get("tags"):
-            continue
-        key = c["tags"][-1]
-        # Solo las claves del Atlas de SCS: un mod de ETS2 usa la misma accion
-        # con otra clave ("poi_tag_sw01") y no es un lugar del Atlas.
-        if not ATLAS_KEY.fullmatch(key):
-            continue
-        out.append([round(c["x"]), round(c["y"]), kind, names.get(key, key)])
-    # Los tourist boards primero: son los destinos del Atlas
-    out.sort(key=lambda a: (a[2] != "t", a[3]))
-    return out
-
 
 def build(variant, folder, prefix):
-    path = os.path.join(PARSER_ROOT, folder, f"{prefix}-pois.json")
-    if not os.path.exists(path):
-        # variante todavia no parseada en esta maquina: se conserva el json publicado
-        print(f"  {variant}: sin {path}, se saltea")
-        return
-    with open(path, encoding="utf-8") as f:
-        pois = json.load(f)
     # Puntos de trabajo por empresa. Si el archivo no esta (variante todavia
     # no procesada en esta maquina), se cae al icono y no se rompe nada.
     work_points = {}
@@ -141,63 +51,17 @@ def build(variant, folder, prefix):
     if os.path.exists(wp_path):
         with open(wp_path, encoding="utf-8") as f:
             work_points = json.load(f)
-    facilities = []
-    companies = []
-    seen = set()
-    for p in pois:
-        x, z = round(p["x"]), round(p["y"])
-        # Se filtra por ICONO y no por tipo: weigh_ico viene como type="road"
-        # (es el cartel de la bascula al costado de la ruta, no un prefab con
-        # playa), y con el filtro por tipo se caian los 34 de ETS2.
-        if p.get("type") != "company" and p.get("icon") in FACILITY_CODES:
-            key = (x, z, p["icon"])
-            if key in seen:
-                continue
-            seen.add(key)
-            facilities.append([x, z, FACILITY_CODES[p["icon"]]])
-        elif p.get("type") == "company" and p.get("icon"):
-            # La posicion que se guarda NO es la del icono sino la del centro
-            # de los puntos de trabajo del prefab (muelles de descarga y
-            # lugares de trailer), que es adonde el juego te manda de verdad.
-            # El icono se equivoca por 53 m de mediana y hasta 214 m; el
-            # centro, por 29 m, y gana en el 99% de las empresas. Lo calcula
-            # build_company_points.py, que vive en el pipeline porque necesita
-            # prefabs, descripciones y nodos (cientos de MB).
-            ciudad = p.get("cityToken") or ""
-            punto = work_points.get(f'{p["icon"]}|{ciudad}')
-            px, pz = (punto[0], punto[1]) if punto else (x, z)
-            companies.append([px, pz, p["icon"], p.get("label") or p["icon"], ciudad])
-    cities = {}
-    try:
-        with open(os.path.join(PARSER_ROOT, folder, f"{prefix}-cities.json"), encoding="utf-8") as f:
-            for c in json.load(f):
-                if c.get("token") and c.get("name"):
-                    cities[c["token"]] = c["name"]
-    except OSError:
-        pass
-    # Dos surtidores de la misma estacion (o dos plazas del mismo parking)
-    # aparecen como POIs separados a pocos metros - se deja uno solo por
-    # tipo dentro de un radio de ~120 m para que la lista no repita.
-    grid = {}
-    deduped = []
-    for x, z, code in facilities:
-        cell = (x // 120, z // 120, code)
-        if any(abs(x - ox) < 120 and abs(z - oz) < 120 for ox, oz in grid.get(cell, [])):
-            continue
-        grid.setdefault(cell, []).append((x, z))
-        deduped.append([x, z, code])
-    facilities = deduped + car_parking(folder, prefix)
-    out = {"facilities": facilities, "companies": companies, "cities": cities}
-    atlas = atlas_items(folder, prefix)
-    if atlas:
-        out["atlas"] = atlas
-    os.makedirs(OUT_DIR, exist_ok=True)
+    pois = mapbuild_pois.build(os.path.join(PARSER_ROOT, folder), prefix, work_points)
+    if pois is None:
+        # variante todavia no parseada en esta maquina: se conserva el json publicado
+        print(f"  {variant}: sin {folder}/{prefix}-pois.json, se saltea")
+        return
     out_path = os.path.join(OUT_DIR, f"pois-{variant}.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    mapbuild_pois.write(pois, out_path)
+    facilities, atlas = pois["facilities"], pois.get("atlas") or []
     autos = sum(1 for f in facilities if f[2] == "c")
     extra = (f", {len(atlas)} atlas" if atlas else "") + (f", {autos} car parking" if autos else "")
-    print(f"  {variant}: {len(facilities)} facilities, {len(companies)} companies{extra} -> {os.path.getsize(out_path) // 1024}KB")
+    print(f"  {variant}: {len(facilities)} facilities, {len(pois['companies'])} companies{extra} -> {os.path.getsize(out_path) // 1024}KB")
 
 
 if __name__ == "__main__":
