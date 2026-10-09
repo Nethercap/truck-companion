@@ -192,18 +192,20 @@ def overlay_settings() -> dict:
     corner = s.get("overlay_corner")
     size = s.get("overlay_size")
     items = s.get("overlay_items")
+    hotkey = s.get("overlay_hotkey", overlay.DEFAULT_HOTKEY)
     return {
         "enabled": overlay_supported() and bool(s.get("overlay")),
         "corner": corner if corner in overlay.CORNERS else overlay.DEFAULT_CORNER,
         "size": size if size in overlay.SIZES else overlay.DEFAULT_SIZE,
         "items": (tuple(i for i in overlay.ITEMS if i in items) if isinstance(items, list)
                   else overlay.ITEMS),
+        "hotkey": hotkey if hotkey in overlay.HOTKEYS else overlay.DEFAULT_HOTKEY,
     }
 
 
 def save_overlay_settings(**cambios) -> None:
     claves = {"enabled": "overlay", "corner": "overlay_corner", "size": "overlay_size",
-              "items": "overlay_items"}
+              "items": "overlay_items", "hotkey": "overlay_hotkey"}
     settings = load_settings()
     for k, v in cambios.items():
         settings[claves[k]] = list(v) if k == "items" else v

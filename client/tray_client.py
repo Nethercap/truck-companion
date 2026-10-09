@@ -150,6 +150,8 @@ class AppState:
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
                                                 T("overlay_arrival_game")))
+        # Tecla rapida que prende y apaga el overlay desde el juego.
+        self.overlay_tecla = overlay.TeclaRapida(lambda: set_overlay(not self.overlay.enabled))
 
     def status_text(self) -> str:
         text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
@@ -615,11 +617,15 @@ class SetupWindow:
             corner, size, items = state.overlay_layout
             self.overlay_corner_var = tk.StringVar(value=T(f"pos_{corner}"))
             self.overlay_size_var = tk.StringVar(value=T(f"size_{size}"))
+            nombre_tecla = lambda k: overlay.nombre_tecla(k) if k else T("hotkey_none")
+            self.overlay_hotkey_var = tk.StringVar(value=nombre_tecla(state.overlay_tecla.actual))
             for etiqueta, var, opciones, al_elegir in (
                 (T("overlay_position"), self.overlay_corner_var, [(c, T(f"pos_{c}")) for c in overlay.CORNERS],
                  lambda c: set_overlay_layout(corner=c)),
                 (T("overlay_size"), self.overlay_size_var, [(k, T(f"size_{k}")) for k in overlay.SIZES],
                  lambda k: set_overlay_layout(size=k)),
+                (T("overlay_hotkey"), self.overlay_hotkey_var, [(k, nombre_tecla(k)) for k in overlay.HOTKEYS],
+                 set_overlay_hotkey),
             ):
                 self.label(fila, etiqueta, fg=MUTED).pack(side="left", padx=(0, 4))
                 por_texto = {texto: clave for clave, texto in opciones}
@@ -1334,6 +1340,11 @@ def set_overlay_layout(corner: str | None = None, size: str | None = None, items
     win_integration.save_overlay_settings(corner=corner, size=size, items=items)
 
 
+def set_overlay_hotkey(combinacion: str) -> None:
+    win_integration.save_overlay_settings(hotkey=combinacion)
+    state.overlay_tecla.poner(combinacion)
+
+
 def toggle_overlay_menu_item(icon, item):
     set_overlay(not state.overlay.enabled)
 
@@ -1915,6 +1926,8 @@ def main():
     state.overlay_layout = (ajustes_overlay["corner"], ajustes_overlay["size"], ajustes_overlay["items"])
     if ajustes_overlay["enabled"]:
         state.overlay.set_enabled(True)
+    if win_integration.overlay_supported():
+        state.overlay_tecla.poner(ajustes_overlay["hotkey"])
     state.discord.set_enabled(bool(win_integration.load_settings().get("discord_presence")))
     win_integration.cleanup_old_exe()
     state.web_url = args.web_url

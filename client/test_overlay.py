@@ -109,12 +109,14 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: True)
     monkeypatch.setattr(win_integration, "load_settings", lambda: {})
     assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": "m",
-                                                  "items": overlay.ITEMS}
+                                                  "items": overlay.ITEMS, "hotkey": "ctrl+shift+o"}
     monkeypatch.setattr(win_integration, "load_settings",
                         lambda: {"overlay": True, "overlay_corner": "middle", "overlay_size": "l",
-                                 "overlay_items": ["arrival", "inventado", "speed"]})
+                                 "overlay_items": ["arrival", "inventado", "speed"], "overlay_hotkey": ""})
     assert win_integration.overlay_settings() == {"enabled": True, "corner": "top_center", "size": "l",
-                                                  "items": ("speed", "arrival")}
+                                                  "items": ("speed", "arrival"), "hotkey": ""}
+    monkeypatch.setattr(win_integration, "load_settings", lambda: {"overlay_hotkey": "ctrl+del"})
+    assert win_integration.overlay_settings()["hotkey"] == "ctrl+shift+o"
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: False)
     assert win_integration.overlay_settings()["enabled"] is False
 
@@ -122,7 +124,8 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
 def test_textos_en_los_ocho_idiomas():
     import i18n
     claves = ["overlay_option", "overlay_position", "overlay_size", "menu_overlay",
-              "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show"]
+              "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show",
+              "overlay_hotkey", "hotkey_none"]
     claves += [f"pos_{c}" for c in overlay.CORNERS] + [f"size_{k}" for k in overlay.SIZES]
     claves += [f"item_{k}" for k in overlay.ITEMS]
     for lang, textos in i18n._STRINGS.items():
@@ -140,3 +143,29 @@ def test_nav_hud_llega_al_overlay():
     finally:
         client.on_nav_hud = None
     assert recibido == [{"type": "nav_hud", "turn": "x"}]
+
+
+def test_las_teclas_rapidas():
+    assert overlay.tecla("ctrl+shift+o") == (overlay.MOD_CONTROL | overlay.MOD_SHIFT, ord("O"))
+    assert overlay.tecla("alt+shift+o") == (overlay.MOD_ALT | overlay.MOD_SHIFT, ord("O"))
+    assert overlay.tecla("") is None and overlay.tecla("ctrl+") is None
+    assert overlay.tecla("win+o") is None and overlay.tecla("ctrl+f10") is None
+    # Todas las que se ofrecen se pueden registrar (salvo "ninguna").
+    assert all(overlay.tecla(k) for k in overlay.HOTKEYS if k)
+    assert overlay.DEFAULT_HOTKEY in overlay.HOTKEYS
+    assert overlay.nombre_tecla("ctrl+shift+o") == "Ctrl+Shift+O"
+
+
+def test_apagar_no_destruye_la_ventana():
+    """Prender de nuevo (con la tecla, con el juego al frente) no puede crear
+    otra ventana: crearla le saca el foco al juego."""
+    ov = overlay.Overlay(overlay.OverlayData(), lambda: None, lambda: None)
+    arrancados = []
+    ov._correr = lambda: arrancados.append(1)
+    ov.set_enabled(True)
+    ov._hilo.join(1)
+    ov._hilo = type("Vivo", (), {"is_alive": lambda self: True})()
+    ov.set_enabled(False)
+    assert ov.enabled is False
+    ov.set_enabled(True)
+    assert ov.enabled is True and arrancados == [1]

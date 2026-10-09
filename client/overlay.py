@@ -237,7 +237,12 @@ def _rect_de(hwnd):
 
 class Overlay:
     """La ventana. Corre en su propio hilo con su propio Tk, como la ventana
-    de Setup. set_enabled la crea o la destruye."""
+    de Setup.
+
+    Se crea la primera vez que se prende y despues vive hasta que se cierra
+    el cliente: apagarla la esconde. Crear una ventana de Tk la activa, y con
+    la tecla rapida eso pasaria con el juego al frente; esconder y mostrar
+    con ShowWindow no le saca el foco a nadie."""
 
     TICK_MS = 100
 
@@ -245,21 +250,21 @@ class Overlay:
         self.data = data
         self.ajustes = ajustes      # () -> (esquina, tamano, que se muestra)
         self.etiquetas = etiquetas  # () -> (falta, llegada real, llegada del juego), idioma del cliente
+        self._activo = False
         self._hilo = None
-        self._parar = threading.Event()
 
     @property
     def enabled(self) -> bool:
-        return self._hilo is not None and self._hilo.is_alive()
+        return self._activo
 
     def set_enabled(self, prender: bool) -> None:
-        if prender and not self.enabled:
-            self._parar.clear()
+        prender = bool(prender)
+        if prender != self._activo:
+            logging.info("Overlay en el juego %s", "prendido" if prender else "apagado")
+        self._activo = prender
+        if prender and (self._hilo is None or not self._hilo.is_alive()):
             self._hilo = threading.Thread(target=self._correr, name="overlay", daemon=True)
             self._hilo.start()
-        elif not prender and self._hilo is not None:
-            self._parar.set()
-            self._hilo = None
 
     def _correr(self):
         try:
@@ -274,6 +279,9 @@ class _Ventana:
         import tkinter as tk
 
         self.ov = overlay
+        # Si al crearse la ventana se lleva el foco, se lo devuelve a quien lo
+        # tenia (el juego, si se prendio con la tecla rapida).
+        frente_antes = ctypes.windll.user32.GetForegroundWindow()
         # Con escalado de Windows (125 %, 150 %) un proceso sin DPI propio se
         # dibuja chico y Windows lo estira: el texto queda borroso. Solo este
         # hilo pasa a medir en pixeles reales; Setup sigue como estaba.
@@ -312,17 +320,17 @@ class _Ventana:
         except Exception:
             pass
         self.u.ShowWindow(self.hwnd, SW_HIDE)
+        if frente_antes and self.u.GetForegroundWindow() != frente_antes:
+            self.u.SetForegroundWindow(frente_antes)
         self.visible = False
         self.dibujado = None   # (contenido, escala) de lo que esta en pantalla
         self.lugar = None      # (x, y, ancho, alto)
         self.ultimo_topmost = 0.0
         self.parpadeo = False
-        logging.info("Overlay en el juego prendido")
 
     def loop(self):
         self.root.after(self.ov.TICK_MS, self.tick)
         self.root.mainloop()
-        logging.info("Overlay en el juego apagado")
 
     def esconder(self):
         if self.visible:
@@ -330,9 +338,6 @@ class _Ventana:
             self.visible = False
 
     def tick(self):
-        if self.ov._parar.is_set():
-            self.root.destroy()
-            return
         try:
             self._tick()
         except Exception:
@@ -342,7 +347,7 @@ class _Ventana:
     def _tick(self):
         import window_compat
 
-        juego = window_compat.game_window_in_front()
+        juego = window_compat.game_window_in_front() if self.ov.enabled else None
         if not juego:
             self.esconder()
             return
@@ -443,3 +448,88 @@ class _Ventana:
         alto = y + fila + pad
         c.configure(width=ancho, height=alto)
         return ancho, alto
+
+
+# --- Tecla rapida ------------------------------------------------------------
+# Prende y apaga el overlay sin salir del juego. Es una tecla global de
+# Windows (RegisterHotKey): anda con el juego al frente, y la combinacion la
+# toma Windows para nosotros, asi que no le llega al juego. Por eso son
+# combinaciones con Ctrl o Alt que ETS2 y ATS no usan por defecto.
+HOTKEYS = ("ctrl+shift+o", "ctrl+shift+h", "ctrl+alt+o", "alt+shift+o", "")
+DEFAULT_HOTKEY = "ctrl+shift+o"
+MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_NOREPEAT = 0x1, 0x2, 0x4, 0x4000
+WM_HOTKEY, WM_QUIT = 0x0312, 0x0012
+_MODS = {"ctrl": MOD_CONTROL, "alt": MOD_ALT, "shift": MOD_SHIFT}
+
+
+def tecla(combinacion: str) -> tuple[int, int] | None:
+    """"ctrl+shift+o" -> (modificadores, codigo de tecla virtual), o None."""
+    partes = [p for p in (combinacion or "").lower().split("+") if p]
+    if not partes or len(partes[-1]) != 1 or not partes[-1].isalnum():
+        return None
+    mods = 0
+    for m in partes[:-1]:
+        if m not in _MODS:
+            return None
+        mods |= _MODS[m]
+    return mods, ord(partes[-1].upper())
+
+
+def nombre_tecla(combinacion: str) -> str:
+    """Como se muestra: "Ctrl+Shift+O"."""
+    return "+".join(p.capitalize() if len(p) > 1 else p.upper() for p in combinacion.split("+"))
+
+
+class TeclaRapida:
+    """Escucha una combinacion global en su propio hilo (RegisterHotKey avisa
+    al hilo que la registro). poner() la cambia; "" la saca."""
+
+    def __init__(self, al_apretar):
+        self.al_apretar = al_apretar
+        self._hilo = None
+        self._id_hilo = None
+        self.actual = ""
+
+    def poner(self, combinacion: str) -> None:
+        self._sacar()
+        self.actual = combinacion if tecla(combinacion) else ""
+        if not self.actual:
+            return
+        listo = threading.Event()
+        self._hilo = threading.Thread(target=self._escuchar, args=(self.actual, listo),
+                                      name="tecla-overlay", daemon=True)
+        self._hilo.start()
+        listo.wait(2)
+
+    def _sacar(self) -> None:
+        if self._hilo is not None and self._id_hilo:
+            import ctypes
+            ctypes.windll.user32.PostThreadMessageW(self._id_hilo, WM_QUIT, 0, 0)
+            self._hilo.join(2)
+        self._hilo = None
+        self._id_hilo = None
+
+    def _escuchar(self, combinacion: str, listo: threading.Event) -> None:
+        import ctypes
+        from ctypes import wintypes
+        u = ctypes.windll.user32
+        self._id_hilo = ctypes.windll.kernel32.GetCurrentThreadId()
+        mods, vk = tecla(combinacion)
+        ok = u.RegisterHotKey(None, 1, mods | MOD_NOREPEAT, vk)
+        listo.set()
+        if not ok:
+            # Otro programa ya la tiene: queda en el log y no se reintenta.
+            logging.warning("No se pudo registrar la tecla del overlay %s (la usa otro programa)",
+                            nombre_tecla(combinacion))
+            return
+        logging.info("Tecla del overlay: %s", nombre_tecla(combinacion))
+        msg = wintypes.MSG()
+        try:
+            while u.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+                if msg.message == WM_HOTKEY:
+                    try:
+                        self.al_apretar()
+                    except Exception:
+                        logging.exception("Error al usar la tecla del overlay")
+        finally:
+            u.UnregisterHotKey(None, 1)
