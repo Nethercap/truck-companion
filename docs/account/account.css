@@ -220,6 +220,11 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
 .juego h3 { font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
             color: var(--accent); margin: 0 0 0.6rem; }
 .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.8rem 1rem; }
+/* En el celular de a tres: de a dos eran cinco filas de numeros. */
+@media (max-width: 560px) {
+  .cifras { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem 0.6rem; }
+  .cifras div b { font-size: 0.98rem; }
+}
 .cifras div b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
 .cifras div span { font-size: 0.72rem; color: var(--muted); }
 .juego .renglon { font-size: 0.85rem; color: var(--muted); margin-top: 0.7rem; }
@@ -333,7 +338,19 @@ table.viajes .camion { white-space: nowrap; }
 .tag { white-space: nowrap; }
 table.viajes .cuando { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 table.viajes .ruta-celda { font-weight: 600; }
-table.viajes .ruta-celda .tag { margin-left: 0.35rem; font-weight: 400; vertical-align: 1px; }
+table.viajes .ruta-celda .tag { margin-left: 0.15rem; font-weight: 400; vertical-align: 1px; }
+table.viajes .ruta-txt { white-space: nowrap; }
+table.viajes .ruta-txt.sin-ciudades { color: var(--muted); font-weight: 400; }
+table.viajes td.num.gris { color: var(--muted); font-size: 0.82rem; }
+/* Laptop chica y tablet: con la barra lateral la tabla no entra con todo en un renglon. */
+@media (max-width: 1100px) {
+  table.viajes .camion, table.viajes .ruta-txt { white-space: normal; }
+}
+/* Recien aparece la barra lateral y el contenido es angosto: el vehiculo se
+   ve en el detalle del viaje. */
+@media (min-width: 821px) and (max-width: 940px) {
+  table.viajes th:nth-child(3), table.viajes td.camion { display: none; }
+}
 table.viajes .juego-chip { font-size: 0.68rem; color: var(--muted); border: 1px solid var(--line);
                            border-radius: 4px; padding: 0 0.3rem; margin-right: 0.4rem; font-weight: 400; }
 table.viajes .chico-gris { display: block; font-size: 0.78rem; color: var(--muted); font-weight: 400; }
@@ -376,9 +393,26 @@ table.viajes td.detalle-celda { padding: 0 0.5rem 0.8rem; background: #1d232b; }
   table.viajes td.detalle-celda { padding: 0 0 0.8rem; }
 }
 
-/* Lo mas repetido de cada juego: listas cortas en columnas. */
+/* Lo mas repetido de cada juego: listas cortas en columnas fijas (con
+   auto-fit quedaba una lista sola en una fila). */
 .tops { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
         gap: 0.9rem 1.2rem; margin-top: 1rem; }
+.tops.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tops.dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) {
+  .tops.tres, .tops.dos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem 0.9rem; }
+  /* Records y consumo son renglones largos: uno debajo del otro. */
+  .tops.dos:has(.records) { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* La plata de un juego, por moneda. */
+table.plata { border-collapse: collapse; margin-top: 0.9rem; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+table.plata th, table.plata td { padding: 0.18rem 0; }
+table.plata thead th { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-align: right; }
+table.plata tbody th { text-align: left; font-weight: 400; color: var(--muted); padding-right: 1.5rem; }
+table.plata td { text-align: right; padding-left: 1.5rem; white-space: nowrap; }
+table.plata tr.gasto td { color: var(--muted); }
+table.plata tr.neto th, table.plata tr.neto td { color: var(--text); font-weight: 600; border-top: 1px solid var(--line); padding-top: 0.35rem; }
 .tops h4 { margin: 0 0 0.3rem; font-size: 0.72rem; letter-spacing: 0.08em;
            text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .tops ol { margin: 0; padding-left: 1.2rem; font-size: 0.88rem; }
@@ -415,7 +449,16 @@ table.viajes td.detalle-celda { padding: 0 0.5rem 0.8rem; background: #1d232b; }
 .leyenda-cal i:last-of-type { margin-right: 4px; }
 
 /* --- logros ----------------------------------------------------------- */
-.logros { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.7rem; }
+/* Cuatro logros recientes en una fila (con 15rem quedaban tres y uno solo abajo). */
+.logros { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.7rem; }
+@media (max-width: 560px) {
+  .logros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .logro { flex-direction: column; gap: 0.4rem; padding: 0.6rem; }
+  .logro .icono { width: 2.1rem; height: 2.1rem; }
+  .logro .icono svg { width: 1.15rem; height: 1.15rem; }
+  .logro b { font-size: 0.86rem; }
+  .logro .desc { font-size: 0.76rem; }
+}
 .logro { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.7rem;
          border: 1px solid var(--line); border-radius: 8px; background: #1b1f25; }
 .logro .icono { flex: none; width: 2.6rem; height: 2.6rem; border-radius: 50%;
@@ -471,7 +514,18 @@ ul.gente .nombre, .vivo .nombre { font-weight: 600; color: var(--text); text-dec
 ul.gente .acciones-fila { margin-left: auto; display: flex; gap: 0.4rem; flex-wrap: wrap; }
 ul.feed .cuando { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
 ul.feed .meta { color: var(--muted); font-size: 0.85rem; }
-.vivos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 0.8rem; }
+/* align-items: start: quien no esta manejando no tiene mapita, y su tarjeta
+   quedaba estirada y vacia al lado de la de quien si. */
+.vivos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: 0.8rem; align-items: start; }
+
+/* Las listas de gente con el mismo titulo que el resto de las tarjetas. */
+.listas-gente h3 { font-size: 0.95rem; margin: 1.1rem 0 0.4rem; color: var(--muted); font-weight: 600; }
+.listas-gente h3:first-child { margin-top: 0; }
+
+/* El codigo de la PC con su boton al lado. */
+.fila-codigo { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.fila-codigo input { flex: 0 1 12rem; }
+.acciones-sesion { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
 .vivo { border: 1px solid var(--line); border-radius: 10px; padding: 0.7rem 0.8rem; background: var(--bg); }
 .vivo .cabeza { display: flex; align-items: center; gap: 0.5rem; }
 .vivo .linea-estado { margin: 0.35rem 0 0; font-size: 0.88rem; }
@@ -550,3 +604,6 @@ label.buscar input:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
 /* Trabajo con auto: la misma etiqueta que el juego, en otro color. */
 table.viajes .juego-chip.auto { color: var(--warn); border-color: var(--warn); }
+
+/* El nombre de usuario en Ajustes: como texto, no como codigo. */
+.nombre-usuario { font-weight: 600; font-size: 1rem; }

@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261009a" />
+<link rel="stylesheet" href="account.css?v=20261009b" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -277,7 +277,7 @@
             <ul class="feed" id="feedList"></ul>
             <p class="muted" id="feedEmpty" data-i18n="feedEmpty" hidden></p>
           </section>
-          <section class="card">
+          <section class="card listas-gente">
             <h3 data-i18n="followingList">You follow</h3>
             <ul class="gente" id="followingList"></ul>
             <h3 data-i18n="followersList">Your followers</h3>
@@ -293,7 +293,7 @@
           <section class="card">
             <h2 data-i18n="usernameLabel">Username</h2>
             <div class="row">
-              <span id="currentUsername" class="mono"></span>
+              <span id="currentUsername" class="nombre-usuario"></span>
               <button class="btn" id="btnChangeUsername" data-i18n="change">Change</button>
             </div>
           </section>
@@ -323,21 +323,24 @@
             <p class="muted small" data-i18n="deviceHint"></p>
             <form id="deviceForm" autocomplete="off">
               <label for="deviceInput" data-i18n="deviceCodeLabel">Code</label>
-              <input id="deviceInput" maxlength="9" autocapitalize="characters"
-                     spellcheck="false" placeholder="ABCD-1234" />
+              <div class="fila-codigo">
+                <input id="deviceInput" maxlength="9" autocapitalize="characters"
+                       spellcheck="false" placeholder="ABCD-1234" />
+                <button class="btn primary" id="btnDeviceApprove" type="submit"
+                        data-i18n="deviceApprove">Link</button>
+              </div>
               <p class="hint" id="deviceHintMsg"></p>
-              <button class="btn primary" id="btnDeviceApprove" type="submit"
-                      data-i18n="deviceApprove">Link</button>
             </form>
           </section>
 
           <section class="card">
             <h2 data-i18n="sessionsTitle">Open sessions</h2>
             <ul class="sessions" id="sessionsList"></ul>
-            <button class="btn" id="btnSignOutAll" data-i18n="signOutAll">Sign out everywhere</button>
+            <div class="acciones-sesion">
+              <button class="btn danger" id="btnSignOut" data-i18n="signOut">Sign out</button>
+              <button class="btn" id="btnSignOutAll" data-i18n="signOutAll">Sign out everywhere</button>
+            </div>
           </section>
-
-          <button class="btn danger" id="btnSignOut" data-i18n="signOut">Sign out</button>
 
           <section class="card">
             <h2 data-i18n="dataTitle">Your data</h2>
@@ -365,7 +368,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261009a"></script>
-<script src="account.js?v=20261009a"></script>
+<script src="../app/i18n.js?v=20261009b"></script>
+<script src="account.js?v=20261009b"></script>
 </body>
 </html>

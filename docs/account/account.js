@@ -1515,6 +1515,60 @@
     return div;
   }
 
+  // La plata de un juego: una columna por moneda (euros y libras no se
+  // suman) y una fila por concepto. Abajo, lo que quedo despues de peajes,
+  // multas, ferries y penalidades; el combustible no, el juego no dice
+  // cuanto se pago. Antes iba en renglones sueltos y no se leia.
+  function tablaPlata(money) {
+    const monedas = (money || []).filter((m) => m && m.currency);
+    if (!monedas.length) return null;
+    const gastos = (m) => (m.tolls || 0) + (m.fines || 0) + (m.ferries || 0) + (m.penalties || 0);
+    const filas = [
+      ['statsEarned', (m) => m.revenue, false],
+      ['tripTolls', (m) => m.tolls, true],
+      ['tripFines', (m) => m.fines, true],
+      ['tripFerries', (m) => m.ferries, true],
+      ['statsPenalties', (m) => m.penalties, true]
+    ].filter(([, valor], i) => i === 0 || monedas.some((m) => valor(m)));
+    const tabla = document.createElement('table');
+    tabla.className = 'plata';
+    if (monedas.length > 1) {
+      const tr = document.createElement('tr');
+      tr.appendChild(document.createElement('th'));
+      monedas.forEach((m) => {
+        const th = document.createElement('th');
+        th.textContent = m.currency;
+        tr.appendChild(th);
+      });
+      const cabeza = document.createElement('thead');
+      cabeza.appendChild(tr);
+      tabla.appendChild(cabeza);
+    }
+    const cuerpo = document.createElement('tbody');
+    const fila = (rotulo, valores, clase) => {
+      const tr = document.createElement('tr');
+      if (clase) tr.className = clase;
+      const th = document.createElement('th');
+      th.textContent = rotulo;
+      tr.appendChild(th);
+      valores.forEach((v) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      cuerpo.appendChild(tr);
+    };
+    filas.forEach(([clave, valor, resta]) => {
+      fila(t(clave), monedas.map((m) => (valor(m) ? (resta ? '\u2212' : '') + plata(valor(m), m.currency) : '\u2014')),
+           resta ? 'gasto' : null);
+    });
+    if (monedas.some(gastos)) {
+      fila(t('statsNet'), monedas.map((m) => plata(m.revenue - gastos(m), m.currency)), 'neto');
+    }
+    tabla.appendChild(cuerpo);
+    return tabla;
+  }
+
   function sumar(caja, nodo) {
     if (nodo) caja.appendChild(nodo);
   }
@@ -1554,23 +1608,7 @@
     }
 
     // La plata, por moneda: sumar euros con libras no da nada.
-    (s.money || []).forEach((m) => {
-      sumar(caja, renglon([
-        t('statsEarned') + ' ' + plata(m.revenue, m.currency),
-        m.tolls ? t('tripTolls') + ' ' + plata(m.tolls, m.currency) : null,
-        m.fines ? t('tripFines') + ' ' + plata(m.fines, m.currency) : null,
-        m.ferries ? t('tripFerries') + ' ' + plata(m.ferries, m.currency) : null,
-        m.penalties ? t('statsPenalties') + ' ' + plata(m.penalties, m.currency) : null
-      ]));
-      // Lo que quedo despues de peajes, multas, ferries y penalidades. El
-      // combustible no: el juego no dice cuanto se pago.
-      const gastos = (m.tolls || 0) + (m.fines || 0) + (m.ferries || 0) + (m.penalties || 0);
-      if (gastos) {
-        const neto = renglon([t('statsNet') + ' ' + plata(m.revenue - gastos, m.currency)]);
-        neto.classList.add('neto');
-        caja.appendChild(neto);
-      }
-    });
+    sumar(caja, tablaPlata(s.money));
     // Por que la plata no cierra con la cantidad de viajes.
     if (s.modded) {
       const aviso = document.createElement('div');
@@ -1585,20 +1623,20 @@
     // Lo mas repetido, de a tres. Lugares y empresas son de todo lo
     // manejado; vehiculo y carga van con cada vehiculo, mas abajo.
     const top = s.top || {};
-    const tops = document.createElement('div');
-    tops.className = 'tops';
-    [
+    const generales = [
       listaTop(t(s.game === 'ats' ? 'topStates' : 'topCountries'), top.regions,
                (r) => nombreDeRegion(r, s.game) || '?'),
       listaTop(t('topCompanies'), top.companies, (c) => c.name),
       listaTop(t('topCities'), top.cities, (c) => c.name),
       listaTop(t('topRoutes'), top.city_pairs, (r) => r.from + ' \u2192 ' + r.to)
-    ].filter(Boolean).forEach((l) => tops.appendChild(l));
-    if (tops.children.length) caja.appendChild(tops);
+    ].filter(Boolean);
 
     // Con trabajos con auto (ATS), camiones y autos en dos solapas: otro
     // vehiculo, otras cargas y otros numeros.
     if (s.cars && s.cars.trips) {
+      // Con solapas, lo general va arriba (de a dos) y lo de cada vehiculo
+      // en su solapa.
+      sumar(caja, grillaTops(generales, 'dos'));
       const vista = leerPref(PREF_VEHICULO) === 'cars' ? 'cars' : 'trucks';
       caja.appendChild(pestanas([['trucks', t('statsTabTrucks')], ['cars', t('statsTabCars')]], vista, (v) => {
         guardarPref(PREF_VEHICULO, v);
@@ -1606,26 +1644,34 @@
       }, 'chicas'));
       caja.appendChild(vista === 'cars' ? bloqueAutos(s.cars) : parteCamion(s));
     } else {
-      caja.appendChild(parteCamion(s));
+      caja.appendChild(parteCamion(s, generales));
     }
     return caja;
   }
 
-  function parteCamion(s) {
+  // Las listas cortas en una grilla de columnas fijas: con auto-fit quedaban
+  // tres arriba, una sola en la fila de abajo y despues dos.
+  function grillaTops(listas, columnas) {
+    if (!listas.length) return null;
+    const tops = document.createElement('div');
+    tops.className = 'tops ' + columnas;
+    listas.forEach((l) => tops.appendChild(l));
+    return tops;
+  }
+
+  function parteCamion(s, generales) {
     const caja = document.createElement('div');
     const top = s.top || {};
-    const tops = document.createElement('div');
-    tops.className = 'tops';
-    [
+    const listas = (generales || []).concat([
       listaTop(t('topTrucks'), top.trucks, (c) => c.name),
       listaTop(t('topCargo'), top.cargo, (c) => c.name)
-    ].filter(Boolean).forEach((l) => tops.appendChild(l));
-    if (tops.children.length) caja.appendChild(tops);
+    ].filter(Boolean));
+    sumar(caja, grillaTops(listas, listas.length % 3 === 0 ? 'tres' : 'dos'));
 
     // Records personales: cada uno con el viaje que lo marco.
     const r = s.records || {};
     const bloques = document.createElement('div');
-    bloques.className = 'tops';
+    bloques.className = 'tops dos';
     sumar(bloques, listaRecords([
       r.best_pay ? [t('recBestPay'), plata(r.best_pay.value, r.best_pay.currency), r.best_pay] : null,
       s.longest ? [t('statsLongest'), distancia(s.longest.distance_km), s.longest] : null,
@@ -1732,9 +1778,7 @@
     ].filter(Boolean).forEach((x) => cifras.appendChild(x));
     caja.appendChild(cifras);
 
-    (c.money || []).forEach((m) => {
-      sumar(caja, renglon([t('statsEarned') + ' ' + plata(m.revenue, m.currency)]));
-    });
+    sumar(caja, tablaPlata(c.money));
 
     const top = c.top || {};
     const tops = document.createElement('div');
@@ -1747,7 +1791,7 @@
 
     const r = c.records || {};
     const bloques = document.createElement('div');
-    bloques.className = 'tops';
+    bloques.className = 'tops dos';
     sumar(bloques, listaRecords([
       r.best_pay ? [t('recBestPay'), plata(r.best_pay.value, r.best_pay.currency), r.best_pay] : null,
       r.longest ? [t('statsLongest'), distancia(r.longest.value), r.longest] : null,
@@ -2849,13 +2893,20 @@
         auto.textContent = t('jobKindCar');
         ruta.appendChild(auto);
       }
-      ruta.appendChild(document.createTextNode(
-        [v.city_src, v.city_dst].filter(Boolean).join(' → ') || t('tripUnnamed')));
+      // Las ciudades no se parten ("Las / Vegas"): las etiquetas bajan.
+      // Sin ciudades (viaje sin terminar), la carga o "Viaje", en gris.
+      const nombre = document.createElement('span');
+      const ciudades = [v.city_src, v.city_dst].filter(Boolean).join(' → ');
+      nombre.className = ciudades ? 'ruta-txt' : 'ruta-txt sin-ciudades';
+      nombre.textContent = ciudades || v.cargo || t('tripUnnamed');
+      ruta.appendChild(nombre);
+      // Con un espacio antes de cada etiqueta: sin eso no hay donde partir el
+      // renglon, la celda no se achica y la tabla se salia de la tarjeta.
       const estado = etiquetaDeEstado(v);
-      if (estado) ruta.appendChild(estado);
+      if (estado) ruta.append(' ', estado);
       // La economia modeada se muestra y no se esconde: un viaje de 900 000
       // euros con un mod de dinero no es comparable con el resto.
-      if (v.modded) ruta.appendChild(etiqueta('gris', t('tripModded')));
+      if (v.modded) ruta.append(' ', etiqueta('gris', t('tripModded')));
       const carga = [v.cargo, masa(v.cargo_mass)].filter(Boolean).join(' · ');
       if (carga) {
         const chico = document.createElement('span');
@@ -2865,7 +2916,7 @@
       }
 
       celda(fila, [v.truck_brand, v.truck_name].filter(Boolean).join(' '), 'oculto-movil camion');
-      celda(fila, distanciaEnTabla(v), 'num');
+      celda(fila, distanciaEnTabla(v), v.distance_game_km ? 'num' : 'num gris');
       celda(fila, duracion(v.real_hours) || '', 'num');
       celdaPago(fila, v);
 
