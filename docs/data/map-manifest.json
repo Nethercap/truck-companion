@@ -414,6 +414,7 @@
   "mods": {
     "c2c": {
       "name": "Coast to Coast",
+      "author": "Homburg",
       "game": "ats",
       "version": "2.24.61.0",
       "homepage": "https://truckymods.io/american-truck-simulator/maps/coast-to-coast",

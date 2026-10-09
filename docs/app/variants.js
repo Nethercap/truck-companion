@@ -279,3 +279,108 @@ const VARIANT_META = {
     ]
   }
 };
+
+// Credito de cada mod de mapa: nombre, autor (si se sabe) y pagina oficial.
+// La app lo muestra en el cartel del mapa y en la ventana de mods.
+const MAP_MOD_CREDITS = {
+  "c2c": {
+    "name": "Coast to Coast",
+    "author": "Homburg",
+    "homepage": "https://truckymods.io/american-truck-simulator/maps/coast-to-coast"
+  },
+  "promods_canada": {
+    "name": "ProMods Canada",
+    "author": null,
+    "homepage": "https://www.promods.net/setup.php"
+  },
+  "promods": {
+    "name": "ProMods Europe",
+    "author": null,
+    "homepage": "https://www.promods.net/setup.php"
+  },
+  "promods_me": {
+    "name": "ProMods Middle East",
+    "author": null,
+    "homepage": "https://www.promods.net/setup.php"
+  },
+  "promods_maghreb": {
+    "name": "ProMods The Maghreb",
+    "author": null,
+    "homepage": "https://www.promods.net/setup.php"
+  },
+  "promods_tgs": {
+    "name": "ProMods The Great Steppe",
+    "author": null,
+    "homepage": "https://www.promods.net/setup.php"
+  },
+  "rusmap": {
+    "name": "RusMap",
+    "author": null,
+    "homepage": "https://forum.scssoft.com/viewtopic.php?t=332124"
+  },
+  "reforma": {
+    "name": "Reforma",
+    "author": null,
+    "homepage": "https://www.teamreforma.com/"
+  },
+  "roextended": {
+    "name": "Roextended (Hybrid, ed. ProMods+ME)",
+    "author": null,
+    "homepage": "https://roextended.ro/"
+  },
+  "cnx_promods_rusmap": {
+    "name": "ProMods–RusMap connector",
+    "author": null,
+    "homepage": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771"
+  },
+  "reforma_mega_resources": {
+    "name": "Reforma Mega Resources",
+    "author": null,
+    "homepage": "https://www.teamreforma.com/"
+  },
+  "reforma_sierra_nevada": {
+    "name": "Reforma Sierra Nevada Remake",
+    "author": null,
+    "homepage": "https://www.teamreforma.com/"
+  },
+  "reforma_othermaps_patch": {
+    "name": "Reforma OtherMaps Compatibility Patch",
+    "author": null,
+    "homepage": "https://www.teamreforma.com/"
+  },
+  "cnx_roex_rusmap": {
+    "name": "Roextended-RusMap connector",
+    "author": null,
+    "homepage": "https://roextended.ro/"
+  },
+  "grand_utopia": {
+    "name": "Grand Utopia",
+    "author": null,
+    "homepage": "https://grandutopia.fr/"
+  },
+  "eu_grand_utopia": {
+    "name": "European Grand Utopia",
+    "author": null,
+    "homepage": "https://truckymods.io/euro-truck-simulator-2/maps/european-grand-utopia"
+  },
+  "truckersmp": {
+    "name": "TruckersMP (map additions)",
+    "author": null,
+    "homepage": "https://truckersmp.com/"
+  },
+  "western_canada": {
+    "name": "Western Canada Expansion (JacobKazias)",
+    "author": null,
+    "homepage": null
+  },
+  "eastern_canada": {
+    "name": "Eastern Canada Expansion (JacobKazias)",
+    "author": null,
+    "homepage": null
+  },
+  "cnx_canada_c2c": {
+    "name": "Western/Eastern Canada C2C Only Connections",
+    "author": null,
+    "homepage": null
+  }
+};

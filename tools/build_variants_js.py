@@ -58,6 +58,10 @@ def build():
             "manual": MANUAL.get(name),
             "mods": var["mods"],
         }
+    credits = {}
+    for mod_id, mod in manifest.get("mods", {}).items():
+        credits[mod_id] = {"name": mod["name"], "author": mod.get("author") or None,
+                           "homepage": mod.get("homepage") or None}
     lines = [
         "// GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.",
         "// No editar a mano: se regenera al publicar o actualizar una variante.",
@@ -67,6 +71,10 @@ def build():
         "// Metadatos por variante: etiqueta, juego, que proyeccion usa, que valor",
         "// le corresponde en el selector manual de Ajustes y que mods incluye.",
         "const VARIANT_META = " + json.dumps(meta, ensure_ascii=False, indent=2) + ";",
+        "",
+        "// Credito de cada mod de mapa: nombre, autor (si se sabe) y pagina oficial.",
+        "// La app lo muestra en el cartel del mapa y en la ventana de mods.",
+        "const MAP_MOD_CREDITS = " + json.dumps(credits, ensure_ascii=False, indent=2) + ";",
         "",
     ]
     return "\n".join(lines)

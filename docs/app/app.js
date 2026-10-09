@@ -437,6 +437,7 @@ document.querySelectorAll('.colorSwatch').forEach(btn => {
 }
 
 function initModsUi() {
+  renderModsCredits();
   document.getElementById('setModsAuto').checked = modsAuto;
   document.getElementById('setModsManual').checked = !modsAuto;
   document.getElementById('modsAutoStatus').textContent = `ATS: ${describeDetectedMods('ats')} · ETS2: ${describeDetectedMods('ets2')}`;
@@ -1164,10 +1165,36 @@ function applyBaseMap() {
 // encima del mini-HUD todo el viaje.
 const MAP_HINT_VISIBLE_MS = 12000;
 let mapHintTimer = null;
-function showMapHint(label) {
+// Credito de los mods de mapa de una variante, como HTML con links a sus
+// paginas oficiales ("Coast to Coast (Homburg)"). Los mapas con mods se usan
+// con permiso o mientras se pide: el credito va siempre.
+function modCreditHtml(modId) {
+  const c = typeof MAP_MOD_CREDITS !== 'undefined' && MAP_MOD_CREDITS[modId];
+  if (!c) return '';
+  const nombre = escapeHtml(c.name) + (c.author ? ` (${escapeHtml(c.author)})` : '');
+  return c.homepage ? `<a href="${escapeHtml(c.homepage)}" target="_blank" rel="noopener">${nombre}</a>` : nombre;
+}
+
+function variantCreditHtml(variant) {
+  const meta = typeof VARIANT_META !== 'undefined' && VARIANT_META[variant];
+  const mods = meta ? meta.mods.map(modCreditHtml).filter(Boolean) : [];
+  return mods.length ? t('mapModsCredit').replace('{list}', mods.join(', ')) : '';
+}
+
+function renderModsCredits() {
+  const el = document.getElementById('modsCredits');
+  if (!el || typeof MAP_MOD_CREDITS === 'undefined') return;
+  const todos = Object.keys(MAP_MOD_CREDITS).map(modCreditHtml).filter(Boolean);
+  el.innerHTML = `${escapeHtml(t('modsCreditsTitle'))} ${todos.join(', ')}.`;
+}
+
+function showMapHint(label, variant) {
   const el = document.getElementById('mapHint');
   if (!el) return;
-  if (label) el.textContent = label;
+  if (label) {
+    const credito = variant ? variantCreditHtml(variant) : '';
+    el.innerHTML = escapeHtml(label) + (credito ? `<span class="mapHintCredit">${credito}</span>` : '');
+  }
   el.classList.remove('faded');
   clearTimeout(mapHintTimer);
   mapHintTimer = setTimeout(() => el.classList.add('faded'), MAP_HINT_VISIBLE_MS);
@@ -3023,7 +3050,7 @@ async function loadGameMap(game) {
   }
   updateTruckArrowSize();
 
-  showMapHint(mapInfo.label);
+  showMapHint(mapInfo.label, currentGame);
   // Los tiles siguen bajando en segundo plano; la barra se va cuando la
   // primera pasada de render termina (o a los 4 s como tope, por si el
   // evento no llega).

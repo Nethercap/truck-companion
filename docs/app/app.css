@@ -159,6 +159,8 @@
   /* Que mapa/mods estan cargados se mira una vez, al arrancar: despues es un
      cartel de mas que ademas se pisa con el mini-HUD cuando tiene la ETA. */
   .mapHint.faded { opacity: 0; pointer-events: none; }
+  .mapHint .mapHintCredit { display: block; opacity: 0.8; }
+  .mapHint a, .modsCredits a { color: inherit; text-decoration: underline; }
   /* Sin WebGL (LibreWolf lo trae apagado): el mapa no se puede dibujar y
      antes quedaba gris sin explicacion. */
   .mapNoWebgl { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1100;
