@@ -3704,6 +3704,14 @@ function runFrameJob(name, fn) {
   if (!frameRaf) frameRaf = requestAnimationFrame(frameLoop);
 }
 function stopFrameJob(name) { frameJobs.delete(name); }
+// Desde cuando cuenta una animacion que arranca de lo que se ve ahora: lo
+// que se ve es el ultimo cuadro dibujado, no este instante. Si contara
+// desde ahora, el rato entre ese cuadro y la llegada del tick se perdia y
+// en cada tick habia un cuadro mas lento (un tiron 4 veces por segundo).
+function animStartFromShown() {
+  const now = performance.now();
+  return frameRaf && now - frameLast < 100 ? frameLast : now;
+}
 function frameLoop(now) {
   frameRaf = null;
   if (now - frameLast >= FRAME_MIN_MS) {
@@ -3731,7 +3739,7 @@ function mapGestureActive() {
 // reloj comun. Se corta sola si el usuario agarra el mapa.
 function followCameraTo(target, ms) {
   const from = { center: map.getCenter(), bearing: map.getBearing(), zoom: map.getZoom(), pitch: map.getPitch() };
-  const start = performance.now();
+  const start = animStartFromShown();
   const dBearing = target.bearing == null ? 0 : ((target.bearing - from.bearing + 540) % 360) - 180;
   runFrameJob('camera', (now) => {
     if (!autoFollow) return false;
@@ -3752,9 +3760,12 @@ function followCameraTo(target, ms) {
 }
 // Duracion de la interpolacion entre dos ticks de telemetria: se mide el
 // intervalo real de llegada (1 s con clientes viejos, 250 ms con 1.5+ por el
-// relay, 100 ms en LAN) y se anima un poco menos que eso, asi la posicion
-// mostrada siempre "alcanza" la real antes del proximo tick sin quedar a
-// saltos. Media movil para que un tick atrasado no rompa el ritmo.
+// relay, 100 ms en LAN) y se anima un poco MAS que eso, arrancando siempre
+// desde donde esta lo mostrado: el tick siguiente llega antes de que la
+// animacion termine y el movimiento nunca se frena. Antes duraba el 90 %:
+// la camara se quedaba quieta el 10 % restante de cada tick y se veia a
+// tirones (medido el 09-10: cada medio segundo un cuadro a un tercio de la
+// velocidad). Media movil para que un tick atrasado no rompa el ritmo.
 let tickIntervalMs = 1000;
 let lastTickArrival = null;
 function noteTickArrival() {
@@ -3766,7 +3777,7 @@ function noteTickArrival() {
   lastTickArrival = now;
 }
 function moveAnimMs() {
-  return Math.max(60, Math.min(950, tickIntervalMs * 0.9));
+  return Math.max(60, Math.min(1100, tickIntervalMs * 1.1));
 }
 
 // Anima SOLO el marcador de forma fluida entre la posicion anterior y la
@@ -3787,9 +3798,14 @@ function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
     truckMarker.setRotation(toHeading);
     return; // sin interpolar por frame
   }
-  const start = performance.now();
+  // Desde donde esta el marcador ahora, no desde el destino anterior: la
+  // animacion dura un poco mas que un tick y no llega a terminar.
+  const ahora = truckMarker.getLngLat();
+  fromLngLat = [ahora.lng, ahora.lat];
+  const start = animStartFromShown();
+  const duracion = moveAnimMs();
   function step(now) {
-    const t = Math.min(1, (now - start) / moveAnimMs());
+    const t = Math.min(1, (now - start) / duracion);
     const cur = [
       fromLngLat[0] + (toPos[0] - fromLngLat[0]) * t,
       fromLngLat[1] + (toPos[1] - fromLngLat[1]) * t,
