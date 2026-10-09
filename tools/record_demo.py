@@ -25,12 +25,17 @@ WIDTH, HEIGHT = 960, 600   # viewport de captura (relacion 16:10, mas cerca de u
 OUT_WIDTH = 720            # ancho final del webp
 FPS = 4
 SECONDS = 14
+# La demo arranca en el patio de Coastline Mining, donde no hay nada que ver,
+# y sin GPU (swiftshader) los tiles tardan: la grabacion de 10-2026 salio con
+# el mapa casi vacio. Se graba con la GPU real y despues de ~40 s, cuando el
+# camion ya va por la US-189 junto al lago Utah, con Provo a la vista.
+WARMUP = 40
 
 
 def main():
     frames = []
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(args=["--use-angle=d3d11", "--enable-gpu", "--ignore-gpu-blocklist"])
         page = browser.new_page(viewport={"width": WIDTH, "height": HEIGHT}, device_scale_factor=1)
         # Sin tour y en ingles, decidido ANTES de que cargue la app (el tour
         # arranca solo en la primera visita y el idioma se lee al inicio).
@@ -44,7 +49,8 @@ def main():
         # bajen los tiles.
         page.wait_for_function("() => typeof lastWorldPos !== 'undefined' && lastWorldPos && currentRouteWorldPoints", timeout=60000)
         page.evaluate("() => setNavMode(true)")
-        time.sleep(4)
+        time.sleep(WARMUP)
+        page.wait_for_function("() => map.areTilesLoaded()", timeout=30000)
         for _ in range(FPS * SECONDS):
             t0 = time.time()
             frames.append(Image.open(io.BytesIO(page.screenshot(type="png"))).convert("RGB"))
