@@ -193,9 +193,15 @@ def overlay_settings() -> dict:
     size = s.get("overlay_size")
     items = s.get("overlay_items")
     hotkey = s.get("overlay_hotkey", overlay.DEFAULT_HOTKEY)
+    pos = s.get("overlay_pos")
+    pos_ok = (isinstance(pos, list) and len(pos) == 2
+              and all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in pos))
+    if corner == overlay.CUSTOM and not pos_ok:
+        corner = None
     return {
         "enabled": overlay_supported() and bool(s.get("overlay")),
-        "corner": corner if corner in overlay.CORNERS else overlay.DEFAULT_CORNER,
+        "corner": corner if corner in overlay.CORNERS + (overlay.CUSTOM,) else overlay.DEFAULT_CORNER,
+        "pos": tuple(pos) if pos_ok else None,
         "size": size if size in overlay.SIZES else overlay.DEFAULT_SIZE,
         "items": (tuple(i for i in overlay.ITEMS if i in items) if isinstance(items, list)
                   else overlay.ITEMS),
@@ -205,10 +211,10 @@ def overlay_settings() -> dict:
 
 def save_overlay_settings(**cambios) -> None:
     claves = {"enabled": "overlay", "corner": "overlay_corner", "size": "overlay_size",
-              "items": "overlay_items", "hotkey": "overlay_hotkey"}
+              "items": "overlay_items", "hotkey": "overlay_hotkey", "pos": "overlay_pos"}
     settings = load_settings()
     for k, v in cambios.items():
-        settings[claves[k]] = list(v) if k == "items" else v
+        settings[claves[k]] = list(v) if k in ("items", "pos") and v is not None else v
     save_settings(settings)
 
 

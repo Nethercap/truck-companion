@@ -83,9 +83,16 @@ def test_llegada_en_el_reloj_del_juego():
     d = overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=4 * 3600), 100, None, 0, 100)
     assert d["game_arrival"] == "01:30 +1d"
     assert overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=0), 100, None, 0, 100)["game_arrival"] == ""
-    # La llegada real lleva siempre la etiqueta del cliente, no la de la web.
-    d = overlay.contenido(tele(), 100, nav(arrivalLabel="Arrival"), 99, 100, etiqueta_llega="Llegada (real)")
-    assert d["arrivalLabel"] == "Llegada (real)"
+    # Las etiquetas van en el idioma del tablero, aunque ya no mande; las del
+    # cliente (idioma de Windows) solo si nunca hubo tablero.
+    web = nav(arrivalLabel="Arrival (real)", gameArrivalLabel="Arrival (game)", remainingLabel="Left")
+    for nav_ts in (99, 0):
+        d = overlay.contenido(tele(), 100, web, nav_ts, 100, etiqueta_llega="Llegada (real)",
+                              etiqueta_juego="Llegada (juego)", etiqueta_falta="Falta")
+        assert (d["arrivalLabel"], d["gameArrivalLabel"], d["remainingLabel"]) == (
+            "Arrival (real)", "Arrival (game)", "Left")
+    d = overlay.contenido(tele(), 100, None, 0, 100, etiqueta_llega="Llegada (real)", etiqueta_juego="Llegada (juego)")
+    assert (d["arrivalLabel"], d["gameArrivalLabel"]) == ("Llegada (real)", "Llegada (juego)")
 
 
 def test_lo_que_llega_de_la_web_se_limpia():
@@ -109,14 +116,24 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: True)
     monkeypatch.setattr(win_integration, "load_settings", lambda: {})
     assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": "m",
-                                                  "items": overlay.ITEMS, "hotkey": "ctrl+shift+o"}
+                                                  "items": overlay.ITEMS, "hotkey": "ctrl+shift+o", "pos": None}
     monkeypatch.setattr(win_integration, "load_settings",
                         lambda: {"overlay": True, "overlay_corner": "middle", "overlay_size": "l",
                                  "overlay_items": ["arrival", "inventado", "speed"], "overlay_hotkey": ""})
     assert win_integration.overlay_settings() == {"enabled": True, "corner": "top_center", "size": "l",
-                                                  "items": ("speed", "arrival"), "hotkey": ""}
+                                                  "items": ("speed", "arrival"), "hotkey": "", "pos": None}
     monkeypatch.setattr(win_integration, "load_settings", lambda: {"overlay_hotkey": "ctrl+del"})
     assert win_integration.overlay_settings()["hotkey"] == "ctrl+shift+o"
+    # Arrastrado a mano: "custom" con su proporcion; sin una proporcion que
+    # sirva, vuelve a la de siempre.
+    monkeypatch.setattr(win_integration, "load_settings",
+                        lambda: {"overlay_corner": "custom", "overlay_pos": [0.7, 0.05]})
+    ajustes = win_integration.overlay_settings()
+    assert (ajustes["corner"], ajustes["pos"]) == ("custom", (0.7, 0.05))
+    monkeypatch.setattr(win_integration, "load_settings",
+                        lambda: {"overlay_corner": "custom", "overlay_pos": [3, "x"]})
+    ajustes = win_integration.overlay_settings()
+    assert (ajustes["corner"], ajustes["pos"]) == ("top_center", None)
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: False)
     assert win_integration.overlay_settings()["enabled"] is False
 
@@ -125,7 +142,8 @@ def test_textos_en_los_ocho_idiomas():
     import i18n
     claves = ["overlay_option", "overlay_position", "overlay_size", "menu_overlay",
               "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show",
-              "overlay_hotkey", "hotkey_none"]
+              "overlay_hotkey", "hotkey_none", "sec_overlay", "overlay_hint", "pos_custom",
+              "overlay_move", "overlay_move_done", "overlay_move_hint"]
     claves += [f"pos_{c}" for c in overlay.CORNERS] + [f"size_{k}" for k in overlay.SIZES]
     claves += [f"item_{k}" for k in overlay.ITEMS]
     for lang, textos in i18n._STRINGS.items():
@@ -180,3 +198,24 @@ def test_la_combinacion_tiene_que_ser_exacta():
     assert not overlay.combinacion_apretada(mods, vk, con(CTRL, vk))            # falta Shift
     assert not overlay.combinacion_apretada(mods, vk, con(CTRL, SHIFT, ALT, vk))  # Alt de mas
     assert not overlay.combinacion_apretada(mods, vk, con(CTRL, SHIFT))         # falta la O
+
+
+def test_posicion_arrastrada():
+    rect = (100, 50, 2020, 1130)   # juego de 1920 x 1080 corrido
+    fx, fy = overlay.relativa_de(rect, 1300, 80)
+    assert overlay.posicion(rect, 400, 100, overlay.CUSTOM, 24, (fx, fy)) == (1300, 80)
+    # Con otra resolucion queda en el mismo lugar relativo.
+    x, y = overlay.posicion((0, 0, 1280, 720), 300, 80, overlay.CUSTOM, 16, (fx, fy))
+    assert abs(x - 1200 / 1920 * 1280) <= 1 and abs(y - 30 / 1080 * 720) <= 1
+    # Nunca afuera del juego, aunque el recuadro haya crecido.
+    assert overlay.posicion(rect, 400, 100, overlay.CUSTOM, 24, (0.99, 0.99)) == (1620, 1030)
+    # Arrastrado afuera: se guarda pegado al borde.
+    assert overlay.relativa_de(rect, -500, 5000) == (0.0, 1.0)
+
+
+def test_el_ejemplo_del_modo_mover_respeta_lo_elegido():
+    d = overlay.ejemplo(("speed", "game_arrival"), ("F", "R", "J"))
+    assert d["speed"] and d["game_arrival"] and not d["turn"] and not d["remaining"] and not d["arrival"]
+    assert d["gameArrivalLabel"] == "J"
+    # Con nada elegido igual se ve algo para poder ubicarlo.
+    assert overlay.ejemplo((), ("F", "R", "J"))["speed"]

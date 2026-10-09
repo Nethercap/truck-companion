@@ -11,7 +11,8 @@ updates on its own and is not versioned here.
   has a route (on your phone, a tablet or this PC). It lets clicks through, never takes
   focus from the game and hides when the game is not in front. Off by default: turn it on
   in Setup, from the tray menu or with Ctrl+Shift+O from inside the game (you can pick
-  another shortcut), and choose its corner, its size and what it shows. It can
+  another shortcut). It has its own section in Setup: choose a corner or drag it anywhere
+  with Move, its size and what it shows. It can
   also show your arrival time on the game clock, next to the real one. With voice guidance
   on in the dashboard, the dashboard also speaks the turns while the overlay is on. Needs
   the game in a window or in borderless fullscreen.

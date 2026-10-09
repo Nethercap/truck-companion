@@ -30,6 +30,10 @@ KM_TO_MI = 0.621371
 
 CORNERS = ("top_left", "top_center", "top_right", "bottom_left", "bottom_right")
 DEFAULT_CORNER = "top_center"
+# Donde lo dejo uno arrastrandolo (modo Mover): la esquina de arriba a la
+# izquierda del overlay, en proporcion a la ventana del juego, para que siga
+# en su lugar si cambia la resolucion.
+CUSTOM = "custom"
 SIZES = {"s": 0.8, "m": 1.0, "l": 1.3}
 DEFAULT_SIZE = "m"
 # Lo que se puede elegir mostrar (Setup): el giro con la proxima ciudad, la
@@ -68,7 +72,8 @@ def limpiar_nav(msg: dict) -> dict:
         "remaining": _texto(msg.get("remaining"), 24),
         "arrival": _texto(msg.get("arrival"), 24),
         "remainingLabel": _texto(msg.get("remainingLabel"), 24),
-        "arrivalLabel": _texto(msg.get("arrivalLabel"), 24),
+        "arrivalLabel": _texto(msg.get("arrivalLabel"), 32),
+        "gameArrivalLabel": _texto(msg.get("gameArrivalLabel"), 32),
         "imperial": msg.get("imperial") if isinstance(msg.get("imperial"), bool) else None,
     }
 
@@ -140,11 +145,12 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         "remaining": falta if "remaining" in items else "",
         "arrival": llega if "arrival" in items else "",
         "game_arrival": llegada_en_juego(tele) if "game_arrival" in items else "",
-        "remainingLabel": (nav_ok and nav.get("remainingLabel")) or etiqueta_falta,
-        # Las dos llegadas con su aclaracion, siempre del cliente: la de la
-        # web dice solo "Llegada" y al lado de la del juego se confunden.
-        "arrivalLabel": etiqueta_llega,
-        "gameArrivalLabel": etiqueta_juego,
+        # Las etiquetas, en el idioma del tablero aunque ya no mande (el giro
+        # viene en ese idioma); las del cliente (idioma de Windows) solo si
+        # nunca hubo tablero.
+        "remainingLabel": (nav and nav.get("remainingLabel")) or etiqueta_falta,
+        "arrivalLabel": (nav and nav.get("arrivalLabel")) or etiqueta_llega,
+        "gameArrivalLabel": (nav and nav.get("gameArrivalLabel")) or etiqueta_juego,
     }
     # Nada para mostrar (todo destildado, o solo el giro y no hay ruta): no
     # se deja un recuadro vacio arriba del juego.
@@ -153,10 +159,18 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
     return datos
 
 
-def posicion(rect, ancho: int, alto: int, esquina: str, margen: int) -> tuple[int, int]:
+def posicion(rect, ancho: int, alto: int, esquina: str, margen: int,
+             relativa=None) -> tuple[int, int]:
     """Donde va la ventana adentro del rectangulo (izq, arriba, der, abajo)
     de la ventana del juego."""
     izq, arriba, der, abajo = rect
+    if esquina == CUSTOM and relativa:
+        # Siempre adentro del juego entero, aunque haya crecido el recuadro.
+        x = izq + relativa[0] * (der - izq)
+        y = arriba + relativa[1] * (abajo - arriba)
+        x = max(izq, min(x, der - ancho))
+        y = max(arriba, min(y, abajo - alto))
+        return int(x), int(y)
     if esquina.endswith("left"):
         x = izq + margen
     elif esquina.endswith("right"):
@@ -165,6 +179,34 @@ def posicion(rect, ancho: int, alto: int, esquina: str, margen: int) -> tuple[in
         x = izq + (der - izq - ancho) // 2
     y = arriba + margen if esquina.startswith("top") else abajo - margen - alto
     return int(x), int(y)
+
+
+def relativa_de(rect, x: int, y: int) -> tuple[float, float]:
+    """Al reves de posicion() con CUSTOM: de un lugar en pantalla a la
+    proporcion dentro del juego, entre 0 y 1."""
+    izq, arriba, der, abajo = rect
+    fx = (x - izq) / max(1, der - izq)
+    fy = (y - arriba) / max(1, abajo - arriba)
+    return round(min(max(fx, 0.0), 1.0), 4), round(min(max(fy, 0.0), 1.0), 4)
+
+
+def ejemplo(items, etiquetas) -> dict:
+    """Lo que se ve en el modo Mover si no hay datos del juego: el tamano de
+    verdad, para saber donde queda."""
+    falta, llega, llega_juego = etiquetas
+    d = {"turn": "\u21b1 400 m", "next": "", "speed": "72", "unit": "km/h", "limit": "80", "over": False,
+         "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59",
+         "remainingLabel": falta, "arrivalLabel": llega, "gameArrivalLabel": llega_juego}
+    if "turn" not in items:
+        d["turn"] = ""
+    if "speed" not in items:
+        d["speed"] = d["limit"] = ""
+    for k in ("remaining", "arrival", "game_arrival"):
+        if k not in items:
+            d[k] = ""
+    if not any(d[k] for k in DATOS):
+        d["speed"], d["limit"] = "72", "80"
+    return d
 
 
 class OverlayData:
@@ -252,6 +294,11 @@ class Overlay:
         self.etiquetas = etiquetas  # () -> (falta, llegada real, llegada del juego), idioma del cliente
         self._activo = False
         self._hilo = None
+        # Modo Mover (boton de Setup): el overlay se ve aunque el juego no
+        # este al frente, deja de pasar los clics y se arrastra con el mouse.
+        # Al soltarlo se llama a al_mover(fx, fy) con la proporcion nueva.
+        self.mover = False
+        self.al_mover = None
 
     @property
     def enabled(self) -> bool:
@@ -327,6 +374,13 @@ class _Ventana:
         self.lugar = None      # (x, y, ancho, alto)
         self.ultimo_topmost = 0.0
         self.parpadeo = False
+        self.clics = False      # si la ventana recibe el mouse (modo Mover)
+        self.agarre = None      # (dx, dy) del puntero mientras se arrastra
+        self.rect = None        # el rectangulo del juego del ultimo cuadro
+        self.juego_mover = (0.0, None)  # (cuando se busco, hwnd) en modo Mover
+        self.canvas.bind("<ButtonPress-1>", self._agarrar)
+        self.canvas.bind("<B1-Motion>", self._arrastrar)
+        self.canvas.bind("<ButtonRelease-1>", self._soltar)
 
     def loop(self):
         self.root.after(self.ov.TICK_MS, self.tick)
@@ -344,36 +398,103 @@ class _Ventana:
             logging.exception("Error en el overlay")
         self.root.after(self.ov.TICK_MS, self.tick)
 
+    def _cursor(self):
+        import ctypes
+        from ctypes import wintypes
+        p = wintypes.POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(p))
+        return p.x, p.y
+
+    def _agarrar(self, _evento):
+        if not self.ov.mover:
+            return
+        r = _rect_de(self.hwnd)
+        x, y = self._cursor()
+        self.agarre = (x - r[0], y - r[1])
+
+    def _arrastrar(self, _evento):
+        if self.agarre is None:
+            return
+        x, y = self._cursor()
+        self.u.SetWindowPos(self.hwnd, HWND_TOPMOST, x - self.agarre[0], y - self.agarre[1], 0, 0,
+                            SWP_NOSIZE | SWP_NOACTIVATE)
+
+    def _soltar(self, _evento):
+        if self.agarre is None:
+            return
+        self.agarre = None
+        r = _rect_de(self.hwnd)
+        if r and self.rect and self.ov.al_mover:
+            self.ov.al_mover(*relativa_de(self.rect, r[0], r[1]))
+
+    def _modo_clics(self, recibir: bool):
+        """En modo Mover la ventana recibe el mouse; fuera de el, los clics
+        pasan al juego."""
+        if recibir == self.clics:
+            return
+        self.clics = recibir
+        ex = self.u.GetWindowLongPtrW(self.hwnd, GWL_EXSTYLE)
+        ex = (ex & ~WS_EX_TRANSPARENT) if recibir else (ex | WS_EX_TRANSPARENT)
+        self.u.SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, ex)
+        self.canvas.configure(cursor="fleur" if recibir else "")
+        self.dibujado = None
+
+    def _juego_para_mover(self):
+        """En modo Mover el juego no esta al frente (se toco el boton de
+        Setup): se lo busca entre todas las ventanas, cada 2 s."""
+        import window_compat
+        cuando, hwnd = self.juego_mover
+        if time.monotonic() - cuando > 2:
+            hwnd = window_compat.find_game_window(())
+            self.juego_mover = (time.monotonic(), hwnd)
+        return hwnd
+
+    def _pantalla(self):
+        import ctypes
+        m = ctypes.windll.user32.GetSystemMetrics
+        return (0, 0, m(0), m(1))
+
     def _tick(self):
         import window_compat
 
-        juego = window_compat.game_window_in_front() if self.ov.enabled else None
-        if not juego:
-            self.esconder()
-            return
+        mover = self.ov.mover and self.ov.enabled
+        self._modo_clics(mover)
+        if mover:
+            juego = self._juego_para_mover()
+        else:
+            juego = window_compat.game_window_in_front() if self.ov.enabled else None
+            if not juego:
+                self.esconder()
+                return
         tele, tele_ts, nav, nav_ts = self.ov.data.foto()
         falta, llega, llega_juego = self.ov.etiquetas()
-        esquina, tamano, items = self.ov.ajustes()
+        esquina, tamano, items, relativa = self.ov.ajustes()
         datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
                           etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items)
-        rect = _rect_de(juego)
+        rect = _rect_de(juego) if juego else None
+        if mover:
+            # Sin juego abierto se acomoda sobre la pantalla principal.
+            rect = rect or self._pantalla()
+            datos = datos or ejemplo(items, (falta, llega, llega_juego))
         if datos is None or rect is None:
             self.esconder()
             return
+        self.rect = rect
         # Todo se mide contra la altura del juego: a 1080 p "m" es la escala 1.
         escala = max(0.6, (rect[3] - rect[1]) / 1080) * SIZES.get(tamano, 1.0)
         self.parpadeo = datos["over"] and int(time.monotonic() * 2) % 2 == 0
-        clave = (datos, escala, self.parpadeo)
+        clave = (datos, escala, self.parpadeo, self.clics)
         if clave != self.dibujado:
             ancho, alto = self.dibujar(datos, escala)
             self.dibujado = clave
         else:
             ancho, alto = self.lugar[2], self.lugar[3]
-        x, y = posicion(rect, ancho, alto, esquina, round(24 * escala))
+        x, y = posicion(rect, ancho, alto, esquina, round(24 * escala), relativa)
         self.lugar = (x, y, ancho, alto)
         # Se compara contra donde esta de verdad: el primer geometry despues
         # de mostrarla fuera de la pantalla cambia el tamano pero no la mueve.
-        if _rect_de(self.hwnd) != (x, y, x + ancho, y + alto):
+        # Mientras se arrastra, manda el mouse.
+        if self.agarre is None and _rect_de(self.hwnd) != (x, y, x + ancho, y + alto):
             self.root.geometry(f"{ancho}x{alto}+{x}+{y}")
             self.u.SetWindowPos(self.hwnd, HWND_TOPMOST, x, y, ancho, alto, SWP_NOACTIVATE)
         ahora = time.monotonic()
@@ -440,6 +561,10 @@ class _Ventana:
             x = c.bbox(v)[2] + round(4 * k)
             c.create_text(x, medio + round(6 * k), text=d["unit"], fill=MUTED, anchor="w", font=fuente(13))
 
+        if self.clics:
+            # Modo Mover: un borde para que se vea que se puede agarrar.
+            c.create_rectangle(1, 1, ancho - 2, y + fila + pad - 2, outline="#4a90d9",
+                               width=max(2, round(2 * k)), dash=(6, 4))
         derecha = ancho - pad
         for valor, etiqueta in columnas:
             a = c.create_text(derecha, medio - round(2 * k), text=valor, fill=FG, anchor="se", font=fuente(19, True))

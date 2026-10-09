@@ -3443,8 +3443,12 @@ function sendNavHud() {
     next: overlayTurnParts ? overlayTurnParts.next : '',
     remaining: resumen ? $('routeRemaining').textContent.trim() : '',
     arrival: resumen ? $('routeArrival').textContent.trim() : '',
+    // Todas las etiquetas del overlay salen de aca, en el idioma del
+    // tablero: si no, el giro salia en un idioma y las llegadas en el de
+    // Windows.
     remainingLabel: t('routeRemainingLabel'),
-    arrivalLabel: t('routeArrivalLabel'),
+    arrivalLabel: t('overlayArrivalReal'),
+    gameArrivalLabel: t('overlayArrivalGame'),
     imperial: !!useImperial,
   };
   const sig = JSON.stringify(msg);
