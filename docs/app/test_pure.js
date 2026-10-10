@@ -294,6 +294,18 @@ test('maneuver: una salida de autopista que despues dobla mucho sigue siendo kee
   assert.deepEqual([m.kind, m.direction], ['fork', 'right']);
 });
 
+test('maneuver: salida corta a la derecha que enseguida dobla a la izquierda -> keep right, no turn left (Gargamosch, 10-10)', () => {
+  // rampa a 17 grados hasta (25,80) y ahi dobla al oeste, cruzando la
+  // autopista hacia el area de descanso: a 250 m el punto de la ruta queda
+  // a la izquierda, pero en el cruce la salida es a la derecha
+  const ctx = scenario({ route: [[0, -300], [0, 0], [25, 80], [-400, 85]], extraNodes: [[0, 150], [0, 700]], edges: [[1, 4], [4, 5]] });
+  const m = detectManeuver(ctx);
+  assert.deepEqual([m.kind, m.direction], ['fork', 'right']);
+  // espejado (se maneja por la izquierda)
+  const izq = scenario({ route: [[0, -300], [0, 0], [-25, 80], [400, 85]], extraNodes: [[0, 150], [0, 700]], edges: [[1, 4], [4, 5]] });
+  assert.deepEqual([detectManeuver(izq).kind, detectManeuver(izq).direction], ['fork', 'left']);
+});
+
 test('maneuver: giro de 90 grados sigue siendo turn', () => {
   // con la calle que sigue derecho como otra opcion
   const ctx = scenario({ route: [[0, -300], [0, 0], [300, 0], [600, 0]], extraNodes: [[0, 300]], edges: [[1, 4]] });

@@ -609,6 +609,16 @@ function detectManeuver(ctx) {
     return best;
   };
 
+  // Si la ruta entra a un anillo corto (una rotonda). El nodo de entrada ya
+  // es parte del anillo; se busca desde el y desde el siguiente, sin volver
+  // por la calle por la que se llega.
+  const entersRing = () => {
+    let before = null, next = null;
+    for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { before = pts[k][4]; break; }
+    for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { next = pts[k][4]; break; }
+    return [pts[iEnd][4], next].some(start => start != null && ringThrough(adjacency, nodeAt, start, before));
+  };
+
   if (Math.abs(delta) > turnThreshold) {
     // Con el grafo a mano, un giro se anuncia solo si habia por donde
     // equivocarse: la calle que dobla 40 grados con un camino lateral del
@@ -624,16 +634,7 @@ function detectManeuver(ctx) {
     if (adjacency && nodes) {
       const alt = straightestAlt(turnAltMaxDeg);
       quiet = alt == null || Math.abs(alt) >= Math.abs(delta) + turnNaturalMargin;
-      if (quiet) {
-        // El nodo de entrada ya es parte del anillo; se busca desde el y desde
-        // el siguiente, sin volver por la calle por la que se llega.
-        let before = null, next = null;
-        for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { before = pts[k][4]; break; }
-        for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { next = pts[k][4]; break; }
-        for (const start of [pts[iEnd][4], next]) {
-          if (start != null && ringThrough(adjacency, nodeAt, start, before)) { quiet = false; break; }
-        }
-      }
+      if (quiet && entersRing()) quiet = false;
     }
     // Dentro del grupo, el giro se atribuye al nodo donde mas cambia el
     // rumbo entre cuerdas consecutivas - no al primero del grupo, que en una
@@ -648,10 +649,31 @@ function detectManeuver(ctx) {
   }
 
   if (!adjacency || !nodes) return null;
-  const routeDelta = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkLegM)) - inBearing);
+  const sampleAt = (d) => normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + d)) - inBearing);
+  let routeDelta = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkLegM)) - inBearing);
   if (Math.abs(routeDelta) < forkMinDev) return null;
   const bestAlt = straightestAlt(100); // mas de 100: vuelve para atras, no es una continuacion
   if (bestAlt == null) return null;
+  // El lado lo da donde la ruta se separa de la otra salida, no solo el punto
+  // de forkLegM: una salida corta a la derecha que enseguida dobla a la
+  // izquierda (un trebol, o cruzar la autopista hacia un area de descanso)
+  // deja ese punto a la izquierda de la autopista, y se anunciaba "turn
+  // left" antes de la salida (Discord, Gargamosch, 10-10). Si a legM la ruta
+  // ya se separo forkMinSep de la otra salida hacia un lado y a forkLegM
+  // queda del otro, vale el lado de legM con su mayor separacion, y ya no es
+  // el carril de giro con isleta: el giro lo anuncia el cruce siguiente. Se
+  // mide contra la otra salida y no contra el rumbo propio: si las dos se
+  // abren a la derecha, la menos abierta es la de la izquierda. La entrada a
+  // una rotonda queda como estaba (se entra a la derecha para doblar a la
+  // izquierda, y lo que sirve es hacia donde se sale).
+  let laterTurn = false;
+  const nearSep = normDeg(sampleAt(legM) - bestAlt);
+  if (Math.abs(nearSep) >= forkMinSep && Math.sign(nearSep) !== Math.sign(normDeg(routeDelta - bestAlt)) && !entersRing()) {
+    laterTurn = true;
+    routeDelta = [legM, (legM + forkLegM) / 2].map(sampleAt)
+      .filter(s => Math.sign(normDeg(s - bestAlt)) === Math.sign(nearSep))
+      .reduce((a, s) => (Math.abs(normDeg(s - bestAlt)) > Math.abs(normDeg(a - bestAlt)) ? s : a));
+  }
   if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return null;
   if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return null;
   const direction = routeDelta > bestAlt ? 'right' : 'left';
@@ -660,7 +682,7 @@ function detectManeuver(ctx) {
   // otra salida sigue derecho. El GPS del juego dice "turn right" y nosotros
   // "keep right" (resena de Roane Gaming en YouTube, 10-10). Una salida de
   // autopista se separa de a poco (pocos grados a legM) y sigue siendo keep.
-  if (Math.abs(delta) >= forkTurnMinDeg && Math.abs(routeDelta) >= forkTurnDeg && Math.abs(bestAlt) <= forkTurnAltMaxDeg) {
+  if (!laterTurn && Math.abs(delta) >= forkTurnMinDeg && Math.abs(routeDelta) >= forkTurnDeg && Math.abs(bestAlt) <= forkTurnAltMaxDeg) {
     return { kind: 'turn', direction, delta: routeDelta, at: i, inBearing, outBearing: (inBearing + routeDelta + 360) % 360, quiet: false };
   }
   return { kind: 'fork', direction, delta: routeDelta, at: i };
