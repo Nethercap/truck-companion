@@ -2914,8 +2914,13 @@ function updateRouteSummary(data) {
   // tiene ruta (parado en la base, partida recien cargada) y el resumen
   // decia "falta 0 km, llegas ahora" con el giro a 5 km. Cerca del destino
   // las dos dan casi 0, por eso el kilometro de margen.
+  // Y si el GPS del juego da mucho menos que nuestra ruta, esta apuntando a
+  // otra cosa: en el freight market, hasta enganchar el remolque, va al
+  // remolque en el deposito de origen. Usandolo, el tablero decia que
+  // faltaban metros y anunciaba la llegada con la ruta a Charleston dibujada
+  // ("says I'm at the location when clearly I'm not", Discord 10-10).
   const manual = waypoints.some(wp => !wp.inGame) || target.kind === 'waypoint'
-    || (!gameKm && ownKm != null && ownKm > 1);
+    || useOwnRemaining(gameKm, ownKm);
   const remainingKm = manual ? ownKm : gameKm;
   const key = routeIdentity(data) + target.key;
   if (routeProgressState.key !== key) routeProgressState = { key, total: 0 };
@@ -2933,10 +2938,15 @@ function updateRouteSummary(data) {
   // la empresa de origen y ninguna ruta a la entrega se leia como un error
   // ("says I'm at the location when clearly I'm not, it's not routing to
   // Charleston", Discord 10-10).
-  const pickup = target.kind === 'pickup'
-    ? t('routePickupNotice', [data.companySrc, data.citySrc].filter(Boolean).join(', ') || '?',
-        [data.companyDst, data.cityDst].filter(Boolean).join(', ') || '?')
-    : null;
+  const origen = [data.companySrc, data.citySrc].filter(Boolean).join(', ') || '?';
+  const destino = [data.companyDst, data.cityDst].filter(Boolean).join(', ') || '?';
+  // Freight market y parecidos: el remolque es de la empresa y espera en el
+  // origen; la carga cuenta como cargada desde el principio (asi lo informa
+  // el SDK fuera del cargo market), asi que la ruta ya va a la entrega.
+  const sinRemolque = data.onJob && data.trailerAttached === false && target.kind === 'dest'
+    && data.jobMarket && data.jobMarket !== 'cargo_market' && data.jobMarket !== 'quick_job';
+  const pickup = target.kind === 'pickup' ? t('routePickupNotice', origen, destino)
+    : sinRemolque ? t('routeTrailerNotice', origen) : null;
   renderRouteSummary({
     pickup,
     approx: !!target.approx,
