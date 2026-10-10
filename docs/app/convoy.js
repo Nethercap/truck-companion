@@ -27,6 +27,12 @@ const convoy = {
   code: null, you: null, creatorId: null, members: [], spectators: 0, ended: false,
   routes: new Map(),          // id -> { rev, points: [[x,z],...] }
   pending: null,              // { kind: 'create'|'join', code, nickname } para (re)enviar al abrir el socket
+  // Esta pestana es la que entro al convoy (o hizo algo en el). El relay le
+  // manda convoy_state a todas las pestanas de la sesion (la PC y el
+  // celular), y cada una mandaba su ruta (vacia si no tenia), su variante y
+  // su "compartir ingresos": la ruta del lider aparecia y desaparecia para
+  // los demas (auditoria del 10-10). Las otras pestanas solo muestran.
+  active: false,
   spectator: false, spectatorWs: null, spectatorGame: null,
   follow: false, followWaypoint: null,
   showLeaderRoute: true,
@@ -94,17 +100,18 @@ function convoyHandleMessage(data) {
   }
 }
 
-function convoyOnRouteChanged() { convoySendRoute(true); }
+function convoyOnRouteChanged() { if (convoy.active) convoySendRoute(true); }
 
 function convoyOnTelemetry(data) {
   if (!convoyInRoom()) return;
+  convoyUpdateFollow();
+  if (!convoy.active) return; // la pestana que entro es la que manda
   const v = resolveEffectiveGame(data.game);
   if (v !== convoy.lastVariantSent) {
     convoy.lastVariantSent = v;
     convoySend({ type: 'convoy_variant', mapVariant: v, shareIncome: convoyShareIncome });
   }
   convoySendRoute(false);
-  convoyUpdateFollow();
 }
 
 // ---------------------------------------------------------------- estado
@@ -128,8 +135,8 @@ function convoyApplyState(st) {
   if (!convoy.spectator) {
     // entrar bien: recordar para reconexiones
     const me = convoyMe();
-    if (me) convoy.pending = { kind: me.creator ? 'create' : 'join', code: st.code, nickname: me.nickname, postSummary: !!st.postSummary };
-    if (!wasIn && me) { convoy.lastVariantSent = null; convoySendRoute(true); }
+    if (me && convoy.active) convoy.pending = { kind: me.creator ? 'create' : 'join', code: st.code, nickname: me.nickname, postSummary: !!st.postSummary };
+    if (!wasIn && me && convoy.active) { convoy.lastVariantSent = null; convoySendRoute(true); }
   }
   for (const id of [...convoy.routes.keys()]) if (!convoy.members.some(m => m.id === id)) convoy.routes.delete(id);
   convoyRenderAll();
@@ -138,6 +145,7 @@ function convoyApplyState(st) {
 function convoyReset() {
   convoy.code = null; convoy.you = null; convoy.creatorId = null; convoy.members = []; convoy.spectators = 0;
   convoy.routes.clear(); convoy.pending = null; convoy.lastVariantSent = null; convoy.lastRouteSig = null;
+  convoy.active = false;
   convoySetFollow(false);
 }
 
@@ -174,6 +182,17 @@ function convoyOnQuickMessage(msg) {
   }
   convoy.msgNotes.set(msg.id, { key: msg.key, until: Date.now() + 60000 });
   convoyRenderCards();
+}
+
+// Tocar algo del convoy en esta pestana (la otra se cerro, el celular quedo
+// bloqueado) la pasa a ser la que manda, con su ruta y su variante.
+function convoyTakeOver() {
+  if (convoy.active || !convoyInRoom()) return;
+  convoy.active = true;
+  const me = convoyMe();
+  if (me) convoy.pending = { kind: me.creator ? 'create' : 'join', code: convoy.code, nickname: me.nickname, postSummary: false };
+  convoy.lastVariantSent = null;
+  convoySendRoute(true);
 }
 
 // ---------------------------------------------------------------- ruta propia -> convoy
@@ -498,6 +517,7 @@ function convoyRenderModal() {
 }
 
 function convoyOpenModal(prefillCode) {
+  convoyTakeOver(); // abrir el convoy aca = esta es la pestana que se esta usando
   convoyRenderModal();
   if (prefillCode) document.getElementById('convoyCodeInput').value = prefillCode;
   document.getElementById('convoyModal').style.display = 'flex';
@@ -511,7 +531,7 @@ function convoyWireUi() {
   $('convoyBtn').addEventListener('click', () => convoyOpenModal());
   $('convoyModalClose').addEventListener('click', () => { $('convoyModal').style.display = 'none'; });
   $('convoyNick').addEventListener('input', e => { convoyNick = e.target.value.trim().slice(0, 16); convoySaveSettings(); });
-  $('convoyShareIncome').addEventListener('change', e => { convoyShareIncome = e.target.checked; convoySaveSettings(); if (convoyInRoom()) convoySend({ type: 'convoy_variant', mapVariant: convoyMyVariant(), shareIncome: convoyShareIncome }); });
+  $('convoyShareIncome').addEventListener('change', e => { convoyShareIncome = e.target.checked; convoySaveSettings(); if (convoyInRoom()) convoyTakeOver(); if (convoyInRoom()) convoySend({ type: 'convoy_variant', mapVariant: convoyMyVariant(), shareIncome: convoyShareIncome }); });
   $('convoyMute').addEventListener('change', e => { convoyMuted = e.target.checked; convoySaveSettings(); });
   $('convoyShowMarkers').addEventListener('change', e => { convoyShowMarkers = e.target.checked; convoySaveSettings(); convoyRenderMarkers(); });
   $('convoyCodeInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6); });
@@ -521,6 +541,7 @@ function convoyWireUi() {
     const code = kind === 'join' ? $('convoyCodeInput').value.trim().toUpperCase() : null;
     if (kind === 'join' && code.length !== 6) { showToast(t('convoyErrNotFound'), 'danger'); return; }
     convoy.pending = { kind, code, nickname, postSummary: $('convoyPostSummary').checked };
+    convoy.active = true;
     convoyOnSocketOpen();
   };
   $('convoyCreateBtn').addEventListener('click', () => start('create'));
