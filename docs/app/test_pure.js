@@ -1064,3 +1064,111 @@ test('storedWaypoints: vuelven los de la variante, vigentes y con forma de waypo
   const muchos = { ats: { at: now, list: Array.from({ length: 20 }, (_, k) => ({ pos: [k, k] })) } };
   assert.equal(storedWaypoints(muchos, 'ats', now, undefined, 9).length, 9);
 });
+
+// ---- rotondas
+// Grafo dirigido chico: nodos [x, y] (y = norte) y aristas [a, b, dosManos].
+function grafoChico(nodos, aristas) {
+  const adjacency = new Map();
+  const add = (a, b) => {
+    if (!adjacency.has(a)) adjacency.set(a, []);
+    adjacency.get(a).push([b, Math.hypot(nodos[b][0] - nodos[a][0], nodos[b][1] - nodos[a][1])]);
+  };
+  for (const [a, b, dos] of aristas) { add(a, b); if (dos) add(b, a); }
+  return { adjacency, nodeAt: (k) => nodos[k] };
+}
+// Calle larga que sale de un nodo hacia (dx, dy), para que la salida sea de verdad.
+function conCalle(nodos, aristas, desde, dx, dy) {
+  const k = nodos.length;
+  nodos.push([nodos[desde][0] + dx, nodos[desde][1] + dy]);
+  aristas.push([desde, k, true]);
+  return k;
+}
+function rutaPor(nodos, ids) {
+  const pts = ids.map((n, k) => [nodos[n][0], nodos[n][1], 0, 1, n]);
+  const { cum, pointAt } = routeMetrics(pts);
+  return { pts, cum, pointAt };
+}
+
+test('detectRoundabout: anillo de un sentido, cuenta las salidas hasta la de la ruta', () => {
+  const { detectRoundabout } = require('./pure.js');
+  // anillo de radio 30 en sentido antihorario, 8 nodos (0..7) arrancando al sur
+  const nodos = [], aristas = [];
+  for (let k = 0; k < 8; k++) { const a = -Math.PI / 2 + k * Math.PI / 4; nodos.push([30 * Math.cos(a), 30 * Math.sin(a)]); }
+  for (let k = 0; k < 8; k++) aristas.push([k, (k + 1) % 8, false]);
+  const sur = conCalle(nodos, aristas, 0, 0, -300); // entrada (doble mano)
+  const este = conCalle(nodos, aristas, 2, 300, 0); // primera salida
+  conCalle(nodos, aristas, 4, 0, 300); // segunda: norte
+  const oeste = conCalle(nodos, aristas, 6, -300, 0); // tercera
+  const g = grafoChico(nodos, aristas);
+  const ctx = (ids) => ({ ...rutaPor(nodos, ids), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing });
+  // del sur al oeste: sur -> 0 -> 1 .. 6 -> oeste
+  let r = detectRoundabout(ctx([sur, 0, 1, 2, 3, 4, 5, 6, oeste]));
+  assert.deepEqual([r.exit, r.enter, r.leave], [3, 1, 7]);
+  r = detectRoundabout(ctx([sur, 0, 1, 2, este]));
+  assert.equal(r.exit, 1);
+  // la misma forma con calles de doble mano (una calle que da la vuelta a una plaza): no
+  const dobles = aristas.map(([a, b]) => [a, b, true]);
+  const g2 = grafoChico(nodos, dobles);
+  assert.equal(detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, este]), i: 1, iEnd: 1, ...g2, bearingBetween: planarBearing }), null);
+});
+
+test('detectRoundabout: un tramo corto de calle dividida o una manzana de una mano no son rotondas', () => {
+  const { detectRoundabout } = require('./pure.js');
+  // calle que se divide: 0 -> (1 mano norte, 2 mano sur) -> 3, 120 m de largo y 10 de ancho
+  let nodos = [[0, 0], [60, 5], [60, -5], [120, 0]], aristas = [[0, 1, false], [1, 3, false], [3, 2, false], [2, 0, false]];
+  const oeste = conCalle(nodos, aristas, 0, -300, 0), este = conCalle(nodos, aristas, 3, 300, 0);
+  let g = grafoChico(nodos, aristas);
+  let base = { ...rutaPor(nodos, [oeste, 0, 1, 3, este]), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing };
+  assert.equal(detectRoundabout(base), null);
+  // manzana cuadrada de 100 m con calles de una mano alrededor
+  nodos = [[0, 0], [100, 0], [100, 100], [0, 100]]; aristas = [[0, 1, false], [1, 2, false], [2, 3, false], [3, 0, false]];
+  const s = conCalle(nodos, aristas, 0, 0, -300); conCalle(nodos, aristas, 1, 300, 0); const n = conCalle(nodos, aristas, 2, 0, 300);
+  g = grafoChico(nodos, aristas);
+  base = { ...rutaPor(nodos, [s, 0, 1, 2, n]), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing };
+  assert.equal(detectRoundabout(base), null);
+});
+
+test('detectRoundabout: rotonda compacta de un prefab, las salidas por el largo de su curva', () => {
+  const { detectRoundabout } = require('./pure.js');
+  // brazos a 25 m del centro: 0 sur (entrada), 1 este, 2 norte, 3 oeste; curvas antihorarias
+  const nodos = [[0, -25], [25, 0], [0, 25], [-25, 0]];
+  const arco = (desde, hasta) => { // de un brazo a otro por el anillo de radio 12, antihorario
+    const a0 = Math.atan2(nodos[desde][1], nodos[desde][0]);
+    let a1 = Math.atan2(nodos[hasta][1], nodos[hasta][0]);
+    while (a1 <= a0) a1 += 2 * Math.PI;
+    const line = [nodos[desde]];
+    for (let a = a0; a <= a1 + 1e-9; a += Math.PI / 12) line.push([12 * Math.cos(a), 12 * Math.sin(a)]);
+    line.push(nodos[hasta]);
+    return line;
+  };
+  const largo = (l) => l.slice(1).reduce((s2, p, k) => s2 + Math.hypot(p[0] - l[k][0], p[1] - l[k][1]), 0);
+  const aristas = [];
+  const adjacency = new Map(), lineas = new Map();
+  // los brazos se cargan en orden inverso: el orden de las salidas sale del largo de la curva
+  for (let a = 0; a < 4; a++) for (let b = 3; b >= 0; b--) if (a !== b) {
+    const l = arco(a, b);
+    lineas.set(`${a},${b}`, l);
+    if (!adjacency.has(a)) adjacency.set(a, []);
+    adjacency.get(a).push([b, largo(l)]);
+  }
+  // calles de afuera
+  const calle = (desde, dx, dy) => { const k = nodos.length; nodos.push([nodos[desde][0] + dx, nodos[desde][1] + dy]);
+    adjacency.get(desde).push([k, 300]); adjacency.set(k, [[desde, 300]]); return k; };
+  const sur = calle(0, 0, -300); calle(1, 300, 0); const norte = calle(2, 0, 300); const oeste = calle(3, -300, 0);
+  const nodeAt = (k) => nodos[k];
+  const edgeLine = (a, b) => lineas.get(`${a},${b}`) || [nodos[a], nodos[b]];
+  const ctx = (ids) => ({ ...rutaPor(nodos, ids), i: 1, iEnd: 2, adjacency, nodeAt, edgeLine, bearingBetween: planarBearing });
+  assert.equal(detectRoundabout(ctx([sur, 0, 2, norte])).exit, 2);
+  assert.equal(detectRoundabout(ctx([sur, 0, 3, oeste])).exit, 3);
+  // el mismo cruce con curvas derechas (una esquina comun): no
+  const recta = (a, b) => [nodos[a], [0, 0], nodos[b]];
+  assert.equal(detectRoundabout({ ...ctx([sur, 0, 2, norte]), edgeLine: recta }), null);
+  assert.equal(detectRoundabout({ ...ctx([sur, 0, 3, oeste]), edgeLine: recta }), null);
+});
+
+test('voiceManeuverKey: rotonda hasta la quinta salida, despues hacia que lado', () => {
+  const { voiceManeuverKey } = require('./pure.js');
+  assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 2, direction: 'left' }), 'roundabout_2');
+  assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 7, direction: 'left' }), 'turn_left');
+  assert.equal(voiceManeuverKey({ kind: 'fork', direction: 'right' }), 'keep_right');
+});

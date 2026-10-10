@@ -334,6 +334,168 @@ function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM) {
   return j;
 }
 
+// Si desde el vecino n del nodo `from` se llega a escapeM de `from` sin
+// pisar los nodos de `blocked`: una salida de verdad, y no un brazo muerto de
+// un prefab o un tramo que vuelve enseguida a la ruta.
+function leadsAway(adjacency, nodeAt, from, n, blocked, escapeM = 120) {
+  const o = nodeAt(from);
+  const seen = new Set([from, n]);
+  const queue = [n];
+  for (let q = 0; q < queue.length && q < 80; q++) {
+    const cur = queue[q];
+    const p = nodeAt(cur);
+    if (Math.hypot(p[0] - o[0], p[1] - o[1]) >= escapeM) return true;
+    for (const [m] of (adjacency.get(cur) || [])) {
+      if (seen.has(m) || blocked.has(m)) continue;
+      seen.add(m); queue.push(m);
+    }
+  }
+  return false;
+}
+
+// El anillo de una rotonda armada con tramos de un solo sentido: un ciclo
+// dirigido de menos de maxLenM que pasa por `start`, sin pasar por `from`
+// (la calle por la que se llega), hecho solo de tramos de un sentido (asi
+// un triangulo de calles de doble mano no cuenta). Devuelve la lista de sus
+// nodos, en orden, o null.
+function oneWayRing(adjacency, nodeAt, start, from, maxLenM = 700, maxDepth = 40) {
+  const oneWay = (a, b) => !(adjacency.get(b) || []).some(([m]) => m === a);
+  let budget = 300;
+  const path = [start];
+  const dfs = (cur, lenM) => {
+    if (--budget < 0 || path.length > maxDepth) return false;
+    const p = nodeAt(cur);
+    for (const [m] of (adjacency.get(cur) || [])) {
+      if (m === from || !oneWay(cur, m)) continue;
+      const q = nodeAt(m);
+      const len = lenM + Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (len > maxLenM) continue;
+      if (m === start) return path.length >= 3;
+      if (path.includes(m)) continue;
+      path.push(m);
+      if (dfs(m, len)) return true;
+      path.pop();
+    }
+    return false;
+  };
+  return dfs(start, 0) ? path : null;
+}
+
+// Puntos cada stepM a lo largo de un anillo (nodos en orden), siguiendo la
+// curva de cada tramo si edgeLine la da: la forma real, no solo sus nodos.
+function ringOutline(ringPath, nodeAt, edgeLine, stepM = 5) {
+  const out = [];
+  for (let k = 0; k < ringPath.length; k++) {
+    const a = ringPath[k], b = ringPath[(k + 1) % ringPath.length];
+    const line = (edgeLine && edgeLine(a, b)) || [nodeAt(a), nodeAt(b)];
+    for (let j = 1; j < line.length; j++) {
+      const [x0, z0] = line[j - 1], [x1, z1] = line[j];
+      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / stepM));
+      for (let t = 0; t < n; t++) out.push([x0 + (x1 - x0) * t / n, z0 + (z1 - z0) * t / n]);
+    }
+  }
+  return out;
+}
+
+// Cuanto se dobla de mas en una polilinea: la suma de los cambios de rumbo
+// menos el cambio neto. Una salida de rotonda se abre para un lado y rodea
+// la isla para el otro; una esquina comun dobla una sola vez.
+function extraTurningDeg(line, bearingBetween) {
+  let total = 0, prev = null, first = null, last = null;
+  for (let k = 1; k < line.length; k++) {
+    if (Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]) < 0.5) continue;
+    const b = bearingBetween(line[k - 1], line[k]);
+    if (prev != null) total += Math.abs(normDeg(b - prev));
+    if (first == null) first = b;
+    prev = b; last = b;
+  }
+  return first == null ? 0 : total - Math.abs(normDeg(last - first));
+}
+
+// Puntos repartidos alrededor de un centro: ninguno mas de maxRatio veces
+// mas lejos del centro que el mas cercano (y nada pegado al centro).
+function roundish(points, maxRatio) {
+  const cx = points.reduce((s2, p) => s2 + p[0], 0) / points.length;
+  const cz = points.reduce((s2, p) => s2 + p[1], 0) / points.length;
+  const radios = points.map(p => Math.hypot(p[0] - cx, p[1] - cz));
+  const min = Math.min(...radios);
+  return min >= 8 && Math.max(...radios) <= maxRatio * min;
+}
+
+// La rotonda en la que entra la ruta en el cruce i..iEnd, y por que salida
+// sale (pedido de Discord, 09-10: "en la rotonda, tomar la segunda salida").
+// El grafo no marca las rotondas; se las reconoce de dos formas:
+//  - anillo redondo de tramos de un solo sentido (oneWayRing): la ruta entra en un
+//    nodo del anillo y lo sigue; se cuentan los nodos del anillo con una
+//    salida de verdad (leadsAway) hasta el que la ruta deja.
+//  - rotonda compacta de un solo prefab: el brazo de entrada se une directo
+//    con cada brazo de salida, con curvas que rodean la isla (al menos dos
+//    doblan 90 grados de mas), cortas y con los brazos repartidos alrededor
+//    de un centro. Las salidas se ordenan por el largo de su curva: la primera es
+//    la mas corta.
+// ctx: { pts, cum, i, iEnd, adjacency, nodeAt, edgeLine(a, b), bearingBetween }.
+// Devuelve { exit, enter, leave } (indices de pts) o null.
+function detectRoundabout(ctx) {
+  const { pts, i, iEnd, adjacency, nodeAt, edgeLine, bearingBetween } = ctx;
+  if (!adjacency || !nodeAt) return null;
+  const escapeM = ctx.escapeM != null ? ctx.escapeM : 120;
+  // Nodos de la ruta (indice en pts) desde el anterior al cruce hasta el
+  // siguiente.
+  const idxs = [];
+  for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { idxs.push(k); break; }
+  for (let k = i; k <= iEnd; k++) if (pts[k][4] != null) idxs.push(k);
+  for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { idxs.push(k); break; }
+  for (let a = 1; a < idxs.length; a++) {
+    const kPrev = idxs[a - 1], kEnter = idxs[a];
+    const u = pts[kPrev][4], v = pts[kEnter][4];
+    // Anillo
+    // Redondo: un tramo corto de calle dividida (las dos manos y los nodos
+    // donde se separan y se juntan) tambien es un ciclo de un sentido, pero
+    // alargado; una manzana de calles de una mano es cuadrada (1,41).
+    const ringPath = oneWayRing(adjacency, nodeAt, v, u);
+    const ring = ringPath && ringPath.length >= 4 && roundish(ringOutline(ringPath, nodeAt, edgeLine), 1.3)
+      ? new Set(ringPath) : null;
+    if (ring && !ring.has(u)) {
+      let exit = 0, leave = kEnter, k = kEnter;
+      for (;;) {
+        let next = null;
+        for (let j = k + 1; j < pts.length; j++) if (pts[j][4] != null) { next = j; break; }
+        const w = pts[k][4];
+        if (k !== kEnter) {
+          const sale = next != null && !ring.has(pts[next][4]);
+          const otra = (adjacency.get(w) || []).some(([n]) => !ring.has(n) && leadsAway(adjacency, nodeAt, w, n, ring, escapeM));
+          if (sale || otra) exit++;
+          if (sale) { leave = k; break; }
+        }
+        if (next == null || !ring.has(pts[next][4])) { leave = k; break; }
+        k = next;
+      }
+      if (exit >= 1 && leave !== kEnter) return { exit, enter: kEnter, leave };
+      continue;
+    }
+    // Prefab compacto: de v (brazo de entrada) al siguiente nodo de la ruta
+    if (a + 1 >= idxs.length || !edgeLine) continue;
+    const kLeave = idxs[a + 1], b = pts[kLeave][4];
+    const outs = (adjacency.get(v) || []).filter(([n]) => n !== u);
+    if (outs.length < 2 || !outs.some(([n]) => n === b)) continue;
+    if (outs.some(([, m]) => !(m <= 150))) continue;
+    if (!roundish([v, ...outs.map(([n]) => n)].map(nodeAt), 1.7)) continue;
+    const rodean = outs.filter(([n]) => { const line = edgeLine(v, n); return line && extraTurningDeg(line, bearingBetween) >= 90; });
+    if (rodean.length < 2) continue;
+    // Y la ruta la usa: rodea la isla o dobla (la primera salida). Pasar
+    // derecho por un prefab chico con curvas raras no es una rotonda.
+    const propia = edgeLine(v, b);
+    if (!propia || (extraTurningDeg(propia, bearingBetween) < 90
+      && Math.abs(normDeg(bearingBetween(propia[propia.length - 2], propia[propia.length - 1]) - bearingBetween(propia[0], propia[1]))) < 45)) continue;
+    const prefab = new Set([v, ...outs.map(([n]) => n)]);
+    const salidas = outs.filter(([n]) => n === b || leadsAway(adjacency, nodeAt, n, n, prefab, escapeM))
+      .sort((x, y) => x[1] - y[1]);
+    const exit = salidas.findIndex(([n]) => n === b) + 1;
+    if (exit >= 1) return { exit, enter: kEnter, leave: kLeave };
+  }
+  return null;
+}
+
 // Si el nodo `start` es parte de un anillo corto (una rotonda): un camino
 // dirigido que vuelve a el en menos de maxLenM sin pasar por `from` (el
 // nodo de la calle por la que se llega) ni volver por la misma arista. Las
@@ -415,21 +577,7 @@ function detectManeuver(ctx) {
     // salto: en un prefab cada brazo se une con todos los demas.
     const ahead = new Set(onRoute);
     for (let k = iEnd + 1; k < pts.length && cum[k] - cum[iEnd] <= rejoinM; k++) if (pts[k][4] != null) ahead.add(pts[k][4]);
-    const escapes = (from, n) => {
-      const o = nodeAt(from);
-      const seen = new Set([from, n]);
-      const queue = [n];
-      for (let q = 0; q < queue.length && q < 80; q++) {
-        const cur = queue[q];
-        const p = nodeAt(cur);
-        if (Math.hypot(p[0] - o[0], p[1] - o[1]) >= escapeM) return true;
-        for (const [m] of (adjacency.get(cur) || [])) {
-          if (seen.has(m) || ahead.has(m)) continue;
-          seen.add(m); queue.push(m);
-        }
-      }
-      return false;
-    };
+    const escapes = (from, n) => leadsAway(adjacency, nodeAt, from, n, ahead, escapeM);
     for (let k = i; k <= iEnd; k++) {
       const idx = pts[k][4];
       if (idx == null) continue;
@@ -1116,7 +1264,11 @@ function insideMapBounds(bounds, x, z) {
   return x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
 }
 
+// Rotonda: "tomar la segunda salida", con frase grabada hasta la quinta; mas
+// alla se dice hacia que lado sale.
+const VOICE_ROUNDABOUT_MAX_EXIT = 5;
 function voiceManeuverKey(turn) {
+  if (turn.kind === 'roundabout' && turn.exit >= 1 && turn.exit <= VOICE_ROUNDABOUT_MAX_EXIT) return `roundabout_${turn.exit}`;
   return `${turn.kind === 'fork' ? 'keep' : 'turn'}_${turn.direction === 'left' ? 'left' : 'right'}`;
 }
 function createVoiceGuide(opts = {}) {
@@ -1317,6 +1469,6 @@ function storedWaypoints(stored, variant, now, maxAgeMs = 12 * 3600 * 1000, max 
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

@@ -3303,17 +3303,52 @@ function findUpcomingTurn() {
     return geoBearingDeg(lng1, lat1, lng2, lat2);
   };
   const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency } : {};
+  // La curva de un tramo del grafo (para reconocer rotondas de un prefab).
+  const edgeLine = routeGraph ? (a, b) => {
+    const k = routeGraph.dirEdge(a, b);
+    if (k === -1) return null;
+    const e = routeGraph.adjEdge[k], line = [routeGraph.nodeXY(a)];
+    const mids = [];
+    for (let m = routeGraph.midOff[e]; m < routeGraph.midOff[e + 1]; m++) mids.push([routeGraph.midXY[2 * m], routeGraph.midXY[2 * m + 1]]);
+    if (routeGraph.adjRev[k]) mids.reverse();
+    return line.concat(mids, [routeGraph.nodeXY(b)]);
+  } : null;
 
   // Se arranca por los nodos ya pasados: si el camion esta adentro de un
   // cruce, el grupo se arma entero y su giro se reconoce como ya hecho. Si
   // se empezara por el primer nodo de adelante, la mitad que queda de una
   // esquina se anunciaba como otro giro.
   let prevTurn = null; // ultimo giro visto, aunque ya haya quedado atras (ver continuesTurn)
+  let roundaboutLeftM = -Infinity; // donde se salio de la ultima rotonda (metros sobre la ruta)
+  const roundaboutAt = (i, iEnd) => graph.adjacency
+    ? detectRoundabout({ pts, cum, i, iEnd, adjacency: graph.adjacency, nodeAt: graph.nodeXY, edgeLine, bearingBetween }) : null;
   for (let i = 1; i < pts.length - 1; i++) {
     if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
     if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
     const iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
+    // Rotonda: se anuncia la salida ("tomar la segunda salida") en la entrada
+    // y se calla todo lo de adentro hasta salir. Adentro, la distancia es a la
+    // salida; la clave (node) sigue siendo la entrada, asi no cambia el aviso.
+    const rb = roundaboutAt(i, iEnd);
+    if (rb) {
+      prevTurn = null;
+      roundaboutLeftM = cum[rb.leave];
+      if (cum[rb.leave] > cum[here]) {
+        const inside = cum[rb.enter] <= cum[here];
+        const after = Math.min(rb.leave + 2, pts.length - 1);
+        const delta = normDeg(bearingBetween(pts[rb.leave], pointAt(cum[rb.leave] + NAV_TURN_LEG_M))
+          - bearingBetween(pointAt(cum[rb.enter] - NAV_TURN_LEG_M), pts[rb.enter]));
+        return {
+          kind: 'roundabout', exit: rb.exit, direction: delta > 0 ? 'right' : 'left',
+          distanceMeters: Math.max(0, cum[inside ? rb.leave : rb.enter] - cum[here]),
+          nearSign: nearestRoadName(pts[after][0], pts[after][1], NAV_ROAD_NAME_MAX_DIST_M),
+          node: [pts[rb.enter][0], pts[rb.enter][1]],
+        };
+      }
+      i = Math.max(iEnd, rb.leave);
+      continue;
+    }
     const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     let m = detectManeuver({ ...ctx, i, iEnd });
@@ -3340,6 +3375,17 @@ function findUpcomingTurn() {
       ? { direction: m.direction, inBearing: m.inBearing, outBearing: m.outBearing, quiet: m.quiet, end: cum[iEnd] } : null;
     if (m && m.quiet) m = null; // curva de la calle, sin otro camino: no se anuncia
     if (m && cum[m.at != null ? m.at : i] <= cum[here]) m = null; // ya pasado
+    // La boca de una rotonda: lo que dobla al salir, o al acercarse a menos
+    // de 80 m de la entrada, es parte de la rotonda y ya lo dice su aviso.
+    if (m && cum[i] - roundaboutLeftM < 60) m = null;
+    if (m) {
+      for (let j = iEnd + 1; j < pts.length - 1 && cum[j] - cum[iEnd] <= 80; j++) {
+        if (pts[j][3] !== 1) continue;
+        const jEnd = junctionClusterEnd(pts, cum, j, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
+        if (roundaboutAt(j, jEnd)) { m = null; break; }
+        j = jEnd;
+      }
+    }
     if (m) {
       const at = m.at != null ? m.at : i;
       // Nombre de ruta del tramo AL QUE se gira (no del que se viene), buscando
@@ -3471,6 +3517,15 @@ function updateNavPanel(turn) {
 // modo navegacion este apagado). Texto plano: cada uno lo escapa o lo pinta.
 function navTurnParts(turn) {
   const next = nextCityName ? `${t('navNextCity')}: ${nextCityName}` : '';
+  if (turn && turn.kind === 'roundabout') {
+    // "Rotonda en 300 m: tomar la segunda salida". Mas alla de la octava, el numero.
+    const ords = t('navOrdinals').split(',');
+    const n = ords[turn.exit - 1] || String(turn.exit);
+    const dist = formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial);
+    let ontoText = '';
+    if (turn.nearSign) ontoText = ` ${turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto')} ${turn.nearSign.label}`;
+    return { text: `↻ ${t('navRoundaboutIn').replace('{d}', dist).replace('{n}', n)}${ontoText}`, next };
+  }
   if (turn) {
     const fork = turn.kind === 'fork';
     const arrow = fork ? (turn.direction === 'left' ? '↖' : '↗') : (turn.direction === 'left' ? '↰' : '↱');

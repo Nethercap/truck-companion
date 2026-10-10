@@ -1,15 +1,15 @@
 {
   "version": 1,
   "voices": [
-    { "id": "en-kristin", "lang": "en", "label": "Kristin", "phrases": "en", "file": "en-kristin-v1.json", "model": "en_US-kristin-medium" },
-    { "id": "en-joe", "lang": "en", "label": "Joe", "phrases": "en", "file": "en-joe-v1.json", "model": "en_US-joe-medium" },
-    { "id": "es-daniela", "lang": "es", "label": "Daniela (AR)", "phrases": "es-AR", "file": "es-daniela-v1.json", "model": "es_AR-daniela-high" },
-    { "id": "es-claude", "lang": "es", "label": "Claude (MX)", "phrases": "es-MX", "file": "es-claude-v1.json", "model": "es_MX-claude-high" },
-    { "id": "de-thorsten", "lang": "de", "label": "Thorsten", "phrases": "de", "file": "de-thorsten-v1.json", "model": "de_DE-thorsten-high" },
-    { "id": "fr-siwis", "lang": "fr", "label": "Siwis", "phrases": "fr", "file": "fr-siwis-v1.json", "model": "fr_FR-siwis-medium" },
-    { "id": "pt-cadu", "lang": "pt", "label": "Cadu", "phrases": "pt", "file": "pt-cadu-v1.json", "model": "pt_BR-cadu-medium" },
-    { "id": "pl-gosia", "lang": "pl", "label": "Gosia", "phrases": "pl", "file": "pl-gosia-v1.json", "model": "pl_PL-gosia-medium" },
-    { "id": "ru-dmitri", "lang": "ru", "label": "Dmitri", "phrases": "ru", "file": "ru-dmitri-v1.json", "model": "ru_RU-dmitri-medium" },
+    { "id": "en-kristin", "lang": "en", "label": "Kristin", "phrases": "en", "file": "en-kristin-v2.json", "model": "en_US-kristin-medium" },
+    { "id": "en-joe", "lang": "en", "label": "Joe", "phrases": "en", "file": "en-joe-v2.json", "model": "en_US-joe-medium" },
+    { "id": "es-daniela", "lang": "es", "label": "Daniela (AR)", "phrases": "es-AR", "file": "es-daniela-v2.json", "model": "es_AR-daniela-high" },
+    { "id": "es-claude", "lang": "es", "label": "Claude (MX)", "phrases": "es-MX", "file": "es-claude-v2.json", "model": "es_MX-claude-high" },
+    { "id": "de-thorsten", "lang": "de", "label": "Thorsten", "phrases": "de", "file": "de-thorsten-v2.json", "model": "de_DE-thorsten-high" },
+    { "id": "fr-siwis", "lang": "fr", "label": "Siwis", "phrases": "fr", "file": "fr-siwis-v2.json", "model": "fr_FR-siwis-medium" },
+    { "id": "pt-cadu", "lang": "pt", "label": "Cadu", "phrases": "pt", "file": "pt-cadu-v2.json", "model": "pt_BR-cadu-medium" },
+    { "id": "pl-gosia", "lang": "pl", "label": "Gosia", "phrases": "pl", "file": "pl-gosia-v2.json", "model": "pl_PL-gosia-medium" },
+    { "id": "ru-dmitri", "lang": "ru", "label": "Dmitri", "phrases": "ru", "file": "ru-dmitri-v2.json", "model": "ru_RU-dmitri-medium" },
     { "id": "tr-system", "lang": "tr", "label": null, "phrases": "tr", "system": true }
   ],
   "phrases": {
@@ -23,7 +23,17 @@
       "keep_left": "Keep left.",
       "keep_right": "Keep right.",
       "arrive_dest": "You have arrived at your destination.",
-      "arrive_pickup": "You have arrived at the pickup."
+      "arrive_pickup": "You have arrived at the pickup.",
+      "soon_roundabout_1": "At the roundabout, take the first exit.",
+      "roundabout_1": "Take the first exit.",
+      "soon_roundabout_2": "At the roundabout, take the second exit.",
+      "roundabout_2": "Take the second exit.",
+      "soon_roundabout_3": "At the roundabout, take the third exit.",
+      "roundabout_3": "Take the third exit.",
+      "soon_roundabout_4": "At the roundabout, take the fourth exit.",
+      "roundabout_4": "Take the fourth exit.",
+      "soon_roundabout_5": "At the roundabout, take the fifth exit.",
+      "roundabout_5": "Take the fifth exit."
     },
     "es-AR": {
       "soon_turn_left": "Más adelante, girá a la izquierda.",
@@ -35,7 +45,17 @@
       "keep_left": "Mantenete a la izquierda.",
       "keep_right": "Mantenete a la derecha.",
       "arrive_dest": "Llegaste a destino.",
-      "arrive_pickup": "Llegaste al lugar de carga."
+      "arrive_pickup": "Llegaste al lugar de carga.",
+      "soon_roundabout_1": "En la rotonda, tomá la primera salida.",
+      "roundabout_1": "Tomá la primera salida.",
+      "soon_roundabout_2": "En la rotonda, tomá la segunda salida.",
+      "roundabout_2": "Tomá la segunda salida.",
+      "soon_roundabout_3": "En la rotonda, tomá la tercera salida.",
+      "roundabout_3": "Tomá la tercera salida.",
+      "soon_roundabout_4": "En la rotonda, tomá la cuarta salida.",
+      "roundabout_4": "Tomá la cuarta salida.",
+      "soon_roundabout_5": "En la rotonda, tomá la quinta salida.",
+      "roundabout_5": "Tomá la quinta salida."
     },
     "es-MX": {
       "soon_turn_left": "Más adelante, gira a la izquierda.",
@@ -47,7 +67,17 @@
       "keep_left": "Mantente a la izquierda.",
       "keep_right": "Mantente a la derecha.",
       "arrive_dest": "Has llegado a tu destino.",
-      "arrive_pickup": "Has llegado al punto de carga."
+      "arrive_pickup": "Has llegado al punto de carga.",
+      "soon_roundabout_1": "En la glorieta, toma la primera salida.",
+      "roundabout_1": "Toma la primera salida.",
+      "soon_roundabout_2": "En la glorieta, toma la segunda salida.",
+      "roundabout_2": "Toma la segunda salida.",
+      "soon_roundabout_3": "En la glorieta, toma la tercera salida.",
+      "roundabout_3": "Toma la tercera salida.",
+      "soon_roundabout_4": "En la glorieta, toma la cuarta salida.",
+      "roundabout_4": "Toma la cuarta salida.",
+      "soon_roundabout_5": "En la glorieta, toma la quinta salida.",
+      "roundabout_5": "Toma la quinta salida."
     },
     "de": {
       "soon_turn_left": "Demnächst links abbiegen.",
@@ -59,7 +89,17 @@
       "keep_left": "Links halten.",
       "keep_right": "Rechts halten.",
       "arrive_dest": "Sie haben Ihr Ziel erreicht.",
-      "arrive_pickup": "Sie haben den Abholort erreicht."
+      "arrive_pickup": "Sie haben den Abholort erreicht.",
+      "soon_roundabout_1": "Im Kreisverkehr die erste Ausfahrt nehmen.",
+      "roundabout_1": "Jetzt die erste Ausfahrt nehmen.",
+      "soon_roundabout_2": "Im Kreisverkehr die zweite Ausfahrt nehmen.",
+      "roundabout_2": "Jetzt die zweite Ausfahrt nehmen.",
+      "soon_roundabout_3": "Im Kreisverkehr die dritte Ausfahrt nehmen.",
+      "roundabout_3": "Jetzt die dritte Ausfahrt nehmen.",
+      "soon_roundabout_4": "Im Kreisverkehr die vierte Ausfahrt nehmen.",
+      "roundabout_4": "Jetzt die vierte Ausfahrt nehmen.",
+      "soon_roundabout_5": "Im Kreisverkehr die fünfte Ausfahrt nehmen.",
+      "roundabout_5": "Jetzt die fünfte Ausfahrt nehmen."
     },
     "fr": {
       "soon_turn_left": "Bientôt, tournez à gauche.",
@@ -71,7 +111,17 @@
       "keep_left": "Restez à gauche.",
       "keep_right": "Restez à droite.",
       "arrive_dest": "Vous êtes arrivé à destination.",
-      "arrive_pickup": "Vous êtes arrivé au lieu de chargement."
+      "arrive_pickup": "Vous êtes arrivé au lieu de chargement.",
+      "soon_roundabout_1": "Au rond-point, prenez la première sortie.",
+      "roundabout_1": "Prenez la première sortie.",
+      "soon_roundabout_2": "Au rond-point, prenez la deuxième sortie.",
+      "roundabout_2": "Prenez la deuxième sortie.",
+      "soon_roundabout_3": "Au rond-point, prenez la troisième sortie.",
+      "roundabout_3": "Prenez la troisième sortie.",
+      "soon_roundabout_4": "Au rond-point, prenez la quatrième sortie.",
+      "roundabout_4": "Prenez la quatrième sortie.",
+      "soon_roundabout_5": "Au rond-point, prenez la cinquième sortie.",
+      "roundabout_5": "Prenez la cinquième sortie."
     },
     "pt": {
       "soon_turn_left": "Em breve, vire à esquerda.",
@@ -83,7 +133,17 @@
       "keep_left": "Mantenha-se à esquerda.",
       "keep_right": "Mantenha-se à direita.",
       "arrive_dest": "Você chegou ao destino.",
-      "arrive_pickup": "Você chegou ao local de carga."
+      "arrive_pickup": "Você chegou ao local de carga.",
+      "soon_roundabout_1": "Na rotatória, pegue a primeira saída.",
+      "roundabout_1": "Pegue a primeira saída.",
+      "soon_roundabout_2": "Na rotatória, pegue a segunda saída.",
+      "roundabout_2": "Pegue a segunda saída.",
+      "soon_roundabout_3": "Na rotatória, pegue a terceira saída.",
+      "roundabout_3": "Pegue a terceira saída.",
+      "soon_roundabout_4": "Na rotatória, pegue a quarta saída.",
+      "roundabout_4": "Pegue a quarta saída.",
+      "soon_roundabout_5": "Na rotatória, pegue a quinta saída.",
+      "roundabout_5": "Pegue a quinta saída."
     },
     "pl": {
       "soon_turn_left": "Za chwilę skręć w lewo.",
@@ -95,7 +155,17 @@
       "keep_left": "Trzymaj się lewej.",
       "keep_right": "Trzymaj się prawej.",
       "arrive_dest": "Dotarłeś do celu.",
-      "arrive_pickup": "Dotarłeś do miejsca załadunku."
+      "arrive_pickup": "Dotarłeś do miejsca załadunku.",
+      "soon_roundabout_1": "Na rondzie zjedź pierwszym zjazdem.",
+      "roundabout_1": "Zjedź pierwszym zjazdem.",
+      "soon_roundabout_2": "Na rondzie zjedź drugim zjazdem.",
+      "roundabout_2": "Zjedź drugim zjazdem.",
+      "soon_roundabout_3": "Na rondzie zjedź trzecim zjazdem.",
+      "roundabout_3": "Zjedź trzecim zjazdem.",
+      "soon_roundabout_4": "Na rondzie zjedź czwartym zjazdem.",
+      "roundabout_4": "Zjedź czwartym zjazdem.",
+      "soon_roundabout_5": "Na rondzie zjedź piątym zjazdem.",
+      "roundabout_5": "Zjedź piątym zjazdem."
     },
     "ru": {
       "soon_turn_left": "Скоро поверните налево.",
@@ -107,7 +177,17 @@
       "keep_left": "Держитесь левее.",
       "keep_right": "Держитесь правее.",
       "arrive_dest": "Вы прибыли в пункт назначения.",
-      "arrive_pickup": "Вы прибыли к месту погрузки."
+      "arrive_pickup": "Вы прибыли к месту погрузки.",
+      "soon_roundabout_1": "На круговом движении сверните на первый съезд.",
+      "roundabout_1": "Сверните на первый съезд.",
+      "soon_roundabout_2": "На круговом движении сверните на второй съезд.",
+      "roundabout_2": "Сверните на второй съезд.",
+      "soon_roundabout_3": "На круговом движении сверните на третий съезд.",
+      "roundabout_3": "Сверните на третий съезд.",
+      "soon_roundabout_4": "На круговом движении сверните на четвёртый съезд.",
+      "roundabout_4": "Сверните на четвёртый съезд.",
+      "soon_roundabout_5": "На круговом движении сверните на пятый съезд.",
+      "roundabout_5": "Сверните на пятый съезд."
     },
     "tr": {
       "soon_turn_left": "Birazdan sola dönün.",
@@ -119,7 +199,17 @@
       "keep_left": "Soldan devam edin.",
       "keep_right": "Sağdan devam edin.",
       "arrive_dest": "Varış noktanıza ulaştınız.",
-      "arrive_pickup": "Yükleme noktasına ulaştınız."
+      "arrive_pickup": "Yükleme noktasına ulaştınız.",
+      "soon_roundabout_1": "Döner kavşakta birinci çıkıştan çıkın.",
+      "roundabout_1": "Birinci çıkıştan çıkın.",
+      "soon_roundabout_2": "Döner kavşakta ikinci çıkıştan çıkın.",
+      "roundabout_2": "Ikinci çıkıştan çıkın.",
+      "soon_roundabout_3": "Döner kavşakta üçüncü çıkıştan çıkın.",
+      "roundabout_3": "Üçüncü çıkıştan çıkın.",
+      "soon_roundabout_4": "Döner kavşakta dördüncü çıkıştan çıkın.",
+      "roundabout_4": "Dördüncü çıkıştan çıkın.",
+      "soon_roundabout_5": "Döner kavşakta beşinci çıkıştan çıkın.",
+      "roundabout_5": "Beşinci çıkıştan çıkın."
     }
   }
 }
