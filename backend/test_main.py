@@ -25,7 +25,19 @@ def main(monkeypatch):
 
 @pytest.fixture
 def client(main):
-    return TestClient(main.app)
+    """Todas las conexiones del test en el mismo event loop, como en
+    produccion (uvicorn). Sin portal compartido, TestClient corre cada
+    websocket_connect en un loop y un thread propios, y el relay manda de una
+    conexion a otra (web -> cliente, cliente -> web): cruzar threads sobre los
+    streams de anyio a veces perdia el mensaje y el test se colgaba (CI del
+    10-10, test_el_aviso_de_fuera_del_mapa_llega_al_cliente). Sin entrar al
+    TestClient con "with", que ademas correria los startup del relay."""
+    from anyio.from_thread import start_blocking_portal
+    c = TestClient(main.app)
+    with start_blocking_portal(**c.async_backend) as portal:
+        c.portal = portal
+        yield c
+        c.portal = None
 
 
 def test_health(client):

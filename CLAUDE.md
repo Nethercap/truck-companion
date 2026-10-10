@@ -10,6 +10,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - Web: `node --test docs/app/test_pure.js`, `python tools/check_pois.py`,
   `python tools/build_variants_js.py --check`, `node --check` del .js tocado.
   Relay: `python -m pytest backend/test_main.py`. Cliente: `python -m pytest client/`.
+- Tests del relay con websockets: siempre con el fixture `client` (un solo
+  event loop para todas las conexiones). Un `TestClient` suelto corre cada
+  conexion en su propio thread y los tests se cuelgan a veces en CI.
 - Todo cambio en `docs/` sube `CACHE_NAME` en `docs/app/sw.js` y el `?v=`
   de `docs/{app,account,dash}/index.html` y del APP_SHELL (mismo token en todos).
 - La logica de decision va en `docs/app/pure.js` con su test, no suelta en
