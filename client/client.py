@@ -692,6 +692,24 @@ def cargo_damage(raw: dict):
 # parser arma un dict, asi que gana el ultimo y raw.get() devuelve el bool,
 # que es el que queremos. Si algun dia el orden cambia, esto pasa a ser un
 # numero y "hay alerta" queda en true para siempre.
+def reloj_del_juego(raw: dict):
+    """Minutos de juego del reloj que ve el jugador. En un convoy (ATS 1.45 y
+    ETS2 1.45 en adelante) es el del servidor: el de la economia local
+    (time_abs) mas multiplayerTimeOffset, que el SDK manda en 0 fuera del
+    convoy. El de la economia local ademas se frena en el convoy mientras el
+    del servidor sigue (pedido de Discord, 09-10: la hora del tablero no era
+    la del convoy). El plugin escribe un s32 en un campo de 64 bits: valen los
+    32 de abajo, con signo."""
+    reloj = raw.get("time_abs")
+    if reloj is None:
+        return None
+    offset = raw.get("multiplayerTimeOffset") or 0
+    offset &= 0xFFFFFFFF
+    if offset >= 0x80000000:
+        offset -= 0x100000000
+    return reloj + offset
+
+
 def build_payload(raw: dict) -> dict:
     speed_kmh = (raw.get("speed") or 0) * 3.6
     # el SDK devuelve speedLimit en m/s igual que speed, hay que convertirlo
@@ -748,8 +766,9 @@ def build_payload(raw: dict) -> dict:
         "restStopSeconds": raw.get("restStop"),
         "restStopMinutes": raw.get("restStop"),
         # Reloj del juego en minutos: la web lo usa para medir la escala de
-        # tiempo real (ETA real, descanso en tiempo real).
-        "gameTimeMinutes": raw.get("time_abs"),
+        # tiempo real (ETA real, descanso en tiempo real). En un convoy, el
+        # del servidor (ver reloj_del_juego).
+        "gameTimeMinutes": reloj_del_juego(raw),
         # time_abs/time_abs_delivery vienen en minutos de tiempo de juego (no
         # tiempo real) - la diferencia es cuanto falta para el deadline de
         # entrega del trabajo actual. Sin trabajo activo, time_abs_delivery

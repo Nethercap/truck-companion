@@ -70,6 +70,21 @@ def test_build_payload_job_deadline_seconds_from_game_minutes():
     assert payload["jobDeadlineSeconds"] == 90 * 60
 
 
+def test_build_payload_reloj_del_convoy():
+    # fuera del convoy el offset es 0
+    assert client.build_payload({"time_abs": 1000})["gameTimeMinutes"] == 1000
+    assert client.build_payload({"time_abs": 1000, "multiplayerTimeOffset": 0})["gameTimeMinutes"] == 1000
+    # en el convoy, el reloj del servidor; el plugin escribe un s32 en un
+    # campo de 64 bits, asi que un offset negativo llega como 2^32 - n
+    assert client.build_payload({"time_abs": 1000, "multiplayerTimeOffset": 300})["gameTimeMinutes"] == 1300
+    assert client.build_payload({"time_abs": 1000, "multiplayerTimeOffset": 2**32 - 120})["gameTimeMinutes"] == 880
+    assert client.build_payload({"time_abs": 1000, "multiplayerTimeOffset": -120})["gameTimeMinutes"] == 880
+    assert client.build_payload({})["gameTimeMinutes"] is None
+    # el plazo del trabajo sigue en el reloj de la economia local, como sus dos puntas
+    payload = client.build_payload({"time_abs": 1000, "time_abs_delivery": 1090, "multiplayerTimeOffset": 300})
+    assert payload["jobDeadlineSeconds"] == 90 * 60
+
+
 def test_build_payload_job_deadline_none_without_active_job():
     payload = client.build_payload({"time_abs": 1000, "time_abs_delivery": 0})
     assert payload["jobDeadlineSeconds"] is None

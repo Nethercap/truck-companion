@@ -4,6 +4,11 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- In a Convoy session the dashboard and the overlay show the convoy's game clock
+  instead of your single player one, so game time arrivals match what everyone sees.
+
 ## 1.5.29 (2026-10-09)
 
 - In-game overlay (Windows): a small panel over the game with your speed and the speed
