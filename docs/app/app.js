@@ -2246,7 +2246,7 @@ function searchCompanies(query, x, z, limit) {
   for (const c of pois.companies) {
     const label = (c[3] || '').toLowerCase();
     const city = (c[4] || '').toLowerCase().replace(/_/g, ' ');
-    if (label.includes(q) || city.includes(q)) out.push({ x: c[0], z: c[1], label: c[3], city: c[4], dist: x != null ? Math.hypot(c[0] - x, c[1] - z) : 0 });
+    if (label.includes(q) || city.includes(q) || cityLabel(c[4]).toLowerCase().includes(q)) out.push({ x: c[0], z: c[1], label: c[3], city: c[4], dist: x != null ? Math.hypot(c[0] - x, c[1] - z) : 0 });
   }
   out.sort((a, b) => a.dist - b.dist);
   return out.slice(0, limit);
@@ -2271,9 +2271,27 @@ function nearestCityName(x, z) {
   return best;
 }
 
+// Ciudades de la busqueda: las del archivo mas las que solo aparecen en sus
+// empresas. En los datos de Coast to Coast faltan Gulfport y Meridian (y unas
+// pocas de ETS2 y ProMods): sus empresas estaban, pero buscar la ciudad no
+// daba nada ("can't find the city I'm going to", Discord 10-10).
+let poiCityNamesCache = null, poiCityNamesFor = null;
+function poiCityNames() {
+  if (!pois) return {};
+  if (poiCityNamesFor === pois) return poiCityNamesCache;
+  const names = { ...(pois.cities || {}) };
+  for (const c of pois.companies || []) {
+    const tok = c[4];
+    if (tok && !names[tok]) names[tok] = tok.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+  poiCityNamesFor = pois;
+  poiCityNamesCache = names;
+  return names;
+}
+
 function cityLabel(token) {
   if (!token) return '';
-  return (pois && pois.cities && pois.cities[token]) || token.replace(/_/g, ' ');
+  return poiCityNames()[token] || token.replace(/_/g, ' ');
 }
 
 function renderPoiResults() {
@@ -2297,7 +2315,8 @@ function renderPoiResults() {
   if (!pos) { list.innerHTML = `<div class="poiEmpty">${t('poiNoPosition')}</div>`; return; }
   const query = document.getElementById('poiSearchInput').value;
   const cityFilter = document.getElementById('poiCityInput').value.trim().toLowerCase();
-  const cityToken = cityFilter && pois.cities ? Object.keys(pois.cities).find(tok => pois.cities[tok].toLowerCase() === cityFilter) : null;
+  const cityNames = poiCityNames();
+  const cityToken = cityFilter ? Object.keys(cityNames).find(tok => cityNames[tok].toLowerCase() === cityFilter) : null;
   let results;
   if (cityToken) {
     // Ciudad elegida: todas sus empresas (filtradas por el texto si hay), a
@@ -2346,8 +2365,8 @@ function updateAtlasChip() {
 
 function fillPoiCityList() {
   const list = document.getElementById('poiCityList');
-  if (!list || !pois || !pois.cities) return;
-  list.innerHTML = Object.values(pois.cities).sort().map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+  if (!list || !pois) return;
+  list.innerHTML = Object.values(poiCityNames()).sort().map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
 }
 function openPoiModal() {
   document.getElementById('poiModal').style.display = 'flex';
