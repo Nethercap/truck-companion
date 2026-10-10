@@ -43,6 +43,7 @@ GUIDE_TEXT.en = {
 <p>The code expires after 10 minutes if nobody uses it. Once connected, the session lasts until you quit the client.</p>
 <h3>Same Wi-Fi: lowest latency</h3>
 <p>Setup &amp; status also shows a local address and a QR code. Scan it with the phone and you are in: no pairing code, and it keeps working even if your internet drops. Windows asks once to let it through the firewall.</p>
+<div class="tip"><p>Same Wi-Fi but the phone can't open it? Usually it's one of these: Windows has the network set to <b>Public</b> (set it to Private in Windows Settings, Network &amp; internet), the phone is on a <b>guest network</b> or the router isolates devices, or a <b>VPN</b> or ad-blocking app is on, on the PC or on the phone. The pairing code works in all of these cases.</p></div>
 <div class="tip"><p>In your phone's browser use <b>Add to Home screen</b>: Truck Dash then opens full screen, like an app.</p></div>
 <p>No game at hand? The <a href="/app/?demo=1">demo</a> plays a trip on the real ATS map.</p>`,
     status: `
@@ -149,7 +150,7 @@ GUIDE_TEXT.en = {
 </ul>
 <div class="tip"><p>Something not working? Ask in our <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> and attach the log file: most problems are solved in a couple of messages.</p></div>`,
     overlay: `
-<p>A small panel the client draws over the game, so you see the essentials without looking away from the road. Windows only, with the game in a window or in borderless fullscreen.</p>
+<p>A small panel the client draws over the game, so you see the essentials without looking away from the road. Windows only (not under Linux with Proton), with the game in a window or in borderless fullscreen.</p>
 <ul>
 <li><b>Speed and speed limit</b>, straight from the game. The limit blinks when you go over it.</li>
 <li><b>Next turn and next city</b>, <b>distance left</b> and <b>arrival</b> in real time. These come from the dashboard, so keep it open with a route (on your phone, a tablet or this PC). Without it, the distance left comes from the game's own GPS.</li>
@@ -252,6 +253,7 @@ GUIDE_TEXT.es = {
 <p>El código vence a los 10 minutos si nadie lo usa. Una vez conectado, la sesión dura hasta que cerrás el cliente.</p>
 <h3>Misma WiFi: la menor latencia</h3>
 <p>Configuración y estado también muestra una dirección local y un código QR. Escanealo con el celular y listo: sin código, y sigue andando aunque se corte internet. Windows pregunta una vez si lo deja pasar por el firewall.</p>
+<div class="tip"><p>¿Misma WiFi y el celular no lo abre? Casi siempre es una de estas: Windows tiene la red como <b>Pública</b> (cambiala a Privada en Configuración de Windows, Red e Internet), el celular está en una <b>red de invitados</b> o el router aísla los dispositivos, o hay una <b>VPN</b> o una app que bloquea publicidad prendida, en la PC o en el celular. El código de pairing anda en todos estos casos.</p></div>
 <div class="tip"><p>En el navegador del celular usá <b>Agregar a la pantalla de inicio</b>: Truck Dash se abre a pantalla completa, como una app.</p></div>
 <p>¿No tenés el juego a mano? La <a href="/app/?demo=1">demo</a> hace un viaje sobre el mapa real de ATS.</p>`,
     status: `
@@ -358,7 +360,7 @@ GUIDE_TEXT.es = {
 </ul>
 <div class="tip"><p>¿Algo no anda? Preguntá en nuestro <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> y adjuntá el archivo de log: la mayoría de los problemas se resuelven en un par de mensajes.</p></div>`,
     overlay: `
-<p>Un recuadro que el cliente dibuja sobre el juego, para ver lo importante sin sacar la vista de la ruta. Solo en Windows, con el juego en ventana o en pantalla completa sin bordes.</p>
+<p>Un recuadro que el cliente dibuja sobre el juego, para ver lo importante sin sacar la vista de la ruta. Solo en Windows (no en Linux con Proton), con el juego en ventana o en pantalla completa sin bordes.</p>
 <ul>
 <li><b>Velocidad y límite</b>, directo del juego. El límite titila si te pasás.</li>
 <li><b>Próximo giro y próxima ciudad</b>, <b>lo que falta</b> y la <b>llegada</b> en hora real. Salen del tablero, así que tenelo abierto con una ruta (en el celular, una tablet o esta PC). Sin el tablero, lo que falta sale del GPS del propio juego.</li>

@@ -88,6 +88,12 @@ function saveSettings() {
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
+// Con los datos del sitio bloqueados (modo privado estricto, cookies
+// bloqueadas) leer localStorage tira SecurityError: uno suelto a nivel de
+// script cortaba el resto y la pagina cargaba sin conectarse nunca
+// (auditoria del 10-10). Lo que no es critico pasa por aca.
+function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
 // El resumen de ruta minimizado a una barrita de progreso. Antes la X de
 // ese panel borraba la ruta, y quien solo queria sacarlo de encima se
 // quedaba sin ruta hasta el proximo trabajo (reporte del 30-09-2026).
@@ -507,7 +513,13 @@ document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
 // variante de mapa (ats, ats_promods, etc.) - el backend usa esto para
 // agrupar "jugadores del mismo juego/mod" y para la reciprocidad (si
 // enabled=false, esta sesion tampoco va a recibir la posicion de nadie).
-function sendLiveShareState() {
+// explicit: el usuario toco la casilla en esta pestana. El reenvio al
+// conectar va sin explicit: con el valor por defecto (prendido) de un
+// celular nuevo, o el de una pestana vieja, volvia a compartir la posicion
+// de toda la sesion aunque el usuario la hubiera apagado en otro lado
+// (auditoria del 10-10). El relay solo deja prender con explicit, y avisa el
+// estado real con live_share_state.
+function sendLiveShareState(explicit = false) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   // Sin telemetria todavia no se sabe el juego: resolveEffectiveGame() cae
   // en 'ats' por defecto y el conductor aparecia en el mapa de ATS aunque
@@ -517,7 +529,7 @@ function sendLiveShareState() {
   lastSentMapVariant = mapVariant;
   // El apodo de convoy (si lo puso) es lo unico con nombre que se muestra en el mapa en vivo.
   const nick = liveShareEnabled ? (loadSettings().convoyNick || null) : null;
-  ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant, nick }));
+  ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant, nick, explicit: !!explicit }));
   if (liveShareNoticePending && liveShareEnabled && !conn.demo && !conn.spectator) {
     liveShareNoticePending = false;
     saveSettings(); // persiste liveShareV2: el aviso es una sola vez
@@ -643,9 +655,34 @@ document.getElementById('setLiveShare').addEventListener('change', (e) => {
   saveSettings();
   if (!liveShareEnabled) updateLivePlayers([]); // saca los marcadores ajenos ya dibujados
   document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
-  sendLiveShareState();
+  sendLiveShareState(true);
   sendLiveRoute(true);
 });
+
+// Lo que dice el relay que comparte la sesion (live_share_state): manda sobre
+// lo guardado en este dispositivo, asi la casilla dice la verdad aunque se
+// haya cambiado en otro.
+function applyLiveShareState(enabled) {
+  enabled = !!enabled;
+  if (enabled === liveShareEnabled) return;
+  liveShareEnabled = enabled;
+  saveSettings();
+  document.getElementById('setLiveShare').checked = enabled;
+  document.getElementById('setLiveShareRoute').disabled = !enabled;
+  if (!enabled) updateLivePlayers([]);
+}
+
+// Modo LAN: el cliente no le pasa este ajuste al relay, asi que la casilla no
+// hacia nada y parecia andar. Se deshabilita y se dice donde se cambia.
+function renderLiveShareForLan() {
+  const lan = !!conn.local;
+  for (const id of ['setLiveShare', 'setLiveShareRoute']) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = lan || (id === 'setLiveShareRoute' && !liveShareEnabled);
+  }
+  const hint = document.getElementById('liveShareLanHint');
+  if (hint) hint.hidden = !lan;
+}
 document.getElementById('setLiveShareRoute').addEventListener('change', (e) => {
   liveShareRoute = e.target.checked;
   saveSettings();
@@ -1919,18 +1956,24 @@ const WAYPOINTS_KEY = 'truckdash_waypoints';
 function readStoredWaypoints() {
   try { return JSON.parse(localStorage.getItem(WAYPOINTS_KEY) || '{}') || {}; } catch (e) { return {}; }
 }
+// La demo no guarda ni recupera: sus waypoints (variante ats) aparecian en la
+// partida real de ATS si se jugaba dentro de las 12 h. El de "seguir al
+// lider" del convoy tampoco se guarda: es del convoy en curso y despues de
+// recargar quedaba como un waypoint comun al destino viejo del lider
+// (auditoria del 10-10).
 function saveWaypoints() {
-  if (!currentGame) return;
+  if (!currentGame || conn.demo) return;
   const stored = readStoredWaypoints();
-  if (waypoints.length) {
-    stored[currentGame] = { at: Date.now(), list: waypoints.map(w => ({ pos: w.pos, inGame: w.inGame, label: w.label })) };
+  const keep = waypoints.filter(w => !w.convoyFollow);
+  if (keep.length) {
+    stored[currentGame] = { at: Date.now(), list: keep.map(w => ({ pos: w.pos, inGame: w.inGame, label: w.label })) };
   } else {
     delete stored[currentGame];
   }
   try { localStorage.setItem(WAYPOINTS_KEY, JSON.stringify(stored)); } catch (e) {}
 }
 function restoreWaypoints() {
-  if (!currentGame || !toLngLat || waypoints.length) return;
+  if (!currentGame || !toLngLat || waypoints.length || conn.demo) return;
   for (const w of storedWaypoints(readStoredWaypoints(), currentGame, Date.now(), 12 * 3600 * 1000, MAX_WAYPOINTS)) {
     const lngLat = toLngLat(w.pos[0], w.pos[1]);
     waypoints.push({ pos: w.pos, lngLat, inGame: w.inGame, label: w.label, marker: makeWaypointMarker(lngLat, waypoints.length) });
@@ -2308,6 +2351,8 @@ function closePoiModal() { document.getElementById('poiModal').style.display = '
 document.getElementById('poiBtn').addEventListener('click', openPoiModal);
 initPip();
 document.getElementById('poiCloseBtn').addEventListener('click', closePoiModal);
+document.getElementById('poiCloseX').addEventListener('click', closePoiModal);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePoiModal(); });
 document.getElementById('poiModal').addEventListener('click', (e) => { if (e.target.id === 'poiModal') closePoiModal(); });
 document.getElementById('poiSearchInput').addEventListener('input', renderPoiResults);
 document.getElementById('poiCityInput').addEventListener('input', () => { renderPoiResults(); });
@@ -3564,6 +3609,12 @@ let navHudLastSig = '';
 let navHudLastSent = 0;
 const NAV_HUD_MIN_MS = 400;
 const NAV_HUD_KEEPALIVE_MS = 3000;
+// Quien manda: con dos tableros abiertos (la pestana que abre el cliente en
+// la PC y el celular por LAN) los dos mandan nav_hud y el overlay saltaba de
+// uno a otro, cada uno con su ruta y sus unidades ("the in game overlay kept
+// bouncing the distance remaining around", Discord 10-10). Con esto el
+// cliente se queda con uno mientras siga mandando (overlay.OverlayData).
+const NAV_HUD_SRC = Math.random().toString(36).slice(2, 10);
 
 function sendNavHud() {
   if (!clientOverlayOn || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -3582,6 +3633,7 @@ function sendNavHud() {
     arrivalLabel: t('overlayArrivalReal'),
     gameArrivalLabel: t('overlayArrivalGame'),
     imperial: !!useImperial,
+    src: NAV_HUD_SRC,
   };
   const sig = JSON.stringify(msg);
   const now = Date.now();
@@ -3699,7 +3751,7 @@ const NAV_FIXED_ZOOM = NAV_ZOOM_DEFAULT;
 // MapLibre (PR #1).
 function updateTruckArrowSize() {
   if (!map || !truckArrowEl) return;
-  const scale = Math.max(0.6, Math.min(1.2, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12));
+  const scale = Math.max(0.8, Math.min(1.3, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12));
   truckArrowEl.style.transform = `scale(${scale})`;
 }
 
@@ -4492,7 +4544,7 @@ function updateHud(data) {
     alertsRow.style.display = 'none';
   }
 
-  updateSessionEvents(data.event || {}, data.game);
+  updateSessionEvents(data.event || {}, data.game, data.onJob);
 }
 
 // Peajes/multas/tren-ferry llegan como pulsos (bool + monto en el mismo tick
@@ -4533,23 +4585,75 @@ function showToast(text, kind = 'success', durationMs = 5000) {
   }, durationMs);
 }
 
-function updateSessionEvents(event, game) {
+// Multas y peajes del trabajo en curso, para el resumen de la entrega. Se
+// arranca de cero al tomar un trabajo (onJob pasa a true) y al terminarlo:
+// lo pagado entre un trabajo y otro no es de ninguno.
+const jobCosts = { fines: 0, tolls: 0 };
+let lastOnJob = null;
+function resetJobCosts() { jobCosts.fines = 0; jobCosts.tolls = 0; }
+
+// Tarjeta "Trabajo entregado": queda hasta cerrarla (o DELIVERY_CARD_MS),
+// no 5 s como el toast de antes, que se perdia mientras uno estacionaba.
+const DELIVERY_CARD_MS = 90000;
+let deliveryCardTimer = null;
+function closeDeliveryCard() {
+  clearTimeout(deliveryCardTimer);
+  document.getElementById('deliveryCard')?.remove();
+}
+function showDeliveryCard(event, costs, game) {
+  const summary = deliverySummary(event, costs);
+  if (!summary) return;
+  closeDeliveryCard();
+  const value = ([, kind, v]) => {
+    if (kind === 'money') return escapeHtml(moneyLine(v, game));
+    if (kind === 'xp') return `+${Math.round(v).toLocaleString()} XP`;
+    if (kind === 'km') return `${Math.round(useImperial ? v * 0.621371 : v).toLocaleString()} ${useImperial ? 'mi' : 'km'}`;
+    if (kind === 'minutes') return escapeHtml(formatGameMinutes(v, t('hourShort'), t('minShort')));
+    if (kind === 'percent') return `${v < 10 && v > 0 ? v.toFixed(1) : Math.round(v)}\u00a0%`;
+    return escapeHtml(String(v));
+  };
+  const el = document.createElement('div');
+  el.id = 'deliveryCard';
+  el.className = 'deliveryCard';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="deliveryCardHead"><span>✅ ${escapeHtml(t('deliveredTitle'))}</span>`
+    + `<button type="button" class="deliveryCardClose" aria-label="${escapeHtml(t('close'))}" title="${escapeHtml(t('close'))}">×</button></div>`
+    + (summary.route ? `<div class="deliveryCardRoute">${escapeHtml(summary.route)}</div>` : '')
+    + (summary.cargo ? `<div class="deliveryCardCargo">${escapeHtml(summary.cargo)}</div>` : '')
+    + summary.rows.map((r, k) => `<div class="row${k === 0 ? ' deliveryCardPay' : ''}"><span class="label">${escapeHtml(t(r[0]))}</span><span>${value(r)}</span></div>`).join('');
+  el.querySelector('.deliveryCardClose').addEventListener('click', closeDeliveryCard);
+  document.body.appendChild(el);
+  deliveryCardTimer = setTimeout(closeDeliveryCard, DELIVERY_CARD_MS);
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDeliveryCard(); });
+
+function updateSessionEvents(event, game, onJob) {
+  if (onJob && lastOnJob === false) resetJobCosts();
+  if (onJob != null) lastOnJob = !!onJob;
   if (game && sessionTotals.game && game !== sessionTotals.game) {
     resetSessionTotals(game);
     showToast(t('sessionResetToast'), 'success', 3000);
   } else if (game && !sessionTotals.game) {
     sessionTotals.game = game;
   }
-  if (event.tollgate && !previousEventState.tollgate) sessionTotals.tolls += event.tollgatePayAmount || 0;
-  if (event.fined && !previousEventState.fined) sessionTotals.fines += event.fineAmount || 0;
+  if (event.tollgate && !previousEventState.tollgate) {
+    sessionTotals.tolls += event.tollgatePayAmount || 0;
+    jobCosts.tolls += event.tollgatePayAmount || 0;
+  }
+  if (event.fined && !previousEventState.fined) {
+    sessionTotals.fines += event.fineAmount || 0;
+    jobCosts.fines += event.fineAmount || 0;
+  }
   if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
   if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
   if (event.jobDelivered && !previousEventState.jobDelivered) {
-    showToast(t('jobDeliveredToast').replace('{amount}', moneyLine(event.jobDeliveredRevenue || 0, lastData?.game)), 'success');
+    showDeliveryCard(event, jobCosts, game || lastData?.game);
     recordTrip(event);
+    resetJobCosts();
   }
   if (event.jobCancelled && !previousEventState.jobCancelled) {
     showToast(t('jobCancelledToast'), 'danger');
+    resetJobCosts();
   }
   previousEventState.tollgate = !!event.tollgate;
   previousEventState.fined = !!event.fined;
@@ -4569,8 +4673,16 @@ const TRIPS_MAX = 50;
 function loadTrips() {
   try { return JSON.parse(localStorage.getItem(TRIPS_KEY) || '[]'); } catch (e) { return []; }
 }
+// Dos pestanas del mismo navegador (el cliente abre una en cada arranque y la
+// de ayer sigue conectada) grababan la misma entrega dos veces en la misma
+// clave (auditoria del 10-10): si la ultima es igual y de hace un rato, ya
+// esta.
+const TRIP_DEDUPE_MS = 3 * 60 * 1000;
 function recordTrip(event) {
   const trips = loadTrips();
+  const prev = trips[0];
+  if (prev && Date.now() - prev.t < TRIP_DEDUPE_MS && prev.src === (event.jobSrc || null)
+      && prev.dst === (event.jobDst || null) && prev.revenue === Math.round(event.jobDeliveredRevenue || 0)) return;
   trips.unshift({
     t: Date.now(),
     game: lastData?.game || null,
@@ -4784,7 +4896,25 @@ async function updateWakeLock(wanted) {
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && conn.socket !== 'idle') updateWakeLock(true);
+  if (document.visibilityState === 'visible') reopenIfStale();
 });
+
+// Socket medio abierto: con el celular bloqueado o al cambiar de WiFi la
+// conexion muere sin que llegue onclose, y el tablero quedaba congelado
+// diciendo "en vivo" y con los botones mudos (auditoria del 10-10). Al volver
+// a la pestana o a la red, si hace rato que no llega nada, se reconecta.
+const WS_STALE_MS = 10000;
+let lastWsMessageAt = 0;
+function reopenIfStale() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !conn.hasTelemetry || !conn.reopen) return;
+  if (Date.now() - lastWsMessageAt < WS_STALE_MS) return;
+  const old = ws;
+  old.onclose = null;
+  try { old.close(); } catch (e) {}
+  clearTimeout(reconnectTimer);
+  conn.reopen();
+}
+window.addEventListener('online', reopenIfStale);
 
 function renderConnectionUi() {
   const view = connectionView();
@@ -5287,12 +5417,14 @@ function handleTelemetry(data) {
 
 function connectWs(backend, code, options = {}) {
   conn.local = !!options.local;
+  renderLiveShareForLan();
   fetchLatestClientVersion(conn.local ? document.getElementById('backendUrl').value : backend);
   clearTimeout(reconnectTimer);
   // Modo LAN: el cliente sirve esta pagina y el WebSocket directo, sin
   // pairing code (misma red = misma persona); ver client/local_server.py.
   const socket = new WebSocket(conn.local ? backend : `${backend}/ws/live/${code}`);
   ws = socket;
+  conn.reopen = () => connectWs(backend, code, options);
   conn.socket = 'connecting';
   conn.invalidCode = false;
   renderConnectionUi();
@@ -5304,12 +5436,15 @@ function connectWs(backend, code, options = {}) {
     conn.waitingClient = false;
     renderConnectionUi();
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
-    liveRouteSig = null; sendLiveRoute(true);
+    // Sin ruta propia no se manda la vacia al conectar: borraba la ruta que
+    // compartia otra pestana de la misma sesion (auditoria del 10-10).
+    liveRouteSig = currentRouteWorldPoints ? null : 'none'; sendLiveRoute(true);
     sendCurrencyPref(); // idem: la moneda para el post de Discord
     if (keybindsModalOpen) requestKeybinds(); // el pedido anterior se pudo haber perdido en el corte
     if (typeof convoyOnSocketOpen === 'function') { convoyOnSocketOpen(); convoyRenderModal(); } // Convoy: volver a entrar tras (re)conectar
   };
   socket.onmessage = (event) => {
+    lastWsMessageAt = Date.now();
     hideReconnectBanner();
     // Un mensaje del backend = el codigo existia de verdad (el rechazo por
     // codigo desconocido cierra sin mandar nada). Ver el 4404 mas abajo.
@@ -5319,6 +5454,7 @@ function connectWs(backend, code, options = {}) {
     if (data.type) flushPendingTelemetry(); // los mensajes de control se procesan en orden con la telemetria que llego antes
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
+    if (data.type === 'live_share_state') { if (!conn.local) applyLiveShareState(data.enabled); return; }
     if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria
     if (data.type && data.type.startsWith('convoy_')) { if (typeof convoyHandleMessage === 'function') convoyHandleMessage(data); return; } // Convoy (beta)
     if (data.type === 'session_state') {
@@ -5471,7 +5607,7 @@ function startTour() {
 function endTour() {
   document.querySelectorAll('.tourHighlight').forEach(el => el.classList.remove('tourHighlight'));
   document.getElementById('tourOverlay').style.display = 'none';
-  localStorage.setItem('truckdash_tour_seen', '1');
+  lsSet('truckdash_tour_seen', '1');
 }
 
 document.getElementById('tourNextBtn').addEventListener('click', () => {
@@ -5482,7 +5618,7 @@ document.getElementById('tourNextBtn').addEventListener('click', () => {
 document.getElementById('tourSkipBtn').addEventListener('click', endTour);
 document.getElementById('helpBtn').addEventListener('click', startTour);
 
-if (!localStorage.getItem('truckdash_tour_seen')) {
+if (!lsGet('truckdash_tour_seen')) {
   // deja que el mapa/botones terminen de acomodarse; en modo espectador
   // (convoy o mapa en vivo, sin cliente) el tour de pairing no tiene sentido
   setTimeout(() => { if (!conn.spectator) startTour(); }, 600);
@@ -5657,7 +5793,7 @@ function ensureDashPanel() {
   });
   dashPanel.setVisible(false);
   dashPanel.applyTranslations();
-  setDashScale(localStorage.getItem(DASH_SCALE_KEY) || '1');
+  setDashScale(lsGet(DASH_SCALE_KEY) || '1');
   return dashPanel;
 }
 
@@ -5697,3 +5833,36 @@ document.getElementById('dashCopyLinkBtn').addEventListener('click', async () =>
     prompt(t('dashCopyLink'), url.toString());
   }
 });
+
+// En una tablet o un celular no hay hover, asi que el title de los botones del
+// mapa no se ve nunca ("I'm not exactly sure what that button there is",
+// resena de Roane Gaming, 10-10). Al tocar uno se muestra su nombre un
+// momento, las primeras BTN_TIP_TIMES veces de cada boton en este navegador:
+// alcanza para aprenderlos sin que despues moleste. Mantener apretado no
+// sirve para esto: ya abre el modo acomodar (LONG_PRESS_MS).
+const BTN_TIP_TIMES = 3;
+const BTN_TIP_KEY = 'truckdash_btn_tips';
+(() => {
+  let lastPointer = null, tip = null, tipTimer = null;
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(BTN_TIP_KEY) || '{}') || {}; } catch (e) {}
+  const hideTip = () => { clearTimeout(tipTimer); if (tip) { tip.remove(); tip = null; } };
+  document.addEventListener('pointerdown', (e) => { lastPointer = e.pointerType; }, { capture: true, passive: true });
+  document.addEventListener('click', (e) => {
+    if (lastPointer !== 'touch' || document.body.classList.contains('editLayout')) return;
+    const btn = e.target.closest && e.target.closest('.mapBtn, .iconBtn');
+    if (!btn || !btn.id || !btn.title || (seen[btn.id] || 0) >= BTN_TIP_TIMES) return;
+    seen[btn.id] = (seen[btn.id] || 0) + 1;
+    try { localStorage.setItem(BTN_TIP_KEY, JSON.stringify(seen)); } catch (err) {}
+    hideTip();
+    tip = document.createElement('div');
+    tip.className = 'btnTip';
+    tip.textContent = btn.title;
+    document.body.appendChild(tip);
+    const r = btn.getBoundingClientRect();
+    const left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, r.left + r.width / 2 - tip.offsetWidth / 2));
+    tip.style.left = `${left}px`;
+    tip.style.top = `${r.top - tip.offsetHeight - 8 >= 8 ? r.top - tip.offsetHeight - 8 : r.bottom + 8}px`;
+    tipTimer = setTimeout(hideTip, 1800);
+  });
+})();

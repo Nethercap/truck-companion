@@ -179,7 +179,9 @@ document.addEventListener('visibilitychange', () => { if (!wakeLock) keepAwake()
 // --- arranque ---
 document.documentElement.lang = currentLang;
 renderUnits();
-setScale(localStorage.getItem(SCALE_KEY) || '1');
+let escalaGuardada = null;
+try { escalaGuardada = localStorage.getItem(SCALE_KEY); } catch (e) {} // datos del sitio bloqueados
+setScale(escalaGuardada || '1');
 applyPageTranslations();
 keepAwake();
 

@@ -150,7 +150,7 @@ class AppState:
         self.overlay_layout = (overlay.DEFAULT_CORNER, overlay.DEFAULT_SIZE, overlay.ITEMS, None)
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
-                                                T("overlay_arrival_game")))
+                                                T("overlay_arrival_game"), T("overlay_turn_hint")))
         # Arrastrado en el modo Mover: queda en esa posicion.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))
         # Tecla rapida que prende y apaga el overlay desde el juego.
@@ -263,6 +263,14 @@ def show_text_dialog(title: str, message: str, copy_value: str | None = None):
         root.mainloop()
 
     threading.Thread(target=_show, daemon=True).start()
+
+
+def abrir_ajustes_de_red() -> None:
+    """Configuracion de Windows > Red, donde se cambia el perfil a Privada."""
+    try:
+        os.startfile("ms-settings:network-status")
+    except (AttributeError, OSError):
+        logging.exception("No se pudo abrir la configuracion de red")
 
 
 def abrir_navegador(url: str) -> None:
@@ -570,6 +578,12 @@ class SetupWindow:
         # cliente roto y no un puerto cerrado.
         self.label(lan_frame, T("lan_ports"), fg=MUTED, wraplength=520).pack(
             anchor="w", pady=(6, 0))
+        # Red en Publica: casi siempre es por eso que el celular no conecta.
+        self.lan_public_frame = tk.Frame(lan_frame, bg=BG)
+        self.label(self.lan_public_frame, T("lan_public_network"), fg=ORANGE, wraplength=520,
+                   justify="left").pack(anchor="w")
+        self.button(self.lan_public_frame, T("lan_network_settings"),
+                    abrir_ajustes_de_red).pack(anchor="w", pady=(4, 0))
         self.button(lan_btns, T("open_here"), self.open_lan_here).pack(side="left", padx=6)
         self.render_lan()
 
@@ -656,6 +670,12 @@ class SetupWindow:
         # que dejan pasar el clic no andan.
         if win_integration.overlay_supported():
             self.build_overlay_section()
+        elif win_integration.is_wine():
+            # Bajo Proton la seccion no aparecia y no se sabia por que ("the
+            # overlay options aren't in here", Discord 10-10): se dice.
+            sec = self.section(T("sec_overlay"))
+            self.label(sec, T("overlay_wine"), fg=MUTED, wraplength=540,
+                       justify="left").pack(anchor="w", pady=(4, 6))
 
         # --- Update ---
         # --- Update ---
@@ -1125,6 +1145,10 @@ class SetupWindow:
             self.root.clipboard_append(state.code)
 
     def render_lan(self):
+        if win_integration.red_publica():
+            self.lan_public_frame.pack(anchor="w", pady=(6, 0), fill="x")
+        else:
+            self.lan_public_frame.pack_forget()
         srv = state.local
         url = srv.url if srv else None
         if not srv or srv.error or not srv.web_ready or not url:
@@ -1219,8 +1243,10 @@ class SetupWindow:
                 self.overlay_corner_var.set(texto)
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
-        if getattr(self, "_last_lan_url", "?") != lan_url:
-            self._last_lan_url = lan_url
+        # La deteccion de la red Publica llega despues (PowerShell, en un hilo).
+        clave_lan = (lan_url, win_integration.red_publica())
+        if getattr(self, "_last_lan_url", "?") != clave_lan:
+            self._last_lan_url = clave_lan
             self.render_lan()
         if state.update_available:
             version = state.update_available[0]
@@ -1867,6 +1893,8 @@ async def run_client(backend_url: str, fixed_code: str | None):
     if state.local is None:
         state.local = local_server.LocalServer(keybinds)
         asyncio.create_task(state.local.start())
+        threading.Thread(target=win_integration.detectar_red_publica,
+                         args=(local_server.lan_ip(),), daemon=True).start()
     local = state.local
     local.keybinds = keybinds
 

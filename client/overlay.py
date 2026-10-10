@@ -13,7 +13,9 @@ De donde sale cada cosa:
   ({"type": "nav_hud"}, por el relay o directo en LAN). La web solo los manda
   si el cliente avisa en client_status que el overlay esta prendido;
 - sin web (o si deja de mandar, por ejemplo con el celular bloqueado), lo que
-  falta sale de la ruta del GPS del propio juego, y el giro no se muestra.
+  falta sale de la ruta del GPS del propio juego, y en lugar del giro va un
+  aviso chico de que el giro sale del tablero (en Discord preguntaban si hacia
+  falta el navegador abierto para el overlay: no, salvo para el giro).
 
 Se ve solo con el juego al frente y el camion andando: en el escritorio, en
 otra ventana o con el juego en pausa (menu) se esconde. Funciona con el juego
@@ -78,6 +80,10 @@ def limpiar_nav(msg: dict) -> dict:
     }
 
 
+def _con_ruta(nav: dict) -> bool:
+    return bool(nav.get("turn") or nav.get("remaining"))
+
+
 def formato_distancia(km: float, imperial: bool) -> str:
     if imperial:
         mi = km * KM_TO_MI
@@ -102,7 +108,8 @@ def llegada_en_juego(tele: dict) -> str:
 def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float,
               ahora: float, imperial_default: bool | None = None,
               etiqueta_falta: str = "Remaining", etiqueta_llega: str = "Arrival (real)",
-              etiqueta_juego: str = "Arrival (game)", items=ITEMS) -> dict | None:
+              etiqueta_juego: str = "Arrival (game)", items=ITEMS,
+              aviso_giro: str = "") -> dict | None:
     """Lo que hay que dibujar, o None si el overlay no tiene que verse.
 
     tele es el payload que va al tablero (el mismo dict); nav lo ultimo que
@@ -135,8 +142,12 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
             falta = formato_distancia(km, imperial)
 
     ver_giro, ver_vel = "turn" in items, "speed" in items
+    # Con ruta en el juego y el giro elegido pero sin tablero que lo mande,
+    # se dice de donde sale en vez de dejar el lugar vacio sin explicacion.
+    con_ruta = (tele.get("routeDistanceKm") or 0) > 0
     datos = {
         "turn": nav["turn"] if nav_ok and ver_giro else "",
+        "hint": aviso_giro if ver_giro and not nav_ok and con_ruta else "",
         "next": nav.get("next", "") if nav_ok and ver_giro else "",
         "speed": str(velocidad) if ver_vel else "",
         "unit": "mph" if imperial else "km/h",
@@ -154,7 +165,7 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
     }
     # Nada para mostrar (todo destildado, o solo el giro y no hay ruta): no
     # se deja un recuadro vacio arriba del juego.
-    if not any(datos[k] for k in DATOS):
+    if not any(datos[k] for k in DATOS) and not datos["hint"]:
         return None
     return datos
 
@@ -219,6 +230,7 @@ class OverlayData:
         self.tele_ts = 0.0
         self.nav = None
         self.nav_ts = 0.0
+        self.nav_src = None
 
     def telemetria(self, payload: dict) -> None:
         with self._lock:
@@ -226,9 +238,26 @@ class OverlayData:
             self.tele_ts = time.time()
 
     def navegacion(self, msg: dict) -> None:
+        # Con dos tableros abiertos (la pestana de la PC y el celular) cada
+        # uno manda lo suyo, con su ruta y sus unidades, y el overlay saltaba
+        # de uno a otro ("kept bouncing the distance remaining around",
+        # Discord 10-10). Se queda con el que venia mandando mientras siga
+        # fresco; si se calla (pestana cerrada, celular bloqueado) toma el
+        # otro. Una pestana de antes del deploy no manda src: cuenta como un
+        # tablero mas (None), si no le sacaba el lugar al de verdad en cada
+        # mensaje. Excepcion: si el que manda no tiene ruta y el otro si, se
+        # pasa al que tiene (un celular en modo Lite, el mapa cargando).
+        src = msg.get("src") if isinstance(msg.get("src"), str) else None
+        nuevo = limpiar_nav(msg)
+        ahora = time.time()
         with self._lock:
-            self.nav = limpiar_nav(msg)
-            self.nav_ts = time.time()
+            if (self.nav is not None and src != self.nav_src
+                    and ahora - self.nav_ts <= NAV_FRESH_SECONDS
+                    and (_con_ruta(self.nav) or not _con_ruta(nuevo))):
+                return
+            self.nav = nuevo
+            self.nav_ts = ahora
+            self.nav_src = src
 
     def foto(self):
         with self._lock:
@@ -291,7 +320,7 @@ class Overlay:
     def __init__(self, data: OverlayData, ajustes, etiquetas):
         self.data = data
         self.ajustes = ajustes      # () -> (esquina, tamano, que se muestra)
-        self.etiquetas = etiquetas  # () -> (falta, llegada real, llegada del juego), idioma del cliente
+        self.etiquetas = etiquetas  # () -> (falta, llegada real, llegada del juego, aviso del giro), idioma del cliente
         self._activo = False
         self._hilo = None
         # Modo Mover (boton de Setup): el overlay se ve aunque el juego no
@@ -476,10 +505,11 @@ class _Ventana:
                 self.esconder()
                 return
         tele, tele_ts, nav, nav_ts = self.ov.data.foto()
-        falta, llega, llega_juego = self.ov.etiquetas()
+        falta, llega, llega_juego, *resto = self.ov.etiquetas()
         esquina, tamano, items, relativa = self.ov.ajustes()
         datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
-                          etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items)
+                          etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items,
+                          aviso_giro=resto[0] if resto else "")
         rect = _rect_de(juego) if juego else None
         if mover:
             # Sin juego abierto se acomoda sobre la pantalla principal.
@@ -549,6 +579,10 @@ class _Ventana:
                                   font=fuente(14), width=ancho - 2 * pad)
                 y = c.bbox(t)[3]
             y += round(8 * k)
+        elif d.get("hint"):
+            t = c.create_text(pad, y, text=d["hint"], fill=MUTED, anchor="nw",
+                              font=fuente(14), width=ancho - 2 * pad)
+            y = c.bbox(t)[3] + round(8 * k)
 
         if not (d["speed"] or columnas):
             alto = y - round(8 * k) + pad

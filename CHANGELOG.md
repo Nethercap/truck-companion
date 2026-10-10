@@ -10,6 +10,19 @@ updates on its own and is not versioned here.
   instead of your single player one, so game time arrivals match what everyone sees.
 - LAN mode keeps a local copy of the new voice guidance, which now also tells you which
   exit to take at roundabouts.
+- In-game overlay: when the game has a route but no dashboard is open, the overlay says
+  where the next turn comes from (the dashboard, on your phone, a tablet or this PC)
+  instead of leaving that space blank. Speed, limit, distance left and the game clock
+  arrival keep working without it.
+- In-game overlay: with the dashboard open on two devices at once (this PC and your
+  phone, say), the overlay sticks to one of them instead of jumping between their
+  distances and units. If that one stops sending, it switches to the other.
+- LAN mode: if Windows has your network set to Public (the usual reason a phone on the
+  same Wi-Fi can't connect), Setup says so and opens the network settings to change it to
+  Private. The log now records which devices reached the PC, to tell "blocked" apart from
+  "never got there".
+- Linux (Proton): Setup says why the in-game overlay is not there (it is Windows only for
+  now) instead of leaving its section out without a word.
 
 ## 1.5.29 (2026-10-09)
 

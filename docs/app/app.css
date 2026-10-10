@@ -208,11 +208,13 @@
      etiquetas de ciudades vienen horneadas en los tiles, rotar el mapa las
      dejaria ilegibles), pero la flecha SI rota para mostrar hacia donde
      apunta el camion. 0deg = norte, gira en sentido horario con headingDeg. */
+  /* 18x22: con 14x16 se perdia en una tablet (resena de Roane Gaming, 10-10:
+     "if it was a little bit bigger, it probably would be better"). */
   .truckArrow {
     width: 0; height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-bottom: 16px solid var(--accent);
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-bottom: 22px solid var(--accent);
     filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000);
     transition: transform 0.2s linear;
   }
@@ -892,3 +894,34 @@
 
 /* DLC de mapa: casillas en columnas para que entren los de ATS. */
 .dlcGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); column-gap: 0.6rem; }
+
+/* Tarjeta "Trabajo entregado" (showDeliveryCard): arriba al centro, debajo de
+   los modales, hasta que se cierra. */
+.deliveryCard {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2400;
+  width: min(320px, calc(100vw - 32px)); padding: 0.75rem 0.9rem 0.6rem;
+  background: var(--panel); color: var(--text); border: 1px solid #4caf50; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+.deliveryCardHead { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 0.95rem; }
+.deliveryCardClose, .panelCloseX {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 1.4rem; line-height: 1; padding: 0.1rem 0.35rem; margin: -0.3rem -0.4rem -0.3rem 0;
+}
+.deliveryCardClose:hover, .panelCloseX:hover { color: var(--text); }
+.deliveryCardRoute { margin-top: 0.3rem; font-size: 0.85rem; }
+.deliveryCardCargo { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.3rem; }
+.deliveryCard .row:last-child { border-bottom: none; }
+.deliveryCardPay span:last-child { font-weight: 700; color: #4caf50; }
+
+/* La X de arriba de un modal largo (buscar lugares): el boton Cerrar queda
+   abajo de la lista y en una tablet no se encontraba ("how do I get out of
+   that?", resena de Roane Gaming). Sticky: sigue a la vista al bajar. */
+.panelCloseX { position: sticky; top: 0; float: right; margin: -0.5rem -0.6rem 0 0.5rem; z-index: 1; }
+
+/* Nombre de un boton al tocarlo en pantallas tactiles (app.js, BTN_TIP_TIMES). */
+.btnTip {
+  position: fixed; z-index: 3100; pointer-events: none; max-width: min(260px, calc(100vw - 16px));
+  background: var(--panel); color: var(--text); border: 1px solid var(--accent); border-radius: 6px;
+  padding: 0.35rem 0.6rem; font-size: 0.82rem; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}

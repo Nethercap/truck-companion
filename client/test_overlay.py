@@ -247,3 +247,65 @@ def test_la_tecla_solo_cuenta_con_el_juego_al_frente(monkeypatch):
     monkeypatch.setattr(window_compat, "game_window_in_front", lambda: 1234)
     tray_client.tecla_del_overlay()
     assert llamadas == [not tray_client.state.overlay.enabled]
+
+
+def test_sin_tablero_con_ruta_avisa_de_donde_sale_el_giro():
+    # Discord: "do I need to have the browser open to display the in game HUD?"
+    aviso = "Turns come from the dashboard"
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, None, 0, 100, aviso_giro=aviso)
+    assert (d["turn"], d["hint"]) == ("", aviso)
+    # con el tablero mandando, el giro de verdad y sin aviso
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, nav(), 99, 100, aviso_giro=aviso)
+    assert d["turn"] and d["hint"] == ""
+    # sin ruta en el juego no hay giro que extranar
+    assert overlay.contenido(tele(), 100, None, 0, 100, aviso_giro=aviso)["hint"] == ""
+    # con el giro destildado tampoco
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, None, 0, 100, aviso_giro=aviso,
+                          items=("speed",))
+    assert d["hint"] == ""
+    # solo el giro elegido y sin tablero: se ve el aviso en vez de nada
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, None, 0, 100, aviso_giro=aviso,
+                          items=("turn",))
+    assert d is not None and d["hint"] == aviso
+
+
+def test_con_dos_tableros_se_queda_con_uno(monkeypatch):
+    # Discord: "the in game overlay kept bouncing the distance remaining around"
+    ahora = [1000.0]
+    monkeypatch.setattr(overlay.time, "time", lambda: ahora[0])
+    data = overlay.OverlayData()
+    data.navegacion({"remaining": "1,234 mi", "src": "pc"})
+    ahora[0] += 1
+    data.navegacion({"remaining": "1,986 km", "src": "celu"})
+    assert data.foto()[2]["remaining"] == "1,234 mi"
+    ahora[0] += 1
+    data.navegacion({"remaining": "1,233 mi", "src": "pc"})
+    assert data.foto()[2]["remaining"] == "1,233 mi"
+    # la PC deja de mandar: pasado el tiempo de frescura, toma el otro
+    ahora[0] += overlay.NAV_FRESH_SECONDS + 1
+    data.navegacion({"remaining": "1,980 km", "src": "celu"})
+    assert data.foto()[2]["remaining"] == "1,980 km"
+    # una pestana de antes del deploy (sin src) no le saca el lugar
+    ahora[0] += 1
+    data.navegacion({"remaining": "5 km"})
+    assert data.foto()[2]["remaining"] == "1,980 km"
+    # el que manda se queda sin ruta y el otro tiene: se pasa al que tiene
+    ahora[0] += 1
+    data.navegacion({"remaining": "", "turn": "", "src": "celu"})
+    ahora[0] += 1
+    data.navegacion({"remaining": "1,230 mi", "src": "pc"})
+    assert data.foto()[2]["remaining"] == "1,230 mi"
+    # pero uno sin ruta no le saca el lugar al que tiene
+    ahora[0] += 1
+    data.navegacion({"remaining": "", "src": "celu"})
+    assert data.foto()[2]["remaining"] == "1,230 mi"
+
+
+def test_solo_webs_viejas_sin_src_se_aceptan_como_antes(monkeypatch):
+    ahora = [1000.0]
+    monkeypatch.setattr(overlay.time, "time", lambda: ahora[0])
+    data = overlay.OverlayData()
+    data.navegacion({"remaining": "10 km"})
+    ahora[0] += 1
+    data.navegacion({"remaining": "9 km"})
+    assert data.foto()[2]["remaining"] == "9 km"

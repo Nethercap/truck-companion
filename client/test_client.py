@@ -1035,3 +1035,25 @@ def test_dlc_de_mapa_los_mismos_ids_que_la_web():
     for game, archivos in client.MAP_DLC_FILES.items():
         for dlc_id in archivos.values():
             assert f"'{dlc_id}'" in pure, (game, dlc_id)
+
+
+def test_perfil_de_red_publico():
+    # "estoy en la misma WiFi y no conecta" (10-10): la red en Publica
+    import win_integration
+    assert win_integration.perfil_es_publico("Public\r\n") is True
+    assert win_integration.perfil_es_publico("Private") is False
+    assert win_integration.perfil_es_publico("DomainAuthenticated") is False
+    assert win_integration.perfil_es_publico("") is None
+
+
+def test_lan_anota_cada_ip_remota_una_vez(caplog):
+    import logging
+    import local_server
+    local_server._remotos_vistos.clear()
+    with caplog.at_level(logging.INFO):
+        local_server.anotar_remoto("127.0.0.1", "pagina (27765)")
+        local_server.anotar_remoto("192.168.1.40", "pagina (27765)")
+        local_server.anotar_remoto("192.168.1.40", "pagina (27765)")
+        local_server.anotar_remoto("192.168.1.40", "datos (27766)")
+    lineas = [r.getMessage() for r in caplog.records if r.getMessage().startswith("LAN:")]
+    assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]

@@ -547,6 +547,9 @@ function detectManeuver(ctx) {
   const forkMinDev = ctx.forkMinDev != null ? ctx.forkMinDev : 6;
   const forkMinSep = ctx.forkMinSep != null ? ctx.forkMinSep : 8;
   const forkAltSlack = ctx.forkAltSlack != null ? ctx.forkAltSlack : 10;
+  const forkTurnMinDeg = ctx.forkTurnMinDeg != null ? ctx.forkTurnMinDeg : 15;
+  const forkTurnDeg = ctx.forkTurnDeg != null ? ctx.forkTurnDeg : 55;
+  const forkTurnAltMaxDeg = ctx.forkTurnAltMaxDeg != null ? ctx.forkTurnAltMaxDeg : 20;
   const turnAltMaxDeg = ctx.turnAltMaxDeg != null ? ctx.turnAltMaxDeg : 150;
   const turnNaturalMargin = ctx.turnNaturalMargin != null ? ctx.turnNaturalMargin : 45;
   const rejoinM = ctx.rejoinM != null ? ctx.rejoinM : 100;
@@ -651,7 +654,16 @@ function detectManeuver(ctx) {
   if (bestAlt == null) return null;
   if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return null;
   if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return null;
-  return { kind: 'fork', direction: routeDelta > bestAlt ? 'right' : 'left', delta: routeDelta, at: i };
+  const direction = routeDelta > bestAlt ? 'right' : 'left';
+  // Carril de giro con isleta (la esquina de una ciudad de EE.UU.): se separa
+  // poco en los primeros legM metros, pero a forkLegM ya dobla de verdad y la
+  // otra salida sigue derecho. El GPS del juego dice "turn right" y nosotros
+  // "keep right" (resena de Roane Gaming en YouTube, 10-10). Una salida de
+  // autopista se separa de a poco (pocos grados a legM) y sigue siendo keep.
+  if (Math.abs(delta) >= forkTurnMinDeg && Math.abs(routeDelta) >= forkTurnDeg && Math.abs(bestAlt) <= forkTurnAltMaxDeg) {
+    return { kind: 'turn', direction, delta: routeDelta, at: i, inBearing, outBearing: (inBearing + routeDelta + 360) % 360, quiet: false };
+  }
+  return { kind: 'fork', direction, delta: routeDelta, at: i };
 }
 
 // Una esquina grande (un cruce en T de un prefab ancho, con mas de 50 m
@@ -1485,7 +1497,39 @@ function holdDetectedMods(prev, incoming) {
   return out;
 }
 
+// Resumen al entregar un trabajo: lo que paso en el viaje, en filas
+// [clave i18n, tipo, valor]. Antes era un toast de 5 s con el pago, y quien
+// estaba estacionando no lo veia ("the only thing it doesn't show you is what
+// I made out of the job", resena de Roane Gaming, 10-10). Los campos que el
+// cliente no manda (versiones viejas) o que vienen en cero no aparecen; el
+// pago siempre, aunque sea 0. costs: multas y peajes pagados durante el
+// trabajo (los suma la web, el SDK no los trae en la entrega).
+function deliverySummary(event, costs = {}) {
+  if (!event) return null;
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const rows = [['deliveredPay', 'money', num(event.jobDeliveredRevenue) || 0]];
+  const xp = num(event.jobEarnedXp);
+  if (xp) rows.push(['deliveredXp', 'xp', xp]);
+  const km = num(event.jobDeliveredDistanceKm);
+  if (km) rows.push(['deliveredDistance', 'km', km]);
+  const mins = num(event.jobDeliveryTime);
+  if (mins) rows.push(['deliveredTime', 'minutes', mins]);
+  const dmg = num(event.jobCargoDamage);
+  if (dmg != null) rows.push(['cargoDamage', 'percent', Math.max(0, Math.min(1, dmg)) * 100]);
+  if (num(costs.fines)) rows.push(['fines', 'money', costs.fines]);
+  if (num(costs.tolls)) rows.push(['tolls', 'money', costs.tolls]);
+  const route = [event.jobSrc, event.jobDst].every(Boolean) ? `${event.jobSrc} → ${event.jobDst}` : (event.jobDst || null);
+  return { route, cargo: event.jobCargo || null, rows };
+}
+
+// Minutos del juego como "3 h 25 min" / "45 min".
+function formatGameMinutes(mins, h = 'h', m = 'min') {
+  const total = Math.max(0, Math.round(mins || 0));
+  const hh = Math.floor(total / 60), mm = total % 60;
+  return hh ? `${hh} ${h} ${mm} ${m}` : `${mm} ${m}`;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
