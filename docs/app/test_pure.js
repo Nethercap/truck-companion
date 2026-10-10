@@ -960,3 +960,26 @@ test('isDrivingCar: auto por la marca, y por el trabajo con auto si el cliente e
   assert.equal(isDrivingCar({ game: 'ats', onJob: false }), false);
   assert.equal(isDrivingCar(null), false);
 });
+
+test('projectAheadOnRoute: un hueco entre lecturas no congela la ruta, el puente sigue sin ganar', () => {
+  const { projectAheadOnRoute } = require('./pure.js');
+  // Ruta recta hacia el este, un punto cada 50 m durante 5 km.
+  const recta = [];
+  for (let x = 0; x <= 5000; x += 50) recta.push([x, 0]);
+  // Tick normal: 30 m mas adelante.
+  let r = projectAheadOnRoute(recta, 30, 2, 400);
+  assert.equal(r.idx, 0);
+  assert.ok(r.dist < 3);
+  // Hueco de un minuto (pestana frenada): 1,82 km mas adelante. Con la
+  // ventana fija de 400 m el mas cercano quedaba a 1,4 km y no se recortaba.
+  r = projectAheadOnRoute(recta, 1820, 3, 400);
+  assert.equal(r.idx, 36);
+  assert.ok(r.dist < 4, String(r.dist));
+  // Puente: la ruta sigue 400 m al este, da la vuelta por un lazo y cruza
+  // por debajo del camion 800 m despues. Recien arrancado, tiene que caer
+  // al principio de la ruta y no en el cruce.
+  const lazo = [[0, 0], [200, 0], [400, 0], [400, 200], [200, 200], [10, 200], [10, 100], [10, 8], [10, -200]];
+  r = projectAheadOnRoute(lazo, 12, 6, 400);
+  assert.equal(r.idx, 0);
+  assert.equal(projectAheadOnRoute([[0, 0]], 0, 0), null);
+});

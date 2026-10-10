@@ -1153,7 +1153,39 @@ function isDrivingCar(data) {
   return !!(data.onJob && data.cargo && !data.cargoMassKg);
 }
 
+// Donde cae el camion sobre la ruta, buscando solo hacia adelante y cerca:
+// en un enlace con puente la calle transversal (que la ruta recorre 800 m
+// mas adelante, despues del lazo) pasa a 10 m del camion y no puede ganar.
+// points[0] es donde se lo ubico la ultima vez; la ventana crece con lo que
+// avanzo desde ahi. Con una ventana fija de 400 m, un hueco entre lecturas
+// (la pestana en segundo plano detras del juego: Chrome la frena a una
+// lectura por minuto) dejaba al camion mas adelante que la ventana, la ruta
+// no se recortaba nunca mas y las indicaciones pedian dar la vuelta (reporte
+// de Discord, 09-10, Rolla -> Okatie). Devuelve { idx, point, dist } con el
+// tramo [idx, idx + 1] mas cercano, o null si la ruta no tiene tramos.
+function projectAheadOnRoute(points, x, z, baseWindowM = 400) {
+  if (!points || points.length < 2) return null;
+  const moved = Math.hypot(x - points[0][0], z - points[0][1]);
+  const windowM = baseWindowM + 2 * moved;
+  let best = null;
+  let along = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    if (along > windowM) break;
+    const [ax, az] = points[i];
+    const [bx, bz] = points[i + 1];
+    const dx = bx - ax, dz = bz - az;
+    const lenSq = dx * dx + dz * dz;
+    along += Math.sqrt(lenSq);
+    let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = ax + t * dx, pz = az + t * dz;
+    const dist = Math.hypot(x - px, z - pz);
+    if (!best || dist < best.dist) best = { idx: i, point: [px, pz], dist };
+  }
+  return best;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CAR_BRANDS, isDrivingCar, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAR_BRANDS, isDrivingCar, projectAheadOnRoute, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
