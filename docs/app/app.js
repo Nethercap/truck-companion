@@ -2308,6 +2308,8 @@ function closePoiModal() { document.getElementById('poiModal').style.display = '
 document.getElementById('poiBtn').addEventListener('click', openPoiModal);
 initPip();
 document.getElementById('poiCloseBtn').addEventListener('click', closePoiModal);
+document.getElementById('poiCloseX').addEventListener('click', closePoiModal);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePoiModal(); });
 document.getElementById('poiModal').addEventListener('click', (e) => { if (e.target.id === 'poiModal') closePoiModal(); });
 document.getElementById('poiSearchInput').addEventListener('input', renderPoiResults);
 document.getElementById('poiCityInput').addEventListener('input', () => { renderPoiResults(); });
@@ -3699,7 +3701,7 @@ const NAV_FIXED_ZOOM = NAV_ZOOM_DEFAULT;
 // MapLibre (PR #1).
 function updateTruckArrowSize() {
   if (!map || !truckArrowEl) return;
-  const scale = Math.max(0.6, Math.min(1.2, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12));
+  const scale = Math.max(0.8, Math.min(1.3, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12));
   truckArrowEl.style.transform = `scale(${scale})`;
 }
 
@@ -4492,7 +4494,7 @@ function updateHud(data) {
     alertsRow.style.display = 'none';
   }
 
-  updateSessionEvents(data.event || {}, data.game);
+  updateSessionEvents(data.event || {}, data.game, data.onJob);
 }
 
 // Peajes/multas/tren-ferry llegan como pulsos (bool + monto en el mismo tick
@@ -4533,23 +4535,75 @@ function showToast(text, kind = 'success', durationMs = 5000) {
   }, durationMs);
 }
 
-function updateSessionEvents(event, game) {
+// Multas y peajes del trabajo en curso, para el resumen de la entrega. Se
+// arranca de cero al tomar un trabajo (onJob pasa a true) y al terminarlo:
+// lo pagado entre un trabajo y otro no es de ninguno.
+const jobCosts = { fines: 0, tolls: 0 };
+let lastOnJob = null;
+function resetJobCosts() { jobCosts.fines = 0; jobCosts.tolls = 0; }
+
+// Tarjeta "Trabajo entregado": queda hasta cerrarla (o DELIVERY_CARD_MS),
+// no 5 s como el toast de antes, que se perdia mientras uno estacionaba.
+const DELIVERY_CARD_MS = 90000;
+let deliveryCardTimer = null;
+function closeDeliveryCard() {
+  clearTimeout(deliveryCardTimer);
+  document.getElementById('deliveryCard')?.remove();
+}
+function showDeliveryCard(event, costs, game) {
+  const summary = deliverySummary(event, costs);
+  if (!summary) return;
+  closeDeliveryCard();
+  const value = ([, kind, v]) => {
+    if (kind === 'money') return escapeHtml(moneyLine(v, game));
+    if (kind === 'xp') return `+${Math.round(v).toLocaleString()} XP`;
+    if (kind === 'km') return `${Math.round(useImperial ? v * 0.621371 : v).toLocaleString()} ${useImperial ? 'mi' : 'km'}`;
+    if (kind === 'minutes') return escapeHtml(formatGameMinutes(v, t('hourShort'), t('minShort')));
+    if (kind === 'percent') return `${v < 10 && v > 0 ? v.toFixed(1) : Math.round(v)}\u00a0%`;
+    return escapeHtml(String(v));
+  };
+  const el = document.createElement('div');
+  el.id = 'deliveryCard';
+  el.className = 'deliveryCard';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="deliveryCardHead"><span>✅ ${escapeHtml(t('deliveredTitle'))}</span>`
+    + `<button type="button" class="deliveryCardClose" aria-label="${escapeHtml(t('close'))}" title="${escapeHtml(t('close'))}">×</button></div>`
+    + (summary.route ? `<div class="deliveryCardRoute">${escapeHtml(summary.route)}</div>` : '')
+    + (summary.cargo ? `<div class="deliveryCardCargo">${escapeHtml(summary.cargo)}</div>` : '')
+    + summary.rows.map((r, k) => `<div class="row${k === 0 ? ' deliveryCardPay' : ''}"><span class="label">${escapeHtml(t(r[0]))}</span><span>${value(r)}</span></div>`).join('');
+  el.querySelector('.deliveryCardClose').addEventListener('click', closeDeliveryCard);
+  document.body.appendChild(el);
+  deliveryCardTimer = setTimeout(closeDeliveryCard, DELIVERY_CARD_MS);
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDeliveryCard(); });
+
+function updateSessionEvents(event, game, onJob) {
+  if (onJob && lastOnJob === false) resetJobCosts();
+  if (onJob != null) lastOnJob = !!onJob;
   if (game && sessionTotals.game && game !== sessionTotals.game) {
     resetSessionTotals(game);
     showToast(t('sessionResetToast'), 'success', 3000);
   } else if (game && !sessionTotals.game) {
     sessionTotals.game = game;
   }
-  if (event.tollgate && !previousEventState.tollgate) sessionTotals.tolls += event.tollgatePayAmount || 0;
-  if (event.fined && !previousEventState.fined) sessionTotals.fines += event.fineAmount || 0;
+  if (event.tollgate && !previousEventState.tollgate) {
+    sessionTotals.tolls += event.tollgatePayAmount || 0;
+    jobCosts.tolls += event.tollgatePayAmount || 0;
+  }
+  if (event.fined && !previousEventState.fined) {
+    sessionTotals.fines += event.fineAmount || 0;
+    jobCosts.fines += event.fineAmount || 0;
+  }
   if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
   if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
   if (event.jobDelivered && !previousEventState.jobDelivered) {
-    showToast(t('jobDeliveredToast').replace('{amount}', moneyLine(event.jobDeliveredRevenue || 0, lastData?.game)), 'success');
+    showDeliveryCard(event, jobCosts, game || lastData?.game);
     recordTrip(event);
+    resetJobCosts();
   }
   if (event.jobCancelled && !previousEventState.jobCancelled) {
     showToast(t('jobCancelledToast'), 'danger');
+    resetJobCosts();
   }
   previousEventState.tollgate = !!event.tollgate;
   previousEventState.fined = !!event.fined;
@@ -5697,3 +5751,36 @@ document.getElementById('dashCopyLinkBtn').addEventListener('click', async () =>
     prompt(t('dashCopyLink'), url.toString());
   }
 });
+
+// En una tablet o un celular no hay hover, asi que el title de los botones del
+// mapa no se ve nunca ("I'm not exactly sure what that button there is",
+// resena de Roane Gaming, 10-10). Al tocar uno se muestra su nombre un
+// momento, las primeras BTN_TIP_TIMES veces de cada boton en este navegador:
+// alcanza para aprenderlos sin que despues moleste. Mantener apretado no
+// sirve para esto: ya abre el modo acomodar (LONG_PRESS_MS).
+const BTN_TIP_TIMES = 3;
+const BTN_TIP_KEY = 'truckdash_btn_tips';
+(() => {
+  let lastPointer = null, tip = null, tipTimer = null;
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(BTN_TIP_KEY) || '{}') || {}; } catch (e) {}
+  const hideTip = () => { clearTimeout(tipTimer); if (tip) { tip.remove(); tip = null; } };
+  document.addEventListener('pointerdown', (e) => { lastPointer = e.pointerType; }, { capture: true, passive: true });
+  document.addEventListener('click', (e) => {
+    if (lastPointer !== 'touch' || document.body.classList.contains('editLayout')) return;
+    const btn = e.target.closest && e.target.closest('.mapBtn, .iconBtn');
+    if (!btn || !btn.id || !btn.title || (seen[btn.id] || 0) >= BTN_TIP_TIMES) return;
+    seen[btn.id] = (seen[btn.id] || 0) + 1;
+    try { localStorage.setItem(BTN_TIP_KEY, JSON.stringify(seen)); } catch (err) {}
+    hideTip();
+    tip = document.createElement('div');
+    tip.className = 'btnTip';
+    tip.textContent = btn.title;
+    document.body.appendChild(tip);
+    const r = btn.getBoundingClientRect();
+    const left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, r.left + r.width / 2 - tip.offsetWidth / 2));
+    tip.style.left = `${left}px`;
+    tip.style.top = `${r.top - tip.offsetHeight - 8 >= 8 ? r.top - tip.offsetHeight - 8 : r.bottom + 8}px`;
+    tipTimer = setTimeout(hideTip, 1800);
+  });
+})();

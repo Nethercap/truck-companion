@@ -275,6 +275,25 @@ test('maneuver: bifurcacion en Y simetrica -> keep left', () => {
   assert.deepEqual([m.kind, m.direction], ['fork', 'left']);
 });
 
+test('maneuver: carril de giro con isleta que termina doblando 90 grados -> turn, no keep (resena de Roane Gaming)', () => {
+  // la ruta se separa 24 grados en los primeros 60 m y a 250 m ya va casi al este;
+  // la otra salida sigue derecho al norte
+  const ctx = scenario({ route: [[0, -300], [0, 0], [25, 55], [60, 80], [400, 80]], extraNodes: [[0, 100], [0, 400]], edges: [[1, 5], [5, 6]] });
+  const m = detectManeuver(ctx);
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'right', false, 1]);
+  assert.ok(m.outBearing > 55 && m.outBearing < 90);
+  // espejado a la izquierda
+  const izq = scenario({ route: [[0, -300], [0, 0], [-25, 55], [-60, 80], [-400, 80]], extraNodes: [[0, 100], [0, 400]], edges: [[1, 5], [5, 6]] });
+  assert.deepEqual([detectManeuver(izq).kind, detectManeuver(izq).direction], ['turn', 'left']);
+});
+
+test('maneuver: una salida de autopista que despues dobla mucho sigue siendo keep (se separa de a poco)', () => {
+  // rampa a 5 grados los primeros 60 m, despues se abre hacia el este: a 250 m va 60 grados
+  const ctx = scenario({ route: [[0, -300], [0, 0], [5, 60], [30, 100], [300, 100]], extraNodes: [[0, 150], [0, 700]], edges: [[1, 5], [5, 6]] });
+  const m = detectManeuver(ctx);
+  assert.deepEqual([m.kind, m.direction], ['fork', 'right']);
+});
+
 test('maneuver: giro de 90 grados sigue siendo turn', () => {
   // con la calle que sigue derecho como otra opcion
   const ctx = scenario({ route: [[0, -300], [0, 0], [300, 0], [600, 0]], extraNodes: [[0, 300]], edges: [[1, 4]] });
@@ -1185,4 +1204,24 @@ test('holdDetectedMods: el hueco sin lista de mods al rearrancar el juego no tir
   // Sin deteccion previa sigue null (la web usa el selector manual).
   assert.deepEqual(holdDetectedMods(null, { ets2: null, ats: null }), { ets2: null, ats: null });
   assert.equal(holdDetectedMods(antes, null), null);
+});
+
+test('deliverySummary: pago, xp, distancia, tiempo, dano y lo pagado en el viaje', () => {
+  const { deliverySummary, formatGameMinutes } = require('./pure.js');
+  const s = deliverySummary({ jobDeliveredRevenue: 61158, jobEarnedXp: 812, jobDeliveredDistanceKm: 402, jobDeliveryTime: 205,
+    jobCargoDamage: 0.034, jobSrc: 'Oxnard', jobDst: 'Los Angeles', jobCargo: 'Lumber' }, { fines: 250, tolls: 0 });
+  assert.equal(s.route, 'Oxnard → Los Angeles');
+  assert.equal(s.cargo, 'Lumber');
+  assert.deepEqual(s.rows.map(r => r[0]), ['deliveredPay', 'deliveredXp', 'deliveredDistance', 'deliveredTime', 'cargoDamage', 'fines']);
+  assert.ok(Math.abs(s.rows[4][2] - 3.4) < 1e-9);
+  assert.equal(formatGameMinutes(205), '3 h 25 min');
+  assert.equal(formatGameMinutes(45, 'Std.', 'Min.'), '45 Min.');
+});
+
+test('deliverySummary: un cliente viejo sin xp ni dano muestra igual el pago', () => {
+  const { deliverySummary } = require('./pure.js');
+  const s = deliverySummary({ jobDelivered: true });
+  assert.deepEqual(s.rows, [['deliveredPay', 'money', 0]]);
+  assert.equal(s.route, null);
+  assert.equal(deliverySummary(null), null);
 });
