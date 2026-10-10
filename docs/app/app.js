@@ -84,7 +84,7 @@ function loadSettings() {
 }
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff, dlcAuto })));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff, dlcAuto })));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -143,6 +143,7 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // junto a navTargetZoom: saveSettings lo lee, y usar un let antes de su
 // declaracion tumba app.js entero.
 let navZoom = navZoomSetting(_savedSettings.navZoom);
+let truckSize = truckSizeSetting(_savedSettings.truckSize);
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
 // DLC de mapa destildados por juego ({ ats: ['co'], ets2: [] }): las rutas
 // evitan sus caminos (ver dlcBlockedGuards en pure.js). Se guarda lo
@@ -419,6 +420,7 @@ function initSettingsUi() {
   document.getElementById('setLiveShareRoute').checked = liveShareRoute;
   document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
   document.getElementById('setNavZoom').value = navZoom;
+  document.getElementById('setTruckSize').value = truckSize;
   document.getElementById('setVoice').checked = voiceOn;
   loadVoiceCatalog().then(fillVoiceSelect);
   document.getElementById('setDarkButtons').checked = darkButtons;
@@ -614,6 +616,15 @@ function applyNavZoom(value) {
 }
 document.getElementById('setNavZoom').addEventListener('input', (e) => applyNavZoom(e.target.value));
 document.getElementById('setNavZoomDefault').addEventListener('click', () => applyNavZoom(NAV_ZOOM_DEFAULT));
+// Igual que el zoom: la flecha cambia en el mapa mientras se arrastra.
+function applyTruckSize(value) {
+  truckSize = truckSizeSetting(value);
+  document.getElementById('setTruckSize').value = truckSize;
+  saveSettings();
+  updateTruckArrowSize();
+}
+document.getElementById('setTruckSize').addEventListener('input', (e) => applyTruckSize(e.target.value));
+document.getElementById('setTruckSizeDefault').addEventListener('click', () => applyTruckSize(TRUCK_SIZE_DEFAULT));
 document.getElementById('setVoice').addEventListener('change', (e) => {
   voiceOn = e.target.checked;
   saveSettings();
@@ -3751,7 +3762,7 @@ const NAV_FIXED_ZOOM = NAV_ZOOM_DEFAULT;
 // MapLibre (PR #1).
 function updateTruckArrowSize() {
   if (!map || !truckArrowEl) return;
-  const scale = Math.max(0.8, Math.min(1.3, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12));
+  const scale = Math.max(0.8, Math.min(1.3, 1 + (map.getZoom() - NAV_FIXED_ZOOM) * 0.12)) * truckSize;
   truckArrowEl.style.transform = `scale(${scale})`;
 }
 
