@@ -656,6 +656,12 @@ class SetupWindow:
         # que dejan pasar el clic no andan.
         if win_integration.overlay_supported():
             self.build_overlay_section()
+        elif win_integration.is_wine():
+            # Bajo Proton la seccion no aparecia y no se sabia por que ("the
+            # overlay options aren't in here", Discord 10-10): se dice.
+            sec = self.section(T("sec_overlay"))
+            self.label(sec, T("overlay_wine"), fg=MUTED, wraplength=540,
+                       justify="left").pack(anchor="w", pady=(4, 6))
 
         # --- Update ---
         # --- Update ---
