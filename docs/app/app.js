@@ -1912,12 +1912,39 @@ function invalidateRoute() {
   paceEta.reset();
 }
 
+// Los waypoints se guardan por variante de mapa en cada cambio, y vuelven al
+// cargar ese mapa (recargar la pagina no los pierde; ver storedWaypoints).
+// Cambiar de mapa no borra lo guardado del otro.
+const WAYPOINTS_KEY = 'truckdash_waypoints';
+function readStoredWaypoints() {
+  try { return JSON.parse(localStorage.getItem(WAYPOINTS_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function saveWaypoints() {
+  if (!currentGame) return;
+  const stored = readStoredWaypoints();
+  if (waypoints.length) {
+    stored[currentGame] = { at: Date.now(), list: waypoints.map(w => ({ pos: w.pos, inGame: w.inGame, label: w.label })) };
+  } else {
+    delete stored[currentGame];
+  }
+  try { localStorage.setItem(WAYPOINTS_KEY, JSON.stringify(stored)); } catch (e) {}
+}
+function restoreWaypoints() {
+  if (!currentGame || !toLngLat || waypoints.length) return;
+  for (const w of storedWaypoints(readStoredWaypoints(), currentGame, Date.now(), 12 * 3600 * 1000, MAX_WAYPOINTS)) {
+    const lngLat = toLngLat(w.pos[0], w.pos[1]);
+    waypoints.push({ pos: w.pos, lngLat, inGame: w.inGame, label: w.label, marker: makeWaypointMarker(lngLat, waypoints.length) });
+  }
+  if (waypoints.length) { renderWaypointList(); invalidateRoute(); }
+}
+
 function addWaypoint(pos, lngLat, inGame, label) {
   if (waypoints.length >= MAX_WAYPOINTS) { showToast(t('waypointLimitToast').replace('{n}', MAX_WAYPOINTS), 'danger'); return; }
   const wp = { pos, lngLat, inGame, label: label || null, marker: makeWaypointMarker(lngLat, waypoints.length) };
   waypoints.push(wp);
   renderWaypointList();
   invalidateRoute();
+  saveWaypoints();
 }
 
 function removeWaypoint(index) {
@@ -1927,14 +1954,18 @@ function removeWaypoint(index) {
   if (!waypoints.length) waypointRouteDistanceKm = null;
   renderWaypointList();
   invalidateRoute();
+  saveWaypoints();
 }
 
-function clearWaypoint() {
+// keepStored: al cambiar de mapa se sacan de la pantalla pero quedan
+// guardados para cuando se vuelva a esa variante.
+function clearWaypoint(keepStored = false) {
   for (const wp of waypoints) if (wp.marker) wp.marker.remove();
   waypoints = [];
   waypointRouteDistanceKm = null;
   renderWaypointList();
   invalidateRoute();
+  if (!keepStored) saveWaypoints();
 }
 
 function renderWaypointList() {
@@ -3015,7 +3046,8 @@ async function loadGameMap(game) {
   setRouteData(emptyLineString());
   if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
   if (destMarker) { destMarker.remove(); destMarker = null; }
-  clearWaypoint();
+  clearWaypoint(true);
+  restoreWaypoints();
 
   // El source vectorial 'vec' no se puede "reapuntar" a otra url una vez
   // creado - hay que sacarlo (y las capas que dependen de el) y crearlo de

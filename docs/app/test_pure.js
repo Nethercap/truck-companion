@@ -1042,3 +1042,25 @@ test('projectAheadOnRoute: un hueco entre lecturas no congela la ruta, el puente
   assert.equal(r.idx, 0);
   assert.equal(projectAheadOnRoute([[0, 0]], 0, 0), null);
 });
+
+test('storedWaypoints: vuelven los de la variante, vigentes y con forma de waypoint', () => {
+  const { storedWaypoints } = require('./pure.js');
+  const now = 1_000_000_000_000;
+  const stored = {
+    ats: { at: now - 3600 * 1000, list: [{ pos: [10, 20], inGame: true, label: 'Fuel' }, { pos: [1, 'x'] }, null, { pos: [30, 40] }] },
+    ets2: { at: now - 13 * 3600 * 1000, list: [{ pos: [5, 5] }] },
+  };
+  assert.deepEqual(storedWaypoints(stored, 'ats', now), [
+    { pos: [10, 20], inGame: true, label: 'Fuel' },
+    { pos: [30, 40], inGame: false, label: null },
+  ]);
+  // mas de 12 h sin tocarlos: vencidos
+  assert.deepEqual(storedWaypoints(stored, 'ets2', now), []);
+  // otra variante, nada guardado o basura
+  assert.deepEqual(storedWaypoints(stored, 'ats_c2c', now), []);
+  assert.deepEqual(storedWaypoints(null, 'ats', now), []);
+  assert.deepEqual(storedWaypoints({ ats: { at: 'ayer', list: [] } }, 'ats', now), []);
+  // tope de cantidad
+  const muchos = { ats: { at: now, list: Array.from({ length: 20 }, (_, k) => ({ pos: [k, k] })) } };
+  assert.equal(storedWaypoints(muchos, 'ats', now, undefined, 9).length, 9);
+});

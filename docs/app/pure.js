@@ -1297,7 +1297,26 @@ function projectAheadOnRoute(points, x, z, baseWindowM = 400) {
   return best;
 }
 
+// Waypoints guardados en el navegador para que sobrevivan a recargar la
+// pagina (pedido de Discord, 09-10). stored: { [variante]: { at, list:
+// [{ pos: [x, z], inGame, label }] } }. Devuelve la lista de la variante si
+// no vencio (maxAgeMs desde el ultimo cambio; un waypoint de otro dia no
+// tiene que adueñarse de la ruta), descartando lo que no tenga forma de
+// waypoint, y como mucho max.
+function storedWaypoints(stored, variant, now, maxAgeMs = 12 * 3600 * 1000, max = 9) {
+  const entry = stored && typeof stored === 'object' ? stored[variant] : null;
+  if (!entry || !Array.isArray(entry.list) || !Number.isFinite(entry.at)) return [];
+  if (now - entry.at > maxAgeMs || entry.at > now + 60000) return [];
+  const out = [];
+  for (const w of entry.list) {
+    if (!w || !Array.isArray(w.pos) || w.pos.length !== 2 || !w.pos.every(Number.isFinite)) continue;
+    out.push({ pos: [w.pos[0], w.pos[1]], inGame: !!w.inGame, label: typeof w.label === 'string' ? w.label.slice(0, 80) : null });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CAR_BRANDS, isDrivingCar, projectAheadOnRoute, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
