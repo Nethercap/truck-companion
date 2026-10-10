@@ -1235,3 +1235,12 @@ test('truckSizeSetting: de 1 a 3 en pasos de 0.25, lo raro vuelve al tamano norm
   assert.equal(truckSizeSetting('x'), 1);
   assert.equal(truckSizeSetting(1.4), 1.5);
 });
+
+test('useOwnRemaining: el GPS del juego apuntando al remolque no cuenta como llegada', () => {
+  const { useOwnRemaining } = require('./pure.js');
+  assert.equal(useOwnRemaining(0.1, 820), true);   // freight market: el juego va al remolque
+  assert.equal(useOwnRemaining(0, 50), true);      // el juego sin ruta todavia
+  assert.equal(useOwnRemaining(780, 820), false);  // las dos parecidas: manda el juego
+  assert.equal(useOwnRemaining(0.3, 0.5), false);  // cerca del destino
+  assert.equal(useOwnRemaining(5, null), false);   // sin ruta nuestra
+});

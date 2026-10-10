@@ -1185,6 +1185,17 @@ function navZoomSetting(raw) {
   return Math.round(Math.min(NAV_ZOOM_MAX, Math.max(NAV_ZOOM_MIN, z)) * 2) / 2;
 }
 
+// Si "lo que falta" sale de nuestra ruta y no del GPS del juego. El juego en 0
+// con una ruta nuestra larga: todavia no tiene ruta (partida recien cargada).
+// El juego muy por debajo de la nuestra: apunta a otra cosa, como el remolque
+// en el deposito de origen del freight market hasta engancharlo (Discord
+// 10-10: "says I'm at the location when clearly I'm not"). Cerca del destino
+// las dos dan casi 0, por eso el kilometro de margen.
+function useOwnRemaining(gameKm, ownKm) {
+  if (ownKm == null || !(ownKm > 1)) return false;
+  return !gameKm || gameKm < ownKm * 0.25;
+}
+
 // Tamano de la flecha del camion elegido en Ajustes (multiplicador): de 1 a 3
 // en pasos de 0.25. Un usuario con poca vista no la encontraba en la tablet
 // ("I'm blind and can barely see it", Discord 10-10).
@@ -1542,6 +1553,6 @@ function formatGameMinutes(mins, h = 'h', m = 'min') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
