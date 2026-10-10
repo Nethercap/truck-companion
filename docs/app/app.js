@@ -3639,7 +3639,9 @@ function updateNextCity(x, z) {
 // con puente, la calle transversal (que la ruta recorre 800 m mas adelante,
 // despues del lazo) pasa a 10 m del camion y era "el tramo mas cercano" -
 // la linea saltaba como si ya se hubiera dado la vuelta (reporte de un
-// usuario). El camion avanza < 30 m por tick, asi que la ventana sobra.
+// usuario). El camion avanza < 30 m por tick, asi que la ventana sobra; si
+// llega una lectura despues de un hueco, crece con lo que avanzo (ver
+// projectAheadOnRoute en pure.js).
 const TRIM_WINDOW_M = 400;
 // El recorte se lleva al dia en cada tick (lo usan las indicaciones y el
 // resumen), pero la linea se vuelve a dibujar a lo sumo una vez por segundo:
@@ -3650,24 +3652,19 @@ const ROUTE_REDRAW_MS = 1000;
 let routeDrawnAt = 0;
 function trimRouteBehindTruck(x, z) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !map.getSource('route')) return;
-  let bestIdx = 0, bestDist = Infinity, bestPoint = null;
-  let along = 0;
-  for (let i = 0; i < currentRouteWorldPoints.length - 1; i++) {
-    const [ax, az] = currentRouteWorldPoints[i];
-    const [bx, bz] = currentRouteWorldPoints[i + 1];
-    const dx = bx - ax, dz = bz - az;
-    const lenSq = dx * dx + dz * dz;
-    if (along > TRIM_WINDOW_M) break;
-    along += Math.sqrt(lenSq);
-    let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
-    t = Math.max(0, Math.min(1, t));
-    const px = ax + t * dx, pz = az + t * dz;
-    const dist = Math.hypot(x - px, z - pz);
-    if (dist < bestDist) { bestDist = dist; bestIdx = i; bestPoint = [px, pz]; }
-  }
+  const cerca = projectAheadOnRoute(currentRouteWorldPoints, x, z, TRIM_WINDOW_M);
+  if (!cerca) return;
+  const { idx: bestIdx, point: bestPoint, dist: bestDist } = cerca;
   // Si estamos lejos de la ruta calculada, es un desvio real: offRoute ya se
-  // encarga de recalcularla entera, no recortar sobre una ruta vieja.
-  if (bestDist > OFF_ROUTE_THRESHOLD_M) return;
+  // encarga de recalcularla entera, no recortar sobre una ruta vieja. Pero
+  // offRoute mira la ruta ENTERA: si el camion quedo sobre ella mas adelante
+  // de lo que se busca aca, no salta nunca, la linea se queda congelada
+  // atras y las indicaciones piden dar la vuelta. Ahi se recalcula desde
+  // donde esta (una sola vez: la ruta nueva arranca en el camion).
+  if (bestDist > OFF_ROUTE_THRESHOLD_M) {
+    if (distanceToRouteMeters(x, z) <= OFF_ROUTE_THRESHOLD_M) currentRouteTarget = null;
+    return;
+  }
   // Los nodos que quedan atras se guardan aparte (ultimos 8): findUpcomingTurn
   // los usa para medir el rumbo de ENTRADA a un cruce cercano - sin ellos, a
   // menos de 60 m del cruce el tramo de entrada se achicaba hasta cero y la
