@@ -229,6 +229,9 @@ right after.
 
 The client runs under Proton and a tester has it working, including plugin
 install, the pairing code and LAN mode. There is no native Linux build yet.
+The in-game overlay is Windows only: Wine can't draw a see-through window
+over the game that lets clicks through, so under Proton its section in Setup
+only explains that. Use the dashboard on a phone or tablet instead.
 
 The one rule that matters: **the client has to run in the same Proton prefix
 as the game.** The telemetry it reads is a named shared memory block, and

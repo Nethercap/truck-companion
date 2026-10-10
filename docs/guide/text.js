@@ -149,7 +149,7 @@ GUIDE_TEXT.en = {
 </ul>
 <div class="tip"><p>Something not working? Ask in our <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> and attach the log file: most problems are solved in a couple of messages.</p></div>`,
     overlay: `
-<p>A small panel the client draws over the game, so you see the essentials without looking away from the road. Windows only, with the game in a window or in borderless fullscreen.</p>
+<p>A small panel the client draws over the game, so you see the essentials without looking away from the road. Windows only (not under Linux with Proton), with the game in a window or in borderless fullscreen.</p>
 <ul>
 <li><b>Speed and speed limit</b>, straight from the game. The limit blinks when you go over it.</li>
 <li><b>Next turn and next city</b>, <b>distance left</b> and <b>arrival</b> in real time. These come from the dashboard, so keep it open with a route (on your phone, a tablet or this PC). Without it, the distance left comes from the game's own GPS.</li>
@@ -358,7 +358,7 @@ GUIDE_TEXT.es = {
 </ul>
 <div class="tip"><p>¿Algo no anda? Preguntá en nuestro <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> y adjuntá el archivo de log: la mayoría de los problemas se resuelven en un par de mensajes.</p></div>`,
     overlay: `
-<p>Un recuadro que el cliente dibuja sobre el juego, para ver lo importante sin sacar la vista de la ruta. Solo en Windows, con el juego en ventana o en pantalla completa sin bordes.</p>
+<p>Un recuadro que el cliente dibuja sobre el juego, para ver lo importante sin sacar la vista de la ruta. Solo en Windows (no en Linux con Proton), con el juego en ventana o en pantalla completa sin bordes.</p>
 <ul>
 <li><b>Velocidad y límite</b>, directo del juego. El límite titila si te pasás.</li>
 <li><b>Próximo giro y próxima ciudad</b>, <b>lo que falta</b> y la <b>llegada</b> en hora real. Salen del tablero, así que tenelo abierto con una ruta (en el celular, una tablet o esta PC). Sin el tablero, lo que falta sale del GPS del propio juego.</li>
