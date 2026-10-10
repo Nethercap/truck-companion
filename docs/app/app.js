@@ -559,6 +559,7 @@ const LIVE_ROUTE_RESEND_MS = 15000;
 let liveRouteSig = null;
 let liveRouteSentAt = 0;
 function sendLiveRoute(force) {
+  if (!isLeaderTab) return; // ver requestLeadership
   if (!ws || ws.readyState !== WebSocket.OPEN || conn.demo || conn.spectator) return;
   const pts = currentRouteWorldPoints;
   if (!liveShareEnabled || !liveShareRoute || !lastSentMapVariant || !pts || pts.length < 2) {
@@ -2902,7 +2903,7 @@ function updateRouteSummary(data) {
   if (remainingKm != null) routeProgressState.total = Math.max(routeProgressState.total, remainingKm);
   if (voiceOn) {
     const arrived = voiceGuide.arrival(key, target.kind, remainingKm, routeProgressState.total);
-    if (arrived) speakVoice(arrived);
+    if (arrived && isLeaderTab) speakVoice(arrived);
   }
   const percent = remainingKm == null || routeProgressState.total <= 0 ? 0
     : Math.max(0, Math.min(100, (1 - remainingKm / routeProgressState.total) * 100));
@@ -3628,6 +3629,7 @@ const NAV_HUD_KEEPALIVE_MS = 3000;
 const NAV_HUD_SRC = Math.random().toString(36).slice(2, 10);
 
 function sendNavHud() {
+  if (!isLeaderTab) return; // ver requestLeadership
   if (!clientOverlayOn || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
   const $ = (id) => document.getElementById(id);
   const resumen = !$('routeSummary').hidden;
@@ -3746,10 +3748,42 @@ function fillVoiceSelect() {
 function voiceManeuverTick(turn) {
   if (!voiceOn) return;
   const key = voiceGuide.maneuver(turn, Math.abs(Number(lastData && lastData.speedKmh) || 0));
-  if (key) speakVoice(key);
+  if (key && isLeaderTab) speakVoice(key);
 }
 
 if (voiceOn) loadVoiceCatalog().then(() => loadVoicePack(currentVoice()));
+
+// Una sola pestana "lider" por navegador. El cliente abre una pestana nueva
+// en cada arranque y la de ayer sigue conectada: las dos hablaban (la voz
+// doble, desfasada), grababan la misma entrega y le mandaban al overlay y al
+// mapa en vivo cada una lo suyo (auditoria del 10-10). La lider es la que
+// tiene el lock; la pestana que se mira se lo saca a la otra, que queda en
+// espera para cuando esta se cierre. Sin navigator.locks (navegador viejo)
+// todas son lider, como antes. Entre dispositivos distintos no aplica.
+const LEADER_LOCK = 'truckdash-leader';
+let isLeaderTab = !(navigator.locks && navigator.locks.request);
+function requestLeadership(steal) {
+  if (!navigator.locks || !navigator.locks.request) return;
+  navigator.locks.request(LEADER_LOCK, steal ? { steal: true } : {}, () => {
+    setLeaderTab(true);
+    return new Promise(() => {}); // se tiene hasta cerrar la pestana o que otra lo saque
+  }).catch(() => {
+    // Otra pestana se lo saco: a la cola, por si esa se cierra.
+    setLeaderTab(false);
+    requestLeadership(false);
+  });
+}
+function setLeaderTab(on) {
+  if (isLeaderTab === on) return;
+  isLeaderTab = on;
+  const hint = document.getElementById('voiceOtherTabHint');
+  if (hint) hint.hidden = on;
+  if (on) { liveRouteSig = null; sendLiveRoute(true); navHudLastSig = ''; sendNavHud(); }
+}
+requestLeadership(document.visibilityState === 'visible');
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !isLeaderTab) requestLeadership(true);
+});
 
 // Zoom fijo en modo navegacion - el acercamiento automatico al doblar
 // (probado antes) generaba saltos molestos justo en intersecciones/enlaces,
@@ -4685,7 +4719,7 @@ function updateSessionEvents(event, game, onJob) {
   if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
   if (event.jobDelivered && !previousEventState.jobDelivered) {
     showDeliveryCard(event, jobCosts, game || lastData?.game);
-    recordTrip(event);
+    if (isLeaderTab) recordTrip(event); // una sola pestana por navegador la graba
     resetJobCosts();
   }
   if (event.jobCancelled && !previousEventState.jobCancelled) {
