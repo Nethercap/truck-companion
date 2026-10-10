@@ -187,16 +187,25 @@ def match_game_window(ventanas, titulos):
     """Elige la ventana del juego de [(hwnd, titulo, exe)], o None.
 
     Primero por ejecutable, que es lo unico que no cambia; despues por
-    titulo, aceptando que tenga algo alrededor (TruckersMP le agrega cosas).
+    titulo, aceptando que tenga algo alrededor (TruckersMP le agrega cosas),
+    pero solo si no se pudo saber el ejecutable: una pestana de Chrome con un
+    video de ATS, la carpeta "Documentos, American Truck Simulator" o opentrack
+    se tomaban por el juego, el cliente quedaba en "falta el plugin" con el
+    juego cerrado y la botonera le mandaba teclas a Chrome (log del 10-10).
     """
     for hwnd, _titulo, exe in ventanas:
         if exe in GAME_EXES:
             return hwnd
-    for hwnd, titulo, _exe in ventanas:
+    for hwnd, titulo, exe in ventanas:
+        if exe:
+            continue
         for esperado in titulos:
             if titulo and esperado and (titulo == esperado or esperado in titulo):
                 return hwnd
     return None
+
+
+_ultimas_vistas = None
 
 
 def find_game_window(titulos):
@@ -217,10 +226,16 @@ def find_game_window(titulos):
         if hwnd:
             return hwnd
         # Sin match, el log tiene que decir QUE se vio: es la diferencia entre
-        # "el titulo cambio" y "la ventana no esta en este escritorio", que es
-        # lo que hay que saber para el proximo reporte.
-        vistas = [f"{t!r}/{e}" for _h, t, e in ventanas if t or e][:12]
-        logging.info(f"Ventana del juego no encontrada entre {len(ventanas)} ventanas: {vistas}")
+        # "el titulo cambio" y "la ventana no esta en este escritorio". Solo
+        # los ejecutables, sin titulos, y solo cuando cambian: con titulos y
+        # cada 3 s el log crecia ~10 MB por dia con las pestanas de Chrome y
+        # los canales de Discord de la persona, y "Report a problem" los
+        # pegaba en un issue publico (auditoria del 10-10).
+        global _ultimas_vistas
+        vistas = sorted({e for _h, _t, e in ventanas if e})
+        if vistas != _ultimas_vistas:
+            _ultimas_vistas = vistas
+            logging.info(f"Ventana del juego no encontrada entre {len(ventanas)} ventanas: {vistas}")
         return None
     if _get_display() is None:
         return None

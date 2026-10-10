@@ -277,8 +277,28 @@ def load_settings() -> dict:
 
 
 def save_settings(settings: dict) -> None:
+    # A un temporal y despues os.replace: escribiendo encima, un corte de luz
+    # o un disco lleno a mitad de camino dejaba el archivo vacio o roto,
+    # load_settings devolvia {} y se perdian el codigo de pairing y la cuenta
+    # vinculada (auditoria del 10-10). Si el reemplazo falla (un antivirus con
+    # el archivo abierto), se escribe directo como antes.
+    path = settings_path()
+    tmp = path + ".tmp"
     try:
-        with open(settings_path(), "w", encoding="utf-8") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        return
+    except Exception as exc:
+        logging.info(f"settings.json: escritura atomica fallo ({exc}), se escribe directo")
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    try:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2)
     except Exception as exc:
         logging.warning(f"No se pudo guardar settings.json ({exc})")
