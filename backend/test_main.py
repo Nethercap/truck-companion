@@ -424,6 +424,8 @@ def test_viewer_receives_session_state_on_connect_and_when_client_connects(clien
     with client.websocket_connect(f"/ws/live/{code}") as viewer:
         first = main.json.loads(viewer.receive_text())
         assert first == {"type": "session_state", "client_connected": False, "client_status": None}
+        # Y enseguida el estado real de "compartir posicion"
+        assert main.json.loads(viewer.receive_text()) == {"type": "live_share_state", "enabled": False}
 
         with client.websocket_connect(f"/ws/client/{code}") as local_client:
             connected = main.json.loads(viewer.receive_text())
@@ -447,6 +449,7 @@ def test_el_aviso_de_fuera_del_mapa_llega_al_cliente(client, main):
     code = client.post("/pair/new").json()["code"]
     with client.websocket_connect(f"/ws/live/{code}") as viewer:
         viewer.receive_text()
+        viewer.receive_text()  # live_share_state
         with client.websocket_connect(f"/ws/client/{code}") as local_client:
             viewer.receive_text()
             aviso = {"type": "offmap", "game": "ats"}
@@ -518,6 +521,32 @@ def test_viewer_with_unknown_code_is_still_rejected(client, main):
     assert "ZZZZ9999" not in main.sessions
 
 
+def test_cliente_nuevo_reemplaza_al_viejo_sin_que_el_viejo_lo_borre(client, main):
+    """Dos conexiones del cliente con el mismo codigo (corte que el servidor
+    no detecto, o el .exe abierto dos veces): la vieja se cierra con 4409 y,
+    cuando termina, no deja la sesion sin cliente ni le avisa a la web que
+    se desconecto (auditoria del 10-10)."""
+    import time as _time
+    from starlette.websockets import WebSocketDisconnect
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as viewer:
+        viewer.receive_text()  # session_state
+        viewer.receive_text()  # live_share_state
+        with client.websocket_connect(f"/ws/client/{code}") as viejo:
+            viewer.receive_text()  # session_state (conectado)
+            with client.websocket_connect(f"/ws/client/{code}") as nuevo:
+                assert main.json.loads(viewer.receive_text())["client_connected"] is True
+                with pytest.raises(WebSocketDisconnect) as exc:
+                    viejo.receive_text()
+                assert exc.value.code == 4409
+                viejo.close()  # termina el handler viejo: corre su finally
+                _time.sleep(0.1)
+                assert main.sessions[code].client_ws is not None
+                nuevo.send_text(main.json.dumps({"type": "client_status", "status": "live"}))
+                # Lo proximo que ve la web es el cliente nuevo, no un "desconectado"
+                assert main.json.loads(viewer.receive_text())["type"] == "client_status"
+
+
 def test_job_delivered_true_on_first_tick_of_a_session_is_not_counted(client, main, monkeypatch):
     # El flag del SDK queda en true un buen rato despues de entregar: un
     # cliente que (re)conecta con el flag ya en true no debe generar una
@@ -545,6 +574,7 @@ def test_client_status_message_does_not_seed_the_delivery_edge(client, main, mon
     tick = lambda delivered: main.json.dumps({"citySrc": "A", "cityDst": "B", "cargo": "C", "event": {"jobDelivered": delivered, "jobDeliveredRevenue": 100, "jobDeliveredDistanceKm": 10}})
     with client.websocket_connect(f"/ws/live/{code}") as viewer:
         viewer.receive_text()  # session_state
+        viewer.receive_text()  # live_share_state
         with client.websocket_connect(f"/ws/client/{code}") as ws:
             viewer.receive_text()  # session_state (cliente conectado)
             ws.send_text(main.json.dumps({"type": "client_status", "status": "live", "game": "ets2", "clientVersion": "1.4.2"}))
@@ -797,6 +827,71 @@ def test_convoy_create_again_with_own_code_is_a_rejoin(main):
     asyncio.run(scenario())
 
 
+def test_convoy_resumen_suma_los_km_de_los_que_se_fueron(main, monkeypatch):
+    """convoy_close saca a todos antes de armar el resumen: los km tienen que
+    quedar en el convoy al salir cada uno, y una sola vez aunque el que se va
+    sea una sesion muerta que limpia convoy_tick (auditoria del 10-10)."""
+    import asyncio
+
+    async def scenario():
+        main.convoys.clear()
+        a, wa = _convoy_session(main, "FFFFFFFF")
+        b, wb = _convoy_session(main, "GGGGGGGG")
+        c, wc = _convoy_session(main, "HHHHHHHH")
+        main.handle_convoy_message(a, wa, "convoy_create", {"nickname": "Lider", "mapVariant": "ets2"})
+        code = a.convoy_code
+        convoy = main.convoys[code]
+        main.handle_convoy_message(b, wb, "convoy_join", {"nickname": "Dos", "code": code})
+        main.handle_convoy_message(c, wc, "convoy_join", {"nickname": "Tres", "code": code})
+        convoy.members[a.code].km = 100.0
+        convoy.members[b.code].km = 40.0
+        convoy.members[c.code].km = 7.0
+        main.handle_convoy_message(b, wb, "convoy_leave", {})  # se va a mano
+        del main.sessions[c.code]                               # su sesion murio
+        main.convoy_tick()
+        main.convoy_tick()                                      # no se cuenta dos veces
+        assert c.convoy_code is None
+        assert abs(convoy.km_left - 47.0) < 1e-6
+        main.handle_convoy_message(a, wa, "convoy_close", {})  # saca a todos y termina
+        assert code not in main.convoys and not convoy.members
+
+        captured = {}
+
+        class FakeResponse:
+            def close(self):
+                pass
+
+        def fake_urlopen(req, timeout=10):
+            captured["body"] = main.json.loads(req.data)
+            return FakeResponse()
+
+        monkeypatch.setattr(main, "DISCORD_CONVOY_WEBHOOK_URL", "https://discord.com/api/webhooks/fake")
+        monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen)
+        main.post_convoy_summary(convoy)
+        fields = {f["name"]: f["value"] for f in captured["body"]["embeds"][0]["fields"]}
+        assert fields["Distance"] == "147 km"
+
+    asyncio.run(scenario())
+
+
+def test_convoy_y_mapa_en_vivo_cierran_despues_del_accept(client, main):
+    """Cerrando antes del accept el navegador ve 1006 sin el codigo y
+    reintenta para siempre un convoy terminado o un mapa lleno. El handshake
+    se tiene que completar y recien ahi llega el cierre con su codigo."""
+    from starlette.websockets import WebSocketDisconnect
+    main.convoys.clear()
+    with client.websocket_connect("/ws/convoy/ZZZZZZ") as ws:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_text()
+    assert exc.value.code == 4404
+    for i in range(main.LIVE_MAP_MAX_SPECTATORS_PER_VARIANT):
+        main.live_map_spectators["ats"][f"lleno{i}"] = None
+    with client.websocket_connect("/ws/livemap/ats") as ws:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_text()
+    assert exc.value.code == 4403
+
+
 # ---------------------------------------------------------------- mapa en vivo publico (/live/)
 
 def _sharing_session(main, code, variant, nick=None, summary=None):
@@ -874,6 +969,95 @@ def test_set_live_share_stores_trimmed_nick_and_clears_when_disabled(client, mai
         ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": False}))
         _time.sleep(0.05)
         assert session.live_nick is None
+
+
+def test_set_live_share_descarta_una_variante_que_no_es_un_nombre(client, main):
+    """Una lista o un dict como mapVariant rompia broadcast_live_positions y
+    /live/summary para todos (auditoria del 10-10)."""
+    import time as _time
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as ws:
+        session = main.sessions[code]
+        for malo in (["ats"], {"a": 1}, "Bad Variant!"):
+            ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": True, "mapVariant": malo}))
+            _time.sleep(0.05)
+            assert session.share_position is True and session.map_variant is None
+        session.last_position = {"x": 1.0, "z": 2.0, "ts": main.time.time()}
+        main.broadcast_live_positions()  # no revienta
+        assert client.get("/live/summary").json()["total"] == 0
+
+
+def test_la_limpieza_de_sesiones_corre_aunque_el_broadcast_falle(main, monkeypatch):
+    import asyncio
+    limpiezas = []
+
+    def roto():
+        raise TypeError("variante rara")
+
+    monkeypatch.setattr(main, "LIVE_POSITIONS_BROADCAST_INTERVAL_SECONDS", 0.001)
+    monkeypatch.setattr(main, "broadcast_live_positions", roto)
+    monkeypatch.setattr(main, "cleanup_expired_sessions", lambda: limpiezas.append(1))
+    monkeypatch.setattr(main.logging, "exception", lambda *a, **k: None)
+
+    async def run():
+        task = asyncio.create_task(main.broadcast_live_positions_loop())
+        for _ in range(200):
+            if limpiezas:
+                break
+            await asyncio.sleep(0.01)
+        task.cancel()
+
+    asyncio.run(run())
+    assert limpiezas
+
+
+def test_el_reenvio_automatico_no_vuelve_a_prender_lo_que_el_usuario_apago(client, main):
+    """share_position es uno por sesion y cada pestana lo reenvia al
+    (re)conectar con su default (prendido): un segundo dispositivo o una
+    reconexion volvia a publicar la posicion despues de que el usuario la
+    apago a mano (auditoria del 10-10). explicit=True es el tilde tocado,
+    explicit=False el reenvio automatico; sin la clave, una web vieja."""
+    import time as _time
+    code = client.post("/pair/new").json()["code"]
+
+    def enviar(ws, enabled, **extra):
+        ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": enabled, "mapVariant": "ats", **extra}))
+
+    def estado(ws):
+        msg = main.json.loads(ws.receive_text())
+        assert msg["type"] == "live_share_state"
+        return msg["enabled"]
+
+    with client.websocket_connect(f"/ws/live/{code}") as tab1:
+        tab1.receive_text()  # session_state
+        assert estado(tab1) is False
+        session = main.sessions[code]
+        enviar(tab1, True, explicit=False)   # primera vez: el default prendido aplica
+        assert estado(tab1) is True
+        enviar(tab1, False, explicit=True)   # el usuario lo apaga
+        assert estado(tab1) is False
+        assert session.share_off_by_user is True
+
+        with client.websocket_connect(f"/ws/live/{code}") as tab2:
+            tab2.receive_text()  # session_state
+            assert estado(tab2) is False     # el dispositivo nuevo se entera del estado real
+            enviar(tab2, True, explicit=False)  # su reenvio automatico se ignora
+            assert estado(tab2) is False
+            assert estado(tab1) is False     # le llega a todas las pestanas
+            assert session.share_position is False and session.map_variant is None
+
+            enviar(tab2, True, explicit=True)   # prender a mano si
+            assert estado(tab2) is True and estado(tab1) is True
+            assert session.share_off_by_user is False and session.map_variant == "ats"
+
+            enviar(tab1, False, explicit=False)  # apagar siempre se puede
+            assert estado(tab1) is False and estado(tab2) is False
+            assert session.share_position is False and session.share_off_by_user is True
+
+            enviar(tab2, True)  # web vieja (sin explicit): se aplica como antes
+            assert estado(tab2) is True
+            _time.sleep(0.05)
+            assert session.share_position is True
 
 
 # --------------------------------------------------------- eventos TruckersMP
@@ -1046,6 +1230,41 @@ def test_dlc_de_mapa_del_cliente_saneados(main):
     assert main.clean_map_dlcs({"ats": ["co", "<script>", 3, "x" * 40], "otro": ["a"]}) == {"ats": ["co"]}
     assert main.clean_map_dlcs({"ats": "co"}) is None
     assert main.clean_map_dlcs(None) is None
+
+
+def test_mods_de_mapa_del_cliente_saneados(main):
+    assert main.clean_map_mods({"ats": {"c2c": True, "canada_expansion": 1}, "ets2": None}) == {
+        "ats": {"c2c": True, "canada_expansion": True}, "ets2": None}
+    sucio = {"ats": {"c2c": "si", "Bad Key": True, "x" * 40: True, "<script>": True, 3: True},
+             "ets2": ["promods"], "otro": {"a": True}}
+    assert main.clean_map_mods(sucio) == {"ats": {"c2c": True}, "ets2": None}
+    largo = {"ats": {f"m{i}": True for i in range(100)}}
+    assert len(main.clean_map_mods(largo)["ats"]) == main.MAP_MOD_FLAGS_MAX
+    assert main.clean_map_mods(None) is None
+    assert main.clean_map_mods("c2c") is None
+
+
+def test_viewer_que_entra_despues_recibe_los_mods_de_mapa(client, main):
+    """El cliente solo reenvia client_status cuando algo cambia: una pestana
+    que abre o recarga despues tiene que recibir los mods de mapa en el
+    session_state, o carga el mapa base y la ciudad "no existe" (auditoria
+    del 10-10). Los nombres de los mods (activeMods) no se guardan."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as local_client:
+        local_client.send_text(main.json.dumps({
+            "type": "client_status", "status": "live", "game": "ats",
+            "mapMods": {"ats": {"c2c": True, "canada_expansion": True, "Basura!": True}, "ets2": None},
+            "activeMods": ["Coast to Coast", "Canada Expansion"],
+        }))
+        import time as _time
+        _time.sleep(0.1)
+        with client.websocket_connect(f"/ws/live/{code}") as viewer:
+            estado = main.json.loads(viewer.receive_text())
+            assert estado["type"] == "session_state"
+            status = estado["client_status"]
+            assert status["mapMods"] == {"ats": {"c2c": True, "canada_expansion": True}, "ets2": None}
+            assert "activeMods" not in status
+            assert "Coast to Coast" not in main.json.dumps(estado)
 
 
 def test_mapas_armados_del_cliente_saneados(main):

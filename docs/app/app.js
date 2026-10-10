@@ -3979,6 +3979,32 @@ function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
   runFrameJob('truck', step);
 }
 
+// Mods de mapa del cliente. Llegan en cada client_status y, al conectar, en
+// el client_status que el relay tenia guardado (session_state), que antes se
+// ignoraba: un tablero recien abierto (recarga, codigo nuevo) cargaba el mapa
+// base hasta el proximo aviso del cliente, el camion en una ciudad de Coast
+// to Coast quedaba "fuera del mapa" y la ruta no encontraba la ciudad
+// (usuario de C2C + Canada, 10-10).
+function applyClientMapMods(st) {
+  if (st.activeMods !== undefined) detectedModNames = st.activeMods;
+  const mapMods = st.mapMods === undefined ? undefined : holdDetectedMods(detectedMods, st.mapMods);
+  if (mapMods !== undefined && JSON.stringify(mapMods) !== JSON.stringify(detectedMods)) {
+    detectedMods = mapMods;
+    if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada
+    if (document.getElementById('modsModal').style.display === 'flex') initModsUi();
+  }
+}
+
+// "Fuera del mapa" solo cuando ya se sabe con que mods juega (o paso un rato:
+// un cliente viejo no los manda, y al cargar el juego vienen en null ~40 s).
+// Si no, el aviso y el offmap al cliente salian con el mapa base cargado de
+// apuro.
+const OFFMAP_GRACE_MS = 60000;
+function offMapCheckReady(game) {
+  if (!modsAuto || (detectedMods && detectedMods[game] != null)) return true;
+  return Date.now() - (conn.openedAt || 0) > OFFMAP_GRACE_MS;
+}
+
 function resolveEffectiveGame(game) {
   const g = game || 'ats';
   // Armado en la PC para los mods activos: se armo justo porque el de R2 no
@@ -4121,7 +4147,7 @@ function updateMap(position, game, gameHeadingDeg) {
   }
   lastWorldPos = { x: position.x, z: position.z };
   if (!conn.demo && !conn.spectator && mapBounds && offMapWarnedFor !== currentGame
-      && !insideMapBounds(mapBounds, position.x, position.z)) {
+      && offMapCheckReady(lastData && lastData.game) && !insideMapBounds(mapBounds, position.x, position.z)) {
     offMapWarnedFor = currentGame;
     const label = (typeof GAME_MAPS !== 'undefined' && GAME_MAPS[currentGame] && GAME_MAPS[currentGame].label) || currentGame;
     showToast(t('offMapNotice').replace('{map}', label), 'info', 20000);
@@ -5431,6 +5457,7 @@ function connectWs(backend, code, options = {}) {
 
   socket.onopen = () => {
     hideReconnectBanner();
+    conn.openedAt = Date.now();
     conn.socket = 'open';
     conn.everOpen = true;
     conn.waitingClient = false;
@@ -5463,6 +5490,7 @@ function connectWs(backend, code, options = {}) {
       setClientOverlay(data.client_status && data.client_status.overlay);
       if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);
       if (data.client_status) applyLocalMaps(data.client_status.localMaps, data.client_status.localMapPort);
+      if (data.client_status) applyClientMapMods(data.client_status);
       if (!conn.clientConnected) conn.hasTelemetry = false;
       renderConnectionUi();
       return;
@@ -5471,15 +5499,9 @@ function connectWs(backend, code, options = {}) {
       conn.clientConnected = true;
       conn.clientStatus = data; // incluye .detail si el cliente lo manda
       setClientOverlay(data.overlay);
-      if (data.activeMods !== undefined) detectedModNames = data.activeMods;
       applyDetectedDlcs(data.mapDlcs);
       applyLocalMaps(data.localMaps, data.localMapPort);
-      const mapMods = data.mapMods === undefined ? undefined : holdDetectedMods(detectedMods, data.mapMods);
-      if (mapMods !== undefined && JSON.stringify(mapMods) !== JSON.stringify(detectedMods)) {
-        detectedMods = mapMods;
-        if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada
-        if (document.getElementById('modsModal').style.display === 'flex') initModsUi();
-      }
+      applyClientMapMods(data);
       if (data.status !== 'live') conn.hasTelemetry = false;
       renderConnectionUi();
       checkUpdateBanner(data.clientVersion);

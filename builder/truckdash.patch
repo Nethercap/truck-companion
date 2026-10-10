@@ -2697,9 +2697,9 @@ index 0000000..1d8a4aa
 +      return new ScsArchive(modPath, source);
 +    if (magic[0] === 0x50 && magic[1] === 0x4b)
 +      return new ZipEntries(modPath, source);
-+    throw new Error(
-+      `${modPath}: no es un .scs que conozcamos (ni HashFS ni ZIP)`,
-+    );
++    // Uno cifrado o de otro formato (un cruce de tren, no un mapa) frenaba todo.
++    console.warn(`${modPath}: no es un .scs que conozcamos (ni HashFS ni ZIP), se saltea`);
++    return null;
 +  }
 +  return createDirArchive(modPath);
 +}
@@ -2734,7 +2734,7 @@ index 0000000..1d8a4aa
 +  // "dlcsupport") se pasan separados por coma y se combinan como archivos
 +  // independientes - el orden importa para paths duplicados (el ultimo gana,
 +  // igual que con .scs reales, ver CombinedEntries.files.get).
-+  const modArchives = modDirsArg.split(',').map(createModArchive);
++  const modArchives = modDirsArg.split(',').map(createModArchive).filter(a => a !== null);
 +
 +  const result = parseMapFiles(scsFilePaths, {
 +    includeDlc: true,

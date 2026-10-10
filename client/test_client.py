@@ -1057,3 +1057,28 @@ def test_lan_anota_cada_ip_remota_una_vez(caplog):
         local_server.anotar_remoto("192.168.1.40", "datos (27766)")
     lineas = [r.getMessage() for r in caplog.records if r.getMessage().startswith("LAN:")]
     assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]
+
+
+def test_cambiar_los_mods_borra_el_fuera_del_mapa_viejo(monkeypatch):
+    # Usuario del 10-10: un "fuera del mapa" (falso) dejaba "Build my map" en
+    # Setup toda la sesion. Se olvida cuando cambian los mods de ese juego, no
+    # con el None de mientras carga el juego.
+    import tray_client
+    st = tray_client.state
+    monkeypatch.setattr(st, "offmap_games", set())
+    monkeypatch.setattr(st, "last_known_mods", {})
+    monkeypatch.setattr(st, "map_mods", None)
+    monkeypatch.setattr(st, "map_mods_read_at", 0)
+    lecturas = iter([{"ats": {"c2c": True}}, {"ats": None}, {"ats": {"c2c": True}},
+                     {"ats": {"c2c": True, "canada_expansion": True}}])
+    monkeypatch.setattr(tray_client.client_lib, "read_map_mods", lambda: next(lecturas))
+    monkeypatch.setattr(tray_client.client_lib, "read_active_mod_names", lambda: None)
+    monkeypatch.setattr(tray_client.client_lib, "read_mounted_mods", lambda: None)
+    monkeypatch.setattr(tray_client, "refresh_local_maps", lambda: False)
+    tray_client.refresh_map_mods(force=True)
+    st.offmap_games.add("ats")
+    tray_client.refresh_map_mods(force=True)   # el juego recarga: None
+    tray_client.refresh_map_mods(force=True)   # vuelven los mismos
+    assert "ats" in st.offmap_games
+    tray_client.refresh_map_mods(force=True)   # cambiaron de verdad
+    assert "ats" not in st.offmap_games
