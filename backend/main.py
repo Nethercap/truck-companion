@@ -171,6 +171,31 @@ def clean_map_dlcs(valor) -> Optional[dict]:
     return limpio or None
 
 
+MAP_MOD_FLAG_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+MAP_MOD_FLAGS_MAX = 32
+
+
+def clean_map_mods(valor) -> Optional[dict]:
+    """Los mods de mapa que el cliente detecto, por juego ({'ats': {'c2c':
+    True, ...} o None, 'ets2': ...}). Se guardan con el estado de la sesion
+    como los DLC: el cliente solo reenvia client_status cuando algo cambia,
+    asi que una pestana que abria o recargaba despues cargaba el mapa base
+    y el que jugaba con Coast to Coast veia "ciudad no encontrada"
+    (auditoria del 10-10). Solo banderas cortas y booleanas, nunca nombres
+    de mods."""
+    if not isinstance(valor, dict):
+        return None
+    limpio = {}
+    for game in ("ats", "ets2"):
+        flags = valor.get(game)
+        if isinstance(flags, dict):
+            limpio[game] = {k: bool(v) for k, v in list(flags.items())[:MAP_MOD_FLAGS_MAX]
+                            if isinstance(k, str) and MAP_MOD_FLAG_RE.fullmatch(k)}
+        else:
+            limpio[game] = None
+    return limpio
+
+
 def clean_local_maps(valor) -> Optional[dict]:
     """Mapas armados en la PC del cliente ("Build my map"): por juego, la
     variante, la huella, cuando y cuantas ciudades. La web los lee del
@@ -385,10 +410,10 @@ JOB_DELIVERED_COOLDOWN_SECONDS = 20
 # capa compara contra el ultimo trabajo ya guardado en las stats globales
 # (sobrevive un redeploy, a diferencia del estado en memoria de Session) y
 # lo descarta si es identico y llego dentro de esta ventana.
-# Una hora: el flag jobDelivered del SDK queda en true durante minutos (hasta
+# Seis horas: el flag jobDelivered del SDK queda en true durante minutos (hasta
 # el proximo trabajo), asi que un cliente o backend reiniciado en ese rato
 # vuelve a ver el mismo evento. Dos entregas reales identicas (misma ruta,
-# carga, pago exacto y distancia) en una hora no existen en la practica.
+# carga, pago exacto y distancia) en seis horas no existen en la practica.
 JOB_DEDUPE_WINDOW_SECONDS = 6 * 60 * 60
 
 
@@ -577,6 +602,12 @@ class Session:
         # cuentas ni consentimiento granular por usuario.
         self.map_variant: Optional[str] = None
         self.share_position = False
+        # El usuario apago "compartir" a mano (set_live_share con explicit).
+        # share_position es uno por sesion y cada pestana lo reenvia al
+        # (re)conectar con su default local (prendido): sin esto un segundo
+        # dispositivo o una reconexion volvia a publicar la posicion sin que
+        # nadie lo pidiera (auditoria del 10-10).
+        self.share_off_by_user = False
         self.last_position: Optional[dict] = None  # {"x":, "z":, "game":, "ts":}
         # Apodo opcional (el de convoy) que se muestra en el mapa en vivo
         # publico; sin apodo el marcador sale anonimo.
@@ -621,12 +652,18 @@ async def broadcast_live_positions_loop():
     while True:
         await asyncio.sleep(LIVE_POSITIONS_BROADCAST_INTERVAL_SECONDS)
         ticks += 1
+        # Cada uno con su try: si el broadcast fallaba en todos los ticks (una
+        # sesion con datos raros) la limpieza de sesiones no corria nunca
+        # (auditoria del 10-10).
         try:
             broadcast_live_positions()
-            if ticks % 30 == 0:  # cada ~1 min
-                cleanup_expired_sessions()
         except Exception:
             logging.exception("Error en broadcast_live_positions_loop")
+        if ticks % 30 == 0:  # cada ~1 min
+            try:
+                cleanup_expired_sessions()
+            except Exception:
+                logging.exception("Error limpiando sesiones vencidas")
 
 
 def coerce_map_variant(variant: Optional[str], game) -> Optional[str]:
@@ -703,6 +740,13 @@ def broadcast_live_positions():
 async def _safe_send(ws: WebSocket, message: str):
     try:
         await ws.send_text(message)
+    except Exception:
+        pass
+
+
+async def _safe_close(ws: WebSocket, code: int, reason: str):
+    try:
+        await ws.close(code=code, reason=reason)
     except Exception:
         pass
 
@@ -812,10 +856,15 @@ async def ws_live_map(websocket: WebSocket, variant: str):
     if not check_rate_limit(client_ip):
         await websocket.close(code=4429, reason="demasiados intentos, esperá un minuto")
         return
+    # Se acepta antes de cerrar, como en ws_viewer: cerrando antes del accept
+    # el navegador ve 1006 sin el codigo y reintenta para siempre en vez de
+    # avisar que el mapa esta lleno (auditoria del 10-10).
     if not LIVE_MAP_VARIANT_RE.match(variant):
+        await websocket.accept()
         await websocket.close(code=4404, reason="variante invalida")
         return
     if len(live_map_spectators[variant]) >= LIVE_MAP_MAX_SPECTATORS_PER_VARIANT:
+        await websocket.accept()
         await websocket.close(code=4403, reason="mapa lleno de espectadores")
         return
     await websocket.accept()
@@ -1033,6 +1082,12 @@ def session_state_message(session: "Session") -> str:
     })
 
 
+def live_share_state_message(session: "Session") -> str:
+    """El estado real de "compartir posicion", para que todas las pestanas
+    de la sesion muestren el mismo tilde (es uno solo por sesion)."""
+    return json.dumps({"type": "live_share_state", "enabled": session.share_position})
+
+
 async def broadcast_session_state(session: "Session"):
     message = session_state_message(session)
     for viewer in list(session.viewer_ws_list):
@@ -1119,6 +1174,10 @@ class Convoy:
         self.empty_since: Optional[float] = None
         self.deliveries = 0
         self.nicknames_seen: list = []
+        # km de los que ya se fueron (convoy_leave los suma al sacarlos): el
+        # resumen de Discord se arma despues de que convoy_close saco a todos,
+        # y sin esto salia con 0 km (auditoria del 10-10).
+        self.km_left = 0.0
 
     def member_of(self, session: "Session") -> Optional[ConvoyMember]:
         return self.members.get(session.code)
@@ -1209,6 +1268,7 @@ def convoy_leave(session: "Session", kicked: bool = False):
         return
     member = convoy.members.pop(session.code, None)
     if member is not None:
+        convoy.km_left += member.km
         # avisar al que se va (con kicked si corresponde) y al resto
         text = json.dumps({**convoy.state_message(None, kicked=kicked), "left": True})
         for outbox in list(session.viewer_outboxes.values()):
@@ -1327,7 +1387,7 @@ def post_convoy_summary(convoy: Convoy):
         return
     try:
         duration = max(0, time.time() - convoy.created_at)
-        km = sum(m.km for m in convoy.members.values()) + getattr(convoy, "km_left", 0.0)
+        km = sum(m.km for m in convoy.members.values()) + convoy.km_left
         names = ", ".join(dict.fromkeys(convoy.nicknames_seen)) or "-"
         embed = {
             "title": f"Convoy {convoy.code}",
@@ -1359,9 +1419,9 @@ def convoy_tick():
                         m.km += d * GAME_DISTANCE_SCALE.get(s.get("game"), 20.0) / 1000
                 m._last_pos = (s["x"], s["z"])
         # miembros cuya sesion murio (cliente cerrado hace mucho) se van solos
+        # (sus km los suma convoy_leave, una sola vez)
         for code, m in list(convoy.members.items()):
             if code not in sessions:
-                convoy.km_left = getattr(convoy, "km_left", 0.0) + m.km
                 convoy_leave(m.session)
         if not convoy.members:
             if convoy.empty_since is None:
@@ -1390,10 +1450,15 @@ async def ws_convoy_spectator(websocket: WebSocket, code: str):
         return
     code = valid_convoy_code(code)
     convoy = convoys.get(code) if code else None
+    # Accept y despues close, como en ws_viewer: sin el accept el navegador
+    # ve 1006 sin el codigo y reintenta para siempre un convoy que ya
+    # termino (auditoria del 10-10).
     if convoy is None:
+        await websocket.accept()
         await websocket.close(code=4404, reason="convoy inexistente o terminado")
         return
     if len(convoy.spectators) >= CONVOY_MAX_SPECTATORS:
+        await websocket.accept()
         await websocket.close(code=4403, reason="convoy lleno de espectadores")
         return
     await websocket.accept()
@@ -1550,7 +1615,16 @@ async def ws_client(websocket: WebSocket, code: str):
         logging.info("Sesion %s recreada por reconexion del cliente", code)
 
     await websocket.accept()
+    # Si quedo una conexion anterior del cliente (corte que el servidor
+    # todavia no detecto, o el .exe abierto dos veces) se cierra: antes se
+    # pisaba sin cerrar y, cuando esa vieja moria, su finally dejaba la
+    # sesion sin cliente aunque el nuevo siguiera conectado (auditoria del
+    # 10-10). En una task aparte: un close a una conexion medio muerta
+    # puede esperar el handshake de cierre varios segundos.
+    anterior = session.client_ws
     session.client_ws = websocket
+    if anterior is not None and anterior is not websocket:
+        asyncio.create_task(_safe_close(anterior, 4409, "replaced"))
     session.last_seen = time.time()
     if not session.counted:
         session.counted = True
@@ -1571,6 +1645,7 @@ async def ws_client(websocket: WebSocket, code: str):
                 if payload.get("type") == "client_status":
                     session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion"),
                                                   "mapDlcs": clean_map_dlcs(payload.get("mapDlcs")),
+                                                  "mapMods": clean_map_mods(payload.get("mapMods")),
                                                   "localMaps": clean_local_maps(payload.get("localMaps")),
                                                   "localMapPort": clean_port(payload.get("localMapPort")),
                                                   "overlay": payload.get("overlay") is True}
@@ -1653,9 +1728,12 @@ async def ws_client(websocket: WebSocket, code: str):
     except WebSocketDisconnect:
         pass
     finally:
-        session.client_ws = None
         session.last_seen = time.time()
-        await broadcast_session_state(session)
+        # Solo si sigue siendo la conexion vigente: una vieja reemplazada no
+        # tiene que borrar ni anunciar como desconectado al cliente nuevo.
+        if session.client_ws is websocket:
+            session.client_ws = None
+            await broadcast_session_state(session)
 
 
 @app.websocket("/ws/live/{code}")
@@ -1682,6 +1760,9 @@ async def ws_viewer(websocket: WebSocket, code: str):
     session.viewer_outboxes[websocket] = ViewerOutbox(websocket)
     session.last_seen = time.time()
     await _safe_send(websocket, session_state_message(session))
+    # El estado real de "compartir": un dispositivo recien abierto arranca
+    # con su default local y si no se lo decimos muestra otra cosa.
+    await _safe_send(websocket, live_share_state_message(session))
     try:
         while True:
             # Normalmente no esperamos nada del viewer (solo mantiene viva la
@@ -1712,14 +1793,36 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     # simple: si no compartis tu posicion, tampoco ves la de
                     # nadie (se resuelve solo via el filtro en
                     # broadcast_live_positions, no hace falta nada mas aca).
-                    session.share_position = bool(payload.get("enabled"))
-                    session.map_variant = payload.get("mapVariant") if session.share_position else None
-                    # mismo chequeo contra el juego que reporta la telemetria
-                    session.map_variant = coerce_map_variant(session.map_variant, (session.last_summary or {}).get("game"))
-                    session.live_nick = clean_live_nick(payload.get("nick")) if session.share_position else None
-                    if not session.share_position:
-                        session.last_position = None
-                        session.live_route = None
+                    enabled = bool(payload.get("enabled"))
+                    explicit = payload.get("explicit")
+                    # explicit True = el usuario toco el tilde; False = el
+                    # reenvio automatico de una pestana al (re)conectar, con
+                    # su default local. Ese reenvio no puede volver a prender
+                    # lo que el usuario apago a mano (apagar si, siempre).
+                    # Sin la clave es una pestana vieja: se aplica como antes
+                    # (auditoria del 10-10).
+                    if not (explicit is False and enabled and session.share_off_by_user):
+                        if isinstance(explicit, bool):
+                            session.share_off_by_user = not enabled
+                        session.share_position = enabled
+                        # Solo un nombre de variante valido: una lista o un
+                        # dict rompia broadcast_live_positions y /live/summary
+                        # para todos (mismo chequeo que clean_offmap_report).
+                        variant = payload.get("mapVariant")
+                        if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
+                            variant = None
+                        session.map_variant = variant if session.share_position else None
+                        # mismo chequeo contra el juego que reporta la telemetria
+                        session.map_variant = coerce_map_variant(session.map_variant, (session.last_summary or {}).get("game"))
+                        session.live_nick = clean_live_nick(payload.get("nick")) if session.share_position else None
+                        if not session.share_position:
+                            session.last_position = None
+                            session.live_route = None
+                    # A todas las pestanas, para que sincronicen el tilde
+                    # (tambien a la que mando un reenvio que se ignoro).
+                    estado = live_share_state_message(session)
+                    for outbox in list(session.viewer_outboxes.values()):
+                        outbox.push_control(estado)
                 elif msg_type == "live_route":
                     # Sin compartir la posicion no hay mapa donde dibujarla.
                     nueva = clean_live_route(payload.get("points")) if session.share_position else None
