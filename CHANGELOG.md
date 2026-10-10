@@ -4,6 +4,11 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## 1.5.31 (unreleased)
+
+- Build my map: cities that only have companies (some Coast to Coast, Russian and
+  ProMods ones) now get a name, so you can search for them on your own map too.
+
 ## 1.5.30 (2026-10-10)
 
 - In-game overlay: with the dashboard open on two devices at once (this PC and your

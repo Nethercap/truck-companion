@@ -132,6 +132,15 @@
         <tbody id="offmapBody"></tbody>
       </table></div>
       <div class="pager" data-for="offmapBody"></div>
+      <!-- Empresas de trabajos que no estan en nuestros POIs: la posicion es
+           donde el camion cargo o entrego, o sea el lugar real de la empresa.
+           Despues de actualizar los datos del mapa, "Clear list". -->
+      <h3>Companies missing from our map data <button id="clearMissingBtn" type="button" style="font-size:12px;padding:2px 8px;margin-left:8px">Clear list</button></h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Variant</th><th>Company</th><th>City</th><th>Reports</th><th>Last</th><th>Where (x, z)</th></tr></thead>
+        <tbody id="missingCompaniesBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="missingCompaniesBody"></div>
     </div>
   </details>
 
@@ -301,6 +310,14 @@ function pintarRelay(data) {
       const sin = v.noMods ? `<br><span class="muted">${v.noMods} without a mod list (TruckersMP or older client)</span>` : '';
       return `<tr><td>${escapeHtml(variant)}</td><td>${fmt(v.reports)}</td><td>${escapeHtml(v.last || '-')}</td><td>${box}</td><td class="muted" style="white-space:normal">${mods || '-'}${sin}</td></tr>`;
     }), 'No reports yet', 5);
+  paginar('missingCompaniesBody', Object.values(data.missing_companies || {})
+    .sort((a, b) => b.reports - a.reports || String(b.last).localeCompare(String(a.last)))
+    .map(m => {
+      const donde = (m.points || []).map(([x, z, kind]) => `${fmt(x)}, ${fmt(z)} <span class="muted">(${escapeHtml(kind)})</span>`).join('<br>');
+      return `<tr><td>${escapeHtml(m.variant)}</td><td>${escapeHtml(m.companyName || '-')} <span class="muted">${escapeHtml(m.company)}</span></td>`
+        + `<td>${escapeHtml(m.cityName || '-')} <span class="muted">${escapeHtml(m.city)}</span></td><td>${fmt(m.reports)}</td>`
+        + `<td>${escapeHtml(m.last || '-')}</td><td class="muted">${donde || '-'}</td></tr>`;
+    }), 'No reports yet', 6);
   $('relaySec').hidden = false;
 }
 
@@ -381,6 +398,13 @@ async function loadStats() {
   statusEl.textContent = `${new Date().toLocaleTimeString()} · ${partes.join(' · ')}`;
   statusEl.className = 'status' + (partes.every(p => p.endsWith(' ok')) ? '' : ' err');
 }
+
+$('clearMissingBtn').addEventListener('click', async () => {
+  if (!confirm('Clear the list of missing companies? Do it after updating the map data.')) return;
+  const res = await fetch(RELAY_URL.replace('/admin/stats', '/admin/stats/seed'), { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': keyInput.value.trim() }, body: JSON.stringify({ missing_companies: {} }) });
+  if (res.ok) loadStats(); else alert(`HTTP ${res.status}`);
+});
 
 // ---- titulos ----
 document.addEventListener('click', (e) => {

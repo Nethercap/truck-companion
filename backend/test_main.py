@@ -1294,3 +1294,108 @@ def test_el_cliente_sabe_cuantos_tableros_hay(client, main):
                 otro.receive_text()
                 assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 2}
             assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 1}
+
+
+# Campos del client_status que el relay NO guarda para las pestanas que abren
+# despues, y por que. Cualquier otro campo que el cliente mande tiene que
+# llegar en el session_state: si no, un tablero abierto despues anda distinto
+# que uno abierto antes (mods de mapa y "detail" se perdian asi, 10-10).
+CLIENT_STATUS_NO_GUARDADO = {
+    "type": "es el tipo del mensaje",
+    "activeMods": "nombres de mods del usuario: privacidad, solo viajan en vivo",
+}
+
+
+def _campos_de_status_message():
+    """Las claves del dict que arma status_message() en el cliente."""
+    import ast
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parent.parent / "client" / "tray_client.py"
+    arbol = ast.parse(src.read_text(encoding="utf-8"))
+    func = next(n for n in ast.walk(arbol) if isinstance(n, ast.FunctionDef) and n.name == "status_message")
+    dic = next(n for n in ast.walk(func) if isinstance(n, ast.Dict))
+    return {k.value for k in dic.keys if isinstance(k, ast.Constant)}
+
+
+def test_contrato_client_status(client, main):
+    campos = _campos_de_status_message()
+    assert {"status", "game", "mapMods", "detail"} <= campos  # el parseo encontro el dict correcto
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as local_client:
+        local_client.send_text(main.json.dumps({
+            "type": "client_status", "status": "plugin_missing", "game": "ats", "clientVersion": "1.5.30",
+            "detail": "The running game (D:\\ATS\\bin\\win_x64) has no telemetry plugin.",
+            "mapMods": {"ats": {"c2c": True}, "ets2": None}, "activeMods": ["Coast to Coast"],
+            "mapDlcs": None, "localMaps": None, "localMapPort": 27765, "overlay": True,
+        }))
+        import time as _time
+        _time.sleep(0.1)
+        with client.websocket_connect(f"/ws/live/{code}") as viewer:
+            estado = main.json.loads(viewer.receive_text())
+            assert estado["type"] == "session_state"
+            guardado = estado["client_status"]
+            faltan = campos - set(CLIENT_STATUS_NO_GUARDADO) - set(guardado)
+            assert not faltan, f"el relay no guarda {sorted(faltan)}: agregarlos o explicar en CLIENT_STATUS_NO_GUARDADO"
+            assert guardado["detail"].startswith("The running game")
+            assert "activeMods" not in guardado
+
+
+def test_client_status_detail_acotado(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as local_client:
+        local_client.send_text(main.json.dumps({"type": "client_status", "status": "live", "detail": "x" * 5000}))
+        import time as _time
+        _time.sleep(0.1)
+        with client.websocket_connect(f"/ws/live/{code}") as viewer:
+            assert len(main.json.loads(viewer.receive_text())["client_status"]["detail"]) == 400
+
+
+# --------------------------------------------------------- empresas que faltan
+
+def test_clean_missing_company_valida_y_limpia(main):
+    bueno = {"variant": "ats_c2c", "company": "homburg_frt", "city": "gulfport", "kind": "pickup",
+             "companyName": "  Homburg   Freight ", "cityName": "Gulfport", "x": -12345.6, "z": 6789.4}
+    assert main.clean_missing_company(bueno) == {
+        "variant": "ats_c2c", "company": "homburg_frt", "city": "gulfport", "kind": "pickup",
+        "companyName": "Homburg Freight", "cityName": "Gulfport", "x": -12346, "z": 6789}
+    assert main.clean_missing_company({**bueno, "company": "<script>"}) is None
+    assert main.clean_missing_company({**bueno, "city": None}) is None
+    assert main.clean_missing_company({**bueno, "variant": "local_ats"}) is None
+    assert main.clean_missing_company({**bueno, "kind": "otro"}) is None
+    assert main.clean_missing_company({**bueno, "x": "nan"}) is None
+    assert main.clean_missing_company({**bueno, "companyName": 7})["companyName"] is None
+    assert len(main.clean_missing_company({**bueno, "companyName": "x" * 500})["companyName"]) == 60
+
+
+def test_missing_company_se_acumula_una_vez_por_sesion(client, main, monkeypatch):
+    import time as _time
+    monkeypatch.setattr(main, "_stats_cache", {"total_sessions": 0, "daily": {}})
+    monkeypatch.setattr(main, "_save_stats", lambda: None)
+    msg = {"type": "missing_company", "variant": "ats_c2c", "company": "homburg_frt", "city": "gulfport",
+           "kind": "pickup", "companyName": "Homburg Freight", "x": 100, "z": 200}
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as ws:
+        ws.send_text(main.json.dumps(msg))
+        ws.send_text(main.json.dumps({**msg, "kind": "dest", "x": 101}))  # repetida en la sesion: no cuenta
+        _time.sleep(0.2)
+    code2 = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code2}") as ws:
+        ws.send_text(main.json.dumps({**msg, "kind": "dest", "x": 102, "z": 202}))
+        _time.sleep(0.2)
+    todo = main._stats_cache["missing_companies"]
+    e = todo["ats_c2c|homburg_frt|gulfport"]
+    assert e["reports"] == 2 and e["companyName"] == "Homburg Freight"
+    assert e["points"] == [[100, 200, "pickup"], [102, 202, "dest"]]
+    assert code not in main.json.dumps(todo)
+    # se ve en el panel de admin y no en las stats publicas
+    assert "missing_companies" in client.get("/admin/stats", headers={"X-Admin-Key": "test-admin-key"}).json()
+    assert "missing_companies" not in client.get("/stats/public").json()
+
+
+def test_missing_company_lista_acotada(main, monkeypatch):
+    monkeypatch.setattr(main, "_stats_cache", {"total_sessions": 0, "daily": {}})
+    monkeypatch.setattr(main, "_save_stats", lambda: None)
+    monkeypatch.setattr(main, "MISSING_COMPANIES_KEPT", 3)
+    for i in range(5):
+        main.record_missing_company({"variant": "ets2", "company": f"c{i}", "city": "x", "kind": "dest", "x": 0, "z": 0})
+    assert len(main._stats_cache["missing_companies"]) == 3

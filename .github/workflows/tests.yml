@@ -9,13 +9,17 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    # Un test colgado (un websocket esperando para siempre) dejaba el job
+    # corriendo hasta el limite de 6 h de GitHub, sin log: --timeout lo corta
+    # a los 60 s con el traceback del test que se colgo.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r backend/requirements-dev.txt
-      - run: python -m pytest backend/test_main.py -v
+      - run: python -m pytest backend/test_main.py -v --timeout=60
 
   client:
     runs-on: windows-latest
@@ -66,6 +70,9 @@ jobs:
       # docs/app/variants.js se genera del manifest: si alguien edita uno sin
       # regenerar el otro, la app publica versiones de mapa que no existen.
       - run: python tools/build_variants_js.py --check
+      # Los POIs publicados: empresas con ciudad sin nombre hacian que buscar
+      # la ciudad no diera nada (Gulfport, 10-10), y nada lo detectaba.
+      - run: python tools/check_pois.py
       # check_inline_js.py mira el JS incrustado en el HTML; esto mira los
       # .js sueltos, que es donde viven las traducciones. Un apostrofo sin
       # escapar en una de ellas rompe el archivo entero y con el la pagina.

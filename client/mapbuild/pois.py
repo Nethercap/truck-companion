@@ -47,6 +47,18 @@ ATLAS_KEY = re.compile(r"(tb|poi)_[a-z]{2}\d+(_\d+)?")
 # uno. Los "hud_parking" son los de camion, que ya vienen como parking_ico.
 CAR_PARKING_RADIUS_M = 150
 
+# Ciudades que tienen empresas pero no salen en <prefijo>-cities.json del
+# parser (pasa con algunas de C2C, Rusia de ETS2 y ProMods/Roextended): sin
+# nombre, buscar la ciudad no daba nada ("can't find the city", Discord
+# 10-10). Las que no estan aca toman el token con mayusculas.
+CITY_NAMES_EXTRA = {
+    "gulfport": "Gulfport", "meridian": "Meridian",
+    "kirishi": "Kirishi", "v_novgorod": "Veliky Novgorod", "volkhov": "Volkhov",
+    "longyearbyem": "Longyearbyen", "strzelcekraj": "Strzelce Krajeńskie",
+    "alakurtti_rm": "Alakurtti", "kandalrm": "Kandalaksha", "kola_rm": "Kola", "murmansk_rm": "Murmansk",
+    "cernihiv": "Chernihiv", "rivnne": "Rivne", "ribnita": "Rîbnița",
+}
+
 
 def _cargar(path):
     with open(path, encoding="utf-8") as f:
@@ -158,7 +170,22 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
     atlas = atlas_items(parser_dir, prefix, atlas_names)
     if atlas:
         out["atlas"] = atlas
+    fill_missing_cities(out)
     return out
+
+
+def city_name_from_token(token):
+    return CITY_NAMES_EXTRA.get(token) or " ".join(w[:1].upper() + w[1:] for w in token.split("_"))
+
+
+def fill_missing_cities(pois):
+    """Agrega a "cities" las ciudades de las empresas que no tienen nombre.
+    Devuelve los tokens agregados."""
+    cities = pois.setdefault("cities", {})
+    nuevos = sorted({c[4] for c in pois.get("companies", []) if c[4] and c[4] not in cities})
+    for tok in nuevos:
+        cities[tok] = city_name_from_token(tok)
+    return nuevos
 
 
 def write(pois, out_path):

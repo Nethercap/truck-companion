@@ -1244,3 +1244,51 @@ test('useOwnRemaining: el GPS del juego apuntando al remolque no cuenta como lle
   assert.equal(useOwnRemaining(0.3, 0.5), false);  // cerca del destino
   assert.equal(useOwnRemaining(5, null), false);   // sin ruta nuestra
 });
+
+test('foldText: buscar sin tildes encuentra las ciudades con tildes', () => {
+  const { foldText } = require('./pure.js');
+  assert.equal(foldText('Kraków'), 'krakow');
+  assert.equal(foldText('Zürich'), 'zurich');
+  assert.equal(foldText('Wrocław'), 'wroclaw');
+  assert.equal(foldText('Târgu Mureș'), 'targu mures');
+  assert.equal(foldText('Strzelce Krajeńskie'), 'strzelce krajenskie');
+  assert.equal(foldText('Tromsø'), 'tromso');
+  assert.equal(foldText(null), '');
+});
+
+test('createMissingCompanyWatch: reporta la empresa que falta donde se carga y donde se entrega', () => {
+  const { createMissingCompanyWatch } = require('./pure.js');
+  const conocidas = new Set(['eddys|gulfport']);
+  const known = (token, _name, city) => conocidas.has(`${token}|${city}`);
+  const w = createMissingCompanyWatch();
+  const job = { onJob: true, jobMarket: 'cargo_market', companySrcId: 'homburg', companySrc: 'Homburg Freight', citySrcId: 'gulfport', citySrc: 'Gulfport',
+                companyDstId: 'nuevo_dst', companyDst: 'Nueva', cityDstId: 'meridian', cityDst: 'Meridian' };
+  assert.deepEqual(w.tick({ ...job, isCargoLoaded: false }, { x: 10, z: 20 }, known), []);
+  const carga = w.tick({ ...job, isCargoLoaded: true }, { x: 11.4, z: 20.6 }, known);
+  assert.deepEqual(carga, [{ kind: 'pickup', company: 'homburg', companyName: 'Homburg Freight', city: 'gulfport', cityName: 'Gulfport', x: 11, z: 21 }]);
+  w.tick({ ...job, isCargoLoaded: true }, { x: 500, z: 600 }, known);
+  // el pulso de entrega llega con el trabajo ya borrado
+  const entrega = w.tick({ onJob: false, event: { jobDelivered: true } }, { x: 900, z: 950 }, known);
+  assert.deepEqual(entrega, [{ kind: 'dest', company: 'nuevo_dst', companyName: 'Nueva', city: 'meridian', cityName: 'Meridian', x: 900, z: 950 }]);
+  // el mismo pulso en el tick siguiente no repite
+  assert.deepEqual(w.tick({ onJob: false, event: { jobDelivered: true } }, { x: 900, z: 950 }, known), []);
+});
+
+test('createMissingCompanyWatch: freight market al enganchar, empresas conocidas y repetidas no', () => {
+  const { createMissingCompanyWatch } = require('./pure.js');
+  const known = (token) => token === 'eddys';
+  const w = createMissingCompanyWatch();
+  const job = { onJob: true, jobMarket: 'freight_market', isCargoLoaded: true, companySrcId: 'homburg', citySrcId: 'gulfport', companyDstId: 'eddys', cityDstId: 'gulfport' };
+  w.tick({ ...job, trailerAttached: false }, { x: 1, z: 2 }, known);
+  assert.equal(w.tick({ ...job, trailerAttached: true }, { x: 3, z: 4 }, known)[0].kind, 'pickup');
+  // destino conocido: nada
+  assert.deepEqual(w.tick({ onJob: false, event: { jobDelivered: true } }, { x: 5, z: 6 }, known), []);
+  // en cargo market enganchar un remolque propio no es cargar
+  const w2 = createMissingCompanyWatch();
+  const propio = { ...job, jobMarket: 'cargo_market', isCargoLoaded: false };
+  w2.tick({ ...propio, trailerAttached: false }, { x: 1, z: 2 }, known);
+  assert.deepEqual(w2.tick({ ...propio, trailerAttached: true }, { x: 3, z: 4 }, known), []);
+  // otra vez la misma empresa: una sola vez por pagina
+  w.tick({ ...job, trailerAttached: false }, { x: 1, z: 2 }, known);
+  assert.deepEqual(w.tick({ ...job, trailerAttached: true }, { x: 3, z: 4 }, known), []);
+});

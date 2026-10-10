@@ -550,6 +550,23 @@ function sendOffMapReport(x, z) {
   ws.send(JSON.stringify({ type: 'offmap_report', variant: currentGame, x: Math.round(x), z: Math.round(z), mods }));
 }
 
+// Empresa del trabajo que no esta en nuestros POIs (ver
+// createMissingCompanyWatch): al relay, con la posicion donde se cargo o se
+// entrego, para el panel de admin. Corre en todas las pestanas para seguir el
+// trabajo, pero manda solo la lider; el relay ademas repite una vez por sesion.
+// Los mapas armados en la PC (local_*) no: sus datos no son los nuestros.
+const missingCompanyWatch = createMissingCompanyWatch();
+function checkMissingCompanies(data) {
+  if (conn.demo || conn.spectator || conn.local) return;
+  // Sin los POIs de esta variante no se sabe: se da por conocida (sin
+  // reporte), pero el tick corre igual para no comparar contra un estado viejo.
+  const usable = pois && currentGame && poisVariant === currentGame && !currentGame.startsWith('local');
+  const known = (token, name, city) => !usable || !!(findCompanyPoi(token, city) || findCompanyPoiByName(name, city));
+  const reportes = missingCompanyWatch.tick(data, lastWorldPos, known);
+  if (!reportes.length || !isLeaderTab || !ws || ws.readyState !== WebSocket.OPEN) return;
+  for (const r of reportes) ws.send(JSON.stringify({ type: 'missing_company', variant: currentGame, ...r }));
+}
+
 // Ruta propia al mapa en vivo publico (/live/): la misma que se dibuja aca,
 // simplificada, cuando cambia y como mucho cada LIVE_ROUTE_RESEND_MS. Solo
 // con la posicion compartida y la casilla de la ruta prendida; si no, se
@@ -2240,13 +2257,13 @@ function nearestFacilities(code, x, z, limit) {
 
 function searchCompanies(query, x, z, limit) {
   if (!pois) return [];
-  const q = query.trim().toLowerCase();
+  const q = foldText(query.trim());
   if (!q) return [];
   const out = [];
   for (const c of pois.companies) {
-    const label = (c[3] || '').toLowerCase();
-    const city = (c[4] || '').toLowerCase().replace(/_/g, ' ');
-    if (label.includes(q) || city.includes(q) || cityLabel(c[4]).toLowerCase().includes(q)) out.push({ x: c[0], z: c[1], label: c[3], city: c[4], dist: x != null ? Math.hypot(c[0] - x, c[1] - z) : 0 });
+    const label = foldText(c[3]);
+    const city = foldText(c[4]).replace(/_/g, ' ');
+    if (label.includes(q) || city.includes(q) || foldText(cityLabel(c[4])).includes(q)) out.push({ x: c[0], z: c[1], label: c[3], city: c[4], dist: x != null ? Math.hypot(c[0] - x, c[1] - z) : 0 });
   }
   out.sort((a, b) => a.dist - b.dist);
   return out.slice(0, limit);
@@ -2314,16 +2331,16 @@ function renderPoiResults() {
   }
   if (!pos) { list.innerHTML = `<div class="poiEmpty">${t('poiNoPosition')}</div>`; return; }
   const query = document.getElementById('poiSearchInput').value;
-  const cityFilter = document.getElementById('poiCityInput').value.trim().toLowerCase();
+  const cityFilter = foldText(document.getElementById('poiCityInput').value.trim());
   const cityNames = poiCityNames();
-  const cityToken = cityFilter ? Object.keys(cityNames).find(tok => cityNames[tok].toLowerCase() === cityFilter) : null;
+  const cityToken = cityFilter ? Object.keys(cityNames).find(tok => foldText(cityNames[tok]) === cityFilter) : null;
   let results;
   if (cityToken) {
     // Ciudad elegida: todas sus empresas (filtradas por el texto si hay), a
     // distancia del camion - dos pasos, como en un GPS de verdad.
-    const q = query.trim().toLowerCase();
+    const q = foldText(query.trim());
     results = pois.companies
-      .filter(c => c[4] === cityToken && (!q || (c[3] || '').toLowerCase().includes(q)))
+      .filter(c => c[4] === cityToken && (!q || foldText(c[3]).includes(q)))
       .map(c => ({ x: c[0], z: c[1], label: c[3], city: c[4], dist: Math.hypot(c[0] - pos.x, c[1] - pos.z), name: c[3], sub: cityLabel(c[4]) }))
       .sort((a, b) => a.label.localeCompare(b.label))
       .slice(0, 40);
@@ -5517,6 +5534,7 @@ function handleTelemetry(data) {
   updateMap(data.position || {}, data.game, data.heading);
   updateDestinationMarker(data);
   updateRouteSummary(data);
+  checkMissingCompanies(data);
   checkUpdateBanner(data.clientVersion);
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
