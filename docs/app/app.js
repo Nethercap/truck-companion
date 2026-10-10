@@ -3566,6 +3566,12 @@ let navHudLastSig = '';
 let navHudLastSent = 0;
 const NAV_HUD_MIN_MS = 400;
 const NAV_HUD_KEEPALIVE_MS = 3000;
+// Quien manda: con dos tableros abiertos (la pestana que abre el cliente en
+// la PC y el celular por LAN) los dos mandan nav_hud y el overlay saltaba de
+// uno a otro, cada uno con su ruta y sus unidades ("the in game overlay kept
+// bouncing the distance remaining around", Discord 10-10). Con esto el
+// cliente se queda con uno mientras siga mandando (overlay.OverlayData).
+const NAV_HUD_SRC = Math.random().toString(36).slice(2, 10);
 
 function sendNavHud() {
   if (!clientOverlayOn || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -3584,6 +3590,7 @@ function sendNavHud() {
     arrivalLabel: t('overlayArrivalReal'),
     gameArrivalLabel: t('overlayArrivalGame'),
     imperial: !!useImperial,
+    src: NAV_HUD_SRC,
   };
   const sig = JSON.stringify(msg);
   const now = Date.now();
