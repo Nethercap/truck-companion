@@ -176,6 +176,56 @@ def set_open_dashboard(activo: bool) -> None:
     save_settings(settings)
 
 
+# Perfil de la red (Privada / Publica) de la placa que usa el modo LAN. Con la
+# red en Publica, Windows suele bloquear las conexiones que llegan del
+# celular aunque se haya tocado "Permitir" (por defecto el permiso es para
+# redes privadas), y el tablero por LAN no abre: el caso mas comun de "estoy
+# en la misma WiFi y no conecta" (log de un usuario del 10-10). None: no se
+# sabe, o no aplica (Linux, Wine).
+_red_publica = None
+
+
+def perfil_es_publico(salida: str):
+    """La salida de Get-NetConnectionProfile (NetworkCategory) -> True si es
+    Public, False si es Private o de dominio, None si no se entiende."""
+    valor = (salida or "").strip().splitlines()[-1:] or [""]
+    valor = valor[0].strip()
+    if valor == "Public":
+        return True
+    if valor in ("Private", "DomainAuthenticated"):
+        return False
+    return None
+
+
+def detectar_red_publica(ip) -> None:
+    """Pregunta a Windows el perfil de la red de esa IP. Tarda (PowerShell),
+    asi que se llama desde un hilo aparte; el resultado queda en
+    red_publica()."""
+    global _red_publica
+    if sys.platform != "win32" or is_wine() or not ip:
+        return
+    import ipaddress
+    try:
+        ip = str(ipaddress.IPv4Address(ip))
+    except ValueError:
+        return
+    script = ("$i=(Get-NetIPAddress -IPAddress '%s' -ErrorAction Stop).InterfaceIndex;"
+              "(Get-NetConnectionProfile -InterfaceIndex $i -ErrorAction Stop).NetworkCategory" % ip)
+    try:
+        salida = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                                capture_output=True, text=True, timeout=20,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        logging.info("No se pudo leer el perfil de la red: %s", exc)
+        return
+    _red_publica = perfil_es_publico(salida)
+    logging.info("Perfil de la red de %s: %s", ip, (salida or "").strip() or "?")
+
+
+def red_publica():
+    return _red_publica
+
+
 def overlay_supported() -> bool:
     """El overlay en el juego (overlay.py) usa ventanas de Windows que Wine
     no reproduce bien (transparencia y clics que pasan): bajo Proton no se

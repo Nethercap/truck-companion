@@ -17,6 +17,10 @@ updates on its own and is not versioned here.
 - In-game overlay: with the dashboard open on two devices at once (this PC and your
   phone, say), the overlay sticks to one of them instead of jumping between their
   distances and units. If that one stops sending, it switches to the other.
+- LAN mode: if Windows has your network set to Public (the usual reason a phone on the
+  same Wi-Fi can't connect), Setup says so and opens the network settings to change it to
+  Private. The log now records which devices reached the PC, to tell "blocked" apart from
+  "never got there".
 - Linux (Proton): Setup says why the in-game overlay is not there (it is Windows only for
   now) instead of leaving its section out without a word.
 

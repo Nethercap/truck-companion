@@ -72,6 +72,25 @@ def cache_dir() -> str:
     return path
 
 
+# Que dispositivos de la red llegaron, una vez por IP y por puerto: sin esto
+# el log no distinguia al celular de la pestana de la propia PC, y con "no me
+# conecta por LAN" no habia forma de saber si el celular llegaba a la pagina,
+# solo a la pagina (27766 cerrado) o a nada (firewall, red Publica, router
+# con aislamiento). Log de un usuario del 10-10.
+_remotos_vistos: set = set()
+_remotos_lock = threading.Lock()
+
+
+def anotar_remoto(ip, que: str) -> None:
+    if not ip or ip.startswith("127.") or ip == "::1":
+        return
+    with _remotos_lock:
+        if (ip, que) in _remotos_vistos:
+            return
+        _remotos_vistos.add((ip, que))
+    logging.info("LAN: %s desde %s", que, ip)
+
+
 def lan_ip() -> str | None:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -202,6 +221,7 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
                 falta -= len(bloque)
 
     def do_GET(self):
+        anotar_remoto(self.client_address[0] if self.client_address else None, "pagina (27765)")
         if self.path.startswith("/localmap/"):
             self._serve_local_map()
             return
@@ -344,7 +364,8 @@ class LocalServer:
             self.http_server = http.server.ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), _StaticHandler)
             threading.Thread(target=self.http_server.serve_forever, daemon=True).start()
             self.ws_server = await websockets.serve(self._handle_viewer, "0.0.0.0", WS_PORT)
-            logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d)", HTTP_PORT, WS_PORT)
+            logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d), direccion %s",
+                         HTTP_PORT, WS_PORT, self.url or "sin IP de LAN")
         except OSError as exc:
             # El puerto ocupado es el caso comun (otra instancia, u otro
             # programa): la ventana mostraba el OSError crudo de Python. Se
@@ -363,6 +384,7 @@ class LocalServer:
             logging.warning("No se pudo levantar el servidor LAN: %s", exc)
 
     async def _handle_viewer(self, ws):
+        anotar_remoto((getattr(ws, "remote_address", None) or (None,))[0], "datos (27766)")
         self.viewers.add(ws)
         try:
             await ws.send(json.dumps({"type": "session_state", "client_connected": True, "client_status": None, "local": True}))
