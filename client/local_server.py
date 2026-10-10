@@ -56,9 +56,9 @@ WEB_FILES = [
     # Guia por voz: el catalogo y un paquete por voz (la version va en el
     # nombre, como vendor/: no se vuelven a bajar). Ver tools/build_voice_packs.py.
     "app/voice/voices.json",
-    "app/voice/en-kristin-v1.json", "app/voice/en-joe-v1.json", "app/voice/es-daniela-v1.json",
-    "app/voice/es-claude-v1.json", "app/voice/de-thorsten-v1.json", "app/voice/fr-siwis-v1.json",
-    "app/voice/pt-cadu-v1.json", "app/voice/pl-gosia-v1.json", "app/voice/ru-dmitri-v1.json",
+    "app/voice/en-kristin-v2.json", "app/voice/en-joe-v2.json", "app/voice/es-daniela-v2.json",
+    "app/voice/es-claude-v2.json", "app/voice/de-thorsten-v2.json", "app/voice/fr-siwis-v2.json",
+    "app/voice/pt-cadu-v2.json", "app/voice/pl-gosia-v2.json", "app/voice/ru-dmitri-v2.json",
 ]
 
 

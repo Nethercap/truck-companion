@@ -8,6 +8,8 @@ updates on its own and is not versioned here.
 
 - In a Convoy session the dashboard and the overlay show the convoy's game clock
   instead of your single player one, so game time arrivals match what everyone sees.
+- LAN mode keeps a local copy of the new voice guidance, which now also tells you which
+  exit to take at roundabouts.
 
 ## 1.5.29 (2026-10-09)
 
