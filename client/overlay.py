@@ -226,6 +226,7 @@ class OverlayData:
         self.tele_ts = 0.0
         self.nav = None
         self.nav_ts = 0.0
+        self.nav_src = None
 
     def telemetria(self, payload: dict) -> None:
         with self._lock:
@@ -233,9 +234,21 @@ class OverlayData:
             self.tele_ts = time.time()
 
     def navegacion(self, msg: dict) -> None:
+        # Con dos tableros abiertos (la pestana de la PC y el celular) cada
+        # uno manda lo suyo, con su ruta y sus unidades, y el overlay saltaba
+        # de uno a otro ("kept bouncing the distance remaining around",
+        # Discord 10-10). Se queda con el que venia mandando mientras siga
+        # fresco; si se calla (pestana cerrada, celular bloqueado) toma el
+        # otro. Una web vieja no manda src y se acepta como antes.
+        src = msg.get("src") if isinstance(msg.get("src"), str) else None
+        ahora = time.time()
         with self._lock:
+            if (src and self.nav_src and src != self.nav_src
+                    and ahora - self.nav_ts <= NAV_FRESH_SECONDS):
+                return
             self.nav = limpiar_nav(msg)
-            self.nav_ts = time.time()
+            self.nav_ts = ahora
+            self.nav_src = src
 
     def foto(self):
         with self._lock:

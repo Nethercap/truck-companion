@@ -267,3 +267,25 @@ def test_sin_tablero_con_ruta_avisa_de_donde_sale_el_giro():
     d = overlay.contenido(tele(routeDistanceKm=42), 100, None, 0, 100, aviso_giro=aviso,
                           items=("turn",))
     assert d is not None and d["hint"] == aviso
+
+
+def test_con_dos_tableros_se_queda_con_uno(monkeypatch):
+    # Discord: "the in game overlay kept bouncing the distance remaining around"
+    ahora = [1000.0]
+    monkeypatch.setattr(overlay.time, "time", lambda: ahora[0])
+    data = overlay.OverlayData()
+    data.navegacion({"remaining": "1,234 mi", "src": "pc"})
+    ahora[0] += 1
+    data.navegacion({"remaining": "1,986 km", "src": "celu"})
+    assert data.foto()[2]["remaining"] == "1,234 mi"
+    ahora[0] += 1
+    data.navegacion({"remaining": "1,233 mi", "src": "pc"})
+    assert data.foto()[2]["remaining"] == "1,233 mi"
+    # la PC deja de mandar: pasado el tiempo de frescura, toma el otro
+    ahora[0] += overlay.NAV_FRESH_SECONDS + 1
+    data.navegacion({"remaining": "1,980 km", "src": "celu"})
+    assert data.foto()[2]["remaining"] == "1,980 km"
+    # una web vieja sin src se acepta como antes
+    ahora[0] += 1
+    data.navegacion({"remaining": "5 km"})
+    assert data.foto()[2]["remaining"] == "5 km"

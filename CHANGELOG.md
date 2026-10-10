@@ -14,6 +14,9 @@ updates on its own and is not versioned here.
   where the next turn comes from (the dashboard, on your phone, a tablet or this PC)
   instead of leaving that space blank. Speed, limit, distance left and the game clock
   arrival keep working without it.
+- In-game overlay: with the dashboard open on two devices at once (this PC and your
+  phone, say), the overlay sticks to one of them instead of jumping between their
+  distances and units. If that one stops sending, it switches to the other.
 - Linux (Proton): Setup says why the in-game overlay is not there (it is Windows only for
   now) instead of leaving its section out without a word.
 
