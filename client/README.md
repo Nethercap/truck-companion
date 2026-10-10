@@ -119,6 +119,21 @@ sudo ufw allow 27766/tcp
 Both can be changed with the `TRUCKDASH_HTTP_PORT` and `TRUCKDASH_WS_PORT`
 environment variables if those numbers clash with something else.
 
+**Same Wi-Fi and the phone still can't open it?** In order of how often:
+
+1. Windows has the network as **Public**. The firewall permission is for
+   private networks, so the phone is blocked. Setup warns about this; set the
+   network profile to Private in Windows Settings, Network & internet.
+2. The phone is on a **guest network**, or the router isolates Wi-Fi
+   devices (AP/client isolation, common on ISP and mesh routers).
+3. A **VPN** is on, on the PC (the address in Setup is then the VPN's) or on
+   the phone (ad-blocking apps that work as a VPN count too).
+
+The log (`truckdash.log`) says which devices reached the PC: `LAN: pagina
+(27765) desde <ip>` and `LAN: datos (27766) desde <ip>`. No line from the
+phone's IP means nothing got through; only the first one means 27766 is
+blocked. The pairing code works in all of these cases.
+
 ### Map mods we don't have: Build my map
 
 If your truck drives off the map Truck Dash knows, the dashboard tells the
