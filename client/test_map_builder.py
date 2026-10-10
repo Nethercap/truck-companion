@@ -119,3 +119,15 @@ def test_preflight_de_red_privada(tmp_path):
         assert r.getheader("Access-Control-Allow-Private-Network") == "true"
     finally:
         srv.shutdown()
+
+
+def test_pois_completa_ciudades_sin_nombre():
+    """Empresas en ciudades que el parser no lista (Gulfport de C2C, Rusia
+    de ETS2): sin nombre, buscar la ciudad no daba nada (Discord 10-10)."""
+    from mapbuild import pois
+    datos = {"companies": [[0, 0, "a", "A", "gulfport"], [0, 0, "b", "B", "v_novgorod"],
+                           [0, 0, "c", "C", "nueva_ciudad"], [0, 0, "d", "D", "austin"]],
+             "cities": {"austin": "Austin"}}
+    assert pois.fill_missing_cities(datos) == ["gulfport", "nueva_ciudad", "v_novgorod"]
+    assert datos["cities"] == {"austin": "Austin", "gulfport": "Gulfport",
+                               "v_novgorod": "Veliky Novgorod", "nueva_ciudad": "Nueva Ciudad"}

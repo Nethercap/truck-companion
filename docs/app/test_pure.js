@@ -1244,3 +1244,14 @@ test('useOwnRemaining: el GPS del juego apuntando al remolque no cuenta como lle
   assert.equal(useOwnRemaining(0.3, 0.5), false);  // cerca del destino
   assert.equal(useOwnRemaining(5, null), false);   // sin ruta nuestra
 });
+
+test('foldText: buscar sin tildes encuentra las ciudades con tildes', () => {
+  const { foldText } = require('./pure.js');
+  assert.equal(foldText('Kraków'), 'krakow');
+  assert.equal(foldText('Zürich'), 'zurich');
+  assert.equal(foldText('Wrocław'), 'wroclaw');
+  assert.equal(foldText('Târgu Mureș'), 'targu mures');
+  assert.equal(foldText('Strzelce Krajeńskie'), 'strzelce krajenskie');
+  assert.equal(foldText('Tromsø'), 'tromso');
+  assert.equal(foldText(null), '');
+});

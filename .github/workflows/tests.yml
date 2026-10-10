@@ -66,6 +66,9 @@ jobs:
       # docs/app/variants.js se genera del manifest: si alguien edita uno sin
       # regenerar el otro, la app publica versiones de mapa que no existen.
       - run: python tools/build_variants_js.py --check
+      # Los POIs publicados: empresas con ciudad sin nombre hacian que buscar
+      # la ciudad no diera nada (Gulfport, 10-10), y nada lo detectaba.
+      - run: python tools/check_pois.py
       # check_inline_js.py mira el JS incrustado en el HTML; esto mira los
       # .js sueltos, que es donde viven las traducciones. Un apostrofo sin
       # escapar en una de ellas rompe el archivo entero y con el la pagina.
