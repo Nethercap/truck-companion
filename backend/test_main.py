@@ -1294,3 +1294,57 @@ def test_el_cliente_sabe_cuantos_tableros_hay(client, main):
                 otro.receive_text()
                 assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 2}
             assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 1}
+
+
+# Campos del client_status que el relay NO guarda para las pestanas que abren
+# despues, y por que. Cualquier otro campo que el cliente mande tiene que
+# llegar en el session_state: si no, un tablero abierto despues anda distinto
+# que uno abierto antes (mods de mapa y "detail" se perdian asi, 10-10).
+CLIENT_STATUS_NO_GUARDADO = {
+    "type": "es el tipo del mensaje",
+    "activeMods": "nombres de mods del usuario: privacidad, solo viajan en vivo",
+}
+
+
+def _campos_de_status_message():
+    """Las claves del dict que arma status_message() en el cliente."""
+    import ast
+    import pathlib
+    src = pathlib.Path(__file__).resolve().parent.parent / "client" / "tray_client.py"
+    arbol = ast.parse(src.read_text(encoding="utf-8"))
+    func = next(n for n in ast.walk(arbol) if isinstance(n, ast.FunctionDef) and n.name == "status_message")
+    dic = next(n for n in ast.walk(func) if isinstance(n, ast.Dict))
+    return {k.value for k in dic.keys if isinstance(k, ast.Constant)}
+
+
+def test_contrato_client_status(client, main):
+    campos = _campos_de_status_message()
+    assert {"status", "game", "mapMods", "detail"} <= campos  # el parseo encontro el dict correcto
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as local_client:
+        local_client.send_text(main.json.dumps({
+            "type": "client_status", "status": "plugin_missing", "game": "ats", "clientVersion": "1.5.30",
+            "detail": "The running game (D:\\ATS\\bin\\win_x64) has no telemetry plugin.",
+            "mapMods": {"ats": {"c2c": True}, "ets2": None}, "activeMods": ["Coast to Coast"],
+            "mapDlcs": None, "localMaps": None, "localMapPort": 27765, "overlay": True,
+        }))
+        import time as _time
+        _time.sleep(0.1)
+        with client.websocket_connect(f"/ws/live/{code}") as viewer:
+            estado = main.json.loads(viewer.receive_text())
+            assert estado["type"] == "session_state"
+            guardado = estado["client_status"]
+            faltan = campos - set(CLIENT_STATUS_NO_GUARDADO) - set(guardado)
+            assert not faltan, f"el relay no guarda {sorted(faltan)}: agregarlos o explicar en CLIENT_STATUS_NO_GUARDADO"
+            assert guardado["detail"].startswith("The running game")
+            assert "activeMods" not in guardado
+
+
+def test_client_status_detail_acotado(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as local_client:
+        local_client.send_text(main.json.dumps({"type": "client_status", "status": "live", "detail": "x" * 5000}))
+        import time as _time
+        _time.sleep(0.1)
+        with client.websocket_connect(f"/ws/live/{code}") as viewer:
+            assert len(main.json.loads(viewer.receive_text())["client_status"]["detail"]) == 400

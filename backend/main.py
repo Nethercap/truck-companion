@@ -1653,7 +1653,14 @@ async def ws_client(websocket: WebSocket, code: str):
             try:
                 payload = json.loads(data)
                 if payload.get("type") == "client_status":
+                    # Todo lo que la web lee del client_status tiene que estar
+                    # aca: una pestana que abre despues solo ve esto (el
+                    # cliente no lo reenvia si nada cambia). "detail" faltaba
+                    # y el tablero abierto despues no decia en que carpeta
+                    # faltaba el plugin. test_contrato_client_status lo cuida.
+                    detail = payload.get("detail")
                     session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion"),
+                                                  "detail": detail[:400] if isinstance(detail, str) and detail else None,
                                                   "mapDlcs": clean_map_dlcs(payload.get("mapDlcs")),
                                                   "mapMods": clean_map_mods(payload.get("mapMods")),
                                                   "localMaps": clean_local_maps(payload.get("localMaps")),
