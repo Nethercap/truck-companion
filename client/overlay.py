@@ -80,6 +80,10 @@ def limpiar_nav(msg: dict) -> dict:
     }
 
 
+def _con_ruta(nav: dict) -> bool:
+    return bool(nav.get("turn") or nav.get("remaining"))
+
+
 def formato_distancia(km: float, imperial: bool) -> str:
     if imperial:
         mi = km * KM_TO_MI
@@ -239,14 +243,19 @@ class OverlayData:
         # de uno a otro ("kept bouncing the distance remaining around",
         # Discord 10-10). Se queda con el que venia mandando mientras siga
         # fresco; si se calla (pestana cerrada, celular bloqueado) toma el
-        # otro. Una web vieja no manda src y se acepta como antes.
+        # otro. Una pestana de antes del deploy no manda src: cuenta como un
+        # tablero mas (None), si no le sacaba el lugar al de verdad en cada
+        # mensaje. Excepcion: si el que manda no tiene ruta y el otro si, se
+        # pasa al que tiene (un celular en modo Lite, el mapa cargando).
         src = msg.get("src") if isinstance(msg.get("src"), str) else None
+        nuevo = limpiar_nav(msg)
         ahora = time.time()
         with self._lock:
-            if (src and self.nav_src and src != self.nav_src
-                    and ahora - self.nav_ts <= NAV_FRESH_SECONDS):
+            if (self.nav is not None and src != self.nav_src
+                    and ahora - self.nav_ts <= NAV_FRESH_SECONDS
+                    and (_con_ruta(self.nav) or not _con_ruta(nuevo))):
                 return
-            self.nav = limpiar_nav(msg)
+            self.nav = nuevo
             self.nav_ts = ahora
             self.nav_src = src
 

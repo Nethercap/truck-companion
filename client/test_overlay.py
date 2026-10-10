@@ -285,7 +285,27 @@ def test_con_dos_tableros_se_queda_con_uno(monkeypatch):
     ahora[0] += overlay.NAV_FRESH_SECONDS + 1
     data.navegacion({"remaining": "1,980 km", "src": "celu"})
     assert data.foto()[2]["remaining"] == "1,980 km"
-    # una web vieja sin src se acepta como antes
+    # una pestana de antes del deploy (sin src) no le saca el lugar
     ahora[0] += 1
     data.navegacion({"remaining": "5 km"})
-    assert data.foto()[2]["remaining"] == "5 km"
+    assert data.foto()[2]["remaining"] == "1,980 km"
+    # el que manda se queda sin ruta y el otro tiene: se pasa al que tiene
+    ahora[0] += 1
+    data.navegacion({"remaining": "", "turn": "", "src": "celu"})
+    ahora[0] += 1
+    data.navegacion({"remaining": "1,230 mi", "src": "pc"})
+    assert data.foto()[2]["remaining"] == "1,230 mi"
+    # pero uno sin ruta no le saca el lugar al que tiene
+    ahora[0] += 1
+    data.navegacion({"remaining": "", "src": "celu"})
+    assert data.foto()[2]["remaining"] == "1,230 mi"
+
+
+def test_solo_webs_viejas_sin_src_se_aceptan_como_antes(monkeypatch):
+    ahora = [1000.0]
+    monkeypatch.setattr(overlay.time, "time", lambda: ahora[0])
+    data = overlay.OverlayData()
+    data.navegacion({"remaining": "10 km"})
+    ahora[0] += 1
+    data.navegacion({"remaining": "9 km"})
+    assert data.foto()[2]["remaining"] == "9 km"
