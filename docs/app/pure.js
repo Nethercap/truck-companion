@@ -334,6 +334,29 @@ function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM) {
   return j;
 }
 
+// Si el nodo `start` es parte de un anillo corto (una rotonda): un camino
+// dirigido que vuelve a el en menos de maxLenM sin pasar por `from` (el
+// nodo de la calle por la que se llega) ni volver por la misma arista. Las
+// manzanas de una ciudad son mas grandes; una rotonda del juego mide
+// 100-250 m de vuelta.
+function ringThrough(adjacency, nodeAt, start, from, maxLenM = 350, maxDepth = 24) {
+  let budget = 400; // nodos a visitar como mucho
+  const dfs = (cur, parent, lenM, depth) => {
+    if (--budget < 0 || depth > maxDepth) return false;
+    const p = nodeAt(cur);
+    for (const [m] of (adjacency.get(cur) || [])) {
+      if (m === parent || m === from) continue;
+      const q = nodeAt(m);
+      const len = lenM + Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (len > maxLenM) continue;
+      if (m === start) return depth >= 2;
+      if (dfs(m, cur, len, depth + 1)) return true;
+    }
+    return false;
+  };
+  return dfs(start, from, 0, 0);
+}
+
 // Maniobra a anunciar en el cruce que empieza en el nodo i de la ruta (y
 // termina en iEnd, ver junctionClusterEnd). Dos casos:
 //  - 'turn': el rumbo cambia mas de turnThreshold grados, medido legM metros
@@ -362,10 +385,105 @@ function detectManeuver(ctx) {
   const forkMinDev = ctx.forkMinDev != null ? ctx.forkMinDev : 6;
   const forkMinSep = ctx.forkMinSep != null ? ctx.forkMinSep : 8;
   const forkAltSlack = ctx.forkAltSlack != null ? ctx.forkAltSlack : 10;
+  const turnAltMaxDeg = ctx.turnAltMaxDeg != null ? ctx.turnAltMaxDeg : 150;
+  const turnNaturalMargin = ctx.turnNaturalMargin != null ? ctx.turnNaturalMargin : 45;
+  const rejoinM = ctx.rejoinM != null ? ctx.rejoinM : 100;
+  const escapeM = ctx.escapeM != null ? ctx.escapeM : 120;
   const inBearing = bearingBetween(pointAt(cum[i] - legM), pts[i]);
   const outBearing = bearingBetween(pts[iEnd], pointAt(cum[iEnd] + legM));
   const delta = normDeg(outBearing - inBearing);
+
+  // Las otras salidas del cruce, como cambio de rumbo contra el de entrada.
+  // Nodos propios de la ruta (no cuentan como "otra salida"): los del cruce
+  // y el nodo real anterior/siguiente - saltando puntos intermedios de la
+  // geometria de la curva, que no tienen indice de nodo. Cada salida se
+  // mide lejos (un salto mas por la mas recta si el primer vecino esta a
+  // menos de forkLegM): una rampa se separa de a poco.
+  let alts = null;
+  const altDeltas = () => {
+    if (alts) return alts;
+    alts = [];
+    const onRoute = new Set();
+    for (let k = i; k <= iEnd; k++) if (pts[k][4] != null) onRoute.add(pts[k][4]);
+    for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
+    for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
+    // Una salida que vuelve a la ruta enseguida, o que no lleva a ningun
+    // lado, no es otro camino: los dos lados de un rombo de la calzada (un
+    // ensanche con isleta) daban "keep left" yendo derecho por una calle de
+    // un carril (reporte de Discord, 09-10). Cuenta solo si desde ella se
+    // llega a escapeM del cruce sin pisar la ruta. No alcanza con mirar un
+    // salto: en un prefab cada brazo se une con todos los demas.
+    const ahead = new Set(onRoute);
+    for (let k = iEnd + 1; k < pts.length && cum[k] - cum[iEnd] <= rejoinM; k++) if (pts[k][4] != null) ahead.add(pts[k][4]);
+    const escapes = (from, n) => {
+      const o = nodeAt(from);
+      const seen = new Set([from, n]);
+      const queue = [n];
+      for (let q = 0; q < queue.length && q < 80; q++) {
+        const cur = queue[q];
+        const p = nodeAt(cur);
+        if (Math.hypot(p[0] - o[0], p[1] - o[1]) >= escapeM) return true;
+        for (const [m] of (adjacency.get(cur) || [])) {
+          if (seen.has(m) || ahead.has(m)) continue;
+          seen.add(m); queue.push(m);
+        }
+      }
+      return false;
+    };
+    for (let k = i; k <= iEnd; k++) {
+      const idx = pts[k][4];
+      if (idx == null) continue;
+      for (const [n] of (adjacency.get(idx) || [])) {
+        if (ahead.has(n) || !escapes(idx, n)) continue;
+        let far = nodeAt(n);
+        if (Math.hypot(far[0] - pts[k][0], far[1] - pts[k][1]) < forkLegM) {
+          const b1 = bearingBetween(pts[k], far);
+          let bestM = null, bestDiff = Infinity;
+          for (const [m] of (adjacency.get(n) || [])) {
+            if (m === idx || onRoute.has(m)) continue;
+            const diff = Math.abs(normDeg(bearingBetween(far, nodeAt(m)) - b1));
+            if (diff < bestDiff) { bestDiff = diff; bestM = m; }
+          }
+          if (bestM != null) far = nodeAt(bestM);
+        }
+        alts.push(normDeg(bearingBetween(pts[i], far) - inBearing));
+      }
+    }
+    return alts;
+  };
+  // La salida mas recta de las que no vuelven para atras (|delta| <= maxAbs).
+  const straightestAlt = (maxAbs) => {
+    let best = null;
+    for (const a of altDeltas()) if (Math.abs(a) <= maxAbs && (best == null || Math.abs(a) < Math.abs(best))) best = a;
+    return best;
+  };
+
   if (Math.abs(delta) > turnThreshold) {
+    // Con el grafo a mano, un giro se anuncia solo si habia por donde
+    // equivocarse: la calle que dobla 40 grados con un camino lateral del
+    // otro lado no es un giro, es la calle (reporte de Discord, 09-10: "me
+    // dice que me prepare para doblar aunque no hay otro camino"). Sin otra
+    // salida, o si la mas recta se desvia turnNaturalMargin mas que la
+    // nuestra, se sigue de largo sin aviso. Se devuelve igual, con quiet,
+    // para que el cruce siguiente no tome esta curva como un giro suyo (ver
+    // continuesTurn). La entrada a una rotonda tampoco tiene otra salida (el
+    // anillo es de un solo sentido), pero se anuncia: lo que viene es elegir
+    // la salida.
+    let quiet = false;
+    if (adjacency && nodes) {
+      const alt = straightestAlt(turnAltMaxDeg);
+      quiet = alt == null || Math.abs(alt) >= Math.abs(delta) + turnNaturalMargin;
+      if (quiet) {
+        // El nodo de entrada ya es parte del anillo; se busca desde el y desde
+        // el siguiente, sin volver por la calle por la que se llega.
+        let before = null, next = null;
+        for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { before = pts[k][4]; break; }
+        for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { next = pts[k][4]; break; }
+        for (const start of [pts[iEnd][4], next]) {
+          if (start != null && ringThrough(adjacency, nodeAt, start, before)) { quiet = false; break; }
+        }
+      }
+    }
     // Dentro del grupo, el giro se atribuye al nodo donde mas cambia el
     // rumbo entre cuerdas consecutivas - no al primero del grupo, que en una
     // avenida con nodos cada 20 m puede quedar 80 m antes de la esquina.
@@ -375,45 +493,39 @@ function detectManeuver(ctx) {
       const local = Math.abs(normDeg(bearingBetween(pts[k], pts[k + 1]) - bearingBetween(pts[k - 1], pts[k])));
       if (local > bestLocal) { bestLocal = local; at = k; }
     }
-    return { kind: 'turn', direction: delta > 0 ? 'right' : 'left', delta, at };
+    return { kind: 'turn', direction: delta > 0 ? 'right' : 'left', delta, at, inBearing, outBearing, quiet };
   }
 
   if (!adjacency || !nodes) return null;
   const routeDelta = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkLegM)) - inBearing);
   if (Math.abs(routeDelta) < forkMinDev) return null;
-  // Nodos propios de la ruta (no cuentan como "otra salida"): los del cruce
-  // y el nodo real anterior/siguiente - saltando puntos intermedios de la
-  // geometria de la curva, que no tienen indice de nodo.
-  const onRoute = new Set();
-  for (let k = i; k <= iEnd; k++) if (pts[k][4] != null) onRoute.add(pts[k][4]);
-  for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
-  for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
-  let bestAlt = null;
-  for (let k = i; k <= iEnd; k++) {
-    const idx = pts[k][4];
-    if (idx == null) continue;
-    for (const [n] of (adjacency.get(idx) || [])) {
-      if (onRoute.has(n)) continue;
-      let far = nodeAt(n);
-      if (Math.hypot(far[0] - pts[k][0], far[1] - pts[k][1]) < forkLegM) {
-        const b1 = bearingBetween(pts[k], far);
-        let bestM = null, bestDiff = Infinity;
-        for (const [m] of (adjacency.get(n) || [])) {
-          if (m === idx || onRoute.has(m)) continue;
-          const diff = Math.abs(normDeg(bearingBetween(far, nodeAt(m)) - b1));
-          if (diff < bestDiff) { bestDiff = diff; bestM = m; }
-        }
-        if (bestM != null) far = nodeAt(bestM);
-      }
-      const altDelta = normDeg(bearingBetween(pts[i], far) - inBearing);
-      if (Math.abs(altDelta) > 100) continue; // vuelve para atras, no es una continuacion
-      if (bestAlt == null || Math.abs(altDelta) < Math.abs(bestAlt)) bestAlt = altDelta;
-    }
-  }
+  const bestAlt = straightestAlt(100); // mas de 100: vuelve para atras, no es una continuacion
   if (bestAlt == null) return null;
   if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return null;
   if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return null;
   return { kind: 'fork', direction: routeDelta > bestAlt ? 'right' : 'left', delta: routeDelta, at: i };
+}
+
+// Una esquina grande (un cruce en T de un prefab ancho, con mas de 50 m
+// entre el nodo por el que se entra y el que se sale) no se agrupa como un
+// solo cruce, y cada mitad de los 90 grados pasaba el umbral: se anunciaba
+// "dobla a la izquierda" y, ya doblando, otra vez (reporte de Discord,
+// 09-10). El giro `m` que viene a menos de gapMaxM del anterior `prev`, en
+// el mismo sentido, es la misma esquina si de la entrada del primero a la
+// salida del segundo se dobla menos de maxDeg. Dos giros de verdad seguidos
+// (derecha y derecha: la vuelta a la manzana, el retorno) suman ~180.
+// Lo mismo despues de una curva callada (quiet), que el tramo de entrada
+// del cruce siguiente alcanza; pero ahi el segundo tiene que doblar menos
+// de quietAddDeg mas que la salida de la curva: una curva de 40 grados y a
+// 70 m una esquina de verdad hacia el mismo lado no suman 135, y la esquina
+// se perdia.
+// prev: { direction, inBearing, outBearing, quiet, end } con end en metros
+// sobre la ruta.
+function continuesTurn(prev, m, startM, gapMaxM = 80, maxDeg = 135, quietAddDeg = 35) {
+  if (!prev || !m || m.kind !== 'turn' || m.direction !== prev.direction) return false;
+  if (startM - prev.end > gapMaxM) return false;
+  if (prev.quiet) return Math.abs(normDeg(m.outBearing - prev.outBearing)) < quietAddDeg;
+  return Math.abs(normDeg(m.outBearing - prev.inBearing)) < maxDeg;
 }
 
 // Anti-parpadeo de la indicacion de giro: una maniobra nueva tiene que
@@ -1186,6 +1298,6 @@ function projectAheadOnRoute(points, x, z, baseWindowM = 400) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CAR_BRANDS, isDrivingCar, projectAheadOnRoute, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAR_BRANDS, isDrivingCar, projectAheadOnRoute, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

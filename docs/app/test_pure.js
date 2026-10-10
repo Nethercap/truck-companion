@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, detectManeuver, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice, mapBoundsFromCities, insideMapBounds } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -276,9 +276,68 @@ test('maneuver: bifurcacion en Y simetrica -> keep left', () => {
 });
 
 test('maneuver: giro de 90 grados sigue siendo turn', () => {
-  const ctx = scenario({ route: [[0, -300], [0, 0], [300, 0], [600, 0]] });
+  // con la calle que sigue derecho como otra opcion
+  const ctx = scenario({ route: [[0, -300], [0, 0], [300, 0], [600, 0]], extraNodes: [[0, 300]], edges: [[1, 4]] });
   const m = detectManeuver(ctx);
-  assert.deepEqual([m.kind, m.direction], ['turn', 'right']);
+  assert.deepEqual([m.kind, m.direction, m.quiet], ['turn', 'right', false]);
+});
+
+test('maneuver: la calle dobla y no hay otro camino -> giro callado (reporte de Discord)', () => {
+  // sin ninguna otra salida
+  let m = detectManeuver(scenario({ route: [[0, -300], [0, 0], [300, 0], [600, 0]] }));
+  assert.deepEqual([m.kind, m.direction, m.quiet], ['turn', 'right', true]);
+  // la calle dobla 40 grados a la izquierda y sale un camino a la derecha: seguimos la calle
+  m = detectManeuver(scenario({ route: [[0, -300], [0, 0], [-257, 306], [-514, 612]], extraNodes: [[300, 0]], edges: [[1, 4]] }));
+  assert.deepEqual([m.kind, m.direction, m.quiet], ['turn', 'left', true]);
+  // misma curva, pero la otra salida sigue derecho: ahi si hay que avisar
+  m = detectManeuver(scenario({ route: [[0, -300], [0, 0], [-257, 306], [-514, 612]], extraNodes: [[0, 300]], edges: [[1, 4]] }));
+  assert.equal(m.quiet, false);
+});
+
+test('maneuver: una salida que vuelve enseguida a la ruta o que no lleva a ningun lado no es otro camino', () => {
+  // rombo de la calzada: la ruta sigue por el medio y dobla 40 grados a la derecha 60 m
+  // despues; los dos lados del rombo (nodos 5 y 6) vuelven a la ruta en el nodo 2. Sin
+  // ellos tampoco hay otra salida: nada que anunciar.
+  const route = [[0, -300], [0, 0], [0, 60], [190, 220], [380, 380]];
+  const ctx = scenario({ route, extraNodes: [[-15, 30], [15, 30]], edges: [[1, 5], [5, 2], [1, 6], [6, 2]] });
+  assert.equal(detectManeuver(ctx), null);
+  // brazo muerto de un prefab (nodo 4, sin calle) que sigue derecho en una curva de 40 grados
+  const curva = scenario({ route: [[0, -300], [0, 0], [-257, 306], [-514, 612]], extraNodes: [[0, 25]], edges: [[1, 4], [4, 1]] });
+  assert.equal(detectManeuver(curva).quiet, true);
+  // el mismo brazo con una calle de verdad detras si cuenta
+  const calle = scenario({ route: [[0, -300], [0, 0], [-257, 306], [-514, 612]], extraNodes: [[0, 25], [0, 400]], edges: [[1, 4], [4, 5]] });
+  assert.equal(detectManeuver(calle).quiet, false);
+});
+
+test('maneuver: la entrada a una rotonda se anuncia aunque no tenga otra salida', () => {
+  // la ruta entra al anillo de un solo sentido (nodos 1 -> 2 -> 4 -> 5 -> 1) y lo deja por el 3
+  const route = [[0, -300], [0, 0], [30, 30], [300, 30]];
+  const ctx = scenario({ route, extraNodes: [[0, 60], [-30, 30]], edges: [[2, 4], [4, 5], [5, 1]] });
+  // solo el anillo y la salida de la ruta: el 1 no tiene otra salida que el 2
+  ctx.adjacency.set(1, [[2]]);
+  const m = detectManeuver(ctx);
+  assert.deepEqual([m.kind, m.quiet], ['turn', false]);
+  assert.equal(ringThrough(ctx.adjacency, (k) => ctx.nodes[k], 1, 0), true);
+  // una calle comun de doble mano no es un anillo
+  const recta = new Map([[0, [[1]]], [1, [[0], [2]]], [2, [[1], [3]]], [3, [[2]]]]);
+  const nodos = [[0, 0], [0, 50], [0, 100], [0, 150]];
+  assert.equal(ringThrough(recta, (k) => nodos[k], 1, 0), false);
+});
+
+test('continuesTurn: una esquina partida en dos nodos se anuncia una vez; dos giros de verdad, dos', () => {
+  const prev = { direction: 'left', inBearing: 0, outBearing: 315, quiet: false, end: 1000 };
+  // segunda mitad de la misma esquina: de la entrada (norte) a la salida (oeste) son 90 grados
+  assert.equal(continuesTurn(prev, { kind: 'turn', direction: 'left', outBearing: 270 }, 1040), true);
+  // vuelta en U (izquierda y otra vez izquierda): 180 grados, son dos giros
+  assert.equal(continuesTurn(prev, { kind: 'turn', direction: 'left', outBearing: 180 }, 1040), false);
+  // lejos, o hacia el otro lado: otro cruce
+  assert.equal(continuesTurn(prev, { kind: 'turn', direction: 'left', outBearing: 270 }, 1200), false);
+  assert.equal(continuesTurn(prev, { kind: 'turn', direction: 'right', outBearing: 45 }, 1040), false);
+  // despues de una curva callada de 40 grados, una esquina de 90 hacia el mismo lado se anuncia
+  const curva = { direction: 'left', inBearing: 0, outBearing: 320, quiet: true, end: 1000 };
+  assert.equal(continuesTurn(curva, { kind: 'turn', direction: 'left', outBearing: 230 }, 1060), false);
+  // pero el cruce que solo arrastra la misma curva en su tramo de entrada no
+  assert.equal(continuesTurn(curva, { kind: 'turn', direction: 'left', outBearing: 310 }, 1060), true);
 });
 
 test('maneuver: calle lateral mientras la ruta curva un poco -> nada (la lateral dobla mas que nosotros)', () => {

@@ -3149,7 +3149,10 @@ const NAV_TURN_LEG_M = 60; // cuanto camino antes/despues de la interseccion se 
 const NAV_FORK_LEG_M = 250; // para bifurcaciones se mira mas lejos: una rampa se separa de la autopista gradualmente
 const NAV_TURN_DEBOUNCE_TICKS = 2; // una indicacion nueva tiene que verse 2 ticks seguidos (anti-parpadeo al pasar salidas)
 const navManeuverState = {};
-let routeBehind = []; // ultimos nodos de la ruta ya recorridos (ver trimRouteBehindTruck)
+let routeBehind = []; // ultimos puntos de la ruta ya recorridos (ver trimRouteBehindTruck)
+// Cuantos: con los puntos de la curva entre nodo y nodo, tienen que alcanzar
+// para un cruce entero (hasta 100 m) mas el tramo de entrada.
+const ROUTE_BEHIND_MAX = 32;
 const NAV_JUNCTION_CLUSTER_GAP_M = 50; // nodos de cruce mas cerca que esto son el mismo cruce (prefab)
 const NAV_JUNCTION_CLUSTER_SPAN_M = 100; // y el cruce entero no mide mas que esto
 const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta mas cercano al tramo del giro
@@ -3269,7 +3272,12 @@ function findUpcomingTurn() {
   };
   const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency } : {};
 
-  for (let i = here + 1; i < pts.length - 1; i++) {
+  // Se arranca por los nodos ya pasados: si el camion esta adentro de un
+  // cruce, el grupo se arma entero y su giro se reconoce como ya hecho. Si
+  // se empezara por el primer nodo de adelante, la mitad que queda de una
+  // esquina se anunciaba como otro giro.
+  let prevTurn = null; // ultimo giro visto, aunque ya haya quedado atras (ver continuesTurn)
+  for (let i = 1; i < pts.length - 1; i++) {
     if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
     if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
@@ -3290,6 +3298,16 @@ function findUpcomingTurn() {
         j = jEnd;
       }
     }
+    if (continuesTurn(prevTurn, m, cum[i], NAV_TURN_LEG_M + 20, 135, NAV_TURN_ANGLE_THRESHOLD_DEG)) {
+      prevTurn.end = cum[iEnd]; // la segunda mitad de la misma esquina
+      prevTurn.outBearing = m.outBearing;
+      i = iEnd;
+      continue;
+    }
+    prevTurn = m && m.kind === 'turn'
+      ? { direction: m.direction, inBearing: m.inBearing, outBearing: m.outBearing, quiet: m.quiet, end: cum[iEnd] } : null;
+    if (m && m.quiet) m = null; // curva de la calle, sin otro camino: no se anuncia
+    if (m && cum[m.at != null ? m.at : i] <= cum[here]) m = null; // ya pasado
     if (m) {
       const at = m.at != null ? m.at : i;
       // Nombre de ruta del tramo AL QUE se gira (no del que se viene), buscando
@@ -3665,12 +3683,12 @@ function trimRouteBehindTruck(x, z) {
     if (distanceToRouteMeters(x, z) <= OFF_ROUTE_THRESHOLD_M) currentRouteTarget = null;
     return;
   }
-  // Los nodos que quedan atras se guardan aparte (ultimos 8): findUpcomingTurn
+  // Los nodos que quedan atras se guardan aparte (ROUTE_BEHIND_MAX): findUpcomingTurn
   // los usa para medir el rumbo de ENTRADA a un cruce cercano - sin ellos, a
   // menos de 60 m del cruce el tramo de entrada se achicaba hasta cero y la
   // medicion cambiaba justo al llegar (giros que aparecian/desaparecian).
   for (let k = 1; k <= bestIdx; k++) routeBehind.push(currentRouteWorldPoints[k]);
-  if (routeBehind.length > 8) routeBehind.splice(0, routeBehind.length - 8);
+  if (routeBehind.length > ROUTE_BEHIND_MAX) routeBehind.splice(0, routeBehind.length - ROUTE_BEHIND_MAX);
   // El punto interpolado hereda el tramo del nodo que sigue.
   const nextPt = currentRouteWorldPoints[bestIdx + 1];
   currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0, nextPt ? nextPt[6] : undefined], ...currentRouteWorldPoints.slice(bestIdx + 1)];
