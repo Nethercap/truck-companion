@@ -744,6 +744,15 @@ async def _safe_send(ws: WebSocket, message: str):
         pass
 
 
+async def notify_client_viewers(session: "Session"):
+    """Cuantos tableros tiene la sesion, al cliente: con eso no abre otra
+    pestana en cada arranque si ya hay una (o el celular) conectada. Antes
+    abria una por arranque y quedaban varias mandando a la vez (auditoria
+    del 10-10). Un cliente viejo ignora el mensaje."""
+    if session.client_ws is not None:
+        await _safe_send(session.client_ws, json.dumps({"type": "viewers", "count": len(session.viewer_ws_list)}))
+
+
 async def _safe_close(ws: WebSocket, code: int, reason: str):
     try:
         await ws.close(code=code, reason=reason)
@@ -1632,6 +1641,7 @@ async def ws_client(websocket: WebSocket, code: str):
         # event loop (que en paralelo esta reenviando telemetria a viewers).
         asyncio.create_task(asyncio.to_thread(record_session_started))
     await broadcast_session_state(session)
+    await notify_client_viewers(session)
     try:
         while True:
             data = await websocket.receive_text()
@@ -1763,6 +1773,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
     # El estado real de "compartir": un dispositivo recien abierto arranca
     # con su default local y si no se lo decimos muestra otra cosa.
     await _safe_send(websocket, live_share_state_message(session))
+    await notify_client_viewers(session)
     try:
         while True:
             # Normalmente no esperamos nada del viewer (solo mantiene viva la
@@ -1854,3 +1865,4 @@ async def ws_viewer(websocket: WebSocket, code: str):
         if outbox is not None:
             outbox.close()
         session.last_seen = time.time()
+        await notify_client_viewers(session)

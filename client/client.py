@@ -54,7 +54,7 @@ RECONNECT_DELAY_SECONDS = 3.0
 # Se bumpea a mano en cada release nueva del .exe (junto con /admin/stats/seed
 # {"latest_client_version": "..."} en el backend) - se manda en cada payload
 # para que /app pueda avisar si el cliente conectado quedo desactualizado.
-CLIENT_VERSION = "1.5.29"
+CLIENT_VERSION = "1.5.30"
 red.AGENTE = f"TruckDash/{CLIENT_VERSION}"
 
 # Comandos que la web puede mandar para simular una tecla en el juego. Estos
@@ -966,6 +966,10 @@ on_offmap = None
 # manda solo si client_status dice que el overlay esta prendido.
 on_nav_hud = None
 
+# Lo define la bandeja: cuantos tableros hay conectados por el relay
+# ({"type": "viewers", "count": n}), para no abrir otra pestana si ya hay uno.
+on_viewers = None
+
 
 async def handle_control_message(message: str, keybinds: dict, send) -> None:
     """Procesa un mensaje de control de la web (comando de botonera, get/set
@@ -990,6 +994,9 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
         elif msg_type == "offmap":
             if on_offmap and payload.get("game") in ("ats", "ets2"):
                 on_offmap(payload["game"])
+        elif msg_type == "viewers":
+            if on_viewers and isinstance(payload.get("count"), int):
+                on_viewers(payload["count"])
         elif msg_type == "nav_hud":
             if on_nav_hud:
                 on_nav_hud(payload)

@@ -452,6 +452,7 @@ def test_el_aviso_de_fuera_del_mapa_llega_al_cliente(client, main):
         viewer.receive_text()  # live_share_state
         with client.websocket_connect(f"/ws/client/{code}") as local_client:
             viewer.receive_text()
+            assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 1}
             aviso = {"type": "offmap", "game": "ats"}
             viewer.send_text(main.json.dumps(aviso))
             assert main.json.loads(local_client.receive_text()) == aviso
@@ -534,6 +535,7 @@ def test_cliente_nuevo_reemplaza_al_viejo_sin_que_el_viejo_lo_borre(client, main
         viewer.receive_text()  # live_share_state
         with client.websocket_connect(f"/ws/client/{code}") as viejo:
             viewer.receive_text()  # session_state (conectado)
+            viejo.receive_text()  # viewers
             with client.websocket_connect(f"/ws/client/{code}") as nuevo:
                 assert main.json.loads(viewer.receive_text())["client_connected"] is True
                 with pytest.raises(WebSocketDisconnect) as exc:
@@ -1277,3 +1279,18 @@ def test_mapas_armados_del_cliente_saneados(main):
     assert main.clean_local_maps("x") is None
     assert main.clean_port(27765) == 27765
     assert main.clean_port("27765") is None and main.clean_port(80) is None
+
+
+def test_el_cliente_sabe_cuantos_tableros_hay(client, main):
+    """Para no abrir otra pestana en cada arranque si ya hay un tablero
+    conectado (auditoria del 10-10)."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as viewer:
+        viewer.receive_text()
+        viewer.receive_text()
+        with client.websocket_connect(f"/ws/client/{code}") as local_client:
+            assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 1}
+            with client.websocket_connect(f"/ws/live/{code}") as otro:
+                otro.receive_text()
+                assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 2}
+            assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 1}

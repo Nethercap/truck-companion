@@ -4,30 +4,40 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.30 (2026-10-10)
 
-- In a Convoy session the dashboard and the overlay show the convoy's game clock
-  instead of your single player one, so game time arrivals match what everyone sees.
-- LAN mode keeps a local copy of the new voice guidance, which now also tells you which
-  exit to take at roundabouts.
+- In-game overlay: with the dashboard open on two devices at once (this PC and your
+  phone, say), the overlay sticks to one of them instead of jumping between their
+  distances and units. If that one stops sending, it switches to the other.
 - In-game overlay: when the game has a route but no dashboard is open, the overlay says
   where the next turn comes from (the dashboard, on your phone, a tablet or this PC)
   instead of leaving that space blank. Speed, limit, distance left and the game clock
   arrival keep working without it.
-- In-game overlay: with the dashboard open on two devices at once (this PC and your
-  phone, say), the overlay sticks to one of them instead of jumping between their
-  distances and units. If that one stops sending, it switches to the other.
+- Truck Dash no longer opens a new dashboard tab every time it starts if one is already
+  connected (the tab from last time, or your phone).
+- If the game crashes or freezes, Truck Dash notices within a few seconds: it stops
+  counting driving time for your account and goes back to waiting for the game.
+- While the game is loading, Setup and the dashboard say "waiting for the game" instead
+  of "the plugin is missing, restart the game".
+- A browser tab, a folder or another program with "American Truck Simulator" or "Euro
+  Truck Simulator 2" in its title is no longer mistaken for the game.
 - LAN mode: if Windows has your network set to Public (the usual reason a phone on the
   same Wi-Fi can't connect), Setup says so and opens the network settings to change it to
-  Private. The log now records which devices reached the PC, to tell "blocked" apart from
-  "never got there".
+  Private.
 - Build my map no longer stops when one of your mods can't be read (an encrypted or
   unusual .scs, usually not a map at all): it skips that mod and builds the map with the
   rest.
 - The "your truck went off the map" offer in Setup goes away when your map mods change,
   instead of staying for the whole session.
+- In a Convoy session the dashboard and the overlay show the convoy's game clock
+  instead of your single player one, so game time arrivals match what everyone sees.
+- LAN mode keeps a local copy of the new voice guidance, which now also tells you which
+  exit to take at roundabouts.
 - Linux (Proton): Setup says why the in-game overlay is not there (it is Windows only for
   now) instead of leaving its section out without a word.
+- The log file no longer grows without limit and no longer lists the titles of your other
+  windows; it keeps the last few megabytes. Settings are saved safely, so a power cut
+  while saving can't lose your pairing code or linked account.
 
 ## 1.5.29 (2026-10-09)
 

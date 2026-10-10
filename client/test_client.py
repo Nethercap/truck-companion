@@ -844,6 +844,16 @@ def test_no_se_confunde_con_otra_ventana_que_hable_de_camiones():
     assert window_compat.match_game_window([], TITULOS) is None
 
 
+def test_una_ventana_de_otro_programa_con_el_nombre_del_juego_no_es_el_juego():
+    # Log del 10-10: Chrome, el Explorador (Documentos\American Truck
+    # Simulator), Steam y opentrack se tomaban por el juego.
+    for titulo, exe in (("American Truck Simulator - YouTube - Google Chrome", "chrome.exe"),
+                        ("American Truck Simulator", "explorer.exe"),
+                        ("American Truck Simulator", "steamwebhelper.exe"),
+                        ("opentrack - Euro Truck Simulator 2", "opentrack.exe")):
+        assert window_compat.match_game_window([(3, titulo, exe)], TITULOS) is None, exe
+
+
 def test_trailer_wear_none_without_trailer():
     # Sin remolque el SDK devuelve las ranuras en cero, que no es lo mismo
     # que un remolque impecable: la web esconde la fila.

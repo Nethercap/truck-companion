@@ -65,7 +65,24 @@ URL_CUENTA = "https://trucksim-dash.com/account/"
 DONATE_URL = "https://tecito.app/truckdash"  # Tecito. Vacio, el item "Apoyar" del menu no aparece
 
 LOG_PATH = os.path.join(win_integration.base_dir(), "truckdash.log")
-logging.basicConfig(filename=LOG_PATH, level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# Con rotacion (2 MB y dos copias) y en UTF-8: el log crecia sin limite (2,7
+# MB en dos dias y medio de un usuario) y en cp1252 una ciudad o un mod con
+# letras de otro alfabeto se perdia. Si al lado del .exe no se puede escribir
+# (Program Files), %LOCALAPPDATA%: antes la app no arrancaba.
+def _abrir_log(path):
+    from logging.handlers import RotatingFileHandler
+    return RotatingFileHandler(path, maxBytes=2 * 1024 * 1024, backupCount=2, encoding="utf-8")
+
+
+try:
+    _log_handler = _abrir_log(LOG_PATH)
+except OSError:
+    LOG_PATH = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "TruckDash", "truckdash.log")
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    _log_handler = _abrir_log(LOG_PATH)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", handlers=[_log_handler])
+# "connection open/closed" de cada visor LAN no dice nada util.
+logging.getLogger("websockets").setLevel(logging.WARNING)
 
 GAME_LABELS = {"ats": "American Truck Simulator", "ets2": "Euro Truck Simulator 2"}
 
@@ -127,6 +144,7 @@ class AppState:
         self.mounted_mods: dict | None = None
         self.local_maps: dict = {}
         self.offmap_games: set = set()
+        self.cloud_viewers = None  # tableros conectados por el relay (None: no se sabe todavia)
         self.last_known_mods: dict = {}  # ultimos mods de mapa no-None por juego
         self.offmap_notified: set = set()
         self.map_build: dict | None = None  # {'game', 'step', 'error', 'running'}
@@ -1335,9 +1353,28 @@ def open_web_ui():
     if _browser_opened:
         return
     _browser_opened = True
+    # Si ya hay un tablero conectado (la pestana de la vez anterior, el
+    # celular) no se abre otro: se abria uno en cada arranque, quedaban
+    # varios con el mismo codigo y el overlay saltaba entre ellos
+    # (auditoria del 10-10).
+    lan = len(state.local.viewers) if state.local else 0
+    if (state.cloud_viewers or 0) > 0 or lan > 0:
+        logging.info("Ya hay un tablero abierto (%s por internet, %d por LAN): no se abre otro",
+                     state.cloud_viewers, lan)
+        return
     url = build_web_url()
     if url:
         abrir_navegador(url)
+
+
+async def abrir_tablero_al_arrancar():
+    """Abre el tablero al arrancar, despues de saber (o de esperar un poco a
+    saber) cuantos hay conectados. Un relay viejo no lo dice: se abre igual."""
+    for _ in range(16):
+        if state.cloud_viewers is not None:
+            break
+        await asyncio.sleep(0.5)
+    open_web_ui()
 
 
 def open_web_menu_item(icon, item):
@@ -1497,16 +1534,33 @@ def actualizar_plugins_viejos(ahora: float | None = None) -> None:
                      plugin_installer.PLUGIN_DLL_VERSION, bin_dir)
 
 
+GAME_LOADING_GRACE_S = 90
+FROZEN_FRAME_SECONDS = 10
+_juego_visto_desde = None
+
+
 def telemetry_status_when_unavailable() -> str:
     """Por que no hay telemetria: el juego no esta abierto, o esta abierto
     pero el plugin no carga. En ese caso se mira el proceso que corre para
     decir CUAL es el problema (state.status_detail, que viaja a la web):
     plugin ausente en esa copia del juego, juego elevado, o plugin presente
     pero no cargado (falta reiniciar / aceptar el dialogo del SDK)."""
+    global _juego_visto_desde
     hwnd = client_lib.find_game_window()
     if hwnd:
-        state.status_detail = diagnose_running_game(hwnd)
+        if _juego_visto_desde is None:
+            _juego_visto_desde = time.time()
+        detalle = diagnose_running_game(hwnd)
+        # La ventana aparece antes de que el plugin cree la memoria: en cada
+        # arranque del juego se decia "falta el plugin, reinicia el juego"
+        # durante 15 a 60 s (log del 10-10). Mientras carga se sigue en
+        # "esperando el juego"; plugin ausente o juego elevado se dicen ya.
+        if detalle in (None, DETAIL_NOT_LOADED) and time.time() - _juego_visto_desde < GAME_LOADING_GRACE_S:
+            state.status_detail = None
+            return "waiting_game"
+        state.status_detail = detalle
         return "plugin_missing"
+    _juego_visto_desde = None
     state.status_detail = None
     if state.installs and not state.any_plugin_installed():
         return "plugin_not_installed"
@@ -1527,6 +1581,12 @@ def diagnose_running_game(hwnd) -> str | None:
         logging.exception("running_game_info failed")
         return None
     if not info or not info.get("exe_path"):
+        return None
+    # Solo el juego de verdad: con la busqueda por titulo, Chrome o el
+    # Explorador terminaban en extra_game_dirs como "carpeta del juego sin
+    # plugin" (log del 10-10). Con ventana de otro .exe no hay diagnostico.
+    import window_compat
+    if sys.platform == "win32" and os.path.basename(info["exe_path"]).lower() not in window_compat.GAME_EXES:
         return None
     bin_dir = os.path.normpath(os.path.dirname(info["exe_path"]))
     if (plugin_installer.plugin_state(bin_dir) == "missing"
@@ -1618,9 +1678,12 @@ def refresh_map_mods(force: bool = False) -> bool:
                 if game in state.last_known_mods:
                     state.offmap_games.discard(game)
                 state.last_known_mods[game] = valor
-        # Para etiquetar la sesion y el viaje de la cuenta con los mods.
+        # Para etiquetar la sesion y el viaje de la cuenta con los mods. Con
+        # el None de mientras carga el juego se mantienen los ultimos: la
+        # sesion salia sin mapa (auditoria del 10-10).
         if getattr(state, "cuenta", None) is not None:
-            state.cuenta.poner_mods(mods)
+            sostenidos = {g: (v if v is not None else state.last_known_mods.get(g)) for g, v in (mods or {}).items()}
+            state.cuenta.poner_mods(sostenidos if mods is not None else mods)
         return True
     return cambio_nombres
 
@@ -1793,6 +1856,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             await local.broadcast(msg, is_status=True)
 
     sin_memoria_desde = None
+    ultimo_render, render_cambio_en, avisado_congelado = None, time.time(), False
 
     while True:
         if not telemetry_ready:
@@ -1839,7 +1903,22 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
             continue
 
-        if raw.get("sdkActive"):
+        # El plugin solo pone sdkActive en false cuando el juego se cierra
+        # bien: si crashea o se cuelga, el ultimo cuadro queda en la memoria
+        # con el camion andando y se seguian sumando horas de manejo a la
+        # cuenta (log del 09-10: viaje clavado en 727 km con las horas
+        # subiendo). renderTime avanza en cada frame, incluso en pausa: si no
+        # cambia en FROZEN_FRAME_SECONDS, el cuadro es viejo. Sin el campo
+        # (otra version del plugin) no se aplica.
+        render = raw.get("renderTime")
+        if render is None or render != ultimo_render:
+            ultimo_render, render_cambio_en = render, time.time()
+        congelado = render is not None and time.time() - render_cambio_en > FROZEN_FRAME_SECONDS
+        if congelado and not avisado_congelado:
+            logging.info("El juego no manda frames hace %d s: se toma como cerrado o colgado", FROZEN_FRAME_SECONDS)
+        avisado_congelado = congelado
+
+        if raw.get("sdkActive") and not congelado:
             inactive_since = None
             client_lib.update_job_snapshot(raw)
             payload = client_lib.build_payload(raw)
@@ -1893,6 +1972,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
 
 async def run_client(backend_url: str, fixed_code: str | None):
     logging.info("Starting client v%s, backend=%s", client_lib.CLIENT_VERSION, backend_url)
+    state.cloud_viewers = None  # codigo nuevo = sesion nueva del relay
     state.refresh_installs()
     keybinds = client_lib.load_keybinds()
 
@@ -1932,7 +2012,8 @@ async def run_client(backend_url: str, fixed_code: str | None):
     state.set_code(code)
     logging.info("Got pairing code %s", code)
     if not state.autostart_mode:
-        open_web_ui()
+        # Un momento, para que el relay diga si ya hay un tablero conectado.
+        asyncio.create_task(abrir_tablero_al_arrancar())
     asyncio.create_task(asyncio.to_thread(check_for_update_silent, backend_url))
     vigilar(asyncio.create_task(vigilar_interruptor(backend_url)), "interruptor de cuentas")
 
@@ -2052,6 +2133,7 @@ def main():
     local_server.on_show_setup = open_setup_window
     client_lib.on_offmap = on_offmap
     client_lib.on_nav_hud = state.overlay_data.navegacion
+    client_lib.on_viewers = lambda n: setattr(state, "cloud_viewers", n)
     ajustes_overlay = win_integration.overlay_settings()
     state.overlay_layout = (ajustes_overlay["corner"], ajustes_overlay["size"], ajustes_overlay["items"],
                             ajustes_overlay["pos"])
