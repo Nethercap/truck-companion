@@ -2895,7 +2895,7 @@ function renderRouteSummary(view) {
   // Un error de ~900 m sin explicacion se lee como un destino equivocado.
   const aviso = document.getElementById('routeApprox');
   if (aviso) {
-    const textos = [view.approx ? t('destApprox') : null, view.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
+    const textos = [view.pickup || null, view.approx ? t('destApprox') : null, view.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
     aviso.hidden = !textos.length;
     if (textos.length) aviso.textContent = textos.join(' ');
   }
@@ -2929,7 +2929,16 @@ function updateRouteSummary(data) {
   const seconds = manual
     ? (remainingKm != null && lastKnownAvgSpeedKmh > 0 ? remainingKm / lastKnownAvgSpeedKmh * 3600 : null)
     : (remainingKm === 0 ? 0 : routeSummaryEtaSeconds);
+  // Ruta a la carga (remolque propio sin cargar): sin decirlo, "llegaste" en
+  // la empresa de origen y ninguna ruta a la entrega se leia como un error
+  // ("says I'm at the location when clearly I'm not, it's not routing to
+  // Charleston", Discord 10-10).
+  const pickup = target.kind === 'pickup'
+    ? t('routePickupNotice', [data.companySrc, data.citySrc].filter(Boolean).join(', ') || '?',
+        [data.companyDst, data.cityDst].filter(Boolean).join(', ') || '?')
+    : null;
   renderRouteSummary({
+    pickup,
     approx: !!target.approx,
     dlc: routeUsesUncheckedDlc,
     percent,
