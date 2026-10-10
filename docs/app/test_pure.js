@@ -1172,3 +1172,17 @@ test('voiceManeuverKey: rotonda hasta la quinta salida, despues hacia que lado',
   assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 7, direction: 'left' }), 'turn_left');
   assert.equal(voiceManeuverKey({ kind: 'fork', direction: 'right' }), 'keep_right');
 });
+
+test('holdDetectedMods: el hueco sin lista de mods al rearrancar el juego no tira la variante', () => {
+  const { holdDetectedMods } = require('./pure.js');
+  const c2c = { c2c: true, promods_canada: false, canada_expansion: true };
+  const antes = { ets2: null, ats: c2c };
+  // Log del 10-10: el juego reescribe game.log.txt y ats vuelve a null 40 s.
+  assert.deepEqual(holdDetectedMods(antes, { ets2: null, ats: null }), { ets2: null, ats: c2c });
+  // Un perfil sin mods trae flags en false, no null: eso si cambia.
+  const sinMods = { c2c: false, promods_canada: false, canada_expansion: false };
+  assert.deepEqual(holdDetectedMods(antes, { ets2: null, ats: sinMods }), { ets2: null, ats: sinMods });
+  // Sin deteccion previa sigue null (la web usa el selector manual).
+  assert.deepEqual(holdDetectedMods(null, { ets2: null, ats: null }), { ets2: null, ats: null });
+  assert.equal(holdDetectedMods(antes, null), null);
+});

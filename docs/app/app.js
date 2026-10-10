@@ -5338,8 +5338,9 @@ function connectWs(backend, code, options = {}) {
       if (data.activeMods !== undefined) detectedModNames = data.activeMods;
       applyDetectedDlcs(data.mapDlcs);
       applyLocalMaps(data.localMaps, data.localMapPort);
-      if (data.mapMods !== undefined && JSON.stringify(data.mapMods) !== JSON.stringify(detectedMods)) {
-        detectedMods = data.mapMods;
+      const mapMods = data.mapMods === undefined ? undefined : holdDetectedMods(detectedMods, data.mapMods);
+      if (mapMods !== undefined && JSON.stringify(mapMods) !== JSON.stringify(detectedMods)) {
+        detectedMods = mapMods;
         if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada
         if (document.getElementById('modsModal').style.display === 'flex') initModsUi();
       }
