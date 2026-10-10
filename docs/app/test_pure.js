@@ -1225,3 +1225,13 @@ test('deliverySummary: un cliente viejo sin xp ni dano muestra igual el pago', (
   assert.equal(s.route, null);
   assert.equal(deliverySummary(null), null);
 });
+
+test('truckSizeSetting: de 1 a 3 en pasos de 0.25, lo raro vuelve al tamano normal', () => {
+  const { truckSizeSetting } = require('./pure.js');
+  assert.equal(truckSizeSetting(undefined), 1);
+  assert.equal(truckSizeSetting('2.1'), 2);
+  assert.equal(truckSizeSetting(5), 3);
+  assert.equal(truckSizeSetting(0.2), 1);
+  assert.equal(truckSizeSetting('x'), 1);
+  assert.equal(truckSizeSetting(1.4), 1.5);
+});
