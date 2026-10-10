@@ -1552,6 +1552,55 @@ function formatGameMinutes(mins, h = 'h', m = 'min') {
   return hh ? `${hh} ${h} ${mm} ${m}` : `${mm} ${m}`;
 }
 
+// Empresas que faltan en nuestros POIs. Si la empresa del trabajo no esta,
+// la ruta cae al centro de la ciudad y la busqueda no la encuentra (Homburg
+// Freight de Coast to Coast, Discord 10-10). El momento en que el juego da la
+// carga por enganchada o el trabajo por entregado, el camion esta en la
+// empresa: esa posicion es su lugar real, y sirve para completar los datos.
+// tick() devuelve los reportes nuevos (uno por empresa y ciudad).
+// known(token, nombre, ciudad): true/false si esta en los POIs.
+function createMissingCompanyWatch() {
+  let prev = null;
+  const enviados = new Set();
+  return {
+    tick(data, pos, known) {
+      const out = [];
+      const ev = data.event || {};
+      const reportar = (kind, token, name, city, cityName) => {
+        if (!token || !city || !pos) return;
+        const clave = `${token}|${city}`;
+        if (enviados.has(clave) || known(token, name, city)) return;
+        enviados.add(clave);
+        out.push({ kind, company: token, companyName: name || null, city, cityName: cityName || null,
+                   x: Math.round(pos.x), z: Math.round(pos.z) });
+      };
+      if (prev && prev.onJob && data.onJob) {
+        // Carga propia: el SDK pasa a cargada en la empresa de origen. Freight
+        // market y externos: la carga figura cargada desde el principio, y el
+        // remolque se engancha en la empresa de origen.
+        const cargo = prev.isCargoLoaded === false && data.isCargoLoaded === true;
+        const remolque = /^(freight_market|external_)/.test(data.jobMarket || '')
+          && prev.trailerAttached === false && data.trailerAttached === true;
+        if (cargo || remolque) reportar('pickup', data.companySrcId, data.companySrc, data.citySrcId, data.citySrc);
+      }
+      // Entregado: el pulso puede llegar con los datos del trabajo ya
+      // borrados, por eso se usa el destino del tick anterior.
+      if (ev.jobDelivered && !(prev && prev.delivered) && prev && prev.companyDstId) {
+        reportar('dest', prev.companyDstId, prev.companyDst, prev.cityDstId, prev.cityDst);
+      }
+      prev = {
+        onJob: !!data.onJob, isCargoLoaded: data.isCargoLoaded, trailerAttached: data.trailerAttached,
+        delivered: !!ev.jobDelivered,
+        companyDstId: data.onJob ? data.companyDstId : (ev.jobDelivered && prev ? prev.companyDstId : null),
+        companyDst: data.onJob ? data.companyDst : (ev.jobDelivered && prev ? prev.companyDst : null),
+        cityDstId: data.onJob ? data.cityDstId : (ev.jobDelivered && prev ? prev.cityDstId : null),
+        cityDst: data.onJob ? data.cityDst : (ev.jobDelivered && prev ? prev.cityDst : null),
+      };
+      return out;
+    },
+  };
+}
+
 // Texto para comparar en las busquedas: sin mayusculas ni tildes. Nadie
 // escribe "Kraków" o "Zürich" en el celular, y la busqueda de empresas y
 // ciudades no las encontraba. NFD separa las tildes; las letras que no se
@@ -1563,6 +1612,6 @@ function foldText(s) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

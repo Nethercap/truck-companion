@@ -1348,3 +1348,54 @@ def test_client_status_detail_acotado(client, main):
         _time.sleep(0.1)
         with client.websocket_connect(f"/ws/live/{code}") as viewer:
             assert len(main.json.loads(viewer.receive_text())["client_status"]["detail"]) == 400
+
+
+# --------------------------------------------------------- empresas que faltan
+
+def test_clean_missing_company_valida_y_limpia(main):
+    bueno = {"variant": "ats_c2c", "company": "homburg_frt", "city": "gulfport", "kind": "pickup",
+             "companyName": "  Homburg   Freight ", "cityName": "Gulfport", "x": -12345.6, "z": 6789.4}
+    assert main.clean_missing_company(bueno) == {
+        "variant": "ats_c2c", "company": "homburg_frt", "city": "gulfport", "kind": "pickup",
+        "companyName": "Homburg Freight", "cityName": "Gulfport", "x": -12346, "z": 6789}
+    assert main.clean_missing_company({**bueno, "company": "<script>"}) is None
+    assert main.clean_missing_company({**bueno, "city": None}) is None
+    assert main.clean_missing_company({**bueno, "variant": "local_ats"}) is None
+    assert main.clean_missing_company({**bueno, "kind": "otro"}) is None
+    assert main.clean_missing_company({**bueno, "x": "nan"}) is None
+    assert main.clean_missing_company({**bueno, "companyName": 7})["companyName"] is None
+    assert len(main.clean_missing_company({**bueno, "companyName": "x" * 500})["companyName"]) == 60
+
+
+def test_missing_company_se_acumula_una_vez_por_sesion(client, main, monkeypatch):
+    import time as _time
+    monkeypatch.setattr(main, "_stats_cache", {"total_sessions": 0, "daily": {}})
+    monkeypatch.setattr(main, "_save_stats", lambda: None)
+    msg = {"type": "missing_company", "variant": "ats_c2c", "company": "homburg_frt", "city": "gulfport",
+           "kind": "pickup", "companyName": "Homburg Freight", "x": 100, "z": 200}
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as ws:
+        ws.send_text(main.json.dumps(msg))
+        ws.send_text(main.json.dumps({**msg, "kind": "dest", "x": 101}))  # repetida en la sesion: no cuenta
+        _time.sleep(0.2)
+    code2 = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code2}") as ws:
+        ws.send_text(main.json.dumps({**msg, "kind": "dest", "x": 102, "z": 202}))
+        _time.sleep(0.2)
+    todo = main._stats_cache["missing_companies"]
+    e = todo["ats_c2c|homburg_frt|gulfport"]
+    assert e["reports"] == 2 and e["companyName"] == "Homburg Freight"
+    assert e["points"] == [[100, 200, "pickup"], [102, 202, "dest"]]
+    assert code not in main.json.dumps(todo)
+    # se ve en el panel de admin y no en las stats publicas
+    assert "missing_companies" in client.get("/admin/stats", headers={"X-Admin-Key": "test-admin-key"}).json()
+    assert "missing_companies" not in client.get("/stats/public").json()
+
+
+def test_missing_company_lista_acotada(main, monkeypatch):
+    monkeypatch.setattr(main, "_stats_cache", {"total_sessions": 0, "daily": {}})
+    monkeypatch.setattr(main, "_save_stats", lambda: None)
+    monkeypatch.setattr(main, "MISSING_COMPANIES_KEPT", 3)
+    for i in range(5):
+        main.record_missing_company({"variant": "ets2", "company": f"c{i}", "city": "x", "kind": "dest", "x": 0, "z": 0})
+    assert len(main._stats_cache["missing_companies"]) == 3

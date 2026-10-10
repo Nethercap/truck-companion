@@ -269,6 +269,64 @@ def record_offmap_report(report: dict):
         _save_stats()
 
 
+# Empresas de trabajos que no estan en los POIs de la variante (la web las
+# detecta, ver createMissingCompanyWatch en docs/app/pure.js), con la posicion
+# donde se cargo o se entrego: es el lugar real de la empresa. Una vez por
+# empresa y sesion; se guardan con las stats y se ven en admin.html.
+GAME_TOKEN_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+MISSING_COMPANIES_KEPT = 500
+MISSING_COMPANY_POINTS = 5
+MISSING_COMPANY_PER_SESSION = 20
+
+
+def _nombre_corto(valor) -> Optional[str]:
+    if not isinstance(valor, str):
+        return None
+    n = " ".join(valor.split())[:60]
+    return n or None
+
+
+def clean_missing_company(payload: dict) -> Optional[dict]:
+    variant, company, city = payload.get("variant"), payload.get("company"), payload.get("city")
+    if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant) or variant.startswith("local"):
+        return None
+    if not all(isinstance(v, str) and GAME_TOKEN_RE.match(v) for v in (company, city)):
+        return None
+    if payload.get("kind") not in ("pickup", "dest"):
+        return None
+    try:
+        x, z = float(payload.get("x")), float(payload.get("z"))
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(x) and math.isfinite(z) and abs(x) < 1e7 and abs(z) < 1e7):
+        return None
+    return {"variant": variant, "company": company, "city": city, "kind": payload["kind"],
+            "companyName": _nombre_corto(payload.get("companyName")), "cityName": _nombre_corto(payload.get("cityName")),
+            "x": round(x), "z": round(z)}
+
+
+def record_missing_company(report: dict):
+    with _stats_lock:
+        stats = _load_stats()
+        todo = stats.setdefault("missing_companies", {})
+        clave = f'{report["variant"]}|{report["company"]}|{report["city"]}'
+        e = todo.get(clave)
+        if e is None:
+            e = todo[clave] = {"variant": report["variant"], "company": report["company"], "city": report["city"],
+                               "reports": 0, "points": []}
+        e["reports"] += 1
+        e["last"] = time.strftime("%Y-%m-%d", time.gmtime())
+        for k in ("companyName", "cityName"):
+            if report.get(k):
+                e[k] = report[k]
+        e["points"] = (e["points"] + [[report["x"], report["z"], report["kind"]]])[-MISSING_COMPANY_POINTS:]
+        if len(todo) > MISSING_COMPANIES_KEPT:
+            # se van las que hace mas que no aparecen
+            for vieja in sorted(todo, key=lambda k: (todo[k].get("last", ""), todo[k]["reports"]))[:len(todo) - MISSING_COMPANIES_KEPT]:
+                del todo[vieja]
+        _save_stats()
+
+
 def record_session_started():
     with _stats_lock:
         stats = _load_stats()
@@ -620,6 +678,7 @@ class Session:
         # Variantes para las que esta sesion ya reporto "fuera del mapa":
         # un reporte por variante y por sesion.
         self.offmap_reported: set = set()
+        self.missing_companies_reported: set = set()
         # Ultimo estado de diagnostico reportado por el cliente local (mensaje
         # "client_status": waiting_game / plugin_missing / live / ...). Se
         # guarda para poder darselo a un viewer que se conecta despues, en vez
@@ -1594,6 +1653,9 @@ def stats_seed(payload: dict, x_admin_key: Optional[str] = Header(default=None))
                 stats[key] = value
             elif key == "accounts_enabled" and isinstance(value, bool):
                 stats[key] = value
+            elif key == "missing_companies" and isinstance(value, dict):
+                # {} borra la lista (despues de actualizar los datos del mapa)
+                stats[key] = value
         _save_stats()
         return stats
 
@@ -1854,6 +1916,13 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         session.offmap_reported.add(report["variant"])
                         # PUT a R2 bloqueante: en un thread, como las demas stats.
                         asyncio.create_task(asyncio.to_thread(record_offmap_report, report))
+                elif msg_type == "missing_company":
+                    report = clean_missing_company(payload)
+                    if report:
+                        clave = (report["variant"], report["company"], report["city"])
+                        if clave not in session.missing_companies_reported and len(session.missing_companies_reported) < MISSING_COMPANY_PER_SESSION:
+                            session.missing_companies_reported.add(clave)
+                            asyncio.create_task(asyncio.to_thread(record_missing_company, report))
                 elif msg_type == "set_currency":
                     cur = payload.get("currency")
                     session.viewer_currency = cur.upper() if is_valid_currency(cur) else None

@@ -550,6 +550,23 @@ function sendOffMapReport(x, z) {
   ws.send(JSON.stringify({ type: 'offmap_report', variant: currentGame, x: Math.round(x), z: Math.round(z), mods }));
 }
 
+// Empresa del trabajo que no esta en nuestros POIs (ver
+// createMissingCompanyWatch): al relay, con la posicion donde se cargo o se
+// entrego, para el panel de admin. Corre en todas las pestanas para seguir el
+// trabajo, pero manda solo la lider; el relay ademas repite una vez por sesion.
+// Los mapas armados en la PC (local_*) no: sus datos no son los nuestros.
+const missingCompanyWatch = createMissingCompanyWatch();
+function checkMissingCompanies(data) {
+  if (conn.demo || conn.spectator || conn.local) return;
+  // Sin los POIs de esta variante no se sabe: se da por conocida (sin
+  // reporte), pero el tick corre igual para no comparar contra un estado viejo.
+  const usable = pois && currentGame && poisVariant === currentGame && !currentGame.startsWith('local');
+  const known = (token, name, city) => !usable || !!(findCompanyPoi(token, city) || findCompanyPoiByName(name, city));
+  const reportes = missingCompanyWatch.tick(data, lastWorldPos, known);
+  if (!reportes.length || !isLeaderTab || !ws || ws.readyState !== WebSocket.OPEN) return;
+  for (const r of reportes) ws.send(JSON.stringify({ type: 'missing_company', variant: currentGame, ...r }));
+}
+
 // Ruta propia al mapa en vivo publico (/live/): la misma que se dibuja aca,
 // simplificada, cuando cambia y como mucho cada LIVE_ROUTE_RESEND_MS. Solo
 // con la posicion compartida y la casilla de la ruta prendida; si no, se
@@ -5517,6 +5534,7 @@ function handleTelemetry(data) {
   updateMap(data.position || {}, data.game, data.heading);
   updateDestinationMarker(data);
   updateRouteSummary(data);
+  checkMissingCompanies(data);
   checkUpdateBanner(data.clientVersion);
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
