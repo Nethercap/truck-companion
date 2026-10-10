@@ -128,7 +128,9 @@
   // mapa en vivo en castellano sin haberlo elegido y el resto del producto
   // en ingles. Lo unico que lo cambia es elegirlo, aca o en la app: las dos
   // guardan en la misma clave.
-  let lang = params.get('lang') || localStorage.getItem('truckdash_lang') || 'en';
+  let guardado = null;
+  try { guardado = localStorage.getItem('truckdash_lang'); } catch (e) {} // datos del sitio bloqueados
+  let lang = params.get('lang') || guardado || 'en';
   if (!I18N[lang]) lang = 'en';
   const t = (k) => I18N[lang][k] || I18N.en[k] || k;
   function applyLang() {

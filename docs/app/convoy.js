@@ -69,7 +69,17 @@ function convoyOnSocketOpen() {
   // a entrar con el mismo codigo/apodo. Si eramos el creador y el convoy ya
   // no existe (redeploy), se recrea con el mismo codigo.
   if (!convoy.pending) return;
+  // Despues de un redeploy el convoy lo recrea el creador al reconectar: si
+  // un miembro llega antes, recibe not_found y quedaba colgado con el
+  // convoy viejo en pantalla (auditoria del 10-10). Se reintenta un rato.
+  convoy.rejoinUntil = convoyInRoom() && convoy.pending.kind !== 'create' ? Date.now() + CONVOY_REJOIN_MS : 0;
+  convoySendPending();
+}
+const CONVOY_REJOIN_MS = 90000;
+const CONVOY_REJOIN_EVERY_MS = 5000;
+function convoySendPending() {
   const p = convoy.pending;
+  if (!p) return;
   convoySend({ type: p.kind === 'create' ? 'convoy_create' : 'convoy_join', code: p.code, nickname: p.nickname,
     mapVariant: convoyMyVariant(), shareIncome: convoyShareIncome, postSummary: !!p.postSummary });
 }
@@ -100,6 +110,8 @@ function convoyOnTelemetry(data) {
 // ---------------------------------------------------------------- estado
 function convoyApplyState(st) {
   const wasIn = convoyInRoom();
+  convoy.rejoinUntil = 0; // ya hay respuesta: se terminaron los reintentos
+  clearTimeout(convoy.rejoinTimer);
   if (st.left || st.kicked || st.ended) {
     const kicked = !!st.kicked;
     convoyReset();
@@ -142,6 +154,11 @@ function convoyOnEvent(ev) {
 }
 
 function convoyOnError(err) {
+  if (err.reason === 'not_found' && convoy.pending && Date.now() < (convoy.rejoinUntil || 0)) {
+    clearTimeout(convoy.rejoinTimer);
+    convoy.rejoinTimer = setTimeout(convoySendPending, CONVOY_REJOIN_EVERY_MS);
+    return;
+  }
   const key = { bad_nickname: 'convoyErrNick', not_found: 'convoyErrNotFound', banned: 'convoyErrBanned', full: 'convoyErrFull', nickname_taken: 'convoyErrTaken', not_in_convoy: 'convoyErrNotIn' }[err.reason] || 'convoyErrGeneric';
   showToast(t(key), 'danger', 5000);
   if (convoy.pending && (err.reason === 'not_found' || err.reason === 'banned') && !convoyInRoom()) convoy.pending = null;
@@ -249,6 +266,9 @@ function convoyUpdateFollow() {
   const label = `📍 ${t('convoyLeaderTag')}: ${leader.cityDst || leader.nickname}`;
   addWaypoint([dest[0], dest[1]], toLngLat(dest[0], dest[1]), false, label);
   convoy.followWaypoint = waypoints[waypoints.length - 1] || null;
+  // No se guarda para despues de recargar (ver saveWaypoints): addWaypoint ya
+  // lo guardo, se marca y se vuelve a guardar sin el.
+  if (convoy.followWaypoint) { convoy.followWaypoint.convoyFollow = true; saveWaypoints(); }
 }
 
 // ---------------------------------------------------------------- mapa: marcadores + borde + ruta del lider
