@@ -150,7 +150,7 @@ class AppState:
         self.overlay_layout = (overlay.DEFAULT_CORNER, overlay.DEFAULT_SIZE, overlay.ITEMS, None)
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
-                                                T("overlay_arrival_game")))
+                                                T("overlay_arrival_game"), T("overlay_turn_hint")))
         # Arrastrado en el modo Mover: queda en esa posicion.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))
         # Tecla rapida que prende y apaga el overlay desde el juego.

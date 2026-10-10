@@ -247,3 +247,23 @@ def test_la_tecla_solo_cuenta_con_el_juego_al_frente(monkeypatch):
     monkeypatch.setattr(window_compat, "game_window_in_front", lambda: 1234)
     tray_client.tecla_del_overlay()
     assert llamadas == [not tray_client.state.overlay.enabled]
+
+
+def test_sin_tablero_con_ruta_avisa_de_donde_sale_el_giro():
+    # Discord: "do I need to have the browser open to display the in game HUD?"
+    aviso = "Turns come from the dashboard"
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, None, 0, 100, aviso_giro=aviso)
+    assert (d["turn"], d["hint"]) == ("", aviso)
+    # con el tablero mandando, el giro de verdad y sin aviso
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, nav(), 99, 100, aviso_giro=aviso)
+    assert d["turn"] and d["hint"] == ""
+    # sin ruta en el juego no hay giro que extranar
+    assert overlay.contenido(tele(), 100, None, 0, 100, aviso_giro=aviso)["hint"] == ""
+    # con el giro destildado tampoco
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, None, 0, 100, aviso_giro=aviso,
+                          items=("speed",))
+    assert d["hint"] == ""
+    # solo el giro elegido y sin tablero: se ve el aviso en vez de nada
+    d = overlay.contenido(tele(routeDistanceKm=42), 100, None, 0, 100, aviso_giro=aviso,
+                          items=("turn",))
+    assert d is not None and d["hint"] == aviso

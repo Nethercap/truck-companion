@@ -10,6 +10,10 @@ updates on its own and is not versioned here.
   instead of your single player one, so game time arrivals match what everyone sees.
 - LAN mode keeps a local copy of the new voice guidance, which now also tells you which
   exit to take at roundabouts.
+- In-game overlay: when the game has a route but no dashboard is open, the overlay says
+  where the next turn comes from (the dashboard, on your phone, a tablet or this PC)
+  instead of leaving that space blank. Speed, limit, distance left and the game clock
+  arrival keep working without it.
 
 ## 1.5.29 (2026-10-09)
 
