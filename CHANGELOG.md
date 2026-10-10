@@ -21,6 +21,11 @@ updates on its own and is not versioned here.
   same Wi-Fi can't connect), Setup says so and opens the network settings to change it to
   Private. The log now records which devices reached the PC, to tell "blocked" apart from
   "never got there".
+- Build my map no longer stops when one of your mods can't be read (an encrypted or
+  unusual .scs, usually not a map at all): it skips that mod and builds the map with the
+  rest.
+- The "your truck went off the map" offer in Setup goes away when your map mods change,
+  instead of staying for the whole session.
 - Linux (Proton): Setup says why the in-game overlay is not there (it is Windows only for
   now) instead of leaving its section out without a word.
 

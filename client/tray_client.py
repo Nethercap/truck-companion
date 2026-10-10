@@ -127,6 +127,7 @@ class AppState:
         self.mounted_mods: dict | None = None
         self.local_maps: dict = {}
         self.offmap_games: set = set()
+        self.last_known_mods: dict = {}  # ultimos mods de mapa no-None por juego
         self.offmap_notified: set = set()
         self.map_build: dict | None = None  # {'game', 'step', 'error', 'running'}
         self.map_build_cancel = threading.Event()
@@ -1608,6 +1609,15 @@ def refresh_map_mods(force: bool = False) -> bool:
     if mods != state.map_mods:
         state.map_mods = mods
         logging.info("Map mods detected: %s", mods)
+        # Si cambiaron los mods de un juego (no el None de mientras carga), el
+        # "fuera del mapa" que habia dicho la web era de otro mapa: Setup
+        # seguia ofreciendo "Build my map" toda la sesion (usuario del 10-10,
+        # con un aviso que ademas era falso).
+        for game, valor in (mods or {}).items():
+            if valor is not None and valor != state.last_known_mods.get(game):
+                if game in state.last_known_mods:
+                    state.offmap_games.discard(game)
+                state.last_known_mods[game] = valor
         # Para etiquetar la sesion y el viaje de la cuenta con los mods.
         if getattr(state, "cuenta", None) is not None:
             state.cuenta.poner_mods(mods)
