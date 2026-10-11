@@ -128,8 +128,13 @@ def main():
             pg.goto(base + "/app/?demo=1")
         for pg in (page, otra):
             pg.wait_for_function("() => typeof isLeaderTab !== 'undefined' && settingsBaseline", timeout=60000)
-        page.wait_for_timeout(2000)
-        lideres = [pg.evaluate("isLeaderTab") for pg in (page, otra)]
+        # La eleccion es asincronica (navigator.locks): se espera a que se
+        # asiente en vez de un tiempo fijo, que en un runner cargado no alcanza.
+        for _ in range(40):
+            lideres = [pg.evaluate("isLeaderTab") for pg in (page, otra)]
+            if lideres.count(True) == 1:
+                break
+            page.wait_for_timeout(250)
         chequear("dos pestanas: una sola lider", lideres.count(True) == 1, f"{lideres}")
         antes = page.evaluate("useImperial")
         page.evaluate("toggleUnits()")
@@ -138,15 +143,19 @@ def main():
         chequear("dos pestanas: los ajustes de una no pisan los de la otra",
                  guardado.get("useImperial") == (not antes) and guardado.get("truckSize") == 2,
                  f"useImperial {guardado.get('useImperial')}, truckSize {guardado.get('truckSize')}")
+        # Los errores se miran ANTES de cerrar: al cerrar la lider se cortan
+        # sus pedidos de tiles y MapLibre puede loguear el abort, que no es un
+        # error de la pagina (y segun que pestana ganara, a veces caia en la
+        # lista: el smoke fallaba de a ratos).
+        chequear("dos pestanas: sin errores en la pagina", not errores, "; ".join(errores[:3]))
         lider, resto = (page, otra) if lideres[0] else (otra, page)
         lider.close()
         try:
-            resto.wait_for_function("() => isLeaderTab", timeout=10000)
+            resto.wait_for_function("() => isLeaderTab", timeout=15000)
             tomo = True
         except Exception:
             tomo = False
         chequear("dos pestanas: al cerrar la lider, la otra toma el lugar", tomo)
-        chequear("dos pestanas: sin errores en la pagina", not errores, "; ".join(errores[:3]))
         b.close()
     srv.shutdown()
     print(f"\n{len(fallas)} fallas" if fallas else "\ntodo bien")
