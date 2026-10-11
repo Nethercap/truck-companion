@@ -83,7 +83,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff, dlcAuto };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -184,6 +184,9 @@ let voiceOn = !!_savedSettings.voiceOn;
 // va); se apaga aparte.
 let liveShareRoute = _savedSettings.liveShareRoute !== false;
 let voiceByLang = (_savedSettings.voiceByLang && typeof _savedSettings.voiceByLang === 'object') ? _savedSettings.voiceByLang : {};
+// Cuando se dice "turn right" en el punto: 'early' | 'normal' | 'late' (ver
+// VOICE_TIMINGS en pure.js).
+let voiceTiming = voiceTimingSetting(_savedSettings.voiceTiming);
 
 // ---------------------------------------------------------------------------
 // Pago en la moneda "real" del usuario. El SDK paga en la moneda interna del
@@ -435,6 +438,7 @@ function initSettingsUi() {
   document.getElementById('setNavZoom').value = navZoom;
   document.getElementById('setTruckSize').value = truckSize;
   document.getElementById('setVoice').checked = voiceOn;
+  document.getElementById('setVoiceTiming').value = voiceTiming;
   loadVoiceCatalog().then(fillVoiceSelect);
   document.getElementById('setDarkButtons').checked = darkButtons;
   document.getElementById('setFadeButtons').checked = fadeButtons;
@@ -666,6 +670,11 @@ document.getElementById('setVoiceName').addEventListener('change', (e) => {
   saveSettings();
   unlockVoice();
   speakVoice('soon_turn_right');
+});
+document.getElementById('setVoiceTiming').addEventListener('change', (e) => {
+  voiceTiming = voiceTimingSetting(e.target.value);
+  voiceGuide.setTiming(voiceTiming);
+  saveSettings();
 });
 document.getElementById('setVoiceTest').addEventListener('click', () => {
   unlockVoice();
@@ -3327,6 +3336,10 @@ const NAV_TURN_LOOKAHEAD_M = 800; // no mirar mas alla de esto para el proximo g
 const NAV_TURN_ANGLE_THRESHOLD_DEG = 35; // cambio de rumbo minimo, medido justo en la interseccion, para contar como "giro"
 const NAV_TURN_LEG_M = 60; // cuanto camino antes/despues de la interseccion se usa para medir el rumbo de entrada/salida
 const NAV_FORK_LEG_M = 250; // para bifurcaciones se mira mas lejos: una rampa se separa de la autopista gradualmente
+// Hasta cuantos metros antes de un giro se busca otra calle hacia el mismo
+// lado que la voz tenga que dejar pasar (sideExitToward): lo que adelanta el
+// aviso del punto mas temprano (6 s a 90 km/h).
+const NAV_VOICE_DECOY_M = 150;
 const NAV_TURN_DEBOUNCE_TICKS = 2; // una indicacion nueva tiene que verse 2 ticks seguidos (anti-parpadeo al pasar salidas)
 const navManeuverState = {};
 let routeBehind = []; // ultimos puntos de la ruta ya recorridos (ver trimRouteBehindTruck)
@@ -3468,6 +3481,7 @@ function findUpcomingTurn() {
   // esquina se anunciaba como otro giro.
   let prevTurn = null; // ultimo giro visto, aunque ya haya quedado atras (ver continuesTurn)
   let roundaboutLeftM = -Infinity; // donde se salio de la ultima rotonda (metros sobre la ruta)
+  const passed = []; // cruces sin aviso de aca al proximo giro: [i, iEnd] (ver sideExitToward)
   const roundaboutAt = (i, iEnd) => graph.adjacency
     ? detectRoundabout({ pts, cum, i, iEnd, adjacency: graph.adjacency, nodeAt: graph.nodeXY, edgeLine, bearingBetween }) : null;
   for (let i = 1; i < pts.length - 1; i++) {
@@ -3481,6 +3495,7 @@ function findUpcomingTurn() {
     const rb = roundaboutAt(i, iEnd);
     if (rb) {
       prevTurn = null;
+      passed.length = 0;
       roundaboutLeftM = cum[rb.leave];
       if (cum[rb.leave] > cum[here]) {
         const inside = cum[rb.enter] <= cum[here];
@@ -3542,8 +3557,20 @@ function findUpcomingTurn() {
       const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
       const [wx, wz] = pts[afterTurnIdx];
       const nearSign = nearestRoadName(wx, wz, NAV_ROAD_NAME_MAX_DIST_M);
-      return { distanceMeters: cum[at] - cum[here], direction: m.direction, kind: m.kind, nearSign, node: [pts[at][0], pts[at][1]] };
+      // Otra calle hacia el mismo lado antes del giro: la voz dice "turn
+      // right" recien despues de pasarla (la distancia es hasta su salida).
+      let decoyMeters;
+      if (m.kind === 'turn') {
+        for (let p = passed.length - 1; p >= 0 && cum[at] - cum[passed[p][1]] <= NAV_VOICE_DECOY_M; p--) {
+          if (sideExitToward({ ...ctx, i: passed[p][0], iEnd: passed[p][1] }, m.direction)) {
+            decoyMeters = cum[passed[p][1]] - cum[here];
+            break;
+          }
+        }
+      }
+      return { distanceMeters: cum[at] - cum[here], direction: m.direction, kind: m.kind, nearSign, decoyMeters, node: [pts[at][0], pts[at][1]] };
     }
+    if (cum[iEnd] > cum[here]) passed.push([i, iEnd]);
     i = iEnd; // el resto del cruce ya se evaluo como parte de este
   }
   return null;
@@ -3760,7 +3787,7 @@ function setClientOverlay(on) {
 // mismo texto con la voz del sistema, que en estas frases no tiene nombres
 // que pronunciar mal (por eso se habia sacado la voz anterior, 18-09).
 // ---------------------------------------------------------------------------
-const voiceGuide = createVoiceGuide();
+const voiceGuide = createVoiceGuide({ timing: voiceTiming });
 let voiceCatalog = null;
 let voiceCatalogLoading = null;
 const voicePacks = {}; // id -> promesa del paquete

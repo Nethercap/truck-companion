@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
-  createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice, mapBoundsFromCities, insideMapBounds } = require("./pure.js");
+  createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, voiceTimingSetting, VOICE_TIMING_DEFAULT, sideExitToward, pickVoice, mapBoundsFromCities, insideMapBounds } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
   const f = createFuelTracker({ windowKm: 100, minKm: 10 });
@@ -392,6 +392,35 @@ test('maneuver: sin grafo solo detecta giros', () => {
   const ctx = scenario({ route: [[0, -300], [0, 0], [40, 250], [120, 500]] });
   ctx.adjacency = null;
   assert.equal(detectManeuver(ctx), null);
+});
+
+test('sideExitToward: otra calle hacia ese lado en el cruce, que lleve a algun lado', () => {
+  const derecho = [[0, -300], [0, 0], [0, 300], [0, 600]];
+  // calle al este (derecha) en el nodo 1
+  let ctx = scenario({ route: derecho, extraNodes: [[200, 0]], edges: [[1, 4]] });
+  assert.equal(sideExitToward(ctx, 'right'), true);
+  assert.equal(sideExitToward(ctx, 'left'), false);
+  // de contramano (solo se sale de ella hacia la ruta): no se puede doblar
+  ctx = scenario({ route: derecho, extraNodes: [[200, 0]], edges: [[4, 1]] });
+  assert.equal(sideExitToward(ctx, 'right'), false);
+  // ensanche que vuelve enseguida a la ruta
+  ctx = scenario({ route: [[0, -300], [0, 0], [0, 60], [0, 600]], extraNodes: [[15, 30]], edges: [[1, 4], [4, 2]] });
+  assert.equal(sideExitToward(ctx, 'right'), false);
+  // una rampa que casi sigue derecho, o una calle que vuelve para atras, no es "doblar"
+  ctx = scenario({ route: derecho, extraNodes: [[35, 200]], edges: [[1, 4]] });
+  assert.equal(sideExitToward(ctx, 'right'), false);
+  ctx = scenario({ route: derecho, extraNodes: [[30, -200]], edges: [[1, 4]] });
+  assert.equal(sideExitToward(ctx, 'right'), false);
+  // sin grafo no se sabe: nada que esperar
+  assert.equal(sideExitToward({ ...ctx, adjacency: null }, 'right'), false);
+});
+
+test('stabilizeManeuver: la misma maniobra trae la calle anterior al dia (y la pierde al pasarla)', () => {
+  const st = {};
+  const g = (d, decoy) => ({ kind: 'turn', direction: 'right', distanceMeters: d, decoyMeters: decoy, node: [500, 500] });
+  stabilizeManeuver(st, g(200, 150), 2);
+  assert.equal(stabilizeManeuver(st, g(190, 140), 2).decoyMeters, 140);
+  assert.equal(stabilizeManeuver(st, { ...g(40), node: [510, 505] }, 2).decoyMeters, undefined);
 });
 
 test('stabilizeManeuver: una indicacion nueva necesita 2 ticks; un parpadeo de 1 tick se ignora', () => {
@@ -927,8 +956,8 @@ test('fatiga: lo manejado sobre el intervalo de 11 h, con tope que crece si un m
 // ---------------------------------------------------------------- voz
 const giro = (dist, extra = {}) => ({ kind: 'turn', direction: 'right', distanceMeters: dist, node: [100, 200], ...extra });
 
-test('voz: aviso anticipado y en el punto, una sola vez cada uno, por tiempo', () => {
-  const v = createVoiceGuide();
+test('voz: aviso anticipado y en el punto, una sola vez cada uno, por tiempo ("con anticipacion", el de antes)', () => {
+  const v = createVoiceGuide({ timing: 'early' });
   // 90 km/h = 25 m/s: 800 m son 32 s, todavia nada
   assert.equal(v.maneuver(giro(800), 90), null);
   assert.equal(v.maneuver(giro(480), 90), 'soon_turn_right'); // 19 s
@@ -950,8 +979,55 @@ test('voz: parado antes de doblar igual avisa (velocidad minima)', () => {
 
 test('voz: si la maniobra aparece cerca, no hay aviso anticipado pegado al del punto', () => {
   const v = createVoiceGuide();
-  assert.equal(v.maneuver(giro(220), 90), null);            // 8,8 s: entre 6 y 10, se calla
-  assert.equal(v.maneuver(giro(140), 90), 'turn_right');
+  assert.equal(v.maneuver(giro(220), 90), null);            // 8,8 s: entre 5 y 9, se calla
+  assert.equal(v.maneuver(giro(60), 90), 'turn_right');
+});
+
+test('voz: el giro se dice cerca aunque se venga rapido (Discord, 11-10: "demasiado temprano")', () => {
+  // 80 km/h = 22 m/s: antes "turn right" salia a 6 s, 133 m antes, y
+  // frenando para doblar se llegaba mucho despues
+  const v = createVoiceGuide();
+  assert.equal(v.maneuver(giro(400), 80), 'soon_turn_right');
+  assert.equal(v.maneuver(giro(130), 80), null);
+  assert.equal(v.maneuver(giro(100), 80), null);            // 4,5 s, pero a 100 m
+  assert.equal(v.maneuver(giro(65), 80), 'turn_right');
+  // la rotonda igual: "primera salida" cerca de la entrada
+  const r = createVoiceGuide();
+  const rotonda = (d) => giro(d, { kind: 'roundabout', exit: 1 });
+  assert.equal(r.maneuver(rotonda(100), 60), null);
+  assert.equal(r.maneuver(rotonda(60), 60), 'roundabout_1');
+  // una salida de autopista se toma a velocidad: sigue siendo por tiempo
+  const k = createVoiceGuide();
+  assert.equal(k.maneuver(giro(110, { kind: 'fork' }), 90), 'keep_right'); // 4,4 s
+});
+
+test('voz: el momento del aviso del punto se elige en Ajustes', () => {
+  assert.equal(voiceTimingSetting('late'), 'late');
+  assert.equal(voiceTimingSetting('cualquiera'), VOICE_TIMING_DEFAULT);
+  assert.equal(voiceTimingSetting(undefined), 'normal');
+  // a 50 km/h (13,9 m/s): con anticipacion a 83 m, normal a 69 m, en el giro a 35 m
+  const cuando = (timing) => {
+    const v = createVoiceGuide({ timing });
+    for (let d = 150; d >= 0; d -= 5) if (v.maneuver(giro(d), 50) === 'turn_right') return d;
+    return null;
+  };
+  assert.deepEqual([cuando('early'), cuando('normal'), cuando('late')], [80, 65, 35]);
+  // cambiarlo con la guia andando vale para el proximo aviso
+  const v = createVoiceGuide({ timing: 'early' });
+  v.setTiming('late');
+  assert.equal(v.maneuver(giro(60), 50), null);
+  assert.equal(v.maneuver(giro(30), 50), 'turn_right');
+});
+
+test('voz: con otra calle a la derecha antes del giro, "turn right" espera a pasarla (Discord, 11-10)', () => {
+  const v = createVoiceGuide();
+  assert.equal(v.maneuver(giro(250, { decoyMeters: 200 }), 50), 'soon_turn_right'); // el aviso anticipado no espera
+  assert.equal(v.maneuver(giro(60, { decoyMeters: 10 }), 50), null);  // la otra calle esta 10 m adelante
+  assert.equal(v.maneuver(giro(45), 50), 'turn_right');                // ya pasada
+  // sin aviso anticipado tampoco se dice antes de tiempo
+  const w = createVoiceGuide();
+  assert.equal(w.maneuver(giro(40, { decoyMeters: 15 }), 30), null);
+  assert.equal(w.maneuver(giro(20, { decoyMeters: 0 }), 30), 'turn_right');
 });
 
 test('voz: bifurcacion dice "keep"; un cruce nuevo vuelve a avisar', () => {
