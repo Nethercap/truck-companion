@@ -4619,7 +4619,41 @@ function renderGauges(data) {
   const cc = document.getElementById('gaugeCruise');
   cc.style.display = data.cruiseControl ? '' : 'none';
   document.getElementById('gaugeCruiseValue').textContent = Math.round(useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh);
+  renderMiniDials(data);
 }
+// Relojitos debajo del cluster: aire, frenos, agua y aceite. Que mostrar y
+// cuando esta en alerta lo decide miniDialReadings (pure.js); aca se arman
+// una vez y se mueve el arco, con el mismo truco de setGaugeArc.
+const MINI_DIAL_KEYS = ['air', 'brake', 'water', 'oil'];
+function buildMiniDials() {
+  const box = document.getElementById('miniDials');
+  if (!box || box.childElementCount) return box;
+  box.innerHTML = MINI_DIAL_KEYS.map(k => `<div class="miniDial" id="miniDial_${k}" hidden>
+    <svg viewBox="0 0 70 58"><path class="dialTrack" d="M 14.2 46 A 24 24 0 1 1 55.8 46" />
+    <path class="dialFill" id="miniDialFill_${k}" d="M 14.2 46 A 24 24 0 1 1 55.8 46" />
+    <text class="miniDialValue" id="miniDialValue_${k}" x="35" y="38" text-anchor="middle">--</text>
+    <text class="miniDialUnit" id="miniDialUnit_${k}" x="35" y="48" text-anchor="middle"></text></svg>
+    <div class="miniDialLabel" id="miniDialLabel_${k}"></div></div>`).join('');
+  return box;
+}
+function renderMiniDials(data) {
+  if (!buildMiniDials()) return;
+  const lecturas = miniDialReadings(data, useImperial);
+  MINI_DIAL_KEYS.forEach((k, i) => {
+    const r = lecturas[i];
+    const dial = document.getElementById(`miniDial_${k}`);
+    dial.hidden = !r;
+    if (!r) return;
+    setGaugeArc(`miniDialFill_${k}`, r.frac);
+    dial.classList.toggle('bad', !!r.bad);
+    // "132 psi": el numero grande y la unidad abajo, si no toca el arco.
+    const [numero, unidad] = r.text.split(' ');
+    document.getElementById(`miniDialValue_${k}`).textContent = numero;
+    document.getElementById(`miniDialUnit_${k}`).textContent = unidad || '';
+    document.getElementById(`miniDialLabel_${k}`).textContent = t(r.labelKey);
+  });
+}
+
 document.querySelectorAll('.panelTab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.panelTab').forEach(b => b.classList.toggle('active', b === tab));

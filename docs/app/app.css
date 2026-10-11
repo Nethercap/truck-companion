@@ -653,10 +653,22 @@
     .panelPage { flex: 0 0 100%; scroll-snap-align: start; overflow-y: auto; }
     /* Mas especificidad que las reglas base (que estan mas abajo en el
        archivo y si no las pisarian). */
-    #infoPanel .panelSwipe #gaugesPage { display: block; }
+    /* El panel mide un tercio de la pantalla: el cluster se achica para que
+       entren la linea de abajo y los relojitos sin scrollear (scrolleando,
+       los dos relojes grandes quedaban cortados contra el mapa). */
+    #infoPanel .panelSwipe #gaugesPage { display: flex; flex-direction: column; overflow-y: hidden; }
+    #gaugesPage .cluster { flex: 1 1 auto; min-height: 0; }
+    #gaugesPage .gaugesFooter, #gaugesPage .miniDials { flex: 0 0 auto; }
+    #gaugesPage .miniDials { margin-top: 0.3rem; padding-top: 0.3rem; }
+    #gaugesPage .miniDial svg { max-width: 58px; }
     #infoPanel.gaugesView .panelSwipe #infoPageContent { display: block; }
     #infoPanel .panelTabs { display: none; }
     .swipeHint { display: block; }
+  }
+  /* Telefono bajo (iPhone SE y parecidos): el panel no da para las dos cosas
+     y el velocimetro va primero. */
+  @media (max-width: 900px) and (orientation: portrait) and (max-height: 720px) {
+    #gaugesPage .miniDials { display: none; }
   }
 
   @media (max-height: 500px) and (orientation: landscape) {
@@ -749,6 +761,18 @@
   .cluster .barFill.critical { fill: var(--danger); }
   .gaugesFooter { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); padding: 0 0.3rem; }
   .gaugesFooter b { color: #4caf50; }
+  /* Aire, frenos, agua y aceite: una fila, con el estilo plano del cluster. */
+  .miniDials { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.2rem; margin-top: 0.7rem; padding-top: 0.55rem; border-top: 1px solid #262a31; }
+  .miniDial { text-align: center; min-width: 0; }
+  .miniDial[hidden] { display: none; }
+  .miniDial svg { display: block; width: 100%; max-width: 76px; height: auto; margin: 0 auto; }
+  .miniDial .dialTrack { fill: none; stroke: #2b3038; stroke-width: 6; stroke-linecap: round; }
+  .miniDial .dialFill { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+  .miniDial.bad .dialFill { stroke: var(--danger); }
+  .miniDialValue { font-size: 13px; font-weight: 800; fill: #fff; font-family: system-ui, sans-serif; }
+  .miniDialUnit { font-size: 7.5px; fill: var(--muted); font-family: system-ui, sans-serif; }
+  .miniDial.bad .miniDialValue { fill: var(--danger); }
+  .miniDialLabel { font-size: 0.7rem; color: var(--muted); margin-top: -0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 0.22rem 0; border-bottom: 1px solid #262a31; }
   .row:last-child { border-bottom: none; }
   /* El atributo hidden pierde contra ".row { display: flex }" (misma

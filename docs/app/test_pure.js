@@ -1587,3 +1587,22 @@ test('gaugeAngle y gaugeScaleMax: la aguja queda en el rango y la escala no salt
   assert.equal(gaugeScaleMax(9000, [500, 1000, 2000]), 2000);
   assert.equal(gaugeScaleMax(undefined, [500, 1000, 2000]), 500);
 });
+
+test('miniDialReadings: cuatro relojitos, alerta del juego primero, F en millas', () => {
+  const { miniDialReadings } = require('./pure.js');
+  const d = { airPressure: 120, brakeTemperature: 320, waterTemperature: 90, oilPressure: 50,
+              mechanicalWarnings: { airPressure: false, waterTemperature: false, oilPressure: false } };
+  const r = miniDialReadings(d, false);
+  assert.deepEqual(r.map(x => x.key), ['air', 'brake', 'water', 'oil']);
+  assert.equal(r[0].frac, 0.8);
+  assert.equal(r[1].bad, true);            // frenos pasados de 300
+  assert.equal(r[2].text, '90 °C');
+  assert.equal(miniDialReadings(d, true)[2].text, '194 °F');
+  // La alerta del juego manda sobre el umbral; sin ella, el umbral.
+  assert.equal(miniDialReadings({ ...d, airPressure: 50 }, false)[0].bad, false);
+  assert.equal(miniDialReadings({ airPressure: 50 }, false)[0].bad, true);
+  assert.equal(miniDialReadings({ ...d, mechanicalWarnings: { airPressure: true } }, false)[0].bad, true);
+  // Lo que el cliente no manda no tiene reloj.
+  assert.deepEqual(miniDialReadings({ airPressure: 100 }, false).map(x => x && x.key), ['air', null, null, null]);
+  assert.deepEqual(miniDialReadings(null, false), []);
+});

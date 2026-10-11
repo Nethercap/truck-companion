@@ -670,6 +670,31 @@ function gaugeAngle(value, min, max, sweepDeg = 270) {
   return -sweepDeg / 2 + frac * sweepDeg;
 }
 
+// Los cuatro relojitos de la pestana Gauges del panel (11-10): los que
+// importan manejando. Aire (los frenos), frenos (bajando una sierra), agua y
+// presion de aceite. AdBlue, bateria y temperatura de aceite quedan para el
+// tablero clasico: casi nunca cambian. Cada uno: { key, labelKey, frac (0..1
+// del arco), text, bad }, o null si el cliente no lo manda. bad es la alerta
+// del juego si la hay, si no el umbral de la zona roja.
+function miniDialReadings(d, imperial) {
+  const w = (d && d.mechanicalWarnings) || {};
+  const frac = (v, min, max) => Math.max(0, Math.min(1, (v - min) / (max - min)));
+  const temp = (c) => Math.round(imperial ? c * 9 / 5 + 32 : c) + (imperial ? ' °F' : ' °C');
+  const ok = (v) => v != null && Number.isFinite(Number(v));
+  const alerta = (flag, umbral) => (flag != null ? !!flag : umbral);
+  if (!d) return [];
+  return [
+    ok(d.airPressure) ? { key: 'air', labelKey: 'airPressureLabel', frac: frac(d.airPressure, 0, 150),
+      text: Math.round(d.airPressure) + ' psi', bad: alerta(w.airPressure, d.airPressure < 60) } : null,
+    ok(d.brakeTemperature) ? { key: 'brake', labelKey: 'brakeTempLabel', frac: frac(d.brakeTemperature, 0, 400),
+      text: temp(d.brakeTemperature), bad: d.brakeTemperature > 300 } : null,
+    ok(d.waterTemperature) ? { key: 'water', labelKey: 'waterTempLabel', frac: frac(d.waterTemperature, 40, 120),
+      text: temp(d.waterTemperature), bad: alerta(w.waterTemperature, d.waterTemperature > 105) } : null,
+    ok(d.oilPressure) ? { key: 'oil', labelKey: 'oilPressureLabel', frac: frac(d.oilPressure, 0, 100),
+      text: Math.round(d.oilPressure) + ' psi', bad: alerta(w.oilPressure, d.oilPressure < 15) } : null,
+  ];
+}
+
 // El tope de un reloj que depende del camion (autonomia, rpm): la primera
 // opcion que alcanza, o la ultima. Asi la escala no cambia a cada tick.
 function gaugeScaleMax(value, options) {
@@ -2012,6 +2037,6 @@ function citiesMatchingInput(names, labels, input) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
