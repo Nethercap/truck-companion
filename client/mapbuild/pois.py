@@ -13,6 +13,9 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
                                               # c estacionamiento para auto (ATS)
     "companies":  [[x, z, "token", "Label", "city_token"], ...],
     "cities":     {"city_token": "City Name", ...},
+    "countries":  {"city_token": "country_token", ...},  # estado/pais del juego
+                                              # ("wyoming"): la web lo muestra
+                                              # en las ciudades repetidas
     "atlas":      [[x, z, "t", "Name"], ...]    # solo ATS: t tourist board,
                                               # o point of interest (Road Trip)
   }
@@ -149,10 +152,15 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
             px, pz = (punto[0], punto[1]) if punto else (x, z)
             companies.append([px, pz, p["icon"], p.get("label") or p["icon"], ciudad])
     cities = {}
+    # El estado de cada ciudad: hay tres Jackson en ATS + C2C, y en el
+    # buscador no se sabia cual era cual (Discord, 11-10).
+    countries = {}
     try:
         for c in _cargar(os.path.join(parser_dir, f"{prefix}-cities.json")):
             if c.get("token") and c.get("name"):
                 cities[c["token"]] = c["name"]
+                if c.get("countryToken"):
+                    countries[c["token"]] = c["countryToken"]
     except OSError:
         pass
     # Dos surtidores de la misma estacion (o dos plazas del mismo parking)
@@ -167,6 +175,8 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
         grid.setdefault(cell, []).append((x, z))
         deduped.append([x, z, code])
     out = {"facilities": deduped + car_parking(parser_dir, prefix), "companies": companies, "cities": cities}
+    if countries:
+        out["countries"] = countries
     atlas = atlas_items(parser_dir, prefix, atlas_names)
     if atlas:
         out["atlas"] = atlas

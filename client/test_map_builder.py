@@ -131,3 +131,21 @@ def test_pois_completa_ciudades_sin_nombre():
     assert pois.fill_missing_cities(datos) == ["gulfport", "nueva_ciudad", "v_novgorod"]
     assert datos["cities"] == {"austin": "Austin", "gulfport": "Gulfport",
                                "v_novgorod": "Veliky Novgorod", "nueva_ciudad": "Nueva Ciudad"}
+
+
+def test_pois_guarda_el_estado_de_cada_ciudad(tmp_path):
+    """Tres Jackson en ATS + C2C: sin el estado, en el buscador de la web no
+    se sabia cual era cual (Discord 11-10)."""
+    import json
+    from mapbuild import pois
+    (tmp_path / "usa-pois.json").write_text(json.dumps([
+        {"x": 10, "y": 20, "type": "company", "icon": "wal_mkt", "label": "Wallbert", "cityToken": "jackson_ms"},
+    ]))
+    (tmp_path / "usa-cities.json").write_text(json.dumps([
+        {"token": "jackson", "name": "Jackson", "countryToken": "wyoming", "x": 0, "y": 0},
+        {"token": "jackson_ms", "name": "Jackson", "countryToken": "mississippi", "x": 9, "y": 9},
+        {"token": "sin_estado", "name": "Sin Estado", "x": 5, "y": 5},
+    ]))
+    datos = pois.build(str(tmp_path), "usa")
+    assert datos["countries"] == {"jackson": "wyoming", "jackson_ms": "mississippi"}
+    assert datos["cities"]["jackson_ms"] == "Jackson"

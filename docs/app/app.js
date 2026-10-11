@@ -2329,9 +2329,37 @@ function poiCityNames() {
   return names;
 }
 
+// Las etiquetas del buscador: las ciudades repetidas llevan el estado o la
+// ciudad cercana (cityChoiceLabels en pure.js). Se rehacen al cambiar los
+// POIs, el Cities.json o el idioma.
+let poiCityLabelsCache = null, poiCityLabelsKey = null;
+function poiCityLabels() {
+  if (!pois) return {};
+  const key = [pois, citiesAll, currentLang, poiVariantNow()];
+  if (poiCityLabelsKey && key.every((v, i) => v === poiCityLabelsKey[i])) return poiCityLabelsCache;
+  // Donde queda cada ciudad: Cities.json, o el centro de sus empresas para
+  // las que el archivo no trae (Gulfport en C2C).
+  const centro = {};
+  for (const c of pois.companies || []) {
+    if (!c[4]) continue;
+    const a = centro[c[4]] || (centro[c[4]] = [0, 0, 0]);
+    a[0] += c[0]; a[1] += c[1]; a[2]++;
+  }
+  const coords = (tok) => {
+    const c = citiesByToken[tok];
+    if (c && Number.isFinite(c.X) && Number.isFinite(c.Y)) return [c.X, c.Y];
+    const a = centro[tok];
+    return a ? [a[0] / a[2], a[1] / a[2]] : null;
+  };
+  const tokenRegions = String(poiVariantNow() || '').startsWith('ats');
+  poiCityLabelsCache = cityChoiceLabels(poiCityNames(), { countries: pois.countries, coords, tokenRegions, near: (c) => t('poiCityNear', c) });
+  poiCityLabelsKey = key;
+  return poiCityLabelsCache;
+}
+
 function cityLabel(token) {
   if (!token) return '';
-  return poiCityNames()[token] || token.replace(/_/g, ' ');
+  return poiCityLabels()[token] || poiCityNames()[token] || token.replace(/_/g, ' ');
 }
 
 function renderPoiResults() {
@@ -2354,19 +2382,20 @@ function renderPoiResults() {
   }
   if (!pos) { list.innerHTML = `<div class="poiEmpty">${t('poiNoPosition')}</div>`; return; }
   const query = document.getElementById('poiSearchInput').value;
-  const cityFilter = foldText(document.getElementById('poiCityInput').value.trim());
-  const cityNames = poiCityNames();
-  const cityToken = cityFilter ? Object.keys(cityNames).find(tok => foldText(cityNames[tok]) === cityFilter) : null;
+  // La ciudad elegida de la lista ("Jackson, WY"), o el nombre a secas: con
+  // "Jackson" escrito a mano salen las empresas de las tres, cada una con su
+  // estado abajo.
+  const cityTokens = new Set(citiesMatchingInput(poiCityNames(), poiCityLabels(), document.getElementById('poiCityInput').value));
   let results;
-  if (cityToken) {
+  if (cityTokens.size) {
     // Ciudad elegida: todas sus empresas (filtradas por el texto si hay), a
     // distancia del camion - dos pasos, como en un GPS de verdad.
     const q = foldText(query.trim());
     results = pois.companies
-      .filter(c => c[4] === cityToken && (!q || foldText(c[3]).includes(q)))
+      .filter(c => cityTokens.has(c[4]) && (!q || foldText(c[3]).includes(q)))
       .map(c => ({ x: c[0], z: c[1], label: c[3], city: c[4], dist: Math.hypot(c[0] - pos.x, c[1] - pos.z), name: c[3], sub: cityLabel(c[4]) }))
-      .sort((a, b) => a.label.localeCompare(b.label))
-      .slice(0, 40);
+      .sort((a, b) => a.sub.localeCompare(b.sub) || a.label.localeCompare(b.label))
+      .slice(0, 40 * Math.min(cityTokens.size, 3));
   } else if (query.trim()) {
     results = searchCompanies(query, pos.x, pos.z, 20).map(r => ({ ...r, name: r.label, sub: cityLabel(r.city) }));
   } else {
@@ -2414,7 +2443,7 @@ function updateAtlasChip() {
 function fillPoiCityList() {
   const list = document.getElementById('poiCityList');
   if (!list || !pois) return;
-  list.innerHTML = Object.values(poiCityNames()).sort().map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+  list.innerHTML = Object.values(poiCityLabels()).sort().map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
 }
 function openPoiModal() {
   document.getElementById('poiModal').style.display = 'flex';

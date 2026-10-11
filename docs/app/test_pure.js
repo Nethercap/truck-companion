@@ -1439,3 +1439,41 @@ test('createRefuelWatch: una vez por carga, no por el ruido ni por gastar', () =
   assert.equal(w.push(400, 1000), false); // la misma carga sigue: no avisa dos veces
   assert.equal(w.push(Number.NaN, 1000), false);
 });
+
+test('ciudades repetidas: el estado si los POIs lo traen, si no la ciudad cercana (Discord, 11-10: tres Jackson)', () => {
+  const { regionLabel, cityChoiceLabels, citiesMatchingInput } = require('./pure.js');
+  const names = { jackson: 'Jackson', jackson_ms: 'Jackson', jackson_tn: 'Jackson', casper: 'Casper', memphis: 'Memphis', vicksburg: 'Vicksburg' };
+  const xy = { jackson: [0, 0], jackson_ms: [1000, 1000], jackson_tn: [2000, 0], casper: [50, 50], memphis: [1900, 50], vicksburg: [950, 950] };
+  const conEstado = cityChoiceLabels(names, { countries: { jackson: 'wyoming', jackson_ms: 'mississippi', jackson_tn: 'tennessee' } });
+  assert.deepEqual([conEstado.jackson, conEstado.jackson_ms, conEstado.jackson_tn], ['Jackson, WY', 'Jackson, MS', 'Jackson, TN']);
+  assert.equal(conEstado.casper, 'Casper'); // las de nombre unico, como siempre
+  // POIs publicados antes del cambio: sin estado, la ciudad unica mas cercana
+  const sinEstado = cityChoiceLabels(names, { coords: (t) => xy[t], near: (c) => `cerca de ${c}` });
+  assert.deepEqual([sinEstado.jackson, sinEstado.jackson_ms, sinEstado.jackson_tn],
+    ['Jackson (cerca de Casper)', 'Jackson (cerca de Vicksburg)', 'Jackson (cerca de Memphis)']);
+  // en ATS, la sigla del token separa a las mellizas de una frontera
+  const kc = { kansas_ci_ks: 'Kansas City', kansas_ci_mo: 'Kansas City', st_joseph: 'St. Joseph' };
+  const kcXY = { kansas_ci_ks: [0, 0], kansas_ci_mo: [30, 0], st_joseph: [0, -500] };
+  assert.deepEqual(cityChoiceLabels(kc, { coords: (t) => kcXY[t], tokenRegions: true }),
+    { kansas_ci_ks: 'Kansas City, KS', kansas_ci_mo: 'Kansas City, MO', st_joseph: 'St. Joseph' });
+  const tx = cityChoiceLabels({ texarkana: 'Texarkana', texarkana_ar: 'Texarkana', shreveport: 'Shreveport' },
+    { coords: () => [0, 0], tokenRegions: true });
+  assert.deepEqual([tx.texarkana, tx.texarkana_ar], ['Texarkana (near Shreveport)', 'Texarkana, AR']);
+  // en ETS2 no: "_de" no es Delaware
+  assert.equal(cityChoiceLabels({ a_de: 'Tours', b: 'Tours' }, { coords: () => [0, 0] }).a_de.includes(', DE'), false);
+  // sin nada con que distinguirlas, el token: feo, pero cada una se puede elegir
+  const nada = cityChoiceLabels({ a: 'Brest', b: 'brest' });
+  assert.notEqual(nada.a, nada.b);
+  // en Europa, el pais entero
+  assert.deepEqual(cityChoiceLabels({ brest: 'Brest', brect: 'Brest' }, { countries: { brest: 'france', brect: 'belarus' } }),
+    { brest: 'Brest, France', brect: 'Brest, Belarus' });
+  assert.equal(regionLabel('british_columbia'), 'BC');
+  assert.equal(regionLabel('uk'), 'UK');
+  assert.equal(regionLabel(undefined), '');
+  // lo elegido de la lista es una sola; "jackson" escrito a mano, las tres
+  assert.deepEqual(citiesMatchingInput(names, conEstado, 'Jackson, MS'), ['jackson_ms']);
+  assert.deepEqual(citiesMatchingInput(names, conEstado, ' jackson '), ['jackson', 'jackson_ms', 'jackson_tn']);
+  assert.deepEqual(citiesMatchingInput(names, conEstado, 'casper'), ['casper']);
+  assert.deepEqual(citiesMatchingInput(names, conEstado, 'jack'), []);
+  assert.deepEqual(citiesMatchingInput(names, conEstado, ''), []);
+});
