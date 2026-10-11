@@ -8,7 +8,8 @@ sale de un bug real:
   - toda empresa tiene nombre de ciudad en "cities": Gulfport, Meridian y
     otras de C2C, Rusia y ProMods no estaban, y buscar la ciudad no daba
     nada ("can't find the city I'm going to", Discord 10-10);
-  - forma de cada fila (coordenadas numericas, codigos que la web conoce).
+  - forma de cada fila (coordenadas numericas, codigos que la web conoce);
+  - "countries" (opcional), el estado de cada ciudad: {token: country_token}.
 
 Uso:
   python tools/check_pois.py          sale con 1 si algo falla
@@ -60,6 +61,10 @@ def check_file(path, fix=False):
             break
     if not all(isinstance(v, str) and v.strip() for v in d["cities"].values()):
         errores.append("ciudad sin nombre en 'cities'")
+    # Opcional (los publicados antes del 11-10 no lo traen): ciudad -> estado.
+    paises = d.get("countries")
+    if paises is not None and not (isinstance(paises, dict) and all(isinstance(v, str) and v for v in paises.values())):
+        errores.append("'countries' raro: tiene que ser {ciudad: country_token}")
     if fix:
         if mapbuild_pois.fill_missing_cities(d):
             mapbuild_pois.write(d, path)

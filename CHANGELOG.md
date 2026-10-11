@@ -11,6 +11,8 @@ updates on its own and is not versioned here.
   side street and back instead of going straight.
 - Build my map: cities that only have companies (some Coast to Coast, Russian and
   ProMods ones) now get a name, so you can search for them on your own map too.
+- Build my map: cities that share a name (three Jacksons with Coast to Coast) show their
+  state in the city search on your own map ("Jackson, WY").
 
 ## 1.5.30 (2026-10-10)
 

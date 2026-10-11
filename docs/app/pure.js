@@ -1779,7 +1779,111 @@ function foldText(s) {
     .replace(/[łøßđðþæœı]/g, ch => FOLD_EXTRA[ch]);
 }
 
+// ------------------------------------------------- ciudades con el mismo nombre
+// En ATS con Coast to Coast hay tres Jackson (Wyoming, Mississippi y
+// Tennessee), dos Kansas City, dos Springfield...: la lista de ciudades del
+// buscador mostraba "Jackson" tres veces, y elegir cualquiera llevaba siempre
+// a la primera (Discord, 11-10). Las repetidas llevan el estado ("Jackson,
+// WY") si el pois-<variante>.json trae "countries" (el countryToken del
+// juego, ver client/mapbuild/pois.py); los publicados antes no lo traen, y
+// ahi va la ciudad de nombre unico mas cercana ("Jackson (near Casper)").
+const REGION_ABBR = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO',
+  connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID',
+  illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA',
+  maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN',
+  mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV',
+  new_hampshire: 'NH', new_jersey: 'NJ', new_mexico: 'NM', new_york: 'NY', north_carolina: 'NC',
+  north_dakota: 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA',
+  rhode_island: 'RI', south_carolina: 'SC', south_dakota: 'SD', tennessee: 'TN', texas: 'TX',
+  utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', west_virginia: 'WV',
+  wisconsin: 'WI', wyoming: 'WY', district_of_columbia: 'DC',
+  alberta: 'AB', british_columbia: 'BC', manitoba: 'MB', new_brunswick: 'NB',
+  newfoundland: 'NL', newfoundland_and_labrador: 'NL', nova_scotia: 'NS', ontario: 'ON',
+  prince_edward_island: 'PE', quebec: 'QC', saskatchewan: 'SK', yukon: 'YT',
+  northwest_territories: 'NT', nunavut: 'NU',
+};
+const COUNTRY_NAMES = { uk: 'UK', czech: 'Czechia', nireland: 'Northern Ireland', iom: 'Isle of Man', usa: 'USA' };
+// Lo que se muestra del countryToken: la sigla de un estado o provincia, o
+// el token con mayusculas ("france" -> "France").
+function regionLabel(countryToken) {
+  const tok = String(countryToken || '').toLowerCase();
+  if (!tok) return '';
+  return REGION_ABBR[tok] || COUNTRY_NAMES[tok] || tok.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+// Sin "countries", en ATS el token suele terminar en la sigla del estado
+// (kansas_ci_ks / kansas_ci_mo, jackson_ms): las mellizas de una frontera
+// estatal tienen la misma ciudad cercana, y es lo unico que las separa.
+const REGION_CODES = new Set(Object.values(REGION_ABBR).map(c => c.toLowerCase()));
+function regionFromToken(token) {
+  const m = /_([a-z]{2})$/.exec(String(token || ''));
+  return m && REGION_CODES.has(m[1]) ? m[1].toUpperCase() : '';
+}
+// names: { token: nombre }. opts.countries: { token: countryToken };
+// opts.coords(token) -> [x, z] o null; opts.near(nombre) -> "near X" en el
+// idioma de la app; opts.tokenRegions: leer la sigla del token (solo ATS:
+// en ETS2 un "_de" no es Delaware). Devuelve { token: etiqueta }, distintas
+// entre si.
+function cityChoiceLabels(names, opts = {}) {
+  const countries = opts.countries || {};
+  const coords = opts.coords || (() => null);
+  const near = opts.near || (c => `near ${c}`);
+  const groups = new Map();
+  for (const [tok, name] of Object.entries(names || {})) {
+    const k = foldText(name);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(tok);
+  }
+  const out = {};
+  // Las de nombre unico, para "cerca de": se conocen y no confunden.
+  const anchors = [];
+  for (const toks of groups.values()) {
+    if (toks.length !== 1) continue;
+    out[toks[0]] = names[toks[0]];
+    const p = coords(toks[0]);
+    if (p) anchors.push([p[0], p[1], names[toks[0]]]);
+  }
+  const nearest = (p) => {
+    let best = null, bestD = Infinity;
+    for (const a of anchors) {
+      const d = Math.hypot(a[0] - p[0], a[1] - p[1]);
+      if (d < bestD) { bestD = d; best = a[2]; }
+    }
+    return best;
+  };
+  for (const toks of groups.values()) {
+    if (toks.length === 1) continue;
+    const regions = toks.map(tok => regionLabel(countries[tok]) || (opts.tokenRegions ? regionFromToken(tok) : ''));
+    for (let k = 0; k < toks.length; k++) {
+      const tok = toks[k], name = names[tok], region = regions[k];
+      if (region && regions.indexOf(region) === regions.lastIndexOf(region)) { out[tok] = `${name}, ${region}`; continue; }
+      const p = coords(tok);
+      const ref = p && nearest(p);
+      out[tok] = ref ? `${name}${region ? `, ${region}` : ''} (${near(ref)})` : name;
+    }
+  }
+  // Si aun asi quedan dos iguales (sin coordenadas, o la misma referencia),
+  // el token del juego: feo, pero se puede elegir cada una.
+  const seen = new Map();
+  for (const [tok, label] of Object.entries(out)) {
+    const k = foldText(label);
+    seen.set(k, (seen.get(k) || 0) + 1);
+  }
+  for (const [tok, label] of Object.entries(out)) if (seen.get(foldText(label)) > 1) out[tok] = `${label} [${tok}]`;
+  return out;
+}
+// Las ciudades que corresponden a lo escrito en el buscador: la etiqueta
+// exacta, o el nombre a secas (escribir "jackson" sin elegir de la lista
+// muestra las empresas de las tres).
+function citiesMatchingInput(names, labels, input) {
+  const q = foldText(String(input || '').trim());
+  if (!q) return [];
+  const toks = Object.keys(names || {});
+  const exact = toks.filter(tok => foldText(labels[tok] || names[tok]) === q);
+  return exact.length ? exact : toks.filter(tok => foldText(names[tok]) === q);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
