@@ -111,6 +111,38 @@ def main():
             propios = [e for e in errores if ruta != "/account/" or not ("CORS policy" in e or "Failed to fetch" in e)]
             chequear(f"{ruta}: carga sin errores", hay and not propios, "; ".join(propios[:3]))
         b.close()
+
+        # 4) Dos pestanas en el mismo navegador (el cliente abria una por
+        # arranque y el celular suma otra): una sola habla y graba, al cerrar
+        # esa la otra toma el lugar, y los ajustes de una no pisan los de la
+        # otra (supuestos 1 y 9 del CLAUDE.md, 10-10).
+        b, page, errores = pagina(p, CON_WEBGL, base)
+        otra = page.context.new_page()
+        otra.on("pageerror", lambda e: errores.append("otra: " + str(e)[:200]))
+        for pg in (page, otra):
+            pg.goto(base + "/app/?demo=1")
+        for pg in (page, otra):
+            pg.wait_for_function("() => typeof isLeaderTab !== 'undefined' && settingsBaseline", timeout=60000)
+        page.wait_for_timeout(2000)
+        lideres = [pg.evaluate("isLeaderTab") for pg in (page, otra)]
+        chequear("dos pestanas: una sola lider", lideres.count(True) == 1, f"{lideres}")
+        antes = page.evaluate("useImperial")
+        page.evaluate("toggleUnits()")
+        otra.evaluate("truckSize = 2; saveSettings()")
+        guardado = page.evaluate("JSON.parse(localStorage.getItem('truckdash_settings'))")
+        chequear("dos pestanas: los ajustes de una no pisan los de la otra",
+                 guardado.get("useImperial") == (not antes) and guardado.get("truckSize") == 2,
+                 f"useImperial {guardado.get('useImperial')}, truckSize {guardado.get('truckSize')}")
+        lider, resto = (page, otra) if lideres[0] else (otra, page)
+        lider.close()
+        try:
+            resto.wait_for_function("() => isLeaderTab", timeout=10000)
+            tomo = True
+        except Exception:
+            tomo = False
+        chequear("dos pestanas: al cerrar la lider, la otra toma el lugar", tomo)
+        chequear("dos pestanas: sin errores en la pagina", not errores, "; ".join(errores[:3]))
+        b.close()
     srv.shutdown()
     print(f"\n{len(fallas)} fallas" if fallas else "\ntodo bien")
     return 1 if fallas else 0

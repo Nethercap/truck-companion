@@ -61,6 +61,10 @@ jobs:
         with:
           node-version: '20'
       - run: node --test docs/app/test_pure.js
+      # Avisos de giro de 50 rutas reales (ATS y ETS2, grafo de R2) contra
+      # tools/avisos-golden.json: un cambio de codigo que cambia lo que se
+      # anuncia falla y lista cada aviso. Si cambio el grafo, solo avisa.
+      - run: node tools/check_avisos.js
       # La guia cae al ingles clave por clave: sin esto, un texto que falta
       # en un idioma pasa sin que nadie lo note.
       - run: node --test docs/guide/test_guide.js
