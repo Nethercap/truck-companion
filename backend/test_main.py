@@ -1480,3 +1480,22 @@ def test_missing_company_lista_acotada(main, monkeypatch):
     for i in range(5):
         main.record_missing_company({"variant": "ets2", "company": f"c{i}", "city": "x", "kind": "dest", "x": 0, "z": 0})
     assert len(main._stats_cache["missing_companies"]) == 3
+
+
+def test_ningun_except_exception_mudo_fuera_de_los_envios():
+    """Un `except Exception: pass` se trago 4 Hz de errores del bucle del
+    cliente sin rastro (auditoria del 10-10). Solo _safe_send y _safe_close
+    pueden callarse: el socket del otro lado ya se fue y no hay nada que hacer."""
+    import ast
+    import pathlib
+    arbol = ast.parse(pathlib.Path(__file__).with_name("main.py").read_text(encoding="utf-8"))
+    permitidos = {"_safe_send", "_safe_close"}
+    mudos = []
+    for func in ast.walk(arbol):
+        if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)) or func.name in permitidos:
+            continue
+        for nodo in ast.walk(func):
+            if (isinstance(nodo, ast.ExceptHandler) and isinstance(nodo.type, ast.Name)
+                    and nodo.type.id == "Exception" and len(nodo.body) == 1 and isinstance(nodo.body[0], ast.Pass)):
+                mudos.append(f"{func.name}:{nodo.lineno}")
+    assert not mudos, f"except Exception: pass sin loguear en {mudos}"
