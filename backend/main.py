@@ -637,6 +637,7 @@ class Session:
         self.client_ws: Optional[WebSocket] = None
         self.viewer_ws_list: list[WebSocket] = []
         self.viewer_outboxes: dict[WebSocket, ViewerOutbox] = {}
+        self.last_tick_error_logged_at = 0.0  # ver el except del bucle de ws_client
         self.counted = False  # ya se sumo al contador historico (una vez por sesion, no por reconexion)
         # Flanco para no contar el mismo evento en cada tick que el flag siga
         # en true. None = todavia no vimos ningun tick de este cliente: el
@@ -1228,6 +1229,13 @@ class ConvoyMember:
         self.share_income = False
         self.km = 0.0                           # km "mostrados" recorridos dentro del convoy
         self._last_pos: Optional[tuple] = None
+        # La pestana que manda la ruta y la variante de este miembro (la sesion
+        # puede tener la PC y el celular abiertos). Las demas solo muestran; si
+        # esta se cierra o se recarga, la que quede la reclama (convoy_claim).
+        self.driver_ws: Optional[WebSocket] = None
+
+    def driver_alive(self) -> bool:
+        return self.driver_ws is not None and self.driver_ws in self.session.viewer_outboxes
 
 
 class Convoy:
@@ -1311,11 +1319,18 @@ def clean_nickname(value) -> Optional[str]:
 def convoy_broadcast(convoy: Convoy, message: Optional[dict] = None):
     """Manda el estado (o un mensaje puntual) a todos los viewers de todos
     los miembros y a los espectadores. Va por la cola de control de cada
-    ViewerOutbox: en orden, sin pisarse."""
+    ViewerOutbox: en orden, sin pisarse. El estado le dice a cada pestana si
+    es la que maneja el convoy (driver) y si no hay ninguna (driverless)."""
     for m in convoy.members.values():
-        text = json.dumps(message if message is not None else convoy.state_message(m))
-        for outbox in list(m.session.viewer_outboxes.values()):
-            outbox.push_control(text)
+        if message is not None:
+            text = json.dumps(message)
+            for outbox in list(m.session.viewer_outboxes.values()):
+                outbox.push_control(text)
+            continue
+        state = convoy.state_message(m)
+        state["driverless"] = not m.driver_alive()
+        for ws, outbox in list(m.session.viewer_outboxes.items()):
+            outbox.push_control(json.dumps({**state, "driver": ws is m.driver_ws}))
     if convoy.spectators:
         text = json.dumps(message if message is not None else convoy.state_message(None))
         for outbox in list(convoy.spectators.values()):
@@ -1394,6 +1409,7 @@ def handle_convoy_message(session: "Session", websocket: WebSocket, msg_type: st
             convoy_broadcast(convoy, {"type": "convoy_event", "event": "joined", "nickname": nickname, "id": member.id})
         else:
             member.nickname = nickname  # reconexion de la misma sesion
+        member.driver_ws = websocket  # entrar (o volver a entrar) desde una pestana la hace la que maneja
         member.variant = payload.get("mapVariant") or member.variant
         member.share_income = bool(payload.get("shareIncome"))
         convoy_broadcast(convoy)
@@ -1420,6 +1436,21 @@ def handle_convoy_message(session: "Session", websocket: WebSocket, msg_type: st
             if target and target.session.code != session.code:
                 convoy.banned.add(target.session.code)
                 convoy_leave(target.session, kicked=True)
+    elif msg_type == "convoy_claim":
+        # force: la persona toco algo del convoy en esta pestana. Sin force:
+        # la pestana vio driverless y lo pide; si dos lo piden a la vez (la PC y
+        # el celular), gana la primera.
+        if member and (payload.get("force") or not member.driver_alive()):
+            member.driver_ws = websocket
+            convoy_broadcast(convoy)
+    elif msg_type in ("convoy_variant", "convoy_route") and member and member.driver_alive() and member.driver_ws is not websocket:
+        # Otra pestana de la misma sesion: su ruta (vacia si no tenia) pisaba
+        # la de la que maneja y los demas la veian aparecer y desaparecer.
+        pass
+    elif msg_type in ("convoy_variant", "convoy_route") and member and not member.driver_alive():
+        # Sin pestana que maneje (web vieja, sin convoy_claim): la que manda se queda.
+        member.driver_ws = websocket
+        return handle_convoy_message(session, websocket, msg_type, payload)
     elif msg_type == "convoy_variant":
         if member:
             member.variant = payload.get("mapVariant") or member.variant
@@ -1801,7 +1832,13 @@ async def ws_client(websocket: WebSocket, code: str):
                     asyncio.create_task(asyncio.to_thread(record_job_delivered, job_info))
                 session.last_job_delivered = job_delivered
             except Exception:
-                pass
+                # Antes era un pass: un error aca (resumen, convoy, conteo de
+                # entregas) se perdia en cada tick sin rastro. Como mucho una
+                # vez por minuto por sesion, para no llenar el log a 4 Hz.
+                ahora = time.time()  # now puede no existir: el error pudo ser antes
+                if ahora - session.last_tick_error_logged_at > 60:
+                    session.last_tick_error_logged_at = ahora
+                    logging.exception("Error procesando la telemetria de %s", code)
             for outbox in list(session.viewer_outboxes.values()):
                 outbox.push_telemetry(data)
     except WebSocketDisconnect:

@@ -806,6 +806,75 @@ def test_convoy_create_join_state_and_leave(main):
     asyncio.run(scenario())
 
 
+def test_convoy_una_sola_pestana_maneja_y_otra_la_reclama_si_se_va(main):
+    """Con la PC y el celular abiertos, solo la pestana que maneja manda la
+    ruta del miembro (la otra mandaba la suya, vacia, y los demas la veian
+    aparecer y desaparecer). Si esa pestana se cierra o se recarga, el estado
+    dice driverless y la que queda la reclama (antes nadie volvia a mandar
+    la ruta despues de recargar)."""
+    import asyncio
+
+    async def scenario():
+        main.convoys.clear()
+        a, wa = _convoy_session(main, "AAAAAAAA")
+        wa2 = _ConvoyWs()  # segunda pestana de la misma sesion
+        a.viewer_ws_list.append(wa2)
+        a.viewer_outboxes[wa2] = main.ViewerOutbox(wa2)
+        b, wb = _convoy_session(main, "BBBBBBBB")
+        main.handle_convoy_message(a, wa, "convoy_create", {"nickname": "Netherman", "mapVariant": "ats"})
+        code = a.convoy_code
+        main.handle_convoy_message(b, wb, "convoy_join", {"nickname": "Cobra", "code": code})
+        member = main.convoys[code].member_of(a)
+        assert member.driver_ws is wa
+        await asyncio.sleep(0.05)
+        ultimo = lambda w: [m for m in w.sent if m.get("type") == "convoy_state"][-1]
+        assert ultimo(wa)["driver"] is True and ultimo(wa2)["driver"] is False
+        assert ultimo(wa)["driverless"] is False
+        # la otra pestana no pisa la ruta ni la variante, ni la reclama sin force
+        main.handle_convoy_message(a, wa, "convoy_route", {"points": [[0, 0], [10, 10]]})
+        main.handle_convoy_message(a, wa2, "convoy_route", {"points": []})
+        main.handle_convoy_message(a, wa2, "convoy_variant", {"mapVariant": "ets2"})
+        main.handle_convoy_message(a, wa2, "convoy_claim", {})
+        assert member.route == [[0, 0], [10, 10]] and member.variant == "ats" and member.driver_ws is wa
+        # se cierra la que manejaba: driverless, y la que queda la reclama
+        del a.viewer_outboxes[wa]
+        a.viewer_ws_list.remove(wa)
+        main.convoy_tick()
+        await asyncio.sleep(0.05)
+        assert ultimo(wa2)["driverless"] is True
+        main.handle_convoy_message(a, wa2, "convoy_claim", {})
+        assert member.driver_ws is wa2
+        await asyncio.sleep(0.05)
+        assert ultimo(wa2)["driver"] is True and ultimo(wa2)["driverless"] is False
+        main.handle_convoy_message(a, wa2, "convoy_route", {"points": [[5, 5], [6, 6]]})
+        assert member.route == [[5, 5], [6, 6]]
+        # tocar algo en otra pestana (force) la pasa a manejar aunque la otra siga viva
+        wa3 = _ConvoyWs()
+        a.viewer_ws_list.append(wa3)
+        a.viewer_outboxes[wa3] = main.ViewerOutbox(wa3)
+        main.handle_convoy_message(a, wa3, "convoy_claim", {"force": True})
+        assert member.driver_ws is wa3
+
+    asyncio.run(scenario())
+
+
+def test_convoy_web_vieja_sin_claim_maneja_si_no_hay_nadie(main):
+    """Una pestana con la web de antes no manda convoy_claim: si no hay
+    pestana viva manejando, la que manda la ruta se queda con el lugar."""
+    import asyncio
+
+    async def scenario():
+        main.convoys.clear()
+        a, wa = _convoy_session(main, "AAAAAAAA")
+        main.handle_convoy_message(a, wa, "convoy_create", {"nickname": "Netherman"})
+        member = main.convoys[a.convoy_code].member_of(a)
+        member.driver_ws = None  # p. ej. la pestana que entro se recargo
+        main.handle_convoy_message(a, wa, "convoy_route", {"points": [[1, 1], [2, 2]]})
+        assert member.driver_ws is wa and member.route == [[1, 1], [2, 2]]
+
+    asyncio.run(scenario())
+
+
 def test_convoy_summary_heading_and_km(main):
     import asyncio
 

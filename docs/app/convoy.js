@@ -74,7 +74,16 @@ function convoyOnSocketOpen() {
   // Tras (re)conectar el backend no recuerda nada de esta pestana: se vuelve
   // a entrar con el mismo codigo/apodo. Si eramos el creador y el convoy ya
   // no existe (redeploy), se recrea con el mismo codigo.
-  if (!convoy.pending) return;
+  convoy.stateSinceOpen = false;
+  clearTimeout(convoy.orphanTimer);
+  if (!convoy.pending) {
+    // Pestana que solo mostraba: si despues de un redeploy la que manejaba
+    // no vuelve (celular bloqueado, pestana cerrada), el relay no tiene el
+    // convoy y nadie lo recrea. Sin noticias del convoy en un rato, la lider
+    // vuelve a entrar con lo que sabia.
+    if (convoyInRoom()) convoy.orphanTimer = setTimeout(convoyRejoinIfOrphan, CONVOY_ORPHAN_MS);
+    return;
+  }
   // Despues de un redeploy el convoy lo recrea el creador al reconectar: si
   // un miembro llega antes, recibe not_found y quedaba colgado con el
   // convoy viejo en pantalla (auditoria del 10-10). Se reintenta un rato.
@@ -82,6 +91,15 @@ function convoyOnSocketOpen() {
   convoySendPending();
 }
 const CONVOY_REJOIN_MS = 90000;
+const CONVOY_ORPHAN_MS = 12000;
+function convoyRejoinIfOrphan() {
+  if (convoy.stateSinceOpen || convoy.active || !convoyInRoom() || !isLeaderTab) return;
+  const me = convoyMe();
+  if (!me) return;
+  convoy.active = true;
+  convoy.pending = { kind: me.creator ? 'create' : 'join', code: convoy.code, nickname: me.nickname, postSummary: false };
+  convoyOnSocketOpen();
+}
 const CONVOY_REJOIN_EVERY_MS = 5000;
 function convoySendPending() {
   const p = convoy.pending;
@@ -117,6 +135,7 @@ function convoyOnTelemetry(data) {
 // ---------------------------------------------------------------- estado
 function convoyApplyState(st) {
   const wasIn = convoyInRoom();
+  convoy.stateSinceOpen = true;
   convoy.rejoinUntil = 0; // ya hay respuesta: se terminaron los reintentos
   clearTimeout(convoy.rejoinTimer);
   if (st.left || st.kicked || st.ended) {
@@ -135,6 +154,22 @@ function convoyApplyState(st) {
   if (!convoy.spectator) {
     // entrar bien: recordar para reconexiones
     const me = convoyMe();
+    // Que pestana maneja lo decide el relay (driver). Relay viejo: no manda
+    // el campo y queda como antes (la que entro o toco algo).
+    if (me && st.driver === true && !convoy.active) {
+      convoy.active = true;
+      convoy.lastVariantSent = null;
+      convoySendRoute(true);
+    } else if (me && st.driver === false && convoy.active && !st.driverless) {
+      convoy.active = false; // otra pestana o el otro dispositivo lo tomo
+    }
+    // La que manejaba se cerro o se recargo: la lider de este navegador lo
+    // pide. Si lo piden dos dispositivos a la vez, el relay se queda con uno.
+    if (me && st.driverless && !convoy.active && isLeaderTab && !convoy.claimPending) {
+      convoy.claimPending = true;
+      setTimeout(() => { convoy.claimPending = false; }, 3000);
+      convoySend({ type: 'convoy_claim' });
+    }
     if (me && convoy.active) convoy.pending = { kind: me.creator ? 'create' : 'join', code: st.code, nickname: me.nickname, postSummary: !!st.postSummary };
     if (!wasIn && me && convoy.active) { convoy.lastVariantSent = null; convoySendRoute(true); }
   }
@@ -146,6 +181,7 @@ function convoyReset() {
   convoy.code = null; convoy.you = null; convoy.creatorId = null; convoy.members = []; convoy.spectators = 0;
   convoy.routes.clear(); convoy.pending = null; convoy.lastVariantSent = null; convoy.lastRouteSig = null;
   convoy.active = false;
+  clearTimeout(convoy.orphanTimer);
   convoySetFollow(false);
 }
 
@@ -192,6 +228,7 @@ function convoyTakeOver() {
   const me = convoyMe();
   if (me) convoy.pending = { kind: me.creator ? 'create' : 'join', code: convoy.code, nickname: me.nickname, postSummary: false };
   convoy.lastVariantSent = null;
+  convoySend({ type: 'convoy_claim', force: true });
   convoySendRoute(true);
 }
 
