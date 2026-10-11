@@ -327,11 +327,19 @@ function normDeg(d) { return ((d + 540) % 360) - 180; }
 // por tramos cortos. Devuelve el indice del ultimo nodo del grupo.
 // maxSpanM acota el largo total: una avenida con nodos de cruce cada 20 m
 // no es un solo prefab, y sin tope el giro del final se atribuia al inicio.
-function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM) {
+// skip: el indice del punto del camion (interpolado, sin nodo). Con el camion
+// entre dos nodos del mismo cruce partia el grupo, y la segunda mitad se
+// media sola con el salto lateral como tramo de entrada: un "keep left"
+// falso a 5 m (Discord, 11-10, Lightningroc771).
+function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM, skip) {
   const span = maxSpanM != null ? maxSpanM : 100;
   let j = i;
-  while (j + 1 < pts.length - 1 && pts[j + 1][3] === 1 && cum[j + 1] - cum[j] < maxGapM && cum[j + 1] - cum[i] <= span) j++;
-  return j;
+  for (;;) {
+    let n = j + 1;
+    if (n === skip && n + 1 < pts.length - 1) n++;
+    if (n >= pts.length - 1 || pts[n][3] !== 1 || cum[n] - cum[j] >= maxGapM || cum[n] - cum[i] > span) return j;
+    j = n;
+  }
 }
 
 // Si desde el vecino n del nodo `from` se llega a escapeM de `from` sin
@@ -670,6 +678,22 @@ function gaugeAngle(value, min, max, sweepDeg = 270) {
   return -sweepDeg / 2 + frac * sweepDeg;
 }
 
+// Lo ya recorrido que se guarda para medir el rumbo de entrada a un cruce
+// cercano: los ultimos puntos que suman al menos minM, con un tope de maxPts.
+// Hasta el 11-10 eran los ultimos 32 puntos, y en la curva de un prefab 32
+// puntos pueden ser 15 m: el rumbo se media sobre el salto lateral entre dos
+// carriles paralelos y salia un "keep left" falso encima del punto (Discord,
+// Lightningroc771).
+function trimRouteBehind(behind, minM, maxPts) {
+  let len = 0, k = behind.length - 1;
+  while (k > 0 && len < minM) {
+    len += Math.hypot(behind[k][0] - behind[k - 1][0], behind[k][1] - behind[k - 1][1]);
+    k--;
+  }
+  const start = Math.max(k, behind.length - maxPts, 0);
+  return start > 0 ? behind.slice(start) : behind;
+}
+
 // Los cuatro relojitos de la pestana Gauges del panel (11-10): los que
 // importan manejando. Aire (los frenos), frenos (bajando una sierra), agua y
 // presion de aceite. AdBlue, bateria y temperatura de aceite quedan para el
@@ -788,6 +812,9 @@ function detectManeuver(ctx) {
   const turnNaturalMargin = ctx.turnNaturalMargin != null ? ctx.turnNaturalMargin : 45;
   const rejoinM = ctx.rejoinM != null ? ctx.rejoinM : 100;
   const escapeM = ctx.escapeM != null ? ctx.escapeM : 120;
+  const forkFarLegM = ctx.forkFarLegM != null ? ctx.forkFarLegM : forkLegM * 2;
+  const forkFarMinSep = ctx.forkFarMinSep != null ? ctx.forkFarMinSep : 12;
+  const forkFarMinRoute = ctx.forkFarMinRoute != null ? ctx.forkFarMinRoute : 25;
   const inBearing = bearingBetween(pointAt(cum[i] - legM), pts[i]);
   const outBearing = bearingBetween(pts[iEnd], pointAt(cum[iEnd] + legM));
   const delta = normDeg(outBearing - inBearing);
@@ -798,11 +825,12 @@ function detectManeuver(ctx) {
   // geometria de la curva, que no tienen indice de nodo. Cada salida se
   // mide lejos (un salto mas por la mas recta si el primer vecino esta a
   // menos de forkLegM): una rampa se separa de a poco.
-  let alts = null;
-  const altDeltas = () => {
-    if (alts) return alts;
-    alts = [];
-    const onRoute = new Set();
+  let alts = null, exits = null;
+  const onRoute = new Set();
+  // [k, nodo del cruce, primer nodo de la salida] de cada otra salida.
+  const altExits = () => {
+    if (exits) return exits;
+    exits = [];
     for (let k = i; k <= iEnd; k++) if (pts[k][4] != null) onRoute.add(pts[k][4]);
     for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
     for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
@@ -819,20 +847,27 @@ function detectManeuver(ctx) {
       const idx = pts[k][4];
       if (idx == null) continue;
       for (const [n] of (adjacency.get(idx) || [])) {
-        if (ahead.has(n) || !escapes(idx, n)) continue;
-        let far = nodeAt(n);
-        if (Math.hypot(far[0] - pts[k][0], far[1] - pts[k][1]) < forkLegM) {
-          const b1 = bearingBetween(pts[k], far);
-          let bestM = null, bestDiff = Infinity;
-          for (const [m] of (adjacency.get(n) || [])) {
-            if (m === idx || onRoute.has(m)) continue;
-            const diff = Math.abs(normDeg(bearingBetween(far, nodeAt(m)) - b1));
-            if (diff < bestDiff) { bestDiff = diff; bestM = m; }
-          }
-          if (bestM != null) far = nodeAt(bestM);
-        }
-        alts.push(normDeg(bearingBetween(pts[i], far) - inBearing));
+        if (!ahead.has(n) && escapes(idx, n)) exits.push([k, idx, n]);
       }
+    }
+    return exits;
+  };
+  const altDeltas = () => {
+    if (alts) return alts;
+    alts = [];
+    for (const [k, idx, n] of altExits()) {
+      let far = nodeAt(n);
+      if (Math.hypot(far[0] - pts[k][0], far[1] - pts[k][1]) < forkLegM) {
+        const b1 = bearingBetween(pts[k], far);
+        let bestM = null, bestDiff = Infinity;
+        for (const [m] of (adjacency.get(n) || [])) {
+          if (m === idx || onRoute.has(m)) continue;
+          const diff = Math.abs(normDeg(bearingBetween(far, nodeAt(m)) - b1));
+          if (diff < bestDiff) { bestDiff = diff; bestM = m; }
+        }
+        if (bestM != null) far = nodeAt(bestM);
+      }
+      alts.push(normDeg(bearingBetween(pts[i], far) - inBearing));
     }
     return alts;
   };
@@ -883,9 +918,54 @@ function detectManeuver(ctx) {
   }
 
   if (!adjacency || !nodes) return null;
+  // Bifurcacion abierta: la autopista se parte en dos calzadas paralelas que
+  // recien se separan de verdad cientos de metros despues. A forkLegM la
+  // ruta y la otra salida todavia van casi juntas y no se anunciaba nada; al
+  // pasar el salto entre calzadas, encima del punto, salia un "keep left"
+  // tarde (Discord, 11-10, Lightningroc771: "didn't call out ... stay
+  // whichever direction"; I-25 al sur de Denver). Se mira a forkFarLegM,
+  // siguiendo la otra salida por su continuacion mas recta, y solo si la ruta
+  // no pasa por otro cruce en ese tramo: si no, el desvio lejano es de un
+  // giro que viene despues.
+  const walkStraight = (from, n, lenM) => {
+    let prev = from, cur = n, len = 0, steps = 0;
+    const seen = new Set([from, n]);
+    for (;;) {
+      const a = nodeAt(prev), b = nodeAt(cur);
+      len += Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len >= lenM || ++steps > 200) return b;
+      const dir = bearingBetween(a, b);
+      let best = null, bestDiff = Infinity;
+      for (const [m] of (adjacency.get(cur) || [])) {
+        if (seen.has(m) || onRoute.has(m)) continue;
+        const diff = Math.abs(normDeg(bearingBetween(b, nodeAt(m)) - dir));
+        if (diff < bestDiff) { bestDiff = diff; best = m; }
+      }
+      if (best == null) return b;
+      seen.add(best); prev = cur; cur = best;
+    }
+  };
+  const farFork = () => {
+    if (cum[cum.length - 1] - cum[iEnd] < forkFarLegM) return null;
+    for (let k = iEnd + 1; k < pts.length && cum[k] - cum[iEnd] <= forkFarLegM; k++) if (pts[k][3] === 1) return null;
+    const rd = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkFarLegM)) - inBearing);
+    const lenM = forkFarLegM + cum[iEnd] - cum[i];
+    let alt = null;
+    for (const [k, idx, n] of altExits()) {
+      const a = normDeg(bearingBetween(pts[i], walkStraight(idx, n, lenM - (cum[k] - cum[i]))) - inBearing);
+      if (Math.abs(a) <= 100 && (alt == null || Math.abs(a) < Math.abs(alt))) alt = a;
+    }
+    if (alt == null || Math.abs(normDeg(rd - alt)) < forkFarMinSep) return null;
+    // Que la otra salida se abra mas que la ruta quiere decir, como a
+    // forkLegM, que pasamos de largo una salida; salvo que la ruta tambien
+    // doble de verdad hacia el otro lado: una Y donde las dos se van.
+    if (Math.abs(alt) > Math.abs(rd) + forkAltSlack
+      && (Math.sign(alt) === Math.sign(rd) || Math.abs(rd) < forkFarMinRoute)) return null;
+    return { kind: 'fork', direction: rd > alt ? 'right' : 'left', delta: rd, at: i, far: true };
+  };
   const sampleAt = (d) => normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + d)) - inBearing);
   let routeDelta = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkLegM)) - inBearing);
-  if (Math.abs(routeDelta) < forkMinDev) return null;
+  if (Math.abs(routeDelta) < forkMinDev) return farFork();
   const bestAlt = straightestAlt(100); // mas de 100: vuelve para atras, no es una continuacion
   if (bestAlt == null) return null;
   // El lado lo da donde la ruta se separa de la otra salida, no solo el punto
@@ -908,8 +988,8 @@ function detectManeuver(ctx) {
       .filter(s => Math.sign(normDeg(s - bestAlt)) === Math.sign(nearSep))
       .reduce((a, s) => (Math.abs(normDeg(s - bestAlt)) > Math.abs(normDeg(a - bestAlt)) ? s : a));
   }
-  if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return null;
-  if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return null;
+  if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return laterTurn ? null : farFork();
+  if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return laterTurn ? null : farFork();
   const direction = routeDelta > bestAlt ? 'right' : 'left';
   // Carril de giro con isleta (la esquina de una ciudad de EE.UU.): se separa
   // poco en los primeros legM metros, pero a forkLegM ya dobla de verdad y la
@@ -2037,6 +2117,6 @@ function citiesMatchingInput(names, labels, input) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

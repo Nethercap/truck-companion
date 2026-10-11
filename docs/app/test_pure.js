@@ -1606,3 +1606,50 @@ test('miniDialReadings: cuatro relojitos, alerta del juego primero, F en millas'
   assert.deepEqual(miniDialReadings({ airPressure: 100 }, false).map(x => x && x.key), ['air', null, null, null]);
   assert.deepEqual(miniDialReadings(null, false), []);
 });
+
+test('maneuver: Y abierta (dos calzadas que recien se separan lejos) -> keep, mirando a 500 m (Lightningroc771, 11-10)', () => {
+  // a 250 m la ruta y la otra rama van casi juntas (2 grados a cada lado);
+  // a 500 m ya se fueron 13 grados para cada lado
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-10, 250], [-120, 500], [-300, 650]],
+                         extraNodes: [[10, 250], [120, 500], [300, 650]], edges: [[1, 5], [5, 6], [6, 7]] });
+  const m = detectManeuver(ctx);
+  assert.deepEqual([m.kind, m.direction, m.far], ['fork', 'left', true]);
+  // la ruta sigue derecho y la otra se va: pasar de largo una salida, nada
+  const recta = scenario({ route: [[0, -300], [0, 0], [0, 250], [0, 500], [0, 700]],
+                           extraNodes: [[10, 250], [120, 500], [300, 650]], edges: [[1, 5], [5, 6], [6, 7]] });
+  assert.equal(detectManeuver(recta), null);
+  // con otro cruce de la ruta antes de los 500 m, el desvio lejano es de ese cruce: nada
+  const otro = scenario({ route: [[0, -300], [0, 0], [-10, 250], [-120, 500], [-300, 650]],
+                          extraNodes: [[10, 250], [120, 500], [300, 650]], edges: [[1, 5], [5, 6], [6, 7]] });
+  otro.pts[2][3] = 1;
+  assert.equal(detectManeuver(otro), null);
+});
+
+test('junctionClusterEnd: el punto del camion no parte un cruce en dos', () => {
+  const { junctionClusterEnd: jce } = require('./pure.js');
+  // nodo de cruce, punto del camion (sin nodo), nodo de cruce a 15 m, calle
+  const pts = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 8, 0, 0, null], [0, 15, 0, 1, 2], [0, 300, 0, 0, 3]];
+  const { cum } = routeMetrics(pts);
+  assert.equal(jce(pts, cum, 1, 50, 100), 1);      // sin saber del camion: se corta
+  assert.equal(jce(pts, cum, 1, 50, 100, 2), 3);   // con el camion en 2: un solo cruce
+  assert.equal(jce(pts, cum, 1, 50, 100, 4), 1);   // el camion en otro lado no cambia nada
+});
+
+test('trimRouteBehind: lo ya recorrido se guarda por metros, con tope de puntos', () => {
+  const { trimRouteBehind } = require('./pure.js');
+  const denso = Array.from({ length: 300 }, (_, k) => [0, k * 0.5]); // 150 m en 300 puntos
+  assert.equal(trimRouteBehind(denso, 200, 400).length, 300);        // todo: no llega a 200 m
+  assert.equal(trimRouteBehind(denso, 50, 400).length, 101);         // 50 m = 100 tramos
+  assert.equal(trimRouteBehind(denso, 200, 40).length, 40);          // el tope manda
+  const ralo = [[0, 0], [0, 100], [0, 200], [0, 300], [0, 400]];
+  assert.deepEqual(trimRouteBehind(ralo, 150, 400), [[0, 200], [0, 300], [0, 400]]);
+  assert.deepEqual(trimRouteBehind([], 200, 400), []);
+});
+
+test('maneuver: Y donde la otra rama se abre mas que la ruta, pero la ruta tambien dobla de verdad -> keep (I-25, Denver)', () => {
+  // a 500 m la ruta va 33 grados a la izquierda y la otra rama 57 a la derecha
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-10, 250], [-400, 450]],
+                         extraNodes: [[10, 250], [500, 330]], edges: [[1, 4], [4, 5]] });
+  const m = detectManeuver(ctx);
+  assert.deepEqual([m.kind, m.direction, m.far], ['fork', 'left', true]);
+});

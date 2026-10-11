@@ -3387,9 +3387,11 @@ const NAV_VOICE_DECOY_M = 150;
 const NAV_TURN_DEBOUNCE_TICKS = 2; // una indicacion nueva tiene que verse 2 ticks seguidos (anti-parpadeo al pasar salidas)
 const navManeuverState = {};
 let routeBehind = []; // ultimos puntos de la ruta ya recorridos (ver trimRouteBehindTruck)
-// Cuantos: con los puntos de la curva entre nodo y nodo, tienen que alcanzar
-// para un cruce entero (hasta 100 m) mas el tramo de entrada.
-const ROUTE_BEHIND_MAX = 32;
+// Cuanto: un cruce entero (hasta 100 m) mas el tramo de entrada (60 m), medido
+// en metros y no en puntos (ver trimRouteBehind); el tope de puntos es para
+// una geometria muy densa.
+const ROUTE_BEHIND_M = 200;
+const ROUTE_BEHIND_MAX = 400;
 const NAV_JUNCTION_CLUSTER_GAP_M = 50; // nodos de cruce mas cerca que esto son el mismo cruce (prefab)
 const NAV_JUNCTION_CLUSTER_SPAN_M = 100; // y el cruce entero no mide mas que esto
 const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta mas cercano al tramo del giro
@@ -3532,7 +3534,7 @@ function findUpcomingTurn() {
     if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
     if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
-    const iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
+    const iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here);
     // Rotonda: se anuncia la salida ("tomar la segunda salida") en la entrada
     // y se calla todo lo de adentro hasta salir. Adentro, la distancia es a la
     // salida; la clave (node) sigue siendo la entrada, asi no cambia el aviso.
@@ -4059,7 +4061,7 @@ function trimRouteBehindTruck(x, z) {
   // menos de 60 m del cruce el tramo de entrada se achicaba hasta cero y la
   // medicion cambiaba justo al llegar (giros que aparecian/desaparecian).
   for (let k = 1; k <= bestIdx; k++) routeBehind.push(currentRouteWorldPoints[k]);
-  if (routeBehind.length > ROUTE_BEHIND_MAX) routeBehind.splice(0, routeBehind.length - ROUTE_BEHIND_MAX);
+  routeBehind = trimRouteBehind(routeBehind, ROUTE_BEHIND_M, ROUTE_BEHIND_MAX);
   // El punto interpolado hereda el tramo del nodo que sigue.
   const nextPt = currentRouteWorldPoints[bestIdx + 1];
   currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0, nextPt ? nextPt[6] : undefined], ...currentRouteWorldPoints.slice(bestIdx + 1)];
