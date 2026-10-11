@@ -40,12 +40,25 @@ function money(amount, game) {
   return simbolo + Math.round(amount || 0).toLocaleString(currentLang);
 }
 
-const panel = createDashPanel({
-  root: panelRoot,
-  money,
-  imperial: () => useImperial,
-  lang: () => currentLang,
-});
+// Dos estilos, moderno y clasico (classic.js). Un cliente viejo en modo LAN
+// no sirve classic.js (no esta en su lista de archivos): sin el, el moderno
+// solo y sin selector.
+const conEstilos = typeof createDashStyles === 'function';
+const panelOpts = { root: panelRoot, money, imperial: () => useImperial, lang: () => currentLang };
+const panel = conEstilos
+  ? createDashStyles(Object.assign({ style: params.get('style') || savedDashStyle() }, panelOpts))
+  : createDashPanel(panelOpts);
+function renderStyle() {
+  const grupo = document.getElementById('styleGroup');
+  grupo.hidden = !conEstilos;
+  if (!conEstilos) return;
+  grupo.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === panel.style()));
+}
+document.querySelectorAll('[data-style]').forEach(b => b.addEventListener('click', () => {
+  panel.setStyle(b.dataset.style);
+  renderStyle();
+  renderStatus();
+}));
 
 // --- estado de la conexion ---
 function renderStatus() {
@@ -156,7 +169,8 @@ langSelect.addEventListener('change', (e) => {
 });
 
 function setScale(valor) {
-  panelRoot.style.setProperty('--d-scale', valor);
+  if (panel.setScale) panel.setScale(valor);
+  else panelRoot.style.setProperty('--d-scale', valor);
   try { localStorage.setItem(SCALE_KEY, valor); } catch (e) {}
   document.querySelectorAll('[data-scale]').forEach(b => b.classList.toggle('active', b.dataset.scale === String(valor)));
 }
@@ -179,6 +193,7 @@ document.addEventListener('visibilitychange', () => { if (!wakeLock) keepAwake()
 // --- arranque ---
 document.documentElement.lang = currentLang;
 renderUnits();
+renderStyle();
 let escalaGuardada = null;
 try { escalaGuardada = localStorage.getItem(SCALE_KEY); } catch (e) {} // datos del sitio bloqueados
 setScale(escalaGuardada || '1');

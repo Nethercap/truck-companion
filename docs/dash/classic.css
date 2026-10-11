@@ -1,0 +1,103 @@
+/* Tablero clasico (classic.js): relojes de aguja. Como dash.css, todo cuelga
+   de .classicRoot porque la app tambien lo muestra sobre el mapa. */
+
+.classicRoot {
+  --d-scale: 1;
+  /* Los relojes se miden contra la pantalla: grandes los dos de arriba,
+     seis por fila los chicos en apaisado. */
+  --c-big: calc(min(36vh, 31vw) * var(--d-scale));
+  --c-small: calc(min(19vh, 14.5vw) * var(--d-scale));
+  display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+  min-height: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 0.6rem 0.4rem 0.8rem; box-sizing: border-box;
+  color: #eee; border-radius: 6px;
+  background: #0f1114 repeating-linear-gradient(45deg, rgba(255,255,255,0.022) 0 2px, transparent 2px 6px);
+}
+.classicRoot[hidden], .dashRoot[hidden] { display: none; }
+.classicRoot [hidden] { display: none !important; }
+.cDefs { position: absolute; width: 0; height: 0; }
+
+.cTop { display: grid; grid-template-columns: var(--c-big) auto var(--c-big); align-items: center; justify-items: center; gap: 0.8rem; }
+.cGauge { position: relative; width: var(--c-small); }
+.cGaugeBig { width: var(--c-big); }
+.cDial { display: block; width: 100%; height: auto; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
+.cGrid { display: grid; grid-template-columns: repeat(6, var(--c-small)); gap: 0.5rem 0.9rem; justify-content: center; }
+
+.cCenter { display: flex; flex-direction: column; align-items: center; gap: 0.55rem; min-width: 9rem; }
+.cBlinkers { display: flex; align-items: center; gap: 0.6rem; }
+.cBlink svg { display: block; width: 2.1rem; height: 2.1rem; color: #17331b; fill: currentColor; }
+.cBlink.on svg { color: #2ee04a; filter: drop-shadow(0 0 6px rgba(46, 224, 74, 0.8)); }
+.cGear {
+  font: 700 2.3rem/1 ui-monospace, Consolas, monospace; color: #f2f2f2;
+  background: #020303; border: 1px solid #3a3f46; border-radius: 4px;
+  padding: 0.2rem 0.6rem; min-width: 2.6rem; text-align: center;
+}
+.cCruise { color: #2ee04a; font-weight: 700; min-height: 1.2em; font-variant-numeric: tabular-nums; }
+.cLamps { display: grid; grid-template-columns: repeat(4, 2rem); gap: 0.35rem; justify-content: center; }
+.cLamp {
+  width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; background: #08090b; border: 1px solid #23262b; color: #343940;
+}
+.cLamp svg { width: 1.3rem; height: 1.3rem; }
+.cLamp.on { color: #ffcf33; border-color: #4a4126; }
+.cLamp-beamHigh.on { color: #3b9eff; border-color: #22405f; }
+.cLamp-parkingBrake.on { color: #ff4d4d; border-color: #5a2626; }
+.cLamp-hazards.on, .cLamp-beacon.on { color: #ff8a1f; border-color: #5a3a1c; }
+.cLamp-trailerAttached.on, .cLamp-beamLow.on, .cLamp-parking.on { color: #2ee04a; border-color: #1f4a29; }
+
+.cJob {
+  display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; justify-content: center; max-width: 100%;
+  font-weight: 600; font-size: 0.95rem; background: rgba(0,0,0,0.45);
+  border: 1px solid #23262b; border-radius: 6px; padding: 0.3rem 0.9rem;
+}
+.cJobDest { color: #9aa4b2; }
+.cWaiting { margin: auto; color: #9aa4b2; }
+
+/* --- dentro de los relojes --- */
+.cZoneRed, .cZoneGreen { fill: none; stroke-width: 5; }
+.cZoneRed { stroke: #d42a1e; }
+.cZoneGreen { stroke: #2fae4a; }
+.cTickMajor { stroke: #f2f2f2; stroke-width: 3; }
+.cTickMinor { stroke: #b8bcc2; stroke-width: 1.4; }
+.cTickRed { stroke: #ff5a48; }
+.cNum { fill: #f0f0f0; font: 600 15px system-ui, sans-serif; text-anchor: middle; }
+.cNumBig { font-size: 17px; }
+.cLabel { fill: #d8dbe0; font: 700 10px system-ui, sans-serif; text-anchor: middle; text-transform: uppercase; letter-spacing: 0.05em; }
+.cLabelBig { font-size: 11px; }
+.cEnd { fill: #9aa4b2; font: 700 9px system-ui, sans-serif; text-transform: uppercase; }
+.cLcdBox { fill: #020303; stroke: #3a3f46; stroke-width: 1; }
+.cLcd { fill: #e9f0ff; font: 700 16px ui-monospace, Consolas, monospace; text-anchor: middle; }
+.cLcdBig { font-size: 18px; }
+.cGauge.alerta .cLcd { fill: #ff4d4d; }
+.cGauge.alerta .cLcdBox { stroke: #ff4d4d; }
+.cNeedle, .cHand, .cMark { transform-box: view-box; transform-origin: 100px 100px; }
+.cNeedle { transition: transform 0.25s linear; }
+.cSweeping .cNeedle { transition: transform 0.65s ease-in-out; }
+.cNeedleBody { fill: #e3261f; }
+.cHand { fill: #f0f0f0; }
+.cMarkLimit { fill: #ff4a3a; }
+.cMarkCruise { fill: #2ee04a; }
+
+/* Vertical (telefono, tablet parada): los dos grandes lado a lado, el
+   centro debajo en una fila, y tres relojes chicos por fila. */
+@media (max-aspect-ratio: 1/1) {
+  .classicRoot {
+    --c-big: calc(min(44vw, 34vh) * var(--d-scale));
+    --c-small: calc(min(29vw, 22vh) * var(--d-scale));
+  }
+  .cTop { grid-template-columns: var(--c-big) var(--c-big); }
+  .cCenter { grid-column: 1 / -1; grid-row: 2; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .cGrid { grid-template-columns: repeat(3, var(--c-small)); }
+}
+
+/* Telefono apaisado: casi no hay alto, asi que se scrollea y los relojes
+   chicos se miden por el ancho; las lamparas en dos filas de seis. */
+@media (min-aspect-ratio: 1/1) and (max-height: 500px) {
+  .classicRoot {
+    --c-big: calc(min(70vh, 30vw) * var(--d-scale));
+    --c-small: calc(14.5vw * var(--d-scale));
+  }
+  .cLamps { grid-template-columns: repeat(6, 1.8rem); }
+  .cLamp { width: 1.8rem; height: 1.8rem; }
+  .cGear { font-size: 1.9rem; }
+}

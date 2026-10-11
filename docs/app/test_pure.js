@@ -1477,3 +1477,113 @@ test('ciudades repetidas: el estado si los POIs lo traen, si no la ciudad cercan
   assert.deepEqual(citiesMatchingInput(names, conEstado, 'jack'), []);
   assert.deepEqual(citiesMatchingInput(names, conEstado, ''), []);
 });
+
+test('createRestWatch: dormir cumple la parada de descanso, manejar no', () => {
+  const { createRestWatch } = require('./pure.js');
+  const w = createRestWatch();
+  assert.equal(w.push(300), false);
+  assert.equal(w.push(40), false);   // manejando baja
+  assert.equal(w.push(0), false);    // fatiga apagada: se ignora
+  assert.equal(w.push(660), true);   // durmio
+  assert.equal(w.push(660), false);  // no avisa dos veces
+  assert.equal(w.push(Number.NaN), false);
+});
+
+test('createStatusAlerts: trabajo nuevo solo si aparece con la pagina abierta y recien tomado', () => {
+  const { createStatusAlerts } = require('./pure.js');
+  const base = { ts: 1000, citySrc: 'Reno', cityDst: 'Elko', cargo: 'Wood', fuel: 500, fuelCapacity: 600, restStopMinutes: 600, trailerAttached: true, plannedDistanceKm: 400 };
+  // El trabajo que ya estaba al abrir la pagina no se anuncia.
+  let a = createStatusAlerts();
+  assert.equal(a.push({ ...base, onJob: true, routeDistanceKm: 200 }).say, null);
+  assert.equal(a.push({ ...base, ts: 1001, onJob: true, routeDistanceKm: 199 }).say, null);
+  // Uno tomado despues, con todo el camino por delante, si.
+  a = createStatusAlerts();
+  a.push({ ...base, onJob: false });
+  assert.equal(a.push({ ...base, ts: 1001, onJob: true, routeDistanceKm: 395 }).say, 'job_new');
+  // Cerrar y abrir el juego: el mismo trabajo no es nuevo.
+  a.push({ ...base, ts: 1002, onJob: false });
+  assert.equal(a.push({ ...base, ts: 1003, onJob: true, routeDistanceKm: 390 }).say, null);
+  // Partida cargada a mitad de camino con el tablero abierto: se espera al
+  // GPS del juego y no se anuncia.
+  a = createStatusAlerts();
+  a.push({ ...base, onJob: false });
+  assert.equal(a.push({ ...base, ts: 1001, onJob: true, cityDst: 'Ely', routeDistanceKm: 0 }).say, null);
+  assert.equal(a.push({ ...base, ts: 1002, onJob: true, cityDst: 'Ely', routeDistanceKm: 120 }).say, null);
+  // Sin GPS nunca: a los 15 s se da por visto, callado.
+  a = createStatusAlerts();
+  a.push({ ...base, onJob: false });
+  a.push({ ...base, ts: 1001, onJob: true, routeDistanceKm: 0 });
+  assert.equal(a.push({ ...base, ts: 1020, onJob: true, routeDistanceKm: 0 }).say, null);
+  assert.equal(a.push({ ...base, ts: 1021, onJob: true, routeDistanceKm: 395 }).say, null);
+  // Freight market: sin remolque enganchado el GPS va al remolque; es nuevo.
+  a = createStatusAlerts();
+  a.push({ ...base, onJob: false });
+  assert.equal(a.push({ ...base, ts: 1001, onJob: true, trailerAttached: false, routeDistanceKm: 3 }).say, 'job_new');
+});
+
+test('createStatusAlerts: poco combustible y descanso, una vez cada uno hasta cargar o dormir', () => {
+  const { createStatusAlerts } = require('./pure.js');
+  const base = { ts: 1000, onJob: false, fuelCapacity: 600, restStopMinutes: 600 };
+  const a = createStatusAlerts();
+  assert.equal(a.push({ ...base, fuel: 300 }).fuelLow, false);
+  let r = a.push({ ...base, fuel: 80, mechanicalWarnings: { fuel: true } });
+  assert.equal(r.say, 'fuel_low');
+  assert.equal(r.fuelLow, true);
+  assert.equal(a.push({ ...base, fuel: 70, mechanicalWarnings: { fuel: true } }).say, null);
+  // Carga un poco: la alerta del juego se apaga pero no se rearma.
+  assert.equal(a.push({ ...base, fuel: 110, mechanicalWarnings: { fuel: false } }).fuelLow, false);
+  assert.equal(a.push({ ...base, fuel: 85, mechanicalWarnings: { fuel: true } }).say, null);
+  // Llena el tanque: la proxima vez avisa de nuevo.
+  a.push({ ...base, fuel: 600, mechanicalWarnings: { fuel: false } });
+  assert.equal(a.push({ ...base, fuel: 80, mechanicalWarnings: { fuel: true } }).say, 'fuel_low');
+  // Cliente viejo sin la alerta del juego: el 15 % del tanque.
+  const b = createStatusAlerts();
+  assert.equal(b.push({ ...base, fuel: 60 }).say, 'fuel_low');
+
+  // Descanso: aviso al bajar de 90 min de juego, de nuevo recien despues de dormir.
+  const c = createStatusAlerts();
+  c.push({ ...base, fuel: 500 });
+  r = c.push({ ...base, fuel: 500, restStopMinutes: 85 });
+  assert.equal(r.say, 'rest_soon');
+  assert.equal(r.restSoon, true);
+  assert.equal(c.push({ ...base, fuel: 500, restStopMinutes: 30 }).say, null);
+  assert.equal(c.push({ ...base, fuel: 500, restStopMinutes: 0 }).restSoon, false); // fatiga apagada
+  c.push({ ...base, fuel: 500, restStopMinutes: 660 });
+  assert.equal(c.push({ ...base, fuel: 500, restStopMinutes: 80 }).say, 'rest_soon');
+
+  // Dos a la vez: uno por tick. En pausa se guardan.
+  const e = createStatusAlerts();
+  e.push({ ...base, fuel: 500 });
+  assert.equal(e.push({ ...base, paused: true, fuel: 50, restStopMinutes: 20 }).say, null);
+  assert.equal(e.push({ ...base, fuel: 50, restStopMinutes: 20 }).say, 'fuel_low');
+  assert.equal(e.push({ ...base, fuel: 50, restStopMinutes: 20 }).say, 'rest_soon');
+  assert.equal(e.push({ ...base, fuel: 50, restStopMinutes: 20 }).say, null);
+});
+
+test('createStopSuggestion: el atajo aparece con la condicion, no si ya hay parada, y cerrado hasta que vuelva', () => {
+  const { createStopSuggestion } = require('./pure.js');
+  const s = createStopSuggestion();
+  assert.equal(s.update({ fuelLow: false, restSoon: false }, []), null);
+  assert.equal(s.update({ fuelLow: true, restSoon: true }, []), 'g');       // el combustible primero
+  assert.equal(s.update({ fuelLow: true, restSoon: true }, ['g']), 'p');    // ya va a una estacion
+  assert.equal(s.update({ fuelLow: true, restSoon: true }, ['g', 'p']), null);
+  s.close('g');
+  assert.equal(s.update({ fuelLow: true, restSoon: false }, []), null);     // cerrado
+  assert.equal(s.update({ fuelLow: false, restSoon: false }, []), null);    // cargo
+  assert.equal(s.update({ fuelLow: true, restSoon: false }, []), 'g');      // vuelve a faltar
+});
+
+test('gaugeAngle y gaugeScaleMax: la aguja queda en el rango y la escala no salta', () => {
+  const { gaugeAngle, gaugeScaleMax } = require('./pure.js');
+  assert.equal(gaugeAngle(0, 0, 100), -135);
+  assert.equal(gaugeAngle(50, 0, 100), 0);
+  assert.equal(gaugeAngle(100, 0, 100), 135);
+  assert.equal(gaugeAngle(130, 0, 100), 135);   // pasado: clavada en la punta
+  assert.equal(gaugeAngle(-5, 0, 100), -135);
+  assert.equal(gaugeAngle(null, 0, 100), -135);
+  assert.equal(gaugeAngle(16, 8, 16), 135);
+  assert.equal(gaugeScaleMax(820, [500, 1000, 2000]), 1000);
+  assert.equal(gaugeScaleMax(1000, [500, 1000, 2000]), 1000);
+  assert.equal(gaugeScaleMax(9000, [500, 1000, 2000]), 2000);
+  assert.equal(gaugeScaleMax(undefined, [500, 1000, 2000]), 500);
+});

@@ -15,8 +15,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261011b" />
-<link rel="stylesheet" href="app.css?v=20261011b" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261011c" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261011c" />
+<link rel="stylesheet" href="app.css?v=20261011c" />
 </head>
 <body>
   <div id="toastContainer"></div>
@@ -59,6 +60,10 @@
   <div id="dashOverlay" class="dashOverlay" hidden>
     <div class="dashOverlayBar">
       <span class="dashOverlayTitle" data-i18n="dashTitle">Dashboard</span>
+      <div class="sizeGroup" id="dashStyleGroup" data-i18n-title="dashStyle" hidden>
+        <button class="iconBtn secondary" data-dash-style="modern" data-i18n="dashStyleModern">Modern</button>
+        <button class="iconBtn secondary" data-dash-style="classic" data-i18n="dashStyleClassic">Classic</button>
+      </div>
       <div class="sizeGroup" id="dashSizeGroup" data-i18n-title="dashSize">
         <button class="iconBtn secondary" data-dash-scale="0.85">S</button>
         <button class="iconBtn secondary" data-dash-scale="1">M</button>
@@ -272,6 +277,7 @@
       <button id="poiCloseX" class="panelCloseX" type="button" data-i18n-title="close" title="Close" aria-label="Close">×</button>
       <h3 data-i18n="poiTitle">Find nearby</h3>
       <button id="poiNearestFuelBtn" class="settingsLinkBtn poiQuick" data-i18n="poiNearestFuel">⛽ Nearest fuel station</button>
+      <button id="poiNearestRestBtn" class="settingsLinkBtn poiQuick" data-i18n="poiNearestRest">🅿️ Nearest rest area</button>
       <div class="poiChips">
         <button class="poiChip active" data-code="g">⛽ <span data-i18n="poiCatFuel">Fuel station</span></button>
         <button class="poiChip" data-code="p">🅿️ <span data-i18n="poiCatRest">Rest area</span></button>
@@ -344,6 +350,14 @@
         <div id="routeApprox" class="routeApprox" hidden></div>
         <!-- Minimizado queda solo la barra de progreso; tocarla lo abre. -->
         <button id="routeExpandBtn" class="routeExpandBtn" data-i18n-title="routeSummaryShow" title="Show the route summary"></button>
+      </div>
+      <!-- Poco combustible o descanso cerca: atajo a la parada mas cercana
+           (renderStopSuggest en app.js). -->
+      <div id="stopSuggest" class="stopSuggest" hidden>
+        <span id="stopSuggestIcon" aria-hidden="true"></span>
+        <span id="stopSuggestText"></span>
+        <button id="stopSuggestGo" class="stopSuggestGo"></button>
+        <button id="stopSuggestClose" class="panelCloseX" data-i18n-title="close" title="Close">×</button>
       </div>
       <div id="bottomRightHud" class="bottomRightHud">
         <div id="miniHudExtra" class="miniHudExtra"></div>
@@ -633,13 +647,14 @@
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261011b"></script>
-<script src="pure.js?v=20261011b"></script>
-<script src="i18n.js?v=20261011b"></script>
-<script src="i18n_en_es.js?v=20261011b"></script>
-<script src="../dash/dash.js?v=20261011b"></script>
-<script src="app.js?v=20261011b"></script>
-<script src="convoy.js?v=20261011b"></script>
-<script src="livemap.js?v=20261011b"></script>
+<script src="variants.js?v=20261011c"></script>
+<script src="pure.js?v=20261011c"></script>
+<script src="i18n.js?v=20261011c"></script>
+<script src="i18n_en_es.js?v=20261011c"></script>
+<script src="../dash/dash.js?v=20261011c"></script>
+<script src="../dash/classic.js?v=20261011c"></script>
+<script src="app.js?v=20261011c"></script>
+<script src="convoy.js?v=20261011c"></script>
+<script src="livemap.js?v=20261011c"></script>
 </body>
 </html>

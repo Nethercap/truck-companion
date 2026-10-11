@@ -61,6 +61,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--voices-dir", required=True, help="donde estan (o se bajan) los modelos .onnx de Piper")
     ap.add_argument("--only", help="solo esta voz (id de voices.json)")
+    ap.add_argument("--reuse-from", metavar="vN",
+                    help="copia tal cual los audios del paquete de esa version (ej. v2) y genera"
+                         " solo las frases nuevas: Piper no da dos veces el mismo audio, y una"
+                         " frase que ya se escuchaba no tiene por que cambiar de tono")
     args = ap.parse_args()
 
     from piper import PiperVoice
@@ -76,8 +80,16 @@ def main():
             subprocess.run([sys.executable, "-m", "piper.download_voices", v["model"],
                             "--data-dir", args.voices_dir], check=True)
         voz = PiperVoice.load(modelo)
+        viejos = {}
+        if args.reuse_from:
+            anterior = os.path.join(VOICE_DIR, v["file"].rsplit("-v", 1)[0] + f"-{args.reuse_from}.json")
+            with open(anterior, encoding="utf-8") as f:
+                viejos = json.load(f)["clips"]
         clips = {}
         for clave, texto in catalogo["phrases"][v["phrases"]].items():
+            if clave in viejos:
+                clips[clave] = viejos[clave]
+                continue
             pcm, frecuencia = sintetizar(voz, texto)
             clips[clave] = "data:audio/mpeg;base64," + base64.b64encode(a_mp3(pcm, frecuencia)).decode()
         salida = os.path.join(VOICE_DIR, v["file"])

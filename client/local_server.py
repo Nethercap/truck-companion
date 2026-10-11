@@ -52,13 +52,13 @@ WEB_FILES = [
     # El panel de tablero: la app lo muestra a pantalla completa y
     # ademas se sirve solo en /dash/ para un segundo dispositivo.
     "dash/index.html", "dash/dash.js", "dash/dash.css", "dash/page.js",
-    "dash/page.css", "dash/manifest.json",
+    "dash/page.css", "dash/manifest.json", "dash/classic.js", "dash/classic.css",
     # Guia por voz: el catalogo y un paquete por voz (la version va en el
     # nombre, como vendor/: no se vuelven a bajar). Ver tools/build_voice_packs.py.
     "app/voice/voices.json",
-    "app/voice/en-kristin-v2.json", "app/voice/en-joe-v2.json", "app/voice/es-daniela-v2.json",
-    "app/voice/es-claude-v2.json", "app/voice/de-thorsten-v2.json", "app/voice/fr-siwis-v2.json",
-    "app/voice/pt-cadu-v2.json", "app/voice/pl-gosia-v2.json", "app/voice/ru-dmitri-v2.json",
+    "app/voice/en-kristin-v3.json", "app/voice/en-joe-v3.json", "app/voice/es-daniela-v3.json",
+    "app/voice/es-claude-v3.json", "app/voice/de-thorsten-v3.json", "app/voice/fr-siwis-v3.json",
+    "app/voice/pt-cadu-v3.json", "app/voice/pl-gosia-v3.json", "app/voice/ru-dmitri-v3.json",
 ]
 
 

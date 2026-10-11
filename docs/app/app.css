@@ -243,6 +243,21 @@
     padding: 0.45rem 0.5rem 0.4rem 0.8rem; box-shadow: 0 2px 10px rgba(0,0,0,0.45);
   }
   .routeSummary[hidden] { display: none; }
+  /* Atajo a la parada mas cercana (poco combustible, descanso cerca): arriba
+     al centro, debajo del giro del modo navegacion. */
+  .stopSuggest {
+    position: absolute; top: calc(3.4rem + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+    z-index: 1240; display: flex; align-items: center; gap: 0.5rem; max-width: calc(100% - 1.2rem); box-sizing: border-box;
+    background: rgba(23, 26, 31, 0.94); color: #fff; border: 1px solid #f0a020; border-radius: 999px;
+    padding: 0.3rem 0.7rem 0.3rem 0.8rem; font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.45);
+  }
+  .stopSuggest[hidden] { display: none; }
+  .stopSuggestGo {
+    background: #f0a020; color: #111; border: none; border-radius: 999px; cursor: pointer;
+    padding: 0.3rem 0.75rem; font: inherit; font-weight: 700;
+  }
+  .stopSuggest .panelCloseX { margin: 0 -0.2rem 0 0; }
   .routeProgressTrack { height: 4px; border-radius: 3px; background: #2b3038; overflow: hidden; margin-bottom: 0.35rem; }
   .routeProgressBar { height: 100%; width: 0; background: #4caf50; transition: width 0.6s ease; }
   .routeSummaryRow { display: flex; align-items: center; gap: 0.9rem; font-size: 0.8rem; color: var(--muted); }
@@ -894,7 +909,12 @@
      Ajustes al que ir, asi que se vuelven a mostrar. */
   .dashOverlayBar .sizeGroup { display: flex; gap: 0.15rem; margin-left: auto; }
   .dashOverlayBar .iconBtn.secondary { display: inline-flex; }
-  #dashOverlayPanel { flex: 1; min-height: 0; }
+  #dashOverlayPanel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #dashOverlayPanel > div { flex: 1; min-height: 0; }
+  .dashOverlayBar #dashStyleGroup { margin-left: auto; }
+  .dashOverlayBar #dashStyleGroup:not([hidden]) + .sizeGroup { margin-left: 0.4rem; }
+  #dashStyleGroup[hidden] { display: none; }
+  #dashStyleGroup .iconBtn { width: auto; padding: 0 0.6rem; font-size: 0.8rem; }
 
 /* DLC de mapa: casillas en columnas para que entren los de ATS. */
 .dlcGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); column-gap: 0.6rem; }

@@ -1,15 +1,15 @@
 {
   "version": 1,
   "voices": [
-    { "id": "en-kristin", "lang": "en", "label": "Kristin", "phrases": "en", "file": "en-kristin-v2.json", "model": "en_US-kristin-medium" },
-    { "id": "en-joe", "lang": "en", "label": "Joe", "phrases": "en", "file": "en-joe-v2.json", "model": "en_US-joe-medium" },
-    { "id": "es-daniela", "lang": "es", "label": "Daniela (AR)", "phrases": "es-AR", "file": "es-daniela-v2.json", "model": "es_AR-daniela-high" },
-    { "id": "es-claude", "lang": "es", "label": "Claude (MX)", "phrases": "es-MX", "file": "es-claude-v2.json", "model": "es_MX-claude-high" },
-    { "id": "de-thorsten", "lang": "de", "label": "Thorsten", "phrases": "de", "file": "de-thorsten-v2.json", "model": "de_DE-thorsten-high" },
-    { "id": "fr-siwis", "lang": "fr", "label": "Siwis", "phrases": "fr", "file": "fr-siwis-v2.json", "model": "fr_FR-siwis-medium" },
-    { "id": "pt-cadu", "lang": "pt", "label": "Cadu", "phrases": "pt", "file": "pt-cadu-v2.json", "model": "pt_BR-cadu-medium" },
-    { "id": "pl-gosia", "lang": "pl", "label": "Gosia", "phrases": "pl", "file": "pl-gosia-v2.json", "model": "pl_PL-gosia-medium" },
-    { "id": "ru-dmitri", "lang": "ru", "label": "Dmitri", "phrases": "ru", "file": "ru-dmitri-v2.json", "model": "ru_RU-dmitri-medium" },
+    { "id": "en-kristin", "lang": "en", "label": "Kristin", "phrases": "en", "file": "en-kristin-v3.json", "model": "en_US-kristin-medium" },
+    { "id": "en-joe", "lang": "en", "label": "Joe", "phrases": "en", "file": "en-joe-v3.json", "model": "en_US-joe-medium" },
+    { "id": "es-daniela", "lang": "es", "label": "Daniela (AR)", "phrases": "es-AR", "file": "es-daniela-v3.json", "model": "es_AR-daniela-high" },
+    { "id": "es-claude", "lang": "es", "label": "Claude (MX)", "phrases": "es-MX", "file": "es-claude-v3.json", "model": "es_MX-claude-high" },
+    { "id": "de-thorsten", "lang": "de", "label": "Thorsten", "phrases": "de", "file": "de-thorsten-v3.json", "model": "de_DE-thorsten-high" },
+    { "id": "fr-siwis", "lang": "fr", "label": "Siwis", "phrases": "fr", "file": "fr-siwis-v3.json", "model": "fr_FR-siwis-medium" },
+    { "id": "pt-cadu", "lang": "pt", "label": "Cadu", "phrases": "pt", "file": "pt-cadu-v3.json", "model": "pt_BR-cadu-medium" },
+    { "id": "pl-gosia", "lang": "pl", "label": "Gosia", "phrases": "pl", "file": "pl-gosia-v3.json", "model": "pl_PL-gosia-medium" },
+    { "id": "ru-dmitri", "lang": "ru", "label": "Dmitri", "phrases": "ru", "file": "ru-dmitri-v3.json", "model": "ru_RU-dmitri-medium" },
     { "id": "tr-system", "lang": "tr", "label": null, "phrases": "tr", "system": true }
   ],
   "phrases": {
@@ -33,7 +33,10 @@
       "soon_roundabout_4": "At the roundabout, take the fourth exit.",
       "roundabout_4": "Take the fourth exit.",
       "soon_roundabout_5": "At the roundabout, take the fifth exit.",
-      "roundabout_5": "Take the fifth exit."
+      "roundabout_5": "Take the fifth exit.",
+      "job_new": "New job received.",
+      "fuel_low": "Fuel is running low.",
+      "rest_soon": "Time to rest soon."
     },
     "es-AR": {
       "soon_turn_left": "Más adelante, girá a la izquierda.",
@@ -55,7 +58,10 @@
       "soon_roundabout_4": "En la rotonda, tomá la cuarta salida.",
       "roundabout_4": "Tomá la cuarta salida.",
       "soon_roundabout_5": "En la rotonda, tomá la quinta salida.",
-      "roundabout_5": "Tomá la quinta salida."
+      "roundabout_5": "Tomá la quinta salida.",
+      "job_new": "Tenés un trabajo nuevo.",
+      "fuel_low": "Queda poco combustible.",
+      "rest_soon": "Pronto vas a tener que descansar."
     },
     "es-MX": {
       "soon_turn_left": "Más adelante, gira a la izquierda.",
@@ -77,7 +83,10 @@
       "soon_roundabout_4": "En la glorieta, toma la cuarta salida.",
       "roundabout_4": "Toma la cuarta salida.",
       "soon_roundabout_5": "En la glorieta, toma la quinta salida.",
-      "roundabout_5": "Toma la quinta salida."
+      "roundabout_5": "Toma la quinta salida.",
+      "job_new": "Tienes un trabajo nuevo.",
+      "fuel_low": "Queda poco combustible.",
+      "rest_soon": "Pronto tendrás que descansar."
     },
     "de": {
       "soon_turn_left": "Demnächst links abbiegen.",
@@ -99,7 +108,10 @@
       "soon_roundabout_4": "Im Kreisverkehr die vierte Ausfahrt nehmen.",
       "roundabout_4": "Jetzt die vierte Ausfahrt nehmen.",
       "soon_roundabout_5": "Im Kreisverkehr die fünfte Ausfahrt nehmen.",
-      "roundabout_5": "Jetzt die fünfte Ausfahrt nehmen."
+      "roundabout_5": "Jetzt die fünfte Ausfahrt nehmen.",
+      "job_new": "Neuer Auftrag erhalten.",
+      "fuel_low": "Der Kraftstoff wird knapp.",
+      "rest_soon": "Bald ist eine Pause fällig."
     },
     "fr": {
       "soon_turn_left": "Bientôt, tournez à gauche.",
@@ -121,7 +133,10 @@
       "soon_roundabout_4": "Au rond-point, prenez la quatrième sortie.",
       "roundabout_4": "Prenez la quatrième sortie.",
       "soon_roundabout_5": "Au rond-point, prenez la cinquième sortie.",
-      "roundabout_5": "Prenez la cinquième sortie."
+      "roundabout_5": "Prenez la cinquième sortie.",
+      "job_new": "Nouvelle mission reçue.",
+      "fuel_low": "Le niveau de carburant est bas.",
+      "rest_soon": "Une pause sera bientôt nécessaire."
     },
     "pt": {
       "soon_turn_left": "Em breve, vire à esquerda.",
@@ -143,7 +158,10 @@
       "soon_roundabout_4": "Na rotatória, pegue a quarta saída.",
       "roundabout_4": "Pegue a quarta saída.",
       "soon_roundabout_5": "Na rotatória, pegue a quinta saída.",
-      "roundabout_5": "Pegue a quinta saída."
+      "roundabout_5": "Pegue a quinta saída.",
+      "job_new": "Novo trabalho recebido.",
+      "fuel_low": "O combustível está acabando.",
+      "rest_soon": "Você vai precisar descansar em breve."
     },
     "pl": {
       "soon_turn_left": "Za chwilę skręć w lewo.",
@@ -165,7 +183,10 @@
       "soon_roundabout_4": "Na rondzie zjedź czwartym zjazdem.",
       "roundabout_4": "Zjedź czwartym zjazdem.",
       "soon_roundabout_5": "Na rondzie zjedź piątym zjazdem.",
-      "roundabout_5": "Zjedź piątym zjazdem."
+      "roundabout_5": "Zjedź piątym zjazdem.",
+      "job_new": "Nowe zlecenie.",
+      "fuel_low": "Kończy się paliwo.",
+      "rest_soon": "Wkrótce czas na odpoczynek."
     },
     "ru": {
       "soon_turn_left": "Скоро поверните налево.",
@@ -187,7 +208,10 @@
       "soon_roundabout_4": "На круговом движении сверните на четвёртый съезд.",
       "roundabout_4": "Сверните на четвёртый съезд.",
       "soon_roundabout_5": "На круговом движении сверните на пятый съезд.",
-      "roundabout_5": "Сверните на пятый съезд."
+      "roundabout_5": "Сверните на пятый съезд.",
+      "job_new": "Получен новый заказ.",
+      "fuel_low": "Топливо заканчивается.",
+      "rest_soon": "Скоро нужно отдохнуть."
     },
     "tr": {
       "soon_turn_left": "Birazdan sola dönün.",
@@ -209,7 +233,10 @@
       "soon_roundabout_4": "Döner kavşakta dördüncü çıkıştan çıkın.",
       "roundabout_4": "Dördüncü çıkıştan çıkın.",
       "soon_roundabout_5": "Döner kavşakta beşinci çıkıştan çıkın.",
-      "roundabout_5": "Beşinci çıkıştan çıkın."
+      "roundabout_5": "Beşinci çıkıştan çıkın.",
+      "job_new": "Yeni iş alındı.",
+      "fuel_low": "Yakıt azalıyor.",
+      "rest_soon": "Yakında mola vermelisin."
     }
   }
 }

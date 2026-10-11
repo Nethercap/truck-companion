@@ -2470,19 +2470,34 @@ document.querySelectorAll('.poiChip').forEach(chip => chip.addEventListener('cli
   document.getElementById('poiSearchInput').value = '';
   renderPoiResults();
 }));
-// Atajo: la estacion de servicio mas cercana como waypoint, en un toque.
-document.getElementById('poiNearestFuelBtn').addEventListener('click', () => {
+// Atajo: la estacion de servicio ('g') o el area de descanso ('p') mas
+// cercana como waypoint, en un toque. Lo usan el buscador y el aviso de
+// arriba del mapa (renderStopSuggest). false si todavia no se puede.
+function addNearestStop(code) {
   const pos = lastWorldPos;
-  if (!pos || !pois) { renderPoiResults(); return; }
+  if (!pos) return false;
+  if (!pois) {
+    const variant = poiVariantNow();
+    if (variant && !poisLoading) loadPois(variant);
+    showToast(t('poiLoading'), 'success', 2500);
+    return false;
+  }
   // La primera sobre la ruta que falta, o la mas cercana adelante: la mas
   // cercana en linea recta podia quedar atras y la ruta volvia a buscarla
   // ("it was a line going behind me", Discord 10-10).
   const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
-  const best = pickFuelStop(nearestFacilities('g', pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints);
-  if (!best) { showToast(t('poiNoResults'), 'danger'); return; }
-  addPoiWaypoint([best.x, best.z], `${t('poiCatFuel')} (${formatPoiDistance(best.why === 'route' ? best.along : best.dist)})`, 'g');
-  closePoiModal();
-});
+  const best = pickFuelStop(nearestFacilities(code, pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints);
+  if (!best) { showToast(t('poiNoResults'), 'danger'); return false; }
+  const name = t(code === 'g' ? 'poiCatFuel' : 'poiCatRest');
+  addPoiWaypoint([best.x, best.z], `${name} (${formatPoiDistance(best.why === 'route' ? best.along : best.dist)})`, code);
+  return true;
+}
+for (const [id, code] of [['poiNearestFuelBtn', 'g'], ['poiNearestRestBtn', 'p']]) {
+  document.getElementById(id).addEventListener('click', () => {
+    if (!lastWorldPos || !pois) { renderPoiResults(); return; }
+    if (addNearestStop(code)) closePoiModal();
+  });
+}
 
 // Distancia minima (aprox) del punto (x,z) a la polilinea de la ruta actual,
 // en unidades del juego. Alcanza con chequear contra cada segmento entre
@@ -5631,8 +5646,54 @@ function fuelFigures(data) {
   return { avg, rangeKm, measured: !!measured, spanKm: measured ? fuelTracker.spanKm() : 0 };
 }
 
+// Avisos de estado (createStatusAlerts, pure.js): trabajo nuevo, poco
+// combustible y descanso cerca, por voz y, los dos ultimos, con un atajo
+// arriba del mapa a la estacion o al area de descanso mas cercana. La parada
+// de descanso se da por cumplida al dormir (createRestWatch), como la de
+// estacion al cargar.
+const statusAlerts = createStatusAlerts();
+const restWatch = createRestWatch();
+const stopSuggestion = createStopSuggestion();
+let stopSuggestKind = null;
+function trackStatus(data) {
+  if (conn.demo) return;
+  const st = statusAlerts.push(data);
+  if (st.say && voiceOn && isLeaderTab) speakVoice(st.say);
+  if (restWatch.push(data.restStopMinutes)) {
+    const i = waypoints.findIndex(w => w.kind === 'p');
+    if (i >= 0) {
+      showToast(t('waypointRestedToast').replace('{name}', waypoints[i].label || t('poiCatRest')), 'success', 4000);
+      removeWaypoint(i);
+    }
+  }
+  renderStopSuggest(stopSuggestion.update(st, waypoints.map(w => w.kind)));
+}
+function renderStopSuggest(kind) {
+  if (kind === stopSuggestKind) return;
+  stopSuggestKind = kind;
+  const box = document.getElementById('stopSuggest');
+  box.hidden = !kind;
+  if (!kind) return;
+  // Con data-i18n: un cambio de idioma lo traduce sin pasar por aca.
+  const text = document.getElementById('stopSuggestText');
+  const go = document.getElementById('stopSuggestGo');
+  document.getElementById('stopSuggestIcon').textContent = kind === 'g' ? '⛽' : '🅿️';
+  text.dataset.i18n = kind === 'g' ? 'stopLowFuel' : 'stopRestSoon';
+  go.dataset.i18n = kind === 'g' ? 'stopGoFuel' : 'stopGoRest';
+  text.textContent = t(text.dataset.i18n);
+  go.textContent = t(go.dataset.i18n);
+}
+document.getElementById('stopSuggestGo').addEventListener('click', () => {
+  if (stopSuggestKind && addNearestStop(stopSuggestKind)) renderStopSuggest(null);
+});
+document.getElementById('stopSuggestClose').addEventListener('click', () => {
+  stopSuggestion.close(stopSuggestKind);
+  renderStopSuggest(null);
+});
+
 function handleTelemetry(data) {
   trackFuel(data);
+  trackStatus(data);
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
   if (clientOverlayOn) setTimeout(sendNavHud, 0); // idem
   const enAuto = isDrivingCar(data);
@@ -6034,22 +6095,39 @@ const DASH_SCALE_KEY = 'truckdash_dash_scale';
 const dashOverlay = document.getElementById('dashOverlay');
 let dashPanel = null;
 
+// Moderno o clasico (classic.js, createDashStyles). Un cliente viejo en modo
+// LAN no sirve classic.js: queda el moderno solo y sin selector.
 function ensureDashPanel() {
   if (dashPanel) return dashPanel;
-  dashPanel = createDashPanel({
+  const opts = {
     root: document.getElementById('dashOverlayPanel'),
     money: moneyLine,       // con la conversion a la moneda local del usuario
     imperial: () => useImperial,
     lang: () => currentLang,
-  });
+  };
+  const conEstilos = typeof createDashStyles === 'function';
+  dashPanel = conEstilos ? createDashStyles(Object.assign({ style: savedDashStyle() }, opts)) : createDashPanel(opts);
+  document.getElementById('dashStyleGroup').hidden = !conEstilos;
+  renderDashStyle();
   dashPanel.setVisible(false);
   dashPanel.applyTranslations();
   setDashScale(lsGet(DASH_SCALE_KEY) || '1');
   return dashPanel;
 }
 
+function renderDashStyle() {
+  if (!dashPanel || !dashPanel.style) return;
+  document.querySelectorAll('[data-dash-style]').forEach(b => b.classList.toggle('active', b.dataset.dashStyle === dashPanel.style()));
+}
+document.querySelectorAll('[data-dash-style]').forEach(b => b.addEventListener('click', () => {
+  ensureDashPanel().setStyle(b.dataset.dashStyle);
+  renderDashStyle();
+  dashPanel.refresh(); // los dos estilos ya tienen el ultimo dato
+}));
+
 function setDashScale(valor) {
-  document.getElementById('dashOverlayPanel').style.setProperty('--d-scale', valor);
+  if (dashPanel && dashPanel.setScale) dashPanel.setScale(valor);
+  else document.getElementById('dashOverlayPanel').style.setProperty('--d-scale', valor);
   try { localStorage.setItem(DASH_SCALE_KEY, valor); } catch (e) {}
   document.querySelectorAll('[data-dash-scale]').forEach(b => b.classList.toggle('active', b.dataset.dashScale === String(valor)));
 }

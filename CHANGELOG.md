@@ -13,6 +13,8 @@ updates on its own and is not versioned here.
   ProMods ones) now get a name, so you can search for them on your own map too.
 - Build my map: cities that share a name (three Jacksons with Coast to Coast) show their
   state in the city search on your own map ("Jackson, WY").
+- Same Wi-Fi (LAN) mode: the classic dashboard style and the new voice lines (new job,
+  low fuel, rest soon) work without internet too.
 
 ## 1.5.30 (2026-10-10)
 

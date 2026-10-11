@@ -569,6 +569,134 @@ function createRefuelWatch({ minL = 20, minFrac = 0.08 } = {}) {
   };
 }
 
+// Lo mismo para el descanso: una parada en un area de descanso queda
+// cumplida al dormir, aunque haya sido en otra. Dormir sube los minutos que
+// faltan para el proximo descanso de golpe (de ~30 a ~11 h); manejar solo
+// los baja. 0 o mas de un dia es la fatiga apagada (ver createFatigue).
+function createRestWatch({ minUpMin = 120 } = {}) {
+  let low = null;
+  return {
+    push(restMinutes) {
+      if (!Number.isFinite(restMinutes) || restMinutes === 0 || restMinutes >= 24 * 60) return false;
+      if (low == null || restMinutes < low) { low = restMinutes; return false; }
+      if (restMinutes - low >= minUpMin) { low = restMinutes; return true; }
+      return false;
+    },
+  };
+}
+
+// Si el trabajo que aparece es uno recien tomado o uno a mitad de camino (una
+// partida cargada con el tablero ya abierto, que es lo de todos los dias: el
+// cliente abre la pagina antes que el juego). true, false, o null si todavia
+// no se puede saber: el GPS del juego tarda unos ticks en calcular la ruta.
+//  - Sin remolque enganchado (freight market, autos del Road Trip) se toma
+//    como nuevo: el GPS apunta al remolque y su distancia no dice nada.
+//  - Con remolque, nuevo si lo que falta es casi todo el trabajo.
+function jobLooksFresh(d, freshFrac = 0.85) {
+  const planned = Number(d.plannedDistanceKm);
+  if (!(planned > 0) || !d.trailerAttached) return true;
+  const route = Number(d.routeDistanceKm);
+  if (!(route > 0)) return null;
+  return route >= planned * freshFrac;
+}
+
+// Avisos de estado para la voz y para el atajo del mapa (11-10, tomado de
+// The Dispatcher): trabajo nuevo, poco combustible y descanso cerca.
+// push(d) con cada tick devuelve { say, fuelLow, restSoon }:
+//  - say: la frase a decir (clave de voices.json) o null, una por tick; si
+//    coinciden dos, la otra sale en el tick siguiente. En pausa se guardan.
+//  - job_new: un trabajo que esta pagina no vio antes y que parece recien
+//    tomado (jobLooksFresh). El que ya estaba al abrir la pagina no, ni el
+//    mismo trabajo que vuelve al cerrar y abrir el juego.
+//  - fuel_low: la alerta del propio juego (mechanicalWarnings.fuel) o, con
+//    un cliente que no la manda, menos de lowFrac del tanque. Una vez por
+//    vez: se rearma al cargar por encima de rearmFrac.
+//  - rest_soon: faltan restSoonMin minutos de JUEGO o menos para el
+//    descanso (90 son ~4,5 min reales). Se rearma al dormir.
+function createStatusAlerts({ lowFrac = 0.15, rearmFrac = 0.25, restSoonMin = 90, restRearmMin = 240, decideMs = 15000 } = {}) {
+  const seenJobs = new Set();
+  let primero = true;
+  let candidato = null; // { job, since }
+  let fuelLow = false, fuelArmed = true;
+  let restSoon = false, restArmed = true;
+  const cola = [];
+  const encolar = (k) => { if (!cola.includes(k)) cola.push(k); };
+  return {
+    push(d) {
+      if (!d) return { say: null, fuelLow, restSoon };
+      const ts = Number(d.ts) * 1000 || Date.now();
+      const job = d.onJob && d.cityDst ? [d.citySrc, d.cityDst, d.companyDst, d.cargo].join('|') : null;
+      if (job && !seenJobs.has(job)) {
+        if (primero) seenJobs.add(job);
+        else {
+          if (!candidato || candidato.job !== job) candidato = { job, since: ts };
+          const fresco = jobLooksFresh(d);
+          if (fresco != null || ts - candidato.since >= decideMs) {
+            seenJobs.add(job);
+            candidato = null;
+            if (fresco) encolar('job_new');
+          }
+        }
+      }
+      if (!job) candidato = null;
+      primero = false;
+
+      const cap = Number(d.fuelCapacity);
+      const frac = cap > 0 && Number.isFinite(d.fuel) ? d.fuel / cap : null;
+      const alerta = (d.mechanicalWarnings || {}).fuel;
+      fuelLow = alerta != null ? !!alerta : (frac != null && frac < lowFrac);
+      if (fuelLow && fuelArmed) { fuelArmed = false; encolar('fuel_low'); }
+      if (!fuelLow && (frac == null || frac > rearmFrac)) fuelArmed = true;
+
+      const r = Number(d.restStopMinutes);
+      const valido = Number.isFinite(r) && r !== 0 && r < 24 * 60;
+      restSoon = valido && r <= restSoonMin;
+      if (restSoon && restArmed) { restArmed = false; encolar('rest_soon'); }
+      if (valido && r > restRearmMin) restArmed = true;
+
+      const say = d.paused || !cola.length ? null : cola.shift();
+      return { say, fuelLow, restSoon };
+    },
+  };
+}
+
+// Angulo de la aguja de un reloj del tablero clasico, en grados desde las
+// 12, con el recorrido repartido a los dos lados (270: de -135 a 135). Lo que
+// se pasa del rango queda clavado en la punta, como una aguja de verdad.
+function gaugeAngle(value, min, max, sweepDeg = 270) {
+  const v = Number(value);
+  if (!Number.isFinite(v) || !(max > min)) return -sweepDeg / 2;
+  const frac = Math.max(0, Math.min(1, (v - min) / (max - min)));
+  return -sweepDeg / 2 + frac * sweepDeg;
+}
+
+// El tope de un reloj que depende del camion (autonomia, rpm): la primera
+// opcion que alcanza, o la ultima. Asi la escala no cambia a cada tick.
+function gaugeScaleMax(value, options) {
+  const v = Number(value);
+  if (!Number.isFinite(v)) return options[0];
+  return options.find(o => o >= v) || options[options.length - 1];
+}
+
+// Que atajo ofrecer arriba del mapa: 'g' (estacion mas cercana) con poco
+// combustible, 'p' (area de descanso) con el descanso cerca, o null. Nada si
+// ya hay una parada de ese tipo en la ruta o si la persona lo cerro; cerrado
+// queda hasta que la condicion se va (cargo, durmio) y vuelve.
+function createStopSuggestion() {
+  const cerrado = { g: false, p: false };
+  return {
+    update({ fuelLow, restSoon }, kinds) {
+      if (!fuelLow) cerrado.g = false;
+      if (!restSoon) cerrado.p = false;
+      const hay = (k) => (kinds || []).includes(k);
+      if (fuelLow && !cerrado.g && !hay('g')) return 'g';
+      if (restSoon && !cerrado.p && !hay('p')) return 'p';
+      return null;
+    },
+    close(kind) { if (kind in cerrado) cerrado[kind] = true; },
+  };
+}
+
 // Claves de los ajustes que cambiaron entre lo que la pestana tenia al cargar
 // (o al guardar la ultima vez) y lo que tiene ahora. Sin base (todavia no
 // termino de cargar), todas: como antes.
@@ -1884,6 +2012,6 @@ function citiesMatchingInput(names, labels, input) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
