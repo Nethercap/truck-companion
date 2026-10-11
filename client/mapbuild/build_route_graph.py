@@ -28,8 +28,11 @@ def load_json(path):
         return json.load(f)
 
 
-# Tolerancia entre el extremo de la cadena de curvas y el nodo del mapa.
-PREFAB_END_TOLERANCE_M = 12.0
+# Tolerancia entre el extremo de la cadena de curvas y el nodo del mapa. Las
+# navCurves son el eje de un carril: en una calle de 3 carriles por mano el
+# de paso arranca a 13,5 m del nodo, y con 12 m el derecho de esos cruces se
+# perdia (Bakersfield, Gargamosch 10-10). 20 m cubre 4 carriles de 4,5 m.
+PREFAB_END_TOLERANCE_M = 20.0
 # Respetar que giros permite cada cruce: los de un solo sentido se marcan y
 # los que no existen se borran, con la red de seguridad de relax_turns para
 # no dejar a nadie sin llegada. Con TRUCKDASH_ENFORCE_TURNS=flags se vuelve
@@ -765,6 +768,13 @@ def main(argv=None):
                     # sintoma de una descripcion rara; ahi se usa la recta.
                     if (math.dist(world[0], node_list[a]) > PREFAB_END_TOLERANCE_M
                             or math.dist(world[-1], node_list[b]) > PREFAB_END_TOLERANCE_M):
+                        # El paso existe en el juego (esta en las navCurves):
+                        # se conserva con la recta. Antes se salteaba y, como
+                        # no quedaba en directed, el modo full lo borraba como
+                        # "giro inexistente": sin el derecho, la ruta entraba a
+                        # un brazo, daba la vuelta en U en su nodo y seguia (el
+                        # lazo de Bakersfield).
+                        directed[(a, b)] = (length, None)
                         continue
                     world = align_to_nodes(world, node_list[a], node_list[b])
                     directed[(a, b)] = (length, prefab_mid_points(world, node_list[a], node_list[b]))

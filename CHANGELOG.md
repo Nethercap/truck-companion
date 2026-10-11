@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## 1.5.31 (unreleased)
 
+- Build my map: wide streets (three or more lanes each way) keep the straight-ahead
+  link through intersections. Without it, the route on your own map could loop into a
+  side street and back instead of going straight.
 - Build my map: cities that only have companies (some Coast to Coast, Russian and
   ProMods ones) now get a name, so you can search for them on your own map too.
 
