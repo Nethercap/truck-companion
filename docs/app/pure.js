@@ -496,6 +496,87 @@ function detectRoundabout(ctx) {
   return null;
 }
 
+// Donde queda un lugar visto desde el camion, en la grilla del juego (x al
+// este, z al sur) y con el rumbo del SDK (0 norte, horario; ver
+// gridHeadingToGeo). rel: grados, + a la derecha. side: 'ahead' hasta 60
+// grados, 'behind' desde 120, 'side' en el medio. null sin rumbo.
+function poiRelative(x, z, headingDeg, px, pz) {
+  if (!Number.isFinite(headingDeg) || x == null || z == null) return null;
+  const dx = px - x, dz = pz - z;
+  if (Math.hypot(dx, dz) < 1) return null;
+  const rel = normDeg(Math.atan2(dx, -dz) * 180 / Math.PI - headingDeg);
+  return { rel, side: Math.abs(rel) <= 60 ? 'ahead' : Math.abs(rel) >= 120 ? 'behind' : 'side' };
+}
+
+// Paradas (estaciones) a lo largo de la ruta que falta, que empieza en el
+// camion: las que quedan a menos de maxOffM del recorrido, ordenadas por lo
+// que hay que andar hasta ellas (sobre la ruta, mas el desvio).
+function stopsAlongRoute(route, stops, maxOffM = 400, maxAlongM = 80000) {
+  if (!route || route.length < 2) return [];
+  const cum = [0];
+  for (let k = 1; k < route.length; k++) cum.push(cum[k - 1] + Math.hypot(route[k][0] - route[k - 1][0], route[k][1] - route[k - 1][1]));
+  const out = [];
+  for (const st of stops) {
+    let best = null;
+    for (let k = 1; k < route.length && cum[k - 1] <= maxAlongM; k++) {
+      const ax = route[k - 1][0], az = route[k - 1][1], bx = route[k][0], bz = route[k][1];
+      const vx = bx - ax, vz = bz - az, L2 = vx * vx + vz * vz;
+      const raw = L2 ? ((st.x - ax) * vx + (st.z - az) * vz) / L2 : 0;
+      if (k === 1 && raw < 0) continue; // antes del camion: queda atras, no en la ruta
+      const t = Math.max(0, Math.min(1, raw));
+      const off = Math.hypot(st.x - ax - t * vx, st.z - az - t * vz);
+      if (off <= maxOffM && (!best || off < best.off)) best = { off, along: cum[k - 1] + t * Math.sqrt(L2) };
+    }
+    if (best) out.push({ ...st, along: best.along, off: best.off });
+  }
+  return out.sort((a, b) => (a.along + 2 * a.off) - (b.along + 2 * b.off));
+}
+
+// La estacion "mas cercana" que conviene: la primera sobre la ruta que falta;
+// sin ruta (o sin ninguna cerca de ella), la mas cercana que quede adelante;
+// si no hay ninguna adelante, la mas cercana. Antes era la mas cercana en
+// linea recta, que podia quedar atras: la ruta daba la vuelta para ir a
+// buscarla ("it was a line going behind me", Discord 10-10).
+// stations: [{x, z, dist}] ordenadas por dist.
+// La de la ruta no puede quedar mucho mas lejos que la mas cercana que no
+// esta atras: en la demo elegia una a 244 km sobre la ruta habiendo otras a
+// pocos km a un costado (maxDetourFactor veces su distancia, mas un margen).
+function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, slackM = 1500) {
+  if (!stations || !stations.length) return null;
+  const notBehind = stations.filter(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return !r || r.side !== 'behind'; });
+  const ref = notBehind.length ? notBehind[0].dist : stations[0].dist;
+  const onRoute = stopsAlongRoute(route, stations).filter(st => st.along + st.off <= ref * maxDetourFactor + slackM);
+  if (onRoute.length) return { ...onRoute[0], why: 'route' };
+  const ahead = stations.find(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return r && r.side === 'ahead'; });
+  if (ahead) return { ...ahead, why: 'ahead' };
+  return { ...stations[0], why: 'nearest' };
+}
+
+// Avisa una vez por carga de combustible: el tanque subio al menos minL
+// litros (o minFrac del tanque) desde el nivel mas bajo visto. Con eso un
+// waypoint de estacion se da por cumplido aunque se haya cargado en otra, o
+// a mas de WAYPOINT_REACHED_M de su icono: antes quedaba puesto y la ruta
+// volvia a buscarlo (Discord, 10-10).
+function createRefuelWatch({ minL = 20, minFrac = 0.08 } = {}) {
+  let low = null;
+  return {
+    push(fuelL, capacityL) {
+      if (!Number.isFinite(fuelL)) return false;
+      if (low == null || fuelL < low) { low = fuelL; return false; }
+      if (fuelL - low >= Math.max(minL, (Number(capacityL) || 0) * minFrac)) { low = fuelL; return true; }
+      return false;
+    },
+  };
+}
+
+// Claves de los ajustes que cambiaron entre lo que la pestana tenia al cargar
+// (o al guardar la ultima vez) y lo que tiene ahora. Sin base (todavia no
+// termino de cargar), todas: como antes.
+function settingsChangedKeys(base, cur) {
+  if (!base) return Object.keys(cur);
+  return Object.keys(cur).filter(k => JSON.stringify(cur[k]) !== JSON.stringify(base[k]));
+}
+
 // Si el nodo `start` es parte de un anillo corto (una rotonda): un camino
 // dirigido que vuelve a el en menos de maxLenM sin pasar por `from` (el
 // nodo de la calle por la que se llega) ni volver por la misma arista. Las
@@ -1519,7 +1600,7 @@ function storedWaypoints(stored, variant, now, maxAgeMs = 12 * 3600 * 1000, max 
   const out = [];
   for (const w of entry.list) {
     if (!w || !Array.isArray(w.pos) || w.pos.length !== 2 || !w.pos.every(Number.isFinite)) continue;
-    out.push({ pos: [w.pos[0], w.pos[1]], inGame: !!w.inGame, label: typeof w.label === 'string' ? w.label.slice(0, 80) : null });
+    out.push({ pos: [w.pos[0], w.pos[1]], inGame: !!w.inGame, label: typeof w.label === 'string' ? w.label.slice(0, 80) : null, ...(typeof w.kind === 'string' ? { kind: w.kind.slice(0, 2) } : {}) });
     if (out.length >= max) break;
   }
   return out;
@@ -1634,6 +1715,6 @@ function foldText(s) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

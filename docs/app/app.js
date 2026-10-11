@@ -82,9 +82,21 @@ function loadSettings() {
   } catch (e) {}
   return {};
 }
+function currentSettings() {
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff, dlcAuto };
+}
+// Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
+// guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
+// pestana vieja, al guardar cualquier cosa, pisara lo que se cambio en otra
+// (el tamano de la flecha, las unidades...). Ver settingsChangedKeys en pure.js.
+let settingsBaseline = null; // se toma al terminar de cargar app.js
 function saveSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, routeSummaryMin, voiceOn, voiceByLang, liveShareRoute, dlcOff, dlcAuto })));
+    const cur = JSON.parse(JSON.stringify(currentSettings()));
+    const stored = loadSettings();
+    for (const k of settingsChangedKeys(settingsBaseline, cur)) stored[k] = cur[k];
+    settingsBaseline = cur;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(stored));
   } catch (e) {}
 }
 const _savedSettings = loadSettings();
@@ -200,6 +212,7 @@ const REGION_CURRENCY = {
   VN: 'VND', IN: 'INR', PK: 'PKR', BD: 'BDT', LK: 'LKR', AU: 'AUD', NZ: 'NZD',
 };
 let currencyPref = _savedSettings.currency || 'auto'; // 'auto' | 'off' | codigo ISO
+const refuelWatch = createRefuelWatch();
 const RATES_KEY = 'truckdash_rates';
 const RATES_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 let exchangeRates = null; // {base:'EUR', rates:{...}, fetched_at}
@@ -1995,7 +2008,7 @@ function saveWaypoints() {
   const stored = readStoredWaypoints();
   const keep = waypoints.filter(w => !w.convoyFollow);
   if (keep.length) {
-    stored[currentGame] = { at: Date.now(), list: keep.map(w => ({ pos: w.pos, inGame: w.inGame, label: w.label })) };
+    stored[currentGame] = { at: Date.now(), list: keep.map(w => ({ pos: w.pos, inGame: w.inGame, label: w.label, ...(w.kind ? { kind: w.kind } : {}) })) };
   } else {
     delete stored[currentGame];
   }
@@ -2005,14 +2018,15 @@ function restoreWaypoints() {
   if (!currentGame || !toLngLat || waypoints.length || conn.demo) return;
   for (const w of storedWaypoints(readStoredWaypoints(), currentGame, Date.now(), 12 * 3600 * 1000, MAX_WAYPOINTS)) {
     const lngLat = toLngLat(w.pos[0], w.pos[1]);
-    waypoints.push({ pos: w.pos, lngLat, inGame: w.inGame, label: w.label, marker: makeWaypointMarker(lngLat, waypoints.length) });
+    waypoints.push({ pos: w.pos, lngLat, inGame: w.inGame, label: w.label, kind: w.kind || null, marker: makeWaypointMarker(lngLat, waypoints.length) });
   }
   if (waypoints.length) { renderWaypointList(); invalidateRoute(); }
 }
 
-function addWaypoint(pos, lngLat, inGame, label) {
+// kind: codigo del POI ('g' estacion de servicio...) si salio del buscador.
+function addWaypoint(pos, lngLat, inGame, label, kind = null) {
   if (waypoints.length >= MAX_WAYPOINTS) { showToast(t('waypointLimitToast').replace('{n}', MAX_WAYPOINTS), 'danger'); return; }
-  const wp = { pos, lngLat, inGame, label: label || null, marker: makeWaypointMarker(lngLat, waypoints.length) };
+  const wp = { pos, lngLat, inGame, label: label || null, kind, marker: makeWaypointMarker(lngLat, waypoints.length) };
   waypoints.push(wp);
   renderWaypointList();
   invalidateRoute();
@@ -2065,9 +2079,9 @@ function finalizeWaypoint(inGame) {
 
 // Un waypoint agregado desde la busqueda de POIs (estacion, taller, empresa)
 // no pasa por el modal: el juego no lo conoce (inGame=false) y ya tiene nombre.
-function addPoiWaypoint(pos, label) {
+function addPoiWaypoint(pos, label, kind = null) {
   if (!toLngLat) return;
-  addWaypoint(pos, toLngLat(pos[0], pos[1]), false, label);
+  addWaypoint(pos, toLngLat(pos[0], pos[1]), false, label, kind);
   showToast(t('poiAddedToast').replace('{name}', label), 'success', 3000);
 }
 
@@ -2355,15 +2369,23 @@ function renderPoiResults() {
   }
   if (!results.length) { list.innerHTML = `<div class="poiEmpty">${t('poiNoResults')}</div>`; return; }
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  list.innerHTML = results.map((r, i) => `
-    <button class="poiItem" data-index="${i}">
+  // Hacia donde queda cada uno respecto del camion (pedido de Gargamosch,
+  // 10-10): con solo la distancia, "la mas cercana" podia estar atras.
+  const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
+  list.innerHTML = results.map((r, i) => {
+    const rel = poiRelative(pos.x, pos.z, heading, r.x, r.z);
+    const dirTitle = rel ? (rel.side === 'behind' ? t('poiBehind') : rel.side === 'ahead' ? t('poiAhead') : '') : '';
+    const dir = rel ? `<span class="poiDir ${rel.side}" title="${esc(dirTitle)}"><svg viewBox="0 0 24 24" width="16" height="16" style="transform:rotate(${Math.round(rel.rel)}deg)"><path d="M12 3l6 9h-4v9h-4v-9H6z" fill="currentColor"/></svg></span>` : '';
+    return `
+    <button class="poiItem${rel && rel.side === 'behind' ? ' behind' : ''}" data-index="${i}">
       <span class="poiIcon">${r.code ? POI_ICONS_TEXT[r.code] : '🏭'}</span>
       <span class="poiText"><span class="poiName">${esc(r.name)}</span>${r.sub ? `<span class="poiSub">${esc(r.sub)}</span>` : ''}</span>
-      <span class="poiDist">${formatPoiDistance(r.dist)}</span>
-    </button>`).join('');
+      ${dir}<span class="poiDist">${formatPoiDistance(r.dist)}</span>
+    </button>`;
+  }).join('');
   list.querySelectorAll('.poiItem').forEach(btn => btn.addEventListener('click', () => {
     const r = results[Number(btn.dataset.index)];
-    addPoiWaypoint([r.x, r.z], r.sub ? `${r.name} (${r.sub})` : r.name);
+    addPoiWaypoint([r.x, r.z], r.sub ? `${r.name} (${r.sub})` : r.name, r.code || null);
     closePoiModal();
   }));
 }
@@ -2414,9 +2436,13 @@ document.querySelectorAll('.poiChip').forEach(chip => chip.addEventListener('cli
 document.getElementById('poiNearestFuelBtn').addEventListener('click', () => {
   const pos = lastWorldPos;
   if (!pos || !pois) { renderPoiResults(); return; }
-  const [best] = nearestFacilities('g', pos.x, pos.z, 1);
+  // La primera sobre la ruta que falta, o la mas cercana adelante: la mas
+  // cercana en linea recta podia quedar atras y la ruta volvia a buscarla
+  // ("it was a line going behind me", Discord 10-10).
+  const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
+  const best = pickFuelStop(nearestFacilities('g', pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints);
   if (!best) { showToast(t('poiNoResults'), 'danger'); return; }
-  addPoiWaypoint([best.x, best.z], `${t('poiCatFuel')} (${formatPoiDistance(best.dist)})`);
+  addPoiWaypoint([best.x, best.z], `${t('poiCatFuel')} (${formatPoiDistance(best.why === 'route' ? best.along : best.dist)})`, 'g');
   closePoiModal();
 });
 
@@ -2910,6 +2936,15 @@ function renderRouteSummary(view) {
   document.getElementById('routeArrival').textContent = view.arrival;
   // Cuando el destino es el centro de la ciudad y no la empresa, se dice.
   // Un error de ~900 m sin explicacion se lee como un destino equivocado.
+  // La proxima parada propia, a la vista con su boton para saltearla: antes
+  // solo se sacaba tocando el marcador (que en modo navegacion queda fuera
+  // de pantalla si quedo atras) o desde el panel de info (Discord, 10-10).
+  const parada = document.getElementById('routeStop');
+  if (parada) {
+    const wp = waypoints[0];
+    parada.hidden = !wp;
+    if (wp) document.getElementById('routeStopName').textContent = t('routeNextStop').replace('{name}', wp.label || `${t('waypoint')} 1`);
+  }
   const aviso = document.getElementById('routeApprox');
   if (aviso) {
     const textos = [view.pickup || null, view.approx ? t('destApprox') : null, view.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
@@ -4960,7 +4995,23 @@ document.getElementById('updateBannerClose').addEventListener('click', () => {
   document.getElementById('updateBanner').style.display = 'none';
 });
 
-document.getElementById('routeResetBtn').addEventListener('click', resetDisplayedRoute);
+// Con paradas puestas y un trabajo, el primer toque saca solo las paradas y
+// la ruta vuelve al destino del trabajo; el segundo la oculta. Antes el
+// unico toque ocultaba tambien la del trabajo hasta que cambiara el trabajo,
+// y quien lo usaba para sacarse una parada vieja se quedaba sin ruta.
+document.getElementById('routeResetBtn').addEventListener('click', () => {
+  const trabajo = lastData ? resolveRawRouteTarget(lastData) : null;
+  if (waypoints.length && trabajo && trabajo.kind !== 'waypoint') {
+    clearWaypoint();
+    showToast(t('waypointsClearedToast'), 'info', 4000);
+    return;
+  }
+  resetDisplayedRoute();
+});
+document.getElementById('routeStopSkip').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (waypoints.length) removeWaypoint(0);
+});
 function applyRouteSummaryMin() {
   document.getElementById('routeSummary').classList.toggle('min', routeSummaryMin);
   keepPanelsClearOfRouteSummary();
@@ -5029,11 +5080,20 @@ document.addEventListener('visibilitychange', () => {
 // conexion muere sin que llegue onclose, y el tablero quedaba congelado
 // diciendo "en vivo" y con los botones mudos (auditoria del 10-10). Al volver
 // a la pestana o a la red, si hace rato que no llega nada, se reconecta.
+// Tambien con la pantalla prendida: una WiFi que sigue asociada pero pierde
+// paquetes no dispara 'online' ni cambia la visibilidad, y la flecha y la
+// ruta quedaban quietas minutos ("the GPS stopped routing me", Discord
+// 10-10, WiFi mala con codigo de pairing). Con el juego en vivo el cliente
+// manda varias veces por segundo: 10 s sin nada es un socket muerto. Una
+// vez por racha de telemetria (staleWatchArmed), para no reconectar en
+// bucle si la red se cayo del todo: ahi sigue la reconexion de siempre.
 const WS_STALE_MS = 10000;
 let lastWsMessageAt = 0;
+let staleWatchArmed = false;
 function reopenIfStale() {
   if (!ws || ws.readyState !== WebSocket.OPEN || !conn.hasTelemetry || !conn.reopen) return;
   if (Date.now() - lastWsMessageAt < WS_STALE_MS) return;
+  staleWatchArmed = false;
   const old = ws;
   old.onclose = null;
   try { old.close(); } catch (e) {}
@@ -5041,6 +5101,7 @@ function reopenIfStale() {
   conn.reopen();
 }
 window.addEventListener('online', reopenIfStale);
+setInterval(() => { if (staleWatchArmed && document.visibilityState === 'visible') reopenIfStale(); }, 3000);
 
 function renderConnectionUi() {
   const view = connectionView();
@@ -5489,6 +5550,15 @@ let fuelTrackerSavedAt = 0;
 function trackFuel(data) {
   if (conn.demo || data.paused) return;
   fuelTracker.push(data.odometerKm, data.fuel, `${data.game || ''}|${data.truckBrand || ''} ${data.truckName || ''}`);
+  // Cargo combustible: la proxima parada de estacion queda cumplida aunque
+  // haya cargado en otra o lejos del icono (ver createRefuelWatch).
+  if (refuelWatch.push(data.fuel, data.fuelCapacity)) {
+    const i = waypoints.findIndex(w => w.kind === 'g');
+    if (i >= 0) {
+      showToast(t('waypointRefueledToast').replace('{name}', waypoints[i].label || t('poiCatFuel')), 'success', 4000);
+      removeWaypoint(i);
+    }
+  }
   const now = Date.now();
   if (now - fuelTrackerSavedAt > 15000) {
     fuelTrackerSavedAt = now;
@@ -5608,6 +5678,7 @@ function connectWs(backend, code, options = {}) {
       checkUpdateBanner(data.clientVersion);
       return;
     }
+    staleWatchArmed = true;
     queueTelemetry(data);
   };
   socket.onclose = (ev) => {
@@ -5989,3 +6060,6 @@ const BTN_TIP_KEY = 'truckdash_btn_tips';
     tipTimer = setTimeout(hideTip, 1800);
   });
 })();
+
+// Lo que esta pestana cargo de los ajustes (ver saveSettings).
+try { settingsBaseline = JSON.parse(JSON.stringify(currentSettings())); } catch (e) {}

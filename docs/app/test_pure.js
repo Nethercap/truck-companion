@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, pickVoice, mapBoundsFromCities, insideMapBounds } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -1303,4 +1303,63 @@ test('createMissingCompanyWatch: freight market al enganchar, empresas conocidas
   // otra vez la misma empresa: una sola vez por pagina
   w.tick({ ...job, trailerAttached: false }, { x: 1, z: 2 }, known);
   assert.deepEqual(w.tick({ ...job, trailerAttached: true }, { x: 3, z: 4 }, known), []);
+});
+
+test('ajustes: una pestana solo escribe lo que cambio ella (no pisa lo de otra)', () => {
+  const base = { truckSize: 1, useImperial: false, btnLayout: { panels: { a: { x: 1 } } } };
+  // nada cambio: no escribe nada
+  assert.deepEqual(settingsChangedKeys(base, JSON.parse(JSON.stringify(base))), []);
+  // cambio las unidades: solo esa clave, aunque otra pestana haya cambiado truckSize en el guardado
+  assert.deepEqual(settingsChangedKeys(base, { ...base, useImperial: true }), ['useImperial']);
+  // objetos mutados en el lugar se comparan por contenido
+  assert.deepEqual(settingsChangedKeys(base, { ...base, btnLayout: { panels: { a: { x: 2 } } } }), ['btnLayout']);
+  // sin base (todavia cargando): todo, como antes
+  assert.deepEqual(settingsChangedKeys(null, { truckSize: 2, useImperial: true }), ['truckSize', 'useImperial']);
+});
+
+test('poiRelative: adelante, atras y al costado segun el rumbo del juego', () => {
+  // rumbo 0 = norte = z negativo
+  assert.equal(poiRelative(0, 0, 0, 0, -500).side, 'ahead');
+  assert.equal(poiRelative(0, 0, 0, 0, 500).side, 'behind');
+  assert.equal(poiRelative(0, 0, 0, 500, 0).side, 'side');
+  assert.ok(Math.abs(poiRelative(0, 0, 0, 500, 0).rel - 90) < 1e-9); // al este = derecha
+  // yendo al este (90), algo al este esta adelante y al oeste atras
+  assert.equal(poiRelative(0, 0, 90, 800, 50).side, 'ahead');
+  assert.equal(poiRelative(0, 0, 90, -800, 0).side, 'behind');
+  assert.equal(poiRelative(0, 0, null, 0, -500), null); // cliente viejo sin rumbo
+});
+
+test('pickFuelStop: la de la ruta antes que la mas cercana de atras (Discord, 10-10)', () => {
+  // camion en (0,0) yendo al norte; la mas cercana esta 300 m atras
+  const stations = [{ x: 0, z: 300, dist: 300 }, { x: 150, z: -2000, dist: 2006 }, { x: 3000, z: -1000, dist: 3162 }];
+  const route = [[0, 0], [0, -5000]];
+  const conRuta = pickFuelStop(stations, 0, 0, 0, route);
+  assert.deepEqual([conRuta.x, conRuta.z, conRuta.why], [150, -2000, 'route']);
+  // sin ruta: la mas cercana adelante
+  const sinRuta = pickFuelStop(stations, 0, 0, 0, null);
+  assert.deepEqual([sinRuta.x, sinRuta.why], [150, 'ahead']);
+  // sin rumbo ni ruta: la mas cercana, como antes
+  assert.equal(pickFuelStop(stations, 0, 0, null, null).why, 'nearest');
+  assert.equal(pickFuelStop([], 0, 0, 0, route), null);
+  // una sobre la ruta pero muy lejos no gana a una cercana al costado adelante
+  const lejos = [{ x: 600, z: -800, dist: 1000 }, { x: 0, z: -40000, dist: 40000 }];
+  const elegida = pickFuelStop(lejos, 0, 0, 0, [[0, 0], [0, -50000]]);
+  assert.deepEqual([elegida.x, elegida.why], [600, 'ahead']);
+});
+
+test('stopsAlongRoute: ordena por lo que hay que andar, no por la recta', () => {
+  // ruta en L: norte 1000 y despues este; una estacion cerca en recta pero al final
+  const route = [[0, 0], [0, -1000], [3000, -1000]];
+  const st = stopsAlongRoute(route, [{ x: 2900, z: -1100 }, { x: 100, z: -500 }, { x: 5000, z: 5000 }]);
+  assert.deepEqual(st.map(s => s.x), [100, 2900]); // la lejana del recorrido queda fuera
+});
+
+test('createRefuelWatch: una vez por carga, no por el ruido ni por gastar', () => {
+  const w = createRefuelWatch();
+  assert.equal(w.push(300, 1000), false);
+  assert.equal(w.push(250, 1000), false); // gastar
+  assert.equal(w.push(260, 1000), false); // 10 l: menos que el 8 % de 1000
+  assert.equal(w.push(340, 1000), true);  // cargo 90 l
+  assert.equal(w.push(400, 1000), false); // la misma carga sigue: no avisa dos veces
+  assert.equal(w.push(Number.NaN, 1000), false);
 });

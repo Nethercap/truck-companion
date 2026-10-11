@@ -46,4 +46,14 @@ Revisar cada cambio contra esta lista:
    (LAN bloqueada), localStorage que tira excepcion (`lsGet`/`lsSet`), VPN.
 7. **Reconexiones.** El relay se redespliega y pierde las sesiones; una
    conexion nueva del mismo cliente reemplaza a la vieja (4409) y el
-   `finally` de la vieja no debe borrar el estado de la nueva.
+   `finally` de la vieja no debe borrar el estado de la nueva. Una
+   conexion puede quedar medio abierta sin onclose (WiFi mala): con el
+   juego en vivo, 10 s sin mensajes es un socket muerto (`staleWatchArmed`).
+8. **Estados que no se cumplen solos.** Un waypoint, una parada o cualquier
+   estado temporal necesita una salida automatica (llegar, cargar
+   combustible, vencer) y una manual a la vista. La parada de estacion que
+   no se daba por alcanzada hacia volver la ruta para atras, y desde que se
+   guarda 12 h sobrevivia a recargar (Discord, 10-10).
+9. **Varias pestanas escriben el mismo localStorage.** Escribir solo lo que
+   cambio esta pestana (`settingsChangedKeys`), nunca todo lo que tiene en
+   memoria.
