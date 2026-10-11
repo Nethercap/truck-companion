@@ -791,6 +791,48 @@ function continuesTurn(prev, m, startM, gapMaxM = 80, maxDeg = 135, quietAddDeg 
   return Math.abs(normDeg(m.outBearing - prev.inBearing)) < maxDeg;
 }
 
+// Si el cruce de nodos i..iEnd tiene otra calle hacia `direction` (una
+// salida que no es la ruta, lleva a algun lado y dobla entre minDeg y maxDeg
+// contra el rumbo de llegada). Es la calle anterior al giro anunciado: con
+// dos a la derecha seguidas, "turn right" dicho antes de la primera hacia
+// doblar en la equivocada (Discord, 11-10). La voz espera a pasarla.
+// ctx: lo de detectManeuver (pts, cum, pointAt, bearingBetween, adjacency y
+// nodes o nodeXY).
+function sideExitToward(ctx, direction, minDeg = 25, maxDeg = 155) {
+  const { pts, i, cum, pointAt, bearingBetween, nodes, adjacency } = ctx;
+  if (!adjacency || (!nodes && !ctx.nodeXY) || (direction !== 'left' && direction !== 'right')) return false;
+  const nodeAt = ctx.nodeXY || ((k) => nodes[k]);
+  const iEnd = ctx.iEnd != null ? ctx.iEnd : i;
+  const legM = ctx.legM != null ? ctx.legM : 60;
+  const rejoinM = ctx.rejoinM != null ? ctx.rejoinM : 100;
+  const escapeM = ctx.escapeM != null ? ctx.escapeM : 120;
+  const inBearing = bearingBetween(pointAt(cum[i] - legM), pts[i]);
+  // Como en detectManeuver: lo que vuelve enseguida a la ruta no es otra calle.
+  const ahead = new Set();
+  for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { ahead.add(pts[k][4]); break; }
+  for (let k = i; k < pts.length && cum[k] - cum[iEnd] <= rejoinM; k++) if (pts[k][4] != null) ahead.add(pts[k][4]);
+  const sign = direction === 'right' ? 1 : -1;
+  for (let k = i; k <= iEnd; k++) {
+    const idx = pts[k][4];
+    if (idx == null) continue;
+    for (const [n] of (adjacency.get(idx) || [])) {
+      if (ahead.has(n) || !leadsAway(adjacency, nodeAt, idx, n, ahead, escapeM)) continue;
+      // Un vecino pegado (dentro del prefab) no da el rumbo: un salto mas.
+      let far = nodeAt(n);
+      if (Math.hypot(far[0] - pts[k][0], far[1] - pts[k][1]) < legM / 2) {
+        for (const [m] of (adjacency.get(n) || [])) {
+          if (m === idx || ahead.has(m)) continue;
+          far = nodeAt(m);
+          break;
+        }
+      }
+      const d = normDeg(bearingBetween(pts[k], far) - inBearing) * sign;
+      if (d >= minDeg && d <= maxDeg) return true;
+    }
+  }
+  return false;
+}
+
 // Anti-parpadeo de la indicacion de giro: una maniobra nueva tiene que
 // detectarse `ticks` ticks seguidos para mostrarse, y desaparecer otros
 // tantos para borrarse. Con la misma maniobra ya mostrada se devuelve la
@@ -801,7 +843,7 @@ function stabilizeManeuver(state, turn, ticks) {
   // sentido ya mostrados, para que "keep left" no cambie a "turn left" al
   // acercarse (la rampa curva cada vez mas dentro de los 60 m de medicion).
   if (turn && state.shown && Math.hypot(turn.node[0] - state.shown.node[0], turn.node[1] - state.shown.node[1]) < 40) {
-    state.shown = { ...state.shown, distanceMeters: turn.distanceMeters, nearSign: turn.nearSign || state.shown.nearSign };
+    state.shown = { ...state.shown, distanceMeters: turn.distanceMeters, decoyMeters: turn.decoyMeters, nearSign: turn.nearSign || state.shown.nearSign };
     state.candidate = undefined; state.candidateTicks = 0;
     return state.shown;
   }
@@ -1375,6 +1417,10 @@ function createFatigue(intervalMinutes = REST_INTERVAL_MINUTES) {
 // distanceMeters va en metros del mundo, que el camion recorre a su
 // velocidad real. Parado o casi (un semaforo antes de doblar) se toma una
 // velocidad minima: si no, el aviso no llegaria nunca.
+// El aviso del punto sale con el primero de dos limites: segundos a la
+// velocidad actual o, en giros y rotondas, metros (ver VOICE_TIMINGS). Si
+// antes del giro queda otra calle hacia el mismo lado (turn.decoyMeters, ver
+// sideExitToward), se espera a pasarla.
 // arrival(key, kind, remainingKm, totalKm): una vez por destino; solo si la
 // ruta era de mas de minTripKm, para no decir "llegaste" al tomar un trabajo
 // estando ya en la empresa de carga.
@@ -1409,9 +1455,24 @@ function voiceManeuverKey(turn) {
   if (turn.kind === 'roundabout' && turn.exit >= 1 && turn.exit <= VOICE_ROUNDABOUT_MAX_EXIT) return `roundabout_${turn.exit}`;
   return `${turn.kind === 'fork' ? 'keep' : 'turn'}_${turn.direction === 'left' ? 'left' : 'right'}`;
 }
+// Cuando se dice el aviso del punto (Ajustes > Guia por voz). Hasta el 11-10
+// era siempre a 6 s: a 80 km/h, 130 m antes, y frenando para doblar se
+// llegaba 10 s despues; en una rotonda se decia "primera salida" lejos de
+// la entrada (Discord, 11-10). Los metros (del mundo, los que recorre el
+// camion) son solo para giros y rotondas, donde se frena; una salida de
+// autopista se toma a velocidad y necesita los segundos.
+const VOICE_TIMINGS = {
+  early: { nowSec: 6, nowMaxM: Infinity }, // el de antes
+  normal: { nowSec: 5, nowMaxM: 70 },
+  late: { nowSec: 4, nowMaxM: 35 },        // en el giro
+};
+const VOICE_TIMING_DEFAULT = 'normal';
+function voiceTimingSetting(value) {
+  return Object.prototype.hasOwnProperty.call(VOICE_TIMINGS, value) ? value : VOICE_TIMING_DEFAULT;
+}
 function createVoiceGuide(opts = {}) {
   const soonSec = opts.soonSec != null ? opts.soonSec : 20;
-  const nowSec = opts.nowSec != null ? opts.nowSec : 6;
+  let timing = VOICE_TIMINGS[voiceTimingSetting(opts.timing)];
   // Un aviso anticipado pegado al del punto no sirve: se dice solo el segundo.
   const minLeadSec = opts.minLeadSec != null ? opts.minLeadSec : 4;
   const minSpeedMs = opts.minSpeedMs != null ? opts.minSpeedMs : 5;
@@ -1427,7 +1488,10 @@ function createVoiceGuide(opts = {}) {
       const speedMs = Math.max(minSpeedMs, (Number(speedKmh) || 0) / 3.6);
       const seconds = turn.distanceMeters / speedMs;
       const action = voiceManeuverKey(turn);
-      if (!current.now && seconds <= nowSec) {
+      const nowSec = timing.nowSec;
+      const capped = turn.kind === 'turn' || turn.kind === 'roundabout';
+      const due = seconds <= nowSec && (!capped || turn.distanceMeters <= timing.nowMaxM);
+      if (!current.now && due && !(turn.decoyMeters > 0)) {
         current.now = current.soon = true;
         return action;
       }
@@ -1444,6 +1508,7 @@ function createVoiceGuide(opts = {}) {
       arrivedKey = key;
       return kind === 'pickup' ? 'arrive_pickup' : 'arrive_dest';
     },
+    setTiming(value) { timing = VOICE_TIMINGS[voiceTimingSetting(value)]; },
   };
 }
 
@@ -1715,6 +1780,6 @@ function foldText(s) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }
