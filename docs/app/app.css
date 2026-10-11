@@ -24,6 +24,8 @@
   .toast.show { opacity: 1; transform: translateY(0); }
   .toast.success { border-color: #4caf50; }
   .toast.danger { border-color: var(--danger); }
+  /* Avisos de una oracion entera: en un telefono no entran en un renglon. */
+  .toast.wrap { white-space: normal; width: max-content; max-width: min(420px, calc(100vw - 32px)); line-height: 1.35; }
   html, body { height: 100%; }
   body {
     font-family: system-ui, sans-serif;

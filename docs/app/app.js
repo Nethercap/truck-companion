@@ -663,12 +663,12 @@ document.getElementById('setTruckSizeDefault').addEventListener('click', () => a
 document.getElementById('setVoice').addEventListener('change', (e) => {
   voiceOn = e.target.checked;
   saveSettings();
-  if (voiceOn) { unlockVoice(); speakVoice('soon_turn_right'); }
+  if (voiceOn) { unlockVoice().catch(() => {}); speakVoice('soon_turn_right'); }
 });
 document.getElementById('setVoiceName').addEventListener('change', (e) => {
   voiceByLang[currentLang] = e.target.value;
   saveSettings();
-  unlockVoice();
+  unlockVoice().catch(() => {});
   speakVoice('soon_turn_right');
 });
 document.getElementById('setVoiceTiming').addEventListener('change', (e) => {
@@ -677,7 +677,7 @@ document.getElementById('setVoiceTiming').addEventListener('change', (e) => {
   saveSettings();
 });
 document.getElementById('setVoiceTest').addEventListener('click', () => {
-  unlockVoice();
+  unlockVoice().catch(() => {});
   speakVoice('soon_turn_right');
 });
 document.getElementById('setDarkButtons').addEventListener('change', (e) => {
@@ -3871,9 +3871,34 @@ function unlockVoice() {
   try {
     if (!voiceAudio) voiceAudio = new Audio();
     voiceAudio.src = SILENT_WAV;
-    voiceAudio.play().catch(() => {});
     if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-  } catch (e) { /* sin audio: la guia queda muda */ }
+    return voiceAudio.play().then(() => { voiceUnlocked = true; });
+  } catch (e) { return Promise.reject(e); } // sin audio: la guia queda muda
+}
+
+// Con la voz ya prendida al cargar la pagina (recargar, la pestana que abre
+// el cliente al arrancar) no habia ningun toque que la habilitara: en
+// iPhone/iPad, y en la PC si nunca se hacia clic en la pagina, el navegador
+// rechazaba cada frase sin decir nada (Discord, 11-10: "it wasn't calling
+// them out at all"). El primer toque, clic o tecla en cualquier parte la
+// habilita; si igual llega una frase bloqueada, un aviso dice que tocar.
+let voiceUnlocked = false;
+let voiceBlockedToastAt = 0;
+const VOICE_BLOCKED_TOAST_MS = 120000;
+function unlockVoiceOnGesture() {
+  if (voiceUnlocked || !voiceOn) return;
+  unlockVoice().catch(() => {});
+}
+for (const ev of ['touchend', 'click', 'pointerup', 'keydown']) {
+  document.addEventListener(ev, unlockVoiceOnGesture, { capture: true, passive: true });
+}
+function voicePlayFailed(err) {
+  if (!err || err.name !== 'NotAllowedError') return;
+  voiceUnlocked = false;
+  const now = Date.now();
+  if (now - voiceBlockedToastAt < VOICE_BLOCKED_TOAST_MS) return;
+  voiceBlockedToastAt = now;
+  showToast(t('voiceBlockedToast'), 'danger wrap', 8000);
 }
 
 async function speakVoice(key) {
@@ -3894,7 +3919,7 @@ async function speakVoice(key) {
   if (!src) return;
   if (!voiceAudio) voiceAudio = new Audio();
   voiceAudio.src = src;
-  voiceAudio.play().catch(() => {});
+  voiceAudio.play().then(() => { voiceUnlocked = true; }, voicePlayFailed);
 }
 
 function fillVoiceSelect() {
