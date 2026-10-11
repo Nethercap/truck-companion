@@ -158,4 +158,5 @@ async function main() {
   }
 }
 
-main().catch(e => { console.error(e); process.exit(2); });
+if (require.main === module) main().catch(e => { console.error(e); process.exit(2); });
+module.exports = { harness, bajar, graphRev, BASE };
