@@ -58,6 +58,11 @@ function harness() {
   return { mod, pure, behindMax };
 }
 
+function graphRev() {
+  const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/const ROUTE_GRAPH_V3_REV = (\d+);/);
+  return m ? m[1] : '';
+}
+
 async function bajar(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
@@ -118,7 +123,8 @@ async function main() {
   const nuevo = { variants: {} };
   let falla = false;
   for (const [v, n] of Object.entries(VARIANTS)) {
-    const bin = await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin`);
+    // Con el ?g= de la app: sin el, el CDN puede servir el grafo anterior.
+    const bin = await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?g=${graphRev()}`);
     const cities = JSON.parse(await bajar(`${BASE}/${v}/Cities.json`));
     const sha = crypto.createHash('sha256').update(bin).digest('hex').slice(0, 16);
     const g = h.mod.buildRouteGraph(h.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength)));

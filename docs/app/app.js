@@ -2470,7 +2470,8 @@ function distanceToRouteMeters(x, z) {
 // de nuevo los tiles). 3 = 06-10: cada sentido de un prefab por separado
 // (los giros a la izquierda en un trebol iban por la rampa al reves).
 // 4 = 07-10: el DLC de cada tramo, para evitar los DLC que no tenes.
-const ROUTE_GRAPH_V3_REV = 4;
+// 5 = 10-10: el derecho de los cruces de calles anchas (el lazo de Bakersfield).
+const ROUTE_GRAPH_V3_REV = 5;
 
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
