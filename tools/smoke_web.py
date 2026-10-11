@@ -38,6 +38,11 @@ def chequear(nombre, ok, detalle=""):
     print(("ok    " if ok else "FALLA ") + nombre + (f"  ({detalle})" if detalle else ""), flush=True)
     if not ok:
         fallas.append(nombre)
+        # En Actions, tambien como anotacion: se lee sin iniciar sesion (el
+        # log del job no), asi que la falla se diagnostica desde cualquier lado.
+        if os.environ.get("GITHUB_ACTIONS"):
+            texto = f"{nombre} ({detalle})" if detalle else nombre
+            print(f"::error title=smoke web::{texto.replace(chr(10), ' ')[:900]}", flush=True)
 
 
 class _Mudo(http.server.SimpleHTTPRequestHandler):
