@@ -59,7 +59,10 @@ WEB_FILES = [
     "app/voice/en-kristin-v3.json", "app/voice/en-joe-v3.json", "app/voice/es-daniela-v3.json",
     "app/voice/es-claude-v3.json", "app/voice/de-thorsten-v3.json", "app/voice/fr-siwis-v3.json",
     "app/voice/pt-cadu-v3.json", "app/voice/pl-gosia-v3.json", "app/voice/ru-dmitri-v3.json",
-]
+    # Las letras de los nombres del mapa (app.js, localGlyphs): sin internet,
+    # el mapa LAN quedaba sin nombres de ciudades.
+] + [f"app/vendor/glyphs-open-sans-omt2/{r}.pbf" for r in (
+    "0-255", "256-511", "512-767", "768-1023", "1024-1279", "7680-7935", "8192-8447")]
 
 
 def cache_dir() -> str:
@@ -107,6 +110,7 @@ def refresh_web_cache() -> bool:
     ok = 0
     for rel in WEB_FILES:
         local = os.path.join(target, rel.replace("/", os.sep))
+        os.makedirs(os.path.dirname(local), exist_ok=True)
         # Las librerias llevan la version en el nombre y no cambian nunca:
         # no hace falta volver a bajar un mega en cada arranque.
         versionado = rel.startswith("app/vendor/") or (rel.startswith("app/voice/") and rel != "app/voice/voices.json")

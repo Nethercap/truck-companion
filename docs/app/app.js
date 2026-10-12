@@ -1702,6 +1702,22 @@ function showNoWebgl(err) {
   setMapLoading(null);
 }
 
+// Los glifos (las letras de los nombres del mapa) de los rangos que usan las
+// ciudades y paises de todas las variantes salen del propio sitio
+// (vendor/glyphs-open-sans-omt2: Open Sans de OpenMapTiles, los mismos bytes
+// que demotiles da para esos rangos). Asi no dependen de un servidor de
+// demostracion y el modo LAN sin internet tiene nombres (auditoria del
+// 12-10). Un rango que no esta (georgiano: Open Sans no lo trae) sigue
+// saliendo de demotiles, que lo completa con Arial Unicode.
+const LOCAL_GLYPH_RANGES = new Set(['0-255', '256-511', '512-767', '768-1023', '1024-1279', '7680-7935', '8192-8447']);
+function localGlyphs(url, resourceType) {
+  if (resourceType !== 'Glyphs') return undefined;
+  const m = /\/font\/([^/]+)\/(\d+-\d+)\.pbf/.exec(url);
+  // Solo la tipografia por defecto de MapLibre, que es la que usan las capas
+  if (!m || !decodeURIComponent(m[1]).startsWith('Open Sans Regular') || !LOCAL_GLYPH_RANGES.has(m[2])) return undefined;
+  return { url: new URL(`vendor/glyphs-open-sans-omt2/${m[2]}.pbf`, location.href).href };
+}
+
 function ensureMapInitialized() {
   if (map || mapUnavailable) return;
   if (!webglAvailable()) { showNoWebgl(); return; }
@@ -1715,7 +1731,8 @@ function ensureMapInitialized() {
       // Sin esto, MapLibre no puede resolver los glifos de texto y CUALQUIER
       // capa 'symbol' (poi/exit/city/country) tira error al agregarse - eso
       // ademas cortaba en seco el loop de addLayer y se perdian todas las
-      // capas de texto de una. Host publico oficial de MapLibre para fuentes basicas.
+      // capas de texto de una. Host publico oficial de MapLibre para fuentes basicas;
+      // los rangos que usan los nombres salen de vendor/ (ver localGlyphs).
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       sources: {},
       layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#2b2f36' } }],
@@ -1723,6 +1740,7 @@ function ensureMapInitialized() {
     center: [0, 20],
     zoom: 1,
     attributionControl: false,
+    transformRequest: localGlyphs,
     // Sin fundido de etiquetas: con la camara siguiendo al camion todo el
     // tiempo, cada movimiento reubica los carteles y el fundido de 300 ms no
     // terminaba nunca, asi que MapLibre se seguia pidiendo cuadros a 60 por

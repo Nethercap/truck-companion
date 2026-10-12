@@ -1092,3 +1092,21 @@ def test_cambiar_los_mods_borra_el_fuera_del_mapa_viejo(monkeypatch):
     assert "ats" in st.offmap_games
     tray_client.refresh_map_mods(force=True)   # cambiaron de verdad
     assert "ats" not in st.offmap_games
+
+
+def test_lan_sirve_los_glifos_que_pide_la_app():
+    # localGlyphs (app.js) pide estos rangos al propio sitio: en LAN sin
+    # internet tienen que estar en la cache, y en docs/ para Pages.
+    import re
+    import local_server
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app = open(os.path.join(raiz, "docs", "app", "app.js"), encoding="utf-8").read()
+    rangos = re.findall(r"'(\d+-\d+)'", re.search(r"LOCAL_GLYPH_RANGES = new Set\(\[([^\]]*)\]", app).group(1))
+    carpeta = re.search(r"vendor/(glyphs-[a-z0-9-]+)/", app).group(1)
+    assert len(rangos) >= 5
+    for r in rangos:
+        rel = f"app/vendor/{carpeta}/{r}.pbf"
+        assert rel in local_server.WEB_FILES, rel
+        assert os.path.exists(os.path.join(raiz, "docs", *rel.split("/"))), rel
+

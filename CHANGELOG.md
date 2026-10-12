@@ -16,6 +16,8 @@ updates on its own and is not versioned here.
   ProMods ones) now get a name, so you can search for them on your own map too.
 - Build my map: cities that share a name (three Jacksons with Coast to Coast) show their
   state in the city search on your own map ("Jackson, WY").
+- Same Wi-Fi (LAN) mode without internet now shows city and country names on the map. The
+  letters used to come from an outside server, so offline the map had no names.
 - Same Wi-Fi (LAN) mode: the classic dashboard style and the new voice lines (new job,
   low fuel, rest soon) work without internet too.
 
