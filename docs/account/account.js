@@ -291,6 +291,17 @@
       tripRemove: "Delete trip",
       tripShare: 'Share',
       tripShareSaved: 'Image saved: share it wherever you like.',
+      startTitle: 'Get started',
+      startStep1: 'Account created',
+      startStep2: 'Link Truck Dash on your PC',
+      startStep2Hint: 'In Truck Dash on your PC, open "Setup & status" and click "Link account". It shows a code like ABCD-1234: type it in Settings, under Link this PC.',
+      startStep2Btn: 'Enter the code',
+      startStep3: 'Deliver your first job',
+      startStep3Hint: 'Take a job in ETS2 or ATS with Truck Dash running. The trip shows up here, with its route, as soon as you deliver it.',
+      signInWhat: 'What you get',
+      signInLi1: 'Every job you drive, with its route on a map colored by speed',
+      signInLi2: 'Stats for each game, records and achievements',
+      signInLi3: 'Private by default. Follow friends and share a trip as an image if you want',
       tripCargo: 'Cargo',
       tripStatus: 'Status',
       tripRemoveSure: 'Remove for good?',
@@ -330,7 +341,6 @@
       emailCodeSent: (m) => 'We sent a 6-digit code to ' + m + '. It is valid for 15 minutes. If that email already has an account, the email tells you instead.',
       emailResetSent: (m) => 'If ' + m + ' has an account, we sent it a 6-digit code. It is valid for 15 minutes.',
       demasiados_intentos: (s) => 'Too many tries. Try again in ' + s + '.',
-      signInSoon: 'More ways to sign in are coming.',
       signInFree: 'Free, like the rest of Truck Dash. We never post anything on your behalf.',
       termsLink: 'Terms of use',
       privacyLink: 'Privacy policy',
@@ -623,6 +633,17 @@
       tripRemove: "Borrar viaje",
       tripShare: 'Compartir',
       tripShareSaved: 'Imagen guardada: compartila donde quieras.',
+      startTitle: 'Primeros pasos',
+      startStep1: 'Cuenta creada',
+      startStep2: 'Vinculá Truck Dash en tu PC',
+      startStep2Hint: 'En Truck Dash en tu PC, abrí "Configuración y estado" y tocá "Vincular cuenta". Muestra un código como ABCD-1234: escribilo en Ajustes, en Vincular esta PC.',
+      startStep2Btn: 'Escribir el código',
+      startStep3: 'Entregá tu primer trabajo',
+      startStep3Hint: 'Tomá un trabajo en ETS2 o ATS con Truck Dash abierto. El viaje aparece acá, con su recorrido, apenas lo entregás.',
+      signInWhat: 'Qué ganás',
+      signInLi1: 'Cada trabajo que manejás, con su recorrido en un mapa coloreado por velocidad',
+      signInLi2: 'Estadísticas por juego, récords y logros',
+      signInLi3: 'Privada por defecto. Si querés, seguís a tus amigos y compartís un viaje como imagen',
       tripCargo: 'Carga',
       tripStatus: 'Estado',
       tripRemoveSure: '¿Borrar para siempre?',
@@ -662,7 +683,6 @@
       emailCodeSent: (m) => 'Te mandamos un código de 6 cifras a ' + m + '. Vale 15 minutos. Si ese mail ya tiene cuenta, el mail te lo dice.',
       emailResetSent: (m) => 'Si ' + m + ' tiene cuenta, le mandamos un código de 6 cifras. Vale 15 minutos.',
       demasiados_intentos: (s) => 'Demasiados intentos. Probá de nuevo en ' + s + '.',
-      signInSoon: 'Se vienen mas formas de entrar.',
       signInFree: 'Gratis, como todo Truck Dash. Nunca publicamos nada en tu nombre.',
       termsLink: 'Términos de uso',
       privacyLink: 'Política de privacidad',
@@ -3376,7 +3396,47 @@
   const RECIENTES = 5;
   let recientes = [];
 
+  // Primeros pasos: cuenta creada, PC vinculada (ya llegaron datos de manejo)
+  // y primer viaje. Se va sola cuando estan los tres. Lo que importa en una
+  // cuenta nueva es vincular la PC, y esa tarjeta vivia en Ajustes, donde
+  // nadie la buscaba (auditoria del 12-10).
+  let recientesListos = false;
+  function pintarPrimerosPasos() {
+    const caja = $('cardStart');
+    if (modoPublico || !recientesListos) { caja.hidden = true; return; }
+    const vinculada = totales.length > 0 || recientes.length > 0;
+    const viaje = recientes.length > 0;
+    caja.hidden = vinculada && viaje;
+    if (caja.hidden) return;
+    const lista = $('startSteps');
+    lista.innerHTML = '';
+    const paso = (hecho, titulo, texto, extra) => {
+      const li = document.createElement('li');
+      if (hecho) li.className = 'hecho';
+      const h = document.createElement('strong');
+      h.textContent = titulo;
+      li.appendChild(h);
+      if (!hecho && texto) {
+        const p = document.createElement('p');
+        p.className = 'muted small';
+        p.textContent = texto;
+        li.appendChild(p);
+      }
+      if (!hecho && extra) li.appendChild(extra);
+      lista.appendChild(li);
+    };
+    paso(true, t('startStep1'));
+    const ir = document.createElement('a');
+    ir.className = 'btn chico primary';
+    ir.href = '#settings';
+    ir.textContent = t('startStep2Btn');
+    ir.addEventListener('click', () => setTimeout(() => { const e = $('deviceInput'); if (e) e.focus(); }, 80));
+    paso(vinculada, t('startStep2'), t('startStep2Hint'), ir);
+    paso(viaje, t('startStep3'), t('startStep3Hint'));
+  }
+
   function pintarRecientes() {
+    pintarPrimerosPasos();
     const lista = $('recentList');
     lista.innerHTML = '';
     const vacio = $('recentEmpty');
@@ -3389,6 +3449,7 @@
     const { ok, datos } = await pedir('/trips?limite=' + RECIENTES);
     if (!ok) return;   // sin viajes la pantalla sigue siendo util
     recientes = datos.trips || [];
+    recientesListos = true;
     pintarRecientes();
     pintarCinta();
     $('cardRecent').hidden = false;

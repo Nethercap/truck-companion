@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261012h" />
+<link rel="stylesheet" href="account.css?v=20261012i" />
 </head>
 <body>
 <div id="toastContainer"></div>
@@ -69,7 +69,16 @@
         <button type="button" class="btn link" id="emailCancelLink" data-i18n="cancel" hidden></button>
       </div>
     </form>
-    <p class="muted small solo-entrar" data-i18n="signInSoon"></p>
+    <!-- Que se gana: la pantalla de entrada no lo decia (auditoria del 12-10). -->
+    <div class="entrar-muestra solo-entrar">
+      <h2 data-i18n="signInWhat">What you get</h2>
+      <ul>
+        <li data-i18n="signInLi1"></li>
+        <li data-i18n="signInLi2"></li>
+        <li data-i18n="signInLi3"></li>
+      </ul>
+      <img src="/assets/cuentas-landing.webp" alt="" width="1600" height="999" loading="lazy" />
+    </div>
     <p class="muted small solo-entrar" data-i18n="signInFree"></p>
     <p class="muted small legal">
       <a href="/terms.html" data-i18n="termsLink">Terms of use</a> ·
@@ -142,6 +151,12 @@
 
         <!-- ------------------------------------------ resumen -->
         <div class="pagina" id="pageOverview">
+          <!-- Primeros pasos de una cuenta nueva (pintarPrimerosPasos): se va
+               sola con el primer viaje. -->
+          <section class="card primeros-pasos" id="cardStart" hidden>
+            <h2 data-i18n="startTitle">Get started</h2>
+            <ol class="pasos" id="startSteps"></ol>
+          </section>
           <div class="cinta" id="quickStats" hidden></div>
 
           <section class="card" id="cardDriving" hidden>
@@ -368,7 +383,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261012h"></script>
-<script src="account.js?v=20261012h"></script>
+<script src="../app/i18n.js?v=20261012i"></script>
+<script src="account.js?v=20261012i"></script>
 </body>
 </html>

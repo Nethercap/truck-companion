@@ -607,3 +607,22 @@ table.viajes .juego-chip.auto { color: var(--warn); border-color: var(--warn); }
 
 /* El nombre de usuario en Ajustes: como texto, no como codigo. */
 .nombre-usuario { font-weight: 600; font-size: 1rem; }
+
+/* Primeros pasos de una cuenta nueva */
+.primeros-pasos .pasos { list-style: none; margin: 0.4rem 0 0; padding: 0; counter-reset: paso; }
+.primeros-pasos .pasos li { position: relative; padding: 0.55rem 0 0.55rem 2.3rem; border-top: 1px solid var(--line); counter-increment: paso; }
+.primeros-pasos .pasos li:first-child { border-top: none; }
+.primeros-pasos .pasos li::before {
+  content: counter(paso); position: absolute; left: 0; top: 0.5rem; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  border: 2px solid var(--accent); color: var(--accent); font-weight: 700; font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+}
+.primeros-pasos .pasos li.hecho::before { content: '\2713'; background: #4caf50; border-color: #4caf50; color: #06121f; }
+.primeros-pasos .pasos li.hecho strong { color: var(--muted); font-weight: 500; }
+.primeros-pasos .pasos p { margin: 0.25rem 0 0.5rem; }
+
+/* Que se gana con una cuenta, en la pantalla de entrada */
+.entrar-muestra { margin: 1.6rem 0 0.8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+.entrar-muestra h2 { font-size: 1rem; margin: 0 0 0.4rem; }
+.entrar-muestra ul { margin: 0 0 0.9rem; padding-left: 1.2rem; line-height: 1.6; }
+.entrar-muestra img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
