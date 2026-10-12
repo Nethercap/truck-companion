@@ -289,6 +289,10 @@
       tripFerries: 'Ferries',
       tripDamage: 'Damage',
       tripRemove: "Delete trip",
+      tripShare: 'Share',
+      tripShareSaved: 'Image saved: share it wherever you like.',
+      tripCargo: 'Cargo',
+      tripStatus: 'Status',
       tripRemoveSure: 'Remove for good?',
       loading: 'Loading...',
       offline: "Can't reach the account service right now. Try again in a minute.",
@@ -617,6 +621,10 @@
       tripFerries: 'Ferries',
       tripDamage: 'Daño',
       tripRemove: "Borrar viaje",
+      tripShare: 'Compartir',
+      tripShareSaved: 'Imagen guardada: compartila donde quieras.',
+      tripCargo: 'Carga',
+      tripStatus: 'Estado',
       tripRemoveSure: '¿Borrar para siempre?',
       loading: 'Cargando...',
       offline: 'No se puede contactar al servicio de cuentas. Proba de nuevo en un minuto.',
@@ -2963,6 +2971,7 @@
           if (v._detalle) td.appendChild(panelCorreccion(v, repintar));
           const acciones = document.createElement('div');
           acciones.className = 'acciones';
+          if (v._detalle) acciones.appendChild(botonCompartir(v));
           acciones.appendChild(botonBorrar(v));
           td.appendChild(acciones);
         }
@@ -3101,6 +3110,264 @@
       avisar(t('savedOk'), 'ok');
     });
     return boton;
+  }
+
+  // ------------------------------------------------ tarjeta para compartir
+  // Imagen de un viaje para Instagram o Discord (auditoria del 12-10, P2):
+  // recorrido coloreado por velocidad, ciudades, los numeros del viaje, el
+  // usuario y trucksim-dash.com. 1080 x 1350 es el vertical de Instagram y
+  // en Discord se ve entera. En el telefono abre el menu de compartir; en la
+  // PC se descarga.
+  const TARJETA_W = 1080, TARJETA_H = 1350;
+
+  function botonCompartir(v) {
+    const boton = document.createElement('button');
+    boton.className = 'btn chico';
+    boton.textContent = t('tripShare');
+    boton.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      boton.disabled = true;
+      try {
+        const lienzo = await tarjetaDeViaje(v);
+        const blob = await new Promise((ok) => lienzo.toBlob(ok, 'image/png'));
+        const nombre = 'truckdash-' + [v.city_src, v.city_dst].filter(Boolean).join('-')
+          .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';
+        const archivo = new File([blob], nombre || 'truckdash-trip.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+          try {
+            await navigator.share({ files: [archivo], text: 'trucksim-dash.com' });
+          } catch (err) {
+            if (!err || err.name !== 'AbortError') descargar(blob, archivo.name);
+          }
+        } else {
+          descargar(blob, archivo.name);
+        }
+      } catch (err) {
+        avisar(t('error'), 'bad');
+      } finally {
+        boton.disabled = false;
+      }
+    });
+    return boton;
+  }
+
+  function descargar(blob, nombre) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    avisar(t('tripShareSaved'), 'ok');
+  }
+
+  function cargarImagen(src) {
+    return new Promise((ok) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = () => ok(null);
+      img.src = src;
+    });
+  }
+
+  // Escribe `texto` con el tamano mas grande que entra en `ancho` (sin bajar
+  // de `minimo`); si ni asi entra, lo corta con puntos suspensivos.
+  function textoAjustado(ctx, texto, ancho, tam, minimo, peso, color, x, y) {
+    const fuente = (n) => `${peso} ${n}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    let n = tam;
+    ctx.font = fuente(n);
+    while (n > minimo && ctx.measureText(texto).width > ancho) { n -= 2; ctx.font = fuente(n); }
+    let salida = texto;
+    if (ctx.measureText(salida).width > ancho) {
+      while (salida.length > 1 && ctx.measureText(salida + '…').width > ancho) salida = salida.slice(0, -1);
+      salida += '…';
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(salida, x, y);
+  }
+
+  function redondeado(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  async function tarjetaDeViaje(v) {
+    const d = v._detalle || {};
+    const lienzo = document.createElement('canvas');
+    lienzo.width = TARJETA_W;
+    lienzo.height = TARJETA_H;
+    const ctx = lienzo.getContext('2d');
+    const fuente = (peso, tam) => `${peso} ${tam}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    const M = 60, ANCHO = TARJETA_W - 2 * M;
+
+    // Fondo
+    const fondo = ctx.createLinearGradient(0, 0, 0, TARJETA_H);
+    fondo.addColorStop(0, '#141922');
+    fondo.addColorStop(1, '#0b0d10');
+    ctx.fillStyle = fondo;
+    ctx.fillRect(0, 0, TARJETA_W, TARJETA_H);
+
+    // Encabezado: logo, nombre y juego
+    const logo = await cargarImagen('/app/assets/logo.svg');
+    if (logo) ctx.drawImage(logo, M, 52, 52, 52);
+    ctx.font = fuente(700, 38);
+    ctx.fillStyle = '#f2f3f5';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Truck', M + 66, 79);
+    const anchoTruck = ctx.measureText('Truck ').width;
+    ctx.fillStyle = '#3b9eff';
+    ctx.fillText('Dash', M + 66 + anchoTruck, 79);
+    const juego = (v.game || '').toUpperCase();
+    if (juego) {
+      ctx.font = fuente(700, 28);
+      const w = ctx.measureText(juego).width + 32;
+      redondeado(ctx, TARJETA_W - M - w, 58, w, 44, 10);
+      ctx.fillStyle = v.game === 'ats' ? 'rgba(255,138,61,0.18)' : 'rgba(59,158,255,0.18)';
+      ctx.fill();
+      ctx.fillStyle = v.game === 'ats' ? '#ff8a3d' : '#3b9eff';
+      ctx.textAlign = 'center';
+      ctx.fillText(juego, TARJETA_W - M - w / 2, 81);
+      ctx.textAlign = 'left';
+    }
+
+    // Titulo: de donde a donde, y las empresas
+    ctx.textBaseline = 'alphabetic';
+    const titulo = [v.city_src, v.city_dst].filter(Boolean).join(' → ') || t('tripShare');
+    textoAjustado(ctx, titulo, ANCHO, 68, 36, 800, '#ffffff', M, 196);
+    const empresas = [d.company_src, d.company_dst].filter(Boolean).join(' → ');
+    if (empresas) textoAjustado(ctx, empresas, ANCHO, 32, 22, 500, '#9aa4b2', M, 244);
+
+    // Mapa del recorrido
+    const caja = { x: M, y: 280, w: ANCHO, h: 700 };
+    redondeado(ctx, caja.x, caja.y, caja.w, caja.h, 24);
+    ctx.fillStyle = '#14171c';
+    ctx.fill();
+    dibujarEnTarjeta(ctx, caja, cortarSaltos(d.route || []), [v.city_src, v.city_dst]);
+
+    // Numeros del viaje: dos filas de tres
+    const sinCobrar = v.status === 'cancelled' || v.status === 'abandoned';
+    const estado = etiquetaDeEstado(v);
+    const datos = [
+      [t('colDistance'), distanciaEnTabla(v) || '-'],
+      [t('tripCargo'), v.cargo || '-'],
+      [t(v.job_kind === 'car' ? 'tripVehicle' : 'tripTruck'), [v.truck_brand, v.truck_name].filter(Boolean).join(' ') || '-'],
+      [t('colTime'), v.real_hours ? duracion(v.real_hours) : '-'],
+      [t('colPay'), sinCobrar || v.modded || !v.revenue ? '-' : plata(v.revenue, v.currency)],
+      [t('tripStatus'), estado ? estado.textContent.charAt(0).toUpperCase() + estado.textContent.slice(1) : '-'],
+    ];
+    const colW = ANCHO / 3;
+    datos.forEach(([etq, valor], i) => {
+      const x = M + (i % 3) * colW, y = 1050 + Math.floor(i / 3) * 120;
+      ctx.font = fuente(600, 24);
+      ctx.fillStyle = '#9aa4b2';
+      ctx.fillText(String(etq).toUpperCase(), x, y);
+      const color = i === 5 && v.on_time === true ? '#4caf50' : i === 5 && (v.on_time === false || sinCobrar) ? '#ff8a3d' : '#f2f3f5';
+      textoAjustado(ctx, String(valor), colW - 24, 40, 24, 700, color, x, y + 48);
+    });
+
+    // Pie: usuario y fecha, y la direccion
+    ctx.font = fuente(500, 28);
+    ctx.fillStyle = '#9aa4b2';
+    const cuando = v.delivered_at || v.started_at;
+    const pie = [usuario && usuario.username ? '@' + usuario.username : null, cuando ? fecha(cuando) : null]
+      .filter(Boolean).join(' · ');
+    ctx.fillText(pie, M, TARJETA_H - 60);
+    ctx.font = fuente(700, 30);
+    ctx.fillStyle = '#3b9eff';
+    ctx.textAlign = 'right';
+    ctx.fillText('trucksim-dash.com', TARJETA_W - M, TARJETA_H - 60);
+    ctx.textAlign = 'left';
+    return lienzo;
+  }
+
+  // El mismo dibujo que el detalle (dibujarRecorrido), en el canvas: norte
+  // arriba, la forma del recorrido entera adentro de la caja, tramos del
+  // color de su velocidad, huecos punteados y las ciudades en las puntas.
+  function dibujarEnTarjeta(ctx, caja, segmentos, nombres) {
+    const puntos = [];
+    segmentos.forEach((seg) => seg.forEach((p) => puntos.push(p)));
+    if (puntos.length < 2) {
+      ctx.font = '500 30px system-ui, sans-serif';
+      ctx.fillStyle = '#5c6470';
+      ctx.textAlign = 'center';
+      ctx.fillText(t('tripNoRoute'), caja.x + caja.w / 2, caja.y + caja.h / 2);
+      ctx.textAlign = 'left';
+      return;
+    }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    puntos.forEach((p) => {
+      minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    });
+    const aire = 90;
+    const escala = Math.min((caja.w - 2 * aire) / ((maxX - minX) || 1), (caja.h - 2 * aire) / ((maxY - minY) || 1));
+    const ox = caja.x + caja.w / 2 - ((minX + maxX) / 2) * escala;
+    const oy = caja.y + caja.h / 2 - ((minY + maxY) / 2) * escala;
+    const X = (p) => ox + p[0] * escala, Y = (p) => oy + p[1] * escala;
+    const tope = topeDeVelocidad(segmentos);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    segmentos.forEach((seg, i) => {
+      const previo = segmentos[i - 1];
+      if (previo && previo.length && seg.length) {
+        ctx.setLineDash([14, 14]);
+        ctx.strokeStyle = 'rgba(154,164,178,0.6)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(X(previo[previo.length - 1]), Y(previo[previo.length - 1]));
+        ctx.lineTo(X(seg[0]), Y(seg[0]));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (seg.length < 2) return;
+      ctx.lineWidth = 10;
+      if (tope && seg.every((p) => p.length > 2)) {
+        for (let k = 1; k < seg.length; k++) {
+          ctx.strokeStyle = colorDeVelocidad((seg[k - 1][2] + seg[k][2]) / 2, tope);
+          ctx.beginPath();
+          ctx.moveTo(X(seg[k - 1]), Y(seg[k - 1]));
+          ctx.lineTo(X(seg[k]), Y(seg[k]));
+          ctx.stroke();
+        }
+      } else {
+        ctx.strokeStyle = '#3b9eff';
+        ctx.beginPath();
+        seg.forEach((p, k) => (k ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))));
+        ctx.stroke();
+      }
+    });
+    const puntas = [puntos[0], puntos[puntos.length - 1]];
+    puntas.forEach((p, i) => {
+      ctx.beginPath();
+      ctx.arc(X(p), Y(p), 14, 0, Math.PI * 2);
+      ctx.fillStyle = i ? '#ff8a3d' : '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#0b0d10';
+      ctx.stroke();
+    });
+    // Los nombres al lado de cada punta, hacia adentro de la caja
+    nombres.forEach((nombre, i) => {
+      if (!nombre || (i === 1 && nombre === nombres[0])) return;
+      const p = puntas[i];
+      ctx.font = '700 30px system-ui, sans-serif';
+      const w = ctx.measureText(nombre).width;
+      let x = X(p) + 26, y = Y(p) + 10;
+      if (x + w > caja.x + caja.w - 20) x = X(p) - 26 - w;
+      if (i === 1 && Math.abs(Y(puntas[0]) - Y(p)) < 50 && Math.abs(X(puntas[0]) - X(p)) < 300) y += 44;
+      ctx.fillStyle = 'rgba(11,13,16,0.75)';
+      redondeado(ctx, x - 10, y - 32, w + 20, 44, 10);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(nombre, x, y);
+    });
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
