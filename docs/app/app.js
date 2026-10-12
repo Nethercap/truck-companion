@@ -3723,6 +3723,7 @@ function initPip() {
   btn.addEventListener('click', openPip);
 }
 
+let navPanelParts = null; // lo ultimo que mostro el panel, para el mini-HUD
 function updateNavPanel(turn) {
   if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
     document.getElementById('navPanel').style.display = 'none';
@@ -3731,6 +3732,7 @@ function updateNavPanel(turn) {
   const panel = document.getElementById('navPanel');
   panel.innerHTML = navPanelHtml(turn);
   panel.style.display = 'block';
+  navPanelParts = navTurnParts(turn);
 }
 
 // El texto del proximo giro: lo usan el panel de navegacion, la ventana
@@ -4493,9 +4495,15 @@ function updateMiniHudExtra(data) {
   }
   const rest = miniHudSettings.rest ? restInfo(data) : null;
   if (rest) lines.push(`${t('nextRest')}: ${rest.text}`);
-  if (miniHudSettings.gps && navMode) {
-    const navText = document.getElementById('navPanel').textContent;
-    if (navText) lines.push(navText);
+  // La indicacion y la proxima ciudad en dos renglones: copiando el texto
+  // del panel salian pegadas ("Continue straightNext city: Sidney", Discord,
+  // Gargamosch, 11-10).
+  if (miniHudSettings.gps && navMode && document.getElementById('navPanel').style.display !== 'none') {
+    if (!navPanelParts) lines.push(escapeHtml(t('navNoRoute')));
+    else {
+      lines.push(escapeHtml(navPanelParts.text));
+      if (navPanelParts.next) lines.push(`<span class="miniHudNext">${escapeHtml(navPanelParts.next)}</span>`);
+    }
   }
   document.getElementById('miniHudExtra').innerHTML = lines.map(l => `<div>${l}</div>`).join('');
 }

@@ -394,6 +394,7 @@
   .roadBadge { display: inline-block; margin-top: 0.15rem; padding: 0.05rem 0.45rem; border-radius: 4px; background: #1d4ed8; color: #fff; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.02em; border: 1px solid #93c5fd; }
   .roadBadge.mini { margin-top: 0.3rem; }
   .navNext { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 500; margin-top: 0.1rem; }
+  .miniHudNext { color: var(--muted); }
   .mapBtn .btnText { font-size: 0.72rem; font-weight: 800; }
   /* En pantalla completa este panel quedaba justo abajo del recorte de la
      camara de algunos telefonos: se baja lo que diga la zona segura. */
