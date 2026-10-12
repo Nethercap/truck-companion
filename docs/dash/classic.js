@@ -353,7 +353,7 @@ function createClassicDash({ root, imperial, lang }) {
     const enViaje = !!(d.onJob && d.cityDst);
     trabajo.hidden = !enViaje;
     if (enViaje) {
-      refs.jobCargo.textContent = [d.cargo, d.cargoMassKg ? num(d.cargoMassKg / 1000, 1) + ' t' : null].filter(Boolean).join(' · ');
+      refs.jobCargo.textContent = [d.cargo, d.cargoMassKg ? formatCargoMass(d.cargoMassKg, idioma(), mi()) : null].filter(Boolean).join(' · ');
       refs.jobDest.textContent = [d.companyDst, d.cityDst].filter(Boolean).join(', ');
     }
 

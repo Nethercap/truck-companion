@@ -603,7 +603,7 @@ function createDashPanel({ root, money, imperial, lang }) {
 
   function renderFranja(d, enViaje) {
     const partes = [];
-    if (d.cargoMassKg) partes.push(num(d.cargoMassKg / 1000, 1) + '\u00a0t');
+    if (d.cargoMassKg) partes.push(formatCargoMass(d.cargoMassKg, idioma(), mi()));
     if (d.plannedDistanceKm) partes.push(t('routeLength') + ' ' + dist(d.plannedDistanceKm));
     refs.cargoBox.hidden = !enViaje;
     texto('cargo', enViaje ? (d.cargo || t('noCargo')) : null);

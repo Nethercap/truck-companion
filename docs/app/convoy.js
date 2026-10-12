@@ -475,7 +475,7 @@ function convoyRenderCards() {
     const variantTag = myVariant && m.variant && m.variant !== myVariant ? `<span class="convoyTag">${escapeHtml(convoyVariantLabel(m.variant))}</span>` : '';
     const leaderTag = m.creator ? `<span class="convoyTag leader">${t('convoyLeaderTag')}</span>` : '';
     const eta = m.etaSeconds != null ? formatSeconds(m.etaSeconds) : '-';
-    const mass = m.cargoMassKg ? ` (${(m.cargoMassKg / 1000).toFixed(1)} TN)` : '';
+    const mass = m.cargoMassKg ? ` (${formatCargoMass(m.cargoMassKg, currentLang, useImperial)})` : '';
     const showFollow = !convoy.spectator && m.creator && !otherGame;
     const income = m.jobIncome ? `<div class="row"><span class="label">${t('jobPay')}</span><span>${moneyLine(m.jobIncome, m.game)}</span></div>` : '';
     card.innerHTML = `

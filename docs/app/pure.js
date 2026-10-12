@@ -246,12 +246,14 @@ function roundTurnDistanceMeters(m) {
   return Math.round(m / 10) * 10;
 }
 
-function formatTurnDistance(m, imperial) {
-  if (imperial) return formatTurnDistanceImperial(m);
+// lang: el idioma de la interfaz, para la coma decimal ("9,5 km" en
+// castellano). Sin el, ingles.
+function formatTurnDistance(m, imperial, lang) {
+  if (imperial) return formatTurnDistanceImperial(m, lang);
   const rounded = roundTurnDistanceMeters(m);
   if (rounded >= 1000) {
     const km = rounded / 1000;
-    return `${Number.isInteger(km) ? km : km.toFixed(1)} km`;
+    return `${km.toLocaleString(lang || 'en', { maximumFractionDigits: 1 })} km`;
   }
   return `${rounded} m`;
 }
@@ -259,11 +261,12 @@ function formatTurnDistance(m, imperial) {
 // Mismo criterio en millas/pies: >10 mi de a 1 mi, >1 mi de a 0.5, entre
 // 0.2 y 1 mi de a 0.1, y por debajo en pies de a 50. Ej: 9 mi, 2.5 mi,
 // 0.4 mi, 800 ft.
-function formatTurnDistanceImperial(m) {
+function formatTurnDistanceImperial(m, lang) {
   const mi = m / 1609.344;
+  const dec = (v) => v.toLocaleString(lang || 'en', { maximumFractionDigits: 1 });
   if (mi >= 10) return `${Math.round(mi)} mi`;
-  if (mi >= 1) { const r = Math.round(mi * 2) / 2; return `${Number.isInteger(r) ? r : r.toFixed(1)} mi`; }
-  if (mi >= 0.2) { const r = Math.round(mi * 10) / 10; return `${r >= 1 ? '1' : r.toFixed(1)} mi`; }
+  if (mi >= 1) { const r = Math.round(mi * 2) / 2; return `${dec(r)} mi`; }
+  if (mi >= 0.2) { const r = Math.round(mi * 10) / 10; return `${r >= 1 ? '1' : dec(r)} mi`; }
   const ft = Math.round(m * 3.28084 / 50) * 50;
   return `${ft} ft`;
 }
@@ -1437,6 +1440,27 @@ const DEMO_ROUTE = {
   truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158,
 };
 
+// Numeros con el idioma de la interfaz y no el del sistema: con la app en
+// ingles y Windows en castellano salia "$61.158" al lado de "184,225 km"
+// (auditoria del 12-10). Ingles es el idioma por defecto, asi que le pasaba a
+// casi todo el que no es angloparlante.
+function formatInt(n, lang) {
+  return Math.round(Number(n) || 0).toLocaleString(lang || 'en');
+}
+// Peso de la carga: toneladas, o libras con millas (como lo muestra ATS).
+// Antes era "18.2 TN" fijo: TN no es el simbolo de tonelada y no cambiaba
+// ni con el idioma ni con las unidades; el panel decia "18.2 t".
+// Con decimales fijos ("760,8 km"): para lo que antes era toFixed.
+function formatDec(n, lang, dec = 1) {
+  return (Number(n) || 0).toLocaleString(lang || 'en', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function formatCargoMass(kg, lang, imperial) {
+  if (!kg || !Number.isFinite(Number(kg))) return '';
+  if (imperial) return `${formatInt(kg * 2.20462, lang)} lb`;
+  const t = (kg / 1000).toLocaleString(lang || 'en', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `${t} t`;
+}
+
 // La ruta de la demo guardada en docs/app/demo-route-<juego>.json (la arma
 // tools/build_demo_route.py con el findRoute de la app). Con ella la demo
 // arranca sin esperar el grafo de ruteo, que pesa 4,5 MB: en 4G lento
@@ -2181,5 +2205,5 @@ function citiesMatchingInput(names, labels, input) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { routeProgressTotal, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
-    createDemoTelemetry, DEMO_ROUTE, demoPathUsable };
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass };
 }

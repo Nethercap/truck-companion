@@ -318,7 +318,7 @@ const CURRENCY_SYMBOLS = {
 };
 const CURRENCY_SUFFIX = new Set(['PLN', 'CZK', 'HUF', 'SEK', 'NOK', 'DKK', 'ISK', 'CHF', 'RON', 'BGN', 'RSD', 'BAM', 'MKD', 'ALL', 'MDL', 'BYN', 'SAR', 'AED', 'KZT', 'GEL']);
 function formatMoney(amount, currency) {
-  const n = Math.round(amount || 0).toLocaleString();
+  const n = formatInt(amount, currentLang);
   const symbol = CURRENCY_SYMBOLS[currency];
   if (!symbol) return `${n} ${currency}`;
   return CURRENCY_SUFFIX.has(currency) ? `${n} ${symbol}` : `${symbol}${n}`;
@@ -2148,7 +2148,7 @@ function updateWaypointRoute(data) {
     return;
   }
   const distDisplay = useImperial ? waypointRouteDistanceKm * KM_TO_MI : waypointRouteDistanceKm;
-  const distText = `${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`;
+  const distText = `${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'}`;
   let timeText = t('calculating');
   if (lastKnownAvgSpeedKmh && lastKnownAvgSpeedKmh > 0) {
     timeText = formatSeconds((waypointRouteDistanceKm / lastKnownAvgSpeedKmh) * 3600);
@@ -2324,9 +2324,9 @@ function searchCompanies(query, x, z, limit) {
 
 function formatPoiDistance(rawMeters) {
   const meters = rawMeters * distanceScale();
-  if (useImperial) { const mi = meters / 1609.34; return mi < 10 ? `${mi.toFixed(1)} mi` : `${Math.round(mi)} mi`; }
+  if (useImperial) { const mi = meters / 1609.34; return mi < 10 ? `${formatDec(mi, currentLang)} mi` : `${Math.round(mi)} mi`; }
   const km = meters / 1000;
-  return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+  return km < 10 ? `${formatDec(km, currentLang)} km` : `${Math.round(km)} km`;
 }
 
 // Ciudad mas cercana a un punto (para ubicar "Estacion de servicio" en la
@@ -3109,10 +3109,10 @@ function updateRouteSummary(data) {
     dlc: routeUsesUncheckedDlc,
     percent,
     remaining: remainingKm == null ? '--'
-      : `${(useImperial ? remainingKm * KM_TO_MI : remainingKm).toFixed(1)} ${useImperial ? 'mi' : 'km'}`,
+      : `${formatDec(useImperial ? remainingKm * KM_TO_MI : remainingKm, currentLang)} ${useImperial ? 'mi' : 'km'}`,
     duration: seconds != null && Number.isFinite(seconds) ? formatSeconds(seconds) : '--',
     arrival: seconds != null && Number.isFinite(seconds)
-      ? new Date(Date.now() + seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      ? new Date(Date.now() + seconds * 1000).toLocaleTimeString(currentLang, { hour: '2-digit', minute: '2-digit' })
       : '--',
   });
 }
@@ -3802,7 +3802,7 @@ function navTurnParts(turn) {
     // "Rotonda en 300 m: tomar la segunda salida". Mas alla de la octava, el numero.
     const ords = t('navOrdinals').split(',');
     const n = ords[turn.exit - 1] || String(turn.exit);
-    const dist = formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial);
+    const dist = formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial, currentLang);
     let ontoText = '';
     if (turn.nearSign) ontoText = ` ${turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto')} ${turn.nearSign.label}`;
     return { text: `↻ ${t('navRoundaboutIn').replace('{d}', dist).replace('{n}', n)}${ontoText}`, next };
@@ -3818,7 +3818,7 @@ function navTurnParts(turn) {
       const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
       ontoText = ` ${preposition} ${turn.nearSign.label}`;
     }
-    return { text: `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial)}`, next };
+    return { text: `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial, currentLang)}`, next };
   }
   if (currentRouteWorldPoints) return { text: `⬆ ${t('navStraight')}`, next };
   return null;
@@ -4549,7 +4549,7 @@ function updateMiniHudExtra(data) {
   }
   if (miniHudSettings.distance && data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
-    lines.push(`${t('distanceLeft')}: ${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'}`);
+    lines.push(`${t('distanceLeft')}: ${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'}`);
   }
   const rest = miniHudSettings.rest ? restInfo(data) : null;
   if (rest) lines.push(`${t('nextRest')}: ${rest.text}`);
@@ -4706,7 +4706,7 @@ function renderGauges(data) {
     document.getElementById('gaugeFuelText').textContent = '--';
   }
   const odo = data.odometerKm;
-  document.getElementById('gaugeOdometer').textContent = odo != null ? `${Math.round(useImperial ? odo * KM_TO_MI : odo).toLocaleString()} ${useImperial ? 'mi' : 'km'}` : '-';
+  document.getElementById('gaugeOdometer').textContent = odo != null ? `${formatInt(useImperial ? odo * KM_TO_MI : odo, currentLang)} ${useImperial ? 'mi' : 'km'}` : '-';
   const gaugeRangeKm = fuelFigures(data).rangeKm;
   document.getElementById('gaugeRange').textContent = gaugeRangeKm != null ? `⛽ ${Math.round(useImperial ? gaugeRangeKm * KM_TO_MI : gaugeRangeKm)} ${useImperial ? 'mi' : 'km'}` : '-';
   const cc = document.getElementById('gaugeCruise');
@@ -4794,7 +4794,7 @@ function updateHud(data) {
       Math.round(odo).toLocaleString(currentLang) + (useImperial ? ' mi' : ' km');
   }
   if (data.cargo) {
-    const cargoWeightText = data.cargoMassKg ? ` (${(data.cargoMassKg / 1000).toFixed(1)} TN)` : '';
+    const cargoWeightText = data.cargoMassKg ? ` (${formatCargoMass(data.cargoMassKg, currentLang, useImperial)})` : '';
     document.getElementById('cargo').textContent = `${data.cargo}${cargoWeightText}`;
   } else {
     document.getElementById('cargo').textContent = t('noCargo');
@@ -4803,7 +4803,7 @@ function updateHud(data) {
   const etaText = formatSeconds(data.routeTimeSeconds);
   if (data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
-    document.getElementById('etaGame').textContent = `${etaText} (${distDisplay.toFixed(1)} ${useImperial ? 'mi' : 'km'})`;
+    document.getElementById('etaGame').textContent = `${etaText} (${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'})`;
   } else {
     document.getElementById('etaGame').textContent = etaText;
   }
@@ -4859,8 +4859,8 @@ function updateHud(data) {
   // convierte a mpg (formula estandar). El SDK lo manda en L/100km siempre.
   if (ff.avg) {
     const consumptionText = useImperial
-      ? `${(235.215 / ff.avg).toFixed(1)} mpg`
-      : `${ff.avg.toFixed(1)} L/100km`;
+      ? `${formatDec(235.215 / ff.avg, currentLang)} mpg`
+      : `${formatDec(ff.avg, currentLang)} L/100km`;
     document.getElementById('fuelAvgLine').textContent = consumptionText;
     document.getElementById('fuelAvgLine').title = ff.measured
       ? t('fuelMeasuredHint').replace('{km}', Math.round(useImperial ? ff.spanKm * KM_TO_MI : ff.spanKm)).replace('{unit}', useImperial ? 'mi' : 'km')
@@ -4966,10 +4966,10 @@ function showDeliveryCard(event, costs, game) {
   closeDeliveryCard();
   const value = ([, kind, v]) => {
     if (kind === 'money') return escapeHtml(moneyLine(v, game));
-    if (kind === 'xp') return `+${Math.round(v).toLocaleString()} XP`;
-    if (kind === 'km') return `${Math.round(useImperial ? v * 0.621371 : v).toLocaleString()} ${useImperial ? 'mi' : 'km'}`;
+    if (kind === 'xp') return `+${formatInt(v, currentLang)} XP`;
+    if (kind === 'km') return `${formatInt(useImperial ? v * 0.621371 : v, currentLang)} ${useImperial ? 'mi' : 'km'}`;
     if (kind === 'minutes') return escapeHtml(formatGameMinutes(v, t('hourShort'), t('minShort')));
-    if (kind === 'percent') return `${v < 10 && v > 0 ? v.toFixed(1) : Math.round(v)}\u00a0%`;
+    if (kind === 'percent') return `${v < 10 && v > 0 ? formatDec(v, currentLang) : Math.round(v)}\u00a0%`;
     return escapeHtml(String(v));
   };
   const el = document.createElement('div');
@@ -5088,7 +5088,7 @@ function renderTripHistory() {
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   list.innerHTML = trips.map(tr => {
     const dist = useImperial ? `${Math.round(tr.distanceKm * KM_TO_MI)} mi` : `${tr.distanceKm} km`;
-    const date = new Date(tr.t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const date = new Date(tr.t).toLocaleDateString(currentLang, { month: 'short', day: 'numeric' });
     return `<div class="trip"><div><div class="tripRoute">${esc(tr.src || '?')} → ${esc(tr.dst || '?')}</div><div class="tripMeta">${esc(tr.cargo || '-')} · ${dist} · ${esc(tr.truck || '')}</div></div><div style="text-align:right"><div>${moneyLine(tr.revenue, tr.game)}</div><div class="tripMeta">${date}${tr.game ? ' · ' + tr.game.toUpperCase() : ''}</div></div></div>`;
   }).join('');
 }

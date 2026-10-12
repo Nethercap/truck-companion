@@ -1715,3 +1715,29 @@ test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version de
   assert.ok(demoPathUsable(guardada, rev, mapData),
     `demo-route-ats.json es del grafo ${guardada.rev}/${guardada.mapData} y la app pide ${rev}/${mapData}: correr python tools/build_demo_route.py`);
 });
+
+test('numeros con el idioma de la interfaz y peso de la carga en t o lb', () => {
+  const { formatInt, formatCargoMass } = require('./pure.js');
+  assert.equal(formatInt(61158, 'en'), '61,158');
+  assert.equal(formatInt(61158, 'es'), '61.158');
+  assert.equal(formatInt(61158, 'de'), '61.158');
+  assert.equal(formatInt(184225.4, 'en'), '184,225');
+  assert.equal(formatInt(null, 'en'), '0');
+  assert.equal(formatCargoMass(18189, 'en', false), '18.2 t');
+  assert.equal(formatCargoMass(18189, 'es', false), '18,2 t');
+  assert.equal(formatCargoMass(18189, 'en', true), '40,100 lb');
+  assert.equal(formatCargoMass(0, 'en', false), '');
+  assert.equal(formatCargoMass(undefined, 'en', true), '');
+});
+
+test('decimales con la coma o el punto del idioma de la interfaz', () => {
+  const { formatDec, formatTurnDistance } = require('./pure.js');
+  assert.equal(formatDec(760.84, 'en'), '760.8');
+  assert.equal(formatDec(760.84, 'es'), '760,8');
+  assert.equal(formatDec(1532, 'en'), '1,532.0');
+  assert.equal(formatTurnDistance(9500, false, 'es'), '9,5 km');
+  assert.equal(formatTurnDistance(9500, false), '9.5 km');
+  assert.equal(formatTurnDistance(11000, false, 'de'), '11 km');
+  assert.equal(formatTurnDistance(2.5 * 1609.344, true, 'pl'), '2,5 mi');
+  assert.equal(formatTurnDistance(0.4 * 1609.344, true, 'en'), '0.4 mi');
+});
