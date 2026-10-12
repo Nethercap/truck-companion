@@ -1,11 +1,11 @@
 {
-  "checkedAt": "2026-10-06T17:16:56Z",
+  "checkedAt": "2026-10-12T19:06:47Z",
   "mods": {
     "c2c": {
       "ours": "2.24.61.0",
-      "upstream": "2.24.61.0",
-      "status": "ok",
-      "error": null,
+      "upstream": null,
+      "status": "unknown",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=202317"
     },
     "promods_canada": {
@@ -45,16 +45,16 @@
     },
     "rusmap": {
       "ours": "2.61",
-      "upstream": "2.61",
-      "status": "ok",
-      "error": null,
+      "upstream": null,
+      "status": "unknown",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=332124"
     },
     "reforma": {
-      "ours": "2.9.9.160",
-      "upstream": "3.0.1.161",
-      "status": "outdated",
-      "error": null,
+      "ours": "3.0.1.161",
+      "upstream": null,
+      "status": "unknown",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=316081"
     },
     "roextended": {
@@ -72,14 +72,14 @@
       "source": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771"
     },
     "reforma_mega_resources": {
-      "ours": "2.9.9.160",
+      "ours": "3.0.1.161",
       "upstream": null,
       "status": "manual",
       "error": "va en sync con Reforma",
       "source": null
     },
     "reforma_sierra_nevada": {
-      "ours": "1.16.160",
+      "ours": "1.19.161",
       "upstream": null,
       "status": "manual",
       "error": "va en sync con Reforma",
@@ -89,7 +89,7 @@
       "ours": "37.160",
       "upstream": null,
       "status": "manual",
-      "error": "solo en el pack Reforma + C2C + ProMods Canada",
+      "error": "solo en el pack Reforma + C2C + ProMods Canada, que sigue armado con Reforma 2.9.9.160 hasta tener el patch para 3.0.1",
       "source": null
     },
     "cnx_roex_rusmap": {
@@ -119,6 +119,27 @@
       "status": "manual",
       "error": "los paquetes .mp del launcher no llevan version: se actualizan solos; regenerar si cambian hq_final/cd_changes",
       "source": null
+    },
+    "western_canada": {
+      "ours": "1.7.3",
+      "upstream": null,
+      "status": "manual",
+      "error": "sin pagina oficial conocida (circula por ModLand/AllMods, que son espejos): verificar a mano",
+      "source": null
+    },
+    "eastern_canada": {
+      "ours": "1.2.1",
+      "upstream": null,
+      "status": "manual",
+      "error": "va en sync con Western Canada Expansion; pide Western 1.7.3",
+      "source": null
+    },
+    "cnx_canada_c2c": {
+      "ours": "1.7.3/1.2.1",
+      "upstream": null,
+      "status": "manual",
+      "error": "conectores de JacobKazias para Coast to Coast 2.23.61; armado con C2C 2.24.61.0",
+      "source": null
     }
   },
   "variants": {
@@ -132,12 +153,12 @@
         "ats/route-graph-ats-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:17 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:31 GMT"
         },
         "ats/route-graph-ats.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:03 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:30 GMT"
         },
         "ats/Cities.json": {
           "ok": true,
@@ -163,12 +184,12 @@
         "ats_c2c/route-graph-ats_c2c-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 01:10:59 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:36 GMT"
         },
         "ats_c2c/route-graph-ats_c2c.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 01:11:05 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:54 GMT"
         },
         "ats_c2c/Cities.json": {
           "ok": true,
@@ -194,12 +215,12 @@
         "ats_promods/route-graph-ats_promods-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:19 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:32 GMT"
         },
         "ats_promods/route-graph-ats_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:18 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:32 GMT"
         },
         "ats_promods/Cities.json": {
           "ok": true,
@@ -225,12 +246,12 @@
         "ats_c2c_promods/route-graph-ats_c2c_promods-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 01:23:21 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:30 GMT"
         },
         "ats_c2c_promods/route-graph-ats_c2c_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 01:23:49 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:29 GMT"
         },
         "ats_c2c_promods/Cities.json": {
           "ok": true,
@@ -246,35 +267,97 @@
       "totalBytes": 60791429,
       "allOk": true
     },
+    "ats_canada": {
+      "files": {
+        "vector/ats_canada.pmtiles": {
+          "ok": true,
+          "bytes": 58301232,
+          "lastModified": "Thu, 08 Oct 2026 19:44:46 GMT"
+        },
+        "ats_canada/route-graph-ats_canada-v3.bin": {
+          "ok": true,
+          "bytes": 0,
+          "lastModified": "Sun, 11 Oct 2026 00:37:33 GMT"
+        },
+        "ats_canada/route-graph-ats_canada.bin": {
+          "ok": true,
+          "bytes": 0,
+          "lastModified": "Sun, 11 Oct 2026 00:37:31 GMT"
+        },
+        "ats_canada/Cities.json": {
+          "ok": true,
+          "bytes": 48578,
+          "lastModified": "Thu, 08 Oct 2026 19:44:39 GMT"
+        },
+        "ats_canada/road-names.json": {
+          "ok": true,
+          "bytes": 951461,
+          "lastModified": "Thu, 08 Oct 2026 19:44:38 GMT"
+        }
+      },
+      "totalBytes": 59301271,
+      "allOk": true
+    },
+    "ats_c2c_canada": {
+      "files": {
+        "vector/ats_c2c_canada.pmtiles": {
+          "ok": true,
+          "bytes": 69627213,
+          "lastModified": "Thu, 08 Oct 2026 19:52:17 GMT"
+        },
+        "ats_c2c_canada/route-graph-ats_c2c_canada-v3.bin": {
+          "ok": true,
+          "bytes": 0,
+          "lastModified": "Sun, 11 Oct 2026 00:37:36 GMT"
+        },
+        "ats_c2c_canada/route-graph-ats_c2c_canada.bin": {
+          "ok": true,
+          "bytes": 0,
+          "lastModified": "Sun, 11 Oct 2026 00:37:30 GMT"
+        },
+        "ats_c2c_canada/Cities.json": {
+          "ok": true,
+          "bytes": 58681,
+          "lastModified": "Thu, 08 Oct 2026 19:51:55 GMT"
+        },
+        "ats_c2c_canada/road-names.json": {
+          "ok": true,
+          "bytes": 1003832,
+          "lastModified": "Thu, 08 Oct 2026 19:51:48 GMT"
+        }
+      },
+      "totalBytes": 70689726,
+      "allOk": true
+    },
     "ats_reforma": {
       "files": {
         "vector/ats_reforma.pmtiles": {
           "ok": true,
-          "bytes": 59736883,
-          "lastModified": "Thu, 24 Sep 2026 18:09:22 GMT"
+          "bytes": 61153075,
+          "lastModified": "Thu, 08 Oct 2026 19:33:59 GMT"
         },
         "ats_reforma/route-graph-ats_reforma-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:59 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:37 GMT"
         },
         "ats_reforma/route-graph-ats_reforma.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:39 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:30 GMT"
         },
         "ats_reforma/Cities.json": {
           "ok": true,
-          "bytes": 39252,
-          "lastModified": "Thu, 24 Sep 2026 18:09:44 GMT"
+          "bytes": 39946,
+          "lastModified": "Thu, 08 Oct 2026 19:33:51 GMT"
         },
         "ats_reforma/road-names.json": {
           "ok": true,
-          "bytes": 950972,
-          "lastModified": "Thu, 24 Sep 2026 18:09:17 GMT"
+          "bytes": 951658,
+          "lastModified": "Thu, 08 Oct 2026 19:33:36 GMT"
         }
       },
-      "totalBytes": 60727107,
+      "totalBytes": 62144679,
       "allOk": true
     },
     "ats_reforma_c2c_promods": {
@@ -287,12 +370,12 @@
         "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 01:24:25 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:38:14 GMT"
         },
         "ats_reforma_c2c_promods/route-graph-ats_reforma_c2c_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 01:24:42 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:52 GMT"
         },
         "ats_reforma_c2c_promods/Cities.json": {
           "ok": true,
@@ -318,12 +401,12 @@
         "ets2/route-graph-ets2-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:16 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:51 GMT"
         },
         "ets2/route-graph-ets2.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:03 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:32 GMT"
         },
         "ets2/Cities.json": {
           "ok": true,
@@ -349,12 +432,12 @@
         "ets2_promods/route-graph-ets2_promods-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:20 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:38:13 GMT"
         },
         "ets2_promods/route-graph-ets2_promods.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:11 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:57 GMT"
         },
         "ets2_promods/Cities.json": {
           "ok": true,
@@ -380,12 +463,12 @@
         "ets2_promods_rusmap/route-graph-ets2_promods_rusmap-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:20 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:33 GMT"
         },
         "ets2_promods_rusmap/route-graph-ets2_promods_rusmap.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:04 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:51 GMT"
         },
         "ets2_promods_rusmap/Cities.json": {
           "ok": true,
@@ -411,12 +494,12 @@
         "ets2_promods_roex/route-graph-ets2_promods_roex-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:32 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:32 GMT"
         },
         "ets2_promods_roex/route-graph-ets2_promods_roex.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:31 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:37 GMT"
         },
         "ets2_promods_roex/Cities.json": {
           "ok": true,
@@ -442,12 +525,12 @@
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:41 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:37 GMT"
         },
         "ets2_promods_rusmap_roex/route-graph-ets2_promods_rusmap_roex.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:06 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:33 GMT"
         },
         "ets2_promods_rusmap_roex/Cities.json": {
           "ok": true,
@@ -473,12 +556,12 @@
         "ets2_gu/route-graph-ets2_gu-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 17:16:37 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:58 GMT"
         },
         "ets2_gu/route-graph-ets2_gu.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 06 Oct 2026 17:16:41 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:44 GMT"
         },
         "ets2_gu/Cities.json": {
           "ok": true,
@@ -504,12 +587,12 @@
         "ets2_eugu/route-graph-ets2_eugu-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 05 Oct 2026 15:21:16 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:37 GMT"
         },
         "ets2_eugu/route-graph-ets2_eugu.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 05 Oct 2026 15:21:25 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:30 GMT"
         },
         "ets2_eugu/Cities.json": {
           "ok": true,
@@ -535,12 +618,12 @@
         "ets2_promods_eugu/route-graph-ets2_promods_eugu-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 05 Oct 2026 15:21:36 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:30 GMT"
         },
         "ets2_promods_eugu/route-graph-ets2_promods_eugu.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Mon, 05 Oct 2026 15:21:35 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:40 GMT"
         },
         "ets2_promods_eugu/Cities.json": {
           "ok": true,
@@ -566,12 +649,12 @@
         "ets2_tmp/route-graph-ets2_tmp-v3.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 23:05:16 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:55 GMT"
         },
         "ets2_tmp/route-graph-ets2_tmp.bin": {
           "ok": true,
           "bytes": 0,
-          "lastModified": "Tue, 29 Sep 2026 19:40:45 GMT"
+          "lastModified": "Sun, 11 Oct 2026 00:37:33 GMT"
         },
         "ets2_tmp/Cities.json": {
           "ok": true,
