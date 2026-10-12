@@ -1219,6 +1219,34 @@ test('detectRoundabout: anillo de un sentido, cuenta las salidas hasta la de la 
   assert.equal(detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, este]), i: 1, iEnd: 1, ...g2, bearingBetween: planarBearing }), null);
 });
 
+test('detectRoundabout: una curva con muchos vertices no corre el centro del anillo (Miles City, salida 139)', () => {
+  const { detectRoundabout, ringOutline } = require('./pure.js');
+  // anillo redondo de radio 29 y 12 nodos; del lado oeste el grafo trae la
+  // curva con un vertice cada ~1 m, del este va recto de nodo a nodo (asi
+  // venian las dos rotondas de Miles City, que daban 1,305 y no pasaban)
+  const R = 29, N = 12, nodos = [], aristas = [];
+  for (let k = 0; k < N; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / N; nodos.push([R * Math.cos(a), R * Math.sin(a)]); }
+  for (let k = 0; k < N; k++) aristas.push([k, (k + 1) % N, false]);
+  const edgeLine = (a, b) => {
+    const a0 = -Math.PI / 2 + a * 2 * Math.PI / N;
+    if (b !== (a + 1) % N || Math.cos(a0 + Math.PI / N) >= 0) return null;
+    return Array.from({ length: 16 }, (_, t) => [R * Math.cos(a0 + 2 * Math.PI / N * t / 15), R * Math.sin(a0 + 2 * Math.PI / N * t / 15)]);
+  };
+  // los puntos del contorno quedan parejos, cada 5 m, tenga la curva los vertices que tenga
+  const contorno = ringOutline([...Array(N).keys()], (k) => nodos[k], edgeLine);
+  for (let k = 1; k < contorno.length; k++) {
+    assert.ok(Math.abs(Math.hypot(contorno[k][0] - contorno[k - 1][0], contorno[k][1] - contorno[k - 1][1]) - 5) < 0.05);
+  }
+  const sur = conCalle(nodos, aristas, 0, 0, -300);
+  conCalle(nodos, aristas, 3, 300, 0);
+  const norte = conCalle(nodos, aristas, 6, 0, 300);
+  conCalle(nodos, aristas, 9, -300, 0);
+  const g = grafoChico(nodos, aristas);
+  const r = detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, 3, 4, 5, 6, norte]), i: 1, iEnd: 1, ...g, edgeLine, bearingBetween: planarBearing });
+  assert.ok(r, 'la rotonda no se reconocio');
+  assert.equal(r.exit, 2); // derecho: segunda salida
+});
+
 test('detectRoundabout: un tramo corto de calle dividida o una manzana de una mano no son rotondas', () => {
   const { detectRoundabout } = require('./pure.js');
   // calle que se divide: 0 -> (1 mano norte, 2 mano sur) -> 3, 120 m de largo y 10 de ancho

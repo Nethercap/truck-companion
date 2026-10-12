@@ -394,15 +394,21 @@ function oneWayRing(adjacency, nodeAt, start, from, maxLenM = 700, maxDepth = 40
 
 // Puntos cada stepM a lo largo de un anillo (nodos en orden), siguiendo la
 // curva de cada tramo si edgeLine la da: la forma real, no solo sus nodos.
+// Parejos por metro de recorrido: antes salia cada vertice de la curva, y
+// los arcos dibujados con muchos vertices corrian el centro (roundish) unos
+// 3 m; las dos rotondas de la salida 139 de Miles City daban 1,305 y no
+// pasaban (Discord, 12-10).
 function ringOutline(ringPath, nodeAt, edgeLine, stepM = 5) {
   const out = [];
+  let next = 0; // metros, sobre el tramo actual, hasta el proximo punto
   for (let k = 0; k < ringPath.length; k++) {
     const a = ringPath[k], b = ringPath[(k + 1) % ringPath.length];
     const line = (edgeLine && edgeLine(a, b)) || [nodeAt(a), nodeAt(b)];
     for (let j = 1; j < line.length; j++) {
       const [x0, z0] = line[j - 1], [x1, z1] = line[j];
-      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / stepM));
-      for (let t = 0; t < n; t++) out.push([x0 + (x1 - x0) * t / n, z0 + (z1 - z0) * t / n]);
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      for (; next < len; next += stepM) out.push([x0 + (x1 - x0) * next / len, z0 + (z1 - z0) * next / len]);
+      next -= len;
     }
   }
   return out;
