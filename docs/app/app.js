@@ -2089,7 +2089,7 @@ function removeWaypoint(index) {
   const [wp] = waypoints.splice(index, 1);
   if (wp && wp.marker) wp.marker.remove();
   renumberWaypointMarkers();
-  if (!waypoints.length) waypointRouteDistanceKm = null;
+  if (!waypoints.length) { waypointRouteDistanceKm = null; forgetWaypointTrip(); }
   renderWaypointList();
   invalidateRoute();
   saveWaypoints();
@@ -2103,7 +2103,7 @@ function clearWaypoint(keepStored = false) {
   waypointRouteDistanceKm = null;
   renderWaypointList();
   invalidateRoute();
-  if (!keepStored) saveWaypoints();
+  if (!keepStored) { saveWaypoints(); forgetWaypointTrip(); }
 }
 
 function renderWaypointList() {
@@ -2972,6 +2972,16 @@ const ROUTE_PROGRESS_KEY = 'truckdash_route_progress';
 function readRouteProgress() {
   try { return JSON.parse(lsGet(ROUTE_PROGRESS_KEY) || 'null'); } catch (e) { return null; }
 }
+// Borrar los waypoints, o llegar al ultimo, termina ese viaje: una ruta nueva
+// al mismo lugar mide desde donde este el camion y no contra el total
+// guardado (Gargamosch, 12-10). Solo rutas de waypoints: con un trabajo la
+// barra es la del trabajo, y se reinicia sola al terminarlo o cancelarlo.
+function forgetWaypointTrip() {
+  if (routeProgressState.kind !== 'waypoint') return;
+  const stored = readRouteProgress();
+  if (stored && stored.key === routeProgressState.key) lsSet(ROUTE_PROGRESS_KEY, 'null');
+  routeProgressState = { key: null, total: 0 };
+}
 
 function routeIdentity(data) {
   return JSON.stringify([data.game, data.citySrc, data.cityDst, data.companySrcId,
@@ -3008,7 +3018,7 @@ function resolveRawRouteTarget(data) {
   }
   if (waypoints.length) {
     const last = waypoints[waypoints.length - 1];
-    return { x: last.pos[0], z: last.pos[1], kind: 'waypoint', key: 'wp-only' };
+    return { x: last.pos[0], z: last.pos[1], kind: 'waypoint', key: waypointRouteKey(waypoints) };
   }
   return null;
 }
@@ -3084,7 +3094,7 @@ function updateRouteSummary(data) {
     || useOwnRemaining(gameKm, ownKm);
   const remainingKm = manual ? ownKm : gameKm;
   const key = routeIdentity(data) + target.key;
-  if (routeProgressState.key !== key) routeProgressState = { key, total: 0, stored: readRouteProgress() };
+  if (routeProgressState.key !== key) routeProgressState = { key, kind: target.kind, total: 0, stored: readRouteProgress() };
   const total = routeProgressTotal({
     kind: target.kind, manual, plannedKm: data.plannedDistanceKm, remainingKm,
     seenKm: routeProgressState.total, stored: routeProgressState.stored, key, now: Date.now(),

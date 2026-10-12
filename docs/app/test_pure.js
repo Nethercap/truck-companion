@@ -1982,3 +1982,24 @@ test('pantalla encendida: rechazo con la pestana oculta no es motivo para el vid
   assert.equal(env.pedidos.length, 2);
   assert.equal(env.videos.length, 0);
 });
+
+test('waypointRouteKey: otro destino es otro viaje, los intermedios no (Gargamosch, 12-10)', () => {
+  const { waypointRouteKey, routeProgressTotal } = require('./pure.js');
+  const haciaA = waypointRouteKey([{ pos: [100.4, 200.6] }]);
+  assert.equal(haciaA, 'wp:100,201');
+  // Con una parada antes: al pasarla se saca y la ruta sigue siendo la misma
+  assert.equal(waypointRouteKey([{ pos: [5, 5] }, { pos: [100.4, 200.6] }]), haciaA);
+  const haciaB = waypointRouteKey([{ pos: [3000, -400] }]);
+  assert.notEqual(haciaB, haciaA);
+  assert.equal(waypointRouteKey([]), null);
+  assert.equal(waypointRouteKey(null), null);
+  assert.equal(waypointRouteKey([{ pos: [NaN, 1] }]), null);
+  // Viaje rapido, borrar el waypoint y poner otro: la barra arranca de cero
+  // (antes todas las rutas de waypoints eran 'wp-only' y heredaban el total).
+  const id = '["ats","","",null,null,false,false,""]';
+  const now = Date.parse('2026-10-12T18:00:00Z');
+  const stored = { key: id + haciaA, total: 640, at: now - 3600 * 1000 };
+  assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored, key: id + haciaB, now }), 300);
+  // La misma ruta despues de recargar sigue midiendo contra lo guardado
+  assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored, key: id + haciaA, now }), 640);
+});
