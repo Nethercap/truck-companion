@@ -380,6 +380,18 @@
   /* settingsLinkBtn es width:100% porque vive en una columna: aca los tres
      tienen que compartir un renglon o la barra ocupa media pantalla. */
   .layoutBar .settingsLinkBtn { width: auto; flex: 0 1 auto; padding: 0.4rem 0.8rem; }
+  /* En el telefono, mientras se acomoda, el mapa ocupa toda la pantalla: con
+     el encabezado, la barra y el panel de datos quedaban 120 px de mapa para
+     mover los botones (Discord, Gargamosch, 11-10). Al terminar vuelve todo;
+     los paneles se anclan al borde mas cercano (layoutAnchor), asi que lo
+     pegado abajo sigue abajo con el mapa mas chico. */
+  @media (max-width: 900px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape) {
+    body.editLayout h1, body.editLayout .setup, body.editLayout #status, body.editLayout #setupHints,
+    body.editLayout #infoPanel, body.editLayout #commandsDrawer { display: none !important; }
+    body.editLayout .layoutBar { padding: 0.35rem 0.5rem; gap: 0.35rem; }
+    body.editLayout .layoutBar > span { min-width: 0; flex-basis: 100%; font-size: 0.72rem; }
+  }
+  .layoutBar #layoutFsBtn.active { border-color: var(--accent); color: var(--accent); }
   /* Grilla de alineacion, solo mientras se acomoda. Va encima del mapa pero
      debajo de los botones (z-index 1000), y no recibe clicks. */
   body.editLayout.layoutGridOn #mapPanel::before {

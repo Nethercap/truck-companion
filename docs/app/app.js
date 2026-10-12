@@ -1594,6 +1594,8 @@ function applyLayoutGrid() {
 
 function setLayoutEdit(on) {
   document.body.classList.toggle('editLayout', on);
+  // En el telefono el mapa cambia de tamano al entrar y salir (app.css).
+  setTimeout(() => { if (map) map.resize(); }, 50);
   if (on) applyLayoutGrid();
   document.getElementById('layoutBar').style.display = on ? 'flex' : 'none';
   document.removeEventListener('click', swallowClick, true);
@@ -5129,7 +5131,7 @@ document.getElementById('panelSwipe').addEventListener('scroll', () => {
   document.getElementById('swipeHint').style.display = 'none';
 }, { once: true });
 
-document.getElementById('fullscreenBtn').addEventListener('click', () => {
+function toggleFsMode() {
   document.body.classList.toggle('fsMode');
   // La Fullscreen API real (esconde tambien la barra de URL en el celular)
   // es un extra sobre ocultar el header - si el navegador no la deja usar
@@ -5139,10 +5141,22 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
   } else if (document.fullscreenElement) {
     document.exitFullscreen?.().catch(() => {});
   }
-});
+  renderLayoutFsBtn();
+  setTimeout(() => { if (map) map.resize(); }, 300);
+}
+// Tambien desde la barra de acomodar: ahi los botones del mapa no responden
+// (un toque los mueve), y en el telefono se acomoda mejor en pantalla
+// completa, que es como se maneja.
+function renderLayoutFsBtn() {
+  const btn = document.getElementById('layoutFsBtn');
+  if (btn) btn.classList.toggle('active', document.body.classList.contains('fsMode'));
+}
+document.getElementById('fullscreenBtn').addEventListener('click', toggleFsMode);
+document.getElementById('layoutFsBtn').addEventListener('click', toggleFsMode);
 
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement) document.body.classList.remove('fsMode');
+  renderLayoutFsBtn();
 });
 
 document.getElementById('navToggleBtn').addEventListener('click', () => {
