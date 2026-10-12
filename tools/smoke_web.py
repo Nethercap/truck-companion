@@ -28,8 +28,10 @@ DOCS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 CON_WEBGL = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 SIN_WEBGL = ["--disable-webgl", "--disable-webgl2", "--disable-3d-apis"]
 # Errores de consola que no son de la pagina: recursos de terceros que un
-# runner de CI puede no alcanzar (fuentes de Google, el contador del relay).
-IGNORAR = ("fonts.googleapis", "fonts.gstatic", "Failed to load resource", "net::ERR")
+# runner de CI puede no alcanzar (fuentes de Google, el contador del relay), y
+# Cloudflare Web Analytics, que solo acepta envios desde trucksim-dash.com y
+# desde 127.0.0.1 los corta por CORS.
+IGNORAR = ("fonts.googleapis", "fonts.gstatic", "Failed to load resource", "net::ERR", "cloudflareinsights.com")
 
 fallas = []
 

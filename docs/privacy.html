@@ -31,7 +31,7 @@
 <header><img src="/assets/logo.svg" alt="" /> <a href="/" style="color:var(--text)">Truck Dash</a></header>
 <main>
   <h1>Privacy policy</h1>
-  <p class="updated">Last updated: 7 October 2026</p>
+  <p class="updated">Last updated: 12 October 2026</p>
 
   <p>Truck Dash is a free, open-source companion for Euro Truck Simulator 2 and American Truck Simulator. It is designed to handle as little data as possible. This page explains exactly what it reads, sends and stores.</p>
   <p><strong>An account is optional.</strong> Without one, everything works as it always has and nothing about you is stored on our servers. If you do create one, the section below says exactly what it holds.</p>
@@ -81,15 +81,16 @@
   <p>The database runs on Railway and is backed up once a day. Backups are encrypted and kept for at most seven days.</p>
 
   <h2>Cookies and analytics</h2>
-  <p>Truck Dash uses <strong>no analytics, advertising or tracking cookies</strong>, and no analytics service of any kind.</p>
+  <p>Truck Dash uses <strong>no analytics, advertising or tracking cookies</strong>.</p>
+  <p>The public pages of this website (the home page, the user guide and the press kit) count visits with <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a>. It sets no cookies, does not use local storage and does not fingerprint your browser, so it cannot follow you across visits or sites. It records aggregate figures: which page was visited, the referring site, the country, the type of browser and device, and how fast the page loaded. We only see those totals, never anything about a single visitor. The dashboard, the map, the live map and the account pages do not load it, so your pairing code and everything you do there stay out of it.</p>
   <p>If you sign in, one strictly necessary cookie is set (<code>td_session</code>). It holds a random value and nothing else: no name, no email, no id. It is <code>HttpOnly</code> and <code>Secure</code>, so scripts cannot read it and it only travels over HTTPS, it lasts 90 days, and it is scoped to <code>trucksim-dash.com</code>. Signing out deletes it and invalidates it on the server. Without an account, no cookie is set at all.</p>
-  <p>Map tiles and fonts are loaded from Cloudflare R2 and Google Fonts respectively, which see the usual request metadata (IP, user agent) as any CDN does.</p>
+  <p>Map tiles are loaded from Cloudflare R2 and the website fonts from Google Fonts, which see the usual request metadata (IP, user agent) as any CDN does.</p>
 
   <h2>Third parties</h2>
   <ul>
     <li><a href="https://railway.app" target="_blank" rel="noopener">Railway</a> hosts the relay backend and, for accounts, the database.</li>
     <li><a href="https://discord.com/" target="_blank" rel="noopener">Discord</a> and <a href="https://google.com/" target="_blank" rel="noopener">Google</a> handle signing in, if you choose to sign in with them. Their own privacy policies apply to what happens on their side.</li>
-    <li><a href="https://www.cloudflare.com/" target="_blank" rel="noopener">Cloudflare R2</a> hosts the map data.</li>
+    <li><a href="https://www.cloudflare.com/" target="_blank" rel="noopener">Cloudflare R2</a> hosts the map data, and <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a> counts visits to the public pages, as described above.</li>
     <li><a href="https://resend.com/" target="_blank" rel="noopener">Resend</a> sends the sign-in emails (the 6-digit codes), only if you use email to sign in. It receives your email address and the message.</li>
     <li><a href="https://pages.github.com/" target="_blank" rel="noopener">GitHub Pages</a> hosts this website and the client downloads.</li>
     <li>Delivered jobs are posted to the public Truck Dash Discord server through a webhook.</li>

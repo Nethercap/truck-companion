@@ -768,8 +768,8 @@
         <p data-i18n="trust2Body">Client, backend and web app live in one public repository. Read the code, build it yourself, or verify a release's SHA-256 before running it.</p>
       </div>
       <div class="trustCard">
-        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span data-i18n="trust3Title">No account needed, no tracking</span></h3>
-        <p data-i18n="trust3Body">No sign-up needed, no analytics cookies. Telemetry is relayed live to your own browser session and not stored. Only delivered jobs (route, cargo, pay) are kept for the community feed, plus your own trips if you link an optional account.</p>
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span data-i18n="trust3Title">No account needed, no tracking cookies</span></h3>
+        <p data-i18n="trust3Body">No sign-up needed. Telemetry is relayed live to your own browser session and not stored. Only delivered jobs (route, cargo, pay) are kept for the community feed, plus your own trips if you link an optional account. This website counts visits anonymously, without cookies.</p>
       </div>
     </div>
     <div class="contactRow">
@@ -1045,8 +1045,8 @@ const TRANSLATIONS = {
     trust1Body: 'The client only reads the game\'s official telemetry SDK. It never touches your saves, profiles or any other file, and it never asks for administrator rights.',
     trust2Title: '100% open source',
     trust2Body: 'Client, backend and web app live in one public repository. Read the code, build it yourself, or verify a release\'s SHA-256 before running it.',
-    trust3Title: 'No account needed, no tracking',
-    trust3Body: 'No sign-up needed, no analytics cookies. Telemetry is relayed live to your own browser session and not stored. Only delivered jobs (route, cargo, pay) are kept for the community feed, plus your own trips if you link an optional account.',
+    trust3Title: 'No account needed, no tracking cookies',
+    trust3Body: 'No sign-up needed. Telemetry is relayed live to your own browser session and not stored. Only delivered jobs (route, cargo, pay) are kept for the community feed, plus your own trips if you link an optional account. This website counts visits anonymously, without cookies.',
     viewSource: 'Source on GitHub',
     privacyLink: 'Privacy policy',
     termsLink: 'Terms of use',
@@ -1263,8 +1263,8 @@ const TRANSLATIONS = {
     trust1Body: 'El cliente solo lee el SDK oficial de telemetría del juego. Nunca toca tus partidas, perfiles ni ningún otro archivo, y nunca pide permisos de administrador.',
     trust2Title: '100% código abierto',
     trust2Body: 'Cliente, backend y web viven en un solo repositorio público. Leé el código, compilalo vos mismo, o verificá el SHA-256 de un release antes de correrlo.',
-    trust3Title: 'Sin cuenta obligatoria, sin tracking',
-    trust3Body: 'Sin registro obligatorio, sin cookies de analytics. La telemetría se retransmite en vivo a tu propia sesión del navegador y no se guarda. Solo los trabajos entregados (ruta, carga, pago) se conservan para el feed de la comunidad, más tus propios viajes si vinculás una cuenta opcional.',
+    trust3Title: 'Sin cuenta obligatoria, sin cookies de rastreo',
+    trust3Body: 'Sin registro obligatorio. La telemetría se retransmite en vivo a tu propia sesión del navegador y no se guarda. Solo los trabajos entregados (ruta, carga, pago) se conservan para el feed de la comunidad, más tus propios viajes si vinculás una cuenta opcional. Este sitio cuenta las visitas de forma anónima, sin cookies.',
     viewSource: 'Código en GitHub',
     privacyLink: 'Política de privacidad',
     termsLink: 'Términos de uso',
@@ -1573,5 +1573,9 @@ function carouselNav(dir) {
 }
 updateCarousel();
 </script>
+<!-- Cloudflare Web Analytics: cuenta visitas sin cookies. Solo en las paginas
+     publicas (landing, guia, kit de prensa), no en la app ni en la cuenta: la URL
+     de la app lleva el codigo de emparejamiento. Ver docs/privacy.html. -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "0d5d61038871400ab2e1c45e84a78f35"}'></script>
 </body>
 </html>
