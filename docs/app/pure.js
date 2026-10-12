@@ -1437,6 +1437,22 @@ const DEMO_ROUTE = {
   truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158,
 };
 
+// La ruta de la demo guardada en docs/app/demo-route-<juego>.json (la arma
+// tools/build_demo_route.py con el findRoute de la app). Con ella la demo
+// arranca sin esperar el grafo de ruteo, que pesa 4,5 MB: en 4G lento
+// llegaba a los 30 s y la demo se rendia (auditoria del 12-10). Sirve solo
+// si se calculo con el mismo grafo que baja la app (revision y version de
+// los datos): con otro, el camion se iria de la ruta que dibuja la app.
+function demoPathUsable(data, graphRev, mapDataVersion) {
+  if (!data || data.rev !== graphRev || !mapDataVersion || data.mapData !== mapDataVersion) return null;
+  const path = data.path;
+  if (!Array.isArray(path) || path.length < 2) return null;
+  for (const p of path) {
+    if (!Array.isArray(p) || !Number.isFinite(p[0]) || !Number.isFinite(p[1])) return null;
+  }
+  return path;
+}
+
 // Telemetria sintetica, un tick por llamada a next(). Es un adelanto
 // rapido (timeScale), pero COHERENTE consigo mismo: los kilometros que
 // suma el odometro son los que se recorren a la velocidad que muestra el
@@ -2165,5 +2181,5 @@ function citiesMatchingInput(names, labels, input) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { routeProgressTotal, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
-    createDemoTelemetry, DEMO_ROUTE };
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable };
 }

@@ -1093,6 +1093,7 @@ let map = null; // instancia de MapLibre
 let mapReady = false; // true despues del evento 'load' inicial (recien ahi se pueden agregar sources/layers)
 let pendingGame = null; // juego que se quiso cargar antes de que el mapa terminara de inicializar
 let truckMarker = null;
+let mapLoadToken = 0; // sube en cada loadGameMap: lo que termina tarde no toca la barra de la nueva carga
 let truckArrowEl = null; // referencia al div interno de la flecha, para rotarlo
 let destMarker = null;
 let toLngLat = null; // funcion (x,z) => [lng,lat] del juego actual
@@ -1899,12 +1900,14 @@ let roadNames = []; // [{x, y, label, kind: 'road'|'city'}, ...] en coordenadas 
 
 async function loadRoadNames(mapInfo) {
   roadNames = [];
+  const game = currentGame; // como el grafo: el que llega tarde no pisa otra variante
   try {
-    const res = await fetch(`${mapInfo.assetsDir}/road-names.json?v=${MAP_DATA_VERSION[currentGame] || ''}`);
+    const res = await fetch(`${mapInfo.assetsDir}/road-names.json?v=${MAP_DATA_VERSION[currentGame] || ''}`, { priority: 'low' });
     if (!res.ok) return;
-    roadNames = await res.json();
+    const nombres = await res.json();
+    if (currentGame === game) roadNames = nombres;
   } catch (err) {
-    roadNames = [];
+    if (currentGame === game) roadNames = [];
   }
 }
 
@@ -2555,6 +2558,9 @@ const ROUTE_GRAPH_V3_REV = 5;
 
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
+  // Baja por detras del mapa (ver loadGameMap): si mientras tanto se cambio
+  // de variante, el grafo que llega tarde no pisa el de la nueva.
+  const game = currentGame;
   const base = `${mapInfo.assetsDir}/route-graph-${currentGame}`;
   const v = `?v=${MAP_DATA_VERSION[currentGame] || ''}`;
   // Formato binario (TDRG v2, ver route_graph_bin.py): typed arrays, sin
@@ -2568,7 +2574,8 @@ async function loadRouteGraph(mapInfo) {
     if (jsonUrl) {
       const res = await fetch(jsonUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      routeGraph = buildRouteGraph(routeGraphFromJson(await res.json()));
+      const g = buildRouteGraph(routeGraphFromJson(await res.json()));
+      if (currentGame === game) routeGraph = g;
       return;
     }
     // Primero el v3 (con la corrida para dibujar la ruta sobre la calzada de
@@ -2576,14 +2583,16 @@ async function loadRouteGraph(mapInfo) {
     // siempre, y la ruta se dibuja por el eje como antes. `g` cambia cuando
     // se resube solo el v3 (corridas corregidas, ruteo igual), para no tener
     // que subir MAP_DATA_VERSION y hacer bajar de nuevo los tiles.
-    let res = await fetch(`${base}-v3.bin${v}&g=${ROUTE_GRAPH_V3_REV}`).catch(() => null);
-    if (!res || !res.ok) res = await fetch(`${base}.bin${v}`);
+    // Prioridad baja: con poca senal, primero los tiles que se ven.
+    let res = await fetch(`${base}-v3.bin${v}&g=${ROUTE_GRAPH_V3_REV}`, { priority: 'low' }).catch(() => null);
+    if (!res || !res.ok) res = await fetch(`${base}.bin${v}`, { priority: 'low' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    routeGraph = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
+    const g = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
+    if (currentGame === game) routeGraph = g;
   } catch (err) {
     // Sin grafo el mapa y el tablero siguen andando; lo que no hay es ruteo.
     console.warn('no se pudo cargar el grafo de rutas', err);
-    routeGraph = null;
+    if (currentGame === game) routeGraph = null;
   }
 }
 
@@ -3261,8 +3270,10 @@ async function loadGameMap(game) {
   toLngLat = mapInfo.toLngLat;
   fromLngLat = mapInfo.fromLngLat;
 
+  const loadToken = ++mapLoadToken;
   setMapLoading('mapLoadingCities');
   await loadCities(mapInfo);
+  let routingReady = Promise.resolve();
   if (conn.spectator || liteNoRouting) {
     // Espectador (convoy / mapa en vivo) o Lite sin ruteo: no rutea ni
     // navega, asi que el grafo (10-25 MB) y los nombres de ruta sobran - el
@@ -3270,14 +3281,13 @@ async function loadGameMap(game) {
     routeGraph = null;
     roadNames = [];
   } else {
-    setMapLoading('mapLoadingGraph');
-    await loadRouteGraph(mapInfo);
-    if (liteMode) {
-      roadNames = []; // sin nombres de ruta en las indicaciones: 5 MB menos
-    } else {
-      setMapLoading('mapLoadingNames');
-      await loadRoadNames(mapInfo);
-    }
+    // El grafo (4,5 a 25 MB) y los nombres de ruta bajan por detras. Antes se
+    // los esperaba para recien ahi dibujar el mapa: en 4G lento la pantalla
+    // quedaba gris 30-40 s, tambien la demo (auditoria del 12-10). Mientras
+    // no esta el grafo no hay ruta: findRoute da null y updateDestinationMarker
+    // vuelve a intentar en el proximo tick.
+    if (liteMode) roadNames = []; // sin nombres de ruta en las indicaciones: 5 MB menos
+    routingReady = Promise.all([loadRouteGraph(mapInfo), liteMode ? null : loadRoadNames(mapInfo)]);
   }
   loadPois(game); // no bloquea: la busqueda muestra "cargando" hasta que llegue
   currentRouteTarget = null;
@@ -3328,11 +3338,18 @@ async function loadGameMap(game) {
   // Los tiles siguen bajando en segundo plano; la barra se va cuando la
   // primera pasada de render termina (o a los 4 s como tope, por si el
   // evento no llega).
+  // Despues, si el grafo sigue bajando, lo dice la misma barra: sin eso,
+  // con un trabajo andando la ruta tardaria en aparecer sin explicacion.
   setMapLoading('mapLoadingTiles');
-  let cleared = false;
-  const clear = () => { if (!cleared) { cleared = true; setMapLoading(null); } };
+  let tilesDone = false, routingDone = false;
+  const refresh = () => {
+    if (loadToken !== mapLoadToken) return; // ya se esta cargando otra variante
+    setMapLoading(!tilesDone ? 'mapLoadingTiles' : !routingDone ? 'mapLoadingGraph' : null);
+  };
+  const clear = () => { if (!tilesDone) { tilesDone = true; refresh(); } };
   map.once('idle', clear);
   setTimeout(clear, 4000);
+  routingReady.finally(() => { routingDone = true; refresh(); });
 }
 
 // Barra "Cargando mapa..." sobre el mapa mientras bajan ciudades, grafo de
@@ -6082,34 +6099,49 @@ function startDemo() {
   document.getElementById('code').value = 'DEMO';
   renderConnectionUi();
   loadGameMap(DEMO_ROUTE.game);
+  // La ruta guardada (demoPathUsable en pure.js): con ella el camion sale
+  // apenas hay mapa, sin esperar el grafo. Si no llega o es de otro grafo,
+  // se calcula como siempre cuando el grafo esta.
+  const mapData = MAP_DATA_VERSION[DEMO_ROUTE.game] || '';
+  let savedPath = null, savedDone = false;
+  fetch(`demo-route-${DEMO_ROUTE.game}.json?v=${mapData}&g=${ROUTE_GRAPH_V3_REV}`)
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => { savedPath = demoPathUsable(d, ROUTE_GRAPH_V3_REV, mapData); })
+    .catch(() => {})
+    .finally(() => { savedDone = true; });
   // Sin tope, si los datos del mapa no llegaban la demo esperaba para
-  // siempre sin decir nada.
-  const giveUpAt = Date.now() + 30000;
+  // siempre sin decir nada. Con la ruta guardada casi nunca hace falta; sin
+  // ella, el grafo en 4G lento tarda mas de 30 s.
+  const giveUpAt = Date.now() + 90000;
   // Los POIs dan las empresas de origen y destino; si tardan, la demo arranca
   // igual entre los centros de las ciudades.
   const poisUntil = Date.now() + 8000;
   const waitAssets = () => {
     if (mapUnavailable) return; // sin WebGL no hay mapa ni ruta: el cartel lo explica
-    if (!mapReady || !routeGraph || !citiesByName[DEMO_ROUTE.from] || !citiesByName[DEMO_ROUTE.to] || !truckMarker
-        || (!pois && Date.now() < poisUntil)) {
-      if (Date.now() > giveUpAt) { showToast('Demo route unavailable', 'danger'); return; }
-      demoTimer = setTimeout(waitAssets, 500);
-      return;
-    }
-    runDemo();
+    const mapOk = mapReady && truckMarker;
+    const graphOk = routeGraph && citiesByName[DEMO_ROUTE.from] && citiesByName[DEMO_ROUTE.to]
+      && (pois || Date.now() >= poisUntil);
+    if (mapOk && graphOk) { runDemo(computeDemoPath()); return; }
+    if (mapOk && savedPath) { runDemo(savedPath); return; }
+    if (Date.now() > giveUpAt) { showToast(t('demoUnavailable'), 'danger'); return; }
+    demoTimer = setTimeout(waitAssets, savedDone ? 500 : 200);
   };
   waitAssets();
 }
 
-function runDemo() {
-  // De empresa a empresa, las mismas que manda la telemetria: si el camion
-  // fuera al centro de la ciudad, la ruta dibujada (a la empresa) y el
-  // recorrido de la demo se separarian al final.
+// De empresa a empresa, las mismas que manda la telemetria: si el camion
+// fuera al centro de la ciudad, la ruta dibujada (a la empresa) y el
+// recorrido de la demo se separarian al final. tools/build_demo_route.py
+// llama a esta funcion para guardar demo-route-<juego>.json.
+function computeDemoPath() {
   const a = citiesByName[DEMO_ROUTE.from], b = citiesByName[DEMO_ROUTE.to];
   const ini = findCompanyPoi(DEMO_ROUTE.companyFromId, DEMO_ROUTE.fromId);
   const fin = findCompanyPoi(DEMO_ROUTE.companyToId, DEMO_ROUTE.toId);
-  const path = findRoute(ini ? [ini.x, ini.z] : [a.X, a.Y], fin ? [fin.x, fin.z] : [b.X, b.Y]);
-  if (!path || path.length < 2) { showToast('Demo route unavailable', 'danger'); return; }
+  return findRoute(ini ? [ini.x, ini.z] : [a.X, a.Y], fin ? [fin.x, fin.z] : [b.X, b.Y]);
+}
+
+function runDemo(path) {
+  if (!path || path.length < 2) { showToast(t('demoUnavailable'), 'danger'); return; }
   const total = sumPathDistanceMeters(path);
 
   const pointAt = (dist) => {

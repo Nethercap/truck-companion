@@ -1688,3 +1688,30 @@ test('routeProgressTotal: la barra no vuelve a cero al recargar (Gargamosch, 11-
   assert.equal(routeProgressTotal({ kind: 'dest', manual: false, plannedKm: 500, remainingKm: 520, seenKm: 530, key: 'a', now }), 530);
   assert.equal(routeProgressTotal({ kind: 'dest', manual: false, plannedKm: null, remainingKm: null, seenKm: 0, key: 'a', now }), 0);
 });
+
+test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version del mapa', () => {
+  const { demoPathUsable } = require('./pure.js');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const buena = { rev: 5, mapData: '20260929', path: [[0, 0], [10, 5], [20, 9]] };
+  assert.deepEqual(demoPathUsable(buena, 5, '20260929'), buena.path);
+  // Otro grafo u otros datos: el camion se iria de la ruta que dibuja la app
+  assert.equal(demoPathUsable(buena, 6, '20260929'), null);
+  assert.equal(demoPathUsable(buena, 5, '20261012'), null);
+  assert.equal(demoPathUsable(buena, 5, ''), null);
+  // Archivo roto o que no llego
+  assert.equal(demoPathUsable(null, 5, '20260929'), null);
+  assert.equal(demoPathUsable({ ...buena, path: [[0, 0]] }, 5, '20260929'), null);
+  assert.equal(demoPathUsable({ ...buena, path: [[0, 0], [1, null]] }, 5, '20260929'), null);
+  assert.equal(demoPathUsable({ ...buena, path: 'x' }, 5, '20260929'), null);
+  // El archivo publicado corresponde al grafo y al mapa que pide la app hoy:
+  // si se sube ROUTE_GRAPH_V3_REV o la version de ATS, correr
+  // python tools/build_demo_route.py
+  const guardada = JSON.parse(fs.readFileSync(path.join(__dirname, 'demo-route-ats.json'), 'utf8'));
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  const variantes = fs.readFileSync(path.join(__dirname, 'variants.js'), 'utf8');
+  const rev = Number(app.match(/const ROUTE_GRAPH_V3_REV = (\d+);/)[1]);
+  const mapData = variantes.match(/"ats": "(\d+)"/)[1];
+  assert.ok(demoPathUsable(guardada, rev, mapData),
+    `demo-route-ats.json es del grafo ${guardada.rev}/${guardada.mapData} y la app pide ${rev}/${mapData}: correr python tools/build_demo_route.py`);
+});

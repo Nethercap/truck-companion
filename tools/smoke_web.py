@@ -95,6 +95,25 @@ def main():
         chequear("demo: sin errores en la pagina", not errores, "; ".join(errores[:3]))
         b.close()
 
+        # 1b) La demo arranca sin el grafo de ruteo, con la ruta guardada
+        # (demo-route-ats.json): en 4G lento el grafo tarda mas de 30 s. Si
+        # el archivo quedo de otro grafo, la demo espera el grafo y esto
+        # falla: correr python tools/build_demo_route.py.
+        b, page, errores = pagina(p, CON_WEBGL, base)
+        # Los dos formatos: si el v3 falla, la app pide el v2
+        page.route("**/route-graph-*", lambda ruta: ruta.abort())
+        page.goto(base + "/app/?demo=1")
+        try:
+            page.wait_for_function(
+                "() => { const v = document.getElementById('miniSpeedBig'); return v && /\\d/.test(v.textContent); }",
+                timeout=60000)
+            arranco = True
+        except Exception:
+            arranco = False
+        chequear("demo sin grafo: arranca con la ruta guardada", arranco,
+                 "" if arranco else "la demo espero el grafo: demo-route-ats.json viejo o roto")
+        b.close()
+
         # 2) Sin WebGL: el cartel en lugar del mapa
         b, page, errores = pagina(p, SIN_WEBGL, base)
         page.goto(base + "/app/?demo=1")
