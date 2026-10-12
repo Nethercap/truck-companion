@@ -2942,6 +2942,12 @@ function findRouteWith(startXY, endXY, filtro) {
 let dismissedRouteIdentity = null;
 let routeProgressState = { key: null, total: 0 };
 let routeSummaryEtaSeconds = null;
+// El total de la barra de progreso por ruta, para que recargar no la vuelva a
+// cero (ver routeProgressTotal en pure.js). { key, total, at }.
+const ROUTE_PROGRESS_KEY = 'truckdash_route_progress';
+function readRouteProgress() {
+  try { return JSON.parse(lsGet(ROUTE_PROGRESS_KEY) || 'null'); } catch (e) { return null; }
+}
 
 function routeIdentity(data) {
   return JSON.stringify([data.game, data.citySrc, data.cityDst, data.companySrcId,
@@ -3054,8 +3060,16 @@ function updateRouteSummary(data) {
     || useOwnRemaining(gameKm, ownKm);
   const remainingKm = manual ? ownKm : gameKm;
   const key = routeIdentity(data) + target.key;
-  if (routeProgressState.key !== key) routeProgressState = { key, total: 0 };
-  if (remainingKm != null) routeProgressState.total = Math.max(routeProgressState.total, remainingKm);
+  if (routeProgressState.key !== key) routeProgressState = { key, total: 0, stored: readRouteProgress() };
+  const total = routeProgressTotal({
+    kind: target.kind, manual, plannedKm: data.plannedDistanceKm, remainingKm,
+    seenKm: routeProgressState.total, stored: routeProgressState.stored, key, now: Date.now(),
+  });
+  // Se guarda cuando crece (una vez por ruta, casi siempre) y no en cada tick.
+  if (total > routeProgressState.total + 0.05 && !conn.demo) {
+    lsSet(ROUTE_PROGRESS_KEY, JSON.stringify({ key, total, at: Date.now() }));
+  }
+  routeProgressState.total = total;
   if (voiceOn) {
     const arrived = voiceGuide.arrival(key, target.kind, remainingKm, routeProgressState.total);
     if (arrived && isLeaderTab) speakVoice(arrived);

@@ -1911,6 +1911,27 @@ function projectAheadOnRoute(points, x, z, baseWindowM = 400) {
   return best;
 }
 
+// El total contra el que se mide la barra de progreso del resumen de ruta.
+// Hasta el 11-10 era lo maximo que faltaba visto en esta pagina, y al
+// recargar la barra volvia a cero desde donde estaba el camion (Discord,
+// Gargamosch). Ahora:
+//  - yendo a la entrega por el GPS del juego, la distancia planeada del
+//    trabajo (la manda el juego siempre: sobrevive a recargar, a otro
+//    dispositivo y a reabrir el juego, sin cuenta);
+//  - si no, lo guardado en el navegador para esta misma ruta (stored, ver
+//    app.js), si no vencio;
+//  - y siempre al menos lo que falta y lo maximo visto.
+// La planeada no vale yendo a buscar la carga (es la del trabajo, no la de
+// ese tramo) ni con ruta propia (waypoints: la distancia es otra).
+function routeProgressTotal({ kind, manual, plannedKm, remainingKm, seenKm, stored, key, now, maxAgeMs = 12 * 3600 * 1000 }) {
+  let total = Math.max(0, Number(seenKm) || 0, Number(remainingKm) || 0);
+  if (kind === 'dest' && !manual && Number(plannedKm) > 0) total = Math.max(total, Number(plannedKm));
+  if (stored && stored.key === key && Number(stored.total) > 0 && now - Number(stored.at) <= maxAgeMs) {
+    total = Math.max(total, Number(stored.total));
+  }
+  return total;
+}
+
 // Waypoints guardados en el navegador para que sobrevivan a recargar la
 // pagina (pedido de Discord, 09-10). stored: { [variante]: { at, list:
 // [{ pos: [x, z], inGame, label }] } }. Devuelve la lista de la variante si
@@ -2143,6 +2164,6 @@ function citiesMatchingInput(names, labels, input) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { routeProgressTotal, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

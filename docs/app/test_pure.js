@@ -1670,3 +1670,21 @@ test('layoutAnchor y layoutCss: un panel pegado abajo sigue pegado abajo con el 
   // un poco afuera del mapa (redondeos) no da negativos
   assert.deepEqual(layoutAnchor({ left: 251, top: 481, width: 150, height: 120 }, area), { r: 0, b: 0 });
 });
+
+test('routeProgressTotal: la barra no vuelve a cero al recargar (Gargamosch, 11-10)', () => {
+  const { routeProgressTotal } = require('./pure.js');
+  const now = 1e12, H = 3600 * 1000;
+  // con trabajo, por el GPS del juego: la distancia planeada aunque la pagina sea nueva
+  assert.equal(routeProgressTotal({ kind: 'dest', manual: false, plannedKm: 2300, remainingKm: 1140, seenKm: 0, key: 'a', now }), 2300);
+  // yendo a buscar la carga, o con ruta propia, la planeada no cuenta
+  assert.equal(routeProgressTotal({ kind: 'pickup', manual: false, plannedKm: 2300, remainingKm: 12, seenKm: 15, key: 'a', now }), 15);
+  assert.equal(routeProgressTotal({ kind: 'dest', manual: true, plannedKm: 2300, remainingKm: 900, seenKm: 0, key: 'a', now }), 900);
+  // sin trabajo: lo guardado para esta ruta, si no vencio y es la misma
+  const stored = { key: 'a', total: 640, at: now - H };
+  assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored, key: 'a', now }), 640);
+  assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored, key: 'b', now }), 300);
+  assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored: { ...stored, at: now - 13 * H }, key: 'a', now }), 300);
+  // nunca menos de lo que falta ni de lo visto
+  assert.equal(routeProgressTotal({ kind: 'dest', manual: false, plannedKm: 500, remainingKm: 520, seenKm: 530, key: 'a', now }), 530);
+  assert.equal(routeProgressTotal({ kind: 'dest', manual: false, plannedKm: null, remainingKm: null, seenKm: 0, key: 'a', now }), 0);
+});
