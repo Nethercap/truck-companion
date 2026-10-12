@@ -5275,28 +5275,16 @@ function connectionView() {
   return connectionViewFor(conn);
 }
 
-// Pantalla encendida mientras la app esta en uso como GPS (Wake Lock API).
-// Sin esto el celular se apaga a los 30 s y hay que estar tocandolo. Se pide
-// cuando hay sesion (cualquier estado que no sea idle) y se vuelve a pedir
-// al volver a primer plano (el navegador lo suelta al ocultar la pestana).
-// Silencioso si el navegador no lo soporta o lo rechaza (bateria baja).
-let wakeLock = null;
-async function updateWakeLock(wanted) {
-  if (!('wakeLock' in navigator)) return;
-  try {
-    if (wanted && !wakeLock && document.visibilityState === 'visible') {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
-    } else if (!wanted && wakeLock) {
-      await wakeLock.release();
-      wakeLock = null;
-    }
-  } catch (e) {
-    wakeLock = null;
-  }
-}
+// Pantalla encendida mientras la app esta en uso como GPS: sin esto el
+// celular se apaga a los 30 s y hay que estar tocandolo. Se pide cuando hay
+// sesion (renderConnectionUi) y se vuelve a pedir al volver a primer plano;
+// en modo LAN (http, sin Wake Lock API) va el video de respaldo, que un
+// toque reintenta si no arranco solo (createScreenKeeper, pure.js).
+const screenKeeper = createScreenKeeper({ wakeLock: navigator.wakeLock, doc: document });
+document.addEventListener('pointerup', screenKeeper.sync, true);
+document.addEventListener('keydown', screenKeeper.sync, true);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && conn.socket !== 'idle') updateWakeLock(true);
+  screenKeeper.sync();
   if (document.visibilityState === 'visible') reopenIfStale();
 });
 
@@ -5329,7 +5317,7 @@ setInterval(() => { if (staleWatchArmed && document.visibilityState === 'visible
 
 function renderConnectionUi() {
   const view = connectionView();
-  updateWakeLock(!!view);
+  screenKeeper.want(!!view);
   const chip = document.getElementById('statusChip');
   const group = document.getElementById('connectGroup');
   const empty = document.getElementById('emptyState');

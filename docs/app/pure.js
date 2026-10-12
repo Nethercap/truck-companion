@@ -2307,7 +2307,95 @@ function citiesMatchingInput(names, labels, input) {
   return exact.length ? exact : toks.filter(tok => foldText(names[tok]) === q);
 }
 
+// Pantalla encendida mientras se mira el tablero o el GPS: sin esto la
+// tablet o el celular se apagan solos al rato y hay que estar tocandolos
+// (Discord, 12-10). Primero la Wake Lock API. Donde no esta o la rechaza
+// (modo LAN: http://192.168.x.x:27765 no es un contexto seguro y el
+// navegador no la ofrece; Safari antes de 16.4) va un video negro, mudo y
+// en loop, invisible y tapando toda la pantalla: Chrome no la deja apagar
+// mientras se reproduce un video que ocupa buena parte de la vista, aunque
+// no se vea ni suene (VideoWakeLock de Blink mide la interseccion con la
+// pantalla, no la opacidad). En iOS un video mudo no alcanza: ahi solo la
+// API (https) o el bloqueo automatico en Nunca.
+// El navegador suelta el lock al ocultar la pestana y no lo devuelve: el
+// tablero guardaba el lock ya soltado y no lo volvia a pedir nunca. sync()
+// lo pide de nuevo al volver a la pestana, y reintenta con un toque un
+// video que no arranco solo (ahorro de bateria).
+// wakeLock: navigator.wakeLock (o nada); doc: document.
+const SCREEN_KEEPER_WEBM = 'data:video/webm;base64,GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJChYECGFOAZwEAAAAAAAHJEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHGTbuMU6uEElTDZ1OsggEMTbuMU6uEHFO7a1OsggGz7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmoCrXsYMPQkBNgIRMYXZmV0GETGF2ZkSJiECfQAAAAAAAFlSua8GuAQAAAAAAADjXgQFzxYgAAAAAAAAAAZyBACK1nIN1bmSIgQCGhVZfVlA4g4EBI+ODhDuaygDgibCBQLqBQJqBAhJUw2fQc3PNY8CLY8WIAAAAAAAAAAFnyJhFo4dFTkNPREVSRIeLTGF2YyBsaWJ2cHhnyKFFo4hEVVJBVElPTkSHkzAwOjAwOjAyLjAwMDAwMDAwMAAfQ7Z1zeeBAKOqgQAAgPACAJ0BKkAAQAAJBwiFhYiZhIgwggAHMKU8hOWlotvsQP7tS2cAo5yBA+gAMQIAJBDcABgAGdf0DAABLAYApgD+8qEAHFO7a5G7j7OBALeK94EB8YIBYfCBAw==';
+const SCREEN_KEEPER_MP4 = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAMIbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAld0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAEAAAABAAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAHPbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABem1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAATpzdGJsAAAAunN0c2QAAAAAAAAAAQAAAKphdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAQABIAAAASAAAAAAAAAABDExhdmMgbGlieDI2NAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAAMGF2Y0MBQsAe/+EAF2dCwB7ZBCbARAAAAwAEAAADAAg8WLkgAQAGaMuAZSyAAAAAEHBhc3AAAAABAAAAAQAAABRidHJ0AAAAAAAAAJQAAACUAAAAGHN0dHMAAAAAAAAAAQAAAAIAAEAAAAAAFHN0c3MAAAAAAAAAAQAAAAEAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAIAAAABAAAAHHN0c3oAAAAAAAAAAAAAAAIAAAAbAAAACgAAABRzdGNvAAAAAAAAAAEAAAM4AAAAPXVkdGEAAAA1bWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAIaWxzdAAAAAhmcmVlAAAALW1kYXQAAAAXZYiEBbyYoAAhTycnJ1111111111114AAAAAGQZo4CvhG';
+function createScreenKeeper({ wakeLock, doc }) {
+  let wanted = false;
+  let sentinel = null;
+  let pending = false; // un solo pedido en vuelo: dos dejaban un lock sin soltar
+  let useVideo = !wakeLock || typeof wakeLock.request !== 'function';
+  let video = null;
+  const visible = () => doc.visibilityState === 'visible';
+
+  function videoEl() {
+    if (video) return video;
+    video = doc.createElement('video');
+    video.muted = true;
+    video.loop = true;
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('aria-hidden', 'true');
+    video.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;z-index:-1';
+    video.src = video.canPlayType && video.canPlayType('video/webm; codecs="vp8"') ? SCREEN_KEEPER_WEBM : SCREEN_KEEPER_MP4;
+    doc.body.appendChild(video);
+    return video;
+  }
+
+  function sync() {
+    const on = wanted && visible();
+    if (useVideo) {
+      if (on) {
+        const v = videoEl();
+        if (v.paused) {
+          const p = v.play();
+          if (p && p.catch) p.catch(() => {});
+        }
+      } else if (video && !video.paused) {
+        video.pause();
+      }
+      return;
+    }
+    if (sentinel && sentinel.released) sentinel = null;
+    if (on && !sentinel && !pending) {
+      pending = true;
+      let pedido;
+      try { pedido = Promise.resolve(wakeLock.request('screen')); } catch (e) { pedido = Promise.reject(e); }
+      pedido.then((s) => {
+        pending = false;
+        sentinel = s;
+        s.addEventListener('release', () => { if (sentinel === s) sentinel = null; });
+        sync(); // si dejo de hacer falta mientras se pedia, se suelta ya
+      }, () => {
+        pending = false;
+        // Rechazado con la pestana a la vista: este navegador no lo da
+        // (politica, app de inicio en iOS viejo). Oculta es lo normal: se
+        // vuelve a pedir al volver.
+        if (visible()) useVideo = true;
+        sync();
+      });
+    } else if (!on && sentinel) {
+      const s = sentinel;
+      sentinel = null;
+      try {
+        const p = s.release();
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) {}
+    }
+  }
+
+  return {
+    want(on) { wanted = !!on; sync(); },
+    sync,
+    usingVideo: () => useVideo,
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { routeProgressTotal, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
-    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn };
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }
