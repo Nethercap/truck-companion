@@ -281,7 +281,8 @@
 .dClaim.bien, .dSecondClaim.bien { color: var(--d-ok); }
 .dClaim.mal, .dSecondClaim.mal { color: var(--d-warn); }
 .dLine { font-size: 0.78em; color: var(--d-muted); }
-.dLine.dDim { color: #565d68; }
+/* #565d68 daba 2,6:1 sobre el panel: el texto mas tenue tiene que seguir leyendose (4,7:1). */
+.dLine.dDim { color: #7d8693; }
 .dLine.alerta { color: var(--d-bad); }
 .dCard[hidden] { display: none; }
 

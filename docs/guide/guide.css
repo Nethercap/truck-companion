@@ -22,7 +22,7 @@ header.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: 
 .brand img { width: 1.4rem; height: 1.4rem; }
 .topRight { display: flex; align-items: center; gap: 0.5rem; }
 select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.5rem; font: inherit; font-size: 0.9rem; }
-.btn { display: inline-block; background: var(--accent); color: #fff; font-weight: 600; font-size: 0.9rem; text-decoration: none;
+.btn { display: inline-block; background: var(--accent); color: #06121f; font-weight: 600; font-size: 0.9rem; text-decoration: none;
   padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid var(--accent); }
 .btn.secondary { background: transparent; color: var(--text); border-color: var(--border); }
 .btn:hover { filter: brightness(1.1); }
@@ -70,7 +70,7 @@ figcaption { color: var(--muted); font-size: 0.85rem; text-align: center; margin
 .cmd { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem; min-height: 78px; padding: 0.5rem 0.3rem;
   background: #23262c; border: 1px solid #333; border-radius: 10px; font-size: 0.78rem; text-align: center; line-height: 1.2; }
 .cmd svg { width: 24px; height: 24px; }
-.cmd.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cmd.on { background: var(--accent); border-color: var(--accent); color: #06121f; }
 .cmd.add { border-style: dashed; color: var(--muted); }
 
 .chips { list-style: none; padding: 0; }

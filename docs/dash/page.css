@@ -56,7 +56,7 @@ select.pageBtn { padding: 0.3rem 0.2rem; }
   width: 9rem; letter-spacing: 0.1em; font-weight: 600;
 }
 .gateRow button {
-  background: #3b9eff; border: none; color: #fff; font-weight: 600;
+  background: #3b9eff; border: none; color: #06121f; font-weight: 600;
   border-radius: 6px; padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer;
 }
 .gateNote { color: #ff4d4d; font-size: 0.85rem; min-height: 1.2em; }
