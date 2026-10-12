@@ -181,14 +181,14 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
   else document.documentElement.requestFullscreen().catch(() => {});
 });
 
-// Que la tablet no se apague sola mirando el tablero. Se vuelve a pedir al
-// volver a la pestana: el navegador lo suelta al ocultarla.
-let wakeLock = null;
-async function keepAwake() {
-  if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
-  try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { wakeLock = null; }
-}
-document.addEventListener('visibilitychange', () => { if (!wakeLock) keepAwake(); });
+// Que la tablet no se apague sola mirando el tablero (createScreenKeeper,
+// pure.js): se vuelve a pedir al volver a la pestana, y un toque reintenta
+// el video de respaldo del modo LAN si no arranco solo.
+const pantalla = createScreenKeeper({ wakeLock: navigator.wakeLock, doc: document });
+document.addEventListener('visibilitychange', pantalla.sync);
+document.addEventListener('fullscreenchange', pantalla.sync);
+document.addEventListener('pointerup', pantalla.sync, true);
+document.addEventListener('keydown', pantalla.sync, true);
 
 // --- arranque ---
 document.documentElement.lang = currentLang;
@@ -198,7 +198,7 @@ let escalaGuardada = null;
 try { escalaGuardada = localStorage.getItem(SCALE_KEY); } catch (e) {} // datos del sitio bloqueados
 setScale(escalaGuardada || '1');
 applyPageTranslations();
-keepAwake();
+pantalla.want(true);
 
 function empezar(code) {
   gate.hidden = true;

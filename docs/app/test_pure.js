@@ -1803,3 +1803,182 @@ test('nombre del giro: el de la salida, no un cartel de destino junto al vertice
     { x: 30, y: 600, label: 'Firenze', kind: 'city' }, { x: 30, y: 900, label: 'Firenze', kind: 'city' }]);
   assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(destinos, x, z, m), [0, 20]).label, 'Venezia');
 });
+
+// Navegador de mentira para createScreenKeeper: pestana, Wake Lock API con
+// pedidos que el test resuelve a mano, y videos.
+function navegadorFalso({ api = true } = {}) {
+  const env = { pedidos: [], videos: [], agregados: 0 };
+  env.doc = {
+    visibilityState: 'visible',
+    body: { appendChild() { env.agregados++; } },
+    createElement() {
+      const v = {
+        paused: true, attrs: {}, style: {}, plays: 0, bloqueado: false,
+        setAttribute(k, val) { this.attrs[k] = val; },
+        canPlayType: () => '',
+        play() {
+          this.plays++;
+          if (this.bloqueado) return Promise.reject(new Error('NotAllowedError'));
+          this.paused = false;
+          return Promise.resolve();
+        },
+        pause() { this.paused = true; },
+      };
+      env.videos.push(v);
+      return v;
+    },
+  };
+  if (api) {
+    env.wakeLock = {
+      request(tipo) {
+        assert.equal(tipo, 'screen');
+        return new Promise((resolve, reject) => env.pedidos.push({ resolve, reject }));
+      },
+    };
+  }
+  // Lo que da el navegador al conceder: se suelta solo (pestana oculta) o con release().
+  env.sentinel = () => {
+    const s = { released: false, liberado: 0, oyentes: [],
+      addEventListener(ev, fn) { if (ev === 'release') this.oyentes.push(fn); },
+      soltar() { this.released = true; this.oyentes.forEach(fn => fn()); },
+      release() { this.liberado++; this.soltar(); return Promise.resolve(); } };
+    return s;
+  };
+  env.ocultar = (oculta) => { env.doc.visibilityState = oculta ? 'hidden' : 'visible'; };
+  return env;
+}
+const esperar = () => new Promise(r => setImmediate(r));
+
+test('pantalla encendida: un solo pedido, y se suelta al dejar de hacer falta', async () => {
+  const { createScreenKeeper } = require('./pure.js');
+  const env = navegadorFalso();
+  const k = createScreenKeeper({ wakeLock: env.wakeLock, doc: env.doc });
+  k.want(true);
+  k.want(true);
+  k.sync();
+  assert.equal(env.pedidos.length, 1);
+  const s = env.sentinel();
+  env.pedidos[0].resolve(s);
+  await esperar();
+  k.sync();
+  assert.equal(env.pedidos.length, 1);
+  k.want(false);
+  assert.equal(s.liberado, 1);
+  assert.equal(k.usingVideo(), false);
+  assert.equal(env.videos.length, 0);
+});
+
+test('pantalla encendida: se vuelve a pedir al volver a la pestana', async () => {
+  const { createScreenKeeper } = require('./pure.js');
+  const env = navegadorFalso();
+  const k = createScreenKeeper({ wakeLock: env.wakeLock, doc: env.doc });
+  k.want(true);
+  const s = env.sentinel();
+  env.pedidos[0].resolve(s);
+  await esperar();
+  // Al ocultarla el navegador suelta el lock por su cuenta
+  env.ocultar(true);
+  s.soltar();
+  k.sync();
+  assert.equal(env.pedidos.length, 1);
+  env.ocultar(false);
+  k.sync();
+  assert.equal(env.pedidos.length, 2);
+  // Aunque el aviso de 'release' no haya llegado, un lock ya soltado no cuenta
+  const s2 = env.sentinel();
+  env.pedidos[1].resolve(s2);
+  await esperar();
+  s2.released = true;
+  k.sync();
+  assert.equal(env.pedidos.length, 3);
+});
+
+test('pantalla encendida: deja de hacer falta mientras se pide y se suelta al llegar', async () => {
+  const { createScreenKeeper } = require('./pure.js');
+  const env = navegadorFalso();
+  const k = createScreenKeeper({ wakeLock: env.wakeLock, doc: env.doc });
+  k.want(true);
+  k.want(false);
+  const s = env.sentinel();
+  env.pedidos[0].resolve(s);
+  await esperar();
+  assert.equal(s.liberado, 1);
+});
+
+test('pantalla encendida: sin la API (modo LAN por http) un video mudo e invisible', () => {
+  const { createScreenKeeper } = require('./pure.js');
+  const env = navegadorFalso({ api: false });
+  const k = createScreenKeeper({ wakeLock: undefined, doc: env.doc });
+  assert.equal(env.videos.length, 0); // nada hasta que haga falta
+  k.want(true);
+  k.sync();
+  assert.equal(env.videos.length, 1);
+  assert.equal(env.agregados, 1);
+  const v = env.videos[0];
+  assert.equal(v.muted, true);
+  assert.equal(v.loop, true);
+  assert.equal(v.attrs.playsinline, '');
+  assert.match(v.src, /^data:video\/mp4;base64,/);
+  assert.match(v.style.cssText, /opacity:0/);
+  assert.match(v.style.cssText, /pointer-events:none/);
+  assert.match(v.style.cssText, /width:100%;height:100%/);
+  assert.equal(v.paused, false);
+  assert.equal(v.plays, 1);
+  // Oculta: se pausa; a la vista: sigue
+  env.ocultar(true);
+  k.sync();
+  assert.equal(v.paused, true);
+  env.ocultar(false);
+  k.sync();
+  assert.equal(v.paused, false);
+  k.want(false);
+  assert.equal(v.paused, true);
+  assert.equal(env.videos.length, 1);
+});
+
+test('pantalla encendida: video bloqueado sin un toque se reintenta con el proximo', async () => {
+  const { createScreenKeeper } = require('./pure.js');
+  const env = navegadorFalso({ api: false });
+  const k = createScreenKeeper({ wakeLock: null, doc: env.doc });
+  k.want(true);
+  const v = env.videos[0];
+  // Primer intento rechazado (ahorro de bateria): en el falso el primer play ya paso
+  v.paused = true;
+  v.bloqueado = true;
+  k.sync();
+  await esperar();
+  assert.equal(v.paused, true);
+  v.bloqueado = false;
+  k.sync(); // el toque
+  assert.equal(v.paused, false);
+  assert.equal(v.plays, 3);
+});
+
+test('pantalla encendida: la API rechaza con la pestana a la vista, va el video', async () => {
+  const { createScreenKeeper } = require('./pure.js');
+  const env = navegadorFalso();
+  const k = createScreenKeeper({ wakeLock: env.wakeLock, doc: env.doc });
+  k.want(true);
+  env.pedidos[0].reject(new Error('NotAllowedError'));
+  await esperar();
+  assert.equal(k.usingVideo(), true);
+  assert.equal(env.videos.length, 1);
+  assert.equal(env.videos[0].paused, false);
+  k.sync();
+  assert.equal(env.pedidos.length, 1);
+});
+
+test('pantalla encendida: rechazo con la pestana oculta no es motivo para el video', async () => {
+  const { createScreenKeeper } = require('./pure.js');
+  const env = navegadorFalso();
+  const k = createScreenKeeper({ wakeLock: env.wakeLock, doc: env.doc });
+  k.want(true);
+  env.ocultar(true);
+  env.pedidos[0].reject(new Error('NotAllowedError'));
+  await esperar();
+  assert.equal(k.usingVideo(), false);
+  env.ocultar(false);
+  k.sync();
+  assert.equal(env.pedidos.length, 2);
+  assert.equal(env.videos.length, 0);
+});
