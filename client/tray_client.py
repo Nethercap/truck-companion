@@ -61,6 +61,9 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
 DEFAULT_WEB_URL = "https://trucksim-dash.com/app/"
+# Con el relay de siempre, el link del celular va sin ?backend=: mas corto,
+# y el QR sale con modulos mas grandes, que la camara lee mejor de lejos.
+DEFAULT_BACKEND = "wss://truck-companion-production.up.railway.app"
 URL_CUENTA = "https://trucksim-dash.com/account/"
 DONATE_URL = "https://tecito.app/truckdash"  # Tecito. Vacio, el item "Apoyar" del menu no aparece
 
@@ -568,7 +571,16 @@ class SetupWindow:
         self.button(code_row, T("copy"), self.copy_code).pack(side="left", padx=(10, 4))
         self.button(code_row, T("new_code"), self.new_code).pack(side="left", padx=4)
         self.button(code_row, T("open_dashboard"), self.open_dashboard, primary=True).pack(side="left", padx=4)
-        self.label(status_frame, T("phone_hint"), fg=MUTED, wraplength=520).pack(anchor="w")
+        # QR del link con el codigo: la camara del celular abre el tablero ya
+        # conectado, sin tipear ocho letras (auditoria del 12-10). Anda por
+        # internet; el de la misma WiFi esta abajo, en Modo LAN.
+        phone_row = tk.Frame(status_frame, bg=BG)
+        phone_row.pack(anchor="w", pady=(4, 0), fill="x")
+        self.phone_qr_label = tk.Label(phone_row, bg=BG)
+        self.phone_qr_label.pack(side="left", padx=(0, 12))
+        self.label(phone_row, T("phone_hint"), fg=MUTED, wraplength=400).pack(side="left", anchor="n")
+        self._phone_qr_url = None
+        self.render_phone_qr()
 
         # --- Cuenta ---
         # Opcional a proposito: todo el cliente funciona sin vincular nada, y
@@ -1163,6 +1175,23 @@ class SetupWindow:
             self.root.clipboard_clear()
             self.root.clipboard_append(state.code)
 
+    def render_phone_qr(self):
+        url = build_phone_url()
+        if url == self._phone_qr_url:
+            return
+        self._phone_qr_url = url
+        if not url:
+            self.phone_qr_label.configure(image="")
+            return
+        try:
+            from PIL import ImageTk
+            img = local_server.qr_image(url)
+            self._phone_qr_photo = ImageTk.PhotoImage(img, master=self.root)
+            self.phone_qr_label.configure(image=self._phone_qr_photo)
+        except Exception:
+            logging.exception("QR del celular")
+            self.phone_qr_label.configure(image="")
+
     def render_lan(self):
         if win_integration.red_publica():
             self.lan_public_frame.pack(anchor="w", pady=(6, 0), fill="x")
@@ -1253,6 +1282,7 @@ class SetupWindow:
             text += "\n" + state.status_detail
         self.status_label.configure(text=text, fg=color)
         self.code_label.configure(text=state.code or "-")
+        self.render_phone_qr()  # el codigo cambia con "Codigo nuevo"
         if hasattr(self, "overlay_var") and self.overlay_var.get() != state.overlay.enabled:
             self.overlay_var.set(state.overlay.enabled)  # se toco desde la bandeja o con la tecla
         if hasattr(self, "overlay_corner_var"):
@@ -1332,6 +1362,17 @@ def quit_app(icon, item):
 
 
 _browser_opened = False
+
+
+def build_phone_url() -> str | None:
+    """El link del QR de Setup: el tablero en otro dispositivo, ya conectado
+    con el codigo (la web lo toma de ?code= y lo recuerda)."""
+    if not state.code:
+        return None
+    params = {"code": state.code}
+    if state.backend_url and state.backend_url != DEFAULT_BACKEND:
+        params["backend"] = state.backend_url
+    return f"{state.web_url}?{urllib.parse.urlencode(params)}"
 
 
 def build_web_url() -> str | None:
@@ -2095,7 +2136,7 @@ def _message_box(text: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", default="wss://truck-companion-production.up.railway.app")
+    parser.add_argument("--backend", default=DEFAULT_BACKEND)
     parser.add_argument("--code", default=None)
     parser.add_argument("--web-url", default=DEFAULT_WEB_URL, help="Web URL to open (for local development)")
     parser.add_argument("--autostart", action="store_true", help="Launched by Windows startup: no setup window, browser opens when the game starts")

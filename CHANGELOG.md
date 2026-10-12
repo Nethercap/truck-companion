@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## 1.5.31 (unreleased)
 
+- Setup shows a QR code next to your pairing code: scan it with your phone's camera and the
+  dashboard opens already connected, without typing the code. It works over the internet, so
+  the phone doesn't need to be on the same Wi-Fi.
 - Build my map: wide streets (three or more lanes each way) keep the straight-ahead
   link through intersections. Without it, the route on your own map could loop into a
   side street and back instead of going straight.

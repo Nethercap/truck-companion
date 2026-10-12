@@ -763,3 +763,25 @@ def test_armar_mi_mapa_aparece_solo_si_hace_falta(ventana, monkeypatch, tmp_path
     monkeypatch.setattr(tray_client.map_builder, "free_memory_gb", lambda: 16.0)
     v.build_my_map("ats")
     assert arrancados == ["ats"]
+
+
+def test_qr_del_celular_con_el_codigo_y_se_rehace_al_cambiarlo(ventana, monkeypatch):
+    ventana, _ = ventana
+    # El QR de Setup abre el tablero ya conectado (auditoria del 12-10). Con
+    # el relay de siempre el link va sin ?backend=: mas corto, QR mas legible.
+    monkeypatch.setattr(tray_client.state, "web_url", tray_client.DEFAULT_WEB_URL)
+    monkeypatch.setattr(tray_client.state, "backend_url", tray_client.DEFAULT_BACKEND)
+    monkeypatch.setattr(tray_client.state, "code", "ABCD2345")
+    ventana.refresh_status()
+    assert ventana._phone_qr_url == "https://trucksim-dash.com/app/?code=ABCD2345"
+    assert ventana.phone_qr_label.cget("image")
+    # "Codigo nuevo": el QR viejo ya no sirve
+    monkeypatch.setattr(tray_client.state, "code", "WXYZ6789")
+    ventana.refresh_status()
+    assert ventana._phone_qr_url.endswith("?code=WXYZ6789")
+    # Otro relay (desarrollo): el link lo lleva, si no la web se conectaria al de produccion
+    monkeypatch.setattr(tray_client.state, "backend_url", "ws://localhost:8100")
+    assert "backend=ws%3A%2F%2Flocalhost%3A8100" in tray_client.build_phone_url()
+    monkeypatch.setattr(tray_client.state, "code", None)
+    ventana.refresh_status()
+    assert ventana._phone_qr_url is None and not ventana.phone_qr_label.cget("image")

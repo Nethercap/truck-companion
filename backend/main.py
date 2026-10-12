@@ -15,7 +15,6 @@ import json
 import logging
 import math
 import os
-import random
 import re
 import secrets
 import string
@@ -1108,11 +1107,18 @@ async def start_background_tasks():
 
 
 CODE_ALPHABET = string.ascii_uppercase + string.digits
+# Los codigos nuevos van sin O/0 ni I/1: se tipean en el celular mirando la
+# bandeja o Setup, y esos pares se confunden. Con secrets y no random: con el
+# codigo se ve la telemetria y se aprietan teclas en la PC, y random
+# (Mersenne Twister) se puede predecir mirando suficientes codigos
+# (auditoria del 12-10). Los codigos ya emitidos, con cualquier letra de
+# CODE_ALPHABET, siguen valiendo: el cliente guarda el suyo.
+NEW_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def generate_code() -> str:
     while True:
-        code = "".join(random.choices(CODE_ALPHABET, k=PAIRING_CODE_LENGTH))
+        code = "".join(secrets.choice(NEW_CODE_ALPHABET) for _ in range(PAIRING_CODE_LENGTH))
         if code not in sessions:
             return code
 

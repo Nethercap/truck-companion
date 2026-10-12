@@ -1499,3 +1499,13 @@ def test_ningun_except_exception_mudo_fuera_de_los_envios():
                     and nodo.type.id == "Exception" and len(nodo.body) == 1 and isinstance(nodo.body[0], ast.Pass)):
                 mudos.append(f"{func.name}:{nodo.lineno}")
     assert not mudos, f"except Exception: pass sin loguear en {mudos}"
+
+
+def test_codigos_nuevos_sin_letras_que_se_confunden_y_viejos_validos(main):
+    # Se tipean mirando la bandeja: sin O/0 ni I/1 (auditoria del 12-10)
+    codes = [main.generate_code() for _ in range(300)]
+    assert all(len(c) == main.PAIRING_CODE_LENGTH for c in codes)
+    assert not any(ch in c for c in codes for ch in "O0I1")
+    assert all(main.is_well_formed_code(c) for c in codes)
+    # Los ya emitidos con esas letras siguen entrando: el cliente guarda el suyo
+    assert main.is_well_formed_code("O0I1ABCD")
