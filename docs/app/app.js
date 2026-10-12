@@ -5126,8 +5126,12 @@ document.getElementById('panelToggleBtn').addEventListener('click', () => {
   }, 260);
 });
 
+const SHORT_LANDSCAPE = window.matchMedia('(max-height: 500px) and (orientation: landscape)');
+const CMDS_LANDSCAPE_KEY = 'truckdash_cmds_landscape';
+
 function toggleCommandsDrawer() {
-  document.getElementById('layout').classList.toggle('commandsHidden');
+  const hidden = document.getElementById('layout').classList.toggle('commandsHidden');
+  if (SHORT_LANDSCAPE.matches) lsSet(CMDS_LANDSCAPE_KEY, hidden ? 'closed' : 'open');
   setTimeout(() => {
     if (!map) return;
     map.resize();
@@ -5140,6 +5144,17 @@ document.getElementById('commandsToggleBtn').addEventListener('click', toggleCom
 // El "pico" traslucido que asoma cuando el drawer esta colapsado tambien
 // funciona como boton - es mas facil de tocar que buscar el boton redondo.
 document.getElementById('commandsPeek').addEventListener('click', toggleCommandsDrawer);
+
+// Celular acostado (alto <= 500 px): la botonera arranca plegada. Abierta se
+// comia la mitad de la pantalla y manejando lo que se mira es el mapa
+// (auditoria del 12-10). Se abre con la pestanita de abajo, como siempre, y
+// si alguien la deja abierta acostado (la usa de botonera) se recuerda.
+function foldCommandsForShortLandscape() {
+  if (!SHORT_LANDSCAPE.matches || lsGet(CMDS_LANDSCAPE_KEY) === 'open') return;
+  if (!document.getElementById('layout').classList.contains('commandsHidden')) toggleCommandsDrawer();
+}
+foldCommandsForShortLandscape();
+SHORT_LANDSCAPE.addEventListener('change', foldCommandsForShortLandscape);
 
 // La flechita de "hay mas swipeando" en el panel de info (vertical) se
 // esconde apenas el usuario ya descubrio que puede swipear, para no
