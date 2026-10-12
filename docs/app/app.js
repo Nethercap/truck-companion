@@ -1959,17 +1959,12 @@ function updateCurrentRoad(x, z) {
   }
 }
 
+// Con grilla (buildPointGrid en pure.js), que se rearma al cambiar de mapa:
+// la busqueda lineal recorria los 17-54 mil carteles en cada llamada.
+let roadNameGrid = null, roadNameGridOf = null;
 function nearestRoadName(x, z, maxDist) {
-  let best = null;
-  let bestDist = maxDist;
-  for (const sign of roadNames) {
-    const dist = Math.hypot(sign.x - x, sign.y - z);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = sign;
-    }
-  }
-  return best; // { x, y, label, kind: 'road'|'city' } o null
+  if (roadNameGridOf !== roadNames) { roadNameGrid = buildPointGrid(roadNames, 500); roadNameGridOf = roadNames; }
+  return nearestInGrid(roadNameGrid, x, z, maxDist); // { x, y, label, kind: 'road'|'city' } o null
 }
 
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
@@ -3470,7 +3465,6 @@ const ROUTE_BEHIND_M = 200;
 const ROUTE_BEHIND_MAX = 400;
 const NAV_JUNCTION_CLUSTER_GAP_M = 50; // nodos de cruce mas cerca que esto son el mismo cruce (prefab)
 const NAV_JUNCTION_CLUSTER_SPAN_M = 100; // y el cruce entero no mide mas que esto
-const NAV_ROAD_NAME_MAX_DIST_M = 400; // radio de busqueda del cartel de ruta mas cercano al tramo del giro
 
 // Vista 3D (inclinacion de camara) en modo navegacion, persistida. En nav el
 // camion se ubica en el tercio inferior de la pantalla (padding) para ver mas
@@ -3627,7 +3621,7 @@ function findUpcomingTurn() {
         return {
           kind: 'roundabout', exit: rb.exit, direction: delta > 0 ? 'right' : 'left',
           distanceMeters: Math.max(0, cum[inside ? rb.leave : rb.enter] - cum[here]),
-          nearSign: nearestRoadName(pts[after][0], pts[after][1], NAV_ROAD_NAME_MAX_DIST_M),
+          nearSign: roadSignForTurn(pointAt, cum[rb.leave], cum[cum.length - 1], nearestRoadName, pts[after]),
           node: [pts[rb.enter][0], pts[rb.enter][1]],
         };
       }
@@ -3673,12 +3667,11 @@ function findUpcomingTurn() {
     }
     if (m) {
       const at = m.at != null ? m.at : i;
-      // Nombre de ruta del tramo AL QUE se gira (no del que se viene), buscando
-      // cerca del punto de mundo un poco despues del giro - asi el cartel del
-      // cruce mismo (que suele estar justo en el vertice) no interfiere.
+      // Nombre de ruta del tramo AL QUE se gira (no del que se viene): votan
+      // varios puntos de la salida (roadSignForTurn en pure.js); sin votos,
+      // el cartel mas cercano a un punto un poco despues del giro.
       const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
-      const [wx, wz] = pts[afterTurnIdx];
-      const nearSign = nearestRoadName(wx, wz, NAV_ROAD_NAME_MAX_DIST_M);
+      const nearSign = roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx]);
       // Otra calle hacia el mismo lado antes del giro: la voz dice "turn
       // right" recien despues de pasarla (la distancia es hasta su salida).
       let decoyMeters;

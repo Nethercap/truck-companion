@@ -1761,3 +1761,45 @@ test('proxima ciudad: la de adelante, no la que acaba de quedar atras', () => {
   assert.equal(nextCityAlongRoute(ruta, [lejos], [0, 0]), null);
   assert.equal(nextCityAlongRoute([[0, 0]], [salina], [0, 0]), null);
 });
+
+test('carteles: grilla igual a la busqueda lineal', () => {
+  const { buildPointGrid, nearestInGrid } = require('./pure.js');
+  let seed = 7;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const signs = [];
+  for (let i = 0; i < 3000; i++) signs.push({ x: rnd() * 20000 - 10000, y: rnd() * 20000 - 10000, label: 'S' + i });
+  const lineal = (x, z, max) => { let b = null, bd = max; for (const s of signs) { const d = Math.hypot(s.x - x, s.y - z); if (d < bd) { bd = d; b = s; } } return b; };
+  const grid = buildPointGrid(signs, 500);
+  for (let k = 0; k < 400; k++) {
+    const x = rnd() * 22000 - 11000, z = rnd() * 22000 - 11000;
+    for (const max of [150, 400, 1200]) assert.equal(nearestInGrid(grid, x, z, max), lineal(x, z, max));
+  }
+  assert.equal(nearestInGrid(null, 0, 0, 100), null);
+});
+
+test('nombre del giro: el de la salida, no un cartel de destino junto al vertice', () => {
+  const { roadSignForTurn, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // Salida recta hacia el sur desde (0, 0); carteles de la US-189 al costado
+  // desde los 700 m, y uno de destino "I-80" a 250 m del vertice.
+  const signs = [{ x: 250, y: 0, label: 'I-80', kind: 'road' }];
+  for (let z = 700; z <= 1500; z += 200) signs.push({ x: 40, y: z, label: 'US-189', kind: 'road' });
+  const grid = buildPointGrid(signs);
+  const nearest = (x, z, max) => nearestInGrid(grid, x, z, max);
+  const pointAt = (m) => [0, m];
+  assert.equal(roadSignForTurn(pointAt, 0, 5000, nearest, [0, 20]).label, 'US-189');
+  // Sin carteles al costado de la salida: el criterio de antes (el mas cercano)
+  const solo = buildPointGrid([{ x: 250, y: 0, label: 'I-80', kind: 'road' }]);
+  assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(solo, x, z, m), [0, 20]).label, 'I-80');
+  // La ruta vuelve a doblar a los 300 m: la calle de este giro junta mas votos
+  const dobla = [{ x: 30, y: 60, label: 'A', kind: 'road' }, { x: 30, y: 150, label: 'A', kind: 'road' },
+    { x: 30, y: 500, label: 'B', kind: 'road' }, { x: 30, y: 800, label: 'B', kind: 'road' }];
+  const g2 = buildPointGrid(dobla);
+  assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(g2, x, z, m), null).label, 'A');
+  // Cerca del final de la ruta: solo las muestras que entran
+  assert.equal(roadSignForTurn(pointAt, 0, 100, nearest, null), null);
+  // Carteles de destino (ETS2): no votan, queda el del cruce aunque mas
+  // adelante haya uno de la otra mano
+  const destinos = buildPointGrid([{ x: 60, y: 20, label: 'Venezia', kind: 'city' },
+    { x: 30, y: 600, label: 'Firenze', kind: 'city' }, { x: 30, y: 900, label: 'Firenze', kind: 'city' }]);
+  assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(destinos, x, z, m), [0, 20]).label, 'Venezia');
+});

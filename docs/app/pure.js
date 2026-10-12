@@ -1440,6 +1440,69 @@ const DEMO_ROUTE = {
   truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158,
 };
 
+// Indice por grilla para "el punto mas cercano a menos de maxDist" ({x, y}).
+// Los carteles de ruta son 17 mil en ATS y 54 mil en ETS2, y nearestRoadName
+// los recorria todos en cada busqueda.
+function buildPointGrid(points, cell = 500) {
+  const cells = new Map();
+  for (const p of points || []) {
+    const k = `${Math.floor(p.x / cell)},${Math.floor(p.y / cell)}`;
+    let a = cells.get(k);
+    if (!a) cells.set(k, a = []);
+    a.push(p);
+  }
+  return { cell, cells };
+}
+function nearestInGrid(grid, x, z, maxDist) {
+  if (!grid) return null;
+  const { cell, cells } = grid;
+  const r = Math.ceil(maxDist / cell), cx = Math.floor(x / cell), cz = Math.floor(z / cell);
+  let best = null, bestD = maxDist;
+  for (let i = cx - r; i <= cx + r; i++) {
+    for (let j = cz - r; j <= cz + r; j++) {
+      const a = cells.get(`${i},${j}`);
+      if (!a) continue;
+      for (const p of a) {
+        const d = Math.hypot(p.x - x, p.y - z);
+        if (d < bestD) { bestD = d; best = p; }
+      }
+    }
+  }
+  return best;
+}
+
+// Nombre de la ruta a la que se gira ("onto US-189"). Antes era el cartel mas
+// cercano (hasta 400 m) a un punto apenas pasado el giro, y en los enlaces
+// ganaba un cartel de destino de otra ruta: la demo decia "Turn right onto
+// I-80" al tomar la US-189 (auditoria del 12-10). Ahora votan varios puntos
+// de la salida, cada uno con el cartel que tenga a menos de `radius` (los de
+// la ruta estan al costado del camino); un voto por punto y, si empatan, gana
+// la que aparecio primero. Con mas peso en los primeros puntos, un cartel
+// de otra ruta en el cruce le ganaba a la ruta que se sigue 3 km (New
+// Orleans -> Houma: US-51 por la US-61). Votan solo los
+// numeros de ruta (kind 'road', los de ATS): los de destino (kind 'city',
+// todos los de ETS2) no dicen hacia donde miran, y a lo largo de la salida
+// aparecen los de la otra mano, que nombran lo que queda atras ("toward
+// FIRENZE" yendo a Venecia). Para esos, y sin ningun voto, el criterio de
+// antes: el del cruce mismo. pointAt(m): punto de la ruta a m metros del inicio.
+const ROAD_SIGN_SAMPLES_M = [60, 150, 300, 500, 800, 1200];
+function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {}) {
+  const radius = opts.radius ?? 200, fallbackRadius = opts.fallbackRadius ?? 400;
+  const votes = new Map(); // en orden de aparicion: un empate lo gana la primera
+  ROAD_SIGN_SAMPLES_M.forEach((d) => {
+    if (fromM + d > totalM) return;
+    const p = pointAt(fromM + d);
+    const s = p && nearest(p[0], p[1], radius);
+    if (!s || s.kind !== 'road') return;
+    const v = votes.get(s.label);
+    if (v) v.score++; else votes.set(s.label, { score: 1, sign: s });
+  });
+  let best = null;
+  for (const v of votes.values()) if (!best || v.score > best.score) best = v;
+  if (best) return best.sign;
+  return fallbackXY ? nearest(fallbackXY[0], fallbackXY[1], fallbackRadius) : null;
+}
+
 // Proxima ciudad sobre la ruta: la que la ruta pasa a menos de `radius` y
 // cuyo punto mas cercano de la ruta esta adelante del camion (al menos
 // `minAhead` metros); entre esas, la primera. Antes era "la primera ciudad a
@@ -2246,5 +2309,5 @@ function citiesMatchingInput(names, labels, input) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { routeProgressTotal, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
-    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute };
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn };
 }
