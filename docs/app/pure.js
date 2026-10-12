@@ -1606,6 +1606,32 @@ function routeHasLine(feature) {
 // en pasos de 5 %.
 const LAYOUT_SCALE_MIN = 0.6;
 const LAYOUT_SCALE_MAX = 2.5;
+// Donde queda un panel o boton movido a mano: en cada eje, contra el borde
+// mas cercano, en porcentaje del mapa ({x|r, y|b}). Hasta el 11-10 siempre
+// desde arriba a la izquierda: pegado abajo en la vista normal, en pantalla
+// completa (mapa mas alto) quedaba en el medio y no habia forma de bajarlo
+// para las dos vistas (Discord, Gargamosch). rect y area: la caja que se ve
+// (con la escala) y la del mapa, {left, top, width, height}.
+function layoutAnchor(rect, area) {
+  const pct = (v, total) => Math.round(Math.max(0, v) / total * 1000) / 10;
+  const out = {};
+  if (rect.left + rect.width / 2 - area.left > area.width / 2) out.r = pct(area.left + area.width - rect.left - rect.width, area.width);
+  else out.x = pct(rect.left - area.left, area.width);
+  if (rect.top + rect.height / 2 - area.top > area.height / 2) out.b = pct(area.top + area.height - rect.top - rect.height, area.height);
+  else out.y = pct(rect.top - area.top, area.height);
+  return out;
+}
+// Lo guardado (layoutAnchor, o el {x, y} de antes) como estilos. El origen de
+// la escala va en la esquina anclada: agrandado crece hacia adentro del mapa.
+function layoutCss(pos) {
+  const right = pos.r != null && pos.x == null, bottom = pos.b != null && pos.y == null;
+  return {
+    left: right ? 'auto' : `${pos.x || 0}%`, right: right ? `${pos.r}%` : 'auto',
+    top: bottom ? 'auto' : `${pos.y || 0}%`, bottom: bottom ? `${pos.b}%` : 'auto',
+    transformOrigin: `${right ? '100%' : '0'} ${bottom ? '100%' : '0'}`,
+  };
+}
+
 function layoutScaleFor({ startScale, startWidth, startHeight, dx, dy, maxWidth, maxHeight, snap }) {
   if (!(startScale > 0) || !(startWidth > 0) || !(startHeight > 0)) return startScale || 1;
   // Se sigue al dedo en la direccion que mas se movio: arrastrar en diagonal,
@@ -2117,6 +2143,6 @@ function citiesMatchingInput(names, labels, input) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE };
 }

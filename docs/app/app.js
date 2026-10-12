@@ -1359,11 +1359,21 @@ function placeMoved(el, pos) {
   if (!panel || !el) return;
   if (el.parentNode !== panel) panel.appendChild(el);
   el.classList.add('moved');
-  el.style.left = `${pos.x}%`;
-  el.style.top = `${pos.y}%`;
-  el.style.right = 'auto';
-  el.style.bottom = 'auto';
+  Object.assign(el.style, layoutCss(pos));
   el.style.scale = pos.s && pos.s !== 1 ? String(pos.s) : '';
+}
+
+// Para acomodarlo se vuelve a medir desde arriba a la izquierda (lo que usan
+// el arrastre y el cambio de tamano); al soltarlo, saveLayoutOf lo ancla de
+// nuevo al borde mas cercano.
+function layoutFromTopLeft(el, panel) {
+  if (!el.classList.contains('moved')) return;
+  const box = el.getBoundingClientRect();
+  const area = panel.getBoundingClientRect();
+  el.style.left = `${((box.left - area.left) / area.width) * 100}%`;
+  el.style.top = `${((box.top - area.top) / area.height) * 100}%`;
+  el.style.right = el.style.bottom = 'auto';
+  el.style.transformOrigin = '';
 }
 
 function layoutBucket(id) {
@@ -1405,7 +1415,7 @@ function resetBtnLayout() {
     const home = btnHome.get(id);
     if (!el || !home) continue;
     el.classList.remove('moved');
-    el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.scale = '';
+    el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.scale = el.style.transformOrigin = '';
     home.parent.insertBefore(el, home.next);
   }
   placeMiniHud();
@@ -1444,10 +1454,15 @@ function detachForLayout(el, panel) {
 }
 
 function saveLayoutOf(el) {
-  const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
-  if (!isFinite(x) || !isFinite(y)) return;
+  const panel = document.getElementById('mapPanel');
+  if (!panel || !isFinite(parseFloat(el.style.left)) || !isFinite(parseFloat(el.style.top))) return;
+  const box = el.getBoundingClientRect(), area = panel.getBoundingClientRect();
+  if (!(area.width > 0) || !(area.height > 0)) return;
   const s = parseFloat(el.style.scale);
-  layoutBucket(el.id)[el.id] = isFinite(s) && s !== 1 ? { x, y, s } : { x, y };
+  const pos = layoutAnchor(box, area);
+  if (isFinite(s) && s !== 1) pos.s = s;
+  layoutBucket(el.id)[el.id] = pos;
+  placeMoved(el, pos);
   saveSettings();
 }
 
@@ -1457,8 +1472,11 @@ function startLayoutResize(el, ev) {
   ev.preventDefault();
   ev.stopPropagation();
   const target = ev.currentTarget;
-  target.setPointerCapture(ev.pointerId);
+  // Primero sacarlo de su lugar y despues capturar: mover el nodo suelta la
+  // captura (ver startLayoutDrag).
+  layoutFromTopLeft(el, panel);
   detachForLayout(el, panel);
+  target.setPointerCapture(ev.pointerId);
   const box = el.getBoundingClientRect();
   const area = panel.getBoundingClientRect();
   const startScale = parseFloat(el.style.scale) || 1;
@@ -1498,6 +1516,7 @@ function startLayoutDrag(ev) {
   }
   ev.preventDefault();
   ev.stopPropagation();
+  layoutFromTopLeft(el, panel);
   const box = el.getBoundingClientRect();
   const area = panel.getBoundingClientRect();
   const grabX = ev.clientX - box.left;
@@ -1534,7 +1553,13 @@ function startLayoutDrag(ev) {
     if (!dragging) {
       if (Math.hypot(e.clientX - from.x, e.clientY - from.y) < LAYOUT_DRAG_SLOP_PX) return;
       dragging = true;
-      if (el.parentNode !== panel) panel.appendChild(el);
+      if (el.parentNode !== panel) {
+        panel.appendChild(el);
+        // Mover el nodo le saca la captura del puntero: al soltar con el
+        // dedo fuera del panel (llevado contra el borde, donde se frena) el
+        // pointerup no llegaba y la posicion no se guardaba.
+        try { target.setPointerCapture(e.pointerId); } catch (err) { /* ya no esta apretado */ }
+      }
       el.classList.add('moved');
       placeMiniHudExtra();
     }

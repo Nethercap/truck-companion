@@ -1653,3 +1653,20 @@ test('maneuver: Y donde la otra rama se abre mas que la ruta, pero la ruta tambi
   const m = detectManeuver(ctx);
   assert.deepEqual([m.kind, m.direction, m.far], ['fork', 'left', true]);
 });
+
+test('layoutAnchor y layoutCss: un panel pegado abajo sigue pegado abajo con el mapa mas alto (Gargamosch, 11-10)', () => {
+  const { layoutAnchor, layoutCss } = require('./pure.js');
+  const area = { left: 0, top: 0, width: 400, height: 600 };
+  // abajo a la derecha, pegado al borde: se guarda desde abajo y la derecha
+  const abajo = layoutAnchor({ left: 250, top: 480, width: 150, height: 120 }, area);
+  assert.deepEqual(abajo, { r: 0, b: 0 });
+  assert.deepEqual(layoutCss(abajo), { left: 'auto', right: '0%', top: 'auto', bottom: '0%', transformOrigin: '100% 100%' });
+  // arriba a la izquierda: como antes, desde arriba y la izquierda
+  const arriba = layoutAnchor({ left: 20, top: 30, width: 100, height: 50 }, { ...area, left: 10, top: 10 });
+  assert.deepEqual(arriba, { x: 2.5, y: 3.3 });
+  assert.deepEqual(layoutCss(arriba), { left: '2.5%', right: 'auto', top: '3.3%', bottom: 'auto', transformOrigin: '0 0' });
+  // lo guardado antes del cambio ({x, y}) se lee igual
+  assert.deepEqual(layoutCss({ x: 60, y: 80, s: 1.5 }), { left: '60%', right: 'auto', top: '80%', bottom: 'auto', transformOrigin: '0 0' });
+  // un poco afuera del mapa (redondeos) no da negativos
+  assert.deepEqual(layoutAnchor({ left: 251, top: 481, width: 150, height: 120 }, area), { r: 0, b: 0 });
+});
