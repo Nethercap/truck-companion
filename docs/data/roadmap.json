@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-09",
+  "updated": "2026-10-12",
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped. Los shipped se muestran aparte en el orden de este archivo: lo mas nuevo primero.",
   "items": [
     {
@@ -64,14 +64,26 @@
     },
     {
       "id": "ingame-overlay",
-      "status": "exploring",
+      "status": "shipped",
       "en": {
         "title": "Overlay inside the game",
-        "body": "The dashboard drawn on top of the game, for people playing on one screen who do not want a second device. Asked for on Reddit. The catch is not permission, it is space: an overlay needs the game in a borderless window rather than exclusive fullscreen, and it takes back the screen room that a second device is there to save."
+        "body": "A small panel over ETS2 and ATS with speed and limit, the next turn and city, distance left and arrival on both clocks. It lets clicks through, never takes focus from the game, and Ctrl+Shift+O shows or hides it. Windows, with the game in a window or borderless fullscreen; off by default, in the client's Setup."
       },
       "es": {
         "title": "Overlay dentro del juego",
-        "body": "El tablero dibujado encima del juego, para quien juega en una sola pantalla y no quiere un segundo dispositivo. Lo pidieron en Reddit. El problema no es el permiso sino el lugar: un overlay necesita el juego en ventana sin bordes y no en pantalla completa exclusiva, y le saca al juego el espacio que el segundo dispositivo justamente ahorra."
+        "body": "Un panel chico encima de ETS2 y ATS con velocidad y límite, el próximo giro y la próxima ciudad, lo que falta y la llegada en los dos relojes. Deja pasar los clics, nunca le saca el foco al juego y Ctrl+Shift+O lo muestra o lo esconde. En Windows, con el juego en ventana o en pantalla completa sin bordes; viene apagado y se prende en la Configuración del cliente."
+      }
+    },
+    {
+      "id": "local-maps",
+      "status": "shipped",
+      "en": {
+        "title": "Build my map",
+        "body": "Drive somewhere the map does not cover, with a map mod we have not built, and the client offers to build the map from your own game files. It runs once, with the game closed, and the dashboard picks it up on its own."
+      },
+      "es": {
+        "title": "Armar mi mapa",
+        "body": "Si manejás por donde el mapa no llega, con un mod de mapa que no armamos, el cliente ofrece armarlo con los archivos de tu juego. Se arma una vez, con el juego cerrado, y el tablero lo usa solo."
       }
     },
     {
