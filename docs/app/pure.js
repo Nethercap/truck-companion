@@ -1440,6 +1440,47 @@ const DEMO_ROUTE = {
   truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158,
 };
 
+// Proxima ciudad sobre la ruta: la que la ruta pasa a menos de `radius` y
+// cuyo punto mas cercano de la ruta esta adelante del camion (al menos
+// `minAhead` metros); entre esas, la primera. Antes era "la primera ciudad a
+// menos de radius de algun punto": la ruta empieza en el camion, asi que una
+// ciudad que acababa de quedar atras (entre los 2 km, donde se la descartaba
+// como la actual, y los 2,5) ganaba, y en la demo la proxima ciudad saltaba
+// Salina -> Provo -> Salina (auditoria del 12-10). Coordenadas del juego.
+function nextCityAlongRoute(points, cities, truck, opts = {}) {
+  const radius = opts.radius ?? 2500, minAhead = opts.minAhead ?? 300;
+  const currentCity = opts.currentCityRadius ?? 2000, maxSamples = opts.maxSamples ?? 400;
+  if (!points || points.length < 2 || !cities || !cities.length) return null;
+  const step = Math.max(1, Math.floor(points.length / maxSamples));
+  const sx = [], sy = [], along = [];
+  let acc = 0;
+  for (let i = 0; i < points.length; i++) {
+    if (i) acc += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+    if (i % step === 0 || i === points.length - 1) { sx.push(points[i][0]); sy.push(points[i][1]); along.push(acc); }
+  }
+  // Donde esta el camion sobre la ruta (por si la lista trae algo de atras)
+  let truckAlong = 0;
+  if (truck) {
+    let d = Infinity;
+    for (let k = 0; k < sx.length; k++) {
+      const e = Math.hypot(sx[k] - truck[0], sy[k] - truck[1]);
+      if (e < d) { d = e; truckAlong = along[k]; }
+    }
+  }
+  let best = null, bestAlong = Infinity;
+  for (const c of cities) {
+    if (truck && Math.hypot(c.X - truck[0], c.Y - truck[1]) < currentCity) continue; // la que se atraviesa
+    let dMin = Infinity, aMin = 0;
+    for (let k = 0; k < sx.length; k++) {
+      const e = Math.hypot(sx[k] - c.X, sy[k] - c.Y);
+      if (e < dMin) { dMin = e; aMin = along[k]; }
+    }
+    const ahead = aMin - truckAlong;
+    if (dMin < radius && ahead >= minAhead && ahead < bestAlong) { bestAlong = ahead; best = c.Name; }
+  }
+  return best;
+}
+
 // Numeros con el idioma de la interfaz y no el del sistema: con la app en
 // ingles y Windows en castellano salia "$61.158" al lado de "184,225 km"
 // (auditoria del 12-10). Ingles es el idioma por defecto, asi que le pasaba a
@@ -2205,5 +2246,5 @@ function citiesMatchingInput(names, labels, input) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { routeProgressTotal, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
-    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass };
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute };
 }

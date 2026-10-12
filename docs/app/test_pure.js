@@ -1741,3 +1741,23 @@ test('decimales con la coma o el punto del idioma de la interfaz', () => {
   assert.equal(formatTurnDistance(2.5 * 1609.344, true, 'pl'), '2,5 mi');
   assert.equal(formatTurnDistance(0.4 * 1609.344, true, 'en'), '0.4 mi');
 });
+
+test('proxima ciudad: la de adelante, no la que acaba de quedar atras', () => {
+  const { nextCityAlongRoute } = require('./pure.js');
+  // Ruta recta hacia el sur desde el camion (0, 0) hasta (0, -20000)
+  const ruta = [];
+  for (let z = 0; z >= -20000; z -= 100) ruta.push([0, z]);
+  const provo = { Name: 'Provo', X: 0, Y: 2200 };          // atras, a 2,2 km del camion
+  const salina = { Name: 'Salina', X: 500, Y: -15000 };    // adelante, al costado de la ruta
+  const lejos = { Name: 'Salina KS', X: 60000, Y: -15000 }; // mismo nombre, otro estado
+  const nephi = { Name: 'Nephi', X: -800, Y: -6000 };      // adelante y antes que Salina
+  assert.equal(nextCityAlongRoute(ruta, [provo, salina, lejos], [0, 0]), 'Salina');
+  assert.equal(nextCityAlongRoute(ruta, [provo, salina, nephi], [0, 0]), 'Nephi');
+  // La que se esta atravesando (centro a menos de 2 km) no cuenta
+  assert.equal(nextCityAlongRoute(ruta, [{ Name: 'Aca', X: 0, Y: -1500 }, salina], [0, 0]), 'Salina');
+  // Si la lista trae tramo de atras, se mide desde donde esta el camion
+  const conAtras = [[0, 5000], [0, 2500], ...ruta];
+  assert.equal(nextCityAlongRoute(conAtras, [provo, salina], [0, 0]), 'Salina');
+  assert.equal(nextCityAlongRoute(ruta, [lejos], [0, 0]), null);
+  assert.equal(nextCityAlongRoute([[0, 0]], [salina], [0, 0]), null);
+});

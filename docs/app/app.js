@@ -4074,29 +4074,16 @@ function navTargetZoom(turn) {
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
 // proyectando la posicion actual sobre la polilinea y descartando los puntos
 // anteriores - asi no queda roja debajo de la azul (trail) ya recorrida.
-// Proxima ciudad sobre la ruta: la primera cuyo centro queda a menos de
-// NEXT_CITY_RADIUS_M de la ruta (muestreada), salvo la que ya estamos
-// atravesando. Se recalcula cada pocos segundos, no por tick.
-const NEXT_CITY_RADIUS_M = 2500;
+// Proxima ciudad sobre la ruta (nextCityAlongRoute en pure.js: la primera
+// que la ruta pasa cerca y que esta adelante del camion, salvo la que se
+// atraviesa). Se recalcula cada pocos segundos, no por tick.
 let nextCityName = null;
 let nextCityComputedAt = 0;
 function updateNextCity(x, z) {
   const now = performance.now();
   if (now - nextCityComputedAt < 4000) return;
   nextCityComputedAt = now;
-  let found = null;
-  if (currentRouteWorldPoints && currentRouteWorldPoints.length > 1) {
-    const pts = currentRouteWorldPoints;
-    const step = Math.max(1, Math.floor(pts.length / 400));
-    let bestIdx = Infinity;
-    for (const c of citiesAll) {
-      if (Math.hypot(c.X - x, c.Y - z) < 2000) continue; // ciudad actual
-      for (let i = 0; i < pts.length; i += step) {
-        if (i >= bestIdx) break;
-        if (Math.hypot(pts[i][0] - c.X, pts[i][1] - c.Y) < NEXT_CITY_RADIUS_M) { bestIdx = i; found = c.Name; break; }
-      }
-    }
-  }
+  const found = nextCityAlongRoute(currentRouteWorldPoints, citiesAll, [x, z]);
   if (found !== nextCityName) {
     nextCityName = found;
     const row = document.getElementById('nextCityRow');
