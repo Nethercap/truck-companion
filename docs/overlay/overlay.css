@@ -1,0 +1,62 @@
+/* Overlay para OBS. El HUD escala con --s (?size=); en OBS el fondo de la
+   pagina tiene que ser transparente, asi que el unico fondo es el del HUD. */
+:root { --s: 1; }
+html, body { margin: 0; background: transparent; }
+[hidden] { display: none !important; }
+
+.hud {
+  display: inline-flex; flex-direction: column; margin: calc(8px * var(--s));
+  padding: calc(10px * var(--s)) calc(16px * var(--s)) calc(5px * var(--s));
+  background: rgba(11, 13, 16, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: calc(14px * var(--s)); color: #fff;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); transition: opacity 0.4s;
+}
+/* Sin datos (pausa, juego cerrado, sin conexion) desaparece del stream */
+.hud.off { opacity: 0; }
+.hudBody { display: flex; align-items: center; gap: calc(16px * var(--s)); }
+.hudSpeed { display: flex; align-items: center; gap: calc(10px * var(--s)); }
+.hudLimit {
+  box-sizing: border-box; width: calc(46px * var(--s)); height: calc(46px * var(--s)); border-radius: 50%;
+  background: #fff; border: calc(5px * var(--s)) solid #e53935; color: #111; text-shadow: none;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: calc(17px * var(--s));
+}
+.hudSpeedNum span { display: block; font-size: calc(44px * var(--s)); font-weight: 800; line-height: 0.95; }
+.hudSpeedNum small { display: block; font-size: calc(12px * var(--s)); opacity: 0.75; }
+.hud.over .hudSpeedNum span { color: #ff6b6b; }
+.hudCruise { display: flex; align-items: center; gap: calc(4px * var(--s)); color: #7cc243; font-weight: 700; font-size: calc(17px * var(--s)); }
+.hudTrip { border-left: 1px solid rgba(255, 255, 255, 0.2); padding-left: calc(16px * var(--s)); min-width: 0; }
+.hudDest { font-size: calc(21px * var(--s)); font-weight: 700; white-space: nowrap; }
+.hudLine { font-size: calc(14px * var(--s)); opacity: 0.85; white-space: nowrap; }
+.hudBrand { align-self: flex-end; margin-top: calc(3px * var(--s)); font-size: calc(10px * var(--s)); opacity: 0.55; letter-spacing: 0.02em; }
+
+/* --- Armador del link (sin ?code=) --- */
+body.setupMode { background: #0b0d10; color: #f2f3f5; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5; }
+.setup { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+.setupBrand { display: inline-flex; align-items: center; gap: 8px; color: #f2f3f5; text-decoration: none; font-weight: 700; }
+.setup h1 { margin: 18px 0 4px; font-size: 1.8rem; }
+.setupIntro { color: #c6ccd4; margin: 0 0 18px; }
+.preview {
+  border-radius: 12px; padding: 20px; min-height: 120px; margin-bottom: 18px; overflow-x: auto;
+  background: repeating-conic-gradient(#2a2e35 0% 25%, #1f2328 0% 50%) 50% / 24px 24px;
+}
+.preview .hud { margin: 0; }
+.preview .hud.off { opacity: 1; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px 16px; margin-bottom: 16px; }
+.fields label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #c6ccd4; }
+.fields label.check { flex-direction: row; align-items: center; gap: 8px; grid-column: 1 / -1; color: #f2f3f5; font-size: 0.95rem; }
+.fields input:not([type]), .fields select, .urlRow input {
+  background: #14171c; color: #f2f3f5; border: 1px solid #333a44; border-radius: 8px; padding: 8px 10px; font-size: 1rem;
+}
+#fCode { text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+.urlRow { display: flex; gap: 8px; }
+.urlRow input { flex: 1; min-width: 0; font-size: 0.85rem; }
+.urlRow button {
+  background: #3b9eff; color: #06121f; border: none; border-radius: 8px; padding: 8px 18px;
+  font-weight: 700; font-size: 1rem; cursor: pointer;
+}
+.urlRow button:disabled { opacity: 0.5; cursor: default; }
+.hint { color: #9aa4b2; font-size: 0.85rem; }
+.steps { color: #c6ccd4; padding-left: 1.2rem; }
+.steps li { margin-bottom: 6px; }

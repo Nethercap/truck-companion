@@ -3,18 +3,6 @@
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped. Los shipped se muestran aparte en el orden de este archivo: lo mas nuevo primero.",
   "items": [
     {
-      "id": "obs-overlay",
-      "status": "planned",
-      "en": {
-        "title": "OBS overlay for streamers",
-        "body": "A browser-source URL with speed, speed limit, next turn and route, on a transparent background, ready to drop into a scene."
-      },
-      "es": {
-        "title": "Overlay para streamers (OBS)",
-        "body": "Una URL de browser-source con velocidad, límite, próximo giro y ruta, con fondo transparente, lista para poner en una escena."
-      }
-    },
-    {
       "id": "linux",
       "status": "planned",
       "en": {
@@ -60,6 +48,18 @@
       "es": {
         "title": "Comandos por voz",
         "body": "Decir “prendé el limpiaparabrisas” en vez de estirarte hasta el celular. Las mismas acciones que ya hace la botonera, activadas por voz y con las manos en el volante."
+      }
+    },
+    {
+      "id": "obs-overlay",
+      "status": "shipped",
+      "en": {
+        "title": "OBS overlay for streamers",
+        "body": "Your speed, the speed limit, cruise and your trip (destination, distance left, time) over the game on stream. Add trucksim-dash.com/overlay/ as a browser source in OBS; it disappears from the stream while the game is paused or closed."
+      },
+      "es": {
+        "title": "Overlay para streamers (OBS)",
+        "body": "Tu velocidad, el límite, el crucero y tu viaje (destino, lo que falta, el tiempo) encima del juego en el stream. Se agrega trucksim-dash.com/overlay/ como fuente de navegador en OBS, y desaparece del stream con el juego en pausa o cerrado."
       }
     },
     {

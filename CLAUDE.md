@@ -14,7 +14,7 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   event loop para todas las conexiones). Un `TestClient` suelto corre cada
   conexion en su propio thread y los tests se cuelgan a veces en CI.
 - Todo cambio en `docs/` sube `CACHE_NAME` en `docs/app/sw.js` y el `?v=`
-  de `docs/{app,account,dash}/index.html` y del APP_SHELL (mismo token en todos).
+  de `docs/{app,account,dash,overlay}/index.html` y del APP_SHELL (mismo token en todos).
 - La logica de decision va en `docs/app/pure.js` con su test, no suelta en
   app.js: la mayoria de los bugs del 10-10 estaban en app.js, donde no hay tests.
 - Cambios de cliente: anotarlos en CHANGELOG.md (seccion de la proxima

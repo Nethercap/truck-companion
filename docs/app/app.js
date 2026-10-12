@@ -6330,6 +6330,17 @@ document.getElementById('dashCopyLinkBtn').addEventListener('click', async () =>
   }
 });
 
+// Armador del overlay para OBS (docs/overlay/) con el codigo ya puesto.
+document.getElementById('obsOverlayLink').addEventListener('click', (e) => {
+  const code = document.getElementById('code').value.trim().toUpperCase();
+  const url = new URL('../overlay/', location.href);
+  url.searchParams.set('setup', '1');
+  if (code && code !== 'DEMO') url.searchParams.set('code', code);
+  if (currentLang !== 'en') url.searchParams.set('lang', currentLang);
+  if (useImperial) url.searchParams.set('units', 'mi');
+  e.currentTarget.href = url.toString();
+});
+
 // En una tablet o un celular no hay hover, asi que el title de los botones del
 // mapa no se ve nunca ("I'm not exactly sure what that button there is",
 // resena de Roane Gaming, 10-10). Al tocar uno se muestra su nombre un
