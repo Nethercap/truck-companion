@@ -58,7 +58,10 @@
   .statusChip.warn .statusDot { background: #ffb020; }
   .statusChip.err .statusDot { background: var(--danger); }
   .statusChip.info .statusDot { background: var(--accent); }
-  .chipBtn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0 0.2rem; line-height: 1; }
+  /* 24x24 para tocarlo (WCAG 2.5.8; era 20x14), con margenes negativos para
+     que la pastilla no crezca */
+  .chipBtn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0; line-height: 1;
+    min-width: 24px; min-height: 24px; margin: -5px -0.25rem -5px 0; border-radius: 50%; }
   .chipBtn:hover { color: var(--text); }
   .topActions { display: flex; gap: 0.4rem; align-items: center; margin-left: auto; }
   .iconBtn {
@@ -467,6 +470,11 @@
     background: var(--panel); border: 1px solid #333; border-radius: 10px;
     padding: 1.2rem; width: min(340px, 90vw); max-height: 85vh; overflow-y: auto;
   }
+  /* El panel recibe el foco al abrir (para que el lector diga su titulo);
+     el anillo va en los controles, no en el cuadro entero */
+  .settingsPanel:focus { outline: none; }
+  /* Solo para lectores de pantalla (#navLive) */
+  .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   /* Tour rapido de onboarding: no tapa toda la pantalla (a diferencia de los
      modales), pointer-events:none en el fondo para que se siga viendo el
      mapa - solo el tooltip en si es clickeable. El highlight del boton
@@ -1015,4 +1023,19 @@
     overflow-x: auto; gap: 0.4rem; scrollbar-width: none;
   }
   #commandsDrawer .cmdBtn { min-height: 50px; padding: 0.3rem 0.2rem; }
+}
+
+/* Reducir movimiento (ajuste del sistema; auditoria del 12-10, P3): sin
+   pulsos, empujoncitos ni paneles que se deslizan. Lo que avisa algo queda
+   fijo a la vista: el anillo de exceso de velocidad y el cartel de
+   reconexion siguen ahi, quietos. Agujas, barras y la flecha del camion
+   conservan su transicion corta, que suaviza el dato entre lecturas. La
+   camara del mapa la resuelve MapLibre: con este ajuste easeTo y flyTo
+   saltan directo. */
+@media (prefers-reduced-motion: reduce) {
+  #reconnectBanner, .swipeHint { animation: none; }
+  .limitSign.over::after { animation: none; opacity: 0.9; transform: none; }
+  #infoPanel, #commandsDrawer { transition: none; }
+  .panelSwipe { scroll-behavior: auto; }
+  .toast, .toast.show { transform: none; }
 }

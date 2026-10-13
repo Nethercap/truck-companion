@@ -891,16 +891,100 @@ document.getElementById('dlcModal').addEventListener('click', (e) => {
   if (e.target.id === 'dlcModal') document.getElementById('dlcModal').style.display = 'none';
 });
 
+// ---------------------------------------------------------------------------
+// Modales accesibles (auditoria del 12-10, P3). Cada .settingsOverlay es un
+// dialogo con nombre (su h3); al abrirse el foco entra al panel, Tab da la
+// vuelta adentro (focusTrapTarget), Escape aprieta su boton de cerrar
+// (data-modal-close, asi corre la misma logica que con el clic) y al cerrarse
+// el foco vuelve a quien lo abrio. Se abren y cierran tocando style.display
+// desde muchos lugares, y a veces uno abre otro (Ajustes -> Mods, DLC,
+// teclas): por eso se mira el estilo con un MutationObserver en vez de
+// cambiar cada apertura. El de las preguntas (waypoint) no tiene cerrar:
+// Escape no lo saca.
+// ---------------------------------------------------------------------------
+const MODALS = [...document.querySelectorAll('.settingsOverlay')];
+const modalStack = []; // { el, opener }; el ultimo es el de arriba
+let focusOutsideModals = null; // lo ultimo enfocado fuera de los modales
+
+// Todos arrancan con display:none en el HTML y se abren con 'flex'
+function modalIsOpen(el) { return el.style.display !== 'none'; }
+function shownElement(el) { return !!(el && el.isConnected && el !== document.body && el.getClientRects().length); }
+function modalFocusables(el) {
+  return [...el.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
+    .filter(x => x.tabIndex >= 0 && !x.disabled && shownElement(x));
+}
+function focusIntoModal(el) {
+  if (el.contains(document.activeElement)) return; // la apertura ya enfoco algo suyo
+  const panel = el.querySelector('.settingsPanel');
+  (panel || el).focus({ preventScroll: true });
+}
+function topModal() { return modalStack.length ? modalStack[modalStack.length - 1].el : null; }
+
+MODALS.forEach(el => {
+  const panel = el.querySelector('.settingsPanel');
+  if (!panel) return;
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.tabIndex = -1;
+  const title = panel.querySelector('h3');
+  if (title) {
+    if (!title.id) title.id = `${el.id}Title`;
+    panel.setAttribute('aria-labelledby', title.id);
+  }
+});
+
+const modalObserver = new MutationObserver(() => {
+  const closed = MODALS.filter(el => modalStack.some(m => m.el === el) && !modalIsOpen(el));
+  const opened = MODALS.filter(el => !modalStack.some(m => m.el === el) && modalIsOpen(el));
+  // De un modal a otro: el nuevo hereda a quien abrio el anterior (el boton
+  // que se toco quedo adentro del que se cerro).
+  let inherited = null;
+  for (const el of closed) {
+    const i = modalStack.findIndex(m => m.el === el);
+    const { opener } = modalStack.splice(i, 1)[0];
+    inherited = inherited || opener;
+    if (opened.length) continue;
+    const act = document.activeElement;
+    if (act && act !== document.body && !el.contains(act) && shownElement(act)) continue; // el foco ya esta en otro lado
+    if (topModal()) focusIntoModal(topModal());
+    else if (shownElement(opener)) opener.focus({ preventScroll: true });
+  }
+  for (const el of opened) {
+    const act = document.activeElement;
+    let opener = act && !el.contains(act) && shownElement(act) ? act : null;
+    if (!opener) opener = shownElement(inherited) ? inherited : focusOutsideModals;
+    modalStack.push({ el, opener });
+    focusIntoModal(el);
+  }
+});
+// Solo los modales: con todo el body corria en cada dato (el HUD toca estilos)
+MODALS.forEach(el => modalObserver.observe(el, { attributes: true, attributeFilter: ['style'] }));
+
+document.addEventListener('focusin', (e) => {
+  const top = topModal();
+  if (!top) {
+    if (!MODALS.some(m => m.contains(e.target))) focusOutsideModals = e.target;
+    return;
+  }
+  // Algo de afuera tomo el foco con un modal abierto: vuelve adentro
+  if (!top.contains(e.target)) focusIntoModal(top);
+});
+
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  if (document.getElementById('dlcModal').style.display === 'flex') {
-    document.getElementById('dlcModal').style.display = 'none';
-  }
-  if (document.getElementById('settingsModal').style.display === 'flex') {
-    document.getElementById('settingsModal').style.display = 'none';
-  }
-  if (document.getElementById('modsModal').style.display === 'flex') {
-    document.getElementById('modsModal').style.display = 'none';
+  const top = topModal();
+  if (!top || e.defaultPrevented) return;
+  if (e.key === 'Escape') {
+    const close = top.querySelector('[data-modal-close]');
+    if (!close) return;
+    e.preventDefault();
+    e.stopImmediatePropagation(); // que no cierre tambien el panel o la tarjeta de entrega
+    close.click();
+  } else if (e.key === 'Tab') {
+    const list = modalFocusables(top);
+    const to = focusTrapTarget(list.length, list.indexOf(document.activeElement), e.shiftKey);
+    if (to == null) return;
+    e.preventDefault();
+    if (to >= 0) list[to].focus();
   }
 });
 
@@ -2544,7 +2628,6 @@ document.getElementById('poiBtn').addEventListener('click', openPoiModal);
 initPip();
 document.getElementById('poiCloseBtn').addEventListener('click', closePoiModal);
 document.getElementById('poiCloseX').addEventListener('click', closePoiModal);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePoiModal(); });
 document.getElementById('poiModal').addEventListener('click', (e) => { if (e.target.id === 'poiModal') closePoiModal(); });
 document.getElementById('poiSearchInput').addEventListener('input', renderPoiResults);
 document.getElementById('poiCityInput').addEventListener('input', () => { renderPoiResults(); });
@@ -3843,6 +3926,7 @@ function initPip() {
 }
 
 let navPanelParts = null; // lo ultimo que mostro el panel, para el mini-HUD
+const turnAnnouncer = createTurnAnnouncer();
 function updateNavPanel(turn) {
   if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
     document.getElementById('navPanel').style.display = 'none';
@@ -3852,6 +3936,9 @@ function updateNavPanel(turn) {
   panel.innerHTML = navPanelHtml(turn);
   panel.style.display = 'block';
   navPanelParts = navTurnParts(turn);
+  // Lector de pantalla: el giro una vez por maniobra, no en cada dato
+  const aviso = turnAnnouncer.next(turn, navPanelParts && navPanelParts.text);
+  if (aviso) document.getElementById('navLive').textContent = aviso;
 }
 
 // El texto del proximo giro: lo usan el panel de navegacion, la ventana
@@ -5622,6 +5709,9 @@ function closeCustomBtnModal() { document.getElementById('customBtnModal').style
 
 document.getElementById('customBtnKey').addEventListener('keydown', (e) => {
   if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return; // esperando la tecla principal
+  // Tab (y Shift+Tab) sale del campo: si lo tomaba como tecla, con el teclado
+  // no habia forma de llegar a Guardar. Ctrl/Alt+Tab se siguen tomando.
+  if (e.key === 'Tab' && !e.ctrlKey && !e.altKey) return;
   e.preventDefault();
   const name = keyNameFromEvent(e);
   if (name) e.target.value = name;

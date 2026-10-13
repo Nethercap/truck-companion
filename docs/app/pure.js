@@ -1885,6 +1885,13 @@ function voiceManeuverKey(turn) {
   if (turn.kind === 'roundabout' && turn.exit >= 1 && turn.exit <= VOICE_ROUNDABOUT_MAX_EXIT) return `roundabout_${turn.exit}`;
   return `${turn.kind === 'fork' ? 'keep' : 'turn'}_${turn.direction === 'left' ? 'left' : 'right'}`;
 }
+// Que maniobra es, para no avisarla dos veces: tipo, lado y el nodo donde se
+// hace. La distancia no entra, que cambia en cada dato. La usan la voz y el
+// aviso para lectores de pantalla (createTurnAnnouncer).
+function turnIdentity(turn) {
+  if (!turn || !turn.node) return null;
+  return `${turn.kind}|${turn.direction}|${Math.round(turn.node[0])},${Math.round(turn.node[1])}`;
+}
 // Cuando se dice el aviso del punto (Ajustes > Guia por voz). Hasta el 11-10
 // era siempre a 6 s: a 80 km/h, 130 m antes, y frenando para doblar se
 // llegaba 10 s despues; en una rotonda se decia "primera salida" lejos de
@@ -1913,7 +1920,7 @@ function createVoiceGuide(opts = {}) {
   return {
     maneuver(turn, speedKmh) {
       if (!turn || !turn.node || !Number.isFinite(turn.distanceMeters)) return null;
-      const id = `${turn.kind}|${turn.direction}|${Math.round(turn.node[0])},${Math.round(turn.node[1])}`;
+      const id = turnIdentity(turn);
       if (!current || current.id !== id) current = { id, soon: false, now: false };
       const speedMs = Math.max(minSpeedMs, (Number(speedKmh) || 0) / 3.6);
       const seconds = turn.distanceMeters / speedMs;
@@ -2446,7 +2453,39 @@ function createScreenKeeper({ wakeLock, doc }) {
   };
 }
 
+// ------------------------------------------------------- accesibilidad
+// Tab con un modal abierto (app.js, modales accesibles): el foco da la vuelta
+// adentro en vez de irse al mapa de atras. count = controles que se pueden
+// enfocar, index = el que tiene el foco (-1: ninguno, porque esta en el
+// panel o se escapo), back = Shift+Tab. Devuelve a cual mandarlo, -1 para
+// quedarse quieto (no hay ninguno) o null para dejar al navegador.
+function focusTrapTarget(count, index, back) {
+  if (!(count > 0)) return -1;
+  if (!(index >= 0 && index < count)) return back ? count - 1 : 0;
+  if (back && index === 0) return count - 1;
+  if (!back && index === count - 1) return 0;
+  return null;
+}
+
+// El proximo giro para un lector de pantalla (region aria-live del panel de
+// navegacion): una vez por maniobra, con la distancia de ese momento. Poner
+// aria-live en el panel lo haria leer en cada dato, porque la distancia
+// cambia todo el tiempo. Si la ruta vuelve a la misma maniobra despues de un
+// dato sin giro, no la repite.
+function createTurnAnnouncer() {
+  let lastId = null;
+  return {
+    next(turn, text) {
+      const id = turnIdentity(turn);
+      if (!id || !text || id === lastId) return null;
+      lastId = id;
+      // La flecha del principio (↰, ↻) el lector la leeria por su nombre
+      return String(text).replace(/^[^\p{L}\p{N}]+/u, '');
+    },
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

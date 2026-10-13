@@ -313,7 +313,12 @@ function createClassicDash({ root, imperial, lang }) {
     for (const n of [arriba, trabajo, grilla]) n.hidden = !d;
     if (!d || !visible) return;
     ajustarEscalas(d);
-    if (barrido === 'pending') barrer();
+    if (barrido === 'pending') {
+      // Con "reducir movimiento" (ajuste del sistema) no hay barrido: las
+      // agujas van directo al dato.
+      if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) barrido = 'done';
+      else barrer();
+    }
     const imp = mi();
     const alertas = d.mechanicalWarnings || {};
     const temp = (c) => (c == null ? null : (imp ? aF(c) : c));

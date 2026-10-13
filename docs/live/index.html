@@ -40,6 +40,7 @@
   .intro h1 { font-size: 2.2rem; line-height: 1.05; }
   .intro h1 .dot { display: inline-block; width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); margin-right: 0.35em; vertical-align: 0.05em; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  @media (prefers-reduced-motion: reduce) { .intro h1 .dot { animation: none; } }
   .intro p { color: var(--muted); margin: 0.4rem 0 0; max-width: 60ch; }
   .total { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 1rem; font-family: var(--display); font-size: 1.1rem; white-space: nowrap; }
   .total b { color: var(--green); font-size: 1.5rem; margin-right: 0.3rem; }

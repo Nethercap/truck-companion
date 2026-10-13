@@ -153,6 +153,7 @@ input[type="text"], #usernameInput {
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .toast, .toast.show { transform: none; } }
 .toast.ok { border-color: var(--ok); }
 .toast.bad { border-color: var(--danger); }
 

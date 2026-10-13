@@ -2064,3 +2064,48 @@ test('waypointRouteKey: otro destino es otro viaje, los intermedios no (Gargamos
   // La misma ruta despues de recargar sigue midiendo contra lo guardado
   assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored, key: id + haciaA, now }), 640);
 });
+
+test('modales: Tab da la vuelta adentro y Shift+Tab tambien', () => {
+  const { focusTrapTarget } = require('./pure.js');
+  // tres controles: del ultimo al primero, del primero al ultimo
+  assert.equal(focusTrapTarget(3, 2, false), 0);
+  assert.equal(focusTrapTarget(3, 0, true), 2);
+  // en el medio decide el navegador
+  assert.equal(focusTrapTarget(3, 1, false), null);
+  assert.equal(focusTrapTarget(3, 1, true), null);
+  assert.equal(focusTrapTarget(3, 0, false), null);
+  assert.equal(focusTrapTarget(3, 2, true), null);
+  // foco en el panel o afuera: entra por la punta que corresponde
+  assert.equal(focusTrapTarget(3, -1, false), 0);
+  assert.equal(focusTrapTarget(3, -1, true), 2);
+  assert.equal(focusTrapTarget(3, 7, false), 0);
+  // uno solo: siempre ese; ninguno: quieto
+  assert.equal(focusTrapTarget(1, 0, false), 0);
+  assert.equal(focusTrapTarget(1, 0, true), 0);
+  assert.equal(focusTrapTarget(0, -1, false), -1);
+});
+
+test('giro para lector de pantalla: una vez por maniobra y sin la flecha', () => {
+  const { createTurnAnnouncer, turnIdentity, createVoiceGuide } = require('./pure.js');
+  const a = createTurnAnnouncer();
+  const giro = (d, x = 100) => ({ kind: 'turn', direction: 'left', node: [x, 50.4], distanceMeters: d });
+  assert.equal(a.next(giro(900), '↰ Turn left onto I-80 in 900 m'), 'Turn left onto I-80 in 900 m');
+  // la misma maniobra mas cerca: nada (si no, se leeria en cada dato)
+  assert.equal(a.next(giro(600), '↰ Turn left onto I-80 in 600 m'), null);
+  // un dato sin giro (recta) y vuelve la misma: tampoco
+  assert.equal(a.next(null, '⬆ Continue straight'), null);
+  assert.equal(a.next(giro(400), '↰ Turn left onto I-80 in 400 m'), null);
+  // otra maniobra: si
+  assert.equal(a.next(giro(2000, 900), '↰ Turn left in 2 km'), 'Turn left in 2 km');
+  const rot = { kind: 'roundabout', direction: 'right', exit: 2, node: [5, 5], distanceMeters: 300 };
+  assert.equal(a.next(rot, '↻ Roundabout in 300 m: take the 2nd exit'), 'Roundabout in 300 m: take the 2nd exit');
+  // sin texto o sin nodo no hay nada que anunciar
+  assert.equal(createTurnAnnouncer().next(giro(100), ''), null);
+  assert.equal(createTurnAnnouncer().next({ kind: 'turn', direction: 'left' }, 'x'), null);
+  // la identidad es la misma que usa la voz: redondeo del nodo incluido
+  assert.equal(turnIdentity(giro(1, 100.2)), turnIdentity(giro(5, 99.8)));
+  assert.notEqual(turnIdentity(giro(1, 100)), turnIdentity({ ...giro(1, 100), direction: 'right' }));
+  const v = createVoiceGuide({ timing: 'early' });
+  assert.equal(v.maneuver(giro(300), 90), 'soon_turn_left');
+  assert.equal(v.maneuver(giro(250, 100.3), 90), null); // mismo nodo redondeado: ya avisado
+});

@@ -370,3 +370,10 @@
   color: var(--d-muted); font-size: 1em; text-align: center; padding: 1em;
 }
 .dWaiting[hidden] { display: none; }
+
+/* Reducir movimiento (ajuste del sistema): los guinos quedan prendidos fijos
+   en vez de titilar. Las agujas y barras conservan su transicion corta, que
+   suaviza el dato; el barrido de las agujas al arrancar lo saca classic.js. */
+@media (prefers-reduced-motion: reduce) {
+  .dInd-blinkerLeft.on, .dInd-blinkerRight.on { animation: none; }
+}

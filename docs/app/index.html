@@ -15,12 +15,15 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261013c" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261013c" />
-<link rel="stylesheet" href="app.css?v=20261013c" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261013d" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261013d" />
+<link rel="stylesheet" href="app.css?v=20261013d" />
 </head>
 <body>
-  <div id="toastContainer"></div>
+  <div id="toastContainer" role="status" aria-live="polite"></div>
+  <!-- El proximo giro para lectores de pantalla, una vez por maniobra
+       (createTurnAnnouncer): el panel de navegacion cambia en cada dato. -->
+  <div id="navLive" class="srOnly" aria-live="polite" aria-atomic="true"></div>
   <h1 class="appTitle"><img src="assets/logo.svg" alt="" style="height:1.1em;width:1.1em;" /> Truck Dash — ETS2 / ATS</h1>
   <div class="setup" id="setupRow">
     <input id="backendUrl" value="wss://truck-companion-production.up.railway.app" size="34" style="display:none" />
@@ -190,7 +193,7 @@
       <a id="roadmapLink" class="settingsLinkBtn settingsLinkA" href="https://trucksim-dash.com/#roadmap" target="_blank" rel="noopener" data-i18n="roadmapLink">What's next</a>
       <button id="reportProblemBtn" class="settingsLinkBtn" data-i18n="reportProblem">Report a problem</button>
 
-      <button id="settingsCloseBtn" data-i18n="close">Close</button>
+      <button id="settingsCloseBtn" data-modal-close data-i18n="close">Close</button>
     </div>
   </div>
 
@@ -221,7 +224,7 @@
           <button id="convoyCloseConvoyBtn" class="settingsLinkBtn danger" hidden data-i18n="convoyCloseConvoy">End convoy for everyone</button>
         </div>
       </div>
-      <button id="convoyModalClose" data-i18n="close">Close</button>
+      <button id="convoyModalClose" data-modal-close data-i18n="close">Close</button>
     </div>
   </div>
 
@@ -233,7 +236,7 @@
       <p class="settingsAbout" id="dlcAutoStatus" style="margin:0 0 0.4rem 1.6rem"></p>
       <label class="settingsRow"><input type="radio" name="dlcAuto" id="setDlcManual" value="manual" /> <span data-i18n="modsManualLabel">Choose manually</span></label>
       <div id="dlcLists"></div>
-      <button id="dlcCloseBtn" data-i18n="close">Close</button>
+      <button id="dlcCloseBtn" data-modal-close data-i18n="close">Close</button>
     </div>
   </div>
 
@@ -269,7 +272,7 @@
       </div>
 
       <p class="settingsAbout modsCredits" id="modsCredits"></p>
-      <button id="modsCloseBtn" data-i18n="close">Close</button>
+      <button id="modsCloseBtn" data-modal-close data-i18n="close">Close</button>
     </div>
   </div>
 
@@ -293,7 +296,7 @@
       <input id="poiSearchInput" class="poiSearch" type="search" data-i18n-placeholder="poiSearchPlaceholder" placeholder="Company or city…" autocomplete="off" />
       <div id="poiResults" class="poiResults"></div>
       <p class="waypointModalExplain" data-i18n="poiHint">Tap a place to route through it as a waypoint.</p>
-      <button id="poiCloseBtn" data-i18n="close">Close</button>
+      <button id="poiCloseBtn" data-modal-close data-i18n="close">Close</button>
     </div>
   </div>
 
@@ -621,7 +624,7 @@
       <div class="waypointModalButtons">
         <button id="customBtnSave" data-i18n="save">Save</button>
         <button id="customBtnDelete" class="secondary" data-i18n="customBtnDelete">Delete</button>
-        <button id="customBtnCancel" class="secondary" data-i18n="close">Close</button>
+        <button id="customBtnCancel" class="secondary" data-modal-close data-i18n="close">Close</button>
       </div>
     </div>
   </div>
@@ -633,7 +636,7 @@
       <div id="keybindsList"></div>
       <div class="waypointModalButtons">
         <button id="keybindsSaveBtn" data-i18n="save">Save</button>
-        <button id="keybindsCloseBtn" class="secondary" data-i18n="close">Close</button>
+        <button id="keybindsCloseBtn" class="secondary" data-modal-close data-i18n="close">Close</button>
       </div>
     </div>
   </div>
@@ -651,14 +654,14 @@
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261013c"></script>
-<script src="pure.js?v=20261013c"></script>
-<script src="i18n.js?v=20261013c"></script>
-<script src="i18n_en_es.js?v=20261013c"></script>
-<script src="../dash/dash.js?v=20261013c"></script>
-<script src="../dash/classic.js?v=20261013c"></script>
-<script src="app.js?v=20261013c"></script>
-<script src="convoy.js?v=20261013c"></script>
-<script src="livemap.js?v=20261013c"></script>
+<script src="variants.js?v=20261013d"></script>
+<script src="pure.js?v=20261013d"></script>
+<script src="i18n.js?v=20261013d"></script>
+<script src="i18n_en_es.js?v=20261013d"></script>
+<script src="../dash/dash.js?v=20261013d"></script>
+<script src="../dash/classic.js?v=20261013d"></script>
+<script src="app.js?v=20261013d"></script>
+<script src="convoy.js?v=20261013d"></script>
+<script src="livemap.js?v=20261013d"></script>
 </body>
 </html>

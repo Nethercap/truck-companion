@@ -1223,7 +1223,8 @@
     $('linkPendingCode').textContent = codigo;
     $('linkPendingHint').textContent = '';
     tarjeta.hidden = false;
-    tarjeta.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    const quieto = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    tarjeta.scrollIntoView({ block: 'start', behavior: quieto ? 'auto' : 'smooth' });
   }
 
   async function aprobarVinculoPendiente() {

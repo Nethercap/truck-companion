@@ -328,13 +328,28 @@
     cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
   .carouselArrow:hover { border-color: var(--accent); color: var(--accent); }
-  .carouselDots { display: flex; gap: 0.4rem; justify-content: center; margin-top: 0.7rem; }
-  .carouselDot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); border: none; cursor: pointer; padding: 0; }
-  .carouselDot.active { background: var(--accent); }
+  /* El boton mide 24x24 (WCAG 2.5.8: con 8x8 pegados se tocaba el de al
+     lado) y el punto se dibuja adentro. */
+  .carouselDots { display: flex; justify-content: center; margin-top: 0.45rem; }
+  .carouselDot { width: 24px; height: 24px; border-radius: 50%; background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; }
+  .carouselDot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+  .carouselDot.active::before { background: var(--accent); }
+  img[onclick] { cursor: zoom-in; }
+  /* <picture> solo elige el archivo: que no se meta en el flex ni en los anchos */
+  .carouselSlide picture, .monitor picture { display: contents; }
 
   .lightbox { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 2000; align-items: center; justify-content: center; padding: 2rem; cursor: zoom-out; }
   .lightbox.open { display: flex; }
   .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+  .lightbox:focus { outline: none; }
+
+  /* Reducir movimiento (ajuste del sistema): sin scroll suave ni
+     deslizamientos; la animacion del monitor pasa a una captura quieta
+     (<picture> con demo-still.webp). */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    #sidebar, #sidebar.open, .carouselTrack, .scrollHintWrap::after { transition: none; }
+  }
 
   .roadmapGrid { margin-top: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1rem; }
   .roadmapCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; }
@@ -487,7 +502,7 @@
       </div>
     </div>
     <div class="mockup" aria-hidden="true">
-      <div class="monitor"><img src="/assets/demo.webp" alt="" width="720" height="450" /></div>
+      <div class="monitor"><picture><source srcset="/assets/demo-still.webp" media="(prefers-reduced-motion: reduce)" /><img src="/assets/demo.webp" alt="" width="720" height="450" /></picture></div>
       <div class="phone"><img src="/assets/screenshot-gps-2.webp" alt="" width="636" height="1400" /></div>
     </div>
   </div>
@@ -626,7 +641,7 @@
         <button class="carouselArrow carouselPrev" onclick="carouselNav(-1)" aria-label="Previous screenshot">‹</button>
         <div class="carouselViewport">
           <div class="carouselTrack" id="carouselTrack">
-            <div class="carouselSlide"><img src="/assets/demo.webp" alt="Truck Dash in navigation mode: the map rotates with the truck, turn prompt, speed and cruise readout" width="720" height="450" onclick="openLightbox(this.src)" /><p class="slideCaption"><span data-i18n="slideDemo">Live: GPS mode with turn-by-turn prompts, speed limit and cruise control.</span> <a href="/app/?demo=1" data-i18n="slideDemoLink">Try the demo →</a></p></div>
+            <div class="carouselSlide"><picture><source srcset="/assets/demo-still.webp" media="(prefers-reduced-motion: reduce)" /><img src="/assets/demo.webp" alt="Truck Dash in navigation mode: the map rotates with the truck, turn prompt, speed and cruise readout" width="720" height="450" onclick="openLightbox(this.currentSrc || this.src)" /></picture><p class="slideCaption"><span data-i18n="slideDemo">Live: GPS mode with turn-by-turn prompts, speed limit and cruise control.</span> <a href="/app/?demo=1" data-i18n="slideDemoLink">Try the demo →</a></p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-dashboard.webp" alt="Truck Dash live dashboard on desktop" width="1916" height="1200" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideDashboard">Desktop: real map, live route and every truck stat in one view.</p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-panel-landscape.webp" alt="Truck Dash dashboard panel on a second monitor: trip ribbon with the rest stop marked, arrival verdict, fuel and truck damage" width="2732" height="1536" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption"><span data-i18n="slidePanelWide">Second screen: the whole trip on a ribbon, whether you arrive before the deadline and whether the fuel lasts.</span> <a href="/dash/?demo=1" data-i18n="slideDemoLink">Try the demo &rarr;</a></p></div>
             <div class="carouselSlide"><img src="/assets/screenshot-panel-portrait.webp" alt="Truck Dash dashboard panel on a phone in portrait, with speed, arrival, fuel and damage stacked" width="860" height="1864" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slidePanelTall">The same panel on a phone: it lays itself out for portrait, and never loads the map.</p></div>
@@ -872,7 +887,7 @@
   </div>
 </footer>
 
-<div id="lightbox" class="lightbox" onclick="this.classList.remove('open')">
+<div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Truck Dash" tabindex="-1" onclick="closeLightbox()">
   <img id="lightboxImg" src="" alt="Truck Dash, enlarged" />
 </div>
 
@@ -1493,7 +1508,7 @@ overlay.addEventListener('click', closeSidebar);
 sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', closeSidebar));
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('open');
+  if (e.key === 'Escape') closeLightbox();
 });
 
 // Pista de scroll de las tablas anchas (ver .scrollHintWrap): se apaga sola
@@ -1550,10 +1565,33 @@ fetch('/data/roadmap.json?v=8').then(r => r.ok ? r.json() : null).then(data => {
   renderRoadmap();
 }).catch(() => {});
 
+// El lightbox recibe el foco al abrir (Escape o un clic lo cierran) y lo
+// devuelve a la captura que se toco, para seguir con el teclado desde ahi.
+let lightboxOpener = null;
 function openLightbox(src) {
+  lightboxOpener = document.activeElement;
   document.getElementById('lightboxImg').src = src;
-  document.getElementById('lightbox').classList.add('open');
+  const box = document.getElementById('lightbox');
+  box.classList.add('open');
+  box.focus();
 }
+function closeLightbox() {
+  const box = document.getElementById('lightbox');
+  if (!box.classList.contains('open')) return;
+  box.classList.remove('open');
+  if (lightboxOpener && lightboxOpener !== document.body && lightboxOpener.focus) lightboxOpener.focus({ preventScroll: true });
+  lightboxOpener = null;
+}
+// Las capturas que se agrandan son botones tambien para el teclado.
+document.querySelectorAll('img[onclick]').forEach(img => {
+  img.tabIndex = 0;
+  img.setAttribute('role', 'button');
+  img.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    img.click();
+  });
+});
 
 let carouselIndex = 0;
 const carouselTrack = document.getElementById('carouselTrack');
@@ -1568,7 +1606,14 @@ for (let i = 0; i < carouselSlideCount; i++) {
 }
 function updateCarousel() {
   carouselTrack.style.transform = `translateX(-${carouselIndex * 100}%)`;
-  carouselDots.querySelectorAll('.carouselDot').forEach((dot, i) => dot.classList.toggle('active', i === carouselIndex));
+  carouselDots.querySelectorAll('.carouselDot').forEach((dot, i) => {
+    dot.classList.toggle('active', i === carouselIndex);
+    if (i === carouselIndex) dot.setAttribute('aria-current', 'true'); else dot.removeAttribute('aria-current');
+  });
+  // Las otras capturas quedan fuera del tabulador y del lector de pantalla:
+  // con el foco en una escondida, el navegador corria el carrusel por su
+  // cuenta y se desacomodaba del translateX.
+  [...carouselTrack.children].forEach((slide, i) => { slide.inert = i !== carouselIndex; });
 }
 function carouselNav(dir) {
   carouselIndex = (carouselIndex + dir + carouselSlideCount) % carouselSlideCount;
