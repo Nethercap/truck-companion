@@ -190,6 +190,16 @@
       navOverview: "Overview",
       navLogbook: "Logbook",
       navFollowing: 'Following',
+      navMap: 'Map',
+      mapTitle: "Everything you've driven",
+      mapAllYears: 'All years',
+      mapStats: (n, c) => n + (n === 1 ? ' trip' : ' trips') + ' · ' + c + (c === 1 ? ' city' : ' cities') + ' where you loaded or delivered',
+      mapCountries: 'Countries',
+      mapStates: 'States and provinces',
+      mapEmpty: 'No trips with a route in this game yet. Every job you drive with Truck Dash linked shows up here.',
+      mapLoading: 'Loading the map…',
+      mapNoWebgl: 'Your browser cannot draw the map (WebGL is turned off).',
+      mapFailed: 'The map did not load. Try again in a moment.',
       followTitle: 'Follow someone',
       followPlaceholder: 'Username',
       followBtn: 'Follow',
@@ -532,6 +542,16 @@
       navOverview: "Resumen",
       navLogbook: "Bitacora",
       navFollowing: 'Siguiendo',
+      navMap: 'Mapa',
+      mapTitle: 'Todo lo que manejaste',
+      mapAllYears: 'Todos los años',
+      mapStats: (n, c) => n + (n === 1 ? ' viaje' : ' viajes') + ' · ' + c + (c === 1 ? ' ciudad' : ' ciudades') + ' donde cargaste o entregaste',
+      mapCountries: 'Países',
+      mapStates: 'Estados y provincias',
+      mapEmpty: 'Todavía no hay viajes con recorrido en este juego. Cada trabajo que manejes con Truck Dash vinculado aparece acá.',
+      mapLoading: 'Cargando el mapa…',
+      mapNoWebgl: 'Tu navegador no puede dibujar el mapa (WebGL está apagado).',
+      mapFailed: 'El mapa no cargó. Probá de nuevo en un rato.',
       followTitle: 'Seguir a alguien',
       followPlaceholder: 'Nombre de usuario',
       followBtn: 'Seguir',
@@ -2756,7 +2776,7 @@
   // ------------------------------------------------------------- paginas
   // Resumen, logbook y ajustes, cada una con su #hash: el link a
   // /account/#logbook abre ahi y el boton de atras del navegador anda.
-  const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook',
+  const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook', map: 'pageMap',
                     achievements: 'pageAchievements', following: 'pageFollowing',
                     settings: 'pageSettings' };
   let logbookPedido = false;
@@ -2781,6 +2801,208 @@
     // los ultimos viajes y la mayoria no pasa de ahi.
     if (actual === 'logbook' && usuario && !logbookPedido) traerViajes(false);
     if (actual === 'following' && usuario) traerSeguir();
+    if (actual === 'map' && usuario && !modoPublico) abrirMapa();
+  }
+
+  // ------------------------------------------------------ mapa de todo
+  // Todos los recorridos de un juego encima del mapa del juego (/trips/map,
+  // que ya los manda en lng/lat). MapLibre y pmtiles son los de la app
+  // (../app/vendor) y se cargan recien al abrir esta pagina: la cuenta sin
+  // ellos pesa 160 KB y ellos 900. Los tiles son los mismos de R2 que usa el
+  // GPS, con un estilo minimo: rutas en gris, nombres, y lo manejado encima.
+  const MAPA_R2 = 'https://maps.trucksim-dash.com';
+  const MAPA_VENDOR = '../app/vendor/';
+  // Los glifos de los nombres, del propio sitio como en la app (localGlyphs)
+  const MAPA_GLIFOS = new Set(['0-255', '256-511', '512-767', '768-1023', '1024-1279', '7680-7935', '8192-8447']);
+  const MAPA_COLOR = '#ff8a3d';
+  let mapaLibs = null;
+  let mapaMl = null;
+  let mapaListo = false;
+  let mapaJuegoCargado = null;
+  let mapaPedido = 0;
+  const mapaCache = {};
+
+  function cargarScript(src) {
+    return new Promise((ok, mal) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = ok;
+      s.onerror = () => mal(new Error(src));
+      document.head.appendChild(s);
+    });
+  }
+
+  function cargarLibsMapa() {
+    if (!mapaLibs) {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = MAPA_VENDOR + 'maplibre-gl-4.7.1.css';
+      document.head.appendChild(css);
+      // variants.js por MAP_DATA_VERSION: el ?v= de los tiles, como en la app
+      mapaLibs = Promise.all([MAPA_VENDOR + 'maplibre-gl-4.7.1.js', MAPA_VENDOR + 'pmtiles-3.2.0.js', '../app/variants.js']
+        .map(cargarScript))
+        .then(() => { maplibregl.addProtocol('pmtiles', new pmtiles.Protocol().tile); });
+      mapaLibs.catch(() => { mapaLibs = null; });
+    }
+    return mapaLibs;
+  }
+
+  function hayWebgl() {
+    try {
+      const c = document.createElement('canvas');
+      return !!(c.getContext('webgl2') || c.getContext('webgl'));
+    } catch (e) { return false; }
+  }
+
+  function avisoMapa(texto) {
+    const lienzo = $('mapCanvas');
+    let aviso = lienzo.querySelector('.mapa-aviso');
+    if (!texto) { if (aviso) aviso.remove(); return; }
+    if (!aviso) {
+      aviso = document.createElement('div');
+      aviso.className = 'mapa-aviso';
+      lienzo.appendChild(aviso);
+    }
+    aviso.textContent = texto;
+  }
+
+  function estiloMapa(juego) {
+    const v = (typeof MAP_DATA_VERSION !== 'undefined' && MAP_DATA_VERSION[juego]) || '';
+    const capa = (tipo, extra) => Object.assign({ source: 'vec', 'source-layer': juego }, extra,
+      { filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], tipo]] });
+    const ancho = (a, b) => ['interpolate', ['linear'], ['zoom'], 4, a, 10, b];
+    return {
+      version: 8,
+      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      sources: { vec: { type: 'vector', url: `pmtiles://${MAPA_R2}/vector/${juego}.pmtiles?v=${v}` } },
+      layers: [
+        { id: 'bg', type: 'background', paint: { 'background-color': '#1b1e23' } },
+        capa('local', { id: 'road-local', type: 'line', paint: { 'line-color': '#363b43', 'line-width': ancho(0.4, 1.2) } }),
+        capa('divided', { id: 'road-divided', type: 'line', paint: { 'line-color': '#444a53', 'line-width': ancho(0.6, 1.8) } }),
+        capa('freeway', { id: 'road-freeway', type: 'line', paint: { 'line-color': '#545b65', 'line-width': ancho(0.8, 2.4) } }),
+        { id: 'country-label', type: 'symbol', source: 'vec', 'source-layer': juego, maxzoom: 8,
+          filter: ['==', ['get', 'type'], 'country'],
+          layout: { 'text-field': ['get', 'name'], 'text-size': 12 },
+          paint: { 'text-color': '#7d8693', 'text-halo-color': '#000', 'text-halo-width': 1 } },
+        { id: 'city-label', type: 'symbol', source: 'vec', 'source-layer': juego, minzoom: 5,
+          filter: ['==', ['get', 'type'], 'city'],
+          layout: { 'text-field': ['get', 'name'], 'text-size': 11 },
+          paint: { 'text-color': '#c6ccd4', 'text-halo-color': '#000', 'text-halo-width': 1.2 } },
+      ],
+    };
+  }
+
+  function glifosLocales(url, tipo) {
+    if (tipo !== 'Glyphs') return undefined;
+    const m = /\/font\/([^/]+)\/(\d+-\d+)\.pbf/.exec(url);
+    if (!m || !decodeURIComponent(m[1]).startsWith('Open Sans Regular') || !MAPA_GLIFOS.has(m[2])) return undefined;
+    return { url: new URL(MAPA_VENDOR + 'glyphs-open-sans-omt2/' + m[2] + '.pbf', location.href).href };
+  }
+
+  function armarFiltrosMapa() {
+    const juegos = $('mapGame');
+    if (!juegos.options.length) {
+      // Primero el juego con mas viajes del resumen; si no hay, ETS2
+      const conViajes = resumen.slice().sort((a, b) => (b.trips || 0) - (a.trips || 0)).map((s) => s.game);
+      const orden = conViajes.concat(['ets2', 'ats'].filter((g) => !conViajes.includes(g)));
+      orden.forEach((g) => juegos.add(new Option(g === 'ats' ? 'ATS' : 'ETS2', g)));
+      juegos.addEventListener('change', abrirMapa);
+      $('mapYear').addEventListener('change', abrirMapa);
+    }
+    // Los anos desde que existen las cuentas (2026) hasta el actual
+    const anos = $('mapYear');
+    const elegido = anos.value;
+    anos.innerHTML = '';
+    anos.add(new Option(t('mapAllYears'), ''));
+    for (let a = new Date().getFullYear(); a >= 2026; a--) anos.add(new Option(String(a), String(a)));
+    anos.value = elegido;
+  }
+
+  function pintarDatosMapa(datos, juego) {
+    const m = datos.map;
+    $('mapSummary').textContent = m.trips ? t('mapStats', m.trips, m.cities.length) : t('mapEmpty');
+    const titulo = $('mapRegionsTitle');
+    const regiones = $('mapRegions');
+    regiones.innerHTML = '';
+    titulo.hidden = !m.regions.length;
+    titulo.textContent = t(juego === 'ats' ? 'mapStates' : 'mapCountries');
+    m.regions.forEach((r) => {
+      const chip = document.createElement('span');
+      chip.textContent = r.name || r.token;
+      const b = document.createElement('b');
+      b.textContent = numero(r.trips);
+      chip.appendChild(b);
+      regiones.appendChild(chip);
+    });
+    if (!mapaMl || !mapaListo) return;
+    const lineas = { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: m.lines } };
+    const ciudades = { type: 'FeatureCollection', features: m.cities.map((c) => ({
+      type: 'Feature', properties: { n: c.visits }, geometry: { type: 'Point', coordinates: c.lnglat } })) };
+    mapaMl.getSource('viajes').setData(lineas);
+    mapaMl.getSource('ciudades').setData(ciudades);
+    // Encuadre en todo lo manejado; sin viajes, el mapa entero del juego
+    const puntos = m.lines.flat().concat(m.cities.map((c) => c.lnglat));
+    if (puntos.length) {
+      const caja = puntos.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])],
+        [Infinity, Infinity, -Infinity, -Infinity]);
+      const margen = mapaMl.getContainer().clientWidth < 500 ? 16 : 40;
+      mapaMl.fitBounds([[caja[0], caja[1]], [caja[2], caja[3]]], { padding: margen, maxZoom: 9, duration: 0 });
+    } else {
+      mapaMl.fitBounds(juego === 'ats' ? [[-125, 25], [-93, 50]] : [[-10, 36], [32, 64]], { padding: 20, duration: 0 });
+    }
+  }
+
+  async function abrirMapa() {
+    armarFiltrosMapa();
+    const juego = $('mapGame').value;
+    const ano = $('mapYear').value;
+    const pedido = ++mapaPedido;
+    if (!hayWebgl()) { avisoMapa(t('mapNoWebgl')); return; }
+    if (!mapaMl) avisoMapa(t('mapLoading'));
+    try {
+      await cargarLibsMapa();
+    } catch (e) { avisoMapa(t('mapFailed')); return; }
+    if (pedido !== mapaPedido) return;
+    if (!mapaMl || mapaJuegoCargado !== juego) {
+      if (mapaMl) mapaMl.remove();
+      mapaListo = false;
+      mapaJuegoCargado = juego;
+      mapaMl = new maplibregl.Map({
+        container: 'mapCanvas', style: estiloMapa(juego), center: juego === 'ats' ? [-105, 39] : [10, 50], zoom: 4,
+        // Los tiles del juego empiezan en el zoom 4: mas lejos el mapa queda
+        // vacio (pasaba en el celular, con toda Europa en 330 px de ancho)
+        minZoom: 4,
+        attributionControl: false, transformRequest: glifosLocales,
+        // En el celular, un dedo hace scroll de la pagina y dos mueven el mapa
+        cooperativeGestures: true, dragRotate: false, pitchWithRotate: false,
+        // Para poder guardar la imagen del mapa (resumen del ano)
+        preserveDrawingBuffer: true,
+      });
+      mapaMl.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+      const cargado = new Promise((ok) => mapaMl.once('load', ok));
+      await cargado;
+      if (pedido !== mapaPedido) return;
+      mapaMl.addSource('viajes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      mapaMl.addSource('ciudades', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      mapaMl.addLayer({ id: 'viajes', type: 'line', source: 'viajes',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': MAPA_COLOR, 'line-opacity': 0.85,
+                 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.6, 10, 3.5] } }, 'country-label');
+      mapaMl.addLayer({ id: 'ciudades', type: 'circle', source: 'ciudades',
+        paint: { 'circle-color': '#fff', 'circle-stroke-color': MAPA_COLOR, 'circle-stroke-width': 2,
+                 'circle-radius': ['interpolate', ['linear'], ['get', 'n'], 1, 3, 20, 7] } }, 'country-label');
+      mapaListo = true;
+    }
+    const clave = juego + '|' + ano;
+    if (!mapaCache[clave]) {
+      const tz = -new Date().getTimezoneOffset();
+      const r = await pedir('/trips/map?game=' + juego + (ano ? '&year=' + ano + '&tz=' + tz : ''));
+      if (pedido !== mapaPedido) return;
+      if (!r.ok) { avisoMapa(t('mapFailed')); return; }
+      mapaCache[clave] = r.datos;
+    }
+    avisoMapa('');
+    pintarDatosMapa(mapaCache[clave], juego);
   }
 
   // ---------------------------------------------------- cinta del resumen
@@ -3768,6 +3990,7 @@
     resumen = [];
     actividad = [];
     logros = [];
+    Object.keys(mapaCache).forEach((k) => { delete mapaCache[k]; });
     $('cardDriving').hidden = true;
     $('cardRecentAch').hidden = true;
     $('cardRecent').hidden = true;
