@@ -569,6 +569,34 @@ function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, sl
   return { ...stations[0], why: 'nearest' };
 }
 
+// Donde entra una parada nueva (estacion, area de descanso, taller...) en la
+// lista de waypoints: antes iba siempre al final, y en una ruta solo de
+// waypoints el ultimo es el destino. Yendo a un pueblo (waypoint 1), la
+// estacion quedaba como parada 2 y habia que llegar al pueblo antes de ir a
+// cargar ("can that be fixed that when you add something it goes to the
+// position one", Discord 13-10). Ahora va primero, salvo que quede sobre la
+// ruta que falta despues de otro waypoint: ahi entra en ese tramo, para no
+// pasar de largo el waypoint e ir a buscarlo despues.
+// route: la ruta que falta, desde el camion, con el tramo en p[5] (el tramo
+// i lleva al waypoint i; con trabajo, el ultimo lleva a su destino). count:
+// cuantos waypoints hay. "Sobre la ruta" es lo mismo que para pickFuelStop
+// (stopsAlongRoute). Devuelve un indice entre 0 y count.
+function stopInsertIndex(route, stop, count, maxOffM = 400) {
+  if (!(count > 0) || !stop || !Number.isFinite(stop.x) || !Number.isFinite(stop.z)) return 0;
+  if (!route || route.length < 2) return 0;
+  for (let k = 1; k < route.length; k++) {
+    const ax = route[k - 1][0], az = route[k - 1][1], bx = route[k][0], bz = route[k][1];
+    const vx = bx - ax, vz = bz - az, L2 = vx * vx + vz * vz;
+    const raw = L2 ? ((stop.x - ax) * vx + (stop.z - az) * vz) / L2 : 0;
+    if (k === 1 && raw < 0) continue; // antes del camion: queda atras, no en la ruta
+    const t = Math.max(0, Math.min(1, raw));
+    if (Math.hypot(stop.x - ax - t * vx, stop.z - az - t * vz) > maxOffM) continue;
+    const leg = Number(route[k][5]);
+    return Number.isInteger(leg) && leg > 0 ? Math.min(leg, count) : 0;
+  }
+  return 0;
+}
+
 // Avisa una vez por carga de combustible: el tanque subio al menos minL
 // litros (o minFrac del tanque) desde el nivel mas bajo visto. Con eso un
 // waypoint de estacion se da por cumplido aunque se haya cargado en otra, o
@@ -2616,6 +2644,6 @@ function createTurnAnnouncer() {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

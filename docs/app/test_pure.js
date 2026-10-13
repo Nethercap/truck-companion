@@ -1491,6 +1491,32 @@ test('stopsAlongRoute: ordena por lo que hay que andar, no por la recta', () => 
   assert.deepEqual(st.map(s => s.x), [100, 2900]); // la lejana del recorrido queda fuera
 });
 
+test('stopInsertIndex: la parada nueva va primero, no despues del destino (Discord, 13-10)', () => {
+  const { stopInsertIndex } = require('./pure.js');
+  // Sin trabajo, yendo a un pueblo (waypoint 0) 20 km al norte: un solo tramo
+  const alPueblo = [[0, 0, 0, 0, null, 0], [0, -10000, 0, 0, null, 0], [0, -20000, 0, 0, null, 0]];
+  // la estacion sobre la ruta, o a un costado: antes del pueblo, no despues
+  assert.equal(stopInsertIndex(alPueblo, { x: 150, z: -4000 }, 1), 0);
+  assert.equal(stopInsertIndex(alPueblo, { x: 5000, z: -4000 }, 1), 0);
+  // la de atras tampoco se manda al final
+  assert.equal(stopInsertIndex(alPueblo, { x: 0, z: 300 }, 1), 0);
+  // Pueblo A (waypoint 0) a 2 km y despues B (waypoint 1); la estacion queda
+  // pasando A: entra entre A y B, sin pasar A de largo e ir a buscarlo despues
+  const aYb = [[0, 0, 0, 0, null, 0], [0, -2000, 0, 0, null, 0], [0, -8000, 0, 0, null, 1], [0, -20000, 0, 0, null, 1]];
+  assert.equal(stopInsertIndex(aYb, { x: 100, z: -6000 }, 2), 1);
+  assert.equal(stopInsertIndex(aYb, { x: 100, z: -1000 }, 2), 0);
+  // Con trabajo: un waypoint propio y despues el destino del trabajo (tramo 1).
+  // La estacion pasando el waypoint va al final de la lista, antes del destino.
+  assert.equal(stopInsertIndex(aYb, { x: 100, z: -15000 }, 1), 1);
+  // Sin waypoints, sin ruta o con una parada sin posicion: primero
+  assert.equal(stopInsertIndex(aYb, { x: 100, z: -6000 }, 0), 0);
+  assert.equal(stopInsertIndex(null, { x: 100, z: -6000 }, 2), 0);
+  assert.equal(stopInsertIndex(aYb, { x: NaN, z: 0 }, 2), 0);
+  // Ruta sin tramos (vieja) o con mas tramos que waypoints: nunca fuera de la lista
+  assert.equal(stopInsertIndex([[0, 0], [0, -20000]], { x: 100, z: -6000 }, 2), 0);
+  assert.equal(stopInsertIndex([[0, 0, 0, 0, null, 4], [0, -20000, 0, 0, null, 4]], { x: 100, z: -6000 }, 2), 2);
+});
+
 test('createRefuelWatch: una vez por carga, no por el ruido ni por gastar', () => {
   const w = createRefuelWatch();
   assert.equal(w.push(300, 1000), false);
