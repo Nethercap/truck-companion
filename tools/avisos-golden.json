@@ -22,7 +22,7 @@
 {"from":"Rock Springs","to":"Rawlins","man":[["turn","left",-48471,-19670],["turn","left",-48194,-20131],["turn","right",-48190,-20235],["turn","left",-47970,-20418]]},
 {"from":"Fort Collins","to":"Steamboat Springs","man":[["turn","right",-39186,-12186],["turn","right",-39448,-9957],["turn","right",-43920,-8383],["turn","right",-46890,-11632]]},
 {"from":"McAllen","to":"Laredo","man":[["fork","right",-16063,70052],["fork","right",-17835,65603]]},
-{"from":"Fort Collins","to":"Scottsbluff","man":[["turn","right",-39186,-12186],["turn","left",-39158,-11562],["turn","right",-38087,-11111],["fork","right",-36805,-20004]]},
+{"from":"Fort Collins","to":"Scottsbluff","man":[["turn","right",-39186,-12186],["turn","left",-39158,-11562],["turn","right",-38087,-11111],["fork","right",-36805,-20004],["turn","right",-32493,-18703],["turn","left",-32475,-18510],["fork","right",-32011,-18465]]},
 {"from":"Steamboat Springs","to":"Rangely","man":[["turn","right",-46890,-11632],["turn","left",-47560,-11402],["turn","left",-55189,-11115]]}]},"ets2":{"graph":"864dfe70317f3dbc","routes":[
 {"from":"Metz","to":"Dijon","man":[["turn","right",-16376,7272],["turn","right",-16435,7792],["fork","left",-18723,12776],["turn","right",-20725,15663],["fork","right",-21548,16539]]},
 {"from":"Banská Bystrica","to":"Bratislava","man":[["turn","right",24251,14534]]},
@@ -40,7 +40,7 @@
 {"from":"Bijelo Polje","to":"Tirana","man":[["turn","left",35527,42757],["fork","left",36402,43545],["roundabout","right",34870,45271,1],["roundabout","left",34704,45759,2],["turn","right",36395,46516]]},
 {"from":"Kristiansund","to":"Dombås","man":[["turn","right",-4794,-68739],["turn","right",-4827,-68576],["fork","left",-5346,-67411],["turn","right",-2630,-67642]]},
 {"from":"Copenhagen","to":"Odense","man":[["turn","right",7560,-28252],["turn","right",7283,-27825],["turn","left",7164,-27701],["turn","right",7327,-27488],["turn","left",7295,-27397],["turn","right",7438,-27140],["fork","right",1811,-25971],["turn","left",1641,-26150],["fork","left",1518,-26198],["turn","right",1256,-26125]]},
-{"from":"Oulu","to":"Kajaani","man":[["turn","left",41778,-82682],["turn","right",48453,-80114],["turn","right",46869,-79532]]},
+{"from":"Oulu","to":"Kajaani","man":[["turn","left",41778,-82682],["turn","left",42581,-82270],["turn","right",48453,-80114],["turn","right",46869,-79532]]},
 {"from":"Linköping","to":"Södertälje","man":[["turn","left",17597,-43814],["fork","right",17642,-43973],["fork","left",18679,-43833],["fork","right",24020,-46465],["turn","left",23524,-46728]]},
 {"from":"Osnabrück","to":"Duisburg","man":[["fork","right",-9461,-7526],["fork","right",-9466,-7459],["fork","right",-12747,-6342],["fork","left",-12711,-6228],["fork","right",-13426,-6375],["turn","right",-13986,-6661],["fork","left",-13974,-6736],["fork","left",-14338,-7586],["turn","left",-14570,-7575]]},
 {"from":"Växjö","to":"Linköping","man":[["turn","right",13865,-38159],["fork","right",13841,-38583],["fork","left",14657,-39444],["fork","right",17295,-43722]]},

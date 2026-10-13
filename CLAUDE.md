@@ -37,6 +37,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   este en R2. Si paso, subir el numero de su `?` (paso con `l=1` el 13-10).
 - Un archivo de mapa nuevo es opcional en la web: sin el, la app hace lo
   de antes (sin flechas de carril, por ejemplo), nunca deja de rutear.
+- El ruteo (`findRouteWith`) es un A* por aristas sin vueltas en U en los
+  nodos (`findArcRoute` en pure.js): el estado es la arista de llegada y no
+  se sale a mas de 150 grados de ella, salvo en ferry/tren o si no queda
+  otra salida. Si asi no hay camino, `nodeRoutePath` (el A* por nodos de
+  antes). `tools/check_avisos.js` saca las dos de app.js por nombre.
 
 ## Modales, overlay de OBS y accesibilidad (13-10)
 

@@ -2256,3 +2256,94 @@ test('giro para lector de pantalla: una vez por maniobra y sin la flecha', () =>
   assert.equal(v.maneuver(giro(300), 90), 'soon_turn_left');
   assert.equal(v.maneuver(giro(250, 100.3), 90), null); // mismo nodo redondeado: ya avisado
 });
+
+
+// --- Ruteo sin vueltas en U en los nodos (13-10) ---
+const { findArcRoute, routeArcDirections, isUTurnArc } = require('./pure.js');
+
+// Un grafo como el de buildRouteGraph, armado a mano: nodos [[x, y]] y
+// aristas { a, b, uno (sentido unico a->b), mids [[x, y]], ferry, m }.
+function grafoDePrueba(nodos, aristas) {
+  const n = nodos.length;
+  const nodes = Float64Array.from(nodos.flat());
+  const midOff = new Uint32Array(aristas.length + 1);
+  const mids = [];
+  aristas.forEach((e, i) => { midOff[i] = mids.length / 2; for (const p of e.mids || []) mids.push(p[0], p[1]); });
+  midOff[aristas.length] = mids.length / 2;
+  const csr = new Uint32Array(n + 1), adjTo = [], adjEdge = [], adjRev = [];
+  for (let i = 0; i < n; i++) {
+    csr[i] = adjTo.length;
+    aristas.forEach((e, k) => {
+      if (e.a === i) { adjTo.push(e.b); adjEdge.push(k); adjRev.push(0); }
+      if (e.b === i && !e.uno) { adjTo.push(e.a); adjEdge.push(k); adjRev.push(1); }
+    });
+  }
+  csr[n] = adjTo.length;
+  const largo = (e) => e.m || Math.hypot(nodos[e.a][0] - nodos[e.b][0], nodos[e.a][1] - nodos[e.b][1]);
+  return {
+    g: { n, nodes, csr, adjTo: Int32Array.from(adjTo), adjEdge: Int32Array.from(adjEdge), adjRev: Uint8Array.from(adjRev), midOff, midXY: Float64Array.from(mids) },
+    opts: (fin) => ({
+      cost: (k) => largo(aristas[k]),
+      heuristic: (i) => Math.hypot(nodos[i][0] - nodos[fin][0], nodos[i][1] - nodos[fin][1]),
+      isFerry: (k) => !!aristas[k].ferry,
+    }),
+  };
+}
+
+test('ruteo: no da la vuelta en el nodo donde una calzada separada pasa a doble mano', () => {
+  // a -> s por la calzada que va al este, s -> b por la que vuelve al oeste
+  // (10 m al costado). s sigue al este por una calle de doble mano hasta una
+  // rotonda (r -> v -> w -> r). Destino: z, del otro lado de b.
+  const nodos = [[0, 0], [100, 5], [0, 10], [-100, 10], [200, 5], [300, 5], [350, 40], [350, -30]];
+  const [a, s, b, z, t, r, v, w] = nodos.keys();
+  const { g, opts } = grafoDePrueba(nodos, [
+    { a, b: s, uno: true }, { a: s, b, uno: true }, { a: b, b: z, uno: true },
+    { a: s, b: t }, { a: t, b: r }, { a: r, b: v, uno: true }, { a: v, b: w, uno: true }, { a: w, b: r, uno: true },
+  ]);
+  const camino = findArcRoute(g, a, z, opts(z));
+  assert.deepEqual(camino, [a, s, t, r, v, w, r, t, s, b, z]);
+  // El A* por nodos hubiera hecho a, s, b, z: la vuelta en U en s
+  const dirs = routeArcDirections(g);
+  const llegaS = [...g.adjTo.keys()].find(k => dirs.from[k] === a && g.adjTo[k] === s);
+  const aB = [...g.adjTo.keys()].find(k => dirs.from[k] === s && g.adjTo[k] === b);
+  assert.ok(isUTurnArc(dirs, llegaS, aB));
+});
+
+test('ruteo: un giro cerrado que no es vuelta en U se puede, y una calle sin salida tambien', () => {
+  // 120 grados en s: se puede
+  const nodos = [[0, 0], [100, 0], [50, 87]];
+  const g1 = grafoDePrueba(nodos, [{ a: 0, b: 1, uno: true }, { a: 1, b: 2, uno: true }]);
+  assert.deepEqual(findArcRoute(g1.g, 0, 2, g1.opts(2)), [0, 1, 2]);
+  // Sin otra salida que volver (la entrada de una empresa): se puede
+  const g2 = grafoDePrueba([[0, 0], [50, 0], [0, 5]], [{ a: 0, b: 1, uno: true }, { a: 1, b: 2, uno: true }]);
+  assert.deepEqual(findArcRoute(g2.g, 0, 2, g2.opts(2)), [0, 1, 2]);
+});
+
+test('ruteo: al bajar del ferry el rumbo del barco no cuenta como vuelta en U', () => {
+  // A -> F en ferry hacia el este; en F la calle sale para el oeste (a B) o
+  // sigue al este (a C, que no lleva a ningun lado).
+  const nodos = [[0, 0], [1000, 0], [0, 5], [2000, 0]];
+  const { g, opts } = grafoDePrueba(nodos, [
+    { a: 0, b: 1, uno: true, ferry: true }, { a: 1, b: 2, uno: true }, { a: 1, b: 3, uno: true },
+  ]);
+  assert.deepEqual(findArcRoute(g, 0, 2, opts(2)), [0, 1, 2]);
+});
+
+test('ruteo: el rumbo en la punta sale de la curva de la arista, no de la recta', () => {
+  // De a a s la recta va al este, pero la curva llega a s desde el sur
+  // (subiendo): salir de s hacia el norte no es darse vuelta.
+  const nodos = [[0, 0], [100, 0], [100, 100]];
+  const { g } = grafoDePrueba(nodos, [
+    { a: 0, b: 1, uno: true, mids: [[50, -60], [100, -50], [99.6, 0.3]] }, { a: 1, b: 2, uno: true },
+  ]);
+  const dirs = routeArcDirections(g);
+  // la llegada ignora el punto a medio metro (que apunta para otro lado):
+  // viene de (100, -50), hacia +y
+  assert.ok(Math.abs(dirs.arrX[0]) < 1e-6 && dirs.arrY[0] > 0.99);
+  assert.ok(!isUTurnArc(dirs, 0, 1));
+  // y recorrida al reves (doble mano), la salida de s va hacia -y
+  const g2 = grafoDePrueba(nodos, [{ a: 0, b: 1, mids: [[50, -60], [100, -50], [99.6, 0.3]] }]);
+  const d2 = routeArcDirections(g2.g);
+  const k = [...g2.g.adjTo.keys()].find(i => d2.from[i] === 1);
+  assert.ok(d2.depY[k] < -0.99);
+});

@@ -44,7 +44,7 @@ function harness() {
     consts,
     /const MIN_REAL_COMPONENT_NODES/.test(consts) ? '' : 'const MIN_REAL_COMPONENT_NODES = 300;',
     extract('decodeRouteGraphBin'), extract('buildRouteGraph'), extract('nearestNodeIndex'),
-    extract('MinHeap', 'class'), extract('findRouteWith'), extract('findUpcomingTurn'),
+    extract('MinHeap', 'class'), extract('findRouteWith'), extract('nodeRoutePath'), extract('findUpcomingTurn'),
     `const { ${Object.keys(pure).filter(k => !propias.has(k)).join(', ')} } = pure;`,
     'const nearestRoadName = () => null;',
     // Las flechas de carril no entran en los avisos (ni en la lista guardada)

@@ -3038,45 +3038,16 @@ function findRouteWith(startXY, endXY, filtro) {
     return byTime ? d / MAX_SPEED_MS : d;
   };
 
-  // Estado de A* en typed arrays (sin Maps/Sets: 300k nodos entran en unos MB
-  // y no generan basura para el GC).
-  const n = routeGraph.n;
-  const gScore = new Float64Array(n).fill(Infinity);
-  const cameFrom = new Int32Array(n).fill(-1);
-  const visited = new Uint8Array(n);
-  gScore[startIdx] = 0;
-  const open = new MinHeap();
-  open.push(heuristic(startIdx), startIdx);
-
-  while (open.size > 0) {
-    const current = open.pop();
-    if (current === endIdx) break;
-    if (visited[current]) continue;
-    visited[current] = 1;
-    const g = gScore[current];
-    for (let k = csr[current]; k < csr[current + 1]; k++) {
-      const neighbor = adjTo[k];
-      if (visited[neighbor]) continue;
-      const e = adjEdge[k];
-      if (blocked && blocked[edgeG[e]]) continue;
-      const tentativeG = g + (byTime ? edgeS[e] : edgeM[e]);
-      if (tentativeG < gScore[neighbor]) {
-        gScore[neighbor] = tentativeG;
-        cameFrom[neighbor] = current;
-        open.push(tentativeG + heuristic(neighbor), neighbor);
-      }
-    }
-  }
-
-  if (gScore[endIdx] === Infinity) return null;
-
-  const path = [endIdx];
-  let node = endIdx;
-  while (cameFrom[node] !== -1) {
-    node = cameFrom[node];
-    path.push(node);
-  }
-  path.reverse();
+  // Primero sin vueltas en U en los nodos (findArcRoute, pure.js): A* por
+  // aristas. Si asi no hay camino (algun rincon raro del grafo), el A* por
+  // nodos de siempre: nunca peor que antes.
+  const path = findArcRoute(routeGraph, startIdx, endIdx, {
+    cost: (e) => (byTime ? edgeS[e] : edgeM[e]),
+    heuristic,
+    blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
+    isFerry: (e) => (edgeF[e] & 1) === 1,
+  }) || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
+  if (!path) return null;
   // Cada punto: [x, y, ferry, junction]. ferry = 1 si el tramo que LLEGA a
   // el es un ferry/tren (dibujado punteado, sin anunciar giros en el mar);
   // junction = 1 si el nodo es una interseccion real (3+ vecinos), que es
@@ -3116,6 +3087,50 @@ function findRouteWith(startXY, endXY, filtro) {
     if (desde >= 0) spreadEdgeShift(out, desde, sIni, sFin);
   }
   return out;
+}
+
+// El A* por nodos de antes (puede dar la vuelta en un nodo): solo si el de
+// aristas no encuentra camino. Devuelve los indices de nodo o null.
+function nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked) {
+  const { csr, adjTo, adjEdge, edgeM, edgeS, edgeG } = routeGraph;
+  // Estado de A* en typed arrays (sin Maps/Sets: 300k nodos entran en unos MB
+  // y no generan basura para el GC).
+  const n = routeGraph.n;
+  const gScore = new Float64Array(n).fill(Infinity);
+  const cameFrom = new Int32Array(n).fill(-1);
+  const visited = new Uint8Array(n);
+  gScore[startIdx] = 0;
+  const open = new MinHeap();
+  open.push(heuristic(startIdx), startIdx);
+
+  while (open.size > 0) {
+    const current = open.pop();
+    if (current === endIdx) break;
+    if (visited[current]) continue;
+    visited[current] = 1;
+    const g = gScore[current];
+    for (let k = csr[current]; k < csr[current + 1]; k++) {
+      const neighbor = adjTo[k];
+      if (visited[neighbor]) continue;
+      const e = adjEdge[k];
+      if (blocked && blocked[edgeG[e]]) continue;
+      const tentativeG = g + (byTime ? edgeS[e] : edgeM[e]);
+      if (tentativeG < gScore[neighbor]) {
+        gScore[neighbor] = tentativeG;
+        cameFrom[neighbor] = current;
+        open.push(tentativeG + heuristic(neighbor), neighbor);
+      }
+    }
+  }
+
+  if (gScore[endIdx] === Infinity) return null;
+  const path = [endIdx];
+  let node = endIdx;
+  while (cameFrom[node] !== -1) {
+    node = cameFrom[node];
+    path.push(node);
+  }
+  return path.reverse();
 }
 
 // Objetivo de la ruta, en orden de preferencia: la empresa de carga (si hay

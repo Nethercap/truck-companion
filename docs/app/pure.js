@@ -2643,7 +2643,152 @@ function createTurnAnnouncer() {
   };
 }
 
+// --- Ruteo sin vueltas en U en los nodos (13-10) ---------------------------
+// El grafo junta en un solo nodo las dos manos de una calle de doble mano.
+// Donde una autopista o una calle con cantero pasa a ser de doble mano (los
+// prefabs fork_temp de ETS2: balt_r1_r2_plus_2, it_hw2-hw1_joint...), el A*
+// por nodos llegaba por una calzada, tocaba ese nodo y volvia por la otra:
+// una vuelta en U en medio de la ruta que el GPS del juego no hace nunca (11
+// de 60 rutas al azar en ETS2, auditar_mapas.py del taller). Aca el estado es
+// la arista por la que se llega a cada nodo, y no se sale a mas de
+// UTURN_MIN_DEG de la llegada. Salvo en ferry o tren (el rumbo del barco no
+// tiene que ver con la calle) y si no queda otra salida (calle sin salida,
+// playa de una empresa).
+const UTURN_MIN_DEG = 150;
+const UTURN_COS = Math.cos(UTURN_MIN_DEG * Math.PI / 180);
+// El rumbo en la punta de una arista saltea los puntos a menos de esto: los
+// prefabs tienen tramitos de centimetros que darian cualquier rumbo.
+const ARC_DIR_MIN_M = 2;
+
+// Rumbo de salida y de llegada (vector unitario) de cada arista dirigida del
+// grafo (indice k del CSR: de from[k] a adjTo[k]), con la curva de la arista.
+// Se calcula una vez por grafo y queda guardado en el.
+function routeArcDirections(g) {
+  if (g._arcDirs) return g._arcDirs;
+  const { n, nodes, csr, adjTo, adjEdge, adjRev, midOff, midXY } = g;
+  const total = csr[n];
+  const from = new Int32Array(total);
+  const depX = new Float32Array(total), depY = new Float32Array(total);
+  const arrX = new Float32Array(total), arrY = new Float32Array(total);
+  for (let i = 0; i < n; i++) {
+    for (let k = csr[i]; k < csr[i + 1]; k++) {
+      from[k] = i;
+      const j = adjTo[k], e = adjEdge[k], rev = adjRev[k];
+      const m0 = midOff ? midOff[e] : 0, cnt = midOff ? midOff[e + 1] - m0 : 0;
+      // Punto t de la arista en el sentido del arco: 0 = i, cnt + 1 = j.
+      const px = (t) => (t === 0 ? nodes[2 * i] : t === cnt + 1 ? nodes[2 * j] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1)]);
+      const py = (t) => (t === 0 ? nodes[2 * i + 1] : t === cnt + 1 ? nodes[2 * j + 1] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1) + 1]);
+      let t = 1;
+      while (t < cnt + 1 && Math.hypot(px(t) - px(0), py(t) - py(0)) < ARC_DIR_MIN_M) t++;
+      let dx = px(t) - px(0), dy = py(t) - py(0), d = Math.hypot(dx, dy) || 1;
+      depX[k] = dx / d; depY[k] = dy / d;
+      t = cnt;
+      while (t > 0 && Math.hypot(px(cnt + 1) - px(t), py(cnt + 1) - py(t)) < ARC_DIR_MIN_M) t--;
+      dx = px(cnt + 1) - px(t); dy = py(cnt + 1) - py(t); d = Math.hypot(dx, dy) || 1;
+      arrX[k] = dx / d; arrY[k] = dy / d;
+    }
+  }
+  g._arcDirs = { from, depX, depY, arrX, arrY };
+  return g._arcDirs;
+}
+
+// Si salir por el arco kOut despues de llegar por kIn es darse vuelta.
+function isUTurnArc(dirs, kIn, kOut) {
+  return dirs.arrX[kIn] * dirs.depX[kOut] + dirs.arrY[kIn] * dirs.depY[kOut] < UTURN_COS;
+}
+
+// Min-heap de numeros (prioridad, valor) en dos arrays: el A* por aristas
+// mete cientos de miles y un par [p, v] por entrada es basura para el GC.
+function createNumberHeap() {
+  const pri = [], val = [];
+  return {
+    get size() { return val.length; },
+    push(p, v) {
+      let i = val.length;
+      pri.push(p); val.push(v);
+      while (i > 0) {
+        const up = (i - 1) >> 1;
+        if (pri[up] <= p) break;
+        pri[i] = pri[up]; val[i] = val[up]; i = up;
+      }
+      pri[i] = p; val[i] = v;
+    },
+    pop() {
+      const top = val[0];
+      const lp = pri.pop(), lv = val.pop();
+      const n = val.length;
+      if (n > 0) {
+        let i = 0;
+        for (;;) {
+          let c = 2 * i + 1;
+          if (c >= n) break;
+          if (c + 1 < n && pri[c + 1] < pri[c]) c++;
+          if (pri[c] >= lp) break;
+          pri[i] = pri[c]; val[i] = val[c]; i = c;
+        }
+        pri[i] = lp; val[i] = lv;
+      }
+      return top;
+    },
+  };
+}
+
+// A* por aristas de startIdx a endIdx sin vueltas en U en los nodos. Devuelve
+// los indices de nodo del camino, o null si asi no hay camino (la app cae
+// entonces al A* por nodos de siempre). opts: cost(e) en la misma unidad que
+// heuristic(i) (que tiene que ser admisible), blocked(e) opcional (DLC) e
+// isFerry(e).
+function findArcRoute(g, startIdx, endIdx, opts) {
+  if (startIdx === endIdx) return [startIdx];
+  const { csr, adjTo, adjEdge } = g;
+  const dirs = routeArcDirections(g);
+  const total = csr[g.n];
+  const gScore = new Float64Array(total).fill(Infinity);
+  const cameFrom = new Int32Array(total).fill(-1);
+  const done = new Uint8Array(total);
+  const blocked = opts.blocked || null;
+  const heap = createNumberHeap();
+  for (let k = csr[startIdx]; k < csr[startIdx + 1]; k++) {
+    const e = adjEdge[k];
+    if (blocked && blocked(e)) continue;
+    const c = opts.cost(e);
+    if (c < gScore[k]) { gScore[k] = c; heap.push(c + opts.heuristic(adjTo[k]), k); }
+  }
+  let fin = -1;
+  while (heap.size > 0) {
+    const k = heap.pop();
+    if (done[k]) continue;
+    done[k] = 1;
+    const u = adjTo[k];
+    if (u === endIdx) { fin = k; break; }
+    const ferryIn = opts.isFerry(adjEdge[k]);
+    // Si todas las salidas son darse vuelta (calle sin salida), se puede.
+    let libre = ferryIn;
+    for (let k2 = csr[u]; !libre && k2 < csr[u + 1]; k2++) {
+      const e2 = adjEdge[k2];
+      if (blocked && blocked(e2)) continue;
+      if (opts.isFerry(e2) || !isUTurnArc(dirs, k, k2)) libre = true;
+    }
+    const g0 = gScore[k];
+    for (let k2 = csr[u]; k2 < csr[u + 1]; k2++) {
+      if (done[k2]) continue;
+      const e2 = adjEdge[k2];
+      if (blocked && blocked(e2)) continue;
+      if (libre && !ferryIn && !opts.isFerry(e2) && isUTurnArc(dirs, k, k2)) continue;
+      const t = g0 + opts.cost(e2);
+      if (t < gScore[k2]) { gScore[k2] = t; cameFrom[k2] = k; heap.push(t + opts.heuristic(adjTo[k2]), k2); }
+    }
+  }
+  if (fin === -1) return null;
+  const arcs = [];
+  for (let k = fin; k !== -1; k = cameFrom[k]) arcs.push(k);
+  arcs.reverse();
+  const path = [dirs.from[arcs[0]]];
+  for (const k of arcs) path.push(adjTo[k]);
+  return path;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }
