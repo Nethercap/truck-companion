@@ -8,7 +8,7 @@
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261013h" />
+<link rel="stylesheet" href="account.css?v=20261013i" />
 </head>
 <body>
 <div id="toastContainer" role="status" aria-live="polite"></div>
@@ -150,6 +150,21 @@
           </div>
         </section>
 
+        <!-- ------------------------------------------ resumen del ano -->
+        <!-- El "Wrapped" de diciembre (abrirResumenAno). Sin link en el menu:
+             se llega por el aviso del resumen (diciembre y enero) o con
+             /account/#wrapped. -->
+        <div class="pagina" id="pageWrapped" hidden>
+          <section class="card">
+            <div class="cabecera">
+              <h2 id="wrappedTitle"></h2>
+              <select id="wrappedYear" aria-label="Year"></select>
+              <button class="btn primary chico" id="wrappedShare" type="button" data-i18n="wrappedShare">Share my year</button>
+            </div>
+          </section>
+          <div class="ano-tarjetas" id="wrappedCards" aria-live="polite"></div>
+        </div>
+
         <!-- ------------------------------------------ mapa de todo -->
         <!-- Todos los recorridos encima del mapa del juego (abrirMapa). El mapa
              se carga recien al abrir esta pagina. -->
@@ -176,6 +191,14 @@
           <section class="card primeros-pasos" id="cardStart" hidden>
             <h2 data-i18n="startTitle">Get started</h2>
             <ol class="pasos" id="startSteps"></ol>
+          </section>
+          <!-- En diciembre y enero: el resumen del ano esta listo (pintarAvisoAno) -->
+          <section class="card aviso-ano" id="cardWrapped" hidden>
+            <div>
+              <h2 id="wrappedBannerTitle"></h2>
+              <p class="muted small" data-i18n="wrappedBannerBody">Kilometers, deliveries, your map and your records of the year, ready to share.</p>
+            </div>
+            <a class="btn primary" href="#wrapped" data-i18n="wrappedBannerBtn">See my year</a>
           </section>
           <div class="cinta" id="quickStats" hidden></div>
 
@@ -403,7 +426,7 @@
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261013h"></script>
-<script src="account.js?v=20261013h"></script>
+<script src="../app/i18n.js?v=20261013i"></script>
+<script src="account.js?v=20261013i"></script>
 </body>
 </html>

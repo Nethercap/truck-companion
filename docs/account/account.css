@@ -534,13 +534,43 @@ ul.feed .meta { color: var(--muted); font-size: 0.85rem; }
 .vivo svg.ruta { margin-top: 0.5rem; max-height: 8rem; width: 100%; }
 .vivo svg.ruta circle.aqui { fill: var(--accent); stroke: #fff; stroke-width: 2px; vector-effect: non-scaling-stroke; }
 .vivo .titulo-usuario { margin: 0; }
-.publico #pageFollowing, .publico #pageMap,
+.publico #pageFollowing, .publico #pageMap, .publico #pageWrapped, .publico #cardWrapped,
 .publico #sideNav, .publico #pageLogbook, .publico #pageSettings,
 .publico #pageAchievements, .publico #recoveryWarning, .publico #cardActivity,
 .publico #cardDriving, .publico #recentAchLink, .publico .cabecera a[href="#logbook"] { display: none; }
 .publico .tablero { grid-template-columns: minmax(0, 1fr); }
 .publico table.viajes tr.fila { cursor: default; }
 .publico table.viajes tr.fila:hover td { background: none; }
+
+/* Resumen del ano (abrirResumenAno en account.js) */
+.aviso-ano { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: space-between;
+  border-color: rgba(255, 138, 61, 0.45); background: linear-gradient(120deg, rgba(255, 138, 61, 0.12), rgba(59, 158, 255, 0.08)); }
+.aviso-ano h2 { margin: 0 0 0.2rem; }
+.aviso-ano p { margin: 0; }
+.aviso-ano .btn { text-decoration: none; }
+#pageWrapped .cabecera h2 { margin-right: auto; }
+/* Minimo 320: con 280 entraban tres columnas y las tarjetas de a dos
+   dejaban un hueco a la derecha */
+.ano-tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 1rem; margin-top: 1rem; }
+.ano-tarjeta { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem; min-width: 0; }
+.ano-tarjeta.ancha { grid-column: 1 / -1; }
+.ano-tarjeta.destacada { background: linear-gradient(140deg, #1d2430, #171a1f 60%); border-color: #33405a; }
+.ano-tarjeta h3 { margin: 0 0 0.7rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.ano-grande { font-size: clamp(2.4rem, 7vw, 4rem); font-weight: 800; line-height: 1.05; color: #fff; overflow-wrap: anywhere; }
+.ano-grande small { font-size: 0.38em; font-weight: 600; color: var(--muted); margin-left: 0.35rem; }
+.ano-sub { margin: 0.5rem 0 0; color: var(--muted); }
+.ano-sub b { color: var(--text); }
+.ano-dato { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
+.ano-dato:last-child { border-bottom: none; }
+.ano-dato span { color: var(--muted); flex: none; }
+.ano-dato b { text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.ano-meses { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; align-items: end; height: 130px; }
+.ano-meses div { background: #2b3442; border-radius: 4px 4px 0 0; min-height: 2px; }
+.ano-meses div.mejor { background: #ff8a3d; }
+.ano-meses-etiquetas { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 4px;
+  font-size: 0.68rem; color: var(--muted); text-align: center; }
+.ano-mapa canvas { display: block; width: 100%; height: auto; border-radius: 10px; background: #14171c; }
+.ano-mapa .btn { margin-top: 0.7rem; }
 
 /* Mapa de todo lo manejado (abrirMapa en account.js) */
 .mapa-filtros { display: flex; gap: 0.5rem; margin-left: auto; }

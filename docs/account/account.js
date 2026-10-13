@@ -200,6 +200,38 @@
       mapLoading: 'Loading the map…',
       mapNoWebgl: 'Your browser cannot draw the map (WebGL is turned off).',
       mapFailed: 'The map did not load. Try again in a moment.',
+      wrappedTitle: (y) => 'Your ' + y + ' on the road',
+      wrappedEmpty: (y) => 'Nothing driven in ' + y + ' yet. With Truck Dash linked on your PC, every kilometer counts.',
+      wrappedDriven: 'driven this year',
+      wrappedEarth: (n) => '≈ ' + n + ' times around the Earth',
+      wrappedHours: (d) => d + ' at the wheel',
+      wrappedHoursLabel: 'At the wheel',
+      wrappedDaysTitle: 'Days on the road',
+      wrappedDaysDriven: 'Days driven',
+      wrappedStreak: 'Longest streak',
+      wrappedDaysN: (n) => n + (n === 1 ? ' day' : ' days'),
+      wrappedBestDay: 'Best day',
+      wrappedJobsTitle: 'Jobs',
+      wrappedDeliveries: 'Deliveries',
+      wrappedOnTime: 'On time',
+      wrappedEarned: 'Earned',
+      wrappedFirstTrip: 'First job of the year',
+      wrappedMapTitle: 'Your year on the map',
+      wrappedMapLink: 'Open the full map',
+      wrappedCountries: (n) => n + (n === 1 ? ' country' : ' countries'),
+      wrappedStates: (n) => n + (n === 1 ? ' state or province' : ' states and provinces'),
+      wrappedRegions: 'Visited',
+      wrappedFavTitle: 'Your favorites',
+      wrappedFavCity: 'City',
+      wrappedFavRoute: 'Route',
+      wrappedMonthsTitle: 'Month by month',
+      wrappedBestMonth: (m, d) => 'Your biggest month: ' + m + ', ' + d,
+      wrappedAch: (n) => n + (n === 1 ? ' achievement unlocked' : ' achievements unlocked'),
+      wrappedShare: 'Share my year',
+      wrappedShareTitle: (y) => 'My ' + y + ' on the road',
+      wrappedBanner: (y) => 'Your ' + y + ' on Truck Dash is ready',
+      wrappedBannerBody: 'Kilometers, deliveries, your map and your records of the year, ready to share.',
+      wrappedBannerBtn: 'See my year',
       followTitle: 'Follow someone',
       followPlaceholder: 'Username',
       followBtn: 'Follow',
@@ -552,6 +584,38 @@
       mapLoading: 'Cargando el mapa…',
       mapNoWebgl: 'Tu navegador no puede dibujar el mapa (WebGL está apagado).',
       mapFailed: 'El mapa no cargó. Probá de nuevo en un rato.',
+      wrappedTitle: (y) => 'Tu ' + y + ' en la ruta',
+      wrappedEmpty: (y) => 'Todavía no hay nada manejado en ' + y + '. Con Truck Dash vinculado en tu PC, cada kilómetro cuenta.',
+      wrappedDriven: 'manejados este año',
+      wrappedEarth: (n) => '≈ ' + n + ' vueltas al mundo',
+      wrappedHours: (d) => d + ' al volante',
+      wrappedHoursLabel: 'Al volante',
+      wrappedDaysTitle: 'Días en la ruta',
+      wrappedDaysDriven: 'Días manejados',
+      wrappedStreak: 'Racha más larga',
+      wrappedDaysN: (n) => n + (n === 1 ? ' día' : ' días'),
+      wrappedBestDay: 'Mejor día',
+      wrappedJobsTitle: 'Trabajos',
+      wrappedDeliveries: 'Entregas',
+      wrappedOnTime: 'A tiempo',
+      wrappedEarned: 'Ganado',
+      wrappedFirstTrip: 'Primer trabajo del año',
+      wrappedMapTitle: 'Tu año en el mapa',
+      wrappedMapLink: 'Abrir el mapa completo',
+      wrappedCountries: (n) => n + (n === 1 ? ' país' : ' países'),
+      wrappedStates: (n) => n + (n === 1 ? ' estado o provincia' : ' estados y provincias'),
+      wrappedRegions: 'Recorriste',
+      wrappedFavTitle: 'Tus favoritos',
+      wrappedFavCity: 'Ciudad',
+      wrappedFavRoute: 'Ruta',
+      wrappedMonthsTitle: 'Mes a mes',
+      wrappedBestMonth: (m, d) => 'Tu mejor mes: ' + m + ', ' + d,
+      wrappedAch: (n) => n + (n === 1 ? ' logro desbloqueado' : ' logros desbloqueados'),
+      wrappedShare: 'Compartir mi año',
+      wrappedShareTitle: (y) => 'Mi ' + y + ' en la ruta',
+      wrappedBanner: (y) => 'Tu ' + y + ' en Truck Dash está listo',
+      wrappedBannerBody: 'Kilómetros, entregas, tu mapa y tus récords del año, listos para compartir.',
+      wrappedBannerBtn: 'Ver mi año',
       followTitle: 'Seguir a alguien',
       followPlaceholder: 'Nombre de usuario',
       followBtn: 'Seguir',
@@ -2776,7 +2840,7 @@
   // ------------------------------------------------------------- paginas
   // Resumen, logbook y ajustes, cada una con su #hash: el link a
   // /account/#logbook abre ahi y el boton de atras del navegador anda.
-  const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook', map: 'pageMap',
+  const PAGINAS = { overview: 'pageOverview', logbook: 'pageLogbook', map: 'pageMap', wrapped: 'pageWrapped',
                     achievements: 'pageAchievements', following: 'pageFollowing',
                     settings: 'pageSettings' };
   let logbookPedido = false;
@@ -2802,6 +2866,436 @@
     if (actual === 'logbook' && usuario && !logbookPedido) traerViajes(false);
     if (actual === 'following' && usuario) traerSeguir();
     if (actual === 'map' && usuario && !modoPublico) abrirMapa();
+    if (actual === 'wrapped' && usuario && !modoPublico) abrirResumenAno();
+  }
+
+  // ---------------------------------------------------- resumen del ano
+  // El "Wrapped" de diciembre (/trips/wrapped): el ano en tarjetas grandes y
+  // una imagen de 1080 x 1350 para compartir, como la del viaje. La pagina
+  // existe todo el ano (#wrapped); el aviso en el resumen sale en diciembre
+  // y enero, y en enero muestra el ano que termino.
+  const VUELTA_AL_MUNDO_KM = 40075;
+  const anoCache = {};
+  let anoPedido = 0;
+
+  function anoDelResumen(hoy) {
+    const d = hoy || new Date();
+    return d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+  }
+
+  function pintarAvisoAno() {
+    const hoy = new Date();
+    const caja = $('cardWrapped');
+    // Solo con algo manejado: a una cuenta vacia no hay nada que mostrarle
+    const hay = totales.some((x) => x.distance_km > 0) || resumen.length;
+    caja.hidden = modoPublico || !hay || !(hoy.getMonth() === 11 || hoy.getMonth() === 0);
+    if (!caja.hidden) $('wrappedBannerTitle').textContent = t('wrappedBanner', anoDelResumen(hoy));
+  }
+
+  // Todo lo del ano: el resumen y el mapa de cada juego que se manejo
+  async function datosDelAno(ano) {
+    if (anoCache[ano]) return anoCache[ano];
+    const tz = -new Date().getTimezoneOffset();
+    const r = await pedir('/trips/wrapped?year=' + ano + '&tz=' + tz);
+    if (!r.ok) return null;
+    const w = r.datos;
+    w.mapas = {};
+    for (const s of w.stats) {
+      const m = await pedir('/trips/map?game=' + s.game + '&year=' + ano + '&tz=' + tz);
+      if (m.ok) w.mapas[s.game] = m.datos.map;
+    }
+    anoCache[ano] = w;
+    return w;
+  }
+
+  async function abrirResumenAno() {
+    const sel = $('wrappedYear');
+    if (!sel.options.length) {
+      for (let a = new Date().getFullYear(); a >= 2026; a--) sel.add(new Option(String(a), String(a)));
+      sel.value = String(Math.max(2026, anoDelResumen()));
+      sel.addEventListener('change', abrirResumenAno);
+      $('wrappedShare').addEventListener('click', compartirAno);
+    }
+    const ano = Number(sel.value);
+    $('wrappedTitle').textContent = t('wrappedTitle', ano);
+    const pedido = ++anoPedido;
+    const caja = $('wrappedCards');
+    if (!anoCache[ano]) {
+      caja.innerHTML = '';
+      const espera = document.createElement('p');
+      espera.className = 'muted';
+      espera.textContent = t('mapLoading');
+      caja.appendChild(espera);
+    }
+    const w = await datosDelAno(ano);
+    if (pedido !== anoPedido) return;
+    if (!w) { caja.textContent = t('mapFailed'); return; }
+    pintarResumenAno(w);
+  }
+
+  function tarjetaAno(titulo, extra) {
+    const c = document.createElement('section');
+    c.className = 'ano-tarjeta' + (extra ? ' ' + extra : '');
+    if (titulo) {
+      const h = document.createElement('h3');
+      h.textContent = titulo;
+      c.appendChild(h);
+    }
+    return c;
+  }
+
+  function datoAno(rotulo, valor) {
+    if (valor == null || valor === '') return null;
+    const fila = document.createElement('div');
+    fila.className = 'ano-dato';
+    const s = document.createElement('span');
+    s.textContent = rotulo;
+    const b = document.createElement('b');
+    b.textContent = valor;
+    fila.append(s, b);
+    return fila;
+  }
+
+  // Los numeros que se juntan entre juegos (km, horas, entregas) y el juego
+  // principal (el mas manejado) para los favoritos y los records.
+  function cuentasDelAno(w) {
+    const suma = (lista, campo) => lista.reduce((a, x) => a + (x[campo] || 0), 0);
+    const principal = w.stats[0] || null;
+    const regiones = Object.entries(w.mapas || {}).map(([juego, m]) => ({ juego, n: m.regions.length }));
+    return {
+      km: suma(w.totals, 'distance_km'),
+      horas: suma(w.totals, 'real_hours'),
+      entregas: suma(w.stats, 'delivered'),
+      aTiempo: suma(w.stats, 'on_time'),
+      tarde: suma(w.stats, 'late'),
+      principal,
+      regiones,
+    };
+  }
+
+  function nombreDeMes(m, largo) {
+    return new Date(Date.UTC(2026, m - 1, 15)).toLocaleDateString(idioma, { month: largo ? 'long' : 'narrow', timeZone: 'UTC' });
+  }
+
+  function pintarResumenAno(w) {
+    const caja = $('wrappedCards');
+    caja.innerHTML = '';
+    const c = cuentasDelAno(w);
+    $('wrappedShare').hidden = !(c.km > 0 || w.stats.length);
+    if (!(c.km > 0 || w.stats.length)) {
+      const vacio = tarjetaAno(null, 'ancha');
+      vacio.textContent = t('wrappedEmpty', w.year);
+      caja.appendChild(vacio);
+      return;
+    }
+
+    // Lo manejado: km, la vuelta al mundo y las horas
+    const kmCaja = tarjetaAno(t('wrappedDriven'), 'ancha destacada');
+    const grande = document.createElement('div');
+    grande.className = 'ano-grande';
+    const partes = (distancia(c.km) || '').split(' ');
+    grande.textContent = partes[0];
+    const unidad = document.createElement('small');
+    unidad.textContent = partes.slice(1).join(' ');
+    grande.appendChild(unidad);
+    kmCaja.appendChild(grande);
+    const sub = document.createElement('p');
+    sub.className = 'ano-sub';
+    const vueltas = c.km / VUELTA_AL_MUNDO_KM;
+    sub.textContent = [vueltas >= 0.1 ? t('wrappedEarth', numero(vueltas, 1)) : null,
+      c.horas ? t('wrappedHours', duracion(c.horas)) : null].filter(Boolean).join(' · ');
+    kmCaja.appendChild(sub);
+    caja.appendChild(kmCaja);
+
+    // Dias y rachas
+    const dias = tarjetaAno(t('wrappedDaysTitle'));
+    [datoAno(t('wrappedDaysDriven'), numero(w.days_driven)),
+     datoAno(t('wrappedStreak'), w.longest_streak ? t('wrappedDaysN', w.longest_streak) : null),
+     datoAno(t('wrappedBestDay'), w.best_day ? fechaCorta(w.best_day.date + 'T12:00:00') + ' · ' + distancia(w.best_day.distance_km) : null)]
+      .forEach((x) => sumar(dias, x));
+    caja.appendChild(dias);
+
+    // Entregas y plata, por juego (dos economias no se suman)
+    const trabajos = tarjetaAno(t('wrappedJobsTitle'));
+    sumar(trabajos, datoAno(t('wrappedDeliveries'), numero(c.entregas)));
+    if (c.aTiempo + c.tarde > 0) sumar(trabajos, datoAno(t('wrappedOnTime'), numero(Math.round(c.aTiempo / (c.aTiempo + c.tarde) * 100)) + ' %'));
+    w.stats.forEach((s) => {
+      const m = (s.money || []).slice().sort((a, b) => b.revenue - a.revenue)[0];
+      if (m && m.revenue) sumar(trabajos, datoAno(t('wrappedEarned') + ' · ' + s.game.toUpperCase(), plata(m.revenue, m.currency)));
+    });
+    if (w.first_trip) {
+      sumar(trabajos, datoAno(t('wrappedFirstTrip'),
+        [w.first_trip.city_src, w.first_trip.city_dst].filter(Boolean).join(' → ') || fechaCorta(w.first_trip.started_at)));
+    }
+    caja.appendChild(trabajos);
+
+    // El mapa del ano del juego principal, dibujado como en la imagen
+    const juegoMapa = c.principal && w.mapas[c.principal.game] ? c.principal.game : Object.keys(w.mapas)[0];
+    const mapa = juegoMapa ? w.mapas[juegoMapa] : null;
+    if (mapa && mapa.lines.length) {
+      const m = tarjetaAno(t('wrappedMapTitle'), 'ancha ano-mapa');
+      const lienzo = document.createElement('canvas');
+      lienzo.width = 1200;
+      lienzo.height = 620;
+      // Grosor 5 como en la imagen: en el celular el canvas se achica a un
+      // tercio y con menos los nombres no se leian
+      dibujarMapaAno(lienzo.getContext('2d'), { x: 0, y: 0, w: 1200, h: 620 }, mapa, 5);
+      lienzo.setAttribute('role', 'img');
+      lienzo.setAttribute('aria-label', t('wrappedMapTitle'));
+      m.appendChild(lienzo);
+      const regiones = c.regiones.filter((r) => r.n).map((r) =>
+        t(r.juego === 'ats' ? 'wrappedStates' : 'wrappedCountries', r.n)).join(' · ');
+      if (regiones) {
+        const p = document.createElement('p');
+        p.className = 'ano-sub';
+        p.textContent = regiones;
+        m.appendChild(p);
+      }
+      const ir = document.createElement('a');
+      ir.className = 'btn chico';
+      ir.href = '#map';
+      ir.textContent = t('wrappedMapLink');
+      ir.addEventListener('click', () => {
+        // Las opciones se arman la primera vez que se abre el mapa: antes
+        // de elegir, que existan.
+        armarFiltrosMapa();
+        $('mapGame').value = juegoMapa;
+        $('mapYear').value = String(w.year);
+      });
+      m.appendChild(ir);
+      caja.appendChild(m);
+    }
+
+    // Favoritos y records del juego principal
+    const p = c.principal;
+    if (p) {
+      const top = p.top || {};
+      const fav = tarjetaAno(t('wrappedFavTitle'));
+      const ruta = top.city_pairs && top.city_pairs[0];
+      [datoAno(t('tripTruck'), top.trucks && top.trucks[0] && top.trucks[0].name),
+       datoAno(t('tripCargo'), top.cargo && top.cargo[0] && top.cargo[0].name),
+       datoAno(t('wrappedFavCity'), top.cities && top.cities[0] && top.cities[0].name),
+       datoAno(t('wrappedFavRoute'), ruta ? ruta.from + ' → ' + ruta.to : null)]
+        .forEach((x) => sumar(fav, x));
+      if (fav.children.length > 1) caja.appendChild(fav);
+      const r = p.records || {};
+      const rec = listaRecords([
+        p.longest ? [t('statsLongest'), distancia(p.longest.distance_km), p.longest] : null,
+        r.best_pay ? [t('recBestPay'), plata(r.best_pay.value, r.best_pay.currency), r.best_pay] : null,
+        r.heaviest ? [t('recHeaviest'), [masa(r.heaviest.value), r.heaviest.cargo].filter(Boolean).join(' · '), r.heaviest] : null,
+      ]);
+      if (rec) {
+        const recCaja = tarjetaAno(null);
+        recCaja.appendChild(rec);
+        caja.appendChild(recCaja);
+      }
+    }
+
+    // Mes a mes
+    const maximo = Math.max(...w.months.map((m) => m.distance_km));
+    if (maximo > 0) {
+      const meses = tarjetaAno(t('wrappedMonthsTitle'), 'ancha');
+      const barras = document.createElement('div');
+      barras.className = 'ano-meses';
+      const etiquetas = document.createElement('div');
+      etiquetas.className = 'ano-meses-etiquetas';
+      const mejor = w.months.reduce((a, m) => (m.distance_km > a.distance_km ? m : a));
+      w.months.forEach((m) => {
+        const b = document.createElement('div');
+        b.style.height = Math.max(1.5, m.distance_km / maximo * 100) + '%';
+        if (m === mejor) b.className = 'mejor';
+        b.title = nombreDeMes(m.month, true) + ': ' + distancia(m.distance_km);
+        barras.appendChild(b);
+        const e = document.createElement('span');
+        e.textContent = nombreDeMes(m.month, false);
+        etiquetas.appendChild(e);
+      });
+      meses.append(barras, etiquetas);
+      const sub2 = document.createElement('p');
+      sub2.className = 'ano-sub';
+      sub2.textContent = t('wrappedBestMonth', nombreDeMes(mejor.month, true), distancia(mejor.distance_km));
+      meses.appendChild(sub2);
+      caja.appendChild(meses);
+    }
+
+    // Logros del ano
+    if (w.achievements.length) {
+      const logrosCaja = tarjetaAno(t('wrappedAch', w.achievements.length), 'ancha');
+      const grilla = document.createElement('div');
+      grilla.className = 'logros';
+      w.achievements.forEach((l) => grilla.appendChild(tarjetaLogro(l)));
+      logrosCaja.appendChild(grilla);
+      caja.appendChild(logrosCaja);
+    }
+  }
+
+  // Los recorridos del ano en el canvas, en Mercator (como el mapa de la
+  // cuenta), sin el mapa del juego de fondo: en una imagen se lee igual y no
+  // depende de bajar tiles. Encuadre en todo lo manejado.
+  function dibujarMapaAno(ctx, caja, mapa, grosor) {
+    ctx.save();
+    redondeado(ctx, caja.x, caja.y, caja.w, caja.h, 24);
+    ctx.fillStyle = '#14171c';
+    ctx.fill();
+    ctx.clip();
+    const merc = (p) => [p[0], -Math.log(Math.tan(Math.PI / 4 + p[1] * Math.PI / 360)) * 180 / Math.PI];
+    const lineas = mapa.lines.map((l) => l.map(merc));
+    const ciudades = mapa.cities.map((ci) => ({ p: merc(ci.lnglat), n: ci.visits, nombre: ci.name }));
+    const todos = lineas.flat().concat(ciudades.map((ci) => ci.p));
+    if (!todos.length) { ctx.restore(); return; }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    todos.forEach((p) => {
+      minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    });
+    const aire = caja.w * 0.07;
+    const escala = Math.min((caja.w - 2 * aire) / ((maxX - minX) || 1), (caja.h - 2 * aire) / ((maxY - minY) || 1));
+    const ox = caja.x + caja.w / 2 - ((minX + maxX) / 2) * escala;
+    const oy = caja.y + caja.h / 2 - ((minY + maxY) / 2) * escala;
+    const X = (p) => ox + p[0] * escala, Y = (p) => oy + p[1] * escala;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,138,61,0.9)';
+    ctx.lineWidth = grosor;
+    lineas.forEach((l) => {
+      if (l.length < 2) return;
+      ctx.beginPath();
+      l.forEach((p, k) => (k ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))));
+      ctx.stroke();
+    });
+    // Las ciudades mas visitadas, con su nombre (las cinco primeras)
+    ciudades.forEach((ci, i) => {
+      const r = grosor * 1.6 + Math.min(ci.n, 20) * grosor * 0.12;
+      ctx.beginPath();
+      ctx.arc(X(ci.p), Y(ci.p), r, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = grosor * 0.6;
+      ctx.strokeStyle = '#ff8a3d';
+      ctx.stroke();
+      if (i < 5) {
+        ctx.font = `600 ${Math.round(grosor * 5.5)}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+        ctx.fillStyle = '#c6ccd4';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(ci.nombre, X(ci.p) + r + grosor * 2, Y(ci.p));
+        ctx.textBaseline = 'alphabetic';
+      }
+    });
+    ctx.restore();
+  }
+
+  async function compartirAno() {
+    const boton = $('wrappedShare');
+    const ano = Number($('wrappedYear').value);
+    const w = anoCache[ano];
+    if (!w) return;
+    boton.disabled = true;
+    try {
+      const lienzo = await tarjetaDelAno(w);
+      const blob = await new Promise((ok) => lienzo.toBlob(ok, 'image/png'));
+      const archivo = new File([blob], 'truckdash-' + ano + '.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        try {
+          await navigator.share({ files: [archivo], text: 'trucksim-dash.com' });
+        } catch (err) {
+          if (!err || err.name !== 'AbortError') descargar(blob, archivo.name);
+        }
+      } else {
+        descargar(blob, archivo.name);
+      }
+    } catch (err) {
+      avisar(t('error'), 'bad');
+    } finally {
+      boton.disabled = false;
+    }
+  }
+
+  async function tarjetaDelAno(w) {
+    const c = cuentasDelAno(w);
+    const lienzo = document.createElement('canvas');
+    lienzo.width = TARJETA_W;
+    lienzo.height = TARJETA_H;
+    const ctx = lienzo.getContext('2d');
+    const fuente = (peso, tam) => `${peso} ${tam}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    const M = 60, ANCHO = TARJETA_W - 2 * M;
+
+    const fondo = ctx.createLinearGradient(0, 0, TARJETA_W, TARJETA_H);
+    fondo.addColorStop(0, '#1a2130');
+    fondo.addColorStop(1, '#0b0d10');
+    ctx.fillStyle = fondo;
+    ctx.fillRect(0, 0, TARJETA_W, TARJETA_H);
+
+    // Encabezado: logo y el ano
+    const logo = await cargarImagen('/app/assets/logo.svg');
+    if (logo) ctx.drawImage(logo, M, 52, 52, 52);
+    ctx.font = fuente(700, 38);
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f2f3f5';
+    ctx.fillText('Truck', M + 66, 79);
+    ctx.fillStyle = '#3b9eff';
+    ctx.fillText('Dash', M + 66 + ctx.measureText('Truck ').width, 79);
+    ctx.font = fuente(800, 34);
+    const anoTxt = String(w.year);
+    const wAno = ctx.measureText(anoTxt).width + 36;
+    redondeado(ctx, TARJETA_W - M - wAno, 56, wAno, 48, 12);
+    ctx.fillStyle = 'rgba(255,138,61,0.2)';
+    ctx.fill();
+    ctx.fillStyle = '#ff8a3d';
+    ctx.textAlign = 'center';
+    ctx.fillText(anoTxt, TARJETA_W - M - wAno / 2, 81);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    // Titulo y lo manejado
+    textoAjustado(ctx, t('wrappedShareTitle', w.year), ANCHO, 60, 34, 800, '#ffffff', M, 190);
+    const kmTxt = distancia(c.km) || '';
+    textoAjustado(ctx, kmTxt, ANCHO, 120, 60, 800, '#ff8a3d', M, 320);
+    const vueltas = c.km / VUELTA_AL_MUNDO_KM;
+    const lineaKm = [t('wrappedDriven'), vueltas >= 0.1 ? t('wrappedEarth', numero(vueltas, 1)) : null].filter(Boolean).join(' · ');
+    textoAjustado(ctx, lineaKm, ANCHO, 32, 22, 500, '#9aa4b2', M, 372);
+
+    // El mapa del ano
+    const juegoMapa = c.principal && w.mapas[c.principal.game] ? c.principal.game : Object.keys(w.mapas)[0];
+    const caja = { x: M, y: 410, w: ANCHO, h: 520 };
+    if (juegoMapa && w.mapas[juegoMapa].lines.length) {
+      dibujarMapaAno(ctx, caja, w.mapas[juegoMapa], 5);
+    } else {
+      redondeado(ctx, caja.x, caja.y, caja.w, caja.h, 24);
+      ctx.fillStyle = '#14171c';
+      ctx.fill();
+    }
+
+    // Seis numeros. Los paises o estados, del juego del mapa: los dos
+    // juntos no entraban en la columna.
+    const regiones = c.regiones.filter((r) => r.n && r.juego === juegoMapa).map((r) =>
+      t(r.juego === 'ats' ? 'wrappedStates' : 'wrappedCountries', r.n)).join(' · ');
+    const camion = c.principal && c.principal.top && c.principal.top.trucks && c.principal.top.trucks[0];
+    const datos = [
+      [t('wrappedHoursLabel'), c.horas ? duracion(c.horas) : '-'],
+      [t('wrappedDeliveries'), numero(c.entregas)],
+      [t('wrappedDaysDriven'), numero(w.days_driven)],
+      [t('wrappedStreak'), w.longest_streak ? t('wrappedDaysN', w.longest_streak) : '-'],
+      [t('wrappedRegions'), regiones || '-'],
+      [t('tripTruck'), camion ? camion.name : '-'],
+    ];
+    const colW = ANCHO / 3;
+    ctx.textBaseline = 'alphabetic';
+    datos.forEach(([etq, valor], i) => {
+      const x = M + (i % 3) * colW, y = 1000 + Math.floor(i / 3) * 120;
+      textoAjustado(ctx, String(etq).toUpperCase(), colW - 24, 24, 16, 600, '#9aa4b2', x, y);
+      textoAjustado(ctx, String(valor), colW - 24, 40, 22, 700, '#f2f3f5', x, y + 48);
+    });
+
+    // Pie
+    ctx.font = fuente(500, 28);
+    ctx.fillStyle = '#9aa4b2';
+    if (usuario && usuario.username) ctx.fillText('@' + usuario.username, M, TARJETA_H - 60);
+    ctx.font = fuente(700, 30);
+    ctx.fillStyle = '#3b9eff';
+    ctx.textAlign = 'right';
+    ctx.fillText('trucksim-dash.com', TARJETA_W - M, TARJETA_H - 60);
+    ctx.textAlign = 'left';
+    return lienzo;
   }
 
   // ------------------------------------------------------ mapa de todo
@@ -3018,6 +3512,7 @@
   }
 
   function pintarCinta() {
+    pintarAvisoAno();
     const caja = $('quickStats');
     caja.innerHTML = '';
     if (!totales.length && !resumen.length && !recientes.length) { caja.hidden = true; return; }
@@ -3991,6 +4486,7 @@
     actividad = [];
     logros = [];
     Object.keys(mapaCache).forEach((k) => { delete mapaCache[k]; });
+    Object.keys(anoCache).forEach((k) => { delete anoCache[k]; });
     $('cardDriving').hidden = true;
     $('cardRecentAch').hidden = true;
     $('cardRecent').hidden = true;
