@@ -410,3 +410,43 @@ def test_carriles_del_giro_solo_validos_y_con_el_giro():
     # En el ejemplo del modo Mover estan, salvo sin el giro
     assert overlay.ejemplo(overlay.ITEMS, ("F", "R", "J"))["lanes"]
     assert overlay.ejemplo(("speed",), ("F", "R", "J"))["lanes"] is None
+
+
+def test_barra_de_paradas_combustible_y_descanso():
+    # Idea del usuario (09-10): donde conviene cargar y donde dormir, en la ruta.
+    # 500 km de ruta del juego a 80 km/h; combustible para 300 km; 4 h de juego hasta descansar.
+    t = tele(routeDistanceKm=500, routeTimeSeconds=500 / 80 * 3600, fuelRangeKm=300, restStopMinutes=240)
+    barra = overlay.barra_paradas(t, 500)
+    # El ultimo cuarto antes de cada punto: 225-300 km y 240-320 km
+    assert barra == {"fuel": (0.45, 0.6), "rest": (0.48, 0.64)}
+    # Si se llega sin parar, sin tramo
+    assert overlay.barra_paradas(tele(fuelRangeKm=800, restStopMinutes=900), 500) == {"fuel": None, "rest": None}
+    # Hay que parar ya: un tramo chiquito al principio, que se vea
+    assert overlay.barra_paradas(tele(fuelRangeKm=0, restStopMinutes=0), 500)["rest"] == (0.0, 0.02)
+    # Tramo corto: al menos 20 km antes
+    assert overlay.barra_paradas(tele(fuelRangeKm=40, restStopMinutes=None), 500)["fuel"] == (0.04, 0.08)
+    # Sin ruta del juego, 70 km/h; y la velocidad media entre 40 y 100
+    assert overlay.barra_paradas(tele(restStopMinutes=60), 500)["rest"] == (0.1, 0.14)
+    assert overlay.barra_paradas(tele(restStopMinutes=60, routeDistanceKm=500, routeTimeSeconds=60), 500)["rest"] == (0.15, 0.2)
+    # Sin ruta, sin barra; datos raros no rompen
+    assert overlay.barra_paradas(t, 0) is None and overlay.barra_paradas(t, None) is None
+    assert overlay.barra_paradas(tele(fuelRangeKm="x", restStopMinutes=float("nan")), 500) == {"fuel": None, "rest": None}
+
+
+def test_barra_de_paradas_en_el_overlay():
+    t = tele(routeDistanceKm=500, routeTimeSeconds=500 / 80 * 3600, fuelRangeKm=300, restStopMinutes=240)
+    # Solo si se elige
+    assert overlay.contenido(t, 100, None, 0, 100, items=("speed",))["stops"] is None
+    d = overlay.contenido(t, 100, None, 0, 100)
+    assert d["stops"]["fuel"] == (0.45, 0.6)
+    # Sola alcanza para que se vea
+    assert overlay.contenido(t, 100, None, 0, 100, items=("stops",))["stops"]
+    # Con el tablero mandando, lo que falta es el de su ruta (con waypoints)
+    n = overlay.limpiar_nav({"remainingKm": 1000, "turn": "x"})
+    assert overlay.contenido(t, 100, n, 99, 100)["stops"]["fuel"] == (0.225, 0.3)
+    # Un tablero callado ya no cuenta
+    assert overlay.contenido(t, 100, n, 0, 100)["stops"]["fuel"] == (0.45, 0.6)
+    for malo in ("12", -1, float("nan"), True):
+        assert overlay.limpiar_nav({"remainingKm": malo})["remainingKm"] is None
+    assert overlay.ejemplo(overlay.ITEMS, ("F", "R", "J"))["stops"]
+    assert overlay.ejemplo(("speed",), ("F", "R", "J"))["stops"] is None

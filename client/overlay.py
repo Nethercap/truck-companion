@@ -51,8 +51,17 @@ DEFAULT_OPACITY = 90  # antes fija en 88; de a SIZE_STEP como el deslizador
 # velocidad con el limite, la del control de crucero (solo si esta puesto),
 # la marcha, lo que falta, la hora de llegada real (la de tu reloj, la
 # calcula la web) y la del reloj del juego (la que importa contra el plazo).
-ITEMS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival")
-DATOS = ITEMS
+ITEMS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival", "stops")
+DATOS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival")
+# La barra de la ruta ("stops", idea del usuario del 09-10): de aca al
+# destino, con el tramo donde conviene cargar combustible y el tramo donde
+# conviene dormir, solo con colores. Cada tramo es el ultimo cuarto antes de
+# quedarse sin combustible o sin poder manejar mas (al menos 20 km).
+PARADA_VENTANA, PARADA_VENTANA_MIN_KM = 0.25, 20.0
+# Para pasar los minutos de juego hasta el descanso a km: la velocidad media
+# de la ruta del GPS del juego, entre estos topes; sin ruta, la del medio.
+VEL_MEDIA_MIN, VEL_MEDIA_MAX, VEL_MEDIA_DEFECTO = 40.0, 100.0, 70.0
+BARRA_FONDO, BARRA_COMBUSTIBLE, BARRA_DESCANSO = "#2a3644", "#ffa726", "#9c7cf0"
 CRUISE = "#7cc243"  # el verde del crucero, el mismo del overlay de OBS
 
 # Cuanto vale lo que manda la web: el giro dice "en 400 m" y a 90 km/h eso
@@ -152,6 +161,8 @@ def limpiar_nav(msg: dict) -> dict:
         "next": _texto(msg.get("next")),
         "remaining": _texto(msg.get("remaining"), 24),
         "arrival": _texto(msg.get("arrival"), 24),
+        # Lo que falta como numero (el de OBS): para la barra de paradas
+        "remainingKm": msg.get("remainingKm") if _numero(msg.get("remainingKm")) and msg.get("remainingKm") >= 0 else None,
         "remainingLabel": _texto(msg.get("remainingLabel"), 24),
         "arrivalLabel": _texto(msg.get("arrivalLabel"), 32),
         "gameArrivalLabel": _texto(msg.get("gameArrivalLabel"), 32),
@@ -207,6 +218,33 @@ def opacidad_valida(valor, defecto=DEFAULT_OPACITY) -> int:
     if not _numero(valor):
         return defecto
     return _a_paso(valor, OPACITY_MIN, OPACITY_MAX)
+
+
+def _zona_parada(punto_km, total_km):
+    """El tramo (desde, hasta) en fraccion de la ruta donde conviene parar
+    antes de `punto_km`, o None si se llega sin parar."""
+    if not _numero(punto_km) or not _numero(total_km) or total_km <= 0 or punto_km >= total_km:
+        return None
+    punto = max(0.0, punto_km)
+    desde = max(0.0, punto - max(PARADA_VENTANA * punto, PARADA_VENTANA_MIN_KM))
+    hasta = max(punto, desde + 0.02 * total_km)  # que se vea aunque haya que parar ya
+    return (round(desde / total_km, 4), round(min(1.0, hasta / total_km), 4))
+
+
+def barra_paradas(tele: dict, total_km) -> dict | None:
+    """La barra de la ruta: {"fuel": tramo o None, "rest": tramo o None},
+    o None si no hay ruta. total_km: lo que falta (del tablero o del GPS
+    del juego); la autonomia y el descanso salen del juego."""
+    if not _numero(total_km) or total_km <= 0:
+        return None
+    combustible = _zona_parada(tele.get("fuelRangeKm"), total_km)
+    km_ruta, s_ruta = tele.get("routeDistanceKm"), tele.get("routeTimeSeconds")
+    vel = (km_ruta / (s_ruta / 3600) if _numero(km_ruta) and _numero(s_ruta) and km_ruta > 0 and s_ruta > 0
+           else VEL_MEDIA_DEFECTO)
+    vel = min(max(vel, VEL_MEDIA_MIN), VEL_MEDIA_MAX)
+    descanso_min = tele.get("restStopMinutes")
+    descanso = _zona_parada(descanso_min / 60 * vel, total_km) if _numero(descanso_min) else None
+    return {"fuel": combustible, "rest": descanso}
 
 
 def llegada_en_juego(tele: dict) -> str:
@@ -281,6 +319,10 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         "remaining": falta if "remaining" in items else "",
         "arrival": llega if "arrival" in items else "",
         "game_arrival": llegada_en_juego(tele) if "game_arrival" in items else "",
+        # Lo que falta: el del tablero si manda (su ruta tiene los waypoints),
+        # si no el del GPS del juego
+        "stops": barra_paradas(tele, nav["remainingKm"] if nav_ok and nav.get("remainingKm") else tele.get("routeDistanceKm"))
+        if "stops" in items else None,
         # Las etiquetas, en el idioma del tablero aunque ya no mande (el giro
         # viene en ese idioma); las del cliente (idioma de Windows) solo si
         # nunca hubo tablero.
@@ -290,7 +332,7 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
     }
     # Nada para mostrar (todo destildado, o solo el giro y no hay ruta): no
     # se deja un recuadro vacio arriba del juego.
-    if not any(datos[k] for k in DATOS) and not datos["hint"]:
+    if not any(datos[k] for k in DATOS) and not datos["hint"] and not datos["stops"]:
         return None
     return datos
 
@@ -336,6 +378,7 @@ def ejemplo(items, etiquetas) -> dict:
          "lanes": carriles({"count": 3, "mask": 0b110, "turn": CARRIL_BITS["right"],
                             "arrows": [CARRIL_BITS["straight"], CARRIL_BITS["straight"] | CARRIL_BITS["right"],
                                        CARRIL_BITS["right"]]})}
+    d["stops"] = {"fuel": (0.45, 0.6), "rest": (0.7, 0.93)} if "stops" in items else None
     if "turn" not in items:
         d["turn"] = ""
         d["lanes"] = None
@@ -791,7 +834,7 @@ class _Ventana:
             y = c.bbox(t)[3] + round(8 * k)
 
         if not (d["speed"] or d["cruise"] or d["gear"] or columnas):
-            alto = y - round(8 * k) + pad
+            alto = self._barra_paradas(d.get("stops"), y - round(8 * k), ancho, pad, k) + pad
             self._marco_mover(ancho, alto, k)
             c.configure(width=ancho, height=alto)
             return ancho, alto
@@ -834,10 +877,30 @@ class _Ventana:
             a = c.create_text(derecha, medio - round(2 * k), text=valor, fill=FG, anchor="se", font=fuente(19, True))
             b = c.create_text(derecha, medio + round(1 * k), text=etiqueta, fill=MUTED, anchor="ne", font=fuente(11))
             derecha = min(c.bbox(a)[0], c.bbox(b)[0]) - sep
-        alto = y + fila + pad
+        alto = self._barra_paradas(d.get("stops"), y + fila, ancho, pad, k) + pad
         self._marco_mover(ancho, alto, k)
         c.configure(width=ancho, height=alto)
         return ancho, alto
+
+    def _barra_paradas(self, barra, y: int, ancho: int, pad: int, k: float) -> int:
+        """La barra de la ruta debajo de todo: de aca (izquierda) al destino,
+        arriba el tramo para cargar combustible y abajo el de dormir. Devuelve
+        donde termina."""
+        if not barra:
+            return y
+        c = self.canvas
+        y += round(8 * k)
+        alto_b = max(8, round(12 * k))
+        x0, x1 = pad, ancho - pad
+        c.create_rectangle(x0, y, x1, y + alto_b, fill=BARRA_FONDO, outline="")
+        mitad = alto_b // 2
+        for clave, color, arriba in (("fuel", BARRA_COMBUSTIBLE, True), ("rest", BARRA_DESCANSO, False)):
+            tramo = barra.get(clave)
+            if tramo:
+                a, b = x0 + tramo[0] * (x1 - x0), x0 + tramo[1] * (x1 - x0)
+                ya = y if arriba else y + mitad
+                c.create_rectangle(a, ya, max(a + 2, b), ya + (mitad if arriba else alto_b - mitad), fill=color, outline="")
+        return y + alto_b
 
     def _carril(self, x: int, y: int, w: int, h: int, carril: dict, k: float) -> None:
         """Un carril como en el tablero (lanesHtml): caja azul si sirve, la

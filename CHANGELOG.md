@@ -8,6 +8,9 @@ updates on its own and is not versioned here.
 
 - In-game overlay: the lane arrows from the dashboard show up under the next turn at junctions with
   several lanes, with the ones for your turn in blue.
+- In-game overlay: a new route bar (Setup, Show, Fuel and rest stops) from where you are to your
+  destination. An orange stripe marks the stretch where you should fill up before the tank runs dry,
+  and a purple one where you should stop to sleep. No stripe means you get there without stopping.
 
 ## 1.5.31 (2026-10-13)
 
