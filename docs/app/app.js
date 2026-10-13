@@ -1988,7 +1988,6 @@ const WAYPOINT_REACHED_M = 150;
 const MAX_WAYPOINTS = 9;
 let waypoints = []; // [{ pos: [x,z], lngLat: [lng,lat], inGame: bool, label: string|null, marker }]
 let waypointMode = false; // true mientras se espera el proximo click en el mapa para ubicar un waypoint
-let waypointRouteDistanceKm = null; // distancia total (posicion->waypoints->destino) calculada por nosotros
 let pendingWaypoint = null; // { pos, lngLat, label } mientras se muestra el modal de confirmacion
 let lastKnownAvgSpeedKmh = null; // ultimo promedio de velocidad real calculado por computeRealEtaSeconds, reusado para el ETA con waypoint
 
@@ -2089,7 +2088,7 @@ function removeWaypoint(index) {
   const [wp] = waypoints.splice(index, 1);
   if (wp && wp.marker) wp.marker.remove();
   renumberWaypointMarkers();
-  if (!waypoints.length) { waypointRouteDistanceKm = null; forgetWaypointTrip(); }
+  if (!waypoints.length) forgetWaypointTrip();
   renderWaypointList();
   invalidateRoute();
   saveWaypoints();
@@ -2100,7 +2099,6 @@ function removeWaypoint(index) {
 function clearWaypoint(keepStored = false) {
   for (const wp of waypoints) if (wp.marker) wp.marker.remove();
   waypoints = [];
-  waypointRouteDistanceKm = null;
   renderWaypointList();
   invalidateRoute();
   if (!keepStored) { saveWaypoints(); forgetWaypointTrip(); }
@@ -2151,25 +2149,35 @@ function checkWaypointReached(x, z) {
 // Actualiza las filas "(with waypoints)" bajo In-game ETA y Real ETA - solo
 // tienen sentido si hay algun waypoint que el juego NO conoce (si estan
 // todos marcados tambien en el juego, el numero del juego ya es correcto).
+// Lo que falta se mide sobre la ruta recortada al camion, como el resumen de
+// ruta: antes era el total de cuando se armo la ruta y no bajaba al andar.
+// Los tiempos salen de waypointEta (pure.js): el de abajo del ETA del juego
+// en horas de juego, el de abajo del ETA real en tiempo real.
 function updateWaypointRoute(data) {
   const gameRow = document.getElementById('etaGameWaypointRow');
   const realRow = document.getElementById('etaRealWaypointRow');
   const anyAppOnly = waypoints.some(wp => !wp.inGame);
-  if (!anyAppOnly || waypointRouteDistanceKm == null) {
+  const viaKm = anyAppOnly && currentRouteWorldPoints ? sumPathDistanceMeters(currentRouteWorldPoints) * distanceScale() / 1000 : null;
+  if (viaKm == null) {
     gameRow.hidden = true;
     realRow.hidden = true;
     return;
   }
-  const distDisplay = useImperial ? waypointRouteDistanceKm * KM_TO_MI : waypointRouteDistanceKm;
+  const distDisplay = useImperial ? viaKm * KM_TO_MI : viaKm;
   const distText = `${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'}`;
-  let timeText = t('calculating');
-  if (lastKnownAvgSpeedKmh && lastKnownAvgSpeedKmh > 0) {
-    timeText = formatSeconds((waypointRouteDistanceKm / lastKnownAvgSpeedKmh) * 3600);
-  }
+  const eta = waypointEta({
+    viaKm,
+    gameKm: Number.isFinite(data.routeDistanceKm) ? data.routeDistanceKm : null,
+    gameEtaSeconds: data.routeTimeSeconds,
+    avgSpeedKmh: lastKnownAvgSpeedKmh,
+    // Sin push: measuredTimeScale ya lo alimenta una vez por tick.
+    timeScale: gameTimeScale.value() ?? distanceScale(),
+  });
+  const timeOf = (sec) => sec != null ? formatSeconds(sec) : t('calculating');
   gameRow.hidden = false;
   realRow.hidden = false;
-  document.getElementById('etaGameWaypoint').textContent = `${timeText} (${distText})`;
-  document.getElementById('etaRealWaypoint').textContent = timeText;
+  document.getElementById('etaGameWaypoint').textContent = `${timeOf(eta.gameSeconds)} (${distText})`;
+  document.getElementById('etaRealWaypoint').textContent = timeOf(eta.realSeconds);
 }
 
 // ---------------------------------------------------------------------------
@@ -3260,7 +3268,6 @@ function updateDestinationMarker(data) {
       from = to;
     });
     if (!routePoints.length) routePoints = null;
-    waypointRouteDistanceKm = (routePoints && waypoints.some(wp => !wp.inGame)) ? (sumPathDistanceMeters(routePoints) * distanceScale()) / 1000 : null;
     currentRouteWorldPoints = routePoints;
     if (map.getSource('route')) {
       if (routePoints) {

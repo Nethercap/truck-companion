@@ -1724,6 +1724,27 @@ function useOwnRemaining(gameKm, ownKm) {
   return !gameKm || gameKm < ownKm * 0.25;
 }
 
+// Las filas "via waypoint" (waypoints que el juego no conoce): cuanto se
+// tarda hasta el destino pasando por ellos. La de abajo del ETA del juego va
+// en horas de juego, como esa fila: el ETA del juego estirado por el desvio
+// (mismo ritmo, mas km). La del ETA real, con el ritmo medido. Antes las dos
+// mostraban el tiempo real: "1h 30m (1,104.8 mi)" abajo de "17h 40m
+// (987.2 mi)" (Discord, 13-10).
+// viaKm: lo que falta por nuestra ruta. gameKm, gameEtaSeconds: el GPS del
+// juego (segundos de juego). avgSpeedKmh: km del juego por hora real.
+// timeScale: minutos de juego por minuto real. Devuelve { gameSeconds,
+// realSeconds }, cada uno null si no se puede estimar.
+function waypointEta({ viaKm, gameKm, gameEtaSeconds, avgSpeedKmh, timeScale }) {
+  if (!Number.isFinite(viaKm) || viaKm < 0) return { gameSeconds: null, realSeconds: null };
+  const realSeconds = avgSpeedKmh > 0 ? viaKm / avgSpeedKmh * 3600 : null;
+  let gameSeconds = null;
+  // Con el GPS del juego apuntando a otra cosa (el remolque del freight
+  // market, ver useOwnRemaining) su ritmo no sirve: del ritmo real.
+  if (gameKm > 1 && gameEtaSeconds > 0 && !useOwnRemaining(gameKm, viaKm)) gameSeconds = gameEtaSeconds * viaKm / gameKm;
+  else if (realSeconds != null && timeScale > 0) gameSeconds = realSeconds * timeScale;
+  return { gameSeconds, realSeconds };
+}
+
 // Tamano de la flecha del camion elegido en Ajustes (multiplicador): de 1 a 3
 // en pasos de 0.25. Un usuario con poca vista no la encontraba en la tablet
 // ("I'm blind and can barely see it", Discord 10-10).
@@ -2414,6 +2435,6 @@ function createScreenKeeper({ wakeLock, doc }) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { routeProgressTotal, waypointRouteKey, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }
