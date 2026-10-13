@@ -2514,14 +2514,30 @@ function turnInstructionText(info, { t, imperial, lang }) {
 // ruta. routeTimeSeconds es tiempo de juego, igual que gameTimeMinutes. Es
 // llegada_en_juego de client/overlay.py: el overlay del juego y el de OBS
 // tienen que decir lo mismo.
-function gameArrivalClock(gameTimeMinutes, routeTimeSeconds) {
+function gameArrivalClock(gameTimeMinutes, routeTimeSeconds, hour12 = false) {
   if (!Number.isFinite(gameTimeMinutes) || !Number.isFinite(routeTimeSeconds) || routeTimeSeconds <= 0) return '';
   const llega = gameTimeMinutes + routeTimeSeconds / 60;
   const hora = Math.floor(llega) % 1440;
   const dias = Math.floor(llega / 1440) - Math.floor(gameTimeMinutes / 1440);
-  const hh = String(Math.floor(hora / 60)).padStart(2, '0');
-  const mm = String(hora % 60).padStart(2, '0');
-  return `${hh}:${mm}` + (dias > 0 ? ` +${dias}d` : '');
+  return formatClockHM(Math.floor(hora / 60), hora % 60, hour12) + (dias > 0 ? ` +${dias}d` : '');
+}
+
+// Formato de todos los relojes (llegada real, reloj y llegada del juego) en
+// Ajustes: 'auto' sigue al idioma (12 h en ingles, 24 h en los demas), o
+// '24' / '12' fijo. Antes la llegada real salia en el formato del idioma y
+// la del juego siempre en 24 h, y en ingles quedaban distintas (Discord, 13-10).
+const CLOCK_FORMATS = ['auto', '24', '12'];
+function clockFormatSetting(raw) {
+  return CLOCK_FORMATS.includes(raw) ? raw : 'auto';
+}
+function clockIs12h(raw, lang) {
+  const f = clockFormatSetting(raw);
+  return f === 'auto' ? lang === 'en' : f === '12';
+}
+function formatClockHM(hours, minutes, hour12) {
+  const mm = String(minutes).padStart(2, '0');
+  if (!hour12) return `${String(hours).padStart(2, '0')}:${mm}`;
+  return `${hours % 12 || 12}:${mm} ${hours < 12 ? 'AM' : 'PM'}`;
 }
 
 // Lo que muestra el overlay de OBS (?items=), en este orden. Los cinco del
@@ -2831,6 +2847,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

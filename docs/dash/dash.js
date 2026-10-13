@@ -84,7 +84,7 @@ const DASH_ANCHO_MARCA = 12;
 // justamente cuando hay que leerlas bien.
 const DASH_AIRE_MARCAS = 10;
 
-function createDashPanel({ root, money, imperial, lang }) {
+function createDashPanel({ root, money, imperial, lang, hour12 }) {
   const KM_TO_MI = 0.621371;
   const escala = createTimeScale();
   const ritmo = createPaceEta();
@@ -275,6 +275,8 @@ function createDashPanel({ root, money, imperial, lang }) {
   // --- formato ---
   const idioma = () => (lang ? lang() : 'en');
   const mi = () => (imperial ? imperial() : false);
+  // Formato de hora de Ajustes; sin el, el del idioma (clockIs12h)
+  const doce = () => (hour12 ? hour12() : clockIs12h('auto', idioma()));
   function num(v, dec) {
     return Number(v).toLocaleString(idioma(), { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 });
   }
@@ -307,11 +309,11 @@ function createDashPanel({ root, money, imperial, lang }) {
     return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
   }
   function reloj(fecha) {
-    return fecha.toLocaleTimeString(idioma(), { hour: '2-digit', minute: '2-digit' });
+    return formatClockHM(fecha.getHours(), fecha.getMinutes(), doce());
   }
   function relojJuego(minutos) {
     const c = gameClockFromMinutes(minutos);
-    return c ? String(c.hours).padStart(2, '0') + ':' + String(c.minutes).padStart(2, '0') : null;
+    return c ? formatClockHM(c.hours, c.minutes, doce()) : null;
   }
   function consumoTexto(lPor100) {
     return mi() ? num(235.215 / lPor100, 1) + '\u00a0mpg' : num(lPor100, 1) + '\u00a0l/100';

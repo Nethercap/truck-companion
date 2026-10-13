@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261013s" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261013s" />
-<link rel="stylesheet" href="app.css?v=20261013s" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261013t" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261013t" />
+<link rel="stylesheet" href="app.css?v=20261013t" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -89,6 +89,11 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
 
       <div class="settingsQuick">
         <button id="setUnitToggle" class="settingsLinkBtn">km</button>
+        <select id="setClockSelect" class="settingsLinkBtn">
+        <option value="auto" data-i18n="clockAuto">Clock: automatic</option>
+        <option value="24" data-i18n="clock24">24-hour clock</option>
+        <option value="12" data-i18n="clock12">12-hour clock (AM/PM)</option>
+        </select>
         <select id="setLangSelect" class="settingsLinkBtn">
         <option value="en">English</option>
         <option value="es">Español</option>
@@ -661,14 +666,14 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261013s"></script>
-<script src="pure.js?v=20261013s"></script>
-<script src="i18n.js?v=20261013s"></script>
-<script src="i18n_en_es.js?v=20261013s"></script>
-<script src="../dash/dash.js?v=20261013s"></script>
-<script src="../dash/classic.js?v=20261013s"></script>
-<script src="app.js?v=20261013s"></script>
-<script src="convoy.js?v=20261013s"></script>
-<script src="livemap.js?v=20261013s"></script>
+<script src="variants.js?v=20261013t"></script>
+<script src="pure.js?v=20261013t"></script>
+<script src="i18n.js?v=20261013t"></script>
+<script src="i18n_en_es.js?v=20261013t"></script>
+<script src="../dash/dash.js?v=20261013t"></script>
+<script src="../dash/classic.js?v=20261013t"></script>
+<script src="app.js?v=20261013t"></script>
+<script src="convoy.js?v=20261013t"></script>
+<script src="livemap.js?v=20261013t"></script>
 </body>
 </html>

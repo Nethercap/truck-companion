@@ -2194,6 +2194,29 @@ test('overlay: llegada en hora del juego, como client/overlay.py', () => {
   assert.equal(gameArrivalClock(600, 0), ''); // el GPS del juego sin ruta
   assert.equal(gameArrivalClock(null, 3600), '');
   assert.equal(gameArrivalClock(600, undefined), '');
+  // En 12 h, igual que la llegada real
+  assert.equal(gameArrivalClock(600, 3600, true), '11:00 AM');
+  assert.equal(gameArrivalClock(1430, 1200, true), '12:10 AM +1d');
+  assert.equal(gameArrivalClock(700, 3600, true), '12:40 PM');
+});
+
+test('formato de hora: el mismo para la llegada real y la del juego', () => {
+  const { clockFormatSetting, clockIs12h, formatClockHM } = require('./pure.js');
+  assert.equal(clockFormatSetting(undefined), 'auto');
+  assert.equal(clockFormatSetting('13'), 'auto');
+  assert.equal(clockFormatSetting('12'), '12');
+  // auto: 12 h solo en ingles
+  assert.equal(clockIs12h('auto', 'en'), true);
+  assert.equal(clockIs12h('auto', 'de'), false);
+  assert.equal(clockIs12h(undefined, 'en'), true);
+  // elegido a mano gana sobre el idioma
+  assert.equal(clockIs12h('24', 'en'), false);
+  assert.equal(clockIs12h('12', 'es'), true);
+  assert.equal(formatClockHM(0, 5, false), '00:05');
+  assert.equal(formatClockHM(0, 5, true), '12:05 AM');
+  assert.equal(formatClockHM(12, 0, true), '12:00 PM');
+  assert.equal(formatClockHM(15, 45, true), '3:45 PM');
+  assert.equal(formatClockHM(15, 45, false), '15:45');
 });
 
 test('overlay de OBS: que se muestra segun el link', () => {

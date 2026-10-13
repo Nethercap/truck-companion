@@ -56,6 +56,11 @@ let nav = null;
 let navEn = 0;
 
 const ver = (item) => opts.items.includes(item);
+// 12 o 24 h: el de Ajustes del tablero si manda nav_hud (clock12), si no
+// el del idioma, para que las dos llegadas salgan iguales.
+function doce() {
+  return nav && typeof nav.clock12 === 'boolean' ? nav.clock12 : clockIs12h('auto', currentLang);
+}
 function velocidad(kmh) {
   return formatInt(opts.imperial ? kmh * KM_TO_MI : kmh, currentLang);
 }
@@ -123,10 +128,11 @@ function render() {
   if (ver('remaining') && km != null) cols.push(columna(distancia(km), t('routeRemainingLabel')));
   if (ver('time') && seg != null) cols.push(columna(hm(seg), t('routeDurationLabel')));
   if (ver('arrival') && seg != null) {
-    const hora = new Date(Date.now() + seg * 1000).toLocaleTimeString(currentLang, { hour: '2-digit', minute: '2-digit' });
+    const fecha = new Date(Date.now() + seg * 1000);
+    const hora = formatClockHM(fecha.getHours(), fecha.getMinutes(), doce());
     cols.push(columna(hora, t('overlayArrivalReal')));
   }
-  const enJuego = ver('game_arrival') ? gameArrivalClock(d.gameTimeMinutes, d.routeTimeSeconds) : '';
+  const enJuego = ver('game_arrival') ? gameArrivalClock(d.gameTimeMinutes, d.routeTimeSeconds, doce()) : '';
   if (enJuego) cols.push(columna(enJuego, t('overlayArrivalGame')));
   $('hudDest').hidden = !destino;
   $('hudDest').textContent = destino;

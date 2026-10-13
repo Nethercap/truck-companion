@@ -27,7 +27,7 @@ const CLASSIC_SWEEP_MS = 650;
 // encima del recuadro de abajo.
 const CLASSIC_SWEEP_DEG = 240;
 
-function createClassicDash({ root, imperial, lang }) {
+function createClassicDash({ root, imperial, lang, hour12 }) {
   const KM_TO_MI = 0.621371;
   const escala = createTimeScale();
   const ritmo = createPaceEta();
@@ -41,6 +41,7 @@ function createClassicDash({ root, imperial, lang }) {
 
   const mi = () => (imperial ? imperial() : false);
   const idioma = () => (lang ? lang() : 'en');
+  const doce = () => (hour12 ? hour12() : clockIs12h('auto', idioma()));
   function num(v, dec) {
     return Number(v).toLocaleString(idioma(), { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 });
   }
@@ -391,7 +392,7 @@ function createClassicDash({ root, imperial, lang }) {
     const c = gameClockFromMinutes(d.gameTimeMinutes);
     refs.clock.celda.hidden = !c;
     if (c) {
-      const texto = String(c.hours).padStart(2, '0') + ':' + String(c.minutes).padStart(2, '0');
+      const texto = formatClockHM(c.hours, c.minutes, doce());
       if (texto !== refs.clock.texto) {
         refs.clock.texto = texto;
         refs.clock.lcd.textContent = texto;
@@ -441,12 +442,12 @@ function createClassicDash({ root, imperial, lang }) {
 const DASH_STYLE_KEY = 'truckdash_dash_style';
 const DASH_STYLES = ['modern', 'classic'];
 
-function createDashStyles({ root, money, imperial, lang, style }) {
+function createDashStyles({ root, money, imperial, lang, hour12, style }) {
   const raizModerno = root.appendChild(document.createElement('div'));
   const raizClasico = root.appendChild(document.createElement('div'));
   const paneles = {
-    modern: createDashPanel({ root: raizModerno, money, imperial, lang }),
-    classic: createClassicDash({ root: raizClasico, imperial, lang }),
+    modern: createDashPanel({ root: raizModerno, money, imperial, lang, hour12 }),
+    classic: createClassicDash({ root: raizClasico, imperial, lang, hour12 }),
   };
   const raices = { modern: raizModerno, classic: raizClasico };
   let actual = DASH_STYLES.includes(style) ? style : 'modern';

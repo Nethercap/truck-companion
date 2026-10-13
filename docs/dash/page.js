@@ -44,7 +44,9 @@ function money(amount, game) {
 // no sirve classic.js (no esta en su lista de archivos): sin el, el moderno
 // solo y sin selector.
 const conEstilos = typeof createDashStyles === 'function';
-const panelOpts = { root: panelRoot, money, imperial: () => useImperial, lang: () => currentLang };
+// El formato de hora se elige en Ajustes de la app (misma clave de ajustes)
+const panelOpts = { root: panelRoot, money, imperial: () => useImperial, lang: () => currentLang,
+  hour12: () => clockIs12h(loadSettings().clockFormat, currentLang) };
 const panel = conEstilos
   ? createDashStyles(Object.assign({ style: params.get('style') || savedDashStyle() }, panelOpts))
   : createDashPanel(panelOpts);

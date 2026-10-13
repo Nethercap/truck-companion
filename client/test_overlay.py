@@ -83,6 +83,17 @@ def test_llegada_en_el_reloj_del_juego():
     d = overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=4 * 3600), 100, None, 0, 100)
     assert d["game_arrival"] == "01:30 +1d"
     assert overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=0), 100, None, 0, 100)["game_arrival"] == ""
+    # En 12 h si el tablero lo eligio (como su llegada real), aunque ya no mande
+    for nav_ts in (99, 0):
+        d = overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=4 * 3600), 100,
+                              nav(clock12=True), nav_ts, 100)
+        assert d["game_arrival"] == "1:30 AM +1d"
+    d = overlay.contenido(tele(gameTimeMinutes=ahora, routeTimeSeconds=135 * 60), 100, nav(clock12=True), 99, 100)
+    assert d["game_arrival"] == "11:45 PM"
+    # Un tablero viejo no lo manda: 24 h; y un valor raro no cuenta
+    assert overlay.limpiar_nav({})["clock12"] is False
+    assert overlay.limpiar_nav({"clock12": "si"})["clock12"] is False
+    assert overlay.formato_hora(0, 5, True) == "12:05 AM" and overlay.formato_hora(12, 0, True) == "12:00 PM"
     # Las etiquetas van en el idioma del tablero, aunque ya no mande; las del
     # cliente (idioma de Windows) solo si nunca hubo tablero.
     web = nav(arrivalLabel="Arrival (real)", gameArrivalLabel="Arrival (game)", remainingLabel="Left")

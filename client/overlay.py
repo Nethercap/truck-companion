@@ -167,6 +167,9 @@ def limpiar_nav(msg: dict) -> dict:
         "arrivalLabel": _texto(msg.get("arrivalLabel"), 32),
         "gameArrivalLabel": _texto(msg.get("gameArrivalLabel"), 32),
         "imperial": msg.get("imperial") if isinstance(msg.get("imperial"), bool) else None,
+        # 12 o 24 h, el de Ajustes del tablero: la llegada del juego la arma
+        # el cliente y tiene que salir igual que la real, que llega hecha
+        "clock12": msg.get("clock12") is True,
     }
 
 
@@ -247,10 +250,18 @@ def barra_paradas(tele: dict, total_km) -> dict | None:
     return {"fuel": combustible, "rest": descanso}
 
 
-def llegada_en_juego(tele: dict) -> str:
+def formato_hora(horas: int, minutos: int, doce: bool) -> str:
+    """"15:45" o "3:45 PM": formatClockHM de docs/app/pure.js."""
+    if not doce:
+        return f"{horas:02d}:{minutos:02d}"
+    return f"{horas % 12 or 12}:{minutos:02d} {'AM' if horas < 12 else 'PM'}"
+
+
+def llegada_en_juego(tele: dict, doce: bool = False) -> str:
     """La hora del reloj del juego a la que se llega por la ruta del GPS del
     juego ("21:59", con "+1d" si cae otro dia), o "" si el juego no tiene
-    ruta. routeTimeSeconds es tiempo de juego, igual que gameTimeMinutes."""
+    ruta. routeTimeSeconds es tiempo de juego, igual que gameTimeMinutes.
+    doce: en 12 h ("9:59 PM"), como lo eligio el tablero."""
     ahora = tele.get("gameTimeMinutes")
     falta = tele.get("routeTimeSeconds")
     if not isinstance(ahora, (int, float)) or not isinstance(falta, (int, float)) or falta <= 0:
@@ -258,7 +269,7 @@ def llegada_en_juego(tele: dict) -> str:
     llega = ahora + falta / 60
     hora = int(llega) % 1440
     dias = int(llega // 1440) - int(ahora // 1440)
-    return f"{hora // 60:02d}:{hora % 60:02d}" + (f" +{dias}d" if dias > 0 else "")
+    return formato_hora(hora // 60, hora % 60, doce) + (f" +{dias}d" if dias > 0 else "")
 
 
 def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float,
@@ -318,7 +329,9 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         "gear": formato_marcha(tele.get("gear")) if "gear" in items else "",
         "remaining": falta if "remaining" in items else "",
         "arrival": llega if "arrival" in items else "",
-        "game_arrival": llegada_en_juego(tele) if "game_arrival" in items else "",
+        # El formato vale aunque el tablero ya no mande: es una preferencia
+        "game_arrival": llegada_en_juego(tele, bool(nav and nav.get("clock12")))
+        if "game_arrival" in items else "",
         # Lo que falta: el del tablero si manda (su ruta tiene los waypoints),
         # si no el del GPS del juego
         "stops": barra_paradas(tele, nav["remainingKm"] if nav_ok and nav.get("remainingKm") else tele.get("routeDistanceKm"))

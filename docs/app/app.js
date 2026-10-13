@@ -74,6 +74,12 @@ function toggleUnits() {
 }
 document.getElementById('unitToggle').addEventListener('click', toggleUnits);
 document.getElementById('setUnitToggle').addEventListener('click', toggleUnits);
+document.getElementById('setClockSelect').addEventListener('change', (e) => {
+  clockFormat = clockFormatSetting(e.target.value);
+  saveSettings();
+  if (lastData) updateHud(lastData);
+  if (dashPanel) dashPanel.refresh();
+});
 let lastData = null;
 
 // Preferencias de usuario (que se muestra en el mini-HUD + color de la ruta),
@@ -87,7 +93,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -160,6 +166,9 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // declaracion tumba app.js entero.
 let navZoom = navZoomSetting(_savedSettings.navZoom);
 let truckSize = truckSizeSetting(_savedSettings.truckSize);
+// 'auto' | '24' | '12' (clockIs12h en pure.js): vale para todos los relojes.
+let clockFormat = clockFormatSetting(_savedSettings.clockFormat);
+function hour12() { return clockIs12h(clockFormat, currentLang); }
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
 // DLC de mapa destildados por juego ({ ats: ['co'], ets2: [] }): las rutas
 // evitan sus caminos (ver dlcBlockedGuards en pure.js). Se guarda lo
@@ -441,6 +450,7 @@ function initSettingsUi() {
   document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
   document.getElementById('setNavZoom').value = navZoom;
   document.getElementById('setTruckSize').value = truckSize;
+  document.getElementById('setClockSelect').value = clockFormat;
   document.getElementById('setVoice').checked = voiceOn;
   document.getElementById('setVoiceTiming').value = voiceTiming;
   loadVoiceCatalog().then(fillVoiceSelect);
@@ -3317,7 +3327,7 @@ function updateRouteSummary(data) {
       : `${formatDec(useImperial ? remainingKm * KM_TO_MI : remainingKm, currentLang)} ${useImperial ? 'mi' : 'km'}`,
     duration: seconds != null && Number.isFinite(seconds) ? formatSeconds(seconds) : '--',
     arrival: seconds != null && Number.isFinite(seconds)
-      ? new Date(Date.now() + seconds * 1000).toLocaleTimeString(currentLang, { hour: '2-digit', minute: '2-digit' })
+      ? (f => formatClockHM(f.getHours(), f.getMinutes(), hour12()))(new Date(Date.now() + seconds * 1000))
       : '--',
   });
 }
@@ -4118,6 +4128,9 @@ function sendNavHud() {
     arrivalLabel: t('overlayArrivalReal'),
     gameArrivalLabel: t('overlayArrivalGame'),
     imperial: !!useImperial,
+    // El formato de hora de Ajustes: el overlay del juego calcula la
+    // llegada del juego y el de OBS las dos, y tienen que salir como aca.
+    clock12: hour12(),
     src: NAV_HUD_SRC,
   };
   const sig = JSON.stringify(msg);
@@ -4834,9 +4847,7 @@ function updateGameClock(gameTimeMinutes) {
   if (!clock) return;
   const ref = new Date(Date.UTC(2024, 0, 1 + clock.dayIndex));
   const day = ref.toLocaleDateString(currentLang, { weekday: 'short', timeZone: 'UTC' });
-  const hh = String(clock.hours).padStart(2, '0');
-  const mm = String(clock.minutes).padStart(2, '0');
-  document.getElementById('gameClock').textContent = `${day} ${hh}:${mm}`;
+  document.getElementById('gameClock').textContent = `${day} ${formatClockHM(clock.hours, clock.minutes, hour12())}`;
 }
 
 // Escala de tiempo del juego (minutos de juego por minuto real). Se mide en
@@ -6507,6 +6518,7 @@ function ensureDashPanel() {
     money: moneyLine,       // con la conversion a la moneda local del usuario
     imperial: () => useImperial,
     lang: () => currentLang,
+    hour12,
   };
   const conEstilos = typeof createDashStyles === 'function';
   dashPanel = conEstilos ? createDashStyles(Object.assign({ style: savedDashStyle() }, opts)) : createDashPanel(opts);
