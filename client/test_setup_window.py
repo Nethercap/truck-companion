@@ -785,3 +785,19 @@ def test_qr_del_celular_con_el_codigo_y_se_rehace_al_cambiarlo(ventana, monkeypa
     monkeypatch.setattr(tray_client.state, "code", None)
     ventana.refresh_status()
     assert ventana._phone_qr_url is None and not ventana.phone_qr_label.cget("image")
+
+
+def test_el_deslizador_de_tamano_sigue_al_overlay_estirado(ventana, monkeypatch):
+    """Estirado en el modo Mover (esquina o rueda, Discord 13-10): se guarda
+    y el deslizador de Setup lo sigue."""
+    v, guardados = ventana
+    if not hasattr(v, "overlay_size_var"):
+        pytest.skip("el overlay solo se ofrece en Windows")
+    monkeypatch.setattr(tray_client.state, "overlay_layout",
+                        dict(tray_client.state.overlay_layout, size=100, opacity=90))
+    v.refresh_status()
+    assert v.overlay_size_var.get() == 100
+    tray_client.state.overlay.al_redimensionar(145)
+    v.refresh_status()
+    assert v.overlay_size_var.get() == 145
+    assert guardados.get("overlay_size") == 145

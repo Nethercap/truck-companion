@@ -115,13 +115,20 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
     import win_integration
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: True)
     monkeypatch.setattr(win_integration, "load_settings", lambda: {})
-    assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": "m",
-                                                  "items": overlay.ITEMS, "hotkey": "ctrl+shift+o", "pos": None}
+    assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": 100,
+                                                  "opacity": 90, "items": overlay.ITEMS,
+                                                  "hotkey": "ctrl+shift+o", "pos": None}
+    # El tamano de antes era una letra: se pasa a su por ciento.
     monkeypatch.setattr(win_integration, "load_settings",
                         lambda: {"overlay": True, "overlay_corner": "middle", "overlay_size": "l",
                                  "overlay_items": ["arrival", "inventado", "speed"], "overlay_hotkey": ""})
-    assert win_integration.overlay_settings() == {"enabled": True, "corner": "top_center", "size": "l",
-                                                  "items": ("speed", "arrival"), "hotkey": "", "pos": None}
+    assert win_integration.overlay_settings() == {"enabled": True, "corner": "top_center", "size": 130,
+                                                  "opacity": 90, "items": ("speed", "arrival"),
+                                                  "hotkey": "", "pos": None}
+    monkeypatch.setattr(win_integration, "load_settings",
+                        lambda: {"overlay_size": 155, "overlay_opacity": 45})
+    ajustes = win_integration.overlay_settings()
+    assert (ajustes["size"], ajustes["opacity"]) == (155, 45)
     monkeypatch.setattr(win_integration, "load_settings", lambda: {"overlay_hotkey": "ctrl+del"})
     assert win_integration.overlay_settings()["hotkey"] == "ctrl+shift+o"
     # Arrastrado a mano: "custom" con su proporcion; sin una proporcion que
@@ -140,11 +147,11 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
 
 def test_textos_en_los_ocho_idiomas():
     import i18n
-    claves = ["overlay_option", "overlay_position", "overlay_size", "menu_overlay",
+    claves = ["overlay_option", "overlay_position", "overlay_size", "overlay_opacity", "menu_overlay",
               "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show",
               "overlay_hotkey", "hotkey_none", "sec_overlay", "overlay_hint", "pos_custom",
               "overlay_move", "overlay_move_done", "overlay_move_hint"]
-    claves += [f"pos_{c}" for c in overlay.CORNERS] + [f"size_{k}" for k in overlay.SIZES]
+    claves += [f"pos_{c}" for c in overlay.CORNERS]
     claves += [f"item_{k}" for k in overlay.ITEMS]
     for lang, textos in i18n._STRINGS.items():
         faltan = [k for k in claves if not textos.get(k)]
@@ -216,7 +223,10 @@ def test_posicion_arrastrada():
 def test_el_ejemplo_del_modo_mover_respeta_lo_elegido():
     d = overlay.ejemplo(("speed", "game_arrival"), ("F", "R", "J"))
     assert d["speed"] and d["game_arrival"] and not d["turn"] and not d["remaining"] and not d["arrival"]
+    assert not d["cruise"] and not d["gear"]
     assert d["gameArrivalLabel"] == "J"
+    d = overlay.ejemplo(("cruise", "gear"), ("F", "R", "J"))
+    assert d["cruise"] and d["gear"] and not d["speed"]
     # Con nada elegido igual se ve algo para poder ubicarlo.
     assert overlay.ejemplo((), ("F", "R", "J"))["speed"]
 
@@ -309,3 +319,67 @@ def test_solo_webs_viejas_sin_src_se_aceptan_como_antes(monkeypatch):
     ahora[0] += 1
     data.navegacion({"remaining": "9 km"})
     assert data.foto()[2]["remaining"] == "9 km"
+
+
+def test_crucero_solo_puesto_y_elegido():
+    # Discord (13-10): "Cruise Control Speed (like the obs overlay)".
+    puesto = tele(cruiseControl=True, cruiseControlSpeedKmh=80.0)
+    assert overlay.contenido(puesto, 100, None, 0, 100)["cruise"] == "80"
+    # en millas como la velocidad
+    ats = tele(game="ats", cruiseControl=True, cruiseControlSpeedKmh=104.6)
+    assert overlay.contenido(ats, 100, None, 0, 100)["cruise"] == "65"
+    # sacado, o con la velocidad fijada en 0, no se muestra
+    assert overlay.contenido(tele(cruiseControl=False, cruiseControlSpeedKmh=80.0), 100, None, 0, 100)["cruise"] == ""
+    assert overlay.contenido(tele(cruiseControl=True, cruiseControlSpeedKmh=0), 100, None, 0, 100)["cruise"] == ""
+    # destildado tampoco
+    d = overlay.contenido(puesto, 100, None, 0, 100, items=("speed",))
+    assert d["cruise"] == "" and d["speed"] == "88"
+    # solo el crucero elegido y sin crucero puesto: no queda un recuadro vacio
+    assert overlay.contenido(tele(), 100, None, 0, 100, items=("cruise",)) is None
+    assert overlay.contenido(puesto, 100, None, 0, 100, items=("cruise",))["cruise"] == "80"
+
+
+def test_marcha_como_el_tablero():
+    # Discord (13-10, Tarah): "Gear Indicator".
+    assert [overlay.formato_marcha(g) for g in (0, None, 1, 12, -1, -2, 3.0)] == ["N", "N", "1", "12", "R", "R2", "3"]
+    assert overlay.formato_marcha(True) == overlay.formato_marcha(float("nan")) == overlay.formato_marcha("5") == "N"
+    assert overlay.contenido(tele(gear=7), 100, None, 0, 100)["gear"] == "7"
+    assert overlay.contenido(tele(gear=7), 100, None, 0, 100, items=("speed",))["gear"] == ""
+    # la marcha sola alcanza para que se vea
+    assert overlay.contenido(tele(gear=0), 100, None, 0, 100, items=("gear",))["gear"] == "N"
+
+
+def test_tamano_y_opacidad_validados():
+    # Discord (13-10): "Opacity slider" y "Resizable windows".
+    assert [overlay.tamano_valido(v) for v in ("s", "m", "l", "xl")] == [80, 100, 130, 100]
+    assert [overlay.tamano_valido(v) for v in (10, 500, 137, 152.4)] == [50, 200, 135, 150]
+    for malo in (None, True, float("nan"), float("inf"), [100]):
+        assert overlay.tamano_valido(malo) == overlay.DEFAULT_SIZE
+        assert overlay.opacidad_valida(malo) == overlay.DEFAULT_OPACITY
+    assert [overlay.opacidad_valida(v) for v in (0, 101, 47, 100)] == [30, 100, 45, 100]
+    # los valores por defecto caen justo en un paso del deslizador
+    assert overlay.tamano_valido(overlay.DEFAULT_SIZE) == overlay.DEFAULT_SIZE
+    assert overlay.opacidad_valida(overlay.DEFAULT_OPACITY) == overlay.DEFAULT_OPACITY
+
+
+def test_cambiar_el_overlay_guarda_solo_lo_tocado(monkeypatch):
+    import tray_client
+    import win_integration
+    guardado = []
+    monkeypatch.setattr(win_integration, "save_overlay_settings", lambda **kw: guardado.append(kw))
+    monkeypatch.setattr(tray_client.state, "overlay_layout",
+                        {"corner": "top_center", "size": 100, "items": overlay.ITEMS, "pos": None, "opacity": 90})
+    # el deslizador en movimiento: se aplica y no va al disco
+    tray_client.set_overlay_layout(guardar=False, size=150)
+    assert tray_client.state.overlay_layout["size"] == 150 and guardado == []
+    # al soltarlo se guarda solo eso
+    tray_client.set_overlay_layout(opacity=60)
+    assert guardado == [{"opacity": 60}]
+    assert tray_client.state.overlay_layout["size"] == 150
+    # arrastrado en el modo Mover
+    tray_client.set_overlay_layout(corner=overlay.CUSTOM, pos=[0.1, 0.2])
+    assert tray_client.state.overlay_layout["pos"] == (0.1, 0.2)
+    assert guardado[-1] == {"corner": "custom", "pos": (0.1, 0.2)}
+    # None deja lo que habia y no se guarda
+    tray_client.set_overlay_layout(size=None, items=["gear"])
+    assert tray_client.state.overlay_layout["size"] == 150 and guardado[-1] == {"items": ("gear",)}

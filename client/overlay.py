@@ -36,14 +36,24 @@ DEFAULT_CORNER = "top_center"
 # izquierda del overlay, en proporcion a la ventana del juego, para que siga
 # en su lugar si cambia la resolucion.
 CUSTOM = "custom"
-SIZES = {"s": 0.8, "m": 1.0, "l": 1.3}
-DEFAULT_SIZE = "m"
+# Tamano en por ciento (100 = el de siempre a 1080 p). Antes eran tres
+# opciones fijas; pedian poder achicarlo o agrandarlo a gusto para ubicarlo
+# mejor (Discord, 13-10). Lo guardado como letra se pasa a su por ciento.
+SIZE_MIN, SIZE_MAX = 50, 200
+DEFAULT_SIZE = 100
+SIZES_VIEJOS = {"s": 80, "m": 100, "l": 130}
+SIZE_STEP = 5
+# Opacidad de la ventana entera, en por ciento. Por debajo de 30 el texto ya
+# no se lee arriba del juego.
+OPACITY_MIN, OPACITY_MAX = 30, 100
+DEFAULT_OPACITY = 90  # antes fija en 88; de a SIZE_STEP como el deslizador
 # Lo que se puede elegir mostrar (Setup): el giro con la proxima ciudad, la
-# velocidad con el limite, lo que falta, la hora de llegada real (la de tu
-# reloj, la calcula la web) y la del reloj del juego (la que importa contra
-# el plazo del trabajo).
-ITEMS = ("turn", "speed", "remaining", "arrival", "game_arrival")
-DATOS = ("turn", "speed", "remaining", "arrival", "game_arrival")
+# velocidad con el limite, la del control de crucero (solo si esta puesto),
+# la marcha, lo que falta, la hora de llegada real (la de tu reloj, la
+# calcula la web) y la del reloj del juego (la que importa contra el plazo).
+ITEMS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival")
+DATOS = ITEMS
+CRUISE = "#7cc243"  # el verde del crucero, el mismo del overlay de OBS
 
 # Cuanto vale lo que manda la web: el giro dice "en 400 m" y a 90 km/h eso
 # cambia rapido. Si la web deja de mandar (pestana cerrada, celular
@@ -56,6 +66,7 @@ BG = "#14171c"
 FG = "#f2f3f5"
 MUTED = "#9aa4b2"
 RED = "#e53935"
+GRIP = 18  # lado de la esquina que estira en el modo Mover, a escala 1
 
 
 def _texto(valor, largo=160) -> str:
@@ -89,6 +100,45 @@ def formato_distancia(km: float, imperial: bool) -> str:
         mi = km * KM_TO_MI
         return f"{mi:.1f} mi" if mi < 10 else f"{round(mi)} mi"
     return f"{km:.1f} km" if km < 10 else f"{round(km)} km"
+
+
+def _numero(valor) -> bool:
+    """Un numero de verdad: ni bool, ni NaN, ni infinito (round() tira)."""
+    return isinstance(valor, (int, float)) and not isinstance(valor, bool) and float("-inf") < valor < float("inf")
+
+
+def formato_marcha(marcha) -> str:
+    """La marcha como la muestra el tablero: "N" en punto muerto (o si no
+    llega), "R" o "R2" atras, el numero adelante. Es la del tablero del
+    camion (gearDashboard), no la de la caja."""
+    if not _numero(marcha) or int(marcha) == 0:
+        return "N"
+    marcha = int(marcha)
+    if marcha < 0:
+        return "R" if marcha == -1 else f"R{-marcha}"
+    return str(marcha)
+
+
+def _a_paso(valor, minimo, maximo) -> int:
+    """Redondeado de a SIZE_STEP y dentro del rango: el deslizador de Setup
+    va de a 5 y un valor suelto lo hacia saltar."""
+    return int(min(max(round(valor / SIZE_STEP) * SIZE_STEP, minimo), maximo))
+
+
+def tamano_valido(valor, defecto=DEFAULT_SIZE) -> int:
+    """El tamano guardado, en por ciento y dentro del rango. Acepta la letra
+    de antes ("s", "m", "l")."""
+    if isinstance(valor, str):
+        return SIZES_VIEJOS.get(valor, defecto)
+    if not _numero(valor):
+        return defecto
+    return _a_paso(valor, SIZE_MIN, SIZE_MAX)
+
+
+def opacidad_valida(valor, defecto=DEFAULT_OPACITY) -> int:
+    if not _numero(valor):
+        return defecto
+    return _a_paso(valor, OPACITY_MIN, OPACITY_MAX)
 
 
 def llegada_en_juego(tele: dict) -> str:
@@ -129,6 +179,9 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
     velocidad = round(abs(tele.get("speedKmh") or 0) * factor)
     limite_kmh = tele.get("speedLimitKmh") or 0
     limite = round(limite_kmh * factor) if limite_kmh > 0 else None
+    crucero_kmh = tele.get("cruiseControlSpeedKmh") or 0
+    crucero = (str(round(crucero_kmh * factor))
+               if "cruise" in items and tele.get("cruiseControl") and crucero_kmh > 0 else "")
 
     falta = llega = ""
     if nav_ok and nav.get("remaining"):
@@ -153,6 +206,8 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         "unit": "mph" if imperial else "km/h",
         "limit": str(limite) if limite and ver_vel else "",
         "over": ver_vel and bool(limite) and velocidad > limite + 2,
+        "cruise": crucero,
+        "gear": formato_marcha(tele.get("gear")) if "gear" in items else "",
         "remaining": falta if "remaining" in items else "",
         "arrival": llega if "arrival" in items else "",
         "game_arrival": llegada_en_juego(tele) if "game_arrival" in items else "",
@@ -206,13 +261,13 @@ def ejemplo(items, etiquetas) -> dict:
     verdad, para saber donde queda."""
     falta, llega, llega_juego = etiquetas
     d = {"turn": "\u21b1 400 m", "next": "", "speed": "72", "unit": "km/h", "limit": "80", "over": False,
-         "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59",
+         "cruise": "80", "gear": "8", "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59",
          "remainingLabel": falta, "arrivalLabel": llega, "gameArrivalLabel": llega_juego}
     if "turn" not in items:
         d["turn"] = ""
     if "speed" not in items:
         d["speed"] = d["limit"] = ""
-    for k in ("remaining", "arrival", "game_arrival"):
+    for k in ("cruise", "gear", "remaining", "arrival", "game_arrival"):
         if k not in items:
             d[k] = ""
     if not any(d[k] for k in DATOS):
@@ -278,6 +333,7 @@ SWP_NOSIZE = 0x0001
 SWP_NOMOVE = 0x0002
 SWP_NOACTIVATE = 0x0010
 SWP_FRAMECHANGED = 0x0020
+LWA_ALPHA = 0x2
 DWMWA_WINDOW_CORNER_PREFERENCE = 33
 DWMWCP_ROUND = 2
 
@@ -294,6 +350,7 @@ def _user32():
                                ctypes.c_int, ctypes.c_int, ctypes.c_uint]
     u.GetParent.restype = wintypes.HWND
     u.GetParent.argtypes = [wintypes.HWND]
+    u.SetLayeredWindowAttributes.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_ubyte, wintypes.DWORD]
     return u
 
 
@@ -319,15 +376,19 @@ class Overlay:
 
     def __init__(self, data: OverlayData, ajustes, etiquetas):
         self.data = data
-        self.ajustes = ajustes      # () -> (esquina, tamano, que se muestra)
+        # () -> {"corner", "size", "items", "pos", "opacity"}, como overlay_settings()
+        self.ajustes = ajustes
         self.etiquetas = etiquetas  # () -> (falta, llegada real, llegada del juego, aviso del giro), idioma del cliente
         self._activo = False
         self._hilo = None
         # Modo Mover (boton de Setup): el overlay se ve aunque el juego no
         # este al frente, deja de pasar los clics y se arrastra con el mouse.
         # Al soltarlo se llama a al_mover(fx, fy) con la proporcion nueva.
+        # Desde la esquina de abajo a la derecha (o con la rueda) se agranda
+        # o achica: al soltar, al_redimensionar(tamano en por ciento).
         self.mover = False
         self.al_mover = None
+        self.al_redimensionar = None
 
     @property
     def enabled(self) -> bool:
@@ -412,11 +473,18 @@ class _Ventana:
         self.parpadeo = False
         self.clics = False      # si la ventana recibe el mouse (modo Mover)
         self.agarre = None      # (dx, dy) del puntero mientras se arrastra
+        self.estira = None      # (x del puntero, tamano, ancho) al agarrar la esquina
+        self.tamano_vivo = None  # el tamano mientras se estira, sin guardar todavia
+        self.tamano = DEFAULT_SIZE  # el del ultimo cuadro
+        self.escala = 1.0       # la del ultimo cuadro (para medir la esquina)
+        self.alfa = None        # la opacidad puesta en la ventana, 0-255
         self.rect = None        # el rectangulo del juego del ultimo cuadro
         self.juego_mover = (0.0, None)  # (cuando se busco, hwnd) en modo Mover
         self.canvas.bind("<ButtonPress-1>", self._agarrar)
         self.canvas.bind("<B1-Motion>", self._arrastrar)
         self.canvas.bind("<ButtonRelease-1>", self._soltar)
+        self.canvas.bind("<Motion>", self._puntero)
+        self.canvas.bind("<MouseWheel>", self._rueda)
 
     def loop(self):
         self.root.after(self.ov.TICK_MS, self.tick)
@@ -441,27 +509,63 @@ class _Ventana:
         ctypes.windll.user32.GetCursorPos(ctypes.byref(p))
         return p.x, p.y
 
+    def _en_esquina(self, x, y, r) -> bool:
+        """Si el puntero esta sobre la esquina de abajo a la derecha, la que
+        estira (se dibuja en el modo Mover)."""
+        lado = max(14, round(GRIP * self.escala))
+        return x >= r[2] - lado and y >= r[3] - lado
+
+    def _puntero(self, _evento):
+        if not self.ov.mover or self.agarre or self.estira:
+            return
+        r = _rect_de(self.hwnd)
+        if r:
+            esquina = self._en_esquina(*self._cursor(), r)
+            self.canvas.configure(cursor="size_nw_se" if esquina else "fleur")
+
     def _agarrar(self, _evento):
         if not self.ov.mover:
             return
         r = _rect_de(self.hwnd)
         x, y = self._cursor()
-        self.agarre = (x - r[0], y - r[1])
+        if self._en_esquina(x, y, r):
+            self.estira = (x, self.tamano, max(1, r[2] - r[0]))
+        else:
+            self.agarre = (x - r[0], y - r[1])
 
     def _arrastrar(self, _evento):
+        x, y = self._cursor()
+        if self.estira is not None:
+            # El tamano crece en la misma proporcion que el ancho: la esquina
+            # sigue al puntero. Se ve en el proximo cuadro; se guarda al soltar.
+            x0, tamano0, ancho0 = self.estira
+            self.tamano_vivo = tamano_valido(tamano0 * (ancho0 + x - x0) / ancho0)
+            return
         if self.agarre is None:
             return
-        x, y = self._cursor()
         self.u.SetWindowPos(self.hwnd, HWND_TOPMOST, x - self.agarre[0], y - self.agarre[1], 0, 0,
                             SWP_NOSIZE | SWP_NOACTIVATE)
 
     def _soltar(self, _evento):
+        if self.estira is not None:
+            self.estira = None
+            if self.tamano_vivo is not None and self.ov.al_redimensionar:
+                self.ov.al_redimensionar(self.tamano_vivo)
+            self.tamano_vivo = None
+            return
         if self.agarre is None:
             return
         self.agarre = None
         r = _rect_de(self.hwnd)
         if r and self.rect and self.ov.al_mover:
             self.ov.al_mover(*relativa_de(self.rect, r[0], r[1]))
+
+    def _rueda(self, evento):
+        """En el modo Mover la rueda agranda o achica de a SIZE_STEP."""
+        if not self.ov.mover or self.estira or not self.ov.al_redimensionar or not evento.delta:
+            return
+        paso = SIZE_STEP if evento.delta > 0 else -SIZE_STEP
+        self.ov.al_redimensionar(tamano_valido(self.tamano + paso))
 
     def _modo_clics(self, recibir: bool):
         """En modo Mover la ventana recibe el mouse; fuera de el, los clics
@@ -506,7 +610,17 @@ class _Ventana:
                 return
         tele, tele_ts, nav, nav_ts = self.ov.data.foto()
         falta, llega, llega_juego, *resto = self.ov.etiquetas()
-        esquina, tamano, items, relativa = self.ov.ajustes()
+        aj = self.ov.ajustes()
+        esquina, items, relativa = aj["corner"], aj["items"], aj["pos"]
+        tamano = self.tamano_vivo if self.tamano_vivo is not None else aj["size"]
+        self.tamano = tamano
+        alfa = round(opacidad_valida(aj.get("opacity")) * 255 / 100)
+        if alfa != self.alfa:
+            # Directo con Win32 y no con el -alpha de Tk: Tk, al llegar a 1.0,
+            # le saca WS_EX_LAYERED y rehace la ventana (otro hwnd), y sin
+            # LAYERED los clics ya no pasan al juego.
+            self.u.SetLayeredWindowAttributes(self.hwnd, 0, alfa, LWA_ALPHA)
+            self.alfa = alfa
         datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
                           etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items,
                           aviso_giro=resto[0] if resto else "")
@@ -520,7 +634,8 @@ class _Ventana:
             return
         self.rect = rect
         # Todo se mide contra la altura del juego: a 1080 p "m" es la escala 1.
-        escala = max(0.6, (rect[3] - rect[1]) / 1080) * SIZES.get(tamano, 1.0)
+        escala = max(0.6, (rect[3] - rect[1]) / 1080) * tamano / 100
+        self.escala = escala
         self.parpadeo = datos["over"] and int(time.monotonic() * 2) % 2 == 0
         clave = (datos, escala, self.parpadeo, self.clics)
         if clave != self.dibujado:
@@ -557,16 +672,24 @@ class _Ventana:
         pad = round(14 * k)
         sep = round(16 * k)
         fila = round(46 * k)
+        hueco = round(12 * k)
+        icono = round(17 * k)          # el reloj del crucero
+        caja = round(36 * k)           # alto del recuadro de la marcha
         # De derecha a izquierda: llegada del juego, llegada real, lo que falta.
         columnas = [(d[v], d[e]) for v, e in (("game_arrival", "gameArrivalLabel"), ("arrival", "arrivalLabel"),
                                                ("remaining", "remainingLabel")) if d[v]]
+        ancho_marcha = max(caja, mide(d["gear"], fuente(20, True)) + round(14 * k)) if d["gear"] else 0
         # El ancho sale de lo que hay que mostrar: con todo prendido no entra
         # en el minimo y los numeros se pisaban con la velocidad.
         izquierda = 0
         if d["limit"]:
-            izquierda += fila + round(12 * k)
+            izquierda += fila + hueco
         if d["speed"]:
             izquierda += mide(d["speed"], fuente(34, True)) + round(4 * k) + mide(d["unit"], fuente(13))
+        if d["cruise"]:
+            izquierda += hueco + icono + round(4 * k) + mide(d["cruise"], fuente(17, True))
+        if d["gear"]:
+            izquierda += hueco + ancho_marcha
         derecha_total = sum(max(mide(v, fuente(19, True)), mide(e, fuente(11))) + sep for v, e in columnas)
         ancho = max(round(420 * k), 2 * pad + izquierda + round(8 * k) + derecha_total)
         y = pad
@@ -584,8 +707,9 @@ class _Ventana:
                               font=fuente(14), width=ancho - 2 * pad)
             y = c.bbox(t)[3] + round(8 * k)
 
-        if not (d["speed"] or columnas):
+        if not (d["speed"] or d["cruise"] or d["gear"] or columnas):
             alto = y - round(8 * k) + pad
+            self._marco_mover(ancho, alto, k)
             c.configure(width=ancho, height=alto)
             return ancho, alto
         medio = y + fila // 2
@@ -597,25 +721,53 @@ class _Ventana:
             c.create_oval(x, medio - r, x + 2 * r, medio + r, fill="#ffffff", outline=anillo, width=borde)
             c.create_text(x + r, medio, text=d["limit"], fill="#111111",
                           font=fuente(17 if len(d["limit"]) < 3 else 14, True))
-            x += 2 * r + round(12 * k)
+            x += 2 * r + hueco
         if d["speed"]:
             v = c.create_text(x, medio, text=d["speed"], fill=RED if d["over"] else FG, anchor="w",
                               font=fuente(34, True))
             x = c.bbox(v)[2] + round(4 * k)
-            c.create_text(x, medio + round(6 * k), text=d["unit"], fill=MUTED, anchor="w", font=fuente(13))
+            u = c.create_text(x, medio + round(6 * k), text=d["unit"], fill=MUTED, anchor="w", font=fuente(13))
+            x = c.bbox(u)[2]
+        if d["cruise"]:
+            # Como en el overlay de OBS: un relojito y la velocidad fijada, en verde.
+            x += hueco if x > pad else 0
+            r = icono // 2
+            grueso = max(2, round(2.4 * k))
+            c.create_oval(x, medio - r, x + 2 * r, medio + r, outline=CRUISE, width=grueso)
+            c.create_line(x + r, medio, x + r + round(r * 0.6), medio - round(r * 0.6),
+                          fill=CRUISE, width=grueso, capstyle="round")
+            t = c.create_text(x + 2 * r + round(4 * k), medio, text=d["cruise"], fill=CRUISE, anchor="w",
+                              font=fuente(17, True))
+            x = c.bbox(t)[2]
+        if d["gear"]:
+            x += hueco if x > pad else 0
+            c.create_rectangle(x, medio - caja // 2, x + ancho_marcha, medio + caja // 2,
+                               outline=MUTED, width=max(1, round(2 * k)))
+            c.create_text(x + ancho_marcha // 2, medio, text=d["gear"], fill=FG, font=fuente(20, True))
+            x += ancho_marcha
 
-        if self.clics:
-            # Modo Mover: un borde para que se vea que se puede agarrar.
-            c.create_rectangle(1, 1, ancho - 2, y + fila + pad - 2, outline="#4a90d9",
-                               width=max(2, round(2 * k)), dash=(6, 4))
         derecha = ancho - pad
         for valor, etiqueta in columnas:
             a = c.create_text(derecha, medio - round(2 * k), text=valor, fill=FG, anchor="se", font=fuente(19, True))
             b = c.create_text(derecha, medio + round(1 * k), text=etiqueta, fill=MUTED, anchor="ne", font=fuente(11))
             derecha = min(c.bbox(a)[0], c.bbox(b)[0]) - sep
         alto = y + fila + pad
+        self._marco_mover(ancho, alto, k)
         c.configure(width=ancho, height=alto)
         return ancho, alto
+
+    def _marco_mover(self, ancho: int, alto: int, k: float) -> None:
+        """Modo Mover: un borde para que se vea que se puede agarrar, y la
+        esquina de abajo a la derecha, que estira."""
+        if not self.clics:
+            return
+        c = self.canvas
+        grueso = max(2, round(2 * k))
+        c.create_rectangle(1, 1, ancho - 2, alto - 2, outline="#4a90d9", width=grueso, dash=(6, 4))
+        lado = max(14, round(GRIP * k))
+        for i in (1, 2, 3):
+            d = round(lado * i / 3)
+            c.create_line(ancho - 3 - d, alto - 3, ancho - 3, alto - 3 - d, fill="#4a90d9", width=grueso)
 
 
 # --- Tecla rapida ------------------------------------------------------------

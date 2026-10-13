@@ -6,6 +6,11 @@ updates on its own and is not versioned here.
 
 ## 1.5.31 (unreleased)
 
+- In-game overlay: an opacity slider, and any size from 50 to 200 % instead of three fixed
+  ones. In Move mode you can also resize it by dragging its bottom-right corner or with
+  the mouse wheel.
+- In-game overlay: two new things to show, your cruise control speed (only while it is
+  on, in green like the OBS overlay) and the gear you are in.
 - Build my map also saves which lane of each junction leads to each exit, so the
   dashboard's lane arrows work on your own map too.
 - Build my map (ATS): fuel pumps that only cars can use (the car canopies the Road Trip

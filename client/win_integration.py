@@ -234,13 +234,13 @@ def overlay_supported() -> bool:
 
 
 def overlay_settings() -> dict:
-    """{'enabled', 'corner', 'size', 'items'} del overlay en el juego.
-    Apagado por defecto: es una ventana encima del juego y la tiene que pedir
-    uno. Sin 'items' guardado se muestra todo."""
+    """{'enabled', 'corner', 'pos', 'size', 'opacity', 'items', 'hotkey'} del
+    overlay en el juego. Apagado por defecto: es una ventana encima del juego
+    y la tiene que pedir uno. Sin 'items' guardado se muestra todo. El tamano
+    y la opacidad van en por ciento; el tamano de antes era una letra."""
     import overlay
     s = load_settings()
     corner = s.get("overlay_corner")
-    size = s.get("overlay_size")
     items = s.get("overlay_items")
     hotkey = s.get("overlay_hotkey", overlay.DEFAULT_HOTKEY)
     pos = s.get("overlay_pos")
@@ -252,7 +252,8 @@ def overlay_settings() -> dict:
         "enabled": overlay_supported() and bool(s.get("overlay")),
         "corner": corner if corner in overlay.CORNERS + (overlay.CUSTOM,) else overlay.DEFAULT_CORNER,
         "pos": tuple(pos) if pos_ok else None,
-        "size": size if size in overlay.SIZES else overlay.DEFAULT_SIZE,
+        "size": overlay.tamano_valido(s.get("overlay_size")),
+        "opacity": overlay.opacidad_valida(s.get("overlay_opacity")),
         "items": (tuple(i for i in overlay.ITEMS if i in items) if isinstance(items, list)
                   else overlay.ITEMS),
         "hotkey": hotkey if hotkey in overlay.HOTKEYS else overlay.DEFAULT_HOTKEY,
@@ -261,7 +262,8 @@ def overlay_settings() -> dict:
 
 def save_overlay_settings(**cambios) -> None:
     claves = {"enabled": "overlay", "corner": "overlay_corner", "size": "overlay_size",
-              "items": "overlay_items", "hotkey": "overlay_hotkey", "pos": "overlay_pos"}
+              "items": "overlay_items", "hotkey": "overlay_hotkey", "pos": "overlay_pos",
+              "opacity": "overlay_opacity"}
     settings = load_settings()
     for k, v in cambios.items():
         settings[claves[k]] = list(v) if k in ("items", "pos") and v is not None else v

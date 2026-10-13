@@ -169,12 +169,16 @@ class AppState:
         # Overlay en el juego (overlay.py): apagado por defecto. La ventana
         # lee la esquina y el tamano de aca, sin ir al disco en cada cuadro.
         self.overlay_data = overlay.OverlayData()
-        self.overlay_layout = (overlay.DEFAULT_CORNER, overlay.DEFAULT_SIZE, overlay.ITEMS, None)
+        # Las mismas claves que win_integration.overlay_settings().
+        self.overlay_layout = {"corner": overlay.DEFAULT_CORNER, "size": overlay.DEFAULT_SIZE,
+                               "items": overlay.ITEMS, "pos": None, "opacity": overlay.DEFAULT_OPACITY}
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
                                                 T("overlay_arrival_game"), T("overlay_turn_hint")))
-        # Arrastrado en el modo Mover: queda en esa posicion.
+        # Arrastrado en el modo Mover: queda en esa posicion; estirado desde
+        # la esquina o con la rueda, con ese tamano.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))
+        self.overlay.al_redimensionar = lambda tamano: set_overlay_layout(size=tamano)
         # Tecla rapida que prende y apaga el overlay desde el juego.
         self.overlay_tecla = overlay.TeclaRapida(lambda: tecla_del_overlay())
 
@@ -989,20 +993,18 @@ class SetupWindow:
         self.label(sec, T("overlay_hint"), fg=MUTED, wraplength=540, justify="left").pack(anchor="w", pady=(0, 6))
         grilla = tk.Frame(sec, bg=BG)
         grilla.pack(anchor="w", padx=(4, 0))
-        corner, size, items, _pos = state.overlay_layout
+        layout = state.overlay_layout
+        items = layout["items"]
         nombre_tecla = lambda k: overlay.nombre_tecla(k) if k else T("hotkey_none")
-        self.overlay_corner_var = tk.StringVar(value=T(f"pos_{corner}"))
-        self.overlay_size_var = tk.StringVar(value=T(f"size_{size}"))
+        self.overlay_corner_var = tk.StringVar(value=T(f"pos_{layout['corner']}"))
         self.overlay_hotkey_var = tk.StringVar(value=nombre_tecla(state.overlay_tecla.actual))
-        filas = (
-            (T("overlay_position"), self.overlay_corner_var, [(c, T(f"pos_{c}")) for c in overlay.CORNERS],
+        menus = (
+            (0, T("overlay_position"), self.overlay_corner_var, [(c, T(f"pos_{c}")) for c in overlay.CORNERS],
              lambda c: set_overlay_layout(corner=c)),
-            (T("overlay_size"), self.overlay_size_var, [(k, T(f"size_{k}")) for k in overlay.SIZES],
-             lambda k: set_overlay_layout(size=k)),
-            (T("overlay_hotkey"), self.overlay_hotkey_var, [(k, nombre_tecla(k)) for k in overlay.HOTKEYS],
+            (3, T("overlay_hotkey"), self.overlay_hotkey_var, [(k, nombre_tecla(k)) for k in overlay.HOTKEYS],
              set_overlay_hotkey),
         )
-        for fila, (etiqueta, var, opciones, al_elegir) in enumerate(filas):
+        for fila, etiqueta, var, opciones, al_elegir in menus:
             self.label(grilla, etiqueta, fg=MUTED).grid(row=fila, column=0, sticky="w", padx=(0, 8), pady=2)
             por_texto = {texto: clave for clave, texto in opciones}
             menu = tk.OptionMenu(grilla, var, *por_texto,
@@ -1011,14 +1013,40 @@ class SetupWindow:
                            highlightthickness=0, bd=0, width=18, anchor="w")
             menu["menu"].configure(bg="#262b33", fg=FG)
             menu.grid(row=fila, column=1, sticky="w", pady=2)
+        # Tamano y opacidad: deslizadores que se ven en vivo en el overlay y
+        # se guardan al soltarlos (no en cada paso).
+        self.overlay_size_var = tk.IntVar(value=layout["size"])
+        self.overlay_opacity_var = tk.IntVar(value=layout["opacity"])
+        deslizadores = (
+            (1, T("overlay_size"), self.overlay_size_var, overlay.SIZE_MIN, overlay.SIZE_MAX, "size"),
+            (2, T("overlay_opacity"), self.overlay_opacity_var, overlay.OPACITY_MIN, overlay.OPACITY_MAX, "opacity"),
+        )
+        for fila, etiqueta, var, desde, hasta, clave in deslizadores:
+            self.label(grilla, etiqueta, fg=MUTED).grid(row=fila, column=0, sticky="w", padx=(0, 8), pady=2)
+            caja = tk.Frame(grilla, bg=BG)
+            caja.grid(row=fila, column=1, columnspan=2, sticky="w", pady=2)
+            valor = self.label(caja, f"{var.get()} %", fg=FG)
+            # En un Scale de Tk el tirador se pinta con bg: con el fondo de la
+            # ventana quedaba como un hueco en la barra.
+            barra = tk.Scale(caja, from_=desde, to=hasta, resolution=overlay.SIZE_STEP, orient="horizontal",
+                             variable=var, showvalue=False, length=180, width=12, sliderlength=22,
+                             bg=MUTED, troughcolor="#262b33", activebackground=FG,
+                             highlightthickness=0, bd=0, sliderrelief="flat",
+                             command=lambda v, c=clave: set_overlay_layout(guardar=False, **{c: int(float(v))}))
+            barra.pack(side="left")
+            valor.pack(side="left", padx=(8, 0))
+            var.trace_add("write", lambda *_, v=var, e=valor: e.configure(text=f"{v.get()} %"))
+            guardar = lambda _e, c=clave, v=var: set_overlay_layout(**{c: v.get()})
+            barra.bind("<ButtonRelease-1>", guardar)
+            barra.bind("<KeyRelease>", guardar)
         # Mover: el overlay se arrastra con el mouse hasta tocar Listo.
         self.overlay_move_button = self.button(grilla, T("overlay_move"), self.toggle_overlay_move)
         self.overlay_move_button.grid(row=0, column=2, sticky="w", padx=(8, 0))
-        self.overlay_move_hint = self.label(sec, T("overlay_move_hint"), fg=BLUE)
+        self.overlay_move_hint = self.label(sec, T("overlay_move_hint"), fg=BLUE, wraplength=540, justify="left")
         # Que se muestra: cada parte se prende o apaga por separado.
-        self.label(grilla, T("overlay_show"), fg=MUTED).grid(row=3, column=0, sticky="nw", padx=(0, 8), pady=(4, 0))
+        self.label(grilla, T("overlay_show"), fg=MUTED).grid(row=4, column=0, sticky="nw", padx=(0, 8), pady=(4, 0))
         casillas = tk.Frame(grilla, bg=BG)
-        casillas.grid(row=3, column=1, columnspan=2, sticky="w", pady=(2, 0))
+        casillas.grid(row=4, column=1, columnspan=2, sticky="w", pady=(2, 0))
         self.overlay_item_vars = {}
         for i, clave in enumerate(overlay.ITEMS):
             var = tk.BooleanVar(value=clave in items)
@@ -1287,9 +1315,12 @@ class SetupWindow:
             self.overlay_var.set(state.overlay.enabled)  # se toco desde la bandeja o con la tecla
         if hasattr(self, "overlay_corner_var"):
             # Arrastrado en el modo Mover: pasa a "Personalizada".
-            texto = T(f"pos_{state.overlay_layout[0]}")
+            texto = T(f"pos_{state.overlay_layout['corner']}")
             if self.overlay_corner_var.get() != texto:
                 self.overlay_corner_var.set(texto)
+            # Estirado en el modo Mover (esquina o rueda): el deslizador lo sigue.
+            if self.overlay_size_var.get() != state.overlay_layout["size"]:
+                self.overlay_size_var.set(state.overlay_layout["size"])
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         # La deteccion de la red Publica llega despues (PowerShell, en un hilo).
@@ -1517,13 +1548,18 @@ def set_overlay(enabled: bool) -> None:
     state.overlay.set_enabled(bool(enabled))
 
 
-def set_overlay_layout(corner: str | None = None, size: str | None = None, items=None, pos=None) -> None:
-    actual_corner, actual_size, actual_items, actual_pos = state.overlay_layout
-    state.overlay_layout = (corner or actual_corner, size or actual_size,
-                            tuple(items) if items is not None else actual_items,
-                            tuple(pos) if pos is not None else actual_pos)
-    corner, size, items, pos = state.overlay_layout
-    win_integration.save_overlay_settings(corner=corner, size=size, items=items, pos=pos)
+def set_overlay_layout(guardar: bool = True, **cambios) -> None:
+    """Cambia como se ve el overlay: corner, size, items, pos u opacity (None
+    deja lo que habia). La ventana lo lee de state en el proximo cuadro.
+    guardar=False no va al disco: los deslizadores de Setup guardan al
+    quedarse quietos, no en cada paso."""
+    nuevo = dict(state.overlay_layout)
+    for clave, valor in cambios.items():
+        if valor is not None:
+            nuevo[clave] = tuple(valor) if clave in ("items", "pos") else valor
+    state.overlay_layout = nuevo
+    if guardar:
+        win_integration.save_overlay_settings(**{k: nuevo[k] for k in cambios if cambios[k] is not None})
 
 
 def set_overlay_hotkey(combinacion: str) -> None:
@@ -2176,8 +2212,7 @@ def main():
     client_lib.on_nav_hud = state.overlay_data.navegacion
     client_lib.on_viewers = lambda n: setattr(state, "cloud_viewers", n)
     ajustes_overlay = win_integration.overlay_settings()
-    state.overlay_layout = (ajustes_overlay["corner"], ajustes_overlay["size"], ajustes_overlay["items"],
-                            ajustes_overlay["pos"])
+    state.overlay_layout = {k: ajustes_overlay[k] for k in ("corner", "size", "items", "pos", "opacity")}
     if ajustes_overlay["enabled"]:
         state.overlay.set_enabled(True)
     if win_integration.overlay_supported():
