@@ -1352,6 +1352,29 @@ test('truckSizeSetting: de 1 a 3 en pasos de 0.25, lo raro vuelve al tamano norm
   assert.equal(truckSizeSetting(1.4), 1.5);
 });
 
+test('waypointEta: abajo del ETA del juego, horas de juego; abajo del real, tiempo real', () => {
+  const { waypointEta } = require('./pure.js');
+  // el waypoint sobre la ruta del juego: el mismo ETA que el juego, no el
+  // tiempo real (antes "1h 30m" abajo de "17h 40m", Discord 13-10)
+  let r = waypointEta({ viaKm: 1588.7, gameKm: 1588.7, gameEtaSeconds: 63600, avgSpeedKmh: 1200, timeScale: 20 });
+  assert.equal(r.gameSeconds, 63600);
+  assert.ok(Math.abs(r.realSeconds - 1588.7 / 1200 * 3600) < 1e-6);
+  // un desvio de 100 km: el ETA del juego estirado al mismo ritmo
+  r = waypointEta({ viaKm: 1100, gameKm: 1000, gameEtaSeconds: 40000, avgSpeedKmh: 1000, timeScale: 20 });
+  assert.ok(Math.abs(r.gameSeconds - 44000) < 1e-6);
+  assert.ok(Math.abs(r.realSeconds - 3960) < 1e-6);
+  // el GPS del juego en el remolque (2 km contra 300): del ritmo real por la escala
+  r = waypointEta({ viaKm: 300, gameKm: 2, gameEtaSeconds: 600, avgSpeedKmh: 1000, timeScale: 20 });
+  assert.ok(Math.abs(r.gameSeconds - 300 / 1000 * 3600 * 20) < 1e-6);
+  // sin ritmo medido todavia: el del juego sale igual, el real no
+  r = waypointEta({ viaKm: 500, gameKm: 400, gameEtaSeconds: 20000, avgSpeedKmh: null, timeScale: 20 });
+  assert.equal(r.gameSeconds, 25000);
+  assert.equal(r.realSeconds, null);
+  // sin GPS del juego ni ritmo, o sin distancia: nada
+  assert.deepEqual(waypointEta({ viaKm: 500, gameKm: 0, gameEtaSeconds: 0, avgSpeedKmh: null, timeScale: 20 }), { gameSeconds: null, realSeconds: null });
+  assert.deepEqual(waypointEta({ viaKm: null, gameKm: 400, gameEtaSeconds: 20000, avgSpeedKmh: 1000, timeScale: 20 }), { gameSeconds: null, realSeconds: null });
+});
+
 test('useOwnRemaining: el GPS del juego apuntando al remolque no cuenta como llegada', () => {
   const { useOwnRemaining } = require('./pure.js');
   assert.equal(useOwnRemaining(0.1, 820), true);   // freight market: el juego va al remolque
