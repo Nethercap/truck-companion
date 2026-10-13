@@ -51,7 +51,14 @@ Package name: `com.trucksimdash.app` (it can never change once published).
    and Google's tester:
    <https://developers.google.com/digital-asset-links/tools/generator>.
 7. **Store listing, Data safety and content rating**: texts, answers and
-   graphics are in the workshop (`marketing/play/`).
+   graphics are in the workshop (`marketing/play/`). Privacy policy:
+   <https://trucksim-dash.com/privacy.html>; account deletion:
+   <https://trucksim-dash.com/privacy.html#delete-account>.
+
+Inside the app the site hides its donation links (`.twa [data-donate]`, set
+by a small script in each page's `<head>` when the page is opened from the
+app): Play's payments policy does not allow sending users to pay outside
+Google Play. Anything new that asks for money gets `data-donate` too.
 
 Updating: change something here, run the workflow, upload the new AAB. The
 version code goes up by itself with each run.

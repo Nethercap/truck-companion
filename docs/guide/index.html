@@ -7,7 +7,13 @@
 <meta name="description" content="Everything Truck Dash can do: the GPS, the info panel, the dashboard, the button box, settings, convoy and the PC client. Free GPS and dashboard for ETS2 and ATS." />
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="guide.css?v=20261013d" />
+<link rel="stylesheet" href="guide.css?v=20261013e" />
+<script>
+// Dentro de la app de Android (TWA, android/) no van los links de donar:
+// Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
+// con referrer android-app://; las que siguen lo leen de la sesion.
+try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0) sessionStorage.setItem('truckdash_twa', '1'); if (sessionStorage.getItem('truckdash_twa') === '1') document.documentElement.classList.add('twa'); } catch (e) {}
+</script>
 </head>
 <body>
 <header class="top">
@@ -39,8 +45,8 @@
 <footer>
   <a href="/">trucksim-dash.com</a> · <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> ·
   <a href="https://github.com/Nethercap/truck-companion" target="_blank" rel="noopener">GitHub</a> ·
-  <a href="/privacy.html" id="privacyLink">Privacy</a> ·
-  <a href="https://tecito.app/truckdash" target="_blank" rel="noopener" id="supportLink">Support</a>
+  <a href="/privacy.html" id="privacyLink">Privacy</a><span data-donate> ·
+  <a href="https://tecito.app/truckdash" target="_blank" rel="noopener" id="supportLink">Support</a></span>
 </footer>
 
 <script src="text.js?v=20261013b"></script>

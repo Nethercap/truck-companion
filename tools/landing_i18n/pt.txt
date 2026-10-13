@@ -172,7 +172,7 @@ modsSectionIntro: 'O cliente lê quais mods de mapa estão ativos no seu perfil 
 modsFooterNote: 'Esses mods continuam precisando estar instalados no seu jogo como sempre: o Truck Dash só sabe desenhar as estradas a mais e traçar rotas nelas. Quer outro mod? Peça no Discord.',
 faqTitle: 'Perguntas frequentes',
 faqQ1: 'É grátis mesmo? Qual é a pegadinha?',
-faqA1: 'Não tem pegadinha. Sem conta obrigatória, sem anúncios, sem limite de rotas, sem versão Pro. Tudo é código aberto. Se quiser apoiar, você pode <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">me pagar um chá no Tecito</a>: é opcional e não libera nada.',
+faqA1: 'Não tem pegadinha. Sem conta obrigatória, sem anúncios, sem limite de rotas, sem versão Pro. Tudo é código aberto. <span data-donate>Se quiser apoiar, você pode <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">me pagar um chá no Tecito</a>: é opcional e não libera nada.</span>',
 faqQ2: 'O Windows ou meu antivírus diz que o arquivo é "não reconhecido" ou perigoso. É seguro?',
 faqA2: 'Sim. O SmartScreen mostra esse aviso para qualquer programa novo sem assinatura de código (os certificados custam caro). Clique em "Mais informações" → "Executar assim mesmo". O cliente tem código aberto, não precisa de permissão de administrador e só lê a telemetria do jogo. Cada versão mostra o SHA-256 do arquivo para você conferir, e dá para rodar do código-fonte com Python. Alguns antivírus o marcam pelo mesmo motivo (um executável sem assinatura que se descompacta sozinho): é um falso positivo, o código e o registro da compilação são públicos. Se o seu bloquear, adicione uma exceção ou rode o cliente do código-fonte.',
 faqQ3: 'Meu celular precisa estar no mesmo Wi-Fi que o PC?',

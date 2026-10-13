@@ -17,9 +17,13 @@ function applyTranslations() {
   });
   if (!ws) statusEl.textContent = t('notConnected');
   markLongCmdLabels();
-  // La landing tiene su propia pagina en espanol; el resto va a la inglesa.
+  // La landing tiene una pagina por idioma (/es/, /de/...); la inglesa es la raiz.
   const roadmapLink = document.getElementById('roadmapLink');
-  if (roadmapLink) roadmapLink.href = `https://trucksim-dash.com/${currentLang === 'es' ? 'es/' : ''}#roadmap`;
+  if (roadmapLink) roadmapLink.href = `https://trucksim-dash.com/${currentLang === 'en' ? '' : currentLang + '/'}#roadmap`;
+  // En la app de Android la cuenta se abre en la misma ventana: una pestana
+  // nueva sale de la app y muestra la barra de Chrome.
+  const accountLink = document.getElementById('accountLink');
+  if (accountLink && document.documentElement.classList.contains('twa')) accountLink.removeAttribute('target');
 }
 
 // Etiquetas de la botonera que no entran en el ancho del boton ("Infotainment",

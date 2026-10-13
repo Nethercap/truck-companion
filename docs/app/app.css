@@ -1049,3 +1049,6 @@
   .panelSwipe { scroll-behavior: auto; }
   .toast, .toast.show { transform: none; }
 }
+
+/* App de Android: sin links de donar (ver el script del <head>). */
+.twa [data-donate] { display: none !important; }

@@ -172,7 +172,7 @@ modsSectionIntro: 'İstemci profilinde hangi harita modlarının etkin olduğunu
 modsFooterNote: 'Bu modların yine her zamanki gibi oyununa kurulu olması gerekir: Truck Dash yalnızca ek yolları çizmeyi ve üzerlerinde rota çıkarmayı bilir. Başka bir mod mu istiyorsun? Discord’da sor.',
 faqTitle: 'Sık sorulan sorular',
 faqQ1: 'Gerçekten ücretsiz mi? İşin içinde ne var?',
-faqA1: 'Hiçbir şey yok. Hesap gerekmez, reklam yok, rota sınırı yok, Pro sürüm yok. Her şey açık kaynak. Desteklemek istersen <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">Tecito’da bana bir çay ısmarlayabilirsin</a>: isteğe bağlıdır ve hiçbir şeyin kilidini açmaz.',
+faqA1: 'Hiçbir şey yok. Hesap gerekmez, reklam yok, rota sınırı yok, Pro sürüm yok. Her şey açık kaynak. <span data-donate>Desteklemek istersen <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">Tecito’da bana bir çay ısmarlayabilirsin</a>: isteğe bağlıdır ve hiçbir şeyin kilidini açmaz.</span>',
 faqQ2: 'Windows ya da antivirüsüm dosyanın “tanınmayan” ya da tehlikeli olduğunu söylüyor. Güvenli mi?',
 faqA2: 'Evet. SmartScreen bu uyarıyı kod imzası olmayan her yeni program için gösterir (imza sertifikaları paralı). “Ek bilgi” → “Yine de çalıştır”a tıkla. İstemci açık kaynaktır, yönetici izni istemez ve yalnızca oyunun telemetrisini okur. Her sürüm dosyanın SHA-256 değerini listeler, böylece doğrulayabilirsin; istersen Python ile kaynak koddan da çalıştırabilirsin. Bazı antivirüsler de aynı nedenle (imzasız, kendini açan bir çalıştırılabilir dosya) uyarı verir: bu bir yanlış alarmdır, kaynak kod ve derleme kaydı herkese açıktır. Seninki engellerse bir istisna ekle ya da istemciyi kaynak koddan çalıştır.',
 faqQ3: 'Telefonum bilgisayarla aynı Wi-Fi’da olmak zorunda mı?',

@@ -56,6 +56,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   si hay overlay del juego O de OBS. Campos nuevos de `nav_hud` son
   opcionales: el HUD de OBS y el del cliente los ignoran si no los conocen.
 
+## App de Android (13-10)
+
+- `android/` es una TWA: la app de Play es la web misma. Un link nuevo que
+  pida plata (donar) lleva `data-donate`: adentro de la app se oculta
+  (`.twa [data-donate]`, el script del `<head>` de app, cuenta, guia y
+  landing marca `html.twa`), porque Play no deja mandar a pagar afuera.
+- Una pagina nueva a la que se llega desde la app necesita ese script si
+  tiene algo para ocultar. Para que algo abra dentro de la app, mismo
+  origen y sin `target="_blank"` cuando `html.twa`.
+
 ## Supuestos que ya rompieron cosas (10-10-2026)
 
 Revisar cada cambio contra esta lista:

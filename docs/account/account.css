@@ -674,3 +674,6 @@ table.viajes .juego-chip.auto { color: var(--warn); border-color: var(--warn); }
 .entrar-muestra h2 { font-size: 1rem; margin: 0 0 0.4rem; }
 .entrar-muestra ul { margin: 0 0 0.9rem; padding-left: 1.2rem; line-height: 1.6; }
 .entrar-muestra img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+
+/* App de Android: sin links de donar (ver el script del <head>). */
+.twa [data-donate] { display: none !important; }
