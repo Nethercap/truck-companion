@@ -159,7 +159,7 @@ GUIDE_TEXT.en = {
 </ul>
 <h3>Turning it on</h3>
 <p>In <b>Setup &amp; status</b>, section <b>In-game overlay</b>, or from the tray menu. In the game, <b>Ctrl+Shift+O</b> shows and hides it (you can pick another shortcut, or none).</p>
-<p>The same section sets its <b>position</b> (a corner, or <b>Move</b> to drag it anywhere with the mouse and then <b>Done</b>), its <b>size</b> and <b>what it shows</b>. Its texts follow the dashboard's language.</p>
+<p>The same section sets its <b>position</b> (a corner, or <b>Move</b> to drag it anywhere with the mouse and then <b>Done</b>), its <b>size</b>, its <b>opacity</b> and <b>what it shows</b>: the next turn, speed and limit, cruise control, gear, distance left and the two arrival times. In <b>Move</b> mode you can also resize it from its bottom-right corner or with the mouse wheel. Its texts follow the dashboard's language.</p>
 <div class="tip"><p>It never takes focus from the game and clicks go right through it. It hides when you leave the game or pause. With voice guidance on in the dashboard's Settings, the dashboard also speaks the turns while the overlay is on.</p></div>
 <div class="tip"><p>Streaming? <a href="/overlay/">trucksim-dash.com/overlay</a> builds a free overlay for OBS with the same things to pick from: speed and limit, next turn, distance left and arrival times. The turn comes from the dashboard here too.</p></div>`,
     account: `
@@ -372,7 +372,7 @@ GUIDE_TEXT.es = {
 </ul>
 <h3>Cómo prenderlo</h3>
 <p>En <b>Configuración y estado</b>, sección <b>Overlay en el juego</b>, o desde el menú de la bandeja. En el juego, <b>Ctrl+Shift+O</b> lo muestra y lo esconde (podés elegir otro atajo, o ninguno).</p>
-<p>En la misma sección elegís la <b>posición</b> (una esquina, o <b>Mover</b> para arrastrarlo con el mouse adonde quieras y después <b>Listo</b>), el <b>tamaño</b> y <b>qué muestra</b>. Sus textos siguen el idioma del tablero.</p>
+<p>En la misma sección elegís la <b>posición</b> (una esquina, o <b>Mover</b> para arrastrarlo con el mouse adonde quieras y después <b>Listo</b>), el <b>tamaño</b>, la <b>opacidad</b> y <b>qué muestra</b>: el próximo giro, la velocidad y el límite, el control de crucero, la marcha, lo que falta y las dos llegadas. En el modo <b>Mover</b> también lo agrandás o achicás desde la esquina de abajo a la derecha o con la rueda del mouse. Sus textos siguen el idioma del tablero.</p>
 <div class="tip"><p>Nunca le saca el foco al juego y los clics pasan a través. Se esconde cuando salís del juego o lo pausás. Con la guía por voz prendida en Ajustes del tablero, el tablero también dice los giros mientras el overlay está prendido.</p></div>
 <div class="tip"><p>¿Hacés streams? En <a href="/overlay/">trucksim-dash.com/overlay</a> armás un overlay gratis para OBS, con lo mismo para elegir: velocidad y límite, próximo giro, lo que falta y las llegadas. El giro también sale del tablero.</p></div>`,
     account: `
