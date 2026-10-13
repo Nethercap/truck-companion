@@ -1115,6 +1115,16 @@ test('DLC: automatico usa lo que encontro el cliente; sin datos, todos; manual, 
   assert.equal(effectiveDlcOff('ets2', true, { ets2: [] }).length, DLC_LIST.ets2.length);
 });
 
+test('facilityCodesFor: en camion sin los surtidores de auto, en auto sin el descanso de camiones', () => {
+  const { facilityCodesFor } = require('./pure.js');
+  assert.deepEqual(facilityCodesFor('g', false), ['g']);
+  assert.deepEqual(facilityCodesFor('g', true), ['g', 'f']);
+  assert.deepEqual(facilityCodesFor('p', false), ['p']);
+  assert.deepEqual(facilityCodesFor('p', true), ['c']);
+  assert.deepEqual(facilityCodesFor('s', true), ['s']);
+  assert.deepEqual(facilityCodesFor('a', false), ['a']);
+});
+
 test('isDrivingCar: auto por la marca, y por el trabajo con auto si el cliente es viejo', () => {
   const { isDrivingCar } = require('./pure.js');
   assert.equal(isDrivingCar({ game: 'ats', truckBrandId: 'ford' }), true);

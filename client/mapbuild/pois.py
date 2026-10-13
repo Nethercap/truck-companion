@@ -10,7 +10,8 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
   {
     "facilities": [[x, z, "g"], ...],          # g gas, p parking/rest, s service,
                                               # r garage, d dealer, w weigh station,
-                                              # c estacionamiento para auto (ATS)
+                                              # c estacionamiento para auto (ATS),
+                                              # f surtidores solo para auto (ATS)
     "companies":  [[x, z, "token", "Label", "city_token"], ...],
     "cities":     {"city_token": "City Name", ...},
     "countries":  {"city_token": "country_token", ...},  # estado/pais del juego
@@ -44,6 +45,24 @@ FACILITY_CODES = {
 # para que el mapa armado en la PC tambien tenga los nombres.
 ATLAS_NAMES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "atlas-names-ats.json")
 ATLAS_KEY = re.compile(r"(tb|poi)_[a-z]{2}\d+(_\d+)?")
+
+# Surtidores solo para auto (ATS 1.61): los techos de surtidores para auto
+# (prefab/gas/us_gas_<marca>_car_<N>rows...) tienen surtidor desde el Road
+# Trip, y en camion no se entra. El juego no los muestra en su mapa yendo en
+# camion; Truck Dash si, y en Spearfish mandaba a un camion a una estacion
+# donde no podia cargar (Discord, 12-10). Las paradas de camiones tienen los
+# dos techos, cada uno con su prefab: el de camion es "_truck_<N>rows".
+# Solo en ATS: en ETS2 no se maneja auto.
+CAR_FUEL_PREFAB = re.compile(r"_car_\d+rows")
+
+
+def facility_code(p, prefix):
+    """El codigo de un POI de servicio del parser (ver FACILITY_CODES), o None."""
+    code = FACILITY_CODES.get(p.get("icon"))
+    if code == "g" and prefix == "usa" and CAR_FUEL_PREFAB.search(p.get("prefabPath") or ""):
+        return "f"
+    return code
+
 
 # Plazas para auto (ATS 1.61): triggers "parking_car", una por lugar de
 # estacionar. Se agrupan en lugares (~150 m) y se guarda el centro de cada
@@ -140,7 +159,7 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
             if key in seen:
                 continue
             seen.add(key)
-            facilities.append([x, z, FACILITY_CODES[p["icon"]]])
+            facilities.append([x, z, facility_code(p, prefix)])
         elif p.get("type") == "company" and p.get("icon"):
             # La posicion que se guarda NO es la del icono sino la del centro
             # de los puntos de trabajo del prefab (muelles de descarga y

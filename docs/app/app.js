@@ -1140,7 +1140,7 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'car-parking', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'car-parking', 'fuel', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
@@ -1180,6 +1180,11 @@ function buildVecLayers(sourceLayer) {
     { id: 'car-parking', type: 'symbol', source: 'car-parking', minzoom: liteMode ? 9 : 7,
       layout: { 'icon-image': 'car_parking', 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true,
                 visibility: drivingCar ? 'visible' : 'none' } },
+    // Con datos que separan los surtidores solo para auto ('f'), el
+    // combustible sale de pois-<variante>.json y no de los tiles, que no
+    // distinguen: ver applyFuelSource.
+    { id: 'fuel', type: 'symbol', source: 'fuel', minzoom: liteMode ? 9 : 7,
+      layout: { 'icon-image': 'gas_ico', 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
     // Atlas del Road Trip de ATS (Tourist Boards y Points of Interest). No
     // estan en los tiles: salen de pois-<variante>.json a la fuente 'atlas'
     // (ver setAtlasData). Los tourist boards desde mas lejos, como en el
@@ -1789,6 +1794,7 @@ function ensureMapInitialized() {
     map.addSource('trail', { type: 'geojson', data: emptyLineString() });
     map.addSource('atlas', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('car-parking', { type: 'geojson', data: atlasGeoJson(null) });
+    map.addSource('fuel', { type: 'geojson', data: atlasGeoJson(null) });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     // La ruta crece con el zoom como las calles, pero siempre un poco mas
     // ancha que la autopista mas ancha (road-freeway: 1 / 3,5 / 10 px a zoom
@@ -1833,13 +1839,27 @@ const POI_ICONS = ['gas_ico', 'service_ico', 'weigh_station_ico', 'weigh_ico', '
 const FERRY_ICONS = ['port_overlay', 'train_ico'];
 // En auto, sin los estacionamientos de camion (parking_ico): no se pueden usar.
 let drivingCar = false;
+// Los POIs de la variante separan los surtidores solo para auto ('f'): el
+// combustible del mapa sale de ahi (capa 'fuel') y no de los gas_ico de los
+// tiles. Con datos viejos o de un mod sin esa separacion, como antes.
+let fuelFromPois = false;
 function poiLayerFilter() {
-  const sprites = drivingCar ? POI_ICONS.filter(n => n !== 'parking_ico') : POI_ICONS;
+  const sprites = POI_ICONS.filter(n => !(drivingCar && n === 'parking_ico') && !(fuelFromPois && n === 'gas_ico'));
   return ['all', ['==', ['get', 'type'], 'poi'], ['in', ['get', 'sprite'], ['literal', sprites]], ['!', ['in', ['get', 'poiType'], ['literal', ['ferry', 'train']]]]];
+}
+// En camion, sin los surtidores de auto (facilityCodesFor en pure.js).
+function applyFuelSource() {
+  if (!map) return;
+  const src = map.getSource('fuel');
+  if (src) {
+    const codes = facilityCodesFor('g', drivingCar);
+    src.setData(atlasGeoJson(fuelFromPois && pois ? pois.facilities.filter(f => codes.includes(f[2])) : null));
+  }
+  if (map.getLayer('poi')) map.setFilter('poi', poiLayerFilter());
 }
 function applyVehicleMode() {
   if (!map) return;
-  if (map.getLayer('poi')) map.setFilter('poi', poiLayerFilter());
+  applyFuelSource();
   if (map.getLayer('car-parking')) map.setLayoutProperty('car-parking', 'visibility', drivingCar ? 'visible' : 'none');
   if (document.getElementById('poiModal').style.display === 'flex') renderPoiResults();
 }
@@ -2247,12 +2267,14 @@ function atlasGeoJson(list) {
     type: 'Feature', geometry: { type: 'Point', coordinates: toLngLat(x, z) }, properties: { k, name } })) };
 }
 function setAtlasData() {
+  const vale = pois && poisVariant === currentGame && toLngLat;
+  fuelFromPois = !!(vale && pois.facilities.some(f => f[2] === 'f'));
   const src = map && map.getSource('atlas');
   if (!src) return;
-  const vale = pois && poisVariant === currentGame && toLngLat;
   src.setData(atlasGeoJson(vale ? pois.atlas : null));
   const autos = map.getSource('car-parking');
   if (autos) autos.setData(atlasGeoJson(vale ? pois.facilities.filter(f => f[2] === 'c') : null));
+  applyFuelSource();
 }
 
 function poiVariantNow() {
@@ -2321,12 +2343,23 @@ function nearestFacilities(code, x, z, limit) {
     out.sort((a, b) => a.dist - b.dist);
     return out.slice(0, limit);
   }
+  // En auto o en camion la categoria junta otros codigos (facilityCodesFor);
+  // el resultado lleva la categoria, que es lo que guarda el waypoint.
+  const codes = facilityCodesFor(code, drivingCar);
   for (const f of pois.facilities) {
-    if (f[2] !== code) continue;
+    if (!codes.includes(f[2])) continue;
     out.push({ x: f[0], z: f[1], code, dist: Math.hypot(f[0] - x, f[1] - z) });
   }
   out.sort((a, b) => a.dist - b.dist);
-  return out.slice(0, limit);
+  if (codes.length === 1) return out.slice(0, limit);
+  // Una parada de camiones tiene surtidores de auto y de camion a pocos
+  // metros: una sola fila por lugar.
+  const lugares = [];
+  for (const r of out) {
+    if (lugares.length >= limit) break;
+    if (!lugares.some(l => Math.hypot(l.x - r.x, l.z - r.z) < 150)) lugares.push(r);
+  }
+  return lugares;
 }
 
 function searchCompanies(query, x, z, limit) {
@@ -2450,9 +2483,9 @@ function renderPoiResults() {
   } else if (query.trim()) {
     results = searchCompanies(query, pos.x, pos.z, 20).map(r => ({ ...r, name: r.label, sub: cityLabel(r.city) }));
   } else {
-    // En auto, "Area de descanso" son los estacionamientos para auto
-    const codigo = poiCategory === 'p' && drivingCar ? 'c' : poiCategory;
-    results = nearestFacilities(codigo, pos.x, pos.z, 15).map(r => r.code === 'a'
+    // En auto, "Area de descanso" son los estacionamientos para auto, y en
+    // camion el combustible es sin los surtidores de auto (nearestFacilities).
+    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => r.code === 'a'
       ? { ...r, sub: [t(r.kind === 't' ? 'atlasTouristBoard' : 'atlasPoi'), nearestCityName(r.x, r.z)].filter(Boolean).join(' · ') }
       : { ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' });
   }
