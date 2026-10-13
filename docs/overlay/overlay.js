@@ -28,7 +28,12 @@ const KM_TO_MI = 0.621371;
 // Minutos de juego por minuto real, hasta medir la propia (createTimeScale)
 const NOMINAL_SCALE = { ets2: 19, ats: 20 };
 // Vista previa del armador: un giro de ejemplo, como si el tablero estuviera abierto
-const SAMPLE_NAV = { turnInfo: { kind: 'turn', direction: 'right', meters: 1200, sign: { kind: 'road', label: 'I-15' } }, nextCity: 'Nephi' };
+// (con sus carriles: los dos de la derecha sirven para doblar)
+const SAMPLE_NAV = {
+  turnInfo: { kind: 'turn', direction: 'right', meters: 1200, sign: { kind: 'road', label: 'I-15' } }, nextCity: 'Nephi',
+  lanes: { count: 3, mask: 0b110, turn: LANE_ARROW_BITS.right,
+    arrows: [LANE_ARROW_BITS.straight, LANE_ARROW_BITS.straight | LANE_ARROW_BITS.right, LANE_ARROW_BITS.right] },
+};
 
 const params = new URLSearchParams(location.search);
 const clampSize = (v) => (Number.isFinite(v) ? Math.min(1.8, Math.max(0.7, v)) : 1);
@@ -88,6 +93,8 @@ function render() {
     $('hudTurnText').textContent = giro;
     $('hudTurnNext').textContent = n.nextCity ? `${t('navNextCity')}: ${n.nextCity}` : '';
   }
+  // lanesHtml valida el registro (llega por el relay) y solo arma texto fijo
+  $('hudTurnLanes').innerHTML = giro && n.lanes ? lanesHtml(n.lanes) : '';
 
   // Velocidad, limite y crucero
   $('hudSpeedBox').hidden = !ver('speed');

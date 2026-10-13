@@ -67,6 +67,41 @@ FG = "#f2f3f5"
 MUTED = "#9aa4b2"
 RED = "#e53935"
 GRIP = 18  # lado de la esquina que estira en el modo Mover, a escala 1
+# Carriles: los colores del tablero (app.css .navLane) sobre el fondo del overlay
+CARRIL_ON, CARRIL_OFF = "#20405f", "#22252a"
+CARRIL_APAGADO, CARRIL_OTRA = "#4d545e", "#8a93a0"
+
+
+def _cuadratica(p0, c, p1, pasos=8):
+    return [((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * c[0] + t * t * p1[0],
+             (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * c[1] + t * t * p1[1])
+            for t in (i / pasos for i in range(pasos + 1))]
+
+
+def _espejo(puntos):
+    return [(24 - x, y) for x, y in puntos]
+
+
+def _formas_carril():
+    """LANE_PATHS de pure.js en puntos, en el mismo cuadro de 24 x 30: el
+    trazo desde la punta del tronco (12, 17) y la cabeza de la flecha."""
+    import math
+    derecha = _cuadratica((12, 17), (12, 11), (18, 11))
+    vuelta = ([(12, 17), (12, 9.5)]
+              + [(8.5 + 3.5 * math.cos(a), 9.5 - 3.5 * math.sin(a)) for a in (i * math.pi / 10 for i in range(11))]
+              + [(5, 17)])
+    formas = {
+        "straight": ([(12, 17), (12, 6)], [(8, 9), (12, 3.5), (16, 9)]),
+        "right": (derecha, [(16, 7), (21.5, 11), (16, 15)]),
+        "slightRight": ([(12, 17), (17.5, 8.5)], [(14, 6.5), (19.8, 5), (19, 10.8)]),
+        "uturn": (vuelta, [(1.5, 14.5), (5, 20), (8.5, 14.5)]),
+    }
+    formas["left"] = (_espejo(formas["right"][0]), _espejo(formas["right"][1]))
+    formas["slightLeft"] = (_espejo(formas["slightRight"][0]), _espejo(formas["slightRight"][1]))
+    return formas
+
+
+CARRIL_FORMAS = _formas_carril()
 
 
 def _texto(valor, largo=160) -> str:
@@ -77,9 +112,42 @@ def _texto(valor, largo=160) -> str:
     return valor.strip()[:largo]
 
 
+# Las flechas de carril (LANE_ARROW_BITS de docs/app/pure.js), de izquierda
+# a derecha como las dibuja el tablero.
+CARRIL_BITS = {"left": 1, "slightLeft": 2, "straight": 4, "slightRight": 8, "right": 16, "uturn": 32}
+CARRIL_ORDEN = ("uturn", "left", "slightLeft", "straight", "slightRight", "right")
+
+
+def _entero(v, maximo) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= maximo
+
+
+def carriles_validos(rec):
+    """Los carriles del giro como llegan en nav_hud (laneHudRecord de la
+    web), o None. Solo enteros chicos: llega por el relay."""
+    if not isinstance(rec, dict):
+        return None
+    n, mask, giro, flechas = rec.get("count"), rec.get("mask"), rec.get("turn"), rec.get("arrows")
+    if not (_entero(n, 8) and n >= 2 and _entero(mask, 255) and _entero(giro, 63)
+            and isinstance(flechas, list) and len(flechas) >= n and all(_entero(f, 63) for f in flechas[:n])):
+        return None
+    return {"count": n, "mask": mask, "turn": giro, "arrows": flechas[:n]}
+
+
+def carriles(rec):
+    """Para dibujar (laneGuidance de pure.js): por carril, de izquierda a
+    derecha, sus direcciones, si sirve para el giro y cual es la del giro."""
+    if not rec:
+        return None
+    giro = next((d for d in CARRIL_ORDEN if rec["turn"] & CARRIL_BITS[d]), None)
+    return [{"dirs": [d for d in CARRIL_ORDEN if bits & CARRIL_BITS[d]], "on": bool(rec["mask"] >> k & 1), "giro": giro}
+            for k, bits in enumerate(rec["arrows"][:rec["count"]])]
+
+
 def limpiar_nav(msg: dict) -> dict:
     """El mensaje nav_hud de la web, con solo lo que se usa."""
     return {
+        "lanes": carriles_validos(msg.get("lanes")),
         "turn": _texto(msg.get("turn")),
         "next": _texto(msg.get("next")),
         "remaining": _texto(msg.get("remaining"), 24),
@@ -200,6 +268,8 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
     con_ruta = (tele.get("routeDistanceKm") or 0) > 0
     datos = {
         "turn": nav["turn"] if nav_ok and ver_giro else "",
+        # Las flechas de carril van con el giro (abajo del texto)
+        "lanes": carriles(nav.get("lanes")) if nav_ok and ver_giro and nav.get("turn") else None,
         "hint": aviso_giro if ver_giro and not nav_ok and con_ruta else "",
         "next": nav.get("next", "") if nav_ok and ver_giro else "",
         "speed": str(velocidad) if ver_vel else "",
@@ -262,9 +332,13 @@ def ejemplo(items, etiquetas) -> dict:
     falta, llega, llega_juego = etiquetas
     d = {"turn": "\u21b1 400 m", "next": "", "speed": "72", "unit": "km/h", "limit": "80", "over": False,
          "cruise": "80", "gear": "8", "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59",
-         "remainingLabel": falta, "arrivalLabel": llega, "gameArrivalLabel": llega_juego}
+         "remainingLabel": falta, "arrivalLabel": llega, "gameArrivalLabel": llega_juego,
+         "lanes": carriles({"count": 3, "mask": 0b110, "turn": CARRIL_BITS["right"],
+                            "arrows": [CARRIL_BITS["straight"], CARRIL_BITS["straight"] | CARRIL_BITS["right"],
+                                       CARRIL_BITS["right"]]})}
     if "turn" not in items:
         d["turn"] = ""
+        d["lanes"] = None
     if "speed" not in items:
         d["speed"] = d["limit"] = ""
     for k in ("cruise", "gear", "remaining", "arrival", "game_arrival"):
@@ -692,11 +766,20 @@ class _Ventana:
             izquierda += hueco + ancho_marcha
         derecha_total = sum(max(mide(v, fuente(19, True)), mide(e, fuente(11))) + sep for v, e in columnas)
         ancho = max(round(420 * k), 2 * pad + izquierda + round(8 * k) + derecha_total)
+        lanes = d.get("lanes") or []
+        carril_w, carril_h, carril_sep = round(30 * k), round(36 * k), round(4 * k)
+        if lanes:
+            ancho = max(ancho, 2 * pad + len(lanes) * (carril_w + carril_sep) - carril_sep)
         y = pad
         if d["turn"]:
             t = c.create_text(pad, y, text=d["turn"], fill=FG, anchor="nw",
                               font=fuente(24, True), width=ancho - 2 * pad)
             y = c.bbox(t)[3] + round(2 * k)
+            if lanes:
+                y += round(3 * k)
+                for i, carril in enumerate(lanes):
+                    self._carril(pad + i * (carril_w + carril_sep), y, carril_w, carril_h, carril, k)
+                y += carril_h + round(4 * k)
             if d["next"]:
                 t = c.create_text(pad, y, text=d["next"], fill=MUTED, anchor="nw",
                                   font=fuente(14), width=ancho - 2 * pad)
@@ -755,6 +838,31 @@ class _Ventana:
         self._marco_mover(ancho, alto, k)
         c.configure(width=ancho, height=alto)
         return ancho, alto
+
+    def _carril(self, x: int, y: int, w: int, h: int, carril: dict, k: float) -> None:
+        """Un carril como en el tablero (lanesHtml): caja azul si sirve, la
+        flecha del giro en blanco y las demas apagadas."""
+        c = self.canvas
+        r = max(2, round(4 * k))
+        fondo = CARRIL_ON if carril["on"] else CARRIL_OFF
+        # Caja con las puntas redondeadas: Tk no tiene, va como poligono suave
+        puntos = [x + r, y, x + w - r, y, x + w, y, x + w, y + r, x + w, y + h - r, x + w, y + h,
+                  x + w - r, y + h, x + r, y + h, x, y + h, x, y + h - r, x, y + r, x, y]
+        c.create_polygon(puntos, fill=fondo, outline="", smooth=True)
+        # El dibujo de 24 x 30 adentro, con el margen de la caja del tablero
+        esc = (w - 6 * k) / 24
+        ox, oy = x + 3 * k, y + (h - 30 * esc) / 2
+        pt = lambda p: (ox + p[0] * esc, oy + p[1] * esc)
+        grueso = max(1.5, 2.6 * esc)
+        color = (lambda dd: "#ffffff" if dd == carril["giro"] else CARRIL_OTRA) if carril["on"] else (lambda dd: CARRIL_APAGADO)
+        c.create_line(*pt((12, 28)), *pt((12, 17)), fill="#ffffff" if carril["on"] else CARRIL_APAGADO,
+                      width=grueso, capstyle="round")
+        # La del giro al final, para que quede arriba de las otras
+        for dd in sorted(carril["dirs"], key=lambda dd: dd == carril["giro"]):
+            trazo, cabeza = CARRIL_FORMAS[dd]
+            c.create_line(*[v for p in trazo for v in pt(p)], fill=color(dd), width=grueso,
+                          capstyle="round", joinstyle="round")
+            c.create_polygon(*[v for p in cabeza for v in pt(p)], fill=color(dd), outline="")
 
     def _marco_mover(self, ancho: int, alto: int, k: float) -> None:
         """Modo Mover: un borde para que se vea que se puede agarrar, y la

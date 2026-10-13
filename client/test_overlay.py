@@ -383,3 +383,30 @@ def test_cambiar_el_overlay_guarda_solo_lo_tocado(monkeypatch):
     # None deja lo que habia y no se guarda
     tray_client.set_overlay_layout(size=None, items=["gear"])
     assert tray_client.state.overlay_layout["size"] == 150 and guardado[-1] == {"items": ("gear",)}
+
+
+def test_carriles_del_giro_solo_validos_y_con_el_giro():
+    B = overlay.CARRIL_BITS
+    rec = {"count": 3, "mask": 0b110, "turn": B["right"], "arrows": [B["straight"], B["straight"] | B["right"], B["right"], 0]}
+    n = nav(lanes=rec)
+    assert n["lanes"] == {"count": 3, "mask": 6, "turn": B["right"], "arrows": [4, 20, 16]}
+    # Llega por el relay: cualquier cosa rara es "sin carriles"
+    for malo in (None, "x", [1, 2], {**rec, "count": 1}, {**rec, "count": 9}, {**rec, "mask": "6"},
+                 {**rec, "arrows": [1, 2]}, {**rec, "arrows": [1, 2, "<b>"]}, {**rec, "turn": True}, {**rec, "count": 2.0}):
+        assert nav(lanes=malo)["lanes"] is None, malo
+    d = overlay.contenido(tele(), 100, n, 99, 100)
+    assert d["lanes"] == [
+        {"dirs": ["straight"], "on": False, "giro": "right"},
+        {"dirs": ["straight", "right"], "on": True, "giro": "right"},
+        {"dirs": ["right"], "on": True, "giro": "right"},
+    ]
+    # Van con el giro: sin el giro elegido, o con el tablero callado, no
+    assert overlay.contenido(tele(), 100, n, 99, 100, items=("speed",))["lanes"] is None
+    assert overlay.contenido(tele(), 100, n, 100 - overlay.NAV_FRESH_SECONDS - 1, 100)["lanes"] is None
+    # Un tablero viejo no los manda
+    assert overlay.contenido(tele(), 100, nav(), 99, 100)["lanes"] is None
+    # Todas las direcciones tienen su dibujo
+    assert set(overlay.CARRIL_FORMAS) == set(overlay.CARRIL_ORDEN)
+    # En el ejemplo del modo Mover estan, salvo sin el giro
+    assert overlay.ejemplo(overlay.ITEMS, ("F", "R", "J"))["lanes"]
+    assert overlay.ejemplo(("speed",), ("F", "R", "J"))["lanes"] is None

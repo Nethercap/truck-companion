@@ -40,6 +40,12 @@ html, body { margin: 0; background: transparent; }
 .hudTurnText { font-size: calc(20px * var(--s)); font-weight: 700; white-space: nowrap; }
 .hudTurnNext { font-size: calc(12px * var(--s)); opacity: 0.75; white-space: nowrap; }
 .hudTurnNext:empty { display: none; }
+/* Los carriles del giro: lanesHtml de pure.js, las mismas flechas que el tablero */
+.hudTurnLanes:empty { display: none; }
+.hudTurnLanes .navLanes { display: flex; gap: calc(3px * var(--s)); margin: calc(4px * var(--s)) 0 calc(3px * var(--s)); }
+.hudTurnLanes .navLane { display: inline-flex; padding: calc(2px * var(--s)) calc(3px * var(--s)); border-radius: calc(4px * var(--s)); background: rgba(255, 255, 255, 0.08); }
+.hudTurnLanes .navLane.on { background: rgba(59, 158, 255, 0.35); }
+.hudTurnLanes .navLane svg { display: block; width: calc(20px * var(--s)); height: calc(25px * var(--s)); }
 .hudBrand { align-self: flex-end; margin-top: calc(3px * var(--s)); font-size: calc(10px * var(--s)); opacity: 0.55; letter-spacing: 0.02em; }
 
 /* --- Armador del link (sin ?code=) --- */

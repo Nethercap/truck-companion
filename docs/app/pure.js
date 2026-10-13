@@ -2611,6 +2611,48 @@ function laneGuidance(rec) {
   }));
 }
 
+// El dibujo de cada direccion en un carril de 24 x 30: el trazo desde la
+// punta del tronco (12, 17) y la cabeza de la flecha. client/overlay.py
+// dibuja las mismas formas con Tk (CARRIL_FORMAS).
+const LANE_PATHS = {
+  straight: ['M12 17V6', '8,9 12,3.5 16,9'],
+  right: ['M12 17Q12 11 18 11', '16,7 21.5,11 16,15'],
+  left: ['M12 17Q12 11 6 11', '8,7 2.5,11 8,15'],
+  slightRight: ['M12 17L17.5 8.5', '14,6.5 19.8,5 19,10.8'],
+  slightLeft: ['M12 17L6.5 8.5', '10,6.5 4.2,5 5,10.8'],
+  uturn: ['M12 17V9.5A3.5 3.5 0 0 0 5 9.5V17', '1.5,14.5 5,20 8.5,14.5'],
+};
+
+// Los carriles de un giro como viajan en nav_hud (overlay del juego y de
+// OBS): los numeros de lanesForEdge, validados, o null. Llega de otra
+// pestana por el relay: nada que no sea un entero chico.
+function laneHudRecord(rec) {
+  if (!rec || typeof rec !== 'object') return null;
+  const ent = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
+  const { count, mask, turn, arrows } = rec;
+  if (!ent(count, 8) || count < 2 || !ent(mask, 255) || !ent(turn, 63) || !Array.isArray(arrows) || arrows.length < count) return null;
+  const a = arrows.slice(0, count);
+  if (!a.every((v) => ent(v, 63))) return null;
+  return { count, mask, turn, arrows: a };
+}
+
+// Los carriles como fila de flechas (laneGuidance): los que sirven, con
+// fondo; adentro de esos, la direccion del giro en blanco y las demas
+// apagadas. Es un apoyo al texto del giro, que ya lo dice: el lector de
+// pantalla no lo lee. Solo arma texto fijo con numeros validados.
+function lanesHtml(rec) {
+  const lanes = laneGuidance(laneHudRecord(rec));
+  if (!lanes) return '';
+  const apagado = '#4d545e';
+  return `<span class="navLanes" aria-hidden="true">${lanes.map((l) => {
+    const color = (d) => (l.active ? (d === l.turn ? '#ffffff' : '#8a93a0') : apagado);
+    // La del giro al final, para que quede arriba de las otras
+    const dirs = l.dirs.slice().sort((a, b) => (a === l.turn) - (b === l.turn));
+    const trazos = dirs.map((d) => `<path d="${LANE_PATHS[d][0]}" stroke="${color(d)}"/><polygon points="${LANE_PATHS[d][1]}" fill="${color(d)}" stroke="none"/>`).join('');
+    return `<span class="navLane${l.active ? ' on' : ''}"><svg viewBox="0 0 24 30" width="20" height="25" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 28V17" stroke="${l.active ? '#ffffff' : apagado}"/>${trazos}</svg></span>`;
+  }).join('')}</span>`;
+}
+
 // ------------------------------------------------------- accesibilidad
 // Tab con un modal abierto (app.js, modales accesibles): el foco da la vuelta
 // adentro en vez de irse al mapa de atras. count = controles que se pueden
@@ -2789,6 +2831,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

@@ -3913,32 +3913,8 @@ function laneGuidanceAt(pts, i, iEnd, kind, direction) {
   return null;
 }
 
-// El dibujo de cada direccion en un carril de 24 x 30: el trazo desde la
-// punta del tronco (12, 17) y la cabeza de la flecha.
-const LANE_PATHS = {
-  straight: ['M12 17V6', '8,9 12,3.5 16,9'],
-  right: ['M12 17Q12 11 18 11', '16,7 21.5,11 16,15'],
-  left: ['M12 17Q12 11 6 11', '8,7 2.5,11 8,15'],
-  slightRight: ['M12 17L17.5 8.5', '14,6.5 19.8,5 19,10.8'],
-  slightLeft: ['M12 17L6.5 8.5', '10,6.5 4.2,5 5,10.8'],
-  uturn: ['M12 17V9.5A3.5 3.5 0 0 0 5 9.5V17', '1.5,14.5 5,20 8.5,14.5'],
-};
-// Los carriles como fila de flechas (laneGuidance en pure.js): los que
-// sirven, con fondo; adentro de esos, la direccion del giro en blanco y las
-// demas apagadas. Es un apoyo al texto del giro, que ya lo dice: el lector
-// de pantalla no lo lee.
-function lanesHtml(rec) {
-  const lanes = laneGuidance(rec);
-  if (!lanes) return '';
-  const apagado = '#4d545e';
-  return `<span class="navLanes" aria-hidden="true">${lanes.map((l) => {
-    const color = (d) => (l.active ? (d === l.turn ? '#ffffff' : '#8a93a0') : apagado);
-    // La del giro al final, para que quede arriba de las otras
-    const dirs = l.dirs.slice().sort((a, b) => (a === l.turn) - (b === l.turn));
-    const trazos = dirs.map((d) => `<path d="${LANE_PATHS[d][0]}" stroke="${color(d)}"/><polygon points="${LANE_PATHS[d][1]}" fill="${color(d)}" stroke="none"/>`).join('');
-    return `<span class="navLane${l.active ? ' on' : ''}"><svg viewBox="0 0 24 30" width="20" height="25" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 28V17" stroke="${l.active ? '#ffffff' : apagado}"/>${trazos}</svg></span>`;
-  }).join('')}</span>`;
-}
+// Las flechas de carril (lanesHtml, LANE_PATHS) viven en pure.js: las usan
+// tambien el overlay de OBS y el registro que va en nav_hud.
 
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
@@ -4068,7 +4044,8 @@ function navTurnParts(turn) {
     info = 'straight';
   }
   if (!info) return null;
-  return { text: turnInstructionText(info, { t, imperial: useImperial, lang: currentLang }), next, info, nextCity: nextCityName || '' };
+  return { text: turnInstructionText(info, { t, imperial: useImperial, lang: currentLang }), next, info, nextCity: nextCityName || '',
+    lanes: laneHudRecord(turn && turn.lanes) };
 }
 
 function navPanelHtml(turn) {
@@ -4124,6 +4101,8 @@ function sendNavHud() {
       ? { ...info, meters: Math.round(info.meters / 10) * 10, sign: info.sign ? { kind: info.sign.kind, label: String(info.sign.label).slice(0, 60) } : null }
       : info,
     nextCity: overlayTurnParts ? overlayTurnParts.nextCity.slice(0, 60) : '',
+    // Los carriles del giro (laneHudRecord): numeros, cada overlay los dibuja
+    lanes: overlayTurnParts ? overlayTurnParts.lanes : null,
     remainingKm: numeros && Number.isFinite(numeros.remainingKm) ? Math.round(numeros.remainingKm * 10) / 10 : null,
     seconds: numeros && Number.isFinite(numeros.seconds) ? Math.round(numeros.seconds / 10) * 10 : null,
     remaining: resumen ? $('routeRemaining').textContent.trim() : '',

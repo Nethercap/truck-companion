@@ -2347,3 +2347,19 @@ test('ruteo: el rumbo en la punta sale de la curva de la arista, no de la recta'
   const k = [...g2.g.adjTo.keys()].find(i => d2.from[i] === 1);
   assert.ok(d2.depY[k] < -0.99);
 });
+
+
+test('carriles en nav_hud: solo enteros chicos, y el dibujo sale de ahi', () => {
+  const { laneHudRecord, lanesHtml, LANE_ARROW_BITS: B } = require('./pure.js');
+  const rec = { count: 3, mask: 0b110, turn: B.right, arrows: [B.straight, B.straight | B.right, B.right, 0, 0, 0, 0, 0] };
+  assert.deepEqual(laneHudRecord(rec), { count: 3, mask: 6, turn: B.right, arrows: [B.straight, B.straight | B.right, B.right] });
+  // Llega por el relay: cualquier cosa rara es "sin carriles"
+  for (const malo of [null, 'x', { ...rec, count: 1 }, { ...rec, count: 9 }, { ...rec, mask: '6' }, { ...rec, turn: -1 },
+    { ...rec, arrows: [1, 2] }, { ...rec, arrows: [1, 2, '<b>'] }, { ...rec, arrows: 'abc' }, { ...rec, count: 2.5 }]) {
+    assert.equal(laneHudRecord(malo), null, JSON.stringify(malo));
+    assert.equal(lanesHtml(malo), '');
+  }
+  const html = lanesHtml(rec);
+  assert.equal((html.match(/class="navLane[ "]/g) || []).length, 3);
+  assert.equal((html.match(/navLane on/g) || []).length, 2);
+});
