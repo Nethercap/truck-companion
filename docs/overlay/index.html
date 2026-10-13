@@ -4,17 +4,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Truck Dash – OBS overlay for ETS2 and ATS</title>
-<meta name="description" content="Free overlay for Euro Truck Simulator 2 and American Truck Simulator streams: your speed, the speed limit and your trip, as an OBS browser source." />
+<meta name="description" content="Free overlay for Euro Truck Simulator 2 and American Truck Simulator streams: your speed and the speed limit, the next turn and your trip, as an OBS browser source." />
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
-<link rel="stylesheet" href="overlay.css?v=20261013d" />
+<link rel="stylesheet" href="overlay.css?v=20261013e" />
 </head>
 <!-- Overlay para OBS (overlay.js). Con ?code= es solo el HUD, sobre fondo
-     transparente; sin codigo es el armador del link. -->
+     transparente; sin codigo es el armador del link. El giro lo manda el
+     tablero (nav_hud por el relay, como al overlay del juego). -->
 <body>
   <main class="setup" id="setup" hidden>
     <a class="setupBrand" href="/"><img src="../app/assets/logo.svg" alt="" width="22" height="22" /> Truck Dash</a>
     <h1 data-i18n="obsTitle">Overlay for OBS</h1>
-    <p class="setupIntro" data-i18n="obsIntro">Your speed, the speed limit and your trip on stream, over the game. Free, like the rest of Truck Dash.</p>
+    <p class="setupIntro" data-i18n="obsIntro">Your speed, the next turn and your trip on stream, over the game. Free, like the rest of Truck Dash.</p>
 
     <div class="preview" id="preview" aria-label="Preview"></div>
 
@@ -35,8 +36,21 @@
       <label><span data-i18n="obsSize">Size</span>
         <input id="fSize" type="range" min="0.7" max="1.8" step="0.1" value="1" />
       </label>
-      <label class="check"><input id="fTrip" type="checkbox" checked /> <span data-i18n="obsTrip">Show the trip: destination, distance left and time</span></label>
     </div>
+
+    <!-- Las mismas casillas que el overlay del juego (Setup del cliente), mas
+         destino y tiempo que falta. data-item = clave de OBS_ITEMS. -->
+    <fieldset class="items" id="fItems">
+      <legend data-i18n="obsShow">Show</legend>
+      <label class="check"><input type="checkbox" data-item="turn" /> <span data-i18n="obsItemTurn">Next turn</span></label>
+      <p class="hint itemHint" data-i18n="obsTurnHint">Turns come from the dashboard: open it on your phone, a tablet or this PC.</p>
+      <label class="check"><input type="checkbox" data-item="speed" /> <span data-i18n="obsItemSpeed">Speed and limit</span></label>
+      <label class="check"><input type="checkbox" data-item="dest" /> <span data-i18n="obsItemDest">Destination</span></label>
+      <label class="check"><input type="checkbox" data-item="remaining" /> <span data-i18n="obsItemRemaining">Distance left</span></label>
+      <label class="check"><input type="checkbox" data-item="time" /> <span data-i18n="obsItemTime">Time left (real)</span></label>
+      <label class="check"><input type="checkbox" data-item="arrival" /> <span data-i18n="obsItemArrival">Arrival (real)</span></label>
+      <label class="check"><input type="checkbox" data-item="game_arrival" /> <span data-i18n="obsItemGameArrival">Arrival (game)</span></label>
+    </fieldset>
 
     <div class="urlRow">
       <input id="fUrl" readonly aria-label="URL" />
@@ -46,15 +60,19 @@
 
     <ol class="steps">
       <li data-i18n="obsStep1">In OBS, under Sources, press + and choose Browser.</li>
-      <li data-i18n="obsStep2">Paste the link in URL, with width 720 and height 200.</li>
+      <li id="step2" data-i18n="obsStep2">Paste the link in URL, with width {w} and height {h}.</li>
       <li data-i18n="obsStep3">Drag it where you want it over the game. It shows up only while you drive: with the game paused or closed it disappears from the stream.</li>
     </ol>
     <p class="hint" data-i18n="obsPrivacy">The link carries your pairing code: whoever has it sees your telemetry. Keep it out of the stream and the chat, and use New code in the client if it leaks.</p>
   </main>
 
   <div class="hud off" id="hud" hidden>
-    <div class="hudBody">
-      <div class="hudSpeed">
+    <div class="hudTurn" id="hudTurn" hidden>
+      <div class="hudTurnText" id="hudTurnText"></div>
+      <div class="hudTurnNext" id="hudTurnNext"></div>
+    </div>
+    <div class="hudBody" id="hudBody">
+      <div class="hudSpeed" id="hudSpeedBox">
         <div class="hudLimit" id="hudLimit" hidden></div>
         <div class="hudSpeedNum"><span id="hudSpeed">--</span><small id="hudUnit">km/h</small></div>
         <div class="hudCruise" id="hudCruise" hidden>
@@ -64,15 +82,15 @@
       </div>
       <div class="hudTrip" id="hudTrip" hidden>
         <div class="hudDest" id="hudDest"></div>
-        <div class="hudLine" id="hudLine"></div>
+        <div class="hudCols" id="hudCols"></div>
       </div>
     </div>
     <div class="hudBrand">trucksim-dash.com</div>
   </div>
 
-<script src="../app/i18n.js?v=20261013d"></script>
-<script src="../app/i18n_en_es.js?v=20261013d"></script>
-<script src="../app/pure.js?v=20261013d"></script>
-<script src="overlay.js?v=20261013d"></script>
+<script src="../app/i18n.js?v=20261013e"></script>
+<script src="../app/i18n_en_es.js?v=20261013e"></script>
+<script src="../app/pure.js?v=20261013e"></script>
+<script src="overlay.js?v=20261013e"></script>
 </body>
 </html>

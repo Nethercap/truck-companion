@@ -3237,6 +3237,7 @@ function updateRouteSummary(data) {
   const seconds = manual
     ? (remainingKm != null && lastKnownAvgSpeedKmh > 0 ? remainingKm / lastKnownAvgSpeedKmh * 3600 : null)
     : (remainingKm === 0 ? 0 : routeSummaryEtaSeconds);
+  routeSummaryNumbers = { remainingKm, seconds }; // para el overlay de OBS (sendNavHud)
   // Ruta a la carga (remolque propio sin cargar): sin decirlo, "llegaste" en
   // la empresa de origen y ninguna ruta a la entrega se leia como un error
   // ("says I'm at the location when clearly I'm not, it's not routing to
@@ -3944,32 +3945,22 @@ function updateNavPanel(turn) {
 // El texto del proximo giro: lo usan el panel de navegacion, la ventana
 // flotante y el overlay del cliente (los dos ultimos lo muestran aunque el
 // modo navegacion este apagado). Texto plano: cada uno lo escapa o lo pinta.
+// info: la maniobra lista para mostrar (turnInstructionText), que tambien
+// viaja en nav_hud para el overlay de OBS.
 function navTurnParts(turn) {
   const next = nextCityName ? `${t('navNextCity')}: ${nextCityName}` : '';
-  if (turn && turn.kind === 'roundabout') {
-    // "Rotonda en 300 m: tomar la segunda salida". Mas alla de la octava, el numero.
-    const ords = t('navOrdinals').split(',');
-    const n = ords[turn.exit - 1] || String(turn.exit);
-    const dist = formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial, currentLang);
-    let ontoText = '';
-    if (turn.nearSign) ontoText = ` ${turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto')} ${turn.nearSign.label}`;
-    return { text: `↻ ${t('navRoundaboutIn').replace('{d}', dist).replace('{n}', n)}${ontoText}`, next };
-  }
+  let info = null;
   if (turn) {
-    const fork = turn.kind === 'fork';
-    const arrow = fork ? (turn.direction === 'left' ? '↖' : '↗') : (turn.direction === 'left' ? '↰' : '↱');
-    const dirText = fork
-      ? (turn.direction === 'left' ? t('navKeepLeft') : t('navKeepRight'))
-      : (turn.direction === 'left' ? t('navTurnLeft') : t('navTurnRight'));
-    let ontoText = '';
-    if (turn.nearSign) {
-      const preposition = turn.nearSign.kind === 'city' ? t('navToward') : t('navOnto');
-      ontoText = ` ${preposition} ${turn.nearSign.label}`;
-    }
-    return { text: `${arrow} ${dirText}${ontoText} ${t('navIn')} ${formatTurnDistance(turn.distanceMeters * distanceScale(), useImperial, currentLang)}`, next };
+    info = {
+      kind: turn.kind, direction: turn.direction, exit: turn.exit,
+      meters: turn.distanceMeters * distanceScale(),
+      sign: turn.nearSign ? { kind: turn.nearSign.kind, label: turn.nearSign.label } : null,
+    };
+  } else if (currentRouteWorldPoints) {
+    info = 'straight';
   }
-  if (currentRouteWorldPoints) return { text: `⬆ ${t('navStraight')}`, next };
-  return null;
+  if (!info) return null;
+  return { text: turnInstructionText(info, { t, imperial: useImperial, lang: currentLang }), next, info, nextCity: nextCityName || '' };
 }
 
 function navPanelHtml(turn) {
@@ -3986,9 +3977,16 @@ function navPanelHtml(turn) {
 // client_status que lo tiene prendido; por el relay o directo en LAN. Cada
 // vez que cambia y, si no cambia, cada 3 s: el cliente saca el giro si pasan
 // 6 s sin noticias (pestana cerrada, celular bloqueado).
+// El overlay de OBS (docs/overlay/) lee lo mismo: el relay le reenvia el
+// nav_hud y avisa en session_state (obs_overlay) si hay uno mirando. Para el
+// van turnInfo, nextCity, remainingKm y seconds, sin traducir: lo escribe
+// en su idioma y unidades.
 // ---------------------------------------------------------------------------
 let clientOverlayOn = false;
+let obsOverlayOn = false;
 let overlayTurnParts = null; // lo arma updateMap en cada dato
+// Lo que falta y los segundos reales del resumen de ruta, como numeros
+let routeSummaryNumbers = null;
 let navHudLastSig = '';
 let navHudLastSent = 0;
 const NAV_HUD_MIN_MS = 400;
@@ -4002,13 +4000,23 @@ const NAV_HUD_SRC = Math.random().toString(36).slice(2, 10);
 
 function sendNavHud() {
   if (!isLeaderTab) return; // ver requestLeadership
-  if (!clientOverlayOn || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if ((!clientOverlayOn && !obsOverlayOn) || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
   const $ = (id) => document.getElementById(id);
   const resumen = !$('routeSummary').hidden;
+  const info = overlayTurnParts ? overlayTurnParts.info : null;
+  const numeros = resumen ? routeSummaryNumbers : null;
   const msg = {
     type: 'nav_hud',
     turn: overlayTurnParts ? overlayTurnParts.text : '',
     next: overlayTurnParts ? overlayTurnParts.next : '',
+    // Para OBS. Redondeado: con la precision completa cambiaria en cada dato
+    // y se mandaria cada 400 ms en vez de al cambiar.
+    turnInfo: info && typeof info === 'object'
+      ? { ...info, meters: Math.round(info.meters / 10) * 10, sign: info.sign ? { kind: info.sign.kind, label: String(info.sign.label).slice(0, 60) } : null }
+      : info,
+    nextCity: overlayTurnParts ? overlayTurnParts.nextCity.slice(0, 60) : '',
+    remainingKm: numeros && Number.isFinite(numeros.remainingKm) ? Math.round(numeros.remainingKm * 10) / 10 : null,
+    seconds: numeros && Number.isFinite(numeros.seconds) ? Math.round(numeros.seconds / 10) * 10 : null,
     remaining: resumen ? $('routeRemaining').textContent.trim() : '',
     arrival: resumen ? $('routeArrival').textContent.trim() : '',
     // Todas las etiquetas del overlay salen de aca, en el idioma del
@@ -4030,7 +4038,13 @@ function sendNavHud() {
 
 function setClientOverlay(on) {
   clientOverlayOn = !!on;
-  if (!clientOverlayOn) overlayTurnParts = null;
+  if (!clientOverlayOn && !obsOverlayOn) overlayTurnParts = null;
+}
+function setObsOverlay(on) {
+  const antes = obsOverlayOn;
+  obsOverlayOn = !!on;
+  if (!clientOverlayOn && !obsOverlayOn) overlayTurnParts = null;
+  if (obsOverlayOn && !antes) navHudLastSig = ''; // que le llegue ya, no al proximo cambio
 }
 
 // ---------------------------------------------------------------------------
@@ -4620,11 +4634,12 @@ function updateMap(position, game, gameHeadingDeg) {
   // El overlay del cliente tambien guia: el giro va a la ventana del juego y,
   // si la voz esta prendida en Ajustes, se dice desde este dispositivo (el
   // celular o la PC donde este abierto el tablero).
+  // El de OBS muestra el giro pero no guia: con el solo, la voz no habla.
   const guiando = navMode || !!pipWin || clientOverlayOn;
-  const turn = guiando ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
+  const turn = guiando || obsOverlayOn ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
   if (guiando) voiceManeuverTick(turn);
   if (pipWin) pipTurnHtml = navPanelHtml(turn);
-  if (clientOverlayOn) overlayTurnParts = navTurnParts(turn);
+  if (clientOverlayOn || obsOverlayOn) overlayTurnParts = navTurnParts(turn);
   if (navMode && !autoFollow) {
     // El usuario esta tocando el mapa (arrastrar, pellizcar, rotar): la
     // camara no se toca hasta que scheduleMapFollow vuelva a engancharla.
@@ -5975,7 +5990,7 @@ function handleTelemetry(data) {
   trackFuel(data);
   trackStatus(data);
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
-  if (clientOverlayOn) setTimeout(sendNavHud, 0); // idem
+  if (clientOverlayOn || obsOverlayOn) setTimeout(sendNavHud, 0); // idem
   const enAuto = isDrivingCar(data);
   if (enAuto !== drivingCar) { drivingCar = enAuto; applyVehicleMode(); }
   // Con el primer dato real se cambian las tarjetas por el estado vacio (ver
@@ -6057,6 +6072,7 @@ function connectWs(backend, code, options = {}) {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;
       setClientOverlay(data.client_status && data.client_status.overlay);
+      setObsOverlay(data.obs_overlay); // un relay viejo no lo manda: apagado
       if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);
       if (data.client_status) applyLocalMaps(data.client_status.localMaps, data.client_status.localMapPort);
       if (data.client_status) applyClientMapMods(data.client_status);

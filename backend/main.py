@@ -695,6 +695,10 @@ class Session:
         # Ultimo resumen de telemetria (subconjunto chico) para el convoy.
         self.last_summary: Optional[dict] = None
         self.convoy_code: Optional[str] = None
+        # Overlays de OBS mirando esta sesion (/ws/live/<codigo>?role=obs):
+        # reciben el nav_hud del tablero, y el tablero lo manda mientras haya
+        # alguno (obs_overlay en session_state).
+        self.obs_viewers: set = set()
         self.last_seen = time.time()
 
 
@@ -1154,6 +1158,7 @@ def session_state_message(session: "Session") -> str:
         "type": "session_state",
         "client_connected": session.client_ws is not None,
         "client_status": session.last_client_status,
+        "obs_overlay": bool(session.obs_viewers),
     })
 
 
@@ -1881,7 +1886,14 @@ async def ws_viewer(websocket: WebSocket, code: str):
     session.viewer_ws_list.append(websocket)
     session.viewer_outboxes[websocket] = ViewerOutbox(websocket)
     session.last_seen = time.time()
-    await _safe_send(websocket, session_state_message(session))
+    # El overlay de OBS se presenta en la URL. Las pestanas del tablero se
+    # enteran por session_state y empiezan a mandar el nav_hud.
+    is_obs = websocket.query_params.get("role") == "obs"
+    if is_obs:
+        session.obs_viewers.add(websocket)
+        await broadcast_session_state(session)
+    else:
+        await _safe_send(websocket, session_state_message(session))
     # El estado real de "compartir": un dispositivo recien abierto arranca
     # con su default local y si no se lo decimos muestra otra cosa.
     await _safe_send(websocket, live_share_state_message(session))
@@ -1908,6 +1920,13 @@ async def ws_viewer(websocket: WebSocket, code: str):
                 # juego; texto corto, se descarta si viene grande.
                 if msg_type == "nav_hud" and len(data) > NAV_HUD_MAX_BYTES:
                     continue
+                if msg_type == "nav_hud":
+                    # Tambien al overlay de OBS, antes que al cliente: si el
+                    # envio al cliente falla, el stream igual tiene el giro.
+                    for obs in list(session.obs_viewers):
+                        outbox = session.viewer_outboxes.get(obs)
+                        if outbox is not None and obs is not websocket:
+                            outbox.push_control(data)
                 if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "nav_hud"):
                     if session.client_ws is not None:
                         await session.client_ws.send_text(data)
@@ -1984,4 +2003,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
         if outbox is not None:
             outbox.close()
         session.last_seen = time.time()
+        if websocket in session.obs_viewers:
+            session.obs_viewers.discard(websocket)
+            await broadcast_session_state(session)
         await notify_client_viewers(session)

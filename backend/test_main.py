@@ -435,7 +435,7 @@ def test_viewer_receives_session_state_on_connect_and_when_client_connects(clien
     code = client.post("/pair/new").json()["code"]
     with client.websocket_connect(f"/ws/live/{code}") as viewer:
         first = main.json.loads(viewer.receive_text())
-        assert first == {"type": "session_state", "client_connected": False, "client_status": None}
+        assert first == {"type": "session_state", "client_connected": False, "client_status": None, "obs_overlay": False}
         # Y enseguida el estado real de "compartir posicion"
         assert main.json.loads(viewer.receive_text()) == {"type": "live_share_state", "enabled": False}
 
@@ -468,6 +468,41 @@ def test_el_aviso_de_fuera_del_mapa_llega_al_cliente(client, main):
             aviso = {"type": "offmap", "game": "ats"}
             viewer.send_text(main.json.dumps(aviso))
             assert main.json.loads(local_client.receive_text()) == aviso
+
+
+def test_el_overlay_de_obs_recibe_el_giro_del_tablero(client, main):
+    """El overlay de OBS (?role=obs) avisa que esta mirando: las pestanas se
+    enteran por session_state y el nav_hud del tablero le llega al overlay,
+    no a las otras pestanas. Cuando se va, vuelve a obs_overlay false."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as tablero:
+        estado = main.json.loads(tablero.receive_text())
+        assert estado["type"] == "session_state" and estado["obs_overlay"] is False
+        tablero.receive_text()  # live_share_state
+        with client.websocket_connect(f"/ws/live/{code}") as otra:
+            otra.receive_text()
+            otra.receive_text()
+            with client.websocket_connect(f"/ws/live/{code}?role=obs") as obs:
+                assert main.json.loads(tablero.receive_text())["obs_overlay"] is True
+                assert main.json.loads(otra.receive_text())["obs_overlay"] is True
+                assert main.json.loads(obs.receive_text())["obs_overlay"] is True
+                obs.receive_text()  # live_share_state
+                giro = {"type": "nav_hud", "turn": "x", "turnInfo": {"kind": "turn", "direction": "left", "meters": 400}}
+                tablero.send_text(main.json.dumps(giro))
+                assert main.json.loads(obs.receive_text()) == giro
+                # A la otra pestana no: lo proximo que recibe es el tilde de
+                # compartir, que va a todas despues del giro.
+                tablero.send_text(main.json.dumps({"type": "set_live_share", "enabled": False, "explicit": True}))
+                assert main.json.loads(otra.receive_text())["type"] == "live_share_state"
+                assert main.json.loads(obs.receive_text())["type"] == "live_share_state"
+                # Un nav_hud de mas de 2 KB no pasa (tampoco al cliente)
+                tablero.send_text(main.json.dumps({"type": "nav_hud", "turn": "y" * main.NAV_HUD_MAX_BYTES}))
+                tablero.send_text(main.json.dumps({"type": "set_live_share", "enabled": False, "explicit": True}))
+                assert main.json.loads(obs.receive_text())["type"] == "live_share_state"
+            for _ in range(2):
+                assert main.json.loads(tablero.receive_text())["type"] == "live_share_state"
+            assert main.json.loads(tablero.receive_text()) == {"type": "session_state", "client_connected": False,
+                                                                 "client_status": None, "obs_overlay": False}
 
 
 def test_cleanup_removes_idle_used_sessions_but_keeps_watched_ones(main):

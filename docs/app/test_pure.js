@@ -2065,6 +2065,58 @@ test('waypointRouteKey: otro destino es otro viaje, los intermedios no (Gargamos
   assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored, key: id + haciaA, now }), 640);
 });
 
+test('overlay: el texto del giro, igual para el tablero y para OBS', () => {
+  const { turnInstructionText } = require('./pure.js');
+  const dic = {
+    navStraight: 'Continue straight', navToward: 'toward', navOnto: 'onto', navIn: 'in',
+    navOrdinals: 'first,second,third,fourth', navRoundaboutIn: 'Roundabout in {d}: take the {n} exit',
+    navKeepLeft: 'Keep left', navKeepRight: 'Keep right', navTurnLeft: 'Turn left', navTurnRight: 'Turn right',
+  };
+  const o = { t: (k) => dic[k], imperial: false, lang: 'en' };
+  const d = (m, imp = false) => formatTurnDistance(m, imp, 'en');
+  assert.equal(turnInstructionText('straight', o), '⬆ Continue straight');
+  assert.equal(turnInstructionText(null, o), '');
+  assert.equal(turnInstructionText({ kind: 'turn', direction: 'left' }, o), ''); // sin metros
+  assert.equal(turnInstructionText({ kind: 'turn', direction: 'right', meters: 1200, sign: { kind: 'road', label: 'I-15' } }, o),
+    `↱ Turn right onto I-15 in ${d(1200)}`);
+  assert.equal(turnInstructionText({ kind: 'turn', direction: 'left', meters: 300, sign: null }, o), `↰ Turn left in ${d(300)}`);
+  assert.equal(turnInstructionText({ kind: 'fork', direction: 'left', meters: 800, sign: { kind: 'city', label: 'Provo' } }, o),
+    `↖ Keep left toward Provo in ${d(800)}`);
+  assert.equal(turnInstructionText({ kind: 'roundabout', direction: 'right', exit: 2, meters: 300, sign: { kind: 'city', label: 'Reno' } }, o),
+    `↻ Roundabout in ${d(300)}: take the second exit toward Reno`);
+  // mas alla de los ordinales, el numero
+  assert.equal(turnInstructionText({ kind: 'roundabout', direction: 'right', exit: 6, meters: 300 }, o), `↻ Roundabout in ${d(300)}: take the 6 exit`);
+  // en millas si el link las pide, aunque el tablero este en km
+  assert.equal(turnInstructionText({ kind: 'turn', direction: 'right', meters: 1200 }, { ...o, imperial: true }), `↱ Turn right in ${d(1200, true)}`);
+});
+
+test('overlay: llegada en hora del juego, como client/overlay.py', () => {
+  const { gameArrivalClock } = require('./pure.js');
+  assert.equal(gameArrivalClock(600, 3600), '11:00');
+  assert.equal(gameArrivalClock(1430, 1200), '00:10 +1d'); // pasa la medianoche
+  assert.equal(gameArrivalClock(100, 2 * 1440 * 60), '01:40 +2d');
+  assert.equal(gameArrivalClock(3 * 1440 + 61, 60), '01:02'); // dia 4 del juego, mismo dia
+  assert.equal(gameArrivalClock(600, 0), ''); // el GPS del juego sin ruta
+  assert.equal(gameArrivalClock(null, 3600), '');
+  assert.equal(gameArrivalClock(600, undefined), '');
+});
+
+test('overlay de OBS: que se muestra segun el link', () => {
+  const { obsOverlayItems, OBS_ITEMS } = require('./pure.js');
+  // en el orden de siempre, sin lo que no existe
+  assert.deepEqual(obsOverlayItems('speed,turn,inventado', null, false), ['turn', 'speed']);
+  assert.deepEqual(obsOverlayItems('', null, false), []);
+  assert.deepEqual(obsOverlayItems(OBS_ITEMS.join(','), null, false), OBS_ITEMS);
+  // los links de antes de las casillas se ven igual que antes
+  assert.deepEqual(obsOverlayItems(null, null, false), ['speed', 'dest', 'remaining', 'time']);
+  assert.deepEqual(obsOverlayItems(null, '0', false), ['speed']);
+  assert.deepEqual(obsOverlayItems(null, '0', true), ['speed']);
+  // el armador arranca con el giro
+  assert.deepEqual(obsOverlayItems(null, null, true), ['turn', 'speed', 'dest', 'remaining', 'time']);
+  // las cinco del overlay del juego estan todas
+  for (const k of ['turn', 'speed', 'remaining', 'arrival', 'game_arrival']) assert.ok(OBS_ITEMS.includes(k), k);
+});
+
 test('modales: Tab da la vuelta adentro y Shift+Tab tambien', () => {
   const { focusTrapTarget } = require('./pure.js');
   // tres controles: del ultimo al primero, del primero al ultimo

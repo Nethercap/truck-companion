@@ -2453,6 +2453,61 @@ function createScreenKeeper({ wakeLock, doc }) {
   };
 }
 
+// -------------------------------------------------- overlay (tablero y OBS)
+// El texto del proximo giro. info es la maniobra ya lista para mostrar
+// ({ kind, direction, exit, meters, sign: { kind, label } }, con los metros
+// en la escala del juego) o 'straight' si hay ruta y no hay giro cerca. Lo
+// arman el panel de navegacion del tablero (navTurnParts) y el overlay de
+// OBS, que recibe info en nav_hud y lo escribe en su propio idioma y
+// unidades: el streamer puede tener el tablero en castellano y el stream en
+// ingles. t es la funcion de traducciones de quien lo llama.
+function turnInstructionText(info, { t, imperial, lang }) {
+  if (info === 'straight') return `⬆ ${t('navStraight')}`;
+  if (!info || typeof info !== 'object' || !Number.isFinite(info.meters)) return '';
+  const dist = formatTurnDistance(info.meters, imperial, lang);
+  const sign = info.sign && info.sign.label ? info.sign : null;
+  const onto = sign ? ` ${sign.kind === 'city' ? t('navToward') : t('navOnto')} ${sign.label}` : '';
+  if (info.kind === 'roundabout') {
+    // "Rotonda en 300 m: tomar la segunda salida". Mas alla de la octava, el numero.
+    const ords = t('navOrdinals').split(',');
+    const n = ords[info.exit - 1] || String(info.exit);
+    return `↻ ${t('navRoundaboutIn').replace('{d}', dist).replace('{n}', n)}${onto}`;
+  }
+  const left = info.direction === 'left';
+  if (info.kind === 'fork') return `${left ? '↖' : '↗'} ${left ? t('navKeepLeft') : t('navKeepRight')}${onto} ${t('navIn')} ${dist}`;
+  return `${left ? '↰' : '↱'} ${left ? t('navTurnLeft') : t('navTurnRight')}${onto} ${t('navIn')} ${dist}`;
+}
+
+// La hora del reloj del juego a la que se llega por la ruta del GPS del
+// juego ("21:59", con "+1d" si cae otro dia), o '' si el juego no tiene
+// ruta. routeTimeSeconds es tiempo de juego, igual que gameTimeMinutes. Es
+// llegada_en_juego de client/overlay.py: el overlay del juego y el de OBS
+// tienen que decir lo mismo.
+function gameArrivalClock(gameTimeMinutes, routeTimeSeconds) {
+  if (!Number.isFinite(gameTimeMinutes) || !Number.isFinite(routeTimeSeconds) || routeTimeSeconds <= 0) return '';
+  const llega = gameTimeMinutes + routeTimeSeconds / 60;
+  const hora = Math.floor(llega) % 1440;
+  const dias = Math.floor(llega / 1440) - Math.floor(gameTimeMinutes / 1440);
+  const hh = String(Math.floor(hora / 60)).padStart(2, '0');
+  const mm = String(hora % 60).padStart(2, '0');
+  return `${hh}:${mm}` + (dias > 0 ? ` +${dias}d` : '');
+}
+
+// Lo que muestra el overlay de OBS (?items=), en este orden. Los cinco del
+// overlay del juego (client/overlay.py ITEMS) mas el destino y el tiempo que
+// falta, que ya tenia. Sin items: los links de antes de las casillas siguen
+// viendose igual (velocidad y el viaje, o solo velocidad con trip=0); el
+// armador arranca con el giro tambien.
+const OBS_ITEMS = ['turn', 'speed', 'dest', 'remaining', 'time', 'arrival', 'game_arrival'];
+function obsOverlayItems(itemsParam, tripParam, setup) {
+  if (typeof itemsParam === 'string') {
+    const pedidos = itemsParam.split(',').map(s => s.trim());
+    return OBS_ITEMS.filter(i => pedidos.includes(i));
+  }
+  if (tripParam === '0') return ['speed'];
+  return setup ? ['turn', 'speed', 'dest', 'remaining', 'time'] : ['speed', 'dest', 'remaining', 'time'];
+}
+
 // ------------------------------------------------------- accesibilidad
 // Tab con un modal abierto (app.js, modales accesibles): el foco da la vuelta
 // adentro en vez de irse al mapa de atras. count = controles que se pueden
@@ -2486,6 +2541,6 @@ function createTurnAnnouncer() {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }
