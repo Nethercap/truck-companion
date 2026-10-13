@@ -47,6 +47,8 @@ function harness() {
     extract('MinHeap', 'class'), extract('findRouteWith'), extract('findUpcomingTurn'),
     `const { ${Object.keys(pure).filter(k => !propias.has(k)).join(', ')} } = pure;`,
     'const nearestRoadName = () => null;',
+    // Las flechas de carril no entran en los avisos (ni en la lista guardada)
+    'const laneGuidanceAt = () => null;',
     'const normDeg = (d) => ((d + 540) % 360) - 180;',
     'const toLngLat = (x, z) => [x, -z];',
     'const geoBearingDeg = (a, b, c, d) => (Math.atan2(c - a, d - b) * 180 / Math.PI + 360) % 360;',

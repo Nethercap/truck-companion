@@ -1085,7 +1085,10 @@ function stabilizeManeuver(state, turn, ticks) {
   // sentido ya mostrados, para que "keep left" no cambie a "turn left" al
   // acercarse (la rampa curva cada vez mas dentro de los 60 m de medicion).
   if (turn && state.shown && Math.hypot(turn.node[0] - state.shown.node[0], turn.node[1] - state.shown.node[1]) < 40) {
-    state.shown = { ...state.shown, distanceMeters: turn.distanceMeters, decoyMeters: turn.decoyMeters, nearSign: turn.nearSign || state.shown.nearSign };
+    // Las flechas de carril tambien: pueden llegar despues (el archivo baja
+    // detras del grafo) y no dependen de donde este el camion.
+    state.shown = { ...state.shown, distanceMeters: turn.distanceMeters, decoyMeters: turn.decoyMeters,
+      nearSign: turn.nearSign || state.shown.nearSign, lanes: turn.lanes || state.shown.lanes };
     state.candidate = undefined; state.candidateTicks = 0;
     return state.shown;
   }
@@ -2508,6 +2511,78 @@ function obsOverlayItems(itemsParam, tripParam, setup) {
   return setup ? ['turn', 'speed', 'dest', 'remaining', 'time'] : ['speed', 'dest', 'remaining', 'time'];
 }
 
+// ------------------------------------------------------ flechas de carril
+// Que carril lleva a cada salida de un cruce, sacado de las navCurves de los
+// prefabs por el constructor del grafo (prefab_lane_table en
+// client/mapbuild/build_route_graph.py). Archivo aparte del grafo ("TDLN" v1,
+// write_lanes en route_graph_bin.py), por indice de arista del v3: con nodos
+// o aristas distintos es de otra corrida y no se usa.
+const LANE_ARROW_BITS = { left: 1, slightLeft: 2, straight: 4, slightRight: 8, right: 16, uturn: 32 };
+function decodeLanesBin(buf, nNodes, nEdges) {
+  if (!buf || buf.byteLength < 20) return null;
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, false) !== 0x54444c4e || dv.getUint32(4, true) !== 1) return null;
+  if (dv.getUint32(8, true) !== nNodes || dv.getUint32(12, true) !== nEdges) return null;
+  const n = dv.getUint32(16, true);
+  const pad = (k) => (k + 3) & ~3;
+  let off = 20;
+  if (buf.byteLength < off + 4 * n + 3 * pad(n) + 8 * n) return null;
+  const keys = new Uint32Array(buf, off, n); off += 4 * n;
+  const lanes = new Uint8Array(buf, off, n); off += pad(n);
+  const mask = new Uint8Array(buf, off, n); off += pad(n);
+  const turn = new Uint8Array(buf, off, n); off += pad(n);
+  const arrows = new Uint8Array(buf, off, 8 * n);
+  return { n, keys, lanes, mask, turn, arrows };
+}
+
+// Los carriles de pasar por la arista `edge` (rev: al reves, de b hacia a),
+// o null si ahi no hay nada que avisar. Las claves estan ordenadas.
+function lanesForEdge(data, edge, rev) {
+  if (!data) return null;
+  const key = edge * 2 + (rev ? 1 : 0);
+  let lo = 0, hi = data.n - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const k = data.keys[mid];
+    if (k === key) {
+      const count = data.lanes[mid];
+      const arrows = [];
+      for (let c = 0; c < count; c++) arrows.push(data.arrows[8 * mid + c]);
+      return { count, mask: data.mask[mid], turn: data.turn[mid], arrows };
+    }
+    if (k < key) lo = mid + 1; else hi = mid - 1;
+  }
+  return null;
+}
+
+// Si los carriles de un paso son los del giro que se anuncia: la direccion
+// de la salida tiene que ir para el mismo lado. Un grupo de nodos de un
+// cruce puede tener dos prefabs (la salida de la autopista y la esquina
+// del final de la rampa), y sin esto un "doble a la izquierda" mostraba las
+// flechas de la salida, que van a la derecha. En una bifurcacion la rama
+// que se toma puede ser "derecho" (la otra se abre hacia el otro lado).
+function laneTurnMatches(kind, direction, turnBits) {
+  const B = LANE_ARROW_BITS;
+  const izquierda = B.left | B.slightLeft | B.uturn, derecha = B.right | B.slightRight;
+  if (kind === 'fork') return !!(turnBits & (direction === 'left' ? izquierda | B.straight : derecha | B.straight));
+  if (kind === 'turn') return !!(turnBits & (direction === 'left' ? izquierda : derecha));
+  return false;
+}
+
+// Para dibujar: un carril por elemento, de izquierda a derecha, con sus
+// direcciones (nombres de LANE_ARROW_BITS), si sirve y cual de ellas es la
+// del giro que se toma.
+function laneGuidance(rec) {
+  if (!rec || !(rec.count >= 2)) return null;
+  const orden = ['uturn', 'left', 'slightLeft', 'straight', 'slightRight', 'right'];
+  const turnName = orden.find((d) => rec.turn & LANE_ARROW_BITS[d]) || null;
+  return rec.arrows.slice(0, rec.count).map((bits, k) => ({
+    dirs: orden.filter((d) => bits & LANE_ARROW_BITS[d]),
+    active: !!(rec.mask >> k & 1),
+    turn: turnName,
+  }));
+}
+
 // ------------------------------------------------------- accesibilidad
 // Tab con un modal abierto (app.js, modales accesibles): el foco da la vuelta
 // adentro en vez de irse al mapa de atras. count = controles que se pueden
@@ -2541,6 +2616,6 @@ function createTurnAnnouncer() {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

@@ -111,6 +111,53 @@ def write_bin(node_list, edges, path, shifts=None):
     return out
 
 
+def write_lanes(node_list, edges, records, path):
+    """Flechas de carril ("TDLN" v1), en un archivo aparte del grafo: las
+    usa solo la guia (giro a giro) y no hace falta bajarlas para rutear.
+
+    records: {(nodo a, nodo b): (carriles, mascara, flechas, giro)} por paso
+    dirigido de un prefab (ver prefab_lane_table). Se guardan por indice de
+    arista de ESTE grafo; nNodes y nEdges van en el encabezado para que la
+    web descarte un archivo de otra corrida.
+
+    Layout (little-endian, cada seccion alineada a 4 bytes):
+      header  'TDLN', u32 version=1, u32 nNodes, u32 nEdges, u32 n (entradas)
+      key     u32[n]    arista * 2 + sentido (0 = de a hacia b, 1 = de b hacia a), ordenadas
+      lanes   u8[n]     carriles que entran al cruce
+      mask    u8[n]     bit k = el carril k, de izquierda a derecha, lleva a la salida
+      turn    u8[n]     flecha de la salida que se toma
+      arrows  u8[n*8]   flechas de cada carril (1 izquierda, 2 izquierda suave,
+                        4 derecho, 8 derecha suave, 16 derecha, 32 vuelta en U)
+    """
+    entradas = []
+    for idx, e in enumerate(edges):
+        a, b, flags = int(e[0]), int(e[1]), int(e[3] or 0) & 3
+        if flags & 1:
+            continue  # ferry o tren
+        rec = records.get((a, b))
+        if rec:
+            entradas.append((idx * 2, rec))
+        if not flags & 2:
+            rec = records.get((b, a))
+            if rec:
+                entradas.append((idx * 2 + 1, rec))
+    entradas.sort(key=lambda x: x[0])
+    keys = array("I", (k for k, _ in entradas))
+    lanes = bytes(r[0] for _, r in entradas)
+    mask = bytes(r[1] for _, r in entradas)
+    turn = bytes(r[3] for _, r in entradas)
+    arrows = bytearray()
+    for _, r in entradas:
+        fila = list(r[2])[:8]
+        arrows.extend(bytes(fila + [0] * (8 - len(fila))))
+    with open(path, "wb") as f:
+        f.write(b"TDLN" + struct.pack("<IIII", 1, len(node_list), len(edges), len(entradas)))
+        f.write(_le(keys).tobytes())
+        f.write(_pad4(lanes)); f.write(_pad4(mask)); f.write(_pad4(turn))
+        f.write(bytes(arrows))
+    return {"entradas": len(entradas)}
+
+
 def info(path):
     with open(path, "rb") as f:
         head = f.read(24)

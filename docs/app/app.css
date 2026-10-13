@@ -409,6 +409,12 @@
   .roadBadge { display: inline-block; margin-top: 0.15rem; padding: 0.05rem 0.45rem; border-radius: 4px; background: #1d4ed8; color: #fff; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.02em; border: 1px solid #93c5fd; }
   .roadBadge.mini { margin-top: 0.3rem; }
   .navNext { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 500; margin-top: 0.1rem; }
+  /* Flechas de carril (lanesHtml): una caja por carril, de izquierda a
+     derecha; con fondo azul los que sirven para el giro */
+  .navLanes { display: flex; justify-content: center; gap: 3px; margin: 0.3rem 0 0.1rem; }
+  .navLane { display: inline-flex; align-items: center; justify-content: center; padding: 2px 3px; border-radius: 4px; background: rgba(255,255,255,0.06); }
+  .navLane.on { background: rgba(59,158,255,0.3); }
+  .navLane svg { display: block; }
   .miniHudNext { color: var(--muted); }
   .mapBtn .btnText { font-size: 0.72rem; font-weight: 800; }
   /* En pantalla completa este panel quedaba justo abajo del recorte de la

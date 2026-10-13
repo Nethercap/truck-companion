@@ -6,6 +6,8 @@ updates on its own and is not versioned here.
 
 ## 1.5.31 (unreleased)
 
+- Build my map also saves which lane of each junction leads to each exit, so the
+  dashboard's lane arrows work on your own map too.
 - Build my map (ATS): fuel pumps that only cars can use (the car canopies the Road Trip
   update made usable) are kept apart from the truck ones. Driving a truck, your own map
   and "nearest fuel" leave them out, so they no longer send you to a station a truck

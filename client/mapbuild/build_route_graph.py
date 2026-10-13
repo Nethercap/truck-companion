@@ -156,6 +156,123 @@ def prefab_nav_paths(desc):
     return out
 
 
+# Flechas de carril: hacia donde puede ir cada carril de entrada de un cruce.
+# Un bit por direccion, como las dibuja la web (laneArrows en pure.js).
+FLECHAS = {"left": 1, "slight_left": 2, "straight": 4, "slight_right": 8, "right": 16, "uturn": 32}
+MAX_CARRILES = 8
+# Dos curvas que arrancan a menos de esto una de otra son el mismo carril
+# (un carril que se abre en dos adentro del cruce).
+MISMO_CARRIL_M = 1.0
+
+
+def _clase_de_giro(delta):
+    """La flecha de un giro, por cuantos grados dobla (+ derecha)."""
+    a = abs(delta)
+    if a < 25:
+        return FLECHAS["straight"]
+    if a > 150:
+        return FLECHAS["uturn"]
+    if a < 60:
+        return FLECHAS["slight_right" if delta > 0 else "slight_left"]
+    return FLECHAS["right" if delta > 0 else "left"]
+
+
+def _rumbo_medio(angulos):
+    x = sum(math.cos(a) for a in angulos)
+    y = sum(math.sin(a) for a in angulos)
+    return math.atan2(y, x)
+
+
+def prefab_lane_table(desc):
+    """{(nodo de entrada, nodo de salida): (carriles, mascara, flechas, giro)}
+    de la descripcion de un prefab, solo donde sirve avisar: dos o mas
+    carriles y alguno que NO lleva a esa salida.
+
+    - carriles: cuantos entran por ese nodo (los de mas de MAX_CARRILES no
+      se guardan).
+    - mascara: bit k = el carril k (de izquierda a derecha segun el sentido
+      de marcha) lleva a esa salida.
+    - flechas: por carril, las direcciones a las que lleva (bits de FLECHAS).
+    - giro: la direccion de esa salida.
+
+    Los carriles se ordenan por donde arranca cada curva, proyectado sobre la
+    derecha del sentido de marcha (x este, y sur): el indice de inputLanes
+    sigue ese orden en el 95 % de los nodos pero no en peajes, estaciones de
+    servicio y fronteras. A que salida lleva cada curva se sigue por
+    nextLines hasta una curva de outputLanes."""
+    nodes = desc.get("nodes") or []
+    curves = desc.get("navCurves") or []
+    if not nodes or not curves:
+        return {}
+    sale_por = {}
+    for j, n in enumerate(nodes):
+        for ci in n.get("outputLanes") or []:
+            sale_por[ci] = j
+    memo = {}
+
+    def alcanza(ci):
+        # Sin recursion: una cadena de curvas larga no tiene que pasar el limite
+        if ci in memo:
+            return memo[ci]
+        salidas, vistos, pila = set(), set(), [ci]
+        while pila:
+            c = pila.pop()
+            if c in vistos or c >= len(curves):
+                continue
+            vistos.add(c)
+            if c in sale_por:
+                salidas.add(sale_por[c])
+            pila.extend(curves[c].get("nextLines") or [])
+        memo[ci] = salidas
+        return salidas
+
+    rumbo_salida = {}
+    for j, n in enumerate(nodes):
+        fines = [curves[ci]["end"].get("rotation", 0.0) for ci in n.get("outputLanes") or [] if ci < len(curves)]
+        if fines:
+            rumbo_salida[j] = _rumbo_medio(fines)
+
+    tabla = {}
+    for i, n in enumerate(nodes):
+        entrada = [ci for ci in n.get("inputLanes") or [] if ci < len(curves)]
+        if len(entrada) < 2:
+            continue
+        rumbo = _rumbo_medio([curves[ci]["start"].get("rotation", 0.0) for ci in entrada])
+        dx, dy = math.cos(rumbo), math.sin(rumbo)
+        rx, ry = -dy, dx  # la derecha del sentido de marcha
+        ordenadas = sorted(entrada, key=lambda ci: curves[ci]["start"]["x"] * rx + curves[ci]["start"]["y"] * ry)
+        carriles = []  # [(posicion, salidas)]
+        for ci in ordenadas:
+            pos = curves[ci]["start"]["x"] * rx + curves[ci]["start"]["y"] * ry
+            if carriles and pos - carriles[-1][0] < MISMO_CARRIL_M:
+                carriles[-1][1].update(alcanza(ci))
+            else:
+                carriles.append((pos, set(alcanza(ci))))
+        if not 2 <= len(carriles) <= MAX_CARRILES:
+            continue
+        giro, deltas = {}, {}
+        for j in set().union(*(s for _, s in carriles)):
+            if j in rumbo_salida and j != i:
+                deltas[j] = math.degrees(math.atan2(math.sin(rumbo_salida[j] - rumbo), math.cos(rumbo_salida[j] - rumbo)))
+                giro[j] = _clase_de_giro(deltas[j])
+        # Una salida de autopista se abre con pocos grados y saldria "derecho"
+        # igual que la autopista: entre varias casi derechas, la mas derecha
+        # queda derecho y las otras, suaves hacia el lado al que se abren.
+        derechas = [j for j in giro if giro[j] == FLECHAS["straight"]]
+        if len(derechas) > 1:
+            centro = min(derechas, key=lambda j: abs(deltas[j]))
+            for j in derechas:
+                if j != centro:
+                    giro[j] = FLECHAS["slight_right" if deltas[j] > deltas[centro] else "slight_left"]
+        flechas = tuple(sum({giro[j] for j in s if j in giro}) for _, s in carriles)
+        todos = (1 << len(carriles)) - 1
+        for j in giro:
+            mascara = sum(1 << k for k, (_, s) in enumerate(carriles) if j in s)
+            if mascara and mascara != todos:
+                tabla[(i, j)] = (len(carriles), mascara, flechas, giro[j])
+    return tabla
+
+
 def _simplify(points, tol):
     """Douglas-Peucker: la cadena de curvas trae mas puntos de los que hacen
     falta para dibujarla."""
@@ -715,6 +832,11 @@ def main(argv=None):
     # cae a la recta de siempre, que es lo que hacia que la ruta cruzara por
     # arriba de las rotondas.
     nav_cache = {}
+    # Flechas de carril: por token de prefab, y por paso (nodo a, nodo b) del
+    # grafo. Salen en un archivo aparte (-lanes.bin) que la web baja solo al
+    # guiar.
+    lane_cache = {}
+    lane_records = {}
     n_prefab_geom = 0
     n_one_way = 0
     one_way_edges = []
@@ -759,6 +881,15 @@ def main(argv=None):
                     if a == b:
                         continue
                     seen_dir.add((a, b))
+                    # Flechas de carril de este paso, si hay que avisar algo
+                    if token not in lane_cache:
+                        try:
+                            lane_cache[token] = prefab_lane_table(desc)
+                        except Exception:
+                            lane_cache[token] = {}
+                    carriles = lane_cache[token].get((ia, ib))
+                    if carriles:
+                        lane_records[(a, b)] = carriles
                     if (a, b) in directed and directed[(a, b)][0] <= length:
                         continue
                     world = [tx(x, y) for x, y in curve_chain_points(desc, chain)]
@@ -1082,6 +1213,16 @@ def main(argv=None):
     bin3_path = bin_path[:-4] + "-v3.bin"
     stats3 = write_bin(node_list, edges, bin3_path, shifts=shifts)
     print(f"Grafo v3 en {bin3_path} ({os.path.getsize(bin3_path) / (1024 * 1024):.1f} MB): {stats3}")
+
+    # Flechas de carril, aparte: van por indice de arista del v3, asi que
+    # salen de esta misma corrida y la web las descarta si no calzan.
+    try:
+        from .route_graph_bin import write_lanes
+    except ImportError:
+        from route_graph_bin import write_lanes
+    lanes_path = bin_path[:-4] + "-lanes.bin"
+    stats_l = write_lanes(node_list, edges, lane_records, lanes_path)
+    print(f"Carriles en {lanes_path} ({os.path.getsize(lanes_path) / 1024:.0f} KB): {stats_l}")
 
 
 if __name__ == "__main__":

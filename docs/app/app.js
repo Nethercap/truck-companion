@@ -2693,8 +2693,26 @@ function distanceToRouteMeters(x, z) {
 // 5 = 10-10: el derecho de los cruces de calles anchas (el lazo de Bakersfield).
 const ROUTE_GRAPH_V3_REV = 5;
 
+// Flechas de carril (decodeLanesBin en pure.js): archivo aparte y chico
+// (~90 KB en ATS), que se baja despues del grafo y solo sirve con ESE grafo
+// (mismos nodos y aristas). Sin el, o en una variante que todavia no lo
+// tiene, no hay flechas y nada mas. 0 = no se pide (hasta subirlo a R2).
+const ROUTE_LANES_REV = 0;
+let routeLanes = null;
+async function loadRouteLanes(base, v, game, decoded, graph) {
+  routeLanes = null;
+  if (!ROUTE_LANES_REV) return;
+  try {
+    const res = await fetch(`${base}-lanes.bin${v}&g=${ROUTE_GRAPH_V3_REV}&l=${ROUTE_LANES_REV}`, { priority: 'low' });
+    if (!res.ok) return;
+    const data = decodeLanesBin(await res.arrayBuffer(), decoded.n, decoded.ne);
+    if (currentGame === game && routeGraph === graph) routeLanes = data;
+  } catch (e) { /* sin flechas: la guia sigue igual */ }
+}
+
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
+  routeLanes = null;
   // Baja por detras del mapa (ver loadGameMap): si mientras tanto se cambio
   // de variante, el grafo que llega tarde no pisa el de la nueva.
   const game = currentGame;
@@ -2724,8 +2742,13 @@ async function loadRouteGraph(mapInfo) {
     let res = await fetch(`${base}-v3.bin${v}&g=${ROUTE_GRAPH_V3_REV}`, { priority: 'low' }).catch(() => null);
     if (!res || !res.ok) res = await fetch(`${base}.bin${v}`, { priority: 'low' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const g = buildRouteGraph(decodeRouteGraphBin(await res.arrayBuffer()));
-    if (currentGame === game) routeGraph = g;
+    const decoded = decodeRouteGraphBin(await res.arrayBuffer());
+    const g = buildRouteGraph(decoded);
+    if (currentGame === game) {
+      routeGraph = g;
+      // Solo con el v3: el archivo de carriles va por sus aristas
+      if (decoded.shiftA) loadRouteLanes(base, v, game, decoded, g);
+    }
   } catch (err) {
     // Sin grafo el mapa y el tablero siguen andando; lo que no hay es ruteo.
     console.warn('no se pudo cargar el grafo de rutas', err);
@@ -3817,7 +3840,8 @@ function findUpcomingTurn() {
           }
         }
       }
-      return { distanceMeters: cum[at] - cum[here], direction: m.direction, kind: m.kind, nearSign, decoyMeters, node: [pts[at][0], pts[at][1]] };
+      return { distanceMeters: cum[at] - cum[here], direction: m.direction, kind: m.kind, nearSign, decoyMeters, node: [pts[at][0], pts[at][1]],
+               lanes: laneGuidanceAt(pts, i, iEnd, m.kind, m.direction) };
     }
     if (cum[iEnd] > cum[here]) passed.push([i, iEnd]);
     i = iEnd; // el resto del cruce ya se evaluo como parte de este
@@ -3832,6 +3856,60 @@ function findUpcomingTurn() {
 // bloqueaba poder arrastrar el mapa a mano, porque cada frame deshacia el
 // drag del usuario). Ahora la camara se actualiza una sola vez por tick,
 // desde updateMap, con un unico llamado que combina centro+zoom+bearing.
+// Las flechas de carril del cruce del giro (lanesForEdge en pure.js): el
+// primer paso del grupo de nodos del cruce que tenga algo que avisar, desde
+// el nodo de antes hasta el primero despues: la entrada al prefab suele ser
+// el primero del grupo y la salida, el que le sigue al ultimo (sin el, el
+// giro a la derecha de Salt Lake City en la demo no tenia flechas).
+function laneGuidanceAt(pts, i, iEnd, kind, direction) {
+  if (!routeLanes || !routeGraph) return null;
+  let k = i - 1;
+  while (k > 0 && pts[k][4] == null) k--;
+  let hasta = iEnd + 1;
+  while (hasta < pts.length - 1 && pts[hasta][4] == null) hasta++;
+  let prev = null;
+  for (; k <= hasta && k < pts.length; k++) {
+    const node = pts[k][4];
+    if (node == null) continue;
+    if (prev != null && prev !== node) {
+      const d = routeGraph.dirEdge(prev, node);
+      if (d !== -1) {
+        const rec = lanesForEdge(routeLanes, routeGraph.adjEdge[d], routeGraph.adjRev[d]);
+        if (rec && laneTurnMatches(kind, direction, rec.turn)) return rec;
+      }
+    }
+    prev = node;
+  }
+  return null;
+}
+
+// El dibujo de cada direccion en un carril de 24 x 30: el trazo desde la
+// punta del tronco (12, 17) y la cabeza de la flecha.
+const LANE_PATHS = {
+  straight: ['M12 17V6', '8,9 12,3.5 16,9'],
+  right: ['M12 17Q12 11 18 11', '16,7 21.5,11 16,15'],
+  left: ['M12 17Q12 11 6 11', '8,7 2.5,11 8,15'],
+  slightRight: ['M12 17L17.5 8.5', '14,6.5 19.8,5 19,10.8'],
+  slightLeft: ['M12 17L6.5 8.5', '10,6.5 4.2,5 5,10.8'],
+  uturn: ['M12 17V9.5A3.5 3.5 0 0 0 5 9.5V17', '1.5,14.5 5,20 8.5,14.5'],
+};
+// Los carriles como fila de flechas (laneGuidance en pure.js): los que
+// sirven, con fondo; adentro de esos, la direccion del giro en blanco y las
+// demas apagadas. Es un apoyo al texto del giro, que ya lo dice: el lector
+// de pantalla no lo lee.
+function lanesHtml(rec) {
+  const lanes = laneGuidance(rec);
+  if (!lanes) return '';
+  const apagado = '#4d545e';
+  return `<span class="navLanes" aria-hidden="true">${lanes.map((l) => {
+    const color = (d) => (l.active ? (d === l.turn ? '#ffffff' : '#8a93a0') : apagado);
+    // La del giro al final, para que quede arriba de las otras
+    const dirs = l.dirs.slice().sort((a, b) => (a === l.turn) - (b === l.turn));
+    const trazos = dirs.map((d) => `<path d="${LANE_PATHS[d][0]}" stroke="${color(d)}"/><polygon points="${LANE_PATHS[d][1]}" fill="${color(d)}" stroke="none"/>`).join('');
+    return `<span class="navLane${l.active ? ' on' : ''}"><svg viewBox="0 0 24 30" width="20" height="25" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 28V17" stroke="${l.active ? '#ffffff' : apagado}"/>${trazos}</svg></span>`;
+  }).join('')}</span>`;
+}
+
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // ---------------------------------------------------------------------------
@@ -3966,7 +4044,8 @@ function navTurnParts(turn) {
 function navPanelHtml(turn) {
   const parts = navTurnParts(turn);
   if (!parts) return escapeHtml(t('navNoRoute'));
-  return escapeHtml(parts.text) + (parts.next ? `<span class="navNext">${escapeHtml(parts.next)}</span>` : '');
+  return escapeHtml(parts.text) + lanesHtml(turn && turn.lanes)
+    + (parts.next ? `<span class="navNext">${escapeHtml(parts.next)}</span>` : '');
 }
 
 // ---------------------------------------------------------------------------

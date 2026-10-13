@@ -2065,6 +2065,75 @@ test('waypointRouteKey: otro destino es otro viaje, los intermedios no (Gargamos
   assert.equal(routeProgressTotal({ kind: 'waypoint', manual: true, remainingKm: 300, seenKm: 0, stored, key: id + haciaA, now }), 640);
 });
 
+// Un -lanes.bin como lo escribe write_lanes (client/mapbuild/route_graph_bin.py)
+function lanesBin(nNodes, nEdges, entradas) {
+  const n = entradas.length, pad = (k) => (k + 3) & ~3;
+  const buf = new ArrayBuffer(20 + 4 * n + 3 * pad(n) + 8 * n);
+  const dv = new DataView(buf);
+  dv.setUint32(0, 0x54444c4e, false);
+  [1, nNodes, nEdges, n].forEach((v, i) => dv.setUint32(4 + 4 * i, v, true));
+  let off = 20;
+  entradas.forEach((e, i) => dv.setUint32(off + 4 * i, e.key, true)); off += 4 * n;
+  const u8 = new Uint8Array(buf);
+  entradas.forEach((e, i) => { u8[off + i] = e.lanes; }); off += pad(n);
+  entradas.forEach((e, i) => { u8[off + i] = e.mask; }); off += pad(n);
+  entradas.forEach((e, i) => { u8[off + i] = e.turn; }); off += pad(n);
+  entradas.forEach((e, i) => e.arrows.forEach((a, c) => { u8[off + 8 * i + c] = a; }));
+  return buf;
+}
+
+test('carriles: el archivo se lee y se busca por arista y sentido', () => {
+  const { decodeLanesBin, lanesForEdge, LANE_ARROW_BITS: B } = require('./pure.js');
+  const buf = lanesBin(100, 50, [
+    { key: 3 * 2 + 1, lanes: 3, mask: 0b001, turn: B.left, arrows: [B.left, B.straight, B.straight | B.right] },
+    { key: 7 * 2, lanes: 2, mask: 0b10, turn: B.slightRight, arrows: [B.straight, B.slightRight] },
+    { key: 40 * 2, lanes: 4, mask: 0b0111, turn: B.straight, arrows: [B.straight, B.straight, B.straight, B.slightRight] },
+  ]);
+  const d = decodeLanesBin(buf, 100, 50);
+  assert.equal(d.n, 3);
+  assert.deepEqual(lanesForEdge(d, 3, true), { count: 3, mask: 1, turn: B.left, arrows: [B.left, B.straight, B.straight | B.right] });
+  assert.equal(lanesForEdge(d, 3, false), null); // el otro sentido no avisa nada
+  assert.deepEqual(lanesForEdge(d, 7, false).arrows, [B.straight, B.slightRight]);
+  assert.equal(lanesForEdge(d, 40, false).count, 4);
+  assert.equal(lanesForEdge(d, 41, false), null);
+  assert.equal(lanesForEdge(null, 3, true), null);
+  // De otra corrida del grafo, roto o de otro formato: no se usa
+  assert.equal(decodeLanesBin(buf, 101, 50), null);
+  assert.equal(decodeLanesBin(buf, 100, 49), null);
+  assert.equal(decodeLanesBin(buf.slice(0, 40), 100, 50), null);
+  assert.equal(decodeLanesBin(new ArrayBuffer(10), 100, 50), null);
+  const otro = buf.slice(0);
+  new DataView(otro).setUint32(0, 0x54445247, false); // 'TDRG'
+  assert.equal(decodeLanesBin(otro, 100, 50), null);
+});
+
+test('carriles: solo los del giro que se anuncia', () => {
+  const { laneTurnMatches, LANE_ARROW_BITS: B } = require('./pure.js');
+  assert.ok(laneTurnMatches('turn', 'left', B.left));
+  assert.ok(laneTurnMatches('turn', 'left', B.slightLeft));
+  assert.ok(laneTurnMatches('turn', 'right', B.right));
+  // la salida de la autopista de al lado no es la esquina a la izquierda
+  assert.ok(!laneTurnMatches('turn', 'left', B.slightRight));
+  assert.ok(!laneTurnMatches('turn', 'right', B.straight));
+  // en una bifurcacion la rama que se toma puede seguir derecho
+  assert.ok(laneTurnMatches('fork', 'right', B.straight));
+  assert.ok(laneTurnMatches('fork', 'right', B.slightRight));
+  assert.ok(!laneTurnMatches('fork', 'right', B.slightLeft));
+  assert.ok(!laneTurnMatches('roundabout', 'right', B.right));
+});
+
+test('carriles: para dibujar, de izquierda a derecha y cuales sirven', () => {
+  const { laneGuidance, LANE_ARROW_BITS: B } = require('./pure.js');
+  const g = laneGuidance({ count: 3, mask: 0b110, turn: B.right, arrows: [B.left, B.straight, B.straight | B.right] });
+  assert.deepEqual(g, [
+    { dirs: ['left'], active: false, turn: 'right' },
+    { dirs: ['straight'], active: true, turn: 'right' },
+    { dirs: ['straight', 'right'], active: true, turn: 'right' },
+  ]);
+  assert.equal(laneGuidance(null), null);
+  assert.equal(laneGuidance({ count: 1, mask: 1, turn: B.left, arrows: [B.left] }), null);
+});
+
 test('overlay: el texto del giro, igual para el tablero y para OBS', () => {
   const { turnInstructionText } = require('./pure.js');
   const dic = {
