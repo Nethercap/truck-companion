@@ -258,6 +258,13 @@
   .featureGroup { margin: 1.8rem 0 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: system-ui, sans-serif; font-weight: 600; }
   .featureGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.1rem; margin-top: 0.8rem; }
   .moreFeatures { margin: 1.3rem 0 0; font-size: 0.95rem; }
+  .vsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.1rem; margin-top: 1.2rem; }
+  .vsCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; }
+  .vsCard h3 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+  .vsCard p { margin: 0.6rem 0 0; font-size: 0.9rem; color: var(--muted); }
+  .vsCard p.vsDash { color: var(--text); }
+  .vsCard b { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-family: system-ui, sans-serif; margin-bottom: 0.1rem; }
+  .vsCard .vsDash b { color: var(--orange); }
   .featureCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; }
   .featureCard .icon {
     width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
@@ -626,6 +633,32 @@
     </div>
   </section>
 
+  <!-- Contra el GPS del juego, que es con lo que la gente compara primero
+       (auditoria del 12-10). Solo cosas confirmadas del juego: el mapa del
+       mundo pausa en un jugador y la llegada es en hora del juego. La voz no
+       va: el juego tambien habla. -->
+  <section id="vs-game">
+    <h2 data-i18n="vsTitle">Why not just the <span class="accent">game's GPS?</span></h2>
+    <p class="sectionIntro" data-i18n="vsIntro">Keep it. Truck Dash runs next to it and adds what can't be done from inside the game.</p>
+    <div class="vsGrid">
+      <div class="vsCard">
+        <h3 data-i18n="vs1Title">The whole route, without pausing</h3>
+        <p class="vsGame"><b data-i18n="vsGameLabel">In the game</b><span data-i18n="vs1Game">Opening the world map pauses the game (in single player).</span></p>
+        <p class="vsDash"><b data-i18n="vsDashLabel">With Truck Dash</b><span data-i18n="vs1Dash">The full route stays on your phone or second monitor while you keep driving.</span></p>
+      </div>
+      <div class="vsCard">
+        <h3 data-i18n="vs2Title">Arrival in your own time</h3>
+        <p class="vsGame"><b data-i18n="vsGameLabel">In the game</b><span data-i18n="vs2Game">The arrival time is on the game clock, which runs about 20 times faster than yours.</span></p>
+        <p class="vsDash"><b data-i18n="vsDashLabel">With Truck Dash</b><span data-i18n="vs2Dash">Also the real time you will get there and how long that is, based on how you are actually driving.</span></p>
+      </div>
+      <div class="vsCard">
+        <h3 data-i18n="vs3Title">A screen of its own</h3>
+        <p class="vsGame"><b data-i18n="vsGameLabel">In the game</b><span data-i18n="vs3Game">The GPS shares the screen with the road.</span></p>
+        <p class="vsDash"><b data-i18n="vsDashLabel">With Truck Dash</b><span data-i18n="vs3Dash">The map, the next turn and your truck on a phone, tablet or second monitor, or in a small panel on top of the game.</span></p>
+      </div>
+    </div>
+  </section>
+
   <!-- Cuentas: opcionales. Todo texto aca tiene que seguir siendo cierto con
        la promesa de "sin cuenta obligatoria" del principio. -->
   <section id="overlay">
@@ -964,6 +997,19 @@ const TRANSLATIONS = {
     featStreamTitle: 'On stream and on Discord <span class="tag">new</span>',
     featStreamBody: 'A free <a href="/overlay/">overlay for OBS</a> with your speed, the next turn and your trip, and a Discord status that shows the run in progress while you drive. Both stay off until you turn them on.',
     featMoreLink: 'Everything else, from the in-game overlay settings to the Road Trip atlas in ATS, is in the user guide',
+    vsTitle: 'Why not just the <span class="accent">game\'s GPS?</span>',
+    vsIntro: 'Keep it. Truck Dash runs next to it and adds what can\'t be done from inside the game.',
+    vsGameLabel: 'In the game',
+    vsDashLabel: 'With Truck Dash',
+    vs1Title: 'The whole route, without pausing',
+    vs1Game: 'Opening the world map pauses the game (in single player).',
+    vs1Dash: 'The full route stays on your phone or second monitor while you keep driving.',
+    vs2Title: 'Arrival in your own time',
+    vs2Game: 'The arrival time is on the game clock, which runs about 20 times faster than yours.',
+    vs2Dash: 'Also the real time you will get there and how long that is, based on how you are actually driving.',
+    vs3Title: 'A screen of its own',
+    vs3Game: 'The GPS shares the screen with the road.',
+    vs3Dash: 'The map, the next turn and your truck on a phone, tablet or second monitor, or in a small panel on top of the game.',
     tagBeta: 'beta',
     tagNew: 'new',
     modsAtsTitle: 'American Truck Simulator',
@@ -1169,6 +1215,19 @@ const TRANSLATIONS = {
     featStreamTitle: 'En el stream y en Discord <span class="tag">nuevo</span>',
     featStreamBody: 'Un <a href="/overlay/">overlay para OBS</a> gratis con tu velocidad, el próximo giro y tu viaje, y un estado de Discord que muestra el viaje en curso mientras manejás. Los dos quedan apagados hasta que los prendés.',
     featMoreLink: 'Todo lo demás, desde los ajustes del overlay en el juego hasta el atlas del Road Trip en ATS, está en la guía de uso',
+    vsTitle: '¿Por qué no alcanza con el <span class="accent">GPS del juego?</span>',
+    vsIntro: 'Seguí usándolo. Truck Dash va al lado y suma lo que desde adentro del juego no se puede.',
+    vsGameLabel: 'En el juego',
+    vsDashLabel: 'Con Truck Dash',
+    vs1Title: 'Toda la ruta, sin pausar',
+    vs1Game: 'Abrir el mapa del mundo pausa el juego (en un jugador).',
+    vs1Dash: 'La ruta completa queda en el celular o el segundo monitor mientras seguís manejando.',
+    vs2Title: 'La llegada en tu hora',
+    vs2Game: 'La hora de llegada es la del reloj del juego, que corre unas 20 veces más rápido que el tuyo.',
+    vs2Dash: 'También la hora real a la que llegás y cuánto falta, según cómo venís manejando.',
+    vs3Title: 'Una pantalla propia',
+    vs3Game: 'El GPS comparte la pantalla con la ruta.',
+    vs3Dash: 'El mapa, el próximo giro y tu camión en un celular, una tablet o un segundo monitor, o en un recuadro chico encima del juego.',
     tagBeta: 'beta',
     tagNew: 'nuevo',
     modsAtsTitle: 'American Truck Simulator',
