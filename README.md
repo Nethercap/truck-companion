@@ -91,6 +91,12 @@ graph), then hosted on Cloudflare R2 rather than committed to this repo
 (they're roughly 800MB combined for both games). The web app fetches them
 from `maps.trucksim-dash.com`.
 
+Each variant also has a small lane file (`route-graph-<variant>-lanes.bin`)
+built next to the graph by `client/mapbuild/build_route_graph.py` from the
+lane curves of the junction prefabs: how many lanes each junction has and
+which arrows each one carries. The app uses it for the lane guidance in
+navigation mode, and works the same without it.
+
 ## Code signing policy
 
 Free code signing for the Windows client is provided by [SignPath.io](https://signpath.io),

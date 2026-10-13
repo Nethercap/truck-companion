@@ -61,6 +61,7 @@ GUIDE_TEXT.en = {
 <p>The <b>route summary</b> at the bottom of the map shows distance left, time left and arrival time, with a progress bar. The arrow shrinks it to a thin progress bar (tap the bar to open it again), and the crossed-out route button clears the route from the map.</p>
 <h3>Navigation mode</h3>
 <p>The map turns with your heading, zooms in before turns and shows directions at the top, such as <i>Keep right onto I-15 toward Provo</i>. Choose how close it follows you in Settings. You can still pinch to zoom; the recenter button takes you back.</p>
+<p>At junctions with several lanes it also shows <b>which lanes to use</b>: one box per lane, with its arrows, and the ones that lead to your turn in blue.</p>
 <h3>Waypoints</h3>
 <p>Tap the flag and then a spot on the map, up to 9 stops. The app asks whether you also set that point in the game's own GPS:</p>
 <ul>
@@ -159,7 +160,8 @@ GUIDE_TEXT.en = {
 <h3>Turning it on</h3>
 <p>In <b>Setup &amp; status</b>, section <b>In-game overlay</b>, or from the tray menu. In the game, <b>Ctrl+Shift+O</b> shows and hides it (you can pick another shortcut, or none).</p>
 <p>The same section sets its <b>position</b> (a corner, or <b>Move</b> to drag it anywhere with the mouse and then <b>Done</b>), its <b>size</b> and <b>what it shows</b>. Its texts follow the dashboard's language.</p>
-<div class="tip"><p>It never takes focus from the game and clicks go right through it. It hides when you leave the game or pause. With voice guidance on in the dashboard's Settings, the dashboard also speaks the turns while the overlay is on.</p></div>`,
+<div class="tip"><p>It never takes focus from the game and clicks go right through it. It hides when you leave the game or pause. With voice guidance on in the dashboard's Settings, the dashboard also speaks the turns while the overlay is on.</p></div>
+<div class="tip"><p>Streaming? <a href="/overlay/">trucksim-dash.com/overlay</a> builds a free overlay for OBS with the same things to pick from: speed and limit, next turn, distance left and arrival times. The turn comes from the dashboard here too.</p></div>`,
     account: `
 <p>An account keeps your driving history: every job you drive, with its route on a map. It is optional and free, and everything else in Truck Dash works the same without one.</p>
 <ol>
@@ -167,6 +169,7 @@ GUIDE_TEXT.en = {
 <li>In the client, open <b>Setup &amp; status</b> and click <b>Link account</b>. A page opens in your browser: confirm, and the client is linked.</li>
 </ol>
 <p>From then on every job is saved when you deliver or cancel it: the route colored by speed, the distance (the game's and what we tracked), pay, fuel, tolls, fines, damage, driving time and hours asleep, on time or late, and the countries or states you drove through. Your account has the logbook (with CSV export), stats for each game, records and achievements. <b>My account</b> in the tray menu takes you there.</p>
+<p>The <b>Map</b> page draws every trip you drove on the game's map, by game and by year. In December and January your account also shows <b>your year</b>: kilometers, days on the road, deliveries, your map, favorites, records and achievements, with an image to share.</p>
 <h3>Good to know</h3>
 <ul>
 <li>Nothing is saved until you link the client. Your profile is private unless you make it public in <b>Settings</b>.</li>
@@ -271,6 +274,7 @@ GUIDE_TEXT.es = {
 <p>El <b>resumen de la ruta</b>, abajo del mapa, muestra lo que falta, el tiempo restante y la hora de llegada, con una barra de progreso. La flecha lo achica a una barrita de progreso (tocala para abrirlo de nuevo), y el botón de la ruta tachada borra la ruta del mapa.</p>
 <h3>Modo navegación</h3>
 <p>El mapa gira con tu rumbo, se acerca antes de las curvas y muestra las indicaciones arriba, por ejemplo <i>Mantenete a la derecha por I-15 hacia Provo</i>. En Configuración elegís qué tan cerca te sigue. Igual podés hacer zoom con los dedos; el botón de centrar te devuelve.</p>
+<p>En los cruces con varios carriles también muestra <b>qué carriles sirven</b>: una caja por carril, con sus flechas, y en azul los que llevan a tu giro.</p>
 <h3>Waypoints</h3>
 <p>Tocá la bandera y después un lugar del mapa, hasta 9 paradas. La app pregunta si también marcaste ese punto en el GPS del juego:</p>
 <ul>
@@ -369,7 +373,8 @@ GUIDE_TEXT.es = {
 <h3>Cómo prenderlo</h3>
 <p>En <b>Configuración y estado</b>, sección <b>Overlay en el juego</b>, o desde el menú de la bandeja. En el juego, <b>Ctrl+Shift+O</b> lo muestra y lo esconde (podés elegir otro atajo, o ninguno).</p>
 <p>En la misma sección elegís la <b>posición</b> (una esquina, o <b>Mover</b> para arrastrarlo con el mouse adonde quieras y después <b>Listo</b>), el <b>tamaño</b> y <b>qué muestra</b>. Sus textos siguen el idioma del tablero.</p>
-<div class="tip"><p>Nunca le saca el foco al juego y los clics pasan a través. Se esconde cuando salís del juego o lo pausás. Con la guía por voz prendida en Ajustes del tablero, el tablero también dice los giros mientras el overlay está prendido.</p></div>`,
+<div class="tip"><p>Nunca le saca el foco al juego y los clics pasan a través. Se esconde cuando salís del juego o lo pausás. Con la guía por voz prendida en Ajustes del tablero, el tablero también dice los giros mientras el overlay está prendido.</p></div>
+<div class="tip"><p>¿Hacés streams? En <a href="/overlay/">trucksim-dash.com/overlay</a> armás un overlay gratis para OBS, con lo mismo para elegir: velocidad y límite, próximo giro, lo que falta y las llegadas. El giro también sale del tablero.</p></div>`,
     account: `
 <p>Una cuenta guarda tu historial de manejo: cada trabajo que hacés, con su recorrido en un mapa. Es opcional y gratis, y todo lo demás de Truck Dash funciona igual sin ella.</p>
 <ol>
@@ -377,6 +382,7 @@ GUIDE_TEXT.es = {
 <li>En el cliente, abrí <b>Configuración y estado</b> y tocá <b>Vincular cuenta</b>. Se abre una página en el navegador: confirmá, y el cliente queda vinculado.</li>
 </ol>
 <p>Desde ahí, cada trabajo se guarda cuando lo entregás o lo cancelás: el recorrido con colores por velocidad, la distancia (la del juego y la que medimos), la plata, el combustible, los peajes, las multas, el daño, el tiempo al volante y las horas de sueño, si llegaste a tiempo o tarde, y los países o estados por los que pasaste. En tu cuenta tenés el logbook (con exportación a CSV), estadísticas por juego, récords y logros. <b>Mi cuenta</b>, en el menú de la bandeja, te lleva ahí.</p>
+<p>La página <b>Mapa</b> dibuja todos tus viajes sobre el mapa del juego, por juego y por año. En diciembre y enero la cuenta también muestra <b>tu año</b>: kilómetros, días en la ruta, entregas, tu mapa, favoritos, récords y logros, con una imagen para compartir.</p>
 <h3>Para tener en cuenta</h3>
 <ul>
 <li>No se guarda nada hasta que vinculás el cliente. Tu perfil es privado, salvo que lo hagas público en <b>Ajustes</b>.</li>

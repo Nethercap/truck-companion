@@ -57,6 +57,7 @@ GUIDE_TEXT.de = {
 <p>Die <b>Routenübersicht</b> unten auf der Karte zeigt Reststrecke, Restzeit und Ankunftszeit mit einem Fortschrittsbalken. Der Pfeil verkleinert sie zu einem schmalen Fortschrittsbalken (antippen, um sie wieder zu öffnen), und der Knopf mit der durchgestrichenen Route entfernt die Route von der Karte.</p>
 <h3>Navigationsmodus</h3>
 <p>Die Karte dreht sich mit deiner Fahrtrichtung, zoomt vor Abzweigungen heran und zeigt oben Anweisungen wie <i>Rechts halten auf I-15 Richtung Provo</i>. Wie nah sie dir folgt, stellst du in den Einstellungen ein. Mit zwei Fingern zoomen geht trotzdem; der Zentrieren-Knopf holt dich zurück.</p>
+<p>An Kreuzungen mit mehreren Spuren zeigt sie auch, <b>welche Spuren passen</b>: ein Feld pro Spur mit ihren Pfeilen, und blau die, die zu deiner Abbiegung führen.</p>
 <h3>Wegpunkte</h3>
 <p>Tippe auf die Fahne und dann auf eine Stelle der Karte, bis zu 9 Stopps. Die App fragt, ob du den Punkt auch im Navi des Spiels gesetzt hast:</p>
 <ul>
@@ -155,7 +156,8 @@ GUIDE_TEXT.de = {
 <h3>Einschalten</h3>
 <p>In <b>Einrichtung &amp; Status</b>, Abschnitt <b>Overlay im Spiel</b>, oder im Menü des Tray-Symbols. Im Spiel blendest du es mit <b>Strg+Umschalt+O</b> ein und aus (anderes Kürzel oder keins wählbar).</p>
 <p>Im selben Abschnitt wählst du die <b>Position</b> (eine Ecke, oder <b>Verschieben</b>, um es mit der Maus irgendwohin zu ziehen, dann <b>Fertig</b>), die <b>Größe</b> und <b>was es zeigt</b>. Die Texte folgen der Sprache des Armaturenbretts.</p>
-<div class="tip"><p>Es nimmt dem Spiel nie den Fokus, und Klicks gehen hindurch. Es verschwindet, wenn du das Spiel verlässt oder pausierst. Mit eingeschalteter Sprachansage in den Einstellungen des Armaturenbretts sagt das Armaturenbrett die Abbiegungen auch an, solange das Overlay an ist.</p></div>`,
+<div class="tip"><p>Es nimmt dem Spiel nie den Fokus, und Klicks gehen hindurch. Es verschwindet, wenn du das Spiel verlässt oder pausierst. Mit eingeschalteter Sprachansage in den Einstellungen des Armaturenbretts sagt das Armaturenbrett die Abbiegungen auch an, solange das Overlay an ist.</p></div>
+<div class="tip"><p>Du streamst? Unter <a href="/overlay/">trucksim-dash.com/overlay</a> erstellst du ein kostenloses Overlay für OBS mit derselben Auswahl: Tempo und Limit, nächste Abbiegung, Restweg und Ankunftszeiten. Die Abbiegung kommt auch hier vom Dashboard.</p></div>`,
     account: `
 <p>Ein Konto speichert deinen Fahrtverlauf: jeden Auftrag, den du fährst, mit seiner Route auf einer Karte. Es ist optional und kostenlos, und alles andere in Truck Dash funktioniert auch ohne.</p>
 <ol>
@@ -163,6 +165,7 @@ GUIDE_TEXT.de = {
 <li>Öffne im Client <b>Einrichtung &amp; Status</b> und klicke auf <b>Konto verknüpfen</b>. Im Browser öffnet sich eine Seite: bestätigen, und der Client ist verknüpft.</li>
 </ol>
 <p>Ab dann wird jeder Auftrag beim Abliefern oder Stornieren gespeichert: die Route nach Geschwindigkeit eingefärbt, die Strecke (die des Spiels und die gemessene), Lohn, Kraftstoff, Maut, Bußgelder, Schaden, Fahrzeit und Schlafstunden, pünktlich oder verspätet, und die Länder oder Staaten, durch die du gefahren bist. In deinem Konto findest du das Fahrtenbuch (mit CSV-Export), Statistiken pro Spiel, Rekorde und Erfolge. <b>Mein Konto</b> im Tray-Menü bringt dich dorthin.</p>
+<p>Die Seite <b>Karte</b> zeichnet jede gefahrene Fahrt auf die Karte des Spiels, nach Spiel und Jahr. Im Dezember und Januar zeigt dein Konto außerdem <b>dein Jahr</b>: Kilometer, Tage auf der Straße, Lieferungen, deine Karte, Favoriten, Rekorde und Erfolge, mit einem Bild zum Teilen.</p>
 <h3>Gut zu wissen</h3>
 <ul>
 <li>Gespeichert wird erst, wenn du den Client verknüpfst. Dein Profil ist privat, außer du machst es in den <b>Einstellungen</b> öffentlich.</li>
@@ -266,6 +269,7 @@ GUIDE_TEXT.fr = {
 <p>Le <b>résumé de l'itinéraire</b>, en bas de la carte, affiche la distance et le temps restants et l'heure d'arrivée, avec une barre de progression. La flèche le réduit à une fine barre de progression (touche-la pour le rouvrir), et le bouton à l'itinéraire barré efface l'itinéraire de la carte.</p>
 <h3>Mode navigation</h3>
 <p>La carte tourne avec ton cap, zoome avant les virages et affiche les indications en haut, par exemple <i>Serrez à droite sur I-15 vers Provo</i>. Tu choisis dans les Paramètres à quelle distance elle te suit. Tu peux toujours zoomer avec deux doigts ; le bouton recentrer te ramène.</p>
+<p>Aux carrefours à plusieurs voies, elle montre aussi <b>quelles voies prendre</b> : une case par voie, avec ses flèches, et en bleu celles qui mènent à ton virage.</p>
 <h3>Points de passage</h3>
 <p>Touche le drapeau puis un endroit de la carte, jusqu'à 9 arrêts. L'appli demande si tu as aussi placé ce point dans le GPS du jeu :</p>
 <ul>
@@ -364,7 +368,8 @@ GUIDE_TEXT.fr = {
 <h3>L'activer</h3>
 <p>Dans <b>Configuration et état</b>, section <b>Overlay en jeu</b>, ou depuis le menu de l'icône. En jeu, <b>Ctrl+Maj+O</b> l'affiche et le cache (tu peux choisir un autre raccourci, ou aucun).</p>
 <p>La même section règle sa <b>position</b> (un coin, ou <b>Déplacer</b> pour le faire glisser à la souris où tu veux, puis <b>Terminé</b>), sa <b>taille</b> et <b>ce qu'il affiche</b>. Ses textes suivent la langue du tableau de bord.</p>
-<div class="tip"><p>Il ne prend jamais le focus du jeu et les clics le traversent. Il se cache quand tu quittes le jeu ou le mets en pause. Avec le guidage vocal activé dans les Réglages du tableau de bord, le tableau de bord annonce aussi les virages tant que l'overlay est actif.</p></div>`,
+<div class="tip"><p>Il ne prend jamais le focus du jeu et les clics le traversent. Il se cache quand tu quittes le jeu ou le mets en pause. Avec le guidage vocal activé dans les Réglages du tableau de bord, le tableau de bord annonce aussi les virages tant que l'overlay est actif.</p></div>
+<div class="tip"><p>Tu streames ? Sur <a href="/overlay/">trucksim-dash.com/overlay</a>, tu crées un overlay gratuit pour OBS avec les mêmes choix : vitesse et limite, prochain virage, distance restante et heures d'arrivée. Le virage vient là aussi du tableau de bord.</p></div>`,
     account: `
 <p>Un compte garde votre historique de conduite : chaque mission que vous faites, avec son itinéraire sur une carte. Il est facultatif et gratuit, et tout le reste de Truck Dash fonctionne pareil sans compte.</p>
 <ol>
@@ -372,6 +377,7 @@ GUIDE_TEXT.fr = {
 <li>Dans le client, ouvrez <b>Configuration et état</b> et cliquez sur <b>Lier un compte</b>. Une page s'ouvre dans le navigateur : confirmez, et le client est lié.</li>
 </ol>
 <p>Dès lors, chaque mission est enregistrée à la livraison ou à l'annulation : l'itinéraire coloré selon la vitesse, la distance (celle du jeu et celle mesurée), la paie, le carburant, les péages, les amendes, les dégâts, le temps de conduite et les heures de sommeil, à l'heure ou en retard, et les pays ou États traversés. Votre compte contient le carnet de route (avec export CSV), des statistiques par jeu, des records et des succès. <b>Mon compte</b>, dans le menu de la zone de notification, vous y mène.</p>
+<p>La page <b>Carte</b> dessine tous tes trajets sur la carte du jeu, par jeu et par année. En décembre et en janvier, ton compte montre aussi <b>ton année</b> : kilomètres, jours sur la route, livraisons, ta carte, favoris, records et succès, avec une image à partager.</p>
 <h3>Bon à savoir</h3>
 <ul>
 <li>Rien n'est enregistré avant de lier le client. Votre profil est privé, sauf si vous le rendez public dans les <b>Paramètres</b>.</li>
@@ -475,6 +481,7 @@ GUIDE_TEXT.pt = {
 <p>O <b>resumo da rota</b>, embaixo do mapa, mostra a distância e o tempo que faltam e a hora de chegada, com uma barra de progresso. A seta reduz ele a uma barrinha de progresso (toque nela para abrir de novo), e o botão da rota riscada apaga a rota do mapa.</p>
 <h3>Modo navegação</h3>
 <p>O mapa gira com a sua direção, aproxima antes das curvas e mostra as instruções no alto, como <i>Mantenha-se à direita na I-15 sentido Provo</i>. Nas Configurações você escolhe o quão perto ele te acompanha. Dá para dar zoom com os dedos; o botão de centralizar te traz de volta.</p>
+<p>Nos cruzamentos com várias faixas, também mostra <b>quais faixas usar</b>: uma caixa por faixa, com as setas, e em azul as que levam à sua curva.</p>
 <h3>Waypoints</h3>
 <p>Toque na bandeira e depois num ponto do mapa, até 9 paradas. O app pergunta se você também marcou esse ponto no GPS do jogo:</p>
 <ul>
@@ -573,7 +580,8 @@ GUIDE_TEXT.pt = {
 <h3>Como ligar</h3>
 <p>Em <b>Configuração e status</b>, seção <b>Overlay no jogo</b>, ou pelo menu da bandeja. No jogo, <b>Ctrl+Shift+O</b> mostra e esconde (dá para escolher outro atalho, ou nenhum).</p>
 <p>Na mesma seção você escolhe a <b>posição</b> (um canto, ou <b>Mover</b> para arrastar com o mouse para onde quiser e depois <b>Pronto</b>), o <b>tamanho</b> e <b>o que ele mostra</b>. Os textos seguem o idioma do painel.</p>
-<div class="tip"><p>Ele nunca tira o foco do jogo e os cliques passam através dele. Some quando você sai do jogo ou pausa. Com a orientação por voz ligada nas Configurações do painel, o painel também fala as curvas enquanto o overlay está ligado.</p></div>`,
+<div class="tip"><p>Ele nunca tira o foco do jogo e os cliques passam através dele. Some quando você sai do jogo ou pausa. Com a orientação por voz ligada nas Configurações do painel, o painel também fala as curvas enquanto o overlay está ligado.</p></div>
+<div class="tip"><p>Faz lives? Em <a href="/overlay/">trucksim-dash.com/overlay</a> você monta um overlay grátis para o OBS com as mesmas opções: velocidade e limite, próxima curva, distância restante e horários de chegada. A curva também vem do painel.</p></div>`,
     account: `
 <p>Uma conta guarda seu histórico de direção: cada entrega que você faz, com a rota num mapa. É opcional e grátis, e todo o resto do Truck Dash funciona igual sem ela.</p>
 <ol>
@@ -581,6 +589,7 @@ GUIDE_TEXT.pt = {
 <li>No cliente, abra <b>Configuração e status</b> e clique em <b>Vincular conta</b>. Uma página abre no navegador: confirme, e o cliente fica vinculado.</li>
 </ol>
 <p>A partir daí, cada entrega é salva quando você entrega ou cancela: a rota colorida pela velocidade, a distância (a do jogo e a que medimos), o pagamento, o combustível, os pedágios, as multas, o dano, o tempo ao volante e as horas de sono, se chegou no prazo ou atrasado, e os países ou estados por onde passou. Sua conta tem o diário de bordo (com exportação CSV), estatísticas por jogo, recordes e conquistas. <b>Minha conta</b>, no menu da bandeja, leva você até lá.</p>
+<p>A página <b>Mapa</b> desenha todas as suas viagens no mapa do jogo, por jogo e por ano. Em dezembro e janeiro sua conta também mostra <b>seu ano</b>: quilômetros, dias na estrada, entregas, seu mapa, favoritos, recordes e conquistas, com uma imagem para compartilhar.</p>
 <h3>Bom saber</h3>
 <ul>
 <li>Nada é salvo até você vincular o cliente. Seu perfil é privado, a menos que você o torne público em <b>Configurações</b>.</li>
@@ -684,6 +693,7 @@ GUIDE_TEXT.pl = {
 <p><b>Podsumowanie trasy</b> na dole mapy pokazuje pozostały dystans, pozostały czas i godzinę przyjazdu, z paskiem postępu. Strzałka zwija je do cienkiego paska postępu (dotknij go, by otworzyć ponownie), a przycisk z przekreśloną trasą usuwa trasę z mapy.</p>
 <h3>Tryb nawigacji</h3>
 <p>Mapa obraca się zgodnie z kierunkiem jazdy, przybliża się przed skrętami i pokazuje wskazówki u góry, np. <i>Trzymaj się prawej na I-15 w kierunku Provo</i>. W Ustawieniach wybierzesz, jak blisko mapa za tobą podąża. Nadal możesz przybliżać dwoma palcami; przycisk wyśrodkowania przywraca widok.</p>
+<p>Na skrzyżowaniach z kilkoma pasami pokazuje też, <b>których pasów użyć</b>: jedno pole na pas, ze strzałkami, a na niebiesko te, które prowadzą do twojego skrętu.</p>
 <h3>Punkty trasy</h3>
 <p>Dotknij flagi, a potem miejsca na mapie, maksymalnie 9 przystanków. Aplikacja zapyta, czy ustawiłeś ten punkt także w GPS gry:</p>
 <ul>
@@ -782,7 +792,8 @@ GUIDE_TEXT.pl = {
 <h3>Włączanie</h3>
 <p>W <b>Konfiguracja i stan</b>, sekcja <b>Nakładka w grze</b>, albo z menu ikony w zasobniku. W grze <b>Ctrl+Shift+O</b> ją pokazuje i ukrywa (możesz wybrać inny skrót albo żaden).</p>
 <p>W tej samej sekcji ustawisz <b>położenie</b> (róg ekranu albo <b>Przesuń</b>, żeby przeciągnąć ją myszą w dowolne miejsce, a potem <b>Gotowe</b>), <b>rozmiar</b> i <b>co pokazuje</b>. Jej teksty są w języku pulpitu.</p>
-<div class="tip"><p>Nigdy nie zabiera grze fokusu, a kliknięcia przez nią przechodzą. Znika, gdy wychodzisz z gry albo ją pauzujesz. Z włączonymi wskazówkami głosowymi w Ustawieniach pulpitu pulpit mówi też o skrętach, gdy nakładka jest włączona.</p></div>`,
+<div class="tip"><p>Nigdy nie zabiera grze fokusu, a kliknięcia przez nią przechodzą. Znika, gdy wychodzisz z gry albo ją pauzujesz. Z włączonymi wskazówkami głosowymi w Ustawieniach pulpitu pulpit mówi też o skrętach, gdy nakładka jest włączona.</p></div>
+<div class="tip"><p>Streamujesz? Na <a href="/overlay/">trucksim-dash.com/overlay</a> zrobisz darmową nakładkę do OBS z tymi samymi opcjami: prędkość i limit, następny skręt, pozostały dystans i godziny przyjazdu. Skręt też pochodzi z pulpitu.</p></div>`,
     account: `
 <p>Konto przechowuje historię twojej jazdy: każde zlecenie, które wykonasz, z trasą na mapie. Jest opcjonalne i darmowe, a cała reszta Truck Dash działa tak samo bez niego.</p>
 <ol>
@@ -790,6 +801,7 @@ GUIDE_TEXT.pl = {
 <li>W kliencie otwórz <b>Konfiguracja i stan</b> i kliknij <b>Powiąż konto</b>. W przeglądarce otworzy się strona: potwierdź i klient jest powiązany.</li>
 </ol>
 <p>Od tej chwili każde zlecenie zapisuje się przy dostarczeniu lub anulowaniu: trasa pokolorowana według prędkości, dystans (z gry i zmierzony przez nas), zarobek, paliwo, opłaty drogowe, mandaty, uszkodzenia, czas jazdy i godziny snu, na czas czy spóźnione, oraz kraje lub stany, przez które jechałeś. Na koncie masz dziennik (z eksportem do CSV), statystyki dla każdej gry, rekordy i osiągnięcia. <b>Moje konto</b> w menu w zasobniku prowadzi prosto tam.</p>
+<p>Strona <b>Mapa</b> rysuje wszystkie twoje trasy na mapie gry, według gry i roku. W grudniu i styczniu konto pokazuje też <b>twój rok</b>: kilometry, dni w trasie, dostawy, twoją mapę, ulubione, rekordy i osiągnięcia, z obrazkiem do udostępnienia.</p>
 <h3>Warto wiedzieć</h3>
 <ul>
 <li>Nic nie jest zapisywane, dopóki nie powiążesz klienta. Twój profil jest prywatny, chyba że udostępnisz go publicznie w <b>Ustawieniach</b>.</li>
@@ -893,6 +905,7 @@ GUIDE_TEXT.tr = {
 <p>Haritanın altındaki <b>rota özeti</b> kalan mesafeyi, kalan süreyi ve varış saatini bir ilerleme çubuğuyla gösterir. Ok onu ince bir ilerleme çubuğuna küçültür (tekrar açmak için çubuğa dokun); üstü çizili rota düğmesi ise rotayı haritadan kaldırır.</p>
 <h3>Navigasyon modu</h3>
 <p>Harita gidiş yönünle birlikte döner, dönüşlerden önce yakınlaşır ve üstte <i>I-15 üzerinden Provo yönüne sağdan devam et</i> gibi yönlendirmeler gösterir. Ne kadar yakından takip edeceğini Ayarlar'da seçersin. İki parmakla yakınlaştırmaya devam edebilirsin; ortalama düğmesi seni geri getirir.</p>
+<p>Birden fazla şeritli kavşaklarda <b>hangi şeritlerin uygun olduğunu</b> da gösterir: her şerit için oklarıyla bir kutu, dönüşüne götürenler mavi.</p>
 <h3>Ara noktalar</h3>
 <p>Bayrağa, sonra haritada bir yere dokun; en fazla 9 durak. Uygulama, bu noktayı oyunun kendi GPS'inde de işaretleyip işaretlemediğini sorar:</p>
 <ul>
@@ -991,7 +1004,8 @@ GUIDE_TEXT.tr = {
 <h3>Açmak için</h3>
 <p><b>Kurulum ve durum</b> içinde <b>Oyun içi katman</b> bölümünden ya da tepsi menüsünden. Oyunda <b>Ctrl+Shift+O</b> onu gösterir ve gizler (başka bir kısayol seçebilir ya da hiç kullanmayabilirsin).</p>
 <p>Aynı bölümde <b>konumunu</b> (bir köşe ya da fareyle istediğin yere sürüklemek için <b>Taşı</b>, sonra <b>Tamam</b>), <b>boyutunu</b> ve <b>neyi gösterdiğini</b> seçersin. Yazıları panonun dilini izler.</p>
-<div class="tip"><p>Oyunun odağını asla almaz ve tıklamalar içinden geçer. Oyundan çıkınca ya da oyunu duraklatınca gizlenir. Panonun Ayarlar'ında sesli yönlendirme açıksa, katman açıkken pano dönüşleri de söyler.</p></div>`,
+<div class="tip"><p>Oyunun odağını asla almaz ve tıklamalar içinden geçer. Oyundan çıkınca ya da oyunu duraklatınca gizlenir. Panonun Ayarlar'ında sesli yönlendirme açıksa, katman açıkken pano dönüşleri de söyler.</p></div>
+<div class="tip"><p>Yayın mı yapıyorsun? <a href="/overlay/">trucksim-dash.com/overlay</a> adresinde aynı seçeneklerle OBS için ücretsiz bir overlay hazırlarsın: hız ve sınır, sonraki dönüş, kalan mesafe ve varış saatleri. Dönüş burada da panelden gelir.</p></div>`,
     account: `
 <p>Bir hesap sürüş geçmişini saklar: sürdüğün her iş, haritadaki rotasıyla. İsteğe bağlı ve ücretsizdir; Truck Dash'in geri kalanı hesapsız da aynı şekilde çalışır.</p>
 <ol>
@@ -999,6 +1013,7 @@ GUIDE_TEXT.tr = {
 <li>İstemcide <b>Kurulum ve durum</b>u aç ve <b>Hesap bağla</b>ya tıkla. Tarayıcıda bir sayfa açılır: onayla, istemci bağlanmış olur.</li>
 </ol>
 <p>Bundan sonra her iş teslim ettiğinde veya iptal ettiğinde kaydedilir: hıza göre renklendirilmiş rota, mesafe (oyununki ve bizim ölçtüğümüz), kazanç, yakıt, geçiş ücretleri, cezalar, hasar, sürüş süresi ve uyku saatleri, zamanında mı geç mi, ve geçtiğin ülkeler veya eyaletler. Hesabında seyir defteri (CSV dışa aktarma ile), her oyun için istatistikler, rekorlar ve başarımlar var. Sistem tepsisi menüsündeki <b>Hesabım</b> seni oraya götürür.</p>
+<p><b>Harita</b> sayfası, sürdüğün tüm seferleri oyuna ve yıla göre oyunun haritasına çizer. Aralık ve ocakta hesabın ayrıca <b>yılını</b> gösterir: kilometreler, yoldaki günler, teslimatlar, haritan, favorilerin, rekorların ve başarımların, paylaşmak için bir görselle.</p>
 <h3>Bilmekte fayda var</h3>
 <ul>
 <li>İstemciyi bağlayana kadar hiçbir şey kaydedilmez. Profilin, <b>Ayarlar</b>'dan herkese açık yapmadığın sürece gizlidir.</li>
@@ -1102,6 +1117,7 @@ GUIDE_TEXT.ru = {
 <p><b>Сводка маршрута</b> внизу карты показывает оставшееся расстояние, оставшееся время и время прибытия с полосой прогресса. Стрелка сворачивает её в тонкую полосу прогресса (нажмите на полосу, чтобы развернуть), а кнопка с перечёркнутым маршрутом убирает маршрут с карты.</p>
 <h3>Режим навигации</h3>
 <p>Карта поворачивается по направлению движения, приближается перед поворотами и показывает подсказки сверху, например <i>Держитесь правее на I-15 в сторону Provo</i>. Насколько близко она следует за вами, выбирается в настройках. Масштабировать двумя пальцами по-прежнему можно; кнопка центрирования вернёт вид.</p>
+<p>На перекрёстках с несколькими полосами она также показывает, <b>какие полосы подходят</b>: по клетке на полосу со стрелками, и синим те, что ведут к вашему повороту.</p>
 <h3>Путевые точки</h3>
 <p>Нажмите на флажок, затем на место на карте, до 9 остановок. Приложение спросит, поставили ли вы эту точку и в GPS игры:</p>
 <ul>
@@ -1200,7 +1216,8 @@ GUIDE_TEXT.ru = {
 <h3>Как включить</h3>
 <p>В <b>Настройка и состояние</b>, раздел <b>Оверлей в игре</b>, или в меню значка в трее. В игре <b>Ctrl+Shift+O</b> показывает и скрывает его (можно выбрать другое сочетание или никакое).</p>
 <p>В том же разделе выбираются <b>положение</b> (угол или <b>Переместить</b>, чтобы перетащить его мышью куда угодно, затем <b>Готово</b>), <b>размер</b> и <b>что показывать</b>. Тексты идут на языке панели.</p>
-<div class="tip"><p>Он никогда не забирает фокус у игры, и клики проходят сквозь него. Он скрывается, когда вы выходите из игры или ставите паузу. Если в Настройках панели включены голосовые подсказки, панель проговаривает повороты и при включённом оверлее.</p></div>`,
+<div class="tip"><p>Он никогда не забирает фокус у игры, и клики проходят сквозь него. Он скрывается, когда вы выходите из игры или ставите паузу. Если в Настройках панели включены голосовые подсказки, панель проговаривает повороты и при включённом оверлее.</p></div>
+<div class="tip"><p>Ведёте стримы? На <a href="/overlay/">trucksim-dash.com/overlay</a> можно собрать бесплатный оверлей для OBS с тем же выбором: скорость и ограничение, следующий поворот, оставшийся путь и время прибытия. Поворот и здесь берётся из панели.</p></div>`,
     account: `
 <p>Аккаунт хранит историю ваших поездок: каждый рейс с маршрутом на карте. Он необязателен и бесплатен, а всё остальное в Truck Dash работает так же и без него.</p>
 <ol>
@@ -1208,6 +1225,7 @@ GUIDE_TEXT.ru = {
 <li>В клиенте откройте <b>Настройка и состояние</b> и нажмите <b>Привязать аккаунт</b>. В браузере откроется страница: подтвердите, и клиент привязан.</li>
 </ol>
 <p>С этого момента каждый рейс сохраняется при доставке или отмене: маршрут, раскрашенный по скорости, расстояние (по игре и измеренное нами), оплата, топливо, платные дороги, штрафы, повреждения, время за рулём и часы сна, вовремя или с опозданием, а также страны или штаты, через которые вы проехали. В аккаунте есть журнал (с экспортом в CSV), статистика по каждой игре, рекорды и достижения. <b>Мой аккаунт</b> в меню трея ведёт прямо туда.</p>
+<p>Страница <b>Карта</b> рисует все ваши рейсы на карте игры, по игре и по году. В декабре и январе аккаунт также показывает <b>ваш год</b>: километры, дни в дороге, доставки, вашу карту, любимое, рекорды и достижения, с картинкой, чтобы поделиться.</p>
 <h3>Полезно знать</h3>
 <ul>
 <li>Ничего не сохраняется, пока вы не привяжете клиент. Профиль закрыт, если вы не сделаете его публичным в <b>Настройках</b>.</li>
