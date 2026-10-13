@@ -4,6 +4,12 @@
     <loc>https://trucksim-dash.com/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
     <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
@@ -12,6 +18,96 @@
     <loc>https://trucksim-dash.com/es/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
     <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://trucksim-dash.com/de/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://trucksim-dash.com/fr/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://trucksim-dash.com/pt/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://trucksim-dash.com/pl/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://trucksim-dash.com/tr/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://trucksim-dash.com/ru/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+    <xhtml:link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>

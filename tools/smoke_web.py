@@ -127,7 +127,8 @@ def main():
 
         # 3) Las demas paginas cargan sin errores de JavaScript
         b, page, errores = pagina(p, CON_WEBGL, base)
-        for ruta, selector in (("/", "#mods"), ("/es/", "#mods"), ("/guide/", "body"), ("/account/", "body"),
+        for ruta, selector in (("/", "#mods"), ("/es/", "#mods"), ("/de/", "#mods"), ("/fr/", "#mods"), ("/pt/", "#mods"),
+                        ("/pl/", "#mods"), ("/tr/", "#mods"), ("/ru/", "#mods"), ("/guide/", "body"), ("/account/", "body"),
                                ("/overlay/", "#setup:not([hidden])")):
             errores.clear()
             page.goto(base + ruta)

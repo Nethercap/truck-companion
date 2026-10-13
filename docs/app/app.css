@@ -1,4 +1,8 @@
 /* Estilos de la app (extraidos de index.html) - ver index.html para el markup. */
+  /* Sin maximum-scale (accesibilidad, 13-10) se puede agrandar con dos dedos;
+     esto saca solo el zoom por doble toque, que con la botonera tocada
+     rapido agrandaba la pagina. El mapa maneja sus gestos aparte. */
+  html { touch-action: manipulation; }
   :root {
     --bg: #0d0f12;
     --panel: #171a1f;

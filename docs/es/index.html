@@ -8,6 +8,12 @@
 <link rel="canonical" href="https://trucksim-dash.com/es/" data-canonical />
 <link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
 <link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+<link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+<link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+<link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+<link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+<link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+<link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
 <link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
 
 <meta property="og:type" content="website" />
@@ -105,6 +111,18 @@
   }
   .langBtn:hover, .menuBtn:hover { border-color: var(--blue); text-decoration: none; }
   .menuBtn { display: none; font-size: 1.2rem; padding: 0.3rem 0.6rem; }
+  /* Selector de idioma: un link por idioma (las paginas las genera
+     tools/build_landing_es.py; los buscadores siguen los links). */
+  .langPick { position: relative; display: inline-block; }
+  .langPick > summary { list-style: none; }
+  .langPick > summary::-webkit-details-marker { display: none; }
+  .langMenu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 11rem;
+    background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem;
+    display: flex; flex-direction: column; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+  .langMenu a { color: var(--text); padding: 0.45rem 0.7rem; border-radius: 6px; font-size: 0.92rem; white-space: nowrap; }
+  .langMenu a:hover { background: var(--panel); text-decoration: none; }
+  .langMenu a[aria-current], #sidebar .langMenu a[aria-current] { color: var(--blue); font-weight: 600; }
+  #sidebar .langMenu { position: static; box-shadow: none; margin-top: 0.4rem; }
 
   #sidebar {
     position: fixed; top: 0; right: 0; bottom: 0; width: 260px;
@@ -453,7 +471,7 @@
     <a href="#faq" data-i18n="navFaq">Preguntas</a>
     <a href="/live/" data-i18n="navLive">Mapa en vivo</a>
     <a class="signInLink" href="/account/" data-i18n="navSignIn">Entrar</a>
-    <a class="langBtn" data-lang-link href="/">EN</a>
+    <details class="langPick"><summary class="langBtn" aria-label="Language">ES</summary><div class="langMenu"><a href="/" hreflang="en" lang="en">English</a><a href="/es/" hreflang="es" lang="es" aria-current="true">Español</a><a href="/de/" hreflang="de" lang="de">Deutsch</a><a href="/fr/" hreflang="fr" lang="fr">Français</a><a href="/pt/" hreflang="pt-BR" lang="pt-BR">Português (BR)</a><a href="/pl/" hreflang="pl" lang="pl">Polski</a><a href="/tr/" hreflang="tr" lang="tr">Türkçe</a><a href="/ru/" hreflang="ru" lang="ru">Русский</a></div></details>
   </nav>
   <button class="menuBtn" id="menuBtn" aria-label="Menu">☰</button>
 </header>
@@ -470,7 +488,7 @@
   <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
   <a href="/live/" data-i18n="navLive">Mapa en vivo</a>
   <a class="signInLink" href="/account/" data-i18n="navSignIn">Entrar</a>
-  <a class="langBtn" data-lang-link href="/">EN</a>
+  <details class="langPick"><summary class="langBtn" aria-label="Language">ES</summary><div class="langMenu"><a href="/" hreflang="en" lang="en">English</a><a href="/es/" hreflang="es" lang="es" aria-current="true">Español</a><a href="/de/" hreflang="de" lang="de">Deutsch</a><a href="/fr/" hreflang="fr" lang="fr">Français</a><a href="/pt/" hreflang="pt-BR" lang="pt-BR">Português (BR)</a><a href="/pl/" hreflang="pl" lang="pl">Polski</a><a href="/tr/" hreflang="tr" lang="tr">Türkçe</a><a href="/ru/" hreflang="ru" lang="ru">Русский</a></div></details>
 </div>
 
 <main>
@@ -1346,7 +1364,7 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     el.innerHTML = t(el.getAttribute('data-i18n'));
   });
-  document.documentElement.lang = currentLang;
+  document.documentElement.lang = currentLang === 'pt' ? 'pt-BR' : currentLang;
   renderRoadmap();
 }
 
@@ -1384,6 +1402,11 @@ function renderDriverCounter() {
 
 applyTranslations();
 buildFaqJsonLd();
+
+// El selector de idioma se cierra al tocar afuera
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('details.langPick[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
+});
 
 if (DONATE_URL) {
   const donate = document.getElementById('donateLink');

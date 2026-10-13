@@ -20,6 +20,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGES = [
     "docs/index.html",
     "docs/es/index.html",
+    "docs/de/index.html",
+    "docs/fr/index.html",
+    "docs/pt/index.html",
+    "docs/pl/index.html",
+    "docs/tr/index.html",
+    "docs/ru/index.html",
     "docs/app/index.html",
     "docs/live/index.html",
     "docs/admin.html",

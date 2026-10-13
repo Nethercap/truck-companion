@@ -1,0 +1,1651 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title data-i18n-text="metaTitle">Truck Dash – бесплатный GPS и живая панель для ETS2 и ATS</title>
+<meta name="description" data-i18n-content="metaDescription" content="Превратите телефон или второй экран в настоящий GPS для Euro Truck Simulator 2 и American Truck Simulator. Живая карта, голосовые подсказки на каждом повороте, показатели грузовика, кнопочная панель и, по желанию, история рейсов. На 100% бесплатно, аккаунт не нужен, открытый код." />
+<link rel="canonical" href="https://trucksim-dash.com/ru/" data-canonical />
+<link rel="alternate" hreflang="en" href="https://trucksim-dash.com/" />
+<link rel="alternate" hreflang="es" href="https://trucksim-dash.com/es/" />
+<link rel="alternate" hreflang="de" href="https://trucksim-dash.com/de/" />
+<link rel="alternate" hreflang="fr" href="https://trucksim-dash.com/fr/" />
+<link rel="alternate" hreflang="pt-BR" href="https://trucksim-dash.com/pt/" />
+<link rel="alternate" hreflang="pl" href="https://trucksim-dash.com/pl/" />
+<link rel="alternate" hreflang="tr" href="https://trucksim-dash.com/tr/" />
+<link rel="alternate" hreflang="ru" href="https://trucksim-dash.com/ru/" />
+<link rel="alternate" hreflang="x-default" href="https://trucksim-dash.com/" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Truck Dash" />
+<meta property="og:url" content="https://trucksim-dash.com/ru/" data-og-url />
+<meta property="og:title" data-i18n-content="ogTitle" content="Truck Dash – бесплатный GPS и живая панель для ETS2 и ATS" />
+<meta property="og:description" data-i18n-content="ogDescription" content="Настоящая карта, подсказки на каждом повороте, показатели грузовика и кнопочная панель на телефоне или втором экране. Бесплатно, аккаунт не нужен, открытый код." />
+<meta property="og:image" content="https://trucksim-dash.com/assets/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:locale" data-og-locale content="ru_RU" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" data-i18n-content="ogTitle" content="Truck Dash – бесплатный GPS и живая панель для ETS2 и ATS" />
+<meta name="twitter:description" data-i18n-content="ogDescription" content="Настоящая карта, подсказки на каждом повороте, показатели грузовика и кнопочная панель на телефоне или втором экране. Бесплатно, аккаунт не нужен, открытый код." />
+<meta name="twitter:image" content="https://trucksim-dash.com/assets/og-image.png" />
+<meta name="theme-color" content="#0b0d10" />
+
+<link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon-180.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://truck-companion-production.up.railway.app" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+
+<script type="application/ld+json" id="appJsonLd">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Truck Dash",
+  "url": "https://trucksim-dash.com/",
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Windows",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "description": "Free real-time GPS and dashboard companion for Euro Truck Simulator 2 and American Truck Simulator: live map, turn-by-turn directions, truck vitals and a button box on your phone or second screen.",
+  "image": "https://trucksim-dash.com/assets/og-image.png",
+  "downloadUrl": "https://github.com/Nethercap/truck-companion/releases/latest",
+  "softwareHelp": "https://trucksim-dash.com/#faq",
+  "isAccessibleForFree": true
+}
+</script>
+<script type="application/ld+json" id="faqJsonLd"></script>
+
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --panel-alt: #1a1e24;
+    --border: #262b33;
+    --text: #f2f3f5;
+    --muted: #9aa4b2;
+    --blue: #3b9eff;
+    --orange: #ff8a3d;
+    --green: #4caf50;
+    --accent: var(--orange);
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1, h2, h3 { font-family: var(--display); letter-spacing: 0.01em; }
+
+  header {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.8rem 1.5rem;
+    background: rgba(11, 13, 16, 0.85);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.2rem; font-family: var(--display); }
+  .brand img { height: 28px; width: 28px; }
+  .brand .name { display: flex; align-items: baseline; gap: 0.5rem; }
+  .brand .sub { font-weight: 400; font-size: 0.8rem; color: var(--muted); font-family: system-ui, sans-serif; }
+
+  .brand { white-space: nowrap; }
+  nav.desktopNav { display: flex; align-items: center; gap: 1.3rem; }
+  nav.desktopNav a { color: var(--text); font-size: 0.93rem; white-space: nowrap; }
+  nav.desktopNav a:hover { color: var(--blue); text-decoration: none; }
+
+  .langBtn, .menuBtn {
+    background: var(--panel-alt); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.4rem 0.7rem; font-size: 0.85rem; cursor: pointer;
+    display: inline-block;
+  }
+  .langBtn:hover, .menuBtn:hover { border-color: var(--blue); text-decoration: none; }
+  .menuBtn { display: none; font-size: 1.2rem; padding: 0.3rem 0.6rem; }
+  /* Selector de idioma: un link por idioma (las paginas las genera
+     tools/build_landing_es.py; los buscadores siguen los links). */
+  .langPick { position: relative; display: inline-block; }
+  .langPick > summary { list-style: none; }
+  .langPick > summary::-webkit-details-marker { display: none; }
+  .langMenu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 11rem;
+    background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem;
+    display: flex; flex-direction: column; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+  .langMenu a { color: var(--text); padding: 0.45rem 0.7rem; border-radius: 6px; font-size: 0.92rem; white-space: nowrap; }
+  .langMenu a:hover { background: var(--panel); text-decoration: none; }
+  .langMenu a[aria-current], #sidebar .langMenu a[aria-current] { color: var(--blue); font-weight: 600; }
+  #sidebar .langMenu { position: static; box-shadow: none; margin-top: 0.4rem; }
+
+  #sidebar {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 260px;
+    background: var(--panel); border-left: 1px solid var(--border);
+    padding: 1.5rem; z-index: 200;
+    transform: translateX(100%);
+    /* visibility: cerrado no se puede tabular a sus links ni lo lee un
+       lector de pantalla; espera a que termine de salir para esconderse. */
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+    display: flex; flex-direction: column; gap: 1.2rem;
+  }
+  #sidebar.open { transform: translateX(0); visibility: visible; transition: transform 0.25s ease; }
+  #sidebarOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 190; display: none; }
+  #sidebarOverlay.open { display: block; }
+  #sidebar a { color: var(--text); font-size: 1.05rem; }
+  #sidebar .closeBtn { align-self: flex-end; background: none; border: none; color: var(--text); font-size: 1.4rem; cursor: pointer; }
+
+  /* Con diez links, entre 860 y 1200 px se partian el nombre y los links en
+     dos renglones. Ahora son ocho (comparar y roadmap estan en el pie y en
+     el menu lateral). Medido en castellano, que es el mas largo: sin el
+     subtitulo entran hasta ~820 px. Primero se va el subtitulo, despues
+     todo pasa al menu lateral. */
+  @media (max-width: 1040px) { header .brand .sub { display: none; } }
+  @media (max-width: 900px) {
+    nav.desktopNav { display: none; }
+    .menuBtn { display: block; }
+  }
+  /* En un celular el subtitulo partia el nombre en dos renglones, y los dos
+     botones del hero quedaban apilados con anchos distintos. */
+  @media (max-width: 480px) {
+    .brand .sub { display: none; }
+    .ctaRow .cta { flex: 1 1 100%; justify-content: center; }
+  }
+
+  main { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* Hero: texto a la izquierda, mockup de celular + monitor a la derecha.
+     El fondo tiene una trama sutil de "rutas" en SVG (data URI, sin peso). */
+  .hero {
+    display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2rem; align-items: center;
+    padding: 4rem 0 3rem; position: relative;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: -2rem -50vw 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(ellipse at 70% 30%, rgba(59,158,255,0.10), transparent 55%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke='%23161a20' stroke-width='6' fill='none'/%3E%3Cpath d='M0 60 H120 M60 0 V120' stroke='%23262b33' stroke-width='1' stroke-dasharray='8 10' fill='none'/%3E%3C/svg%3E");
+    opacity: 0.6;
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent 95%);
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent 95%);
+  }
+  /* Sin logo ni nombre: el header, pegado arriba, ya los muestra. */
+  .hero .kicker { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.6rem; }
+  .hero h1 { font-size: 3.4rem; line-height: 1.02; margin: 0 0 1rem; font-weight: 700; }
+  .hero h1 .accent { color: var(--orange); }
+  .hero .tagline { font-size: 1.12rem; color: #d7dbe0; margin: 0 0 1.6rem; max-width: 34rem; }
+  .ctaRow { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
+  .modLists { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; margin-top: 1.2rem; }
+  .modList { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.2rem; }
+  .modList h3 { margin: 0 0 0.6rem; font-size: 1.05rem; }
+  .modList ul { list-style: none; margin: 0; padding: 0; }
+  .modList li { padding: 0.45rem 0; border-top: 1px solid var(--border); line-height: 1.4; }
+  .modList li:first-child { border-top: none; }
+  .modList .muted { color: var(--muted); font-size: 0.9rem; }
+  .modList .tag { display: inline-block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--blue); border: 1px solid rgba(59,158,255,0.5); border-radius: 4px; padding: 0.05rem 0.35rem; margin-left: 0.3rem; vertical-align: middle; }
+  /* Texto oscuro sobre el azul: el blanco daba 2,79:1 de contraste y el
+     minimo es 4,5 (auditoria del 12-10). Es el mismo par que el boton
+     principal de la cuenta. */
+  .cta {
+    display: inline-flex; align-items: center; gap: 0.5rem; background: var(--blue); color: #06121f; font-weight: 600;
+    padding: 0.85rem 1.5rem; border-radius: 8px; font-size: 1.02rem;
+  }
+  .cta:hover { background: #2b8ef0; text-decoration: none; }
+  .cta.secondary { background: var(--panel-alt); border: 1px solid var(--border); color: var(--text); }
+  .cta.secondary:hover { border-color: var(--blue); background: var(--panel-alt); }
+  /* El cliente es para Windows: en un telefono o una tablet bajar no sirve.
+     Ahi el boton principal es la demo y el otro manda el link a la PC. */
+  .onlyPhone { display: none !important; }
+  @media (hover: none) and (pointer: coarse) {
+    .onlyDesktop { display: none !important; }
+    .onlyPhone { display: revert !important; }
+    .cta.onlyPhone { display: inline-flex !important; }
+    .ctaRow .cta.demoCta { background: var(--blue); border-color: var(--blue); color: #06121f; }
+  }
+  .heroVersion { white-space: nowrap; }
+  /* Azul de Tecito un punto mas oscuro: con #3b82f6 el blanco daba 3,7:1. */
+  .teaBtn { background: #2563eb; color: #fff; }
+  nav.desktopNav a.signInLink, #sidebar a.signInLink { border: 1px solid var(--blue); color: var(--blue); border-radius: 8px; padding: 0.3rem 0.8rem; }
+  nav.desktopNav a.signInLink:hover { background: rgba(59,158,255,0.12); }
+  .accountsGrid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 2.2rem; align-items: center; margin-top: 1.2rem; }
+  .accountsGrid p { color: #d7dbe0; }
+  .accountsList { margin: 0.8rem 0 1.4rem; padding-left: 1.2rem; color: #d7dbe0; line-height: 1.7; }
+  .accountsShot { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); cursor: zoom-in; }
+  @media (max-width: 860px) { .accountsGrid { grid-template-columns: 1fr; } }
+  .teaBtn:hover { background: #1d4ed8; }
+  .teaBtn svg { width: 1.2em; height: 1.2em; }
+  .ctaNote { font-size: 0.78rem; color: var(--muted); margin: 0.6rem 0 0; }
+  .heroBadges { margin-top: 1.4rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .heroBadges span {
+    font-size: 0.8rem; color: var(--text); border: 1px solid var(--border); border-radius: 999px;
+    padding: 0.25rem 0.7rem; background: rgba(20,23,28,0.7);
+  }
+  .heroBadges span::before { content: "✓ "; color: var(--green); }
+  .driverCounter { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); }
+  .driverCounter strong { color: var(--orange); font-size: 1rem; }
+  /* Lo que no es bajar ni probar va como links y no como botones: cuatro
+     botones del mismo peso no dicen cual es el paso siguiente. */
+  .heroLinks { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; margin-top: 0.9rem; font-size: 0.9rem; }
+  .heroLinks a { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--muted); }
+  .heroLinks a:hover { color: #fff; text-decoration: none; }
+
+  .mockup { position: relative; height: 520px; display: flex; justify-content: center; align-items: flex-end; }
+  .monitor {
+    position: absolute; left: 0; top: 30px; width: 78%;
+    background: #1c2027; border: 6px solid #1c2027; border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+  }
+  .monitor img { display: block; width: 100%; height: auto; border-radius: 6px; }
+  .monitor::after {
+    content: ""; position: absolute; left: 50%; bottom: -34px; width: 30%; height: 28px;
+    transform: translateX(-50%); background: linear-gradient(#262b33, #14171c); border-radius: 0 0 8px 8px;
+  }
+  .phone {
+    position: absolute; right: 0; bottom: 0; width: 42%; max-width: 230px;
+    background: #0e1115; border: 8px solid #1c2027; border-radius: 34px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+  }
+  .phone img { display: block; width: 100%; height: auto; border-radius: 26px; }
+  .phone::before {
+    content: ""; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 34%; height: 18px; background: #1c2027; border-radius: 10px;
+  }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 2.5rem; }
+    .hero h1 { font-size: 2.6rem; }
+    .mockup { height: auto; margin-top: 1rem; justify-content: center; }
+    .monitor { display: none; }
+    .phone { position: static; width: 60%; max-width: 260px; }
+  }
+
+  section { padding: 3.2rem 0; border-top: 1px solid var(--border); }
+  section h2 { font-size: 2rem; margin: 0 0 1rem; }
+  section h2 .accent { color: var(--orange); }
+  section > p { color: #d7dbe0; max-width: 46rem; }
+  .sectionIntro { color: var(--muted); }
+
+  /* 8 tarjetas en tres grupos (auditoria del 12-10): con 17 la seccion medía
+     varias pantallas en el celular y nada se destacaba. El resto, en la guia. */
+  .featureGroup { margin: 1.8rem 0 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: system-ui, sans-serif; font-weight: 600; }
+  .featureGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.1rem; margin-top: 0.8rem; }
+  .moreFeatures { margin: 1.3rem 0 0; font-size: 0.95rem; }
+  .vsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.1rem; margin-top: 1.2rem; }
+  .vsCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; }
+  .vsCard h3 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+  .vsCard p { margin: 0.6rem 0 0; font-size: 0.9rem; color: var(--muted); }
+  .vsCard p.vsDash { color: var(--text); }
+  .vsCard b { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-family: system-ui, sans-serif; margin-bottom: 0.1rem; }
+  .vsCard .vsDash b { color: var(--orange); }
+  .featureCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; }
+  .featureCard .icon {
+    width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    background: rgba(59,158,255,0.12); color: var(--blue); margin-bottom: 0.7rem;
+  }
+  .featureCard .icon.orange { background: rgba(255,138,61,0.14); color: var(--orange); }
+  .featureCard .icon svg { width: 22px; height: 22px; }
+  .featureCard h4 { font-size: 1.15rem; margin: 0 0 0.3rem; }
+  .featureCard p { font-size: 0.88rem; color: var(--muted); margin: 0; }
+  .featureCard .tag { display: inline-block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orange); border: 1px solid rgba(255,138,61,0.5); border-radius: 4px; padding: 0.05rem 0.35rem; margin-left: 0.4rem; vertical-align: middle; font-family: system-ui, sans-serif; }
+
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .step { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; position: relative; }
+  .step .num {
+    width: 34px; height: 34px; border-radius: 50%; margin-bottom: 0.7rem;
+    background: var(--orange); color: #1a1002; font-weight: 800; font-family: var(--display); font-size: 1.15rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step h3 { margin: 0 0 0.4rem; font-size: 1.2rem; }
+  .step p { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--muted); }
+  .step .links { display: flex; gap: 0.9rem; flex-wrap: wrap; font-size: 0.86rem; }
+  .step code { background: var(--panel-alt); padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.82em; }
+
+  .note {
+    margin-top: 1.2rem; font-size: 0.86rem; color: var(--muted);
+    background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1.1rem;
+  }
+  .note strong { color: var(--text); }
+
+  .compareWrap { overflow-x: auto; margin-top: 1.5rem; border-radius: 12px; border: 1px solid var(--border); }
+  /* En celular estas tablas se ven a medias (325 de 560 px) y nada avisaba
+     que seguian a la derecha: degradado en el borde mientras falte scroll. */
+  .scrollHintWrap { position: relative; }
+  .scrollHintWrap::after {
+    content: ''; position: absolute; top: 1px; right: 0; bottom: 1px; width: 2.5rem;
+    pointer-events: none; opacity: 0; transition: opacity 0.2s ease;
+    background: linear-gradient(to right, rgba(11,13,16,0), var(--bg));
+    border-radius: 0 12px 12px 0;
+  }
+  .scrollHintWrap.hasMore::after { opacity: 1; }
+  .compare { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--panel); min-width: 560px; }
+  .compare th, .compare td { padding: 0.65rem 0.9rem; text-align: left; border-bottom: 1px solid var(--border); }
+  .compare th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .compare th.td, .compare td.td { background: rgba(59,158,255,0.07); }
+  .compare th.td { color: var(--blue); }
+  .compare tbody tr:last-child td { border-bottom: none; }
+  .compare .yes { color: var(--green); font-weight: 700; }
+  .compare .no { color: #ff6b6b; }
+  .compare .meh { color: var(--orange); }
+  .compare .price { font-weight: 700; }
+
+  .trustGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .trustCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; }
+  .trustCard h3 { margin: 0 0 0.4rem; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem; }
+  .trustCard h3 svg { width: 20px; height: 20px; color: var(--green); }
+  .trustCard p { margin: 0; font-size: 0.88rem; color: var(--muted); }
+
+  .screenshotWrap { margin-top: 1.5rem; text-align: center; }
+  .screenshotCaption { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--muted); }
+  .carousel { display: flex; align-items: center; gap: 0.6rem; }
+  .carouselViewport { overflow: hidden; flex: 1; min-width: 0; }
+  .carouselTrack { display: flex; transition: transform 0.3s ease; }
+  .carouselSlide { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; gap: 0.5rem; }
+  .slideCaption { margin: 0; font-size: 0.85rem; color: var(--muted); max-width: 40rem; }
+  .carouselSlide img { max-height: 480px; max-width: 100%; width: auto; height: auto; border-radius: 10px; border: 1px solid var(--border); cursor: zoom-in; background: var(--panel-alt); }
+  /* Altura reservada: las capturas son lazy y sin esto el bloque colapsaba a
+     nada mientras cargaban (hueco negro de media pantalla al scrollear). */
+  .carouselViewport { min-height: 520px; }
+  .carouselArrow {
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); font-size: 1.5rem; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .carouselArrow:hover { border-color: var(--accent); color: var(--accent); }
+  /* El boton mide 24x24 (WCAG 2.5.8: con 8x8 pegados se tocaba el de al
+     lado) y el punto se dibuja adentro. */
+  .carouselDots { display: flex; justify-content: center; margin-top: 0.45rem; }
+  .carouselDot { width: 24px; height: 24px; border-radius: 50%; background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; }
+  .carouselDot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+  .carouselDot.active::before { background: var(--accent); }
+  img[onclick] { cursor: zoom-in; }
+  /* <picture> solo elige el archivo: que no se meta en el flex ni en los anchos */
+  .carouselSlide picture, .monitor picture { display: contents; }
+
+  .lightbox { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 2000; align-items: center; justify-content: center; padding: 2rem; cursor: zoom-out; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+  .lightbox:focus { outline: none; }
+
+  /* Reducir movimiento (ajuste del sistema): sin scroll suave ni
+     deslizamientos; la animacion del monitor pasa a una captura quieta
+     (<picture> con demo-still.webp). */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    #sidebar, #sidebar.open, .carouselTrack, .scrollHintWrap::after { transition: none; }
+  }
+
+  .roadmapGrid { margin-top: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1rem; }
+  .roadmapCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; }
+  .roadmapCard h3 { margin: 0.4rem 0 0.4rem; font-size: 1.05rem; }
+  .roadmapCard p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
+  .roadmapSub { margin: 2rem 0 0; font-size: 1.25rem; color: var(--muted); }
+  .shippedGrid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.7rem; margin-top: 0.8rem; }
+  .shippedGrid .roadmapCard { padding: 0.75rem 0.9rem; background: transparent; }
+  .shippedGrid .roadmapChip { display: none; }
+  .shippedGrid .roadmapCard h3 { margin-top: 0; font-size: 1rem; }
+  .shippedGrid .roadmapCard h3::before { content: "\2713  "; color: var(--green); }
+  .shippedGrid .roadmapCard p { font-size: 0.84rem; }
+  .roadmapChip { display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; border-radius: 999px; padding: 0.1rem 0.55rem; border: 1px solid; }
+  .roadmapChip.planned { color: var(--orange); border-color: rgba(255,138,61,0.5); }
+  .roadmapChip.exploring { color: var(--blue); border-color: rgba(59,158,255,0.5); }
+  .roadmapChip.blocked { color: var(--muted); border-color: var(--border); }
+  .roadmapChip.shipped { color: #4caf50; border-color: rgba(76,175,80,0.5); }
+  .roadmapChip.building { color: #ffb020; border-color: rgba(255,176,32,0.5); }
+  .roadmapFoot { margin-top: 1.2rem; font-size: 0.85rem; color: var(--muted); }
+  @media (max-width: 720px) { .roadmapChip { font-size: 0.75rem; } }
+
+  .faq { margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .faq details { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 0.2rem 1rem; }
+  .faq summary { cursor: pointer; padding: 0.7rem 0; font-weight: 600; font-size: 0.98rem; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; color: var(--muted); font-size: 1.2rem; flex-shrink: 0; }
+  .faq details[open] summary::after { content: "–"; }
+  .faq details p { margin: 0 0 0.9rem; font-size: 0.9rem; color: var(--muted); }
+
+  .community { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1.5rem; align-items: start; margin-top: 1.5rem; }
+  /* min-width:0: sin esto un item de grid nunca se achica por debajo del ancho
+     intrinseco de su contenido (la tabla con nowrap), y toda la pagina
+     termina con scroll horizontal en el celular. */
+  .community > * { min-width: 0; }
+  .communityCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; min-width: 0; }
+  .communityCard h3 { margin: 0 0 0.5rem; font-size: 1.2rem; }
+  .communityCard p { margin: 0 0 0.9rem; font-size: 0.9rem; color: var(--muted); }
+  .discordCta { display: inline-flex; align-items: center; gap: 0.5rem; background: #5865F2; color: #fff; font-weight: 600; padding: 0.6rem 1.1rem; border-radius: 8px; }
+  .discordCta:hover { background: #4752c4; text-decoration: none; }
+  .latestJobsTitle { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.6rem; }
+  .latestJobsTableWrap { overflow-x: auto; border-radius: 10px; }
+  .latestJobsTable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .latestJobsTable th, .latestJobsTable td { padding: 0.45rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .latestJobsTable th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  .latestJobsTable tbody tr:last-child td { border-bottom: none; }
+  @media (max-width: 860px) { .community { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .latestJobsTable th, .latestJobsTable td { white-space: normal; padding: 0.4rem 0.4rem; }
+    .latestJobsTable .colTruck, .latestJobsTable .colGame, .latestJobsTable .colDistance { display: none; }
+  }
+
+  /* En celular varios textos quedaban en 10.9-12.5 px (chapitas, encabezados
+     de tabla, los <code> de los pasos): piso de ~13 px. */
+  @media (max-width: 720px) {
+    .carouselViewport { min-height: 500px; }
+    .modList .tag, .featureCard .tag { font-size: 0.8rem; }
+    .ctaNote { font-size: 0.85rem; }
+    .step code, .trustCard code { font-size: 0.9em; }
+    .latestJobsTable { font-size: 0.88rem; }
+    .latestJobsTable th { font-size: 0.8rem; }
+    .compare th { font-size: 0.82rem; }
+  }
+
+  .contactRow { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-top: 1rem; font-size: 0.95rem; }
+  .contactRow a { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .contactRow svg { width: 18px; height: 18px; }
+
+  footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 0.82rem; padding: 2rem 1.5rem 3rem; }
+  .footerInner { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 0.8rem; }
+  .footerLinks { display: flex; flex-wrap: wrap; gap: 1.2rem; }
+  .footerLinks a { color: var(--muted); }
+  .footerLinks a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="/assets/logo.svg" alt="Truck Dash logo" width="28" height="28" />
+    <div class="name">
+      <span>Truck <span style="color:var(--blue)">Dash</span></span>
+      <span class="sub" data-i18n="brandSub">Truck-Sim Companion</span>
+    </div>
+  </div>
+  <nav class="desktopNav">
+    <a href="#get-started" data-i18n="navGetStarted">Начать</a>
+    <a href="#features" data-i18n="navFeatures">Возможности</a>
+    <a href="#community" data-i18n="navCommunity">Сообщество</a>
+    <a href="#mods" data-i18n="navMods">Моды</a>
+    <a href="#faq" data-i18n="navFaq">Вопросы</a>
+    <a href="/live/" data-i18n="navLive">Живая карта</a>
+    <a class="signInLink" href="/account/" data-i18n="navSignIn">Войти</a>
+    <details class="langPick"><summary class="langBtn" aria-label="Language">RU</summary><div class="langMenu"><a href="/" hreflang="en" lang="en">English</a><a href="/es/" hreflang="es" lang="es">Español</a><a href="/de/" hreflang="de" lang="de">Deutsch</a><a href="/fr/" hreflang="fr" lang="fr">Français</a><a href="/pt/" hreflang="pt-BR" lang="pt-BR">Português (BR)</a><a href="/pl/" hreflang="pl" lang="pl">Polski</a><a href="/tr/" hreflang="tr" lang="tr">Türkçe</a><a href="/ru/" hreflang="ru" lang="ru" aria-current="true">Русский</a></div></details>
+  </nav>
+  <button class="menuBtn" id="menuBtn" aria-label="Menu">☰</button>
+</header>
+
+<div id="sidebarOverlay"></div>
+<div id="sidebar">
+  <button class="closeBtn" id="sidebarClose" aria-label="Close">×</button>
+  <a href="#get-started" data-i18n="navGetStarted">Начать</a>
+  <a href="#features" data-i18n="navFeatures">Возможности</a>
+  <a href="#community" data-i18n="navCommunity">Сообщество</a>
+  <a href="#compare" data-i18n="navCompare">Бесплатно и платно</a>
+  <a href="#mods" data-i18n="navMods">Моды</a>
+  <a href="#faq" data-i18n="navFaq">Вопросы</a>
+  <a href="#roadmap" data-i18n="navRoadmap">Планы</a>
+  <a href="/live/" data-i18n="navLive">Живая карта</a>
+  <a class="signInLink" href="/account/" data-i18n="navSignIn">Войти</a>
+  <details class="langPick"><summary class="langBtn" aria-label="Language">RU</summary><div class="langMenu"><a href="/" hreflang="en" lang="en">English</a><a href="/es/" hreflang="es" lang="es">Español</a><a href="/de/" hreflang="de" lang="de">Deutsch</a><a href="/fr/" hreflang="fr" lang="fr">Français</a><a href="/pt/" hreflang="pt-BR" lang="pt-BR">Português (BR)</a><a href="/pl/" hreflang="pl" lang="pl">Polski</a><a href="/tr/" hreflang="tr" lang="tr">Türkçe</a><a href="/ru/" hreflang="ru" lang="ru" aria-current="true">Русский</a></div></details>
+</div>
+
+<main>
+  <div class="hero">
+    <div>
+      <p class="kicker" data-i18n="kicker">Для Euro Truck Simulator 2 &amp; American Truck Simulator</p>
+      <h1 data-i18n="heroTitle">Ваш телефон теперь <span class="accent">настоящий GPS</span> для вашего симулятора грузовика.</h1>
+      <p class="tagline" data-i18n="heroTagline">Живая карта с настоящими дорогами, подсказки на каждом повороте, ограничение скорости, топливо и износ, а ещё кнопочная панель для управления грузовиком — на телефоне, планшете или втором экране.</p>
+      <!-- Bajar va directo al zip: la pagina de releases de GitHub, con el
+           Map Builder y los SHA256SUMS al lado, es un lugar para perderse. -->
+      <div class="ctaRow">
+        <a href="https://github.com/Nethercap/truck-companion/releases/latest/download/TruckDash-windows.zip" class="cta onlyDesktop">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <span data-i18n="heroCta">Скачать для Windows</span>
+        </a>
+        <a href="/app/?demo=1" class="cta secondary demoCta" data-i18n="heroDemo">Посмотреть живую демо</a>
+        <a href="#" role="button" class="cta secondary onlyPhone" data-send-link data-i18n="sendLinkCta">Отправить ссылку на мой ПК</a>
+      </div>
+      <p class="ctaNote onlyDesktop"><span data-i18n="ctaNote">Портативный .exe, без установщика и без прав администратора. Панель открывается в любом браузере.</span> <span class="heroVersion" hidden></span></p>
+      <p class="ctaNote onlyPhone" data-i18n="ctaNotePhone">Truck Dash работает на вашем ПК с Windows, а телефон служит экраном. Попробуйте демо сейчас и откройте ссылку на ПК, чтобы скачать.</p>
+      <div class="heroBadges">
+        <span data-i18n="badgeFree">Бесплатно навсегда</span>
+        <span data-i18n="badgeNoLogin">Аккаунт не нужен</span>
+        <span data-i18n="badgeNoLimits">Без лимитов на маршруты и без рекламы</span>
+        <span data-i18n="badgeOpenSource">Открытый код</span>
+        <span>ETS2 + ATS</span>
+      </div>
+      <p id="driverCounter" class="driverCounter" hidden></p>
+      <div class="heroLinks">
+        <a href="#get-started" data-i18n="heroCta2">Как это работает</a>
+        <a href="https://www.youtube.com/watch?v=HPQEUd-LplY" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12 31 31 0 0 0 1 16.8a3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.8 15.1V8.9l5.7 3.1z"/></svg>
+          <span data-i18n="heroVideo">Видео на 1 минуту</span>
+        </a>
+        <a href="/live/" data-i18n="heroLive">Смотреть живую карту</a>
+        <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">
+          <svg viewBox="0 0 127.14 96.36" width="16" height="16" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.9,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+          <span data-i18n="heroDiscord">Присоединяйтесь к Discord</span>
+        </a>
+      </div>
+    </div>
+    <div class="mockup" aria-hidden="true">
+      <div class="monitor"><picture><source srcset="/assets/demo-still.webp" media="(prefers-reduced-motion: reduce)" /><img src="/assets/demo.webp" alt="" width="720" height="450" /></picture></div>
+      <div class="phone"><img src="/assets/screenshot-gps-2.webp" alt="" width="636" height="1400" /></div>
+    </div>
+  </div>
+
+  <section id="get-started">
+    <h2 data-i18n="gsTitle">Готово за <span class="accent">две минуты</span></h2>
+    <p class="sectionIntro" data-i18n="gsIntro">Без установщика, без регистрации, без прав администратора. Три шага, один раз.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h3 data-i18n="gsStep1Title">Скачайте клиент</h3>
+        <p data-i18n="gsStep1Body">Небольшая портативная программа для Windows. Распакуйте куда угодно и запустите <code>TruckDash.exe</code>. Она живёт в системном трее.</p>
+        <div class="links">
+          <a class="onlyDesktop" href="https://github.com/Nethercap/truck-companion/releases/latest/download/TruckDash-windows.zip" data-i18n="gsStep1Link">Скачать TruckDash-windows.zip</a>
+          <a class="onlyPhone" href="#" role="button" data-send-link data-i18n="sendLinkCta">Отправить ссылку на мой ПК</a>
+          <a href="https://github.com/Nethercap/truck-companion/releases" target="_blank" rel="noopener" data-i18n="gsStep1Releases">Все версии и что изменилось</a>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3 data-i18n="gsStep2Title">Пусть он подготовит игру</h3>
+        <p data-i18n="gsStep2Body">При первом запуске клиент находит вашу установку ETS2 / ATS и в один клик ставит свой плагин телеметрии, сделанный на официальном SDK от SCS. Он работает рядом с Trucky и любыми другими инструментами телеметрии, не трогая их. Предпочитаете вручную? Шаги описаны в README.</p>
+        <div class="links">
+          <a href="https://github.com/Nethercap/truck-companion/blob/main/client/README.md" target="_blank" rel="noopener" data-i18n="gsStep2Link">Установить плагин вручную (README)</a>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3 data-i18n="gsStep3Title">Езжайте</h3>
+        <p data-i18n="gsStep3Body">Запустите игру. Браузер откроет панель, уже подключённую. На телефоне зайдите на <code>trucksim-dash.com/app</code> и введите 8-буквенный код со значка в трее: телефону даже не нужно быть в той же сети Wi-Fi.</p>
+        <div class="links">
+          <a href="/app/" data-i18n="gsStep3Link">Открыть панель →</a>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <strong data-i18n="smartscreenTitle">Windows пишет «неопознанное приложение»?</strong>
+      <span data-i18n="smartscreenBody">Это SmartScreen, который предупреждает о любой новой неподписанной программе: нажмите «Подробнее» → «Выполнить в любом случае». У клиента открытый код, ему не нужны права администратора, и он читает только телеметрию игры. На странице каждого выпуска указан SHA-256 файла, чтобы вы могли проверить скачанное, а запустить его можно и прямо из исходного кода.</span>
+      <a href="https://github.com/Nethercap/truck-companion/tree/main/client#building-it-yourself" target="_blank" rel="noopener" data-i18n="sourceOptionLink">Запустить из исходного кода →</a>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2 data-i18n="featuresTitle">Всё, что должен уметь GPS для грузовика. <span class="accent">И даже больше.</span></h2>
+    <h3 class="featureGroup" data-i18n="featGroupNav">Навигация</h3>
+    <div class="featureGrid">
+      <div class="featureCard">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 7v13M15 4v13"/></svg></div>
+        <h4 data-i18n="featMapTitle">Настоящие дороги, настоящие маршруты</h4>
+        <p data-i18n="featMapBody">Настоящая дорожная сеть обеих игр, совмещённая с координатами самой игры. Подсказки на каждом повороте с названием дороги, на которую вы сворачиваете, карта, которая поворачивается во время езды, и маршруты в обход картографических DLC, которых у вас нет.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></div>
+        <h4 data-i18n="featVoiceTitle">Голосовые подсказки <span class="tag">новое</span></h4>
+        <p data-i18n="featVoiceBody">Предупреждение перед каждым поворотом, ещё одно на повороте и при прибытии. Естественные записанные голоса на 8 языках, без неправильно произнесённых названий дорог. По умолчанию выключено, один переключатель в Настройках.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
+        <h4 data-i18n="featWaypointsTitle">Остановки по пути</h4>
+        <p data-i18n="featWaypointsBody">Нажмите на карту или найдите заправки, места отдыха, сервисы и компании, чтобы проложить маршрут через них. Ближайшая заправка или место отдыха в одном касании, а пронумерованные остановки исчезают сами, когда вы до них доезжаете.</p>
+      </div>
+    </div>
+    <h3 class="featureGroup" data-i18n="featGroupTruck">Ваш грузовик</h3>
+    <div class="featureGrid">
+      <div class="featureCard">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0"/><path d="M3 12v4h18v-4"/><path d="M12 12l4-3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></div>
+        <h4 data-i18n="featPanelTitle">Панель на любом экране</h4>
+        <p data-i18n="featPanelBody">Скорость и ограничение, круиз-контроль, топливо и запас хода, отдых, износ, срок заказа и ваше прибытие в реальном времени — на телефоне, планшете или втором мониторе. Телефон может быть на мобильном интернете, та же сеть Wi-Fi не нужна, а любую кнопку и панель можно перетащить, куда удобно.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <h4 data-i18n="featButtonsTitle">Кнопочная панель грузовика</h4>
+        <p data-i18n="featButtonsBody">Аварийка, маячок, ручник, двигатель, прицеп, камера, круиз-контроль, фары, дворники и многое другое: нажмите на телефоне, и клиент нажмёт настоящую клавишу, взятую из ваших собственных настроек управления в игре.</p>
+      </div>
+    </div>
+    <h3 class="featureGroup" data-i18n="featGroupShare">Сохранить и поделиться</h3>
+    <div class="featureGrid">
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+        <h4 data-i18n="featStatsTitle">История рейсов и статистика <span class="tag">новое</span></h4>
+        <p data-i18n="featStatsBody">С необязательным бесплатным аккаунтом сохраняется каждый заказ: маршрут, раскрашенный по скорости, оплата, топливо и время. Журнал рейсов, статистика по каждой игре, рекорды и достижения, друзья, на которых можно подписаться, и публичный профиль только по желанию. <a href="#accounts">Подробнее ниже</a>.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <h4 data-i18n="featLiveTitle">Другие водители вживую</h4>
+        <p data-i18n="featLiveBody">Смотрите, как водители Truck Dash едут по <a href="/live/">публичной живой карте</a>, анонимно, с одним переключателем, чтобы на ней не появляться. Или поделитесь с друзьями 6-буквенным кодом и езжайте конвоем (бета), каждый в своей игре, без TruckersMP.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><circle cx="7" cy="9" r="1.6" fill="currentColor"/><path d="M8 21h8"/></svg></div>
+        <h4 data-i18n="featStreamTitle">В стриме и в Discord <span class="tag">новое</span></h4>
+        <p data-i18n="featStreamBody">Бесплатный <a href="/overlay/">оверлей для OBS</a> с вашей скоростью, следующим поворотом и рейсом, и статус в Discord, который показывает текущий рейс, пока вы едете. Оба выключены, пока вы их не включите.</p>
+      </div>
+    </div>
+    <p class="moreFeatures"><a href="/guide/"><span data-i18n="featMoreLink">Всё остальное, от настроек оверлея в игре до атласа Road Trip в ATS, есть в руководстве</span> &rarr;</a></p>
+
+    <div class="screenshotWrap">
+      <p class="screenshotCaption" data-i18n="screenshotCaption">Вот как это выглядит в дороге:</p>
+      <div class="carousel">
+        <button class="carouselArrow carouselPrev" onclick="carouselNav(-1)" aria-label="Previous screenshot">‹</button>
+        <div class="carouselViewport">
+          <div class="carouselTrack" id="carouselTrack">
+            <div class="carouselSlide"><picture><source srcset="/assets/demo-still.webp" media="(prefers-reduced-motion: reduce)" /><img src="/assets/demo.webp" alt="Truck Dash in navigation mode: the map rotates with the truck, turn prompt, speed and cruise readout" width="720" height="450" onclick="openLightbox(this.currentSrc || this.src)" /></picture><p class="slideCaption"><span data-i18n="slideDemo">Вживую: режим GPS с подсказками на каждом повороте, ограничением скорости и круиз-контролем.</span> <a href="/app/?demo=1" data-i18n="slideDemoLink">Попробовать демо →</a></p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-dashboard.webp" alt="Truck Dash live dashboard on desktop" width="1916" height="1200" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideDashboard">Компьютер: настоящая карта, живой маршрут и все показатели грузовика на одном экране.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-panel-landscape.webp" alt="Truck Dash dashboard panel on a second monitor: trip ribbon with the rest stop marked, arrival verdict, fuel and truck damage" width="2732" height="1536" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption"><span data-i18n="slidePanelWide">Второй экран: весь рейс на одной ленте, успеваете ли вы к сроку и хватит ли топлива.</span> <a href="/dash/?demo=1" data-i18n="slideDemoLink">Попробовать демо →</a></p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-panel-portrait.webp" alt="Truck Dash dashboard panel on a phone in portrait, with speed, arrival, fuel and damage stacked" width="860" height="1864" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slidePanelTall">Та же панель на телефоне: сама раскладывается вертикально и никогда не грузит карту.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-waypoints.webp" alt="Route through two numbered waypoints near Cheyenne with fuel and rest stops on the map" width="801" height="556" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideWaypoints">Маршруты с несколькими остановками: пронумерованные точки, которые исчезают сами, когда вы до них доезжаете.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-find-nearby.webp" alt="Find nearby panel listing fuel stations sorted by distance" width="840" height="1020" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideFindNearby">Поблизости: заправки, места отдыха, сервисы, гаражи и компании, по расстоянию.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-gps-2.webp" alt="Truck Dash GPS navigation mode with speed limit" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideGps">Телефон в режиме GPS: карта по курсу, ограничение скорости и круиз-контроль.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-gps-3.webp" alt="Truck Dash GPS navigation mode, close up on an intersection" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideTurn">Поворот за поворотом: следующий манёвр и дорога, на которую он вас выведет, с картой, поворачивающейся во время езды.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-buttonbox.webp" alt="Truck Dash button box: hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideButtons">Кнопочная панель: нажмите на телефоне, и клиент нажмёт настоящую клавишу в игре.</p></div>
+            <div class="carouselSlide"><img src="/assets/screenshot-gps-1.webp" alt="Truck Dash GPS navigation mode, zoomed out" width="636" height="1400" loading="lazy" onclick="openLightbox(this.src)" /><p class="slideCaption" data-i18n="slideOverview">Обзор: весь маршрут, пройденный путь синим, дорожная сеть оранжевым.</p></div>
+          </div>
+        </div>
+        <button class="carouselArrow carouselNext" onclick="carouselNav(1)" aria-label="Next screenshot">›</button>
+      </div>
+      <div class="carouselDots" id="carouselDots"></div>
+    </div>
+  </section>
+
+  <!-- Contra el GPS del juego, que es con lo que la gente compara primero
+       (auditoria del 12-10). Solo cosas confirmadas del juego: el mapa del
+       mundo pausa en un jugador y la llegada es en hora del juego. La voz no
+       va: el juego tambien habla. -->
+  <section id="vs-game">
+    <h2 data-i18n="vsTitle">Почему не просто <span class="accent">GPS игры?</span></h2>
+    <p class="sectionIntro" data-i18n="vsIntro">Оставьте его. Truck Dash работает рядом и добавляет то, чего нельзя сделать изнутри игры.</p>
+    <div class="vsGrid">
+      <div class="vsCard">
+        <h3 data-i18n="vs1Title">Весь маршрут без паузы</h3>
+        <p class="vsGame"><b data-i18n="vsGameLabel">В игре</b><span data-i18n="vs1Game">Открытие карты мира ставит игру на паузу (в одиночной игре).</span></p>
+        <p class="vsDash"><b data-i18n="vsDashLabel">С Truck Dash</b><span data-i18n="vs1Dash">Весь маршрут остаётся на телефоне или втором мониторе, а вы продолжаете ехать.</span></p>
+      </div>
+      <div class="vsCard">
+        <h3 data-i18n="vs2Title">Прибытие по вашему времени</h3>
+        <p class="vsGame"><b data-i18n="vsGameLabel">В игре</b><span data-i18n="vs2Game">Время прибытия показано по часам игры, которые идут примерно в 20 раз быстрее ваших.</span></p>
+        <p class="vsDash"><b data-i18n="vsDashLabel">С Truck Dash</b><span data-i18n="vs2Dash">А также реальное время, когда вы доедете, и сколько это займёт, с учётом того, как вы на самом деле едете.</span></p>
+      </div>
+      <div class="vsCard">
+        <h3 data-i18n="vs3Title">Отдельный экран</h3>
+        <p class="vsGame"><b data-i18n="vsGameLabel">В игре</b><span data-i18n="vs3Game">GPS делит экран с дорогой.</span></p>
+        <p class="vsDash"><b data-i18n="vsDashLabel">С Truck Dash</b><span data-i18n="vs3Dash">Карта, следующий поворот и ваш грузовик на телефоне, планшете или втором мониторе — или в небольшой панели поверх игры.</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cuentas: opcionales. Todo texto aca tiene que seguir siendo cierto con
+       la promesa de "sin cuenta obligatoria" del principio. -->
+  <section id="overlay">
+    <h2 data-i18n="overlayTitle">GPS <span class="accent">поверх игры.</span></h2>
+    <div class="accountsGrid">
+      <div>
+        <p data-i18n="overlayBody">Второго экрана под рукой нет или просто не хочется смотреть вниз? Клиент рисует небольшую панель поверх ETS2 и ATS, пока вы едете.</p>
+        <ul class="accountsList">
+          <li data-i18n="overlayLi1">Скорость и ограничение скорости, которое мигает при превышении</li>
+          <li data-i18n="overlayLi2">Следующий поворот и следующий город, оставшийся путь и время прибытия по вашему маршруту</li>
+          <li data-i18n="overlayLi3">Прибытие по часам игры, чтобы сравнить со сроком доставки</li>
+          <li data-i18n="overlayLi4">Выберите, что она показывает, её размер и место. Ctrl+Shift+O показывает и скрывает её</li>
+        </ul>
+        <div class="ctaRow">
+          <a class="cta onlyDesktop" href="https://github.com/Nethercap/truck-companion/releases/latest/download/TruckDash-windows.zip" data-i18n="heroCta">Скачать для Windows</a>
+          <a href="#" role="button" class="cta onlyPhone" data-send-link data-i18n="sendLinkCta">Отправить ссылку на мой ПК</a>
+          <a class="cta secondary" href="/guide/#overlay" data-i18n="overlayHow">Как это работает</a>
+        </div>
+        <p class="ctaNote" data-i18n="overlayNote">Windows, игра в окне или в полноэкранном режиме без рамки. По умолчанию выключено: включите в окне Setup клиента.</p>
+        <p class="ctaNote" data-i18n="overlayObsNote">Ведёте стримы? Есть ещё <a href="/overlay/">оверлей для OBS</a> с вашей скоростью, ограничением и рейсом.</p>
+      </div>
+      <img class="accountsShot" src="/assets/overlay-ets2.webp" alt="The Truck Dash overlay over Euro Truck Simulator 2: next turn, next city, speed and limit, distance left and arrival times" width="1000" height="565" loading="lazy" onclick="openLightbox(this.src)" />
+    </div>
+  </section>
+
+  <section id="accounts">
+    <h2 data-i18n="accountsTitle">Ваши рейсы сохранены. <span class="accent">Если хотите.</span></h2>
+    <div class="accountsGrid">
+      <div>
+        <p data-i18n="accountsBody">Привяжите клиент к бесплатному аккаунту, и каждый выполненный заказ сохранится: маршрут на карте, раскрашенный по скорости, с расстоянием, оплатой, топливом, платными дорогами, штрафами, повреждениями и временем.</p>
+        <ul class="accountsList">
+          <li data-i18n="accountsLi1">Журнал рейсов с фильтрами и выгрузкой в CSV</li>
+          <li data-i18n="accountsLi2">Статистика по каждой игре: активность по неделям и месяцам, рекорды и достижения</li>
+          <li data-i18n="accountsLi3">Страны и штаты, через которые вы проехали</li>
+          <li data-i18n="accountsLi5">Подписывайтесь на друзей: когда они примут заявку, вы увидите их рейсы и где они едут сейчас</li>
+          <li data-i18n="accountsLi4">По умолчанию закрыто, публичный профиль только по желанию. Вход через Discord, Google или e-mail</li>
+        </ul>
+        <div class="ctaRow">
+          <a class="cta" href="/account/" data-i18n="accountsCta">Создать бесплатный аккаунт</a>
+          <a class="cta secondary" href="/guide/#account" data-i18n="accountsHow">Как это работает</a>
+        </div>
+        <p class="ctaNote" data-i18n="accountsNote">Необязательно: всё остальное работает без аккаунта, и ничего не сохраняется, пока вы его не привяжете.</p>
+      </div>
+      <img class="accountsShot" src="/assets/cuentas-landing.webp" alt="A Truck Dash account: distance, deliveries and hours driven, and the latest trips with their status, truck, distance and pay" width="1600" height="999" loading="lazy" onclick="openLightbox(this.src)" />
+    </div>
+  </section>
+
+  <section id="community">
+    <h2 data-i18n="communityTitle">Сообщество</h2>
+    <div class="community">
+      <div class="communityCard">
+        <h3 data-i18n="discordTitle">Заходите в Discord</h3>
+        <p data-i18n="discordBody">Каждый заказ, доставленный с Truck Dash, публикуется на сервере вживую. Просите помощи, предлагайте моды, показывайте своё рабочее место.</p>
+        <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener" class="discordCta">
+          <svg viewBox="0 0 127.14 96.36" width="18" height="18" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.9,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+          <span data-i18n="heroDiscord">Присоединяйтесь к Discord</span>
+        </a>
+        <p style="margin-top:1rem" data-i18n="contactBody">Ошибки, идеи или вопросы? Быстрее всего в Discord, или:</p>
+        <div class="contactRow" style="margin-top:0">
+          <a href="https://github.com/Nethercap/truck-companion/issues" target="_blank" rel="noopener" data-i18n="issuesLink">Issues на GitHub</a>
+          <a href="mailto:nether.appdev@gmail.com">nether.appdev@gmail.com</a>
+        </div>
+      </div>
+      <div class="communityCard" id="latestJobs" hidden>
+        <h3 data-i18n="latestJobsTitle">Последние доставленные заказы</h3>
+        <p class="latestJobsTitle" data-i18n="latestJobsSub">Вживую от водителей Truck Dash прямо сейчас.</p>
+        <div class="latestJobsTableWrap scrollHintWrap">
+          <table class="latestJobsTable">
+            <thead>
+              <tr>
+                <th data-i18n="colRoute">Маршрут</th>
+                <th class="colTruck" data-i18n="colTruck">Грузовик</th>
+                <th data-i18n="colCargo">Груз</th>
+                <th data-i18n="colPay">Оплата</th>
+                <th class="colDistance" data-i18n="colDistance">Расстояние</th>
+                <th class="colGame" data-i18n="colGame">Игра</th>
+              </tr>
+            </thead>
+            <tbody id="latestJobsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="compare">
+    <h2 data-i18n="compareTitle">За что берут деньги платные GPS, <span class="accent">здесь бесплатно</span></h2>
+    <p class="sectionIntro" data-i18n="compareIntro">Большинство GPS-приложений для симуляторов грузовиков дают ограниченную бесплатную версию, а неограниченные маршруты, остановки и отключение рекламы прячут за подпиской. У Truck Dash нет тарифов.</p>
+    <div class="compareWrap scrollHintWrap">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="td">Truck Dash</th>
+            <th data-i18n="compareColFree">Платные приложения – бесплатная версия</th>
+            <th data-i18n="compareColPro">Платные приложения – Pro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td data-i18n="cmpMap">Живая карта &amp; подсказки на поворотах</td><td class="td yes">✓</td><td class="meh" data-i18n="cmpLimited">Дневной лимит</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmpRouting">Неограниченные маршруты</td><td class="td yes">✓</td><td class="no">✗</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmpWaypoints">Несколько остановок</td><td class="td yes">✓</td><td class="no">✗</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmpAds">Без рекламы</td><td class="td yes">✓</td><td class="no">✗</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmpWifi">Телефон на мобильном интернете (не только в той же сети Wi-Fi)</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpButtons">Кнопочная панель грузовика с телефона</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpLive">Другие водители вживую</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpOpenSource">Открытый код</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpPrice">Цена</td><td class="td price" data-i18n="cmpPriceTd">Бесплатно, навсегда</td><td data-i18n="cmpPriceFree">Бесплатно (с ограничениями)</td><td class="price" data-i18n="cmpPricePro">≈ 5 $ в месяц или 50 $ в год</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="ctaNote" data-i18n="compareNote">«Платные приложения» описывает распространённую в этой категории модель «бесплатно плюс Pro» на конец 2026 года; актуальные условия смотрите у каждого приложения.</p>
+  </section>
+
+  <section id="trust">
+    <h2 data-i18n="trustTitle">Безопасно, прозрачно, <span class="accent">ваше</span></h2>
+    <div class="trustGrid">
+      <div class="trustCard">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span data-i18n="trust1Title">Только чтение, без администратора</span></h3>
+        <p data-i18n="trust1Body">Клиент только читает официальный SDK телеметрии игры. Он никогда не трогает ваши сохранения, профили или другие файлы и никогда не просит права администратора.</p>
+      </div>
+      <div class="trustCard">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg><span data-i18n="trust2Title">Открытый код на 100%</span></h3>
+        <p data-i18n="trust2Body">Клиент, сервер и веб-приложение лежат в одном публичном репозитории. Читайте код, собирайте сами или проверяйте SHA-256 выпуска перед запуском.</p>
+      </div>
+      <div class="trustCard">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span data-i18n="trust3Title">Аккаунт не нужен, без следящих cookie</span></h3>
+        <p data-i18n="trust3Body">Регистрация не нужна. Телеметрия передаётся вживую в вашу собственную сессию браузера и не хранится. Сохраняются только доставленные заказы (маршрут, груз, оплата) для ленты сообщества, плюс ваши собственные рейсы, если вы привяжете необязательный аккаунт. Этот сайт считает посещения анонимно, без cookie.</p>
+      </div>
+    </div>
+    <div class="contactRow">
+      <a href="https://github.com/Nethercap/truck-companion" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg><span data-i18n="viewSource">Исходный код на GitHub</span></a>
+      <a href="/privacy.html" data-i18n="privacyLink">Политика конфиденциальности</a>
+      <a href="/terms.html" data-i18n="termsLink">Условия использования</a>
+      <a href="https://github.com/Nethercap/truck-companion/releases" target="_blank" rel="noopener" data-i18n="changelogLink">Изменения / выпуски</a>
+    </div>
+  </section>
+
+  <section id="mods">
+    <h2 data-i18n="modsSectionTitle">Поддержка модов карт</h2>
+    <p class="sectionIntro" data-i18n="modsSectionIntro">Клиент читает, какие моды карт включены в вашем профиле, и приложение само загружает подходящую карту — без дополнительной настройки и без отдельного скачивания. Карту можно выбрать и вручную в панели «Моды» приложения.</p>
+    <div class="modLists">
+      <div class="modList">
+        <h3><span style="color:var(--orange)">ATS</span> <span data-i18n="modsAtsTitle">American Truck Simulator</span></h3>
+        <ul>
+          <li><b>Coast to Coast</b> <span class="muted" data-i18n="modsC2CNote">новые дороги и города по всем США</span></li>
+          <li><b>ProMods Canada</b> <span class="muted" data-i18n="modsPMCNote">Британская Колумбия</span></li>
+          <li><b>Coast to Coast + ProMods Canada</b></li>
+          <li><b>Western + Eastern Canada Expansion</b> <span class="muted" data-i18n="modsCanadaNote">от Юкона до Новой Шотландии</span></li>
+          <li><b>Coast to Coast + Western/Eastern Canada Expansion</b> <span class="muted" data-i18n="modsC2CCanadaNote">с их соединениями C2C</span></li>
+          <li><b>Reforma</b> <span class="muted" data-i18n="modsReformaNote">Мексика, с Mega Resources и Sierra Nevada</span></li>
+          <li><b>Reforma + Coast to Coast + ProMods Canada</b> <span class="muted" data-i18n="modsReformaAllNote">полный набор, с патчем OtherMaps</span></li>
+        </ul>
+      </div>
+      <div class="modList">
+        <h3><span style="color:var(--blue)">ETS2</span> <span data-i18n="modsEts2Title">Euro Truck Simulator 2</span></h3>
+        <ul>
+          <li><b>ProMods</b> <span class="muted" data-i18n="modsProModsNote">Европа + Ближний Восток, The Great Steppe и Магриб</span></li>
+          <li><b>ProMods + RusMap</b> <span class="muted" data-i18n="modsRusMapNote">с коннектором ProMods–RusMap</span></li>
+          <li><b>ProMods + Roextended</b> <span class="muted" data-i18n="modsRoexNote">издание Hybrid, с RusMap или без</span></li>
+          <li><b>Grand Utopia</b> <span class="muted" data-i18n="modsGUNote">отдельная карта</span></li>
+          <li><b>European Grand Utopia</b> <span class="muted" data-i18n="modsEUGUNote">острова Grand Utopia, соединённые с Европой, с ProMods или без</span></li>
+          <li><b>TruckersMP</b> <span class="muted" data-i18n="modsTMPNote">штаб TruckersMP и CD road</span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="note" data-i18n="modsFooterNote">Эти моды по-прежнему нужно установить в игру как обычно: Truck Dash лишь умеет рисовать дополнительные дороги и прокладывать по ним маршруты. Хотите поддержку другого мода? Спросите в Discord.</p>
+  </section>
+
+  <section id="roadmap">
+    <h2 data-i18n="roadmapTitle">Что дальше</h2>
+    <p class="sectionIntro" data-i18n="roadmapIntro">Всё здесь будет бесплатным, когда выйдет, как и остальное. Список складывается из просьб в Discord и на GitHub, поэтому он меняется.</p>
+    <div class="roadmapGrid" id="roadmapGrid"></div>
+    <h3 class="roadmapSub" id="roadmapShippedTitle" data-i18n="roadmapShippedTitle" hidden>Уже вышло</h3>
+    <div class="roadmapGrid shippedGrid" id="roadmapShipped"></div>
+    <p class="roadmapFoot">
+      <span data-i18n="roadmapUpdated">Обновлено</span> <span id="roadmapUpdated">-</span> ·
+      <a href="https://github.com/Nethercap/truck-companion/issues" target="_blank" rel="noopener" data-i18n="roadmapSuggest">Предложить идею</a>
+    </p>
+  </section>
+
+  <section id="faq">
+    <h2 data-i18n="faqTitle">Частые вопросы</h2>
+    <div class="faq" id="faqList">
+      <details><summary data-i18n="faqQ1">Это правда бесплатно? В чём подвох?</summary><p data-i18n="faqA1">Подвоха нет. Аккаунт не нужен, рекламы нет, лимитов на маршруты нет, версии Pro нет. Всё с открытым кодом. Если хотите поддержать проект, можете <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">угостить меня чаем на Tecito</a>: это по желанию и ничего не открывает.</p></details>
+      <details><summary data-i18n="faqQ2">Windows или антивирус говорит, что файл «неопознанный» или опасный. Это безопасно?</summary><p data-i18n="faqA2">Да. SmartScreen показывает это предупреждение для любой новой программы без цифровой подписи (сертификаты стоят денег). Нажмите «Подробнее» → «Выполнить в любом случае». У клиента открытый код, ему не нужны права администратора, и он читает только телеметрию игры. В каждом выпуске указан SHA-256 файла для проверки, а вместо этого можно запустить его из исходного кода через Python. Некоторые антивирусы помечают его по той же причине (неподписанный самораспаковывающийся исполняемый файл): это ложное срабатывание, исходный код и журнал сборки открыты. Если ваш его блокирует, добавьте исключение или запустите клиент из исходного кода.</p></details>
+      <details><summary data-i18n="faqQ3">Телефон должен быть в той же сети Wi-Fi, что и ПК?</summary><p data-i18n="faqA3">Нет. Truck Dash связывает ПК и телефон 8-буквенным кодом через небольшой сервер-ретранслятор, поэтому телефон может быть на мобильном интернете, в другой сети, а смотреть можно даже из другого места. Ничего настраивать не нужно, IP-адреса вводить не надо. Если же вы В ТОЙ ЖЕ сети Wi-Fi, клиент предлагает и прямой режим LAN (отсканируйте QR-код в окне Setup) с минимальной задержкой, без кода и без интернета.</p></details>
+      <details><summary data-i18n="faqQ4">Работает ли с ProMods, Coast to Coast или другими модами карт?</summary><p data-i18n="faqA4">Да: ProMods (с RusMap и Roextended), Grand Utopia, European Grand Utopia и TruckersMP для ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion и Reforma для ATS — в любых привычных сочетаниях. Клиент определяет, что включено в вашем профиле, и приложение переключается само. Нужен другой? Спросите в Discord.</p></details>
+      <details><summary data-i18n="faqQ5">Он меняет игру, мои сохранения или достижения?</summary><p data-i18n="faqA5">Нет. Он читает данные через официальный SDK телеметрии от SCS Software — поддерживаемую функцию обеих игр, работающую только на чтение. В игру, профиль или сохранения ничего не записывается, достижения не затрагиваются. Работает и вместе с TruckersMP.</p></details>
+      <details><summary data-i18n="faqQ6">Что мне нужно?</summary><p data-i18n="faqA6">ПК с Windows, на котором запущен Euro Truck Simulator 2 или American Truck Simulator, и любое устройство с современным браузером для панели: телефон, планшет или второй монитор. Панель можно добавить на главный экран, чтобы она открывалась как приложение.</p></details>
+      <details><summary data-i18n="faqQ7">Панель пишет «ожидание телеметрии». Что делать?</summary><p data-i18n="faqA7">Проверьте три вещи: плагин телеметрии установлен (клиент может сделать это за вас из меню в трее), игра открыта и вы действительно в грузовике (а не в меню), и значок в трее показывает «подключено». В меню есть пункт «Показать файл журнала», который точно говорит, что было обнаружено.</p></details>
+      <details><summary data-i18n="faqQ8">Можно ли пользоваться с рулём, геймпадом или на втором мониторе?</summary><p data-i18n="faqA8">Да, Truck Dash всё равно, как вы управляете. Откройте панель в браузере на втором мониторе для большого GPS или на телефоне в держателе на столе. Кнопочная панель работает с любого из них.</p></details>
+      <details><summary data-i18n="faqQ9">Работает ли на Linux или Steam Deck?</summary><p data-i18n="faqA9">Под Proton да: клиент для Windows работает внутри префикса Proton игры, включая установку плагина и код подключения. Шаги и два готовых ярлыка запуска есть в <a href="https://github.com/Nethercap/truck-companion/tree/main/client#linux-through-proton" target="_blank" rel="noopener">README клиента</a>. Нативные Linux-версии игр пока не поддерживаются.</p></details>
+      <details><summary data-i18n="faqQ10">Можно ли использовать вместе с Trucky или другими инструментами?</summary><p data-i18n="faqA10">Да. Truck Dash ставит свой плагин телеметрии рядом с тем, что используют Trucky и похожие инструменты, не заменяя и не трогая его, так что оба работают одновременно.</p></details>
+    </div>
+  </section>
+
+  <!-- Donaciones: un link propio a Tecito y no su script, que cargaria JS
+       de un tercero en el sitio. Lo pide el usuario y no desbloquea nada. -->
+  <section id="support">
+    <h2 data-i18n="supportTitle">Поддержать Truck Dash</h2>
+    <p data-i18n="supportBody">Truck Dash делает один человек, и его работа стоит денег: серверы и хостинг карт. Если он вам полезен, чашка чая помогает ему работать дальше. Это по желанию и ничего не открывает.</p>
+    <a class="cta teaBtn" href="https://tecito.app/truckdash" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg><span data-i18n="teaButton">Угостите меня чаем!</span></a>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footerInner">
+    <div class="footerLinks">
+      <a href="/app/" data-i18n="footerApp">Открыть панель</a>
+      <a href="/guide/" data-i18n="footerGuide">Руководство</a>
+      <a href="/press/" data-i18n="footerPress">Для прессы</a>
+      <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3816420484" target="_blank" rel="noopener" data-i18n="footerSteamEts2">Руководство в Steam (ETS2)</a>
+      <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3816426342" target="_blank" rel="noopener" data-i18n="footerSteamAts">Руководство в Steam (ATS)</a>
+      <a href="#compare" data-i18n="navCompare">Бесплатно и платно</a>
+      <a href="#roadmap" data-i18n="navRoadmap">Планы</a>
+      <a href="https://github.com/Nethercap/truck-companion" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/Nethercap/truck-companion/releases" target="_blank" rel="noopener" data-i18n="changelogLink">Изменения / выпуски</a>
+      <a href="/privacy.html" data-i18n="privacyLink">Политика конфиденциальности</a>
+      <a href="/terms.html" data-i18n="termsLink">Условия использования</a>
+      <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>
+      <a href="https://www.youtube.com/@TruckDashGPS" target="_blank" rel="noopener">YouTube</a>
+      <a id="donateLink" href="#" target="_blank" rel="noopener" hidden data-i18n="donateLink">Поддержать проект</a>
+    </div>
+    <div>Truck Dash — <span data-i18n="footerNote">независимый фанатский инструмент-компаньон, не связанный с SCS Software.</span></div>
+  </div>
+</footer>
+
+<div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Truck Dash" tabindex="-1" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="Truck Dash, enlarged" />
+</div>
+
+<script>
+const DEFAULT_LANG = 'ru';
+// Donaciones: Tecito. Si se vacia, el link del pie se esconde solo.
+const DONATE_URL = 'https://tecito.app/truckdash';
+
+const TRANSLATIONS = {
+  en: {
+    metaTitle: 'Truck Dash – Free GPS & Live Dashboard for ETS2 and ATS',
+    metaDescription: 'Turn your phone or second screen into a real GPS for Euro Truck Simulator 2 and American Truck Simulator. Live map, spoken turn-by-turn directions, truck vitals, a button box and optional trip history. 100% free, no account needed, open source.',
+    ogTitle: 'Truck Dash – Free GPS & Live Dashboard for ETS2 and ATS',
+    ogDescription: 'Real map, turn-by-turn directions, truck vitals and a button box on your phone or second screen. Free, no account needed, open source.',
+    brandSub: 'Truck-Sim Companion',
+    navFeatures: 'Features',
+    navGetStarted: 'Get started',
+    navCompare: 'Free vs paid',
+    navMods: 'Mods',
+    navFaq: 'FAQ',
+    navRoadmap: 'Roadmap',
+    roadmapTitle: 'What\'s next',
+    roadmapIntro: 'Everything here is free when it lands, like the rest. The list comes from what people ask for on Discord and GitHub, so it moves.',
+    roadmapUpdated: 'Updated',
+    roadmapSuggest: 'Suggest something',
+    roadmapStatusBuilding: 'in the works',
+    roadmapStatusPlanned: 'next up',
+    roadmapStatusExploring: 'exploring',
+    roadmapStatusBlocked: 'needs a third party',
+    roadmapStatusShipped: 'shipped',
+    roadmapShippedTitle: 'Already shipped',
+    navLive: 'Live map',
+    navSignIn: 'Sign in',
+    accountsTitle: 'Your trips, saved. <span class="accent">If you want.</span>',
+    accountsBody: 'Link the client to a free account and every job you drive is kept: the route on a map, colored by speed, with distance, pay, fuel, tolls, fines, damage and times.',
+    accountsLi1: 'A logbook you can filter and export to CSV',
+    accountsLi2: 'Stats for each game: activity by week and month, records and achievements',
+    accountsLi3: 'The countries and states you drove through',
+    accountsLi4: 'Private by default, with a public profile only if you want one. Sign in with Discord, Google or email',
+    accountsLi5: 'Follow friends: once they accept, you see their trips and where they are driving now',
+    accountsCta: 'Create a free account',
+    accountsHow: 'How it works',
+    accountsNote: 'Optional: everything else works without an account, and nothing is saved until you link it.',
+    overlayTitle: 'The GPS, <span class="accent">on top of the game.</span>',
+    overlayBody: 'No second screen at hand, or you just don\'t want to look down? The client draws a small panel over ETS2 and ATS while you drive.',
+    overlayLi1: 'Speed and speed limit, blinking when you go over',
+    overlayLi2: 'Next turn and next city, distance left and arrival time from your route',
+    overlayLi3: 'Arrival on the game clock, to check against your delivery deadline',
+    overlayLi4: 'Pick what it shows, its size and where it goes. Ctrl+Shift+O shows and hides it',
+    overlayHow: 'How it works',
+    overlayNote: 'Windows, with the game in a window or in borderless fullscreen. Off by default: turn it on in the client\'s Setup.',
+    overlayObsNote: 'Streaming? There is also an <a href="/overlay/">overlay for OBS</a> with your speed, the limit and your trip.',
+    navCommunity: 'Community',
+    kicker: 'For Euro Truck Simulator 2 &amp; American Truck Simulator',
+    heroTitle: 'Your phone is now a <span class="accent">real GPS</span> for your truck sim.',
+    heroTagline: 'Live map with real roads, turn-by-turn directions, speed limit, fuel and wear, plus a button box to control your truck, on your phone, tablet or second screen.',
+    heroCta: 'Download for Windows',
+    heroCta2: 'How it works',
+    heroDemo: 'See the live demo',
+    heroLive: 'Watch the live map',
+    heroVideo: 'Watch the 1-minute video',
+    ctaNote: 'Portable .exe, no installer, no admin rights. Dashboard opens in any browser.',
+    ctaNotePhone: 'Truck Dash runs on your Windows PC and your phone is the screen. Try the demo now, and open the link on your PC to download it.',
+    sendLinkCta: 'Send the link to my PC',
+    sendLinkText: 'Truck Dash: free GPS and dashboard for ETS2 and ATS. Download it on your PC:',
+    linkCopied: 'Link copied. Open it on your PC.',
+    badgeFree: 'Free forever',
+    badgeNoLogin: 'No account needed',
+    badgeNoLimits: 'No routing limits, no ads',
+    badgeOpenSource: 'Open source',
+    heroDiscord: 'Join our Discord',
+    driversOnlineText: '{n} drivers online right now',
+    jobsDeliveredText: '{n} jobs delivered with Truck Dash',
+    gsTitle: 'Up and running in <span class="accent">two minutes</span>',
+    gsIntro: 'No installer, no sign-up, no admin rights. Three steps, once.',
+    gsStep1Title: 'Download the client',
+    gsStep1Body: 'A small portable program for Windows. Unzip it anywhere and run <code>TruckDash.exe</code>. It lives in your system tray.',
+    gsStep1Link: 'Download TruckDash-windows.zip',
+    gsStep1Releases: 'All versions and what changed',
+    gsStep2Title: 'Let it set up the game',
+    gsStep2Body: 'On first run, the client finds your ETS2 / ATS install and installs its telemetry plugin, built on SCS\'s official SDK, with one click. It sits next to Trucky or any other telemetry tool without touching them. Prefer to do it by hand? The manual steps are in the README.',
+    gsStep2Link: 'Manual plugin install (README)',
+    gsStep3Title: 'Drive',
+    gsStep3Body: 'Open the game. Your browser opens the dashboard already connected. On your phone, go to <code>trucksim-dash.com/app</code> and type the 8-letter code from the tray icon — your phone doesn\'t even need to be on the same Wi-Fi.',
+    gsStep3Link: 'Open the dashboard →',
+    smartscreenTitle: 'Windows says "unrecognized app"?',
+    smartscreenBody: 'That\'s SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn\'t need admin rights and only reads the game\'s telemetry. Every release page lists the file\'s SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.',
+    sourceOptionLink: 'Run from source →',
+    featuresTitle: 'Everything a truck GPS should do. <span class="accent">And then some.</span>',
+    featGroupNav: 'Navigate',
+    featGroupTruck: 'See your truck',
+    featGroupShare: 'Save and share',
+    featMapTitle: 'Real roads, real routes',
+    featMapBody: 'The actual road network of both games, lined up with the game\'s own coordinates. Turn-by-turn directions with the name of the road you turn onto, a map that turns as you drive, and routes that skip the map DLCs you don\'t own.',
+    featVoiceTitle: 'Spoken directions <span class="tag">new</span>',
+    featVoiceBody: 'A heads-up before each turn, again at the turn, and when you arrive. Natural recorded voices in 8 languages, with no road names to mispronounce. Off by default, one switch in Settings.',
+    featWaypointsTitle: 'Stops along the way',
+    featWaypointsBody: 'Tap the map, or search fuel, rest areas, service and companies, to route through them. The nearest fuel or rest stop is one tap away, and numbered stops clear themselves as you reach them.',
+    featPanelTitle: 'A dashboard on any screen',
+    featPanelBody: 'Speed and the limit, cruise, fuel and range, rest, wear, the job deadline and your arrival in real time, on a phone, tablet or second monitor. Your phone can be on mobile data, no same Wi-Fi needed, and every button and panel can be dragged where it suits you.',
+    featButtonsTitle: 'Truck button box',
+    featButtonsBody: 'Hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers and more: tap on your phone and the client presses the real key, read from your own in-game controls.',
+    featStatsTitle: 'Trip history and stats <span class="tag">new</span>',
+    featStatsBody: 'With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.',
+    featLiveTitle: 'Other drivers, live',
+    featLiveBody: 'Watch Truck Dash drivers move on the <a href="/live/">public live map</a>, anonymous, with one toggle to stay off it. Or share a 6-letter code with friends and drive as a convoy (beta), each in your own game, no TruckersMP needed.',
+    featStreamTitle: 'On stream and on Discord <span class="tag">new</span>',
+    featStreamBody: 'A free <a href="/overlay/">overlay for OBS</a> with your speed, the next turn and your trip, and a Discord status that shows the run in progress while you drive. Both stay off until you turn them on.',
+    featMoreLink: 'Everything else, from the in-game overlay settings to the Road Trip atlas in ATS, is in the user guide',
+    vsTitle: 'Why not just the <span class="accent">game\'s GPS?</span>',
+    vsIntro: 'Keep it. Truck Dash runs next to it and adds what can\'t be done from inside the game.',
+    vsGameLabel: 'In the game',
+    vsDashLabel: 'With Truck Dash',
+    vs1Title: 'The whole route, without pausing',
+    vs1Game: 'Opening the world map pauses the game (in single player).',
+    vs1Dash: 'The full route stays on your phone or second monitor while you keep driving.',
+    vs2Title: 'Arrival in your own time',
+    vs2Game: 'The arrival time is on the game clock, which runs about 20 times faster than yours.',
+    vs2Dash: 'Also the real time you will get there and how long that is, based on how you are actually driving.',
+    vs3Title: 'A screen of its own',
+    vs3Game: 'The GPS shares the screen with the road.',
+    vs3Dash: 'The map, the next turn and your truck on a phone, tablet or second monitor, or in a small panel on top of the game.',
+    tagBeta: 'beta',
+    tagNew: 'new',
+    modsAtsTitle: 'American Truck Simulator',
+    modsEts2Title: 'Euro Truck Simulator 2',
+    modsC2CNote: 'new roads and cities across the US',
+    modsPMCNote: 'British Columbia',
+    modsReformaNote: 'Mexico, with Mega Resources and Sierra Nevada',
+    modsReformaAllNote: 'the full pack, with the OtherMaps patch',
+    modsCanadaNote: 'from the Yukon to Nova Scotia',
+    modsC2CCanadaNote: 'with their C2C connections',
+    modsProModsNote: 'Europe + Middle East, The Great Steppe and Maghreb',
+    modsRusMapNote: 'with the ProMods–RusMap connector',
+    modsRoexNote: 'Hybrid edition, with or without RusMap',
+    modsGUNote: 'standalone map',
+    modsEUGUNote: 'the Grand Utopia islands joined to Europe, with or without ProMods',
+    modsTMPNote: 'TruckersMP HQ and the CD road',
+    screenshotCaption: 'This is what it looks like while driving:',
+    slideDemo: 'Live: GPS mode with turn-by-turn prompts, speed limit and cruise control.',
+    slideDemoLink: 'Try the demo →',
+    slideDashboard: 'Desktop: real map, live route and every truck stat in one view.',
+    slidePanelWide: 'Second screen: the whole trip on a ribbon, whether you arrive before the deadline and whether the fuel lasts.',
+    slidePanelTall: 'The same panel on a phone: it lays itself out for portrait, and never loads the map.',
+    slideWaypoints: 'Multi-stop routing: numbered waypoints that clear themselves as you reach them.',
+    slideFindNearby: 'Find nearby: fuel, rest areas, service, garages and companies, sorted by distance.',
+    slideGps: 'Phone in GPS mode: heading-up map, speed limit and cruise readout.',
+    slideTurn: 'Turn-by-turn: the next manoeuvre and the road it puts you on, with the map turning as you drive.',
+    slideButtons: 'Button box: tap on your phone, the client presses the real key in the game.',
+    slideOverview: 'Zoomed out: the whole route, driven trail in blue, road network in orange.',
+    compareTitle: 'What paid GPS apps charge for, <span class="accent">free here</span>',
+    compareIntro: 'Most truck-sim GPS apps give you a limited free tier and put routing limits, waypoints and ad removal behind a subscription. Truck Dash has no tiers.',
+    compareColFree: 'Paid apps – free tier',
+    compareColPro: 'Paid apps – Pro',
+    cmpMap: 'Live map &amp; turn-by-turn',
+    cmpLimited: 'Daily limit',
+    cmpRouting: 'Unlimited routing',
+    cmpWaypoints: 'Multi-stop waypoints',
+    cmpAds: 'No ads',
+    cmpWifi: 'Phone on mobile data (not only same Wi-Fi)',
+    cmpButtons: 'Truck button box from your phone',
+    cmpLive: 'See other drivers live',
+    cmpOpenSource: 'Open source',
+    cmpPrice: 'Price',
+    cmpPriceTd: 'Free, forever',
+    cmpPriceFree: 'Free (limited)',
+    cmpPricePro: '≈ $5/month or $50/year',
+    compareNote: '"Paid apps" describes the common free-with-Pro model in this category as of late 2026; check each app for its current terms.',
+    trustTitle: 'Safe, transparent, <span class="accent">yours</span>',
+    trust1Title: 'Read-only, no admin',
+    trust1Body: 'The client only reads the game\'s official telemetry SDK. It never touches your saves, profiles or any other file, and it never asks for administrator rights.',
+    trust2Title: '100% open source',
+    trust2Body: 'Client, backend and web app live in one public repository. Read the code, build it yourself, or verify a release\'s SHA-256 before running it.',
+    trust3Title: 'No account needed, no tracking cookies',
+    trust3Body: 'No sign-up needed. Telemetry is relayed live to your own browser session and not stored. Only delivered jobs (route, cargo, pay) are kept for the community feed, plus your own trips if you link an optional account. This website counts visits anonymously, without cookies.',
+    viewSource: 'Source on GitHub',
+    privacyLink: 'Privacy policy',
+    termsLink: 'Terms of use',
+    changelogLink: 'Changelog / releases',
+    modsSectionTitle: 'Map mod support',
+    modsSectionIntro: 'The client reads which map mods your profile has active and the app loads the matching map on its own — no extra setup, no separate download. You can also pick one by hand in the app\'s Mods panel.',
+    modsFooterNote: 'These mods still need to be installed in your game as usual — Truck Dash just knows how to draw the extra roads and route on them. Want another mod supported? Ask on Discord.',
+    faqTitle: 'Frequently asked questions',
+    faqQ1: 'Is it really free? What\'s the catch?',
+    faqA1: 'No catch. No account needed, no ads, no routing limits, no Pro tier. Everything is open source. If you want to support it, you can <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">buy me a tea on Tecito</a>: it\'s optional and doesn\'t unlock anything.',
+    faqQ2: 'Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?',
+    faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive: the source and the build log are public. If yours blocks it, you can add an exclusion or run the client from source.',
+    faqQ3: 'Does my phone need to be on the same Wi-Fi as my PC?',
+    faqA3: 'No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type. If you ARE on the same Wi-Fi, the client also offers a direct LAN mode (scan a QR code in its Setup window) with the lowest latency, no code and no internet needed.',
+    faqQ4: 'Does it work with ProMods, Coast to Coast or other map mods?',
+    faqA4: 'Yes: ProMods (with RusMap and Roextended), Grand Utopia, European Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.',
+    faqQ5: 'Does it modify the game, my saves or my achievements?',
+    faqA5: 'No. It reads data through SCS Software\'s official Telemetry SDK, which is a supported, read-only feature of both games. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.',
+    faqQ6: 'What do I need?',
+    faqA6: 'A Windows PC running Euro Truck Simulator 2 or American Truck Simulator, and any device with a modern browser for the dashboard: your phone, a tablet, or a second monitor. You can add the dashboard to your home screen so it opens like an app.',
+    faqQ7: 'The dashboard says "waiting for telemetry". What now?',
+    faqA7: 'Three things to check: the telemetry plugin is installed (the client can do it for you from the tray menu), the game is open and you\'re actually in the truck (not in a menu), and the tray icon shows "connected". The tray menu has a "Show log file" option that says exactly what it detected.',
+    faqQ8: 'Can I use it with a steering wheel, controller or on a second monitor?',
+    faqA8: 'Yes — Truck Dash doesn\'t care how you drive. Open the dashboard in a browser on a second monitor for a big GPS view, or on a phone mounted on your desk. The button box works from any of them.',
+    faqQ9: 'Does it work on Linux or the Steam Deck?',
+    faqA9: 'Under Proton, yes: the Windows client runs inside the game\'s Proton prefix, plugin install and pairing code included. The steps and two ready-made launchers are in the <a href="https://github.com/Nethercap/truck-companion/tree/main/client#linux-through-proton" target="_blank" rel="noopener">client README</a>. The native Linux builds of the games are not supported yet.',
+    faqQ10: 'Can I use it together with Trucky or other tools?',
+    faqA10: 'Yes. Truck Dash installs its own telemetry plugin next to the one Trucky and similar tools use, without replacing or touching it, so both work at the same time.',
+    communityTitle: 'Community',
+    discordTitle: 'Join the Discord',
+    discordBody: 'Every job delivered with Truck Dash is posted live in the server. Ask for help, request a mod, share your rig.',
+    contactBody: 'Bugs, ideas or questions? Discord is fastest, or:',
+    issuesLink: 'GitHub issues',
+    latestJobsTitle: 'Latest jobs delivered',
+    latestJobsSub: 'Live from Truck Dash drivers right now.',
+    colRoute: 'Route',
+    colTruck: 'Truck',
+    colCargo: 'Cargo',
+    colPay: 'Pay',
+    colDistance: 'Distance',
+    colGame: 'Game',
+    footerApp: 'Open dashboard',
+    footerGuide: 'User guide',
+    footerPress: 'Press kit',
+    footerSteamEts2: 'Steam guide (ETS2)',
+    footerSteamAts: 'Steam guide (ATS)',
+    donateLink: 'Support the project',
+    supportTitle: 'Support Truck Dash',
+    supportBody: 'Truck Dash is made by one person, and keeping it running costs money: the servers and the map hosting. If it\'s useful to you, a tea helps keep it going. It\'s optional and it doesn\'t unlock anything.',
+    teaButton: 'Buy me a cup of tea!',
+    footerNote: 'an independent fan-made companion tool, not affiliated with SCS Software.',
+  },
+  es: {
+    metaTitle: 'Truck Dash – GPS y tablero en vivo gratis para ETS2 y ATS',
+    metaDescription: 'Convertí tu celular o segundo monitor en un GPS real para Euro Truck Simulator 2 y American Truck Simulator. Mapa en vivo, indicaciones de giro habladas, estado del camión, botonera e historial de viajes opcional. 100% gratis, sin cuenta obligatoria, código abierto.',
+    ogTitle: 'Truck Dash – GPS y tablero en vivo gratis para ETS2 y ATS',
+    ogDescription: 'Mapa real, indicaciones de giro, estado del camión y botonera en tu celular o segundo monitor. Gratis, sin cuenta obligatoria, código abierto.',
+    brandSub: 'Companion de Truck-Sim',
+    navFeatures: 'Funciones',
+    navGetStarted: 'Empezar',
+    navCompare: 'Gratis vs pagas',
+    navMods: 'Mods',
+    navFaq: 'Preguntas',
+    navRoadmap: 'Roadmap',
+    roadmapTitle: 'Qué viene',
+    roadmapIntro: 'Todo lo que está acá va a ser gratis cuando salga, como el resto. La lista sale de lo que pide la gente en Discord y GitHub, así que se mueve.',
+    roadmapUpdated: 'Actualizado',
+    roadmapSuggest: 'Proponer algo',
+    roadmapStatusBuilding: 'en curso',
+    roadmapStatusPlanned: 'lo próximo',
+    roadmapStatusExploring: 'en estudio',
+    roadmapStatusBlocked: 'depende de terceros',
+    roadmapStatusShipped: 'ya está',
+    roadmapShippedTitle: 'Ya salió',
+    navLive: 'Mapa en vivo',
+    navSignIn: 'Entrar',
+    accountsTitle: 'Tus viajes, guardados. <span class="accent">Si querés.</span>',
+    accountsBody: 'Vinculá el cliente a una cuenta gratis y cada trabajo que manejás queda guardado: el recorrido en un mapa, con colores por velocidad, y la distancia, la plata, el combustible, los peajes, las multas, el daño y los tiempos.',
+    accountsLi1: 'Un logbook que podés filtrar y exportar a CSV',
+    accountsLi2: 'Estadísticas por juego: actividad por semana y por mes, récords y logros',
+    accountsLi3: 'Los países y estados por los que pasaste',
+    accountsLi4: 'Privado por defecto, con perfil público solo si querés. Entrás con Discord, Google o mail',
+    accountsLi5: 'Seguir a amigos: cuando te aceptan, ves sus viajes y por dónde andan manejando',
+    accountsCta: 'Crear una cuenta gratis',
+    accountsHow: 'Cómo funciona',
+    accountsNote: 'Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.',
+    overlayTitle: 'El GPS, <span class="accent">arriba del juego.</span>',
+    overlayBody: '¿No tenés una segunda pantalla a mano, o no querés bajar la vista? El cliente dibuja un recuadro chico sobre ETS2 y ATS mientras manejás.',
+    overlayLi1: 'Velocidad y límite, que titila si te pasás',
+    overlayLi2: 'Próximo giro y próxima ciudad, lo que falta y la hora de llegada de tu ruta',
+    overlayLi3: 'La llegada en el reloj del juego, para compararla con el plazo de entrega',
+    overlayLi4: 'Elegís qué muestra, el tamaño y dónde va. Ctrl+Shift+O lo muestra y lo esconde',
+    overlayHow: 'Cómo funciona',
+    overlayNote: 'Windows, con el juego en ventana o en pantalla completa sin bordes. Viene apagado: se prende en la Configuración del cliente.',
+    overlayObsNote: '¿Hacés streaming? También hay un <a href="/overlay/">overlay para OBS</a> con tu velocidad, el límite y tu viaje.',
+    navCommunity: 'Comunidad',
+    kicker: 'Para Euro Truck Simulator 2 y American Truck Simulator',
+    heroTitle: 'Tu celular ahora es un <span class="accent">GPS real</span> para tu simulador de camiones.',
+    heroTagline: 'Mapa en vivo con rutas reales, indicaciones de giro, límite de velocidad, combustible y desgaste, más una botonera para controlar el camión, en tu celular, tablet o segundo monitor.',
+    heroCta: 'Descargar para Windows',
+    heroCta2: 'Cómo funciona',
+    heroDemo: 'Ver la demo en vivo',
+    heroLive: 'Ver el mapa en vivo',
+    heroVideo: 'Mirá el video de 1 minuto',
+    ctaNote: '.exe portable, sin instalador, sin permisos de administrador. El tablero abre en cualquier navegador.',
+    ctaNotePhone: 'Truck Dash corre en tu PC con Windows y el celular es la pantalla. Probá la demo ahora y abrí el link en la PC para bajarlo.',
+    sendLinkCta: 'Mandarme el link a la PC',
+    sendLinkText: 'Truck Dash: GPS y tablero gratis para ETS2 y ATS. Bajalo en la PC:',
+    linkCopied: 'Link copiado. Abrilo en la PC.',
+    badgeFree: 'Gratis para siempre',
+    badgeNoLogin: 'Sin cuenta obligatoria',
+    badgeNoLimits: 'Sin límite de rutas, sin publicidad',
+    badgeOpenSource: 'Código abierto',
+    heroDiscord: 'Unite a nuestro Discord',
+    driversOnlineText: '{n} camioneros conectados ahora',
+    jobsDeliveredText: '{n} trabajos entregados con Truck Dash',
+    gsTitle: 'Listo en <span class="accent">dos minutos</span>',
+    gsIntro: 'Sin instalador, sin registrarte, sin permisos de administrador. Tres pasos, una sola vez.',
+    gsStep1Title: 'Descargá el cliente',
+    gsStep1Body: 'Un programa chico y portable para Windows. Descomprimilo donde quieras y abrí <code>TruckDash.exe</code>. Vive en la bandeja del sistema.',
+    gsStep1Link: 'Descargar TruckDash-windows.zip',
+    gsStep1Releases: 'Todas las versiones y qué cambió',
+    gsStep2Title: 'Dejá que configure el juego',
+    gsStep2Body: 'La primera vez, el cliente encuentra tu instalación de ETS2 / ATS e instala su plugin de telemetría, hecho sobre el SDK oficial de SCS, con un click. Convive con Trucky o cualquier otra herramienta de telemetría sin tocarlas. ¿Preferís hacerlo a mano? Los pasos manuales están en el README.',
+    gsStep2Link: 'Instalación manual del plugin (README)',
+    gsStep3Title: 'Manejá',
+    gsStep3Body: 'Abrí el juego. Tu navegador abre el tablero ya conectado. Desde el celular, entrá a <code>trucksim-dash.com/app</code> y escribí el código de 8 letras del ícono de la bandeja — ni siquiera hace falta que esté en la misma WiFi.',
+    gsStep3Link: 'Abrir el tablero →',
+    smartscreenTitle: '¿Windows dice "aplicación no reconocida"?',
+    smartscreenBody: 'Es SmartScreen avisando sobre cualquier programa nuevo sin firmar — tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que verifiques lo que bajaste, y siempre podés correrlo directo desde el código fuente.',
+    sourceOptionLink: 'Correr desde el código fuente →',
+    featuresTitle: 'Todo lo que un GPS de camión tiene que hacer. <span class="accent">Y bastante más.</span>',
+    featGroupNav: 'Navegar',
+    featGroupTruck: 'Tu camión a la vista',
+    featGroupShare: 'Guardar y compartir',
+    featMapTitle: 'Rutas reales, por calles reales',
+    featMapBody: 'La red de rutas real de los dos juegos, alineada con las coordenadas del propio juego. Indicaciones giro a giro con el nombre de la ruta a la que doblás, un mapa que gira mientras manejás y rutas que esquivan los DLC de mapa que no tenés.',
+    featVoiceTitle: 'Indicaciones habladas <span class="tag">nuevo</span>',
+    featVoiceBody: 'Un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, sin nombres de rutas que pronunciar mal. Apagadas de entrada, se prenden con un botón en Ajustes.',
+    featWaypointsTitle: 'Paradas en el camino',
+    featWaypointsBody: 'Tocá el mapa, o buscá combustible, áreas de descanso, talleres y empresas, para pasar por ahí. La estación o el descanso más cercano está a un toque, y las paradas numeradas se quitan solas cuando llegás.',
+    featPanelTitle: 'Un tablero en cualquier pantalla',
+    featPanelBody: 'Velocidad y límite, crucero, combustible y autonomía, descanso, desgaste, el plazo del trabajo y tu llegada en hora real, en un celular, una tablet o un segundo monitor. El celular puede estar con datos móviles, sin compartir el Wi-Fi, y cada botón y panel se puede arrastrar a donde te quede cómodo.',
+    featButtonsTitle: 'Botonera del camión',
+    featButtonsBody: 'Balizas, beacon, freno de mano, motor, trailer, cámara, crucero, luces, limpiaparabrisas y más: tocás en el celular y el cliente aprieta la tecla de verdad, leída de tus propios controles del juego.',
+    featStatsTitle: 'Historial de viajes y estadísticas <span class="tag">nuevo</span>',
+    featStatsBody: 'Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, récords y logros, amigos para seguir y un perfil público solo si lo querés. <a href="#accounts">Más abajo</a>.',
+    featLiveTitle: 'Otros camioneros en vivo',
+    featLiveBody: 'Mirá a los camioneros de Truck Dash moverse en el <a href="/live/">mapa en vivo público</a>, de forma anónima y con un tilde para no aparecer. O compartí un código de 6 letras con amigos y manejen en convoy (beta), cada uno en su juego, sin TruckersMP.',
+    featStreamTitle: 'En el stream y en Discord <span class="tag">nuevo</span>',
+    featStreamBody: 'Un <a href="/overlay/">overlay para OBS</a> gratis con tu velocidad, el próximo giro y tu viaje, y un estado de Discord que muestra el viaje en curso mientras manejás. Los dos quedan apagados hasta que los prendés.',
+    featMoreLink: 'Todo lo demás, desde los ajustes del overlay en el juego hasta el atlas del Road Trip en ATS, está en la guía de uso',
+    vsTitle: '¿Por qué no alcanza con el <span class="accent">GPS del juego?</span>',
+    vsIntro: 'Seguí usándolo. Truck Dash va al lado y suma lo que desde adentro del juego no se puede.',
+    vsGameLabel: 'En el juego',
+    vsDashLabel: 'Con Truck Dash',
+    vs1Title: 'Toda la ruta, sin pausar',
+    vs1Game: 'Abrir el mapa del mundo pausa el juego (en un jugador).',
+    vs1Dash: 'La ruta completa queda en el celular o el segundo monitor mientras seguís manejando.',
+    vs2Title: 'La llegada en tu hora',
+    vs2Game: 'La hora de llegada es la del reloj del juego, que corre unas 20 veces más rápido que el tuyo.',
+    vs2Dash: 'También la hora real a la que llegás y cuánto falta, según cómo venís manejando.',
+    vs3Title: 'Una pantalla propia',
+    vs3Game: 'El GPS comparte la pantalla con la ruta.',
+    vs3Dash: 'El mapa, el próximo giro y tu camión en un celular, una tablet o un segundo monitor, o en un recuadro chico encima del juego.',
+    tagBeta: 'beta',
+    tagNew: 'nuevo',
+    modsAtsTitle: 'American Truck Simulator',
+    modsEts2Title: 'Euro Truck Simulator 2',
+    modsC2CNote: 'rutas y ciudades nuevas por todo EE. UU.',
+    modsPMCNote: 'Columbia Británica',
+    modsReformaNote: 'México, con Mega Resources y Sierra Nevada',
+    modsReformaAllNote: 'el pack completo, con el parche OtherMaps',
+    modsCanadaNote: 'del Yukón a Nueva Escocia',
+    modsC2CCanadaNote: 'con sus conectores para C2C',
+    modsProModsNote: 'Europa + Middle East, The Great Steppe y Maghreb',
+    modsRusMapNote: 'con el conector ProMods–RusMap',
+    modsRoexNote: 'edición Hybrid, con o sin RusMap',
+    modsGUNote: 'mapa standalone',
+    modsEUGUNote: 'las islas de Grand Utopia pegadas a Europa, con o sin ProMods',
+    modsTMPNote: 'la sede de TruckersMP y la ruta CD',
+    screenshotCaption: 'Así se ve mientras manejás:',
+    slideDemo: 'En vivo: modo GPS con indicaciones giro a giro, límite de velocidad y crucero.',
+    slideDemoLink: 'Probá la demo →',
+    slideDashboard: 'Escritorio: mapa real, ruta en vivo y todos los datos del camión en una sola vista.',
+    slidePanelWide: 'Segunda pantalla: el viaje entero en una cinta, si llegás antes del vencimiento y si te alcanza la nafta.',
+    slidePanelTall: 'El mismo panel en el celular: se acomoda solo al vertical, y nunca carga el mapa.',
+    slideWaypoints: 'Rutas con paradas: waypoints numerados que se quitan solos cuando llegás.',
+    slideFindNearby: 'Buscar cerca: combustible, áreas de descanso, talleres, garages y empresas, ordenados por distancia.',
+    slideGps: 'Celular en modo GPS: mapa orientado al rumbo, límite de velocidad y crucero.',
+    slideTurn: 'Giro a giro: la próxima maniobra y a qué ruta te mete, con el mapa girando mientras manejás.',
+    slideButtons: 'Botonera: tocás en el celular, el cliente aprieta la tecla real en el juego.',
+    slideOverview: 'Alejado: toda la ruta, el recorrido hecho en azul, la red de rutas en naranja.',
+    compareTitle: 'Lo que las apps de GPS pagas cobran, <span class="accent">acá es gratis</span>',
+    compareIntro: 'La mayoría de las apps de GPS para simuladores de camiones dan un plan gratis limitado y ponen los límites de ruteo, los waypoints y sacar la publicidad detrás de una suscripción. Truck Dash no tiene planes.',
+    compareColFree: 'Apps pagas – plan gratis',
+    compareColPro: 'Apps pagas – Pro',
+    cmpMap: 'Mapa en vivo e indicaciones de giro',
+    cmpLimited: 'Límite diario',
+    cmpRouting: 'Ruteo ilimitado',
+    cmpWaypoints: 'Waypoints múltiples',
+    cmpAds: 'Sin publicidad',
+    cmpWifi: 'Celular con datos móviles (no solo misma WiFi)',
+    cmpButtons: 'Botonera del camión desde el celular',
+    cmpLive: 'Ver otros camioneros en vivo',
+    cmpOpenSource: 'Código abierto',
+    cmpPrice: 'Precio',
+    cmpPriceTd: 'Gratis, para siempre',
+    cmpPriceFree: 'Gratis (limitado)',
+    cmpPricePro: '≈ USD 5/mes o USD 50/año',
+    compareNote: '"Apps pagas" describe el modelo habitual gratis-con-Pro de esta categoría a fines de 2026; revisá cada app para sus condiciones actuales.',
+    trustTitle: 'Seguro, transparente, <span class="accent">tuyo</span>',
+    trust1Title: 'Solo lectura, sin administrador',
+    trust1Body: 'El cliente solo lee el SDK oficial de telemetría del juego. Nunca toca tus partidas, perfiles ni ningún otro archivo, y nunca pide permisos de administrador.',
+    trust2Title: '100% código abierto',
+    trust2Body: 'Cliente, backend y web viven en un solo repositorio público. Leé el código, compilalo vos mismo, o verificá el SHA-256 de un release antes de correrlo.',
+    trust3Title: 'Sin cuenta obligatoria, sin cookies de rastreo',
+    trust3Body: 'Sin registro obligatorio. La telemetría se retransmite en vivo a tu propia sesión del navegador y no se guarda. Solo los trabajos entregados (ruta, carga, pago) se conservan para el feed de la comunidad, más tus propios viajes si vinculás una cuenta opcional. Este sitio cuenta las visitas de forma anónima, sin cookies.',
+    viewSource: 'Código en GitHub',
+    privacyLink: 'Política de privacidad',
+    termsLink: 'Términos de uso',
+    changelogLink: 'Novedades / releases',
+    modsSectionTitle: 'Soporte de mods de mapa',
+    modsSectionIntro: 'El cliente lee qué mods de mapa tiene activos tu perfil y la app carga el mapa que corresponde sola — sin configurar nada, sin descargas aparte. También podés elegirlo a mano en el panel de Mods de la app.',
+    modsFooterNote: 'Estos mods hay que tenerlos instalados en el juego como siempre — Truck Dash solo sabe dibujar las rutas extra y rutear por ellas. ¿Querés otro mod? Pedilo en Discord.',
+    faqTitle: 'Preguntas frecuentes',
+    faqQ1: '¿Es realmente gratis? ¿Cuál es la trampa?',
+    faqA1: 'No hay trampa. Sin cuenta obligatoria, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. Si querés apoyarlo, podés <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">invitarme un tecito</a>: es opcional y no desbloquea nada.',
+    faqQ2: 'Windows o mi antivirus dicen que el archivo es "no reconocido" o peligroso. ¿Es seguro?',
+    faqA2: 'Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python. Algunos antivirus lo marcan por lo mismo (un ejecutable sin firma que se descomprime solo): es un falso positivo: el código y el log de compilación son públicos. Si el tuyo lo bloquea, podés agregar una excepción o correr el cliente desde el código fuente.',
+    faqQ3: '¿Mi celular tiene que estar en la misma WiFi que la PC?',
+    faqA3: 'No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.',
+    faqQ4: '¿Funciona con ProMods, Coast to Coast u otros mods de mapa?',
+    faqA4: 'Sí: ProMods (con RusMap y Roextended), Grand Utopia, European Grand Utopia y TruckersMP para ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion y Reforma para ATS — en las combinaciones habituales. El cliente detecta lo que usa tu perfil y la app cambia sola. ¿Querés otro? Pedilo en Discord.',
+    faqQ5: '¿Modifica el juego, mis partidas o mis logros?',
+    faqA5: 'No. Lee los datos a través del SDK de telemetría oficial de SCS Software, que es una función soportada y de solo lectura de ambos juegos. No se escribe nada en el juego, tu perfil ni tus partidas, y los logros no se ven afectados. También funciona junto con TruckersMP.',
+    faqQ6: '¿Qué necesito?',
+    faqA6: 'Una PC con Windows corriendo Euro Truck Simulator 2 o American Truck Simulator, y cualquier dispositivo con un navegador moderno para el tablero: tu celular, una tablet o un segundo monitor. Podés agregar el tablero a la pantalla de inicio para que abra como una app.',
+    faqQ7: 'El tablero dice "esperando telemetría". ¿Y ahora?',
+    faqA7: 'Tres cosas para revisar: que el plugin de telemetría esté instalado (el cliente lo puede hacer por vos desde el menú de la bandeja), que el juego esté abierto y estés arriba del camión (no en un menú), y que el ícono de la bandeja diga "connected". El menú de la bandeja tiene una opción "Show log file" que dice exactamente qué detectó.',
+    faqQ8: '¿Puedo usarlo con volante, joystick o en un segundo monitor?',
+    faqA8: 'Sí — a Truck Dash no le importa cómo manejás. Abrí el tablero en un navegador en un segundo monitor para un GPS grande, o en un celular apoyado en el escritorio. La botonera funciona desde cualquiera.',
+    faqQ9: '¿Anda en Linux o en la Steam Deck?',
+    faqA9: 'Con Proton, sí: el cliente de Windows corre adentro del prefijo de Proton del juego, con la instalación del plugin y el código de emparejamiento incluidos. Los pasos y dos lanzadores listos están en el <a href="https://github.com/Nethercap/truck-companion/tree/main/client#linux-through-proton" target="_blank" rel="noopener">README del cliente</a>. Los builds nativos de Linux de los juegos todavía no están soportados.',
+    faqQ10: '¿Puedo usarlo junto con Trucky u otras herramientas?',
+    faqA10: 'Sí. Truck Dash instala su propio plugin de telemetría al lado del que usan Trucky y herramientas parecidas, sin reemplazarlo ni tocarlo, así que andan los dos a la vez.',
+    communityTitle: 'Comunidad',
+    discordTitle: 'Sumate al Discord',
+    discordBody: 'Cada trabajo entregado con Truck Dash se publica en vivo en el servidor. Pedí ayuda, pedí un mod, mostrá tu equipo.',
+    contactBody: '¿Errores, ideas o preguntas? Discord es lo más rápido, o:',
+    issuesLink: 'Issues en GitHub',
+    latestJobsTitle: 'Últimos trabajos entregados',
+    latestJobsSub: 'En vivo, de los camioneros de Truck Dash ahora mismo.',
+    colRoute: 'Ruta',
+    colTruck: 'Camión',
+    colCargo: 'Carga',
+    colPay: 'Pago',
+    colDistance: 'Distancia',
+    colGame: 'Juego',
+    footerApp: 'Abrir el tablero',
+    footerGuide: 'Guía de uso',
+    footerPress: 'Kit de prensa',
+    footerSteamEts2: 'Guía de Steam (ETS2)',
+    footerSteamAts: 'Guía de Steam (ATS)',
+    donateLink: 'Apoyar el proyecto',
+    supportTitle: 'Apoyá a Truck Dash',
+    supportBody: 'Truck Dash lo hace una sola persona, y mantenerlo andando cuesta plata: los servidores y el alojamiento de los mapas. Si te sirve, un tecito ayuda a que siga. Es opcional y no desbloquea nada.',
+    teaButton: '¡Invitame un tecito!',
+    footerNote: 'una herramienta independiente hecha por un fan, sin afiliación con SCS Software.',
+  },
+  ru: {"metaTitle": "Truck Dash – бесплатный GPS и живая панель для ETS2 и ATS", "metaDescription": "Превратите телефон или второй экран в настоящий GPS для Euro Truck Simulator 2 и American Truck Simulator. Живая карта, голосовые подсказки на каждом повороте, показатели грузовика, кнопочная панель и, по желанию, история рейсов. На 100% бесплатно, аккаунт не нужен, открытый код.", "ogTitle": "Truck Dash – бесплатный GPS и живая панель для ETS2 и ATS", "ogDescription": "Настоящая карта, подсказки на каждом повороте, показатели грузовика и кнопочная панель на телефоне или втором экране. Бесплатно, аккаунт не нужен, открытый код.", "brandSub": "Truck-Sim Companion", "navFeatures": "Возможности", "navGetStarted": "Начать", "navCompare": "Бесплатно и платно", "navMods": "Моды", "navFaq": "Вопросы", "navRoadmap": "Планы", "roadmapTitle": "Что дальше", "roadmapIntro": "Всё здесь будет бесплатным, когда выйдет, как и остальное. Список складывается из просьб в Discord и на GitHub, поэтому он меняется.", "roadmapUpdated": "Обновлено", "roadmapSuggest": "Предложить идею", "roadmapStatusBuilding": "в работе", "roadmapStatusPlanned": "следующее", "roadmapStatusExploring": "изучаем", "roadmapStatusBlocked": "зависит от других", "roadmapStatusShipped": "вышло", "roadmapShippedTitle": "Уже вышло", "navLive": "Живая карта", "navSignIn": "Войти", "accountsTitle": "Ваши рейсы сохранены. <span class=\"accent\">Если хотите.</span>", "accountsBody": "Привяжите клиент к бесплатному аккаунту, и каждый выполненный заказ сохранится: маршрут на карте, раскрашенный по скорости, с расстоянием, оплатой, топливом, платными дорогами, штрафами, повреждениями и временем.", "accountsLi1": "Журнал рейсов с фильтрами и выгрузкой в CSV", "accountsLi2": "Статистика по каждой игре: активность по неделям и месяцам, рекорды и достижения", "accountsLi3": "Страны и штаты, через которые вы проехали", "accountsLi4": "По умолчанию закрыто, публичный профиль только по желанию. Вход через Discord, Google или e-mail", "accountsLi5": "Подписывайтесь на друзей: когда они примут заявку, вы увидите их рейсы и где они едут сейчас", "accountsCta": "Создать бесплатный аккаунт", "accountsHow": "Как это работает", "accountsNote": "Необязательно: всё остальное работает без аккаунта, и ничего не сохраняется, пока вы его не привяжете.", "overlayTitle": "GPS <span class=\"accent\">поверх игры.</span>", "overlayBody": "Второго экрана под рукой нет или просто не хочется смотреть вниз? Клиент рисует небольшую панель поверх ETS2 и ATS, пока вы едете.", "overlayLi1": "Скорость и ограничение скорости, которое мигает при превышении", "overlayLi2": "Следующий поворот и следующий город, оставшийся путь и время прибытия по вашему маршруту", "overlayLi3": "Прибытие по часам игры, чтобы сравнить со сроком доставки", "overlayLi4": "Выберите, что она показывает, её размер и место. Ctrl+Shift+O показывает и скрывает её", "overlayHow": "Как это работает", "overlayNote": "Windows, игра в окне или в полноэкранном режиме без рамки. По умолчанию выключено: включите в окне Setup клиента.", "overlayObsNote": "Ведёте стримы? Есть ещё <a href=\"/overlay/\">оверлей для OBS</a> с вашей скоростью, ограничением и рейсом.", "navCommunity": "Сообщество", "kicker": "Для Euro Truck Simulator 2 &amp; American Truck Simulator", "heroTitle": "Ваш телефон теперь <span class=\"accent\">настоящий GPS</span> для вашего симулятора грузовика.", "heroTagline": "Живая карта с настоящими дорогами, подсказки на каждом повороте, ограничение скорости, топливо и износ, а ещё кнопочная панель для управления грузовиком — на телефоне, планшете или втором экране.", "heroCta": "Скачать для Windows", "heroCta2": "Как это работает", "heroDemo": "Посмотреть живую демо", "heroLive": "Смотреть живую карту", "heroVideo": "Видео на 1 минуту", "ctaNote": "Портативный .exe, без установщика и без прав администратора. Панель открывается в любом браузере.", "ctaNotePhone": "Truck Dash работает на вашем ПК с Windows, а телефон служит экраном. Попробуйте демо сейчас и откройте ссылку на ПК, чтобы скачать.", "sendLinkCta": "Отправить ссылку на мой ПК", "sendLinkText": "Truck Dash: бесплатный GPS и панель для ETS2 и ATS. Скачайте на ПК:", "linkCopied": "Ссылка скопирована. Откройте её на ПК.", "badgeFree": "Бесплатно навсегда", "badgeNoLogin": "Аккаунт не нужен", "badgeNoLimits": "Без лимитов на маршруты и без рекламы", "badgeOpenSource": "Открытый код", "heroDiscord": "Присоединяйтесь к Discord", "driversOnlineText": "Водителей онлайн сейчас: {n}", "jobsDeliveredText": "Заказов доставлено с Truck Dash: {n}", "gsTitle": "Готово за <span class=\"accent\">две минуты</span>", "gsIntro": "Без установщика, без регистрации, без прав администратора. Три шага, один раз.", "gsStep1Title": "Скачайте клиент", "gsStep1Body": "Небольшая портативная программа для Windows. Распакуйте куда угодно и запустите <code>TruckDash.exe</code>. Она живёт в системном трее.", "gsStep1Link": "Скачать TruckDash-windows.zip", "gsStep1Releases": "Все версии и что изменилось", "gsStep2Title": "Пусть он подготовит игру", "gsStep2Body": "При первом запуске клиент находит вашу установку ETS2 / ATS и в один клик ставит свой плагин телеметрии, сделанный на официальном SDK от SCS. Он работает рядом с Trucky и любыми другими инструментами телеметрии, не трогая их. Предпочитаете вручную? Шаги описаны в README.", "gsStep2Link": "Установить плагин вручную (README)", "gsStep3Title": "Езжайте", "gsStep3Body": "Запустите игру. Браузер откроет панель, уже подключённую. На телефоне зайдите на <code>trucksim-dash.com/app</code> и введите 8-буквенный код со значка в трее: телефону даже не нужно быть в той же сети Wi-Fi.", "gsStep3Link": "Открыть панель →", "smartscreenTitle": "Windows пишет «неопознанное приложение»?", "smartscreenBody": "Это SmartScreen, который предупреждает о любой новой неподписанной программе: нажмите «Подробнее» → «Выполнить в любом случае». У клиента открытый код, ему не нужны права администратора, и он читает только телеметрию игры. На странице каждого выпуска указан SHA-256 файла, чтобы вы могли проверить скачанное, а запустить его можно и прямо из исходного кода.", "sourceOptionLink": "Запустить из исходного кода →", "featuresTitle": "Всё, что должен уметь GPS для грузовика. <span class=\"accent\">И даже больше.</span>", "featGroupNav": "Навигация", "featGroupTruck": "Ваш грузовик", "featGroupShare": "Сохранить и поделиться", "featMapTitle": "Настоящие дороги, настоящие маршруты", "featMapBody": "Настоящая дорожная сеть обеих игр, совмещённая с координатами самой игры. Подсказки на каждом повороте с названием дороги, на которую вы сворачиваете, карта, которая поворачивается во время езды, и маршруты в обход картографических DLC, которых у вас нет.", "featVoiceTitle": "Голосовые подсказки <span class=\"tag\">новое</span>", "featVoiceBody": "Предупреждение перед каждым поворотом, ещё одно на повороте и при прибытии. Естественные записанные голоса на 8 языках, без неправильно произнесённых названий дорог. По умолчанию выключено, один переключатель в Настройках.", "featWaypointsTitle": "Остановки по пути", "featWaypointsBody": "Нажмите на карту или найдите заправки, места отдыха, сервисы и компании, чтобы проложить маршрут через них. Ближайшая заправка или место отдыха в одном касании, а пронумерованные остановки исчезают сами, когда вы до них доезжаете.", "featPanelTitle": "Панель на любом экране", "featPanelBody": "Скорость и ограничение, круиз-контроль, топливо и запас хода, отдых, износ, срок заказа и ваше прибытие в реальном времени — на телефоне, планшете или втором мониторе. Телефон может быть на мобильном интернете, та же сеть Wi-Fi не нужна, а любую кнопку и панель можно перетащить, куда удобно.", "featButtonsTitle": "Кнопочная панель грузовика", "featButtonsBody": "Аварийка, маячок, ручник, двигатель, прицеп, камера, круиз-контроль, фары, дворники и многое другое: нажмите на телефоне, и клиент нажмёт настоящую клавишу, взятую из ваших собственных настроек управления в игре.", "featStatsTitle": "История рейсов и статистика <span class=\"tag\">новое</span>", "featStatsBody": "С необязательным бесплатным аккаунтом сохраняется каждый заказ: маршрут, раскрашенный по скорости, оплата, топливо и время. Журнал рейсов, статистика по каждой игре, рекорды и достижения, друзья, на которых можно подписаться, и публичный профиль только по желанию. <a href=\"#accounts\">Подробнее ниже</a>.", "featLiveTitle": "Другие водители вживую", "featLiveBody": "Смотрите, как водители Truck Dash едут по <a href=\"/live/\">публичной живой карте</a>, анонимно, с одним переключателем, чтобы на ней не появляться. Или поделитесь с друзьями 6-буквенным кодом и езжайте конвоем (бета), каждый в своей игре, без TruckersMP.", "featStreamTitle": "В стриме и в Discord <span class=\"tag\">новое</span>", "featStreamBody": "Бесплатный <a href=\"/overlay/\">оверлей для OBS</a> с вашей скоростью, следующим поворотом и рейсом, и статус в Discord, который показывает текущий рейс, пока вы едете. Оба выключены, пока вы их не включите.", "featMoreLink": "Всё остальное, от настроек оверлея в игре до атласа Road Trip в ATS, есть в руководстве", "vsTitle": "Почему не просто <span class=\"accent\">GPS игры?</span>", "vsIntro": "Оставьте его. Truck Dash работает рядом и добавляет то, чего нельзя сделать изнутри игры.", "vsGameLabel": "В игре", "vsDashLabel": "С Truck Dash", "vs1Title": "Весь маршрут без паузы", "vs1Game": "Открытие карты мира ставит игру на паузу (в одиночной игре).", "vs1Dash": "Весь маршрут остаётся на телефоне или втором мониторе, а вы продолжаете ехать.", "vs2Title": "Прибытие по вашему времени", "vs2Game": "Время прибытия показано по часам игры, которые идут примерно в 20 раз быстрее ваших.", "vs2Dash": "А также реальное время, когда вы доедете, и сколько это займёт, с учётом того, как вы на самом деле едете.", "vs3Title": "Отдельный экран", "vs3Game": "GPS делит экран с дорогой.", "vs3Dash": "Карта, следующий поворот и ваш грузовик на телефоне, планшете или втором мониторе — или в небольшой панели поверх игры.", "tagBeta": "бета", "tagNew": "новое", "modsAtsTitle": "American Truck Simulator", "modsEts2Title": "Euro Truck Simulator 2", "modsC2CNote": "новые дороги и города по всем США", "modsPMCNote": "Британская Колумбия", "modsReformaNote": "Мексика, с Mega Resources и Sierra Nevada", "modsReformaAllNote": "полный набор, с патчем OtherMaps", "modsCanadaNote": "от Юкона до Новой Шотландии", "modsC2CCanadaNote": "с их соединениями C2C", "modsProModsNote": "Европа + Ближний Восток, The Great Steppe и Магриб", "modsRusMapNote": "с коннектором ProMods–RusMap", "modsRoexNote": "издание Hybrid, с RusMap или без", "modsGUNote": "отдельная карта", "modsEUGUNote": "острова Grand Utopia, соединённые с Европой, с ProMods или без", "modsTMPNote": "штаб TruckersMP и CD road", "screenshotCaption": "Вот как это выглядит в дороге:", "slideDemo": "Вживую: режим GPS с подсказками на каждом повороте, ограничением скорости и круиз-контролем.", "slideDemoLink": "Попробовать демо →", "slideDashboard": "Компьютер: настоящая карта, живой маршрут и все показатели грузовика на одном экране.", "slidePanelWide": "Второй экран: весь рейс на одной ленте, успеваете ли вы к сроку и хватит ли топлива.", "slidePanelTall": "Та же панель на телефоне: сама раскладывается вертикально и никогда не грузит карту.", "slideWaypoints": "Маршруты с несколькими остановками: пронумерованные точки, которые исчезают сами, когда вы до них доезжаете.", "slideFindNearby": "Поблизости: заправки, места отдыха, сервисы, гаражи и компании, по расстоянию.", "slideGps": "Телефон в режиме GPS: карта по курсу, ограничение скорости и круиз-контроль.", "slideTurn": "Поворот за поворотом: следующий манёвр и дорога, на которую он вас выведет, с картой, поворачивающейся во время езды.", "slideButtons": "Кнопочная панель: нажмите на телефоне, и клиент нажмёт настоящую клавишу в игре.", "slideOverview": "Обзор: весь маршрут, пройденный путь синим, дорожная сеть оранжевым.", "compareTitle": "За что берут деньги платные GPS, <span class=\"accent\">здесь бесплатно</span>", "compareIntro": "Большинство GPS-приложений для симуляторов грузовиков дают ограниченную бесплатную версию, а неограниченные маршруты, остановки и отключение рекламы прячут за подпиской. У Truck Dash нет тарифов.", "compareColFree": "Платные приложения – бесплатная версия", "compareColPro": "Платные приложения – Pro", "cmpMap": "Живая карта &amp; подсказки на поворотах", "cmpLimited": "Дневной лимит", "cmpRouting": "Неограниченные маршруты", "cmpWaypoints": "Несколько остановок", "cmpAds": "Без рекламы", "cmpWifi": "Телефон на мобильном интернете (не только в той же сети Wi-Fi)", "cmpButtons": "Кнопочная панель грузовика с телефона", "cmpLive": "Другие водители вживую", "cmpOpenSource": "Открытый код", "cmpPrice": "Цена", "cmpPriceTd": "Бесплатно, навсегда", "cmpPriceFree": "Бесплатно (с ограничениями)", "cmpPricePro": "≈ 5 $ в месяц или 50 $ в год", "compareNote": "«Платные приложения» описывает распространённую в этой категории модель «бесплатно плюс Pro» на конец 2026 года; актуальные условия смотрите у каждого приложения.", "trustTitle": "Безопасно, прозрачно, <span class=\"accent\">ваше</span>", "trust1Title": "Только чтение, без администратора", "trust1Body": "Клиент только читает официальный SDK телеметрии игры. Он никогда не трогает ваши сохранения, профили или другие файлы и никогда не просит права администратора.", "trust2Title": "Открытый код на 100%", "trust2Body": "Клиент, сервер и веб-приложение лежат в одном публичном репозитории. Читайте код, собирайте сами или проверяйте SHA-256 выпуска перед запуском.", "trust3Title": "Аккаунт не нужен, без следящих cookie", "trust3Body": "Регистрация не нужна. Телеметрия передаётся вживую в вашу собственную сессию браузера и не хранится. Сохраняются только доставленные заказы (маршрут, груз, оплата) для ленты сообщества, плюс ваши собственные рейсы, если вы привяжете необязательный аккаунт. Этот сайт считает посещения анонимно, без cookie.", "viewSource": "Исходный код на GitHub", "privacyLink": "Политика конфиденциальности", "termsLink": "Условия использования", "changelogLink": "Изменения / выпуски", "modsSectionTitle": "Поддержка модов карт", "modsSectionIntro": "Клиент читает, какие моды карт включены в вашем профиле, и приложение само загружает подходящую карту — без дополнительной настройки и без отдельного скачивания. Карту можно выбрать и вручную в панели «Моды» приложения.", "modsFooterNote": "Эти моды по-прежнему нужно установить в игру как обычно: Truck Dash лишь умеет рисовать дополнительные дороги и прокладывать по ним маршруты. Хотите поддержку другого мода? Спросите в Discord.", "faqTitle": "Частые вопросы", "faqQ1": "Это правда бесплатно? В чём подвох?", "faqA1": "Подвоха нет. Аккаунт не нужен, рекламы нет, лимитов на маршруты нет, версии Pro нет. Всё с открытым кодом. Если хотите поддержать проект, можете <a href=\"https://tecito.app/truckdash\" target=\"_blank\" rel=\"noopener\">угостить меня чаем на Tecito</a>: это по желанию и ничего не открывает.", "faqQ2": "Windows или антивирус говорит, что файл «неопознанный» или опасный. Это безопасно?", "faqA2": "Да. SmartScreen показывает это предупреждение для любой новой программы без цифровой подписи (сертификаты стоят денег). Нажмите «Подробнее» → «Выполнить в любом случае». У клиента открытый код, ему не нужны права администратора, и он читает только телеметрию игры. В каждом выпуске указан SHA-256 файла для проверки, а вместо этого можно запустить его из исходного кода через Python. Некоторые антивирусы помечают его по той же причине (неподписанный самораспаковывающийся исполняемый файл): это ложное срабатывание, исходный код и журнал сборки открыты. Если ваш его блокирует, добавьте исключение или запустите клиент из исходного кода.", "faqQ3": "Телефон должен быть в той же сети Wi-Fi, что и ПК?", "faqA3": "Нет. Truck Dash связывает ПК и телефон 8-буквенным кодом через небольшой сервер-ретранслятор, поэтому телефон может быть на мобильном интернете, в другой сети, а смотреть можно даже из другого места. Ничего настраивать не нужно, IP-адреса вводить не надо. Если же вы В ТОЙ ЖЕ сети Wi-Fi, клиент предлагает и прямой режим LAN (отсканируйте QR-код в окне Setup) с минимальной задержкой, без кода и без интернета.", "faqQ4": "Работает ли с ProMods, Coast to Coast или другими модами карт?", "faqA4": "Да: ProMods (с RusMap и Roextended), Grand Utopia, European Grand Utopia и TruckersMP для ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion и Reforma для ATS — в любых привычных сочетаниях. Клиент определяет, что включено в вашем профиле, и приложение переключается само. Нужен другой? Спросите в Discord.", "faqQ5": "Он меняет игру, мои сохранения или достижения?", "faqA5": "Нет. Он читает данные через официальный SDK телеметрии от SCS Software — поддерживаемую функцию обеих игр, работающую только на чтение. В игру, профиль или сохранения ничего не записывается, достижения не затрагиваются. Работает и вместе с TruckersMP.", "faqQ6": "Что мне нужно?", "faqA6": "ПК с Windows, на котором запущен Euro Truck Simulator 2 или American Truck Simulator, и любое устройство с современным браузером для панели: телефон, планшет или второй монитор. Панель можно добавить на главный экран, чтобы она открывалась как приложение.", "faqQ7": "Панель пишет «ожидание телеметрии». Что делать?", "faqA7": "Проверьте три вещи: плагин телеметрии установлен (клиент может сделать это за вас из меню в трее), игра открыта и вы действительно в грузовике (а не в меню), и значок в трее показывает «подключено». В меню есть пункт «Показать файл журнала», который точно говорит, что было обнаружено.", "faqQ8": "Можно ли пользоваться с рулём, геймпадом или на втором мониторе?", "faqA8": "Да, Truck Dash всё равно, как вы управляете. Откройте панель в браузере на втором мониторе для большого GPS или на телефоне в держателе на столе. Кнопочная панель работает с любого из них.", "faqQ9": "Работает ли на Linux или Steam Deck?", "faqA9": "Под Proton да: клиент для Windows работает внутри префикса Proton игры, включая установку плагина и код подключения. Шаги и два готовых ярлыка запуска есть в <a href=\"https://github.com/Nethercap/truck-companion/tree/main/client#linux-through-proton\" target=\"_blank\" rel=\"noopener\">README клиента</a>. Нативные Linux-версии игр пока не поддерживаются.", "faqQ10": "Можно ли использовать вместе с Trucky или другими инструментами?", "faqA10": "Да. Truck Dash ставит свой плагин телеметрии рядом с тем, что используют Trucky и похожие инструменты, не заменяя и не трогая его, так что оба работают одновременно.", "communityTitle": "Сообщество", "discordTitle": "Заходите в Discord", "discordBody": "Каждый заказ, доставленный с Truck Dash, публикуется на сервере вживую. Просите помощи, предлагайте моды, показывайте своё рабочее место.", "contactBody": "Ошибки, идеи или вопросы? Быстрее всего в Discord, или:", "issuesLink": "Issues на GitHub", "latestJobsTitle": "Последние доставленные заказы", "latestJobsSub": "Вживую от водителей Truck Dash прямо сейчас.", "colRoute": "Маршрут", "colTruck": "Грузовик", "colCargo": "Груз", "colPay": "Оплата", "colDistance": "Расстояние", "colGame": "Игра", "footerApp": "Открыть панель", "footerGuide": "Руководство", "footerPress": "Для прессы", "footerSteamEts2": "Руководство в Steam (ETS2)", "footerSteamAts": "Руководство в Steam (ATS)", "donateLink": "Поддержать проект", "supportTitle": "Поддержать Truck Dash", "supportBody": "Truck Dash делает один человек, и его работа стоит денег: серверы и хостинг карт. Если он вам полезен, чашка чая помогает ему работать дальше. Это по желанию и ничего не открывает.", "teaButton": "Угостите меня чаем!", "footerNote": "независимый фанатский инструмент-компаньон, не связанный с SCS Software."},
+};
+
+let currentLang = DEFAULT_LANG;
+let roadmapData = null;   // lo llena el fetch de /data/roadmap.json, ver renderRoadmap()
+// Si a un idioma le falta una clave, cae al ingles: antes devolvia undefined
+// y applyTranslations lo escribia tal cual en la pagina (le pasaba a
+// signpathNote en castellano).
+function t(key) { return TRANSLATIONS[currentLang][key] ?? TRANSLATIONS.en[key] ?? ''; }
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.innerHTML = t(el.getAttribute('data-i18n'));
+  });
+  document.documentElement.lang = currentLang === 'pt' ? 'pt-BR' : currentLang;
+  renderRoadmap();
+}
+
+// JSON-LD de FAQ armado desde las mismas traducciones (una sola fuente de
+// verdad para el texto visible y el que ve Google).
+function buildFaqJsonLd() {
+  const items = [];
+  for (let i = 1; i <= 12; i++) {
+    const q = t(`faqQ${i}`), a = t(`faqA${i}`);
+    if (!q || !a) continue;
+    items.push({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } });
+  }
+  document.getElementById('faqJsonLd').textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: items });
+}
+
+// Contador: conectados ahora (PCs con el cliente andando, /health del relay)
+// y trabajos entregados. Antes decia "N drivers have tracked their jobs" con
+// total_sessions, que suma una por sesion del relay: el mismo camionero que
+// juega 30 dias contaba 30 veces (auditoria del 12-10).
+let lastOnline = null;
+let lastJobsDelivered = null;
+
+// Con el idioma de la pagina: con toLocaleString() pelado, una PC en
+// castellano mostraba "2.833" en la landing en ingles.
+function fmtCount(n) { return n.toLocaleString(currentLang); }
+
+function renderDriverCounter() {
+  const el = document.getElementById('driverCounter');
+  const parts = [];
+  if (lastOnline) parts.push(t('driversOnlineText').replace('{n}', `<strong>${fmtCount(lastOnline)}</strong>`));
+  if (lastJobsDelivered) parts.push(t('jobsDeliveredText').replace('{n}', `<strong>${fmtCount(lastJobsDelivered)}</strong>`));
+  el.innerHTML = parts.join(' · ');
+  el.hidden = !parts.length;
+}
+
+applyTranslations();
+buildFaqJsonLd();
+
+// El selector de idioma se cierra al tocar afuera
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('details.langPick[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
+});
+
+if (DONATE_URL) {
+  const donate = document.getElementById('donateLink');
+  donate.href = DONATE_URL;
+  donate.hidden = false;
+}
+
+const RELAY_HTTP = 'https://truck-companion-production.up.railway.app';
+const STATS_URL = RELAY_HTTP + '/stats/public';
+const HEALTH_URL = RELAY_HTTP + '/health';
+const VERSION_URL = RELAY_HTTP + '/version';
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const GAME_LABELS = { ets2: 'ETS2', ats: 'ATS' };
+// El SDK paga en EUR (ETS2) o USD (ATS); entradas viejas no traen currency.
+// localRevenue/localCurrency: equivalente en la moneda real del conductor,
+// si su web nos la dijo (ver /app Ajustes).
+function formatMoney(amount, currency) {
+  const n = Math.round(amount || 0);
+  try { return new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n); }
+  catch (e) { return `${n.toLocaleString('en')} ${currency}`; }
+}
+function formatPay(j) {
+  const currency = j.currency || (j.game === 'ets2' ? 'EUR' : 'USD');
+  let text = formatMoney(j.revenue, currency);
+  if (j.localRevenue != null && j.localCurrency && j.localCurrency !== currency) text += ` · ≈ ${formatMoney(j.localRevenue, j.localCurrency)}`;
+  return text;
+}
+
+function renderLatestJobs(jobs) {
+  const container = document.getElementById('latestJobs');
+  if (!jobs || !jobs.length) { container.hidden = true; return; }
+  document.getElementById('latestJobsBody').innerHTML = jobs.map(j => `
+    <tr>
+      <td>${escapeHtml(j.citySrc || '?')} → ${escapeHtml(j.cityDst || '?')}</td>
+      <td class="colTruck">${escapeHtml([j.truckBrand, j.truckName].filter(Boolean).join(' ')) || '-'}</td>
+      <td>${escapeHtml(j.cargo) || '-'}</td>
+      <td>${formatPay(j)}${j.modded ? ' <span title="Modded economy - not counted in totals">⚠</span>' : ''}</td>
+      <td class="colDistance">${Math.round(j.distanceKm || 0)} km</td>
+      <td class="colGame">${GAME_LABELS[j.game] || '-'}</td>
+    </tr>
+  `).join('');
+  container.hidden = false;
+}
+
+const STATS_CACHE_KEY = 'truckdash_stats_cache';
+
+function applyStatsData(data) {
+  if (data && typeof data.jobs_delivered === 'number') {
+    lastJobsDelivered = data.jobs_delivered;
+    renderDriverCounter();
+  }
+  if (data) renderLatestJobs(data.latest_jobs);
+}
+
+try {
+  const cached = localStorage.getItem(STATS_CACHE_KEY);
+  if (cached) applyStatsData(JSON.parse(cached));
+} catch (e) {}
+
+function fetchDriverCount() {
+  fetch(STATS_URL).then(r => r.ok ? r.json() : null).then(data => {
+    if (!data) return;
+    applyStatsData(data);
+    try { localStorage.setItem(STATS_CACHE_KEY, JSON.stringify(data)); } catch (e) {}
+  }).catch(() => {});
+}
+// Los conectados no se guardan en localStorage: un numero en vivo de ayer
+// no dice nada.
+function fetchOnline() {
+  fetch(HEALTH_URL).then(r => r.ok ? r.json() : null).then(data => {
+    if (!data || typeof data.connected_clients !== 'number') return;
+    lastOnline = data.connected_clients;
+    renderDriverCounter();
+  }).catch(() => {});
+}
+fetchDriverCount();
+fetchOnline();
+setInterval(() => { fetchDriverCount(); fetchOnline(); }, 60000);
+
+// La version que ofrece el relay a los clientes (/version, la siembra el
+// workflow de cada release), al lado del boton de bajar.
+fetch(VERSION_URL).then(r => r.ok ? r.json() : null).then(data => {
+  const v = data && data.latest_client_version;
+  if (!v || !/^[0-9.]+$/.test(v)) return;
+  document.querySelectorAll('.heroVersion').forEach(el => { el.textContent = 'v' + v; el.hidden = false; });
+}).catch(() => {});
+
+// "Mandarme el link a la PC" (solo en telefonos y tablets, ver .onlyPhone):
+// el menu de compartir del telefono (mail, WhatsApp, Discord a uno mismo) o,
+// si no hay, copiar el link.
+document.querySelectorAll('[data-send-link]').forEach(btn => btn.addEventListener('click', async (e) => {
+  e.preventDefault();
+  const url = new URL(document.querySelector('link[rel=canonical]').href);
+  url.searchParams.set('ref', 'send-to-pc');
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Truck Dash', text: t('sendLinkText'), url: url.href }); return; }
+    catch (err) { if (err && err.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(url.href);
+    const antes = btn.innerHTML;
+    btn.textContent = t('linkCopied');
+    setTimeout(() => { btn.innerHTML = antes; }, 3000);
+  } catch (err) {
+    window.prompt(t('sendLinkCta'), url.href);
+  }
+}));
+
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('open'); }
+function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+document.getElementById('menuBtn').addEventListener('click', openSidebar);
+document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
+overlay.addEventListener('click', closeSidebar);
+sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', closeSidebar));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeLightbox();
+});
+
+// Pista de scroll de las tablas anchas (ver .scrollHintWrap): se apaga sola
+// cuando no queda nada por ver a la derecha.
+function updateScrollHints() {
+  document.querySelectorAll('.scrollHintWrap').forEach(el => {
+    el.classList.toggle('hasMore', el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+  });
+}
+// La tabla de ultimas entregas se llena despues (fetch), asi que no alcanza
+// con mirar una vez: se observa el tamano de cada contenedor y su contenido.
+const scrollHintObserver = new ResizeObserver(updateScrollHints);
+document.querySelectorAll('.scrollHintWrap').forEach(el => {
+  scrollHintObserver.observe(el);
+  if (el.firstElementChild) scrollHintObserver.observe(el.firstElementChild);
+});
+window.addEventListener('resize', updateScrollHints);
+document.addEventListener('scroll', e => {
+  if (e.target instanceof Element && e.target.classList.contains('scrollHintWrap')) updateScrollHints();
+}, true);
+updateScrollHints();
+
+// Roadmap: se arma desde docs/data/roadmap.json, que es lo unico que hay que
+// editar para cambiarlo. Se vuelve a dibujar al cambiar de idioma.
+function renderRoadmap() {
+  const grid = document.getElementById('roadmapGrid');
+  if (!grid || !roadmapData) return;
+  const order = { building: 0, planned: 1, exploring: 2, blocked: 3 };
+  const card = item => {
+    const txt = item[currentLang] || item.en;
+    const chipKey = 'roadmapStatus' + item.status.charAt(0).toUpperCase() + item.status.slice(1);
+    const chip = (TRANSLATIONS[currentLang] || TRANSLATIONS.en)[chipKey] || item.status;
+    return `<div class="roadmapCard ${item.status}">
+      <span class="roadmapChip ${item.status}">${chip}</span>
+      <h3>${txt.title}</h3>
+      <p>${txt.body}</p>
+    </div>`;
+  };
+  const open = roadmapData.items.filter(i => i.status !== 'shipped')
+    .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+  // Lo hecho, en el orden del JSON (lo mas nuevo arriba), sin la chapita.
+  const shipped = roadmapData.items.filter(i => i.status === 'shipped');
+  grid.innerHTML = open.map(card).join('');
+  document.getElementById('roadmapShipped').innerHTML = shipped.map(card).join('');
+  document.getElementById('roadmapShippedTitle').hidden = !shipped.length;
+  const updated = document.getElementById('roadmapUpdated');
+  if (updated && roadmapData.updated) {
+    updated.textContent = new Date(roadmapData.updated + 'T12:00:00Z').toLocaleDateString(currentLang, { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+}
+fetch('/data/roadmap.json?v=8').then(r => r.ok ? r.json() : null).then(data => {
+  if (!data) return;
+  roadmapData = data;
+  renderRoadmap();
+}).catch(() => {});
+
+// El lightbox recibe el foco al abrir (Escape o un clic lo cierran) y lo
+// devuelve a la captura que se toco, para seguir con el teclado desde ahi.
+let lightboxOpener = null;
+function openLightbox(src) {
+  lightboxOpener = document.activeElement;
+  document.getElementById('lightboxImg').src = src;
+  const box = document.getElementById('lightbox');
+  box.classList.add('open');
+  box.focus();
+}
+function closeLightbox() {
+  const box = document.getElementById('lightbox');
+  if (!box.classList.contains('open')) return;
+  box.classList.remove('open');
+  if (lightboxOpener && lightboxOpener !== document.body && lightboxOpener.focus) lightboxOpener.focus({ preventScroll: true });
+  lightboxOpener = null;
+}
+// Las capturas que se agrandan son botones tambien para el teclado.
+document.querySelectorAll('img[onclick]').forEach(img => {
+  img.tabIndex = 0;
+  img.setAttribute('role', 'button');
+  img.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    img.click();
+  });
+});
+
+let carouselIndex = 0;
+const carouselTrack = document.getElementById('carouselTrack');
+const carouselSlideCount = carouselTrack.children.length;
+const carouselDots = document.getElementById('carouselDots');
+for (let i = 0; i < carouselSlideCount; i++) {
+  const dot = document.createElement('button');
+  dot.className = 'carouselDot';
+  dot.setAttribute('aria-label', `Screenshot ${i + 1}`);
+  dot.addEventListener('click', () => { carouselIndex = i; updateCarousel(); });
+  carouselDots.appendChild(dot);
+}
+function updateCarousel() {
+  carouselTrack.style.transform = `translateX(-${carouselIndex * 100}%)`;
+  carouselDots.querySelectorAll('.carouselDot').forEach((dot, i) => {
+    dot.classList.toggle('active', i === carouselIndex);
+    if (i === carouselIndex) dot.setAttribute('aria-current', 'true'); else dot.removeAttribute('aria-current');
+  });
+  // Las otras capturas quedan fuera del tabulador y del lector de pantalla:
+  // con el foco en una escondida, el navegador corria el carrusel por su
+  // cuenta y se desacomodaba del translateX.
+  [...carouselTrack.children].forEach((slide, i) => { slide.inert = i !== carouselIndex; });
+}
+function carouselNav(dir) {
+  carouselIndex = (carouselIndex + dir + carouselSlideCount) % carouselSlideCount;
+  updateCarousel();
+}
+updateCarousel();
+</script>
+<!-- Cloudflare Web Analytics: cuenta visitas sin cookies. Solo en las paginas
+     publicas (landing, guia, kit de prensa), no en la app ni en la cuenta: la URL
+     de la app lleva el codigo de emparejamiento. Ver docs/privacy.html. -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "0d5d61038871400ab2e1c45e84a78f35"}'></script>
+</body>
+</html>

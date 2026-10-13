@@ -3,6 +3,9 @@
    .dashRoot y nada toca body ni :root desde aca. */
 
 .dashRoot {
+  /* Zoom con dos dedos si (sin maximum-scale desde el 13-10), por doble
+     toque no: tocar rapido los botones agrandaba la pagina. */
+  touch-action: manipulation;
   /* Todo el panel escala con una sola variable: es un tablero que se mira a
      distinta distancia segun donde este apoyado el dispositivo, y el control
      de tamano solo cambia esto. */
