@@ -33,6 +33,16 @@ def load_json(path):
 # de paso arranca a 13,5 m del nodo, y con 12 m el derecho de esos cruces se
 # perdia (Bakersfield, Gargamosch 10-10). 20 m cubre 4 carriles de 4,5 m.
 PREFAB_END_TOLERANCE_M = 20.0
+# Rulos de calle (lazos de trebol, horquillas): un tramo que gira mas de 90
+# grados y es LAZO_LARGO_FACTOR veces mas largo que la recta entre sus nodos
+# lleva un punto de dibujo cada LAZO_PASO_M, hasta LAZO_PASOS_MAX (13-10).
+LAZO_LARGO_FACTOR = 1.3
+LAZO_PASO_M = 12.0
+LAZO_PASOS_MAX = 32
+# Curvas de prefab: un paso de muestreo cada tantos grados de giro (minimo 3,
+# los de siempre), hasta CURVA_PASOS_MAX (ver curve_pasos).
+CURVA_GRADOS_POR_PASO = 10.0
+CURVA_PASOS_MAX = 16
 # Respetar que giros permite cada cruce: los de un solo sentido se marcan y
 # los que no existen se borran, con la red de seguridad de relax_turns para
 # no dejar a nadie sin llegada. Con TRUCKDASH_ENFORCE_TURNS=flags se vuelve
@@ -97,6 +107,14 @@ def _hermite(p0, d0, p1, d1, steps):
     return out
 
 
+def curve_pasos(giro: float, minimo: int = 3) -> int:
+    """Pasos de muestreo de una navCurve segun cuanto gira (radianes): 3
+    alcanzaban para una esquina, pero el lazo de un trebol quedaba de rectas
+    largas y se dibujaba como una punta (ETS2, 13-10). Uno cada
+    CURVA_GRADOS_POR_PASO; Douglas-Peucker saca despues los que sobran."""
+    return max(minimo, min(CURVA_PASOS_MAX, int(math.degrees(giro) / CURVA_GRADOS_POR_PASO) + 1))
+
+
 def curve_chain_points(desc, chain, steps=3):
     curves = desc.get("navCurves") or []
     pts = []
@@ -106,11 +124,13 @@ def curve_chain_points(desc, chain, steps=3):
         c = curves[ci]
         a, b = c["start"], c["end"]
         p0, p1 = (a["x"], a["y"]), (b["x"], b["y"])
-        d0 = (math.cos(a.get("rotation", 0.0)), math.sin(a.get("rotation", 0.0)))
-        d1 = (math.cos(b.get("rotation", 0.0)), math.sin(b.get("rotation", 0.0)))
+        ra, rb = a.get("rotation", 0.0), b.get("rotation", 0.0)
+        d0 = (math.cos(ra), math.sin(ra))
+        d1 = (math.cos(rb), math.sin(rb))
         if not pts:
             pts.append(p0)
-        pts.extend(_hermite(p0, d0, p1, d1, steps))
+        giro = abs((ra - rb + math.pi) % (2 * math.pi) - math.pi)
+        pts.extend(_hermite(p0, d0, p1, d1, curve_pasos(giro, steps)))
         pts.append(p1)
     return pts
 
@@ -695,15 +715,25 @@ def main(argv=None):
     # calzada en las curvas ("leve desvio" reportado). Se guardan los puntos
     # intermedios (sin los extremos) como 6to elemento de la arista, solo si
     # el tramo curva; el largo `w` ya es el real (viene del parser).
-    def hermite_mid_points(uid_a, uid_b):
+    def hermite_mid_points(uid_a, uid_b, largo=None):
         ra, rb = node_rot.get(uid_a), node_rot.get(uid_b)
         if ra is None or rb is None:
             return None
         (x0, y0), (x1, y1) = coord_of(uid_a), coord_of(uid_b)
-        steps = min(8, int(abs(math.tan(ra - rb)) * 20) + 1)
+        dist = math.hypot(x1 - x0, y1 - y0)
+        giro = abs((ra - rb + math.pi) % (2 * math.pi) - math.pi)
+        if giro > math.pi / 2 and largo and dist > 0 and largo > LAZO_LARGO_FACTOR * dist:
+            # Un rulo (el lazo de un trebol, una horquilla): con 8 puntos
+            # parejos en t, la punta del rulo quedaba de dos rectas y se
+            # dibujaba como una esquina (13-10). Un punto cada LAZO_PASO_M
+            # del largo real. Solo si el tramo es de verdad mas largo que la
+            # recta: tan() repite cada 180 grados y abajo un nodo con la
+            # rotacion dada vuelta en una calle recta sigue siendo recta.
+            steps = min(LAZO_PASOS_MAX, max(8, int(largo / LAZO_PASO_M) + 1))
+        else:
+            steps = min(8, int(abs(math.tan(ra - rb)) * 20) + 1)
         if steps <= 1:
             return None
-        dist = math.hypot(x1 - x0, y1 - y0)
         m0 = (math.cos(ra) * dist, math.sin(ra) * dist)
         m1 = (math.cos(rb) * dist, math.sin(rb) * dist)
         pts = []
@@ -716,7 +746,7 @@ def main(argv=None):
         return pts
 
     def road_edge(a, b, w, flags, wt, uid_a, uid_b):
-        mid = hermite_mid_points(uid_a, uid_b)
+        mid = hermite_mid_points(uid_a, uid_b, w)
         return [a, b, w, flags, wt] + ([mid] if mid else [])
 
     # Corrida de la ruta dibujada en cada punta de cada arista (a, b) -> (en

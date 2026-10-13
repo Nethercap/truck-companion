@@ -11,6 +11,8 @@ updates on its own and is not versioned here.
 - In-game overlay: a new route bar (Setup, Show, Fuel and rest stops) from where you are to your
   destination. An orange stripe marks the stretch where you should fill up before the tank runs dry,
   and a purple one where you should stop to sleep. No stripe means you get there without stopping.
+- Build my map: tight curves inside junctions, like the loops of a cloverleaf, get more points, so
+  the route on your own map follows them instead of cutting a corner.
 
 ## 1.5.31 (2026-10-13)
 
