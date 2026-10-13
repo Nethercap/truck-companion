@@ -253,7 +253,11 @@
   section > p { color: #d7dbe0; max-width: 46rem; }
   .sectionIntro { color: var(--muted); }
 
-  .featureGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.1rem; margin-top: 1.5rem; }
+  /* 8 tarjetas en tres grupos (auditoria del 12-10): con 17 la seccion medía
+     varias pantallas en el celular y nada se destacaba. El resto, en la guia. */
+  .featureGroup { margin: 1.8rem 0 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: system-ui, sans-serif; font-weight: 600; }
+  .featureGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.1rem; margin-top: 0.8rem; }
+  .moreFeatures { margin: 1.3rem 0 0; font-size: 0.95rem; }
   .featureCard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; }
   .featureCard .icon {
     width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
@@ -261,7 +265,7 @@
   }
   .featureCard .icon.orange { background: rgba(255,138,61,0.14); color: var(--orange); }
   .featureCard .icon svg { width: 22px; height: 22px; }
-  .featureCard h3 { font-size: 1.15rem; margin: 0 0 0.3rem; }
+  .featureCard h4 { font-size: 1.15rem; margin: 0 0 0.3rem; }
   .featureCard p { font-size: 0.88rem; color: var(--muted); margin: 0; }
   .featureCard .tag { display: inline-block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orange); border: 1px solid rgba(255,138,61,0.5); border-radius: 4px; padding: 0.05rem 0.35rem; margin-left: 0.4rem; vertical-align: middle; font-family: system-ui, sans-serif; }
 
@@ -547,93 +551,56 @@
 
   <section id="features">
     <h2 data-i18n="featuresTitle">Everything a truck GPS should do. <span class="accent">And then some.</span></h2>
+    <h3 class="featureGroup" data-i18n="featGroupNav">Navigate</h3>
     <div class="featureGrid">
       <div class="featureCard">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 7v13M15 4v13"/></svg></div>
-        <h3 data-i18n="featMapTitle">Real map &amp; real routes</h3>
-        <p data-i18n="featMapBody">The actual road network of both games, with coastline, lakes, rivers and towns drawn underneath and lined up with the game's own coordinates. Routes are calculated over real roads to your destination, never a straight line.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></div>
-        <h3 data-i18n="featGpsTitle">GPS navigation mode</h3>
-        <p data-i18n="featGpsBody">Heading-up view that rotates as you drive, with turn-by-turn directions and the name of the road you're turning onto — like a real sat-nav.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="5" y="7" width="8" height="4" rx="1"/></svg></div>
-        <h3 data-i18n="featOverlayTitle">In-game overlay <span class="tag">new</span></h3>
-        <p data-i18n="featOverlayBody">A small panel right on top of the game with your speed and the limit, the next turn, distance left and arrival, so you never look away from the road. Clicks go through it and it never steals focus. <a href="#overlay">See it</a>.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0"/><path d="M3 12v4h18v-4"/><path d="M12 12l4-3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></div>
-        <h3 data-i18n="featPanelTitle">Full dashboard panel</h3>
-        <p data-i18n="featPanelBody">Speed, fuel, rest, damage and what the session added up to, on a second phone or monitor while the map stays on the first. One device, one button: it covers the map and comes back instantly.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
-        <h3 data-i18n="featWaypointsTitle">Multi-stop waypoints</h3>
-        <p data-i18n="featWaypointsBody">Tap the map or pick a place to route through it. Numbered stops clear themselves as you reach them, and the route recalculates if you stray.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
-        <h3 data-i18n="featPoiTitle">Find fuel, rest &amp; service</h3>
-        <p data-i18n="featPoiBody">Search gas stations, rest areas, service shops and garages, and get the nearest one routed in one tap.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l4-3"/><path d="M12 3v2M21 12h-2M12 21v-2M3 12h2"/></svg></div>
-        <h3 data-i18n="featSpeedTitle">Speed, limits &amp; cruise</h3>
-        <p data-i18n="featSpeedBody">Google-Maps-style speed limit sign that flashes when you're over, cruise control readout, and a full instrument cluster view.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M3 12h12"/><path d="M15 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9l-3-3"/></svg></div>
-        <h3 data-i18n="featTruckTitle">Truck vitals</h3>
-        <p data-i18n="featTruckBody">Fuel, range, consumption, wear per part, mechanical alerts, job deadline, pay, tolls and fines for the session.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
-        <h3 data-i18n="featButtonsTitle">Truck button box</h3>
-        <p data-i18n="featButtonsBody">Hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers and more — tap on your phone, the client presses the real key. Keys are read from your own in-game controls.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <h3 data-i18n="featLiveTitle">Other drivers, live</h3>
-        <p data-i18n="featLiveBody">See other Truck Dash drivers on the same game and map as you, moving live — and watch every map from the <a href="/live/">public live map</a>, no account needed. Anonymous: position, truck, job and the route you are on. One toggle turns it off, another keeps your route to yourself.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l4 4v3h-8z"/><circle cx="5" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div>
-        <h3 data-i18n="featConvoyTitle">Convoy with friends <span class="tag" data-i18n="tagBeta">beta</span></h3>
-        <p data-i18n="featConvoyBody">Each of you drives in your own game — no TruckersMP, nothing to install. Share a 6-letter code and see everyone as arrows on the map, with speed, cargo, ETA and how far behind the leader they are. Follow the leader's destination with one tap, send quick messages, or share a spectator link for anyone to watch from a phone.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 4.5C6.5 5 4.8 5.9 4 6.7 2.6 9.4 2 12.6 2.3 16c1.6 1.4 3.2 2.2 4.8 2.6l1-1.6"/><path d="M15.5 4.5c2 .5 3.7 1.4 4.5 2.2 1.4 2.7 2 5.9 1.7 9.3-1.6 1.4-3.2 2.2-4.8 2.6l-1-1.6"/><path d="M7.5 15c3 1.3 6 1.3 9 0"/><circle cx="9.3" cy="11.5" r="1.3"/><circle cx="14.7" cy="11.5" r="1.3"/></svg></div>
-        <h3 data-i18n="featDiscordTitle">Discord status</h3>
-        <p data-i18n="featDiscordBody">Your Discord profile can show the run in progress while you drive: where you left from, where you are headed, how far is left and what you are hauling, with a timer. Off by default, one checkbox turns it on.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
-        <h3 data-i18n="featMobileTitle">Any screen, anywhere</h3>
-        <p data-i18n="featMobileBody">Phone, tablet or second monitor, portrait or landscape. Add it to your home screen like an app. Your phone can be on mobile data — no same-Wi-Fi requirement. Drag any button or panel where it suits you: on a touch screen, press and hold one to start.</p>
+        <h4 data-i18n="featMapTitle">Real roads, real routes</h4>
+        <p data-i18n="featMapBody">The actual road network of both games, lined up with the game's own coordinates. Turn-by-turn directions with the name of the road you turn onto, a map that turns as you drive, and routes that skip the map DLCs you don't own.</p>
       </div>
       <div class="featureCard">
         <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></div>
-        <h3 data-i18n="featVoiceTitle">Spoken directions <span class="tag" data-i18n="tagNew">new</span></h3>
-        <p data-i18n="featVoiceBody">Turn-by-turn read out loud: a heads-up before each turn, again at the turn, and when you arrive. Natural recorded voices in 8 languages, with no road names to mispronounce. Off by default, one switch in Settings.</p>
+        <h4 data-i18n="featVoiceTitle">Spoken directions <span class="tag">new</span></h4>
+        <p data-i18n="featVoiceBody">A heads-up before each turn, again at the turn, and when you arrive. Natural recorded voices in 8 languages, with no road names to mispronounce. Off by default, one switch in Settings.</p>
       </div>
       <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
-        <h3 data-i18n="featStatsTitle">Trip history &amp; stats <span class="tag" data-i18n="tagNew">new</span></h3>
-        <p data-i18n="featStatsBody">With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, activity by week and month, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg></div>
-        <h3 data-i18n="featDlcTitle">Routes for the DLCs you own <span class="tag">new</span></h3>
-        <p data-i18n="featDlcBody">Tell it which map DLCs you have and routes go around the countries and states you don't own. If there is no way around one, the route uses it anyway and tells you.</p>
-      </div>
-      <div class="featureCard">
-        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></div>
-        <h3 data-i18n="featAtlasTitle">Road Trip atlas in ATS <span class="tag">new</span></h3>
-        <p data-i18n="featAtlasBody">The Tourist Boards and Points of Interest of ATS's Road Trip, on the map and in the search: one tap adds the next one to your route.</p>
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
+        <h4 data-i18n="featWaypointsTitle">Stops along the way</h4>
+        <p data-i18n="featWaypointsBody">Tap the map, or search fuel, rest areas, service and companies, to route through them. The nearest fuel or rest stop is one tap away, and numbered stops clear themselves as you reach them.</p>
       </div>
     </div>
+    <h3 class="featureGroup" data-i18n="featGroupTruck">See your truck</h3>
+    <div class="featureGrid">
+      <div class="featureCard">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0"/><path d="M3 12v4h18v-4"/><path d="M12 12l4-3"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></div>
+        <h4 data-i18n="featPanelTitle">A dashboard on any screen</h4>
+        <p data-i18n="featPanelBody">Speed and the limit, cruise, fuel and range, rest, wear, the job deadline and your arrival in real time, on a phone, tablet or second monitor. Your phone can be on mobile data, no same Wi-Fi needed, and every button and panel can be dragged where it suits you.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <h4 data-i18n="featButtonsTitle">Truck button box</h4>
+        <p data-i18n="featButtonsBody">Hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers and more: tap on your phone and the client presses the real key, read from your own in-game controls.</p>
+      </div>
+    </div>
+    <h3 class="featureGroup" data-i18n="featGroupShare">Save and share</h3>
+    <div class="featureGrid">
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+        <h4 data-i18n="featStatsTitle">Trip history and stats <span class="tag">new</span></h4>
+        <p data-i18n="featStatsBody">With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <h4 data-i18n="featLiveTitle">Other drivers, live</h4>
+        <p data-i18n="featLiveBody">Watch Truck Dash drivers move on the <a href="/live/">public live map</a>, anonymous, with one toggle to stay off it. Or share a 6-letter code with friends and drive as a convoy (beta), each in your own game, no TruckersMP needed.</p>
+      </div>
+      <div class="featureCard">
+        <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><circle cx="7" cy="9" r="1.6" fill="currentColor"/><path d="M8 21h8"/></svg></div>
+        <h4 data-i18n="featStreamTitle">On stream and on Discord <span class="tag">new</span></h4>
+        <p data-i18n="featStreamBody">A free <a href="/overlay/">overlay for OBS</a> with your speed, the next turn and your trip, and a Discord status that shows the run in progress while you drive. Both stay off until you turn them on.</p>
+      </div>
+    </div>
+    <p class="moreFeatures"><a href="/guide/"><span data-i18n="featMoreLink">Everything else, from the in-game overlay settings to the Road Trip atlas in ATS, is in the user guide</span> &rarr;</a></p>
 
     <div class="screenshotWrap">
       <p class="screenshotCaption" data-i18n="screenshotCaption">This is what it looks like while driving:</p>
@@ -931,8 +898,6 @@ const TRANSLATIONS = {
     accountsCta: 'Create a free account',
     accountsHow: 'How it works',
     accountsNote: 'Optional: everything else works without an account, and nothing is saved until you link it.',
-    featOverlayTitle: 'In-game overlay <span class="tag">new</span>',
-    featOverlayBody: 'A small panel right on top of the game with your speed and the limit, the next turn, distance left and arrival, so you never look away from the road. Clicks go through it and it never steals focus. <a href="#overlay">See it</a>.',
     overlayTitle: 'The GPS, <span class="accent">on top of the game.</span>',
     overlayBody: 'No second screen at hand, or you just don\'t want to look down? The client draws a small panel over ETS2 and ATS while you drive.',
     overlayLi1: 'Speed and speed limit, blinking when you go over',
@@ -979,40 +944,28 @@ const TRANSLATIONS = {
     smartscreenBody: 'That\'s SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn\'t need admin rights and only reads the game\'s telemetry. Every release page lists the file\'s SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.',
     sourceOptionLink: 'Run from source →',
     featuresTitle: 'Everything a truck GPS should do. <span class="accent">And then some.</span>',
-    featDiscordTitle: 'Discord status',
-    featDiscordBody: 'Your Discord profile can show the run in progress while you drive: where you left from, where you are headed, how far is left and what you are hauling, with a timer. Off by default, one checkbox turns it on.',
-    featMapTitle: 'Real map &amp; real routes',
-    featDlcTitle: 'Routes for the DLCs you own <span class="tag">new</span>',
-    featDlcBody: 'Tell it which map DLCs you have and routes go around the countries and states you don\'t own. If there is no way around one, the route uses it anyway and tells you.',
-    featAtlasTitle: 'Road Trip atlas in ATS <span class="tag">new</span>',
-    featAtlasBody: 'The Tourist Boards and Points of Interest of ATS\'s Road Trip, on the map and in the search: one tap adds the next one to your route.',
-    featMapBody: "The actual road network of both games, with coastline, lakes, rivers and towns drawn underneath and lined up with the game's own coordinates. Routes are calculated over real roads to your destination, never a straight line.",
-    featGpsTitle: 'GPS navigation mode',
-    featGpsBody: 'Heading-up view that rotates as you drive, with turn-by-turn directions and the name of the road you\'re turning onto — like a real sat-nav.',
-    featWaypointsTitle: 'Multi-stop waypoints',
-    featWaypointsBody: 'Tap the map or pick a place to route through it. Numbered stops clear themselves as you reach them, and the route recalculates if you stray.',
-    featPanelTitle: 'Full dashboard panel',
-    featPanelBody: 'Speed, fuel, rest, damage and what the session added up to, on a second phone or monitor while the map stays on the first. It works out whether you arrive before the deadline and whether the fuel lasts, instead of leaving you two numbers to subtract.',
-    featPoiTitle: 'Find fuel, rest &amp; service',
-    featPoiBody: 'Search gas stations, rest areas, service shops and garages, and get the nearest one routed in one tap.',
-    featSpeedTitle: 'Speed, limits &amp; cruise',
-    featSpeedBody: 'Google-Maps-style speed limit sign that flashes when you\'re over, cruise control readout, and a full instrument cluster view.',
-    featTruckTitle: 'Truck vitals',
-    featTruckBody: 'Fuel, range, consumption, wear per part, mechanical alerts, job deadline, pay, tolls and fines for the session.',
+    featGroupNav: 'Navigate',
+    featGroupTruck: 'See your truck',
+    featGroupShare: 'Save and share',
+    featMapTitle: 'Real roads, real routes',
+    featMapBody: 'The actual road network of both games, lined up with the game\'s own coordinates. Turn-by-turn directions with the name of the road you turn onto, a map that turns as you drive, and routes that skip the map DLCs you don\'t own.',
+    featVoiceTitle: 'Spoken directions <span class="tag">new</span>',
+    featVoiceBody: 'A heads-up before each turn, again at the turn, and when you arrive. Natural recorded voices in 8 languages, with no road names to mispronounce. Off by default, one switch in Settings.',
+    featWaypointsTitle: 'Stops along the way',
+    featWaypointsBody: 'Tap the map, or search fuel, rest areas, service and companies, to route through them. The nearest fuel or rest stop is one tap away, and numbered stops clear themselves as you reach them.',
+    featPanelTitle: 'A dashboard on any screen',
+    featPanelBody: 'Speed and the limit, cruise, fuel and range, rest, wear, the job deadline and your arrival in real time, on a phone, tablet or second monitor. Your phone can be on mobile data, no same Wi-Fi needed, and every button and panel can be dragged where it suits you.',
     featButtonsTitle: 'Truck button box',
-    featButtonsBody: 'Hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers and more — tap on your phone, the client presses the real key. Keys are read from your own in-game controls.',
+    featButtonsBody: 'Hazards, beacon, handbrake, engine, trailer, camera, cruise, lights, wipers and more: tap on your phone and the client presses the real key, read from your own in-game controls.',
+    featStatsTitle: 'Trip history and stats <span class="tag">new</span>',
+    featStatsBody: 'With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.',
     featLiveTitle: 'Other drivers, live',
-    featLiveBody: 'See other Truck Dash drivers on the same game and map as you, moving live — and watch every map from the <a href="/live/">public live map</a>, no account needed. Anonymous: position, truck, job and the route you are on. One toggle turns it off, another keeps your route to yourself.',
-    featMobileTitle: 'Any screen, anywhere',
-    featMobileBody: 'Phone, tablet or second monitor, portrait or landscape. Add it to your home screen like an app. Your phone can be on mobile data — no same-Wi-Fi requirement. Drag any button or panel where it suits you: on a touch screen, press and hold one to start.',
-    featConvoyTitle: 'Convoy with friends <span class="tag">beta</span>',
-    featConvoyBody: "Each of you drives in your own game — no TruckersMP, nothing to install. Share a 6-letter code and see everyone as arrows on the map, with speed, cargo, ETA and how far behind the leader they are. Follow the leader's destination with one tap, send quick messages, or share a spectator link for anyone to watch from a phone.",
+    featLiveBody: 'Watch Truck Dash drivers move on the <a href="/live/">public live map</a>, anonymous, with one toggle to stay off it. Or share a 6-letter code with friends and drive as a convoy (beta), each in your own game, no TruckersMP needed.',
+    featStreamTitle: 'On stream and on Discord <span class="tag">new</span>',
+    featStreamBody: 'A free <a href="/overlay/">overlay for OBS</a> with your speed, the next turn and your trip, and a Discord status that shows the run in progress while you drive. Both stay off until you turn them on.',
+    featMoreLink: 'Everything else, from the in-game overlay settings to the Road Trip atlas in ATS, is in the user guide',
     tagBeta: 'beta',
     tagNew: 'new',
-    featVoiceTitle: 'Spoken directions <span class="tag">new</span>',
-    featVoiceBody: 'Turn-by-turn read out loud: a heads-up before each turn, again at the turn, and when you arrive. Natural recorded voices in 8 languages, with no road names to mispronounce. Off by default, one switch in Settings.',
-    featStatsTitle: 'Trip history &amp; stats <span class="tag">new</span>',
-    featStatsBody: 'With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, activity by week and month, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.',
     modsAtsTitle: 'American Truck Simulator',
     modsEts2Title: 'Euro Truck Simulator 2',
     modsC2CNote: 'new roads and cities across the US',
@@ -1150,8 +1103,6 @@ const TRANSLATIONS = {
     accountsCta: 'Crear una cuenta gratis',
     accountsHow: 'Cómo funciona',
     accountsNote: 'Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.',
-    featOverlayTitle: 'Overlay en el juego <span class="tag">nuevo</span>',
-    featOverlayBody: 'Un recuadro chico arriba del juego con tu velocidad y el límite, el próximo giro, lo que falta y la llegada, para no sacar la vista de la ruta. Los clics pasan a través y nunca le saca el foco al juego. <a href="#overlay">Miralo</a>.',
     overlayTitle: 'El GPS, <span class="accent">arriba del juego.</span>',
     overlayBody: '¿No tenés una segunda pantalla a mano, o no querés bajar la vista? El cliente dibuja un recuadro chico sobre ETS2 y ATS mientras manejás.',
     overlayLi1: 'Velocidad y límite, que titila si te pasás',
@@ -1198,40 +1149,28 @@ const TRANSLATIONS = {
     smartscreenBody: 'Es SmartScreen avisando sobre cualquier programa nuevo sin firmar — tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que verifiques lo que bajaste, y siempre podés correrlo directo desde el código fuente.',
     sourceOptionLink: 'Correr desde el código fuente →',
     featuresTitle: 'Todo lo que un GPS de camión tiene que hacer. <span class="accent">Y bastante más.</span>',
-    featDiscordTitle: 'Estado de Discord',
-    featDiscordBody: 'Tu perfil de Discord puede mostrar el viaje en curso mientras manejás: de dónde saliste, a dónde vas, cuánto falta y qué llevás, con cronómetro. Apagado por defecto, se prende con una casilla.',
-    featMapTitle: 'Mapa y rutas reales',
-    featMapBody: 'La red de carreteras real de ambos juegos, con costa, lagos, ríos y ciudades dibujados debajo y alineados con las coordenadas del propio juego. Las rutas se calculan por caminos reales hasta tu destino, nunca en línea recta.',
-    featGpsTitle: 'Modo navegación GPS',
-    featGpsBody: 'Vista que rota con tu rumbo mientras manejás, con indicaciones de giro y el nombre de la ruta a la que doblás — como un GPS de verdad.',
-    featWaypointsTitle: 'Waypoints con paradas',
-    featWaypointsBody: 'Tocá el mapa o elegí un lugar para pasar por ahí. Las paradas numeradas se quitan solas cuando llegás, y la ruta se recalcula si te desviás.',
-    featPanelTitle: 'Panel de tablero completo',
-    featPanelBody: 'Velocidad, combustible, descanso, daños y cómo viene la sesión, en un segundo celular o monitor mientras el mapa sigue en el primero. Te dice si llegás antes del vencimiento y si te alcanza la nafta, en vez de dejarte dos números para restar.',
-    featPoiTitle: 'Encontrá combustible, descanso y taller',
-    featPoiBody: 'Buscá estaciones de servicio, áreas de descanso, talleres y garages, y ruteá a la más cercana con un toque.',
-    featSpeedTitle: 'Velocidad, límites y crucero',
-    featSpeedBody: 'Cartel de límite estilo Google Maps que parpadea si te pasás, lectura del control de crucero, y una vista de cluster de instrumentos completa.',
-    featTruckTitle: 'Estado del camión',
-    featTruckBody: 'Combustible, autonomía, consumo, desgaste por pieza, alertas mecánicas, deadline del trabajo, pago, peajes y multas de la sesión.',
+    featGroupNav: 'Navegar',
+    featGroupTruck: 'Tu camión a la vista',
+    featGroupShare: 'Guardar y compartir',
+    featMapTitle: 'Rutas reales, por calles reales',
+    featMapBody: 'La red de rutas real de los dos juegos, alineada con las coordenadas del propio juego. Indicaciones giro a giro con el nombre de la ruta a la que doblás, un mapa que gira mientras manejás y rutas que esquivan los DLC de mapa que no tenés.',
+    featVoiceTitle: 'Indicaciones habladas <span class="tag">nuevo</span>',
+    featVoiceBody: 'Un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, sin nombres de rutas que pronunciar mal. Apagadas de entrada, se prenden con un botón en Ajustes.',
+    featWaypointsTitle: 'Paradas en el camino',
+    featWaypointsBody: 'Tocá el mapa, o buscá combustible, áreas de descanso, talleres y empresas, para pasar por ahí. La estación o el descanso más cercano está a un toque, y las paradas numeradas se quitan solas cuando llegás.',
+    featPanelTitle: 'Un tablero en cualquier pantalla',
+    featPanelBody: 'Velocidad y límite, crucero, combustible y autonomía, descanso, desgaste, el plazo del trabajo y tu llegada en hora real, en un celular, una tablet o un segundo monitor. El celular puede estar con datos móviles, sin compartir el Wi-Fi, y cada botón y panel se puede arrastrar a donde te quede cómodo.',
     featButtonsTitle: 'Botonera del camión',
-    featButtonsBody: 'Balizas, beacon, freno de mano, motor, trailer, cámara, crucero, luces, limpiaparabrisas y más — tocás en el celular, el cliente aprieta la tecla real. Las teclas se leen de tus propios controles del juego.',
+    featButtonsBody: 'Balizas, beacon, freno de mano, motor, trailer, cámara, crucero, luces, limpiaparabrisas y más: tocás en el celular y el cliente aprieta la tecla de verdad, leída de tus propios controles del juego.',
+    featStatsTitle: 'Historial de viajes y estadísticas <span class="tag">nuevo</span>',
+    featStatsBody: 'Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, récords y logros, amigos para seguir y un perfil público solo si lo querés. <a href="#accounts">Más abajo</a>.',
     featLiveTitle: 'Otros camioneros en vivo',
-    featLiveBody: 'Mirá a otros usuarios de Truck Dash en el mismo juego y mapa que vos, moviéndose en vivo — y seguí cualquier mapa desde el <a href="/live/">mapa en vivo público</a>, sin cuenta. Anónimo: posición, camión, viaje y la ruta que llevás. Se apaga con un interruptor, y otro deja la ruta solo para vos.',
-    featMobileTitle: 'Cualquier pantalla, en cualquier lado',
-    featMobileBody: 'Celular, tablet o segundo monitor, vertical u horizontal. Agregalo a la pantalla de inicio como una app. El celular puede estar con datos móviles — no hace falta la misma WiFi. Arrastrá cualquier botón o panel a donde te sirva: en pantalla táctil, mantené apretado uno para empezar.',
-    featConvoyTitle: 'Convoy con amigos <span class="tag">beta</span>',
-    featConvoyBody: 'Cada uno maneja en su propio juego — sin TruckersMP, sin instalar nada. Compartís un código de 6 letras y ven a todos como flechas en el mapa, con velocidad, carga, ETA y a cuánto van del líder. Seguí el destino del líder con un toque, mandá mensajes rápidos o compartí un link de espectador para que cualquiera mire desde el celular.',
+    featLiveBody: 'Mirá a los camioneros de Truck Dash moverse en el <a href="/live/">mapa en vivo público</a>, de forma anónima y con un tilde para no aparecer. O compartí un código de 6 letras con amigos y manejen en convoy (beta), cada uno en su juego, sin TruckersMP.',
+    featStreamTitle: 'En el stream y en Discord <span class="tag">nuevo</span>',
+    featStreamBody: 'Un <a href="/overlay/">overlay para OBS</a> gratis con tu velocidad, el próximo giro y tu viaje, y un estado de Discord que muestra el viaje en curso mientras manejás. Los dos quedan apagados hasta que los prendés.',
+    featMoreLink: 'Todo lo demás, desde los ajustes del overlay en el juego hasta el atlas del Road Trip en ATS, está en la guía de uso',
     tagBeta: 'beta',
     tagNew: 'nuevo',
-    featVoiceTitle: 'Indicaciones habladas <span class="tag">nuevo</span>',
-    featVoiceBody: 'Las indicaciones de giro en voz alta: un aviso antes de cada giro, otro en el giro y al llegar. Voces grabadas naturales en 8 idiomas, sin nombres de rutas mal pronunciados. Apagada por defecto, un interruptor en Ajustes.',
-    featStatsTitle: 'Historial de viajes y estadísticas <span class="tag">nuevo</span>',
-    featStatsBody: 'Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, actividad por semana y por mes, récords y logros, amigos para seguir, y un perfil público solo si querés. <a href="#accounts">Más abajo</a>.',
-    featDlcTitle: 'Rutas con los DLC que tenés <span class="tag">nuevo</span>',
-    featDlcBody: 'Marcá qué DLC de mapa tenés y las rutas rodean los países y estados que no. Si no hay forma de rodear uno, la ruta pasa igual y te avisa.',
-    featAtlasTitle: 'Atlas del Road Trip en ATS <span class="tag">nuevo</span>',
-    featAtlasBody: 'Los Tourist Boards y Points of Interest del Road Trip de ATS, en el mapa y en el buscador: con un toque sumás el próximo a tu ruta.',
     modsAtsTitle: 'American Truck Simulator',
     modsEts2Title: 'Euro Truck Simulator 2',
     modsC2CNote: 'rutas y ciudades nuevas por todo EE. UU.',
