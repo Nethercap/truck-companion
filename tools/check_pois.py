@@ -29,8 +29,9 @@ sys.path.insert(0, os.path.join(ROOT, "client"))
 from mapbuild import pois as mapbuild_pois  # noqa: E402
 
 # Codigos de facilities: los de los iconos del juego, mas los estacionamientos
-# para auto ("c", car_parking) que no salen de un icono.
-FACILITY_CODES = set(mapbuild_pois.FACILITY_CODES.values()) | {"c"}
+# para auto ("c", car_parking) que no salen de un icono y los surtidores solo
+# para auto ("f", facility_code).
+FACILITY_CODES = set(mapbuild_pois.FACILITY_CODES.values()) | {"c", "f"}
 ATLAS_KINDS = {"t", "o"}  # tourist board / otro punto del Atlas
 
 

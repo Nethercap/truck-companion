@@ -133,6 +133,29 @@ def test_pois_completa_ciudades_sin_nombre():
                                "v_novgorod": "Veliky Novgorod", "nueva_ciudad": "Nueva Ciudad"}
 
 
+def test_pois_surtidores_solo_para_auto(tmp_path):
+    """Los techos de surtidores para auto (ATS 1.61) van con su propio codigo:
+    en camion no se entra, y la web mandaba a un camion a la de Spearfish
+    (Discord 12-10). Una parada de camiones tiene los dos techos; el de
+    camion sigue siendo "g". En ETS2 no se maneja auto: todo es "g"."""
+    import json
+    from mapbuild import pois
+    surtidores = [
+        {"x": -31035, "y": -34508, "type": "facility", "icon": "gas_ico", "prefabPath": "prefab/gas/us_gas_gp_car_2rows_roof.ppd"},
+        {"x": -28960, "y": -30470, "type": "facility", "icon": "gas_ico", "prefabPath": "prefab/gas/us_gas_driver_car_4rows_roof_rt.ppd"},
+        {"x": -28990, "y": -30490, "type": "facility", "icon": "gas_ico", "prefabPath": "prefab/gas/us_gas_driver_truck_5rows_roof.ppd"},
+        {"x": 5000, "y": 5000, "type": "facility", "icon": "gas_ico", "prefabPath": "prefab/gas/us_gas_station_trigger_only_rt.ppd"},
+        {"x": 9000, "y": 9000, "type": "facility", "icon": "gas_ico"},
+    ]
+    (tmp_path / "usa-pois.json").write_text(json.dumps(surtidores))
+    datos = pois.build(str(tmp_path), "usa")
+    assert sorted(datos["facilities"]) == sorted([
+        [-31035, -34508, "f"], [-28960, -30470, "f"], [-28990, -30490, "g"], [5000, 5000, "g"], [9000, 9000, "g"],
+    ])
+    (tmp_path / "europe-pois.json").write_text(json.dumps(surtidores))
+    assert {f[2] for f in pois.build(str(tmp_path), "europe")["facilities"]} == {"g"}
+
+
 def test_pois_guarda_el_estado_de_cada_ciudad(tmp_path):
     """Tres Jackson en ATS + C2C: sin el estado, en el buscador de la web no
     se sabia cual era cual (Discord 11-10)."""
