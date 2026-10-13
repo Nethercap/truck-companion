@@ -2179,10 +2179,13 @@ function restoreWaypoints() {
 }
 
 // kind: codigo del POI ('g' estacion de servicio...) si salio del buscador.
-function addWaypoint(pos, lngLat, inGame, label, kind = null) {
+// at: donde entra en la lista (al final si no se dice; ver addPoiWaypoint).
+function addWaypoint(pos, lngLat, inGame, label, kind = null, at = waypoints.length) {
   if (waypoints.length >= MAX_WAYPOINTS) { showToast(t('waypointLimitToast').replace('{n}', MAX_WAYPOINTS), 'danger'); return; }
-  const wp = { pos, lngLat, inGame, label: label || null, kind, marker: makeWaypointMarker(lngLat, waypoints.length) };
-  waypoints.push(wp);
+  const i = Math.max(0, Math.min(at, waypoints.length));
+  const wp = { pos, lngLat, inGame, label: label || null, kind, marker: makeWaypointMarker(lngLat, i) };
+  waypoints.splice(i, 0, wp);
+  renumberWaypointMarkers();
   renderWaypointList();
   invalidateRoute();
   saveWaypoints();
@@ -2233,9 +2236,17 @@ function finalizeWaypoint(inGame) {
 
 // Un waypoint agregado desde la busqueda de POIs (estacion, taller, empresa)
 // no pasa por el modal: el juego no lo conoce (inGame=false) y ya tiene nombre.
+// Una parada (con kind: estacion, descanso, taller...) va como la proxima, o
+// en el tramo de la ruta por el que se pasa por ella (stopInsertIndex); una
+// empresa sigue yendo al final, que sin trabajo es el destino. La ruta solo
+// sirve si es la de los waypoints de ahora: con currentRouteTarget en null
+// (recien invalidada) sus tramos pueden ser los de antes.
 function addPoiWaypoint(pos, label, kind = null) {
   if (!toLngLat) return;
-  addWaypoint(pos, toLngLat(pos[0], pos[1]), false, label, kind);
+  const at = kind
+    ? stopInsertIndex(currentRouteTarget ? currentRouteWorldPoints : null, { x: pos[0], z: pos[1] }, waypoints.length)
+    : waypoints.length;
+  addWaypoint(pos, toLngLat(pos[0], pos[1]), false, label, kind, at);
   showToast(t('poiAddedToast').replace('{name}', label), 'success', 3000);
 }
 
