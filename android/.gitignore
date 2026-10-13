@@ -1,0 +1,11 @@
+# Compilacion de Gradle y configuracion local
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+# Nunca la clave de firma ni sus contrasenas: van como secrets de GitHub
+*.jks
+*.keystore
+keystore.properties

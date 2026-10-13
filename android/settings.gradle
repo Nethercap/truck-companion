@@ -1,0 +1,19 @@
+// App de Android de Truck Dash: una Trusted Web Activity (TWA) que abre
+// https://trucksim-dash.com/app/ a pantalla completa con el Chrome del
+// telefono. No tiene codigo propio: la app web es la misma. Ver README.md.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'TruckDash'
+include ':app'

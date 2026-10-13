@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Panel</string>
+    <string name="shortcutDashLong">Gösterge panelini aç</string>
+    <string name="shortcutStats">İstatistik</string>
+    <string name="shortcutStatsLong">İstatistiklerim</string>
+    <string name="shortcutLive">Canlı</string>
+    <string name="shortcutLiveLong">Canlı harita</string>
+    <string name="shortcutClassic">Klasik</string>
+    <string name="shortcutClassicLong">Klasik göstergeler</string>
+</resources>

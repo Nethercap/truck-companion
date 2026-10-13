@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Pulpit</string>
+    <string name="shortcutDashLong">Otwórz pulpit</string>
+    <string name="shortcutStats">Statystyki</string>
+    <string name="shortcutStatsLong">Moje statystyki</string>
+    <string name="shortcutLive">Na żywo</string>
+    <string name="shortcutLiveLong">Mapa na żywo</string>
+    <string name="shortcutClassic">Klasyczny</string>
+    <string name="shortcutClassicLong">Klasyczne zegary</string>
+</resources>

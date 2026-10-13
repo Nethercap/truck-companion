@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Dashboard</string>
+    <string name="shortcutDashLong">Open the dashboard</string>
+    <string name="shortcutStats">Stats</string>
+    <string name="shortcutStatsLong">My stats</string>
+    <string name="shortcutLive">Live map</string>
+    <string name="shortcutLiveLong">Live map of drivers</string>
+    <string name="shortcutClassic">Classic</string>
+    <string name="shortcutClassicLong">Classic gauges</string>
+</resources>

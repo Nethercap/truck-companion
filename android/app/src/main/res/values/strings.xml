@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName" translatable="false">Truck Dash</string>
+    <string name="launcherName" translatable="false">Truck Dash</string>
+    <string name="launchUrl" translatable="false">https://trucksim-dash.com/app/</string>
+    <string name="providerAuthority" translatable="false">com.trucksimdash.app.fileprovider</string>
+    <!-- Digital Asset Links: la app dice que es de trucksim-dash.com; el sitio
+         lo confirma en /.well-known/assetlinks.json -->
+    <string name="assetStatements" translatable="false">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {\"namespace\": \"web\", \"site\": \"https://trucksim-dash.com\"}
+        }]
+    </string>
+</resources>

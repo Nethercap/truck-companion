@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Painel</string>
+    <string name="shortcutDashLong">Abrir o painel</string>
+    <string name="shortcutStats">Estatís.</string>
+    <string name="shortcutStatsLong">Minhas estatísticas</string>
+    <string name="shortcutLive">Ao vivo</string>
+    <string name="shortcutLiveLong">Mapa ao vivo</string>
+    <string name="shortcutClassic">Clássico</string>
+    <string name="shortcutClassicLong">Mostradores clássicos</string>
+</resources>

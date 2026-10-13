@@ -1,0 +1,4 @@
+# GitHub Pages arma docs/ con Jekyll, que deja afuera las carpetas que
+# empiezan con punto: sin esto no se publicaria /.well-known/assetlinks.json,
+# que necesita la app de Android (android/README.md, tools/assetlinks.py).
+include: [".well-known"]

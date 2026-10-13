@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Панель</string>
+    <string name="shortcutDashLong">Открыть панель</string>
+    <string name="shortcutStats">Статистика</string>
+    <string name="shortcutStatsLong">Моя статистика</string>
+    <string name="shortcutLive">Карта</string>
+    <string name="shortcutLiveLong">Живая карта</string>
+    <string name="shortcutClassic">Классика</string>
+    <string name="shortcutClassicLong">Классические приборы</string>
+</resources>

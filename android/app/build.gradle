@@ -1,0 +1,52 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Version y firma salen del entorno (workflow "Build Android", ver README):
+// TD_VERSION_CODE sube en cada build que se sube a Play; sin TD_KEYSTORE el
+// AAB sale sin firmar (sirve para ver que compila, no para subirlo).
+def env = System.getenv()
+
+android {
+    namespace 'com.trucksimdash.app'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.trucksimdash.app'
+        minSdk 21
+        targetSdk 36
+        versionCode Integer.parseInt(env.getOrDefault('TD_VERSION_CODE', '1'))
+        versionName env.getOrDefault('TD_VERSION_NAME', '1.0.0')
+    }
+
+    signingConfigs {
+        release {
+            if (env.TD_KEYSTORE) {
+                storeFile file(env.TD_KEYSTORE)
+                storePassword env.TD_KEYSTORE_PASSWORD
+                keyAlias env.TD_KEY_ALIAS
+                keyPassword env.TD_KEY_PASSWORD
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (env.TD_KEYSTORE) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // La TWA de Google (LauncherActivity, splash, delegacion, respaldo con
+    // WebView si el telefono no tiene un navegador compatible)
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

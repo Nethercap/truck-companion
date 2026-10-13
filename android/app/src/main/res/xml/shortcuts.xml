@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Al mantener apretado el icono: van directo a cada parte del sitio, adentro
+     de la misma app (LauncherActivity con la URL como dato). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="dash"
+        android:shortcutShortLabel="@string/shortcutDash"
+        android:shortcutLongLabel="@string/shortcutDashLong">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:data="https://trucksim-dash.com/app/"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:targetPackage="com.trucksimdash.app" />
+    </shortcut>
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="stats"
+        android:shortcutShortLabel="@string/shortcutStats"
+        android:shortcutLongLabel="@string/shortcutStatsLong">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:data="https://trucksim-dash.com/account/"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:targetPackage="com.trucksimdash.app" />
+    </shortcut>
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="live"
+        android:shortcutShortLabel="@string/shortcutLive"
+        android:shortcutLongLabel="@string/shortcutLiveLong">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:data="https://trucksim-dash.com/live/"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:targetPackage="com.trucksimdash.app" />
+    </shortcut>
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="classic"
+        android:shortcutShortLabel="@string/shortcutClassic"
+        android:shortcutLongLabel="@string/shortcutClassicLong">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:data="https://trucksim-dash.com/dash/"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:targetPackage="com.trucksimdash.app" />
+    </shortcut>
+</shortcuts>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Tableau</string>
+    <string name="shortcutDashLong">Ouvrir le tableau de bord</string>
+    <string name="shortcutStats">Stats</string>
+    <string name="shortcutStatsLong">Mes stats</string>
+    <string name="shortcutLive">En direct</string>
+    <string name="shortcutLiveLong">Carte en direct</string>
+    <string name="shortcutClassic">Classique</string>
+    <string name="shortcutClassicLong">Cadrans classiques</string>
+</resources>

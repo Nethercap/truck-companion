@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Tablero</string>
+    <string name="shortcutDashLong">Abrir el tablero</string>
+    <string name="shortcutStats">Stats</string>
+    <string name="shortcutStatsLong">Mis estadísticas</string>
+    <string name="shortcutLive">En vivo</string>
+    <string name="shortcutLiveLong">Mapa en vivo</string>
+    <string name="shortcutClassic">Clásico</string>
+    <string name="shortcutClassicLong">Relojes clásicos</string>
+</resources>

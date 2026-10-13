@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcutDash">Dashboard</string>
+    <string name="shortcutDashLong">Dashboard öffnen</string>
+    <string name="shortcutStats">Statistik</string>
+    <string name="shortcutStatsLong">Meine Statistiken</string>
+    <string name="shortcutLive">Live</string>
+    <string name="shortcutLiveLong">Live-Karte</string>
+    <string name="shortcutClassic">Klassisch</string>
+    <string name="shortcutClassicLong">Klassische Anzeigen</string>
+</resources>
