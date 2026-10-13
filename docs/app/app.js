@@ -2696,8 +2696,12 @@ const ROUTE_GRAPH_V3_REV = 5;
 // Flechas de carril (decodeLanesBin en pure.js): archivo aparte y chico
 // (~90 KB en ATS), que se baja despues del grafo y solo sirve con ESE grafo
 // (mismos nodos y aristas). Sin el, o en una variante que todavia no lo
-// tiene, no hay flechas y nada mas. 0 = no se pide (hasta subirlo a R2).
-const ROUTE_LANES_REV = 0;
+// tiene, no hay flechas y nada mas. 0 = no se pide. 2 = 13-10, los de las
+// 17 variantes (r2-upload-lanes del taller); el 1 quedo con un 404 guardado
+// en el cache de Cloudflare (se pidio antes de subirlo y la regla "Mapas
+// R2" guarda tambien los 404). Al regenerar grafos, regenerar tambien
+// estos y subir el numero.
+const ROUTE_LANES_REV = 2;
 let routeLanes = null;
 async function loadRouteLanes(base, v, game, decoded, graph) {
   routeLanes = null;
