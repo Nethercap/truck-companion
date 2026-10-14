@@ -197,3 +197,61 @@ def test_pois_guarda_las_areas_de_ciudad(tmp_path):
     assert datos["areas"] == [[26158, -17488, 338, 331], [100, 200, 1, 51]]
     (tmp_path / "usa-cities.json").write_text(json.dumps([{"token": "a", "name": "A", "x": 0, "y": 0}]))
     assert "areas" not in pois.build(str(tmp_path), "usa")
+
+
+def test_nombres_de_ruta_con_el_cartelito():
+    """Rockford es la Business US-20 (West State St) y el tablero decia
+    "Keep right onto US-20" (Discord 14-10): el cartelito BUSINESS de abajo
+    del escudo se perdia."""
+    from mapbuild.extract_road_names import sign_labels
+    a = "/def/sign/atlas/"
+    # Los carteles de Rockford, tal cual vienen del parser
+    assert sign_labels([a + "us_20.sii", "<sub scale=1.16>E</sub>AST", "BUSINESS", "/font/sign/us_sign_b.font"]) == ["US-20 Bus"]
+    assert sign_labels([a + "us_20.sii", "BUSINESS", "/font/sign/us_sign_b.font", "WEST"]) == ["US-20 Bus"]
+    assert sign_labels([a + "us_20.sii", "EAST", a + "small_arrow_10.sii"]) == ["US-20"]
+    # Las dos manos en un cartel: los dos cartelitos, uno por escudo
+    assert sign_labels([a + "us_20.sii", a + "us_20.sii", "BUSINESS", "BUSINESS", "EAST", "WEST"]) == ["US-20 Bus"]
+    # Varias rutas: el cartelito es del escudo de antes, si no hay otro texto en el medio
+    assert sign_labels([a + "us_61.sii", "BUSINESS", a + "us_67.sii"]) == ["US-61 Bus", "US-67"]
+    assert sign_labels([a + "us_60.sii", "BUSINESS", a + "us_67.sii", "BUSINESS"]) == ["US-60 Bus", "US-67 Bus"]
+    assert sign_labels([a + "us_75.sii", "BUSINESS", "Council Bluffs", a + "is_29.sii", "SOUTH"]) == ["US-75 Bus", "I-29"]
+    assert sign_labels([a + "us_75.sii", "Council Bluffs", "BUSINESS", a + "is_29.sii"]) == ["US-75", "I-29"]
+    # Una sola ruta: el cartelito es de ella aunque este arriba del escudo
+    assert sign_labels(["TRUCK", a + "us_277.sii", "SOUTH"]) == ["US-277 Truck"]
+    assert sign_labels(["ALTERNATE", "TO", a + "us_16.sii"]) == ["US-16 Alt"]
+    # El cartelito en el nombre del sprite, y las variantes de dibujo que antes no se leian
+    assert sign_labels([a + "us_71b.sii"]) == ["US-71 Bus"]
+    assert sign_labels([a + "us_65b_2.sii"]) == ["US-65 Bus"]
+    assert sign_labels([a + "us_16a.sii"]) == ["US-16 Alt"]
+    assert sign_labels([a + "us_14_alt.sii"]) == ["US-14 Alt"]
+    assert sign_labels([a + "us_54_bus_nm_2.sii"]) == ["US-54 Bus"]
+    assert sign_labels([a + "us_66_h_nm.sii"]) == ["US-66 Hist"]
+    assert sign_labels([a + "us_30_historic_or.sii"]) == ["US-30 Hist"]
+    assert sign_labels([a + "bu_80.sii"]) == ["I-80 Bus"]
+    assert sign_labels([a + "bu_10_white.sii"]) == ["I-10 Bus"]
+    assert sign_labels([a + "is_35e_w.sii"]) == ["I-35E"]
+    assert sign_labels([a + "is_69w.sii"]) == ["I-69W"]
+    for variante in ("us_385_2", "us_50_guide", "us_101_ca_guide_2", "us_54_black", "us_97_ca"):
+        assert sign_labels([a + variante + ".sii"]) == ["US-" + variante.split("_")[1]]
+    assert sign_labels([a + "is_40_2.sii", a + "is_580_ca.sii"]) == ["I-40", "I-580"]
+    # Lo que no es escudo de ruta no da nombre
+    assert sign_labels([a + "ca_shields.sii", "US  Bus  20", "West  State  St"]) == []
+    assert sign_labels(None) == []
+
+
+def test_nombres_de_ruta_extract_deduplica_por_cartel(tmp_path):
+    import json
+    from mapbuild import extract_road_names
+    carteles = [
+        {"x": 26862.4, "y": -20129.6, "textItems": ["/def/sign/atlas/us_20.sii", "WEST", "BUSINESS"]},
+        {"x": 26862.4, "y": -20129.6, "textItems": ["/def/sign/atlas/us_20.sii", "WEST", "BUSINESS"]},
+        {"x": 27279, "y": -19323, "textItems": ["EAST", "/def/sign/atlas/us_20.sii"]},
+        {"textItems": ["/def/sign/atlas/us_20.sii"]},
+    ]
+    entrada, salida = tmp_path / "usa-signs.json", tmp_path / "road-names.json"
+    entrada.write_text(json.dumps(carteles))
+    extract_road_names.main(["", str(entrada), str(salida)])
+    assert json.loads(salida.read_text()) == [
+        {"x": 26862.4, "y": -20129.6, "label": "US-20 Bus", "kind": "road"},
+        {"x": 27279, "y": -19323, "label": "US-20", "kind": "road"},
+    ]
