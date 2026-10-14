@@ -172,3 +172,28 @@ def test_pois_guarda_el_estado_de_cada_ciudad(tmp_path):
     datos = pois.build(str(tmp_path), "usa")
     assert datos["countries"] == {"jackson": "wyoming", "jackson_ms": "mississippi"}
     assert datos["cities"]["jackson_ms"] == "Jackson"
+
+
+def test_pois_guarda_las_areas_de_ciudad(tmp_path):
+    """Adentro de las cajas de ciudad el juego va a 1:3: sin ellas la web
+    media Rockford a 1:20 y daba 25,5 mi con el GPS del juego en 4,0
+    (Discord 14-10). Van las ocultas tambien, y una caja angosta no queda
+    en 0 de ancho al redondear."""
+    import json
+    from mapbuild import pois
+    (tmp_path / "usa-pois.json").write_text(json.dumps([
+        {"x": 10, "y": 20, "type": "company", "icon": "wal_mkt", "label": "Wallbert", "cityToken": "rockford"},
+    ]))
+    (tmp_path / "usa-cities.json").write_text(json.dumps([
+        {"token": "rockford", "name": "Rockford", "x": 0, "y": 0, "areas": [
+            {"x": 26158.07, "y": -17487.24, "width": 337.18, "height": 329.42, "hidden": True},
+            {"x": 100.6, "y": 200.2, "width": 0.4, "height": 50, "hidden": False},
+            {"x": 5, "y": 5, "width": 0, "height": 10},
+            {"x": 5, "y": 5},
+        ]},
+        {"token": "sin_areas", "name": "Sin Areas", "x": 5, "y": 5},
+    ]))
+    datos = pois.build(str(tmp_path), "usa")
+    assert datos["areas"] == [[26158, -17488, 338, 331], [100, 200, 1, 51]]
+    (tmp_path / "usa-cities.json").write_text(json.dumps([{"token": "a", "name": "A", "x": 0, "y": 0}]))
+    assert "areas" not in pois.build(str(tmp_path), "usa")

@@ -1385,6 +1385,78 @@ test('waypointEta: abajo del ETA del juego, horas de juego; abajo del real, tiem
   assert.deepEqual(waypointEta({ viaKm: null, gameKm: 400, gameEtaSeconds: 20000, avgSpeedKmh: 1000, timeScale: 20 }), { gameSeconds: null, realSeconds: null });
 });
 
+test('createCityScale: adentro de las cajas de ciudad el juego va a 1:3', () => {
+  const { createCityScale, CITY_SCALE, waypointEta } = require('./pure.js');
+  assert.equal(CITY_SCALE, 3);
+  // Una ciudad de 2 km x 2 km con la esquina en (0, 0), y otra caja chica
+  // que cruza el borde de una celda de la grilla.
+  const escala = createCityScale([[0, 0, 2000, 2000], [2950, 950, 100, 100]], { outside: 20 });
+  assert.equal(escala.at(1000, 1000), 3);
+  assert.equal(escala.at(2000, 2000), 3);   // el borde es ciudad
+  assert.equal(escala.at(2001, 1000), 20);
+  assert.equal(escala.at(-1, 1000), 20);
+  assert.equal(escala.at(3020, 1020), 3);   // la chica, del otro lado de la celda
+  // Rockford (Discord, 14-10): 2 km de calles adentro de la ciudad. A 1:20
+  // eran 40 km (24,9 mi) contra los 4,0 mi del juego; a 1:3, 6 km.
+  const calles = [[100, 1900], [100, 1100], [600, 400], [1300, 300], [1400, 380]];
+  const mundo = calles.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - calles[i][0], p[1] - calles[i][1]), 0);
+  assert.ok(Math.abs(escala.pathMeters(calles) - mundo * 3) < 1e-6);
+  // y con el km corregido, la fila "via waypoint" sigue al ETA del juego
+  // (antes caia al ritmo real porque 4 mi < 25 % de 25,5 mi)
+  const viaKm = escala.pathMeters(calles) / 1000;
+  const eta = waypointEta({ viaKm, gameKm: viaKm * 1.02, gameEtaSeconds: 1200, avgSpeedKmh: 30, timeScale: 3 });
+  assert.ok(Math.abs(eta.gameSeconds - 1200 / 1.02) < 1e-6);
+  // Una recta de la ruta que entra a la ciudad: cada parte a su escala, no
+  // toda del lado de su punto medio. 1000 m afuera y 500 adentro.
+  assert.ok(Math.abs(escala.pathMeters([[-1000, 1000], [500, 1000]]) - (1000 * 20 + 500 * 3)) < 1e-6);
+  // Hasta un tope de metros de mundo (la distancia al proximo giro): corta
+  // el tramo a la mitad si hace falta.
+  assert.ok(Math.abs(escala.pathMeters([[100, 100], [100, 600], [100, 1600]], 800) - 800 * 3) < 1e-6);
+  assert.ok(Math.abs(escala.pathMeters([[2100, 0], [2100, 300], [2100, 1300]], 800) - 800 * 20) < 1e-6);
+  // Sin areas (POIs de antes, o bajando todavia): todo a la escala de la
+  // ruta, como antes.
+  const sinAreas = createCityScale(null, { outside: 19 });
+  assert.equal(sinAreas.at(1000, 1000), 19);
+  assert.ok(Math.abs(sinAreas.pathMeters(calles) - mundo * 19) < 1e-6);
+  assert.equal(sinAreas.pathMeters(null), 0);
+  assert.equal(sinAreas.pathMeters([[0, 0]]), 0);
+  // Filas raras (lado en 0, cortas) no rompen nada ni hacen ciudad.
+  assert.equal(createCityScale([[0, 0, 0, 100], [5, 5], null], { outside: 20 }).at(0, 50), 20);
+});
+
+test('createCityScale: un hueco corto entre dos cajas de la misma ciudad es ciudad', () => {
+  const { createCityScale, CITY_GAP_M } = require('./pure.js');
+  assert.equal(CITY_GAP_M, 500);
+  // Rockford (Discord, 14-10): de la caja del oeste (hasta x = 27389) a la
+  // del este (desde x = 27654) hay 265 m de calle sin caja, y el GPS del
+  // juego decia 4,0 mi: todo a 1:3. Con el hueco a 1:20 serian 6,6.
+  const escala = createCityScale([[26841, -20470, 548, 1319], [27654, -19953, 578, 855]], { outside: 20 });
+  const cruce = [[27000, -19940], [27389, -19940], [27654, -19940], [28000, -19940]];
+  assert.ok(Math.abs(escala.pathMeters(cruce) - 1000 * 3) < 1e-6);
+  // Hasta el proximo giro, adentro del hueco: el hueco ya cuenta como ciudad
+  // aunque el tope corte antes de la otra caja.
+  assert.ok(Math.abs(escala.pathMeters(cruce, 500) - 500 * 3) < 1e-6);
+  // Un hueco largo (otra ciudad, o la ruta entre dos barrios lejos) no.
+  const lejos = createCityScale([[0, 0, 1000, 1000], [1800, 0, 1000, 1000]], { outside: 20 });
+  assert.ok(Math.abs(lejos.pathMeters([[500, 500], [2300, 500]]) - (500 * 3 + 800 * 20 + 500 * 3)) < 1e-6);
+  // Las puntas no se rellenan: salir de la ciudad sigue a 1:20 desde la caja,
+  // y arrancar afuera tambien.
+  assert.ok(Math.abs(lejos.pathMeters([[500, 500], [1300, 500]]) - (500 * 3 + 300 * 20)) < 1e-6);
+  assert.ok(Math.abs(lejos.pathMeters([[-200, 500], [500, 500]]) - (200 * 20 + 500 * 3)) < 1e-6);
+});
+
+test('createCityScale: el primer tramo de la ruta recortada se mide cada vez', () => {
+  const { createCityScale } = require('./pure.js');
+  const escala = createCityScale([[0, 0, 1000, 1000]], { outside: 20 });
+  // Un tramo largo que sale de la ciudad: 500 m adentro, 500 afuera.
+  const fin = [1500, 500];
+  const ruta = [[0, 500], [500, 500], fin];
+  assert.ok(Math.abs(escala.pathMeters(ruta) - (500 * 3 + 500 * 3 + 500 * 20)) < 1e-6);
+  // El camion ya salio de la ciudad: la ruta recortada arranca en (1200,
+  // 500) y el primer tramo, el mismo punto final, ya es todo de afuera.
+  assert.ok(Math.abs(escala.pathMeters([[1200, 500], fin]) - 300 * 20) < 1e-6);
+});
+
 test('useOwnRemaining: el GPS del juego apuntando al remolque no cuenta como llegada', () => {
   const { useOwnRemaining } = require('./pure.js');
   assert.equal(useOwnRemaining(0.1, 820), true);   // freight market: el juego va al remolque

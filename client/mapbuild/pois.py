@@ -17,12 +17,16 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
     "countries":  {"city_token": "country_token", ...},  # estado/pais del juego
                                               # ("wyoming"): la web lo muestra
                                               # en las ciudades repetidas
-    "atlas":      [[x, z, "t", "Name"], ...]    # solo ATS: t tourist board,
+    "atlas":      [[x, z, "t", "Name"], ...],   # solo ATS: t tourist board,
                                               # o point of interest (Road Trip)
+    "areas":      [[x, z, ancho, alto], ...]  # areas de ciudad (esquina de
+                                              # arriba a la izquierda): adentro
+                                              # el juego va a escala 1:3
   }
 """
 
 import json
+import math
 import os
 import re
 
@@ -174,12 +178,14 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
     # El estado de cada ciudad: hay tres Jackson en ATS + C2C, y en el
     # buscador no se sabia cual era cual (Discord, 11-10).
     countries = {}
+    areas = []
     try:
         for c in _cargar(os.path.join(parser_dir, f"{prefix}-cities.json")):
             if c.get("token") and c.get("name"):
                 cities[c["token"]] = c["name"]
                 if c.get("countryToken"):
                     countries[c["token"]] = c["countryToken"]
+            areas.extend(city_areas(c))
     except OSError:
         pass
     # Dos surtidores de la misma estacion (o dos plazas del mismo parking)
@@ -199,7 +205,34 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
     atlas = atlas_items(parser_dir, prefix, atlas_names)
     if atlas:
         out["atlas"] = atlas
+    if areas:
+        out["areas"] = areas
     fill_missing_cities(out)
+    return out
+
+
+def city_areas(city):
+    """Las areas de una ciudad del parser como [x, z, ancho, alto], en metros.
+
+    Adentro de esas cajas el juego corre a escala 1:3 (reloj y distancias) en
+    vez de la 1:19/1:20 de la ruta: la web media todo a 1:20 y en Rockford
+    decia 25,5 mi (y "2h 21m") a un waypoint con el GPS del juego en 4,0 mi
+    (Discord, 14-10). Van tambien las ocultas (hidden): no muestran el nombre
+    pero son ciudad igual, y en ATS son casi todas (las de Rockford, todas).
+    x, y es la esquina de arriba a la izquierda: con esa lectura el 93% de
+    las empresas de ATS cae adentro de su ciudad; tomandola como centro, el
+    28%.
+    Se redondea para afuera: hay cajas de menos de un metro de ancho (ProMods)
+    y redondeadas al metro quedaban en 0."""
+    out = []
+    for a in city.get("areas") or []:
+        try:
+            x, z, w, h = float(a["x"]), float(a["y"]), float(a["width"]), float(a["height"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if w > 0 and h > 0:
+            x0, z0 = math.floor(x), math.floor(z)
+            out.append([x0, z0, math.ceil(x + w) - x0, math.ceil(z + h) - z0])
     return out
 
 

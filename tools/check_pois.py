@@ -9,7 +9,8 @@ sale de un bug real:
     otras de C2C, Rusia y ProMods no estaban, y buscar la ciudad no daba
     nada ("can't find the city I'm going to", Discord 10-10);
   - forma de cada fila (coordenadas numericas, codigos que la web conoce);
-  - "countries" (opcional), el estado de cada ciudad: {token: country_token}.
+  - "countries" (opcional), el estado de cada ciudad: {token: country_token};
+  - "areas" (opcional), las cajas de ciudad: [x, z, ancho, alto] con lados > 0.
 
 Uso:
   python tools/check_pois.py          sale con 1 si algo falla
@@ -66,6 +67,13 @@ def check_file(path, fix=False):
     paises = d.get("countries")
     if paises is not None and not (isinstance(paises, dict) and all(isinstance(v, str) and v for v in paises.values())):
         errores.append("'countries' raro: tiene que ser {ciudad: country_token}")
+    # Opcional (desde el 14-10): areas de ciudad, donde el juego va a 1:3.
+    # Una caja con ancho o alto en 0 (o al reves) no contiene nada y la web
+    # mediria esa ciudad a 1:20 sin avisar.
+    for fila in d.get("areas") or []:
+        if len(fila) != 4 or not all(_num(v) for v in fila) or fila[2] <= 0 or fila[3] <= 0:
+            errores.append(f"area rara: {fila}")
+            break
     if fix:
         if mapbuild_pois.fill_missing_cities(d):
             mapbuild_pois.write(d, path)

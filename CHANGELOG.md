@@ -15,6 +15,9 @@ updates on its own and is not versioned here.
   Settings (24-hour or 12-hour), the same as the real arrival next to it.
 - Build my map: tight curves inside junctions, like the loops of a cloverleaf, get more points, so
   the route on your own map follows them instead of cutting a corner.
+- Build my map also saves where each city's area is. Inside cities the game counts distance at a
+  smaller scale, and with this the dashboard's distances and turn instructions on your own map
+  match the game's GPS in town too.
 
 ## 1.5.31 (2026-10-13)
 

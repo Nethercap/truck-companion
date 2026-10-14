@@ -2280,13 +2280,15 @@ function checkWaypointReached(x, z) {
 // todos marcados tambien en el juego, el numero del juego ya es correcto).
 // Lo que falta se mide sobre la ruta recortada al camion, como el resumen de
 // ruta: antes era el total de cuando se armo la ruta y no bajaba al andar.
+// Y a la escala del juego en cada parte (gameKmOf): en la ciudad, a 1:20,
+// decia 25,5 mi con el juego en 4,0 y bajaba mucho mas rapido (14-10).
 // Los tiempos salen de waypointEta (pure.js): el de abajo del ETA del juego
 // en horas de juego, el de abajo del ETA real en tiempo real.
 function updateWaypointRoute(data) {
   const gameRow = document.getElementById('etaGameWaypointRow');
   const realRow = document.getElementById('etaRealWaypointRow');
   const anyAppOnly = waypoints.some(wp => !wp.inGame);
-  const viaKm = anyAppOnly && currentRouteWorldPoints ? sumPathDistanceMeters(currentRouteWorldPoints) * distanceScale() / 1000 : null;
+  const viaKm = anyAppOnly ? gameKmOf(currentRouteWorldPoints) : null;
   if (viaKm == null) {
     gameRow.hidden = true;
     realRow.hidden = true;
@@ -2330,6 +2332,25 @@ const POI_BASE = new URLSearchParams(location.search).get('local') ? 'https://tr
 // umbrales de logica (giro cerca, waypoint alcanzado) siguen en metros crudos.
 function distanceScale() {
   return (currentGame || '').startsWith('ets2') ? 19 : 20;
+}
+
+// La escala de la ruta no vale en las ciudades: ahi el juego va a 1:3
+// (createCityScale en pure.js, con las areas de ciudad de los POIs). Hasta
+// que bajan los POIs, o con unos de antes sin areas, todo a distanceScale.
+let cityScale = null, cityScaleGame = null, cityScaleOf = null;
+function gameScale() {
+  const datos = pois && poisVariant === currentGame ? pois : null;
+  if (!cityScale || cityScaleGame !== currentGame || cityScaleOf !== datos) {
+    cityScale = createCityScale(datos && datos.areas, { outside: distanceScale() });
+    cityScaleGame = currentGame;
+    cityScaleOf = datos;
+  }
+  return cityScale;
+}
+
+// Km del juego de un camino en coordenadas de mundo (null sin camino).
+function gameKmOf(points) {
+  return points ? gameScale().pathMeters(points) / 1000 : null;
 }
 
 const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', c: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh', a: 'poiCatAtlas' };
@@ -2485,8 +2506,11 @@ function searchCompanies(query, x, z, limit) {
   return out.slice(0, limit);
 }
 
-function formatPoiDistance(rawMeters) {
-  const meters = rawMeters * distanceScale();
+// path: el camino de esos metros de mundo (la recta del camion al lugar, o
+// la ruta hasta el), para medir cada parte a su escala: una estacion a 250 m
+// en el centro decia 3 mi a 1:20 (ver createCityScale).
+function formatPoiDistance(rawMeters, path) {
+  const meters = path ? gameScale().pathMeters(path, rawMeters) : rawMeters * distanceScale();
   if (useImperial) { const mi = meters / 1609.34; return mi < 10 ? `${formatDec(mi, currentLang)} mi` : `${Math.round(mi)} mi`; }
   const km = meters / 1000;
   return km < 10 ? `${formatDec(km, currentLang)} km` : `${Math.round(km)} km`;
@@ -2611,7 +2635,7 @@ function renderPoiResults() {
     <button class="poiItem${rel && rel.side === 'behind' ? ' behind' : ''}" data-index="${i}">
       <span class="poiIcon">${r.code ? POI_ICONS_TEXT[r.code] : '🏭'}</span>
       <span class="poiText"><span class="poiName">${esc(r.name)}</span>${r.sub ? `<span class="poiSub">${esc(r.sub)}</span>` : ''}</span>
-      ${dir}<span class="poiDist">${formatPoiDistance(r.dist)}</span>
+      ${dir}<span class="poiDist">${formatPoiDistance(r.dist, [[pos.x, pos.z], [r.x, r.z]])}</span>
     </button>`;
   }).join('');
   list.querySelectorAll('.poiItem').forEach(btn => btn.addEventListener('click', () => {
@@ -2681,7 +2705,10 @@ function addNearestStop(code) {
   const best = pickFuelStop(nearestFacilities(code, pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints);
   if (!best) { showToast(t('poiNoResults'), 'danger'); return false; }
   const name = t(code === 'g' ? 'poiCatFuel' : 'poiCatRest');
-  addPoiWaypoint([best.x, best.z], `${name} (${formatPoiDistance(best.why === 'route' ? best.along : best.dist)})`, code);
+  const lejos = best.why === 'route'
+    ? formatPoiDistance(best.along, currentRouteWorldPoints)
+    : formatPoiDistance(best.dist, [[pos.x, pos.z], [best.x, best.z]]);
+  addPoiWaypoint([best.x, best.z], `${name} (${lejos})`, code);
   return true;
 }
 for (const [id, code] of [['poiNearestFuelBtn', 'g'], ['poiNearestRestBtn', 'p']]) {
@@ -3270,7 +3297,7 @@ function updateRouteSummary(data) {
   if (!target) { routeProgressState = { key: null, total: 0 }; renderRouteSummary(null); return; }
   // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
   // sobre la ruta que dibujamos nosotros.
-  const ownKm = currentRouteWorldPoints ? sumPathDistanceMeters(currentRouteWorldPoints) * distanceScale() / 1000 : null;
+  const ownKm = gameKmOf(currentRouteWorldPoints);
   const gameKm = Number.isFinite(data.routeDistanceKm) ? Math.max(0, data.routeDistanceKm) : null;
   // El GPS del juego en 0 con una ruta nuestra larga: el juego todavia no
   // tiene ruta (parado en la base, partida recien cargada) y el resumen
@@ -4051,7 +4078,12 @@ function navTurnParts(turn) {
   if (turn) {
     info = {
       kind: turn.kind, direction: turn.direction, exit: turn.exit,
-      meters: turn.distanceMeters * distanceScale(),
+      // distanceMeters es de mundo y desde el primer punto de la ruta (el
+      // camion): se lo mide sobre ella a la escala de cada parte. A 1:20 una
+      // bifurcacion a menos de 1 km en Rockford era "in 5 mi" (14-10).
+      meters: currentRouteWorldPoints
+        ? gameScale().pathMeters(currentRouteWorldPoints, turn.distanceMeters)
+        : turn.distanceMeters * distanceScale(),
       sign: turn.nearSign ? { kind: turn.nearSign.kind, label: turn.nearSign.label } : null,
     };
   } else if (currentRouteWorldPoints) {
@@ -6404,17 +6436,19 @@ function runDemo(path) {
   if (!path || path.length < 2) { showToast(t('demoUnavailable'), 'danger'); return; }
   const total = sumPathDistanceMeters(path);
 
+  // [x, z, i]: el punto a dist metros del inicio y el indice del punto de
+  // la ruta que le sigue.
   const pointAt = (dist) => {
     let acc = 0;
     for (let i = 1; i < path.length; i++) {
       const seg = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
       if (acc + seg >= dist) {
         const f = seg ? (dist - acc) / seg : 0;
-        return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * f, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * f];
+        return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * f, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * f, i];
       }
       acc += seg;
     }
-    return path[path.length - 1];
+    return [path[path.length - 1][0], path[path.length - 1][1], path.length];
   };
 
   // El largo real de la ruta calculada, a la escala del juego: asi la demo
@@ -6432,8 +6466,15 @@ function runDemo(path) {
   const step = () => {
     const data = demo.next();
     const dist = demo.progress() * total;
-    const [x, z] = pointAt(dist);
+    const [x, z, i] = pointAt(dist);
     data.position = { x, y: 0, z };
+    // El camion anda a velocidad pareja, pero el GPS del juego cuenta las
+    // ciudades a 1:3 (createCityScale): sin esto la demo decia 745 km y la
+    // fila "via waypoint", con un waypoint sobre la ruta, 630.
+    const restoKm = gameKmOf([[x, z], ...path.slice(i)]);
+    if (data.routeDistanceKm > 0) data.routeTimeSeconds *= restoKm / data.routeDistanceKm;
+    data.routeDistanceKm = restoKm;
+    data.plannedDistanceKm = gameKmOf(path);
     // Rumbo como lo manda el cliente 1.5.13+: sobre la grilla del juego
     // (0 = -z), no geografico. Sin esto la demo iba por el camino viejo de
     // deducirlo y no mostraba la diferencia entre los dos norte.

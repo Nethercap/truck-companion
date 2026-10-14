@@ -1776,6 +1776,100 @@ function waypointEta({ viaKm, gameKm, gameEtaSeconds, avgSpeedKmh, timeScale }) 
   return { gameSeconds, realSeconds };
 }
 
+// Escala del juego segun la zona. La ruta va a 1:19 (ETS2) o 1:20 (ATS),
+// pero adentro de las cajas de ciudad a 1:3: ahi el reloj corre mas lento y
+// el GPS del juego cuenta los metros a esa escala. Medido todo a 1:20, en
+// Rockford el tablero decia 25,5 mi y "2h 21m" hasta un waypoint con el
+// juego en 4,0 mi y 20 min, y "Keep right in 5 mi" a una bifurcacion a
+// menos de un kilometro (Discord, 14-10).
+// areas: [[x, z, ancho, alto], ...] con x, z la esquina de arriba a la
+// izquierda ("areas" de los POIs, client/mapbuild/pois.py). Sin areas (POIs
+// de antes, o todavia bajando) todo va a `outside`, como antes.
+// pathMeters(points, maxWorldM): metros del juego de los primeros maxWorldM
+// metros de mundo del camino (sin tope, el camino entero). El camino se
+// muestrea cada `step` metros (una recta larga que entra a la ciudad no
+// queda entera de un lado) y se arma en corridas de ciudad y de afuera.
+// Un hueco de afuera de hasta gapM metros entre dos partes de ciudad
+// cuenta como ciudad: en Rockford hay 265 m de calle entre dos cajas por
+// los que pasa cualquier camino al este, y el juego daba 4,0 mi; con el
+// hueco a 1:20 serian por lo menos 6,6. Las puntas no se rellenan: salir
+// de la ciudad por la ruta sigue a 1:20 desde el borde de la caja.
+// Lo muestreado de cada tramo se guarda por su punto final, salvo el del
+// primero: la ruta recortada al camion estrena primer punto en cada dato.
+const CITY_SCALE = 3;
+const CITY_GAP_M = 500;
+function createCityScale(areas, { outside, city = CITY_SCALE, cell = 1000, step = 50, gapM = CITY_GAP_M } = {}) {
+  const cells = new Map();
+  for (const a of areas || []) {
+    if (!Array.isArray(a) || a.length < 4) continue;
+    const [x, z, w, h] = a;
+    if (!(w > 0 && h > 0)) continue;
+    for (let i = Math.floor(x / cell); i <= Math.floor((x + w) / cell); i++) {
+      for (let j = Math.floor(z / cell); j <= Math.floor((z + h) / cell); j++) {
+        const k = `${i},${j}`;
+        let lista = cells.get(k);
+        if (!lista) cells.set(k, lista = []);
+        lista.push(a);
+      }
+    }
+  }
+  const inside = (x, z) => {
+    const lista = cells.get(`${Math.floor(x / cell)},${Math.floor(z / cell)}`);
+    if (lista) {
+      for (const [ax, az, w, h] of lista) if (x >= ax && x <= ax + w && z >= az && z <= az + h) return true;
+    }
+    return false;
+  };
+  const at = (x, z) => (inside(x, z) ? city : outside);
+  // Que muestras del tramo p -> q caen en ciudad, en orden (1 si, 0 no).
+  const muestras = (p, q, len) => {
+    const n = Math.max(1, Math.ceil(len / step));
+    const flags = new Uint8Array(n);
+    for (let k = 0; k < n; k++) {
+      const f = (k + 0.5) / n;
+      flags[k] = inside(p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f) ? 1 : 0;
+    }
+    return flags;
+  };
+  const guardadas = new WeakMap(); // punto final de un tramo -> sus muestras
+  // El camino en corridas alternadas: largos[k] metros de mundo, ciudad[k].
+  const corridas = (points) => {
+    const largos = [], ciudad = [];
+    for (let i = 1; i < points.length; i++) {
+      const p = points[i - 1], q = points[i];
+      const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (!(len > 0)) continue;
+      const guardable = i > 1 && typeof q === 'object' && q !== null;
+      let flags = guardable ? guardadas.get(q) : undefined;
+      if (!flags) {
+        flags = muestras(p, q, len);
+        if (guardable) guardadas.set(q, flags);
+      }
+      const parte = len / flags.length;
+      for (const c of flags) {
+        const ultima = ciudad.length - 1;
+        if (ultima >= 0 && ciudad[ultima] === c) largos[ultima] += parte;
+        else { largos.push(parte); ciudad.push(c); }
+      }
+    }
+    return { largos, ciudad };
+  };
+  const pathMeters = (points, maxWorldM = Infinity) => {
+    if (!points || points.length < 2) return 0;
+    const { largos, ciudad } = corridas(points);
+    let mundo = 0, juego = 0;
+    for (let k = 0; k < largos.length && mundo < maxWorldM; k++) {
+      // Alternan: una de afuera que no es punta tiene ciudad a los dos lados.
+      const enCiudad = ciudad[k] === 1 || (k > 0 && k < largos.length - 1 && largos[k] <= gapM);
+      const usado = Math.min(largos[k], maxWorldM - mundo);
+      mundo += usado;
+      juego += usado * (enCiudad ? city : outside);
+    }
+    return juego;
+  };
+  return { at, pathMeters, outside };
+}
+
 // Tamano de la flecha del camion elegido en Ajustes (multiplicador): de 1 a 3
 // en pasos de 0.25. Un usuario con poca vista no la encontraba en la tablet
 // ("I'm blind and can barely see it", Discord 10-10).
@@ -2847,6 +2941,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }
