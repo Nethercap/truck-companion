@@ -384,3 +384,7 @@ const MAP_MOD_CREDITS = {
     "homepage": null
   }
 };
+
+// Version de los logos de empresa en R2 (vector/company-icons/<juego>/), por
+// juego. Sin entrada todavia no se subieron: la web no los pide.
+const COMPANY_ICONS_VERSION = {};

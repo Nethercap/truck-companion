@@ -1238,7 +1238,7 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'car-parking', 'fuel', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi', 'car-parking', 'fuel', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
@@ -1270,6 +1270,15 @@ function buildVecLayers(sourceLayer) {
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
+    // Empresas con su logo, como el mapa del juego (ver loadCompanyIcons).
+    // Debajo de los POIs y sin taparles nada (icon-ignore-placement), pero
+    // entre ellas y con los nombres si se ocultan cuando se pisan: de lejos
+    // una ciudad seria una pila de logos.
+    { id: 'company', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 11 : 9,
+      filter: companyLayerFilter(companyIconTokens(L)),
+      layout: { 'icon-image': companyIconImage(L),
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.45, 13, 0.8, 16, 1],
+                'icon-padding': 1, 'icon-ignore-placement': true } },
     { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
       filter: poiLayerFilter(),
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
@@ -1873,6 +1882,7 @@ function ensureMapInitialized() {
   map.on('rotatestart', (e) => { if (e.originalEvent) pauseMapFollow(); });
   map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   map.on('zoom', updateTruckArrowSize);
+  map.on('styleimagemissing', onStyleImageMissing);
   // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
   // zoom dinamico (si no, el proximo tick lo pisa y parece que "no se puede
   // tocar") - se reactiva con el boton de recentrar. originalEvent solo esta
@@ -1976,6 +1986,54 @@ async function loadPoiIcons() {
       console.error('No se pudo cargar el icono de POI', name, err);
     }
   }
+}
+
+// Logos de empresa (capa 'company'). Uno por empresa y por juego, en R2 desde
+// tools/build_company_icons.py; el index.json dice cuales hay. Los PNG se piden
+// recien cuando MapLibre los necesita (styleimagemissing): una ciudad son 20
+// logos y el juego entero cientos. Un juego sin version en
+// COMPANY_ICONS_VERSION (variants.js) no tiene logos subidos y no se pide
+// nada: la capa queda vacia, como antes.
+const COMPANY_ICON_BASE = `${REMOTE_MAP_BASE}/vector/company-icons`;
+const companyIcons = {}; // juego -> { pixelRatio, tokens, has: Set } | 'loading' | null (no hay)
+const companyIconsAsked = new Set(); // imagenes ya pedidas: una que falla no se vuelve a pedir
+
+function companyIconTokens(game) {
+  const index = companyIcons[game];
+  return index && index !== 'loading' ? index.tokens : null;
+}
+
+async function loadCompanyIcons(game) {
+  const version = COMPANY_ICONS_VERSION[game];
+  if (!version || game in companyIcons) return;
+  companyIcons[game] = 'loading';
+  let index = null;
+  try {
+    const res = await fetch(`${COMPANY_ICON_BASE}/${game}/index.json?v=${version}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    index = companyIconIndex(await res.json());
+    if (index) index.has = new Set(index.tokens);
+  } catch (err) {
+    console.error('No se pudieron cargar los logos de empresa', game, err);
+  }
+  companyIcons[game] = index;
+  // El mapa puede haber cambiado de juego mientras bajaba: el filtro es el
+  // del juego que se ve ahora.
+  const shown = currentGame && GAME_MAPS[currentGame] ? GAME_MAPS[currentGame].sourceLayer : null;
+  if (index && shown === game && map && map.getLayer('company')) {
+    map.setFilter('company', companyLayerFilter(index.tokens));
+  }
+}
+
+function onStyleImageMissing(e) {
+  const ref = parseCompanyIconId(e.id);
+  if (!ref || companyIconsAsked.has(e.id)) return;
+  const index = companyIcons[ref.game];
+  if (!index || index === 'loading' || !index.has.has(ref.token)) return;
+  companyIconsAsked.add(e.id);
+  map.loadImage(`${COMPANY_ICON_BASE}/${ref.game}/${ref.token}.png?v=${COMPANY_ICONS_VERSION[ref.game]}`)
+    .then((res) => { if (!map.hasImage(e.id)) map.addImage(e.id, res.data, { pixelRatio: index.pixelRatio }); })
+    .catch((err) => console.error('No se pudo cargar el logo de empresa', e.id, err));
 }
 
 async function loadCities(mapInfo) {
@@ -3531,6 +3589,7 @@ async function loadGameMap(game) {
     routingReady = Promise.all([loadRouteGraph(mapInfo), liteMode ? null : loadRoadNames(mapInfo)]);
   }
   loadPois(game); // no bloquea: la busqueda muestra "cargando" hasta que llegue
+  loadCompanyIcons(mapInfo.sourceLayer); // tampoco: la capa de empresas se llena cuando llega
   currentRouteTarget = null;
   currentRouteWorldPoints = null;
   trailWorld.length = 0;

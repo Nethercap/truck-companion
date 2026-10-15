@@ -2194,6 +2194,51 @@ function facilityCodesFor(category, drivingCar) {
   return [category];
 }
 
+// Logos de empresa en el mapa (capa 'company' de app.js). Estan en R2 en
+// vector/company-icons/<juego>/<token>.png, con un index.json de los que hay
+// (tools/build_company_icons.py). La imagen lleva el juego en el nombre: el
+// mismo token puede ser otra empresa en ATS y en ETS2. Los tokens del juego
+// son de hasta 12 caracteres [a-z0-9_] y van en la URL del PNG: lo que no
+// tenga esa forma no se pide.
+const COMPANY_TOKEN_RE = /^[a-z0-9_]{1,12}$/;
+const COMPANY_ICON_GAMES = ['ats', 'ets2'];
+
+// El index.json validado: { pixelRatio, tokens } (tokens ordenados y sin
+// repetir), o null si no tiene la forma esperada.
+function companyIconIndex(json) {
+  if (!json || typeof json !== 'object' || !Array.isArray(json.icons)) return null;
+  const pr = Number(json.pixelRatio);
+  const pixelRatio = Number.isFinite(pr) && pr >= 1 && pr <= 4 ? pr : 2;
+  const tokens = [...new Set(json.icons.filter(t => typeof t === 'string' && COMPANY_TOKEN_RE.test(t)))].sort();
+  return { pixelRatio, tokens };
+}
+
+function companyIconId(game, token) {
+  return `company:${game}:${token}`;
+}
+
+// El icon-image de la capa: el mismo nombre que companyIconId para el sprite
+// de cada empresa de los tiles.
+function companyIconImage(game) {
+  return ['concat', `company:${game}:`, ['get', 'sprite']];
+}
+
+// La inversa de companyIconId, para el styleimagemissing de MapLibre: null
+// si el nombre no es de un logo de empresa.
+function parseCompanyIconId(id) {
+  const m = /^company:([a-z0-9]+):(.*)$/.exec(String(id));
+  if (!m || !COMPANY_ICON_GAMES.includes(m[1]) || !COMPANY_TOKEN_RE.test(m[2])) return null;
+  return { game: m[1], token: m[2] };
+}
+
+// Filtro de la capa: solo las empresas con logo en el index. Sin index (el
+// juego no tiene logos publicados, o todavia bajan) no pasa ninguna, asi
+// MapLibre no pide imagenes que no estan.
+function companyLayerFilter(tokens) {
+  return ['all', ['==', ['get', 'type'], 'poi'], ['==', ['get', 'poiType'], 'company'],
+    ['in', ['get', 'sprite'], ['literal', tokens || []]]];
+}
+
 // Donde cae el camion sobre la ruta, buscando solo hacia adelante y cerca:
 // en un enlace con puente la calle transversal (que la ruta recorre 800 m
 // mas adelante, despues del lazo) pasa a 10 m del camion y no puede ganar.
@@ -2941,6 +2986,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, COMPANY_TOKEN_RE, companyIconIndex, companyIconId, companyIconImage, parseCompanyIconId, companyLayerFilter, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing,navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

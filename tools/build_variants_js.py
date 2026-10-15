@@ -62,6 +62,9 @@ def build():
     for mod_id, mod in manifest.get("mods", {}).items():
         credits[mod_id] = {"name": mod["name"], "author": mod.get("author") or None,
                            "homepage": mod.get("homepage") or None}
+    # Logos de empresa (tools/build_company_icons.py): uno por juego, no por
+    # variante. Un juego sin version todavia no esta en R2 y la web no los pide.
+    company_icons = {game: v for game, v in (manifest.get("companyIcons") or {}).items() if v}
     lines = [
         "// GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.",
         "// No editar a mano: se regenera al publicar o actualizar una variante.",
@@ -75,6 +78,10 @@ def build():
         "// Credito de cada mod de mapa: nombre, autor (si se sabe) y pagina oficial.",
         "// La app lo muestra en el cartel del mapa y en la ventana de mods.",
         "const MAP_MOD_CREDITS = " + json.dumps(credits, ensure_ascii=False, indent=2) + ";",
+        "",
+        "// Version de los logos de empresa en R2 (vector/company-icons/<juego>/), por",
+        "// juego. Sin entrada todavia no se subieron: la web no los pide.",
+        "const COMPANY_ICONS_VERSION = " + json.dumps(company_icons, ensure_ascii=False, indent=2) + ";",
         "",
     ]
     return "\n".join(lines)

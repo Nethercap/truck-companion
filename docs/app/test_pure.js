@@ -2458,3 +2458,37 @@ test('carriles en nav_hud: solo enteros chicos, y el dibujo sale de ahi', () => 
   assert.equal((html.match(/class="navLane[ "]/g) || []).length, 3);
   assert.equal((html.match(/navLane on/g) || []).length, 2);
 });
+
+test('logos de empresa: el index.json solo deja tokens que pueden ir en una URL', () => {
+  const { companyIconIndex } = require('./pure.js');
+  assert.deepEqual(companyIconIndex({ pixelRatio: 2, icons: ['wld_frm_str', 'flv_food_str', 'flv_food_str'] }),
+    { pixelRatio: 2, tokens: ['flv_food_str', 'wld_frm_str'] });
+  // nada de rutas, mayusculas, tokens de mas de 12 ni otros tipos
+  assert.deepEqual(companyIconIndex({ icons: ['../x', 'ABC', 'token_muy_largo', 7, null, 'ok'] }).tokens, ['ok']);
+  // pixelRatio raro o ausente: 2, que es lo que arma build_company_icons.py
+  assert.equal(companyIconIndex({ icons: [] }).pixelRatio, 2);
+  assert.equal(companyIconIndex({ pixelRatio: 0, icons: [] }).pixelRatio, 2);
+  assert.equal(companyIconIndex({ pixelRatio: 'x', icons: [] }).pixelRatio, 2);
+  assert.equal(companyIconIndex({ pixelRatio: 1, icons: [] }).pixelRatio, 1);
+  for (const malo of [null, undefined, 'x', [], {}, { icons: 'flv_food_str' }]) assert.equal(companyIconIndex(malo), null);
+});
+
+test('logos de empresa: el nombre de la imagen ida y vuelta, con el juego adentro', () => {
+  const { companyIconId, companyIconImage, parseCompanyIconId } = require('./pure.js');
+  assert.equal(companyIconId('ats', 'flv_food_str'), 'company:ats:flv_food_str');
+  assert.deepEqual(parseCompanyIconId(companyIconId('ets2', 'posped')), { game: 'ets2', token: 'posped' });
+  // icon-image arma el mismo nombre con el sprite de cada empresa
+  assert.deepEqual(companyIconImage('ats'), ['concat', 'company:ats:', ['get', 'sprite']]);
+  // lo que no es un logo de empresa (iconos de POI, otro juego, token raro) no se toca
+  for (const id of ['gas_ico', 'company:ats:', 'company:gu:posped', 'company:ats:../x', 'company:ats:a:b', undefined]) {
+    assert.equal(parseCompanyIconId(id), null, String(id));
+  }
+});
+
+test('logos de empresa: sin index la capa no deja pasar ninguna empresa', () => {
+  const { companyLayerFilter } = require('./pure.js');
+  const filtro = companyLayerFilter(['flv_food_str']);
+  assert.deepEqual(filtro[filtro.length - 1], ['in', ['get', 'sprite'], ['literal', ['flv_food_str']]]);
+  assert.ok(filtro.some(f => Array.isArray(f) && f[0] === '==' && f[2] === 'company'));
+  assert.deepEqual(companyLayerFilter(null).at(-1), ['in', ['get', 'sprite'], ['literal', []]]);
+});
