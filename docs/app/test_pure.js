@@ -2550,3 +2550,119 @@ test('carriles en nav_hud: solo enteros chicos, y el dibujo sale de ahi', () => 
   assert.equal((html.match(/class="navLane[ "]/g) || []).length, 3);
   assert.equal((html.match(/navLane on/g) || []).length, 2);
 });
+
+test('stabilizeManeuver: el giro siguiente hacia el otro lado, a menos de 40 m, no queda tapado por el anterior', () => {
+  // Pasado un "turn left", la entrada a la empresa a la derecha 38 m despues
+  // (Le Mans -> Bourges, simulaciones del 15-10): antes seguia "turn left".
+  const st = {};
+  const izq = { kind: 'turn', direction: 'left', distanceMeters: 60, node: [0, 0] };
+  stabilizeManeuver(st, izq, 2); stabilizeManeuver(st, izq, 2);
+  const der = { kind: 'turn', direction: 'right', distanceMeters: 30, node: [30, 24] };
+  assert.equal(stabilizeManeuver(st, der, 2).direction, 'left'); // 1 dato: anti-parpadeo
+  const nuevo = stabilizeManeuver(st, { ...der, distanceMeters: 28 }, 2);
+  assert.deepEqual([nuevo.direction, nuevo.node], ['right', [30, 24]]);
+  // Del mismo lado sigue siendo el mismo cruce (keep -> turn), y en el mismo
+  // nodo tambien aunque cambie el sentido (la rotonda, que se mide de nuevo)
+  const st2 = {};
+  const rb = { kind: 'roundabout', direction: 'left', exit: 2, distanceMeters: 80, node: [5, 5] };
+  stabilizeManeuver(st2, rb, 2); stabilizeManeuver(st2, rb, 2);
+  const otra = stabilizeManeuver(st2, { kind: 'turn', direction: 'right', distanceMeters: 70, node: [5.2, 5] }, 2);
+  assert.deepEqual([otra.kind, otra.direction, otra.distanceMeters], ['roundabout', 'left', 70]);
+});
+
+test('ruteo: con los segundos redondeados, la recta del cruce le gana a la V por el brazo', () => {
+  // Fort Dodge (ATS): oeste -> este derecho 63 m (5,67 s, guardado 6) contra
+  // oeste -> brazo sur -> este, 34 + 34 m (3 + 3 s). Empataban.
+  const { routeEdgeCost } = require('./pure.js');
+  const nodos = [[0, 0], [63, 0], [31.5, 20]];
+  const aristas = [{ a: 0, b: 1, s: 6 }, { a: 0, b: 2, s: 3, m: 34 }, { a: 2, b: 1, s: 3, m: 34 }];
+  const { g } = grafoDePrueba(nodos, aristas.map(e => ({ ...e, uno: true })));
+  const largo = (e) => e.m || Math.hypot(nodos[e.a][0] - nodos[e.b][0], nodos[e.a][1] - nodos[e.b][1]);
+  const base = { heuristic: (i) => Math.hypot(nodos[i][0] - 63, nodos[i][1]) / 25, isFerry: () => false };
+  assert.deepEqual(findArcRoute(g, 0, 1, { ...base, cost: (k) => routeEdgeCost(aristas[k].s, largo(aristas[k]), true) }), [0, 1]);
+  assert.equal(routeEdgeCost(6, 63, false), 63); // por metros, los metros
+  assert.ok(routeEdgeCost(6, 63, true) < routeEdgeCost(3, 34, true) + routeEdgeCost(3, 34, true));
+});
+
+test('createCityScale: lo que falta medido sobre la ruta entera no salta al entrar al hueco entre cajas', () => {
+  // Little Rock -> Tulsa (ATS, simulaciones del 15-10): caja, 300 m de
+  // hueco, caja. Medido sobre la ruta recortada, al entrar al hueco el resto
+  // pasaba a 1:20 y la distancia al giro subia de 1 km a 6,5.
+  const { createCityScale } = require('./pure.js');
+  const escala = createCityScale([[0, 0, 1000, 1000], [1300, 0, 1000, 1000]], { outside: 20 });
+  const ruta = [[200, 500], [1000, 500], [1300, 500], [2000, 500], [3000, 500]];
+  const total = escala.routeMeters(ruta, ruta);
+  assert.ok(Math.abs(total - ((800 + 300 + 1000) * 3 + 700 * 20)) < 1e-6); // el hueco a 1:3
+  let antes = Infinity, giroAntes = Infinity;
+  for (let x = 200; x < 2950; x += 5) {
+    // la ruta recortada como trimRouteBehindTruck: el camion y los puntos de adelante
+    const k = ruta.findIndex(p => p[0] > x);
+    const recortada = [[x, 500], ...ruta.slice(k)];
+    const falta = escala.routeMeters(ruta, recortada);
+    assert.ok(falta <= antes + 1e-6, `en x=${x}: ${falta} > ${antes}`);
+    antes = falta;
+    if (x < 2000) {
+      const giro = escala.routeMeters(ruta, recortada, 2000 - x); // el giro esta en x = 2000
+      assert.ok(giro <= giroAntes + 1e-6, `giro en x=${x}: ${giro} > ${giroAntes}`);
+      giroAntes = giro;
+    }
+  }
+  // Lo de antes, sobre la ruta recortada, si saltaba (entrando al hueco)
+  const adentro = escala.pathMeters([[990, 500], [1000, 500], ...ruta.slice(2)], 1010);
+  const enElHueco = escala.pathMeters([[1010, 500], ...ruta.slice(2)], 990);
+  assert.ok(enElHueco > adentro + 4000);
+  // Un camino que no sale de la ruta (la recta a un POI) se mide como siempre
+  assert.equal(escala.routeMeters(ruta, [[1100, 500], [1200, 500]]), escala.pathMeters([[1100, 500], [1200, 500]]));
+  assert.equal(escala.routeMeters(null, [[1100, 500], [1200, 500]]), 100 * 20);
+  assert.equal(escala.routeMeters(ruta, null), 0);
+});
+
+test('startArcForHeading: recalcular andando arranca en la calzada y el sentido del camion', () => {
+  const { startArcForHeading } = require('./pure.js');
+  // Autovia: calzada al este en z = 0 y al oeste en z = -20, de un sentido,
+  // con nodos solo en las puntas (1 km); y una calle de doble mano al sur.
+  const nodos = [[0, 0], [1000, 0], [1000, -20], [0, -20], [0, 40], [1000, 40]];
+  const { g } = grafoDePrueba(nodos, [
+    { a: 0, b: 1, uno: true }, { a: 2, b: 3, uno: true }, { a: 4, b: 5, mids: [[500, 45]] },
+  ]);
+  const llegaA = (r) => r && r.to;
+  // Yendo al este a 6 m de la calzada este: su punta, aunque el nodo mas
+  // cercano (a 500 m) sea cualquiera
+  let r = startArcForHeading(g, 500, -6, 90);
+  assert.equal(llegaA(r), 1);
+  assert.deepEqual(r.point.map(Math.round), [500, 0]);
+  assert.ok(Math.abs(r.f - 0.5) < 1e-6);
+  // Mas cerca de la calzada oeste pero yendo al este: igual la este
+  r = startArcForHeading(g, 500, -12, 90);
+  assert.equal(llegaA(r), 1);
+  // Yendo al oeste: la oeste, hacia su punta
+  assert.equal(llegaA(startArcForHeading(g, 500, -8, 270)), 3);
+  // Doble mano: el sentido lo pone el rumbo, con lo que queda de la curva
+  r = startArcForHeading(g, 300, 42, 265);
+  assert.deepEqual([r.to, r.rest.length], [4, 0]);
+  r = startArcForHeading(g, 300, 42, 85);
+  assert.deepEqual([r.to, r.rest.map(p => p.map(Math.round))], [5, [[500, 45]]]);
+  // Lejos de todo, o cruzado (rumbo norte sobre la autovia): nada, como antes
+  assert.equal(startArcForHeading(g, 500, 200, 90), null);
+  assert.equal(startArcForHeading(g, 500, -6, 0), null);
+  assert.equal(startArcForHeading(g, 500, -6, NaN), null);
+  // edgeOk deja afuera lo que no se puede usar (DLC, islas)
+  assert.equal(llegaA(startArcForHeading(g, 500, -6, 90, { edgeOk: (e) => e !== 0 })), null);
+});
+
+test('ruteo: arrancando en el tramo del camion no se da la vuelta en el primer nodo', () => {
+  // El camion va de a hacia s (al este) y el destino z esta atras, pasando b.
+  // Sin el arco de llegada, desde s la ruta volvia derecho a a.
+  const nodos = [[0, 0], [100, 0], [-100, 0], [200, 0], [300, 30], [300, -30]];
+  const [a, s, z, t, v, w] = nodos.keys();
+  const { g, opts } = grafoDePrueba(nodos, [
+    { a, b: s }, { a, b: z }, { a: s, b: t }, { a: t, b: v, uno: true }, { a: v, b: w, uno: true }, { a: w, b: t, uno: true },
+  ]);
+  assert.deepEqual(findArcRoute(g, s, z, opts(z)), [s, a, z]);
+  const llegada = [...g.adjTo.keys()].find(k => routeArcDirections(g).from[k] === a && g.adjTo[k] === s);
+  assert.deepEqual(findArcRoute(g, s, z, { ...opts(z), startArc: llegada }), [s, t, v, w, t, s, a, z]);
+  // Calle sin salida adelante: se puede volver
+  const g2 = grafoDePrueba([[0, 0], [100, 0], [-100, 0]], [{ a: 0, b: 1 }, { a: 0, b: 2 }]);
+  const k2 = [...g2.g.adjTo.keys()].find(k => routeArcDirections(g2.g).from[k] === 0 && g2.g.adjTo[k] === 1);
+  assert.deepEqual(findArcRoute(g2.g, 1, 2, { ...g2.opts(2), startArc: k2 }), [1, 0, 2]);
+});

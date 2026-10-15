@@ -1159,7 +1159,12 @@ function stabilizeManeuver(state, turn, ticks) {
   // misma maniobra: se actualiza la distancia pero se conserva el tipo y el
   // sentido ya mostrados, para que "keep left" no cambie a "turn left" al
   // acercarse (la rampa curva cada vez mas dentro de los 60 m de medicion).
-  if (turn && state.shown && Math.hypot(turn.node[0] - state.shown.node[0], turn.node[1] - state.shown.node[1]) < 40) {
+  // Hacia el otro lado y en otro nodo es el giro siguiente, no el mismo
+  // visto de otra forma: pasado un "turn left", la entrada a la empresa a la
+  // derecha 38 m despues seguia diciendo "turn left" 5 a 7 s y la voz no la
+  // anunciaba (22 lugares en 943 rutas simuladas, 15-10).
+  const cerca = turn && state.shown ? Math.hypot(turn.node[0] - state.shown.node[0], turn.node[1] - state.shown.node[1]) : Infinity;
+  if (cerca < 40 && (cerca < 1 || turn.direction === state.shown.direction)) {
     // Las flechas de carril tambien: pueden llegar despues (el archivo baja
     // detras del grafo) y no dependen de donde este el camion.
     state.shown = { ...state.shown, distanceMeters: turn.distanceMeters, decoyMeters: turn.decoyMeters,
@@ -1932,7 +1937,57 @@ function createCityScale(areas, { outside, city = CITY_SCALE, cell = 1000, step 
     }
     return juego;
   };
-  return { at, pathMeters, outside };
+  // Lo que falta de una ruta, medido desde el camion, sale de un perfil de
+  // la ruta ENTERA: metros del juego acumulados, con cada hueco decidido una
+  // sola vez con las dos cajas a la vista. Medido sobre la ruta recortada,
+  // al entrar el camion al hueco la caja de atras quedaba afuera, el resto
+  // del hueco pasaba a ser punta (1:20) y "Keep right in 1 km" saltaba a
+  // "in 6.5 km" a 5 m de distancia (577 saltos de mas de 1,5 km en 943
+  // rutas simuladas, 15-10). El perfil se arma la primera vez y queda
+  // guardado por el array de la ruta.
+  const perfiles = new WeakMap();
+  const perfil = (full) => {
+    let p = perfiles.get(full);
+    if (p) return p;
+    const { largos, ciudad } = corridas(full);
+    const desde = [0], juego = [0], escala = [];
+    for (let k = 0; k < largos.length; k++) {
+      const enCiudad = ciudad[k] === 1 || (k > 0 && k < largos.length - 1 && largos[k] <= gapM);
+      escala.push(enCiudad ? city : outside);
+      desde.push(desde[k] + largos[k]);
+      juego.push(juego[k] + largos[k] * escala[k]);
+    }
+    // metros de mundo de cada punto desde el principio de la ruta
+    const mundoDe = new Map();
+    for (let i = 0, s = 0; i < full.length; i++) {
+      if (i > 0) s += Math.hypot(full[i][0] - full[i - 1][0], full[i][1] - full[i - 1][1]);
+      if (!mundoDe.has(full[i])) mundoDe.set(full[i], s);
+    }
+    const total = desde[desde.length - 1];
+    const juegoEn = (s) => {
+      if (!(s > 0)) return 0;
+      if (s >= total) return juego[juego.length - 1];
+      let lo = 0, hi = escala.length - 1;
+      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (desde[mid] <= s) lo = mid; else hi = mid - 1; }
+      return juego[lo] + (s - desde[lo]) * escala[lo];
+    };
+    p = { mundoDe, total, juegoEn };
+    perfiles.set(full, p);
+    return p;
+  };
+  // routeMeters(full, points, maxWorldM): como pathMeters(points, maxWorldM)
+  // para la ruta recortada al camion (points: el camion y despues los
+  // puntos de `full` desde el siguiente), sobre el perfil de `full`. Si
+  // points no sale de full (otra ruta, o sin ruta entera), pathMeters.
+  const routeMeters = (full, points, maxWorldM = Infinity) => {
+    if (!points || points.length < 2) return 0;
+    const p = full && full.length >= 2 ? perfil(full) : null;
+    const s1 = p ? p.mundoDe.get(points[1]) : undefined;
+    if (s1 === undefined) return pathMeters(points, maxWorldM);
+    const s0 = Math.max(0, s1 - Math.hypot(points[1][0] - points[0][0], points[1][1] - points[0][1]));
+    return p.juegoEn(Math.min(p.total, s0 + maxWorldM)) - p.juegoEn(s0);
+  };
+  return { at, pathMeters, routeMeters, outside };
 }
 
 // Tamano de la flecha del camion elegido en Ajustes (multiplicador): de 1 a 3
@@ -2950,11 +3005,92 @@ function createNumberHeap() {
   };
 }
 
+// Costo de una arista para el A*. Los segundos del grafo vienen redondeados
+// a entero (client/mapbuild/route_graph_bin.py): en un cruce, la recta de
+// 63 m (5,67 s -> 6) empataba con pasar por el nodo de un brazo, 34 + 34 m
+// (3 + 3 s), y la ruta hacia una V con un "turn left" donde se sigue
+// derecho (Fort Dodge, ATS; 589 V en 943 rutas simuladas, 15-10). Un
+// milisegundo por metro desempata por la mas corta sin cambiar el tiempo, y
+// la heuristica por tiempo sigue admisible: el costo solo sube.
+const ROUTE_TIE_S_PER_M = 1e-3;
+function routeEdgeCost(seconds, meters, byTime) {
+  return byTime ? seconds + meters * ROUTE_TIE_S_PER_M : meters;
+}
+
+// El tramo por el que va el camion, para arrancar ahi la ruta al recalcular
+// andando (desvio, waypoint alcanzado, trabajo nuevo). Con el nodo mas
+// cercano, sin mirar el rumbo, 160 de 3.044 recalculos simulados (15-10)
+// salian mal: el nodo era de la calzada contraria (la ruta arrancaba para
+// atras), de una rampa vecina, o estaba a mas de 200 m en un tramo largo y
+// la app recalculaba en cada dato.
+// headingDeg: rumbo del juego sobre su grilla (0 = -z, horario, como manda
+// el cliente). Busca el arco dirigido mas cercano a menos de maxDistM, con
+// su curva, cuyo sentido difiere del rumbo menos de maxDeg. edgeOk(e, a):
+// si la arista e (que sale del nodo a) se puede usar. Devuelve { arc, to,
+// point, rest, f, dist }: el arco (indice del CSR), su nodo de llegada, el
+// punto proyectado, los puntos de la curva que quedan hasta el nodo y que
+// fraccion del arco ya se hizo; o null.
+function startArcForHeading(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, edgeOk = null } = {}) {
+  if (!g || !g.csr || !Number.isFinite(headingDeg) || !Number.isFinite(x) || !Number.isFinite(z)) return null;
+  if (!g._edgeBoxes) {
+    // puntas y caja de cada arista, una vez por grafo
+    const ne = g.midOff.length - 1, dirs = routeArcDirections(g);
+    const a = new Int32Array(ne).fill(-1), b = new Int32Array(ne), doble = new Uint8Array(ne), box = new Float32Array(4 * ne);
+    for (let k = 0; k < g.csr[g.n]; k++) {
+      if (g.adjRev[k]) doble[g.adjEdge[k]] = 1;
+      else { a[g.adjEdge[k]] = dirs.from[k]; b[g.adjEdge[k]] = g.adjTo[k]; }
+    }
+    for (let e = 0; e < ne; e++) {
+      if (a[e] < 0) continue;
+      let x0 = Math.min(g.nodes[2 * a[e]], g.nodes[2 * b[e]]), x1 = Math.max(g.nodes[2 * a[e]], g.nodes[2 * b[e]]);
+      let z0 = Math.min(g.nodes[2 * a[e] + 1], g.nodes[2 * b[e] + 1]), z1 = Math.max(g.nodes[2 * a[e] + 1], g.nodes[2 * b[e] + 1]);
+      for (let m = g.midOff[e]; m < g.midOff[e + 1]; m++) {
+        x0 = Math.min(x0, g.midXY[2 * m]); x1 = Math.max(x1, g.midXY[2 * m]);
+        z0 = Math.min(z0, g.midXY[2 * m + 1]); z1 = Math.max(z1, g.midXY[2 * m + 1]);
+      }
+      box[4 * e] = x0; box[4 * e + 1] = z0; box[4 * e + 2] = x1; box[4 * e + 3] = z1;
+    }
+    g._edgeBoxes = { a, b, doble, box, ne };
+  }
+  const { a, b, doble, box, ne } = g._edgeBoxes;
+  const hx = Math.sin(headingDeg * Math.PI / 180), hz = -Math.cos(headingDeg * Math.PI / 180);
+  const cosMax = Math.cos(maxDeg * Math.PI / 180);
+  let best = null;
+  for (let e = 0; e < ne; e++) {
+    if (a[e] < 0 || x < box[4 * e] - maxDistM || x > box[4 * e + 2] + maxDistM || z < box[4 * e + 1] - maxDistM || z > box[4 * e + 3] + maxDistM) continue;
+    if ((g.edgeF && (g.edgeF[e] & 1)) || (edgeOk && !edgeOk(e, a[e]))) continue;
+    const line = [[g.nodes[2 * a[e]], g.nodes[2 * a[e] + 1]]];
+    for (let m = g.midOff[e]; m < g.midOff[e + 1]; m++) line.push([g.midXY[2 * m], g.midXY[2 * m + 1]]);
+    line.push([g.nodes[2 * b[e]], g.nodes[2 * b[e] + 1]]);
+    let largo = 0;
+    const acum = [0];
+    for (let j = 1; j < line.length; j++) acum.push(largo += Math.hypot(line[j][0] - line[j - 1][0], line[j][1] - line[j - 1][1]));
+    for (let j = 1; j < line.length; j++) {
+      const [x0, z0] = line[j - 1], [x1, z1] = line[j];
+      const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz);
+      if (L < 0.5) continue;
+      const t = Math.max(0, Math.min(1, ((x - x0) * dx + (z - z0) * dz) / (L * L)));
+      const px = x0 + dx * t, pz = z0 + dz * t, dist = Math.hypot(x - px, z - pz);
+      if (dist > maxDistM || (best && dist >= best.dist)) continue;
+      const dot = (dx * hx + dz * hz) / L;
+      const hecho = largo > 0 ? (acum[j - 1] + L * t) / largo : 0;
+      if (dot >= cosMax) best = { e, from: a[e], to: b[e], point: [px, pz], rest: line.slice(j, -1), f: hecho, dist };
+      else if (dot <= -cosMax && doble[e]) best = { e, from: b[e], to: a[e], point: [px, pz], rest: line.slice(1, j).reverse(), f: 1 - hecho, dist };
+    }
+  }
+  if (!best) return null;
+  for (let k = g.csr[best.from]; k < g.csr[best.from + 1]; k++) {
+    if (g.adjEdge[k] === best.e && g.adjTo[k] === best.to) return { arc: k, to: best.to, point: best.point, rest: best.rest, f: best.f, dist: best.dist };
+  }
+  return null;
+}
+
 // A* por aristas de startIdx a endIdx sin vueltas en U en los nodos. Devuelve
 // los indices de nodo del camino, o null si asi no hay camino (la app cae
 // entonces al A* por nodos de siempre). opts: cost(e) en la misma unidad que
 // heuristic(i) (que tiene que ser admisible), blocked(e) opcional (DLC) e
-// isFerry(e).
+// isFerry(e). startArc opcional: el arco por el que el camion llega a
+// startIdx (startArcForHeading); tampoco se sale de el dandose vuelta.
 function findArcRoute(g, startIdx, endIdx, opts) {
   if (startIdx === endIdx) return [startIdx];
   const { csr, adjTo, adjEdge } = g;
@@ -2965,9 +3101,16 @@ function findArcRoute(g, startIdx, endIdx, opts) {
   const done = new Uint8Array(total);
   const blocked = opts.blocked || null;
   const heap = createNumberHeap();
+  const llegada = opts.startArc != null && opts.startArc >= 0 ? opts.startArc : -1;
+  let libre0 = llegada === -1;
+  for (let k = csr[startIdx]; !libre0 && k < csr[startIdx + 1]; k++) {
+    if (blocked && blocked(adjEdge[k])) continue;
+    if (opts.isFerry(adjEdge[k]) || !isUTurnArc(dirs, llegada, k)) libre0 = true;
+  }
   for (let k = csr[startIdx]; k < csr[startIdx + 1]; k++) {
     const e = adjEdge[k];
     if (blocked && blocked(e)) continue;
+    if (llegada !== -1 && libre0 && !opts.isFerry(e) && isUTurnArc(dirs, llegada, k)) continue;
     const c = opts.cost(e);
     if (c < gScore[k]) { gScore[k] = c; heap.push(c + opts.heuristic(adjTo[k]), k); }
   }
@@ -3006,6 +3149,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

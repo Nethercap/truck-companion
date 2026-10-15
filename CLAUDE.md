@@ -42,6 +42,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   se sale a mas de 150 grados de ella, salvo en ferry/tren o si no queda
   otra salida. Si asi no hay camino, `nodeRoutePath` (el A* por nodos de
   antes). `tools/check_avisos.js` saca las dos de app.js por nombre.
+  El costo es `routeEdgeCost` (segundos + 1 ms por metro: los segundos del
+  grafo son enteros y sin desempate la ruta hacia una V por un brazo del
+  cruce). Andando, la ruta arranca en el tramo del camion en su sentido
+  (`startArcForHeading`, `routeStartHeading`), no en el nodo mas cercano.
+- Lo que falta y la distancia al giro se miden sobre la ruta entera
+  (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
+  sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco
+  entre dos cajas de ciudad.
+- `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
+  de app.js y pure.js y lista sospechosos (escala, recalculos, avisos, voz,
+  rotondas); `tools/dibujar_simulacion.py` dibuja cada uno. Correrlo antes y
+  despues de tocar el ruteo o los avisos, con la misma `--semilla`.
 
 ## Modales, overlay de OBS y accesibilidad (13-10)
 

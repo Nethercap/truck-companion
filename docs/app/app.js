@@ -2142,6 +2142,10 @@ let routeGraph = null; // typed arrays + CSR, ver buildRouteGraph()
 let routeUsesUncheckedDlc = false;
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
 let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
+// La ruta como se calculo, sin recortar: lo que falta y la distancia al giro
+// se miden sobre ella (gameKmOf, routeMeters en pure.js). Si ya no es la de
+// currentRouteWorldPoints, routeMeters mide como antes.
+let currentRouteFull = null;
 const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS) - en interconexiones con rampas paralelas cercanas, 400 tardaba en detectar que se tomo una rampa distinta
 
 // Waypoints intermedios puestos a mano desde la app (posicion -> wp1 -> wp2
@@ -2398,9 +2402,12 @@ function gameScale() {
   return cityScale;
 }
 
-// Km del juego de un camino en coordenadas de mundo (null sin camino).
-function gameKmOf(points) {
-  return points ? gameScale().pathMeters(points) / 1000 : null;
+// Km del juego de un camino en coordenadas de mundo (null sin camino). La
+// ruta recortada al camion se mide sobre el perfil de la ruta entera (full,
+// ver routeMeters): medida desde el camion, al pasar de una caja de ciudad
+// al hueco hasta la siguiente lo que falta subia 5 km (15-10).
+function gameKmOf(points, full = currentRouteFull) {
+  return points ? gameScale().routeMeters(full, points) / 1000 : null;
 }
 
 const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', c: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh', a: 'poiCatAtlas' };
@@ -2560,7 +2567,7 @@ function searchCompanies(query, x, z, limit) {
 // la ruta hasta el), para medir cada parte a su escala: una estacion a 250 m
 // en el centro decia 3 mi a 1:20 (ver createCityScale).
 function formatPoiDistance(rawMeters, path) {
-  const meters = path ? gameScale().pathMeters(path, rawMeters) : rawMeters * distanceScale();
+  const meters = path ? gameScale().routeMeters(currentRouteFull, path, rawMeters) : rawMeters * distanceScale();
   if (useImperial) { const mi = meters / 1609.34; return mi < 10 ? `${formatDec(mi, currentLang)} mi` : `${Math.round(mi)} mi`; }
   const km = meters / 1000;
   return km < 10 ? `${formatDec(km, currentLang)} km` : `${Math.round(km)} km`;
@@ -3094,19 +3101,29 @@ function dlcFilter(conElecciones) {
 // destildo (el destino esta adentro, o no hay forma de rodearlo), la de
 // todos los publicados, marcada para avisar. Y si ni asi, como antes del
 // filtro: nunca peor que sin el.
-function findRoute(startXY, endXY) {
+// startHeading: el rumbo del juego si el camion viene andando (ver
+// routeStartHeading); la ruta arranca en su tramo y no da la vuelta.
+function findRoute(startXY, endXY, startHeading = null) {
   if (!routeGraph) return null;
   const propio = dlcFilter(true);
-  let ruta = findRouteWith(startXY, endXY, propio);
+  let ruta = findRouteWith(startXY, endXY, propio, startHeading);
   if (ruta || !propio) return ruta;
   if (dlcOffFor(dlcGameOf(currentGame)).length) {
-    ruta = findRouteWith(startXY, endXY, dlcFilter(false));
+    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading);
     if (ruta) { ruta.usesUncheckedDlc = true; return ruta; }
   }
-  return findRouteWith(startXY, endXY, null);
+  return findRouteWith(startXY, endXY, null, startHeading);
 }
 
-function findRouteWith(startXY, endXY, filtro) {
+// El rumbo con que arranca la ruta al recalcular: el del juego, solo si el
+// camion viene andando para adelante. Parado en el deposito el rumbo no dice
+// por donde va a salir: ahi, el nodo mas cercano como siempre.
+const ROUTE_HEADING_MIN_KMH = 15;
+function routeStartHeading(data) {
+  return data && Number.isFinite(data.heading) && Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH ? data.heading : null;
+}
+
+function findRouteWith(startXY, endXY, filtro, startHeading = null) {
   const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
   const blocked = filtro ? filtro.blocked : null;
   const nodeOk = filtro ? filtro.nodeOk : null;
@@ -3115,7 +3132,14 @@ function findRouteWith(startXY, endXY, filtro) {
   // real; si no coinciden (ej. destino en una isla sin ferry en el grafo),
   // se re-snapea el destino dentro de la componente del origen (ruta hasta
   // el punto mas cercano alcanzable, mejor que nada).
-  let startIdx = nearestNodeIndex(startXY[0], startXY[1], 'real', -1, nodeOk);
+  // Andando, el origen es el tramo por el que va el camion, en su sentido
+  // (startArcForHeading, pure.js): el nodo mas cercano podia ser de la
+  // calzada contraria, de otra rampa o estar a cientos de metros.
+  const { componentSize } = routeGraph;
+  const arranque = startHeading != null ? startArcForHeading(routeGraph, startXY[0], startXY[1], startHeading, {
+    edgeOk: (e, a) => (!blocked || !blocked[edgeG[e]]) && componentSize[componentId[a]] >= MIN_REAL_COMPONENT_NODES,
+  }) : null;
+  let startIdx = arranque ? arranque.to : nearestNodeIndex(startXY[0], startXY[1], 'real', -1, nodeOk);
   let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real', -1, nodeOk);
   if (startIdx === -1 || endIdx === -1) return null;
   if (componentId[startIdx] !== componentId[endIdx]) {
@@ -3139,10 +3163,11 @@ function findRouteWith(startXY, endXY, filtro) {
   // aristas. Si asi no hay camino (algun rincon raro del grafo), el A* por
   // nodos de siempre: nunca peor que antes.
   const path = findArcRoute(routeGraph, startIdx, endIdx, {
-    cost: (e) => (byTime ? edgeS[e] : edgeM[e]),
+    cost: (e) => routeEdgeCost(edgeS[e], edgeM[e], byTime),
     heuristic,
     blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
     isFerry: (e) => (edgeF[e] & 1) === 1,
+    startArc: arranque ? arranque.arc : null,
   }) || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
   if (!path) return null;
   // Cada punto: [x, y, ferry, junction]. ferry = 1 si el tramo que LLEGA a
@@ -3159,7 +3184,9 @@ function findRouteWith(startXY, endXY, filtro) {
   // + a la derecha del sentido de marcha (ver routeDrawShift en pure.js). Se
   // reparte a lo largo de la arista entre la corrida de sus dos puntas.
   const { shiftA, shiftB } = routeGraph;
-  const out = [];
+  // Arrancando en el tramo del camion: el punto del camion sobre el y lo que
+  // queda de su curva, antes del primer nodo.
+  const out = arranque ? [arranque.point, ...arranque.rest].map(p => [p[0], p[1], 0, 0, null]) : [];
   for (let k = 0; k < path.length; k++) {
     const i = path[k];
     let ferry = 0;
@@ -3182,6 +3209,11 @@ function findRouteWith(startXY, endXY, filtro) {
     }
     out.push([nodes[2 * i], nodes[2 * i + 1], ferry, degree[i] >= 3 ? 1 : 0, i]);
     if (desde >= 0) spreadEdgeShift(out, desde, sIni, sFin);
+    else if (k === 0 && arranque && shiftA) {
+      const e = adjEdge[arranque.arc], r = adjRev[arranque.arc];
+      const sCola = (r ? shiftB[e] : shiftA[e]) / 2, sPunta = (r ? shiftA[e] : shiftB[e]) / 2;
+      spreadEdgeShift(out, 0, sCola + (sPunta - sCola) * arranque.f, sPunta);
+    }
   }
   return out;
 }
@@ -3211,7 +3243,7 @@ function nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked) {
       if (visited[neighbor]) continue;
       const e = adjEdge[k];
       if (blocked && blocked[edgeG[e]]) continue;
-      const tentativeG = g + (byTime ? edgeS[e] : edgeM[e]);
+      const tentativeG = g + routeEdgeCost(edgeS[e], edgeM[e], byTime);
       if (tentativeG < gScore[neighbor]) {
         gScore[neighbor] = tentativeG;
         cameFrom[neighbor] = current;
@@ -3526,7 +3558,8 @@ function updateDestinationMarker(data) {
     let complete = true;
     routeUsesUncheckedDlc = false;
     legs.forEach((to, legIdx) => {
-      let leg = findRoute(from, to);
+      // El primer tramo sale del camion: con su rumbo si viene andando.
+      let leg = findRoute(from, to, legIdx === 0 ? routeStartHeading(data) : null);
       if (leg) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
         leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
@@ -3536,6 +3569,7 @@ function updateDestinationMarker(data) {
     });
     if (!routePoints.length) routePoints = null;
     currentRouteWorldPoints = routePoints;
+    currentRouteFull = routePoints;
     if (map.getSource('route')) {
       if (routePoints) {
         const parts = splitRouteForDrawing(routePoints);
@@ -4139,7 +4173,7 @@ function navTurnParts(turn) {
       // camion): se lo mide sobre ella a la escala de cada parte. A 1:20 una
       // bifurcacion a menos de 1 km en Rockford era "in 5 mi" (14-10).
       meters: currentRouteWorldPoints
-        ? gameScale().pathMeters(currentRouteWorldPoints, turn.distanceMeters)
+        ? gameScale().routeMeters(currentRouteFull, currentRouteWorldPoints, turn.distanceMeters)
         : turn.distanceMeters * distanceScale(),
       sign: turn.nearSign ? { kind: turn.nearSign.kind, label: turn.nearSign.label } : null,
     };
@@ -6531,10 +6565,10 @@ function runDemo(path) {
     // El camion anda a velocidad pareja, pero el GPS del juego cuenta las
     // ciudades a 1:3 (createCityScale): sin esto la demo decia 745 km y la
     // fila "via waypoint", con un waypoint sobre la ruta, 630.
-    const restoKm = gameKmOf([[x, z], ...path.slice(i)]);
+    const restoKm = gameKmOf([[x, z], ...path.slice(i)], path);
     if (data.routeDistanceKm > 0) data.routeTimeSeconds *= restoKm / data.routeDistanceKm;
     data.routeDistanceKm = restoKm;
-    data.plannedDistanceKm = gameKmOf(path);
+    data.plannedDistanceKm = gameKmOf(path, path);
     // Rumbo como lo manda el cliente 1.5.13+: sobre la grilla del juego
     // (0 = -z), no geografico. Sin esto la demo iba por el camino viejo de
     // deducirlo y no mostraba la diferencia entre los dos norte.
