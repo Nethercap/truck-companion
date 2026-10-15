@@ -3312,11 +3312,7 @@ function forgetWaypointTrip() {
   routeProgressState = { key: null, total: 0 };
 }
 
-function routeIdentity(data) {
-  return JSON.stringify([data.game, data.citySrc, data.cityDst, data.companySrcId,
-    data.companyDstId, data.onJob, data.isCargoLoaded, data.cargo]);
-}
-
+// routeIdentity esta en pure.js, con routeDismissed (el "Ruta oculta").
 function resolveRouteTarget(data) {
   if (dismissedRouteIdentity === routeIdentity(data)) return null;
   return resolveRawRouteTarget(data);
@@ -3369,13 +3365,31 @@ function resetDisplayedRoute() {
   sendLiveRoute(true);
 }
 
+// Volver a mostrar la ruta borrada a mano, desde el "Ruta oculta" del
+// resumen (routeDismissed en pure.js). Los waypoints borrados no vuelven.
+function restoreDismissedRoute() {
+  dismissedRouteIdentity = null;
+  invalidateRoute();
+  if (lastData) { updateDestinationMarker(lastData); updateRouteSummary(lastData); }
+  sendLiveRoute(true);
+}
+
+// El resumen a la vista y con numeros: en "Ruta oculta" se ve pero no tiene.
+function routeSummaryShown() {
+  const panel = document.getElementById('routeSummary');
+  return !!panel && !panel.hidden && !panel.classList.contains('dismissed');
+}
+
+// view: null (sin ruta), { dismissed: true } (borrada a mano, con el boton
+// para traerla) o los numeros de la ruta.
 function renderRouteSummary(view) {
   const panel = document.getElementById('routeSummary');
   if (!panel) return;
   panel.hidden = !view;
+  panel.classList.toggle('dismissed', !!(view && view.dismissed));
   document.getElementById('mapPanel').classList.toggle('hasRouteSummary', !!view);
   keepPanelsClearOfRouteSummary();
-  if (!view) return;
+  if (!view || view.dismissed) return;
   const bar = document.getElementById('routeProgressBar');
   bar.style.width = `${view.percent}%`;
   bar.parentElement.title = `${Math.round(view.percent)}%`;
@@ -3405,7 +3419,12 @@ function renderRouteSummary(view) {
 // tiempo real restante y la hora de llegada estimada (PR #1).
 function updateRouteSummary(data) {
   const target = resolveRouteTarget(data);
-  if (!target) { routeProgressState = { key: null, total: 0 }; renderRouteSummary(null); return; }
+  if (!target) {
+    routeProgressState = { key: null, total: 0 };
+    routeSummaryNumbers = null;
+    renderRouteSummary(routeDismissed(dismissedRouteIdentity, data, resolveRawRouteTarget(data)) ? { dismissed: true } : null);
+    return;
+  }
   // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
   // sobre la ruta que dibujamos nosotros.
   const ownKm = gameKmOf(currentRouteWorldPoints);
@@ -4154,7 +4173,7 @@ function refreshPip() {
   lim.textContent = limite;
   const vel = parseFloat($('miniSpeedBig').textContent);
   lim.classList.toggle('pasado', !lim.hidden && Number.isFinite(vel) && vel > parseFloat(limite) + 2);
-  const resumen = !$('routeSummary').hidden;
+  const resumen = routeSummaryShown();
   d.getElementById('pFalta').textContent = resumen ? $('routeRemaining').textContent : '--';
   d.getElementById('pLlega').textContent = resumen ? $('routeArrival').textContent : '--';
 }
@@ -4249,7 +4268,7 @@ function sendNavHud() {
   if (!isLeaderTab) return; // ver requestLeadership
   if ((!clientOverlayOn && !obsOverlayOn) || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
   const $ = (id) => document.getElementById(id);
-  const resumen = !$('routeSummary').hidden;
+  const resumen = routeSummaryShown();
   const info = overlayTurnParts ? overlayTurnParts.info : null;
   const numeros = resumen ? routeSummaryNumbers : null;
   const msg = {
@@ -5664,6 +5683,7 @@ document.getElementById('routeResetBtn').addEventListener('click', () => {
   }
   resetDisplayedRoute();
 });
+document.getElementById('routeShowBtn').addEventListener('click', restoreDismissedRoute);
 document.getElementById('routeStopSkip').addEventListener('click', (e) => {
   e.stopPropagation();
   if (waypoints.length) removeWaypoint(0);
