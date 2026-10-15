@@ -218,6 +218,11 @@ def clean_local_maps(valor) -> Optional[dict]:
             "cities": m.get("cities") if isinstance(m.get("cities"), int) else None,
             "mods": [x[:80] for x in mods if isinstance(x, str)][:40],
         }
+        # Cuantos logos de empresa trae (clientes 1.5.32+): la web los busca
+        # ahi antes que en R2. Sin el campo, como antes.
+        logos = m.get("companyIcons")
+        if isinstance(logos, int) and not isinstance(logos, bool) and 0 <= logos <= 5000:
+            limpio[game]["companyIcons"] = logos
     return limpio or None
 
 

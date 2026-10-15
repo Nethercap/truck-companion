@@ -1098,6 +1098,8 @@ async function applyLocalMaps(maps, port) {
       pmtilesUrl: `${root}/vector/${m.variant}.pmtiles`,
       label: `${vainilla.label} (${t('localMapLabel')})`,
       poisUrl: `${root}/pois-${m.variant}.json`,
+      // Los logos de sus empresas, mods incluidos (armado con la 1.5.32+).
+      companyIconsBase: m.companyIcons > 0 ? `${root}/company-icons` : null,
     });
     MAP_DATA_VERSION[m.variant] = m.fingerprint;
     usables[game] = m;
@@ -1991,27 +1993,39 @@ async function loadPoiIcons() {
 // Logos de las empresas (128x32, con el borde blanco que les pone el juego),
 // en R2 desde build_company_icons.py del taller. Son unos 500 entre los dos
 // juegos y en una ciudad se ven diez: se piden de a uno cuando MapLibre avisa
-// que la capa 'company' necesita uno. Una empresa de un mod armado en la PC
-// que no esta en R2 queda sin dibujar, nunca con un icono generico. Subir
-// COMPANY_ICONS_REV si se agregan o cambian: Cloudflare guarda los 404.
+// que la capa 'company' necesita uno. Un mapa armado en la PC (1.5.32+) trae
+// los suyos, con los de sus mods (companyIconsBase, ver applyLocalMaps). Si
+// no esta en ningun lado queda sin dibujar, nunca con un icono generico.
+// Subir COMPANY_ICONS_REV si se agregan o cambian: Cloudflare guarda los 404.
 const COMPANY_ICONS_REV = '1';
+// Los que ya se pidieron en este mapa: uno que no se encontro se vuelve a
+// buscar al cambiar de mapa (puede ser uno armado que si lo trae).
 const companyIconsAsked = new Set();
-function companyIconUrl(token) {
-  return `${REMOTE_MAP_BASE}/vector/company-icons/${token}.png?v=${COMPANY_ICONS_REV}`;
+function companyIconSources(token) {
+  const local = (GAME_MAPS[currentGame] || {}).companyIconsBase;
+  return companyIconUrls(token, local, `${REMOTE_MAP_BASE}/vector/company-icons`, COMPANY_ICONS_REV);
 }
-// En la lista del buscador, el mismo logo en vez del 🏭 de antes. Si no
-// carga, queda el hueco y no un icono generico.
+// En la lista del buscador, el mismo logo en vez del 🏭 de antes. Las otras
+// fuentes van en data-fallback (ver renderPoiResults); si ninguna carga,
+// queda el hueco y no un icono generico.
 function companyLogoHtml(token) {
   const ok = token && companyIconToken(COMPANY_ICON_PREFIX + token);
-  return `<span class="poiIcon poiLogo">${ok ? `<img src="${companyIconUrl(ok)}" alt="" loading="lazy">` : ''}</span>`;
+  const urls = ok ? companyIconSources(ok) : [];
+  return `<span class="poiIcon poiLogo">${urls.length ? `<img src="${urls[0]}" data-fallback="${urls.slice(1).join(' ')}" alt="" loading="lazy">` : ''}</span>`;
 }
-function loadMissingCompanyIcon(e) {
+async function loadMissingCompanyIcon(e) {
   const token = companyIconToken(e.id);
   if (!token || companyIconsAsked.has(e.id)) return;
   companyIconsAsked.add(e.id);
-  map.loadImage(companyIconUrl(token))
-    .then((res) => { if (!map.hasImage(e.id)) map.addImage(e.id, res.data); })
-    .catch(() => {});
+  for (const url of companyIconSources(token)) {
+    try {
+      const res = await map.loadImage(url);
+      if (!map.hasImage(e.id)) map.addImage(e.id, res.data);
+      return;
+    } catch (err) {
+      // la siguiente fuente
+    }
+  }
 }
 
 async function loadCities(mapInfo) {
@@ -2674,7 +2688,12 @@ function renderPoiResults() {
       ${dir}<span class="poiDist">${formatPoiDistance(r.dist, [[pos.x, pos.z], [r.x, r.z]])}</span>
     </button>`;
   }).join('');
-  list.querySelectorAll('.poiLogo img').forEach(img => img.addEventListener('error', () => img.remove()));
+  list.querySelectorAll('.poiLogo img').forEach(img => img.addEventListener('error', () => {
+    const [sig, ...resto] = img.dataset.fallback.split(' ').filter(Boolean);
+    if (!sig) { img.remove(); return; }
+    img.dataset.fallback = resto.join(' ');
+    img.src = sig;
+  }));
   list.querySelectorAll('.poiItem').forEach(btn => btn.addEventListener('click', () => {
     const r = results[Number(btn.dataset.index)];
     addPoiWaypoint([r.x, r.z], r.sub ? `${r.name} (${r.sub})` : r.name, r.code || null);
@@ -3584,6 +3603,7 @@ async function loadGameMap(game) {
   // nuevo con el pmtiles del juego que corresponda.
   for (const id of VEC_LAYER_IDS) { if (map.getLayer(id)) map.removeLayer(id); }
   if (map.getSource('vec')) map.removeSource('vec');
+  companyIconsAsked.clear(); // los que ya estan no se vuelven a pedir (hasImage)
   map.addSource('vec', { type: 'vector', url: `pmtiles://${mapInfo.pmtilesUrl}?v=${MAP_DATA_VERSION[game] || ''}` });
   // Se insertan justo antes de 'trail-line' para que el trail/ruta/marcadores
   // queden siempre por encima del mapa base. try/catch por capa: si una sola

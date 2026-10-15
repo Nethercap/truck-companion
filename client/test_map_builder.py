@@ -121,6 +121,44 @@ def test_preflight_de_red_privada(tmp_path):
         srv.shutdown()
 
 
+def test_el_mapa_local_sirve_los_logos_como_png(tmp_path):
+    """El buscador los usa en un <img>: con octet-stream no es seguro que el
+    navegador los muestre."""
+    srv = _servidor(tmp_path)
+    (tmp_path / "mapa" / "company-icons").mkdir()
+    (tmp_path / "mapa" / "company-icons" / "mod_co.png").write_bytes(b"\x89PNG")
+    try:
+        r, cuerpo = _pedir(srv, "/localmap/ats/company-icons/mod_co.png")
+        assert r.status == 200 and cuerpo == b"\x89PNG"
+        assert r.getheader("Content-Type") == "image/png"
+        assert r.getheader("Access-Control-Allow-Origin") == "*"
+    finally:
+        srv.shutdown()
+
+
+def test_copia_los_logos_de_las_empresas(tmp_path):
+    """Los de las empresas del mapa, mods incluidos (en R2 solo estan los de
+    las variantes publicadas); no los cientos de iconos que no son empresas."""
+    parser = tmp_path / "parser"
+    (parser / "icons").mkdir(parents=True)
+    for nombre in ("wal_mkt", "mod_co", "gas_ico", "sin_uso"):
+        (parser / "icons" / f"{nombre}.png").write_bytes(nombre.encode())
+    (parser / "usa-pois.json").write_text(json.dumps([
+        {"x": 1, "y": 2, "type": "company", "icon": "wal_mkt", "cityToken": "a"},
+        {"x": 3, "y": 4, "type": "company", "icon": "wal_mkt", "cityToken": "b"},
+        {"x": 5, "y": 6, "type": "company", "icon": "mod_co", "cityToken": "c"},
+        {"x": 7, "y": 8, "type": "company", "icon": "sin_png", "cityToken": "c"},
+        {"x": 9, "y": 9, "type": "company", "icon": "../fuera", "cityToken": "c"},
+        {"x": 9, "y": 9, "type": "facility", "icon": "gas_ico"},
+    ]))
+    destino = tmp_path / "mapa" / "company-icons"
+    assert map_builder.copy_company_icons(str(parser), "usa", str(destino)) == 2
+    assert sorted(os.listdir(destino)) == ["mod_co.png", "wal_mkt.png"]
+    assert (destino / "mod_co.png").read_bytes() == b"mod_co"
+    # Sin datos del parser no se rompe el armado: el mapa sale sin logos.
+    assert map_builder.copy_company_icons(str(tmp_path / "nada"), "usa", str(tmp_path / "otro")) == 0
+
+
 def test_pois_completa_ciudades_sin_nombre():
     """Empresas en ciudades que el parser no lista (Gulfport de C2C, Rusia
     de ETS2): sin nombre, buscar la ciudad no daba nada (Discord 10-10)."""

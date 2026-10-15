@@ -1389,6 +1389,11 @@ def test_mapas_armados_del_cliente_saneados(main):
     bueno = {"ats": {"variant": "local_ats", "fingerprint": "17445ca6a572", "built": "2026-10-09T00:08:24",
                      "cities": 563, "mods": ["Western Canada Expansion"]}}
     assert main.clean_local_maps(bueno) == bueno
+    # Los logos de empresa del mapa armado (1.5.32): pasan si son un numero.
+    con_logos = {"ats": dict(bueno["ats"], companyIcons=231)}
+    assert main.clean_local_maps(con_logos) == con_logos
+    for raro in (True, -1, "231", 10 ** 6):
+        assert "companyIcons" not in main.clean_local_maps({"ats": dict(bueno["ats"], companyIcons=raro)})["ats"]
     assert main.clean_local_maps({"ats": {"variant": "ets2", "fingerprint": "abcdef"}}) is None
     assert main.clean_local_maps({"ats": {"variant": "local_ats", "fingerprint": "<script>"}}) is None
     assert main.clean_local_maps({"nope": bueno["ats"]}) is None

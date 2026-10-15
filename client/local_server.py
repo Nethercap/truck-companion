@@ -205,7 +205,9 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Range", f"bytes {inicio}-{fin}/{total}")
         else:
             self.send_response(200)
-        tipo = "application/json" if ruta.endswith(".json") else "application/octet-stream"
+        # Los logos de empresa (company-icons/) los usa tambien un <img> del buscador.
+        tipo = ("application/json" if ruta.endswith(".json")
+                else "image/png" if ruta.endswith(".png") else "application/octet-stream")
         self.send_header("Content-Type", tipo)
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(fin - inicio + 1))

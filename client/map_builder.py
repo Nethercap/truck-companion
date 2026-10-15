@@ -273,6 +273,31 @@ def _correr(cmd: list, log_path: str, cancel: threading.Event, env: dict):
 
 STEPS = ("download", "parser", "generator", "tiles", "graph", "finish")
 
+# Lo que la web acepta como token de logo (companyIconToken en pure.js).
+_TOKEN_RE = re.compile(r"[a-z0-9_]{1,64}")
+
+
+def copy_company_icons(parser_dir: str, prefijo: str, destino: str) -> int:
+    """Los logos de las empresas del mapa, para que la web los muestre
+    tambien con mods que no estan en R2 (alli solo estan los de las variantes
+    publicadas). El parser los deja en icons/, entre cientos de iconos que no
+    son empresas: se copian los "icon" de los POIs de empresa, que es el
+    sprite de los tiles y el token del buscador (pois.py). Devuelve cuantos
+    copio."""
+    try:
+        with open(os.path.join(parser_dir, f"{prefijo}-pois.json"), encoding="utf-8") as f:
+            tokens = {p.get("icon") for p in json.load(f) if isinstance(p, dict) and p.get("type") == "company"}
+    except (OSError, ValueError):
+        return 0
+    copiados = 0
+    for token in sorted(t for t in tokens if isinstance(t, str) and _TOKEN_RE.fullmatch(t)):
+        origen = os.path.join(parser_dir, "icons", f"{token}.png")
+        if os.path.isfile(origen):
+            os.makedirs(destino, exist_ok=True)
+            shutil.copyfile(origen, os.path.join(destino, f"{token}.png"))
+            copiados += 1
+    return copiados
+
 
 def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
               progress=lambda paso: None, cancel: threading.Event | None = None,
@@ -330,6 +355,8 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
     pois = mapbuild_pois.build(parser_dir, prefijo)
     if pois is not None:
         mapbuild_pois.write(pois, os.path.join(tmp, f"pois-{variante}.json"))
+    # Antes de borrar parser/: la web los pide a /localmap/<juego>/company-icons/
+    logos = copy_company_icons(parser_dir, prefijo, os.path.join(tmp, "company-icons"))
 
     progress("finish")
     # Lo intermedio pesa GB: solo se quedan los archivos que sirve la web
@@ -344,6 +371,8 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
         "format": MAP_FORMAT, "game": game, "variant": variante, "fingerprint": fp,
         "built": time.strftime("%Y-%m-%dT%H:%M:%S"), "seconds": round(time.time() - t0),
         "cities": ciudades, "mods": mod_names or [os.path.basename(p) for p in mod_paths],
+        # Sin el campo (mapas armados antes de la 1.5.32), la web usa los de R2.
+        "companyIcons": logos,
         "clientVersion": client_version,
     }
     with open(os.path.join(tmp, "manifest.json"), "w", encoding="utf-8") as f:

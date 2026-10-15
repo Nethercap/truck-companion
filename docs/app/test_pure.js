@@ -934,6 +934,18 @@ test('logos de empresas: solo las imagenes de la capa, con un token limpio', () 
   assert.equal(companyIconToken(undefined), null);
 });
 
+test('logos de empresas: primero el mapa armado en la PC, despues R2', () => {
+  const { companyIconUrls } = require('./pure.js');
+  const r2 = 'https://maps.trucksim-dash.com/vector/company-icons';
+  // Mapa de R2 o armado antes de la 1.5.32: solo R2, con su ?v=.
+  assert.deepEqual(companyIconUrls('flv_food_str', null, r2, '1'), [`${r2}/flv_food_str.png?v=1`]);
+  // Armado con logos: los de sus mods solo estan ahi.
+  assert.deepEqual(companyIconUrls('mod_co', 'http://127.0.0.1:27765/localmap/ats/company-icons', r2, '1'),
+    ['http://127.0.0.1:27765/localmap/ats/company-icons/mod_co.png', `${r2}/mod_co.png?v=1`]);
+  // Modo LAN: mismo origen, ruta relativa.
+  assert.equal(companyIconUrls('mod_co', '/localmap/ets2/company-icons', r2, '1')[0], '/localmap/ets2/company-icons/mod_co.png');
+});
+
 // Zoom del modo navegacion elegido en Ajustes (pedido de usuarios).
 test('zoom de navegacion: valida lo guardado y respeta el rango', () => {
   assert.equal(navZoomSetting(undefined), NAV_ZOOM_DEFAULT); // nunca se toco

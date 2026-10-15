@@ -21,6 +21,9 @@ updates on its own and is not versioned here.
 - Build my map (ATS): road names keep the plate under the shield, so a business route reads
   "US-20 Bus" instead of "US-20" (also Alt, Bypass, Truck and historic routes), and shields
   drawn in other styles (guide signs, state versions) are no longer skipped.
+- Build my map also saves the logo of every company on your map, including the ones your mods add,
+  so the dashboard's map and company search show them on your own map too. Maps built with an
+  older version still show the logos of the base game and the supported mods.
 
 ## 1.5.31 (2026-10-13)
 

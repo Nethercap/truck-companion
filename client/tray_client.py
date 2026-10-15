@@ -1715,7 +1715,7 @@ def status_message() -> str:
 
 
 def local_maps_summary() -> dict:
-    return {g: {k: m.get(k) for k in ("variant", "fingerprint", "built", "cities", "mods")}
+    return {g: {k: m.get(k) for k in ("variant", "fingerprint", "built", "cities", "mods", "companyIcons")}
             for g, m in state.local_maps.items()}
 
 
