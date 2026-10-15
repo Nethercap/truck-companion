@@ -57,11 +57,12 @@ function harness() {
   ].join('\n');
   const mod = new Function('pure', 'let routeGraph = null, currentRouteWorldPoints = null, routeBehind = []; const routeProfile = "fastest";\n' + code)(pure);
   const behindMax = Number((src.match(/const ROUTE_BEHIND_MAX = (\d+)/) || [])[1]) || 32;
-  // Lo ya recorrido, como lo guarda la app (trimRouteBehind: por metros).
+  // Lo ya recorrido, como lo guarda la app (trimRouteBehind: por metros, y
+  // adentro de una rotonda desde su entrada: keep es el node del aviso).
   const behindM = Number((src.match(/const ROUTE_BEHIND_M = (\d+)/) || [])[1]) || 0;
-  const behind = (pts, h) => {
-    const b = pts.slice(Math.max(0, h + 1 - behindMax), h + 1);
-    return behindM && pure.trimRouteBehind ? pure.trimRouteBehind(b, behindM, behindMax) : b;
+  const behind = (pts, h, keep = null) => {
+    const b = pts.slice(keep ? 0 : Math.max(0, h + 1 - behindMax), h + 1);
+    return behindM && pure.trimRouteBehind ? pure.trimRouteBehind(b, behindM, behindMax, keep) : b;
   };
   return { mod, pure, behind };
 }
@@ -98,7 +99,7 @@ function simular({ mod, pure, behind }, g, cities, n) {
       for (let s = 0; s < steps; s++) {
         const f = s / steps;
         const here = [ax + (bx - ax) * f, az + (bz - az) * f, 0, 0, null, pts[h + 1][5], pts[h + 1][6]];
-        mod.set(g, [here, ...pts.slice(h + 1)], behind(pts, h));
+        mod.set(g, [here, ...pts.slice(h + 1)], behind(pts, h, state.shown && state.shown.kind === 'roundabout' ? state.shown.node : null));
         const turn = pure.stabilizeManeuver(state, mod.findUpcomingTurn(), 2);
         if (!turn) continue;
         const item = [turn.kind, turn.direction || null, Math.round(turn.node[0]), Math.round(turn.node[1])];

@@ -368,10 +368,9 @@ function leadsAway(adjacency, nodeAt, from, n, blocked, escapeM = 120) {
 // dirigido de menos de maxLenM que pasa por `start`, sin pasar por `from`
 // (la calle por la que se llega), hecho solo de tramos de un sentido (asi
 // un triangulo de calles de doble mano no cuenta). Devuelve la lista de sus
-// nodos, en orden, o null.
-function oneWayRing(adjacency, nodeAt, start, from, maxLenM = 700, maxDepth = 40) {
+// nodos, en orden, o null. budget: nodos a visitar como mucho.
+function oneWayRing(adjacency, nodeAt, start, from, maxLenM = 700, maxDepth = 40, budget = 300) {
   const oneWay = (a, b) => !(adjacency.get(b) || []).some(([m]) => m === a);
-  let budget = 300;
   const path = [start];
   const dfs = (cur, lenM) => {
     if (--budget < 0 || path.length > maxDepth) return false;
@@ -429,6 +428,18 @@ function extraTurningDeg(line, bearingBetween) {
   return first == null ? 0 : total - Math.abs(normDeg(last - first));
 }
 
+// Direccion (vector unitario en la grilla) con la que sale de su primer punto
+// una polilinea, o con la que llega al ultimo (alFinal), salteando los
+// tramitos de menos de ARC_DIR_MIN_M como routeArcDirections.
+function lineDir(line, alFinal) {
+  const a = alFinal ? line.length - 1 : 0, lejos = alFinal ? 0 : line.length - 1, paso = alFinal ? -1 : 1;
+  let t = a + paso;
+  while (t !== lejos && Math.hypot(line[t][0] - line[a][0], line[t][1] - line[a][1]) < ARC_DIR_MIN_M) t += paso;
+  const s = alFinal ? 1 : -1, dx = s * (line[a][0] - line[t][0]), dy = s * (line[a][1] - line[t][1]);
+  const d = Math.hypot(dx, dy) || 1;
+  return [dx / d, dy / d];
+}
+
 // Puntos repartidos alrededor de un centro: ninguno mas de maxRatio veces
 // mas lejos del centro que el mas cercano (y nada pegado al centro).
 function roundish(points, maxRatio) {
@@ -444,7 +455,13 @@ function roundish(points, maxRatio) {
 // El grafo no marca las rotondas; se las reconoce de dos formas:
 //  - anillo redondo de tramos de un solo sentido (oneWayRing): la ruta entra en un
 //    nodo del anillo y lo sigue; se cuentan los nodos del anillo con una
-//    salida de verdad (leadsAway) hasta el que la ruta deja.
+//    salida de verdad (leadsAway) hasta el que la ruta deja. El nodo de
+//    entrada tambien: en muchas rotondas del grafo el brazo entra al anillo
+//    en el mismo nodo del que se abre la salida siguiente, y sin contarla
+//    "derecho" salia "primera salida" (Discord, 15-10: "the immediate exit
+//    isn't counted"; 1 de cada 3 nodos de anillo de ATS es asi). Ahi no
+//    cuenta la calle por la que se llega ni lo que se sale dandose vuelta
+//    (mas de UTURN_MIN_DEG, como el ruteo), que es el mismo brazo.
 //  - rotonda compacta de un solo prefab: el brazo de entrada se une directo
 //    con cada brazo de salida, con curvas que rodean la isla (al menos dos
 //    doblan 90 grados de mas), cortas y con los brazos repartidos alrededor
@@ -452,6 +469,16 @@ function roundish(points, maxRatio) {
 //    la mas corta.
 // ctx: { pts, cum, i, iEnd, adjacency, nodeAt, edgeLine(a, b), bearingBetween }.
 // Devuelve { exit, enter, leave } (indices de pts) o null.
+//
+// Las rotondas grandes (15-10): casi todas miden menos de 700 m de vuelta,
+// pero el circulo de Alexandria (ATS) mide 1138 m y 10 brazos y salia como
+// "keep left". Si hasta 700 m no hay un anillo redondo, se busca otra vez
+// hasta RING_BIG_M (ninguna otra de ATS, ETS2 ni ProMods pasa de 700 m).
+// Una segunda busqueda y no un limite mas alto: con mas largo, la busqueda
+// puede volver al nodo por otro camino antes que por el anillo, y las
+// chicas quedan como estaban. Cuesta menos de 0,5 ms por cruce.
+const RING_BIG_M = 1500;
+const RING_SEARCHES = [[700, 40, 300], [RING_BIG_M, 80, 600]]; // [metros, nodos, presupuesto]
 function detectRoundabout(ctx) {
   const { pts, i, iEnd, adjacency, nodeAt, edgeLine, bearingBetween } = ctx;
   if (!adjacency || !nodeAt) return null;
@@ -469,25 +496,30 @@ function detectRoundabout(ctx) {
     // Redondo: un tramo corto de calle dividida (las dos manos y los nodos
     // donde se separan y se juntan) tambien es un ciclo de un sentido, pero
     // alargado; una manzana de calles de una mano es cuadrada (1,41).
-    const ringPath = oneWayRing(adjacency, nodeAt, v, u);
-    const ring = ringPath && ringPath.length >= 4 && roundish(ringOutline(ringPath, nodeAt, edgeLine), 1.3)
-      ? new Set(ringPath) : null;
+    let ring = null;
+    for (const [maxM, maxDepth, budget] of RING_SEARCHES) {
+      const ringPath = oneWayRing(adjacency, nodeAt, v, u, maxM, maxDepth, budget);
+      if (ringPath && ringPath.length >= 4 && roundish(ringOutline(ringPath, nodeAt, edgeLine), 1.3)) { ring = new Set(ringPath); break; }
+    }
     if (ring && !ring.has(u)) {
-      let exit = 0, leave = kEnter, k = kEnter;
+      const lineOf = (a, b) => (edgeLine && edgeLine(a, b)) || [nodeAt(a), nodeAt(b)];
+      const llegada = lineDir(lineOf(u, v), true);
+      const vuelve = (n) => { const d = lineDir(lineOf(v, n), false); return llegada[0] * d[0] + llegada[1] * d[1] < UTURN_COS; };
+      // u: el brazo por el que se llega, que en el anillo es la ultima salida
+      const esSalida = (w, n) => n !== u && !ring.has(n) && (w !== v || !vuelve(n));
+      let exit = 0, leave = kEnter, k = kEnter, saleEnLaEntrada = false;
       for (;;) {
         let next = null;
         for (let j = k + 1; j < pts.length; j++) if (pts[j][4] != null) { next = j; break; }
         const w = pts[k][4];
-        if (k !== kEnter) {
-          const sale = next != null && !ring.has(pts[next][4]);
-          const otra = (adjacency.get(w) || []).some(([n]) => !ring.has(n) && leadsAway(adjacency, nodeAt, w, n, ring, escapeM));
-          if (sale || otra) exit++;
-          if (sale) { leave = k; break; }
-        }
+        const sale = next != null && !ring.has(pts[next][4]) && (k !== kEnter || esSalida(w, pts[next][4]));
+        const otra = (adjacency.get(w) || []).some(([n]) => esSalida(w, n) && leadsAway(adjacency, nodeAt, w, n, ring, escapeM));
+        if (sale || otra) exit++;
+        if (sale) { leave = k; saleEnLaEntrada = k === kEnter; break; }
         if (next == null || !ring.has(pts[next][4])) { leave = k; break; }
         k = next;
       }
-      if (exit >= 1 && leave !== kEnter) return { exit, enter: kEnter, leave };
+      if (exit >= 1 && (leave !== kEnter || saleEnLaEntrada)) return { exit, enter: kEnter, leave };
       continue;
     }
     // Prefab compacto: de v (brazo de entrada) al siguiente nodo de la ruta
@@ -721,13 +753,28 @@ function gaugeAngle(value, min, max, sweepDeg = 270) {
 // puntos pueden ser 15 m: el rumbo se media sobre el salto lateral entre dos
 // carriles paralelos y salia un "keep left" falso encima del punto (Discord,
 // Lightningroc771).
-function trimRouteBehind(behind, minM, maxPts) {
-  let len = 0, k = behind.length - 1;
+// Adentro de una rotonda (keepFrom: [x, z] de su entrada, el node del aviso)
+// se cuenta desde la entrada y no desde el camion: en una rotonda grande,
+// a los 200 m de entrar la entrada se perdia, detectRoundabout ya no la
+// encontraba y el aviso de la salida se apagaba, o pasaba a "turn left",
+// antes de llegar (1 de cada 4 pasadas en las de mas de 250 m de ETS2).
+// Hasta ROUTE_KEEP_MAX_M detras del camion: mas que la rotonda mas grande
+// que se reconoce (RING_BIG_M).
+const ROUTE_KEEP_MAX_M = 2000;
+function trimRouteBehind(behind, minM, maxPts, keepFrom = null) {
+  let end = behind.length - 1;
+  if (keepFrom) {
+    for (let j = end, lenM = 0; j >= 0 && lenM <= ROUTE_KEEP_MAX_M; j--) {
+      if (Math.hypot(behind[j][0] - keepFrom[0], behind[j][1] - keepFrom[1]) < 0.5) { end = j; break; }
+      if (j > 0) lenM += Math.hypot(behind[j][0] - behind[j - 1][0], behind[j][1] - behind[j - 1][1]);
+    }
+  }
+  let len = 0, k = end;
   while (k > 0 && len < minM) {
     len += Math.hypot(behind[k][0] - behind[k - 1][0], behind[k][1] - behind[k - 1][1]);
     k--;
   }
-  const start = Math.max(k, behind.length - maxPts, 0);
+  const start = Math.max(k, end + 1 - maxPts, 0);
   return start > 0 ? behind.slice(start) : behind;
 }
 

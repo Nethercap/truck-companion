@@ -1255,6 +1255,57 @@ test('detectRoundabout: anillo de un sentido, cuenta las salidas hasta la de la 
   assert.equal(detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, este]), i: 1, iEnd: 1, ...g2, bearingBetween: planarBearing }), null);
 });
 
+test('detectRoundabout: la salida que se abre en el mismo nodo de la entrada es la primera (Discord, 15-10)', () => {
+  const { detectRoundabout } = require('./pure.js');
+  // rotonda de 4 brazos como la del nodo 9654 de ATS: anillo antihorario de
+  // radio 30 y 8 nodos (0 sur, 1 sureste, ... 7 suroeste). Cada brazo entra
+  // al anillo en el nodo diagonal del que sale el brazo siguiente: en 1
+  // entra el sur y sale el este, en 3 entra el este y sale el norte, etc.
+  const nodos = [], aristas = [];
+  for (let k = 0; k < 8; k++) { const a = -Math.PI / 2 + k * Math.PI / 4; nodos.push([30 * Math.cos(a), 30 * Math.sin(a)]); }
+  for (let k = 0; k < 8; k++) aristas.push([k, (k + 1) % 8, false]);
+  const brazo = (x, y, desde, hasta) => { const k = nodos.length; nodos.push([x, y]); aristas.push(desde == null ? [k, hasta, false] : [desde, k, false]); return k; };
+  const surEntra = brazo(15, -300, null, 1), este = brazo(300, -15, 1);
+  brazo(300, 15, null, 3); const norte = brazo(15, 300, 3);
+  brazo(-15, 300, null, 5); const oeste = brazo(-300, 15, 5);
+  brazo(-300, -15, null, 7); const surSale = brazo(-15, -300, 7);
+  const ctx = (ids, g) => ({ ...rutaPor(nodos, ids), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing });
+  let g = grafoChico(nodos, aristas);
+  // derecho: segunda salida (antes decia "primera")
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, norte], g)).exit, 2);
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, 4, 5, oeste], g)).exit, 3);
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, 4, 5, 6, 7, surSale], g)).exit, 4);
+  // la primera, que sale del nodo de la entrada sin pisar el anillo: rotonda
+  // y no "doblar a la derecha"
+  const r = detectRoundabout(ctx([surEntra, 1, este], g));
+  assert.deepEqual([r.exit, r.enter, r.leave], [1, 1, 1]);
+  // una calle que sale del nodo de la entrada dandose vuelta (para el lado
+  // del que se viene) no es otra salida
+  brazo(25, -300, 1);
+  g = grafoChico(nodos, aristas);
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, norte], g)).exit, 2);
+});
+
+test('detectRoundabout: una rotonda grande, de mas de 700 m de vuelta (Alexandria, 15-10)', () => {
+  const { detectRoundabout, oneWayRing } = require('./pure.js');
+  // anillo antihorario de radio 200 (1253 m de vuelta) y 24 nodos, brazos
+  // de doble mano al sur (0), este (6), norte (12) y oeste (18)
+  const nodos = [], aristas = [];
+  for (let k = 0; k < 24; k++) { const a = -Math.PI / 2 + k * Math.PI / 12; nodos.push([200 * Math.cos(a), 200 * Math.sin(a)]); }
+  for (let k = 0; k < 24; k++) aristas.push([k, (k + 1) % 24, false]);
+  const sur = conCalle(nodos, aristas, 0, 0, -300);
+  conCalle(nodos, aristas, 6, 300, 0);
+  const norte = conCalle(nodos, aristas, 12, 0, 300);
+  const oeste = conCalle(nodos, aristas, 18, -300, 0);
+  const g = grafoChico(nodos, aristas);
+  const ctx = (ids) => ({ ...rutaPor(nodos, ids), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing });
+  // la primera busqueda (700 m) no la ve; la segunda si
+  assert.equal(oneWayRing(g.adjacency, g.nodeAt, 0, sur), null);
+  const ids = (hasta, salida) => [sur, ...Array.from({ length: hasta + 1 }, (_, k) => k), salida];
+  assert.equal(detectRoundabout(ctx(ids(12, norte))).exit, 2);
+  assert.equal(detectRoundabout(ctx(ids(18, oeste))).exit, 3);
+});
+
 test('detectRoundabout: una curva con muchos vertices no corre el centro del anillo (Miles City, salida 139)', () => {
   const { detectRoundabout, ringOutline } = require('./pure.js');
   // anillo redondo de radio 29 y 12 nodos; del lado oeste el grafo trae la
@@ -1829,6 +1880,21 @@ test('trimRouteBehind: lo ya recorrido se guarda por metros, con tope de puntos'
   const ralo = [[0, 0], [0, 100], [0, 200], [0, 300], [0, 400]];
   assert.deepEqual(trimRouteBehind(ralo, 150, 400), [[0, 200], [0, 300], [0, 400]]);
   assert.deepEqual(trimRouteBehind([], 200, 400), []);
+});
+
+test('trimRouteBehind: adentro de una rotonda se guarda desde su entrada (rotondas grandes, 15-10)', () => {
+  const { trimRouteBehind } = require('./pure.js');
+  const ralo = Array.from({ length: 11 }, (_, k) => [0, k * 100]); // 1 km, un punto cada 100 m
+  assert.deepEqual(trimRouteBehind(ralo, 150, 400), ralo.slice(8));
+  // entrada en (0, 500): los 150 m se cuentan desde ella, no desde el camion
+  assert.deepEqual(trimRouteBehind(ralo, 150, 400, [0, 500]), ralo.slice(3));
+  // el tope de puntos tambien cuenta desde la entrada
+  assert.deepEqual(trimRouteBehind(ralo, 150, 1, [0, 500]), ralo.slice(5));
+  // una entrada que no esta (ya recortada, o de otra ruta): como siempre
+  assert.deepEqual(trimRouteBehind(ralo, 150, 400, [7, 7]), ralo.slice(8));
+  // ni mas de 2 km detras del camion
+  const largo = Array.from({ length: 31 }, (_, k) => [0, k * 100]);
+  assert.deepEqual(trimRouteBehind(largo, 150, 400, [0, 0]), largo.slice(28));
 });
 
 test('maneuver: Y donde la otra rama se abre mas que la ruta, pero la ruta tambien dobla de verdad -> keep (I-25, Denver)', () => {
