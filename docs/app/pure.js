@@ -2519,6 +2519,23 @@ function waypointRouteKey(list) {
   return `wp:${Math.round(last.pos[0])},${Math.round(last.pos[1])}`;
 }
 
+// El viaje de la ruta borrada a mano (boton "borrar la ruta del mapa"): no
+// se vuelve a dibujar hasta que esto cambie (PR #1 de Vladimir Kutkovoy).
+// Enganchar la carga cambia el viaje: la ruta vuelve, ya a la entrega.
+function routeIdentity(data) {
+  return JSON.stringify([data.game, data.citySrc, data.cityDst, data.companySrcId,
+    data.companyDstId, data.onJob, data.isCargoLoaded, data.cargo]);
+}
+
+// Ruta borrada a mano que se podria volver a mostrar: el resumen queda como
+// "Ruta oculta" con un boton para traerla. Antes el resumen desaparecia con
+// el boton adentro y, hasta el proximo trabajo, la unica salida era recargar
+// la pagina, que nadie adivina ("it never shows a set route anymore",
+// Discord 15-10). rawTarget: el objetivo sin contar el borrado.
+function routeDismissed(dismissedIdentity, data, rawTarget) {
+  return dismissedIdentity != null && !!data && !!rawTarget && dismissedIdentity === routeIdentity(data);
+}
+
 // Waypoints guardados en el navegador para que sobrevivan a recargar la
 // pagina (pedido de Discord, 09-10). stored: { [variante]: { at, list:
 // [{ pos: [x, z], inGame, label }] } }. Devuelve la lista de la variante si
@@ -3301,6 +3318,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { routeIdentity, routeDismissed, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

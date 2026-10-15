@@ -1941,6 +1941,26 @@ test('routeProgressTotal: la barra no vuelve a cero al recargar (Gargamosch, 11-
   assert.equal(routeProgressTotal({ kind: 'dest', manual: false, plannedKm: null, remainingKm: null, seenKm: 0, key: 'a', now }), 0);
 });
 
+test('routeDismissed: la ruta borrada a mano se puede volver a mostrar (Discord, 15-10)', () => {
+  const { routeIdentity, routeDismissed } = require('./pure.js');
+  const viaje = { game: 'ats', citySrc: 'Reno', cityDst: 'Elko', companySrcId: 'wal', companyDstId: 'tree_et',
+    onJob: true, isCargoLoaded: true, cargo: 'Lumber' };
+  const objetivo = { kind: 'dest', key: 'dest:tree_et@elko' };
+  const borrada = routeIdentity(viaje);
+  // el mismo viaje: oculta, con el boton para traerla
+  assert.equal(routeDismissed(borrada, { ...viaje, position: { x: 1, z: 2 } }, objetivo), true);
+  // otro trabajo, o enganchar la carga: la ruta vuelve sola y no hay "oculta"
+  assert.equal(routeDismissed(borrada, { ...viaje, cityDst: 'Ely' }, objetivo), false);
+  assert.equal(routeDismissed(borrada, { ...viaje, isCargoLoaded: false }, objetivo), false);
+  // nada que mostrar (sin trabajo ni waypoints) o nada borrado: no hay boton
+  assert.equal(routeDismissed(borrada, viaje, null), false);
+  assert.equal(routeDismissed(null, viaje, objetivo), false);
+  assert.equal(routeDismissed(borrada, null, objetivo), false);
+  // cliente viejo sin los campos del trabajo: igual se reconoce el mismo viaje
+  const viejo = { game: 'ets2', cityDst: 'Berlin' };
+  assert.equal(routeDismissed(routeIdentity(viejo), { ...viejo }, objetivo), true);
+});
+
 test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version del mapa', () => {
   const { demoPathUsable } = require('./pure.js');
   const fs = require('node:fs');

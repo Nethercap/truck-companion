@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261015g" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261015g" />
-<link rel="stylesheet" href="app.css?v=20261015g" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261015h" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261015h" />
+<link rel="stylesheet" href="app.css?v=20261015h" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -367,6 +367,9 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
         <div id="routeApprox" class="routeApprox" hidden></div>
         <!-- Minimizado queda solo la barra de progreso; tocarla lo abre. -->
         <button id="routeExpandBtn" class="routeExpandBtn" data-i18n-title="routeSummaryShow" title="Show the route summary"></button>
+        <!-- Ruta borrada a mano: queda esto en vez del resumen, con la salida
+             a la vista (routeDismissed en pure.js). -->
+        <div class="routeHidden"><span data-i18n="routeHiddenLabel">Route hidden</span><button id="routeShowBtn" class="routeStopSkip" data-i18n="routeShowAgain">Show route</button></div>
       </div>
       <!-- Poco combustible o descanso cerca: atajo a la parada mas cercana
            (renderStopSuggest en app.js). -->
@@ -666,14 +669,14 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261015g"></script>
-<script src="pure.js?v=20261015g"></script>
-<script src="i18n.js?v=20261015g"></script>
-<script src="i18n_en_es.js?v=20261015g"></script>
-<script src="../dash/dash.js?v=20261015g"></script>
-<script src="../dash/classic.js?v=20261015g"></script>
-<script src="app.js?v=20261015g"></script>
-<script src="convoy.js?v=20261015g"></script>
-<script src="livemap.js?v=20261015g"></script>
+<script src="variants.js?v=20261015h"></script>
+<script src="pure.js?v=20261015h"></script>
+<script src="i18n.js?v=20261015h"></script>
+<script src="i18n_en_es.js?v=20261015h"></script>
+<script src="../dash/dash.js?v=20261015h"></script>
+<script src="../dash/classic.js?v=20261015h"></script>
+<script src="app.js?v=20261015h"></script>
+<script src="convoy.js?v=20261015h"></script>
+<script src="livemap.js?v=20261015h"></script>
 </body>
 </html>
