@@ -50,6 +50,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
   sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco
   entre dos cajas de ciudad.
+- Rotondas: `detectRoundabout` descarta anillos con lados rectos largos
+  (`longestStraightFrac`: manzanas y colectoras de una mano) y prefabs
+  compactos sin isla (`compactIslandM`: cruces de ATS con curvas cuadradas).
+  Los umbrales salen de medir contra el nombre del prefab del parser; antes
+  de moverlos, correr el simulador con `--rotondas`.
+- La voz habla de a una frase (`voiceQueueAction`): una nueva espera a que
+  termine la que suena, salvo un aviso en el punto contra uno anticipado.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
   de app.js y pure.js y lista sospechosos (escala, recalculos, avisos, voz,
   rotondas); `tools/dibujar_simulacion.py` dibuja cada uno. Correrlo antes y

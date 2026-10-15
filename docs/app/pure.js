@@ -479,6 +479,63 @@ function roundish(points, maxRatio) {
 // chicas quedan como estaban. Cuesta menos de 0,5 ms por cruce.
 const RING_BIG_M = 1500;
 const RING_SEARCHES = [[700, 40, 300], [RING_BIG_M, 80, 600]]; // [metros, nodos, presupuesto]
+
+// Un anillo de verdad dobla parejo. Una manzana de calles de una mano, las
+// colectoras de un enlace de Texas o el lazo de un area de descanso, con las
+// esquinas recortadas por las curvas de giro, pasan por redondas pero tienen
+// lados rectos largos: salian como "roundabout, 2nd exit" (10 de las 45
+// rotondas anunciadas en las rutas de ATS simuladas el 15-10). El tramo mas
+// largo que dobla menos de maxTurnDeg, como fraccion de la vuelta: en las
+// rotondas de ETS2, ProMods y ATS hasta 0,146; en las manzanas y colectoras
+// de ATS, 0,162 a 0,198 (contra el nombre del prefab del parser).
+const RING_MAX_STRAIGHT = 0.155;
+function longestStraightFrac(outline, maxTurnDeg = 15) {
+  const n = outline.length;
+  if (n < 3) return 1;
+  const giro = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const a = outline[(k + n - 1) % n], b = outline[k], c = outline[(k + 1) % n];
+    const r1 = Math.atan2(b[1] - a[1], b[0] - a[0]), r2 = Math.atan2(c[1] - b[1], c[0] - b[0]);
+    giro[k] = Math.abs(normDeg((r2 - r1) * 180 / Math.PI));
+  }
+  // la ventana circular mas larga que suma menos de maxTurnDeg
+  let mejor = 0, suma = 0, j = 0;
+  for (let i = 0; i < n; i++) {
+    if (j < i) { j = i; suma = 0; }
+    while (j - i < n && suma + giro[j % n] <= maxTurnDeg) { suma += giro[j % n]; j++; }
+    mejor = Math.max(mejor, j - i);
+    if (j > i) suma -= giro[i];
+  }
+  return mejor / n;
+}
+
+// Una rotonda compacta tiene isla: ninguna de sus curvas pasa cerca del
+// centro. En los cruces comunes de ATS las curvas de navegacion son
+// "cuadradas", doblan 90 grados de mas igual que alrededor de una isla, y la
+// regla del prefab compacto los tomaba por rotondas: de los 187 nodos de ATS
+// que la cumplian, 185 estan en prefabs que no son rotondas, y un cruce en X
+// decia "roundabout, 2nd exit" (15-10). Cuanto se acercan las curvas que
+// salen de v (sin la calle por la que se llega) al centro de las puntas de
+// los brazos: en un cruce es el medio, por donde pasa la que sigue derecho;
+// en una rotonda, la isla. En los cruces de ATS, 1,3 m de mediana (175 de
+// 176 por debajo de 3 m); en las rotondas compactas de ETS2 y ProMods, 7,4
+// m (84 % pasan los 3 m: las otras vuelven a anunciarse como giro).
+const COMPACT_MIN_ISLAND_M = 3;
+function compactIslandM(v, outs, nodeAt, edgeLine) {
+  const puntas = [v, ...outs].map(nodeAt);
+  const cx = puntas.reduce((s2, p) => s2 + p[0], 0) / puntas.length, cz = puntas.reduce((s2, p) => s2 + p[1], 0) / puntas.length;
+  let min = Infinity;
+  for (const n of outs) {
+    const l = (edgeLine && edgeLine(v, n)) || [nodeAt(v), nodeAt(n)];
+    for (let k = 1; k < l.length; k++) {
+      const [x0, z0] = l[k - 1], dx = l[k][0] - x0, dz = l[k][1] - z0, L2 = dx * dx + dz * dz;
+      const t = L2 ? Math.max(0, Math.min(1, ((cx - x0) * dx + (cz - z0) * dz) / L2)) : 0;
+      min = Math.min(min, Math.hypot(cx - x0 - dx * t, cz - z0 - dz * t));
+    }
+  }
+  return min;
+}
+
 function detectRoundabout(ctx) {
   const { pts, i, iEnd, adjacency, nodeAt, edgeLine, bearingBetween } = ctx;
   if (!adjacency || !nodeAt) return null;
@@ -499,7 +556,9 @@ function detectRoundabout(ctx) {
     let ring = null;
     for (const [maxM, maxDepth, budget] of RING_SEARCHES) {
       const ringPath = oneWayRing(adjacency, nodeAt, v, u, maxM, maxDepth, budget);
-      if (ringPath && ringPath.length >= 4 && roundish(ringOutline(ringPath, nodeAt, edgeLine), 1.3)) { ring = new Set(ringPath); break; }
+      if (!ringPath || ringPath.length < 4) continue;
+      const contorno = ringOutline(ringPath, nodeAt, edgeLine);
+      if (roundish(contorno, 1.3) && longestStraightFrac(contorno) < RING_MAX_STRAIGHT) { ring = new Set(ringPath); break; }
     }
     if (ring && !ring.has(u)) {
       const lineOf = (a, b) => (edgeLine && edgeLine(a, b)) || [nodeAt(a), nodeAt(b)];
@@ -531,6 +590,7 @@ function detectRoundabout(ctx) {
     if (!roundish([v, ...outs.map(([n]) => n)].map(nodeAt), 1.7)) continue;
     const rodean = outs.filter(([n]) => { const line = edgeLine(v, n); return line && extraTurningDeg(line, bearingBetween) >= 90; });
     if (rodean.length < 2) continue;
+    if (compactIslandM(v, outs.map(([n]) => n), nodeAt, edgeLine) < COMPACT_MIN_ISLAND_M) continue;
     // Y la ruta la usa: rodea la isla o dobla (la primera salida). Pasar
     // derecho por un prefab chico con curvas raras no es una rotonda.
     const propia = edgeLine(v, b);
@@ -972,6 +1032,31 @@ function detectManeuver(ctx) {
     return [pts[iEnd][4], next].some(start => start != null && ringThrough(adjacency, nodeAt, start, before));
   };
 
+  // Una salida que arranca a menos de forkStartMaxDeg de la ruta (medido a
+  // forkStartM del nodo, por su curva si ctx.edgeLine la da): la ruta y esa
+  // rama se separan de a poco. Devuelve la bifurcacion ("keep" hacia el lado
+  // de la ruta, mirando lejos) o null.
+  const forkStartM = ctx.forkStartM != null ? ctx.forkStartM : 20;
+  const forkStartMaxDeg = ctx.forkStartMaxDeg != null ? ctx.forkStartMaxDeg : 30;
+  const forkInCurve = () => {
+    for (const [k, idx, n] of altExits()) {
+      const line = (ctx.edgeLine && ctx.edgeLine(idx, n)) || [nodeAt(idx), nodeAt(n)];
+      let acum = 0, inicio = line[line.length - 1];
+      for (let j = 1; j < line.length; j++) {
+        const L = Math.hypot(line[j][0] - line[j - 1][0], line[j][1] - line[j - 1][1]);
+        if (acum + L >= forkStartM) { const t = (forkStartM - acum) / L; inicio = [line[j - 1][0] + (line[j][0] - line[j - 1][0]) * t, line[j - 1][1] + (line[j][1] - line[j - 1][1]) * t]; break; }
+        acum += L;
+      }
+      if (Math.hypot(inicio[0] - pts[k][0], inicio[1] - pts[k][1]) < 5) continue;
+      const rutaIni = bearingBetween(pts[k], pointAt(cum[k] + forkStartM));
+      if (Math.abs(normDeg(bearingBetween(pts[k], inicio) - rutaIni)) >= forkStartMaxDeg) continue;
+      const lejos = altDeltas()[altExits().indexOf(altExits().find(e => e[0] === k && e[1] === idx && e[2] === n))];
+      const rutaLejos = normDeg(bearingBetween(pts[k], pointAt(cum[k] + legM)) - inBearing);
+      return { kind: 'fork', direction: rutaLejos > lejos ? 'right' : 'left', delta, at: k, inBearing, outBearing, inCurve: true };
+    }
+    return null;
+  };
+
   if (Math.abs(delta) > turnThreshold) {
     // Con el grafo a mano, un giro se anuncia solo si habia por donde
     // equivocarse: la calle que dobla 40 grados con un camino lateral del
@@ -988,6 +1073,14 @@ function detectManeuver(ctx) {
       const alt = straightestAlt(turnAltMaxDeg);
       quiet = alt == null || Math.abs(alt) >= Math.abs(delta) + turnNaturalMargin;
       if (quiet && entersRing()) quiet = false;
+      // Salvo que la otra salida arranque pareja con la ruta: es una
+      // bifurcacion en una curva (el rulo de un trebol que se abre en dos
+      // rampas, Burgos y Kotka en las simulaciones del 15-10), no una calle
+      // lateral. Lejos se va para el otro lado, pero hay que elegir rama.
+      if (quiet && alt != null) {
+        const f = forkInCurve();
+        if (f) return f;
+      }
     }
     // Dentro del grupo, el giro se atribuye al nodo donde mas cambia el
     // rumbo entre cuerdas consecutivas - no al primero del grupo, que en una
@@ -2194,6 +2287,25 @@ function createVoiceGuide(opts = {}) {
   };
 }
 
+// La guia habla de a una frase. Poner otra en el audio cortaba la que
+// sonaba: "turn left" y 0,75 s despues "soon turn right" se comia la
+// indicacion del giro (simulaciones del 15-10). Que hacer con una frase
+// nueva mientras suena otra: 'play' (cortarla) o 'queue' (decirla al
+// terminar). Solo un aviso en el punto corta a uno que no lo es (anticipado,
+// llegada, avisos del camion). En espera queda una sola: la mas urgente, o
+// si empatan, la ultima.
+function voiceIsUrgent(key) {
+  return /^(turn|keep|roundabout)_/.test(String(key));
+}
+function voiceQueueAction(playingKey, newKey) {
+  if (!playingKey) return 'play';
+  return voiceIsUrgent(newKey) && !voiceIsUrgent(playingKey) ? 'play' : 'queue';
+}
+function voiceQueuePick(pendingKey, newKey) {
+  if (!pendingKey) return newKey;
+  return voiceIsUrgent(pendingKey) && !voiceIsUrgent(newKey) ? pendingKey : newKey;
+}
+
 // La voz a usar segun el idioma de la app y la eleccion guardada (una por
 // idioma). Sin voz para ese idioma, null; con la guardada que ya no existe,
 // la primera del idioma.
@@ -3149,6 +3261,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

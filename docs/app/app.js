@@ -3947,14 +3947,15 @@ function findUpcomingTurn() {
       i = Math.max(iEnd, rb.leave);
       continue;
     }
-    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency,
+    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, edgeLine,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     let m = detectManeuver({ ...ctx, i, iEnd });
-    if (m && m.kind === 'fork') {
+    if (m && m.kind === 'fork' && !m.inCurve) {
       // La bifurcacion se mide a 250 m: si en ese tramo hay un cruce con un
       // giro de verdad, lo que "se desvia" es ese giro, no una rampa - se
       // deja que el giro se anuncie por si mismo (una esquina de 90 grados
-      // avisada como "keep left" 200 m antes confundia).
+      // avisada como "keep left" 200 m antes confundia). La de un rulo
+      // (inCurve) ya se midio en el nodo: el rulo sigue doblando despues.
       for (let j = iEnd + 1; j < pts.length - 1 && cum[j] - cum[iEnd] <= NAV_FORK_LEG_M; j++) {
         if (pts[j][3] !== 1) continue;
         const jEnd = junctionClusterEnd(pts, cum, j, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
@@ -4353,16 +4354,41 @@ function voicePlayFailed(err) {
   showToast(t('voiceBlockedToast'), 'danger wrap', 8000);
 }
 
+// De a una frase (voiceQueueAction en pure.js): la que suena y la que
+// espera. La que espera vence a los VOICE_PENDING_MAX_MS (un "soon" de hace
+// rato ya no sirve), y si el audio no avisa que termino (pestana dormida,
+// error), a los VOICE_STUCK_MS se da por terminada: la voz no se traba.
+let voicePlaying = null; // { key, at, token }
+let voicePending = null; // { key, at }
+let voiceToken = 0;
+const VOICE_PENDING_MAX_MS = 4000;
+const VOICE_STUCK_MS = 6000;
+function voiceDone(token) {
+  if (!voicePlaying || voicePlaying.token !== token) return;
+  voicePlaying = null;
+  const p = voicePending;
+  voicePending = null;
+  if (p && Date.now() - p.at <= VOICE_PENDING_MAX_MS) speakVoice(p.key);
+}
+
 async function speakVoice(key) {
   const catalog = await loadVoiceCatalog();
   const voice = currentVoice();
   if (!catalog || !voice) return;
+  if (voicePlaying && Date.now() - voicePlaying.at > VOICE_STUCK_MS) voicePlaying = null;
+  if (voiceQueueAction(voicePlaying && voicePlaying.key, key) === 'queue') {
+    voicePending = { key: voiceQueuePick(voicePending && voicePending.key, key), at: Date.now() };
+    return;
+  }
+  const token = ++voiceToken;
   if (voice.system) {
     const text = (catalog.phrases[voice.phrases] || {})[key];
     if (!text || !('speechSynthesis' in window)) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = voice.lang;
+    u.onend = u.onerror = () => voiceDone(token);
     speechSynthesis.cancel();
+    voicePlaying = { key, at: Date.now(), token };
     speechSynthesis.speak(u);
     return;
   }
@@ -4370,8 +4396,10 @@ async function speakVoice(key) {
   const src = pack && pack.clips && pack.clips[key];
   if (!src) return;
   if (!voiceAudio) voiceAudio = new Audio();
+  voiceAudio.onended = voiceAudio.onerror = () => voiceDone(token);
   voiceAudio.src = src;
-  voiceAudio.play().then(() => { voiceUnlocked = true; }, voicePlayFailed);
+  voicePlaying = { key, at: Date.now(), token };
+  voiceAudio.play().then(() => { voiceUnlocked = true; }, (err) => { voiceDone(token); voicePlayFailed(err); });
 }
 
 function fillVoiceSelect() {

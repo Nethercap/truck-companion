@@ -2666,3 +2666,77 @@ test('ruteo: arrancando en el tramo del camion no se da la vuelta en el primer n
   const k2 = [...g2.g.adjTo.keys()].find(k => routeArcDirections(g2.g).from[k] === 0 && g2.g.adjTo[k] === 1);
   assert.deepEqual(findArcRoute(g2.g, 1, 2, { ...g2.opts(2), startArc: k2 }), [1, 0, 2]);
 });
+
+test('detectRoundabout: una manzana de una mano con las esquinas redondeadas no es rotonda (Texas, 15-10)', () => {
+  const { detectRoundabout, longestStraightFrac, RING_MAX_STRAIGHT } = require('./pure.js');
+  // manzana de 100 m, calles de una mano en sentido antihorario y esquinas
+  // con curvas de giro de radio 15: pasa por redonda (1,29) pero tiene lados
+  // rectos de 70 m (el 19 % de la vuelta)
+  const nodos = [], aristas = [], lineas = new Map();
+  const esquinas = [[35, -35, -Math.PI / 2], [35, 35, 0], [-35, 35, Math.PI / 2], [-35, -35, Math.PI]];
+  for (const [cx, cy, a0] of esquinas) nodos.push([cx + 15 * Math.cos(a0), cy + 15 * Math.sin(a0)], [cx + 15 * Math.cos(a0 + Math.PI / 2), cy + 15 * Math.sin(a0 + Math.PI / 2)]);
+  for (let k = 0; k < 8; k++) aristas.push([k, (k + 1) % 8, false]);
+  // la curva de cada esquina (de 2c a 2c+1), con un vertice cada 10 grados
+  esquinas.forEach(([cx, cy, a0], c) => lineas.set(`${2 * c},${2 * c + 1}`, Array.from({ length: 10 }, (_, t) => [cx + 15 * Math.cos(a0 + t * Math.PI / 18), cy + 15 * Math.sin(a0 + t * Math.PI / 18)])));
+  const sur = conCalle(nodos, aristas, 0, 0, -300); conCalle(nodos, aristas, 2, 300, 0); const norte = conCalle(nodos, aristas, 4, 0, 300);
+  const g = grafoChico(nodos, aristas);
+  const edgeLine = (a, b) => lineas.get(`${a},${b}`) || null;
+  const ctx = { ...rutaPor(nodos, [sur, 0, 1, 2, 3, 4, norte]), i: 1, iEnd: 1, ...g, edgeLine, bearingBetween: planarBearing };
+  assert.equal(detectRoundabout(ctx), null);
+  // una rotonda de verdad dobla parejo
+  const circulo = Array.from({ length: 60 }, (_, k) => [30 * Math.cos(k * Math.PI / 30), 30 * Math.sin(k * Math.PI / 30)]);
+  assert.ok(longestStraightFrac(circulo) < RING_MAX_STRAIGHT);
+});
+
+test('detectRoundabout: un cruce con curvas que pasan por el medio no es una rotonda compacta', () => {
+  const { detectRoundabout, compactIslandM } = require('./pure.js');
+  // el mismo armado que la rotonda compacta, con las curvas por un anillo de
+  // radio r: con 12 m hay isla, con 1,5 m es un cruce de curvas "cuadradas"
+  const armar = (r) => {
+    const nodos = [[0, -25], [25, 0], [0, 25], [-25, 0]];
+    const arco = (desde, hasta) => {
+      const a0 = Math.atan2(nodos[desde][1], nodos[desde][0]);
+      let a1 = Math.atan2(nodos[hasta][1], nodos[hasta][0]);
+      while (a1 <= a0) a1 += 2 * Math.PI;
+      const line = [nodos[desde]];
+      for (let a = a0; a <= a1 + 1e-9; a += Math.PI / 12) line.push([r * Math.cos(a), r * Math.sin(a)]);
+      line.push(nodos[hasta]);
+      return line;
+    };
+    const largo = (l) => l.slice(1).reduce((s2, p, k) => s2 + Math.hypot(p[0] - l[k][0], p[1] - l[k][1]), 0);
+    const adjacency = new Map(), lineas = new Map();
+    for (let a = 0; a < 4; a++) for (let b = 3; b >= 0; b--) if (a !== b) {
+      const l = arco(a, b); lineas.set(`${a},${b}`, l);
+      if (!adjacency.has(a)) adjacency.set(a, []);
+      adjacency.get(a).push([b, largo(l)]);
+    }
+    const calle = (desde, dx, dy) => { const k = nodos.length; nodos.push([nodos[desde][0] + dx, nodos[desde][1] + dy]);
+      adjacency.get(desde).push([k, 300]); adjacency.set(k, [[desde, 300]]); return k; };
+    const sur = calle(0, 0, -300); calle(1, 300, 0); const norte = calle(2, 0, 300); calle(3, -300, 0);
+    const nodeAt = (k) => nodos[k];
+    const edgeLine = (a, b) => lineas.get(`${a},${b}`) || [nodos[a], nodos[b]];
+    return { ctx: { ...rutaPor(nodos, [sur, 0, 2, norte]), i: 1, iEnd: 2, adjacency, nodeAt, edgeLine, bearingBetween: planarBearing }, nodeAt, edgeLine };
+  };
+  const conIsla = armar(12), cruce = armar(1.5);
+  assert.ok(Math.abs(compactIslandM(0, [1, 2, 3], conIsla.nodeAt, conIsla.edgeLine) - 12) < 0.5);
+  assert.equal(detectRoundabout(conIsla.ctx).exit, 2);
+  assert.ok(compactIslandM(0, [1, 2, 3], cruce.nodeAt, cruce.edgeLine) < 2);
+  assert.equal(detectRoundabout(cruce.ctx), null);
+});
+
+test('voz: una frase nueva no corta la que suena, salvo un aviso en el punto a uno anticipado', () => {
+  const { voiceQueueAction, voiceQueuePick } = require('./pure.js');
+  assert.equal(voiceQueueAction(null, 'soon_turn_right'), 'play');
+  // "turn left" y 0,75 s despues "soon turn right" (ProMods, 15-10): espera
+  assert.equal(voiceQueueAction('turn_left', 'soon_turn_right'), 'queue');
+  assert.equal(voiceQueueAction('turn_left', 'keep_right'), 'queue');
+  assert.equal(voiceQueueAction('turn_left', 'arrive_dest'), 'queue');
+  // el giro ya esta encima: corta al anticipado o a un aviso del camion
+  assert.equal(voiceQueueAction('soon_turn_left', 'roundabout_2'), 'play');
+  assert.equal(voiceQueueAction('fuel_low', 'turn_right'), 'play');
+  // en espera queda una: la urgente le gana a la anticipada; si no, la ultima
+  assert.equal(voiceQueuePick(null, 'soon_keep_left'), 'soon_keep_left');
+  assert.equal(voiceQueuePick('turn_left', 'soon_turn_right'), 'turn_left');
+  assert.equal(voiceQueuePick('soon_turn_right', 'turn_right'), 'turn_right');
+  assert.equal(voiceQueuePick('soon_turn_right', 'soon_keep_left'), 'soon_keep_left');
+});
