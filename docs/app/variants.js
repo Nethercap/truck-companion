@@ -1,15 +1,15 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-10-08.
+// Fuente: manifest del 2026-10-14.
 const MAP_DATA_VERSION = {
-  "ats": "20260929",
-  "ats_c2c": "20261005",
-  "ats_promods": "20260929",
-  "ats_c2c_promods": "20261005",
-  "ats_canada": "20261008",
-  "ats_c2c_canada": "20261008",
-  "ats_reforma": "20261008",
-  "ats_reforma_c2c_promods": "20261005",
+  "ats": "20261014",
+  "ats_c2c": "20261014",
+  "ats_promods": "20261014",
+  "ats_c2c_promods": "20261014",
+  "ats_canada": "20261014",
+  "ats_c2c_canada": "20261014",
+  "ats_reforma": "20261014",
+  "ats_reforma_c2c_promods": "20261014",
   "ets2": "20260929",
   "ets2_promods": "20260929",
   "ets2_promods_rusmap": "20260929",
