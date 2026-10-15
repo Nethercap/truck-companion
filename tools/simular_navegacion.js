@@ -501,10 +501,19 @@ function analizarRuta(ctx, ruta, hallazgos) {
     const igual = r.direction === c.direction;
     add(igual ? 'aviso_pegado_mismo' : 'aviso_pegado_distinto', { donde: xy(r.node), muestra: `${r.kind} ${r.direction}${r.exit ? ' ' + r.exit : ''}`, deVerdad: `${c.kind} ${c.direction}${c.exit ? ' ' + c.exit : ''}`, a: Math.round(c.d), separacion: Math.round(Math.hypot(r.node[0] - c.node[0], r.node[1] - c.node[1])), datos: ra.max });
   }
-  // dos frases encimadas: la segunda corta la primera (voiceAudio.src)
-  for (let k = 1; k < vozEventos.length; k++) {
-    const a = vozEventos[k - 1], b = vozEventos[k];
-    if (b.t < a.t + a.dur - 0.05) add('voz_encimada', { primera: a.clave, segunda: b.clave, separacion: +(b.t - a.t).toFixed(2), dura: +a.dur.toFixed(2) });
+  // De a una frase, como speakVoice (voiceQueueAction): la que llega
+  // mientras suena otra espera, salvo un aviso en el punto contra uno
+  // anticipado. Un aviso en el punto que espera mas de 1,5 s llega tarde.
+  let suenaHasta = -1, suena = null;
+  for (const e of vozEventos) {
+    if (suena && e.t < suenaHasta && pure.voiceQueueAction(suena, e.clave) === 'queue') {
+      const espera = suenaHasta - e.t;
+      if (pure.voiceIsUrgent(e.clave) && espera > 1.5) add('voz_demorada', { clave: e.clave, detrasDe: suena, espera: +espera.toFixed(2) });
+      suenaHasta += e.dur;
+    } else {
+      suenaHasta = e.t + e.dur;
+    }
+    suena = e.clave;
   }
   // 5. escala: lo que falta y la distancia al giro no tienen que subir
   const enFerry = (d) => { const k = met.indiceEn(d); return pts[Math.min(k + 1, pts.length - 1)][2] === 1; };
