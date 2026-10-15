@@ -26,11 +26,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 
 ## Datos de mapa y R2
 
-- El grafo de una variante son tres archivos: `.bin` (v2, web vieja),
-  `-v3.bin` y `-lanes.bin` (carriles por arista, `decodeLanesBin`). Si se
-  regenera el grafo, se regeneran y suben los tres juntos y se sube
+- El grafo de una variante son cuatro archivos: `.bin` (v2, web vieja),
+  `-v3.bin`, `-lanes.bin` (carriles por arista, `decodeLanesBin`) y
+  `-times.bin` (decimas de segundo por arista, `decodeTimesBin`). Si se
+  regenera el grafo, se regeneran y suben los cuatro juntos y se sube
   `ROUTE_GRAPH_V3_REV` en `app.js`; si solo cambian los carriles,
-  `ROUTE_LANES_REV`. Al subir `ROUTE_GRAPH_V3_REV` o la version de ATS en
+  `ROUTE_LANES_REV`, y si solo las decimas, `ROUTE_TIMES_REV`
+  (`generar_carriles.py` y `generar_tiempos.py` del taller). Al subir `ROUTE_GRAPH_V3_REV` o la version de ATS en
   `variants.js`, correr `python tools/build_demo_route.py`.
 - La regla de cache "Mapas R2" de Cloudflare guarda tambien los 404, por
   variante de compresion: nunca pedir desde la web un archivo antes de que
