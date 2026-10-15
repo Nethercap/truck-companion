@@ -429,6 +429,18 @@ function extraTurningDeg(line, bearingBetween) {
   return first == null ? 0 : total - Math.abs(normDeg(last - first));
 }
 
+// Direccion (vector unitario en la grilla) con la que sale de su primer punto
+// una polilinea, o con la que llega al ultimo (alFinal), salteando los
+// tramitos de menos de ARC_DIR_MIN_M como routeArcDirections.
+function lineDir(line, alFinal) {
+  const a = alFinal ? line.length - 1 : 0, lejos = alFinal ? 0 : line.length - 1, paso = alFinal ? -1 : 1;
+  let t = a + paso;
+  while (t !== lejos && Math.hypot(line[t][0] - line[a][0], line[t][1] - line[a][1]) < ARC_DIR_MIN_M) t += paso;
+  const s = alFinal ? 1 : -1, dx = s * (line[a][0] - line[t][0]), dy = s * (line[a][1] - line[t][1]);
+  const d = Math.hypot(dx, dy) || 1;
+  return [dx / d, dy / d];
+}
+
 // Puntos repartidos alrededor de un centro: ninguno mas de maxRatio veces
 // mas lejos del centro que el mas cercano (y nada pegado al centro).
 function roundish(points, maxRatio) {
@@ -444,7 +456,13 @@ function roundish(points, maxRatio) {
 // El grafo no marca las rotondas; se las reconoce de dos formas:
 //  - anillo redondo de tramos de un solo sentido (oneWayRing): la ruta entra en un
 //    nodo del anillo y lo sigue; se cuentan los nodos del anillo con una
-//    salida de verdad (leadsAway) hasta el que la ruta deja.
+//    salida de verdad (leadsAway) hasta el que la ruta deja. El nodo de
+//    entrada tambien: en muchas rotondas del grafo el brazo entra al anillo
+//    en el mismo nodo del que se abre la salida siguiente, y sin contarla
+//    "derecho" salia "primera salida" (Discord, 15-10: "the immediate exit
+//    isn't counted"; 1 de cada 3 nodos de anillo de ATS es asi). Ahi no
+//    cuenta la calle por la que se llega ni lo que se sale dandose vuelta
+//    (mas de UTURN_MIN_DEG, como el ruteo), que es el mismo brazo.
 //  - rotonda compacta de un solo prefab: el brazo de entrada se une directo
 //    con cada brazo de salida, con curvas que rodean la isla (al menos dos
 //    doblan 90 grados de mas), cortas y con los brazos repartidos alrededor
@@ -473,21 +491,24 @@ function detectRoundabout(ctx) {
     const ring = ringPath && ringPath.length >= 4 && roundish(ringOutline(ringPath, nodeAt, edgeLine), 1.3)
       ? new Set(ringPath) : null;
     if (ring && !ring.has(u)) {
-      let exit = 0, leave = kEnter, k = kEnter;
+      const lineOf = (a, b) => (edgeLine && edgeLine(a, b)) || [nodeAt(a), nodeAt(b)];
+      const llegada = lineDir(lineOf(u, v), true);
+      const vuelve = (n) => { const d = lineDir(lineOf(v, n), false); return llegada[0] * d[0] + llegada[1] * d[1] < UTURN_COS; };
+      // u: el brazo por el que se llega, que en el anillo es la ultima salida
+      const esSalida = (w, n) => n !== u && !ring.has(n) && (w !== v || !vuelve(n));
+      let exit = 0, leave = kEnter, k = kEnter, saleEnLaEntrada = false;
       for (;;) {
         let next = null;
         for (let j = k + 1; j < pts.length; j++) if (pts[j][4] != null) { next = j; break; }
         const w = pts[k][4];
-        if (k !== kEnter) {
-          const sale = next != null && !ring.has(pts[next][4]);
-          const otra = (adjacency.get(w) || []).some(([n]) => !ring.has(n) && leadsAway(adjacency, nodeAt, w, n, ring, escapeM));
-          if (sale || otra) exit++;
-          if (sale) { leave = k; break; }
-        }
+        const sale = next != null && !ring.has(pts[next][4]) && (k !== kEnter || esSalida(w, pts[next][4]));
+        const otra = (adjacency.get(w) || []).some(([n]) => esSalida(w, n) && leadsAway(adjacency, nodeAt, w, n, ring, escapeM));
+        if (sale || otra) exit++;
+        if (sale) { leave = k; saleEnLaEntrada = k === kEnter; break; }
         if (next == null || !ring.has(pts[next][4])) { leave = k; break; }
         k = next;
       }
-      if (exit >= 1 && leave !== kEnter) return { exit, enter: kEnter, leave };
+      if (exit >= 1 && (leave !== kEnter || saleEnLaEntrada)) return { exit, enter: kEnter, leave };
       continue;
     }
     // Prefab compacto: de v (brazo de entrada) al siguiente nodo de la ruta

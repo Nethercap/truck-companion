@@ -1255,6 +1255,37 @@ test('detectRoundabout: anillo de un sentido, cuenta las salidas hasta la de la 
   assert.equal(detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, este]), i: 1, iEnd: 1, ...g2, bearingBetween: planarBearing }), null);
 });
 
+test('detectRoundabout: la salida que se abre en el mismo nodo de la entrada es la primera (Discord, 15-10)', () => {
+  const { detectRoundabout } = require('./pure.js');
+  // rotonda de 4 brazos como la del nodo 9654 de ATS: anillo antihorario de
+  // radio 30 y 8 nodos (0 sur, 1 sureste, ... 7 suroeste). Cada brazo entra
+  // al anillo en el nodo diagonal del que sale el brazo siguiente: en 1
+  // entra el sur y sale el este, en 3 entra el este y sale el norte, etc.
+  const nodos = [], aristas = [];
+  for (let k = 0; k < 8; k++) { const a = -Math.PI / 2 + k * Math.PI / 4; nodos.push([30 * Math.cos(a), 30 * Math.sin(a)]); }
+  for (let k = 0; k < 8; k++) aristas.push([k, (k + 1) % 8, false]);
+  const brazo = (x, y, desde, hasta) => { const k = nodos.length; nodos.push([x, y]); aristas.push(desde == null ? [k, hasta, false] : [desde, k, false]); return k; };
+  const surEntra = brazo(15, -300, null, 1), este = brazo(300, -15, 1);
+  brazo(300, 15, null, 3); const norte = brazo(15, 300, 3);
+  brazo(-15, 300, null, 5); const oeste = brazo(-300, 15, 5);
+  brazo(-300, -15, null, 7); const surSale = brazo(-15, -300, 7);
+  const ctx = (ids, g) => ({ ...rutaPor(nodos, ids), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing });
+  let g = grafoChico(nodos, aristas);
+  // derecho: segunda salida (antes decia "primera")
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, norte], g)).exit, 2);
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, 4, 5, oeste], g)).exit, 3);
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, 4, 5, 6, 7, surSale], g)).exit, 4);
+  // la primera, que sale del nodo de la entrada sin pisar el anillo: rotonda
+  // y no "doblar a la derecha"
+  const r = detectRoundabout(ctx([surEntra, 1, este], g));
+  assert.deepEqual([r.exit, r.enter, r.leave], [1, 1, 1]);
+  // una calle que sale del nodo de la entrada dandose vuelta (para el lado
+  // del que se viene) no es otra salida
+  brazo(25, -300, 1);
+  g = grafoChico(nodos, aristas);
+  assert.equal(detectRoundabout(ctx([surEntra, 1, 2, 3, norte], g)).exit, 2);
+});
+
 test('detectRoundabout: una curva con muchos vertices no corre el centro del anillo (Miles City, salida 139)', () => {
   const { detectRoundabout, ringOutline } = require('./pure.js');
   // anillo redondo de radio 29 y 12 nodos; del lado oeste el grafo trae la
