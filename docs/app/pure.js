@@ -368,10 +368,9 @@ function leadsAway(adjacency, nodeAt, from, n, blocked, escapeM = 120) {
 // dirigido de menos de maxLenM que pasa por `start`, sin pasar por `from`
 // (la calle por la que se llega), hecho solo de tramos de un sentido (asi
 // un triangulo de calles de doble mano no cuenta). Devuelve la lista de sus
-// nodos, en orden, o null.
-function oneWayRing(adjacency, nodeAt, start, from, maxLenM = 700, maxDepth = 40) {
+// nodos, en orden, o null. budget: nodos a visitar como mucho.
+function oneWayRing(adjacency, nodeAt, start, from, maxLenM = 700, maxDepth = 40, budget = 300) {
   const oneWay = (a, b) => !(adjacency.get(b) || []).some(([m]) => m === a);
-  let budget = 300;
   const path = [start];
   const dfs = (cur, lenM) => {
     if (--budget < 0 || path.length > maxDepth) return false;
@@ -470,6 +469,16 @@ function roundish(points, maxRatio) {
 //    la mas corta.
 // ctx: { pts, cum, i, iEnd, adjacency, nodeAt, edgeLine(a, b), bearingBetween }.
 // Devuelve { exit, enter, leave } (indices de pts) o null.
+//
+// Las rotondas grandes (15-10): casi todas miden menos de 700 m de vuelta,
+// pero el circulo de Alexandria (ATS) mide 1138 m y 10 brazos y salia como
+// "keep left". Si hasta 700 m no hay un anillo redondo, se busca otra vez
+// hasta RING_BIG_M (ninguna otra de ATS, ETS2 ni ProMods pasa de 700 m).
+// Una segunda busqueda y no un limite mas alto: con mas largo, la busqueda
+// puede volver al nodo por otro camino antes que por el anillo, y las
+// chicas quedan como estaban. Cuesta menos de 0,5 ms por cruce.
+const RING_BIG_M = 1500;
+const RING_SEARCHES = [[700, 40, 300], [RING_BIG_M, 80, 600]]; // [metros, nodos, presupuesto]
 function detectRoundabout(ctx) {
   const { pts, i, iEnd, adjacency, nodeAt, edgeLine, bearingBetween } = ctx;
   if (!adjacency || !nodeAt) return null;
@@ -487,9 +496,11 @@ function detectRoundabout(ctx) {
     // Redondo: un tramo corto de calle dividida (las dos manos y los nodos
     // donde se separan y se juntan) tambien es un ciclo de un sentido, pero
     // alargado; una manzana de calles de una mano es cuadrada (1,41).
-    const ringPath = oneWayRing(adjacency, nodeAt, v, u);
-    const ring = ringPath && ringPath.length >= 4 && roundish(ringOutline(ringPath, nodeAt, edgeLine), 1.3)
-      ? new Set(ringPath) : null;
+    let ring = null;
+    for (const [maxM, maxDepth, budget] of RING_SEARCHES) {
+      const ringPath = oneWayRing(adjacency, nodeAt, v, u, maxM, maxDepth, budget);
+      if (ringPath && ringPath.length >= 4 && roundish(ringOutline(ringPath, nodeAt, edgeLine), 1.3)) { ring = new Set(ringPath); break; }
+    }
     if (ring && !ring.has(u)) {
       const lineOf = (a, b) => (edgeLine && edgeLine(a, b)) || [nodeAt(a), nodeAt(b)];
       const llegada = lineDir(lineOf(u, v), true);
@@ -742,13 +753,28 @@ function gaugeAngle(value, min, max, sweepDeg = 270) {
 // puntos pueden ser 15 m: el rumbo se media sobre el salto lateral entre dos
 // carriles paralelos y salia un "keep left" falso encima del punto (Discord,
 // Lightningroc771).
-function trimRouteBehind(behind, minM, maxPts) {
-  let len = 0, k = behind.length - 1;
+// Adentro de una rotonda (keepFrom: [x, z] de su entrada, el node del aviso)
+// se cuenta desde la entrada y no desde el camion: en una rotonda grande,
+// a los 200 m de entrar la entrada se perdia, detectRoundabout ya no la
+// encontraba y el aviso de la salida se apagaba, o pasaba a "turn left",
+// antes de llegar (1 de cada 4 pasadas en las de mas de 250 m de ETS2).
+// Hasta ROUTE_KEEP_MAX_M detras del camion: mas que la rotonda mas grande
+// que se reconoce (RING_BIG_M).
+const ROUTE_KEEP_MAX_M = 2000;
+function trimRouteBehind(behind, minM, maxPts, keepFrom = null) {
+  let end = behind.length - 1;
+  if (keepFrom) {
+    for (let j = end, lenM = 0; j >= 0 && lenM <= ROUTE_KEEP_MAX_M; j--) {
+      if (Math.hypot(behind[j][0] - keepFrom[0], behind[j][1] - keepFrom[1]) < 0.5) { end = j; break; }
+      if (j > 0) lenM += Math.hypot(behind[j][0] - behind[j - 1][0], behind[j][1] - behind[j - 1][1]);
+    }
+  }
+  let len = 0, k = end;
   while (k > 0 && len < minM) {
     len += Math.hypot(behind[k][0] - behind[k - 1][0], behind[k][1] - behind[k - 1][1]);
     k--;
   }
-  const start = Math.max(k, behind.length - maxPts, 0);
+  const start = Math.max(k, end + 1 - maxPts, 0);
   return start > 0 ? behind.slice(start) : behind;
 }
 
