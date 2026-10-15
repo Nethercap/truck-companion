@@ -1388,10 +1388,11 @@ test('detectRoundabout: rotonda compacta de un prefab, las salidas por el largo 
   assert.equal(detectRoundabout({ ...ctx([sur, 0, 3, oeste]), edgeLine: recta }), null);
 });
 
-test('voiceManeuverKey: rotonda hasta la quinta salida, despues hacia que lado', () => {
+test('voiceManeuverKey: rotonda hasta la octava salida, despues hacia que lado', () => {
   const { voiceManeuverKey } = require('./pure.js');
   assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 2, direction: 'left' }), 'roundabout_2');
-  assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 7, direction: 'left' }), 'turn_left');
+  assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 7, direction: 'left' }), 'roundabout_7');
+  assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 9, direction: 'left' }), 'turn_left');
   assert.equal(voiceManeuverKey({ kind: 'fork', direction: 'right' }), 'keep_right');
 });
 
@@ -2739,4 +2740,50 @@ test('voz: una frase nueva no corta la que suena, salvo un aviso en el punto a u
   assert.equal(voiceQueuePick('turn_left', 'soon_turn_right'), 'turn_left');
   assert.equal(voiceQueuePick('soon_turn_right', 'turn_right'), 'turn_right');
   assert.equal(voiceQueuePick('soon_turn_right', 'soon_keep_left'), 'soon_keep_left');
+});
+
+test('decodeTimesBin: las decimas de cada arista, solo si el archivo es de este grafo', () => {
+  const { decodeTimesBin } = require('./pure.js');
+  const armar = (version, n, ne, decimas) => {
+    const buf = new ArrayBuffer(16 + ((decimas.length + 3) & ~3));
+    const dv = new DataView(buf);
+    dv.setUint32(0, 0x54445453, false); dv.setUint32(4, version, true); dv.setUint32(8, n, true); dv.setUint32(12, ne, true);
+    new Int8Array(buf, 16, decimas.length).set(decimas);
+    return buf;
+  };
+  const t = decodeTimesBin(armar(1, 3, 5, [-3, 1, 1, 5, 0]), 3, 5);
+  assert.deepEqual([...t], [-3, 1, 1, 5, 0]);
+  // segundos exactos: los del grafo mas las decimas (6 - 0.3 = 5.7)
+  assert.ok(Math.abs(6 + t[0] / 10 - 5.7) < 1e-9);
+  assert.equal(decodeTimesBin(armar(1, 3, 4, [0, 0, 0, 0]), 3, 5), null); // otro grafo
+  assert.equal(decodeTimesBin(armar(2, 3, 5, [0, 0, 0, 0, 0]), 3, 5), null); // otra version
+  assert.equal(decodeTimesBin(null, 3, 5), null);
+});
+
+test('rotondas: el sentido de giro, para que la flecha del aviso gire para el mismo lado', () => {
+  const { detectRoundabout, ringCcw, sweepCcw, turnInstructionText } = require('./pure.js');
+  // anillo de radio 30 y 8 nodos, como el primer test de rotondas; en un
+  // sentido (antihorario, mano derecha) y en el otro (mano izquierda)
+  const armar = (antihorario) => {
+    const nodos = [], aristas = [];
+    for (let k = 0; k < 8; k++) { const a = -Math.PI / 2 + (antihorario ? 1 : -1) * k * Math.PI / 4; nodos.push([30 * Math.cos(a), 30 * Math.sin(a)]); }
+    for (let k = 0; k < 8; k++) aristas.push([k, (k + 1) % 8, false]);
+    const sur = conCalle(nodos, aristas, 0, 0, -300);
+    const sale = conCalle(nodos, aristas, 4, 0, 300);
+    const g = grafoChico(nodos, aristas);
+    return detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, 3, 4, sale]), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing });
+  };
+  assert.equal(armar(true).ccw, true);
+  assert.equal(armar(false).ccw, false);
+  // una curva que da la vuelta alrededor de un centro, para cada lado
+  const arco = (sentido) => Array.from({ length: 10 }, (_, k) => [12 * Math.cos(sentido * k * Math.PI / 12), 12 * Math.sin(sentido * k * Math.PI / 12)]);
+  assert.equal(sweepCcw(arco(1), [0, 0], planarBearing), true);
+  assert.equal(sweepCcw(arco(-1), [0, 0], planarBearing), false);
+  assert.equal(ringCcw(null, planarBearing), null);
+  // la flecha: antihoraria si se sabe que lo es; si no, la de antes
+  const o = { t: (k) => ({ navOrdinals: 'first,second', navRoundaboutIn: 'Roundabout in {d}: take the {n} exit' }[k]), imperial: false, lang: 'en' };
+  const texto = (ccw) => turnInstructionText({ kind: 'roundabout', direction: 'left', exit: 2, meters: 300, sign: null, ccw }, o);
+  assert.ok(texto(true).startsWith('↺ '));
+  assert.ok(texto(false).startsWith('↻ '));
+  assert.ok(texto(undefined).startsWith('↻ '));
 });

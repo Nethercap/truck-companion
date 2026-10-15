@@ -1254,6 +1254,16 @@ def main(argv=None):
     stats_l = write_lanes(node_list, edges, lane_records, lanes_path)
     print(f"Carriles en {lanes_path} ({os.path.getsize(lanes_path) / 1024:.0f} KB): {stats_l}")
 
+    # Las decimas de segundo de cada arista, aparte y por indice del v3
+    # (write_times): la web desempata con ellas los segundos enteros.
+    try:
+        from .route_graph_bin import write_times
+    except ImportError:
+        from route_graph_bin import write_times
+    times_path = bin_path[:-4] + "-times.bin"
+    stats_t = write_times(node_list, edges, times_path)
+    print(f"Decimas en {times_path} ({os.path.getsize(times_path) / 1024:.0f} KB): {stats_t}")
+
 
 if __name__ == "__main__":
     main()

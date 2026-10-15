@@ -536,6 +536,27 @@ function compactIslandM(v, outs, nodeAt, edgeLine) {
   return min;
 }
 
+// Para que lado se da la vuelta (el icono del aviso): true antihorario (mano
+// derecha), false horario (mano izquierda), null si no se sabe. ringCcw: el
+// contorno de un anillo, en el sentido de sus aristas, dobla en total -360
+// grados si es antihorario (rumbos horarios). sweepCcw: como gira, visto
+// desde el centro, una curva que rodea la isla.
+function ringCcw(contorno, bearingBetween) {
+  if (!contorno || contorno.length < 3) return null;
+  let total = 0;
+  for (let k = 0; k < contorno.length; k++) {
+    const a = contorno[k], b = contorno[(k + 1) % contorno.length], c = contorno[(k + 2) % contorno.length];
+    total += normDeg(bearingBetween(b, c) - bearingBetween(a, b));
+  }
+  return Math.abs(total) > 180 ? total < 0 : null;
+}
+function sweepCcw(line, centro, bearingBetween) {
+  if (!line || line.length < 2) return null;
+  let total = 0;
+  for (let k = 1; k < line.length; k++) total += normDeg(bearingBetween(centro, line[k]) - bearingBetween(centro, line[k - 1]));
+  return Math.abs(total) > 45 ? total < 0 : null;
+}
+
 function detectRoundabout(ctx) {
   const { pts, i, iEnd, adjacency, nodeAt, edgeLine, bearingBetween } = ctx;
   if (!adjacency || !nodeAt) return null;
@@ -553,12 +574,12 @@ function detectRoundabout(ctx) {
     // Redondo: un tramo corto de calle dividida (las dos manos y los nodos
     // donde se separan y se juntan) tambien es un ciclo de un sentido, pero
     // alargado; una manzana de calles de una mano es cuadrada (1,41).
-    let ring = null;
+    let ring = null, contornoRing = null;
     for (const [maxM, maxDepth, budget] of RING_SEARCHES) {
       const ringPath = oneWayRing(adjacency, nodeAt, v, u, maxM, maxDepth, budget);
       if (!ringPath || ringPath.length < 4) continue;
       const contorno = ringOutline(ringPath, nodeAt, edgeLine);
-      if (roundish(contorno, 1.3) && longestStraightFrac(contorno) < RING_MAX_STRAIGHT) { ring = new Set(ringPath); break; }
+      if (roundish(contorno, 1.3) && longestStraightFrac(contorno) < RING_MAX_STRAIGHT) { ring = new Set(ringPath); contornoRing = contorno; break; }
     }
     if (ring && !ring.has(u)) {
       const lineOf = (a, b) => (edgeLine && edgeLine(a, b)) || [nodeAt(a), nodeAt(b)];
@@ -578,7 +599,7 @@ function detectRoundabout(ctx) {
         if (next == null || !ring.has(pts[next][4])) { leave = k; break; }
         k = next;
       }
-      if (exit >= 1 && (leave !== kEnter || saleEnLaEntrada)) return { exit, enter: kEnter, leave };
+      if (exit >= 1 && (leave !== kEnter || saleEnLaEntrada)) return { exit, enter: kEnter, leave, ccw: ringCcw(contornoRing, bearingBetween) };
       continue;
     }
     // Prefab compacto: de v (brazo de entrada) al siguiente nodo de la ruta
@@ -600,7 +621,13 @@ function detectRoundabout(ctx) {
     const salidas = outs.filter(([n]) => n === b || leadsAway(adjacency, nodeAt, n, n, prefab, escapeM))
       .sort((x, y) => x[1] - y[1]);
     const exit = salidas.findIndex(([n]) => n === b) + 1;
-    if (exit >= 1) return { exit, enter: kEnter, leave: kLeave };
+    if (exit >= 1) {
+      // el sentido: como rodea el centro la curva que mas da la vuelta
+      const masVuelta = rodean.map(([n]) => edgeLine(v, n)).sort((x, y) => extraTurningDeg(y, bearingBetween) - extraTurningDeg(x, bearingBetween))[0];
+      const puntas = [v, ...outs.map(([n]) => n)].map(nodeAt);
+      const c = [puntas.reduce((s2, p) => s2 + p[0], 0) / puntas.length, puntas.reduce((s2, p) => s2 + p[1], 0) / puntas.length];
+      return { exit, enter: kEnter, leave: kLeave, ccw: sweepCcw(masVuelta, c, bearingBetween) };
+    }
   }
   return null;
 }
@@ -2216,9 +2243,10 @@ function insideMapBounds(bounds, x, z) {
   return x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
 }
 
-// Rotonda: "tomar la segunda salida", con frase grabada hasta la quinta; mas
-// alla se dice hacia que lado sale.
-const VOICE_ROUNDABOUT_MAX_EXIT = 5;
+// Rotonda: "tomar la segunda salida", con frase grabada hasta la octava
+// (como los ordinales de la pantalla; las de sexta a octava, desde los
+// paquetes v4 del 15-10); mas alla se dice hacia que lado sale.
+const VOICE_ROUNDABOUT_MAX_EXIT = 8;
 function voiceManeuverKey(turn) {
   if (turn.kind === 'roundabout' && turn.exit >= 1 && turn.exit <= VOICE_ROUNDABOUT_MAX_EXIT) return `roundabout_${turn.exit}`;
   return `${turn.kind === 'fork' ? 'keep' : 'turn'}_${turn.direction === 'left' ? 'left' : 'right'}`;
@@ -2828,7 +2856,9 @@ function turnInstructionText(info, { t, imperial, lang }) {
     // "Rotonda en 300 m: tomar la segunda salida". Mas alla de la octava, el numero.
     const ords = t('navOrdinals').split(',');
     const n = ords[info.exit - 1] || String(info.exit);
-    return `↻ ${t('navRoundaboutIn').replace('{d}', dist).replace('{n}', n)}${onto}`;
+    // La flecha gira para el lado de la rotonda: antihoraria con mano
+    // derecha (ccw), horaria con mano izquierda o si no se sabe.
+    return `${info.ccw === true ? '↺' : '↻'} ${t('navRoundaboutIn').replace('{d}', dist).replace('{n}', n)}${onto}`;
   }
   const left = info.direction === 'left';
   if (info.kind === 'fork') return `${left ? '↖' : '↗'} ${left ? t('navKeepLeft') : t('navKeepRight')}${onto} ${t('navIn')} ${dist}`;
@@ -2903,6 +2933,16 @@ function decodeLanesBin(buf, nNodes, nEdges) {
   const turn = new Uint8Array(buf, off, n); off += pad(n);
   const arrows = new Uint8Array(buf, off, 8 * n);
   return { n, keys, lanes, mask, turn, arrows };
+}
+
+// Las decimas de segundo de cada arista (route_graph_bin.py, write_times):
+// Int8Array de nEdges, o null si el archivo no es de este grafo.
+function decodeTimesBin(buf, nNodes, nEdges) {
+  if (!buf || buf.byteLength < 16 + nEdges) return null;
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, false) !== 0x54445453 || dv.getUint32(4, true) !== 1) return null;
+  if (dv.getUint32(8, true) !== nNodes || dv.getUint32(12, true) !== nEdges) return null;
+  return new Int8Array(buf, 16, nEdges);
 }
 
 // Los carriles de pasar por la arista `edge` (rev: al reves, de b hacia a),
@@ -3261,6 +3301,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

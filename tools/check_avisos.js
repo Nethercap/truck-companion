@@ -72,6 +72,13 @@ function graphRev() {
   return m ? m[1] : '';
 }
 
+// Las decimas de segundo de cada arista, como loadRouteTimes de app.js: con
+// ROUTE_TIMES_REV en 0 la app no las pide y aca tampoco.
+function timesRev() {
+  const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/const ROUTE_TIMES_REV = (\d+);/);
+  return m ? Number(m[1]) : 0;
+}
+
 async function bajar(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
@@ -136,7 +143,12 @@ async function main() {
     const bin = await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?g=${graphRev()}`);
     const cities = JSON.parse(await bajar(`${BASE}/${v}/Cities.json`));
     const sha = crypto.createHash('sha256').update(bin).digest('hex').slice(0, 16);
-    const g = h.mod.buildRouteGraph(h.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength)));
+    const decoded = h.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
+    const g = h.mod.buildRouteGraph(decoded);
+    if (timesRev()) {
+      const tb = await bajar(`${BASE}/${v}/route-graph-${v}-times.bin?g=${graphRev()}&t=${timesRev()}`);
+      g.edgeT = h.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
+    }
     const rutas = simular(h, g, Array.isArray(cities) ? cities : Object.values(cities), n);
     const total = rutas.reduce((s, r) => s + r.man.length, 0);
     nuevo.variants[v] = { graph: sha, routes: rutas };
@@ -168,4 +180,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(2); });
-module.exports = { harness, bajar, graphRev, BASE };
+module.exports = { harness, bajar, graphRev, timesRev, BASE };

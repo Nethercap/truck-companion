@@ -56,9 +56,9 @@ WEB_FILES = [
     # Guia por voz: el catalogo y un paquete por voz (la version va en el
     # nombre, como vendor/: no se vuelven a bajar). Ver tools/build_voice_packs.py.
     "app/voice/voices.json",
-    "app/voice/en-kristin-v3.json", "app/voice/en-joe-v3.json", "app/voice/es-daniela-v3.json",
-    "app/voice/es-claude-v3.json", "app/voice/de-thorsten-v3.json", "app/voice/fr-siwis-v3.json",
-    "app/voice/pt-cadu-v3.json", "app/voice/pl-gosia-v3.json", "app/voice/ru-dmitri-v3.json",
+    "app/voice/en-kristin-v4.json", "app/voice/en-joe-v4.json", "app/voice/es-daniela-v4.json",
+    "app/voice/es-claude-v4.json", "app/voice/de-thorsten-v4.json", "app/voice/fr-siwis-v4.json",
+    "app/voice/pt-cadu-v4.json", "app/voice/pl-gosia-v4.json", "app/voice/ru-dmitri-v4.json",
     # Las letras de los nombres del mapa (app.js, localGlyphs): sin internet,
     # el mapa LAN quedaba sin nombres de ciudades.
 ] + [f"app/vendor/glyphs-open-sans-omt2/{r}.pbf" for r in (

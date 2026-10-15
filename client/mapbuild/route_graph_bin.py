@@ -111,6 +111,30 @@ def write_bin(node_list, edges, path, shifts=None):
     return out
 
 
+def write_times(node_list, edges, path):
+    """Las decimas de segundo de cada arista ("TDTS" v1), en un archivo aparte
+    del grafo: el .bin guarda los segundos enteros (u16) y con eso, en un
+    cruce, la recta de 63 m (5,7 s -> 6) empataba o perdia con pasar por el
+    brazo, 34 + 34 m (3,1 + 3,1 s -> 3 + 3), y la ruta hacia una V con un
+    "turn left" donde se sigue derecho (simulaciones del 15-10). La web suma
+    estas decimas a los segundos del grafo; sin el archivo, rutea como antes.
+
+    Layout (little-endian):
+      header  'TDTS', u32 version=1, u32 nNodes, u32 nEdges
+      tenths  i8[nEdges] (+pad)  segundos - segundos del .bin, en decimas (-5..5)
+    """
+    tenths = bytearray()
+    for e in edges:
+        s = float(e[4])
+        entero = min(65535, int(round(s)))
+        d = int(round((s - entero) * 10)) if s < 65535 else 0
+        tenths.append(max(-127, min(127, d)) & 0xFF)
+    with open(path, "wb") as f:
+        f.write(b"TDTS" + struct.pack("<III", 1, len(node_list), len(edges)))
+        f.write(_pad4(bytes(tenths)))
+    return {"aristas": len(edges), "con_decimas": sum(1 for t in tenths if t)}
+
+
 def write_lanes(node_list, edges, records, path):
     """Flechas de carril ("TDLN" v1), en un archivo aparte del grafo: las
     usa solo la guia (giro a giro) y no hace falta bajarlas para rutear.

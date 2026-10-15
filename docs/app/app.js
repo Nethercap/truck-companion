@@ -2829,6 +2829,26 @@ async function loadRouteLanes(base, v, game, decoded, graph) {
   } catch (e) { /* sin flechas: la guia sigue igual */ }
 }
 
+// Las decimas de segundo de cada arista (decodeTimesBin en pure.js):
+// archivo aparte y chico. El grafo guarda segundos enteros y con eso la
+// recta de un cruce podia perder contra pasar por un brazo (rutas en V con
+// un "turn left" falso). Se cuelgan del grafo (edgeT) y las usa el costo del
+// A*; sin el archivo, segundos enteros como antes. 0 = no se pide: la regla
+// de cache "Mapas R2" guarda los 404, nunca pedirlo antes de subirlo. 1 =
+// 15-10, los de las 17 variantes (r2-upload-times del taller, generados por
+// generar_tiempos.py contra los v3 publicados). Al regenerar grafos,
+// regenerar tambien estos y subir el numero.
+const ROUTE_TIMES_REV = 1;
+async function loadRouteTimes(base, v, game, decoded, graph) {
+  if (!ROUTE_TIMES_REV) return;
+  try {
+    const res = await fetch(`${base}-times.bin${v}&g=${ROUTE_GRAPH_V3_REV}&t=${ROUTE_TIMES_REV}`, { priority: 'low' });
+    if (!res.ok) return;
+    const data = decodeTimesBin(await res.arrayBuffer(), decoded.n, decoded.ne);
+    if (data && currentGame === game && routeGraph === graph) graph.edgeT = data;
+  } catch (e) { /* sin decimas: los segundos enteros */ }
+}
+
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
   routeLanes = null;
@@ -2866,7 +2886,10 @@ async function loadRouteGraph(mapInfo) {
     if (currentGame === game) {
       routeGraph = g;
       // Solo con el v3: el archivo de carriles va por sus aristas
-      if (decoded.shiftA) loadRouteLanes(base, v, game, decoded, g);
+      if (decoded.shiftA) {
+        loadRouteLanes(base, v, game, decoded, g);
+        loadRouteTimes(base, v, game, decoded, g);
+      }
     }
   } catch (err) {
     // Sin grafo el mapa y el tablero siguen andando; lo que no hay es ruteo.
@@ -3124,7 +3147,7 @@ function routeStartHeading(data) {
 }
 
 function findRouteWith(startXY, endXY, filtro, startHeading = null) {
-  const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
+  const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeT, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
   const blocked = filtro ? filtro.blocked : null;
   const nodeOk = filtro ? filtro.nodeOk : null;
   // Origen y destino tienen que caer en la misma componente para que A*
@@ -3163,7 +3186,7 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null) {
   // aristas. Si asi no hay camino (algun rincon raro del grafo), el A* por
   // nodos de siempre: nunca peor que antes.
   const path = findArcRoute(routeGraph, startIdx, endIdx, {
-    cost: (e) => routeEdgeCost(edgeS[e], edgeM[e], byTime),
+    cost: (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime),
     heuristic,
     blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
     isFerry: (e) => (edgeF[e] & 1) === 1,
@@ -3221,7 +3244,7 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null) {
 // El A* por nodos de antes (puede dar la vuelta en un nodo): solo si el de
 // aristas no encuentra camino. Devuelve los indices de nodo o null.
 function nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked) {
-  const { csr, adjTo, adjEdge, edgeM, edgeS, edgeG } = routeGraph;
+  const { csr, adjTo, adjEdge, edgeM, edgeS, edgeT, edgeG } = routeGraph;
   // Estado de A* en typed arrays (sin Maps/Sets: 300k nodos entran en unos MB
   // y no generan basura para el GC).
   const n = routeGraph.n;
@@ -3243,7 +3266,7 @@ function nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked) {
       if (visited[neighbor]) continue;
       const e = adjEdge[k];
       if (blocked && blocked[edgeG[e]]) continue;
-      const tentativeG = g + routeEdgeCost(edgeS[e], edgeM[e], byTime);
+      const tentativeG = g + routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime);
       if (tentativeG < gScore[neighbor]) {
         gScore[neighbor] = tentativeG;
         cameFrom[neighbor] = current;
@@ -3938,7 +3961,7 @@ function findUpcomingTurn() {
         const delta = normDeg(bearingBetween(pts[rb.leave], pointAt(cum[rb.leave] + NAV_TURN_LEG_M))
           - bearingBetween(pointAt(cum[rb.enter] - NAV_TURN_LEG_M), pts[rb.enter]));
         return {
-          kind: 'roundabout', exit: rb.exit, direction: delta > 0 ? 'right' : 'left',
+          kind: 'roundabout', exit: rb.exit, direction: delta > 0 ? 'right' : 'left', ccw: rb.ccw,
           distanceMeters: Math.max(0, cum[inside ? rb.leave : rb.enter] - cum[here]),
           nearSign: roadSignForTurn(pointAt, cum[rb.leave], cum[cum.length - 1], nearestRoadName, pts[after]),
           node: [pts[rb.enter][0], pts[rb.enter][1]],
@@ -4169,7 +4192,7 @@ function navTurnParts(turn) {
   let info = null;
   if (turn) {
     info = {
-      kind: turn.kind, direction: turn.direction, exit: turn.exit,
+      kind: turn.kind, direction: turn.direction, exit: turn.exit, ccw: turn.ccw,
       // distanceMeters es de mundo y desde el primer punto de la ruta (el
       // camion): se lo mide sobre ella a la escala de cada parte. A 1:20 una
       // bifurcacion a menos de 1 km en Rockford era "in 5 mi" (14-10).

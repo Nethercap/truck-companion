@@ -18,7 +18,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { harness, bajar, graphRev, BASE } = require('./check_avisos');
+const { harness, bajar, graphRev, timesRev, BASE } = require('./check_avisos');
 
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(ROOT, 'docs', 'data');
@@ -122,7 +122,19 @@ async function cargarVariante(v, cache, H) {
   const bin = await archivo(`${v}-v3-g${rev}.bin`, `${BASE}/${v}/route-graph-${v}-v3.bin?g=${rev}`);
   let cities = JSON.parse(await archivo(`${v}-Cities.json`, `${BASE}/${v}/Cities.json`));
   cities = Array.isArray(cities) ? cities : Object.values(cities);
-  const g = H.mod.buildRouteGraph(H.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength)));
+  const decoded = H.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
+  const g = H.mod.buildRouteGraph(decoded);
+  // Las decimas de cada arista, como loadRouteTimes: de R2 si la app las
+  // pide (ROUTE_TIMES_REV), o de --tiempos <carpeta>/<v>/route-graph-<v>-times.bin
+  // para probar unas que todavia no se subieron.
+  const tiempos = argumentos(process.argv.slice(2)).tiempos;
+  const ft = tiempos && path.join(tiempos, v, `route-graph-${v}-times.bin`);
+  const tb = ft && fs.existsSync(ft) ? fs.readFileSync(ft)
+    : timesRev() ? await archivo(`${v}-times-g${rev}-t${timesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-times.bin?g=${rev}&t=${timesRev()}`) : null;
+  if (tb) {
+    g.edgeT = H.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
+    if (!g.edgeT) throw new Error(`las decimas de ${v} no son de este grafo`);
+  }
   const pois = JSON.parse(fs.readFileSync(path.join(DATA, `pois-${v}.json`), 'utf8'));
   // Pais de cada ciudad (mano izquierda en las islas) y a que ciudad es cada
   // caja de ciudad, del parser si esta a mano.
@@ -580,10 +592,11 @@ function revisarRuteo(ctx, ruta, hallazgos) {
     const d = g.dirEdge(a, b);
     if (d === -1 || a === b) continue;
     const ea = g.adjEdge[g.dirEdge(a, n)], eb = g.adjEdge[g.dirEdge(n, b)], ed = g.adjEdge[d];
-    const via = g.edgeS[ea] + g.edgeS[eb], directa = g.edgeS[ed];
+    const seg = (e) => (g.edgeT ? g.edgeS[e] + g.edgeT[e] / 10 : g.edgeS[e]);
+    const via = seg(ea) + seg(eb), directa = seg(ed);
     if (via > directa) continue;
     ctx.stats.atajos = (ctx.stats.atajos || 0) + 1;
-    add('atajo_salteado', { donde: xy(g.nodeXY(n)), via: `${g.edgeM[ea].toFixed(0)}+${g.edgeM[eb].toFixed(0)} m = ${via} s`, directa: `${g.edgeM[ed].toFixed(0)} m = ${directa} s` });
+    add('atajo_salteado', { donde: xy(g.nodeXY(n)), via: `${g.edgeM[ea].toFixed(0)}+${g.edgeM[eb].toFixed(0)} m = ${via.toFixed(1)} s`, directa: `${g.edgeM[ed].toFixed(0)} m = ${directa.toFixed(1)} s` });
   }
   // el A* de la app contra Dijkstra (heuristica 0): si da mas caro, la
   // heuristica no es admisible con los segundos redondeados del grafo
@@ -612,7 +625,10 @@ function revisarRuteo(ctx, ruta, hallazgos) {
     if (enFerry(s) || enFerry(s - 300) || enFerry(s + 300)) continue;
     const p = met.pointAt(s), q = met.pointAt(s + 5);
     const rb = rumbo(p, q) * Math.PI / 180;
-    const lado = ctx.manoIzq(p) ? -2.5 : 2.5;
+    // sobre su carril: el corrimiento con que la app dibuja la ruta (p[6],
+    // + a la derecha); en las curvas de prefab, que ya son carriles, 0
+    const sig = pts[Math.min(met.indiceEn(s) + 1, pts.length - 1)];
+    const lado = Number.isFinite(sig[6]) ? sig[6] : 0;
     // a la derecha del rumbo: (cos, -sin) en x,z con el norte en -z
     const x = p[0] + Math.cos(rb) * lado, z = p[1] + Math.sin(rb) * lado;
     H.mod.set(g, null, []);
