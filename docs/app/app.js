@@ -1238,7 +1238,7 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'poi', 'car-parking', 'fuel', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
@@ -1270,7 +1270,16 @@ function buildVecLayers(sourceLayer) {
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
-    { id: 'poi', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
+    // Logos de las empresas, los del mapa del juego: el sprite del tile es el
+    // token y la imagen baja de R2 cuando hace falta (loadMissingCompanyIcon).
+    // Sin superponerse entre ellos: en una ciudad hay varias pegadas y se
+    // van mostrando al acercarse. Debajo de los POIs, que los tapan.
+    { id: 'company', type: 'symbol', source: 'vec', 'source-layer': L, minzoom: 9,
+      filter: ['all', ['==', ['get', 'type'], 'poi'], ['==', ['get', 'poiType'], 'company']],
+      layout: { 'icon-image': ['concat', COMPANY_ICON_PREFIX, ['get', 'sprite']],
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.55, 12, 0.8, 15, 1],
+                'icon-padding': 1 } },
+    { id: 'poi',type: 'symbol', source: 'vec', 'source-layer': L, minzoom: liteMode ? 9 : 7,
       filter: poiLayerFilter(),
       layout: { 'icon-image': ['get', 'sprite'], 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
     // En auto (ATS) los lugares de descanso son otros: los de camion se
@@ -1873,6 +1882,7 @@ function ensureMapInitialized() {
   map.on('rotatestart', (e) => { if (e.originalEvent) pauseMapFollow(); });
   map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   map.on('zoom', updateTruckArrowSize);
+  map.on('styleimagemissing', loadMissingCompanyIcon);
   // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
   // zoom dinamico (si no, el proximo tick lo pisa y parece que "no se puede
   // tocar") - se reactiva con el boton de recentrar. originalEvent solo esta
@@ -1976,6 +1986,32 @@ async function loadPoiIcons() {
       console.error('No se pudo cargar el icono de POI', name, err);
     }
   }
+}
+
+// Logos de las empresas (128x32, con el borde blanco que les pone el juego),
+// en R2 desde build_company_icons.py del taller. Son unos 500 entre los dos
+// juegos y en una ciudad se ven diez: se piden de a uno cuando MapLibre avisa
+// que la capa 'company' necesita uno. Una empresa de un mod armado en la PC
+// que no esta en R2 queda sin dibujar, nunca con un icono generico. Subir
+// COMPANY_ICONS_REV si se agregan o cambian: Cloudflare guarda los 404.
+const COMPANY_ICONS_REV = '1';
+const companyIconsAsked = new Set();
+function companyIconUrl(token) {
+  return `${REMOTE_MAP_BASE}/vector/company-icons/${token}.png?v=${COMPANY_ICONS_REV}`;
+}
+// En la lista del buscador, el mismo logo en vez del 🏭 de antes. Si no
+// carga, queda el hueco y no un icono generico.
+function companyLogoHtml(token) {
+  const ok = token && companyIconToken(COMPANY_ICON_PREFIX + token);
+  return `<span class="poiIcon poiLogo">${ok ? `<img src="${companyIconUrl(ok)}" alt="" loading="lazy">` : ''}</span>`;
+}
+function loadMissingCompanyIcon(e) {
+  const token = companyIconToken(e.id);
+  if (!token || companyIconsAsked.has(e.id)) return;
+  companyIconsAsked.add(e.id);
+  map.loadImage(companyIconUrl(token))
+    .then((res) => { if (!map.hasImage(e.id)) map.addImage(e.id, res.data); })
+    .catch(() => {});
 }
 
 async function loadCities(mapInfo) {
@@ -2500,7 +2536,7 @@ function searchCompanies(query, x, z, limit) {
   for (const c of pois.companies) {
     const label = foldText(c[3]);
     const city = foldText(c[4]).replace(/_/g, ' ');
-    if (label.includes(q) || city.includes(q) || foldText(cityLabel(c[4])).includes(q)) out.push({ x: c[0], z: c[1], label: c[3], city: c[4], dist: x != null ? Math.hypot(c[0] - x, c[1] - z) : 0 });
+    if (label.includes(q) || city.includes(q) || foldText(cityLabel(c[4])).includes(q)) out.push({ x: c[0], z: c[1], token: c[2], label: c[3], city: c[4], dist: x != null ? Math.hypot(c[0] - x, c[1] - z) : 0 });
   }
   out.sort((a, b) => a.dist - b.dist);
   return out.slice(0, limit);
@@ -2610,7 +2646,7 @@ function renderPoiResults() {
     const q = foldText(query.trim());
     results = pois.companies
       .filter(c => cityTokens.has(c[4]) && (!q || foldText(c[3]).includes(q)))
-      .map(c => ({ x: c[0], z: c[1], label: c[3], city: c[4], dist: Math.hypot(c[0] - pos.x, c[1] - pos.z), name: c[3], sub: cityLabel(c[4]) }))
+      .map(c => ({ x: c[0], z: c[1], token: c[2], label: c[3], city: c[4], dist: Math.hypot(c[0] - pos.x, c[1] - pos.z), name: c[3], sub: cityLabel(c[4]) }))
       .sort((a, b) => a.sub.localeCompare(b.sub) || a.label.localeCompare(b.label))
       .slice(0, 40 * Math.min(cityTokens.size, 3));
   } else if (query.trim()) {
@@ -2633,11 +2669,12 @@ function renderPoiResults() {
     const dir = rel ? `<span class="poiDir ${rel.side}" title="${esc(dirTitle)}"><svg viewBox="0 0 24 24" width="16" height="16" style="transform:rotate(${Math.round(rel.rel)}deg)"><path d="M12 3l6 9h-4v9h-4v-9H6z" fill="currentColor"/></svg></span>` : '';
     return `
     <button class="poiItem${rel && rel.side === 'behind' ? ' behind' : ''}" data-index="${i}">
-      <span class="poiIcon">${r.code ? POI_ICONS_TEXT[r.code] : '🏭'}</span>
+      ${r.code ? `<span class="poiIcon">${POI_ICONS_TEXT[r.code]}</span>` : companyLogoHtml(r.token)}
       <span class="poiText"><span class="poiName">${esc(r.name)}</span>${r.sub ? `<span class="poiSub">${esc(r.sub)}</span>` : ''}</span>
       ${dir}<span class="poiDist">${formatPoiDistance(r.dist, [[pos.x, pos.z], [r.x, r.z]])}</span>
     </button>`;
   }).join('');
+  list.querySelectorAll('.poiLogo img').forEach(img => img.addEventListener('error', () => img.remove()));
   list.querySelectorAll('.poiItem').forEach(btn => btn.addEventListener('click', () => {
     const r = results[Number(btn.dataset.index)];
     addPoiWaypoint([r.x, r.z], r.sub ? `${r.name} (${r.sub})` : r.name, r.code || null);

@@ -920,6 +920,20 @@ test('corrida de la ruta: el puente de la salida 257 queda sobre la calzada y si
   assert.deepEqual([dibujo[3][0], dibujo[3][1]], nodos[3]);
 });
 
+// Logos de las empresas: la capa pide "co:<token>" y solo esas se bajan.
+test('logos de empresas: solo las imagenes de la capa, con un token limpio', () => {
+  const { companyIconToken, COMPANY_ICON_PREFIX } = require('./pure.js');
+  assert.equal(companyIconToken(COMPANY_ICON_PREFIX + 'flv_food_str'), 'flv_food_str');
+  assert.equal(companyIconToken('co:lintukai_hrv'), 'lintukai_hrv');
+  // Otras imagenes que falten (POIs genericos, carteles) no son logos.
+  assert.equal(companyIconToken('gas_ico'), null);
+  assert.equal(companyIconToken('co:'), null);
+  // Un sprite raro no se arma en la URL.
+  assert.equal(companyIconToken('co:../icons/gas_ico'), null);
+  assert.equal(companyIconToken('co:a?b'), null);
+  assert.equal(companyIconToken(undefined), null);
+});
+
 // Zoom del modo navegacion elegido en Ajustes (pedido de usuarios).
 test('zoom de navegacion: valida lo guardado y respeta el rango', () => {
   assert.equal(navZoomSetting(undefined), NAV_ZOOM_DEFAULT); // nunca se toco
