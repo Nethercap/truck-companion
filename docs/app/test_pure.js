@@ -1961,6 +1961,30 @@ test('routeDismissed: la ruta borrada a mano se puede volver a mostrar (Discord,
   assert.equal(routeDismissed(routeIdentity(viejo), { ...viejo }, objetivo), true);
 });
 
+test('routeDismissed: una ruta de waypoints borrada tambien se puede traer (Brackenreach, 15-10)', () => {
+  const { routeIdentity, routeDismissed, plainWaypoints } = require('./pure.js');
+  // destino del evento de Halloween, fuera del mapa: sin objetivo propio, la
+  // ruta eran los waypoints, y el borrado se los llevo
+  const evento = { game: 'ats', citySrc: 'Dallas', cityDst: 'Brackenreach', companySrcId: 'wal', companyDstId: 'castle',
+    onJob: true, isCargoLoaded: true, cargo: 'Halloween Treats' };
+  const borrada = routeIdentity(evento);
+  assert.equal(routeDismissed(borrada, evento, null, 2), true);
+  assert.equal(routeDismissed(borrada, evento, null, 0), false);
+  assert.equal(routeDismissed(borrada, evento, null), false);
+  // otro viaje: el borrado ya no cuenta, aunque haya waypoints guardados
+  assert.equal(routeDismissed(borrada, { ...evento, onJob: false }, null, 2), false);
+  // lo que se guarda: sin marcador y sin el de seguir al lider del convoy
+  const marcador = { remove() {} };
+  assert.deepEqual(plainWaypoints([
+    { pos: [1, 2], inGame: true, label: 'A', kind: null, marker: marcador },
+    { pos: [3, 4], inGame: false, label: null, kind: 'g', marker: marcador },
+    { pos: [5, 6], inGame: false, label: 'Lider', marker: marcador, convoyFollow: true },
+  ]), [
+    { pos: [1, 2], inGame: true, label: 'A' },
+    { pos: [3, 4], inGame: false, label: null, kind: 'g' },
+  ]);
+});
+
 test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version del mapa', () => {
   const { demoPathUsable } = require('./pure.js');
   const fs = require('node:fs');
