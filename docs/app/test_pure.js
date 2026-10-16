@@ -1906,6 +1906,27 @@ test('maneuver: Y donde la otra rama se abre mas que la ruta, pero la ruta tambi
   assert.deepEqual([m.kind, m.direction, m.far], ['fork', 'left', true]);
 });
 
+test('maneuver: rampa que sale a la derecha y cruza por arriba de la autopista, que dobla a la derecha -> nada (US-63 al NE de Columbia, 16-10)', () => {
+  // la autopista sigue derecho y a 500 m dobla 12 grados a la derecha; la
+  // rampa sale 20 grados a la derecha y despues pasa al otro lado sin nodo
+  // (puente): a 500 m queda 7 grados a la izquierda
+  const ctx = scenario({ route: [[0, -300], [0, 0], [3, 125], [28, 250], [105, 490]],
+                         extraNodes: [[14, 44], [60, 120], [60, 200], [0, 330], [-60, 480]],
+                         edges: [[1, 5], [5, 6], [6, 7], [7, 8], [8, 9]] });
+  assert.equal(detectManeuver(ctx), null);
+  // espejado: la rampa sale a la izquierda y cruza a la derecha
+  const espejo = (p) => [-p[0], p[1]];
+  const izq = scenario({ route: [[0, -300], [0, 0], [3, 125], [28, 250], [105, 490]].map(espejo),
+                         extraNodes: [[14, 44], [60, 120], [60, 200], [0, 330], [-60, 480]].map(espejo),
+                         edges: [[1, 5], [5, 6], [6, 7], [7, 8], [8, 9]] });
+  assert.equal(detectManeuver(izq), null);
+  // la misma rampa sin cruzar (se queda a la derecha): pasar de largo una salida, nada
+  const sinCruzar = scenario({ route: [[0, -300], [0, 0], [3, 125], [28, 250], [105, 490]],
+                               extraNodes: [[14, 44], [60, 120], [110, 200], [200, 330], [300, 480]],
+                               edges: [[1, 5], [5, 6], [6, 7], [7, 8], [8, 9]] });
+  assert.equal(detectManeuver(sinCruzar), null);
+});
+
 test('layoutAnchor y layoutCss: un panel pegado abajo sigue pegado abajo con el mapa mas alto (Gargamosch, 11-10)', () => {
   const { layoutAnchor, layoutCss } = require('./pure.js');
   const area = { left: 0, top: 0, width: 400, height: 600 };
