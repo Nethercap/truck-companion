@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261016a" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261016a" />
-<link rel="stylesheet" href="app.css?v=20261016a" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261016c" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261016c" />
+<link rel="stylesheet" href="app.css?v=20261016c" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -349,6 +349,11 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
    <div class="rowWrap">
     <div id="mapPanel">
       <div id="mapCanvas"></div>
+      <!-- El mapa se mudo a la ventana flotante (pipMapIn en app.js) -->
+      <div id="mapAway" class="mapAway" hidden>
+        <p data-i18n="pipMapAway">The map is in the floating window.</p>
+        <button type="button" id="mapAwayBack" data-i18n="pipMapBack">Bring it back</button>
+      </div>
       <div id="convoyEdgeLayer" class="convoyEdgeLayer"></div>
       <div id="convoyMsgPop" class="convoyMsgPop" style="display:none"></div>
       <!-- Resumen de la ruta (PR #1 de Vladimir Kutkovoy): progreso, lo que
@@ -672,14 +677,14 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261016a"></script>
-<script src="pure.js?v=20261016a"></script>
-<script src="i18n.js?v=20261016a"></script>
-<script src="i18n_en_es.js?v=20261016a"></script>
-<script src="../dash/dash.js?v=20261016a"></script>
-<script src="../dash/classic.js?v=20261016a"></script>
-<script src="app.js?v=20261016a"></script>
-<script src="convoy.js?v=20261016a"></script>
-<script src="livemap.js?v=20261016a"></script>
+<script src="variants.js?v=20261016c"></script>
+<script src="pure.js?v=20261016c"></script>
+<script src="i18n.js?v=20261016c"></script>
+<script src="i18n_en_es.js?v=20261016c"></script>
+<script src="../dash/dash.js?v=20261016c"></script>
+<script src="../dash/classic.js?v=20261016c"></script>
+<script src="app.js?v=20261016c"></script>
+<script src="convoy.js?v=20261016c"></script>
+<script src="livemap.js?v=20261016c"></script>
 </body>
 </html>

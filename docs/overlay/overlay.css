@@ -26,6 +26,12 @@ html, body { margin: 0; background: transparent; }
 .hudSpeedNum small { display: block; font-size: calc(12px * var(--s)); opacity: 0.75; }
 .hud.over .hudSpeedNum span { color: #ff6b6b; }
 .hudCruise { display: flex; align-items: center; gap: calc(4px * var(--s)); color: #7cc243; font-weight: 700; font-size: calc(17px * var(--s)); }
+/* La marcha: recuadro con borde gris, como el overlay del juego (client/overlay.py) */
+.hudGear {
+  box-sizing: border-box; min-width: calc(36px * var(--s)); height: calc(36px * var(--s));
+  padding: 0 calc(7px * var(--s)); border: calc(2px * var(--s)) solid #9aa4b2; border-radius: calc(6px * var(--s));
+  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: calc(20px * var(--s));
+}
 .hudTrip { border-left: 1px solid rgba(255, 255, 255, 0.2); padding-left: calc(16px * var(--s)); min-width: 0; }
 .hudSpeed[hidden] + .hudTrip { border-left: 0; padding-left: 0; }
 .hudDest { font-size: calc(21px * var(--s)); font-weight: 700; white-space: nowrap; }

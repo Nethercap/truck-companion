@@ -162,6 +162,17 @@
     display: flex; align-items: center; gap: 0.5rem; background: rgba(23,26,31,0.92); border: 1px solid #333;
     border-radius: 999px; padding: 0.35rem 0.9rem; font-size: 0.8rem; color: var(--text); white-space: nowrap; pointer-events: none;
   }
+  /* El mapa esta en la ventana flotante: un aviso en su lugar */
+  .mapAway {
+    position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.8rem; padding: 1rem; background: #2b2f36; color: var(--text); text-align: center;
+  }
+  .mapAway[hidden] { display: none; }
+  .mapAway p { margin: 0; }
+  .mapAway button {
+    min-height: 32px; padding: 0.4rem 1rem; border-radius: 999px; border: 1px solid #444;
+    background: rgba(23,26,31,0.92); color: var(--text); font: inherit; cursor: pointer;
+  }
   .mapSpinner { width: 12px; height: 12px; border: 2px solid #444; border-top-color: var(--accent); border-radius: 50%; animation: mapSpin 0.8s linear infinite; }
   @keyframes mapSpin { to { transform: rotate(360deg); } }
   .mapHint { position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.7rem; color: #ddd; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; z-index: 1000; transition: opacity 0.6s ease; }
