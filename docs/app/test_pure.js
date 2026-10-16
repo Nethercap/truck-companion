@@ -1985,6 +1985,24 @@ test('routeDismissed: una ruta de waypoints borrada tambien se puede traer (Brac
   ]);
 });
 
+test('offMapJobPlace: trabajo a un lugar que no esta en el mapa (Brackenreach, 15-10)', () => {
+  const { offMapJobPlace } = require('./pure.js');
+  const evento = { game: 'ats', citySrc: 'Dallas', cityDst: 'Brackenreach', companyDst: 'Castle Brackenhelm',
+    onJob: true, isCargoLoaded: true };
+  // sin objetivo con el mapa ya cargado: se dice por que no hay ruta
+  assert.equal(offMapJobPlace(evento, null, true), 'Brackenreach');
+  assert.equal(offMapJobPlace({ ...evento, cityDst: '' }, null, true), 'Castle Brackenhelm');
+  // mientras cargan las ciudades o los POIs tampoco se encuentra: nada
+  assert.equal(offMapJobPlace(evento, null, false), null);
+  // con un waypoint (o el destino encontrado) ya hay objetivo
+  assert.equal(offMapJobPlace(evento, { kind: 'waypoint', key: 'wp:1,2' }, true), null);
+  // sin trabajo, o cliente viejo sin onJob: no hay destino que avisar
+  assert.equal(offMapJobPlace({ ...evento, onJob: false }, null, true), null);
+  assert.equal(offMapJobPlace({ game: 'ats', cityDst: 'Brackenreach' }, null, true), null);
+  assert.equal(offMapJobPlace({ game: 'ats', onJob: true }, null, true), null);
+  assert.equal(offMapJobPlace(null, null, true), null);
+});
+
 test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version del mapa', () => {
   const { demoPathUsable } = require('./pure.js');
   const fs = require('node:fs');

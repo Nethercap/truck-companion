@@ -1210,6 +1210,9 @@ let citiesAll = [];
 let mapBounds = null;
 let offMapWarnedFor = null;
 let citiesByToken = {}; // token del juego -> misma entrada
+// De que mapa (GAME_MAPS) son las ciudades cargadas; null mientras cargan o
+// si fallaron (ver jobPlacesReady).
+let citiesMap = null;
 const trailWorld = []; // [[lng,lat], ...]
 const MAX_TRAIL_POINTS = 1000;
 let trailWorldRaw = null; // coords de juego del ultimo punto agregado al trail
@@ -2029,6 +2032,7 @@ async function loadMissingCompanyIcon(e) {
 }
 
 async function loadCities(mapInfo) {
+  citiesMap = null;
   try {
     const res = await fetch(`${mapInfo.assetsDir}/Cities.json?v=${MAP_DATA_VERSION[currentGame] || ''}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -2036,6 +2040,7 @@ async function loadCities(mapInfo) {
     citiesByName = {};
     citiesByToken = {};
     citiesAll = list;
+    citiesMap = mapInfo;
     mapBounds = mapBoundsFromCities(list);
     for (const c of list) {
       if (!citiesByName[c.Name]) citiesByName[c.Name] = c;
@@ -3401,22 +3406,32 @@ function restoreDismissedRoute() {
   sendLiveRoute(true);
 }
 
-// El resumen a la vista y con numeros: en "Ruta oculta" se ve pero no tiene.
+// El resumen a la vista y con numeros: en "Ruta oculta" o con el aviso de
+// destino fuera del mapa se ve pero no tiene.
 function routeSummaryShown() {
   const panel = document.getElementById('routeSummary');
-  return !!panel && !panel.hidden && !panel.classList.contains('dismissed');
+  return !!panel && !panel.hidden && !panel.classList.contains('dismissed') && !panel.classList.contains('offmap');
+}
+
+// Ciudades y POIs de la variante ya cargados (o los POIs fallaron): recien
+// ahi que no se encuentre el destino quiere decir algo (offMapJobPlace).
+function jobPlacesReady() {
+  return !!currentGame && citiesMap === GAME_MAPS[currentGame] && poisVariant === currentGame && !poisLoading;
 }
 
 // view: null (sin ruta), { dismissed: true } (borrada a mano, con el boton
-// para traerla) o los numeros de la ruta.
+// para traerla), { offMap: nombre } (trabajo a un lugar que no esta en el
+// mapa, con el boton para poner un waypoint) o los numeros de la ruta.
 function renderRouteSummary(view) {
   const panel = document.getElementById('routeSummary');
   if (!panel) return;
   panel.hidden = !view;
   panel.classList.toggle('dismissed', !!(view && view.dismissed));
+  panel.classList.toggle('offmap', !!(view && view.offMap));
   document.getElementById('mapPanel').classList.toggle('hasRouteSummary', !!view);
+  if (view && view.offMap) document.getElementById('routeOffMapText').textContent = t('routeOffMap').replace('{name}', view.offMap);
   keepPanelsClearOfRouteSummary();
-  if (!view || view.dismissed) return;
+  if (!view || view.dismissed || view.offMap) return;
   const bar = document.getElementById('routeProgressBar');
   bar.style.width = `${view.percent}%`;
   bar.parentElement.title = `${Math.round(view.percent)}%`;
@@ -3449,8 +3464,10 @@ function updateRouteSummary(data) {
   if (!target) {
     routeProgressState = { key: null, total: 0 };
     routeSummaryNumbers = null;
-    const oculta = routeDismissed(dismissedRouteIdentity, data, resolveRawRouteTarget(data), dismissedStopList().length);
-    renderRouteSummary(oculta ? { dismissed: true } : null);
+    const raw = resolveRawRouteTarget(data);
+    const oculta = routeDismissed(dismissedRouteIdentity, data, raw, dismissedStopList().length);
+    const fuera = oculta ? null : offMapJobPlace(data, raw, jobPlacesReady());
+    renderRouteSummary(oculta ? { dismissed: true } : fuera ? { offMap: fuera } : null);
     return;
   }
   // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
@@ -5712,6 +5729,7 @@ document.getElementById('routeResetBtn').addEventListener('click', () => {
   resetDisplayedRoute();
 });
 document.getElementById('routeShowBtn').addEventListener('click', restoreDismissedRoute);
+document.getElementById('routeOffMapAdd').addEventListener('click', () => setWaypointMode(true));
 document.getElementById('routeStopSkip').addEventListener('click', (e) => {
   e.stopPropagation();
   if (waypoints.length) removeWaypoint(0);

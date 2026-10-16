@@ -300,6 +300,13 @@
   .routeSummary.dismissed > :not(.routeHidden) { display: none; }
   .routeSummary.dismissed .routeHidden { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
   .routeSummary.dismissed .routeStopSkip { min-height: 28px; }
+  /* Trabajo a un lugar que no esta en el mapa: el aviso y el boton para
+     poner un waypoint. El texto es largo y se parte, el boton no. */
+  .routeOffMap { display: none; }
+  .routeSummary.offmap { width: min(420px, calc(100% - 1.2rem)); padding: 0.45rem 0.45rem 0.45rem 0.8rem; }
+  .routeSummary.offmap > :not(.routeOffMap) { display: none; }
+  .routeSummary.offmap .routeOffMap { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--muted); }
+  .routeSummary.offmap .routeStopSkip { min-height: 28px; flex-shrink: 0; }
   /* Que el resumen no tape el mini-HUD ni el cartel del mapa. El alto lo
      mide app.js (keepPanelsClearOfRouteSummary): con el aviso de destino
      aproximado el resumen crece y un valor fijo quedaba corto. */
