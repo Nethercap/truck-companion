@@ -1182,11 +1182,20 @@ function detectManeuver(ctx) {
     for (let k = iEnd + 1; k < pts.length && cum[k] - cum[iEnd] <= forkFarLegM; k++) if (pts[k][3] === 1) return null;
     const rd = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkFarLegM)) - inBearing);
     const lenM = forkFarLegM + cum[iEnd] - cum[i];
+    // Una rama que a forkLegM ya se separo forkMinSep hacia un lado y lejos
+    // queda del otro cruzo la ruta por un puente: la rampa a la I-70 sale a
+    // la derecha de la US-63 y pasa al este, y como la autopista dobla a la
+    // derecha, a 500 m se anunciaba "keep right" yendo derecho (Discord,
+    // 16-10, al NE de Columbia). El lado de una bifurcacion es donde las
+    // ramas se separan; esa rama no cuenta.
+    const near = sampleAt(forkLegM);
     let alt = null;
-    for (const [k, idx, n] of altExits()) {
+    altExits().forEach(([k, idx, n], e) => {
       const a = normDeg(bearingBetween(pts[i], walkStraight(idx, n, lenM - (cum[k] - cum[i]))) - inBearing);
+      const nearSep = normDeg(near - altDeltas()[e]);
+      if (Math.abs(nearSep) >= forkMinSep && Math.sign(nearSep) !== Math.sign(normDeg(rd - a))) return;
       if (Math.abs(a) <= 100 && (alt == null || Math.abs(a) < Math.abs(alt))) alt = a;
-    }
+    });
     if (alt == null || Math.abs(normDeg(rd - alt)) < forkFarMinSep) return null;
     // Que la otra salida se abra mas que la ruta quiere decir, como a
     // forkLegM, que pasamos de largo una salida; salvo que la ruta tambien
