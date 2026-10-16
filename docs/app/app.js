@@ -3365,7 +3365,8 @@ function resolveRawRouteTarget(data) {
     // para poder decirlo en pantalla en vez de fingir precision.
     if (srcCity) return { x: srcCity.X, z: srcCity.Y, kind: 'pickup', key: `pickupcity:${data.citySrc}`, approx: true };
   }
-  if (data.cityDst) {
+  // Sin trabajo no hay destino, aunque cityDst siga (hasJobDestination).
+  if (hasJobDestination(data)) {
     const company = (data.companyDstId ? findCompanyPoi(data.companyDstId, data.cityDstId) : null)
       || findCompanyPoiByName(data.companyDst, data.cityDstId);
     if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${company.token}@${company.city}` };

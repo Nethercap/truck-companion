@@ -2088,6 +2088,22 @@ test('offMapJobPlace: trabajo a un lugar que no esta en el mapa (Brackenreach, 1
   assert.equal(offMapJobPlace(null, null, true), null);
 });
 
+test('hasJobDestination: un trabajo terminado sin evento no deja la ruta al destino (16-10)', () => {
+  const { hasJobDestination } = require('./pure.js');
+  const trabajo = { game: 'ats', citySrc: 'Reno', cityDst: 'Sacramento', companyDstId: 'wal_food',
+    cityDstId: 'sacramento', jobMarket: 'external_contracts', onJob: true, isCargoLoaded: true };
+  assert.equal(hasJobDestination(trabajo), true);
+  // carga externa cancelada al pedir la grua: onJob en false, el destino queda
+  assert.equal(hasJobDestination({ ...trabajo, onJob: false }), false);
+  // con el evento el plugin borra el destino
+  assert.equal(hasJobDestination({ ...trabajo, onJob: false, cityDst: null }), false);
+  // cliente < 1.3.1, sin onJob: rutea al destino como antes
+  const { onJob, ...viejo } = trabajo;
+  assert.equal(hasJobDestination(viejo), true);
+  assert.equal(hasJobDestination({ game: 'ats', onJob: true }), false);
+  assert.equal(hasJobDestination(null), false);
+});
+
 test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version del mapa', () => {
   const { demoPathUsable } = require('./pure.js');
   const fs = require('node:fs');
