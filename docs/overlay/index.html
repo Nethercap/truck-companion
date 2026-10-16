@@ -6,7 +6,7 @@
 <title>Truck Dash – OBS overlay for ETS2 and ATS</title>
 <meta name="description" content="Free overlay for Euro Truck Simulator 2 and American Truck Simulator streams: your speed and the speed limit, the next turn and your trip, as an OBS browser source." />
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
-<link rel="stylesheet" href="overlay.css?v=20261016a" />
+<link rel="stylesheet" href="overlay.css?v=20261016b" />
 </head>
 <!-- Overlay para OBS (overlay.js). Con ?code= es solo el HUD, sobre fondo
      transparente; sin codigo es el armador del link. El giro lo manda el
@@ -45,6 +45,7 @@
       <label class="check"><input type="checkbox" data-item="turn" /> <span data-i18n="obsItemTurn">Next turn</span></label>
       <p class="hint itemHint" data-i18n="obsTurnHint">Turns come from the dashboard: open it on your phone, a tablet or this PC.</p>
       <label class="check"><input type="checkbox" data-item="speed" /> <span data-i18n="obsItemSpeed">Speed and limit</span></label>
+      <label class="check"><input type="checkbox" data-item="gear" /> <span data-i18n="obsItemGear">Gear</span></label>
       <label class="check"><input type="checkbox" data-item="dest" /> <span data-i18n="obsItemDest">Destination</span></label>
       <label class="check"><input type="checkbox" data-item="remaining" /> <span data-i18n="obsItemRemaining">Distance left</span></label>
       <label class="check"><input type="checkbox" data-item="time" /> <span data-i18n="obsItemTime">Time left (real)</span></label>
@@ -75,11 +76,13 @@
     <div class="hudBody" id="hudBody">
       <div class="hudSpeed" id="hudSpeedBox">
         <div class="hudLimit" id="hudLimit" hidden></div>
-        <div class="hudSpeedNum"><span id="hudSpeed">--</span><small id="hudUnit">km/h</small></div>
+        <div class="hudSpeedNum" id="hudSpeedNum"><span id="hudSpeed">--</span><small id="hudUnit">km/h</small></div>
         <div class="hudCruise" id="hudCruise" hidden>
           <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 12l4-4"/></svg>
           <span id="hudCruiseVal"></span>
         </div>
+        <!-- La marcha en su recuadro, como en el overlay del juego -->
+        <div class="hudGear" id="hudGear" hidden></div>
       </div>
       <div class="hudTrip" id="hudTrip" hidden>
         <div class="hudDest" id="hudDest"></div>
@@ -89,9 +92,9 @@
     <div class="hudBrand">trucksim-dash.com</div>
   </div>
 
-<script src="../app/i18n.js?v=20261016a"></script>
-<script src="../app/i18n_en_es.js?v=20261016a"></script>
-<script src="../app/pure.js?v=20261016a"></script>
-<script src="overlay.js?v=20261016a"></script>
+<script src="../app/i18n.js?v=20261016b"></script>
+<script src="../app/i18n_en_es.js?v=20261016b"></script>
+<script src="../app/pure.js?v=20261016b"></script>
+<script src="overlay.js?v=20261016b"></script>
 </body>
 </html>

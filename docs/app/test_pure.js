@@ -2522,8 +2522,22 @@ test('overlay de OBS: que se muestra segun el link', () => {
   assert.deepEqual(obsOverlayItems(null, '0', true), ['speed']);
   // el armador arranca con el giro
   assert.deepEqual(obsOverlayItems(null, null, true), ['turn', 'speed', 'dest', 'remaining', 'time']);
-  // las cinco del overlay del juego estan todas
-  for (const k of ['turn', 'speed', 'remaining', 'arrival', 'game_arrival']) assert.ok(OBS_ITEMS.includes(k), k);
+  // las del overlay del juego estan todas (el crucero sale con la velocidad)
+  for (const k of ['turn', 'speed', 'gear', 'remaining', 'arrival', 'game_arrival']) assert.ok(OBS_ITEMS.includes(k), k);
+  // la marcha es casilla nueva: los links de antes no la muestran sola
+  assert.deepEqual(obsOverlayItems('gear,speed', null, false), ['speed', 'gear']);
+  assert.ok(!obsOverlayItems(null, null, false).includes('gear'));
+});
+
+test('formatGear: la marcha igual que en el overlay del juego', () => {
+  const { formatGear } = require('./pure.js');
+  // los mismos casos que formato_marcha en client/test_overlay.py
+  assert.deepEqual([0, null, 1, 12, -1, -2, 3.0].map(formatGear), ['N', 'N', '1', '12', 'R', 'R2', '3']);
+  assert.equal(formatGear(true), 'N');
+  assert.equal(formatGear(NaN), 'N');
+  assert.equal(formatGear('5'), 'N');
+  assert.equal(formatGear(undefined), 'N'); // un cliente que no la manda
+  assert.equal(formatGear(3.7), '3'); // como int() de Python
 });
 
 test('modales: Tab da la vuelta adentro y Shift+Tab tambien', () => {

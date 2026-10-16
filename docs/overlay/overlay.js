@@ -101,17 +101,22 @@ function render() {
   // lanesHtml valida el registro (llega por el relay) y solo arma texto fijo
   $('hudTurnLanes').innerHTML = giro && n.lanes ? lanesHtml(n.lanes) : '';
 
-  // Velocidad, limite y crucero
-  $('hudSpeedBox').hidden = !ver('speed');
+  // Velocidad, limite y crucero; al lado la marcha, que tambien va sola
+  // (como en el overlay del juego)
+  const conVelocidad = ver('speed');
+  $('hudSpeedBox').hidden = !conVelocidad && !ver('gear');
+  $('hudSpeedNum').hidden = !conVelocidad;
   $('hudSpeed').textContent = d.speedKmh != null ? velocidad(d.speedKmh) : '--';
   $('hudUnit').textContent = opts.imperial ? 'mph' : 'km/h';
-  const limite = d.speedLimitKmh > 0;
+  const limite = conVelocidad && d.speedLimitKmh > 0;
   $('hudLimit').hidden = !limite;
   if (limite) $('hudLimit').textContent = velocidad(d.speedLimitKmh);
-  hud.classList.toggle('over', ver('speed') && limite && d.speedKmh > d.speedLimitKmh + 2);
-  const crucero = d.cruiseControl && d.cruiseControlSpeedKmh > 0;
+  hud.classList.toggle('over', limite && d.speedKmh > d.speedLimitKmh + 2);
+  const crucero = conVelocidad && d.cruiseControl && d.cruiseControlSpeedKmh > 0;
   $('hudCruise').hidden = !crucero;
   if (crucero) $('hudCruiseVal').textContent = velocidad(d.cruiseControlSpeedKmh);
+  $('hudGear').hidden = !ver('gear');
+  if (ver('gear')) $('hudGear').textContent = formatGear(d.gear);
 
   // El viaje: con el tablero, sus numeros (cuentan los waypoints propios);
   // sin el, el GPS del juego y el ritmo medido aca.
