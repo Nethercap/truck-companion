@@ -1527,6 +1527,29 @@ test('waypointEta: abajo del ETA del juego, horas de juego; abajo del real, tiem
   assert.deepEqual(waypointEta({ viaKm: null, gameKm: 400, gameEtaSeconds: 20000, avgSpeedKmh: 1000, timeScale: 20 }), { gameSeconds: null, realSeconds: null });
 });
 
+test('waypointEta: el real sale del ETA real, no del ritmo medido en la ciudad (16-10)', () => {
+  const { waypointEta } = require('./pure.js');
+  // Saliendo de Sioux Falls: el juego 224,6 mi y 4h 1m, el ETA real 0h 15m,
+  // nuestra ruta por el waypoint 233,9 mi. El ritmo, medido adentro de la
+  // ciudad a 1:3, 65,6 km/h: con el daba 5h 44m.
+  const MI = 1.609344;
+  const r = waypointEta({ viaKm: 233.9 * MI, gameKm: 224.6 * MI, gameEtaSeconds: 14460, realEtaSeconds: 900,
+    avgSpeedKmh: 65.6, timeScale: 20 });
+  assert.ok(Math.abs(r.realSeconds - 900 * 233.9 / 224.6) < 1e-6);
+  assert.ok(r.realSeconds < 1000);
+  assert.ok(Math.abs(r.gameSeconds - 14460 * 233.9 / 224.6) < 1e-6);
+  // sin ETA real todavia: del ritmo, como antes
+  const sinReal = waypointEta({ viaKm: 1100, gameKm: 1000, gameEtaSeconds: 40000, realEtaSeconds: null, avgSpeedKmh: 1000, timeScale: 20 });
+  assert.ok(Math.abs(sinReal.realSeconds - 3960) < 1e-6);
+  // el GPS del juego en el remolque: su ETA real tampoco sirve, del ritmo
+  const remolque = waypointEta({ viaKm: 300, gameKm: 2, gameEtaSeconds: 600, realEtaSeconds: 30, avgSpeedKmh: 1000, timeScale: 20 });
+  assert.ok(Math.abs(remolque.realSeconds - 1080) < 1e-6);
+  assert.ok(Math.abs(remolque.gameSeconds - 1080 * 20) < 1e-6);
+  // sin GPS del juego (ruta solo de waypoints, sin destino en el juego): del ritmo
+  const sinJuego = waypointEta({ viaKm: 50, gameKm: 0, gameEtaSeconds: 0, realEtaSeconds: null, avgSpeedKmh: 1000, timeScale: 20 });
+  assert.ok(Math.abs(sinJuego.realSeconds - 180) < 1e-6);
+});
+
 test('createCityScale: adentro de las cajas de ciudad el juego va a 1:3', () => {
   const { createCityScale, CITY_SCALE, waypointEta } = require('./pure.js');
   assert.equal(CITY_SCALE, 3);
