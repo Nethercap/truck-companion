@@ -1186,6 +1186,70 @@ test('projectAheadOnRoute: un hueco entre lecturas no congela la ruta, el puente
   assert.equal(projectAheadOnRoute([[0, 0]], 0, 0), null);
 });
 
+test('projectAheadOnRoute: en una ida y vuelta por el mismo camino no pasa a la vuelta antes de llegar al fondo', () => {
+  const { projectAheadOnRoute } = require('./pure.js');
+  // Calle sin salida de 600 m al oeste, con curvas y puntos desparejos como
+  // los del grafo; la vuelta son los mismos puntos al reves. Hasta el 16-10
+  // el empate lo decidia la coma flotante y 1 de cada 50 lecturas caia en la
+  // vuelta: la ruta perdia lo de adelante (ATS + C2C).
+  const ida = [];
+  for (let x = 0; x > -600; x -= 17.3) ida.push([x, Math.sin(x / 90) * 30]);
+  ida.push([-600, Math.sin(-600 / 90) * 30]);
+  const ruta = [...ida, ...ida.slice(0, -1).reverse(), [300, 0]];
+  const finIda = ida.length - 1; // los tramos de la ida son 0 .. finIda - 1
+  let lecturas = 0;
+  for (let k = 0; k < finIda; k++) {
+    const [ax, az] = ida[k], [bx, bz] = ida[k + 1];
+    const L = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / L, nz = (bx - ax) / L;
+    for (const f of [0, 0.3, 0.71]) {
+      for (const lado of [-4, -2.5, 0, 1.3, 2.5, 4]) {
+        // como la app: la ruta ya recortada hasta el tramo del camion
+        const r = projectAheadOnRoute(ruta.slice(k), ax + (bx - ax) * f + nx * lado, az + (bz - az) * f + nz * lado, 400);
+        assert.ok(r.idx + k < finIda, `tramo ${k} f ${f} lado ${lado}: cayo en el ${r.idx + k} (la vuelta)`);
+        lecturas++;
+      }
+    }
+  }
+  assert.ok(lecturas > 500);
+  // Ya dio la vuelta (antes del fondo, donde pudo): la vuelta gana enseguida.
+  const desde = ruta.slice(20); // recortada en la ida, a unos 350 m
+  const r = projectAheadOnRoute(desde, ida[12][0], ida[12][1] - 3, 400);
+  assert.ok(r.idx + 20 >= finIda, String(r.idx + 20));
+  assert.ok(r.dist < 4);
+  // Y un tramo de mas adelante que pasa mas cerca por mas de 1 m sigue ganando:
+  // el camion a 4 m del primero y encima del que baja por x = 20.
+  const cruce = [[0, 0], [100, 0], [100, 50], [20, 50], [20, 1.5], [20, -100]];
+  assert.equal(projectAheadOnRoute(cruce, 20, 4, 400).idx, 3);
+});
+
+test('waypointReached: por el toque o por la ruta hasta el nodo de su tramo', () => {
+  const { waypointReached, WAYPOINT_ROUTE_END_M } = require('./pure.js');
+  // Ruta: tramo 0 hasta el nodo del waypoint en (1000, 0), tramo 1 al destino.
+  const ruta = [[0, 0, 0, 0, null, 0], [500, 0, 0, 0, 1, 0], [1000, 0, 0, 0, 2, 0], [1000, 600, 0, 0, 3, 1], [2000, 600, 0, 0, 4, 1]];
+  const lejos = [1000, 300]; // tocado a 300 m del camino
+  // Toque a menos de 150 m: como siempre, aunque no haya ruta.
+  assert.equal(waypointReached(900, 280, lejos, null), true);
+  assert.equal(waypointReached(900, 0, lejos, null), false);
+  // Por la ruta: a 200 m del nodo todavia no, a 20 m si.
+  assert.equal(waypointReached(800, 0, lejos, [[800, 0, 0, 0, null, 0], ...ruta.slice(2)]), false);
+  assert.equal(waypointReached(980, 0, lejos, [[980, 0, 0, 0, null, 0], ...ruta.slice(2)]), true);
+  assert.ok(WAYPOINT_ROUTE_END_M < 150);
+  // Paso el nodo: la ruta recortada ya arranca en el tramo siguiente.
+  assert.equal(waypointReached(1000, 100, lejos, [[1000, 100, 0, 0, null, 1], ...ruta.slice(3)]), true);
+  // La ruta da la vuelta en el nodo (el destino queda atras) y el camion siguio
+  // derecho: el recorte lo deja clavado en el nodo, cuenta como llegado.
+  const vuelta = [[990, 0, 0, 0, null, 0], [1000, 0, 0, 0, 2, 0], [500, 0, 0, 0, 1, 1], [0, 0, 0, 0, 0, 1]];
+  assert.equal(waypointReached(1040, 0, lejos, [[1000, 0, 0, 0, null, 0], ...vuelta.slice(1)]), true);
+  // Una rampa que corre a 25 m de la autopista: el nodo queda cerca en linea
+  // recta pero a 400 m por la ruta, todavia no.
+  const rampa = [[1000, 25, 0, 0, null, 0], [1200, 25, 0, 0, 7, 0], [1200, 0, 0, 0, 8, 0], [1000, 0, 0, 0, 9, 0], [1000, -500, 0, 0, 10, 1]];
+  assert.equal(waypointReached(1000, 25, [1000, -300], rampa), false);
+  // Sin datos que sirvan
+  assert.equal(waypointReached(NaN, 0, lejos, ruta), false);
+  assert.equal(waypointReached(0, 0, null, ruta), false);
+  assert.equal(waypointReached(0, 0, lejos, [[0, 0, 0, 0, null, 2]]), false);
+});
+
 test('storedWaypoints: vuelven los de la variante, vigentes y con forma de waypoint', () => {
   const { storedWaypoints } = require('./pure.js');
   const now = 1_000_000_000_000;
