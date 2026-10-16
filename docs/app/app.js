@@ -5446,8 +5446,10 @@ function updateHud(data) {
     }
   }
 
-  document.getElementById('citySrc').textContent = data.citySrc || '?';
-  document.getElementById('cityDst').textContent = data.cityDst || '?';
+  // Sin trabajo, nada del trabajo de antes (jobPanelFields).
+  const viaje = jobPanelFields(data);
+  document.getElementById('citySrc').textContent = viaje.citySrc || '?';
+  document.getElementById('cityDst').textContent = viaje.cityDst || '?';
   const truckLabel = [data.truckBrand, data.truckName].filter(Boolean).join(' ');
   document.getElementById('truck').textContent = truckLabel || '-';
   // Odometro: es el numero que el juego muestra en el tablero y el unico
@@ -5459,9 +5461,9 @@ function updateHud(data) {
     document.getElementById('odometer').textContent =
       Math.round(odo).toLocaleString(currentLang) + (useImperial ? ' mi' : ' km');
   }
-  if (data.cargo) {
-    const cargoWeightText = data.cargoMassKg ? ` (${formatCargoMass(data.cargoMassKg, currentLang, useImperial)})` : '';
-    document.getElementById('cargo').textContent = `${data.cargo}${cargoWeightText}`;
+  if (viaje.cargo) {
+    const cargoWeightText = viaje.cargoMassKg ? ` (${formatCargoMass(viaje.cargoMassKg, currentLang, useImperial)})` : '';
+    document.getElementById('cargo').textContent = `${viaje.cargo}${cargoWeightText}`;
   } else {
     document.getElementById('cargo').textContent = t('noCargo');
   }
@@ -5475,11 +5477,11 @@ function updateHud(data) {
   }
 
   const jobDeadlineRow = document.getElementById('jobDeadlineRow');
-  if (data.jobDeadlineSeconds != null) {
+  if (viaje.deadlineSeconds != null) {
     jobDeadlineRow.hidden = false;
     const deadlineEl = document.getElementById('jobDeadline');
-    deadlineEl.textContent = formatSeconds(Math.max(0, data.jobDeadlineSeconds));
-    deadlineEl.classList.toggle('over', data.jobDeadlineSeconds <= 0);
+    deadlineEl.textContent = formatSeconds(Math.max(0, viaje.deadlineSeconds));
+    deadlineEl.classList.toggle('over', viaje.deadlineSeconds <= 0);
   } else {
     jobDeadlineRow.hidden = true;
   }
@@ -5501,7 +5503,7 @@ function updateHud(data) {
     restRow.hidden = true;
   }
 
-  document.getElementById('jobIncome').innerHTML = data.jobIncome ? moneyHtml(data.jobIncome, data.game) : '-';
+  document.getElementById('jobIncome').innerHTML = viaje.income ? moneyHtml(viaje.income, data.game) : '-';
 
   // Combustible: fuel/fuelCapacity vienen en unidades del juego (litros o
   // galones segun el pais del camion), pero el porcentaje da igual la unidad.
