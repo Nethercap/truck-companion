@@ -2160,7 +2160,8 @@ const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calcu
 // numeros. Si alguno es solo de la app (inGame=false), calculamos nosotros
 // la distancia total sumando los tramos del grafo y se muestra aparte en las
 // filas "(with waypoints)". Un waypoint se da por alcanzado (y se saca solo,
-// como un GPS) cuando el camion pasa a menos de WAYPOINT_REACHED_M.
+// como un GPS) cuando el camion pasa a menos de WAYPOINT_REACHED_M o llega
+// por la ruta al nodo de su tramo (ver checkWaypointReached).
 const WAYPOINT_REACHED_M = 150;
 const MAX_WAYPOINTS = 9;
 let waypoints = []; // [{ pos: [x,z], lngLat: [lng,lat], inGame: bool, label: string|null, marker }]
@@ -2325,12 +2326,16 @@ function addPoiWaypoint(pos, label, kind = null) {
   showToast(t('poiAddedToast').replace('{name}', label), 'success', 3000);
 }
 
-// Saca el primer waypoint cuando el camion llega (pasa cerca) - asi una
-// ruta con varias paradas avanza sola, como un GPS de verdad.
+// Saca el primer waypoint cuando el camion llega (pasa cerca, o la ruta ya
+// lo llevo hasta el final de su tramo: waypointReached en pure.js) - asi una
+// ruta con varias paradas avanza sola, como un GPS de verdad. La ruta solo
+// cuenta si es la de los waypoints de ahora: con currentRouteTarget en null
+// (recien invalidada) sus tramos pueden ser los de antes.
 function checkWaypointReached(x, z) {
   if (!waypoints.length) return;
   const wp = waypoints[0];
-  if (Math.hypot(wp.pos[0] - x, wp.pos[1] - z) < WAYPOINT_REACHED_M) {
+  const route = currentRouteTarget ? currentRouteWorldPoints : null;
+  if (waypointReached(x, z, wp.pos, route, { tapM: WAYPOINT_REACHED_M })) {
     showToast(t('waypointReachedToast').replace('{name}', wp.label || `${t('waypoint')} 1`), 'success', 3000);
     removeWaypoint(0);
   }
@@ -3804,7 +3809,7 @@ function resumeMapFollow() {
   if (map && truckMarker) {
     // Fuera del modo nav ademas se endereza el mapa (norte arriba) por si lo
     // rotaron a mano; en modo nav el bearing lo pisa el proximo tick.
-    map.jumpTo(navMode ? { center: truckMarker.getLngLat() } : { center: truckMarker.getLngLat(), bearing: 0 });
+    map.jumpTo(navCameraOn() ? { center: truckMarker.getLngLat() } : { center: truckMarker.getLngLat(), bearing: 0 });
   }
 }
 
@@ -3827,6 +3832,9 @@ const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es u
 // via CSS), MapLibre soporta rotacion real del mapa (bearing) - el pan sigue
 // funcionando bien incluso rotado, asi que no hace falta deshabilitar drag.
 let navMode = false;
+// El mapa esta en la ventana flotante (ver pipMapIn): aca arriba porque la
+// camara lo lee desde el arranque.
+let pipMapOn = false;
 let navAutoZoomPaused = false; // true si el usuario zoomeo a mano en modo nav - se reactiva al recentrar
 // Rumbo del camion. El cliente 1.5.13+ manda el del juego ya en grados de
 // brujula; con clientes viejos se deduce del desplazamiento, que es lo que
@@ -3876,15 +3884,21 @@ const NAV_JUNCTION_CLUSTER_SPAN_M = 100; // y el cruce entero no mide mas que es
 // camion se ubica en el tercio inferior de la pantalla (padding) para ver mas
 // camino adelante, con o sin 3D.
 let nav3d = !liteMode && (_savedSettings.nav3d || false);
+// La camara del modo navegacion (adelante para arriba, el camion abajo):
+// tambien con el mapa en la ventana flotante, que es un GPS chico arriba del
+// juego aunque el modo navegacion de la pestana este apagado.
+function navCameraOn() {
+  return navMode || pipMapOn;
+}
 function navPadding() {
   const h = map ? map.getContainer().clientHeight : 0;
   // Rellenar ARRIBA desplaza el centro hacia abajo: el camion queda en el
   // tercio inferior y se ve mas camino adelante.
-  return navMode ? { top: Math.round(h * 0.45), bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 };
+  return navCameraOn() ? { top: Math.round(h * 0.45), bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 };
 }
 function applyNavCamera() {
   if (!map) return;
-  if (navMode) {
+  if (navCameraOn()) {
     map.easeTo({ pitch: nav3d ? 58 : 0, padding: navPadding(), duration: 400 });
   } else {
     map.easeTo({ pitch: 0, bearing: 0, padding: navPadding(), duration: 300 });
@@ -4170,6 +4184,16 @@ const PIP_CSS = `
   .dato + .dato { margin-left: 0; }
   .dato b { font-size: 1.05rem; }
   .dato span { color: #9aa4b2; font-size: 0.7rem; }
+  .modo { position: absolute; top: 0.35rem; right: 0.35rem; z-index: 5; min-width: 24px; min-height: 24px;
+    padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid #333a44; background: rgba(20,23,28,0.9);
+    color: #f2f3f5; font: inherit; font-size: 0.75rem; cursor: pointer; }
+  .modo[hidden] { display: none; }
+  .mapa { display: none; position: relative; flex: 1; min-height: 0; }
+  .pip.conMapa { padding: 0; gap: 0; }
+  .conMapa .mapa { display: block; }
+  .conMapa .giro { flex: none; font-size: clamp(0.9rem, 4.6vw, 1.3rem); padding: 0.4rem 4.5rem 0.4rem 0.6rem; }
+  .conMapa .fila { padding: 0.35rem 0.6rem 0.45rem; }
+  .mapa > #mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 `;
 
 function pipSupported() {
@@ -4178,20 +4202,31 @@ function pipSupported() {
 
 async function openPip() {
   if (pipWin) { try { pipWin.focus(); } catch (err) { /* nada */ } return; }
+  const conMapa = pipMapWanted();
+  let w;
   try {
-    pipWin = await documentPictureInPicture.requestWindow({ width: 380, height: 160 });
+    w = await documentPictureInPicture.requestWindow(pipWindowSize(conMapa));
   } catch (err) {
     console.error('No se pudo abrir la ventana flotante', err);
-    pipWin = null;
     return;
   }
-  const d = pipWin.document;
+  setupPipWindow(w, conMapa);
+}
+
+// Arma la ventana flotante en w (la de Document Picture-in-Picture; las
+// pruebas le pasan la de un iframe, porque el navegador de algunas
+// herramientas no abre ventanas). conMapa: arranca con el mapa adentro.
+function setupPipWindow(w, conMapa) {
+  pipWin = w;
+  const d = w.document;
   d.title = 'Truck Dash';
   const estilo = d.createElement('style');
   estilo.textContent = PIP_CSS;
   d.head.appendChild(estilo);
-  d.body.innerHTML = `<div class="pip">
+  d.body.innerHTML = `<div class="pip" id="pCaja">
+      <button type="button" class="modo" id="pModo" hidden></button>
       <div class="giro" id="pGiro"></div>
+      <div class="mapa" id="pMapa"></div>
       <div class="fila">
         <div class="lim" id="pLim" hidden></div>
         <div class="vel"><b id="pVel">--</b><span id="pUnidad"></span></div>
@@ -4199,8 +4234,142 @@ async function openPip() {
         <div class="dato"><b id="pLlega">--</b><span>${escapeHtml(t('routeArrivalLabel'))}</span></div>
       </div>
     </div>`;
-  pipWin.addEventListener('pagehide', () => { pipWin = null; });
+  d.getElementById('pModo').addEventListener('click', () => {
+    if (pipMapOn) pipMapOut(); else pipMapIn();
+    // El clic adentro de la ventana deja cambiarle el tamano
+    const { width, height } = pipWindowSize(pipMapOn);
+    try { w.resizeTo(width, height); } catch (err) { /* el usuario la estira a mano */ }
+  });
+  // Arrastrar el mapa adentro de la ventana: el soltar llega a esta ventana
+  // y no a la pestana (ver mapPointersDown). Sin esto el seguimiento del
+  // camion quedaba cortado despues del primer toque.
+  for (const type of ['pointerup', 'pointercancel']) {
+    w.addEventListener(type, (e) => mapPointersDown.delete(e.pointerId), true);
+  }
+  w.addEventListener('blur', () => mapPointersDown.clear());
+  w.addEventListener('resize', () => { if (pipMapOn && map) map.resize(); });
+  w.addEventListener('pagehide', () => {
+    // El mapa vuelve a la pestana antes de que la ventana se destruya; la
+    // preferencia queda para la proxima vez que se abra.
+    pipMapOut(true);
+    pipWin = null;
+  });
+  if (conMapa) pipMapIn();
+  refreshPipMode();
   refreshPip();
+}
+
+// ---------------------------------------------------------------------------
+// Mini mapa en la ventana flotante (prototipo, 16-10). Pedido de Discord: "a
+// mini map inside the small pop out window that stays on top of the game,
+// or a window that can be moved and resized to replace the in-game GPS map".
+// El mapa no se duplica: el mismo contenedor de MapLibre se muda a la
+// ventana y vuelve al cerrarla (el contexto WebGL sobrevive la mudanza).
+// Mientras esta afuera la camara va como en el modo navegacion (adelante
+// para arriba) y los cuadros los pide tambien esa ventana (createFrameRace):
+// con la pestana tapada por el juego Chrome no le da cuadros a la pestana.
+// Se activa con el boton Mapa de la propia ventana y se recuerda.
+// ---------------------------------------------------------------------------
+const PIP_MAP_KEY = 'truckdash_pip_map';
+let pipMapHome = null; // { parent, next }: donde estaba el mapa en la pestana
+const frameRace = createFrameRace(window.requestAnimationFrame.bind(window), window.cancelAnimationFrame.bind(window), () => performance.now());
+let frameRaceInstalled = false;
+
+function pipMapWanted() {
+  return lsGet(PIP_MAP_KEY) === '1';
+}
+
+// Desde la primera mudanza, todos los pedidos de cuadros (MapLibre, la
+// camara, el marcador, la telemetria) pasan por la carrera entre ventanas.
+// No se desinstala: un pedido hecho por ella tiene que cancelarse por ella.
+function installFrameRace() {
+  if (frameRaceInstalled) return;
+  frameRaceInstalled = true;
+  window.requestAnimationFrame = (cb) => frameRace.request(cb);
+  window.cancelAnimationFrame = (id) => frameRace.cancel(id);
+}
+
+// Las hojas de estilo de la pagina (MapLibre, los marcadores), una vez por
+// ventana: sin ellas los controles y el camion quedaban sin forma. Las de
+// otro origen van como link.
+function copyStylesTo(d) {
+  if (d.getElementById('pEstilosMapa')) return;
+  const marca = d.createElement('meta');
+  marca.id = 'pEstilosMapa';
+  d.head.appendChild(marca);
+  for (const hoja of document.styleSheets) {
+    try {
+      const st = d.createElement('style');
+      st.textContent = [...hoja.cssRules].map(r => r.cssText).join('\n');
+      d.head.insertBefore(st, d.head.firstChild);
+    } catch (err) {
+      if (!hoja.href) continue;
+      const link = d.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = hoja.href;
+      d.head.insertBefore(link, d.head.firstChild);
+    }
+  }
+}
+
+function pipMapIn() {
+  if (!pipWin || !map || pipMapOn) return;
+  const w = pipWin;
+  const d = w.document;
+  copyStylesTo(d);
+  installFrameRace();
+  frameRace.setExtra({ raf: (cb) => w.requestAnimationFrame(cb), cancel: (id) => w.cancelAnimationFrame(id) });
+  const cont = map.getContainer();
+  pipMapHome = { parent: cont.parentElement, next: cont.nextSibling };
+  d.getElementById('pMapa').appendChild(cont);
+  pipMapOn = true;
+  d.getElementById('pCaja').classList.add('conMapa');
+  document.getElementById('mapAway').hidden = false;
+  lsSet(PIP_MAP_KEY, '1');
+  map.resize();
+  snapNavCamera();
+  resumeMapFollow();
+  refreshPipMode();
+}
+
+// keepPref: al cerrar la ventana el mapa vuelve, pero la proxima abre con el.
+function pipMapOut(keepPref = false) {
+  if (!pipMapOn) return;
+  const cont = map.getContainer();
+  const home = pipMapHome;
+  home.parent.insertBefore(cont, home.next && home.next.parentNode === home.parent ? home.next : null);
+  pipMapOn = false;
+  pipMapHome = null;
+  frameRace.setExtra(null);
+  if (pipWin) pipWin.document.getElementById('pCaja').classList.remove('conMapa');
+  document.getElementById('mapAway').hidden = true;
+  if (!keepPref) lsSet(PIP_MAP_KEY, '0');
+  map.resize();
+  snapNavCamera();
+  resumeMapFollow();
+  refreshPipMode();
+}
+
+// Inclinacion, relleno y rumbo de la camara de una, sin animar: con el modo
+// navegacion apagado la camara que sigue al camion solo mueve el centro, y su
+// primer cuadro cortaba el easeTo de applyNavCamera. Al volver de la ventana
+// el camion quedaba abajo, con el relleno de navegacion (16-10). Antes se
+// corta la animacion del tick anterior: iba hacia el rumbo y el relleno del
+// otro modo y los volvia a poner en cada cuadro.
+function snapNavCamera() {
+  if (!map) return;
+  stopFrameJob('camera');
+  const nav = navCameraOn();
+  map.jumpTo({ pitch: nav && nav3d ? 58 : 0, padding: navPadding(), ...(nav ? {} : { bearing: 0 }) });
+}
+
+function refreshPipMode() {
+  if (!pipWin) return;
+  const btn = pipWin.document.getElementById('pModo');
+  if (!btn) return;
+  btn.hidden = !map; // sin WebGL no hay mapa para mudar
+  btn.textContent = t(pipMapOn ? 'pipMapHide' : 'pipMapShow');
+  btn.setAttribute('aria-pressed', pipMapOn ? 'true' : 'false');
 }
 
 function refreshPip() {
@@ -4228,6 +4397,7 @@ function initPip() {
   if (!btn || !pipSupported()) return;
   btn.style.display = '';
   btn.addEventListener('click', openPip);
+  document.getElementById('mapAwayBack').addEventListener('click', () => pipMapOut());
 }
 
 let navPanelParts = null; // lo ultimo que mostro el panel, para el mini-HUD
@@ -4986,14 +5156,15 @@ function updateMap(position, game, gameHeadingDeg) {
   if (guiando) voiceManeuverTick(turn);
   if (pipWin) pipTurnHtml = navPanelHtml(turn);
   if (clientOverlayOn || obsOverlayOn) overlayTurnParts = navTurnParts(turn);
-  if (navMode && !autoFollow) {
+  const navCam = navCameraOn();
+  if (navCam && !autoFollow) {
     // El usuario esta tocando el mapa (arrastrar, pellizcar, rotar): la
     // camara no se toca hasta que scheduleMapFollow vuelva a engancharla.
     // Sin esto, cada tick disparaba un easeTo que cancelaba el gesto y el
     // pellizco para hacer zoom no llegaba a agarrar.
-    updateNavPanel(turn);
-  } else if (navMode) {
-    updateNavPanel(turn);
+    if (navMode) updateNavPanel(turn);
+  } else if (navCam) {
+    if (navMode) updateNavPanel(turn);
     // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
     // seguimos actualizando centro/bearing hasta que recentre.
     const zoomOverride = navAutoZoomPaused ? {} : { zoom: navTargetZoom(turn) };

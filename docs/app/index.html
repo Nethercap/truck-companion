@@ -349,6 +349,11 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
    <div class="rowWrap">
     <div id="mapPanel">
       <div id="mapCanvas"></div>
+      <!-- El mapa se mudo a la ventana flotante (pipMapIn en app.js) -->
+      <div id="mapAway" class="mapAway" hidden>
+        <p data-i18n="pipMapAway">The map is in the floating window.</p>
+        <button type="button" id="mapAwayBack" data-i18n="pipMapBack">Bring it back</button>
+      </div>
       <div id="convoyEdgeLayer" class="convoyEdgeLayer"></div>
       <div id="convoyMsgPop" class="convoyMsgPop" style="display:none"></div>
       <!-- Resumen de la ruta (PR #1 de Vladimir Kutkovoy): progreso, lo que
