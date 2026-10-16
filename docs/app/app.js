@@ -2366,6 +2366,7 @@ function updateWaypointRoute(data) {
     viaKm,
     gameKm: Number.isFinite(data.routeDistanceKm) ? data.routeDistanceKm : null,
     gameEtaSeconds: data.routeTimeSeconds,
+    realEtaSeconds: routeSummaryEtaSeconds,
     avgSpeedKmh: lastKnownAvgSpeedKmh,
     // Sin push: measuredTimeScale ya lo alimenta una vez por tick.
     timeScale: gameTimeScale.value() ?? distanceScale(),
@@ -3509,8 +3510,9 @@ function updateRouteSummary(data) {
   }
   const percent = remainingKm == null || routeProgressState.total <= 0 ? 0
     : Math.max(0, Math.min(100, (1 - remainingKm / routeProgressState.total) * 100));
+  // Por nuestra ruta, lo mismo que la fila "via waypoint" del ETA real.
   const seconds = manual
-    ? (remainingKm != null && lastKnownAvgSpeedKmh > 0 ? remainingKm / lastKnownAvgSpeedKmh * 3600 : null)
+    ? waypointEta({ viaKm: remainingKm, gameKm, realEtaSeconds: routeSummaryEtaSeconds, avgSpeedKmh: lastKnownAvgSpeedKmh }).realSeconds
     : (remainingKm === 0 ? 0 : routeSummaryEtaSeconds);
   routeSummaryNumbers = { remainingKm, seconds }; // para el overlay de OBS (sendNavHud)
   // Ruta a la carga (remolque propio sin cargar): sin decirlo, "llegaste" en
@@ -5486,10 +5488,11 @@ function updateHud(data) {
     jobDeadlineRow.hidden = true;
   }
 
-  updateWaypointRoute(data);
   updateGameClock(data.gameTimeMinutes);
   const realEtaSeconds = computeRealEtaSeconds(data);
   routeSummaryEtaSeconds = realEtaSeconds;
+  // Despues del ETA real: la fila "via waypoint" sale de el (waypointEta).
+  updateWaypointRoute(data);
   document.getElementById('etaReal').textContent = realEtaSeconds != null ? formatSeconds(realEtaSeconds) : t('calculating');
 
   // Proximo descanso obligatorio, con la fatiga (ver restInfo).

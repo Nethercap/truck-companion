@@ -1989,16 +1989,25 @@ function useOwnRemaining(gameKm, ownKm) {
 // mostraban el tiempo real: "1h 30m (1,104.8 mi)" abajo de "17h 40m
 // (987.2 mi)" (Discord, 13-10).
 // viaKm: lo que falta por nuestra ruta. gameKm, gameEtaSeconds: el GPS del
-// juego (segundos de juego). avgSpeedKmh: km del juego por hora real.
+// juego (segundos de juego). realEtaSeconds: el ETA real de la fila de
+// arriba (computeRealEtaSeconds). avgSpeedKmh: km del juego por hora real.
 // timeScale: minutos de juego por minuto real. Devuelve { gameSeconds,
 // realSeconds }, cada uno null si no se puede estimar.
-function waypointEta({ viaKm, gameKm, gameEtaSeconds, avgSpeedKmh, timeScale }) {
+// El real tambien es el ETA real estirado por el desvio. El ritmo solo
+// cuenta los metros como el GPS del juego, a 1:3 en la ciudad y a 1:20 en la
+// ruta: saliendo de Sioux Falls daba 65 km/h y la fila decia 5h 44m abajo de
+// un ETA real de 0h 15m (16-10). El ETA real ya lo mezcla de a poco con el
+// del juego; el ritmo solo queda para cuando el GPS del juego no sirve.
+function waypointEta({ viaKm, gameKm, gameEtaSeconds, realEtaSeconds, avgSpeedKmh, timeScale }) {
   if (!Number.isFinite(viaKm) || viaKm < 0) return { gameSeconds: null, realSeconds: null };
-  const realSeconds = avgSpeedKmh > 0 ? viaKm / avgSpeedKmh * 3600 : null;
-  let gameSeconds = null;
   // Con el GPS del juego apuntando a otra cosa (el remolque del freight
-  // market, ver useOwnRemaining) su ritmo no sirve: del ritmo real.
-  if (gameKm > 1 && gameEtaSeconds > 0 && !useOwnRemaining(gameKm, viaKm)) gameSeconds = gameEtaSeconds * viaKm / gameKm;
+  // market, ver useOwnRemaining) sus tiempos no sirven: del ritmo real.
+  const juegoSirve = gameKm > 1 && !useOwnRemaining(gameKm, viaKm);
+  let realSeconds = null;
+  if (juegoSirve && realEtaSeconds > 0) realSeconds = realEtaSeconds * viaKm / gameKm;
+  else if (avgSpeedKmh > 0) realSeconds = viaKm / avgSpeedKmh * 3600;
+  let gameSeconds = null;
+  if (juegoSirve && gameEtaSeconds > 0) gameSeconds = gameEtaSeconds * viaKm / gameKm;
   else if (realSeconds != null && timeScale > 0) gameSeconds = realSeconds * timeScale;
   return { gameSeconds, realSeconds };
 }
