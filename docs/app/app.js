@@ -2229,9 +2229,9 @@ function readStoredWaypoints() {
 function saveWaypoints() {
   if (!currentGame || conn.demo) return;
   const stored = readStoredWaypoints();
-  const keep = waypoints.filter(w => !w.convoyFollow);
+  const keep = plainWaypoints(waypoints);
   if (keep.length) {
-    stored[currentGame] = { at: Date.now(), list: keep.map(w => ({ pos: w.pos, inGame: w.inGame, label: w.label, ...(w.kind ? { kind: w.kind } : {}) })) };
+    stored[currentGame] = { at: Date.now(), list: keep };
   } else {
     delete stored[currentGame];
   }
@@ -2298,6 +2298,7 @@ function renderWaypointList() {
 
 function finalizeWaypoint(inGame) {
   if (!pendingWaypoint) return;
+  endRouteDismissal();
   addWaypoint(pendingWaypoint.pos, pendingWaypoint.lngLat, inGame, pendingWaypoint.label);
   pendingWaypoint = null;
 }
@@ -2314,6 +2315,7 @@ function addPoiWaypoint(pos, label, kind = null) {
   const at = kind
     ? stopInsertIndex(currentRouteTarget ? currentRouteWorldPoints : null, { x: pos[0], z: pos[1] }, waypoints.length)
     : waypoints.length;
+  endRouteDismissal();
   addWaypoint(pos, toLngLat(pos[0], pos[1]), false, label, kind, at);
   showToast(t('poiAddedToast').replace('{name}', label), 'success', 3000);
 }
@@ -3293,6 +3295,20 @@ function nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked) {
 // Ruta borrada a mano: se recuerda de que viaje era para no volver a
 // dibujarla hasta que cambie el trabajo (PR #1 de Vladimir Kutkovoy).
 let dismissedRouteIdentity = null;
+// Los waypoints que se llevo el borrado, para devolverlos con "Mostrar ruta":
+// { game: variante, list } (plainWaypoints). Sin trabajo, o con un destino
+// que no esta en el mapa, la ruta era solo eso (Discord, 15-10).
+let dismissedStops = null;
+function dismissedStopList() {
+  return dismissedStops && dismissedStops.game === currentGame ? dismissedStops.list : [];
+}
+// Un waypoint puesto a mano es pedir una ruta: despues de borrarla quedaba
+// escondido hasta que cambiara el trabajo. El de seguir al lider del convoy
+// no pasa por aca: se vuelve a poner solo y deshacia el borrado.
+function endRouteDismissal() {
+  dismissedRouteIdentity = null;
+  dismissedStops = null;
+}
 let routeProgressState = { key: null, total: 0 };
 let routeSummaryEtaSeconds = null;
 // El total de la barra de progreso por ruta, para que recargar no la vuelva a
@@ -3314,7 +3330,13 @@ function forgetWaypointTrip() {
 
 // routeIdentity esta en pure.js, con routeDismissed (el "Ruta oculta").
 function resolveRouteTarget(data) {
-  if (dismissedRouteIdentity === routeIdentity(data)) return null;
+  if (dismissedRouteIdentity != null) {
+    if (dismissedRouteIdentity === routeIdentity(data)) return null;
+    // Cambio el viaje: el borrado ya cumplio. Si quedaba, al entregar el
+    // trabajo siguiente el viaje "sin trabajo" volvia a ser el borrado y la
+    // ruta se escondia otra vez.
+    endRouteDismissal();
+  }
   return resolveRawRouteTarget(data);
 }
 
@@ -3350,6 +3372,7 @@ function resolveRawRouteTarget(data) {
 
 function resetDisplayedRoute() {
   dismissedRouteIdentity = lastData ? routeIdentity(lastData) : null;
+  dismissedStops = { game: currentGame, list: plainWaypoints(waypoints) };
   clearWaypoint();
   setWaypointMode(false);
   currentRouteWorldPoints = null;
@@ -3360,15 +3383,19 @@ function resetDisplayedRoute() {
   }
   if (destMarker) { destMarker.remove(); destMarker = null; }
   document.getElementById('navPanel').style.display = 'none';
-  renderRouteSummary(null);
+  // Ya con el "Ruta oculta" y su boton, sin esperar al proximo dato.
+  if (lastData) updateRouteSummary(lastData); else renderRouteSummary(null);
   if (typeof convoyOnRouteChanged === 'function') convoyOnRouteChanged();
   sendLiveRoute(true);
 }
 
 // Volver a mostrar la ruta borrada a mano, desde el "Ruta oculta" del
-// resumen (routeDismissed en pure.js). Los waypoints borrados no vuelven.
+// resumen (routeDismissed en pure.js), con los waypoints que se llevo. Van
+// antes del de seguir al lider del convoy, si se volvio a poner.
 function restoreDismissedRoute() {
-  dismissedRouteIdentity = null;
+  const stops = dismissedStopList();
+  endRouteDismissal();
+  if (toLngLat) stops.forEach((w, i) => addWaypoint(w.pos, toLngLat(w.pos[0], w.pos[1]), w.inGame, w.label, w.kind || null, i));
   invalidateRoute();
   if (lastData) { updateDestinationMarker(lastData); updateRouteSummary(lastData); }
   sendLiveRoute(true);
@@ -3422,7 +3449,8 @@ function updateRouteSummary(data) {
   if (!target) {
     routeProgressState = { key: null, total: 0 };
     routeSummaryNumbers = null;
-    renderRouteSummary(routeDismissed(dismissedRouteIdentity, data, resolveRawRouteTarget(data)) ? { dismissed: true } : null);
+    const oculta = routeDismissed(dismissedRouteIdentity, data, resolveRawRouteTarget(data), dismissedStopList().length);
+    renderRouteSummary(oculta ? { dismissed: true } : null);
     return;
   }
   // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
