@@ -2088,6 +2088,41 @@ test('offMapJobPlace: trabajo a un lugar que no esta en el mapa (Brackenreach, 1
   assert.equal(offMapJobPlace(null, null, true), null);
 });
 
+test('hasJobDestination: un trabajo terminado sin evento no deja la ruta al destino (16-10)', () => {
+  const { hasJobDestination } = require('./pure.js');
+  const trabajo = { game: 'ats', citySrc: 'Reno', cityDst: 'Sacramento', companyDstId: 'wal_food',
+    cityDstId: 'sacramento', jobMarket: 'external_contracts', onJob: true, isCargoLoaded: true };
+  assert.equal(hasJobDestination(trabajo), true);
+  // carga externa cancelada al pedir la grua: onJob en false, el destino queda
+  assert.equal(hasJobDestination({ ...trabajo, onJob: false }), false);
+  // con el evento el plugin borra el destino
+  assert.equal(hasJobDestination({ ...trabajo, onJob: false, cityDst: null }), false);
+  // cliente < 1.3.1, sin onJob: rutea al destino como antes
+  const { onJob, ...viejo } = trabajo;
+  assert.equal(hasJobDestination(viejo), true);
+  assert.equal(hasJobDestination({ game: 'ats', onJob: true }), false);
+  assert.equal(hasJobDestination(null), false);
+});
+
+test('jobPanelFields: el panel no sigue con el trabajo cancelado (16-10)', () => {
+  const { jobPanelFields } = require('./pure.js');
+  const trabajo = { game: 'ats', citySrc: 'Reno', cityDst: 'Sacramento', cargo: 'Bulldozer', cargoMassKg: 16200,
+    jobIncome: 61158, jobDeadlineSeconds: 7200, onJob: true };
+  const enCurso = { citySrc: 'Reno', cityDst: 'Sacramento', cargo: 'Bulldozer', cargoMassKg: 16200,
+    income: 61158, deadlineSeconds: 7200 };
+  const nada = { citySrc: null, cityDst: null, cargo: null, cargoMassKg: null, income: null, deadlineSeconds: null };
+  assert.deepEqual(jobPanelFields(trabajo), enCurso);
+  // terminado sin evento: los campos quedan, el panel no los muestra
+  assert.deepEqual(jobPanelFields({ ...trabajo, onJob: false }), nada);
+  // vencido sigue siendo un vencimiento (en rojo), no "sin vencimiento"
+  assert.equal(jobPanelFields({ ...trabajo, jobDeadlineSeconds: 0 }).deadlineSeconds, 0);
+  assert.equal(jobPanelFields({ ...trabajo, jobDeadlineSeconds: -60 }).deadlineSeconds, -60);
+  // cliente < 1.3.1, sin onJob: como antes
+  const { onJob, ...viejo } = trabajo;
+  assert.deepEqual(jobPanelFields(viejo), enCurso);
+  assert.deepEqual(jobPanelFields(null), nada);
+});
+
 test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version del mapa', () => {
   const { demoPathUsable } = require('./pure.js');
   const fs = require('node:fs');
