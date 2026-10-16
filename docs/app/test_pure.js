@@ -2540,6 +2540,76 @@ test('formatGear: la marcha igual que en el overlay del juego', () => {
   assert.equal(formatGear(3.7), '3'); // como int() de Python
 });
 
+test('pipWindowSize: la ventana flotante con mapa es mas alta que la de texto', () => {
+  const { pipWindowSize } = require('./pure.js');
+  assert.deepEqual(pipWindowSize(false), { width: 380, height: 160 });
+  const conMapa = pipWindowSize(true);
+  assert.equal(conMapa.width, 380);
+  assert.ok(conMapa.height >= 400);
+  conMapa.height = 1; // es una copia
+  assert.ok(pipWindowSize(true).height >= 400);
+});
+
+test('createFrameRace: el cuadro sale de la primera ventana que lo da y nunca queda colgado', () => {
+  const { createFrameRace } = require('./pure.js');
+  // Una ventana de mentira: guarda los pedidos y los cumple con fire()
+  const ventana = () => {
+    let n = 0;
+    const q = new Map();
+    return {
+      raf: (cb) => { q.set(++n, cb); return n; },
+      cancel: (id) => { q.delete(id); },
+      fire() { const l = [...q.values()]; q.clear(); l.forEach(cb => cb(999999)); },
+      get size() { return q.size; },
+    };
+  };
+  const tab = ventana(), pip = ventana();
+  let reloj = 10;
+  const race = createFrameRace(tab.raf, tab.cancel, () => reloj);
+  const vistos = [];
+  // Sin ventana flotante: solo la pestana
+  race.request((t) => vistos.push(['tab', t]));
+  assert.equal(pip.size, 0);
+  tab.fire();
+  assert.deepEqual(vistos, [['tab', 10]]);
+  // Con el mapa en la ventana: se pide en las dos. La pestana tapada por el
+  // juego no da cuadros y sale por la ventana, con el reloj de la pestana.
+  race.setExtra({ raf: pip.raf, cancel: pip.cancel });
+  reloj = 20;
+  race.request((t) => vistos.push(['pip', t]));
+  assert.equal(tab.size, 1);
+  assert.equal(pip.size, 1);
+  pip.fire();
+  assert.deepEqual(vistos[1], ['pip', 20]);
+  assert.equal(tab.size, 0); // el de la pestana se cancelo
+  assert.equal(race.pending, 0);
+  // Cancelar cancela en las dos
+  const id = race.request(() => vistos.push(['nunca']));
+  race.cancel(id);
+  assert.equal(tab.size + pip.size, 0);
+  // La ventana se cierra con un pedido en vuelo: lo cumple la pestana
+  race.request((t) => vistos.push(['cerrada', t]));
+  race.setExtra(null);
+  tab.fire();
+  assert.deepEqual(vistos[2], ['cerrada', 20]);
+  // Una ventana que ya no da pedidos (tira): sale por la pestana igual
+  race.setExtra({ raf: () => { throw new Error('cerrada'); }, cancel: () => {} });
+  race.request(() => vistos.push(['rota']));
+  tab.fire();
+  assert.deepEqual(vistos[3], ['rota']);
+  assert.equal(vistos.length, 4);
+  // Si las dos dan el cuadro (una cancelacion que no llego), corre una vez
+  const t2 = ventana(), p2 = ventana();
+  const race2 = createFrameRace(t2.raf, () => {}, () => 0);
+  race2.setExtra({ raf: p2.raf, cancel: () => {} });
+  let veces = 0;
+  race2.request(() => veces++);
+  p2.fire();
+  t2.fire();
+  assert.equal(veces, 1);
+  assert.equal(race2.pending, 0);
+});
+
 test('modales: Tab da la vuelta adentro y Shift+Tab tambien', () => {
   const { focusTrapTarget } = require('./pure.js');
   // tres controles: del ultimo al primero, del primero al ultimo
