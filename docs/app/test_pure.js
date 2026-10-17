@@ -2848,6 +2848,42 @@ test('vista de cabina: se prende solo con cab=1', () => {
   for (const s of ['', '?cab=0', '?cab=', '?cabin=1', '?demo=1']) assert.equal(cabModeFromSearch(s), false, s);
 });
 
+test('vista de cabina: el mapa se estira con la ventana, como el zoom del navegador', () => {
+  const { cabMapScale, CAB_MAP_HEIGHT } = require('./pure.js');
+  // A cualquier alto, el mapa ocupa lo mismo de la ventana: a pantalla
+  // completa no vuelve a quedar chico
+  assert.equal(cabMapScale(CAB_MAP_HEIGHT * 2, 1), 2);
+  assert.equal(cabMapScale(1080, 1), 1080 / CAB_MAP_HEIGHT);
+  // Mas grande con + (tambien la letra, en el CSS)
+  assert.equal(cabMapScale(1080, 1.5), 1080 * 1.5 / CAB_MAP_HEIGHT);
+  // Nunca se achica, y sin alto (la ventana todavia sin armar) queda en 1
+  assert.equal(cabMapScale(CAB_MAP_HEIGHT / 2, 1), 1);
+  for (const h of [0, -5, NaN, undefined, null]) assert.equal(cabMapScale(h, 1), 1, String(h));
+  // Un tamano guardado roto no rompe la cuenta
+  assert.equal(cabMapScale(600, 'abc'), 600 / CAB_MAP_HEIGHT);
+});
+
+test('vista de cabina: el tamano con + y -, entre los topes y de a 10 %', () => {
+  const { cabSizeStep, cabSizeSetting, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT } = require('./pure.js');
+  assert.equal(cabSizeStep(1, '+'), 1.1);
+  assert.equal(cabSizeStep(1, '='), 1.1); // la misma tecla sin Shift
+  assert.equal(cabSizeStep(1, '-'), 0.9);
+  assert.equal(cabSizeStep(1.7, '0'), CAB_SIZE_DEFAULT);
+  assert.equal(cabSizeStep(1, 'a'), null);
+  assert.equal(cabSizeStep(1, 'Enter'), null);
+  assert.equal(cabSizeStep(CAB_SIZE_MAX, '+'), CAB_SIZE_MAX);
+  assert.equal(cabSizeStep(CAB_SIZE_MIN, '-'), CAB_SIZE_MIN);
+  // Sin errores de coma flotante que se acumulen
+  let s = 1;
+  for (let i = 0; i < 7; i++) s = cabSizeStep(s, '+');
+  assert.equal(s, 1.7);
+  // Lo guardado en localStorage llega como texto, o no llega
+  assert.equal(cabSizeSetting('1.3'), 1.3);
+  for (const malo of [null, '', 'x', undefined, NaN]) assert.equal(cabSizeSetting(malo), CAB_SIZE_DEFAULT, String(malo));
+  assert.equal(cabSizeSetting('9'), CAB_SIZE_MAX);
+  assert.equal(cabSizeSetting('0.1'), CAB_SIZE_MIN);
+});
+
 test('vista de cabina: el link lleva lo que hace falta para conectarse sola', () => {
   const { cabViewUrl } = require('./pure.js');
   const q = (u) => Object.fromEntries(new URL(u).searchParams);
