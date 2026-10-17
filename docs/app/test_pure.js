@@ -2297,6 +2297,21 @@ test('jobPanelFields: el panel no sigue con el trabajo cancelado (16-10)', () =>
   assert.deepEqual(jobPanelFields(null), nada);
 });
 
+test('jobDeadlineSeconds: el "sin plazo" del SDK no es un plazo (Discord, 17-10)', () => {
+  const { jobDeadlineSeconds, jobPanelFields } = require('./pure.js');
+  // la entrega en 2^32 - 1 minutos menos la hora del juego: "71567355h 55m"
+  const sinPlazo = (4294967295 - 925940) * 60;
+  assert.equal(Math.floor(sinPlazo / 3600), 71567355);
+  assert.equal(jobDeadlineSeconds({ jobDeadlineSeconds: sinPlazo }), null);
+  assert.equal(jobPanelFields({ cityDst: 'Cheyenne', jobDeadlineSeconds: sinPlazo, onJob: true }).deadlineSeconds, null);
+  // un plazo de verdad, vencido o no, sigue
+  assert.equal(jobDeadlineSeconds({ jobDeadlineSeconds: 9 * 3600 }), 9 * 3600);
+  assert.equal(jobDeadlineSeconds({ jobDeadlineSeconds: -60 }), -60);
+  assert.equal(jobDeadlineSeconds({ jobDeadlineSeconds: 30 * 24 * 3600 }), 30 * 24 * 3600);
+  assert.equal(jobDeadlineSeconds({ jobDeadlineSeconds: null }), null);
+  assert.equal(jobDeadlineSeconds(null), null);
+});
+
 test('demo: la ruta guardada sirve solo con el mismo grafo y la misma version del mapa', () => {
   const { demoPathUsable } = require('./pure.js');
   const fs = require('node:fs');

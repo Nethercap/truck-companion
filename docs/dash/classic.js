@@ -385,7 +385,8 @@ function createClassicDash({ root, imperial, lang, hour12 }) {
     const sT = escalaTiempo();
     const juegoCrudo = enViaje && d.routeTimeSeconds > 0 ? d.routeTimeSeconds : null;
     const realSeg = enViaje ? ritmo.estimate(juegoCrudo != null ? juegoCrudo / sT : null, d.ts) : null;
-    const margen = enViaje && d.jobDeadlineSeconds != null && realSeg != null ? d.jobDeadlineSeconds - realSeg * sT : null;
+    const plazo = jobDeadlineSeconds(d); // sin el "sin plazo" del SDK (pure.js)
+    const margen = enViaje && plazo != null && realSeg != null ? plazo - realSeg * sT : null;
     poner('onTime', margen != null ? -margen / 3600 : null,
           margen != null ? (margen >= 0 ? '+' : '−') + hm(margen) : '', margen != null && margen < 0);
 
