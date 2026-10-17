@@ -74,6 +74,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.
   Juntar siempre no: mezcla el giro con la curva de la calle de despues.
+- Una salida que a los 150 m vuelve por donde se vino (la calzada contraria
+  donde termina una autovia) no es rama de una bifurcacion (`forkInCurve`).
+- Lo recorrido (`routeBehind`) incluye el comienzo de la ruta
+  (`passedRoutePoints`); el simulador y `check_avisos` lo arman igual.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
   de app.js y pure.js y lista sospechosos (escala, recalculos, avisos, voz,
   rotondas); `tools/dibujar_simulacion.py` dibuja cada uno. Correrlo antes y

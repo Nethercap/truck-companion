@@ -5,7 +5,7 @@
 {"from":"DeRidder","to":"Beaumont","man":[["turn","right",12692,44861],["turn","left",9866,44760],["fork","left",8623,49269],["fork","right",9098,49497],["turn","right",9402,49546],["turn","left",9806,50564],["turn","left",9792,50507]]},
 {"from":"Lake Havasu City","to":"Primm","man":[["turn","left",-82774,17697],["turn","right",-82864,17672],["turn","right",-83854,15328],["fork","right",-82999,13911],["turn","left",-82906,13649],["turn","left",-84274,7535],["turn","left",-84678,7520],["turn","left",-85212,7540],["turn","left",-85890,7838],["fork","right",-87210,9062],["turn","right",-87336,9334]]},
 {"from":"Yankton","to":"Mitchell","man":[["turn","left",-9087,-23624],["turn","right",-9717,-23642],["turn","right",-10420,-26880],["fork","right",-8866,-26660],["turn","left",-8559,-26570]]},
-{"from":"Scottsbluff","to":"Chadron","man":[["fork","left",-31521,-17873],["turn","left",-29420,-17770],["fork","right",-29366,-17795],["turn","right",-28601,-22839]]},
+{"from":"Scottsbluff","to":"Chadron","man":[["fork","left",-31521,-17873],["turn","left",-29420,-17770],["turn","right",-28601,-22839]]},
 {"from":"Moline","to":"Waterloo","man":[["turn","right",22565,-15658],["fork","right",21426,-19266],["turn","left",21383,-19826],["fork","right",14343,-19889],["turn","right",13972,-20124],["turn","right",14034,-20453]]},
 {"from":"New Orleans","to":"Houma","man":[["fork","right",28305,48664],["fork","right",28186,48923],["fork","right",27114,48499],["turn","left",26916,48277],["turn","right",26233,48795],["fork","left",25553,49430]]},
 {"from":"Joplin","to":"Tulsa","man":[["turn","right",6721,11988],["fork","right",2632,14582],["fork","right",2068,14863],["fork","left",-500,14499]]},
