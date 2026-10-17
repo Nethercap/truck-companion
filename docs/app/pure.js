@@ -334,12 +334,18 @@ function normDeg(d) { return ((d + 540) % 360) - 180; }
 // entre dos nodos del mismo cruce partia el grupo, y la segunda mitad se
 // media sola con el salto lateral como tramo de entrada: un "keep left"
 // falso a 5 m (Discord, 11-10, Lightningroc771).
-function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM, skip) {
+// curveSpanM: los puntos de la curva de un prefab (sin nodo) tampoco cortan
+// el grupo, mientras el cruce entero no pase de curveSpanM (el prefab de
+// punta a punta, ver junctionManeuver). Por defecto 0: cortan.
+function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM, skip, curveSpanM = 0) {
   const span = maxSpanM != null ? maxSpanM : 100;
   let j = i;
   for (;;) {
     let n = j + 1;
     if (n === skip && n + 1 < pts.length - 1) n++;
+    let curva = false;
+    while (curveSpanM > 0 && n < pts.length - 1 && pts[n][4] == null && cum[n] - cum[j] < maxGapM) { n++; curva = true; }
+    if (curva && cum[n] - cum[i] > curveSpanM) return j;
     if (n >= pts.length - 1 || pts[n][3] !== 1 || cum[n] - cum[j] >= maxGapM || cum[n] - cum[i] > span) return j;
     j = n;
   }
@@ -1133,8 +1139,14 @@ function detectManeuver(ctx) {
     // Dentro del grupo, el giro se atribuye al nodo donde mas cambia el
     // rumbo entre cuerdas consecutivas - no al primero del grupo, que en una
     // avenida con nodos cada 20 m puede quedar 80 m antes de la esquina.
+    // Con el prefab entero (ctx.firstRunAt, ver junctionManeuver), en el
+    // primer tramo de nodos de cruce seguidos: la entrada al prefab, de donde
+    // sale la otra calle. Entre todos ganaba la salida y el aviso llegaba de
+    // 20 a 50 m tarde (check_avisos, 17-10).
+    let r1 = iEnd;
+    if (ctx.firstRunAt) for (r1 = i; r1 < iEnd && pts[r1 + 1][3] === 1; r1++);
     let at = i, bestLocal = -1;
-    for (let k = i; k <= iEnd; k++) {
+    for (let k = i; k <= r1; k++) {
       if (k < 1 || k + 1 >= pts.length) continue;
       const local = Math.abs(normDeg(bearingBetween(pts[k], pts[k + 1]) - bearingBetween(pts[k - 1], pts[k])));
       if (local > bestLocal) { bestLocal = local; at = k; }
@@ -1234,6 +1246,46 @@ function detectManeuver(ctx) {
     return { kind: 'turn', direction, delta: routeDelta, at: i, inBearing, outBearing: (inBearing + routeDelta + 360) % 360, quiet: false };
   }
   return { kind: 'fork', direction, delta: routeDelta, at: i };
+}
+
+// La maniobra del cruce que empieza en el nodo ctx.i, con ctx.iEnd el grupo
+// de nodos de cruce seguidos (junctionClusterEnd). Si ahi y en los grupos
+// que siguen dentro del mismo prefab no hay nada que avisar, o todo se calla,
+// se mira el prefab entero, de punta a punta de su curva (curveSpanM): partida
+// en dos por los puntos de la curva, una T se callaba entera. La entrada
+// doblaba poco y la salida no tenia otra calle, que salia de la entrada
+// (Discord, 17-10: de Oregon a Louisiana; la T de (-53869,9028) en ATS).
+// Solo cambia algo si asi sale un giro que no se calla: juntar siempre
+// mezclaba el giro de un cruce con la curva de la calle de despues. Un
+// grupo de adentro que avisa solo queda como estaba, salvo que se lo trague
+// la curva callada de antes (continuesTurn, como en findUpcomingTurn): el
+// ovalo alrededor de una autovia de Estocolmo (ETS2, 24238,-47524).
+// gapM, spanM y skip: los de junctionClusterEnd. Devuelve { iEnd, m }.
+function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
+  const { pts, cum, i } = ctx;
+  const legM = ctx.legM != null ? ctx.legM : 60;
+  const turnThreshold = ctx.turnThreshold != null ? ctx.turnThreshold : 35;
+  const m = detectManeuver(ctx);
+  if (m && !m.quiet) return { iEnd: ctx.iEnd, m };
+  const iEnd = junctionClusterEnd(pts, cum, i, gapM, spanM, skip, curveSpanM);
+  if (iEnd <= ctx.iEnd) return { iEnd: ctx.iEnd, m };
+  const comoPrev = (x, end) => (x && x.kind === 'turn' ? { direction: x.direction, inBearing: x.inBearing, outBearing: x.outBearing, quiet: x.quiet, end } : null);
+  let prev = comoPrev(m, cum[ctx.iEnd]);
+  for (let j = ctx.iEnd + 1; j <= iEnd; j++) {
+    if (pts[j][3] !== 1) continue;
+    const jEnd = junctionClusterEnd(pts, cum, j, gapM, spanM, skip);
+    const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd });
+    if (continuesTurn(prev, mj, cum[j], legM + 20, 135, turnThreshold)) {
+      prev.end = cum[jEnd];
+      prev.outBearing = mj.outBearing;
+    } else {
+      if (mj && !mj.quiet) return { iEnd: ctx.iEnd, m };
+      prev = comoPrev(mj, cum[jEnd]);
+    }
+    j = jEnd;
+  }
+  const todo = detectManeuver({ ...ctx, iEnd, firstRunAt: true });
+  return todo && todo.kind === 'turn' && !todo.quiet ? { iEnd, m: todo } : { iEnd: ctx.iEnd, m };
 }
 
 // Una esquina grande (un cruce en T de un prefab ancho, con mas de 50 m
@@ -3725,6 +3777,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }

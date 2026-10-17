@@ -3952,6 +3952,7 @@ const ROUTE_BEHIND_M = 200;
 const ROUTE_BEHIND_MAX = 400;
 const NAV_JUNCTION_CLUSTER_GAP_M = 50; // nodos de cruce mas cerca que esto son el mismo cruce (prefab)
 const NAV_JUNCTION_CLUSTER_SPAN_M = 100; // y el cruce entero no mide mas que esto
+const NAV_JUNCTION_CURVE_SPAN_M = 60; // un prefab de punta a punta de su curva (junctionManeuver)
 
 // Vista 3D (inclinacion de camara) en modo navegacion, persistida. En nav el
 // camion se ubica en el tercio inferior de la pantalla (padding) para ver mas
@@ -4098,7 +4099,7 @@ function findUpcomingTurn() {
     if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
     if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
-    const iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here);
+    let iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here);
     // Rotonda: se anuncia la salida ("tomar la segunda salida") en la entrada
     // y se calla todo lo de adentro hasta salir. Adentro, la distancia es a la
     // salida; la clave (node) sigue siendo la entrada, asi no cambia el aviso.
@@ -4124,7 +4125,11 @@ function findUpcomingTurn() {
     }
     const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, edgeLine,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
-    let m = detectManeuver({ ...ctx, i, iEnd });
+    // Si ahi no hay nada que avisar, el prefab entero, de punta a punta de
+    // su curva (junctionManeuver): partida en dos, una T se callaba.
+    const jm = junctionManeuver({ ...ctx, i, iEnd }, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here, NAV_JUNCTION_CURVE_SPAN_M);
+    let m = jm.m;
+    iEnd = jm.iEnd;
     // Derecho por el cruce, pero los carriles de un costado se van por una
     // salida (exit only): "keep left" con las flechas, como el juego. Solo
     // donde no hay otra maniobra (laneKeepAt, Discord 17-10).
