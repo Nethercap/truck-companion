@@ -2301,11 +2301,54 @@ function renderWaypointList() {
   if (!row || !list) return;
   row.hidden = waypoints.length === 0;
   list.innerHTML = waypoints.map((wp, i) => {
-    const label = wp.label ? wp.label : `${t('waypoint')} ${i + 1}`;
-    const kind = wp.inGame ? t('waypointInGameShort') : t('waypointAppOnlyShort');
-    return `<div class="waypointItem"><span class="waypointNum">${i + 1}</span><span class="waypointName">${label.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))} <span class="waypointKind">${kind}</span></span><button class="waypointClearBtn" data-index="${i}" data-i18n-title="clear" title="${t('clear')}">✕</button></div>`;
+    const { label, kind } = waypointNameParts(wp, i);
+    return `<div class="waypointItem" title="${escapeHtml(`${label} ${kind}`)}"><span class="waypointNum">${i + 1}</span><span class="waypointName" data-wp="${i}">${waypointRowHtml(wp, i, null)}</span><button class="waypointClearBtn" data-index="${i}" data-i18n-title="clear" title="${t('clear')}">✕</button></div>`;
   }).join('');
   list.querySelectorAll('button[data-index]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); removeWaypoint(Number(b.dataset.index)); }));
+}
+
+function waypointNameParts(wp, i) {
+  return {
+    label: wp.label ? wp.label : `${t('waypoint')} ${i + 1}`,
+    kind: wp.inGame ? t('waypointInGameShort') : t('waypointAppOnlyShort'),
+  };
+}
+
+// La fila de cada waypoint: el numero y, hasta el, el ETA real, el del juego
+// y la distancia (waypointLegEtas), para saber si alcanza el combustible o
+// el sueno (Discord, 17-10). El nombre no entraba al lado y paso al title.
+// Sin ruta para los waypoints de ahora (recien cambiados, sin grafo, sin
+// telemetria), el nombre como antes.
+function waypointRowHtml(wp, i, leg) {
+  if (!leg) {
+    const { label, kind } = waypointNameParts(wp, i);
+    return `${escapeHtml(label)} <span class="waypointKind">${escapeHtml(kind)}</span>`;
+  }
+  // Cada separador va pegado a su pieza: en un celular la fila se parte
+  // y quedaba el "-" colgando al final y la distancia sola abajo.
+  const parte = (texto) => `<span class="waypointEtaPart">${escapeHtml(texto)}</span>`;
+  const dist = useImperial ? leg.km * KM_TO_MI : leg.km;
+  const distText = dist < 10 ? formatDec(dist, currentLang) : formatInt(dist, currentLang);
+  return `${parte(`${t('waypointEtaReal')}: ${formatSeconds(leg.realSeconds)} /`)} `
+    + `${parte(`${t('waypointEtaGame')}: ${formatSeconds(leg.gameSeconds)}`)} `
+    + parte(`- ${distText} ${useImperial ? 'mi' : 'km'}`);
+}
+
+// En cada dato, sin rearmar la lista (los botones tienen sus listeners).
+function updateWaypointListEta(legs) {
+  const list = document.getElementById('waypointList');
+  if (!list) return;
+  for (const el of list.querySelectorAll('.waypointName[data-wp]')) {
+    const i = Number(el.dataset.wp);
+    const wp = waypoints[i];
+    if (!wp) continue;
+    const leg = legs ? legs[i] : null;
+    const html = waypointRowHtml(wp, i, leg);
+    if (el._html === html) continue;
+    el._html = html;
+    el.innerHTML = html;
+    el.classList.toggle('eta', !!leg);
+  }
 }
 
 function finalizeWaypoint(inGame) {
@@ -2355,20 +2398,14 @@ function checkWaypointReached(x, z) {
 // Y a la escala del juego en cada parte (gameKmOf): en la ciudad, a 1:20,
 // decia 25,5 mi con el juego en 4,0 y bajaba mucho mas rapido (14-10).
 // Los tiempos salen de waypointEta (pure.js): el de abajo del ETA del juego
-// en horas de juego, el de abajo del ETA real en tiempo real.
+// en horas de juego, el de abajo del ETA real en tiempo real. Los de cada
+// waypoint de la lista son una parte de esos (waypointLegEtas), con o sin
+// waypoints que el juego no conoce.
 function updateWaypointRoute(data) {
   const gameRow = document.getElementById('etaGameWaypointRow');
   const realRow = document.getElementById('etaRealWaypointRow');
-  const anyAppOnly = waypoints.some(wp => !wp.inGame);
-  const viaKm = anyAppOnly ? gameKmOf(currentRouteWorldPoints) : null;
-  if (viaKm == null) {
-    gameRow.hidden = true;
-    realRow.hidden = true;
-    return;
-  }
-  const distDisplay = useImperial ? viaKm * KM_TO_MI : viaKm;
-  const distText = `${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'}`;
-  const eta = waypointEta({
+  const viaKm = waypoints.length ? gameKmOf(currentRouteWorldPoints) : null;
+  const eta = viaKm == null ? null : waypointEta({
     viaKm,
     gameKm: Number.isFinite(data.routeDistanceKm) ? data.routeDistanceKm : null,
     gameEtaSeconds: data.routeTimeSeconds,
@@ -2377,6 +2414,24 @@ function updateWaypointRoute(data) {
     // Sin push: measuredTimeScale ya lo alimenta una vez por tick.
     timeScale: gameTimeScale.value() ?? distanceScale(),
   });
+  // Los tramos solo si la ruta es la de los waypoints de ahora: recien
+  // cambiados (currentRouteTarget en null) son los de antes, corridos.
+  let legs = null;
+  if (eta && currentRouteTarget) {
+    const medida = waypointLegMeters(currentRouteWorldPoints, waypoints.length);
+    const scale = gameScale();
+    legs = waypointLegEtas(
+      medida.legs.map(m => (m == null ? null : { worldM: m, km: scale.routeMeters(currentRouteFull, currentRouteWorldPoints, m) / 1000 })),
+      { worldM: medida.total, km: viaKm }, eta);
+  }
+  updateWaypointListEta(legs);
+  if (!eta || !waypoints.some(wp => !wp.inGame)) {
+    gameRow.hidden = true;
+    realRow.hidden = true;
+    return;
+  }
+  const distDisplay = useImperial ? viaKm * KM_TO_MI : viaKm;
+  const distText = `${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'}`;
   const timeOf = (sec) => sec != null ? formatSeconds(sec) : t('calculating');
   gameRow.hidden = false;
   realRow.hidden = false;

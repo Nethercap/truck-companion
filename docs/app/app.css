@@ -842,6 +842,9 @@
   .waypointNum { width: 16px; height: 16px; border-radius: 50%; background: #ffb020; color: #1a1002; font-size: 0.66rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .waypointName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .waypointKind { color: var(--muted); font-size: 0.68rem; }
+  /* Con los ETA hasta el waypoint: se parte entre piezas, no adentro de una. */
+  .waypointName.eta { white-space: normal; font-variant-numeric: tabular-nums; }
+  .waypointEtaPart { white-space: nowrap; }
   /* Sin position:relative: pisaria el position:absolute que MapLibre le pone
      al marcador y el div pasaria a ocupar todo el ancho del mapa. */
   .waypointMarkerWrap { cursor: pointer; width: 24px; height: 24px; }

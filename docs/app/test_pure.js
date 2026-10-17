@@ -1550,6 +1550,49 @@ test('waypointEta: el real sale del ETA real, no del ritmo medido en la ciudad (
   assert.ok(Math.abs(sinJuego.realSeconds - 180) < 1e-6);
 });
 
+test('waypointLegMeters: desde el camion hasta el final del tramo de cada waypoint', () => {
+  const { waypointLegMeters } = require('./pure.js');
+  // El camion en (0, 0); el tramo 0 llega al waypoint 1 en (300, 400), el 1
+  // al waypoint 2 en (300, 1400) y el 2 al destino del trabajo en (1300, 1400).
+  const ruta = [[0, 0, 0, 0, null, 0], [300, 400, 0, 0, null, 0],
+    [300, 900, 0, 0, null, 1], [300, 1400, 0, 0, null, 1], [1300, 1400, 0, 0, null, 2]];
+  assert.deepEqual(waypointLegMeters(ruta, 2), { legs: [500, 1500], total: 2500 });
+  // sin trabajo el ultimo waypoint es el destino: su tramo es la ruta entera
+  assert.deepEqual(waypointLegMeters(ruta.slice(0, 4), 2), { legs: [500, 1500], total: 1500 });
+  // el camion ya paso el waypoint 1 y todavia no se saco: 0, no null
+  const pasado = [[300, 600, 0, 0, null, 1], [300, 900, 0, 0, null, 1], [300, 1400, 0, 0, null, 1]];
+  assert.deepEqual(waypointLegMeters(pasado, 2), { legs: [0, 800], total: 800 });
+  // un tramo que no esta en la ruta, o sin ruta: null
+  assert.deepEqual(waypointLegMeters(ruta.slice(0, 2), 2), { legs: [500, null], total: 500 });
+  assert.deepEqual(waypointLegMeters(null, 2), { legs: [null, null], total: null });
+});
+
+test('waypointLegEtas: el juego por los km del juego, el real por los metros manejados (Discord, 17-10)', () => {
+  const { waypointLegEtas, waypointEta } = require('./pure.js');
+  // Saliendo de la ciudad: hasta el waypoint 1 hay 2 km de mundo, 1 adentro
+  // de la ciudad (1:3) y 1 afuera (1:20), 23 km del juego. Despues 48 km de
+  // mundo de ruta hasta el destino: 50 km de mundo y 983 km del juego.
+  const total = { worldM: 50000, km: 983 };
+  const eta = waypointEta({ viaKm: 983, gameKm: 960, gameEtaSeconds: 40000, realEtaSeconds: 2400, avgSpeedKmh: 1000, timeScale: 20 });
+  const [uno, dos] = waypointLegEtas([{ worldM: 2000, km: 23 }, { worldM: 50000, km: 983 }], total, eta);
+  assert.equal(uno.km, 23);
+  assert.ok(Math.abs(uno.gameSeconds - eta.gameSeconds * 23 / 983) < 1e-6);
+  // el real por los metros de mundo: por los km del juego daria la mitad
+  assert.ok(Math.abs(uno.realSeconds - eta.realSeconds * 2000 / 50000) < 1e-6);
+  assert.ok(uno.realSeconds > eta.realSeconds * 23 / 983 * 1.5);
+  // el ultimo waypoint (el destino, sin trabajo) da lo mismo que la fila "via waypoint"
+  assert.ok(Math.abs(dos.gameSeconds - eta.gameSeconds) < 1e-6);
+  assert.ok(Math.abs(dos.realSeconds - eta.realSeconds) < 1e-6);
+  // sin ETA real todavia: el del juego sale igual, el real no
+  const [sinReal] = waypointLegEtas([{ worldM: 2000, km: 23 }], total, { gameSeconds: 40000, realSeconds: null });
+  assert.equal(sinReal.realSeconds, null);
+  assert.ok(sinReal.gameSeconds > 0);
+  // un tramo que no se sabe, o una ruta de largo 0 (ya en el destino)
+  assert.deepEqual(waypointLegEtas([null], total, eta), [null]);
+  assert.deepEqual(waypointLegEtas([{ worldM: 0, km: 0 }], { worldM: 0, km: 0 }, { gameSeconds: 0, realSeconds: 0 }),
+    [{ km: 0, gameSeconds: 0, realSeconds: 0 }]);
+});
+
 test('createCityScale: adentro de las cajas de ciudad el juego va a 1:3', () => {
   const { createCityScale, CITY_SCALE, waypointEta } = require('./pure.js');
   assert.equal(CITY_SCALE, 3);
