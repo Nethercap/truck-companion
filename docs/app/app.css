@@ -1062,6 +1062,56 @@
   #commandsDrawer .cmdBtn { min-height: 50px; padding: 0.3rem 0.2rem; }
 }
 
+/* Vista de cabina (?cab=1, initCab en app.js): solo el mapa en modo
+   navegacion, con el giro arriba y la velocidad y la llegada abajo. Se mira
+   en la pantalla del GPS del camion, que en el juego son unos pocos
+   centimetros: la letra va en vmin y crece con la ventana que copia el mod.
+   La clase la pone el <head>, antes de pintar. */
+.cab body { padding: 0; }
+.cab .appTitle, .cab .setup, .cab #status, .cab .setupHints, .cab #updateBanner, .cab #layoutBar,
+.cab #infoPanel, .cab #commandsDrawer, .cab #mapLeftControls, .cab #topRightControls, .cab #navPanel,
+.cab #routeSummary, .cab #stopSuggest, .cab #bottomRightHud, .cab #toastContainer, .cab #convoyMsgPop,
+.cab #dashOverlay { display: none !important; }
+/* Abierta sin codigo en el link: la fila de conectar, hasta que se conecta */
+.cab.cabNeedsCode .setup { display: flex !important; padding: 0.6rem 0.8rem 0; }
+.cab .layout { border-radius: 0; }
+/* --u: la unidad de todo lo de la vista de cabina. Crece con la ventana
+   (vmin) y con el tamano elegido con + y - (--cab-size, applyCabScale),
+   con tope por el ancho: la barra de abajo mide unas 135 --u y no se sale
+   ni en 4:3. Los tamanos son para la pantalla del Scania en el juego, que
+   en la captura del 17-10 media unos 190 px de alto: lo mas chico (las
+   etiquetas) queda en unos 9 px ahi. */
+.cabScreen { --u: min(calc(1vmin * var(--cab-size, 1)), 0.7vw);
+  position: absolute; inset: 0; z-index: 1300; cursor: pointer; color: #fff; }
+.cabScreen[hidden], .cabScreen [hidden] { display: none !important; }
+.cabTop, .cabBar { position: absolute; left: 0; right: 0; display: flex; align-items: center; background: rgba(20, 23, 28, 0.92); }
+.cabTop { top: 0; gap: calc(var(--u) * 3); padding: calc(var(--u) * 2) calc(var(--u) * 3);
+  box-shadow: 0 calc(var(--u) * 0.5) calc(var(--u) * 2) rgba(0, 0, 0, 0.45); }
+.cabIcon { flex: none; width: calc(var(--u) * 13); height: calc(var(--u) * 16); border-radius: calc(var(--u) * 1.6); background: #1f6fd1;
+  display: flex; align-items: center; justify-content: center; }
+.cabIcon:empty { display: none; }
+.cabIcon svg { width: calc(var(--u) * 10.4); height: calc(var(--u) * 13); }
+.cabTurn { flex: 1; min-width: 0; }
+.cabTurnText { font-size: calc(var(--u) * 8); font-weight: 700; line-height: 1.12;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cabNext { font-size: calc(var(--u) * 5); color: #b4bcc8; margin-top: calc(var(--u) * 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cabNext:empty { display: none; }
+.cabTurn .navLanes { justify-content: flex-start; gap: calc(var(--u) * 0.8); margin: calc(var(--u) * 1.2) 0 0; }
+.cabTurn .navLane { padding: calc(var(--u) * 0.5) calc(var(--u) * 0.7); border-radius: calc(var(--u) * 0.8); }
+.cabTurn .navLane svg { width: calc(var(--u) * 5.2); height: calc(var(--u) * 6.5); }
+.cabBar { bottom: 0; gap: calc(var(--u) * 4); padding: calc(var(--u) * 1.6) calc(var(--u) * 3); font-variant-numeric: tabular-nums; }
+.cabBar .limitSign { width: calc(var(--u) * 13); height: calc(var(--u) * 13); border-width: calc(var(--u) * 1.3); font-size: calc(var(--u) * 5.6); }
+.cabBar .limitSign.over::after { inset: calc(var(--u) * -1.3); border-width: calc(var(--u) * 0.9); }
+.cabSpeed { white-space: nowrap; }
+.cabSpeed b { font-size: calc(var(--u) * 12); font-weight: 700; line-height: 1; }
+.cabSpeed span { font-size: calc(var(--u) * 4.6); color: #b4bcc8; margin-left: calc(var(--u) * 1); }
+.cabStat { display: flex; flex-direction: column; align-items: flex-end; margin-left: auto; line-height: 1.05; white-space: nowrap; }
+.cabStat + .cabStat { margin-left: 0; }
+.cabStat b { font-size: calc(var(--u) * 8); font-weight: 700; }
+.cabStat span { font-size: calc(var(--u) * 4.6); color: #b4bcc8; }
+.cabHint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: calc(var(--u) * 1.6) calc(var(--u) * 3);
+  border-radius: 999px; background: rgba(20, 23, 28, 0.85); font-size: calc(var(--u) * 4.4); white-space: nowrap; pointer-events: none; }
+
 /* Reducir movimiento (ajuste del sistema; auditoria del 12-10, P3): sin
    pulsos, empujoncitos ni paneles que se deslizan. Lo que avisa algo queda
    fijo a la vista: el anillo de exceso de velocidad y el cartel de

@@ -1,6 +1,11 @@
 // Logica de la app (extraida de index.html). Las funciones puras testeables viven en pure.js.
 const statusEl = document.getElementById('status');
 let ws = null;
+// Vista de cabina (?cab=1): ver initCab. El tamano (+ y -) es de la
+// ventana de cabina y va en su propia clave, fuera de los ajustes.
+const cabMode = cabModeFromSearch(location.search);
+const CAB_SIZE_KEY = 'truckdash_cab_size';
+let cabSize = cabMode ? cabSizeSetting(lsGet(CAB_SIZE_KEY)) : CAB_SIZE_DEFAULT;
 
 // Las traducciones (EN/ES aca, el resto en i18n.js) viven en
 // i18n_en_es.js, que se carga antes que este archivo.
@@ -1872,6 +1877,7 @@ function ensureMapInitialized() {
     showNoWebgl(err);
     return;
   }
+  if (cabMode) applyCabScale(); // la densidad del mapa estirado
   // Mientras haya un dedo o el mouse apretado sobre el mapa, la camara que
   // sigue al camion no se mueve (ver mapGestureActive).
   const mapCanvas = map.getCanvasContainer();
@@ -4403,6 +4409,108 @@ function initPip() {
   document.getElementById('mapAwayBack').addEventListener('click', () => pipMapOut());
 }
 
+// ---------------------------------------------------------------------------
+// Vista de cabina (?cab=1, 17-10). Discord: un usuario puso el tablero en la
+// pantalla del GPS del camion con un mod que copia una ventana a esa
+// pantalla (PrismTextureStreamer), pero copiaba el tablero entero, con
+// botones y letra chica que ahi no se leen ni se pueden tocar. Esta es la
+// misma pagina en una ventana aparte (cabViewBtn en Ajustes) con el mapa en
+// modo navegacion, el giro arriba y la velocidad y la llegada abajo, en
+// letra que crece con la ventana, y el mapa estirado igual (applyCabScale).
+// Como la ventana flotante, lee lo que ya muestra el tablero (panel de
+// navegacion, mini-HUD, resumen de ruta).
+// La pestana compite por ser la lider como cualquier otra: si es la unica
+// abierta, la voz y los viajes guardados salen de ella.
+// ---------------------------------------------------------------------------
+const CAB_HINT_MS = 8000;
+const CAB_SIZE_HINT_MS = 1500;
+let cabHintTimer = null;
+
+function showCabHint(texto, ms) {
+  const hint = document.getElementById('cabHint');
+  hint.textContent = texto;
+  hint.hidden = false;
+  clearTimeout(cabHintTimer);
+  cabHintTimer = setTimeout(() => { hint.hidden = true; }, ms);
+}
+
+// El mapa, estirado como con el zoom del navegador (cabMapScale): el
+// contenedor toma el tamano de la ventana dividido k y se agranda k veces,
+// y MapLibre dibuja a k veces la densidad para que no salga borroso. Nadie
+// lo toca (cabScreen lo tapa), asi que el transform no molesta a los gestos.
+// La letra crece con --cab-size (app.css).
+function applyCabScale() {
+  if (!cabMode) return;
+  document.documentElement.style.setProperty('--cab-size', String(cabSize));
+  const panel = document.getElementById('mapPanel');
+  const cont = document.getElementById('mapCanvas');
+  const w = panel.clientWidth, h = panel.clientHeight;
+  if (!w || !h) return;
+  const k = cabMapScale(h, cabSize);
+  cont.style.width = `${w / k}px`;
+  cont.style.height = `${h / k}px`;
+  cont.style.transformOrigin = '0 0';
+  cont.style.transform = k > 1 ? `scale(${k})` : '';
+  if (map) map.setPixelRatio((liteMode ? 1 : window.devicePixelRatio || 1) * k);
+}
+
+function refreshCab() {
+  const $ = (id) => document.getElementById(id);
+  // updateNavPanel lo esconde con la ruta borrada a mano; navPanelParts
+  // queda con el ultimo giro.
+  const parts = $('navPanel').style.display !== 'none' ? navPanelParts : null;
+  $('cabTop').hidden = false;
+  $('cabBar').hidden = false;
+  $('cabIcon').innerHTML = parts ? turnIconHtml(parts.info) : '';
+  $('cabTurnText').textContent = parts ? turnTextWithoutArrow(parts.text) : t('navNoRoute');
+  $('cabLanes').innerHTML = parts ? lanesHtml(parts.lanes) : '';
+  $('cabNext').textContent = parts ? parts.next : '';
+  $('cabSpeed').textContent = $('miniSpeedBig').textContent;
+  $('cabUnit').textContent = $('miniSpeedUnitLabel').textContent;
+  const mini = $('miniLimitSign');
+  const limite = mini.textContent.trim();
+  const lim = $('cabLimit');
+  lim.hidden = !limite || limite === '--';
+  lim.textContent = limite;
+  lim.classList.toggle('over', !lim.hidden && mini.classList.contains('over'));
+  const resumen = routeSummaryShown();
+  $('cabRemaining').textContent = resumen ? $('routeRemaining').textContent : '--';
+  $('cabArrival').textContent = resumen ? $('routeArrival').textContent : '--';
+}
+
+// Va al final del archivo: setNavMode usa variables (let) de mas abajo.
+function initCab() {
+  if (!cabMode) return;
+  const pantalla = document.getElementById('cabScreen');
+  pantalla.hidden = false;
+  // Abierta a mano sin codigo: queda la fila de conectar (ver connectBtn)
+  const params = new URLSearchParams(location.search);
+  if (!params.get('code') && !params.get('local') && !params.get('demo')) document.documentElement.classList.add('cabNeedsCode');
+  setNavMode(true);
+  applyCabScale();
+  // Pantalla completa, zoom del navegador o ventana estirada a mano
+  if (window.ResizeObserver) new ResizeObserver(applyCabScale).observe(document.getElementById('mapPanel'));
+  else window.addEventListener('resize', applyCabScale);
+  // Un clic pone o saca la pantalla completa: en el monitor de al lado la
+  // ventana queda sin bordes ni barras, que el mod copiaria tambien.
+  pantalla.addEventListener('click', toggleFsMode);
+  if (document.documentElement.requestFullscreen) showCabHint(t('cabFullscreenHint'), CAB_HINT_MS);
+  document.addEventListener('fullscreenchange', () => { if (document.fullscreenElement) document.getElementById('cabHint').hidden = true; });
+  // + y - cambian el tamano: con un clic no se puede (pone pantalla
+  // completa) y el zoom del navegador ya no hace nada aca (applyCabScale).
+  document.addEventListener('keydown', (e) => {
+    // Ctrl + es el zoom del navegador; la fila de conectar tambien recibe teclas
+    if (e.ctrlKey || e.metaKey || e.altKey || (e.target.closest && e.target.closest('input, select, textarea'))) return;
+    const nuevo = cabSizeStep(cabSize, e.key);
+    if (nuevo === null) return;
+    e.preventDefault();
+    cabSize = nuevo;
+    lsSet(CAB_SIZE_KEY, String(cabSize));
+    applyCabScale();
+    showCabHint(`${t('dashSize')} ${Math.round(cabSize * 100)}%`, CAB_SIZE_HINT_MS);
+  });
+}
+
 let navPanelParts = null; // lo ultimo que mostro el panel, para el mini-HUD
 const turnAnnouncer = createTurnAnnouncer();
 function updateNavPanel(turn) {
@@ -6513,6 +6621,7 @@ function handleTelemetry(data) {
   trackFuel(data);
   trackStatus(data);
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
+  if (cabMode) setTimeout(refreshCab, 0); // idem
   if (clientOverlayOn || obsOverlayOn) setTimeout(sendNavHud, 0); // idem
   const enAuto = isDrivingCar(data);
   if (enAuto !== drivingCar) { drivingCar = enAuto; applyVehicleMode(); }
@@ -6670,6 +6779,13 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   currentRouteWorldPoints = null;
   if (map && map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
   setRouteData(emptyLineString());
+  if (cabMode) {
+    // El codigo queda en la URL: si la ventana se recarga, se conecta sola
+    document.documentElement.classList.remove('cabNeedsCode');
+    const url = new URL(location.href);
+    url.searchParams.set('code', code);
+    try { history.replaceState(null, '', url); } catch (e) { /* nada */ }
+  }
   connectWs(backend, code, { remembered: codeFromLink });
 });
 
@@ -6749,7 +6865,7 @@ document.getElementById('tourNextBtn').addEventListener('click', () => {
 document.getElementById('tourSkipBtn').addEventListener('click', endTour);
 document.getElementById('helpBtn').addEventListener('click', startTour);
 
-if (!lsGet('truckdash_tour_seen')) {
+if (!lsGet('truckdash_tour_seen') && !cabMode) {
   // deja que el mapa/botones terminen de acomodarse; en modo espectador
   // (convoy o mapa en vivo, sin cliente) el tour de pairing no tiene sentido
   setTimeout(() => { if (!conn.spectator) startTour(); }, 600);
@@ -6882,6 +6998,7 @@ function runDemo(path) {
 renderConnectionUi();
 renderTripHistory();
 buildSpeedTicks();
+initCab();
 
 // El .exe del cliente abre el navegador directo con ?code=...&backend=...
 // para que el usuario no tenga que tipear nada a mano; ?local=1 y ?demo=1
@@ -7005,6 +7122,14 @@ document.getElementById('dashCopyLinkBtn').addEventListener('click', async () =>
     // muestra para copiarlo a mano.
     prompt(t('dashCopyLink'), url.toString());
   }
+});
+
+// La vista de cabina en una ventana aparte, no en una pestana: el mod copia
+// lo que muestra la ventana, y una pestana de atras no se ve.
+document.getElementById('cabViewBtn').addEventListener('click', () => {
+  const code = document.getElementById('code').value.trim().toUpperCase();
+  const { width, height } = CAB_WINDOW_SIZE;
+  window.open(cabViewUrl(location.href, code), 'truckdash-cab', `popup,width=${width},height=${height}`);
 });
 
 // Armador del overlay para OBS (docs/overlay/) con el codigo ya puesto.

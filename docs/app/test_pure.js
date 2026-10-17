@@ -2841,6 +2841,98 @@ test('carriles en nav_hud: solo enteros chicos, y el dibujo sale de ahi', () => 
   assert.equal((html.match(/navLane on/g) || []).length, 2);
 });
 
+test('vista de cabina: se prende solo con cab=1', () => {
+  const { cabModeFromSearch } = require('./pure.js');
+  assert.equal(cabModeFromSearch('?cab=1'), true);
+  assert.equal(cabModeFromSearch('?code=ABCD1234&cab=1'), true);
+  for (const s of ['', '?cab=0', '?cab=', '?cabin=1', '?demo=1']) assert.equal(cabModeFromSearch(s), false, s);
+});
+
+test('vista de cabina: el mapa se estira con la ventana, como el zoom del navegador', () => {
+  const { cabMapScale, CAB_MAP_HEIGHT } = require('./pure.js');
+  // A cualquier alto, el mapa ocupa lo mismo de la ventana: a pantalla
+  // completa no vuelve a quedar chico
+  assert.equal(cabMapScale(CAB_MAP_HEIGHT * 2, 1), 2);
+  assert.equal(cabMapScale(1080, 1), 1080 / CAB_MAP_HEIGHT);
+  // Mas grande con + (tambien la letra, en el CSS)
+  assert.equal(cabMapScale(1080, 1.5), 1080 * 1.5 / CAB_MAP_HEIGHT);
+  // Nunca se achica, y sin alto (la ventana todavia sin armar) queda en 1
+  assert.equal(cabMapScale(CAB_MAP_HEIGHT / 2, 1), 1);
+  for (const h of [0, -5, NaN, undefined, null]) assert.equal(cabMapScale(h, 1), 1, String(h));
+  // Un tamano guardado roto no rompe la cuenta
+  assert.equal(cabMapScale(600, 'abc'), 600 / CAB_MAP_HEIGHT);
+});
+
+test('vista de cabina: el tamano con + y -, entre los topes y de a 10 %', () => {
+  const { cabSizeStep, cabSizeSetting, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT } = require('./pure.js');
+  assert.equal(cabSizeStep(1, '+'), 1.1);
+  assert.equal(cabSizeStep(1, '='), 1.1); // la misma tecla sin Shift
+  assert.equal(cabSizeStep(1, '-'), 0.9);
+  assert.equal(cabSizeStep(1.7, '0'), CAB_SIZE_DEFAULT);
+  assert.equal(cabSizeStep(1, 'a'), null);
+  assert.equal(cabSizeStep(1, 'Enter'), null);
+  assert.equal(cabSizeStep(CAB_SIZE_MAX, '+'), CAB_SIZE_MAX);
+  assert.equal(cabSizeStep(CAB_SIZE_MIN, '-'), CAB_SIZE_MIN);
+  // Sin errores de coma flotante que se acumulen
+  let s = 1;
+  for (let i = 0; i < 7; i++) s = cabSizeStep(s, '+');
+  assert.equal(s, 1.7);
+  // Lo guardado en localStorage llega como texto, o no llega
+  assert.equal(cabSizeSetting('1.3'), 1.3);
+  for (const malo of [null, '', 'x', undefined, NaN]) assert.equal(cabSizeSetting(malo), CAB_SIZE_DEFAULT, String(malo));
+  assert.equal(cabSizeSetting('9'), CAB_SIZE_MAX);
+  assert.equal(cabSizeSetting('0.1'), CAB_SIZE_MIN);
+});
+
+test('vista de cabina: el link lleva lo que hace falta para conectarse sola', () => {
+  const { cabViewUrl } = require('./pure.js');
+  const q = (u) => Object.fromEntries(new URL(u).searchParams);
+  // Con codigo (el link que abre el cliente trae backend): el codigo viaja
+  assert.deepEqual(q(cabViewUrl('https://trucksim-dash.com/app/?code=OLD&backend=wss%3A%2F%2Fx', 'ABCD1234')),
+    { code: 'ABCD1234', backend: 'wss://x', cab: '1' });
+  // Codigo tipeado a mano, sin nada en la URL
+  assert.equal(cabViewUrl('https://trucksim-dash.com/app/', 'ABCD1234'), 'https://trucksim-dash.com/app/?code=ABCD1234&cab=1');
+  // LAN y demo siguen como estan, sin codigo
+  assert.deepEqual(q(cabViewUrl('http://192.168.1.5:27765/app/?local=1', 'ABCD1234')), { local: '1', cab: '1' });
+  assert.deepEqual(q(cabViewUrl('https://trucksim-dash.com/app/?demo=1', 'DEMO')), { demo: '1', cab: '1' });
+  // Convoy y mapa en vivo se quedan en la pestana; el ancla tambien
+  assert.deepEqual(q(cabViewUrl('https://trucksim-dash.com/app/?code=ABCD1234&convoy=XY12&live=ats#x', 'ABCD1234')),
+    { code: 'ABCD1234', cab: '1' });
+  assert.equal(new URL(cabViewUrl('https://trucksim-dash.com/app/#x', '')).hash, '');
+});
+
+test('vista de cabina: la flecha grande sale de la maniobra', () => {
+  const { turnIconShape, turnIconHtml, LANE_PATHS } = require('./pure.js');
+  assert.deepEqual(turnIconShape('straight'), { shape: 'straight' });
+  assert.deepEqual(turnIconShape({ kind: 'turn', direction: 'left' }), { shape: 'left' });
+  assert.deepEqual(turnIconShape({ kind: 'turn', direction: 'right' }), { shape: 'right' });
+  assert.deepEqual(turnIconShape({ kind: 'fork', direction: 'left' }), { shape: 'slightLeft' });
+  assert.deepEqual(turnIconShape({ kind: 'fork', direction: 'right' }), { shape: 'slightRight' });
+  assert.deepEqual(turnIconShape({ kind: 'roundabout', exit: 3, ccw: true }), { shape: 'roundabout', exit: 3 });
+  // Sin maniobra no hay flecha
+  for (const nada of [null, undefined, '', 'x', {}, { kind: 'otro' }]) {
+    assert.equal(turnIconShape(nada), null, JSON.stringify(nada));
+    assert.equal(turnIconHtml(nada), '');
+  }
+  // La forma es la de la flecha de carril, y la rotonda lleva su salida
+  assert.ok(turnIconHtml({ kind: 'turn', direction: 'right' }).includes(LANE_PATHS.right[0]));
+  assert.ok(turnIconHtml({ kind: 'roundabout', exit: 2 }).includes('>2</text>'));
+  // Una salida rara no se escribe en el SVG
+  for (const exit of ['<b>', 2.5, -1, 0, 120]) {
+    const html = turnIconHtml({ kind: 'roundabout', exit });
+    assert.ok(html.includes('<circle') && !html.includes('<text'), String(exit));
+  }
+});
+
+test('vista de cabina: el texto del giro sin la flecha del principio', () => {
+  const { turnTextWithoutArrow } = require('./pure.js');
+  assert.equal(turnTextWithoutArrow('↱ Turn right in 300 m'), 'Turn right in 300 m');
+  assert.equal(turnTextWithoutArrow('↻ Roundabout in 1 km: take the 2nd exit'), 'Roundabout in 1 km: take the 2nd exit');
+  assert.equal(turnTextWithoutArrow('⬆ Continue straight'), 'Continue straight');
+  assert.equal(turnTextWithoutArrow('Sin destino asignado'), 'Sin destino asignado');
+  assert.equal(turnTextWithoutArrow(null), '');
+});
+
 test('stabilizeManeuver: el giro siguiente hacia el otro lado, a menos de 40 m, no queda tapado por el anterior', () => {
   // Pasado un "turn left", la entrada a la empresa a la derecha 38 m despues
   // (Le Mans -> Bourges, simulaciones del 15-10): antes seguia "turn left".

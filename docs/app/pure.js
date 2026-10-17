@@ -3226,6 +3226,104 @@ function lanesHtml(rec) {
   }).join('')}</span>`;
 }
 
+// ------------------------------------------------------- vista de cabina
+// La vista de cabina (?cab=1, 17-10): el tablero en una ventana aparte, con
+// el mapa, el giro y la llegada en grande, para un mod que copia una ventana
+// a la pantalla del GPS del camion (Discord: un usuario lo armo con
+// PrismTextureStreamer sobre el tablero entero). La ventana arranca chica,
+// que es menos para dibujar: todo crece con ella (cabMapScale y el CSS), asi
+// que a pantalla completa se ve igual, solo mas nitido.
+const CAB_WINDOW_SIZE = { width: 854, height: 480 };
+
+function cabModeFromSearch(search) {
+  try { return new URLSearchParams(search).get('cab') === '1'; } catch (e) { return false; }
+}
+
+// El mapa de la vista de cabina se dibuja como si la ventana midiera
+// CAB_MAP_HEIGHT px de alto y se estira hasta llenarla: es lo que hace el
+// zoom del navegador, que el primer usuario tuvo que subir a 250 % para
+// leer algo en la pantalla del juego (17-10; con una ventana de 1080 p eso
+// son unos 380 px). Sin esto la letra crecia con la ventana pero las
+// calles, los nombres y el camion no, y a pantalla completa volvian a ser
+// hilos. size: el tamano elegido con + y - (cabSizeStep), que tambien
+// agranda la letra; las pantallas de los camiones no miden todas lo mismo.
+const CAB_MAP_HEIGHT = 300;
+const CAB_SIZE_MIN = 0.6;
+const CAB_SIZE_MAX = 2;
+const CAB_SIZE_STEP = 0.1;
+const CAB_SIZE_DEFAULT = 1;
+
+function cabSizeSetting(raw) {
+  const n = Number(raw);
+  if (raw === null || raw === '' || !Number.isFinite(n)) return CAB_SIZE_DEFAULT;
+  return Math.round(Math.min(CAB_SIZE_MAX, Math.max(CAB_SIZE_MIN, n)) * 10) / 10;
+}
+
+// Cuanto se estira el mapa (nunca se achica: en una ventana mas baja que
+// la referencia queda como esta).
+function cabMapScale(heightPx, size) {
+  if (!(heightPx > 0)) return 1;
+  return Math.max(1, heightPx * cabSizeSetting(size) / CAB_MAP_HEIGHT);
+}
+
+// + (o =, la misma tecla sin Shift) agranda, - achica, 0 vuelve al de
+// fabrica; cualquier otra tecla, null.
+function cabSizeStep(size, key) {
+  if (key === '0') return CAB_SIZE_DEFAULT;
+  const paso = key === '+' || key === '=' ? 1 : key === '-' ? -1 : 0;
+  if (!paso) return null;
+  return cabSizeSetting(cabSizeSetting(size) + paso * CAB_SIZE_STEP);
+}
+
+// El link de la ventana de cabina: la misma pagina con cab=1 y lo que hace
+// falta para conectarse sola. El codigo no se guarda en ningun lado: viaja
+// en la URL, como en el link que abre el cliente. En LAN (local=1) y en la
+// demo no hay codigo que poner; live y convoy sin codigo son de espectador,
+// sin camion propio que mostrar.
+function cabViewUrl(href, code) {
+  const url = new URL(href);
+  url.hash = '';
+  for (const p of ['live', 'convoy']) url.searchParams.delete(p);
+  if (code && code !== 'DEMO' && !url.searchParams.get('local') && !url.searchParams.get('demo')) url.searchParams.set('code', code);
+  url.searchParams.set('cab', '1');
+  return url.toString();
+}
+
+// La flecha grande del giro: las mismas formas que las de carril
+// (LANE_PATHS); la rotonda es un anillo con el numero de la salida adentro.
+// info: la maniobra de navTurnParts, o 'straight' si sigue derecho.
+function turnIconShape(info) {
+  if (info === 'straight') return { shape: 'straight' };
+  if (!info || typeof info !== 'object') return null;
+  if (info.kind === 'roundabout') {
+    return { shape: 'roundabout', exit: Number.isInteger(info.exit) && info.exit > 0 && info.exit < 100 ? info.exit : null };
+  }
+  const left = info.direction === 'left';
+  if (info.kind === 'fork') return { shape: left ? 'slightLeft' : 'slightRight' };
+  if (info.kind === 'turn') return { shape: left ? 'left' : 'right' };
+  return null;
+}
+
+// Solo arma texto fijo y un numero validado (turnIconShape).
+function turnIconHtml(info) {
+  const s = turnIconShape(info);
+  if (!s) return '';
+  const svg = (adentro) => `<svg viewBox="0 0 24 30" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${adentro}</svg>`;
+  if (s.shape === 'roundabout') {
+    const num = s.exit ? `<text x="12" y="13.9" text-anchor="middle" font-size="8" font-weight="800" font-family="system-ui, sans-serif" fill="#ffffff" stroke="none">${s.exit}</text>` : '';
+    return svg(`<path d="M12 28V17.5"/><circle cx="12" cy="11" r="6.5"/>${num}`);
+  }
+  const [trazo, punta] = LANE_PATHS[s.shape];
+  return svg(`<path d="M12 28V17"/><path d="${trazo}"/><polygon points="${punta}" fill="#ffffff" stroke="none"/>`);
+}
+
+// El texto del giro sin la flecha del principio (↰, ↻, ⬆): la vista de
+// cabina la dibuja aparte en grande, y un lector de pantalla la leeria por
+// su nombre.
+function turnTextWithoutArrow(text) {
+  return String(text == null ? '' : text).replace(/^[^\p{L}\p{N}]+/u, '');
+}
+
 // ------------------------------------------------------- accesibilidad
 // Tab con un modal abierto (app.js, modales accesibles): el foco da la vuelta
 // adentro en vez de irse al mapa de atras. count = controles que se pueden
@@ -3252,8 +3350,7 @@ function createTurnAnnouncer() {
       const id = turnIdentity(turn);
       if (!id || !text || id === lastId) return null;
       lastId = id;
-      // La flecha del principio (↰, ↻) el lector la leeria por su nombre
-      return String(text).replace(/^[^\p{L}\p{N}]+/u, '');
+      return turnTextWithoutArrow(text);
     },
   };
 }
@@ -3492,6 +3589,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, waypointEta, CITY_SCALE, CITY_GAP_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }
