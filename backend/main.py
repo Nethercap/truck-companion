@@ -51,6 +51,61 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Desde un navegador, el relay solo atiende a la web propia y a la copia que
+# sirve el cliente en la red local (modo LAN, http://<ip de la PC>:27765). El
+# repo es publico: una copia de la web alojada en otro dominio funcionaba
+# tal cual contra este relay (17-10). Sin header Origin (el cliente de
+# Python, el servidor LAN, curl) no se mira nada: no son navegadores.
+# TRUCKDASH_ORIGENES=avisar deja pasar todo y solo anota en el log los
+# origenes que se rechazarian (por si uno legitimo quedo afuera).
+ORIGENES_WEB = {"https://trucksim-dash.com", "https://www.trucksim-dash.com"}
+_ORIGEN_LOCAL = re.compile(
+    r"^https?://("
+    r"localhost|\[::1\]|127\.\d+\.\d+\.\d+"
+    r"|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|169\.254\.\d+\.\d+"
+    r"|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+"  # VPN de malla (Tailscale, CGNAT)
+    r"|[a-z0-9-]+|[a-z0-9-]+\.local"  # el nombre de la PC en la red local
+    r")(:\d+)?$",
+    re.IGNORECASE,
+)
+_origenes_avisados: dict[str, float] = {}
+
+
+def origen_permitido(origin: Optional[str]) -> bool:
+    if not origin:
+        return True
+    return origin in ORIGENES_WEB or bool(_ORIGEN_LOCAL.match(origin))
+
+
+class SoloOrigenesPropios:
+    """Rechaza (403, o el handshake del WebSocket) lo que llega desde un
+    navegador en otro dominio."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            origin = next((v.decode("latin-1") for k, v in scope.get("headers", []) if k == b"origin"), None)
+            if not origen_permitido(origin):
+                ahora = time.time()
+                if ahora - _origenes_avisados.get(origin, 0) > 3600:
+                    _origenes_avisados[origin] = ahora
+                    logging.warning("Origen ajeno %s en %s", origin, scope.get("path"))
+                if os.environ.get("TRUCKDASH_ORIGENES", "aplicar") != "avisar":
+                    if scope["type"] == "websocket":
+                        await receive()  # websocket.connect
+                        await send({"type": "websocket.close", "code": 1008})
+                    else:
+                        await send({"type": "http.response.start", "status": 403,
+                                    "headers": [(b"content-type", b"text/plain; charset=utf-8")]})
+                        await send({"type": "http.response.body", "body": b"origin not allowed"})
+                    return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(SoloOrigenesPropios)
+
 # 8 caracteres alfanumericos (36^8 ~= 2.8 billones de combinaciones) en vez de
 # 6 (36^6 ~= 2.200 millones) para que adivinar un codigo ajeno sea muchisimo
 # mas caro, sumado al limite de intentos de abajo.
