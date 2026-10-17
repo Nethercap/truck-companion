@@ -355,6 +355,25 @@ test('maneuver: la entrada a una rotonda se anuncia aunque no tenga otra salida'
   assert.equal(ringThrough(recta, (k) => nodos[k], 1, 0), false);
 });
 
+test('maneuver: esquina con un brazo muerto del prefab no es la entrada a una rotonda (Discord, 17-10)', () => {
+  // la calle dobla 90 grados a la derecha en el nodo 1; el prefab tiene un
+  // brazo (nodo 4) que sigue derecho 30 m y no lleva a ninguna calle
+  const route = [[0, -300], [0, 0], [300, 0], [600, 0]];
+  // brazo de doble mano con su tapa: un triangulo de un sentido (5 -> 6 -> 7
+  // -> 5) para dar la vuelta. Se podia ir y volver por los mismos nodos.
+  let ctx = scenario({ route, extraNodes: [[0, 30], [0, 45], [8, 55], [-8, 55]],
+    edges: [[1, 4], [4, 1], [4, 5], [5, 4], [5, 6], [6, 7], [7, 5]] });
+  assert.equal(ringThrough(ctx.adjacency, (k) => ctx.nodes[k], 1, 0), false);
+  assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).quiet], ['turn', true]);
+  // curvas de doble mano del prefab en T: 1 -> 2 -> 4 -> 1 es un triangulo
+  ctx = scenario({ route, extraNodes: [[0, 30]], edges: [[2, 1], [1, 4], [4, 1], [2, 4], [4, 2]] });
+  assert.equal(ringThrough(ctx.adjacency, (k) => ctx.nodes[k], 1, 0), false);
+  assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).quiet], ['turn', true]);
+  // con una calle de verdad detras del brazo, si: hay por donde equivocarse
+  ctx = scenario({ route, extraNodes: [[0, 30], [0, 400]], edges: [[2, 1], [1, 4], [4, 1], [2, 4], [4, 2], [4, 5]] });
+  assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).quiet], ['turn', false]);
+});
+
 test('continuesTurn: una esquina partida en dos nodos se anuncia una vez; dos giros de verdad, dos', () => {
   const prev = { direction: 'left', inBearing: 0, outBearing: 315, quiet: false, end: 1000 };
   // segunda mitad de la misma esquina: de la entrada (norte) a la salida (oeste) son 90 grados

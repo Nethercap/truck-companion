@@ -14,6 +14,14 @@
 //
 // Uso: node tools/simular_navegacion.js [--variantes ats,ets2] [--rutas 30]
 //        [--semilla 1] [--salida carpeta] [--cache carpeta] [--carriles carpeta]
+//        [--estados or,wa] [--destinos la,tx]
+//
+// --estados: solo empresas de esos estados (o paises en ETS2), por la
+// sigla de EE.UU. o por el nombre de pois-<v>.json (countries). Con
+// --destinos, la llegada es en esos otros y las rutas son todas largas
+// (sin tope de distancia): un viaje de Oregon a Louisiana (Discord, 17-10).
+// Cada "turn" anunciado queda en giros.json con su cruce (cuanto dobla,
+// las otras salidas y su velocidad) para filtrarlos despues.
 'use strict';
 const fs = require('fs');
 const os = require('os');
@@ -156,6 +164,19 @@ async function cargarVariante(v, cache, H) {
   return { v, g, cities, pois, parserCities, lanes };
 }
 
+// Sigla de EE.UU. -> estado como lo nombra pois-<v>.json (countries).
+const SIGLAS = { al: 'alabama', az: 'arizona', ar: 'arkansas', ca: 'california', co: 'colorado', ct: 'connecticut', dc: 'dc',
+  fl: 'florida', ga: 'georgia', id: 'idaho', il: 'illinois', in: 'indiana', ia: 'iowa', ks: 'kansas', ky: 'kentucky',
+  la: 'louisiana', me: 'maine', md: 'maryland', ma: 'massachusets', mi: 'michigan', mn: 'minnesota', ms: 'mississippi',
+  mo: 'missouri', mt: 'montana', ne: 'nebraska', nv: 'nevada', nh: 'nhampshire', nj: 'njersey', nm: 'new_mexico',
+  ny: 'newyork', nc: 'ncarolina', nd: 'ndakota', oh: 'ohio', ok: 'oklahoma', or: 'oregon', pa: 'pennsylvania',
+  ri: 'rhodei', sc: 'scarolina', sd: 'south_dakota', tn: 'tennessee', tx: 'texas', ut: 'utah', vt: 'vermont',
+  va: 'virginia', wa: 'washington', wv: 'wvirginia', wi: 'wisconsin', wy: 'wyoming' };
+function listaEstados(txt) {
+  if (!txt) return null;
+  return new Set(String(txt).toLowerCase().split(',').map(x => x.trim()).filter(Boolean).map(x => SIGLAS[x] || x));
+}
+
 const MANO_IZQUIERDA = new Set(['uk', 'ireland', 'malta', 'cyprus', 'isle_of_man', 'jersey', 'guernsey', 'faroe']);
 
 // Grilla de nodos para buscar el mas cercano rapido (la app recorre todos).
@@ -192,6 +213,15 @@ function lineaArista(g, a, b) {
   return line.concat(mids, [g.nodeXY(b)]);
 }
 
+// km/h de la arista a -> b (los segundos del grafo salen de la velocidad
+// de la calle), o null
+function velArista(g, a, b) {
+  const k = g.dirEdge(a, b);
+  if (k === -1) return null;
+  const e = g.adjEdge[k], seg = g.edgeT ? g.edgeS[e] + g.edgeT[e] / 10 : g.edgeS[e];
+  return seg > 0 ? Math.round(g.edgeM[e] / seg * 3.6) : null;
+}
+
 // --- la verdad de cada cruce ------------------------------------------------
 // Grupos de nodos de cruce de la ruta (como la app: a menos de 50 m y hasta
 // 100 m de largo), y si en el grupo habia otra salida de verdad (no darse
@@ -199,6 +229,9 @@ function lineaArista(g, a, b) {
 // 60 m uno de otro forman una zona (hasta 250 m): en el centro de una ciudad
 // el rumbo de entrada de un cruce cae adentro del anterior. Cuanto dobla la
 // zona se mide de 60 a 20 m antes y de 20 a 60 m despues de ella.
+// La app pide 120 m sin pisar la ruta (detectManeuver): un callejon sin
+// salida de 80 a 120 m sale aca como otra salida, y la esquina, callada en la
+// app, como giro_sin_aviso.
 function verdadDeCruces(ctx, pts, met) {
   const { g, pure } = ctx;
   const { cum, pointAt } = met;
@@ -215,9 +248,11 @@ function verdadDeCruces(ctx, pts, met) {
     for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { kNext = k; break; }
     const enGrupo = new Set(nodos.map(k => pts[k][4]));
     const cadena = [kPrev, ...nodos, kNext].filter(k => k >= 0);
-    let otra = null;
+    // todas las otras salidas (otra: la primera), con la velocidad de su
+    // primer tramo
+    const otras = [];
     const enIn = rumbo(pointAt(cum[i] - 40), pointAt(cum[i] - 5));
-    for (let c = 1; c < cadena.length - 1 && !otra; c++) {
+    for (let c = 1; c < cadena.length - 1; c++) {
       const u = pts[cadena[c - 1]][4], w = pts[cadena[c]][4], sig = pts[cadena[c + 1]][4];
       const kIn = g.dirEdge(u, w);
       for (let k2 = g.csr[w]; k2 < g.csr[w + 1]; k2++) {
@@ -226,11 +261,14 @@ function verdadDeCruces(ctx, pts, met) {
         if (kIn !== -1 && pure.isUTurnArc(dirs, kIn, k2)) continue;
         const bloq = new Set([...enGrupo, u, sig]);
         if (!pure.leadsAway(g.adjacency, g.nodeXY, w, n, bloq, 80)) continue;
-        otra = { node: n, rumbo: normDeg(rumbo(g.nodeXY(w), g.nodeXY(n)) - enIn) };
-        break;
+        // el rumbo a unos 40 m por la salida (el primer nodo de un prefab
+        // puede estar pegado)
+        const linea = lineaArista(g, w, n) || [g.nodeXY(w), g.nodeXY(n)];
+        const ml = metrica(linea), lejos = ml.pointAt(Math.min(40, ml.cum[ml.cum.length - 1]));
+        otras.push({ node: n, rumbo: normDeg(rumbo(g.nodeXY(w), lejos) - enIn), kmh: velArista(g, w, n), m: Math.round(ml.cum[ml.cum.length - 1]) });
       }
     }
-    grupos.push({ i, iEnd, otra });
+    grupos.push({ i, iEnd, otra: otras[0] || null, otras });
     i = iEnd;
   }
   // cuanto dobla cada grupo, con ventanas que no se meten en los vecinos (o
@@ -252,6 +290,7 @@ function verdadDeCruces(ctx, pts, met) {
     const enOut = rumbo(pointAt(cum[z.iEnd] + 20), pointAt(cum[z.iEnd] + 60));
     z.delta = normDeg(enOut - enIn);
     z.otra = (z.grupos.find(gr => gr.otra) || {}).otra || null;
+    z.otras = z.grupos.flatMap(gr => gr.otras);
   }
   return zonas;
 }
@@ -475,6 +514,26 @@ function analizarRuta(ctx, ruta, hallazgos) {
     }
     if (solo && !c.otra && Math.abs(c.delta) < 30) {
       add('aviso_sin_opcion', { donde: xy(r.node), dice: `${r.kind} ${r.direction}`, dobla: Math.round(c.delta) });
+    }
+    // "turn" en una esquina o curva sin otro camino: la calle dobla sola
+    // (Discord, 17-10: "turn right" donde no hay a donde doblar, en Oregon)
+    if (solo && r.kind === 'turn' && !c.otra && Math.abs(c.delta) >= 30) {
+      add('giro_sin_otra_salida', { donde: xy(r.node), dice: `turn ${r.direction}`, dobla: Math.round(c.delta), doblaCerca: Math.round(dCorta) });
+    }
+    if (r.kind === 'turn' && ctx.giros) {
+      // el rumbo de la ruta de 150 a 60 m antes y de 60 a 150 m despues: si
+      // la calle ya venia doblando o sigue doblando, es una curva larga
+      const R = (a, b) => rumbo(met.pointAt(a), met.pointAt(b));
+      const antes = normDeg(R(cum[c.i] - 60, cum[c.i] - 20) - R(cum[c.i] - 150, cum[c.i] - 60));
+      const despues = normDeg(R(cum[c.iEnd] + 60, cum[c.iEnd] + 150) - R(cum[c.iEnd] + 20, cum[c.iEnd] + 60));
+      const nodo = (desde, hasta, paso) => { for (let k = desde; paso > 0 ? k <= hasta : k >= hasta; k += paso) if (pts[k][4] != null) return pts[k][4]; return null; };
+      const nAntes = nodo(c.i - 1, 0, -1), nI = nodo(c.i, c.iEnd, 1), nF = nodo(c.iEnd, c.i, -1), nDespues = nodo(c.iEnd + 1, pts.length - 1, 1);
+      ctx.giros.push({ variante: ctx.v, ruta: nombre, donde: xy(r.node), dice: r.direction, solo, km: +(r.sNodo / 1000).toFixed(2),
+        dobla: Math.round(c.delta), doblaCerca: Math.round(dCorta), antes: Math.round(antes), despues: Math.round(despues),
+        largoZona: Math.round(cum[c.iEnd] - cum[c.i]), cruces: c.grupos.length,
+        kmhEntra: nAntes != null && nI != null ? velArista(g, nAntes, nI) : null,
+        kmhSale: nF != null && nDespues != null ? velArista(g, nF, nDespues) : null,
+        otras: c.otras.map(o => ({ rumbo: Math.round(o.rumbo), kmh: o.kmh, m: o.m })), decoy: r.decoy });
     }
   }
   // 4. avisos tarde, que cambian o que desaparecen, y voz
@@ -903,6 +962,7 @@ async function main() {
   const duraciones = {};
   for (const [k, src] of Object.entries(paquete.clips)) duraciones[k] = mp3Segundos(Buffer.from(src.split(',')[1], 'base64'));
   const hallazgos = [];
+  const giros = [];
   const resumen = {};
   const rotondas = [];
   for (const v of args.variantes.split(',')) {
@@ -923,18 +983,25 @@ async function main() {
       vmax: v.startsWith('ets2') ? 24 : 27, rnd: lcg(args.semilla * 7919 + v.length), dijkstra: true, recalculos: 4,
       optimo: [], stats: { rutas: 0, sinRuta: 0, recalculos: 0, recalculoMal: 0, ticks: 0, maniobras: 0, voces: 0 } };
     const mapa = revisarMapa(ctx, hallazgos);
-    // rutas: empresa a empresa, 1 de cada 3 corta (adentro o cerca de una ciudad)
+    // rutas: empresa a empresa, 1 de cada 3 corta (adentro o cerca de una
+    // ciudad); con --estados, de esos estados, y con --destinos, todas
+    // largas hacia esos otros
     const rnd = lcg(args.semilla + v.length * 131);
-    const emp = pois.companies;
+    const estados = listaEstados(args.estados), destinos = listaEstados(args.destinos) || estados;
+    const deEstados = (set) => (set ? pois.companies.filter(e => set.has((pois.countries || {})[e[4]])) : pois.companies);
+    const emp = deEstados(estados), llegadas = deEstados(destinos);
+    if (!emp.length || !llegadas.length) throw new Error(`${v}: no hay empresas en ${args.estados}${args.destinos ? ' / ' + args.destinos : ''}`);
+    const lejos = !!args.destinos;
+    ctx.giros = [];
     const escalas = [];
     const pares = new Set();
     for (let r = 0, intentos = 0; r < args.rutas && intentos < args.rutas * 200; intentos++) {
-      const a = emp[Math.floor(rnd() * emp.length)], b = emp[Math.floor(rnd() * emp.length)];
+      const a = emp[Math.floor(rnd() * emp.length)], b = llegadas[Math.floor(rnd() * llegadas.length)];
       const par = `${a[2]}@${a[4]}>${b[2]}@${b[4]}`;
       if (pares.has(par)) continue;
       const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      const corta = r % 3 === 2;
-      if (corta ? (d < 300 || d > 2500) : (d < 2500 || d > 14000)) continue;
+      const corta = !lejos && r % 3 === 2;
+      if (lejos ? d < 2500 : corta ? (d < 300 || d > 2500) : (d < 2500 || d > 14000)) continue;
       r++;
       pares.add(par);
       const nombre = `${a[2]}@${a[4]} -> ${b[2]}@${b[4]}`;
@@ -950,6 +1017,7 @@ async function main() {
       ctx.stats.ticks += res.sim.ticks.length;
       ctx.stats.maniobras += res.lista.length;
       ctx.stats.voces += res.sim.vozEventos.length;
+      ctx.stats.kmMundo = +((ctx.stats.kmMundo || 0) + res.sim.L / 1000).toFixed(1);
       escalas.push({ ruta: nombre, ...escalaDeRuta(ctx, pts) });
       process.stdout.write('.');
     }
@@ -971,10 +1039,12 @@ async function main() {
       segundos: Math.round((Date.now() - t0) / 1000),
     };
     console.log(`\n${v}: ${JSON.stringify(resumen[v])}`);
+    giros.push(...ctx.giros);
   }
   const porTipo = {};
   for (const h of hallazgos) porTipo[`${h.variante}:${h.tipo}`] = (porTipo[`${h.variante}:${h.tipo}`] || 0) + 1;
   fs.writeFileSync(path.join(salida, 'hallazgos.json'), JSON.stringify(hallazgos, null, 1));
+  fs.writeFileSync(path.join(salida, 'giros.json'), JSON.stringify(giros, null, 1));
   fs.writeFileSync(path.join(salida, 'resumen.json'), JSON.stringify({ args, resumen, porTipo, rotondas, duraciones }, null, 1));
   console.log('\nPor tipo:');
   for (const [k, n] of Object.entries(porTipo).sort()) console.log(`  ${k}: ${n}`);
@@ -982,4 +1052,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(2); });
-module.exports = { lcg, buscarRotondas, argumentos, cargarVariante, metrica, rumbo, normDeg, perfilVelocidad, manejar, verdadDeCruces, salidaPorAngulo, lineaArista, grillaNodos, escalaDeRuta, mp3Segundos };
+module.exports = { lcg, listaEstados, buscarRotondas, argumentos, cargarVariante, metrica, rumbo, normDeg, perfilVelocidad, manejar, verdadDeCruces, salidaPorAngulo, lineaArista, grillaNodos, escalaDeRuta, mp3Segundos };

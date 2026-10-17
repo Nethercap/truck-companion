@@ -953,27 +953,20 @@ function settingsChangedKeys(base, cur) {
   return Object.keys(cur).filter(k => JSON.stringify(cur[k]) !== JSON.stringify(base[k]));
 }
 
-// Si el nodo `start` es parte de un anillo corto (una rotonda): un camino
-// dirigido que vuelve a el en menos de maxLenM sin pasar por `from` (el
-// nodo de la calle por la que se llega) ni volver por la misma arista. Las
-// manzanas de una ciudad son mas grandes; una rotonda del juego mide
+// Si el nodo `start` es parte de un anillo corto (una rotonda): un ciclo de
+// tramos de un solo sentido, sin repetir nodos, que vuelve a el en menos de
+// maxLenM sin pasar por `from` (el nodo de la calle por la que se llega).
+// Las manzanas de una ciudad son mas grandes; una rotonda del juego mide
 // 100-250 m de vuelta.
+// Hasta el 17-10 valia cualquier camino dirigido, y en una esquina cuyo
+// otro brazo del prefab no tiene calle habia uno: el brazo muerto da la
+// vuelta por su tapa y vuelve por los mismos nodos, o las curvas de doble
+// mano del prefab hacen un triangulo. La esquina sin otro camino pasaba por
+// la entrada a una rotonda y se anunciaba "turn right" en cada curva de la
+// sierra (Discord, 17-10, de Oregon a Louisiana): 100 de los 433 "turn" de
+// 80 rutas de Oregon y Washington en el simulador.
 function ringThrough(adjacency, nodeAt, start, from, maxLenM = 350, maxDepth = 24) {
-  let budget = 400; // nodos a visitar como mucho
-  const dfs = (cur, parent, lenM, depth) => {
-    if (--budget < 0 || depth > maxDepth) return false;
-    const p = nodeAt(cur);
-    for (const [m] of (adjacency.get(cur) || [])) {
-      if (m === parent || m === from) continue;
-      const q = nodeAt(m);
-      const len = lenM + Math.hypot(q[0] - p[0], q[1] - p[1]);
-      if (len > maxLenM) continue;
-      if (m === start) return depth >= 2;
-      if (dfs(m, cur, len, depth + 1)) return true;
-    }
-    return false;
-  };
-  return dfs(start, from, 0, 0);
+  return oneWayRing(adjacency, nodeAt, start, from, maxLenM, maxDepth, 400) != null;
 }
 
 // Maniobra a anunciar en el cruce que empieza en el nodo i de la ruta (y
