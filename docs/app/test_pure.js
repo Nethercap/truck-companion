@@ -3244,3 +3244,65 @@ test('rotondas: el sentido de giro, para que la flecha del aviso gire para el mi
   assert.ok(texto(false).startsWith('↻ '));
   assert.ok(texto(undefined).startsWith('↻ '));
 });
+
+test('createTurnLog: los ultimos avisos, cada uno una vez, el mas nuevo primero (Discord, 17-10)', () => {
+  const { createTurnLog, TURN_LOG_MAX } = require('./pure.js');
+  const log = createTurnLog();
+  const giro = (x, dir = 'right', kind = 'turn') => ({ kind, direction: dir, node: [x + 0.4, -45600.6], distanceMeters: 300 });
+  let llamadas = 0;
+  const datos = (x) => () => { llamadas++; return { t: 1000 + x, truck: [x - 50.2, -45700.7], text: `Turn right in ${x} ft` }; };
+  assert.equal(log.push(giro(1), datos(1)), true);
+  // el mismo aviso en el dato siguiente (con otra distancia): no se repite
+  // ni se arma el texto de nuevo
+  assert.equal(log.push({ ...giro(1), distanceMeters: 120 }, datos(1)), false);
+  assert.equal(llamadas, 1);
+  // sin aviso (derecho): nada
+  assert.equal(log.push(null, datos(2)), false);
+  log.push(giro(2, 'left', 'fork'), datos(2));
+  const l = log.list();
+  assert.equal(l.length, 2);
+  assert.deepEqual(l[0], { id: 'fork|left|2,-45601', t: 1002, kind: 'fork', direction: 'left', exit: null,
+    node: [2, -45601], truck: [-48, -45701], text: 'Turn right in 2 ft' });
+  assert.equal(l[1].kind, 'turn');
+  // el mismo cruce despues de un "derecho" en el medio tampoco se repite
+  assert.equal(log.push(giro(1), datos(1)), false);
+  // no crece mas que el tope
+  for (let k = 10; k < 40; k++) log.push(giro(k * 100), datos(k));
+  assert.equal(log.list().length, TURN_LOG_MAX);
+  assert.equal(log.list()[0].node[0], 3900);
+  // list devuelve una copia
+  log.list().length = 0;
+  assert.equal(log.list().length, TURN_LOG_MAX);
+});
+
+test('turnReportText: mapa, versiones, el camion y los avisos, para pegar en Discord', () => {
+  const { turnReportText, createTurnLog, TURN_LOG_MAX } = require('./pure.js');
+  const hora = (ms) => `h${ms}`;
+  const items = [
+    { t: 20, kind: 'roundabout', direction: 'right', exit: 2, node: [10, 20], truck: [5, 6], text: '' },
+    { t: 10, kind: 'turn', direction: 'right', exit: null, node: [-63500, -45600], truck: [-63800, -45900], text: 'Turn right in 0.2 mi onto OR-22' },
+  ];
+  const txt = turnReportText({ game: 'ats', map: 'ats_c2c', web: '20261017f', client: '1.5.32', truck: [-63577.4, -45687.6],
+    heading: 311.6, now: 30, items, formatTime: hora });
+  const lineas = txt.split('\n');
+  assert.equal(lineas[0], '```');
+  assert.equal(lineas[lineas.length - 1], '```');
+  assert.equal(lineas[2], 'Map: ats_c2c (game ats), web 20261017f, client 1.5.32');
+  assert.equal(lineas[3], 'Truck now: x -63577, z -45688, heading 312 (h30)');
+  assert.equal(lineas[5], '1. h20 roundabout exit 2 at 10, 20, truck at 5, 6');
+  assert.equal(lineas[6], '2. h10 turn right at -63500, -45600, truck at -63800, -45900 "Turn right in 0.2 mi onto OR-22"');
+  // sin posicion ni avisos todavia
+  const vacio = turnReportText({ game: null, map: 'ats', web: 'x', client: null, truck: null, now: 1, items: [], formatTime: hora });
+  assert.ok(vacio.includes('Truck now: no position (h1)'));
+  assert.ok(vacio.includes('No turn warnings shown yet'));
+  assert.ok(vacio.includes('client ?'));
+  // diez avisos largos entran en un mensaje de Discord (2000 caracteres)
+  const log = createTurnLog();
+  for (let k = 0; k < TURN_LOG_MAX + 5; k++) {
+    log.push({ kind: 'fork', direction: 'left', node: [-123456 - k, -98765] },
+      () => ({ t: 1792000000000, truck: [-123456, -98765], text: 'Keep left in 1.5 mi onto I-5 N toward Portland' }));
+  }
+  const largo = turnReportText({ game: 'ats', map: 'ats_c2c_promods', web: '20261017f', client: '1.5.32', truck: [-123456, -98765],
+    heading: 359, now: 1792000000000, items: log.list(), formatTime: () => '23:59' });
+  assert.ok(largo.length < 2000, `${largo.length} caracteres`);
+});

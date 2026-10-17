@@ -4617,6 +4617,8 @@ function initCab() {
 
 let navPanelParts = null; // lo ultimo que mostro el panel, para el mini-HUD
 const turnAnnouncer = createTurnAnnouncer();
+// Los ultimos avisos mostrados, para "Copy turn report" (createTurnLog)
+const turnLog = createTurnLog();
 function updateNavPanel(turn) {
   if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
     document.getElementById('navPanel').style.display = 'none';
@@ -5368,6 +5370,7 @@ function updateMap(position, game, gameHeadingDeg) {
   // El de OBS muestra el giro pero no guia: con el solo, la voz no habla.
   const guiando = navMode || !!pipWin || clientOverlayOn;
   const turn = guiando || obsOverlayOn ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
+  if (turn) turnLog.push(turn, () => ({ t: Date.now(), truck: [position.x, position.z], text: (navTurnParts(turn) || {}).text }));
   if (guiando) voiceManeuverTick(turn);
   if (pipWin) pipTurnHtml = navPanelHtml(turn);
   if (clientOverlayOn || obsOverlayOn) overlayTurnParts = navTurnParts(turn);
@@ -5943,12 +5946,18 @@ function recordTrip(event) {
 // Issue de GitHub prefilled con lo que hace falta para reproducir (version
 // del cliente/web, navegador, estado de conexion, juego, mapa). Nada privado:
 // el usuario ve el texto antes de publicar.
-const WEB_BUILD = '20260918';
+// La version de la web: el ?v= con que se cargo app.js (el token de cache,
+// el mismo en todos los archivos). Antes era una constante a mano que habia
+// quedado en 20260918.
+function webVersion() {
+  const s = document.querySelector('script[src*="app.js"]');
+  try { return (s && new URL(s.src, location.href).searchParams.get('v')) || 'unknown'; } catch (e) { return 'unknown'; }
+}
 function buildIssueUrl() {
   const lines = [
     '**What happened?**', '', '(describe the problem here)', '', '**Steps to reproduce**', '', '1. ', '',
     '---', '<details><summary>Diagnostics (auto-filled)</summary>', '',
-    `- Web build: ${WEB_BUILD}`,
+    `- Web build: ${webVersion()}`,
     `- Client version: ${conn.clientStatus?.clientVersion || lastData?.clientVersion || 'unknown'}`,
     `- Mode: ${conn.demo ? 'demo' : conn.local ? 'LAN' : 'cloud'}`,
     `- Connection: socket=${conn.socket}, clientConnected=${conn.clientConnected}, status=${conn.clientStatus?.status || '-'}, telemetry=${conn.hasTelemetry}`,
@@ -5963,6 +5972,39 @@ function buildIssueUrl() {
 }
 document.getElementById('reportProblemBtn').addEventListener('click', () => {
   window.open(buildIssueUrl(), '_blank', 'noopener');
+});
+
+// Texto al portapapeles. Sin permiso (http en la LAN) por un textarea
+// elegido; si tampoco, a la vista para copiarlo a mano (prompt lo deja en
+// una linea, pero se puede copiar).
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* abajo */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+// Donde estaba cada aviso de giro, para pegar en Discord cuando uno estuvo
+// mal (turnReportText en pure.js). Con las coordenadas y la variante se
+// reproduce el cruce en el simulador.
+document.getElementById('turnReportBtn').addEventListener('click', async () => {
+  const pos = lastData && lastData.position;
+  const text = turnReportText({
+    game: lastData && lastData.game, map: currentGame, web: webVersion(),
+    client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
+    truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
+    now: Date.now(), items: turnLog.list(),
+    formatTime: (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+  });
+  if (await copyText(text)) showToast(t('turnReportCopied'), 'success', 3000);
+  else prompt(t('turnReportCopy'), text);
 });
 
 function renderTripHistory() {
