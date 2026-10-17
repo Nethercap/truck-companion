@@ -5006,9 +5006,8 @@ function trimRouteBehindTruck(x, z) {
   // medicion cambiaba justo al llegar (giros que aparecian/desaparecian).
   // Con una rotonda en pantalla, desde su entrada: en una grande el aviso de
   // la salida se apagaba adentro (ver trimRouteBehind).
-  for (let k = 1; k <= bestIdx; k++) routeBehind.push(currentRouteWorldPoints[k]);
   const shown = navManeuverState.shown;
-  routeBehind = trimRouteBehind(routeBehind, ROUTE_BEHIND_M, ROUTE_BEHIND_MAX, shown && shown.kind === 'roundabout' ? shown.node : null);
+  routeBehind = trimRouteBehind(passedRoutePoints(routeBehind, currentRouteWorldPoints, bestIdx), ROUTE_BEHIND_M, ROUTE_BEHIND_MAX, shown && shown.kind === 'roundabout' ? shown.node : null);
   // El punto interpolado hereda el tramo del nodo que sigue.
   const nextPt = currentRouteWorldPoints[bestIdx + 1];
   currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0, nextPt ? nextPt[6] : undefined], ...currentRouteWorldPoints.slice(bestIdx + 1)];

@@ -421,7 +421,8 @@ function manejar(ctx, pts, opciones) {
     ticks.push(tick);
     // recortar lo recorrido (trimRouteBehindTruck)
     const hn = indiceEn(sNuevo);
-    for (let k = h + 1; k <= hn; k++) behind.push(pts[k]);
+    // como trimRouteBehindTruck: en el primer recorte, tambien el comienzo de la ruta
+    for (let k = behind.length ? h + 1 : h; k <= hn; k++) behind.push(pts[k]);
     const shown = state.shown;
     behind = pure.trimRouteBehind(behind, 200, 400, shown && shown.kind === 'roundabout' ? shown.node : null);
     const aca = pointAt(sNuevo), sig = pts[Math.min(hn + 1, pts.length - 1)];

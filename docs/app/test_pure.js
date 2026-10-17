@@ -2063,6 +2063,29 @@ test('maneuver: T partida por la curva del prefab: el giro y la calle del otro l
   assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'left', false, 4]);
 });
 
+test('maneuver: al final de una autovia, volver por la calzada contraria no es una bifurcacion (17-10)', () => {
+  // La US-12 al este de Aberdeen (ATS, -105601,-61480), corrida al origen: la
+  // ruta llega al noreste por su calzada (nodos 3 y 4) y sigue al este; del
+  // prefab donde se juntan sale la calzada contraria (9 en adelante), que
+  // arranca pareja con la ruta por la curva del prefab y vuelve al oeste.
+  const pts = [[-92, -144, 0, 0, 0], [-60, -71, 0, 0, 1], [-52, -53, 0, 0, 2], [-44, -34, 0, 0, 3], [-40, -28, 0, 0, null], [-36, -23, 0, 0, null],
+    [-31, -19, 0, 0, null], [-26, -16, 0, 1, 4], [0, 0, 0, 1, 5], [28, 10, 0, 1, 6], [50, 16, 0, 0, null], [61, 19, 0, 0, 7], [300, 30, 0, 0, 8]];
+  const nodes = [[-92, -144], [-60, -71], [-52, -53], [-44, -34], [-26, -16], [0, 0], [28, 10], [61, 19], [300, 30],
+    [-30, -4], [-42, -7], [-66, -15], [-116, -32], [-182, -55], [-400, -120], [19, -9]];
+  const adjacency = new Map();
+  const add = (a, b) => { if (!adjacency.has(a)) adjacency.set(a, []); adjacency.get(a).push([b]); };
+  for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [4, 9], [5, 9], [5, 15], [5, 6], [6, 7], [6, 15], [6, 5], [15, 5], [15, 6], [7, 8],
+    [9, 10], [10, 11], [11, 12], [12, 13], [13, 14]]) add(a, b);
+  const curvas = { '4-9': [[-26, -16], [1, -7], [-12, 2], [-30, -4]], '6-15': [[28, 10], [16, 4], [19, -9]] };
+  const { cum, pointAt } = routeMetrics(pts);
+  const ctx = { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency, edgeLine: (a, b) => curvas[`${a}-${b}`] || null, i: 7, iEnd: 9 };
+  const m = detectManeuver(ctx);
+  assert.ok(!m || (m.kind === 'turn' && m.quiet), JSON.stringify(m));
+  // sin mirar a donde va la otra rama, era "keep right" (forkInCurve)
+  const viejo = detectManeuver({ ...ctx, uTurnDeg: 180 });
+  assert.deepEqual([viejo.kind, viejo.direction], ['fork', 'right']);
+});
+
 test('junctionManeuver: si la otra mitad del prefab avisa sola, no se junta', () => {
   // derecho por el nodo 1 (sin otra salida), curva corta y en el nodo 2 un
   // giro a la derecha con otra calle que sigue derecho: se avisa en el 2
@@ -2075,6 +2098,16 @@ test('junctionManeuver: si la otra mitad del prefab avisa sola, no se junta', ()
   assert.deepEqual([r.iEnd, r.m], [1, null]);
   const m2 = detectManeuver({ ...ctx, i: 4, iEnd: 4 });
   assert.deepEqual([m2.kind, m2.direction, m2.quiet], ['turn', 'right', false]);
+});
+
+test('passedRoutePoints: el primer recorte guarda tambien el comienzo de la ruta (17-10)', () => {
+  const { passedRoutePoints } = require('./pure.js');
+  const ruta = [[0, 0], [0, 10], [0, 20], [0, 30]];
+  // recien calculada: el 0 es el comienzo y va a lo recorrido
+  assert.deepEqual(passedRoutePoints([], ruta, 2), [[0, 0], [0, 10], [0, 20]]);
+  // despues el 0 es el punto del camion del recorte anterior: no se repite
+  const camino = [[0, 25], [0, 30], [0, 40]];
+  assert.deepEqual(passedRoutePoints([[0, 0], [0, 20]], camino, 1), [[0, 0], [0, 20], [0, 30]]);
 });
 
 test('trimRouteBehind: lo ya recorrido se guarda por metros, con tope de puntos', () => {
