@@ -4229,6 +4229,11 @@ function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':
 // ---------------------------------------------------------------------------
 let pipWin = null;
 let pipTurnHtml = null; // el texto del giro, lo arma updateMap en cada dato
+// Lo que falta para el descanso, en horas de juego como la fila del panel
+// (updateHud), o null con la fatiga apagada. "The only thing missing that I
+// would like to see is the time remaining before rest in that window"
+// (Discord, 17-10).
+let pipRest = null;
 const PIP_CSS = `
   html, body { margin: 0; height: 100%; background: #14171c; color: #f2f3f5;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
@@ -4236,7 +4241,7 @@ const PIP_CSS = `
   .giro { font-size: clamp(1rem, 6.5vw, 2.4rem); font-weight: 700; line-height: 1.15; flex: 1; display: flex;
     flex-direction: column; justify-content: center; }
   .giro .navNext { display: block; font-size: 0.5em; font-weight: 400; color: #9aa4b2; margin-top: 0.2rem; }
-  .fila { display: flex; align-items: center; gap: 0.9rem; font-variant-numeric: tabular-nums; }
+  .fila { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; font-variant-numeric: tabular-nums; }
   .vel b { font-size: clamp(1.1rem, 7vw, 2.2rem); }
   .vel span { color: #9aa4b2; font-size: 0.8rem; margin-left: 0.2rem; }
   .lim { width: 2.2rem; height: 2.2rem; border-radius: 50%; border: 0.25rem solid #e53935; background: #fff;
@@ -4248,6 +4253,7 @@ const PIP_CSS = `
   .dato + .dato { margin-left: 0; }
   .dato b { font-size: 1.05rem; }
   .dato span { color: #9aa4b2; font-size: 0.7rem; }
+  .dato[hidden] { display: none; }
   .modo { position: absolute; top: 0.35rem; right: 0.35rem; z-index: 5; min-width: 24px; min-height: 24px;
     padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid #333a44; background: rgba(20,23,28,0.9);
     color: #f2f3f5; font: inherit; font-size: 0.75rem; cursor: pointer; }
@@ -4296,6 +4302,7 @@ function setupPipWindow(w, conMapa) {
         <div class="vel"><b id="pVel">--</b><span id="pUnidad"></span></div>
         <div class="dato"><b id="pFalta">--</b><span>${escapeHtml(t('routeRemainingLabel'))}</span></div>
         <div class="dato"><b id="pLlega">--</b><span>${escapeHtml(t('routeArrivalLabel'))}</span></div>
+        <div class="dato" id="pDescansoCaja" hidden><b id="pDescanso">--</b><span>${escapeHtml(t('pipRestLabel'))}</span></div>
       </div>
     </div>`;
   d.getElementById('pModo').addEventListener('click', () => {
@@ -4454,6 +4461,8 @@ function refreshPip() {
   const resumen = routeSummaryShown();
   d.getElementById('pFalta').textContent = resumen ? $('routeRemaining').textContent : '--';
   d.getElementById('pLlega').textContent = resumen ? $('routeArrival').textContent : '--';
+  d.getElementById('pDescansoCaja').hidden = !pipRest;
+  if (pipRest) d.getElementById('pDescanso').textContent = pipRest;
 }
 
 function initPip() {
@@ -5665,8 +5674,10 @@ function updateHud(data) {
     restRow.hidden = false;
     const realSec = (rest.min * 60) / measuredTimeScale(data);
     document.getElementById('restStop').innerHTML = `${escapeHtml(rest.text)}<span class="subValue">≈ ${escapeHtml(formatSeconds(realSec))} ${escapeHtml(t('realShort'))}</span>`;
+    pipRest = formatSeconds(rest.min * 60);
   } else {
     restRow.hidden = true;
+    pipRest = null;
   }
 
   document.getElementById('jobIncome').innerHTML = viaje.income ? moneyHtml(viaje.income, data.game) : '-';
