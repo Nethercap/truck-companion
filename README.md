@@ -120,9 +120,27 @@ costs money (the relay and the map hosting). If it is useful to you, you can
 
 ## License / transparency
 
-MIT License (see [`LICENSE`](LICENSE)). The bundled SCS telemetry plugin
-(`client/vendor/truckdash-telemetry.dll`) is a fork of RenCloud's, also MIT;
-its source is in [`plugin/`](plugin/).
+Copyright (C) 2026 Nethercap (Truck Dash). Licensed under the GNU Affero
+General Public License v3.0 (see [`LICENSE`](LICENSE)): you can use, study,
+change and share the code, and if you publish a modified version, or run one
+as a service that others use over the network, you have to publish its source
+under the same license.
+
+Versions up to commit `a990dcd` (17 October 2026) were released under the MIT
+License, and those versions stay under it (see [`LICENSE-MIT`](LICENSE-MIT)).
+The bundled SCS telemetry plugin (`client/vendor/truckdash-telemetry.dll`) is
+a fork of RenCloud's and stays under the MIT License; its source and license
+are in [`plugin/`](plugin/). The map builder in [`builder/`](builder/) is
+GPL-3.0-or-later.
+
+### Name and logo
+
+The license covers the code, not the Truck Dash name, the logo, or the
+trucksim-dash.com domain. Forks are welcome under the license, but they need
+their own name and logo and must not present themselves as Truck Dash or as
+official. They also need their own relay and map hosting: the Truck Dash relay
+and maps only answer pages served from trucksim-dash.com (and the copy the
+client serves on your local network).
 
 The country flag font used on the account page
 (`docs/assets/TwemojiCountryFlags.woff2`) is a subset of Twemoji Mozilla,
