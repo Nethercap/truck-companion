@@ -66,10 +66,20 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   de moverlos, correr el simulador con `--rotondas`.
 - La voz habla de a una frase (`voiceQueueAction`): una nueva espera a que
   termine la que suena, salvo un aviso en el punto contra uno anticipado.
+- Un giro sin otro camino se calla (`quiet` de `detectManeuver`), salvo la
+  entrada a un anillo (`ringThrough`): solo tramos de un sentido y sin
+  repetir nodos. Con cualquier camino dirigido, toda esquina con un brazo
+  muerto de prefab parecia una rotonda (Discord, 17-10, Oregon).
+- Los puntos de la curva de un prefab cortan el grupo de nodos de cruce
+  (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
+  `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.
+  Juntar siempre no: mezcla el giro con la curva de la calle de despues.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
   de app.js y pure.js y lista sospechosos (escala, recalculos, avisos, voz,
   rotondas); `tools/dibujar_simulacion.py` dibuja cada uno. Correrlo antes y
   despues de tocar el ruteo o los avisos, con la misma `--semilla`.
+  `--estados or,wa` (y `--destinos`) eligen rutas de esos estados; cada
+  "turn" queda en `giros.json` con las otras salidas de su cruce.
 
 ## Modales, overlay de OBS y accesibilidad (13-10)
 

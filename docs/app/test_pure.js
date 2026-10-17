@@ -1,7 +1,7 @@
 // Corre con: node --test docs/app/test_pure.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
+const { poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine,layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, ringThrough, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker , gameClockFromMinutes, createTimeScale,
   createPaceEta, createSessionStats, createDemoTelemetry, createVoiceGuide, voiceTimingSetting, VOICE_TIMING_DEFAULT, sideExitToward, pickVoice, mapBoundsFromCities, insideMapBounds } = require("./pure.js");
 
 test('fuel tracker: consumo medido sobre la ventana, reinicio al cargar y al cambiar de camion', () => {
@@ -353,6 +353,25 @@ test('maneuver: la entrada a una rotonda se anuncia aunque no tenga otra salida'
   const recta = new Map([[0, [[1]]], [1, [[0], [2]]], [2, [[1], [3]]], [3, [[2]]]]);
   const nodos = [[0, 0], [0, 50], [0, 100], [0, 150]];
   assert.equal(ringThrough(recta, (k) => nodos[k], 1, 0), false);
+});
+
+test('maneuver: esquina con un brazo muerto del prefab no es la entrada a una rotonda (Discord, 17-10)', () => {
+  // la calle dobla 90 grados a la derecha en el nodo 1; el prefab tiene un
+  // brazo (nodo 4) que sigue derecho 30 m y no lleva a ninguna calle
+  const route = [[0, -300], [0, 0], [300, 0], [600, 0]];
+  // brazo de doble mano con su tapa: un triangulo de un sentido (5 -> 6 -> 7
+  // -> 5) para dar la vuelta. Se podia ir y volver por los mismos nodos.
+  let ctx = scenario({ route, extraNodes: [[0, 30], [0, 45], [8, 55], [-8, 55]],
+    edges: [[1, 4], [4, 1], [4, 5], [5, 4], [5, 6], [6, 7], [7, 5]] });
+  assert.equal(ringThrough(ctx.adjacency, (k) => ctx.nodes[k], 1, 0), false);
+  assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).quiet], ['turn', true]);
+  // curvas de doble mano del prefab en T: 1 -> 2 -> 4 -> 1 es un triangulo
+  ctx = scenario({ route, extraNodes: [[0, 30]], edges: [[2, 1], [1, 4], [4, 1], [2, 4], [4, 2]] });
+  assert.equal(ringThrough(ctx.adjacency, (k) => ctx.nodes[k], 1, 0), false);
+  assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).quiet], ['turn', true]);
+  // con una calle de verdad detras del brazo, si: hay por donde equivocarse
+  ctx = scenario({ route, extraNodes: [[0, 30], [0, 400]], edges: [[2, 1], [1, 4], [4, 1], [2, 4], [4, 2], [4, 5]] });
+  assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).quiet], ['turn', false]);
 });
 
 test('continuesTurn: una esquina partida en dos nodos se anuncia una vez; dos giros de verdad, dos', () => {
@@ -2000,6 +2019,62 @@ test('junctionClusterEnd: el punto del camion no parte un cruce en dos', () => {
   assert.equal(jce(pts, cum, 1, 50, 100), 1);      // sin saber del camion: se corta
   assert.equal(jce(pts, cum, 1, 50, 100, 2), 3);   // con el camion en 2: un solo cruce
   assert.equal(jce(pts, cum, 1, 50, 100, 4), 1);   // el camion en otro lado no cambia nada
+  assert.equal(jce(pts, cum, 1, 50, 100, undefined, 60), 3); // de punta a punta del prefab, tampoco
+});
+
+test('junctionClusterEnd: de punta a punta de la curva de un prefab (curveSpanM, 17-10)', () => {
+  const { junctionClusterEnd: jce } = require('./pure.js');
+  // nodo de entrada del prefab, dos puntos de su curva, nodo de salida a 40 m
+  const pts = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [5, 15, 0, 0, null], [15, 28, 0, 0, null], [30, 32, 0, 1, 2], [300, 32, 0, 0, 3]];
+  const { cum } = routeMetrics(pts);
+  assert.equal(jce(pts, cum, 1, 50, 100), 1);          // por defecto la curva corta
+  assert.equal(jce(pts, cum, 1, 50, 100, undefined, 60), 4);
+  // a 50 m o mas por la curva ya no es el mismo cruce
+  const lejos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 0, null], [0, 55, 0, 1, 2], [0, 300, 0, 0, 3]];
+  assert.equal(jce(lejos, routeMetrics(lejos).cum, 1, 50, 100, undefined, 60), 1);
+  // ni un nodo que, por la curva, deja el cruce en mas de 60 m (dos cruces:
+  // uno que se pasa derecho y la esquina, con una curva en S entre los dos)
+  const dos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 1, 2], [0, 45, 0, 0, null], [0, 70, 0, 1, 3], [0, 300, 0, 0, 4]];
+  assert.equal(jce(dos, routeMetrics(dos).cum, 1, 50, 100, undefined, 60), 2);
+});
+
+test('maneuver: T partida por la curva del prefab: el giro y la calle del otro lado son del mismo cruce', () => {
+  // La T de la ruta de Aberdeen a Dallas (ATS, -53869,9028): la ruta llega
+  // en diagonal al nodo 1, dobla a la izquierda por la curva del prefab
+  // hasta el nodo 2 (53 m) y la otra calle sale del nodo 1 al otro lado.
+  // Cada mitad medida sola se callaba: el 1 dobla poco y el 2 no tiene otra
+  // salida que doble menos que la calle de enfrente.
+  const pts = [[-73, 121, 0, 0, 0], [-15, 50, 0, 0, null], [-7, 34, 0, 0, null], [-2, 17, 0, 0, null], [0, 0, 0, 1, 1],
+    [2.5, -21.7, 0, 0, null], [9.5, -27, 0, 0, null], [28, -28, 0, 1, 2], [199, -28.5, 0, 0, 3], [400, -28, 0, 0, 4]];
+  const nodes = [[-73, 121], [0, 0], [28, -28], [199, -28.5], [400, -28], [-28, -25.6], [-65, -25.6], [-155, -26.6], [-400, -26]];
+  const adjacency = new Map();
+  const add = (a, b) => { if (!adjacency.has(a)) adjacency.set(a, []); adjacency.get(a).push([b]); };
+  for (const [a, b] of [[0, 1], [1, 2], [1, 5], [2, 5], [5, 6], [6, 7], [7, 8], [2, 3], [3, 4]]) { add(a, b); add(b, a); }
+  const { cum, pointAt } = routeMetrics(pts);
+  const ctx = { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency };
+  // partida por la curva, ninguna mitad avisa
+  assert.equal(junctionClusterEnd(pts, cum, 4, 50, 100), 4);
+  const mitad = (i) => detectManeuver({ ...ctx, i, iEnd: i });
+  assert.ok(!mitad(4) || mitad(4).quiet);
+  assert.ok(!mitad(7) || mitad(7).quiet);
+  // el prefab entero si, en el nodo de la entrada
+  const { iEnd, m } = junctionManeuver({ ...ctx, i: 4, iEnd: 4 }, 50, 100);
+  assert.equal(iEnd, 7);
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'left', false, 4]);
+});
+
+test('junctionManeuver: si la otra mitad del prefab avisa sola, no se junta', () => {
+  // derecho por el nodo 1 (sin otra salida), curva corta y en el nodo 2 un
+  // giro a la derecha con otra calle que sigue derecho: se avisa en el 2
+  const pts = [[0, -300, 0, 0, 0], [0, 0, 0, 1, 1], [0, 15, 0, 0, null], [0, 30, 0, 0, null], [0, 40, 0, 1, 2], [300, 40, 0, 0, 3]];
+  const nodes = [[0, -300], [0, 0], [0, 40], [300, 40], [0, 400]];
+  const adjacency = new Map([[0, [[1]]], [1, [[2]]], [2, [[3], [4]]], [3, []], [4, []]]);
+  const { cum, pointAt } = routeMetrics(pts);
+  const ctx = { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency };
+  const r = junctionManeuver({ ...ctx, i: 1, iEnd: 1 }, 50, 100);
+  assert.deepEqual([r.iEnd, r.m], [1, null]);
+  const m2 = detectManeuver({ ...ctx, i: 4, iEnd: 4 });
+  assert.deepEqual([m2.kind, m2.direction, m2.quiet], ['turn', 'right', false]);
 });
 
 test('trimRouteBehind: lo ya recorrido se guarda por metros, con tope de puntos', () => {
