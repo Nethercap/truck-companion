@@ -2888,9 +2888,10 @@ const ROUTE_GRAPH_V3_REV = 5;
 // tiene, no hay flechas y nada mas. 0 = no se pide. 2 = 13-10, los de las
 // 17 variantes (r2-upload-lanes del taller); el 1 quedo con un 404 guardado
 // en el cache de Cloudflare (se pidio antes de subirlo y la regla "Mapas
-// R2" guarda tambien los 404). Al regenerar grafos, regenerar tambien
-// estos y subir el numero.
-const ROUTE_LANES_REV = 2;
+// R2" guarda tambien los 404). 3 = 17-10, los mismos con la marca del
+// carril que se pierde (+64 en el giro, LANE_DROP_BIT). Al regenerar
+// grafos, regenerar tambien estos y subir el numero.
+const ROUTE_LANES_REV = 3;
 let routeLanes = null;
 async function loadRouteLanes(base, v, game, decoded, graph) {
   routeLanes = null;
@@ -3933,6 +3934,14 @@ const NAV_FORK_LEG_M = 250; // para bifurcaciones se mira mas lejos: una rampa s
 // lado que la voz tenga que dejar pasar (sideExitToward): lo que adelanta el
 // aviso del punto mas temprano (6 s a 90 km/h).
 const NAV_VOICE_DECOY_M = 150;
+// Un "keep" por carriles (laneKeepAt) hacia el mismo lado que otro de hasta
+// estos metros antes es el mismo carril que se pierde en dos prefabs
+// pegados (60 m en la ruta New Orleans -> Houma de check_avisos): un aviso.
+const NAV_LANE_KEEP_REPEAT_M = 200;
+// Y la salida por la que se van los otros carriles tiene que alejarse estos
+// metros sin tocar estos metros de ruta: los que rodean una isleta, o una
+// calzada que se abre en dos y se vuelve a juntar, no son una salida.
+const NAV_LANE_KEEP_ESCAPE_M = 600;
 const NAV_TURN_DEBOUNCE_TICKS = 2; // una indicacion nueva tiene que verse 2 ticks seguidos (anti-parpadeo al pasar salidas)
 const navManeuverState = {};
 let routeBehind = []; // ultimos puntos de la ruta ya recorridos (ver trimRouteBehindTruck)
@@ -4081,6 +4090,7 @@ function findUpcomingTurn() {
   // esquina se anunciaba como otro giro.
   let prevTurn = null; // ultimo giro visto, aunque ya haya quedado atras (ver continuesTurn)
   let roundaboutLeftM = -Infinity; // donde se salio de la ultima rotonda (metros sobre la ruta)
+  let lastKeep = null; // ultimo "keep" por carriles, aunque haya quedado atras (NAV_LANE_KEEP_REPEAT_M)
   const passed = []; // cruces sin aviso de aca al proximo giro: [i, iEnd] (ver sideExitToward)
   const roundaboutAt = (i, iEnd) => graph.adjacency
     ? detectRoundabout({ pts, cum, i, iEnd, adjacency: graph.adjacency, nodeAt: graph.nodeXY, edgeLine, bearingBetween }) : null;
@@ -4115,7 +4125,23 @@ function findUpcomingTurn() {
     const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, edgeLine,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     let m = detectManeuver({ ...ctx, i, iEnd });
-    if (m && m.kind === 'fork' && !m.inCurve) {
+    // Derecho por el cruce, pero los carriles de un costado se van por una
+    // salida (exit only): "keep left" con las flechas, como el juego. Solo
+    // donde no hay otra maniobra (laneKeepAt, Discord 17-10).
+    if (!m) {
+      // Y solo si hay otra salida que se aleja sin volver a la ruta (de -100
+      // a 100 grados): los carriles que rodean una isleta, o una calzada que
+      // se parte y se vuelve a juntar, no dan a elegir (10 "keep" de mas en
+      // 60 rutas del simulador, la mitad en una autopista de Helsinki).
+      const keep = laneKeepAt(pts, i, iEnd);
+      const salida = keep && sideExitToward({ ...ctx, i, iEnd, rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M }, 'right', -100, 100);
+      if (salida) {
+        const repetido = lastKeep && lastKeep.direction === keep.direction && cum[i] - lastKeep.atM <= NAV_LANE_KEEP_REPEAT_M;
+        if (!repetido) m = { kind: 'fork', direction: keep.direction, at: i, lanes: keep.lanes, laneKeep: true };
+        lastKeep = { direction: keep.direction, atM: cum[i] };
+      }
+    }
+    if (m && m.kind === 'fork' && !m.inCurve && !m.laneKeep) {
       // La bifurcacion se mide a 250 m: si en ese tramo hay un cruce con un
       // giro de verdad, lo que "se desvia" es ese giro, no una rampa - se
       // deja que el giro se anuncie por si mismo (una esquina de 90 grados
@@ -4169,7 +4195,7 @@ function findUpcomingTurn() {
         }
       }
       return { distanceMeters: cum[at] - cum[here], direction: m.direction, kind: m.kind, nearSign, decoyMeters, node: [pts[at][0], pts[at][1]],
-               lanes: laneGuidanceAt(pts, i, iEnd, m.kind, m.direction) };
+               lanes: m.lanes || laneGuidanceAt(pts, i, iEnd, m.kind, m.direction) };
     }
     if (cum[iEnd] > cum[here]) passed.push([i, iEnd]);
     i = iEnd; // el resto del cruce ya se evaluo como parte de este
@@ -4190,6 +4216,20 @@ function findUpcomingTurn() {
 // el primero del grupo y la salida, el que le sigue al ultimo (sin el, el
 // giro a la derecha de Salt Lake City en la demo no tenia flechas).
 function laneGuidanceAt(pts, i, iEnd, kind, direction) {
+  return laneRecordAt(pts, i, iEnd, (rec) => laneTurnMatches(kind, direction, rec.turn));
+}
+
+// "Keep left" sin giro: derecho por un cruce donde los carriles de un
+// costado se van por una salida (laneKeepSide en pure.js). El lado y los
+// carriles, o null.
+function laneKeepAt(pts, i, iEnd) {
+  let direction = null;
+  const lanes = laneRecordAt(pts, i, iEnd, (rec) => (direction = laneKeepSide(rec)) != null);
+  return lanes ? { direction, lanes } : null;
+}
+
+// El primer paso del cruce cuyos carriles cumplen `accept` (ver laneGuidanceAt).
+function laneRecordAt(pts, i, iEnd, accept) {
   if (!routeLanes || !routeGraph) return null;
   let k = i - 1;
   while (k > 0 && pts[k][4] == null) k--;
@@ -4203,7 +4243,7 @@ function laneGuidanceAt(pts, i, iEnd, kind, direction) {
       const d = routeGraph.dirEdge(prev, node);
       if (d !== -1) {
         const rec = lanesForEdge(routeLanes, routeGraph.adjEdge[d], routeGraph.adjRev[d]);
-        if (rec && laneTurnMatches(kind, direction, rec.turn)) return rec;
+        if (rec && accept(rec)) return rec;
       }
     }
     prev = node;

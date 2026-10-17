@@ -149,7 +149,9 @@ def write_lanes(node_list, edges, records, path):
       key     u32[n]    arista * 2 + sentido (0 = de a hacia b, 1 = de b hacia a), ordenadas
       lanes   u8[n]     carriles que entran al cruce
       mask    u8[n]     bit k = el carril k, de izquierda a derecha, lleva a la salida
-      turn    u8[n]     flecha de la salida que se toma
+      turn    u8[n]     flecha de la salida que se toma; + 64 si es seguir derecho
+                        donde un carril que venia de antes se va por una salida
+                        (CARRIL_QUE_SE_PIERDE en build_route_graph)
       arrows  u8[n*8]   flechas de cada carril (1 izquierda, 2 izquierda suave,
                         4 derecho, 8 derecha suave, 16 derecha, 32 vuelta en U)
     """

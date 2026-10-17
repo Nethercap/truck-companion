@@ -13,12 +13,12 @@
 // bajan de R2 (con el ?g= de la app) y quedan en --cache.
 //
 // Uso: node tools/simular_navegacion.js [--variantes ats,ets2] [--rutas 30]
-//        [--semilla 1] [--salida carpeta] [--cache carpeta]
+//        [--semilla 1] [--salida carpeta] [--cache carpeta] [--carriles carpeta]
 'use strict';
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { harness, bajar, graphRev, timesRev, BASE } = require('./check_avisos');
+const { harness, bajar, graphRev, timesRev, lanesRev, BASE } = require('./check_avisos');
 
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(ROOT, 'docs', 'data');
@@ -135,6 +135,15 @@ async function cargarVariante(v, cache, H) {
     g.edgeT = H.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
     if (!g.edgeT) throw new Error(`las decimas de ${v} no son de este grafo`);
   }
+  // Los carriles, como loadRouteLanes: con ellos salen los "keep" de seguir
+  // derecho donde un carril se pierde (laneKeepAt). De R2, o de --carriles
+  // <carpeta>/<v>/route-graph-<v>-lanes.bin para probar unos sin subir.
+  const carriles = argumentos(process.argv.slice(2)).carriles;
+  const fl = carriles && path.join(carriles, v, `route-graph-${v}-lanes.bin`);
+  const lb = fl && fs.existsSync(fl) ? fs.readFileSync(fl)
+    : lanesRev() ? await archivo(`${v}-lanes-g${rev}-l${lanesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-lanes.bin?g=${rev}&l=${lanesRev()}`) : null;
+  const lanes = lb ? H.pure.decodeLanesBin(lb.buffer.slice(lb.byteOffset, lb.byteOffset + lb.byteLength), decoded.n, decoded.ne) : null;
+  if (lb && !lanes) throw new Error(`los carriles de ${v} no son de este grafo`);
   const pois = JSON.parse(fs.readFileSync(path.join(DATA, `pois-${v}.json`), 'utf8'));
   // Pais de cada ciudad (mano izquierda en las islas) y a que ciudad es cada
   // caja de ciudad, del parser si esta a mano.
@@ -144,7 +153,7 @@ async function cargarVariante(v, cache, H) {
     const f = path.join(pdir, `${pre}-cities.json`);
     if (fs.existsSync(f)) parserCities = JSON.parse(fs.readFileSync(f, 'utf8'));
   }
-  return { v, g, cities, pois, parserCities };
+  return { v, g, cities, pois, parserCities, lanes };
 }
 
 const MANO_IZQUIERDA = new Set(['uk', 'ireland', 'malta', 'cyprus', 'isle_of_man', 'jersey', 'guernsey', 'faroe']);
@@ -900,6 +909,7 @@ async function main() {
     const t0 = Date.now();
     const datos = await cargarVariante(v, args.cache, H);
     const { g, pois, cities, parserCities } = datos;
+    H.mod.setLanes(datos.lanes);
     const escala = pure.createCityScale(pois.areas, { outside: v.startsWith('ets2') ? 19 : 20 });
     const cercano = grillaNodos(g);
     // mano izquierda: el pais de la ciudad mas cercana (parser)
