@@ -22,8 +22,11 @@ as a separate program.
 
 ## What the patch changes
 
-- Mods can be read as they come (a folder, a HashFS `.scs` or a ZIP `.scs`),
-  without extracting them first.
+- Mods can be read as they come (a folder, a HashFS v1 or v2 `.scs` or a
+  ZIP `.scs`), without extracting them first.
+- A standalone map from a mod (its own `.mbd` and sector folder, with no
+  sectors added to `europe`/`usa`) is parsed instead of the game's map; with
+  two `.mbd` files the game's one wins if the mod adds sectors to it.
 - CityHash64 in TypeScript, so it runs on Windows without native modules.
   Without `gdeflate`, icon images are skipped; their names still count, so
   companies and weigh stations are kept.

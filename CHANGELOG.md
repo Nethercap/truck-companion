@@ -35,6 +35,11 @@ updates on its own and is not versioned here.
 - Build my map also saves the logo of every company on your map, including the ones your mods add,
   so the dashboard's map and company search show them on your own map too. Maps built with an
   older version still show the logos of the base game and the supported mods.
+- Build my map reads mods packed in the older .scs format (HashFS v1), like the EAA map or RusMap.
+  Before, they were skipped as "invalid" and the map came out without them. Encrypted files inside
+  a mod are still skipped.
+- Build my map: a standalone map that replaces Europe (like Grand Utopia) is built on its own, and a
+  map mod that ships a standalone map next to the connected one (RusMap) no longer stops the build.
 
 ## 1.5.31 (2026-10-13)
 
