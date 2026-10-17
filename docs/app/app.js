@@ -4481,6 +4481,7 @@ function refreshCab() {
 // Va al final del archivo: setNavMode usa variables (let) de mas abajo.
 function initCab() {
   if (!cabMode) return;
+  document.title = CAB_WINDOW_TITLE;
   const pantalla = document.getElementById('cabScreen');
   pantalla.hidden = false;
   // Abierta a mano sin codigo: queda la fila de conectar (ver connectBtn)

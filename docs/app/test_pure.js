@@ -2841,6 +2841,16 @@ test('carriles en nav_hud: solo enteros chicos, y el dibujo sale de ahi', () => 
   assert.equal((html.match(/navLane on/g) || []).length, 2);
 });
 
+test('vista de cabina: el titulo se distingue del tablero y el menu del mod lo puede dibujar', () => {
+  const { CAB_WINDOW_TITLE } = require('./pure.js');
+  const fs = require('fs');
+  const tablero = /<title>([^<]*)<\/title>/.exec(fs.readFileSync(require('path').join(__dirname, 'index.html'), 'utf8'))[1];
+  assert.notEqual(CAB_WINDOW_TITLE, tablero);
+  assert.ok(CAB_WINDOW_TITLE.startsWith('Truck Dash'));
+  // Solo ASCII imprimible: el menu de PrismTextureStreamer pone "?" por la raya
+  assert.match(CAB_WINDOW_TITLE, /^[\x20-\x7e]+$/);
+});
+
 test('vista de cabina: se prende solo con cab=1', () => {
   const { cabModeFromSearch } = require('./pure.js');
   assert.equal(cabModeFromSearch('?cab=1'), true);
