@@ -2664,9 +2664,9 @@ test('formatGear: la marcha igual que en el overlay del juego', () => {
 
 test('pipWindowSize: la ventana flotante con mapa es mas alta que la de texto', () => {
   const { pipWindowSize } = require('./pure.js');
-  assert.deepEqual(pipWindowSize(false), { width: 380, height: 160 });
+  assert.deepEqual(pipWindowSize(false), { width: 400, height: 160 });
   const conMapa = pipWindowSize(true);
-  assert.equal(conMapa.width, 380);
+  assert.equal(conMapa.width, pipWindowSize(false).width); // al cambiar de modo no cambia el ancho
   assert.ok(conMapa.height >= 400);
   conMapa.height = 1; // es una copia
   assert.ok(pipWindowSize(true).height >= 400);

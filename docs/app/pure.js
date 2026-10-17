@@ -3094,11 +3094,12 @@ function formatGear(gear) {
 }
 
 // Tamano de la ventana flotante (Document Picture-in-Picture) al abrirla o al
-// cambiar de modo. El texto entra en una tira de 380 x 160; con el mapa
-// (prototipo del 16-10, Discord: "a mini map inside the small pop out window
-// that stays on top of the game") hace falta alto para ver camino adelante.
+// cambiar de modo. El texto entra en una tira de 400 x 160 (380 hasta que
+// se sumo el descanso a la fila de abajo, 17-10); con el mapa (prototipo
+// del 16-10, Discord: "a mini map inside the small pop out window that
+// stays on top of the game") hace falta alto para ver camino adelante.
 // Chrome la achica si no entra en la pantalla.
-const PIP_SIZES = { text: { width: 380, height: 160 }, map: { width: 380, height: 460 } };
+const PIP_SIZES = { text: { width: 400, height: 160 }, map: { width: 400, height: 460 } };
 function pipWindowSize(withMap) {
   return { ...PIP_SIZES[withMap ? 'map' : 'text'] };
 }
