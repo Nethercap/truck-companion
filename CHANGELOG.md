@@ -23,6 +23,9 @@ updates on its own and is not versioned here.
 - Build my map also saves where each city's area is. Inside cities the game counts distance at a
   smaller scale, and with this the dashboard's distances and turn instructions on your own map
   match the game's GPS in town too.
+- Build my map marks where a lane you are driving in ends as an exit (on a freeway, the right lane
+  that becomes exit only), so on your own map the dashboard says "keep left" there with the lane
+  arrows, like the game's GPS.
 - Build my map (ATS): road names keep the plate under the shield, so a business route reads
   "US-20 Bus" instead of "US-20" (also Alt, Bypass, Truck and historic routes), and shields
   drawn in other styles (guide signs, state versions) are no longer skipped.

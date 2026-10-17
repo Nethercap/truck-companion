@@ -3,7 +3,7 @@ write_lanes en mapbuild): que carril lleva a cada salida de un cruce."""
 import math
 import struct
 
-from mapbuild.build_route_graph import FLECHAS, prefab_lane_table
+from mapbuild.build_route_graph import FLECHAS, carril_que_se_pierde, keep_side, prefab_lane_table
 from mapbuild.route_graph_bin import write_lanes
 
 L, LS, S, RS, R = (FLECHAS[k] for k in ("left", "slight_left", "straight", "slight_right", "right"))
@@ -75,6 +75,52 @@ def test_una_salida_de_autopista_es_suave_y_no_derecho():
     t = prefab_lane_table(d)
     assert t[(0, 2)] == (2, 0b10, (S, RS), RS)
     assert t[(0, 1)] == (2, 0b01, (S, RS), S)
+
+
+def test_keep_side_como_la_web():
+    # el de la derecha solo a la salida: por los de la izquierda
+    assert keep_side(3, 0b011, (S, S, RS), S) == "left"
+    assert keep_side(3, 0b110, (LS, S, S), S) == "right"
+    # todos sirven, o el que no sirve dobla (carril de girar en una esquina)
+    assert keep_side(3, 0b111, (S, S, S | RS), S) is None
+    assert keep_side(3, 0b011, (S, S, R), S) is None
+    # a los dos lados, o lo que se toma dobla de verdad
+    assert keep_side(3, 0b010, (LS, S, RS), S) is None
+    assert keep_side(3, 0b100, (S, S, R), R) is None
+
+
+def autopista(carriles_antes, carriles_calle=3, largo=200.0, calle_antes=None):
+    """Una autopista hacia el norte: un cruce de antes (prefab "antes", con
+    `carriles_antes` carriles que siguen todos derecho), una calle de `largo`
+    metros con `carriles_calle` carriles y el cruce de la salida (prefab
+    "salida"). Con calle_antes, en vez del cruce de antes hay otra calle con
+    esos carriles."""
+    descs = {"antes": {"nodes": [{"inputLanes": list(range(carriles_antes)), "outputLanes": []},
+                                 {"inputLanes": [], "outputLanes": list(range(carriles_antes))}],
+                       "navCurves": [curva(4.5 * k, 0, NORTE, 4.5 * k, -50, NORTE) for k in range(carriles_antes)]}}
+    prefabs = {"pa": {"uid": "pa", "token": "antes", "nodeUids": ["n0", "n1"], "originNodeIndex": 0}}
+    calles = {"c1": {"uid": "c1", "startNodeUid": "n1", "endNodeUid": "n2", "length": largo, "carriles": carriles_calle}}
+    items = {"n1": ("c1", "pa"), "n2": ("ps", "c1")}
+    if calle_antes is not None:
+        calles["c0"] = {"uid": "c0", "startNodeUid": "n0", "endNodeUid": "n1", "length": 5000.0, "carriles": calle_antes}
+        items["n1"] = ("c1", "c0")
+    return dict(items_de_nodo=items, calles=calles, prefabs=prefabs, descs=descs,
+                carriles_de_calle=lambda calle, uid: calle["carriles"])
+
+
+def test_carril_que_se_pierde_o_que_se_agrego():
+    # la autopista ya traia tres carriles: el de la derecha se pierde
+    assert carril_que_se_pierde("ps", "n2", 3, **autopista(3))
+    # traia dos y el cruce de antes agrego el tercero (desaceleracion, o
+    # la rampa de entrada que termina en esta salida): no
+    assert not carril_que_se_pierde("ps", "n2", 3, **autopista(2))
+    # una calle de antes con menos carriles: se agrego ahi; con mas, venian
+    assert not carril_que_se_pierde("ps", "n2", 3, **autopista(3, calle_antes=2))
+    assert carril_que_se_pierde("ps", "n2", 3, **autopista(3, calle_antes=4))
+    # muchos km con tres carriles
+    assert carril_que_se_pierde("ps", "n2", 3, **autopista(2, largo=4000.0))
+    # la calle de la salida con otra cantidad: no son estos carriles
+    assert not carril_que_se_pierde("ps", "n2", 3, **autopista(3, carriles_calle=2))
 
 
 def test_el_archivo_va_por_arista_y_sentido(tmp_path):

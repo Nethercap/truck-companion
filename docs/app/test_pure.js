@@ -2522,18 +2522,21 @@ function lanesBin(nNodes, nEdges, entradas) {
 }
 
 test('carriles: el archivo se lee y se busca por arista y sentido', () => {
-  const { decodeLanesBin, lanesForEdge, LANE_ARROW_BITS: B } = require('./pure.js');
+  const { decodeLanesBin, lanesForEdge, LANE_ARROW_BITS: B, LANE_DROP_BIT } = require('./pure.js');
   const buf = lanesBin(100, 50, [
     { key: 3 * 2 + 1, lanes: 3, mask: 0b001, turn: B.left, arrows: [B.left, B.straight, B.straight | B.right] },
     { key: 7 * 2, lanes: 2, mask: 0b10, turn: B.slightRight, arrows: [B.straight, B.slightRight] },
-    { key: 40 * 2, lanes: 4, mask: 0b0111, turn: B.straight, arrows: [B.straight, B.straight, B.straight, B.slightRight] },
+    { key: 40 * 2, lanes: 4, mask: 0b0111, turn: B.straight | LANE_DROP_BIT, arrows: [B.straight, B.straight, B.straight, B.slightRight] },
   ]);
   const d = decodeLanesBin(buf, 100, 50);
   assert.equal(d.n, 3);
-  assert.deepEqual(lanesForEdge(d, 3, true), { count: 3, mask: 1, turn: B.left, arrows: [B.left, B.straight, B.straight | B.right] });
+  assert.deepEqual(lanesForEdge(d, 3, true), { count: 3, mask: 1, turn: B.left, arrows: [B.left, B.straight, B.straight | B.right], drop: false });
   assert.equal(lanesForEdge(d, 3, false), null); // el otro sentido no avisa nada
   assert.deepEqual(lanesForEdge(d, 7, false).arrows, [B.straight, B.slightRight]);
   assert.equal(lanesForEdge(d, 40, false).count, 4);
+  // el carril que se pierde viene aparte: el giro queda con las flechas solas
+  assert.equal(lanesForEdge(d, 40, false).turn, B.straight);
+  assert.equal(lanesForEdge(d, 40, false).drop, true);
   assert.equal(lanesForEdge(d, 41, false), null);
   assert.equal(lanesForEdge(null, 3, true), null);
   // De otra corrida del grafo, roto o de otro formato: no se usa
@@ -2559,6 +2562,36 @@ test('carriles: solo los del giro que se anuncia', () => {
   assert.ok(laneTurnMatches('fork', 'right', B.slightRight));
   assert.ok(!laneTurnMatches('fork', 'right', B.slightLeft));
   assert.ok(!laneTurnMatches('roundabout', 'right', B.right));
+});
+
+test('carriles: keep left yendo derecho cuando el de la derecha sale (Discord, 17-10)', () => {
+  const { laneKeepSide, LANE_ARROW_BITS: B } = require('./pure.js');
+  const rec = (mask, arrows, turn = B.straight) => ({ count: arrows.length, mask, turn, arrows, drop: true });
+  // tres carriles, el de la derecha solo a la salida: por los dos de la izquierda
+  assert.equal(laneKeepSide(rec(0b011, [B.straight, B.straight, B.slightRight])), 'left');
+  // dos de la derecha a la salida
+  assert.equal(laneKeepSide(rec(0b0011, [B.straight, B.straight, B.slightRight, B.slightRight])), 'left');
+  // una salida por la izquierda: keep right
+  assert.equal(laneKeepSide(rec(0b110, [B.slightLeft, B.straight, B.straight])), 'right');
+  // nuestro lado puede ser "suave" si la salida es mas recta (los dos se abren)
+  assert.equal(laneKeepSide(rec(0b01, [B.slightLeft, B.straight], B.slightLeft)), 'left');
+  // el de la derecha sirve para las dos (salida comun): todos sirven, nada
+  assert.equal(laneKeepSide(rec(0b111, [B.straight, B.straight, B.straight | B.slightRight])), null);
+  // el carril de doblar a la derecha de una esquina no es un "keep left"
+  assert.equal(laneKeepSide(rec(0b011, [B.straight, B.straight, B.right])), null);
+  assert.equal(laneKeepSide(rec(0b011, [B.straight, B.straight, B.slightRight | B.right])), null);
+  // los que no sirven a los dos lados, o uno del medio: no hay un lado
+  assert.equal(laneKeepSide(rec(0b010, [B.slightLeft, B.straight, B.slightRight])), null);
+  assert.equal(laneKeepSide(rec(0b101, [B.straight, B.slightRight, B.straight])), null);
+  // lo que se toma dobla de verdad: es un giro, no un keep
+  assert.equal(laneKeepSide(rec(0b100, [B.straight, B.straight, B.right], B.right)), null);
+  // sin la marca del constructor el carril se agrego para la salida (el de
+  // desaceleracion): ahi no se avisa
+  assert.equal(laneKeepSide({ ...rec(0b011, [B.straight, B.straight, B.slightRight]), drop: false }), null);
+  // sin datos, un carril, o un carril sin flechas
+  assert.equal(laneKeepSide(null), null);
+  assert.equal(laneKeepSide(rec(0b1, [B.straight])), null);
+  assert.equal(laneKeepSide(rec(0b01, [B.straight, 0])), null);
 });
 
 test('carriles: para dibujar, de izquierda a derecha y cuales sirven', () => {

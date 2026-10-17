@@ -203,27 +203,12 @@ def _rumbo_medio(angulos):
     return math.atan2(y, x)
 
 
-def prefab_lane_table(desc):
-    """{(nodo de entrada, nodo de salida): (carriles, mascara, flechas, giro)}
-    de la descripcion de un prefab, solo donde sirve avisar: dos o mas
-    carriles y alguno que NO lleva a esa salida.
-
-    - carriles: cuantos entran por ese nodo (los de mas de MAX_CARRILES no
-      se guardan).
-    - mascara: bit k = el carril k (de izquierda a derecha segun el sentido
-      de marcha) lleva a esa salida.
-    - flechas: por carril, las direcciones a las que lleva (bits de FLECHAS).
-    - giro: la direccion de esa salida.
-
-    Los carriles se ordenan por donde arranca cada curva, proyectado sobre la
-    derecha del sentido de marcha (x este, y sur): el indice de inputLanes
-    sigue ese orden en el 95 % de los nodos pero no en peajes, estaciones de
-    servicio y fronteras. A que salida lleva cada curva se sigue por
-    nextLines hasta una curva de outputLanes."""
+def _carriles_por_entrada(desc):
+    """{nodo de entrada: (rumbo, [(posicion, salidas)])} de un prefab: los
+    carriles que entran por cada nodo, de izquierda a derecha, y a que nodos
+    de salida lleva cada uno (ver prefab_lane_table)."""
     nodes = desc.get("nodes") or []
     curves = desc.get("navCurves") or []
-    if not nodes or not curves:
-        return {}
     sale_por = {}
     for j, n in enumerate(nodes):
         for ci in n.get("outputLanes") or []:
@@ -246,16 +231,10 @@ def prefab_lane_table(desc):
         memo[ci] = salidas
         return salidas
 
-    rumbo_salida = {}
-    for j, n in enumerate(nodes):
-        fines = [curves[ci]["end"].get("rotation", 0.0) for ci in n.get("outputLanes") or [] if ci < len(curves)]
-        if fines:
-            rumbo_salida[j] = _rumbo_medio(fines)
-
-    tabla = {}
+    out = {}
     for i, n in enumerate(nodes):
         entrada = [ci for ci in n.get("inputLanes") or [] if ci < len(curves)]
-        if len(entrada) < 2:
+        if not entrada:
             continue
         rumbo = _rumbo_medio([curves[ci]["start"].get("rotation", 0.0) for ci in entrada])
         dx, dy = math.cos(rumbo), math.sin(rumbo)
@@ -268,6 +247,121 @@ def prefab_lane_table(desc):
                 carriles[-1][1].update(alcanza(ci))
             else:
                 carriles.append((pos, set(alcanza(ci))))
+        out[i] = (rumbo, carriles)
+    return out
+
+
+# Bit de `giro` en un paso derecho donde los carriles de un costado se van
+# por una salida y venian de antes del cruce anterior (carril_que_se_pierde):
+# ahi la web avisa "keep left" sin giro. Las flechas usan los bits 0 a 5.
+CARRIL_QUE_SE_PIERDE = 64
+_DE_A_POCO = FLECHAS["straight"] | FLECHAS["slight_left"] | FLECHAS["slight_right"]
+
+
+def keep_side(carriles, mascara, flechas, giro):
+    """El lado al que hay que ir para seguir por este paso ('left' si los
+    carriles que no sirven son los de la derecha), o None. Igual que
+    laneKeepSide de la web: solo pasos derechos o suaves, los que no sirven
+    todos de un costado y yendose de a poco (salida de autopista, no el
+    carril de doblar en una esquina)."""
+    if carriles < 2 or not giro & _DE_A_POCO:
+        return None
+    todos = (1 << carriles) - 1
+    mascara &= todos
+    if not mascara or mascara == todos:
+        return None
+    sirven = [k for k in range(carriles) if mascara >> k & 1]
+    if sirven[0] > 0 and sirven[-1] < carriles - 1:
+        return None
+    if len(sirven) != sirven[-1] - sirven[0] + 1:
+        return None
+    for k in range(carriles):
+        if not mascara >> k & 1 and (not flechas[k] or flechas[k] & ~_DE_A_POCO):
+            return None
+    return "left" if sirven[0] == 0 else "right"
+
+
+def carriles_hasta(desc, salida):
+    """{nodo de entrada: (carriles, cuantos de ellos llevan a `salida`)}."""
+    return {i: (len(c), sum(1 for _, s in c if salida in s))
+            for i, (_, c) in _carriles_por_entrada(desc).items() if i != salida}
+
+
+def carril_que_se_pierde(prefab_uid, nodo, carriles, items_de_nodo, calles, prefabs, descs, carriles_de_calle,
+                         tope_m=3000.0):
+    """Si los `carriles` que entran al prefab por `nodo` ya venian de antes
+    del cruce anterior. Con keep_side, el carril que no sirve se pierde por
+    la salida (el juego dice "keep left"); si no, es uno que se agrego para
+    ella: el de desaceleracion, o el de una rampa de entrada que termina en
+    la salida siguiente. Esa es la salida de autopista comun (77 % de los
+    pasos de ETS2, 51 % de ATS) y ahi el juego no dice nada.
+
+    Sube por las calles con esos carriles hasta el cruce de antes: vienen de
+    antes si en el alguna entrada trae tantos carriles hasta aca, o si hay
+    tope_m de calle con ellos. Una calle con menos carriles corta (se
+    agregaron ahi); con mas, vienen de antes.
+    items_de_nodo: uid -> (forwardItemUid, backwardItemUid); calles y
+    prefabs: por uid; descs: descripciones por token; carriles_de_calle(calle,
+    uid): los carriles de la calle en el sentido que llega a uid."""
+    def otro(uid, item):
+        f, b = items_de_nodo.get(uid, (None, None))
+        sig = b if f == item else f if b == item else None
+        return sig if sig and sig != "0" else None
+
+    item, uid, dist = otro(nodo, prefab_uid), nodo, 0.0
+    for _ in range(500):
+        if item is None:
+            return False
+        if item not in calles:
+            p = prefabs.get(item)
+            desc = descs.get(p.get("token")) if p else None
+            rot = rotate_right(p.get("nodeUids", []), p.get("originNodeIndex", 0)) if desc else []
+            if uid not in rot:
+                return False
+            return any(llegan >= carriles for _, llegan in carriles_hasta(desc, rot.index(uid)).values())
+        calle = calles[item]
+        c = carriles_de_calle(calle, uid)
+        if c is None or c < carriles:
+            return False
+        if c > carriles:
+            return True
+        dist += calle.get("length") or 0.0
+        if dist > tope_m:
+            return True
+        antes = calle["startNodeUid"] if calle["endNodeUid"] == uid else calle["endNodeUid"]
+        item, uid = otro(antes, item), antes
+    return False
+
+
+def prefab_lane_table(desc):
+    """{(nodo de entrada, nodo de salida): (carriles, mascara, flechas, giro)}
+    de la descripcion de un prefab, solo donde sirve avisar: dos o mas
+    carriles y alguno que NO lleva a esa salida.
+
+    - carriles: cuantos entran por ese nodo (los de mas de MAX_CARRILES no
+      se guardan).
+    - mascara: bit k = el carril k (de izquierda a derecha segun el sentido
+      de marcha) lleva a esa salida.
+    - flechas: por carril, las direcciones a las que lleva (bits de FLECHAS).
+    - giro: la direccion de esa salida.
+
+    Los carriles se ordenan por donde arranca cada curva, proyectado sobre la
+    derecha del sentido de marcha (x este, y sur): el indice de inputLanes
+    sigue ese orden en el 95 % de los nodos pero no en peajes, estaciones de
+    servicio y fronteras. A que salida lleva cada curva se sigue por
+    nextLines hasta una curva de outputLanes."""
+    nodes = desc.get("nodes") or []
+    curves = desc.get("navCurves") or []
+    if not nodes or not curves:
+        return {}
+    rumbo_salida = {}
+    for j, n in enumerate(nodes):
+        fines = [curves[ci]["end"].get("rotation", 0.0) for ci in n.get("outputLanes") or [] if ci < len(curves)]
+        if fines:
+            rumbo_salida[j] = _rumbo_medio(fines)
+
+    tabla = {}
+    for i, (rumbo, carriles) in _carriles_por_entrada(desc).items():
         if not 2 <= len(carriles) <= MAX_CARRILES:
             continue
         giro, deltas = {}, {}
@@ -664,11 +758,13 @@ def main(argv=None):
     print(f"  {len(nodes)} nodes totales en el archivo")
     node_rot = {}
     hidden_coords = {}
+    node_items = {}  # que calle o prefab sigue de cada lado (carril_que_se_pierde)
     for n in nodes:
         uid = n["uid"]
         if uid in used_node_uids:
             node_coords[uid] = (n["x"], n["y"])
             node_rot[uid] = n.get("rotation")
+            node_items[uid] = (n.get("forwardItemUid"), n.get("backwardItemUid"))
         elif uid in hidden_node_uids:
             hidden_coords[uid] = (n["x"], n["y"])
             node_rot[uid] = n.get("rotation")
@@ -867,6 +963,23 @@ def main(argv=None):
     # guiar.
     lane_cache = {}
     lane_records = {}
+    # Los pasos derechos con un carril que se pierde por una salida llevan
+    # CARRIL_QUE_SE_PIERDE en el giro (la web avisa "keep left").
+    calles_por_uid = {r["uid"]: r for r in roads}
+    prefabs_por_uid = {p["uid"]: p for p in prefabs}
+    n_se_pierde = 0
+
+    def carriles_de_calle(r, uid):
+        lk = road_looks.get(r.get("roadLookToken"))
+        if not lk:
+            return None
+        izq, der = lk[0], lk[1]
+        if not izq or not der:
+            return izq + der
+        zurda = drives_on_left(r["x"], r["y"])
+        al_fin, al_inicio = (izq, der) if zurda else (der, izq)
+        return al_fin if r["endNodeUid"] == uid else al_inicio
+
     n_prefab_geom = 0
     n_one_way = 0
     one_way_edges = []
@@ -919,6 +1032,11 @@ def main(argv=None):
                             lane_cache[token] = {}
                     carriles = lane_cache[token].get((ia, ib))
                     if carriles:
+                        if keep_side(*carriles) and carril_que_se_pierde(
+                                p["uid"], ua, carriles[0], node_items, calles_por_uid, prefabs_por_uid,
+                                prefab_descs, carriles_de_calle):
+                            carriles = carriles[:3] + (carriles[3] | CARRIL_QUE_SE_PIERDE,)
+                            n_se_pierde += 1
                         lane_records[(a, b)] = carriles
                     if (a, b) in directed and directed[(a, b)][0] <= length:
                         continue
@@ -1252,7 +1370,8 @@ def main(argv=None):
         from route_graph_bin import write_lanes
     lanes_path = bin_path[:-4] + "-lanes.bin"
     stats_l = write_lanes(node_list, edges, lane_records, lanes_path)
-    print(f"Carriles en {lanes_path} ({os.path.getsize(lanes_path) / 1024:.0f} KB): {stats_l}")
+    print(f"Carriles en {lanes_path} ({os.path.getsize(lanes_path) / 1024:.0f} KB): {stats_l}, "
+          f"{n_se_pierde} pasos con un carril que se pierde")
 
     # Las decimas de segundo de cada arista, aparte y por indice del v3
     # (write_times): la web desempata con ellas los segundos enteros.

@@ -45,17 +45,19 @@ function harness() {
     /const MIN_REAL_COMPONENT_NODES/.test(consts) ? '' : 'const MIN_REAL_COMPONENT_NODES = 300;',
     extract('decodeRouteGraphBin'), extract('buildRouteGraph'), extract('nearestNodeIndex'),
     extract('MinHeap', 'class'), extract('findRouteWith'), extract('nodeRoutePath'), extract('findUpcomingTurn'),
+    extract('laneGuidanceAt'), extract('laneKeepAt'), extract('laneRecordAt'),
     `const { ${Object.keys(pure).filter(k => !propias.has(k)).join(', ')} } = pure;`,
     'const nearestRoadName = () => null;',
-    // Las flechas de carril no entran en los avisos (ni en la lista guardada)
-    'const laneGuidanceAt = () => null;',
     'const normDeg = (d) => ((d + 540) % 360) - 180;',
     'const toLngLat = (x, z) => [x, -z];',
     'const geoBearingDeg = (a, b, c, d) => (Math.atan2(c - a, d - b) * 180 / Math.PI + 360) % 360;',
     `return { decodeRouteGraphBin, buildRouteGraph, findRouteWith, findUpcomingTurn,
-      set: (g, cur, behind) => { routeGraph = g; currentRouteWorldPoints = cur; routeBehind = behind; } };`,
+      set: (g, cur, behind) => { routeGraph = g; currentRouteWorldPoints = cur; routeBehind = behind; },
+      // Los carriles del grafo (decodeLanesBin): con ellos salen los "keep"
+      // de seguir derecho donde un carril se va (laneKeepAt). Sin ellos, nada.
+      setLanes: (l) => { routeLanes = l || null; } };`,
   ].join('\n');
-  const mod = new Function('pure', 'let routeGraph = null, currentRouteWorldPoints = null, routeBehind = []; const routeProfile = "fastest";\n' + code)(pure);
+  const mod = new Function('pure', 'let routeGraph = null, routeLanes = null, currentRouteWorldPoints = null, routeBehind = []; const routeProfile = "fastest";\n' + code)(pure);
   const behindMax = Number((src.match(/const ROUTE_BEHIND_MAX = (\d+)/) || [])[1]) || 32;
   // Lo ya recorrido, como lo guarda la app (trimRouteBehind: por metros, y
   // adentro de una rotonda desde su entrada: keep es el node del aviso).
@@ -70,6 +72,26 @@ function harness() {
 function graphRev() {
   const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/const ROUTE_GRAPH_V3_REV = (\d+);/);
   return m ? m[1] : '';
+}
+
+// Los carriles, como loadRouteLanes de app.js: con ROUTE_LANES_REV en 0 la
+// app no los pide y aca tampoco.
+function lanesRev() {
+  const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/const ROUTE_LANES_REV = (\d+);/);
+  return m ? Number(m[1]) : 0;
+}
+
+// Los carriles de una variante para el arnes (decodeLanesBin), o null. Con
+// TRUCKDASH_LANES_DIR, los de esa carpeta (<dir>/<variante>/route-graph-
+// <variante>-lanes.bin, como r2-upload-lanes del taller): para ver los avisos
+// con carriles regenerados ANTES de subirlos a R2.
+async function bajarCarriles(pure, v, decoded) {
+  if (!lanesRev()) return null;
+  const local = process.env.TRUCKDASH_LANES_DIR;
+  const lb = local
+    ? fs.readFileSync(path.join(local, v, `route-graph-${v}-lanes.bin`))
+    : await bajar(`${BASE}/${v}/route-graph-${v}-lanes.bin?g=${graphRev()}&l=${lanesRev()}`);
+  return pure.decodeLanesBin(lb.buffer.slice(lb.byteOffset, lb.byteOffset + lb.byteLength), decoded.n, decoded.ne);
 }
 
 // Las decimas de segundo de cada arista, como loadRouteTimes de app.js: con
@@ -149,6 +171,7 @@ async function main() {
       const tb = await bajar(`${BASE}/${v}/route-graph-${v}-times.bin?g=${graphRev()}&t=${timesRev()}`);
       g.edgeT = h.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
     }
+    h.mod.setLanes(await bajarCarriles(h.pure, v, decoded));
     const rutas = simular(h, g, Array.isArray(cities) ? cities : Object.values(cities), n);
     const total = rutas.reduce((s, r) => s + r.man.length, 0);
     nuevo.variants[v] = { graph: sha, routes: rutas };
@@ -180,4 +203,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(2); });
-module.exports = { harness, bajar, graphRev, timesRev, BASE };
+module.exports = { harness, bajar, bajarCarriles, graphRev, timesRev, lanesRev, BASE };
