@@ -43,4 +43,4 @@ entrenados sobre estos datos:
 
 Los audios de `es-daniela-v3.json` se publican bajo CC BY-SA 4.0, como sus
 datos. Los de `fr-siwis-v3.json`, bajo CC BY 4.0 con el credito de arriba. El
-resto, como el repositorio (MIT).
+resto, como el repositorio (AGPL-3.0; MIT hasta el commit `a990dcd`).

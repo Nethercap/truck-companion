@@ -39,6 +39,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   este en R2. Si paso, subir el numero de su `?` (paso con `l=1` el 13-10).
 - Un archivo de mapa nuevo es opcional en la web: sin el, la app hace lo
   de antes (sin flechas de carril, por ejemplo), nunca deja de rutear.
+- Desde un navegador, el relay (`SoloOrigenesPropios` en backend/main.py)
+  solo atiende a trucksim-dash.com y a la copia LAN del cliente
+  (`http://<ip>:27765`, localhost, IPs privadas); sin header Origin (cliente,
+  curl) no mira nada. Una pagina en otro dominio no conecta:
+  `TRUCKDASH_ORIGENES=avisar` en Railway la deja pasar y anota el origen.
 - En el `-lanes.bin`, el giro de un paso lleva +64 (`CARRIL_QUE_SE_PIERDE`
   del constructor, `drop` de `lanesForEdge`) si se sigue derecho y un
   carril que venia de antes del cruce anterior se va por una salida: ahi

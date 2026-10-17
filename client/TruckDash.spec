@@ -29,7 +29,7 @@ if IS_WINDOWS:
       StringStruct('FileDescription', 'Truck Dash - telemetry client for ETS2 / ATS'),
       StringStruct('FileVersion', '{CLIENT_VERSION}'),
       StringStruct('InternalName', 'TruckDash'),
-      StringStruct('LegalCopyright', 'Copyright (c) 2026 Nethercap - MIT License'),
+      StringStruct('LegalCopyright', 'Copyright (c) 2026 Nethercap - AGPL-3.0'),
       StringStruct('OriginalFilename', 'TruckDash.exe'),
       StringStruct('ProductName', 'Truck Dash'),
       StringStruct('ProductVersion', '{CLIENT_VERSION}'),

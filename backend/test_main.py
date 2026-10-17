@@ -1549,3 +1549,35 @@ def test_codigos_nuevos_sin_letras_que_se_confunden_y_viejos_validos(main):
     assert all(main.is_well_formed_code(c) for c in codes)
     # Los ya emitidos con esas letras siguen entrando: el cliente guarda el suyo
     assert main.is_well_formed_code("O0I1ABCD")
+
+
+def test_solo_la_web_propia_y_la_red_local_usan_el_relay(client):
+    """El repo es publico: una copia de la web en otro dominio funcionaba
+    contra este relay (17-10). Sin Origin (cliente de Python, servidor LAN)
+    no se mira nada."""
+    assert client.get("/health").status_code == 200
+    for propio in ("https://trucksim-dash.com", "https://www.trucksim-dash.com",
+                   "http://192.168.1.20:27765", "http://localhost:27765", "http://127.0.0.1:27765",
+                   "http://10.0.0.5:27765", "http://172.20.1.2:27765", "http://100.101.102.103:27765",
+                   "http://escritorio-juan:27765", "http://pc-de-juan.local:27765"):
+        assert client.get("/health", headers={"Origin": propio}).status_code == 200, propio
+    for ajeno in ("https://copia.github.io", "https://trucksim-dash.com.otro.com", "http://172.32.0.1:27765",
+                  "https://otro.example", "null"):
+        assert client.get("/health", headers={"Origin": ajeno}).status_code == 403, ajeno
+
+
+def test_websocket_desde_otro_dominio_no_entra(client, main):
+    from starlette.websockets import WebSocketDisconnect
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with client.websocket_connect("/ws/client/ABCDEFGH", headers={"Origin": "https://copia.github.io"}):
+            pass
+    assert exc.value.code == 1008
+    assert "ABCDEFGH" not in main.sessions
+    with client.websocket_connect("/ws/client/ABCDEFGH", headers={"Origin": "https://trucksim-dash.com"}):
+        pass
+    assert "ABCDEFGH" in main.sessions
+
+
+def test_modo_avisar_deja_pasar_otros_origenes(client, monkeypatch):
+    monkeypatch.setenv("TRUCKDASH_ORIGENES", "avisar")
+    assert client.get("/health", headers={"Origin": "https://copia.github.io"}).status_code == 200

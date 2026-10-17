@@ -32,7 +32,7 @@ DESCRIPTION = (
     "Truck Dash reads the game's telemetry on your PC and shows a live map with your route, "
     "speed, fuel, job and delivery time on a phone, tablet or second monitor through the browser. "
     "It works over the internet or on your own Wi-Fi without internet, needs no account and no admin "
-    "rights, and installs the telemetry plugin for you. Free and open source (MIT)."
+    "rights, and installs the telemetry plugin for you. Free and open source (AGPL-3.0)."
 )
 TAGS = ["ets2", "ats", "euro-truck-simulator-2", "american-truck-simulator",
         "telemetry", "dashboard", "gps", "trucksim", "second-screen"]
@@ -100,7 +100,7 @@ def manifests(version: str, sha: str, release_date: str) -> dict[str, str]:
         + "Author: Nethercap\n"
         + "PackageName: Truck Dash\n"
         + "PackageUrl: https://trucksim-dash.com/\n"
-        + "License: MIT\n"
+        + "License: AGPL-3.0\n"
         + f"LicenseUrl: https://github.com/{REPO}/blob/main/LICENSE\n"
         + "Copyright: Copyright (c) 2026 Nethercap (Truck Dash)\n"
         + f"ShortDescription: {SHORT_DESCRIPTION}\n"

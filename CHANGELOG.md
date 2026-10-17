@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## 1.5.32 (unreleased)
 
+- License: from this version Truck Dash is under the GNU AGPL v3 instead of MIT. Nothing changes for
+  using it; forks that publish a modified version, or run it as a service, have to publish their
+  source too. The telemetry plugin stays MIT. Earlier versions stay under MIT.
 - In-game overlay: the lane arrows from the dashboard show up under the next turn at junctions with
   several lanes, with the ones for your turn in blue.
 - In-game overlay: a new route bar (Setup, Show, Fuel and rest stops) from where you are to your

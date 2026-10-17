@@ -497,8 +497,9 @@ function createDashPanel({ root, money, imperial, lang, hour12 }) {
   }
 
   function renderLlegada(d, enViaje, viajeJuegoSeg) {
-    const margen = enViaje && d.jobDeadlineSeconds != null && viajeJuegoSeg != null
-      ? d.jobDeadlineSeconds - viajeJuegoSeg : null;
+    const plazo = jobDeadlineSeconds(d); // sin el "sin plazo" del SDK (pure.js)
+    const margen = enViaje && plazo != null && viajeJuegoSeg != null
+      ? plazo - viajeJuegoSeg : null;
     refs.cardEta.hidden = margen == null;
     if (margen == null) return;
     texto('etaClaim', margen >= 0 ? t('deadlineEarly', dur(margen)) : t('deadlineLate', dur(-margen)),
@@ -506,7 +507,7 @@ function createDashPanel({ root, money, imperial, lang, hour12 }) {
     const partes = [];
     // La hora de llegada no va aca: la cinta de arriba ya la dice, y esta
     // tarjeta solo aparece cuando la cinta esta a la vista.
-    if (d.jobDeadlineSeconds != null) partes.push(t('deadlineIn', dur(d.jobDeadlineSeconds)));
+    if (plazo != null) partes.push(t('deadlineIn', dur(plazo)));
     texto('etaLine', partes.join(' · ') || null);
     // El total va con la conversion a la moneda local si el anfitrion la
     // hace; el precio por km NO. Es un numero para comparar trabajos entre
