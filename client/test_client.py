@@ -1069,6 +1069,32 @@ def test_lan_anota_cada_ip_remota_una_vez(caplog):
     assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]
 
 
+def test_web_cache_pisa_los_archivos_en_solo_lectura(monkeypatch, tmp_path, caplog):
+    # Un mod (18-10) deja app.js y compania en solo lectura: al volver al
+    # cliente oficial, la cache tiene que quedar con lo que se bajo.
+    import io
+    import logging
+    import stat
+    import local_server
+    monkeypatch.setattr(local_server, "cache_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(local_server, "WEB_FILES", ["app/index.html", "app/app.js"])
+    monkeypatch.setattr(local_server.red, "abrir", lambda url, timeout: io.BytesIO(b"oficial"))
+    (tmp_path / "app").mkdir()
+    del_mod = tmp_path / "app" / "app.js"
+    del_mod.write_bytes(b"del mod")
+    os.chmod(del_mod, stat.S_IREAD)
+    try:
+        with caplog.at_level(logging.INFO):
+            assert local_server.refresh_web_cache() is True
+        assert del_mod.read_bytes() == b"oficial"
+        assert (tmp_path / "app" / "index.html").read_bytes() == b"oficial"
+        assert os.access(del_mod, os.W_OK)
+        avisos = [r.getMessage() for r in caplog.records if "solo lectura" in r.getMessage()]
+        assert avisos == ["Web cache: estaban en solo lectura y se pisaron igual: app/app.js"]
+    finally:
+        os.chmod(del_mod, stat.S_IREAD | stat.S_IWRITE)
+
+
 def test_cambiar_los_mods_borra_el_fuera_del_mapa_viejo(monkeypatch):
     # Usuario del 10-10: un "fuera del mapa" (falso) dejaba "Build my map" en
     # Setup toda la sesion. Se olvida cuando cambian los mods de ese juego, no
