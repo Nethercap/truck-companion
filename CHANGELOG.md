@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## 1.5.32 (unreleased)
+## 1.5.32 (2026-10-17)
 
 - License: from this version Truck Dash is under the GNU AGPL v3 instead of MIT. Nothing changes for
   using it; forks that publish a modified version, or run it as a service, have to publish their
