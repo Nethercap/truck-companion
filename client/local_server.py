@@ -356,8 +356,22 @@ class _ViewerOutbox:
     def close(self):
         self.task.cancel()
 
+def lan_al_arrancar(settings: dict) -> bool:
+    """Si el modo LAN escucha en la red desde que arranca el cliente.
+
+    Escuchar en la red hace que Windows pregunte por el firewall, y a un
+    usuario estandar le pide la clave de administrador aunque nunca vaya a
+    usar el celular por WiFi (FioJon, 18-10). A quien recien instala se le
+    abre recien cuando lo pide (Setup o el menu de la bandeja) y queda
+    guardado en "lan_open". Quien ya usaba el cliente lo tenia siempre en la
+    red y ya contesto esa pregunta: sigue igual."""
+    if "lan_open" in settings:
+        return bool(settings["lan_open"])
+    return bool(settings.get("first_run_done"))
+
+
 class LocalServer:
-    def __init__(self, keybinds: dict):
+    def __init__(self, keybinds: dict, en_la_red: bool = True):
         self.keybinds = keybinds
         self.viewers: set = set()
         self._outboxes: dict = {}
@@ -367,6 +381,12 @@ class LocalServer:
         self.web_ready = False
         self.error: str | None = None
         self.port_in_use = False
+        # Sin la red solo atiende a esta PC (127.0.0.1): "Abrir aca", los mapas
+        # armados en la PC y el /__show-setup andan igual, y Windows no pregunta
+        # por el firewall. Ver lan_al_arrancar y abrir_a_la_red.
+        self.en_la_red = en_la_red
+        self._escucho = False  # start() ya intento escuchar (bien o con error)
+        self._lock = asyncio.Lock()
 
     @property
     def url(self) -> str | None:
@@ -374,15 +394,49 @@ class LocalServer:
         return f"http://{ip}:{HTTP_PORT}/app/?local=1" if ip else None
 
     async def start(self):
+        self.web_ready = await asyncio.to_thread(refresh_web_cache)
+        async with self._lock:
+            await self._escuchar()
+            self._escucho = True
+
+    async def abrir_a_la_red(self) -> None:
+        """Pasa de escuchar solo en esta PC a escuchar en la red (de 127.0.0.1
+        a 0.0.0.0). Los tableros conectados se caen un momento y reconectan."""
+        async with self._lock:
+            if self.en_la_red:
+                return
+            self.en_la_red = True
+            if not self._escucho:
+                return  # start() todavia baja la web: va a escuchar ya en la red
+            await self._cerrar()
+            self.error = None
+            self.port_in_use = False
+            await self._escuchar()
+
+    async def _cerrar(self):
+        if self.http_server is not None:
+            server, self.http_server = self.http_server, None
+            await asyncio.to_thread(server.shutdown)
+            server.server_close()
+        if self.ws_server is not None:
+            ws_server, self.ws_server = self.ws_server, None
+            ws_server.close()
+            await ws_server.wait_closed()
+
+    async def _escuchar(self):
         import websockets
 
-        self.web_ready = await asyncio.to_thread(refresh_web_cache)
+        host = "0.0.0.0" if self.en_la_red else "127.0.0.1"
         try:
-            self.http_server = http.server.ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), _StaticHandler)
+            self.http_server = http.server.ThreadingHTTPServer((host, HTTP_PORT), _StaticHandler)
             threading.Thread(target=self.http_server.serve_forever, daemon=True).start()
-            self.ws_server = await websockets.serve(self._handle_viewer, "0.0.0.0", WS_PORT)
-            logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d), direccion %s",
-                         HTTP_PORT, WS_PORT, self.url or "sin IP de LAN")
+            self.ws_server = await websockets.serve(self._handle_viewer, host, WS_PORT)
+            if self.en_la_red:
+                logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d), direccion %s",
+                             HTTP_PORT, WS_PORT, self.url or "sin IP de LAN")
+            else:
+                logging.info("Servidor LAN solo para esta PC en http://127.0.0.1:%d (ws %d): "
+                             "la red se abre desde Setup", HTTP_PORT, WS_PORT)
         except OSError as exc:
             # El puerto ocupado es el caso comun (otra instancia, u otro
             # programa): la ventana mostraba el OSError crudo de Python. Se

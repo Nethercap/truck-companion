@@ -96,6 +96,13 @@ with a direct WebSocket link — lowest latency, no pairing code, and it keeps
 working even if your internet drops. The cloud mode with the pairing code
 keeps working at the same time.
 
+On a new install LAN mode starts off: press **Turn on** in that section of
+Setup, or pick "Same Wi-Fi address" in the tray menu. Until then it only
+answers this PC, so Windows doesn't ask about the firewall (or, for a
+standard user, for an administrator password) when you never use a phone on
+your Wi-Fi. Once turned on it stays on. Installs from before this change
+keep it on, as before.
+
 **LAN mode uses two ports, and you need both open:**
 
 | port | what it does | what happens if it is closed |
@@ -107,8 +114,9 @@ That second row is the confusing one: with only 27765 open, the dashboard
 appears and then sits there with no data, which looks like the client is
 broken rather than like a closed port.
 
-On Windows this is usually automatic: it asks once to allow TruckDash
-through the firewall on private networks, and Allow covers both. On Linux
+On Windows this is usually automatic: when you turn LAN mode on, it asks
+once to allow TruckDash through the firewall on private networks, and Allow
+covers both. On Linux
 you have to open them yourself, for example:
 
 ```bash

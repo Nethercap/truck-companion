@@ -5,6 +5,7 @@ import os
 import pathlib
 import sys
 import tempfile
+import threading
 
 import pytest
 
@@ -1095,6 +1096,99 @@ def test_lan_anota_cada_ip_remota_una_vez(caplog):
         local_server.anotar_remoto("192.168.1.40", "datos (27766)")
     lineas = [r.getMessage() for r in caplog.records if r.getMessage().startswith("LAN:")]
     assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]
+
+
+def test_lan_en_la_red_al_arrancar_solo_si_ya_se_usaba():
+    """Escuchar en la red hace que Windows pida el firewall (y la clave de
+    administrador a un usuario estandar, FioJon 18-10): quien recien instala
+    no lo ve hasta que prende el modo LAN; quien ya usaba el cliente, sigue."""
+    import local_server
+    assert local_server.lan_al_arrancar({}) is False  # instalacion nueva
+    assert local_server.lan_al_arrancar({"first_run_done": True}) is True  # ya lo usaba: como antes
+    assert local_server.lan_al_arrancar({"lan_open": True}) is True
+    assert local_server.lan_al_arrancar({"first_run_done": True, "lan_open": False}) is False
+
+
+class _HttpFalso:
+    def __init__(self, addr, handler, escuchas):
+        self.server_address = addr
+        self.cerrado = threading.Event()
+        escuchas.append(("http", addr[0]))
+
+    def serve_forever(self):
+        self.cerrado.wait(5)
+
+    def shutdown(self):
+        self.cerrado.set()
+
+    def server_close(self):
+        pass
+
+
+class _WsFalso:
+    def close(self):
+        pass
+
+    async def wait_closed(self):
+        pass
+
+
+def _servidor_lan_falso(monkeypatch, escuchas, web=None):
+    """El LocalServer sin abrir puertos de verdad: con 0.0.0.0 Windows le
+    pediria el firewall a python.exe al correr los tests."""
+    import websockets
+    import local_server
+    monkeypatch.setattr(local_server, "refresh_web_cache", web or (lambda: True))
+    monkeypatch.setattr(local_server.http.server, "ThreadingHTTPServer",
+                        lambda addr, handler: _HttpFalso(addr, handler, escuchas))
+
+    async def serve(handler, host, port):
+        escuchas.append(("ws", host))
+        return _WsFalso()
+    monkeypatch.setattr(websockets, "serve", serve)
+    return local_server
+
+
+def test_lan_sin_la_red_escucha_solo_en_esta_pc_y_se_abre_al_pedirlo(monkeypatch):
+    import asyncio
+    escuchas = []
+    local_server = _servidor_lan_falso(monkeypatch, escuchas)
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        await srv.start()
+        assert escuchas == [("http", "127.0.0.1"), ("ws", "127.0.0.1")]
+        await srv.abrir_a_la_red()
+        assert escuchas[2:] == [("http", "0.0.0.0"), ("ws", "0.0.0.0")]
+        assert srv.en_la_red and srv.error is None
+        await srv.abrir_a_la_red()  # ya abierto: no vuelve a escuchar
+        assert len(escuchas) == 4
+    asyncio.run(probar())
+
+
+def test_lan_abierto_mientras_baja_la_web_escucha_una_sola_vez_en_la_red(monkeypatch):
+    """Prender desde Setup en los primeros segundos (la web todavia se baja):
+    sin cuidado escuchaba dos veces en el mismo puerto y la segunda fallaba."""
+    import asyncio
+    escuchas = []
+    bajando = threading.Event()
+    seguir = threading.Event()
+
+    def web_lenta():
+        bajando.set()
+        seguir.wait(5)
+        return True
+    local_server = _servidor_lan_falso(monkeypatch, escuchas, web_lenta)
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        arranque = asyncio.create_task(srv.start())
+        await asyncio.to_thread(bajando.wait, 5)
+        await srv.abrir_a_la_red()
+        seguir.set()
+        await arranque
+        assert escuchas == [("http", "0.0.0.0"), ("ws", "0.0.0.0")]
+    asyncio.run(probar())
 
 
 def test_web_cache_pisa_los_archivos_en_solo_lectura(monkeypatch, tmp_path, caplog):

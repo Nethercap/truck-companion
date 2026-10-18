@@ -164,6 +164,9 @@ class AppState:
         self.installs = []  # ver plugin_installer.find_game_installs()
         self.plugins_revisados_at = 0.0  # ver actualizar_plugins_viejos
         self.local: local_server.LocalServer | None = None  # modo LAN (ver local_server.py)
+        # Si el modo LAN arranca escuchando en la red o solo en esta PC
+        # (local_server.lan_al_arrancar); abrir_modo_lan lo cambia.
+        self.lan_en_la_red = True
         # Rich Presence de Discord: se prende desde Ajustes, apagado por defecto.
         self.discord = discord_presence.DiscordPresence()
         # Overlay en el juego (overlay.py): apagado por defecto. La ventana
@@ -607,7 +610,12 @@ class SetupWindow:
         self.lan_hint_label.pack(anchor="w", pady=(4, 0))
         lan_btns = tk.Frame(lan_text, bg=BG)
         lan_btns.pack(anchor="w", pady=(6, 0))
-        self.button(lan_btns, T("copy_address"), self.copy_lan_url).pack(side="left")
+        # Hasta que se prende, el modo LAN solo atiende a esta PC: este boton
+        # lo abre a la red (abrir_modo_lan) y ahi Windows pregunta por el
+        # firewall. Copiar la direccion recien sirve despues.
+        self.lan_on_btn = self.button(lan_btns, T("lan_turn_on"), self.turn_on_lan, primary=True)
+        self.copy_lan_btn = self.button(lan_btns, T("copy_address"), self.copy_lan_url)
+        self.copy_lan_btn.pack(side="left")
         # Los dos puertos, aca y no solo en el README: es donde esta la
         # persona cuando el tablero carga y se queda vacio, que parece un
         # cliente roto y no un puerto cerrado.
@@ -619,7 +627,8 @@ class SetupWindow:
                    justify="left").pack(anchor="w")
         self.button(self.lan_public_frame, T("lan_network_settings"),
                     abrir_ajustes_de_red).pack(anchor="w", pady=(4, 0))
-        self.button(lan_btns, T("open_here"), self.open_lan_here).pack(side="left", padx=6)
+        self.open_here_btn = self.button(lan_btns, T("open_here"), self.open_lan_here)
+        self.open_here_btn.pack(side="left", padx=6)
         self.render_lan()
 
         # --- Juegos / plugin ---
@@ -1221,11 +1230,27 @@ class SetupWindow:
             self.phone_qr_label.configure(image="")
 
     def render_lan(self):
-        if win_integration.red_publica():
+        srv = state.local
+        # El estado pedido, no el del servidor: al tocar Prender cambia ya,
+        # aunque el loop tarde un momento en volver a escuchar.
+        cerrado = not state.lan_en_la_red
+        # La red Publica solo importa si el celular tiene que llegar.
+        if win_integration.red_publica() and not cerrado:
             self.lan_public_frame.pack(anchor="w", pady=(6, 0), fill="x")
         else:
             self.lan_public_frame.pack_forget()
-        srv = state.local
+        if cerrado:
+            self.lan_url_label.configure(text=T("lan_off"), fg=MUTED)
+            self.lan_hint_label.configure(text=T("lan_off_hint"))
+            self.qr_label.configure(image="", text="")
+            self.copy_lan_btn.pack_forget()
+            if not self.lan_on_btn.winfo_manager():
+                self.lan_on_btn.pack(side="left", before=self.open_here_btn)
+            return
+        self.lan_hint_label.configure(text=T("lan_hint"))
+        self.lan_on_btn.pack_forget()
+        if not self.copy_lan_btn.winfo_manager():
+            self.copy_lan_btn.pack(side="left", before=self.open_here_btn)
         url = srv.url if srv else None
         if not srv or srv.error or not srv.web_ready or not url:
             if not srv:
@@ -1246,6 +1271,10 @@ class SetupWindow:
         except Exception:
             logging.exception("QR render failed")
             self.qr_label.configure(image="", text="")
+
+    def turn_on_lan(self):
+        abrir_modo_lan()
+        self.render_lan()
 
     def copy_lan_url(self):
         url = state.local.url if state.local else None
@@ -1324,7 +1353,7 @@ class SetupWindow:
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         # La deteccion de la red Publica llega despues (PowerShell, en un hilo).
-        clave_lan = (lan_url, win_integration.red_publica())
+        clave_lan = (lan_url, win_integration.red_publica(), state.lan_en_la_red)
         if getattr(self, "_last_lan_url", "?") != clave_lan:
             self._last_lan_url = clave_lan
             self.render_lan()
@@ -1457,8 +1486,25 @@ def open_web_menu_item(icon, item):
         show_text_dialog("Truck Dash", T("dlg_no_code"))
 
 
+def abrir_modo_lan() -> None:
+    """El modo LAN a la red, desde el boton de Setup o el menu de la bandeja:
+    ahi es cuando Windows pregunta por el firewall. Queda guardado para los
+    proximos arranques (local_server.lan_al_arrancar)."""
+    state.lan_en_la_red = True
+    settings = win_integration.load_settings()
+    if not settings.get("lan_open"):
+        settings["lan_open"] = True
+        win_integration.save_settings(settings)
+        logging.info("Modo LAN abierto a la red desde Setup o el menu")
+    if state.local is not None and _loop is not None:
+        asyncio.run_coroutine_threadsafe(state.local.abrir_a_la_red(), _loop)
+
+
 def show_lan_menu_item(icon, item):
     srv = state.local
+    # Pedir la direccion es pedir el modo LAN: se abre a la red.
+    if not state.lan_en_la_red:
+        abrir_modo_lan()
     if srv and srv.web_ready and not srv.error and srv.url:
         show_text_dialog("Truck Dash", T("dlg_lan"), copy_value=srv.url)
     else:
@@ -1524,7 +1570,8 @@ def report_problem(icon, item):
         tail = "(no log)"
     installs = ", ".join(f"{i['game']}={i['state']}" for i in state.installs) or "none detected"
     lan = state.local
-    lan_text = "unavailable" if not lan or lan.error or not lan.web_ready else "ok"
+    lan_text = ("unavailable" if not lan or lan.error or not lan.web_ready
+                else "ok" if lan.en_la_red else "this PC only (not turned on)")
     body = "\n".join([
         "**What happened?**", "", "(describe the problem here)", "", "**Steps to reproduce**", "", "1. ", "",
         "---", "<details><summary>Diagnostics (auto-filled)</summary>", "",
@@ -2058,7 +2105,7 @@ async def run_client(backend_url: str, fixed_code: str | None):
     # run_client se relanza (Disconnect -> codigo nuevo) se reusa la que ya
     # tiene los puertos tomados.
     if state.local is None:
-        state.local = local_server.LocalServer(keybinds)
+        state.local = local_server.LocalServer(keybinds, en_la_red=state.lan_en_la_red)
         asyncio.create_task(state.local.start())
         threading.Thread(target=win_integration.detectar_red_publica,
                          args=(local_server.lan_ip(),), daemon=True).start()
@@ -2223,6 +2270,8 @@ def main():
     state.backend_url = args.backend
     state.autostart_mode = args.autostart
 
+    # Antes de arrancar el hilo: first_run_done se guarda mas abajo.
+    state.lan_en_la_red = local_server.lan_al_arrancar(win_integration.load_settings())
     start_asyncio_thread(args.backend, args.code)
 
     settings = win_integration.load_settings()

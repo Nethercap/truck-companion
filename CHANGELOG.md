@@ -12,6 +12,10 @@ updates on its own and is not versioned here.
 - The download (zip on Windows, tarball on Linux) now includes the license (`LICENSE.txt`) and
   `THIRD-PARTY-NOTICES.txt`, with the license of every library inside the program. The README
   says where the source code is.
+- LAN mode (phone or tablet on the same Wi-Fi) starts off on a new install: turn it on in Setup or
+  from the tray menu's "Same Wi-Fi address". Until then the client only answers this PC, so
+  Windows no longer asks about the firewall, or for an administrator password, to people who never
+  use it. Installs that already used the client keep it on.
 
 ## 1.5.32 (2026-10-17)
 

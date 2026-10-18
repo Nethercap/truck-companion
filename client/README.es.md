@@ -73,6 +73,13 @@ con un WebSocket directo — la menor latencia, sin código de pairing, y sigue
 funcionando aunque se corte internet. El modo cloud con código sigue
 funcionando al mismo tiempo.
 
+En una instalación nueva el modo LAN arranca apagado: tocá **Prender** en
+esa sección de Setup, o elegí "Dirección en la misma WiFi" en el menú de la
+bandeja. Hasta entonces solo atiende a esta PC, así Windows no pregunta por
+el firewall (ni, a un usuario estándar, por la clave de administrador) si
+nunca usás un celular en tu WiFi. Una vez prendido, queda prendido. Las
+instalaciones de antes de este cambio lo siguen teniendo prendido.
+
 **El modo LAN usa dos puertos y hacen falta los dos abiertos:**
 
 | puerto | para qué | si está cerrado |
@@ -84,8 +91,9 @@ La segunda fila es la que confunde: con solo el 27765 abierto, el tablero
 aparece y se queda sin datos, que parece un cliente roto y no un puerto
 cerrado.
 
-En Windows suele ser automático: pregunta una vez si permitís TruckDash en
-el firewall para redes privadas, y Permitir cubre los dos. En Linux hay que
+En Windows suele ser automático: al prender el modo LAN pregunta una vez si
+permitís TruckDash en el firewall para redes privadas, y Permitir cubre los
+dos. En Linux hay que
 abrirlos a mano, por ejemplo:
 
 ```bash
