@@ -1692,7 +1692,7 @@ def telemetry_status_when_unavailable() -> str:
         # arranque del juego se decia "falta el plugin, reinicia el juego"
         # durante 15 a 60 s (log del 10-10). Mientras carga se sigue en
         # "esperando el juego"; plugin ausente o juego elevado se dicen ya.
-        if detalle in (None, DETAIL_NOT_LOADED) and time.time() - _juego_visto_desde < GAME_LOADING_GRACE_S:
+        if detalle in (None, DETAIL_NOT_LOADED, DETAIL_SMART_APP_CONTROL) and time.time() - _juego_visto_desde < GAME_LOADING_GRACE_S:
             state.status_detail = None
             return "waiting_game"
         state.status_detail = detalle
@@ -1709,6 +1709,11 @@ _diagnosed_dirs = set()
 DETAIL_PLUGIN_ABSENT = "The running game ({bin_dir}) has no telemetry plugin. Open Setup & status and click Install plugin for that folder, then restart the game."
 DETAIL_ELEVATED = "The game is running as administrator, so Truck Dash can't read its telemetry. Run the game normally (not as admin), or run TruckDash as administrator too."
 DETAIL_NOT_LOADED = "The plugin file is in place but the game hasn't loaded it: restart the game, and click OK on the in-game 'Advanced SDK features' dialog the first time."
+DETAIL_SMART_APP_CONTROL = ("Windows Smart App Control is on and is probably blocking the telemetry plugin: Truck Dash's "
+                            "isn't digitally signed yet, and Smart App Control has no per-app exceptions. Until it is, "
+                            "turn Smart App Control off (Windows Security > App & browser control; recent Windows 11 "
+                            "lets you turn it back on) and restart the game.")
+_sac_anotado = False
 
 
 def diagnose_running_game(hwnd) -> str | None:
@@ -1749,6 +1754,15 @@ def diagnose_running_game(hwnd) -> str | None:
         return DETAIL_PLUGIN_ABSENT.format(bin_dir=bin_dir)
     if info.get("elevated_guess"):
         return DETAIL_ELEVATED
+    # El plugin esta y el juego no lo cargo. Con Smart App Control prendido
+    # lo mas probable es que lo bloquee (la DLL va sin firma), y "reinicia el
+    # juego" no sirve de nada. En evaluacion no bloquea.
+    if win_integration.smart_app_control() == "on":
+        global _sac_anotado
+        if not _sac_anotado:
+            _sac_anotado = True
+            logging.warning("Smart App Control is on and the game in %s didn't load the plugin", bin_dir)
+        return DETAIL_SMART_APP_CONTROL
     return DETAIL_NOT_LOADED
 
 
@@ -2109,6 +2123,10 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
 
 async def run_client(backend_url: str, fixed_code: str | None):
     logging.info("Starting client v%s, backend=%s", client_lib.CLIENT_VERSION, backend_url)
+    # Para soporte: con Smart App Control prendido el plugin sin firma no carga.
+    sac = win_integration.smart_app_control()
+    if sac:
+        logging.info("Smart App Control: %s", sac)
     state.cloud_viewers = None  # codigo nuevo = sesion nueva del relay
     state.refresh_installs()
     keybinds = client_lib.load_keybinds()

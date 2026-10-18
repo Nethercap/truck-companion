@@ -226,6 +226,34 @@ def red_publica():
     return _red_publica
 
 
+# Smart App Control (Windows 11): prendido, no carga una DLL sin firma que la
+# nube de Microsoft no conoce, aunque la cargue un juego firmado, y no tiene
+# excepciones por programa. El plugin nuestro todavia va sin firma (18-10).
+# Microsoft no documenta este valor: 0 apagado, 1 prendido, 2 evaluacion (en
+# evaluacion mira pero no bloquea).
+SAC_KEY = r"SYSTEM\CurrentControlSet\Control\CI\Policy"
+SAC_VALUE = "VerifiedAndReputablePolicyState"
+
+
+def estado_sac(valor):
+    """El valor del registro -> 'off', 'on' o 'evaluation'; None si no se entiende."""
+    return {0: "off", 1: "on", 2: "evaluation"}.get(valor)
+
+
+def smart_app_control():
+    """Como esta Smart App Control en esta PC. None si no existe (Windows 10),
+    no aplica (Linux, Wine) o no se pudo leer."""
+    if sys.platform != "win32" or is_wine():
+        return None
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, SAC_KEY) as key:
+            valor, _ = winreg.QueryValueEx(key, SAC_VALUE)
+    except OSError:
+        return None
+    return estado_sac(valor)
+
+
 def overlay_supported() -> bool:
     """El overlay en el juego (overlay.py) usa ventanas de Windows que Wine
     no reproduce bien (transparencia y clics que pasan): bajo Proton no se

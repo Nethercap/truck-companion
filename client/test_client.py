@@ -1278,6 +1278,46 @@ def test_web_cache_pisa_los_archivos_en_solo_lectura(monkeypatch, tmp_path, capl
         os.chmod(del_mod, stat.S_IREAD | stat.S_IWRITE)
 
 
+def test_estado_de_smart_app_control():
+    import win_integration
+    assert [win_integration.estado_sac(v) for v in (0, 1, 2, 7, None)] == ["off", "on", "evaluation", None, None]
+
+
+def _juego_con_plugin_que_no_carga(monkeypatch, tmp_path):
+    import tray_client
+    bin_dir = tmp_path / "bin" / "win_x64"
+    (bin_dir / "plugins").mkdir(parents=True)
+    (bin_dir / "plugins" / tray_client.plugin_installer.PLUGIN_DLL_NAME).write_bytes(b"MZ")
+    info = {"exe_path": str(bin_dir / "eurotrucks2.exe"), "elevated_guess": False}
+    monkeypatch.setattr(tray_client.client_lib, "running_game_info", lambda hwnd: info)
+    monkeypatch.setattr(tray_client.state, "status_detail", None)
+    return tray_client
+
+
+def test_smart_app_control_prendido_explica_el_plugin_que_no_carga(monkeypatch, tmp_path):
+    # Prendido, la DLL sin firma no carga y "reinicia el juego" no servia de
+    # nada (18-10). En evaluacion no bloquea: queda el diagnostico de siempre.
+    tray_client = _juego_con_plugin_que_no_carga(monkeypatch, tmp_path)
+    estados = iter(["on", "evaluation", "off", None])
+    monkeypatch.setattr(tray_client.win_integration, "smart_app_control", lambda: next(estados))
+    assert tray_client.diagnose_running_game(1) == tray_client.DETAIL_SMART_APP_CONTROL
+    for _ in range(3):
+        assert tray_client.diagnose_running_game(1) == tray_client.DETAIL_NOT_LOADED
+
+
+def test_smart_app_control_espera_a_que_cargue_el_juego(monkeypatch, tmp_path):
+    # Como "no cargo": mientras el juego arranca el plugin todavia no esta.
+    import time
+    tray_client = _juego_con_plugin_que_no_carga(monkeypatch, tmp_path)
+    monkeypatch.setattr(tray_client.win_integration, "smart_app_control", lambda: "on")
+    monkeypatch.setattr(tray_client.client_lib, "find_game_window", lambda: 1)
+    monkeypatch.setattr(tray_client, "_juego_visto_desde", time.time())
+    assert tray_client.telemetry_status_when_unavailable() == "waiting_game"
+    monkeypatch.setattr(tray_client, "_juego_visto_desde", time.time() - tray_client.GAME_LOADING_GRACE_S - 1)
+    assert tray_client.telemetry_status_when_unavailable() == "plugin_missing"
+    assert tray_client.state.status_detail == tray_client.DETAIL_SMART_APP_CONTROL
+
+
 def test_cambiar_los_mods_borra_el_fuera_del_mapa_viejo(monkeypatch):
     # Usuario del 10-10: un "fuera del mapa" (falso) dejaba "Build my map" en
     # Setup toda la sesion. Se olvida cuando cambian los mods de ese juego, no
