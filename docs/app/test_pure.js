@@ -2798,7 +2798,7 @@ function rampaAntes({ cruce = 200, otros = [], tramos = [], desde = 0, salidaAnt
   return laneFromOnRamp({ pts, cum, pointAt, i: 3 - desde, nodes: nodos, adjacency: { get: (k) => sale.get(k) || [] }, incoming: (k) => llega.get(k) || [] });
 }
 
-test('carriles: el carril de una rampa de entrada que se va por la salida siguiente (I-25 en Trinidad, Discord 18-10)', () => {
+test('carriles: el carril de una rampa de entrada que se va por la salida siguiente (I-25 al norte de Raton, Discord 18-10)', () => {
   // la rampa llega desde atras por la derecha y se suma en el cruce de antes
   const rampa = { otros: [[60, 600], [20, 300]], tramos: [[5, 6], [6, 1]] };
   assert.equal(rampaAntes(rampa), true);

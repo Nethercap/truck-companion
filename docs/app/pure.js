@@ -1442,8 +1442,8 @@ function sideExitToward(ctx, direction, minDeg = 25, maxDeg = 155) {
 // la salida siguiente. El constructor no lo marca (LANE_DROP_BIT: no venia
 // de antes del cruce anterior) y sin aviso de giro la web seguia derecho sin
 // flechas, aunque 700 m antes la salida de al lado, igual pero con la
-// autopista doblando 8 grados, daba "keep left" con las flechas (I-25 en
-// Trinidad, ATS, -38130,7643, Discord 18-10). El de desaceleracion, que se
+// autopista doblando 8 grados, daba "keep left" con las flechas (I-25 al
+// norte de Raton, ATS, -38130,7643, Discord 18-10). El de desaceleracion, que se
 // agrega en la calle antes de la salida, sigue sin aviso.
 // Mira los nodos de cruce de la ruta hasta maxM antes de ctx.i: alguno donde
 // llega otra calle (ctx.incoming: los nodos con un tramo hacia el) que viene
