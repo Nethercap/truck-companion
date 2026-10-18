@@ -3708,3 +3708,32 @@ test('turnPassed: parado en la linea de una T el giro sigue adelante; ya dobland
   assert.equal(turnPassed({ atM: 100, endM: 160, hereM: 121 }), true);
   assert.equal(turnPassed({ atM: 100, endM: 100, hereM: 116 }), true);
 });
+
+test('layoutResizeCornerPx: en algo chico la esquina de agrandar no tapa el centro', () => {
+  const { layoutResizeCornerPx } = require('./pure.js');
+  // un boton de 44 y un panel grande: la esquina de siempre
+  assert.equal(layoutResizeCornerPx(44, 44), 22);
+  assert.equal(layoutResizeCornerPx(200, 60), 22);
+  // la brujula de 36 o un boton achicado: un tercio, el centro queda para mover
+  assert.equal(layoutResizeCornerPx(36, 36), 12);
+  assert.ok(layoutResizeCornerPx(26, 26) < 13);
+  // sin medidas: la de siempre
+  assert.equal(layoutResizeCornerPx(0, 0), 22);
+});
+
+test('compassView: la brujula aparece con el norte torcido o en navegacion, y la aguja apunta al norte', () => {
+  const { compassView } = require('./pure.js');
+  // norte arriba fuera de navegacion: no hace falta
+  assert.deepEqual(compassView(0), { show: false, angle: 0 });
+  assert.equal(compassView(0.4).show, false);
+  assert.equal(compassView(359.6).show, false);
+  // girado a mano: aparece, y la aguja gira al reves que el mapa
+  assert.deepEqual(compassView(90), { show: true, angle: -90 });
+  assert.deepEqual(compassView(-90), { show: true, angle: -270 });
+  assert.equal(compassView(450).angle, -90);
+  // en navegacion siempre
+  assert.deepEqual(compassView(37, { navMode: true }), { show: true, angle: -37 });
+  // datos raros: como norte arriba
+  assert.deepEqual(compassView(NaN), { show: false, angle: 0 });
+  assert.deepEqual(compassView(undefined, {}), { show: false, angle: 0 });
+});
