@@ -3749,9 +3749,14 @@ function updateDestinationMarker(data) {
     routeUsesUncheckedDlc = false;
     legs.forEach((to, legIdx) => {
       // El primer tramo sale del camion: con su rumbo si viene andando.
-      let leg = findRoute(from, to, legIdx === 0 ? routeStartHeading(data) : null);
+      const rumbo = legIdx === 0 ? routeStartHeading(data) : null;
+      let leg = findRoute(from, to, rumbo);
       if (leg) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
+        // Parado arranca en el nodo mas cercano: si es el cruce de adelante,
+        // con su entrada, o el giro de ahi no se avisa (stoppedRouteLead).
+        const entrada = legIdx === 0 && rumbo == null ? stoppedRouteLead(leg, from[0], from[1], data.heading) : null;
+        if (entrada) leg = [entrada, ...leg];
         leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
         routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
       } else { complete = false; routePoints.push([from[0], from[1], 0, 0, null, legIdx], [to[0], to[1], 0, 0, null, legIdx]); }
