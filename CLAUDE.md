@@ -49,7 +49,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   carril que venia de antes del cruce anterior se va por una salida: ahi
   la web avisa "keep left" sin giro (`laneKeepAt`). Sin la marca no: el
   carril de desaceleracion (la salida comun de ETS2) tambien deja afuera
-  al de la derecha. `check_avisos.js` y el simulador cargan los carriles;
+  al de la derecha. Salvo que ese carril haya entrado por una rampa a menos
+  de 200 m (`laneFromOnRamp`, `NAV_LANE_RAMP_M`, no mas que `ROUTE_BEHIND_M`):
+  la calle que se suma tiene que venir de atras, no el retorno de la
+  calzada contraria donde empieza una autovia. `check_avisos.js` y el simulador cargan los carriles;
   `TRUCKDASH_LANES_DIR` y `--carriles` prueban unos sin subir.
 - El ruteo (`findRouteWith`) es un A* por aristas sin vueltas en U en los
   nodos (`findArcRoute` en pure.js): el estado es la arista de llegada y no

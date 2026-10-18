@@ -3102,6 +3102,20 @@ function buildRouteGraph(g) {
   };
   // indice de arista dirigida entre dos nodos (-1 si no existe)
   graph.dirEdge = (from, to) => { for (let k = csr[from]; k < csr[from + 1]; k++) if (adjTo[k] === to) return k; return -1; };
+  // Los nodos con un tramo hacia i (laneFromOnRamp: si en un cruce se suma
+  // una calle). La adyacencia al reves se arma la primera vez que se pide.
+  let inCsr = null, inFrom = null;
+  graph.incoming = (i) => {
+    if (!inCsr) {
+      inCsr = new Uint32Array(n + 1);
+      for (let k = 0; k < nDir; k++) inCsr[adjTo[k] + 1]++;
+      for (let j = 0; j < n; j++) inCsr[j + 1] += inCsr[j];
+      inFrom = new Uint32Array(nDir);
+      const pos = inCsr.slice(0, n);
+      for (let a = 0; a < n; a++) for (let k = csr[a]; k < csr[a + 1]; k++) inFrom[pos[adjTo[k]]++] = a;
+    }
+    return inFrom.subarray(inCsr[i], inCsr[i + 1]);
+  };
   return graph;
 }
 
@@ -3942,6 +3956,11 @@ const NAV_LANE_KEEP_REPEAT_M = 200;
 // metros sin tocar estos metros de ruta: los que rodean una isleta, o una
 // calzada que se abre en dos y se vuelve a juntar, no son una salida.
 const NAV_LANE_KEEP_ESCAPE_M = 600;
+// Sin la marca del constructor, el carril que se va tiene que haber entrado
+// por una rampa hasta estos metros antes (laneFromOnRamp). No mas que
+// ROUTE_BEHIND_M: con el camion entre la rampa y la salida, la entrada
+// tiene que seguir en lo recorrido o el aviso se apagaba antes de llegar.
+const NAV_LANE_RAMP_M = 200;
 const NAV_TURN_DEBOUNCE_TICKS = 2; // una indicacion nueva tiene que verse 2 ticks seguidos (anti-parpadeo al pasar salidas)
 const navManeuverState = {};
 let routeBehind = []; // ultimos puntos de la ruta ya recorridos (ver trimRouteBehindTruck)
@@ -4073,7 +4092,7 @@ function findUpcomingTurn() {
     const [lng2, lat2] = toLngLat(q[0], q[1]);
     return geoBearingDeg(lng1, lat1, lng2, lat2);
   };
-  const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency } : {};
+  const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency, incoming: routeGraph.incoming } : {};
   // La curva de un tramo del grafo (para reconocer rotondas de un prefab).
   const edgeLine = routeGraph ? (a, b) => {
     const k = routeGraph.dirEdge(a, b);
@@ -4132,7 +4151,7 @@ function findUpcomingTurn() {
       i = Math.max(iEnd, rb.leave);
       continue;
     }
-    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, edgeLine, laneTurn,
+    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, incoming: graph.incoming, edgeLine, laneTurn,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     // Si ahi no hay nada que avisar, el prefab entero, de punta a punta de
     // su curva (junctionManeuver): partida en dos, una T se callaba.
@@ -4147,7 +4166,14 @@ function findUpcomingTurn() {
       // a 100 grados): los carriles que rodean una isleta, o una calzada que
       // se parte y se vuelve a juntar, no dan a elegir (10 "keep" de mas en
       // 60 rutas del simulador, la mitad en una autopista de Helsinki).
-      const keep = laneKeepAt(pts, i, iEnd);
+      // Sin la marca del constructor, el carril de una rampa de entrada que
+      // termina en esta salida (laneFromOnRamp): la salida de al lado daba
+      // "keep left" porque la autopista doblaba un poco, y esta nada.
+      let keep = laneKeepAt(pts, i, iEnd);
+      if (!keep) {
+        const deRampa = laneKeepAt(pts, i, iEnd, true);
+        if (deRampa && laneFromOnRamp({ ...ctx, i }, NAV_LANE_RAMP_M)) keep = deRampa;
+      }
       const salida = keep && sideExitToward({ ...ctx, i, iEnd, rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M }, 'right', -100, 100);
       if (salida) {
         const repetido = lastKeep && lastKeep.direction === keep.direction && cum[i] - lastKeep.atM <= NAV_LANE_KEEP_REPEAT_M;
@@ -4237,10 +4263,10 @@ function laneGuidanceAt(pts, i, iEnd, kind, direction) {
 
 // "Keep left" sin giro: derecho por un cruce donde los carriles de un
 // costado se van por una salida (laneKeepSide en pure.js). El lado y los
-// carriles, o null.
-function laneKeepAt(pts, i, iEnd) {
+// carriles, o null. fromRamp: tambien sin la marca del constructor.
+function laneKeepAt(pts, i, iEnd, fromRamp = false) {
   let direction = null;
-  const lanes = laneRecordAt(pts, i, iEnd, (rec) => (direction = laneKeepSide(rec)) != null);
+  const lanes = laneRecordAt(pts, i, iEnd, (rec) => (direction = laneKeepSide(rec, fromRamp)) != null);
   return lanes ? { direction, lanes } : null;
 }
 

@@ -1437,6 +1437,67 @@ function sideExitToward(ctx, direction, minDeg = 25, maxDeg = 155) {
   return false;
 }
 
+// Si el carril que se va por la salida del cruce ctx.i entro poco antes por
+// una rampa de entrada: el que la autopista suma en una entrada y suelta en
+// la salida siguiente. El constructor no lo marca (LANE_DROP_BIT: no venia
+// de antes del cruce anterior) y sin aviso de giro la web seguia derecho sin
+// flechas, aunque 700 m antes la salida de al lado, igual pero con la
+// autopista doblando 8 grados, daba "keep left" con las flechas (I-25 en
+// Trinidad, ATS, -38130,7643, Discord 18-10). El de desaceleracion, que se
+// agrega en la calle antes de la salida, sigue sin aviso.
+// Mira los nodos de cruce de la ruta hasta maxM antes de ctx.i: alguno donde
+// llega otra calle (ctx.incoming: los nodos con un tramo hacia el) que viene
+// de atras. Seguida para atras walkM metros por su continuacion mas recta,
+// tiene que quedar detras del nodo en el sentido de la ruta: el retorno de
+// un prefab donde empieza una autovia llega pegado y parejo a la ruta, pero
+// desde la calzada contraria, que va para adelante. Un cruce de antes con
+// otra salida corta la busqueda: el carril de la rampa se iba por ella.
+// Sin ctx.incoming, false.
+function laneFromOnRamp(ctx, maxM = 200, walkM = 100) {
+  const { pts, cum, i, pointAt, adjacency, incoming } = ctx;
+  if (!incoming || !adjacency) return false;
+  const nodeAt = ctx.nodeXY || ((k) => ctx.nodes[k]);
+  const nodoDe = (k, paso) => { for (let j = k + paso; j >= 0 && j < pts.length; j += paso) if (pts[j][4] != null) return pts[j][4]; return null; };
+  for (let k = i - 1; k >= 0 && cum[i] - cum[k] <= maxM; k--) {
+    const p = pts[k][4];
+    if (pts[k][3] !== 1 || p == null) continue;
+    // Sin el nodo de antes (recortado de lo recorrido) la calle por la que
+    // llega la ruta parecia otra que se suma (Amsterdam -> Werlte, ETS2,
+    // donde una calle de doble mano se abre en autovia).
+    const antes = nodoDe(k, -1), despues = nodoDe(k, 1);
+    if (antes == null) continue;
+    // el sentido de la ruta en el nodo
+    const a = pointAt(cum[k] - 30), b = pointAt(cum[k] + 30);
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (!L) continue;
+    const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+    for (const x of incoming(p)) {
+      if (x === antes || x === despues) continue;
+      let prev = p, cur = x, largo = 0;
+      const vistos = new Set([p, x]);
+      for (let pasos = 0; pasos < 50; pasos++) {
+        const q = nodeAt(prev), c = nodeAt(cur);
+        largo += Math.hypot(c[0] - q[0], c[1] - q[1]);
+        if (largo >= walkM) break;
+        const dx = q[0] - c[0], dz = q[1] - c[1];
+        let mejor = null, mejorCos = -Infinity;
+        for (const y of incoming(cur)) {
+          if (vistos.has(y)) continue;
+          const r = nodeAt(y), ry = Math.hypot(c[0] - r[0], c[1] - r[1]);
+          const cos = ry ? ((c[0] - r[0]) * dx + (c[1] - r[1]) * dz) / (ry * Math.hypot(dx, dz) || 1) : -1;
+          if (cos > mejorCos) { mejorCos = cos; mejor = y; }
+        }
+        if (mejor == null) break;
+        vistos.add(mejor); prev = cur; cur = mejor;
+      }
+      const o = nodeAt(p), f = nodeAt(cur);
+      if ((f[0] - o[0]) * ux + (f[1] - o[1]) * uz <= -Math.min(largo, walkM) / 2) return true;
+    }
+    for (const [n] of (adjacency.get(p) || [])) if (n !== antes && n !== despues) return false;
+  }
+  return false;
+}
+
 // Anti-parpadeo de la indicacion de giro: una maniobra nueva tiene que
 // detectarse `ticks` ticks seguidos para mostrarse, y desaparecer otros
 // tantos para borrarse. Con la misma maniobra ya mostrada se devuelve la
@@ -3455,9 +3516,10 @@ function laneGuidance(rec) {
 // (carril_que_se_pierde en client/mapbuild/build_route_graph.py). Sin eso
 // es uno que se agrego para la salida (el de desaceleracion, la salida
 // comun de ETS2) y el juego no dice nada: sin la marca, 71 "keep left" de
-// mas en 25 rutas de ETS2 de check_avisos.
-function laneKeepSide(rec) {
-  if (!rec || !rec.drop || !(rec.count >= 2) || !Array.isArray(rec.arrows)) return null;
+// mas en 25 rutas de ETS2 de check_avisos. fromRamp: el carril entro por
+// una rampa poco antes (laneFromOnRamp) y vale sin la marca.
+function laneKeepSide(rec, fromRamp = false) {
+  if (!rec || !(rec.drop || fromRamp) || !(rec.count >= 2) || !Array.isArray(rec.arrows)) return null;
   const B = LANE_ARROW_BITS;
   const deAPoco = B.straight | B.slightLeft | B.slightRight;
   if (!(rec.turn & deAPoco)) return null;
@@ -3882,6 +3944,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, laneFromOnRamp, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper };
 }
