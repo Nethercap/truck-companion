@@ -1117,6 +1117,31 @@ function detectManeuver(ctx) {
       seen.add(best); prev = cur; cur = best;
     }
   };
+  // Lo mismo, pero el punto justo a lenM metros (null si la salida se termina
+  // antes): para comparar con la ruta a la misma distancia.
+  const walkPointAt = (from, n, lenM) => {
+    let prev = from, cur = n, len = 0, steps = 0;
+    const seen = new Set([from, n]);
+    for (;;) {
+      const a = nodeAt(prev), b = nodeAt(cur);
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len + L >= lenM) {
+        const t = L > 0 ? (lenM - len) / L : 0;
+        return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      }
+      len += L;
+      if (++steps > 200) return null;
+      const dir = bearingBetween(a, b);
+      let best = null, bestDiff = Infinity;
+      for (const [m] of (adjacency.get(cur) || [])) {
+        if (seen.has(m) || onRoute.has(m)) continue;
+        const diff = Math.abs(normDeg(bearingBetween(b, nodeAt(m)) - dir));
+        if (diff < bestDiff) { bestDiff = diff; best = m; }
+      }
+      if (best == null) return null;
+      seen.add(best); prev = cur; cur = best;
+    }
+  };
 
   // Una salida que arranca a menos de forkStartMaxDeg de la ruta (medido a
   // forkStartM del nodo, por su curva si ctx.edgeLine la da): la ruta y esa
@@ -1230,9 +1255,48 @@ function detectManeuver(ctx) {
       && (Math.sign(alt) === Math.sign(rd) || Math.abs(rd) < forkFarMinRoute)) return null;
     return { kind: 'fork', direction: rd > alt ? 'right' : 'left', delta: rd, at: i, far: true };
   };
+  // Bifurcacion pareja: el conector se parte en dos calzadas de un sentido
+  // casi paralelas (la colectora al lado de la autopista) y la ruta toma la
+  // que se abre. Por angulo no llega a forkMinDev ni a forkMinSep, y farFork
+  // no mira si la ruta tiene otro cruce enseguida (la colectora se vuelve a
+  // partir). No se decia nada, el aviso siguiente era "keep left" y el camion
+  // seguia por la autopista (Discord, 17-10, Gargamosch: del I-29 al I-80
+  // en Council Bluffs, 2775,-12693). Se mide a parallelForkM por la ruta y
+  // por la otra salida: si ya van a parallelForkSepM y la otra es la mas
+  // recta, se avisa hacia el lado de la ruta. Si la ruta es la mas recta
+  // (seguir por la autopista cuando sale una rampa), nada. Con los carriles
+  // del juego (ctx.laneTurn), manda la flecha de la rama de la ruta: solo si
+  // va a un costado y no derecho. Sin flecha en la ruta y con flecha en la
+  // otra, la otra es una salida y la ruta sigue: nada (una autopista que
+  // dobla al lado de una rampa recta daba "keep left" en el I-15 de Helena).
+  const parallelForkM = ctx.parallelForkM != null ? ctx.parallelForkM : 100;
+  const parallelForkSepM = ctx.parallelForkSepM != null ? ctx.parallelForkSepM : 10;
+  const parallelFork = () => {
+    const B = LANE_ARROW_BITS;
+    const ruta = pointAt(cum[i] + parallelForkM);
+    const rutaDelta = normDeg(bearingBetween(pts[i], ruta) - inBearing);
+    for (const [k, idx, n] of altExits()) {
+      const otra = walkPointAt(idx, n, parallelForkM - (cum[k] - cum[i]));
+      if (!otra) continue;
+      const otraDelta = normDeg(bearingBetween(pts[i], otra) - inBearing);
+      if (Math.abs(otraDelta) >= Math.abs(rutaDelta)) continue;
+      if (Math.hypot(otra[0] - ruta[0], otra[1] - ruta[1]) < parallelForkSepM) continue;
+      let direction = rutaDelta > otraDelta ? 'right' : 'left';
+      let sig = null;
+      for (let j = k + 1; j < pts.length && sig == null; j++) sig = pts[j][4];
+      const tr = ctx.laneTurn && sig != null ? ctx.laneTurn(idx, sig) : null;
+      const ta = ctx.laneTurn ? ctx.laneTurn(idx, n) : null;
+      if (tr != null || ta != null) {
+        if (tr == null || (tr & B.straight) || !(tr & (B.left | B.slightLeft | B.right | B.slightRight))) continue;
+        direction = tr & (B.right | B.slightRight) ? 'right' : 'left';
+      }
+      return { kind: 'fork', direction, delta: rutaDelta, at: i, parallel: true };
+    }
+    return null;
+  };
   const sampleAt = (d) => normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + d)) - inBearing);
   let routeDelta = normDeg(bearingBetween(pts[i], pointAt(cum[iEnd] + forkLegM)) - inBearing);
-  if (Math.abs(routeDelta) < forkMinDev) return farFork();
+  if (Math.abs(routeDelta) < forkMinDev) return parallelFork() || farFork();
   const bestAlt = straightestAlt(100); // mas de 100: vuelve para atras, no es una continuacion
   if (bestAlt == null) return null;
   // El lado lo da donde la ruta se separa de la otra salida, no solo el punto
@@ -1255,7 +1319,7 @@ function detectManeuver(ctx) {
       .filter(s => Math.sign(normDeg(s - bestAlt)) === Math.sign(nearSep))
       .reduce((a, s) => (Math.abs(normDeg(s - bestAlt)) > Math.abs(normDeg(a - bestAlt)) ? s : a));
   }
-  if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return laterTurn ? null : farFork();
+  if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return laterTurn ? null : (parallelFork() || farFork());
   if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return laterTurn ? null : farFork();
   const direction = routeDelta > bestAlt ? 'right' : 'left';
   // Carril de giro con isleta (la esquina de una ciudad de EE.UU.): se separa
