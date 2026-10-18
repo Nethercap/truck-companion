@@ -1092,6 +1092,19 @@ test('voz: llegada una vez por destino, y no al tomar un trabajo ya en la empres
   assert.equal(v.arrival('wp', 'waypoint', 0, 30), null);
 });
 
+test('voz: el ultimo waypoint sin trabajo es el destino (Gargamosch, Discord 18-10)', () => {
+  const v = createVoiceGuide();
+  // quedan otros, o hay trabajo (los waypoints son paradas en el camino): nada
+  assert.equal(v.waypointReached('wp|a,b', false, 'waypoint', 30), null);
+  assert.equal(v.waypointReached('job|dest', true, 'dest', 30), null);
+  assert.equal(v.waypointReached('job|pickup', true, 'pickup', 30), null);
+  // un viaje de 400 m: ya estaba ahi
+  assert.equal(v.waypointReached('wp|corto', true, 'waypoint', 0.4), null);
+  // el ultimo, sin trabajo: "llegaste", una sola vez
+  assert.equal(v.waypointReached('wp|b', true, 'waypoint', 30), 'arrive_dest');
+  assert.equal(v.waypointReached('wp|b', true, 'waypoint', 30), null);
+});
+
 test('voz: elige la guardada del idioma, si no la primera, y null sin voces', () => {
   const voices = [{ id: 'en-a', lang: 'en' }, { id: 'en-b', lang: 'en' }, { id: 'es-a', lang: 'es' }];
   assert.equal(pickVoice(voices, 'en', 'en-b').id, 'en-b');

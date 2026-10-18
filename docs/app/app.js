@@ -2386,6 +2386,12 @@ function checkWaypointReached(x, z) {
   const route = currentRouteTarget ? currentRouteWorldPoints : null;
   if (waypointReached(x, z, wp.pos, route, { tapM: WAYPOINT_REACHED_M })) {
     showToast(t('waypointReachedToast').replace('{name}', wp.label || `${t('waypoint')} 1`), 'success', 3000);
+    // Sin trabajo, el ultimo es el destino: la voz dice "llegaste"
+    // (voiceGuide.waypointReached), con la ruta de antes de sacarlo.
+    if (voiceOn) {
+      const llegada = voiceGuide.waypointReached(routeProgressState.key, waypoints.length === 1, routeProgressState.kind, routeProgressState.total);
+      if (llegada && isLeaderTab) speakVoice(llegada);
+    }
     removeWaypoint(0);
   }
 }

@@ -2706,6 +2706,17 @@ function createVoiceGuide(opts = {}) {
       arrivedKey = key;
       return kind === 'pickup' ? 'arrive_pickup' : 'arrive_dest';
     },
+    // Se llego a un waypoint (checkWaypointReached). Sin trabajo, el ultimo
+    // es el destino y se dice como la llegada de un trabajo ("You could also
+    // have the voice say: You have reached your destination", Discord, 18-10,
+    // Gargamosch). arrival no llegaba a decirlo: el waypoint se saca a 150 m,
+    // con mas de arriveKm por delante. Con trabajo (targetKind dest o pickup)
+    // los waypoints son paradas en el camino y la llegada es la del trabajo.
+    // key y totalKm: los de la ruta a los waypoints (routeProgressState).
+    waypointReached(key, wasLast, targetKind, totalKm) {
+      if (!wasLast || targetKind !== 'waypoint') return null;
+      return this.arrival(key, 'dest', 0, totalKm);
+    },
     setTiming(value) { timing = VOICE_TIMINGS[voiceTimingSetting(value)]; },
   };
 }
