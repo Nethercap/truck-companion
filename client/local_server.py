@@ -356,8 +356,28 @@ class _ViewerOutbox:
     def close(self):
         self.task.cancel()
 
+# Al abrir a la red, cuantas veces mas probar si el puerto sigue tomado, y cada
+# cuanto (ver LocalServer._escuchar_o_solo_aca).
+REINTENTOS_EN_LA_RED = 2
+ESPERA_REINTENTO_S = 1.0
+
+
+def lan_al_arrancar(settings: dict) -> bool:
+    """Si el modo LAN escucha en la red desde que arranca el cliente.
+
+    Escuchar en la red hace que Windows pregunte por el firewall, y a un
+    usuario estandar le pide la clave de administrador aunque nunca vaya a
+    usar el celular por WiFi (FioJon, 18-10). A quien recien instala se le
+    abre recien cuando lo pide (Setup o el menu de la bandeja) y queda
+    guardado en "lan_open". Quien ya usaba el cliente lo tenia siempre en la
+    red y ya contesto esa pregunta: sigue igual."""
+    if "lan_open" in settings:
+        return bool(settings["lan_open"])
+    return bool(settings.get("first_run_done"))
+
+
 class LocalServer:
-    def __init__(self, keybinds: dict):
+    def __init__(self, keybinds: dict, en_la_red: bool = True):
         self.keybinds = keybinds
         self.viewers: set = set()
         self._outboxes: dict = {}
@@ -367,6 +387,12 @@ class LocalServer:
         self.web_ready = False
         self.error: str | None = None
         self.port_in_use = False
+        # Sin la red solo atiende a esta PC (127.0.0.1): "Abrir aca", los mapas
+        # armados en la PC y el /__show-setup andan igual, y Windows no pregunta
+        # por el firewall. Ver lan_al_arrancar y abrir_a_la_red.
+        self.en_la_red = en_la_red
+        self._escucho = False  # start() ya intento escuchar (bien o con error)
+        self._lock = asyncio.Lock()
 
     @property
     def url(self) -> str | None:
@@ -374,15 +400,81 @@ class LocalServer:
         return f"http://{ip}:{HTTP_PORT}/app/?local=1" if ip else None
 
     async def start(self):
+        self.web_ready = await asyncio.to_thread(refresh_web_cache)
+        async with self._lock:
+            await self._escuchar_o_solo_aca()
+            self._escucho = True
+
+    async def abrir_a_la_red(self) -> None:
+        """Pasa de escuchar solo en esta PC a escuchar en la red (de 127.0.0.1
+        a 0.0.0.0). Los tableros conectados se caen un momento y reconectan."""
+        await self._poner_en_la_red(True)
+
+    async def cerrar_a_la_red(self) -> None:
+        """Vuelve a escuchar solo en esta PC: los celulares y tablets por WiFi
+        se desconectan, y Windows deja de tener algo que preguntar."""
+        await self._poner_en_la_red(False)
+
+    async def _poner_en_la_red(self, en_la_red: bool) -> None:
+        async with self._lock:
+            if self.en_la_red == en_la_red:
+                return
+            self.en_la_red = en_la_red
+            if not self._escucho:
+                return  # start() todavia baja la web: va a escuchar ya como corresponde
+            await self._cerrar()
+            self.error = None
+            self.port_in_use = False
+            await self._escuchar_o_solo_aca()
+
+    async def _escuchar_o_solo_aca(self):
+        """En la red si esta prendido, con reintentos si el puerto sigue tomado:
+        al pasar de 127.0.0.1 a 0.0.0.0 las conexiones recien cerradas quedan
+        en TIME_WAIT, y asyncio en Windows (y bajo Wine, con las reglas de
+        Linux) no pone SO_REUSEADDR. Si igual no se puede, vuelve a esta PC:
+        "Abrir aca", los mapas armados y /__show-setup siguen andando, y el
+        error queda para que Setup lo diga."""
+        await self._escuchar("0.0.0.0" if self.en_la_red else "127.0.0.1")
+        if not self.en_la_red:
+            return
+        for _ in range(REINTENTOS_EN_LA_RED):
+            if not self.port_in_use:
+                break
+            await asyncio.sleep(ESPERA_REINTENTO_S)
+            self.error = None
+            self.port_in_use = False
+            await self._escuchar("0.0.0.0")
+        if self.error:
+            error, ocupado = self.error, self.port_in_use
+            await self._escuchar("127.0.0.1")
+            self.error, self.port_in_use = error, ocupado
+
+    async def _cerrar(self):
+        if self.http_server is not None:
+            server, self.http_server = self.http_server, None
+            await asyncio.to_thread(server.shutdown)
+            server.server_close()
+        if self.ws_server is not None:
+            ws_server, self.ws_server = self.ws_server, None
+            ws_server.close()
+            await ws_server.wait_closed()
+
+    async def _escuchar(self, host: str):
         import websockets
 
-        self.web_ready = await asyncio.to_thread(refresh_web_cache)
         try:
-            self.http_server = http.server.ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), _StaticHandler)
+            self.http_server = http.server.ThreadingHTTPServer((host, HTTP_PORT), _StaticHandler)
             threading.Thread(target=self.http_server.serve_forever, daemon=True).start()
-            self.ws_server = await websockets.serve(self._handle_viewer, "0.0.0.0", WS_PORT)
-            logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d), direccion %s",
-                         HTTP_PORT, WS_PORT, self.url or "sin IP de LAN")
+            self.ws_server = await websockets.serve(self._handle_viewer, host, WS_PORT)
+            if host != "127.0.0.1":
+                logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d), direccion %s",
+                             HTTP_PORT, WS_PORT, self.url or "sin IP de LAN")
+            elif self.en_la_red:
+                logging.info("Servidor LAN solo para esta PC en http://127.0.0.1:%d (ws %d): "
+                             "no pudo escuchar en la red", HTTP_PORT, WS_PORT)
+            else:
+                logging.info("Servidor LAN solo para esta PC en http://127.0.0.1:%d (ws %d): "
+                             "la red se abre desde Setup", HTTP_PORT, WS_PORT)
         except OSError as exc:
             # El puerto ocupado es el caso comun (otra instancia, u otro
             # programa): la ventana mostraba el OSError crudo de Python. Se
@@ -391,14 +483,11 @@ class LocalServer:
             self.port_in_use = getattr(exc, "errno", None) == errno.EADDRINUSE or "10048" in str(exc)
             # Si el HTTP levanto y fallo el WS, no dejar medio servidor arriba:
             # el modo LAN no sirve sin los dos y el puerto queda tomado.
-            if self.http_server is not None:
-                try:
-                    self.http_server.shutdown()
-                    self.http_server.server_close()
-                except Exception:
-                    logging.exception("No se pudo cerrar el HTTP a medio levantar")
-                self.http_server = None
-            logging.warning("No se pudo levantar el servidor LAN: %s", exc)
+            try:
+                await self._cerrar()
+            except Exception:
+                logging.exception("No se pudo cerrar el HTTP a medio levantar")
+            logging.warning("No se pudo levantar el servidor LAN en %s: %s", host, exc)
 
     async def _handle_viewer(self, ws):
         anotar_remoto((getattr(ws, "remote_address", None) or (None,))[0], "datos (27766)")

@@ -5,6 +5,7 @@ import os
 import pathlib
 import sys
 import tempfile
+import threading
 
 import pytest
 
@@ -1095,6 +1096,178 @@ def test_lan_anota_cada_ip_remota_una_vez(caplog):
         local_server.anotar_remoto("192.168.1.40", "datos (27766)")
     lineas = [r.getMessage() for r in caplog.records if r.getMessage().startswith("LAN:")]
     assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]
+
+
+def test_lan_en_la_red_al_arrancar_solo_si_ya_se_usaba():
+    """Escuchar en la red hace que Windows pida el firewall (y la clave de
+    administrador a un usuario estandar, FioJon 18-10): quien recien instala
+    no lo ve hasta que prende el modo LAN; quien ya usaba el cliente, sigue."""
+    import local_server
+    assert local_server.lan_al_arrancar({}) is False  # instalacion nueva
+    assert local_server.lan_al_arrancar({"first_run_done": True}) is True  # ya lo usaba: como antes
+    assert local_server.lan_al_arrancar({"lan_open": True}) is True
+    assert local_server.lan_al_arrancar({"first_run_done": True, "lan_open": False}) is False
+
+
+class _HttpFalso:
+    def __init__(self, addr, handler, escuchas, ocupados=None):
+        if ocupados and ocupados.get(addr[0], 0) > 0:
+            ocupados[addr[0]] -= 1
+            escuchas.append(("ocupado", addr[0]))
+            import errno
+            raise OSError(errno.EADDRINUSE, "Address already in use")
+        self.server_address = addr
+        self.cerrado = threading.Event()
+        escuchas.append(("http", addr[0]))
+
+    def serve_forever(self):
+        self.cerrado.wait(5)
+
+    def shutdown(self):
+        self.cerrado.set()
+
+    def server_close(self):
+        pass
+
+
+class _WsFalso:
+    def close(self):
+        pass
+
+    async def wait_closed(self):
+        pass
+
+
+def _servidor_lan_falso(monkeypatch, escuchas, web=None, ocupados=None):
+    """El LocalServer sin abrir puertos de verdad: con 0.0.0.0 Windows le
+    pediria el firewall a python.exe al correr los tests. ocupados: host ->
+    cuantas veces seguidas el puerto da "en uso" ahi."""
+    import websockets
+    import local_server
+    monkeypatch.setattr(local_server, "refresh_web_cache", web or (lambda: True))
+    monkeypatch.setattr(local_server, "ESPERA_REINTENTO_S", 0)
+    monkeypatch.setattr(local_server.http.server, "ThreadingHTTPServer",
+                        lambda addr, handler: _HttpFalso(addr, handler, escuchas, ocupados))
+
+    async def serve(handler, host, port):
+        escuchas.append(("ws", host))
+        return _WsFalso()
+    monkeypatch.setattr(websockets, "serve", serve)
+    return local_server
+
+
+def test_lan_sin_la_red_escucha_solo_en_esta_pc_y_se_abre_al_pedirlo(monkeypatch):
+    import asyncio
+    escuchas = []
+    local_server = _servidor_lan_falso(monkeypatch, escuchas)
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        await srv.start()
+        assert escuchas == [("http", "127.0.0.1"), ("ws", "127.0.0.1")]
+        await srv.abrir_a_la_red()
+        assert escuchas[2:] == [("http", "0.0.0.0"), ("ws", "0.0.0.0")]
+        assert srv.en_la_red and srv.error is None
+        await srv.abrir_a_la_red()  # ya abierto: no vuelve a escuchar
+        assert len(escuchas) == 4
+    asyncio.run(probar())
+
+
+def test_lan_abierto_mientras_baja_la_web_escucha_una_sola_vez_en_la_red(monkeypatch):
+    """Prender desde Setup en los primeros segundos (la web todavia se baja):
+    sin cuidado escuchaba dos veces en el mismo puerto y la segunda fallaba."""
+    import asyncio
+    escuchas = []
+    bajando = threading.Event()
+    seguir = threading.Event()
+
+    def web_lenta():
+        bajando.set()
+        seguir.wait(5)
+        return True
+    local_server = _servidor_lan_falso(monkeypatch, escuchas, web_lenta)
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        arranque = asyncio.create_task(srv.start())
+        await asyncio.to_thread(bajando.wait, 5)
+        await srv.abrir_a_la_red()
+        seguir.set()
+        await arranque
+        assert escuchas == [("http", "0.0.0.0"), ("ws", "0.0.0.0")]
+    asyncio.run(probar())
+
+
+def test_lan_se_apaga_y_vuelve_a_escuchar_solo_en_esta_pc(monkeypatch):
+    """Quien ya lo usaba (o lo prendio sin querer) lo puede apagar: deja de
+    escuchar en la red y Windows no tiene mas nada que preguntar."""
+    import asyncio
+    escuchas = []
+    local_server = _servidor_lan_falso(monkeypatch, escuchas)
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=True)
+        await srv.start()
+        await srv.cerrar_a_la_red()
+        assert escuchas == [("http", "0.0.0.0"), ("ws", "0.0.0.0"), ("http", "127.0.0.1"), ("ws", "127.0.0.1")]
+        assert not srv.en_la_red and srv.error is None
+        await srv.cerrar_a_la_red()  # ya apagado: nada
+        assert len(escuchas) == 4
+    asyncio.run(probar())
+
+
+def test_lan_al_abrir_reintenta_si_el_puerto_sigue_tomado(monkeypatch):
+    """Las conexiones de 127.0.0.1 recien cerradas quedan en TIME_WAIT: el
+    primer intento en 0.0.0.0 puede dar "en uso" y al rato no."""
+    import asyncio
+    escuchas = []
+    local_server = _servidor_lan_falso(monkeypatch, escuchas, ocupados={"0.0.0.0": 1})
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        await srv.start()
+        await srv.abrir_a_la_red()
+        assert escuchas[2:] == [("ocupado", "0.0.0.0"), ("http", "0.0.0.0"), ("ws", "0.0.0.0")]
+        assert srv.error is None and not srv.port_in_use
+    asyncio.run(probar())
+
+
+def test_lan_si_no_puede_abrir_vuelve_a_esta_pc_y_dice_por_que(monkeypatch):
+    """Sin la red no se puede quedar sin nada: "Abrir aca", los mapas armados
+    y /__show-setup necesitan 127.0.0.1. El error queda para Setup."""
+    import asyncio
+    escuchas = []
+    local_server = _servidor_lan_falso(monkeypatch, escuchas, ocupados={"0.0.0.0": 99})
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        await srv.start()
+        await srv.abrir_a_la_red()
+        intentos = 1 + local_server.REINTENTOS_EN_LA_RED
+        assert escuchas[2:] == [("ocupado", "0.0.0.0")] * intentos + [("http", "127.0.0.1"), ("ws", "127.0.0.1")]
+        assert srv.en_la_red and srv.port_in_use and srv.error
+        assert srv.http_server is not None and srv.ws_server is not None
+    asyncio.run(probar())
+
+
+def test_lan_la_bandeja_lo_prende_y_main_decide_antes_de_guardar_first_run(monkeypatch):
+    import inspect
+    import tray_client
+    abiertos = []
+    monkeypatch.setattr(tray_client, "abrir_modo_lan", lambda: abiertos.append(1))
+    monkeypatch.setattr(tray_client, "show_text_dialog", lambda *a, **k: None)
+    monkeypatch.setattr(tray_client.state, "lan_en_la_red", False)
+    tray_client.show_lan_menu_item(None, None)
+    assert abiertos == [1]
+    monkeypatch.setattr(tray_client.state, "lan_en_la_red", True)
+    tray_client.show_lan_menu_item(None, None)
+    assert abiertos == [1]
+    # Si se decide despues de guardar first_run_done (o en el hilo del loop,
+    # que corre a la par), una instalacion nueva pasa por usuaria vieja y
+    # vuelve el pedido del firewall.
+    fuente = inspect.getsource(tray_client.main)
+    decide = fuente.index("lan_al_arrancar(")
+    assert decide < fuente.index("start_asyncio_thread(") < fuente.index('settings["first_run_done"] = True')
 
 
 def test_web_cache_pisa_los_archivos_en_solo_lectura(monkeypatch, tmp_path, caplog):
