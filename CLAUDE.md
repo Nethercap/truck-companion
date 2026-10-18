@@ -116,6 +116,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   ya van a 10 m y la ruta toma la que se abre, es "keep" (`parallelFork`).
   Con carriles manda la flecha del juego de la rama de la ruta (`laneTurn`
   en el ctx): sin flecha a un costado, la ruta es la autopista y no se avisa.
+- Un giro no se da por pasado por estar en el primer nodo del cruce: parado en
+  la linea de una T el camion queda ahi y decia "Continue straight" (Discord,
+  Gargamosch, 18-10). `turnPassed`: hasta 15 m despues del ultimo nodo decide
+  el rumbo del camion (`findUpcomingTurn(heading)`) contra como se entra (los
+  ultimos 10 m antes del nodo, no los 60 m de `inBearing`): pasado si se
+  desvio 25 grados (o la mitad del giro) hacia la salida.
 - Lo recorrido (`routeBehind`) incluye el comienzo de la ruta
   (`passedRoutePoints`); el simulador y `check_avisos` lo arman igual.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo

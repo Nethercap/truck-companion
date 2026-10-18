@@ -4106,7 +4106,9 @@ document.getElementById('tilt3dBtn').addEventListener('click', () => {
 // salidas de autopista y rampas se separan de a poco, con menos de 35
 // grados, y antes pasaban en silencio - la primera indicacion era el giro
 // al final de la rampa (queja de r/trucksim). Ver detectManeuver en pure.js.
-function findUpcomingTurn() {
+// heading: el rumbo geografico del camion (turnPassed). Sin el, el del tramo
+// de la ruta por el que llega (check_avisos y el simulador no lo pasan).
+function findUpcomingTurn(heading) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !toLngLat) return null;
   const pts = routeBehind.length ? routeBehind.concat(currentRouteWorldPoints) : currentRouteWorldPoints;
   const here = routeBehind.length; // indice de la posicion actual dentro de pts
@@ -4117,6 +4119,8 @@ function findUpcomingTurn() {
     const [lng2, lat2] = toLngLat(q[0], q[1]);
     return geoBearingDeg(lng1, lat1, lng2, lat2);
   };
+  const rumbo = Number.isFinite(heading) ? heading
+    : (cum[here] >= 15 ? bearingBetween(pointAt(cum[here] - 15), pts[here]) : null);
   const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency, incoming: routeGraph.incoming } : {};
   // La curva de un tramo del grafo (para reconocer rotondas de un prefab).
   const edgeLine = routeGraph ? (a, b) => {
@@ -4227,7 +4231,14 @@ function findUpcomingTurn() {
     prevTurn = m && m.kind === 'turn'
       ? { direction: m.direction, inBearing: m.inBearing, outBearing: m.outBearing, quiet: m.quiet, end: cum[iEnd] } : null;
     if (m && m.quiet) m = null; // curva de la calle, sin otro camino: no se anuncia
-    if (m && cum[m.at != null ? m.at : i] <= cum[here]) m = null; // ya pasado
+    // Ya pasado: no basta con estar en el primer nodo del cruce (parado en la
+    // linea de una T se daba por hecho); adentro del cruce decide el rumbo,
+    // contra como se entra (los ultimos 10 m antes del nodo).
+    if (m) {
+      const atI = m.at != null ? m.at : i;
+      const entrada = cum[atI] >= 10 ? bearingBetween(pointAt(cum[atI] - 10), pts[atI]) : null;
+      if (turnPassed({ atM: cum[atI], endM: cum[iEnd], hereM: cum[here], heading: rumbo, entryBearing: entrada, outBearing: m.outBearing })) m = null;
+    }
     // La boca de una rotonda: lo que dobla al salir, o al acercarse a menos
     // de 80 m de la entrada, es parte de la rotonda y ya lo dice su aviso.
     if (m && cum[i] - roundaboutLeftM < 60) m = null;
@@ -4257,7 +4268,7 @@ function findUpcomingTurn() {
           }
         }
       }
-      return { distanceMeters: cum[at] - cum[here], direction: m.direction, kind: m.kind, nearSign, decoyMeters, node: [pts[at][0], pts[at][1]],
+      return { distanceMeters: Math.max(0, cum[at] - cum[here]), direction: m.direction, kind: m.kind, nearSign, decoyMeters, node: [pts[at][0], pts[at][1]],
                lanes: m.lanes || laneGuidanceAt(pts, i, iEnd, m.kind, m.direction) };
     }
     if (cum[iEnd] > cum[here]) passed.push([i, iEnd]);
@@ -5494,7 +5505,7 @@ function updateMap(position, game, gameHeadingDeg) {
   // celular o la PC donde este abierto el tablero).
   // El de OBS muestra el giro pero no guia: con el solo, la voz no habla.
   const guiando = navMode || !!pipWin || clientOverlayOn;
-  const giroAhora = guiando || obsOverlayOn ? findUpcomingTurn() : null;
+  const giroAhora = guiando || obsOverlayOn ? findUpcomingTurn(lastHeadingDeg) : null;
   const turn = guiando || obsOverlayOn ? stabilizeManeuver(navManeuverState, giroAhora, NAV_TURN_DEBOUNCE_TICKS) : null;
   // Sin giro (ni uno a punto de aparecer), las flechas del proximo cruce
   // donde no sirven todos los carriles: abajo de "Continue straight", sin voz.
