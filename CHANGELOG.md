@@ -20,6 +20,9 @@ updates on its own and is not versioned here.
   Windows no longer asks about the firewall, or for an administrator password, to people who never
   use it. Installs that already used the client keep it on. Either way, Setup can now turn it off
   again.
+- Build my map reads the cities, ferries and companies of the EAA map. Before, the map built with
+  EAA came out without cities, because EAA writes city and ferry names as plain text and names its
+  company and cargo entries in a different way. Thanks to pauloo27, who found it and wrote the fix.
 
 ## 1.5.32 (2026-10-17)
 
