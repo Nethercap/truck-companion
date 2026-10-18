@@ -162,6 +162,16 @@ def main():
         antes = page.evaluate("useImperial")
         page.evaluate("toggleUnits()")
         otra.evaluate("truckSize = 2; saveSettings()")
+        # Chromium le da a cada pestana su copia del localStorage y lo que
+        # escribe la otra llega un momento despues: leido al toque salia
+        # truckSize None aunque se hubiera guardado (fallo de a ratos, #74).
+        # Se espera a verlo, con tope; si no llega, el chequeo de abajo falla.
+        try:
+            page.wait_for_function(
+                "() => (JSON.parse(localStorage.getItem('truckdash_settings') || '{}')).truckSize === 2",
+                timeout=5000)
+        except Exception:
+            pass
         guardado = page.evaluate("JSON.parse(localStorage.getItem('truckdash_settings'))")
         chequear("dos pestanas: los ajustes de una no pisan los de la otra",
                  guardado.get("useImperial") == (not antes) and guardado.get("truckSize") == 2,
