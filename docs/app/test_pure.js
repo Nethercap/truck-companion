@@ -3613,3 +3613,24 @@ test('turnReportText: mapa, versiones, el camion y los avisos, para pegar en Dis
     heading: 359, now: 1792000000000, items: log.list(), formatTime: () => '23:59' });
   assert.ok(largo.length < 2000, `${largo.length} caracteres`);
 });
+
+test('turnPassed: parado en la linea de una T el giro sigue adelante; ya doblando, no (Discord 18-10)', () => {
+  const { turnPassed } = require('./pure.js');
+  // T a la derecha: se entra mirando al norte (0) y se sale al este (90); el cruce va de 100 a 160 m
+  const t = { atM: 100, endM: 160, entryBearing: 0, outBearing: 90 };
+  assert.equal(turnPassed({ ...t, hereM: 80, heading: 0 }), false);  // todavia no llega
+  assert.equal(turnPassed({ ...t, hereM: 100, heading: 0 }), false); // parado en el nodo
+  assert.equal(turnPassed({ ...t, hereM: 104, heading: 3 }), false); // en la linea, sin doblar
+  assert.equal(turnPassed({ ...t, hereM: 108, heading: 70 }), true);  // ya dobla: el giro siguiente puede aparecer
+  assert.equal(turnPassed({ ...t, hereM: 105, heading: 30 }), true);  // empezo a doblar (25 grados alcanzan)
+  assert.equal(turnPassed({ ...t, hereM: 105, heading: 330 }), false); // se desvio, pero para el otro lado
+  assert.equal(turnPassed({ ...t, hereM: 180, heading: 0 }), true);   // paso el cruce entero
+  // una calle que llega curvandose: al llegar ya mira casi a la salida (296 contra 280)
+  const c = { atM: 100, endM: 100, entryBearing: 296, outBearing: 280 };
+  assert.equal(turnPassed({ ...c, hereM: 103, heading: 296 }), false);
+  assert.equal(turnPassed({ ...c, hereM: 110, heading: 282 }), true);
+  // sin rumbos (bifurcacion, o sin el del camion): solo la posicion
+  assert.equal(turnPassed({ atM: 100, endM: 100, hereM: 104 }), false);
+  assert.equal(turnPassed({ atM: 100, endM: 160, hereM: 121 }), true);
+  assert.equal(turnPassed({ atM: 100, endM: 100, hereM: 116 }), true);
+});
