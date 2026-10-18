@@ -851,7 +851,7 @@ index 4094551..e63aa42 100644
        // TODO figure out a way to get building footprint information for
        //  polygons in prefabs that look like buildings.
 diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
-index b65d4c8..59b4220 100644
+index b65d4c8..05a7a61 100644
 --- a/packages/clis/parser/game-files/map-files-parser.ts
 +++ b/packages/clis/parser/game-files/map-files-parser.ts
 @@ -54,7 +54,18 @@ import {
@@ -874,16 +874,120 @@ index b65d4c8..59b4220 100644
  ):
    | {
        data: 'all';
-@@ -94,6 +105,7 @@ export function parseMapFiles(
+@@ -94,6 +105,9 @@ export function parseMapFiles(
        logger.log('adding', scsSource);
        return new ScsArchive(p, scsSource);
      });
++  // Lo que no viene de estos archivos del juego viene de un mod.
++  const gameSources = new Set(archives.map(a => a.scsSource));
 +  archives.push(...(extraArchives as typeof archives));
    const entries = new CombinedEntries(archives);
    try {
      const version = parseVersionSii(entries);
-@@ -165,9 +177,23 @@ function parseSectorFiles(entries: Entries): {
-   logger.start(`parsing ${map} sector files...`);
+@@ -122,7 +136,7 @@ export function parseMapFiles(
+       };
+     }
+ 
+-    const sectorData = parseSectorFiles(entries);
++    const sectorData = parseSectorFiles(entries, map, gameSources);
+     return {
+       ...baseResult,
+       data: 'all',
+@@ -148,26 +162,106 @@ function parseVersionSii(entries: Entries) {
+   return { application, version };
+ }
+ 
+-function parseSectorFiles(entries: Entries): {
++// Que carpeta de sectores leer: la del juego (europe/usa), salvo un mapa
++// standalone de un mod, otro .mbd con su carpeta (Grand Utopia, EAA "sem
++// Europa"), que se elige como modulo de mapa al crear el perfil y no carga
++// Europa. Si el mod tambien suma sectores al mapa del juego, se juega
++// conectado: RusMap trae russia.mbd ademas de sus sectores en map/europe.
++// Antes, dos .mbd o uno con otro nombre abortaban el parseo.
++export function chooseMapFolder(
++  entries: Entries,
++  map: 'usa' | 'europe',
++  gameSources: ReadonlySet<string>,
++): string {
++  const mapDir = Preconditions.checkExists(entries.directories.get('map'));
++  const modules = mapDir.files
++    .filter(f => f.endsWith('.mbd'))
++    .map(f => f.replace(/\.mbd$/, ''));
++  const fromMod = (p: string) => {
++    const source = entries.files.get(p)?.scsSource;
++    return source != null && !gameSources.has(source);
++  };
++  const sectorFiles = (m: string) =>
++    (entries.directories.get(`map/${m}`)?.files ?? []).filter(f =>
++      f.endsWith('.base'),
++    );
++  const standalone = modules.filter(
++    m => m !== map && fromMod(`map/${m}.mbd`) && sectorFiles(m).length > 0,
++  );
++  const modInGameMap = sectorFiles(map).some(f => fromMod(`map/${map}/${f}`));
++  if (standalone.length > 0 && !modInGameMap) {
++    // Con varios, el ultimo mod de la lista (el de mas prioridad).
++    const folder = standalone[standalone.length - 1];
++    // El rango de sectores: la proyeccion de ETS2 trata como UK lo que
++    // queda al noroeste de Calais (x <= -8, y <= -2, ver projections.ts).
++    const xs: number[] = [];
++    const ys: number[] = [];
++    for (const f of sectorFiles(folder)) {
++      const m = /^sec([+-]\d{4})([+-]\d{4})\.base$/.exec(f);
++      if (m) {
++        xs.push(Number(m[1]));
++        ys.push(Number(m[2]));
++      }
++    }
++    logger.info(
++      `standalone map ${folder}.mbd from a mod`,
++      `(${sectorFiles(folder).length} sectors, x ${Math.min(...xs)}..${Math.max(...xs)},`,
++      `y ${Math.min(...ys)}..${Math.max(...ys)}); ${map} is not loaded`,
++    );
++    if (standalone.length > 1) {
++      logger.warn(
++        'other standalone maps ignored:',
++        standalone.slice(0, -1).map(m => `${m}.mbd`),
++      );
++    }
++    return folder;
++  }
++  if (!modules.includes(map)) {
++    throw new Error(
++      `map/${map}.mbd not found (map/ has ${modules.map(m => `${m}.mbd`).join(', ') || 'no .mbd'})`,
++    );
++  }
++  if (standalone.length > 0) {
++    logger.info(
++      `mod sectors added to ${map}; standalone maps ignored:`,
++      standalone.map(m => `${m}.mbd`),
++    );
++  }
++  return map;
++}
++
++function parseSectorFiles(
++  entries: Entries,
++  map: 'usa' | 'europe',
++  gameSources: ReadonlySet<string>,
++): {
+   map: 'usa' | 'europe';
+   sectors: Map<string, { items: Item[]; nodes: Node[] }>;
+ } {
+-  const mapDir = Preconditions.checkExists(entries.directories.get('map'));
+-  const mbds = mapDir.files.filter(f => f.endsWith('.mbd'));
+-  if (mbds.length !== 1) {
+-    throw new Error();
+-  }
+-  const map = mbds[0].replace(/\.mbd$/, '');
+-  assert(map === 'usa' || map === 'europe');
++  const folder = chooseMapFolder(entries, map, gameSources);
+   const sectorRoot = Preconditions.checkExists(
+-    entries.directories.get(`map/${map}`),
++    entries.directories.get(`map/${folder}`),
+   );
+-  logger.start(`parsing ${map} sector files...`);
++  logger.start(`parsing ${folder} sector files...`);
    const start = Date.now();
  
 +  // TM_SECTORS_ONLY_MOD=1: mapa standalone (ej. Grand Utopia) - solo se
@@ -895,7 +999,7 @@ index b65d4c8..59b4220 100644
 +    f =>
 +      (f.endsWith('.base') || f.endsWith('.aux')) &&
 +      (!onlyMod ||
-+        entries.files.get(`map/${map}/${f}`)?.scsSource === 'coast_to_coast'),
++        entries.files.get(`map/${folder}/${f}`)?.scsSource === 'coast_to_coast'),
    );
 +  if (onlyMod) {
 +    logger.info(
@@ -907,11 +1011,13 @@ index b65d4c8..59b4220 100644
    const bar = new cliProgress.SingleBar(
      {
        format: `[{bar}] | {filename} | {value} of {total}`,
-@@ -195,7 +221,26 @@ function parseSectorFiles(entries: Entries): {
+@@ -194,8 +288,27 @@ function parseSectorFiles(entries: Entries): {
+       throw new Error(`couldn't parse ${sectorX} or ${sectorY}`);
      }
      const sector = putIfAbsent(sectorKey, { items: [], nodes: [] }, sectors);
-     const baseFile = assertExists(entries.files.get(`map/${map}/${f}`));
+-    const baseFile = assertExists(entries.files.get(`map/${map}/${f}`));
 -    const parsedSector = parseSector(baseFile.read(), seenNodeUids);
++    const baseFile = assertExists(entries.files.get(`map/${folder}/${f}`));
 +    // Algunos mods viejos (ej. ProMods) tienen sectores con una version de
 +    // formato binario anterior a la que este parser soporta (907) - intentar
 +    // decodificarlos igual con el layout de 907 desalinea la lectura y
@@ -935,7 +1041,7 @@ index b65d4c8..59b4220 100644
      sector.items = sector.items.concat(
        parsedSector.items.map(item =>
          withDlcGuard(item, map, baseFile.scsSource),
-@@ -284,11 +329,15 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
+@@ -284,11 +397,15 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
        l10nStrings,
      );
      for (const f of localeSubdir.files) {
@@ -952,7 +1058,7 @@ index b65d4c8..59b4220 100644
        ) {
          continue;
        }
-@@ -404,12 +453,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+@@ -404,12 +521,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
      // .dds pixel data. Assume that the concrete instance of the FileEntry for
      // the .tobj file is an ScsArchiveTobjFile, whose .read() returns a complete
      // header-ful .dds file.
@@ -990,7 +1096,7 @@ index b65d4c8..59b4220 100644
    // verify that mapX pngs are square
    const size = mapPngs[0].width;
    assert(mapPngs.every(p => p.width === p.height && p.width === size));
-@@ -611,288 +681,317 @@ function postProcess(
+@@ -611,288 +749,317 @@ function postProcess(
      nodeUid: bigint;
    }[] = [];
    for (const item of poifulItems) {
@@ -1556,7 +1662,7 @@ index b65d4c8..59b4220 100644
      }
    }
  
-@@ -1156,12 +1255,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
+@@ -1156,12 +1323,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
      if (o.nameLocalized && !l10n.has(o.nameLocalized.replaceAll('@', ''))) {
        logger.warn('no localized name for', o.nameLocalized, `(${o.name})`);
      }
@@ -2074,7 +2180,7 @@ index 10fdc04..46f7831 100644
      }),
      navNodes: rawPrefab.navNodes.map(rn => {
 diff --git a/packages/clis/parser/game-files/scs-archive.ts b/packages/clis/parser/game-files/scs-archive.ts
-index 73a4a8f..da33698 100644
+index 73a4a8f..a5c0605 100644
 --- a/packages/clis/parser/game-files/scs-archive.ts
 +++ b/packages/clis/parser/game-files/scs-archive.ts
 @@ -6,18 +6,33 @@ import type { BaseOf } from 'restructure';
@@ -2119,6 +2225,142 @@ index 73a4a8f..da33698 100644
  };
  
  const FileHeader = new r.Struct({
+@@ -179,11 +194,14 @@ export class ScsArchive {
+     fs.closeSync(this.fd);
+   }
+ 
++  // HashFS v1 (el formato de antes de 1.50) tambien: muchos mods de mapa
++  // siguen saliendo asi (EAA, RusMap, los assets de ProMods), y "Build my
++  // map" los descartaba con "is invalid. ignoring." (Discord, 17-10).
+   isValid(): boolean {
+     return (
+       this.header.magic === 'SCS#' &&
+       this.header.hashMethod === 'CITY' &&
+-      this.header.version === 2
++      (this.header.version === 1 || this.header.version === 2)
+     );
+   }
+ 
+@@ -192,6 +210,10 @@ export class ScsArchive {
+     if (this.entries) {
+       return this.entries;
+     }
++    if (this.header.version === 1) {
++      this.entries = this.parseEntriesV1();
++      return this.entries;
++    }
+ 
+     const entryHeaders = new r.Array(
+       EntryHeader,
+@@ -222,6 +244,57 @@ export class ScsArchive {
+     return this.entries;
+   }
+ 
++  // HashFS v1: cabecera de 20 bytes (magic, version, salt, metodo, cantidad
++  // de entradas y donde empieza su tabla) y entradas de 32 bytes: hash,
++  // offset, flags (1 directorio, 2 comprimido con zlib, 8 cifrado), crc,
++  // tamano y tamano comprimido. Los listados de directorio son texto, un
++  // nombre por linea y los subdirectorios con "*" adelante. Con salt, se
++  // hashea la ruta con el salt en decimal adelante (como TruckLib).
++  private parseEntriesV1(): Entries {
++    const buffer = Buffer.alloc(20);
++    fs.readSync(this.fd, buffer, { length: buffer.length, position: 0 });
++    const salt = buffer.readUInt16LE(6);
++    const count = buffer.readUInt32LE(12);
++    const start = buffer.readUInt32LE(16);
++    const table = Buffer.alloc(count * 32);
++    fs.readSync(this.fd, table, { length: table.length, position: start });
++
++    const directories: DirectoryEntry[] = [];
++    const files: FileEntry[] = [];
++    let encrypted = 0;
++    for (let i = 0; i < count; i++) {
++      const o = i * 32;
++      const flags = table.readUInt32LE(o + 16);
++      if (flags & 8) {
++        encrypted++;
++        continue;
++      }
++      const metadata: EntryMetadata = {
++        hash: table.readBigUInt64LE(o),
++        offset: table.readBigUInt64LE(o + 8),
++        uncompressedSize: table.readUInt32LE(o + 24),
++        compressedSize: table.readUInt32LE(o + 28),
++        compression: flags & 2 ? Compression.ZLIB : Compression.NONE,
++        isDirectory: (flags & 1) !== 0,
++      };
++      if (metadata.isDirectory) {
++        directories.push(
++          new ScsArchiveDirectoryV1(this.fd, metadata, this.scsSource),
++        );
++      } else {
++        files.push(new ScsArchiveFile(this.fd, metadata, this.scsSource));
++      }
++    }
++    if (encrypted) {
++      logger.warn(`${this.path}: ${encrypted} encrypted entries skipped.`);
++    }
++    const hash = salt ? (key: string) => city64(`${salt}${key}`) : city64;
++    return {
++      directories: createStore(directories, hash),
++      files: createStore(files, hash),
++    };
++  }
++
+   private createMetadataMap(
+     entryHeaders: BaseOf<typeof EntryHeader>[],
+   ): Map<number, MetadataEntry> {
+@@ -313,10 +386,13 @@ export class ScsArchive {
+   }
+ }
+ 
+-function createStore<V extends { hash: bigint }>(values: V[]) {
++function createStore<V extends { hash: bigint }>(
++  values: V[],
++  hash: (key: string) => bigint = city64,
++) {
+   const map = new Map(values.map(v => [v.hash, v]));
+   return {
+-    get: (key: string) => map.get(city64(key)),
++    get: (key: string) => map.get(hash(key)),
+   };
+ }
+ 
+@@ -623,6 +699,34 @@ function closestPowerOf2(n: number): number {
+   return Math.pow(2, lg);
+ }
+ 
++// El listado de un directorio en HashFS v1: texto, un nombre por linea, los
++// subdirectorios con "*" adelante.
++class ScsArchiveDirectoryV1
++  extends ScsArchiveEntry
++  implements DirectoryEntry
++{
++  readonly type = 'directory';
++  readonly subdirectories: readonly string[];
++  readonly files: readonly string[];
++
++  constructor(fd: number, metadata: EntryMetadata, scsSource: string) {
++    super(fd, metadata, scsSource);
++    const subdirectories: string[] = [];
++    const files: string[] = [];
++    for (const line of this.read().toString('utf8').split('\n')) {
++      const name = line.replace(/\r$/, '');
++      if (!name) continue;
++      if (name.startsWith('*')) {
++        subdirectories.push(name.substring(1));
++      } else {
++        files.push(name);
++      }
++    }
++    this.subdirectories = subdirectories;
++    this.files = files;
++  }
++}
++
+ class ScsArchiveDirectory extends ScsArchiveEntry implements DirectoryEntry {
+   readonly type = 'directory';
+   readonly subdirectories: readonly string[];
 diff --git a/packages/clis/parser/game-files/sii-schemas.ts b/packages/clis/parser/game-files/sii-schemas.ts
 index b8accdc..564519e 100644
 --- a/packages/clis/parser/game-files/sii-schemas.ts
@@ -2585,7 +2827,7 @@ index 8a13c01..3ec05a7 100755
  }
 diff --git a/packages/clis/parser/run-with-mod.ts b/packages/clis/parser/run-with-mod.ts
 new file mode 100755
-index 0000000..1d8a4aa
+index 0000000..b9823be
 --- /dev/null
 +++ b/packages/clis/parser/run-with-mod.ts
 @@ -0,0 +1,180 @@
