@@ -2152,6 +2152,11 @@ let routeGraph = null; // typed arrays + CSR, ver buildRouteGraph()
 // La ruta actual pasa por un DLC destildado porque no hay otro camino.
 let routeUsesUncheckedDlc = false;
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
+// Sin destino en la app: por que (noRouteReason) y los km de la ruta del GPS
+// del juego, para decirlo en vez de "No destination set". Los pone
+// updateDestinationMarker en cada dato.
+let noRouteNow = null;
+let gameRouteKmNow = 0;
 let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas de juego, para detectar desvios
 // La ruta como se calculo, sin recortar: lo que falta y la distancia al giro
 // se miden sobre ella (gameKmOf, routeMeters en pure.js). Si ya no es la de
@@ -3679,8 +3684,13 @@ function updateDestinationMarker(data) {
     if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
     currentRouteTarget = null;
     currentRouteWorldPoints = null;
+    // Con la ruta borrada por el usuario hay destino igual (el crudo): ahi
+    // no se explica nada.
+    noRouteNow = noRouteReason({ hasTarget: !!resolveRawRouteTarget(data), hasRoute: false, gameRouteKm: data.routeDistanceKm });
+    gameRouteKmNow = data.routeDistanceKm || 0;
     return;
   }
+  noRouteNow = null;
   const destLngLat = toLngLat(target.x, target.z);
   if (target.kind === 'waypoint') {
     // El ultimo waypoint ya tiene su propio marcador - no duplicar bandera.
@@ -4571,7 +4581,7 @@ function refreshPip() {
   const $ = (id) => document.getElementById(id);
   const giro = d.getElementById('pGiro');
   if (!giro) return;
-  giro.innerHTML = pipTurnHtml || escapeHtml(t('navNoRoute'));
+  giro.innerHTML = pipTurnHtml || escapeHtml(noRouteText());
   d.getElementById('pVel').textContent = $('miniSpeedBig').textContent;
   d.getElementById('pUnidad').textContent = $('miniSpeedUnitLabel').textContent;
   const limite = $('miniLimitSign').textContent.trim();
@@ -4648,7 +4658,7 @@ function refreshCab() {
   $('cabTop').hidden = false;
   $('cabBar').hidden = false;
   $('cabIcon').innerHTML = parts ? turnIconHtml(parts.info) : '';
-  $('cabTurnText').textContent = parts ? turnTextWithoutArrow(parts.text) : t('navNoRoute');
+  $('cabTurnText').textContent = parts ? turnTextWithoutArrow(parts.text) : noRouteText();
   $('cabLanes').innerHTML = parts ? lanesHtml(parts.lanes) : '';
   $('cabNext').textContent = parts ? parts.next : '';
   $('cabSpeed').textContent = $('miniSpeedBig').textContent;
@@ -4707,9 +4717,21 @@ function updateNavPanel(turn) {
     return;
   }
   const panel = document.getElementById('navPanel');
-  panel.innerHTML = navPanelHtml(turn);
-  panel.style.display = 'block';
   navPanelParts = navTurnParts(turn);
+  let html = navPanelHtml(turn);
+  // Ruta en el GPS del juego que la app no puede seguir: por que, y el
+  // buscador para ponerle el destino aca (openPoiModal, un toque = waypoint).
+  if (!navPanelParts && noRouteNow === 'game_gps') {
+    html += `<span class="navNext navHint">${escapeHtml(t('navGameRouteHint'))}</span>`
+      + `<button type="button" class="navSearchBtn" data-nav-search>${escapeHtml(t('navSearchDestination'))}</button>`;
+  }
+  // Solo si cambio: con el boton adentro, rehacerlo en cada dato se comia el
+  // toque (y el foco del teclado) si caia entre que se apreta y se suelta.
+  if (html !== panel.dataset.html) {
+    panel.innerHTML = html;
+    panel.dataset.html = html;
+  }
+  panel.style.display = 'block';
   // Lector de pantalla: el giro una vez por maniobra, no en cada dato
   const aviso = turnAnnouncer.next(turn, navPanelParts && navPanelParts.text);
   if (aviso) document.getElementById('navLive').textContent = aviso;
@@ -4749,12 +4771,27 @@ function navLanesFor(turn) {
   return currentRouteWorldPoints && navQuietLanes ? navQuietLanes.lanes : null;
 }
 
+// Lo que se dice sin indicaciones: si el GPS del juego tiene una ruta que la
+// app no puede seguir (sin trabajo, #56), sus km en vez de "No destination set".
+function noRouteText() {
+  return noRouteNow === 'game_gps'
+    ? t('navGameRouteOnly', gameRouteDistanceText(gameRouteKmNow, useImperial, currentLang))
+    : t('navNoRoute');
+}
+
 function navPanelHtml(turn) {
   const parts = navTurnParts(turn);
-  if (!parts) return escapeHtml(t('navNoRoute'));
+  if (!parts) return escapeHtml(noRouteText());
   return escapeHtml(parts.text) + lanesHtml(navLanesFor(turn))
     + (parts.next ? `<span class="navNext">${escapeHtml(parts.next)}</span>` : '');
 }
+
+// El boton de buscar destino del panel (updateNavPanel): por delegacion,
+// porque el contenido se rehace cuando cambia.
+document.getElementById('navPanel').addEventListener('click', (e) => {
+  if (document.body.classList.contains('editLayout')) return; // acomodando, un toque mueve
+  if (e.target.closest && e.target.closest('[data-nav-search]')) openPoiModal();
+});
 
 // ---------------------------------------------------------------------------
 // Overlay en el juego (client/overlay.py): el cliente dibuja una ventanita
@@ -5535,7 +5572,7 @@ function updateMiniHudExtra(data) {
   // del panel salian pegadas ("Continue straightNext city: Sidney", Discord,
   // Gargamosch, 11-10).
   if (miniHudSettings.gps && navMode && document.getElementById('navPanel').style.display !== 'none') {
-    if (!navPanelParts) lines.push(escapeHtml(t('navNoRoute')));
+    if (!navPanelParts) lines.push(escapeHtml(noRouteText()));
     else {
       lines.push(escapeHtml(navPanelParts.text));
       if (navPanelParts.next) lines.push(`<span class="miniHudNext">${escapeHtml(navPanelParts.next)}</span>`);

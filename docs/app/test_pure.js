@@ -2366,6 +2366,29 @@ test('hasJobDestination: un trabajo terminado sin evento no deja la ruta al dest
   assert.equal(hasJobDestination(null), false);
 });
 
+test('noRouteReason: sin trabajo, la ruta del GPS del juego se explica en vez de "No destination set" (#56)', () => {
+  const { noRouteReason } = require('./pure.js');
+  // ATS sin trabajo con un destino puesto en el GPS del juego: el SDK da los km, no el punto
+  assert.equal(noRouteReason({ hasTarget: false, hasRoute: false, gameRouteKm: 312.4 }), 'game_gps');
+  // ni trabajo ni GPS del juego
+  assert.equal(noRouteReason({ hasTarget: false, hasRoute: false, gameRouteKm: 0 }), 'none');
+  // clientes viejos sin el campo
+  assert.equal(noRouteReason({ hasTarget: false, hasRoute: false, gameRouteKm: undefined }), 'none');
+  assert.equal(noRouteReason({ hasTarget: false, hasRoute: false, gameRouteKm: NaN }), 'none');
+  // con trabajo o waypoint la app tiene a donde ir: si no hay indicaciones es por otra cosa
+  assert.equal(noRouteReason({ hasTarget: true, hasRoute: false, gameRouteKm: 312.4 }), null);
+  assert.equal(noRouteReason({ hasTarget: false, hasRoute: true, gameRouteKm: 312.4 }), null);
+});
+
+test('gameRouteDistanceText: entero lejos, un decimal cerca, en millas con imperial', () => {
+  const { gameRouteDistanceText } = require('./pure.js');
+  assert.equal(gameRouteDistanceText(312.4, false, 'en'), '312 km');
+  assert.equal(gameRouteDistanceText(1312.4, false, 'en'), '1,312 km');
+  assert.equal(gameRouteDistanceText(4.56, false, 'es'), '4,6 km');
+  assert.equal(gameRouteDistanceText(100, true, 'en'), '62 mi');
+  assert.equal(gameRouteDistanceText(10, true, 'en'), '6.2 mi');
+});
+
 test('jobPanelFields: el panel no sigue con el trabajo cancelado (16-10)', () => {
   const { jobPanelFields } = require('./pure.js');
   const trabajo = { game: 'ats', citySrc: 'Reno', cityDst: 'Sacramento', cargo: 'Bulldozer', cargoMassKg: 16200,
