@@ -54,6 +54,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   la calle que se suma tiene que venir de atras, no el retorno de la
   calzada contraria donde empieza una autovia. `check_avisos.js` y el simulador cargan los carriles;
   `TRUCKDASH_LANES_DIR` y `--carriles` prueban unos sin subir.
+- Sin giro a la vista, abajo de "Continue straight" van las flechas del
+  proximo cruce a menos de 500 m donde no sirven todos los carriles
+  (`findQuietLanes`, `quietLanesAhead`, `navQuietLanes`): solo salidas de
+  autopista (`laneKeepSide` sin la marca), sin voz ni texto. Las de doblar
+  en una esquina de ciudad no (un carril de giro en cada cuadra).
 - El ruteo (`findRouteWith`) es un A* por aristas sin vueltas en U en los
   nodos (`findArcRoute` en pure.js): el estado es la arista de llegada y no
   se sale a mas de 150 grados de ella, salvo en ferry/tren o si no queda
