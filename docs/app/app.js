@@ -3723,6 +3723,8 @@ function updateDestinationMarker(data) {
   if ((destChanged || offRoute) && data.position?.x != null && routeGraph) {
     currentRouteTarget = routeKey;
     navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;
+    navQuietLanesState.shown = null; navQuietLanesState.shownKey = null; navQuietLanesState.candidate = undefined; navQuietLanesState.candidateTicks = 0;
+    navQuietLanes = null;
     routeBehind = [];
     let routePoints = [];
     let from = [data.position.x, data.position.z];
@@ -3961,8 +3963,15 @@ const NAV_LANE_KEEP_ESCAPE_M = 600;
 // ROUTE_BEHIND_M: con el camion entre la rampa y la salida, la entrada
 // tiene que seguir en lo recorrido o el aviso se apagaba antes de llegar.
 const NAV_LANE_RAMP_M = 200;
+// Sin giro a la vista, las flechas del proximo cruce donde no sirven todos
+// los carriles (findQuietLanes) se muestran desde estos metros antes.
+const NAV_QUIET_LANES_M = 500;
 const NAV_TURN_DEBOUNCE_TICKS = 2; // una indicacion nueva tiene que verse 2 ticks seguidos (anti-parpadeo al pasar salidas)
 const navManeuverState = {};
+// Las flechas sin aviso (findQuietLanes), con el mismo anti-parpadeo que los
+// giros: lo que muestran el panel y el overlay cuando el giro es seguir derecho.
+const navQuietLanesState = {};
+let navQuietLanes = null;
 let routeBehind = []; // ultimos puntos de la ruta ya recorridos (ver trimRouteBehindTruck)
 // Cuanto: un cruce entero (hasta 100 m) mas el tramo de entrada (60 m), medido
 // en metros y no en puntos (ver trimRouteBehind); el tope de puntos es para
@@ -4268,6 +4277,32 @@ function laneKeepAt(pts, i, iEnd, fromRamp = false) {
   let direction = null;
   const lanes = laneRecordAt(pts, i, iEnd, (rec) => (direction = laneKeepSide(rec, fromRamp)) != null);
   return lanes ? { direction, lanes } : null;
+}
+
+// Las flechas del proximo cruce sin aviso (quietLanesAhead en pure.js), para
+// mostrar con "Continue straight": solo salidas de autopista (laneKeepSide,
+// sin la marca del constructor: no se dice nada, solo se ven), y con otra
+// salida que se aleja de verdad, como los "keep" por carriles. Las de doblar
+// en una esquina de ciudad no: con un carril de giro en cada cuadra, las
+// flechas aparecian y se iban a cada rato. Como un giro para
+// stabilizeManeuver ({ kind: 'lanes', node, distanceMeters, lanes }), o null.
+function findQuietLanes() {
+  if (!routeLanes || !routeGraph || !currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !toLngLat) return null;
+  const pts = routeBehind.length ? routeBehind.concat(currentRouteWorldPoints) : currentRouteWorldPoints;
+  const here = routeBehind.length;
+  const { cum, pointAt } = routeMetrics(pts);
+  const bearingBetween = (p, q) => {
+    const [lng1, lat1] = toLngLat(p[0], p[1]);
+    const [lng2, lat2] = toLngLat(q[0], q[1]);
+    return geoBearingDeg(lng1, lat1, lng2, lat2);
+  };
+  const ctx = { pts, cum, pointAt, bearingBetween, nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency,
+    rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M };
+  const q = quietLanesAhead(pts, cum, here, NAV_QUIET_LANES_M, (i, iEnd) => {
+    const rec = laneRecordAt(pts, i, iEnd, (r) => laneKeepSide(r, true) != null);
+    return rec && sideExitToward({ ...ctx, i, iEnd }, 'right', -100, 100) ? rec : null;
+  }, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
+  return q ? { kind: 'lanes', direction: null, node: q.node, distanceMeters: q.distanceMeters, lanes: q.lanes } : null;
 }
 
 // El primer paso del cruce cuyos carriles cumplen `accept` (ver laneGuidanceAt).
@@ -4699,13 +4734,20 @@ function navTurnParts(turn) {
   }
   if (!info) return null;
   return { text: turnInstructionText(info, { t, imperial: useImperial, lang: currentLang }), next, info, nextCity: nextCityName || '',
-    lanes: laneHudRecord(turn && turn.lanes) };
+    lanes: laneHudRecord(navLanesFor(turn)) };
+}
+
+// Las flechas que van abajo del texto: las del giro, o con el giro en
+// seguir derecho, las del proximo cruce sin aviso (navQuietLanes).
+function navLanesFor(turn) {
+  if (turn) return turn.lanes || null;
+  return currentRouteWorldPoints && navQuietLanes ? navQuietLanes.lanes : null;
 }
 
 function navPanelHtml(turn) {
   const parts = navTurnParts(turn);
   if (!parts) return escapeHtml(t('navNoRoute'));
-  return escapeHtml(parts.text) + lanesHtml(turn && turn.lanes)
+  return escapeHtml(parts.text) + lanesHtml(navLanesFor(turn))
     + (parts.next ? `<span class="navNext">${escapeHtml(parts.next)}</span>` : '');
 }
 
@@ -5410,7 +5452,12 @@ function updateMap(position, game, gameHeadingDeg) {
   // celular o la PC donde este abierto el tablero).
   // El de OBS muestra el giro pero no guia: con el solo, la voz no habla.
   const guiando = navMode || !!pipWin || clientOverlayOn;
-  const turn = guiando || obsOverlayOn ? stabilizeManeuver(navManeuverState, findUpcomingTurn(), NAV_TURN_DEBOUNCE_TICKS) : null;
+  const giroAhora = guiando || obsOverlayOn ? findUpcomingTurn() : null;
+  const turn = guiando || obsOverlayOn ? stabilizeManeuver(navManeuverState, giroAhora, NAV_TURN_DEBOUNCE_TICKS) : null;
+  // Sin giro (ni uno a punto de aparecer), las flechas del proximo cruce
+  // donde no sirven todos los carriles: abajo de "Continue straight", sin voz.
+  navQuietLanes = guiando || obsOverlayOn
+    ? stabilizeManeuver(navQuietLanesState, giroAhora || turn ? null : findQuietLanes(), NAV_TURN_DEBOUNCE_TICKS) : null;
   if (turn) turnLog.push(turn, () => ({ t: Date.now(), truck: [position.x, position.z], text: (navTurnParts(turn) || {}).text }));
   if (guiando) voiceManeuverTick(turn);
   if (pipWin) pipTurnHtml = navPanelHtml(turn);

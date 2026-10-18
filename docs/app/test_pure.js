@@ -2817,6 +2817,32 @@ test('carriles: el carril de una rampa de entrada que se va por la salida siguie
   assert.equal(rampaAntes({ ...rampa, desde: 1 }), false);
 });
 
+test('carriles: sin giro, las flechas del proximo cruce donde no sirven todos (Ittikorn, Discord 18-10)', () => {
+  const { quietLanesAhead, routeMetrics } = require('./pure.js');
+  // hacia el norte por x = 0: el camion (2) entre cruces; cruces en z -100
+  // (nodos 3 y 4, un prefab), -400 (5) y -900 (6). [x, z, ferry, cruce, nodo]
+  const ruta = (ferry = -1) => [[0, 100, 0, 1, 0], [0, 50, 0, 0, 1], [0, 0, 0, 0, null], [0, -100, 0, 1, 3], [0, -120, 0, 1, 4],
+    [0, -400, ferry === 5 ? 1 : 0, 1, 5], [0, -900, 0, 1, 6], [0, -1200, 0, 0, 7]];
+  const correr = (pts, conCarriles, maxM = 500) => {
+    const { cum } = routeMetrics(pts);
+    const pedidos = [];
+    const q = quietLanesAhead(pts, cum, 2, maxM, (i, iEnd) => { pedidos.push([i, iEnd]); return conCarriles.includes(pts[i][4]) ? { count: 3 } : null; });
+    return { q, pedidos };
+  };
+  // el prefab de z -100 no tiene nada que mostrar: el de -400, a 400 m
+  let { q, pedidos } = correr(ruta(), [5, 6]);
+  assert.deepEqual([q.node, q.distanceMeters, q.lanes], [[0, -400], 400, { count: 3 }]);
+  // el prefab entero se pide una vez (nodos 3 y 4), y el cruce de atras no
+  assert.deepEqual(pedidos, [[3, 4], [5, 5]]);
+  // el primero que tiene flechas, aunque haya otro despues
+  assert.deepEqual(correr(ruta(), [3, 5]).q.node, [0, -100]);
+  // mas lejos que maxM, nada
+  assert.equal(correr(ruta(), [6]).q, null);
+  assert.equal(correr(ruta(), [5], 300).q, null);
+  // del otro lado de un ferry, nada
+  assert.equal(correr(ruta(5), [5, 6]).q, null);
+});
+
 test('carriles: para dibujar, de izquierda a derecha y cuales sirven', () => {
   const { laneGuidance, LANE_ARROW_BITS: B } = require('./pure.js');
   const g = laneGuidance({ count: 3, mask: 0b110, turn: B.right, arrows: [B.left, B.straight, B.straight | B.right] });
