@@ -2768,6 +2768,53 @@ test('carriles: keep left yendo derecho cuando el de la derecha sale (Discord, 1
   assert.equal(laneKeepSide(null), null);
   assert.equal(laneKeepSide(rec(0b1, [B.straight])), null);
   assert.equal(laneKeepSide(rec(0b01, [B.straight, 0])), null);
+  // sin la marca pero el carril entro por una rampa poco antes (laneFromOnRamp)
+  assert.equal(laneKeepSide({ ...rec(0b011, [B.straight, B.straight, B.slightRight]), drop: false }, true), 'left');
+  assert.equal(laneKeepSide({ ...rec(0b011, [B.straight, B.straight, B.right]), drop: false }, true), null);
+});
+
+// Una autopista hacia el norte (z baja) por x = 0: nodo 0 en z 400, el cruce
+// de antes (1) en z 200, un nodo en z 130 (2, otro cruce con salidaAntes) y
+// la salida del aviso (3) en z 70. otros: los nodos ([x, z]) desde el 5;
+// tramos: los suyos, dirigidos [a, b]. desde: los puntos de la ruta que ya
+// no estan (recortados de lo recorrido).
+function rampaAntes({ cruce = 200, otros = [], tramos = [], desde = 0, salidaAntes = false } = {}) {
+  const { laneFromOnRamp, routeMetrics } = require('./pure.js');
+  const ruta = [[0, 400], [0, cruce], [0, 130], [0, 70], [0, -300]];
+  const nodos = [...ruta, ...otros];
+  const cruces = new Set([1, 3, ...(salidaAntes ? [2] : [])]);
+  const pts = ruta.map((p, k) => [p[0], p[1], 0, cruces.has(k) ? 1 : 0, k]).slice(desde);
+  const sale = new Map(), llega = new Map();
+  const add = (a, b) => {
+    if (!sale.has(a)) sale.set(a, []);
+    sale.get(a).push([b]);
+    if (!llega.has(b)) llega.set(b, []);
+    llega.get(b).push(a);
+  };
+  for (let k = 0; k < ruta.length - 1; k++) add(k, k + 1);
+  for (const [a, b] of tramos) add(a, b);
+  if (salidaAntes) { nodos.push([40, 30]); add(2, nodos.length - 1); }
+  const { cum, pointAt } = routeMetrics(pts);
+  return laneFromOnRamp({ pts, cum, pointAt, i: 3 - desde, nodes: nodos, adjacency: { get: (k) => sale.get(k) || [] }, incoming: (k) => llega.get(k) || [] });
+}
+
+test('carriles: el carril de una rampa de entrada que se va por la salida siguiente (I-25 al norte de Raton, Discord 18-10)', () => {
+  // la rampa llega desde atras por la derecha y se suma en el cruce de antes
+  const rampa = { otros: [[60, 600], [20, 300]], tramos: [[5, 6], [6, 1]] };
+  assert.equal(rampaAntes(rampa), true);
+  // por la izquierda tambien (dos autopistas que se juntan)
+  assert.equal(rampaAntes({ ...rampa, otros: [[-60, 600], [-20, 300]] }), true);
+  // la entrada mas lejos que maxM: el carril pudo agregarse despues
+  assert.equal(rampaAntes({ ...rampa, cruce: 320, otros: [[60, 700], [20, 400]] }), false);
+  // donde empieza una autovia, el retorno del prefab llega pegado y parejo a
+  // la ruta, pero desde la calzada contraria, que va para adelante
+  assert.equal(rampaAntes({ otros: [[-20, -200], [-20, 180], [-10, 215]], tramos: [[5, 6], [6, 7], [7, 1]] }), false);
+  // entre la rampa y el aviso hay otra salida: el carril de la rampa se iba por ella
+  assert.equal(rampaAntes({ ...rampa, salidaAntes: true }), false);
+  // sin rampa, o sin el nodo de antes del cruce (recortado de lo recorrido):
+  // la calle por la que llega la ruta no es otra que se suma
+  assert.equal(rampaAntes(), false);
+  assert.equal(rampaAntes({ ...rampa, desde: 1 }), false);
 });
 
 test('carriles: para dibujar, de izquierda a derecha y cuales sirven', () => {
