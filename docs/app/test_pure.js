@@ -2165,6 +2165,41 @@ test('maneuver: rampa que sale a la derecha y cruza por arriba de la autopista, 
   assert.equal(detectManeuver(sinCruzar), null);
 });
 
+test('maneuver: el conector se parte en dos calzadas casi paralelas y la ruta toma la que se abre -> keep right (Council Bluffs, 17-10)', () => {
+  // del I-29 al I-80: a 120 m la ruta (la colectora) va 5 grados a la
+  // derecha y la otra (el I-80) 3 a la izquierda, 16 m entre las dos; por
+  // angulo no llegaba a forkMinDev ni a forkMinSep y no se decia nada
+  const geo = { route: [[0, -300], [0, 0], [10, 120], [14, 148], [20, 400]],
+                extraNodes: [[-6, 120], [-30, 400]], edges: [[1, 5], [5, 6]] };
+  const m = detectManeuver(scenario(geo));
+  assert.deepEqual([m.kind, m.direction, m.parallel], ['fork', 'right', true]);
+  // espejado: la ruta es la de la izquierda
+  const espejo = (p) => [-p[0], p[1]];
+  const izq = detectManeuver(scenario({ ...geo, route: geo.route.map(espejo), extraNodes: geo.extraNodes.map(espejo) }));
+  assert.deepEqual([izq.kind, izq.direction], ['fork', 'left']);
+});
+
+test('maneuver: bifurcacion pareja con los carriles del juego: manda la flecha de la rama de la ruta', () => {
+  const B = { straight: 4, slightRight: 8 };
+  const geo = { route: [[0, -300], [0, 0], [10, 120], [14, 148], [20, 400]],
+                extraNodes: [[-6, 120], [-30, 400]], edges: [[1, 5], [5, 6]] };
+  const flechas = (ruta, otra) => (a, b) => (a === 1 && b === 2 ? ruta : a === 1 && b === 5 ? otra : null);
+  // la rama de la ruta es la "slight right" del juego: keep right
+  const m = detectManeuver({ ...scenario(geo), laneTurn: flechas(B.slightRight, B.straight) });
+  assert.deepEqual([m.kind, m.direction], ['fork', 'right']);
+  // la de la ruta sigue derecho (la autopista dobla al lado de una rampa
+  // recta, I-15 en Helena): nada
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(B.straight, B.slightRight) }), null);
+  // sin flecha en la ruta y con flecha en la otra: la otra es la salida
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(null, B.slightRight) }), null);
+});
+
+test('maneuver: seguir por la autopista cuando sale una rampa suave -> nada (la ruta es la mas recta)', () => {
+  const ctx = scenario({ route: [[0, -300], [0, 0], [0, 120], [0, 400]],
+                         extraNodes: [[14, 120], [40, 400]], edges: [[1, 4], [4, 5]] });
+  assert.equal(detectManeuver(ctx), null);
+});
+
 test('layoutAnchor y layoutCss: un panel pegado abajo sigue pegado abajo con el mapa mas alto (Gargamosch, 11-10)', () => {
   const { layoutAnchor, layoutCss } = require('./pure.js');
   const area = { left: 0, top: 0, width: 400, height: 600 };

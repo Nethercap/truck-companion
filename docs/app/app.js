@@ -4084,6 +4084,15 @@ function findUpcomingTurn() {
     if (routeGraph.adjRev[k]) mids.reverse();
     return line.concat(mids, [routeGraph.nodeXY(b)]);
   } : null;
+  // La flecha de carril del juego para pasar de a a b (LANE_ARROW_BITS), o
+  // null si ese paso no tiene carriles: detectManeuver la usa para saber
+  // cual rama de una bifurcacion pareja es la que sigue.
+  const laneTurn = routeLanes && routeGraph ? (a, b) => {
+    const k = routeGraph.dirEdge(a, b);
+    if (k === -1) return null;
+    const rec = lanesForEdge(routeLanes, routeGraph.adjEdge[k], routeGraph.adjRev[k]);
+    return rec ? rec.turn : null;
+  } : null;
 
   // Se arranca por los nodos ya pasados: si el camion esta adentro de un
   // cruce, el grupo se arma entero y su giro se reconoce como ya hecho. Si
@@ -4123,7 +4132,7 @@ function findUpcomingTurn() {
       i = Math.max(iEnd, rb.leave);
       continue;
     }
-    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, edgeLine,
+    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, edgeLine, laneTurn,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     // Si ahi no hay nada que avisar, el prefab entero, de punta a punta de
     // su curva (junctionManeuver): partida en dos, una T se callaba.
@@ -4146,12 +4155,14 @@ function findUpcomingTurn() {
         lastKeep = { direction: keep.direction, atM: cum[i] };
       }
     }
-    if (m && m.kind === 'fork' && !m.inCurve && !m.laneKeep) {
+    if (m && m.kind === 'fork' && !m.inCurve && !m.laneKeep && !m.parallel) {
       // La bifurcacion se mide a 250 m: si en ese tramo hay un cruce con un
       // giro de verdad, lo que "se desvia" es ese giro, no una rampa - se
       // deja que el giro se anuncie por si mismo (una esquina de 90 grados
       // avisada como "keep left" 200 m antes confundia). La de un rulo
-      // (inCurve) ya se midio en el nodo: el rulo sigue doblando despues.
+      // (inCurve) ya se midio en el nodo: el rulo sigue doblando despues. La
+      // pareja (parallel) se midio a 100 m y con la flecha del carril: la
+      // salida de Odense que dobla al final de la rampa perdia su "keep right".
       for (let j = iEnd + 1; j < pts.length - 1 && cum[j] - cum[iEnd] <= NAV_FORK_LEG_M; j++) {
         if (pts[j][3] !== 1) continue;
         const jEnd = junctionClusterEnd(pts, cum, j, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);

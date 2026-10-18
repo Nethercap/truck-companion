@@ -81,6 +81,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Juntar siempre no: mezcla el giro con la curva de la calle de despues.
 - Una salida que a los 150 m vuelve por donde se vino (la calzada contraria
   donde termina una autovia) no es rama de una bifurcacion (`forkInCurve`).
+- Dos calzadas de un sentido que se separan casi paralelas (la colectora al
+  lado de la autopista) no llegan a los grados de una bifurcacion: si a 100 m
+  ya van a 10 m y la ruta toma la que se abre, es "keep" (`parallelFork`).
+  Con carriles manda la flecha del juego de la rama de la ruta (`laneTurn`
+  en el ctx): sin flecha a un costado, la ruta es la autopista y no se avisa.
 - Lo recorrido (`routeBehind`) incluye el comienzo de la ruta
   (`passedRoutePoints`); el simulador y `check_avisos` lo arman igual.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
