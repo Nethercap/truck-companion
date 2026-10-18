@@ -31,6 +31,10 @@ env:
 
 jobs:
   chequear:
+    # Solo en este repo: un fork con Actions prendido lo corria cada 10
+    # minutos contra nuestro relay, fallando sin los webhooks y con issues
+    # alla (vladimirkutkovoy, 31 corridas hasta el 17-10).
+    if: github.repository == 'Nethercap/truck-companion'
     runs-on: ubuntu-latest
     steps:
       - name: Probar los servicios

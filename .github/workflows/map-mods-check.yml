@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   check:
+    # Solo en este repo: en un fork hacia el commit del estado alla, sin
+    # nuestros secretos (vladimirkutkovoy, 12-10).
+    if: github.repository == 'Nethercap/truck-companion'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
