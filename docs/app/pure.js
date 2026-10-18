@@ -722,32 +722,63 @@ function stopInsertIndex(route, stop, count, maxOffM = 400) {
   return 0;
 }
 
-// Si el camion ya llego al primer waypoint (y se saca, como un GPS): paso a
-// menos de tapM del punto tocado, o la ruta que falta ya no lleva hasta el
-// final de su tramo (el nodo del grafo al que la ruta va por el waypoint)
-// mas de routeM. La ruta va al nodo mas cercano al toque: con un toque a mas
-// de 150 m del camino (en el celular, con el mapa alejado) se pasaba por
-// ese nodo, el waypoint quedaba puesto y cada recalculo, al salirse de la
-// ruta, mandaba a volver a el (reporte del 16-10, ATS + C2C). Se mide por la
-// ruta y no en linea recta: una rampa o una colectora corren a 30 m de la
-// autopista y no cuentan hasta que el camion va por ellas.
+// Si el camion ya llego al primer waypoint (y se saca, como un GPS). Con la
+// ruta de los waypoints de ahora se mide por la ruta: llega al pasar a menos
+// de routeM del punto de la ruta mas cerca del icono, buscado a
+// WAYPOINT_NODE_WINDOW_M de cada lado del nodo donde termina su tramo (o a
+// 1,5 veces lo que hay del nodo al icono, si es mas: una arista larga sin
+// nodos). La ruta va al nodo del grafo mas cercano al toque, que puede caer
+// antes o despues del icono. Un toque a mas de WAYPOINT_SNAP_M del camino (en el
+// celular, con el mapa alejado) llega en el nodo: antes quedaba puesto y
+// cada recalculo, al salirse de la ruta, mandaba a volver a el (reporte del
+// 16-10, ATS + C2C). Pasado el nodo, salirse de la ruta tambien es llegar,
+// por lo mismo. Una rampa o una colectora corren a 30 m de la autopista y no
+// cuentan hasta que el camion va por ellas.
+// En linea recta (tapM) solo sin ruta: 150 m del mundo son 3 km del juego a
+// 1:20 y el waypoint se iba casi 2 millas antes del icono (Discord,
+// Gargamosch, 18-10). Parado (speedKmh < 5) alcanza con stoppedM por la
+// ruta: estacionar un poco antes del nodo tambien es llegar.
 // route: la ruta recortada al camion con el tramo en p[5] (como
 // stopInsertIndex), o null si no es la de los waypoints de ahora.
-const WAYPOINT_ROUTE_END_M = 30;
-function waypointReached(x, z, wpPos, route, { tapM = 150, routeM = WAYPOINT_ROUTE_END_M } = {}) {
+const WAYPOINT_ROUTE_END_M = 10;
+const WAYPOINT_STOPPED_M = 50;
+const WAYPOINT_NODE_WINDOW_M = 100;
+const WAYPOINT_SNAP_M = 30;
+const WAYPOINT_OFF_ROUTE_M = 50;
+function waypointReached(x, z, wpPos, route, { tapM = 150, routeM = WAYPOINT_ROUTE_END_M, stoppedM = WAYPOINT_STOPPED_M, speedKmh = null } = {}) {
   if (!Array.isArray(wpPos) || !Number.isFinite(x) || !Number.isFinite(z)) return false;
-  if (Math.hypot(wpPos[0] - x, wpPos[1] - z) < tapM) return true;
-  if (!route || route.length < 2) return false;
-  // Ya en el tramo siguiente
-  if (Number(route[0][5]) > 0) return true;
-  let end = -1;
-  for (let k = route.length - 1; k >= 0; k--) {
-    if (Number(route[k][5]) === 0) { end = k; break; }
+  if (!route || route.length < 2 || !Number.isFinite(Number(route[0][5]))) return Math.hypot(wpPos[0] - x, wpPos[1] - z) < tapM;
+  const parado = Number.isFinite(speedKmh) && speedKmh < 5;
+  const llega = (faltaM) => faltaM <= routeM || (parado && faltaM <= stoppedM);
+  // Lo que falta por la ruta hasta el punto mas cerca del icono entre loM y
+  // hiM de lo que falta (null si el icono esta a mas de WAYPOINT_SNAP_M)
+  const alIcono = (loM, hiM) => {
+    let best = null;
+    for (let k = 1, m = 0; k < route.length && m <= hiM; k++) {
+      const ax = route[k - 1][0], az = route[k - 1][1], vx = route[k][0] - ax, vz = route[k][1] - az;
+      const L = Math.hypot(vx, vz);
+      if (L > 0 && m + L >= loM) {
+        const t = Math.max(Math.max(0, (loM - m) / L), Math.min(Math.min(1, (hiM - m) / L), ((wpPos[0] - ax) * vx + (wpPos[1] - az) * vz) / (L * L)));
+        const d = Math.hypot(wpPos[0] - ax - t * vx, wpPos[1] - az - t * vz);
+        // A la par, el primero: una ruta que vuelve por el mismo camino pasa dos veces
+        if (!best || d < best.d - 1) best = { m: m + t * L, d };
+      }
+      m += L;
+    }
+    return best && best.d <= WAYPOINT_SNAP_M ? best.m : null;
+  };
+  const ventana = (p) => Math.max(WAYPOINT_NODE_WINDOW_M, 1.5 * Math.hypot(wpPos[0] - p[0], wpPos[1] - p[1]));
+  if (Number(route[0][5]) > 0) {
+    // Ya paso el nodo: llega, salvo que el icono este un poco mas adelante
+    if (Math.hypot(x - route[0][0], z - route[0][1]) > WAYPOINT_OFF_ROUTE_M) return true;
+    const icono = alIcono(0, ventana(route[0]));
+    return icono == null || llega(icono);
   }
-  if (end < 0) return false;
-  let m = 0;
-  for (let k = 1; k <= end && m <= routeM; k++) m += Math.hypot(route[k][0] - route[k - 1][0], route[k][1] - route[k - 1][1]);
-  return m <= routeM;
+  let nodoM = 0, k = 1;
+  for (; k < route.length && Number(route[k][5]) === 0; k++) nodoM += Math.hypot(route[k][0] - route[k - 1][0], route[k][1] - route[k - 1][1]);
+  const w = ventana(route[k - 1]);
+  const icono = alIcono(Math.max(0, nodoM - w), nodoM + w);
+  return llega(icono == null ? nodoM : icono);
 }
 
 // Avisa una vez por carga de combustible: el tanque subio al menos minL
@@ -4045,6 +4076,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { turnPassed, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { turnPassed, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }
