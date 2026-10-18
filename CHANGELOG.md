@@ -9,6 +9,9 @@ updates on its own and is not versioned here.
 - LAN mode: dashboard files left read-only in the client's web cache (an unofficial mod does this
   so they are never replaced) no longer keep LAN mode on an old copy mixed with new files. The
   client updates them like the rest.
+- The download (zip on Windows, tarball on Linux) now includes the license (`LICENSE.txt`) and
+  `THIRD-PARTY-NOTICES.txt`, with the license of every library inside the program. The README
+  says where the source code is.
 
 ## 1.5.32 (2026-10-17)
 

@@ -269,3 +269,13 @@ directo desde el código fuente (requiere Python 3.10+):
 pip install -r requirements.txt
 python tray_client.py
 ```
+
+## Licencia
+
+Copyright (C) 2026 Nethercap (Truck Dash). Truck Dash es software libre bajo
+la GNU Affero General Public License v3.0 (`LICENSE.txt` en el zip): podés
+usarlo, cambiarlo y compartirlo bajo esa licencia, y viene sin garantía. El
+código está en <https://github.com/Nethercap/truck-companion>. La licencia
+cubre el código, no el nombre ni el logo de Truck Dash: una versión
+modificada lleva su propio nombre. `THIRD-PARTY-NOTICES.txt` lista el resto
+del software que va adentro de `TruckDash.exe`, cada uno con su licencia.
