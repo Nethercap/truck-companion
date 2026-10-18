@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import socket
+import stat
 import threading
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -108,6 +109,7 @@ def refresh_web_cache() -> bool:
     hay una copia servible (nueva o anterior)."""
     target = cache_dir()
     ok = 0
+    solo_lectura = []
     for rel in WEB_FILES:
         local = os.path.join(target, rel.replace("/", os.sep))
         os.makedirs(os.path.dirname(local), exist_ok=True)
@@ -120,11 +122,20 @@ def refresh_web_cache() -> bool:
         try:
             with red.abrir(f"{WEB_ORIGIN}/{rel}", timeout=15) as resp:
                 data = resp.read()
+            # Un mod (18-10) deja index.html, app.js, app.css y pure.js en
+            # solo lectura para que no se los pisen: al volver al cliente
+            # oficial quedaban los del mod mezclados con el resto nuevo y el
+            # modo LAN andaba raro. La cache es nuestra, se le saca.
+            if os.path.exists(local) and not os.access(local, os.W_OK):
+                os.chmod(local, os.stat(local).st_mode | stat.S_IWRITE)
+                solo_lectura.append(rel)
             with open(local, "wb") as f:
                 f.write(data)
             ok += 1
         except Exception as exc:
             logging.warning("No se pudo bajar %s para el modo LAN: %s", rel, exc)
+    if solo_lectura:
+        logging.warning("Web cache: estaban en solo lectura y se pisaron igual: %s", ", ".join(solo_lectura))
     if ok:
         logging.info("Web cache actualizada (%d/%d archivos)", ok, len(WEB_FILES))
     return os.path.exists(os.path.join(target, "app", "index.html"))

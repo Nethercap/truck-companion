@@ -4,6 +4,12 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- LAN mode: dashboard files left read-only in the client's web cache (an unofficial mod does this
+  so they are never replaced) no longer keep LAN mode on an old copy mixed with new files. The
+  client updates them like the rest.
+
 ## 1.5.32 (2026-10-17)
 
 - License: from this version Truck Dash is under the GNU AGPL v3 instead of MIT. Nothing changes for
