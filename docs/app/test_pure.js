@@ -2212,6 +2212,28 @@ test('maneuver: bifurcacion pareja con los carriles del juego: manda la flecha d
   assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(null, B.slightRight) }), null);
 });
 
+test('turnAfterFork: la curva callada de la rampa no tapa la salida (I-25 en Walsenburg, Discord 18-10)', () => {
+  const { turnAfterFork } = require('./pure.js');
+  // la ruta sale a la derecha en el nodo 1 (la autopista sigue derecho por
+  // 6-7) y a 180 m la rampa dobla 47 grados a la izquierda en el nodo 3
+  const geo = (otra) => {
+    const ctx = scenario({ route: [[0, -300], [0, 0], [15, 100], [30, 180], [-60, 300], [-200, 450]],
+      extraNodes: [[-5, 150], [-5, 600], ...otra], edges: [[1, 6], [6, 7], [3, 8], [8, 9]] });
+    ctx.pts[3][3] = 1;
+    return ctx;
+  };
+  // en el nodo 3 solo sale otra calle que vuelve para atras: el giro se
+  // calla, no se anuncia, y la salida tiene que avisarse
+  assert.equal(turnAfterFork(geo([[100, 100], [150, 0]]), 1), false);
+  // una calle que sigue derecho al norte: el giro de la rampa se anuncia y
+  // la salida se deja (como antes)
+  assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1), true);
+  // sin grafo no se sabe si se calla: cuenta
+  assert.equal(turnAfterFork({ ...geo([[100, 100], [150, 0]]), adjacency: null }, 1), true);
+  // el giro mas lejos que legM no cuenta
+  assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1, 150), false);
+});
+
 test('maneuver: seguir por la autopista cuando sale una rampa suave -> nada (la ruta es la mas recta)', () => {
   const ctx = scenario({ route: [[0, -300], [0, 0], [0, 120], [0, 400]],
                          extraNodes: [[14, 120], [40, 400]], edges: [[1, 4], [4, 5]] });

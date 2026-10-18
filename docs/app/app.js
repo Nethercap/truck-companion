@@ -4198,13 +4198,9 @@ function findUpcomingTurn() {
       // (inCurve) ya se midio en el nodo: el rulo sigue doblando despues. La
       // pareja (parallel) se midio a 100 m y con la flecha del carril: la
       // salida de Odense que dobla al final de la rampa perdia su "keep right".
-      for (let j = iEnd + 1; j < pts.length - 1 && cum[j] - cum[iEnd] <= NAV_FORK_LEG_M; j++) {
-        if (pts[j][3] !== 1) continue;
-        const jEnd = junctionClusterEnd(pts, cum, j, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
-        const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd, adjacency: null });
-        if (mj && mj.kind === 'turn') { m = null; break; }
-        j = jEnd;
-      }
+      // Un giro callado (la curva de la rampa) no se anuncia y no cuenta
+      // (turnAfterFork): la salida 50 de Walsenburg quedaba sin nada.
+      if (turnAfterFork(ctx, iEnd, NAV_FORK_LEG_M, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here, NAV_JUNCTION_CURVE_SPAN_M)) m = null;
     }
     if (continuesTurn(prevTurn, m, cum[i], NAV_TURN_LEG_M + 20, 135, NAV_TURN_ANGLE_THRESHOLD_DEG)) {
       prevTurn.end = cum[iEnd]; // la segunda mitad de la misma esquina
@@ -4282,9 +4278,12 @@ function laneKeepAt(pts, i, iEnd, fromRamp = false) {
 // Las flechas del proximo cruce sin aviso (quietLanesAhead en pure.js), para
 // mostrar con "Continue straight": solo salidas de autopista (laneKeepSide,
 // sin la marca del constructor: no se dice nada, solo se ven), y con otra
-// salida que se aleja de verdad, como los "keep" por carriles. Las de doblar
-// en una esquina de ciudad no: con un carril de giro en cada cuadra, las
-// flechas aparecian y se iban a cada rato. Como un giro para
+// salida que se aleja de verdad, como los "keep" por carriles. Y solo si el
+// carril de la ruta sigue derecho: si va a la salida, el panel diria
+// "Continue straight" con las flechas de salir (Walsenburg, antes de que se
+// anunciara esa salida; ver turnAfterFork). Las de doblar en una esquina de
+// ciudad no: con un carril de giro en cada cuadra, las flechas aparecian y
+// se iban a cada rato. Como un giro para
 // stabilizeManeuver ({ kind: 'lanes', node, distanceMeters, lanes }), o null.
 function findQuietLanes() {
   if (!routeLanes || !routeGraph || !currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !toLngLat) return null;
@@ -4299,7 +4298,7 @@ function findQuietLanes() {
   const ctx = { pts, cum, pointAt, bearingBetween, nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency,
     rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M };
   const q = quietLanesAhead(pts, cum, here, NAV_QUIET_LANES_M, (i, iEnd) => {
-    const rec = laneRecordAt(pts, i, iEnd, (r) => laneKeepSide(r, true) != null);
+    const rec = laneRecordAt(pts, i, iEnd, (r) => (r.turn & LANE_ARROW_BITS.straight) && laneKeepSide(r, true) != null);
     return rec && sideExitToward({ ...ctx, i, iEnd }, 'right', -100, 100) ? rec : null;
   }, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
   return q ? { kind: 'lanes', direction: null, node: q.node, distanceMeters: q.distanceMeters, lanes: q.lanes } : null;
