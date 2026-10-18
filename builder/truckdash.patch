@@ -548,7 +548,7 @@ index ece847d..8b709b6 100644
 +  return value;
 +}
 diff --git a/packages/clis/parser/game-files/def-parser.ts b/packages/clis/parser/game-files/def-parser.ts
-index 4094551..e63aa42 100644
+index 4094551..0ab0ec9 100644
 --- a/packages/clis/parser/game-files/def-parser.ts
 +++ b/packages/clis/parser/game-files/def-parser.ts
 @@ -101,7 +101,18 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
@@ -726,7 +726,7 @@ index 4094551..e63aa42 100644
 -    nameLocalized: rawCity.cityNameLocalized,
 +    // fallback a cityName si el mod no trae nombre localizado (ver comentario
 +    // en CitySiiSchema, sii-schemas.ts)
-+    nameLocalized: rawCity.cityNameLocalized ?? rawCity.cityName,
++    nameLocalized: localeTokenOr(rawCity.cityNameLocalized, rawCity.cityName),
      countryToken: rawCity.country,
      population: rawCity.population ?? 0,
    };
@@ -806,6 +806,15 @@ index 4094551..e63aa42 100644
      const ferryConnection = json.ferryConnection;
      const key = Object.keys(ferryConnection)[0];
      // key is expected to be in form: "conn.source_token.dest_token"
+@@ -575,7 +662,7 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+   return {
+     token,
+     name: rawFerry.ferryName,
+-    nameLocalized: rawFerry.ferryNameLocalized,
++    nameLocalized: localeTokenOr(rawFerry.ferryNameLocalized, undefined),
+     connections,
+   };
+ }
 @@ -589,9 +676,15 @@ function processPrefabJson(
      return new Map();
    }
@@ -850,6 +859,20 @@ index 4094551..e63aa42 100644
      if (ppd.mapPoints.some(p => p.type === 'polygon')) {
        // TODO figure out a way to get building footprint information for
        //  polygons in prefabs that look like buildings.
+@@ -1094,3 +1205,13 @@ function processMileageTargetJson(
+   }
+   return mileageTargets;
+ }
++
++// Un nombre localizado es un token @@...@@. Algunos mods (ej. EAA) ponen el
++// nombre ya escrito en ese campo: ese no se busca en las traducciones (salia
++// "no localized name") y se usa el nombre del def.
++function localeTokenOr<T extends string | undefined>(
++  value: string | undefined,
++  fallback: T,
++): string | T {
++  return value && /^@@.+@@$/.test(value) ? value : fallback;
++}
 diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
 index b65d4c8..05a7a61 100644
 --- a/packages/clis/parser/game-files/map-files-parser.ts
@@ -2362,19 +2385,24 @@ index 73a4a8f..a5c0605 100644
    readonly type = 'directory';
    readonly subdirectories: readonly string[];
 diff --git a/packages/clis/parser/game-files/sii-schemas.ts b/packages/clis/parser/game-files/sii-schemas.ts
-index b8accdc..564519e 100644
+index b8accdc..8bec80f 100644
 --- a/packages/clis/parser/game-files/sii-schemas.ts
 +++ b/packages/clis/parser/game-files/sii-schemas.ts
-@@ -116,7 +116,7 @@ const numberQuadruple = fixedLengthArray(number, 4);
+@@ -115,8 +115,12 @@ const numberTriple = fixedLengthArray(number, 3);
+ const numberQuadruple = fixedLengthArray(number, 4);
  const stringArray = arrayOf(string);
  const localeToken = stringPattern(/^@@.+@@$/);
++// Nombre de ciudad o ferry: un token @@...@@ o, en algunos mods (ej. EAA), el
++// nombre ya escrito ("Aparecida"). El juego acepta los dos; def-parser.ts usa
++// solo los @@...@@ para buscar la traduccion.
++const localeTokenOrName = string;
  const token = {
 -  ...stringPattern(/^[0-9a-z_]{1,12}$/),
 +  ...stringPattern(/^[0-9a-zA-Z_.]{1,40}$/),
    // ETS2 has some country and city names (e.g. Hungary, Odense) as capitalized
    // tokens. Lowercase them so they're valid tokens.
    transform: ['toLowerCase'],
-@@ -136,7 +136,7 @@ export interface VersionSii {
+@@ -136,7 +140,7 @@ export interface VersionSii {
    >;
  }
  export const VersionSiiSchema: JSONSchemaType<VersionSii> = object({
@@ -2383,7 +2411,7 @@ index b8accdc..564519e 100644
      application: stringEnum('ats', 'eut2'),
      version: stringPattern(/^\d+(\.\d+){3}$/),
    }),
-@@ -152,7 +152,7 @@ export interface RouteSii {
+@@ -152,7 +156,7 @@ export interface RouteSii {
    >;
  }
  export const RouteSiiSchema: JSONSchemaType<RouteSii> = object({
@@ -2392,7 +2420,7 @@ index b8accdc..564519e 100644
      fromCity: token,
      toCity: token,
    }),
-@@ -168,9 +168,9 @@ export interface OversizeOfferSii {
+@@ -168,9 +172,9 @@ export interface OversizeOfferSii {
    >;
  }
  export const OversizeOfferSiiSchema: JSONSchemaType<OversizeOfferSii> = object({
@@ -2405,7 +2433,7 @@ index b8accdc..564519e 100644
    }),
  });
  
-@@ -320,7 +320,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+@@ -320,7 +324,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
      ),
      achievementDeliveryLogData: nullable(
        patternRecord(
@@ -2414,7 +2442,7 @@ index b8accdc..564519e 100644
          {
            sourceCompanies: nullable(stringArray),
            cargos: nullable(stringArray),
-@@ -332,15 +332,15 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+@@ -332,15 +336,15 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
        ),
      ),
      achievementDelivery: nullable(
@@ -2433,7 +2461,7 @@ index b8accdc..564519e 100644
          {
            companyName: token,
            cityName: nullable(token),
-@@ -351,7 +351,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+@@ -351,7 +355,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
      ),
      achievementEachCompanyData: nullable(
        patternRecord(
@@ -2442,7 +2470,7 @@ index b8accdc..564519e 100644
          {
            targets: nullable(stringArray),
            sources: nullable(stringArray),
-@@ -361,20 +361,20 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+@@ -361,20 +365,20 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
        ),
      ),
      achievementTriggerData: nullable(
@@ -2466,7 +2494,7 @@ index b8accdc..564519e 100644
          sources: stringArray,
          targets: stringArray,
          achievementName: string,
-@@ -382,7 +382,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+@@ -382,7 +386,7 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
      ),
      achievementFerryData: nullable(
        patternRecord(
@@ -2475,7 +2503,7 @@ index b8accdc..564519e 100644
          {
            endpointA: nullable(token),
            endpointB: nullable(token),
-@@ -393,13 +393,13 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
+@@ -393,13 +397,13 @@ export const AchievementsSiiSchema: JSONSchemaType<AchievementsSii> = object(
        ),
      ),
      achievementDeliveryPointCity: nullable(
@@ -2491,7 +2519,7 @@ index b8accdc..564519e 100644
          achievementName: string,
        }),
      ),
-@@ -480,7 +480,7 @@ export interface FerrySii {
+@@ -480,10 +484,10 @@ export interface FerrySii {
  }
  export const FerrySiiSchema: JSONSchemaType<FerrySii> = object({
    ferryData: patternRecord(
@@ -2499,8 +2527,12 @@ index b8accdc..564519e 100644
 +    /^ferry\.[0-9a-zA-Z_.]{1,40}$/,
      {
        ferryName: string,
-       ferryNameLocalized: nullable(localeToken),
-@@ -493,7 +493,7 @@ export interface CompanySii {
+-      ferryNameLocalized: nullable(localeToken),
++      ferryNameLocalized: nullable(localeTokenOrName),
+     },
+     ['ferryName'],
+   ),
+@@ -493,7 +497,7 @@ export interface CompanySii {
    companyPermanent: Record<string, { name: string }>;
  }
  export const CompanySiiSchema: JSONSchemaType<CompanySii> = object({
@@ -2509,7 +2541,7 @@ index b8accdc..564519e 100644
      name: string,
    }),
  });
-@@ -524,7 +524,7 @@ export const CountrySiiSchema: JSONSchemaType<CountrySii> = object(
+@@ -524,7 +528,7 @@ export const CountrySiiSchema: JSONSchemaType<CountrySii> = object(
    {
      countryData: nullable(
        patternRecord(
@@ -2518,7 +2550,7 @@ index b8accdc..564519e 100644
          {
            name: string,
            nameLocalized: localeToken,
-@@ -558,7 +558,13 @@ export interface CitySii {
+@@ -558,7 +562,13 @@ export interface CitySii {
      string,
      {
        cityName: string;
@@ -2533,7 +2565,7 @@ index b8accdc..564519e 100644
        country: string;
        population?: number;
      }
-@@ -568,14 +574,14 @@ export const CitySiiSchema: JSONSchemaType<CitySii> = object(
+@@ -568,14 +578,14 @@ export const CitySiiSchema: JSONSchemaType<CitySii> = object(
    {
      cityData: nullable(
        patternRecord(
@@ -2542,7 +2574,7 @@ index b8accdc..564519e 100644
          {
            cityName: string,
 -          cityNameLocalized: localeToken,
-+          cityNameLocalized: nullable(localeToken),
++          cityNameLocalized: nullable(localeTokenOrName),
            country: token,
            population: nullable(integer),
          },
@@ -2551,7 +2583,7 @@ index b8accdc..564519e 100644
        ),
      ),
    },
-@@ -601,7 +607,7 @@ export const MileageTargetsSiiSchema: JSONSchemaType<MileageTargetsSii> =
+@@ -601,7 +611,7 @@ export const MileageTargetsSiiSchema: JSONSchemaType<MileageTargetsSii> =
    object(
      {
        mileageTarget: patternRecord(
@@ -2560,7 +2592,7 @@ index b8accdc..564519e 100644
          {
            editorName: string,
            defaultName: string,
-@@ -648,7 +654,7 @@ export interface ViewpointsSii {
+@@ -648,7 +658,7 @@ export interface ViewpointsSii {
  }
  export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
    photoAlbumItem: patternRecord(
@@ -2569,7 +2601,7 @@ index b8accdc..564519e 100644
      {
        name: localeToken,
        dlcId: token,
-@@ -656,7 +662,7 @@ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
+@@ -656,7 +666,7 @@ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
      },
    ),
    photoAlbumGroup: patternRecord(
@@ -2578,7 +2610,7 @@ index b8accdc..564519e 100644
      {
        name: localeToken,
        items: stringArray,
-@@ -679,7 +685,7 @@ interface FerryConnectionSii {
+@@ -679,7 +689,7 @@ interface FerryConnectionSii {
  export const FerryConnectionSiiSchema: JSONSchemaType<FerryConnectionSii> =
    object({
      ferryConnection: patternRecord(
@@ -2587,7 +2619,7 @@ index b8accdc..564519e 100644
        {
          price: number,
          time: number,
-@@ -705,7 +711,7 @@ export const PrefabSiiSchema: JSONSchemaType<PrefabSii> = object(
+@@ -705,7 +715,7 @@ export const PrefabSiiSchema: JSONSchemaType<PrefabSii> = object(
    {
      prefabModel: nullable(
        patternRecord(
@@ -2596,7 +2628,7 @@ index b8accdc..564519e 100644
          {
            prefabDesc: string,
            modelDesc: string,
-@@ -725,7 +731,7 @@ export const ModelSiiSchema: JSONSchemaType<ModelSii> = object(
+@@ -725,7 +735,7 @@ export const ModelSiiSchema: JSONSchemaType<ModelSii> = object(
    {
      modelDef: nullable(
        patternRecord(
@@ -2605,7 +2637,7 @@ index b8accdc..564519e 100644
          {
            modelDesc: nullable(string),
            vegetationModel: nullable(string),
-@@ -761,7 +767,7 @@ export const RoadLookSiiSchema: JSONSchemaType<RoadLookSii> = object(
+@@ -761,7 +771,7 @@ export const RoadLookSiiSchema: JSONSchemaType<RoadLookSii> = object(
    {
      roadLook: nullable(
        patternRecord(
@@ -2614,7 +2646,7 @@ index b8accdc..564519e 100644
          {
            name: string,
            lanesLeft: nullable(stringArray),
-@@ -830,7 +836,11 @@ export interface CityCompanySii {
+@@ -830,7 +840,13 @@ export interface CityCompanySii {
    companyDef: Record<string, { city: string }>;
  }
  export const CityCompanySiiSchema: JSONSchemaType<CityCompanySii> = object({
@@ -2623,23 +2655,25 @@ index b8accdc..564519e 100644
 +  // tokens de ciudad con mayusculas (ej. .lonepineMt para "Lonepine Mt"),
 +  // que el juego acepta pero el patron original (pensado solo para tokens
 +  // vainilla, siempre en minuscula) rechazaba como "additional property".
-+  companyDef: patternRecord(/^\.[0-9a-zA-Z_.]{1,40}$/, {
++  // Punto inicial opcional: algunos mods (ej. EAA) nombran estas unidades
++  // sin punto ("live_cattle") o como _nameless.XXXX.XXXX; el nombre no se usa.
++  companyDef: patternRecord(/^\.?[0-9a-zA-Z_.]{1,40}$/, {
      city: token,
    }),
  });
-@@ -839,9 +849,9 @@ export interface CargoDefSii {
+@@ -839,9 +855,9 @@ export interface CargoDefSii {
    cargoDef: Record<string, { cargo: string }>;
  }
  export const CargoDefSiiSchema: JSONSchemaType<CargoDefSii> = object({
 -  cargoDef: patternRecord(/^\.[0-9a-z_]{1,12}$/, {
-+  cargoDef: patternRecord(/^\.[0-9a-zA-Z_.]{1,40}$/, {
++  cargoDef: patternRecord(/^\.?[0-9a-zA-Z_.]{1,40}$/, {
      // Note: more information (like l18n strings) for `cargo.foo` can be found in defs/cargo/foo.sui.
 -    cargo: stringPattern(/^cargo\.[0-9a-z_]{1,12}$/),
 +    cargo: stringPattern(/^cargo\.[0-9a-zA-Z_.]{1,40}$/),
    }),
  });
  
-@@ -864,7 +874,7 @@ export interface CargoDataSii {
+@@ -864,7 +880,7 @@ export interface CargoDataSii {
  }
  export const CargoDataSiiSchema: JSONSchemaType<CargoDataSii> = object({
    cargoData: patternRecord(
@@ -2648,7 +2682,7 @@ index b8accdc..564519e 100644
      {
        name: string, // should be `localeToken`, but Valentines cargo :(
        volume: number,
-@@ -895,9 +905,12 @@ export const SignSiiSchema: JSONSchemaType<SignSii> = object(
+@@ -895,9 +911,12 @@ export const SignSiiSchema: JSONSchemaType<SignSii> = object(
    {
      signModel: nullable(
        patternRecord(
