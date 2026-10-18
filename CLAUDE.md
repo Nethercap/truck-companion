@@ -106,6 +106,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   entrada a un anillo (`ringThrough`): solo tramos de un sentido y sin
   repetir nodos. Con cualquier camino dirigido, toda esquina con un brazo
   muerto de prefab parecia una rotonda (Discord, 17-10, Oregon).
+  Tampoco la esquina en escuadra (60 a 120 grados entre tramos rectos) de
+  una cruz con dos brazos muertos: la calle se termina y hay que doblar
+  (salida 115 de Rockford, Discord 18-10, Gargamosch). Con un brazo muerto o
+  con la calle curvandose (sierras, zigzags), callada.
 - Los puntos de la curva de un prefab cortan el grupo de nodos de cruce
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.

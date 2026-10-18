@@ -1050,6 +1050,16 @@ function detectManeuver(ctx) {
   const forkTurnAltMaxDeg = ctx.forkTurnAltMaxDeg != null ? ctx.forkTurnAltMaxDeg : 20;
   const turnAltMaxDeg = ctx.turnAltMaxDeg != null ? ctx.turnAltMaxDeg : 150;
   const turnNaturalMargin = ctx.turnNaturalMargin != null ? ctx.turnNaturalMargin : 45;
+  // Una esquina de 60 a 120 grados entre dos tramos rectos: lo que hay de 0
+  // a legM del cruce va para el mismo lado (a menos de straightLegDeg) que lo
+  // que hay de legM a 2 legM, antes y despues.
+  const straightLegDeg = ctx.straightLegDeg != null ? ctx.straightLegDeg : 20;
+  const esquinaEnEscuadra = () => {
+    if (Math.abs(delta) < 60 || Math.abs(delta) > 120 || cum[i] < 2 * legM || cum[iEnd] + 2 * legM > cum[cum.length - 1]) return false;
+    const antes = bearingBetween(pointAt(cum[i] - 2 * legM), pointAt(cum[i] - legM));
+    const despues = bearingBetween(pointAt(cum[iEnd] + legM), pointAt(cum[iEnd] + 2 * legM));
+    return Math.abs(normDeg(antes - inBearing)) < straightLegDeg && Math.abs(normDeg(despues - outBearing)) < straightLegDeg;
+  };
   const rejoinM = ctx.rejoinM != null ? ctx.rejoinM : 100;
   const escapeM = ctx.escapeM != null ? ctx.escapeM : 120;
   const forkFarLegM = ctx.forkFarLegM != null ? ctx.forkFarLegM : forkLegM * 2;
@@ -1065,12 +1075,13 @@ function detectManeuver(ctx) {
   // geometria de la curva, que no tienen indice de nodo. Cada salida se
   // mide lejos (un salto mas por la mas recta si el primer vecino esta a
   // menos de forkLegM): una rampa se separa de a poco.
-  let alts = null, exits = null;
+  let alts = null, exits = null, deads = null;
   const onRoute = new Set();
   // [k, nodo del cruce, primer nodo de la salida] de cada otra salida.
   const altExits = () => {
     if (exits) return exits;
     exits = [];
+    deads = [];
     for (let k = i; k <= iEnd; k++) if (pts[k][4] != null) onRoute.add(pts[k][4]);
     for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
     for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { onRoute.add(pts[k][4]); break; }
@@ -1087,7 +1098,8 @@ function detectManeuver(ctx) {
       const idx = pts[k][4];
       if (idx == null) continue;
       for (const [n] of (adjacency.get(idx) || [])) {
-        if (!ahead.has(n) && escapes(idx, n)) exits.push([k, idx, n]);
+        if (ahead.has(n)) continue;
+        if (escapes(idx, n)) exits.push([k, idx, n]); else deads.push([k, idx, n]);
       }
     }
     return exits;
@@ -1222,6 +1234,17 @@ function detectManeuver(ctx) {
       const alt = straightestAlt(turnAltMaxDeg);
       quiet = alt == null || Math.abs(alt) >= Math.abs(delta) + turnNaturalMargin;
       if (quiet && entersRing()) quiet = false;
+      // Tampoco la esquina en escuadra de una cruz con dos brazos muertos (el
+      // prefab tiene cuatro brazos y dos sin calle): la calle se termina ahi y
+      // hay que doblar. Decia "Continue straight" donde termina la calle del
+      // puente de la salida 115 de Rockford (ATS, 28824,-18008, Discord 18-10,
+      // Gargamosch). Con un brazo muerto, o con la calle curvandose antes o
+      // despues (sierras, horquillas, zigzags), sigue callado: asi decia "turn"
+      // en curvas sin otro camino (Discord 17-10, Oregon; check_avisos).
+      if (quiet && alt == null && esquinaEnEscuadra()) {
+        altExits();
+        if (new Set(deads.map(([, , n]) => n)).size >= 2) quiet = false;
+      }
       // Salvo que la otra salida arranque pareja con la ruta: es una
       // bifurcacion en una curva (el rulo de un trebol que se abre en dos
       // rampas, Burgos y Kotka en las simulaciones del 15-10), no una calle
