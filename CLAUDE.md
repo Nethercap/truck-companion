@@ -64,6 +64,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
   sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco
   entre dos cajas de ciudad.
+- Escala de ciudad (`createCityScale`): cada caja cuenta 30 m mas de cada
+  lado (`CITY_MARGIN_M`) y el hueco entre dos cajas va a 1:20
+  (`CITY_GAP_M` = 0). Sale de medir el GPS del juego con la posicion del
+  "Copy turn report" (Sidney NE, 17-10): antes de mover esos numeros,
+  medir asi otro lugar.
 - Rotondas: `detectRoundabout` descarta anillos con lados rectos largos
   (`longestStraightFrac`: manzanas y colectoras de una mano) y prefabs
   compactos sin isla (`compactIslandM`: cruces de ATS con curvas cuadradas).

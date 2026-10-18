@@ -1617,7 +1617,7 @@ test('createCityScale: adentro de las cajas de ciudad el juego va a 1:3', () => 
   assert.equal(CITY_SCALE, 3);
   // Una ciudad de 2 km x 2 km con la esquina en (0, 0), y otra caja chica
   // que cruza el borde de una celda de la grilla.
-  const escala = createCityScale([[0, 0, 2000, 2000], [2950, 950, 100, 100]], { outside: 20 });
+  const escala = createCityScale([[0, 0, 2000, 2000], [2950, 950, 100, 100]], { outside: 20, margin: 0 });
   assert.equal(escala.at(1000, 1000), 3);
   assert.equal(escala.at(2000, 2000), 3);   // el borde es ciudad
   assert.equal(escala.at(2001, 1000), 20);
@@ -1651,20 +1651,20 @@ test('createCityScale: adentro de las cajas de ciudad el juego va a 1:3', () => 
   assert.equal(createCityScale([[0, 0, 0, 100], [5, 5], null], { outside: 20 }).at(0, 50), 20);
 });
 
-test('createCityScale: un hueco corto entre dos cajas de la misma ciudad es ciudad', () => {
+test('createCityScale: con gapM, un hueco corto entre dos cajas de la misma ciudad es ciudad', () => {
   const { createCityScale, CITY_GAP_M } = require('./pure.js');
-  assert.equal(CITY_GAP_M, 500);
+  assert.equal(CITY_GAP_M, 0); // apagado desde el 17-10 (Sidney NE): ver el test de las cajas con margen
   // Rockford (Discord, 14-10): de la caja del oeste (hasta x = 27389) a la
   // del este (desde x = 27654) hay 265 m de calle sin caja, y el GPS del
   // juego decia 4,0 mi: todo a 1:3. Con el hueco a 1:20 serian 6,6.
-  const escala = createCityScale([[26841, -20470, 548, 1319], [27654, -19953, 578, 855]], { outside: 20 });
+  const escala = createCityScale([[26841, -20470, 548, 1319], [27654, -19953, 578, 855]], { outside: 20, gapM: 500, margin: 0 });
   const cruce = [[27000, -19940], [27389, -19940], [27654, -19940], [28000, -19940]];
   assert.ok(Math.abs(escala.pathMeters(cruce) - 1000 * 3) < 1e-6);
   // Hasta el proximo giro, adentro del hueco: el hueco ya cuenta como ciudad
   // aunque el tope corte antes de la otra caja.
   assert.ok(Math.abs(escala.pathMeters(cruce, 500) - 500 * 3) < 1e-6);
   // Un hueco largo (otra ciudad, o la ruta entre dos barrios lejos) no.
-  const lejos = createCityScale([[0, 0, 1000, 1000], [1800, 0, 1000, 1000]], { outside: 20 });
+  const lejos = createCityScale([[0, 0, 1000, 1000], [1800, 0, 1000, 1000]], { outside: 20, gapM: 500, margin: 0 });
   assert.ok(Math.abs(lejos.pathMeters([[500, 500], [2300, 500]]) - (500 * 3 + 800 * 20 + 500 * 3)) < 1e-6);
   // Las puntas no se rellenan: salir de la ciudad sigue a 1:20 desde la caja,
   // y arrancar afuera tambien.
@@ -1672,9 +1672,27 @@ test('createCityScale: un hueco corto entre dos cajas de la misma ciudad es ciud
   assert.ok(Math.abs(lejos.pathMeters([[-200, 500], [500, 500]]) - (200 * 20 + 500 * 3)) < 1e-6);
 });
 
+test('createCityScale: las cajas cuentan 30 m mas de cada lado y los huecos van a 1:20 (Sidney NE, 17-10)', () => {
+  const { createCityScale, CITY_MARGIN_M } = require('./pure.js');
+  assert.equal(CITY_MARGIN_M, 30);
+  // Gargamosch midio el GPS del juego a EliMax en tres puntos de la US-385
+  // (7, 5 y 2 mi). Con los huecos de 150, 210 y 200 m entre cajas rellenos
+  // a 1:3 la app decia 3,1, 1,9 y 0,8; asi da 7,1, 4,9 y 2,1.
+  const escala = createCityScale([[0, 0, 100, 100], [300, 0, 100, 100]], { outside: 20, step: 1 });
+  assert.equal(escala.at(129, 50), 3);
+  assert.equal(escala.at(131, 50), 20);
+  assert.equal(escala.at(-29, 50), 3);
+  assert.equal(escala.at(50, 131), 20);
+  // de una caja a la otra: 80 m de ciudad, 140 m del hueco a 1:20, 80 de ciudad
+  assert.ok(Math.abs(escala.pathMeters([[50, 50], [350, 50]]) - (160 * 3 + 140 * 20)) < 1e-6);
+  // dos cajas a menos de 60 m quedan pegadas
+  const pegadas = createCityScale([[0, 0, 100, 100], [150, 0, 100, 100]], { outside: 20, step: 1 });
+  assert.ok(Math.abs(pegadas.pathMeters([[50, 50], [200, 50]]) - 150 * 3) < 1e-6);
+});
+
 test('createCityScale: el primer tramo de la ruta recortada se mide cada vez', () => {
   const { createCityScale } = require('./pure.js');
-  const escala = createCityScale([[0, 0, 1000, 1000]], { outside: 20 });
+  const escala = createCityScale([[0, 0, 1000, 1000]], { outside: 20, margin: 0 });
   // Un tramo largo que sale de la ciudad: 500 m adentro, 500 afuera.
   const fin = [1500, 500];
   const ruta = [[0, 500], [500, 500], fin];
@@ -3205,7 +3223,7 @@ test('createCityScale: lo que falta medido sobre la ruta entera no salta al entr
   // hueco, caja. Medido sobre la ruta recortada, al entrar al hueco el resto
   // pasaba a 1:20 y la distancia al giro subia de 1 km a 6,5.
   const { createCityScale } = require('./pure.js');
-  const escala = createCityScale([[0, 0, 1000, 1000], [1300, 0, 1000, 1000]], { outside: 20 });
+  const escala = createCityScale([[0, 0, 1000, 1000], [1300, 0, 1000, 1000]], { outside: 20, gapM: 500, margin: 0 });
   const ruta = [[200, 500], [1000, 500], [1300, 500], [2000, 500], [3000, 500]];
   const total = escala.routeMeters(ruta, ruta);
   assert.ok(Math.abs(total - ((800 + 300 + 1000) * 3 + 700 * 20)) < 1e-6); // el hueco a 1:3
