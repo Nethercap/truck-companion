@@ -39,7 +39,7 @@ GUIDE_TEXT.de = {
 </ol>
 <p>Der Code läuft nach 10 Minuten ab, wenn ihn niemand benutzt. Einmal verbunden, bleibt die Sitzung aktiv, bis du den Client beendest.</p>
 <h3>Gleiches WLAN: geringste Latenz</h3>
-<p>Einrichtung &amp; Status zeigt auch eine lokale Adresse und einen QR-Code. Scanne ihn mit dem Handy und du bist drin: ohne Pairing-Code, und es läuft weiter, auch wenn das Internet ausfällt. Windows fragt einmal, ob es durch die Firewall darf.</p>
+<p>Einrichtung &amp; Status hat einen Bereich fürs gleiche WLAN mit einer lokalen Adresse und einem QR-Code. Steht dort, dass er aus ist (bei einer neuen Installation ist das so), klick auf <b>Einschalten</b>: Dann fragt Windows einmal, ob es durch die Firewall darf. Scanne den QR-Code mit dem Handy und du bist drin: ohne Pairing-Code, und es läuft weiter, auch wenn das Internet ausfällt. <b>Ausschalten</b> an derselben Stelle schließt ihn wieder.</p>
 <div class="tip"><p>Nutze im Handy-Browser <b>Zum Startbildschirm hinzufügen</b>: Dann öffnet sich Truck Dash im Vollbild, wie eine App.</p></div>
 <p>Kein Spiel zur Hand? Die <a href="/app/?demo=1">Demo</a> fährt eine Tour auf der echten ATS-Karte.</p>`,
     status: `
@@ -139,7 +139,7 @@ GUIDE_TEXT.de = {
     client: `
 <p>Rechtsklick auf das Symbol in der Taskleiste, neben der Uhr:</p>
 <ul>
-<li><b>Einrichtung &amp; Status</b>: der Pairing-Code, die Adresse fürs gleiche WLAN mit QR-Code, das Plugin für jedes Spiel (Steam-Installationen werden selbst gefunden; <b>Spielordner hinzufügen</b> für den Rest) und die Optionen.</li>
+<li><b>Einrichtung &amp; Status</b>: der Pairing-Code, der Modus fürs gleiche WLAN (<b>Einschalten</b>, dann Adresse und QR-Code), das Plugin für jedes Spiel (Steam-Installationen werden selbst gefunden; <b>Spielordner hinzufügen</b> für den Rest) und die Optionen.</li>
 <li><b>Optionen</b>: mit Windows starten (öffnet das Armaturenbrett, wenn das Spiel startet), deine Tour im Discord-Profil zeigen, Truck Dash schließen, wenn das Spiel beendet wird, und das Armaturenbrett beim Start im Browser öffnen. Dort stellst du auch die Sprache des Clients ein (sonst folgt sie Windows).</li>
 <li><b>Pairing-Code anzeigen</b>, und <b>Trennen</b>, das dir einen neuen Code gibt.</li>
 <li><b>Nach Updates suchen</b>. Client und App melden sich auch, wenn eine neue Version da ist.</li>
@@ -252,7 +252,7 @@ GUIDE_TEXT.fr = {
 </ol>
 <p>Le code expire au bout de 10 minutes s'il n'est pas utilisé. Une fois connecté, la session dure jusqu'à ce que tu quittes le client.</p>
 <h3>Même Wi-Fi : latence minimale</h3>
-<p>Configuration et état affiche aussi une adresse locale et un QR code. Scanne-le avec le téléphone et c'est parti : pas de code d'appairage, et ça continue de marcher même si internet coupe. Windows demande une fois l'autorisation dans le pare-feu.</p>
+<p>Configuration et état a une section pour le même Wi-Fi, avec une adresse locale et un QR code. Si elle indique que c'est désactivé (c'est le cas après une nouvelle installation), clique <b>Activer</b> : Windows demande alors une fois l'autorisation dans le pare-feu. Scanne le QR code avec le téléphone et c'est parti : pas de code d'appairage, et ça continue de marcher même si internet coupe. <b>Désactiver</b>, au même endroit, le referme.</p>
 <div class="tip"><p>Dans le navigateur du téléphone, utilise <b>Ajouter à l'écran d'accueil</b> : Truck Dash s'ouvre alors en plein écran, comme une appli.</p></div>
 <p>Pas de jeu sous la main ? La <a href="/app/?demo=1">démo</a> joue un trajet sur la vraie carte d'ATS.</p>`,
     status: `
@@ -352,7 +352,7 @@ GUIDE_TEXT.fr = {
     client: `
 <p>Clic droit sur l'icône de la zone de notification, à côté de l'horloge :</p>
 <ul>
-<li><b>Configuration et état</b> : le code d'appairage, l'adresse pour le même Wi-Fi avec son QR code, le plugin de chaque jeu (les installations Steam sont trouvées toutes seules ; <b>Ajouter le dossier du jeu</b> pour les autres) et les options.</li>
+<li><b>Configuration et état</b> : le code d'appairage, le mode même Wi-Fi (<b>Activer</b>, puis son adresse et son QR code), le plugin de chaque jeu (les installations Steam sont trouvées toutes seules ; <b>Ajouter le dossier du jeu</b> pour les autres) et les options.</li>
 <li><b>Options</b> : lancer avec Windows (ouvre le tableau de bord au démarrage du jeu), afficher ton trajet sur ton profil Discord, fermer Truck Dash quand le jeu se ferme, et ouvrir le tableau de bord dans le navigateur au démarrage. Tu y choisis aussi la langue du client (sinon elle suit celle de Windows).</li>
 <li><b>Afficher le code d'appairage</b>, et <b>Déconnecter</b>, qui te donne un nouveau code.</li>
 <li><b>Rechercher des mises à jour</b>. Le client et l'appli te préviennent aussi quand une nouvelle version sort.</li>
@@ -465,7 +465,7 @@ GUIDE_TEXT.pt = {
 </ol>
 <p>O código expira depois de 10 minutos se ninguém usar. Depois de conectado, a sessão dura até você fechar o cliente.</p>
 <h3>Mesma Wi-Fi: a menor latência</h3>
-<p>Configuração e status também mostra um endereço local e um QR code. Escaneie com o celular e pronto: sem código de pareamento, e continua funcionando mesmo se a internet cair. O Windows pergunta uma vez se pode liberar no firewall.</p>
+<p>Configuração e status tem uma seção para a mesma Wi-Fi, com um endereço local e um QR code. Se ela disser que está desligado (uma instalação nova começa assim), clique em <b>Ligar</b>: aí o Windows pergunta uma vez se pode liberar no firewall. Escaneie o QR code com o celular e pronto: sem código de pareamento, e continua funcionando mesmo se a internet cair. <b>Desligar</b>, no mesmo lugar, fecha de novo.</p>
 <div class="tip"><p>No navegador do celular use <b>Adicionar à tela inicial</b>: o Truck Dash passa a abrir em tela cheia, como um app.</p></div>
 <p>Sem o jogo por perto? A <a href="/app/?demo=1">demo</a> faz uma viagem no mapa real do ATS.</p>`,
     status: `
@@ -565,7 +565,7 @@ GUIDE_TEXT.pt = {
     client: `
 <p>Clique com o botão direito no ícone da bandeja, ao lado do relógio:</p>
 <ul>
-<li><b>Configuração e status</b>: o código de pareamento, o endereço para a mesma Wi-Fi com o QR code, o plugin de cada jogo (instalações da Steam são encontradas sozinhas; <b>Adicionar pasta do jogo</b> para as outras) e as opções.</li>
+<li><b>Configuração e status</b>: o código de pareamento, o modo da mesma Wi-Fi (<b>Ligar</b>, depois o endereço e o QR code), o plugin de cada jogo (instalações da Steam são encontradas sozinhas; <b>Adicionar pasta do jogo</b> para as outras) e as opções.</li>
 <li><b>Opções</b>: iniciar com o Windows (abre o painel quando o jogo inicia), mostrar sua viagem no seu perfil do Discord, fechar o Truck Dash quando o jogo fechar, e abrir o painel no navegador ao iniciar. Ali também fica o idioma do cliente (segue o do Windows, a menos que você escolha outro).</li>
 <li><b>Mostrar código de pareamento</b>, e <b>Desconectar</b>, que te dá um código novo.</li>
 <li><b>Verificar atualizações</b>. O cliente e o app também avisam quando sai uma versão nova.</li>
@@ -678,7 +678,7 @@ GUIDE_TEXT.pl = {
 </ol>
 <p>Nieużyty kod wygasa po 10 minutach. Po połączeniu sesja trwa, dopóki nie zamkniesz klienta.</p>
 <h3>Ta sama sieć Wi-Fi: najmniejsze opóźnienie</h3>
-<p>Konfiguracja i stan pokazuje też adres lokalny i kod QR. Zeskanuj go telefonem i gotowe: bez kodu parowania, a działa dalej nawet bez internetu. Windows raz zapyta o zgodę w zaporze.</p>
+<p>Konfiguracja i stan ma sekcję dla tej samej sieci Wi-Fi, z adresem lokalnym i kodem QR. Jeśli jest tam napisane, że jest wyłączony (tak jest po nowej instalacji), kliknij <b>Włącz</b>: wtedy Windows raz zapyta o zgodę w zaporze. Zeskanuj kod QR telefonem i gotowe: bez kodu parowania, a działa dalej nawet bez internetu. <b>Wyłącz</b> w tym samym miejscu zamyka go z powrotem.</p>
 <div class="tip"><p>W przeglądarce telefonu użyj <b>Dodaj do ekranu głównego</b>: Truck Dash otworzy się wtedy na pełnym ekranie, jak aplikacja.</p></div>
 <p>Nie masz gry pod ręką? <a href="/app/?demo=1">Demo</a> odtwarza trasę na prawdziwej mapie ATS.</p>`,
     status: `
@@ -778,7 +778,7 @@ GUIDE_TEXT.pl = {
     client: `
 <p>Kliknij prawym przyciskiem ikonę w zasobniku, obok zegara:</p>
 <ul>
-<li><b>Konfiguracja i stan</b>: kod parowania, adres dla tej samej sieci Wi-Fi z kodem QR, wtyczka dla każdej gry (instalacje ze Steam są wykrywane same; <b>Dodaj folder gry</b> dla pozostałych) i opcje.</li>
+<li><b>Konfiguracja i stan</b>: kod parowania, tryb tej samej sieci Wi-Fi (<b>Włącz</b>, potem adres i kod QR), wtyczka dla każdej gry (instalacje ze Steam są wykrywane same; <b>Dodaj folder gry</b> dla pozostałych) i opcje.</li>
 <li><b>Opcje</b>: uruchamiaj z Windows (otwiera deskę rozdzielczą, gdy startuje gra), pokazuj trasę w profilu Discord, zamykaj Truck Dash razem z grą i otwieraj deskę rozdzielczą w przeglądarce przy starcie. Tam też wybierzesz język klienta (domyślnie taki jak w Windows).</li>
 <li><b>Pokaż kod parowania</b>, oraz <b>Rozłącz</b>, które daje nowy kod.</li>
 <li><b>Sprawdź aktualizacje</b>. Klient i aplikacja same też dają znać o nowej wersji.</li>
@@ -891,7 +891,7 @@ GUIDE_TEXT.tr = {
 </ol>
 <p>Kod kullanılmazsa 10 dakika sonra geçersiz olur. Bağlandıktan sonra oturum, istemciyi kapatana kadar sürer.</p>
 <h3>Aynı Wi-Fi: en düşük gecikme</h3>
-<p>Kurulum ve durum penceresi yerel bir adres ve bir QR kod da gösterir. Telefonla tara ve hazırsın: eşleştirme kodu yok, internet kesilse bile çalışmaya devam eder. Windows güvenlik duvarı için bir kez izin ister.</p>
+<p>Kurulum ve durum penceresinde aynı Wi-Fi için yerel bir adres ve bir QR kod içeren bir bölüm var. Kapalı olduğunu söylüyorsa (yeni kurulum böyle başlar) <b>Aç</b>'a tıkla: Windows o zaman güvenlik duvarı için bir kez izin ister. QR kodu telefonla tara ve hazırsın: eşleştirme kodu yok, internet kesilse bile çalışmaya devam eder. Aynı yerdeki <b>Kapat</b> onu yeniden kapatır.</p>
 <div class="tip"><p>Telefonun tarayıcısında <b>Ana ekrana ekle</b> seçeneğini kullan: Truck Dash artık bir uygulama gibi tam ekran açılır.</p></div>
 <p>Oyun yanında değil mi? <a href="/app/?demo=1">Demo</a>, gerçek ATS haritasında bir yolculuk oynatır.</p>`,
     status: `
@@ -991,7 +991,7 @@ GUIDE_TEXT.tr = {
     client: `
 <p>Saatin yanındaki tepsi simgesine sağ tıkla:</p>
 <ul>
-<li><b>Kurulum ve durum</b>: eşleştirme kodu, QR koduyla aynı Wi-Fi adresi, her oyun için eklenti (Steam kurulumları kendiliğinden bulunur; diğerleri için <b>Oyun klasörü ekle</b>) ve seçenekler.</li>
+<li><b>Kurulum ve durum</b>: eşleştirme kodu, aynı Wi-Fi modu (<b>Aç</b>, sonra adresi ve QR kodu), her oyun için eklenti (Steam kurulumları kendiliğinden bulunur; diğerleri için <b>Oyun klasörü ekle</b>) ve seçenekler.</li>
 <li><b>Seçenekler</b>: Windows ile başlat (oyun başlayınca gösterge panelini açar), yolculuğunu Discord profilinde göster, oyun kapanınca Truck Dash'i kapat ve açılışta gösterge panelini tarayıcıda aç. İstemcinin dili de oradan seçilir (seçmezsen Windows'unkini kullanır).</li>
 <li><b>Eşleştirme kodunu göster</b> ve sana yeni bir kod veren <b>Bağlantıyı kes</b>.</li>
 <li><b>Güncellemeleri denetle</b>. İstemci ve uygulama yeni bir sürüm çıktığında da haber verir.</li>
@@ -1104,7 +1104,7 @@ GUIDE_TEXT.ru = {
 </ol>
 <p>Неиспользованный код истекает через 10 минут. После подключения сессия длится, пока вы не закроете клиент.</p>
 <h3>Та же сеть Wi-Fi: минимальная задержка</h3>
-<p>В окне «Настройка и состояние» также есть локальный адрес и QR-код. Отсканируйте его телефоном, и всё: без кода сопряжения, и работает даже без интернета. Windows один раз спросит разрешение в брандмауэре.</p>
+<p>В окне «Настройка и состояние» есть раздел для той же сети Wi-Fi с локальным адресом и QR-кодом. Если там написано, что он выключен (так бывает после новой установки), нажмите <b>Включить</b>: тогда Windows один раз спросит разрешение в брандмауэре. Отсканируйте QR-код телефоном, и всё: без кода сопряжения, и работает даже без интернета. <b>Выключить</b> там же снова его закрывает.</p>
 <div class="tip"><p>В браузере телефона выберите <b>Добавить на главный экран</b>: Truck Dash будет открываться на весь экран, как приложение.</p></div>
 <p>Игры нет под рукой? <a href="/app/?demo=1">Демо</a> показывает рейс на настоящей карте ATS.</p>`,
     status: `
@@ -1204,7 +1204,7 @@ GUIDE_TEXT.ru = {
     client: `
 <p>Щёлкните правой кнопкой по значку в области уведомлений, рядом с часами:</p>
 <ul>
-<li><b>Настройка и состояние</b>: код сопряжения, адрес для той же сети Wi-Fi с QR-кодом, плагин для каждой игры (установки Steam находятся сами; для остальных <b>Добавить папку игры</b>) и параметры.</li>
+<li><b>Настройка и состояние</b>: код сопряжения, режим той же сети Wi-Fi (<b>Включить</b>, затем адрес и QR-код), плагин для каждой игры (установки Steam находятся сами; для остальных <b>Добавить папку игры</b>) и параметры.</li>
 <li><b>Параметры</b>: запуск вместе с Windows (открывает панель приборов, когда стартует игра), показ рейса в профиле Discord, закрытие Truck Dash вместе с игрой и открытие панели приборов в браузере при запуске. Там же выбирается язык клиента (по умолчанию как в Windows).</li>
 <li><b>Показать код сопряжения</b>, и <b>Отключить</b>, что даёт новый код.</li>
 <li><b>Проверить обновления</b>. Клиент и приложение также сообщают о выходе новой версии.</li>

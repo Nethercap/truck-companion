@@ -42,7 +42,7 @@ GUIDE_TEXT.en = {
 </ol>
 <p>The code expires after 10 minutes if nobody uses it. Once connected, the session lasts until you quit the client.</p>
 <h3>Same Wi-Fi: lowest latency</h3>
-<p>Setup &amp; status also shows a local address and a QR code. Scan it with the phone and you are in: no pairing code, and it keeps working even if your internet drops. Windows asks once to let it through the firewall.</p>
+<p>Setup &amp; status has a same Wi-Fi section with a local address and a QR code. If it says it is off (a new install starts that way), press <b>Turn on</b>: Windows then asks once to let it through the firewall. Scan the QR with the phone and you are in: no pairing code, and it keeps working even if your internet drops. <b>Turn off</b>, in the same place, closes it again.</p>
 <div class="tip"><p>Same Wi-Fi but the phone can't open it? Usually it's one of these: Windows has the network set to <b>Public</b> (set it to Private in Windows Settings, Network &amp; internet), the phone is on a <b>guest network</b> or the router isolates devices, or a <b>VPN</b> or ad-blocking app is on, on the PC or on the phone. The pairing code works in all of these cases.</p></div>
 <div class="tip"><p>In your phone's browser use <b>Add to Home screen</b>: Truck Dash then opens full screen, like an app.</p></div>
 <p>No game at hand? The <a href="/app/?demo=1">demo</a> plays a trip on the real ATS map.</p>`,
@@ -143,7 +143,7 @@ GUIDE_TEXT.en = {
     client: `
 <p>Right-click the tray icon, next to the clock:</p>
 <ul>
-<li><b>Setup &amp; status</b>: the pairing code, the same Wi-Fi address with its QR, the plugin for each game (Steam installs are found on their own; <b>Add game folder</b> for the rest) and the options.</li>
+<li><b>Setup &amp; status</b>: the pairing code, the same Wi-Fi mode (<b>Turn on</b>, then its address and QR), the plugin for each game (Steam installs are found on their own; <b>Add game folder</b> for the rest) and the options.</li>
 <li><b>Options</b>: start with Windows (it opens the dashboard when the game starts), show your trip on your Discord profile, close Truck Dash when the game closes, and open the dashboard in your browser when it starts. The client's language is there too (it follows Windows unless you pick one).</li>
 <li><b>Show pairing code</b>, and <b>Disconnect</b>, which gives you a new code.</li>
 <li><b>Check for updates</b>. The client and the app also let you know when a new version is out.</li>
@@ -256,7 +256,7 @@ GUIDE_TEXT.es = {
 </ol>
 <p>El código vence a los 10 minutos si nadie lo usa. Una vez conectado, la sesión dura hasta que cerrás el cliente.</p>
 <h3>Misma WiFi: la menor latencia</h3>
-<p>Configuración y estado también muestra una dirección local y un código QR. Escanealo con el celular y listo: sin código, y sigue andando aunque se corte internet. Windows pregunta una vez si lo deja pasar por el firewall.</p>
+<p>Configuración y estado tiene una sección para la misma WiFi, con una dirección local y un código QR. Si dice que está apagado (una instalación nueva arranca así), tocá <b>Prender</b>: ahí Windows pregunta una vez si lo deja pasar por el firewall. Escaneá el QR con el celular y listo: sin código, y sigue andando aunque se corte internet. <b>Apagar</b>, en el mismo lugar, lo vuelve a cerrar.</p>
 <div class="tip"><p>¿Misma WiFi y el celular no lo abre? Casi siempre es una de estas: Windows tiene la red como <b>Pública</b> (cambiala a Privada en Configuración de Windows, Red e Internet), el celular está en una <b>red de invitados</b> o el router aísla los dispositivos, o hay una <b>VPN</b> o una app que bloquea publicidad prendida, en la PC o en el celular. El código de pairing anda en todos estos casos.</p></div>
 <div class="tip"><p>En el navegador del celular usá <b>Agregar a la pantalla de inicio</b>: Truck Dash se abre a pantalla completa, como una app.</p></div>
 <p>¿No tenés el juego a mano? La <a href="/app/?demo=1">demo</a> hace un viaje sobre el mapa real de ATS.</p>`,
@@ -357,7 +357,7 @@ GUIDE_TEXT.es = {
     client: `
 <p>Clic derecho en el ícono de la bandeja, al lado del reloj:</p>
 <ul>
-<li><b>Configuración y estado</b>: el código, la dirección para la misma WiFi con su QR, el plugin de cada juego (las instalaciones de Steam las encuentra solo; <b>Agregar carpeta del juego</b> para las demás) y las opciones.</li>
+<li><b>Configuración y estado</b>: el código, el modo para la misma WiFi (<b>Prender</b>, y después su dirección y su QR), el plugin de cada juego (las instalaciones de Steam las encuentra solo; <b>Agregar carpeta del juego</b> para las demás) y las opciones.</li>
 <li><b>Opciones</b>: iniciar con Windows (abre el tablero cuando arranca el juego), mostrar tu viaje en tu perfil de Discord, cerrar Truck Dash cuando se cierra el juego y abrir el tablero en el navegador al arrancar. Ahí también está el idioma del cliente (sigue al de Windows salvo que elijas otro).</li>
 <li><b>Ver código de pairing</b>, y <b>Desconectar</b>, que te da un código nuevo.</li>
 <li><b>Buscar actualizaciones</b>. El cliente y la app también avisan cuando sale una versión nueva.</li>
