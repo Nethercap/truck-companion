@@ -25,8 +25,19 @@ STATUS = os.path.join(ROOT, "docs", "data", "map-mods-status.json")
 UA = "Mozilla/5.0 (compatible; TruckDash-mapcheck/1.0; +https://trucksim-dash.com)"
 
 
+# Los mapas de R2 (MAPS) piden este header fuera del navegador: la regla de
+# Cloudflare deja pasar lo que viene de trucksim-dash.com y lo demas solo con
+# el secreto TRUCKDASH_MAPS_KEY. Solo a esos archivos: este script tambien
+# consulta las paginas de los mods, y ahi no tiene que ir.
+MAPS = "https://maps.trucksim-dash.com/"
+MAPS_KEY = os.environ.get("TRUCKDASH_MAPS_KEY", "")
+
+
 def fetch(url: str, method: str = "GET", timeout: int = 25):
-    req = urllib.request.Request(url, method=method, headers={"User-Agent": UA})
+    headers = {"User-Agent": UA}
+    if MAPS_KEY and url.startswith(MAPS):
+        headers["x-truckdash-tools"] = MAPS_KEY
+    req = urllib.request.Request(url, method=method, headers=headers)
     return urllib.request.urlopen(req, timeout=timeout)
 
 
