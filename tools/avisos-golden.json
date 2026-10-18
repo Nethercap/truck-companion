@@ -19,7 +19,7 @@
 {"from":"Truckee","to":"Sacramento","man":[["turn","left",-106334,-16866],["turn","right",-106208,-16772],["roundabout","right",-106266,-16655,1],["fork","right",-111186,-16179],["fork","left",-111412,-16113],["fork","right",-111425,-14755],["fork","left",-111503,-14580]]},
 {"from":"Fort Smith","to":"McAlester","man":[["turn","left",6416,19158],["turn","right",2697,19317],["fork","left",2714,19377],["fork","left",1745,22229],["fork","right",137,23984]]},
 {"from":"Jackpot","to":"Twin Falls","man":[["fork","right",-76784,-29187]]},
-{"from":"Rock Springs","to":"Rawlins","man":[["turn","left",-48471,-19670],["turn","left",-48194,-20131],["turn","right",-48190,-20235],["fork","left",-48050,-20286]]},
+{"from":"Rock Springs","to":"Rawlins","man":[["fork","right",-48654,-19715],["turn","left",-48471,-19670],["turn","left",-48194,-20131],["turn","right",-48190,-20235],["fork","left",-48050,-20286]]},
 {"from":"Fort Collins","to":"Steamboat Springs","man":[["turn","right",-39448,-9957],["turn","right",-43920,-8383],["turn","right",-46890,-11632]]},
 {"from":"McAllen","to":"Laredo","man":[["fork","left",-12695,71147],["fork","right",-16063,70052],["fork","right",-17835,65603]]},
 {"from":"Fort Collins","to":"Scottsbluff","man":[["turn","left",-39158,-11562],["fork","left",-38105,-11169],["fork","left",-36577,-14486],["fork","left",-36575,-15245],["fork","left",-36558,-15566],["fork","right",-36805,-20004]]},

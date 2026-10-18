@@ -114,6 +114,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   giro se anuncia (`turnAfterFork`): la curva callada de una rampa que
   termina en una T sin otra salida tapaba la salida 50 de la I-25 en
   Walsenburg (ATS, 18-10) y no se decia nada.
+  Tampoco si el giro es para el otro lado despues de una salida de una mano
+  (`salidaDeUnaMano`): salir a la derecha y doblar a la izquierda al final de
+  la rampa avisa la salida primero (salida 115 de Rockford, 18-10).
 - Una salida que a los 150 m vuelve por donde se vino (la calzada contraria
   donde termina una autovia) no es rama de una bifurcacion (`forkInCurve`).
 - Dos calzadas de un sentido que se separan casi paralelas (la colectora al
@@ -127,6 +130,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   el rumbo del camion (`findUpcomingTurn(heading)`) contra como se entra (los
   ultimos 10 m antes del nodo, no los 60 m de `inBearing`): pasado si se
   desvio 25 grados (o la mitad del giro) hacia la salida.
+- Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
+  mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
+  borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
+  `stoppedRouteLead` le antepone una entrada sobre el rumbo del camion si el
+  nodo esta adelante y la ruta no sale de ahi para atras.
 - Lo recorrido (`routeBehind`) incluye el comienzo de la ruta
   (`passedRoutePoints`); el simulador y `check_avisos` lo arman igual.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo

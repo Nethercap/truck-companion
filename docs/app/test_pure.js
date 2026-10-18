@@ -2269,6 +2269,16 @@ test('turnAfterFork: la curva callada de la rampa no tapa la salida (I-25 en Wal
   assert.equal(turnAfterFork({ ...geo([[100, 100], [150, 0]]), adjacency: null }, 1), true);
   // el giro mas lejos que legM no cuenta
   assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1, 150), false);
+  // Salir a la derecha y doblar a la izquierda al final de la rampa: la salida
+  // se avisa primero (salida 115 de Rockford, Discord 18-10). Si el giro es
+  // para el mismo lado, como antes.
+  assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1, 250, 50, 100, undefined, 60, 'right'), false);
+  assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1, 250, 50, 100, undefined, 60, 'left'), true);
+  // Si el nodo no es una salida de una mano (en el prefab de una rotonda o
+  // un cruce, una calle vuelve al nodo), tambien como antes.
+  const dobleMano = geo([[35, 400], [40, 700]]);
+  dobleMano.adjacency.get(6).push([1]);
+  assert.equal(turnAfterFork(dobleMano, 1, 250, 50, 100, undefined, 60, 'right'), true);
 });
 
 test('maneuver: seguir por la autopista cuando sale una rampa suave -> nada (la ruta es la mas recta)', () => {
@@ -3404,6 +3414,32 @@ test('createCityScale: lo que falta medido sobre la ruta entera no salta al entr
   assert.equal(escala.routeMeters(ruta, [[1100, 500], [1200, 500]]), escala.pathMeters([[1100, 500], [1200, 500]]));
   assert.equal(escala.routeMeters(null, [[1100, 500], [1200, 500]]), 100 * 20);
   assert.equal(escala.routeMeters(ruta, null), 0);
+});
+
+test('stoppedRouteLead: parado antes de un cruce, la ruta empieza con la entrada al cruce', () => {
+  const { stoppedRouteLead, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M } = require('./pure.js');
+  // Rumbo del juego: 0 = hacia -z, horario. El cruce en (0, 0) y la ruta dobla
+  // a la derecha (+x), como la T de Rockford (Discord, Gargamosch, 18-10).
+  const ruta = [[0, 0, 0, 1, 7], [50, 0, 0, 0, null], [100, 0, 0, 1, 8]];
+  // 5 m antes, mirando al cruce: un punto STOPPED_LEAD_BACK_M detras del camion
+  assert.deepEqual(stoppedRouteLead(ruta, 0, 5, 0), [0, 5 + STOPPED_LEAD_BACK_M, 0, 0, null]);
+  // En la linea, corrido por el carril: igual (a menos de 5 m no se mira el angulo)
+  const enLaLinea = stoppedRouteLead(ruta, 3, 2, 0);
+  assert.ok(enLaLinea && enLaLinea[4] === null && enLaLinea[1] > 2);
+  // Ya arranca en el tramo del camion (andando): nada
+  assert.equal(stoppedRouteLead([[0, 3, 0, 0, null], ...ruta], 0, 5, 0), null);
+  // El nodo lejos, atras o al costado: nada
+  assert.equal(stoppedRouteLead(ruta, 0, STOPPED_LEAD_MAX_M + 5, 0), null);
+  assert.equal(stoppedRouteLead(ruta, 0, -10, 0), null);
+  assert.equal(stoppedRouteLead(ruta, -10, 1, 0), null);
+  // La ruta sale del nodo para atras (hay que dar la vuelta): nada
+  assert.equal(stoppedRouteLead([[0, 0, 0, 1, 7], [0, 50, 0, 0, null]], 0, 5, 0), null);
+  // Sin rumbo del juego (cliente viejo): el del camion al nodo, si no esta encima
+  assert.deepEqual(stoppedRouteLead(ruta, 0, 10, null), [0, 10 + STOPPED_LEAD_BACK_M, 0, 0, null]);
+  assert.equal(stoppedRouteLead(ruta, 0, 3, null), null);
+  // Sin datos
+  assert.equal(stoppedRouteLead(null, 0, 5, 0), null);
+  assert.equal(stoppedRouteLead(ruta, NaN, 5, 0), null);
 });
 
 test('startArcForHeading: recalcular andando arranca en la calzada y el sentido del camion', () => {

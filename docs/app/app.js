@@ -3749,9 +3749,14 @@ function updateDestinationMarker(data) {
     routeUsesUncheckedDlc = false;
     legs.forEach((to, legIdx) => {
       // El primer tramo sale del camion: con su rumbo si viene andando.
-      let leg = findRoute(from, to, legIdx === 0 ? routeStartHeading(data) : null);
+      const rumbo = legIdx === 0 ? routeStartHeading(data) : null;
+      let leg = findRoute(from, to, rumbo);
       if (leg) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
+        // Parado arranca en el nodo mas cercano: si es el cruce de adelante,
+        // con su entrada, o el giro de ahi no se avisa (stoppedRouteLead).
+        const entrada = legIdx === 0 && rumbo == null ? stoppedRouteLead(leg, from[0], from[1], data.heading) : null;
+        if (entrada) leg = [entrada, ...leg];
         leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
         routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
       } else { complete = false; routePoints.push([from[0], from[1], 0, 0, null, legIdx], [to[0], to[1], 0, 0, null, legIdx]); }
@@ -4221,7 +4226,10 @@ function findUpcomingTurn(heading) {
       // salida de Odense que dobla al final de la rampa perdia su "keep right".
       // Un giro callado (la curva de la rampa) no se anuncia y no cuenta
       // (turnAfterFork): la salida 50 de Walsenburg quedaba sin nada.
-      if (turnAfterFork(ctx, iEnd, NAV_FORK_LEG_M, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here, NAV_JUNCTION_CURVE_SPAN_M)) m = null;
+      // Si el giro es para el otro lado despues de una salida de una mano
+      // (salir a la derecha y doblar a la izquierda al final de la rampa), la
+      // salida se avisa igual.
+      if (turnAfterFork(ctx, iEnd, NAV_FORK_LEG_M, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here, NAV_JUNCTION_CURVE_SPAN_M, m.direction)) m = null;
     }
     if (continuesTurn(prevTurn, m, cum[i], NAV_TURN_LEG_M + 20, 135, NAV_TURN_ANGLE_THRESHOLD_DEG)) {
       prevTurn.end = cum[iEnd]; // la segunda mitad de la misma esquina
