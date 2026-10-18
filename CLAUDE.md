@@ -90,6 +90,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`CITY_GAP_M` = 0). Sale de medir el GPS del juego con la posicion del
   "Copy turn report" (Sidney NE, 17-10): antes de mover esos numeros,
   medir asi otro lugar.
+- Las distancias del mundo se ven por 20 en el juego (por 3 en la ciudad):
+  150 m en linea recta son casi 2 millas en el GPS. Un waypoint se da por
+  alcanzado por la ruta, al pasar por el punto mas cerca del icono o por el
+  nodo de su tramo (`waypointReached`); en linea recta solo sin ruta
+  (Discord, Gargamosch, 18-10: se iba 1 o 2 millas antes).
 - Rotondas: `detectRoundabout` descarta anillos con lados rectos largos
   (`longestStraightFrac`: manzanas y colectoras de una mano) y prefabs
   compactos sin isla (`compactIslandM`: cruces de ATS con curvas cuadradas).

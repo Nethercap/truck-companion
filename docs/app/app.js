@@ -2171,8 +2171,8 @@ const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calcu
 // numeros. Si alguno es solo de la app (inGame=false), calculamos nosotros
 // la distancia total sumando los tramos del grafo y se muestra aparte en las
 // filas "(with waypoints)". Un waypoint se da por alcanzado (y se saca solo,
-// como un GPS) cuando el camion pasa a menos de WAYPOINT_REACHED_M o llega
-// por la ruta al nodo de su tramo (ver checkWaypointReached).
+// como un GPS) cuando el camion llega por la ruta al icono o al nodo de su
+// tramo, o sin ruta a menos de WAYPOINT_REACHED_M (ver checkWaypointReached).
 const WAYPOINT_REACHED_M = 150;
 const MAX_WAYPOINTS = 9;
 let waypoints = []; // [{ pos: [x,z], lngLat: [lng,lat], inGame: bool, label: string|null, marker }]
@@ -2380,16 +2380,17 @@ function addPoiWaypoint(pos, label, kind = null) {
   showToast(t('poiAddedToast').replace('{name}', label), 'success', 3000);
 }
 
-// Saca el primer waypoint cuando el camion llega (pasa cerca, o la ruta ya
-// lo llevo hasta el final de su tramo: waypointReached en pure.js) - asi una
-// ruta con varias paradas avanza sola, como un GPS de verdad. La ruta solo
-// cuenta si es la de los waypoints de ahora: con currentRouteTarget en null
-// (recien invalidada) sus tramos pueden ser los de antes.
+// Saca el primer waypoint cuando el camion llega (la ruta ya lo llevo al
+// icono o al final de su tramo, o sin ruta paso cerca: waypointReached en
+// pure.js) - asi una ruta con varias paradas avanza sola, como un GPS de
+// verdad. La ruta solo cuenta si es la de los waypoints de ahora: con
+// currentRouteTarget en null (recien invalidada) sus tramos pueden ser los de antes.
 function checkWaypointReached(x, z) {
   if (!waypoints.length) return;
   const wp = waypoints[0];
   const route = currentRouteTarget ? currentRouteWorldPoints : null;
-  if (waypointReached(x, z, wp.pos, route, { tapM: WAYPOINT_REACHED_M })) {
+  const speedKmh = lastData && Number.isFinite(lastData.speedKmh) ? Math.abs(lastData.speedKmh) : null;
+  if (waypointReached(x, z, wp.pos, route, { tapM: WAYPOINT_REACHED_M, speedKmh })) {
     showToast(t('waypointReachedToast').replace('{name}', wp.label || `${t('waypoint')} 1`), 'success', 3000);
     // Sin trabajo, el ultimo es el destino: la voz dice "llegaste"
     // (voiceGuide.waypointReached), con la ruta de antes de sacarlo.

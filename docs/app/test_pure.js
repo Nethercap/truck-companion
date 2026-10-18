@@ -1254,28 +1254,52 @@ test('projectAheadOnRoute: en una ida y vuelta por el mismo camino no pasa a la 
   assert.equal(projectAheadOnRoute(cruce, 20, 4, 400).idx, 3);
 });
 
-test('waypointReached: por el toque o por la ruta hasta el nodo de su tramo', () => {
-  const { waypointReached, WAYPOINT_ROUTE_END_M } = require('./pure.js');
-  // Ruta: tramo 0 hasta el nodo del waypoint en (1000, 0), tramo 1 al destino.
-  const ruta = [[0, 0, 0, 0, null, 0], [500, 0, 0, 0, 1, 0], [1000, 0, 0, 0, 2, 0], [1000, 600, 0, 0, 3, 1], [2000, 600, 0, 0, 4, 1]];
-  const lejos = [1000, 300]; // tocado a 300 m del camino
-  // Toque a menos de 150 m: como siempre, aunque no haya ruta.
-  assert.equal(waypointReached(900, 280, lejos, null), true);
-  assert.equal(waypointReached(900, 0, lejos, null), false);
-  // Por la ruta: a 200 m del nodo todavia no, a 20 m si.
-  assert.equal(waypointReached(800, 0, lejos, [[800, 0, 0, 0, null, 0], ...ruta.slice(2)]), false);
-  assert.equal(waypointReached(980, 0, lejos, [[980, 0, 0, 0, null, 0], ...ruta.slice(2)]), true);
-  assert.ok(WAYPOINT_ROUTE_END_M < 150);
-  // Paso el nodo: la ruta recortada ya arranca en el tramo siguiente.
-  assert.equal(waypointReached(1000, 100, lejos, [[1000, 100, 0, 0, null, 1], ...ruta.slice(3)]), true);
+test('waypointReached: por la ruta hasta el icono o el nodo de su tramo, en linea recta solo sin ruta', () => {
+  const { waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_SNAP_M } = require('./pure.js');
+  const desde = (x, z, leg, resto) => [[x, z, 0, 0, null, leg], ...resto];
+  // Tramo 0 por z = 0 hasta el nodo del waypoint en (1000, 0); el 1 sigue derecho.
+  const ruta = [[0, 0, 0, 0, null, 0], [500, 0, 0, 0, 1, 0], [1000, 0, 0, 0, 2, 0], [1100, 0, 0, 0, null, 1], [2000, 0, 0, 0, 3, 1]];
+  const resto = (x) => ruta.filter(p => p[0] > x);
+  const legDe = (x) => (x < 1000 ? 0 : 1);
+  const en = (x, wp, o) => waypointReached(x, 0, wp, desde(x, 0, legDe(x), resto(x)), o);
+  // Sin ruta: en linea recta, como siempre.
+  assert.equal(waypointReached(900, -280, [1000, -300], null), true);
+  assert.equal(waypointReached(900, 0, [1000, -300], null), false);
+  // Con ruta, la linea recta no: a 150 m del mundo (3 km del juego a 1:20) el
+  // waypoint se iba casi 2 millas antes del icono (Discord, Gargamosch, 18-10).
+  assert.equal(en(860, [1000, 5]), false);
+  assert.equal(en(1000 - WAYPOINT_ROUTE_END_M + 2, [1000, 5]), true);
+  assert.equal(en(1050, [1000, 5]), true);
+  // El icono despues del nodo (el nodo mas cercano al toque quedo antes):
+  // llega al pasar por el icono, no en el nodo.
+  assert.equal(en(995, [1060, 5]), false);
+  assert.equal(en(1030, [1060, 5]), false);
+  assert.equal(en(1055, [1060, 5]), true);
+  // ... pero salirse de la ruta pasado el nodo es llegar: la ruta nueva
+  // mandaria a volver al nodo.
+  assert.equal(waypointReached(1030, 80, [1060, 5], desde(1030, 0, 1, resto(1030))), true);
+  // El icono antes del nodo, en una arista larga: llega en el icono.
+  assert.equal(en(700, [840, 10]), false);
+  assert.equal(en(835, [840, 10]), true);
+  // Toque lejos del camino (en el celular, con el mapa alejado): llega en el
+  // nodo; antes quedaba puesto y la ruta mandaba a volver (16-10).
+  const lejos = [1000, -300];
+  assert.ok(300 > WAYPOINT_SNAP_M);
+  assert.equal(en(800, lejos), false);
+  assert.equal(en(995, lejos), true);
+  assert.equal(en(1010, lejos), true);
+  // Parado un poco antes del nodo (estacionado) tambien es llegar; andando no.
+  assert.equal(en(1000 - WAYPOINT_STOPPED_M + 5, lejos, { speedKmh: 0 }), true);
+  assert.equal(en(1000 - WAYPOINT_STOPPED_M + 5, lejos, { speedKmh: 60 }), false);
   // La ruta da la vuelta en el nodo (el destino queda atras) y el camion siguio
   // derecho: el recorte lo deja clavado en el nodo, cuenta como llegado.
-  const vuelta = [[990, 0, 0, 0, null, 0], [1000, 0, 0, 0, 2, 0], [500, 0, 0, 0, 1, 1], [0, 0, 0, 0, 0, 1]];
-  assert.equal(waypointReached(1040, 0, lejos, [[1000, 0, 0, 0, null, 0], ...vuelta.slice(1)]), true);
-  // Una rampa que corre a 25 m de la autopista: el nodo queda cerca en linea
-  // recta pero a 400 m por la ruta, todavia no.
-  const rampa = [[1000, 25, 0, 0, null, 0], [1200, 25, 0, 0, 7, 0], [1200, 0, 0, 0, 8, 0], [1000, 0, 0, 0, 9, 0], [1000, -500, 0, 0, 10, 1]];
-  assert.equal(waypointReached(1000, 25, [1000, -300], rampa), false);
+  const vuelta = [[1000, 0, 0, 0, 2, 0], [500, 0, 0, 0, 1, 1], [0, 0, 0, 0, 0, 1]];
+  assert.equal(waypointReached(1040, 0, lejos, desde(1000, 0, 0, vuelta)), true);
+  // Una rampa que corre a 25 m de la autopista, con el icono sobre ella (la
+  // salida 115 de Gargamosch): cerca en linea recta, a 325 m por la ruta.
+  const rampa = [[1200, 25, 0, 0, 7, 0], [1200, 0, 0, 0, 8, 0], [1000, 0, 0, 0, 9, 0], [1000, -500, 0, 0, 10, 1]];
+  assert.equal(waypointReached(1000, 25, [1100, 0], desde(1000, 25, 0, rampa)), false);
+  assert.equal(waypointReached(1105, 0, [1100, 0], desde(1105, 0, 0, rampa.slice(2))), true);
   // Sin datos que sirvan
   assert.equal(waypointReached(NaN, 0, lejos, ruta), false);
   assert.equal(waypointReached(0, 0, null, ruta), false);
