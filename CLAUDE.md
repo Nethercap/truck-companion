@@ -114,6 +114,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   giro se anuncia (`turnAfterFork`): la curva callada de una rampa que
   termina en una T sin otra salida tapaba la salida 50 de la I-25 en
   Walsenburg (ATS, 18-10) y no se decia nada.
+  Tampoco si el giro es para el otro lado despues de una salida de una mano
+  (`salidaDeUnaMano`): salir a la derecha y doblar a la izquierda al final de
+  la rampa avisa la salida primero (salida 115 de Rockford, 18-10).
 - Una salida que a los 150 m vuelve por donde se vino (la calzada contraria
   donde termina una autovia) no es rama de una bifurcacion (`forkInCurve`).
 - Dos calzadas de un sentido que se separan casi paralelas (la colectora al

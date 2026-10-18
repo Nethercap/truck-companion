@@ -4226,7 +4226,10 @@ function findUpcomingTurn(heading) {
       // salida de Odense que dobla al final de la rampa perdia su "keep right".
       // Un giro callado (la curva de la rampa) no se anuncia y no cuenta
       // (turnAfterFork): la salida 50 de Walsenburg quedaba sin nada.
-      if (turnAfterFork(ctx, iEnd, NAV_FORK_LEG_M, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here, NAV_JUNCTION_CURVE_SPAN_M)) m = null;
+      // Si el giro es para el otro lado despues de una salida de una mano
+      // (salir a la derecha y doblar a la izquierda al final de la rampa), la
+      // salida se avisa igual.
+      if (turnAfterFork(ctx, iEnd, NAV_FORK_LEG_M, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here, NAV_JUNCTION_CURVE_SPAN_M, m.direction)) m = null;
     }
     if (continuesTurn(prevTurn, m, cum[i], NAV_TURN_LEG_M + 20, 135, NAV_TURN_ANGLE_THRESHOLD_DEG)) {
       prevTurn.end = cum[iEnd]; // la segunda mitad de la misma esquina

@@ -2269,6 +2269,16 @@ test('turnAfterFork: la curva callada de la rampa no tapa la salida (I-25 en Wal
   assert.equal(turnAfterFork({ ...geo([[100, 100], [150, 0]]), adjacency: null }, 1), true);
   // el giro mas lejos que legM no cuenta
   assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1, 150), false);
+  // Salir a la derecha y doblar a la izquierda al final de la rampa: la salida
+  // se avisa primero (salida 115 de Rockford, Discord 18-10). Si el giro es
+  // para el mismo lado, como antes.
+  assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1, 250, 50, 100, undefined, 60, 'right'), false);
+  assert.equal(turnAfterFork(geo([[35, 400], [40, 700]]), 1, 250, 50, 100, undefined, 60, 'left'), true);
+  // Si el nodo no es una salida de una mano (en el prefab de una rotonda o
+  // un cruce, una calle vuelve al nodo), tambien como antes.
+  const dobleMano = geo([[35, 400], [40, 700]]);
+  dobleMano.adjacency.get(6).push([1]);
+  assert.equal(turnAfterFork(dobleMano, 1, 250, 50, 100, undefined, 60, 'right'), true);
 });
 
 test('maneuver: seguir por la autopista cuando sale una rampa suave -> nada (la ruta es la mas recta)', () => {

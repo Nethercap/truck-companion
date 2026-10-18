@@ -1413,8 +1413,20 @@ function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
 // de la I-25 en Walsenburg (ATS, -38973,6043, Discord 18-10) se quedaba sin
 // aviso, con la rampa doblando 37 grados a 170 m y terminando en una T sin
 // otra salida. Sin grafo (ctx.adjacency) no se sabe y cuenta, como antes.
+// Un giro para el otro lado que forkDirection, despues de una salida de una
+// mano (el nodo se parte en dos tramos que no vuelven: autopista y rampa),
+// tampoco: salir a la derecha y al final de la rampa doblar a la izquierda
+// por el puente es la salida primero, y "turn left" desde la autopista no
+// dice que hay que salir (salida 115 de Rockford, ATS, 28193,-17814, Discord
+// 18-10: 196 m de rampa). La esquina que la bifurcacion confundia dobla para
+// el mismo lado; en el prefab de una rotonda o de un cruce grande la
+// bifurcacion es parte del giro (Gothenburg, ETS2: keep left y a 136 m turn right).
 // gapM, spanM, skip y curveSpanM: los de junctionManeuver.
-function turnAfterFork(ctx, iEnd, legM = 250, gapM = 50, spanM = 100, skip, curveSpanM = 60) {
+function salidaDeUnaMano({ adjacency }, n) {
+  const outs = adjacency && n != null ? (adjacency.get(n) || []) : [];
+  return outs.length === 2 && outs.every(([m]) => !(adjacency.get(m) || []).some(([b]) => b === n));
+}
+function turnAfterFork(ctx, iEnd, legM = 250, gapM = 50, spanM = 100, skip, curveSpanM = 60, forkDirection = null) {
   const { pts, cum } = ctx;
   for (let j = iEnd + 1; j < pts.length - 1 && cum[j] - cum[iEnd] <= legM; j++) {
     if (pts[j][3] !== 1) continue;
@@ -1422,7 +1434,10 @@ function turnAfterFork(ctx, iEnd, legM = 250, gapM = 50, spanM = 100, skip, curv
     const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd, adjacency: null });
     if (mj && mj.kind === 'turn') {
       const conCalles = ctx.adjacency ? junctionManeuver({ ...ctx, i: j, iEnd: jEnd }, gapM, spanM, skip, curveSpanM).m : null;
-      if (!conCalles || conCalles.kind !== 'turn' || !conCalles.quiet) return true;
+      if (!conCalles || conCalles.kind !== 'turn' || !conCalles.quiet) {
+        const giro = conCalles && conCalles.kind === 'turn' ? conCalles : mj;
+        return !forkDirection || giro.direction === forkDirection || !salidaDeUnaMano(ctx, pts[iEnd][4]);
+      }
     }
     j = jEnd;
   }
