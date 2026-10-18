@@ -92,6 +92,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.
   Juntar siempre no: mezcla el giro con la curva de la calle de despues.
+- Una bifurcacion se deja al giro que viene a menos de 250 m solo si ese
+  giro se anuncia (`turnAfterFork`): la curva callada de una rampa que
+  termina en una T sin otra salida tapaba la salida 50 de la I-25 en
+  Walsenburg (ATS, 18-10) y no se decia nada.
 - Una salida que a los 150 m vuelve por donde se vino (la calzada contraria
   donde termina una autovia) no es rama de una bifurcacion (`forkInCurve`).
 - Dos calzadas de un sentido que se separan casi paralelas (la colectora al
