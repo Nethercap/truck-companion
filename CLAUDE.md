@@ -43,6 +43,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Actions y en la PC del maintainer). check_avisos, el simulador y
   `check_map_*` lo mandan solo a maps.trucksim-dash.com; sin el secreto,
   check_avisos se saltea con un aviso (el PR de un fork no lo recibe).
+  Si se cambia el secreto, en los tres lugares a la vez (GitHub, la regla
+  con su Deploy, la PC), o check_avisos falla con 403. La URL r2.dev del
+  bucket esta apagada (saltearia la regla); el CORS del bucket queda en `*`
+  porque el modo LAN pide desde direcciones que cambian en cada casa.
 - Un archivo de mapa nuevo es opcional en la web: sin el, la app hace lo
   de antes (sin flechas de carril, por ejemplo), nunca deja de rutear.
 - Desde un navegador, el relay (`SoloOrigenesPropios` en backend/main.py)
@@ -50,6 +54,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`http://<ip>:27765`, localhost, IPs privadas); sin header Origin (cliente,
   curl) no mira nada. Una pagina en otro dominio no conecta:
   `TRUCKDASH_ORIGENES=avisar` en Railway la deja pasar y anota el origen.
+  Una app nativa no manda Origin y entra igual: los terminos
+  (`docs/terms.html`, "The relay and other apps", 18-10) prohiben conectar
+  otras apps sin permiso escrito; bloquearlas de verdad seria otra medida.
 - En el `-lanes.bin`, el giro de un paso lleva +64 (`CARRIL_QUE_SE_PIERDE`
   del constructor, `drop` de `lanesForEdge`) si se sigue derecho y un
   carril que venia de antes del cruce anterior se va por una salida: ahi
@@ -117,6 +124,26 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   despues de tocar el ruteo o los avisos, con la misma `--semilla`.
   `--estados or,wa` (y `--destinos`) eligen rutas de esos estados; cada
   "turn" queda en `giros.json` con las otras salidas de su cruce.
+
+## Pendientes y decisiones (18-10)
+
+- macOS: un usuario porto el plugin (dice que el juego en Mac lo carga) e
+  hizo su propia app estilo CarPlay. Plan propio, por etapas: el plugin con
+  `shm_open` o un archivo en vez de `CreateFileMapping`
+  (`plugin/scs-telemetry/src/sharedmemory.cpp`), compilado en un runner
+  macOS para Intel y Apple Silicon; `telemetry_compat.py` y
+  `plugin_installer.py` con los caminos de Mac; beta desde el codigo con
+  `client.py` (sin overlay ni botonera); despues un `.app`. Falta quien lo
+  pruebe con el juego en una Mac. Sin empezar.
+- Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
+  proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
+- Las flechas de carril (con giro o sin aviso) no tienen ajuste para
+  apagarlas. Si se agrega, el texto va en todos los idiomas de la app.
+- La guia no menciona las flechas sin aviso; su frase de los carriles sigue
+  siendo cierta.
+- Propuestas de afuera: pedir el codigo en un repo publico antes de mirar
+  o correr nada; los forks y ports, con su propio nombre, relay y mapas
+  (README y terminos). Registrar la marca quedo como sugerencia.
 
 ## Modales, overlay de OBS y accesibilidad (13-10)
 
