@@ -4,6 +4,12 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Build my map reads the cities, ferries and companies of the EAA map. Before, the map built with
+  EAA came out without cities, because EAA writes city and ferry names as plain text and names its
+  company and cargo entries in a different way.
+
 ## 1.5.32 (2026-10-17)
 
 - License: from this version Truck Dash is under the GNU AGPL v3 instead of MIT. Nothing changes for
