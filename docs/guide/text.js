@@ -154,12 +154,13 @@ GUIDE_TEXT.en = {
 <p>A small panel the client draws over the game, so you see the essentials without looking away from the road. Windows only (not under Linux with Proton), with the game in a window or in borderless fullscreen.</p>
 <ul>
 <li><b>Speed and speed limit</b>, straight from the game. The limit blinks when you go over it.</li>
-<li><b>Next turn and next city</b>, <b>distance left</b> and <b>arrival</b> in real time. These come from the dashboard, so keep it open with a route (on your phone, a tablet or this PC). Without it, the distance left comes from the game's own GPS.</li>
+<li><b>Next turn and next city</b>, <b>distance left</b> and <b>arrival</b> in real time. These come from the dashboard, so keep it open with a route (on your phone, a tablet or this PC). Without it, the distance left comes from the game's own GPS. At junctions with several lanes, the lane arrows show up under the turn, with the ones for your turn in blue.</li>
 <li><b>Arrival on the game clock</b>, to check against your job's deadline. This one works without the dashboard.</li>
+<li><b>Fuel and rest stops</b>: a bar from where you are to your destination. An orange stripe marks where to fill up before the tank runs dry, a purple one where to stop to sleep. No stripe means you get there without stopping.</li>
 </ul>
 <h3>Turning it on</h3>
 <p>In <b>Setup &amp; status</b>, section <b>In-game overlay</b>, or from the tray menu. In the game, <b>Ctrl+Shift+O</b> shows and hides it (you can pick another shortcut, or none).</p>
-<p>The same section sets its <b>position</b> (a corner, or <b>Move</b> to drag it anywhere with the mouse and then <b>Done</b>), its <b>size</b>, its <b>opacity</b> and <b>what it shows</b>: the next turn, speed and limit, cruise control, gear, distance left and the two arrival times. In <b>Move</b> mode you can also resize it from its bottom-right corner or with the mouse wheel. Its texts follow the dashboard's language.</p>
+<p>The same section sets its <b>position</b> (a corner, or <b>Move</b> to drag it anywhere with the mouse and then <b>Done</b>), its <b>size</b>, its <b>opacity</b> and <b>what it shows</b>: the next turn, speed and limit, cruise control, gear, distance left, the two arrival times and the fuel and rest stops. In <b>Move</b> mode you can also resize it from its bottom-right corner or with the mouse wheel. Its texts follow the dashboard's language.</p>
 <div class="tip"><p>It never takes focus from the game and clicks go right through it. It hides when you leave the game or pause. With voice guidance on in the dashboard's Settings, the dashboard also speaks the turns while the overlay is on.</p></div>
 <div class="tip"><p>Streaming? <a href="/overlay/">trucksim-dash.com/overlay</a> builds a free overlay for OBS with the same things to pick from: speed and limit, next turn, distance left and arrival times. The turn comes from the dashboard here too.</p></div>`,
     account: `
@@ -367,12 +368,13 @@ GUIDE_TEXT.es = {
 <p>Un recuadro que el cliente dibuja sobre el juego, para ver lo importante sin sacar la vista de la ruta. Solo en Windows (no en Linux con Proton), con el juego en ventana o en pantalla completa sin bordes.</p>
 <ul>
 <li><b>Velocidad y límite</b>, directo del juego. El límite titila si te pasás.</li>
-<li><b>Próximo giro y próxima ciudad</b>, <b>lo que falta</b> y la <b>llegada</b> en hora real. Salen del tablero, así que tenelo abierto con una ruta (en el celular, una tablet o esta PC). Sin el tablero, lo que falta sale del GPS del propio juego.</li>
+<li><b>Próximo giro y próxima ciudad</b>, <b>lo que falta</b> y la <b>llegada</b> en hora real. Salen del tablero, así que tenelo abierto con una ruta (en el celular, una tablet o esta PC). Sin el tablero, lo que falta sale del GPS del propio juego. En cruces con varios carriles, abajo del giro aparecen las flechas de carril, con las de tu giro en azul.</li>
 <li><b>Llegada en el reloj del juego</b>, para compararla con el plazo del trabajo. Esta anda sin el tablero.</li>
+<li><b>Paradas de combustible y descanso</b>: una barra desde donde estás hasta el destino. Una franja naranja marca dónde cargar antes de quedarte sin combustible y una violeta, dónde parar a dormir. Sin franja, llegás sin parar.</li>
 </ul>
 <h3>Cómo prenderlo</h3>
 <p>En <b>Configuración y estado</b>, sección <b>Overlay en el juego</b>, o desde el menú de la bandeja. En el juego, <b>Ctrl+Shift+O</b> lo muestra y lo esconde (podés elegir otro atajo, o ninguno).</p>
-<p>En la misma sección elegís la <b>posición</b> (una esquina, o <b>Mover</b> para arrastrarlo con el mouse adonde quieras y después <b>Listo</b>), el <b>tamaño</b>, la <b>opacidad</b> y <b>qué muestra</b>: el próximo giro, la velocidad y el límite, el control de crucero, la marcha, lo que falta y las dos llegadas. En el modo <b>Mover</b> también lo agrandás o achicás desde la esquina de abajo a la derecha o con la rueda del mouse. Sus textos siguen el idioma del tablero.</p>
+<p>En la misma sección elegís la <b>posición</b> (una esquina, o <b>Mover</b> para arrastrarlo con el mouse adonde quieras y después <b>Listo</b>), el <b>tamaño</b>, la <b>opacidad</b> y <b>qué muestra</b>: el próximo giro, la velocidad y el límite, el control de crucero, la marcha, lo que falta, las dos llegadas y las paradas de combustible y descanso. En el modo <b>Mover</b> también lo agrandás o achicás desde la esquina de abajo a la derecha o con la rueda del mouse. Sus textos siguen el idioma del tablero.</p>
 <div class="tip"><p>Nunca le saca el foco al juego y los clics pasan a través. Se esconde cuando salís del juego o lo pausás. Con la guía por voz prendida en Ajustes del tablero, el tablero también dice los giros mientras el overlay está prendido.</p></div>
 <div class="tip"><p>¿Hacés streams? En <a href="/overlay/">trucksim-dash.com/overlay</a> armás un overlay gratis para OBS, con lo mismo para elegir: velocidad y límite, próximo giro, lo que falta y las llegadas. El giro también sale del tablero.</p></div>`,
     account: `

@@ -150,12 +150,13 @@ GUIDE_TEXT.de = {
 <p>Ein kleines Feld, das der Client über das Spiel legt: das Wichtigste, ohne den Blick von der Straße zu nehmen. Nur unter Windows, mit dem Spiel im Fenster oder im randlosen Vollbild.</p>
 <ul>
 <li><b>Tempo und Tempolimit</b>, direkt aus dem Spiel. Das Limit blinkt, wenn du zu schnell bist.</li>
-<li><b>Nächste Abbiegung und nächste Stadt</b>, <b>Restweg</b> und <b>Ankunft</b> in Echtzeit. Das kommt vom Armaturenbrett, lass es also mit einer Route offen (Handy, Tablet oder dieser PC). Ohne es kommt der Restweg vom Navi des Spiels.</li>
+<li><b>Nächste Abbiegung und nächste Stadt</b>, <b>Restweg</b> und <b>Ankunft</b> in Echtzeit. Das kommt vom Armaturenbrett, lass es also mit einer Route offen (Handy, Tablet oder dieser PC). Ohne es kommt der Restweg vom Navi des Spiels. An Kreuzungen mit mehreren Spuren erscheinen unter der Abbiegung die Spurpfeile, die für deine Abbiegung in Blau.</li>
 <li><b>Ankunft auf der Spieluhr</b>, zum Vergleich mit der Lieferfrist. Das geht auch ohne Armaturenbrett.</li>
+<li><b>Tank- und Ruhepausen</b>: ein Balken von deiner Position bis zum Ziel. Ein oranger Streifen zeigt, wo du tanken solltest, bevor der Tank leer ist, ein violetter, wo du zum Schlafen anhalten solltest. Ohne Streifen kommst du ohne Halt an.</li>
 </ul>
 <h3>Einschalten</h3>
 <p>In <b>Einrichtung &amp; Status</b>, Abschnitt <b>Overlay im Spiel</b>, oder im Menü des Tray-Symbols. Im Spiel blendest du es mit <b>Strg+Umschalt+O</b> ein und aus (anderes Kürzel oder keins wählbar).</p>
-<p>Im selben Abschnitt wählst du die <b>Position</b> (eine Ecke, oder <b>Verschieben</b>, um es mit der Maus irgendwohin zu ziehen, dann <b>Fertig</b>), die <b>Größe</b>, die <b>Deckkraft</b> und <b>was es zeigt</b>: nächste Abbiegung, Tempo und Limit, Tempomat, Gang, Restweg und die beiden Ankunftszeiten. Im Modus <b>Verschieben</b> änderst du die Größe auch an der Ecke unten rechts oder mit dem Mausrad. Die Texte folgen der Sprache des Armaturenbretts.</p>
+<p>Im selben Abschnitt wählst du die <b>Position</b> (eine Ecke, oder <b>Verschieben</b>, um es mit der Maus irgendwohin zu ziehen, dann <b>Fertig</b>), die <b>Größe</b>, die <b>Deckkraft</b> und <b>was es zeigt</b>: nächste Abbiegung, Tempo und Limit, Tempomat, Gang, Restweg, die beiden Ankunftszeiten sowie Tank- und Ruhepausen. Im Modus <b>Verschieben</b> änderst du die Größe auch an der Ecke unten rechts oder mit dem Mausrad. Die Texte folgen der Sprache des Armaturenbretts.</p>
 <div class="tip"><p>Es nimmt dem Spiel nie den Fokus, und Klicks gehen hindurch. Es verschwindet, wenn du das Spiel verlässt oder pausierst. Mit eingeschalteter Sprachansage in den Einstellungen des Armaturenbretts sagt das Armaturenbrett die Abbiegungen auch an, solange das Overlay an ist.</p></div>
 <div class="tip"><p>Du streamst? Unter <a href="/overlay/">trucksim-dash.com/overlay</a> erstellst du ein kostenloses Overlay für OBS mit derselben Auswahl: Tempo und Limit, nächste Abbiegung, Restweg und Ankunftszeiten. Die Abbiegung kommt auch hier vom Dashboard.</p></div>`,
     account: `
@@ -362,12 +363,13 @@ GUIDE_TEXT.fr = {
 <p>Un petit cadre que le client dessine par-dessus le jeu, pour voir l'essentiel sans quitter la route des yeux. Windows uniquement, avec le jeu en fenêtre ou en plein écran sans bordure.</p>
 <ul>
 <li><b>Vitesse et limitation</b>, directement depuis le jeu. La limite clignote quand tu la dépasses.</li>
-<li><b>Prochain virage et prochaine ville</b>, <b>distance restante</b> et <b>arrivée</b> en temps réel. Ils viennent du tableau de bord : garde-le ouvert avec un itinéraire (téléphone, tablette ou ce PC). Sans lui, la distance restante vient du GPS du jeu.</li>
+<li><b>Prochain virage et prochaine ville</b>, <b>distance restante</b> et <b>arrivée</b> en temps réel. Ils viennent du tableau de bord : garde-le ouvert avec un itinéraire (téléphone, tablette ou ce PC). Sans lui, la distance restante vient du GPS du jeu. Aux carrefours à plusieurs voies, les flèches de voie s'affichent sous le virage, celles de ton virage en bleu.</li>
 <li><b>Arrivée à l'horloge du jeu</b>, à comparer avec le délai de la mission. Elle marche sans le tableau de bord.</li>
+<li><b>Arrêts carburant et repos</b> : une barre de ta position jusqu'à la destination. Une bande orange indique où faire le plein avant que le réservoir soit vide, une violette où t'arrêter pour dormir. Sans bande, tu arrives sans t'arrêter.</li>
 </ul>
 <h3>L'activer</h3>
 <p>Dans <b>Configuration et état</b>, section <b>Overlay en jeu</b>, ou depuis le menu de l'icône. En jeu, <b>Ctrl+Maj+O</b> l'affiche et le cache (tu peux choisir un autre raccourci, ou aucun).</p>
-<p>La même section règle sa <b>position</b> (un coin, ou <b>Déplacer</b> pour le faire glisser à la souris où tu veux, puis <b>Terminé</b>), sa <b>taille</b>, son <b>opacité</b> et <b>ce qu'il affiche</b> : prochain virage, vitesse et limite, régulateur de vitesse, rapport engagé, distance restante et les deux heures d'arrivée. En mode <b>Déplacer</b>, tu peux aussi le redimensionner par le coin en bas à droite ou avec la molette. Ses textes suivent la langue du tableau de bord.</p>
+<p>La même section règle sa <b>position</b> (un coin, ou <b>Déplacer</b> pour le faire glisser à la souris où tu veux, puis <b>Terminé</b>), sa <b>taille</b>, son <b>opacité</b> et <b>ce qu'il affiche</b> : prochain virage, vitesse et limite, régulateur de vitesse, rapport engagé, distance restante, les deux heures d'arrivée et les arrêts carburant et repos. En mode <b>Déplacer</b>, tu peux aussi le redimensionner par le coin en bas à droite ou avec la molette. Ses textes suivent la langue du tableau de bord.</p>
 <div class="tip"><p>Il ne prend jamais le focus du jeu et les clics le traversent. Il se cache quand tu quittes le jeu ou le mets en pause. Avec le guidage vocal activé dans les Réglages du tableau de bord, le tableau de bord annonce aussi les virages tant que l'overlay est actif.</p></div>
 <div class="tip"><p>Tu streames ? Sur <a href="/overlay/">trucksim-dash.com/overlay</a>, tu crées un overlay gratuit pour OBS avec les mêmes choix : vitesse et limite, prochain virage, distance restante et heures d'arrivée. Le virage vient là aussi du tableau de bord.</p></div>`,
     account: `
@@ -574,12 +576,13 @@ GUIDE_TEXT.pt = {
 <p>Um quadro que o cliente desenha sobre o jogo, para ver o essencial sem tirar os olhos da estrada. Só no Windows, com o jogo em janela ou em tela cheia sem bordas.</p>
 <ul>
 <li><b>Velocidade e limite</b>, direto do jogo. O limite pisca quando você passa dele.</li>
-<li><b>Próxima curva e próxima cidade</b>, <b>distância restante</b> e <b>chegada</b> no horário real. Vêm do painel, então deixe-o aberto com uma rota (celular, tablet ou este PC). Sem ele, a distância restante vem do GPS do próprio jogo.</li>
+<li><b>Próxima curva e próxima cidade</b>, <b>distância restante</b> e <b>chegada</b> no horário real. Vêm do painel, então deixe-o aberto com uma rota (celular, tablet ou este PC). Sem ele, a distância restante vem do GPS do próprio jogo. Em cruzamentos com várias faixas, as setas de faixa aparecem embaixo da curva, com as da sua curva em azul.</li>
 <li><b>Chegada no relógio do jogo</b>, para comparar com o prazo da entrega. Esta funciona sem o painel.</li>
+<li><b>Paradas para combustível e descanso</b>: uma barra de onde você está até o destino. Uma listra laranja marca onde abastecer antes de o tanque secar, e uma roxa, onde parar para dormir. Sem listra, você chega sem parar.</li>
 </ul>
 <h3>Como ligar</h3>
 <p>Em <b>Configuração e status</b>, seção <b>Overlay no jogo</b>, ou pelo menu da bandeja. No jogo, <b>Ctrl+Shift+O</b> mostra e esconde (dá para escolher outro atalho, ou nenhum).</p>
-<p>Na mesma seção você escolhe a <b>posição</b> (um canto, ou <b>Mover</b> para arrastar com o mouse para onde quiser e depois <b>Pronto</b>), o <b>tamanho</b>, a <b>opacidade</b> e <b>o que ele mostra</b>: a próxima curva, velocidade e limite, piloto automático, marcha, distância restante e os dois horários de chegada. No modo <b>Mover</b> você também muda o tamanho pelo canto inferior direito ou com a roda do mouse. Os textos seguem o idioma do painel.</p>
+<p>Na mesma seção você escolhe a <b>posição</b> (um canto, ou <b>Mover</b> para arrastar com o mouse para onde quiser e depois <b>Pronto</b>), o <b>tamanho</b>, a <b>opacidade</b> e <b>o que ele mostra</b>: a próxima curva, velocidade e limite, piloto automático, marcha, distância restante, os dois horários de chegada e as paradas para combustível e descanso. No modo <b>Mover</b> você também muda o tamanho pelo canto inferior direito ou com a roda do mouse. Os textos seguem o idioma do painel.</p>
 <div class="tip"><p>Ele nunca tira o foco do jogo e os cliques passam através dele. Some quando você sai do jogo ou pausa. Com a orientação por voz ligada nas Configurações do painel, o painel também fala as curvas enquanto o overlay está ligado.</p></div>
 <div class="tip"><p>Faz lives? Em <a href="/overlay/">trucksim-dash.com/overlay</a> você monta um overlay grátis para o OBS com as mesmas opções: velocidade e limite, próxima curva, distância restante e horários de chegada. A curva também vem do painel.</p></div>`,
     account: `
@@ -786,12 +789,13 @@ GUIDE_TEXT.pl = {
 <p>Małe okienko, które klient rysuje nad grą: to, co najważniejsze, bez odrywania wzroku od drogi. Tylko Windows, z grą w oknie lub w pełnym ekranie bez ramek.</p>
 <ul>
 <li><b>Prędkość i ograniczenie</b>, prosto z gry. Limit miga, gdy go przekroczysz.</li>
-<li><b>Następny skręt i następne miasto</b>, <b>pozostały dystans</b> i <b>przyjazd</b> w czasie rzeczywistym. Pochodzą z pulpitu, więc miej go otwartego z trasą (telefon, tablet lub ten PC). Bez niego pozostały dystans bierze się z GPS gry.</li>
+<li><b>Następny skręt i następne miasto</b>, <b>pozostały dystans</b> i <b>przyjazd</b> w czasie rzeczywistym. Pochodzą z pulpitu, więc miej go otwartego z trasą (telefon, tablet lub ten PC). Bez niego pozostały dystans bierze się z GPS gry. Na skrzyżowaniach z kilkoma pasami pod skrętem pojawiają się strzałki pasów, te dla twojego skrętu na niebiesko.</li>
 <li><b>Przyjazd według zegara gry</b>, do porównania z terminem zlecenia. Działa bez pulpitu.</li>
+<li><b>Postoje na paliwo i odpoczynek</b>: pasek od miejsca, w którym jesteś, do celu. Pomarańczowy odcinek pokazuje, gdzie zatankować, zanim skończy się paliwo, a fioletowy, gdzie zatrzymać się na sen. Bez odcinków dojedziesz bez postoju.</li>
 </ul>
 <h3>Włączanie</h3>
 <p>W <b>Konfiguracja i stan</b>, sekcja <b>Nakładka w grze</b>, albo z menu ikony w zasobniku. W grze <b>Ctrl+Shift+O</b> ją pokazuje i ukrywa (możesz wybrać inny skrót albo żaden).</p>
-<p>W tej samej sekcji ustawisz <b>położenie</b> (róg ekranu albo <b>Przesuń</b>, żeby przeciągnąć ją myszą w dowolne miejsce, a potem <b>Gotowe</b>), <b>rozmiar</b>, <b>krycie</b> i <b>co pokazuje</b>: następny skręt, prędkość i limit, tempomat, bieg, pozostały dystans i obie godziny przyjazdu. W trybie <b>Przesuń</b> zmienisz też rozmiar, ciągnąc prawy dolny róg albo kółkiem myszy. Jej teksty są w języku pulpitu.</p>
+<p>W tej samej sekcji ustawisz <b>położenie</b> (róg ekranu albo <b>Przesuń</b>, żeby przeciągnąć ją myszą w dowolne miejsce, a potem <b>Gotowe</b>), <b>rozmiar</b>, <b>krycie</b> i <b>co pokazuje</b>: następny skręt, prędkość i limit, tempomat, bieg, pozostały dystans, obie godziny przyjazdu oraz postoje na paliwo i odpoczynek. W trybie <b>Przesuń</b> zmienisz też rozmiar, ciągnąc prawy dolny róg albo kółkiem myszy. Jej teksty są w języku pulpitu.</p>
 <div class="tip"><p>Nigdy nie zabiera grze fokusu, a kliknięcia przez nią przechodzą. Znika, gdy wychodzisz z gry albo ją pauzujesz. Z włączonymi wskazówkami głosowymi w Ustawieniach pulpitu pulpit mówi też o skrętach, gdy nakładka jest włączona.</p></div>
 <div class="tip"><p>Streamujesz? Na <a href="/overlay/">trucksim-dash.com/overlay</a> zrobisz darmową nakładkę do OBS z tymi samymi opcjami: prędkość i limit, następny skręt, pozostały dystans i godziny przyjazdu. Skręt też pochodzi z pulpitu.</p></div>`,
     account: `
@@ -998,12 +1002,13 @@ GUIDE_TEXT.tr = {
 <p>İstemcinin oyunun üzerine çizdiği küçük bir kutu: gözünü yoldan ayırmadan önemli bilgiler. Yalnızca Windows'ta, oyun pencerede veya kenarlıksız tam ekrandayken.</p>
 <ul>
 <li><b>Hız ve hız sınırı</b>, doğrudan oyundan. Sınırı aşınca sınır işareti yanıp söner.</li>
-<li><b>Sonraki dönüş ve sonraki şehir</b>, <b>kalan mesafe</b> ve gerçek saatle <b>varış</b>. Bunlar panodan gelir, bu yüzden panoyu bir rotayla açık tut (telefon, tablet veya bu PC). Pano yoksa kalan mesafe oyunun kendi GPS'inden gelir.</li>
+<li><b>Sonraki dönüş ve sonraki şehir</b>, <b>kalan mesafe</b> ve gerçek saatle <b>varış</b>. Bunlar panodan gelir, bu yüzden panoyu bir rotayla açık tut (telefon, tablet veya bu PC). Pano yoksa kalan mesafe oyunun kendi GPS'inden gelir. Birden fazla şeritli kavşaklarda dönüşün altında şerit okları çıkar; senin dönüşünün okları mavidir.</li>
 <li><b>Oyun saatine göre varış</b>, işin teslim süresiyle karşılaştırmak için. Bu, pano olmadan da çalışır.</li>
+<li><b>Yakıt ve mola durakları</b>: bulunduğun yerden varış noktasına kadar bir çubuk. Turuncu bant, depo bitmeden nerede yakıt alman gerektiğini, mor bant da uyumak için nerede durman gerektiğini gösterir. Bant yoksa durmadan varırsın.</li>
 </ul>
 <h3>Açmak için</h3>
 <p><b>Kurulum ve durum</b> içinde <b>Oyun içi katman</b> bölümünden ya da tepsi menüsünden. Oyunda <b>Ctrl+Shift+O</b> onu gösterir ve gizler (başka bir kısayol seçebilir ya da hiç kullanmayabilirsin).</p>
-<p>Aynı bölümde <b>konumunu</b> (bir köşe ya da fareyle istediğin yere sürüklemek için <b>Taşı</b>, sonra <b>Tamam</b>), <b>boyutunu</b>, <b>opaklığını</b> ve <b>neyi gösterdiğini</b> seçersin: sonraki dönüş, hız ve sınır, hız sabitleyici, vites, kalan mesafe ve iki varış saati. <b>Taşı</b> modunda sağ alt köşeden ya da fare tekerleğiyle boyutunu da değiştirebilirsin. Yazıları panonun dilini izler.</p>
+<p>Aynı bölümde <b>konumunu</b> (bir köşe ya da fareyle istediğin yere sürüklemek için <b>Taşı</b>, sonra <b>Tamam</b>), <b>boyutunu</b>, <b>opaklığını</b> ve <b>neyi gösterdiğini</b> seçersin: sonraki dönüş, hız ve sınır, hız sabitleyici, vites, kalan mesafe, iki varış saati, yakıt ve mola durakları. <b>Taşı</b> modunda sağ alt köşeden ya da fare tekerleğiyle boyutunu da değiştirebilirsin. Yazıları panonun dilini izler.</p>
 <div class="tip"><p>Oyunun odağını asla almaz ve tıklamalar içinden geçer. Oyundan çıkınca ya da oyunu duraklatınca gizlenir. Panonun Ayarlar'ında sesli yönlendirme açıksa, katman açıkken pano dönüşleri de söyler.</p></div>
 <div class="tip"><p>Yayın mı yapıyorsun? <a href="/overlay/">trucksim-dash.com/overlay</a> adresinde aynı seçeneklerle OBS için ücretsiz bir overlay hazırlarsın: hız ve sınır, sonraki dönüş, kalan mesafe ve varış saatleri. Dönüş burada da panelden gelir.</p></div>`,
     account: `
@@ -1210,12 +1215,13 @@ GUIDE_TEXT.ru = {
 <p>Небольшое окно, которое клиент рисует поверх игры: главное, не отрывая взгляда от дороги. Только Windows, игра в окне или в полноэкранном режиме без рамки.</p>
 <ul>
 <li><b>Скорость и ограничение скорости</b>, прямо из игры. Знак мигает, когда вы превышаете.</li>
-<li><b>Следующий поворот и следующий город</b>, <b>оставшееся расстояние</b> и <b>прибытие</b> по реальному времени. Это приходит с панели, поэтому держите её открытой с маршрутом (телефон, планшет или этот ПК). Без неё оставшееся расстояние берётся из навигатора игры.</li>
+<li><b>Следующий поворот и следующий город</b>, <b>оставшееся расстояние</b> и <b>прибытие</b> по реальному времени. Это приходит с панели, поэтому держите её открытой с маршрутом (телефон, планшет или этот ПК). Без неё оставшееся расстояние берётся из навигатора игры. На перекрёстках с несколькими полосами под поворотом появляются стрелки полос, а нужные для вашего поворота — синие.</li>
 <li><b>Прибытие по часам игры</b>, чтобы сравнить со сроком заказа. Работает и без панели.</li>
+<li><b>Остановки: топливо и отдых</b>: шкала от вашего места до пункта назначения. Оранжевый участок показывает, где заправиться, пока бак не опустел, фиолетовый — где остановиться на сон. Без участков вы доедете без остановок.</li>
 </ul>
 <h3>Как включить</h3>
 <p>В <b>Настройка и состояние</b>, раздел <b>Оверлей в игре</b>, или в меню значка в трее. В игре <b>Ctrl+Shift+O</b> показывает и скрывает его (можно выбрать другое сочетание или никакое).</p>
-<p>В том же разделе выбираются <b>положение</b> (угол или <b>Переместить</b>, чтобы перетащить его мышью куда угодно, затем <b>Готово</b>), <b>размер</b>, <b>непрозрачность</b> и <b>что показывать</b>: следующий поворот, скорость и ограничение, круиз-контроль, передача, оставшийся путь и оба времени прибытия. В режиме <b>Переместить</b> размер можно менять и за правый нижний угол или колёсиком мыши. Тексты идут на языке панели.</p>
+<p>В том же разделе выбираются <b>положение</b> (угол или <b>Переместить</b>, чтобы перетащить его мышью куда угодно, затем <b>Готово</b>), <b>размер</b>, <b>непрозрачность</b> и <b>что показывать</b>: следующий поворот, скорость и ограничение, круиз-контроль, передача, оставшийся путь, оба времени прибытия и остановки на топливо и отдых. В режиме <b>Переместить</b> размер можно менять и за правый нижний угол или колёсиком мыши. Тексты идут на языке панели.</p>
 <div class="tip"><p>Он никогда не забирает фокус у игры, и клики проходят сквозь него. Он скрывается, когда вы выходите из игры или ставите паузу. Если в Настройках панели включены голосовые подсказки, панель проговаривает повороты и при включённом оверлее.</p></div>
 <div class="tip"><p>Ведёте стримы? На <a href="/overlay/">trucksim-dash.com/overlay</a> можно собрать бесплатный оверлей для OBS с тем же выбором: скорость и ограничение, следующий поворот, оставшийся путь и время прибытия. Поворот и здесь берётся из панели.</p></div>`,
     account: `
