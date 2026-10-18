@@ -374,6 +374,20 @@ test('maneuver: esquina con un brazo muerto del prefab no es la entrada a una ro
   assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).quiet], ['turn', false]);
 });
 
+test('maneuver: la esquina en escuadra de una cruz con dos brazos muertos se anuncia (salida 115 de Rockford, Discord 18-10)', () => {
+  // la calle llega del sur y en la cruz (nodo 1) dobla 90 grados al este; el
+  // prefab tiene dos brazos mas, al norte y al oeste, que no llevan a ninguna calle
+  const route = [[0, -300], [0, 0], [300, 0], [600, 0]];
+  const muertos = [[0, 30], [-30, 0]];
+  const cruz = (r, extra = muertos) => scenario({ route: r, extraNodes: extra, edges: extra.flatMap((_, k) => [[1, r.length + k], [r.length + k, 1]]) });
+  assert.deepEqual([detectManeuver(cruz(route)).kind, detectManeuver(cruz(route)).quiet], ['turn', false]);
+  // con un solo brazo muerto es una esquina con un prefab en T: callada (Oregon, 17-10)
+  assert.equal(detectManeuver(cruz(route, [[0, 30]])).quiet, true);
+  // con la calle doblando otra vez enseguida (zigzag, sierra): callada
+  const zigzag = [[0, -300], [0, 0], [60, 0], [100, -40], [100, -300]];
+  assert.equal(detectManeuver(cruz(zigzag)).quiet, true);
+});
+
 test('continuesTurn: una esquina partida en dos nodos se anuncia una vez; dos giros de verdad, dos', () => {
   const prev = { direction: 'left', inBearing: 0, outBearing: 315, quiet: false, end: 1000 };
   // segunda mitad de la misma esquina: de la entrada (norte) a la salida (oeste) son 90 grados
