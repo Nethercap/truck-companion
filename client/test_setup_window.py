@@ -831,3 +831,20 @@ def test_modo_lan_apagado_hasta_prenderlo_y_queda_guardado(ventana, monkeypatch)
     assert v.lan_hint_label.cget("text") == i18n.T("lan_hint")
     assert v.copy_lan_btn.winfo_manager() == "pack" and not v.lan_on_btn.winfo_manager()
     assert v.qr_label.cget("image")
+
+
+def test_modo_lan_apagado_con_el_puerto_tomado_lo_dice(ventana, monkeypatch):
+    """Issue #4: si ni en esta PC pudo escuchar, Setup dice el puerto ocupado
+    y no solo "apagado"."""
+    import i18n
+    import local_server
+    v, _ = ventana
+
+    class Ocupado(_LanFalso):
+        error = "[WinError 10048] puerto en uso"
+        port_in_use = True
+    monkeypatch.setattr(tray_client.state, "local", Ocupado())
+    monkeypatch.setattr(tray_client.state, "lan_en_la_red", False)
+    v.render_lan()
+    esperado = i18n.T("lan_unavailable", reason=i18n.T("lan_port_busy", port=local_server.HTTP_PORT))
+    assert v.lan_url_label.cget("text") == esperado

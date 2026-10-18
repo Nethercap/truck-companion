@@ -1240,7 +1240,10 @@ class SetupWindow:
         else:
             self.lan_public_frame.pack_forget()
         if cerrado:
-            self.lan_url_label.configure(text=T("lan_off"), fg=MUTED)
+            # Si ni siquiera pudo escuchar en esta PC (puerto tomado, issue #4),
+            # eso es lo que hay que decir, no "apagado".
+            texto = T("lan_unavailable", reason=lan_motivo(srv)) if srv and srv.error else T("lan_off")
+            self.lan_url_label.configure(text=texto, fg=MUTED)
             self.lan_hint_label.configure(text=T("lan_off_hint"))
             self.qr_label.configure(image="", text="")
             self.copy_lan_btn.pack_forget()
@@ -1253,13 +1256,7 @@ class SetupWindow:
             self.copy_lan_btn.pack(side="left", before=self.open_here_btn)
         url = srv.url if srv else None
         if not srv or srv.error or not srv.web_ready or not url:
-            if not srv:
-                reason = T("lan_starting")
-            elif getattr(srv, "port_in_use", False):
-                reason = T("lan_port_busy", port=local_server.HTTP_PORT)
-            else:
-                reason = srv.error or T("lan_no_web")
-            self.lan_url_label.configure(text=T("lan_unavailable", reason=reason), fg=MUTED)
+            self.lan_url_label.configure(text=T("lan_unavailable", reason=lan_motivo(srv)), fg=MUTED)
             self.qr_label.configure(image="", text="")
             return
         self.lan_url_label.configure(text=url, fg=BLUE)
@@ -1353,7 +1350,8 @@ class SetupWindow:
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         # La deteccion de la red Publica llega despues (PowerShell, en un hilo).
-        clave_lan = (lan_url, win_integration.red_publica(), state.lan_en_la_red)
+        clave_lan = (lan_url, win_integration.red_publica(), state.lan_en_la_red,
+                     state.local.error if state.local else None)
         if getattr(self, "_last_lan_url", "?") != clave_lan:
             self._last_lan_url = clave_lan
             self.render_lan()
@@ -1486,6 +1484,21 @@ def open_web_menu_item(icon, item):
         show_text_dialog("Truck Dash", T("dlg_no_code"))
 
 
+def lan_motivo(srv) -> str:
+    """Por que el modo LAN no esta disponible, para Setup."""
+    if not srv:
+        return T("lan_starting")
+    if getattr(srv, "port_in_use", False):
+        return T("lan_port_busy", port=local_server.HTTP_PORT)
+    return srv.error or T("lan_no_web")
+
+
+def _avisar_si_fallo(futuro) -> None:
+    # Lo que _escuchar no atrapa (no es OSError) se perdia con el futuro.
+    if not futuro.cancelled() and futuro.exception() is not None:
+        logging.error("No se pudo abrir el modo LAN a la red", exc_info=futuro.exception())
+
+
 def abrir_modo_lan() -> None:
     """El modo LAN a la red, desde el boton de Setup o el menu de la bandeja:
     ahi es cuando Windows pregunta por el firewall. Queda guardado para los
@@ -1497,7 +1510,7 @@ def abrir_modo_lan() -> None:
         win_integration.save_settings(settings)
         logging.info("Modo LAN abierto a la red desde Setup o el menu")
     if state.local is not None and _loop is not None:
-        asyncio.run_coroutine_threadsafe(state.local.abrir_a_la_red(), _loop)
+        asyncio.run_coroutine_threadsafe(state.local.abrir_a_la_red(), _loop).add_done_callback(_avisar_si_fallo)
 
 
 def show_lan_menu_item(icon, item):
