@@ -629,6 +629,8 @@ class SetupWindow:
                     abrir_ajustes_de_red).pack(anchor="w", pady=(4, 0))
         self.open_here_btn = self.button(lan_btns, T("open_here"), self.open_lan_here)
         self.open_here_btn.pack(side="left", padx=6)
+        # Y para volver atras: el celular deja de llegar y Windows no pregunta mas.
+        self.lan_off_btn = self.button(lan_btns, T("lan_turn_off"), self.turn_off_lan)
         self.render_lan()
 
         # --- Juegos / plugin ---
@@ -1247,6 +1249,7 @@ class SetupWindow:
             self.lan_hint_label.configure(text=T("lan_off_hint"))
             self.qr_label.configure(image="", text="")
             self.copy_lan_btn.pack_forget()
+            self.lan_off_btn.pack_forget()
             if not self.lan_on_btn.winfo_manager():
                 self.lan_on_btn.pack(side="left", before=self.open_here_btn)
             return
@@ -1254,6 +1257,8 @@ class SetupWindow:
         self.lan_on_btn.pack_forget()
         if not self.copy_lan_btn.winfo_manager():
             self.copy_lan_btn.pack(side="left", before=self.open_here_btn)
+        if not self.lan_off_btn.winfo_manager():
+            self.lan_off_btn.pack(side="left", after=self.open_here_btn)
         url = srv.url if srv else None
         if not srv or srv.error or not srv.web_ready or not url:
             self.lan_url_label.configure(text=T("lan_unavailable", reason=lan_motivo(srv)), fg=MUTED)
@@ -1271,6 +1276,10 @@ class SetupWindow:
 
     def turn_on_lan(self):
         abrir_modo_lan()
+        self.render_lan()
+
+    def turn_off_lan(self):
+        poner_modo_lan(False)
         self.render_lan()
 
     def copy_lan_url(self):
@@ -1496,21 +1505,27 @@ def lan_motivo(srv) -> str:
 def _avisar_si_fallo(futuro) -> None:
     # Lo que _escuchar no atrapa (no es OSError) se perdia con el futuro.
     if not futuro.cancelled() and futuro.exception() is not None:
-        logging.error("No se pudo abrir el modo LAN a la red", exc_info=futuro.exception())
+        logging.error("No se pudo cambiar el modo LAN", exc_info=futuro.exception())
+
+
+def poner_modo_lan(en_la_red: bool) -> None:
+    """Prende o apaga el modo LAN desde Setup (o lo prende el menu de la
+    bandeja). Prenderlo es cuando Windows pregunta por el firewall. Queda
+    guardado para los proximos arranques (local_server.lan_al_arrancar), tambien
+    para quien ya lo tenia prendido desde antes de este cambio."""
+    state.lan_en_la_red = en_la_red
+    settings = win_integration.load_settings()
+    if settings.get("lan_open") is not en_la_red:
+        settings["lan_open"] = en_la_red
+        win_integration.save_settings(settings)
+        logging.info("Modo LAN %s desde Setup o el menu", "abierto a la red" if en_la_red else "solo para esta PC")
+    if state.local is not None and _loop is not None:
+        cambio = state.local.abrir_a_la_red() if en_la_red else state.local.cerrar_a_la_red()
+        asyncio.run_coroutine_threadsafe(cambio, _loop).add_done_callback(_avisar_si_fallo)
 
 
 def abrir_modo_lan() -> None:
-    """El modo LAN a la red, desde el boton de Setup o el menu de la bandeja:
-    ahi es cuando Windows pregunta por el firewall. Queda guardado para los
-    proximos arranques (local_server.lan_al_arrancar)."""
-    state.lan_en_la_red = True
-    settings = win_integration.load_settings()
-    if not settings.get("lan_open"):
-        settings["lan_open"] = True
-        win_integration.save_settings(settings)
-        logging.info("Modo LAN abierto a la red desde Setup o el menu")
-    if state.local is not None and _loop is not None:
-        asyncio.run_coroutine_threadsafe(state.local.abrir_a_la_red(), _loop).add_done_callback(_avisar_si_fallo)
+    poner_modo_lan(True)
 
 
 def show_lan_menu_item(icon, item):

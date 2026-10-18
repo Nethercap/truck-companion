@@ -100,8 +100,9 @@ On a new install LAN mode starts off: press **Turn on** in that section of
 Setup, or pick "Same Wi-Fi address" in the tray menu. Until then it only
 answers this PC, so Windows doesn't ask about the firewall (or, for a
 standard user, for an administrator password) when you never use a phone on
-your Wi-Fi. Once turned on it stays on. Installs from before this change
-keep it on, as before.
+your Wi-Fi. Once turned on it stays on until you press **Turn off** in the
+same section. Installs from before this change keep it on, as before, and
+can turn it off there too.
 
 **LAN mode uses two ports, and you need both open:**
 

@@ -831,6 +831,15 @@ def test_modo_lan_apagado_hasta_prenderlo_y_queda_guardado(ventana, monkeypatch)
     assert v.lan_hint_label.cget("text") == i18n.T("lan_hint")
     assert v.copy_lan_btn.winfo_manager() == "pack" and not v.lan_on_btn.winfo_manager()
     assert v.qr_label.cget("image")
+    assert v.lan_off_btn.winfo_manager() == "pack"
+
+    # Y se puede volver atras, tambien quien lo tenia prendido de antes.
+    v.turn_off_lan()
+    assert tray_client.state.lan_en_la_red is False
+    assert guardados.get("lan_open") is False
+    assert v.lan_url_label.cget("text") == i18n.T("lan_off")
+    assert v.lan_on_btn.winfo_manager() == "pack"
+    assert not v.lan_off_btn.winfo_manager() and not v.copy_lan_btn.winfo_manager()
 
 
 def test_modo_lan_apagado_con_el_puerto_tomado_lo_dice(ventana, monkeypatch):

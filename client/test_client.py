@@ -1198,6 +1198,24 @@ def test_lan_abierto_mientras_baja_la_web_escucha_una_sola_vez_en_la_red(monkeyp
     asyncio.run(probar())
 
 
+def test_lan_se_apaga_y_vuelve_a_escuchar_solo_en_esta_pc(monkeypatch):
+    """Quien ya lo usaba (o lo prendio sin querer) lo puede apagar: deja de
+    escuchar en la red y Windows no tiene mas nada que preguntar."""
+    import asyncio
+    escuchas = []
+    local_server = _servidor_lan_falso(monkeypatch, escuchas)
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=True)
+        await srv.start()
+        await srv.cerrar_a_la_red()
+        assert escuchas == [("http", "0.0.0.0"), ("ws", "0.0.0.0"), ("http", "127.0.0.1"), ("ws", "127.0.0.1")]
+        assert not srv.en_la_red and srv.error is None
+        await srv.cerrar_a_la_red()  # ya apagado: nada
+        assert len(escuchas) == 4
+    asyncio.run(probar())
+
+
 def test_lan_al_abrir_reintenta_si_el_puerto_sigue_tomado(monkeypatch):
     """Las conexiones de 127.0.0.1 recien cerradas quedan en TIME_WAIT: el
     primer intento en 0.0.0.0 puede dar "en uso" y al rato no."""

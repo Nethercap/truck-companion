@@ -408,12 +408,20 @@ class LocalServer:
     async def abrir_a_la_red(self) -> None:
         """Pasa de escuchar solo en esta PC a escuchar en la red (de 127.0.0.1
         a 0.0.0.0). Los tableros conectados se caen un momento y reconectan."""
+        await self._poner_en_la_red(True)
+
+    async def cerrar_a_la_red(self) -> None:
+        """Vuelve a escuchar solo en esta PC: los celulares y tablets por WiFi
+        se desconectan, y Windows deja de tener algo que preguntar."""
+        await self._poner_en_la_red(False)
+
+    async def _poner_en_la_red(self, en_la_red: bool) -> None:
         async with self._lock:
-            if self.en_la_red:
+            if self.en_la_red == en_la_red:
                 return
-            self.en_la_red = True
+            self.en_la_red = en_la_red
             if not self._escucho:
-                return  # start() todavia baja la web: va a escuchar ya en la red
+                return  # start() todavia baja la web: va a escuchar ya como corresponde
             await self._cerrar()
             self.error = None
             self.port_in_use = False

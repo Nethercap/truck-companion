@@ -77,8 +77,9 @@ En una instalación nueva el modo LAN arranca apagado: tocá **Prender** en
 esa sección de Setup, o elegí "Dirección en la misma WiFi" en el menú de la
 bandeja. Hasta entonces solo atiende a esta PC, así Windows no pregunta por
 el firewall (ni, a un usuario estándar, por la clave de administrador) si
-nunca usás un celular en tu WiFi. Una vez prendido, queda prendido. Las
-instalaciones de antes de este cambio lo siguen teniendo prendido.
+nunca usás un celular en tu WiFi. Una vez prendido, queda prendido hasta que
+toques **Apagar** en la misma sección. Las instalaciones de antes de este
+cambio lo siguen teniendo prendido, y también lo pueden apagar ahí.
 
 **El modo LAN usa dos puertos y hacen falta los dos abiertos:**
 
