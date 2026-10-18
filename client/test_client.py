@@ -978,6 +978,34 @@ def test_changelog_seccion_corta_en_la_siguiente():
     assert cl.seccion("## 1.0.0\n\n## 0.9.0\n- x\n", "1.0.0") is None
 
 
+def test_avisos_de_terceros_del_zip():
+    """THIRD-PARTY-NOTICES.txt sale de lo instalado: cada paquete que entra al
+    exe con su licencia entera, y pyinstaller no (va su bootloader, aparte)."""
+    import importlib.util
+    ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "avisos_de_terceros.py")
+    spec = importlib.util.spec_from_file_location("avisos_de_terceros", ruta)
+    avisos = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(avisos)
+    texto = avisos.armar()
+    assert texto.startswith("Truck Dash\nCopyright (C) 2026 Nethercap")
+    titulos = [b.split("\n", 1)[0] for b in texto.split(avisos.SEPARADOR + "\n")[1:]]
+    nombres = {t.split(" ")[0].lower() for t in titulos}
+    assert {"websockets", "pystray", "pillow", "qrcode", "truststore", "six"} <= nombres
+    assert "PyInstaller bootloader" in titulos
+    assert [t for t in titulos if t.lower().startswith("pyinstaller")] == ["PyInstaller bootloader"]
+    # La LGPL de pystray pide sus dos textos; la MIT del plugin, el suyo.
+    assert "--- COPYING.LGPL ---" in texto
+    if sys.platform == "win32":
+        assert "pydirectinput" in nombres
+        assert "Copyright (c) 2014 Hans" in texto and "Copyright (C) 2016 SCS Software" in texto
+    # Leer la metadata de todos los paquetes deja mucha basura: si se junta en
+    # el medio de test_setup_window, borra variables de tkinter con la ventana
+    # ya cerrada y pytest avisa. Se junta aca.
+    import gc
+    del texto
+    gc.collect()
+
+
 def test_european_grand_utopia_no_es_el_standalone():
     """Con European Grand Utopia se cargan el y el Grand Utopia original: la
     marca aparte es la que le dice a la web que es Europa, no el mapa de

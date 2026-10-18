@@ -123,6 +123,10 @@ jobs:
           Copy-Item dist/TruckDash.exe release/TruckDash.exe
           Copy-Item README.md release/README.md
           Copy-Item README.es.md release/README.es.md
+          # La licencia y la de lo que va adentro del exe viajan con el zip:
+          # la MIT y la BSD lo piden, y un repack del zip se las lleva.
+          Copy-Item ../LICENSE release/LICENSE.txt
+          python ../tools/avisos_de_terceros.py release/THIRD-PARTY-NOTICES.txt
           Compress-Archive -Path release/* -DestinationPath TruckDash-windows.zip -Force
           $zip = (Get-FileHash TruckDash-windows.zip -Algorithm SHA256).Hash.ToLower()
           $exe = (Get-FileHash dist/TruckDash.exe -Algorithm SHA256).Hash.ToLower()
@@ -334,6 +338,8 @@ jobs:
           mkdir -p release
           cp dist/TruckDash release/TruckDash
           cp README.md README.es.md release/
+          cp ../LICENSE release/LICENSE.txt
+          python ../tools/avisos_de_terceros.py release/THIRD-PARTY-NOTICES.txt
           tar -czf TruckDash-linux-x86_64.tar.gz -C release .
           tgz=$(sha256sum TruckDash-linux-x86_64.tar.gz | cut -d" " -f1)
           bin=$(sha256sum dist/TruckDash | cut -d" " -f1)
