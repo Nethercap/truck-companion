@@ -167,9 +167,12 @@ def main():
         try:
             # Con el User-Agent de Python, Cloudflare devuelve 403 y todos
             # los iconos parecen faltantes. Hay que pedirlo como un navegador.
-            req = urllib.request.Request(
-                f"{ICON_BASE}/{s}.png", method="HEAD",
-                headers={"User-Agent": "Mozilla/5.0 (compatible; TruckDash-check)"})
+            # Y fuera del navegador, el secreto de la regla de los mapas
+            # (TRUCKDASH_MAPS_KEY, ver tools/check_map_mods.py).
+            cabeceras = {"User-Agent": "Mozilla/5.0 (compatible; TruckDash-check)"}
+            if os.environ.get("TRUCKDASH_MAPS_KEY"):
+                cabeceras["x-truckdash-tools"] = os.environ["TRUCKDASH_MAPS_KEY"]
+            req = urllib.request.Request(f"{ICON_BASE}/{s}.png", method="HEAD", headers=cabeceras)
             with urllib.request.urlopen(req, timeout=10) as r:
                 if r.status == 200:
                     iconos_remotos.add(s)

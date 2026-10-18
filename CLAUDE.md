@@ -37,6 +37,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - La regla de cache "Mapas R2" de Cloudflare guarda tambien los 404, por
   variante de compresion: nunca pedir desde la web un archivo antes de que
   este en R2. Si paso, subir el numero de su `?` (paso con `l=1` el 13-10).
+- Otra regla de Cloudflare (WAF, plan Free: sin regex) bloquea los mapas
+  sin Referer de trucksim-dash.com o de la copia LAN (`http://`), salvo con
+  el header `x-truckdash-tools` igual al secreto `TRUCKDASH_MAPS_KEY` (en
+  Actions y en la PC del maintainer). check_avisos, el simulador y
+  `check_map_*` lo mandan solo a maps.trucksim-dash.com; sin el secreto,
+  check_avisos se saltea con un aviso (el PR de un fork no lo recibe).
 - Un archivo de mapa nuevo es opcional en la web: sin el, la app hace lo
   de antes (sin flechas de carril, por ejemplo), nunca deja de rutear.
 - Desde un navegador, el relay (`SoloOrigenesPropios` en backend/main.py)

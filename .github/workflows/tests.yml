@@ -65,6 +65,10 @@ jobs:
       # tools/avisos-golden.json: un cambio de codigo que cambia lo que se
       # anuncia falla y lista cada aviso. Si cambio el grafo, solo avisa.
       - run: node tools/check_avisos.js
+        # R2 pide el secreto fuera del navegador (regla de Cloudflare de
+        # los mapas). En el PR de un fork no llega y el chequeo se saltea.
+        env:
+          TRUCKDASH_MAPS_KEY: ${{ secrets.TRUCKDASH_MAPS_KEY }}
       # La guia cae al ingles clave por clave: sin esto, un texto que falta
       # en un idioma pasa sin que nadie lo note.
       - run: node --test docs/guide/test_guide.js

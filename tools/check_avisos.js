@@ -101,9 +101,18 @@ function timesRev() {
   return m ? Number(m[1]) : 0;
 }
 
+// Fuera del navegador, los mapas de R2 piden este header: la regla de
+// Cloudflare deja pasar lo que trae Referer de trucksim-dash.com o de la
+// copia LAN, y lo demas solo con el secreto (TRUCKDASH_MAPS_KEY: el de
+// Actions, o el mismo en tu PC). Solo a nuestros mapas, nunca a otro host.
+const MAPS_KEY = process.env.TRUCKDASH_MAPS_KEY || '';
 async function bajar(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  const res = await fetch(url, MAPS_KEY && url.startsWith(`${BASE}/`) ? { headers: { 'x-truckdash-tools': MAPS_KEY } } : undefined);
+  if (!res.ok) {
+    const err = new Error(`${url}: ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   return Buffer.from(await res.arrayBuffer());
 }
 
@@ -202,5 +211,15 @@ async function main() {
   }
 }
 
-if (require.main === module) main().catch(e => { console.error(e); process.exit(2); });
+// Sin el secreto (el PR de un fork: GitHub no le pasa los secretos) R2 dice
+// 403 y no hay con que comparar: se saltea con un aviso, no se falla. Con el
+// secreto puesto, un 403 es un error de verdad.
+if (require.main === module) main().catch(e => {
+  if (e.status === 403 && !MAPS_KEY) {
+    console.log('::warning::check_avisos: los mapas de R2 piden TRUCKDASH_MAPS_KEY y no esta; se saltea.');
+    process.exit(0);
+  }
+  console.error(e);
+  process.exit(2);
+});
 module.exports = { harness, bajar, bajarCarriles, graphRev, timesRev, lanesRev, BASE };
