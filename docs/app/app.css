@@ -438,6 +438,10 @@
   .roadBadge { display: inline-block; margin-top: 0.15rem; padding: 0.05rem 0.45rem; border-radius: 4px; background: #1d4ed8; color: #fff; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.02em; border: 1px solid #93c5fd; }
   .roadBadge.mini { margin-top: 0.3rem; }
   .navNext { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 500; margin-top: 0.1rem; }
+  /* Ruta del GPS del juego sin trabajo (#56): la explicacion corta en
+     renglones (el panel no corta) y el boton para buscar el destino. */
+  .navHint { white-space: normal; max-width: 19rem; margin: 0.2rem auto 0; }
+  .navSearchBtn { display: block; margin: 0.4rem auto 0.1rem; min-height: 28px; padding: 0.2rem 0.9rem; font-size: 0.8rem; }
   /* Flechas de carril (lanesHtml): una caja por carril, de izquierda a
      derecha; con fondo azul los que sirven para el giro */
   .navLanes { display: flex; justify-content: center; gap: 3px; margin: 0.3rem 0 0.1rem; }
