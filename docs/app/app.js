@@ -98,7 +98,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, screenLayout: screenLayoutPref };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -121,6 +121,7 @@ const _savedSettings = loadSettings();
 // (auditoria del 10-10). Lo que no es critico pasa por aca.
 function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
 function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+let screenLayoutPref = _savedSettings.screenLayout || 'standard';
 // El resumen de ruta minimizado a una barrita de progreso. Antes la X de
 // ese panel borraba la ruta, y quien solo queria sacarlo de encima se
 // quedaba sin ruta hasta el proximo trabajo (reporte del 30-09-2026).
@@ -703,6 +704,20 @@ document.getElementById('setDarkButtons').addEventListener('change', (e) => {
   darkButtons = e.target.checked;
   saveSettings();
   applyButtonPrefs();
+});
+document.getElementById('setLayoutStandard')?.addEventListener('change', (e) => {
+  if (e.target.checked) {
+    screenLayoutPref = 'standard';
+    saveSettings();
+    applyScreenLayout('standard');
+  }
+});
+document.getElementById('setLayoutCarDisplay')?.addEventListener('change', (e) => {
+  if (e.target.checked) {
+    screenLayoutPref = 'cardisplay';
+    saveSettings();
+    applyScreenLayout('cardisplay');
+  }
 });
 document.getElementById('setFadeButtons').addEventListener('change', (e) => {
   fadeButtons = e.target.checked;
@@ -4883,6 +4898,7 @@ function updateNavPanel(turn) {
   // Lector de pantalla: el giro una vez por maniobra, no en cada dato
   const aviso = turnAnnouncer.next(turn, navPanelParts && navPanelParts.text);
   if (aviso) document.getElementById('navLive').textContent = aviso;
+  if (document.body.classList.contains('layout-cardisplay')) updateCdNavigation(turn);
 }
 
 // El texto del proximo giro: lo usan el panel de navegacion, la ventana
@@ -5756,6 +5772,7 @@ function updateGameClock(gameTimeMinutes) {
   const ref = new Date(Date.UTC(2024, 0, 1 + clock.dayIndex));
   const day = ref.toLocaleDateString(currentLang, { weekday: 'short', timeZone: 'UTC' });
   document.getElementById('gameClock').textContent = `${day} ${formatClockHM(clock.hours, clock.minutes, hour12())}`;
+  updateCdClock(clock);
 }
 
 // Escala de tiempo del juego (minutos de juego por minuto real). Se mide en
@@ -5919,6 +5936,7 @@ document.querySelectorAll('.panelTab').forEach(tab => {
 function updateHud(data) {
   lastData = data;
   updateCommandButtonStates(data);
+  if (document.body.classList.contains('layout-cardisplay')) updateCdHud(data);
 
   // El mini-HUD (top-right del mapa, visible solo con el panel oculto)
   // duplica velocidad/limite/crucero, asi que se actualizan en pares.
@@ -6559,6 +6577,7 @@ function renderConnectionUi() {
   const clientDetail = conn.clientStatus?.detail;
   statusEl.textContent = (view.detail ? t(view.detail) : '') + (clientDetail ? ` — ${clientDetail}` : '');
   statusEl.className = view.cls;
+  updateCdConnection(view);
   if (view.empty) {
     const [titleKey, bodyKey, icon, showDownload] = view.empty;
     document.getElementById('emptyStateIcon').textContent = icon;
@@ -7605,3 +7624,315 @@ const BTN_TIP_KEY = 'truckdash_btn_tips';
 
 // Lo que esta pestana cargo de los ajustes (ver saveSettings).
 try { settingsBaseline = JSON.parse(JSON.stringify(currentSettings())); } catch (e) {}
+
+// ============================================================================
+// CAR DISPLAY (AUTOMOTIVE LAYOUT) CONTROLLER & APP ENGINE
+// ============================================================================
+let activeCdApp = 'dashboard';
+
+function applyScreenLayout(layout) {
+  const isCd = layout === 'cardisplay';
+  document.body.classList.toggle('layout-cardisplay', isCd);
+  const rStd = document.getElementById('setLayoutStandard');
+  const rCd = document.getElementById('setLayoutCarDisplay');
+  if (rStd) rStd.checked = !isCd;
+  if (rCd) rCd.checked = isCd;
+  const dock = document.getElementById('carDisplayDock');
+  const views = document.getElementById('carDisplayViews');
+  if (dock) dock.style.display = isCd ? 'flex' : 'none';
+  if (views) views.style.display = isCd ? 'flex' : 'none';
+
+  if (isCd) {
+    switchCdApp(activeCdApp || 'dashboard');
+    if (lastData) updateCdHud(lastData);
+  }
+  if (map) {
+    try {
+      setTimeout(() => { if (map) map.resize(); }, 50);
+      setTimeout(() => { if (map) map.resize(); }, 180);
+      setTimeout(() => { if (map) map.resize(); }, 350);
+    } catch (e) {}
+  }
+}
+
+function switchCdApp(appName) {
+  activeCdApp = appName;
+  const views = document.getElementById('carDisplayViews');
+  if (views) views.setAttribute('data-active-app', appName);
+
+  // Clear existing cd-view-* classes on body
+  document.body.className = document.body.className.replace(/\bcd-view-[^\s]+\b/g, '').trim();
+  document.body.classList.add(`cd-view-${appName}`);
+
+  // Dock buttons active state
+  document.querySelectorAll('.cdDockBtn[data-app]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-app') === appName);
+  });
+  const homeBtn = document.getElementById('cdDockHomeBtn');
+  if (homeBtn) homeBtn.classList.toggle('active', appName === 'home');
+
+  // App views visibility
+  document.querySelectorAll('.cdAppView').forEach(v => {
+    const isTarget = v.id === `cdApp${appName.charAt(0).toUpperCase() + appName.slice(1)}`;
+    v.classList.toggle('active', isTarget);
+  });
+
+  if (map) {
+    try {
+      map.resize();
+      setTimeout(() => { if (map) map.resize(); }, 60);
+      setTimeout(() => { if (map) map.resize(); }, 200);
+    } catch (e) {}
+  }
+}
+
+function updateCdHud(data) {
+  if (!data) return;
+  const speedDisplay = useImperial ? data.speedKmh * KM_TO_MI : data.speedKmh;
+  const speedText = data.speedKmh != null ? Math.round(speedDisplay) : '--';
+  const speedUnit = useImperial ? 'mph' : 'km/h';
+
+  const speedValEl = document.getElementById('cdSpeedVal');
+  if (speedValEl) speedValEl.textContent = speedText;
+  const speedUnitEl = document.getElementById('cdSpeedUnit');
+  if (speedUnitEl) speedUnitEl.textContent = speedUnit;
+  const gSpeedEl = document.getElementById('cdGaugeSpeed');
+  if (gSpeedEl) gSpeedEl.textContent = speedText;
+  const gSpeedUnitEl = document.getElementById('cdGaugeSpeedUnit');
+  if (gSpeedUnitEl) gSpeedUnitEl.textContent = speedUnit;
+
+  // Speed limit
+  const cdLimit = document.getElementById('cdLimitSign');
+  if (cdLimit) {
+    if (data.speedLimitKmh && data.speedLimitKmh > 0) {
+      const limDisplay = useImperial ? data.speedLimitKmh * KM_TO_MI : data.speedLimitKmh;
+      cdLimit.textContent = Math.round(limDisplay);
+      cdLimit.classList.toggle('over', data.speedKmh > data.speedLimitKmh + 3);
+    } else {
+      cdLimit.textContent = '--';
+      cdLimit.classList.remove('over');
+    }
+  }
+
+  // Gear
+  const gearText = formatGear(data.gear);
+  const gearBadgeEl = document.getElementById('cdGearBadge');
+  if (gearBadgeEl) gearBadgeEl.textContent = gearText;
+  const gGearEl = document.getElementById('cdGaugeGear');
+  if (gGearEl) gGearEl.textContent = gearText;
+
+  // RPM
+  const rpmEl = document.getElementById('cdGaugeRpm');
+  if (rpmEl) rpmEl.textContent = data.engineRpm != null ? Math.round(data.engineRpm) : '--';
+
+  // Fuel
+  const fuelPct = (data.fuel != null && data.fuelCapacity)
+    ? Math.max(0, Math.min(100, Math.round((data.fuel / data.fuelCapacity) * 100)))
+    : null;
+  const fuelFillEl = document.getElementById('cdFuelFill');
+  if (fuelFillEl && fuelPct != null) {
+    fuelFillEl.style.width = `${fuelPct}%`;
+    fuelFillEl.classList.toggle('low', fuelPct < 25 && fuelPct >= 12);
+    fuelFillEl.classList.toggle('critical', fuelPct < 12);
+  }
+  const fuelPctEl = document.getElementById('cdFuelPct');
+  if (fuelPctEl) fuelPctEl.textContent = fuelPct != null ? `${fuelPct}%` : '--%';
+  const fuelRangeEl = document.getElementById('cdFuelRange');
+  if (fuelRangeEl) {
+    const rangeKm = fuelFigures(data).rangeKm;
+    fuelRangeEl.textContent = rangeKm != null
+      ? `${Math.round(useImperial ? rangeKm * KM_TO_MI : rangeKm)} ${useImperial ? 'mi' : 'km'}`
+      : '--';
+  }
+
+  // Cruise
+  const cruiseEl = document.getElementById('cdCruiseVal');
+  if (cruiseEl) {
+    if (data.cruiseControl && data.cruiseControlSpeedKmh > 0) {
+      const cc = Math.round(useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh);
+      cruiseEl.textContent = `${cc} ${speedUnit}`;
+    } else {
+      cruiseEl.textContent = 'OFF';
+    }
+  }
+
+  // Damage
+  const wear = data.wear || {};
+  const maxTruckWear = Math.round(Math.max(0, ...['engine', 'transmission', 'cabin', 'chassis', 'wheels'].map(p => (wear[p] || 0) * 100)));
+  const trailerWear = Math.round((data.wearTrailer || 0) * 100);
+  const truckDmgEl = document.getElementById('cdTruckDamage');
+  if (truckDmgEl) truckDmgEl.textContent = `${maxTruckWear}%`;
+  const trailerDmgEl = document.getElementById('cdTrailerDamage');
+  if (trailerDmgEl) trailerDmgEl.textContent = `${trailerWear}%`;
+
+  // Pressures & Temperatures
+  const airEl = document.getElementById('cdAirPressure');
+  if (airEl) airEl.textContent = data.airPressureBar != null ? data.airPressureBar.toFixed(1) : '--';
+  const oilEl = document.getElementById('cdOilTemp');
+  if (oilEl) oilEl.textContent = data.oilTemperatureC != null ? Math.round(data.oilTemperatureC) : '--';
+
+  // Odometer
+  const odoEl = document.getElementById('cdOdometer');
+  if (odoEl) {
+    odoEl.textContent = data.odometerKm != null
+      ? Math.round(useImperial ? data.odometerKm * KM_TO_MI : data.odometerKm).toLocaleString(currentLang)
+      : '--';
+  }
+  const odoUnitEl = document.getElementById('cdOdoUnit');
+  if (odoUnitEl) odoUnitEl.textContent = useImperial ? 'mi' : 'km';
+
+  // Trip & Cargo
+  const viaje = jobPanelFields(data);
+  const cargoNameEl = document.getElementById('cdCargoName');
+  if (cargoNameEl) cargoNameEl.textContent = viaje.cargo || t('cdNoDelivery');
+  const cargoWeightEl = document.getElementById('cdCargoWeight');
+  if (cargoWeightEl) {
+    cargoWeightEl.textContent = viaje.cargoMassKg ? formatCargoMass(viaje.cargoMassKg, currentLang, useImperial) : '0.0 t';
+  }
+  const citySrcEl = document.getElementById('cdCitySrc');
+  if (citySrcEl) citySrcEl.textContent = viaje.citySrc || '—';
+  const cityDstEl = document.getElementById('cdCityDst');
+  if (cityDstEl) cityDstEl.textContent = viaje.cityDst || '—';
+  const jobIncomeEl = document.getElementById('cdJobIncome');
+  if (jobIncomeEl) jobIncomeEl.textContent = viaje.income != null ? viaje.income : '--';
+  const jobDeadlineEl = document.getElementById('cdJobDeadline');
+  if (jobDeadlineEl) jobDeadlineEl.textContent = data.jobDeadlineSeconds != null ? formatSeconds(data.jobDeadlineSeconds) : '--';
+  const tripDistEl = document.getElementById('cdTripDist');
+  if (tripDistEl) {
+    tripDistEl.textContent = data.routeDistanceKm
+      ? `${Math.round(useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm)} ${useImperial ? 'mi' : 'km'}`
+      : '--';
+  }
+  const tripTimeEl = document.getElementById('cdTripTime');
+  if (tripTimeEl) tripTimeEl.textContent = data.routeTimeSeconds ? formatSeconds(data.routeTimeSeconds) : '--';
+
+  // Route footer in nav card
+  const routeRemainEl = document.getElementById('cdRouteRemain');
+  if (routeRemainEl) {
+    routeRemainEl.textContent = data.routeDistanceKm
+      ? `${Math.round(useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm)} ${useImperial ? 'mi' : 'km'}`
+      : '--';
+  }
+  const routeArrivalEl = document.getElementById('cdRouteArrival');
+  if (routeArrivalEl) {
+    routeArrivalEl.textContent = (data.gameTimeMinutes != null && data.routeTimeSeconds != null)
+      ? gameArrivalClock(data.gameTimeMinutes, data.routeTimeSeconds, hour12())
+      : '--:--';
+  }
+
+  // Switches states
+  const switches = {
+    cdCmdEngine: !!data.engineOn,
+    cdCmdHandbrake: !!data.parkingBrake,
+    cdCmdHazards: !!(data.lightsHazards || (data.blinkerLeftOn && data.blinkerRightOn)),
+    cdCmdLights: !!data.lightsBeamLow,
+    cdCmdHighBeam: !!data.lightsBeamHigh,
+    cdCmdBeacon: !!data.lightsBeacon,
+    cdCmdWipers: !!data.wipers,
+    cdCmdDiff: !!data.differentialLock,
+    cdCmdAxle: !!data.liftAxle,
+    cdCmdCruise: !!data.cruiseControl
+  };
+  for (const [btnId, on] of Object.entries(switches)) {
+    const el = document.getElementById(btnId);
+    if (el) el.classList.toggle('active', on);
+  }
+}
+
+function updateCdNavigation(turn) {
+  const distEl = document.getElementById('cdTurnDist');
+  const roadEl = document.getElementById('cdTurnRoad');
+  const iconEl = document.getElementById('cdTurnIcon');
+
+  if (turn && !(lastData && dismissedRouteIdentity === routeIdentity(lastData))) {
+    const parts = navTurnParts(turn);
+    if (parts && parts.info) {
+      if (distEl) distEl.textContent = formatTurnDistance(parts.info.meters, useImperial, currentLang);
+      if (roadEl) roadEl.textContent = parts.text;
+      if (iconEl) iconEl.innerHTML = turnIconHtml(turnIconShape(turn));
+      return;
+    }
+  }
+
+  // Free drive / no active maneuver
+  if (distEl) distEl.textContent = '--';
+  if (roadEl) roadEl.textContent = t('cdFreeDrive');
+  if (iconEl) iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 2L4 10h5v10h6V10h5z"/></svg>';
+}
+
+function updateCdClock(clock) {
+  const cdClockEl = document.getElementById('cdClock');
+  if (!cdClockEl) return;
+  if (clock) {
+    cdClockEl.textContent = formatClockHM(clock.hours, clock.minutes, hour12());
+  } else {
+    const now = new Date();
+    cdClockEl.textContent = formatClockHM(now.getHours(), now.getMinutes(), hour12());
+  }
+}
+
+function updateCdConnection(view) {
+  const cdDot = document.getElementById('cdConnDot');
+  if (cdDot) cdDot.classList.toggle('connected', view.cls === 'ok');
+  const cdBadge = document.getElementById('cdSettingsStatusBadge');
+  if (cdBadge) {
+    cdBadge.textContent = view.cls === 'ok' ? (lastData?.game ? `${lastData.game.toUpperCase()} Connected` : t('cdStatusConnected')) : t('cdStatusWaiting');
+    cdBadge.style.color = view.cls === 'ok' ? '#22c55e' : '#eab308';
+  }
+}
+
+function initCarDisplay() {
+  // Dock buttons
+  document.querySelectorAll('.cdDockBtn[data-app]').forEach(btn => {
+    btn.addEventListener('click', () => switchCdApp(btn.getAttribute('data-app')));
+  });
+  const homeBtn = document.getElementById('cdDockHomeBtn');
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+      switchCdApp(activeCdApp === 'home' ? 'dashboard' : 'home');
+    });
+  }
+
+  // App launcher tiles
+  document.querySelectorAll('.cdAppTile[data-app]').forEach(tile => {
+    tile.addEventListener('click', () => switchCdApp(tile.getAttribute('data-app')));
+  });
+  document.getElementById('cdTilePoi')?.addEventListener('click', () => {
+    const poi = document.getElementById('poiModal');
+    if (poi) poi.style.display = 'flex';
+  });
+
+  // Switch to standard layout button in Car Display Settings
+  document.getElementById('cdSwitchToStandardBtn')?.addEventListener('click', () => {
+    screenLayoutPref = 'standard';
+    saveSettings();
+    applyScreenLayout('standard');
+  });
+
+  // Settings inside Car Display
+  document.getElementById('cdConnectBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('cdCodeInput');
+    if (input && input.value.trim()) {
+      const codeField = document.getElementById('code');
+      if (codeField) codeField.value = input.value.trim().toUpperCase();
+      document.getElementById('connectBtn')?.click();
+    }
+  });
+  document.getElementById('cdToggleFsBtn')?.addEventListener('click', toggleFsMode);
+  document.getElementById('cdUnitToggleBtn')?.addEventListener('click', () => {
+    document.getElementById('unitToggle')?.click();
+  });
+
+  // Switches in Controls view
+  document.querySelectorAll('.cdSwitchBtn[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sendCommand({ action: btn.dataset.action });
+    });
+  });
+
+  // Apply layout saved in preferences
+  applyScreenLayout(screenLayoutPref);
+  updateCdClock(null);
+}
+
+initCarDisplay();

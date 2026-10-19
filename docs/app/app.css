@@ -1143,3 +1143,755 @@
 
 /* App de Android: sin links de donar (ver el script del <head>). */
 .twa [data-donate] { display: none !important; }
+
+/* ==========================================================================
+   CAR DISPLAY (AUTOMOTIVE LAYOUT) - OPT-IN
+   ========================================================================== */
+
+/* Standard layout hiding: carDisplay is hidden unless opted in */
+body:not(.layout-cardisplay) #carDisplayDock,
+body:not(.layout-cardisplay) #carDisplayViews {
+  display: none !important;
+}
+
+/* Full immersion layout when Car Display is active */
+body.layout-cardisplay #appHeader,
+body.layout-cardisplay #setupRow,
+body.layout-cardisplay #infoPanel,
+body.layout-cardisplay #commandsDrawer,
+body.layout-cardisplay #layoutBar,
+body.layout-cardisplay #commandsPeek {
+  display: none !important;
+}
+
+body.layout-cardisplay .layout {
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-width: none !important;
+}
+
+body.layout-cardisplay .rowWrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  overflow: hidden;
+  background: #090c10;
+}
+
+/* Car Display Dock */
+body.layout-cardisplay #carDisplayDock {
+  display: flex !important;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  width: 68px;
+  min-width: 68px;
+  height: 100%;
+  background: rgba(13, 16, 23, 0.96);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  padding: 12px 6px;
+  z-index: 100;
+  user-select: none;
+}
+
+body.layout-cardisplay .cdDockMid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+body.layout-cardisplay .cdDockBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  padding: 0;
+}
+
+body.layout-cardisplay .cdDockBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+body.layout-cardisplay .cdDockBtn.active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+body.layout-cardisplay .cdDockBottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+body.layout-cardisplay .cdStatusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+body.layout-cardisplay .cdStatusDot.connected {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+body.layout-cardisplay .cdClock {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dashboard Split View */
+body.layout-cardisplay:not([class*="cd-view-"]) #mapPanel,
+body.layout-cardisplay.cd-view-dashboard #mapPanel {
+  display: block !important;
+  flex: 1 1 58% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+}
+
+body.layout-cardisplay:not([class*="cd-view-"]) #carDisplayViews,
+body.layout-cardisplay.cd-view-dashboard #carDisplayViews {
+  display: flex !important;
+  flex: 0 0 42% !important;
+  min-width: 320px !important;
+  max-width: 520px !important;
+  height: 100% !important;
+  padding: 14px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  gap: 12px;
+}
+
+body.layout-cardisplay:not([class*="cd-view-"]) #cdAppDashboard,
+body.layout-cardisplay.cd-view-dashboard #cdAppDashboard {
+  display: flex !important;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+/* Maps Full View */
+body.layout-cardisplay.cd-view-maps #mapPanel {
+  display: block !important;
+  flex: 1 1 100% !important;
+  height: 100% !important;
+}
+
+body.layout-cardisplay.cd-view-maps #carDisplayViews {
+  display: none !important;
+}
+
+/* Other App Views (Gauges, Controls, Trip, Home, Settings) */
+body.layout-cardisplay.cd-view-gauges #mapPanel,
+body.layout-cardisplay.cd-view-controls #mapPanel,
+body.layout-cardisplay.cd-view-trip #mapPanel,
+body.layout-cardisplay.cd-view-home #mapPanel,
+body.layout-cardisplay.cd-view-settings #mapPanel {
+  display: none !important;
+}
+
+body.layout-cardisplay.cd-view-gauges #carDisplayViews,
+body.layout-cardisplay.cd-view-controls #carDisplayViews,
+body.layout-cardisplay.cd-view-trip #carDisplayViews,
+body.layout-cardisplay.cd-view-home #carDisplayViews,
+body.layout-cardisplay.cd-view-settings #carDisplayViews {
+  display: flex !important;
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cdAppView {
+  display: none;
+  width: 100%;
+}
+
+.cdAppView.active {
+  display: flex;
+}
+
+/* Glass Card & Widget Styling */
+.cdCard {
+  background: rgba(22, 28, 40, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 16px;
+  color: #fff;
+  box-sizing: border-box;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+}
+
+.cdCardTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+
+.cdNavHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cdSpeedStack {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.cdSpeedVal {
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #f8fafc;
+}
+
+.cdSpeedUnit {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.cdLimitSign {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 4px solid #ef4444;
+  color: #000000;
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.cdLimitSign.over {
+  animation: cdPulseLimit 1s infinite alternate;
+  border-color: #dc2626;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes cdPulseLimit {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+}
+
+.cdGearBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+}
+
+.cdTurnBanner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.cdTurnIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.2);
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.cdTurnText {
+  flex: 1;
+  min-width: 0;
+}
+
+.cdTurnDist {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.1;
+}
+
+.cdTurnRoad {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cdRouteFooter {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+}
+
+.cdStatItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.cdStatLabel {
+  font-size: 0.72rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.cdStatVal {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Vehicle Health */
+.cdFuelRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cdFuelBar {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cdFuelFill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 6px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.cdFuelFill.low {
+  background: #eab308;
+}
+
+.cdFuelFill.critical {
+  background: #ef4444;
+}
+
+.cdStatsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cdMiniStat {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cdMiniStat .cdLabel {
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.cdMiniStat .cdVal {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.cdGaugesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.cdGaugeBox {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.cdGaugeName {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cdGaugeNum {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #38bdf8;
+  margin: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cdGaugeUnit {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* Controls Grid */
+.cdControlsWrap, .cdTripContainer, .cdSettingsWrap {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.cdControlsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.cdSwitchBtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cdSwitchBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cdSwitchBtn.active {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+.cdSwitchBtn .cdLed {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #475569;
+  flex-shrink: 0;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cdSwitchBtn.active .cdLed {
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+/* App Launcher Home */
+.cdHomeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 18px;
+  padding: 24px;
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cdAppTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  aspect-ratio: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  color: #f1f5f9;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.cdAppTile:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.cdAppTile svg {
+  width: 36px;
+  height: 36px;
+  color: #60a5fa;
+}
+
+/* Settings App */
+.cdSettingsGroup {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.cdGroupTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.cdSettingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.cdSettingsRow + .cdSettingsRow {
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.cdGlassBtn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cdGlassBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cdBadge {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cdCodeInputRow {
+  display: flex;
+  gap: 8px;
+}
+
+.cdCodeInputRow input {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #fff;
+  font-weight: 700;
+  font-family: monospace;
+  width: 90px;
+  text-align: center;
+}
+
+/* Trip App */
+.cdCargoHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 12px 0 16px;
+}
+
+.cdCargoIcon {
+  font-size: 2.2rem;
+}
+
+.cdCargoName {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+  color: #f8fafc;
+}
+
+.cdCargoWeight {
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
+
+.cdRouteCities {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.cdCityItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cdCityDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.cdCityDot.start {
+  background: #3b82f6;
+}
+
+.cdCityDot.end {
+  background: #22c55e;
+}
+
+.cdCityName {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.cdCityArrow {
+  color: #64748b;
+  font-size: 1.2rem;
+}
+
+.cdTripStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.cdTripStat {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cdTripStat .cdLabel {
+  font-size: 0.72rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.cdTripStat .cdVal {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-top: 4px;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .cdDockBtn, .cdSwitchBtn, .cdAppTile, .cdLimitSign, .cdFuelFill {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Portrait Layout */
+@media (max-aspect-ratio: 1/1), (max-width: 768px) {
+  body.layout-cardisplay .rowWrap {
+    flex-direction: column-reverse;
+  }
+  body.layout-cardisplay #carDisplayDock {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    flex-direction: row !important;
+    border-right: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding: 6px 14px !important;
+  }
+  body.layout-cardisplay .cdDockMid {
+    flex-direction: row !important;
+    gap: 12px;
+  }
+  body.layout-cardisplay .cdDockBottom {
+    flex-direction: row !important;
+    gap: 8px;
+  }
+  body.layout-cardisplay:not([class*="cd-view-"]) #mapPanel,
+  body.layout-cardisplay.cd-view-dashboard #mapPanel {
+    flex: 1 1 50% !important;
+  }
+  body.layout-cardisplay:not([class*="cd-view-"]) #carDisplayViews,
+  body.layout-cardisplay.cd-view-dashboard #carDisplayViews {
+    flex: 1 1 50% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
+
