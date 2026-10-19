@@ -34,6 +34,9 @@ as a separate program.
   with the same layers and zoom filter as the maps on our servers.
 - Flags of prefab navigation curves, map projection fixes for standalone
   maps, and schema fixes for some mods.
+- The `@include` lists in `def/` (cities, companies, cargo...) are read with
+  the same 3nK de-obfuscation as the other `.sii` files, and one that still
+  can't be read is skipped with a warning instead of stopping the build.
 
 ## Building it
 
