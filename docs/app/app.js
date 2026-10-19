@@ -1349,6 +1349,29 @@ function buildBaseLayers() {
   ];
 }
 
+// Un mapa armado en la PC con un mod que cae donde la proyeccion no tiene
+// tierra (Explorando a America en ATS, Discord 18-10, Paulo) se veia en el
+// medio del mar al alejar. Se mide una vez por mapa armado (citiesOnLand,
+// basemapFitsCities): si la mayoria de sus ciudades no esta en la tierra
+// real, el fondo va liso como sin mapa base y quedan los lagos y los rios.
+// Los mapas de R2 no se miden: sus ciudades estan en tierra (99 % en ATS,
+// 95 a 98 % en ETS2).
+const basemapFlatFor = {}; // variante|version del mapa -> true si el fondo va liso
+async function measureLocalBasemap(game, name) {
+  const key = `${game}|${MAP_DATA_VERSION[game] || ''}`;
+  try {
+    const res = await fetch(`${REMOTE_MAP_BASE}/basemap/${name}.geojson?v=${BASEMAP_VERSION}`);
+    if (!res.ok) return;
+    const geo = await res.json();
+    if (game !== currentGame || !toLngLat || citiesMap !== GAME_MAPS[game]) return;
+    const r = citiesOnLand(citiesAll.map(c => toLngLat(c.X, c.Y)), geo.features);
+    basemapFlatFor[key] = !basemapFitsCities(r);
+    if (basemapFlatFor[key]) applyBaseMap();
+  } catch (err) {
+    // sin medir: el fondo de siempre
+  }
+}
+
 // Prende o apaga el mapa base sin recargar. Se llama al cargar un juego y
 // cada vez que se toca el interruptor de Ajustes.
 function applyBaseMap() {
@@ -1359,7 +1382,12 @@ function applyBaseMap() {
   for (const id of BASE_LAYER_IDS) { if (map.getLayer(id)) map.removeLayer(id); }
   if (map.getSource('base')) map.removeSource('base');
   const name = realBase && currentGame ? GAME_MAPS[currentGame]?.basemap : null;
-  map.setPaintProperty('bg', 'background-color', name ? MAP_BG_WATER : MAP_BG_FLAT);
+  const key = `${currentGame}|${MAP_DATA_VERSION[currentGame] || ''}`;
+  if (name && String(currentGame).startsWith('local_') && !(key in basemapFlatFor) && citiesMap === GAME_MAPS[currentGame]) {
+    basemapFlatFor[key] = false;
+    measureLocalBasemap(currentGame, name);
+  }
+  map.setPaintProperty('bg', 'background-color', name && !basemapFlatFor[key] ? MAP_BG_WATER : MAP_BG_FLAT);
   if (!name) return;
   map.addSource('base', { type: 'geojson', data: `${REMOTE_MAP_BASE}/basemap/${name}.geojson?v=${BASEMAP_VERSION}` });
   // Antes de 'mapArea' (la capa mas baja del juego) para que el mapa base

@@ -49,6 +49,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   porque el modo LAN pide desde direcciones que cambian en cada casa.
 - Un archivo de mapa nuevo es opcional en la web: sin el, la app hace lo
   de antes (sin flechas de carril, por ejemplo), nunca deja de rutear.
+- Un mapa armado en la PC ("Build my map") cuyas ciudades caen sobre todo
+  fuera de la tierra real (Explorando a America en ATS, 18-10) va con el
+  fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5
+  grados de margen por la costa, y `basemapFitsCities`, 80 %). Los de R2 no
+  se miden (99 % en ATS, 95 a 98 % en ETS2).
 - Desde un navegador, el relay (`SoloOrigenesPropios` en backend/main.py)
   solo atiende a trucksim-dash.com y a la copia LAN del cliente
   (`http://<ip>:27765`, localhost, IPs privadas); sin header Origin (cliente,
