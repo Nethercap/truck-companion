@@ -4,8 +4,9 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.33 (2026-10-19)
 
+- The README in the download thanks the people who have sent code to Truck Dash.
 - Build my map reads map mods that ship their list of cities (or companies, cargo...) in the
   obfuscated format some mods use, like Mapa BR Brasil. Before, the build stopped with
   "parser.mjs failed". A list it still can't read (an encrypted one) is now skipped with a note in
