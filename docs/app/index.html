@@ -113,6 +113,9 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
         <a class="settingsLinkBtn" id="accountLink" href="/account/" target="_blank" rel="noopener" data-i18n="accountLink">My account</a>
         <a class="settingsLinkBtn" id="guideLink" href="https://trucksim-dash.com/guide/" target="_blank" rel="noopener" data-i18n="guideLink">User guide</a>
       </div>
+      <p class="settingsSectionTitle" data-i18n="settingsLayoutTitle">Screen layout:</p>
+      <label class="settingsRow"><input type="radio" name="screenLayout" id="setLayoutStandard" value="standard" checked /> <span data-i18n="settingsLayoutStandard">Standard dashboard</span></label>
+      <label class="settingsRow"><input type="radio" name="screenLayout" id="setLayoutCarDisplay" value="cardisplay" /> <span data-i18n="settingsLayoutCarDisplay">Car display (automotive)</span></label>
 
       <p class="settingsSectionTitle" data-i18n="settingsMiniHudTitle">Show in mini-HUD (when info panel is hidden):</p>
       <label class="settingsRow"><input type="checkbox" id="setMiniFuelPct" /> <span data-i18n="fuel">Fuel</span></label>
@@ -355,6 +358,41 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 
   <div class="layout" id="layout">
    <div class="rowWrap">
+    <!-- Car Display Dock (Automotive layout) -->
+    <nav id="carDisplayDock" class="cdDock" aria-label="Car Display Navigation" style="display:none;">
+      <div class="dockStatusCluster">
+        <div class="dockClock" id="cdClock">--:--</div>
+        <div class="dockSignalGroup">
+          <span class="dockSignalBars"><i></i><i></i><i></i><i></i></span>
+          <span class="dockStatusDot" id="cdConnDot" title="ETS2 / ATS Live"></span>
+        </div>
+      </div>
+      <div class="dockAppGrid" id="cdDockAppGrid">
+        <button type="button" class="dockSquircleBtn active" data-app="dashboard" aria-label="Dashboard" title="Dashboard">
+          <div class="squircleIcon iconDashboard">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="12" y="3" width="9" height="8" rx="2"/><rect x="12" y="13" width="9" height="8" rx="2"/></svg>
+          </div>
+        </button>
+        <button type="button" class="dockSquircleBtn" data-app="maps" aria-label="Maps" title="Maps">
+          <div class="squircleIcon iconMaps">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+          </div>
+        </button>
+        <button type="button" class="dockSquircleBtn" data-app="gauges" aria-label="Gauges" title="Gauges">
+          <div class="squircleIcon iconGauges">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+          </div>
+        </button>
+      </div>
+      <div class="dockBottomCluster">
+        <button type="button" class="dockHomeBtn" id="cdDockHomeBtn" aria-label="CarPlay Home" title="CarPlay Home">
+          <div class="homeDotsGrid">
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </button>
+      </div>
+    </nav>
     <div id="mapPanel">
       <div id="mapCanvas"></div>
       <!-- El mapa se mudo a la ventana flotante (pipMapIn en app.js) -->
@@ -473,6 +511,310 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
         <button id="poiBtn" class="mapBtn" data-i18n-title="poiTitle" title="Find nearby"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
       </div>
         </div>
+    </div>
+
+    <!-- Car Display Views Container (Automotive layout) -->
+    <div id="carDisplayViews" class="cdViews" style="display:none;">
+      <!-- DASHBOARD SPLIT VIEW -->
+      <div class="cdAppView active" id="cdAppDashboard">
+        <!-- Turn & Speed Card -->
+        <div class="cdCard cdNavCard" id="cdCardNav">
+          <div class="cdNavHeader">
+            <div class="cdSpeedStack">
+              <span class="cdSpeedVal" id="cdSpeedVal">--</span>
+              <span class="cdSpeedUnit" id="cdSpeedUnit">km/h</span>
+            </div>
+            <div class="cdLimitSign" id="cdLimitSign">--</div>
+            <div class="cdGearBadge" id="cdGearBadge">N</div>
+          </div>
+          <div class="cdTurnBanner" id="cdTurnBanner">
+            <div class="cdTurnIcon" id="cdTurnIcon">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 2L4 10h5v10h6V10h5z"/></svg>
+            </div>
+            <div class="cdTurnText">
+              <div class="cdTurnDist" id="cdTurnDist">--</div>
+              <div class="cdTurnRoad" id="cdTurnRoad" data-i18n="cdFreeDrive">Free Drive</div>
+            </div>
+          </div>
+          <div class="cdRouteFooter">
+            <div class="cdStatItem">
+              <span class="cdStatLabel" data-i18n="remainingLabel">remaining</span>
+              <span class="cdStatVal" id="cdRouteRemain">--</span>
+            </div>
+            <div class="cdStatItem">
+              <span class="cdStatLabel" data-i18n="arrivalLabel">arrival</span>
+              <span class="cdStatVal" id="cdRouteArrival">--:--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Optional External Add-on Card (hidden until an add-on URL is configured) -->
+        <div class="cdCard cdAddonCardSmall" id="cdCardAddon" style="display:none;">
+          <div class="cdAddonSmallHeader">
+            <div class="cdAddonSmallSquircle">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+            </div>
+            <div class="cdAddonSmallMeta">
+              <span class="cdAddonSmallTitle" id="cdAddonSmallTitle" data-i18n="cdAddonTitle">External Add-on</span>
+              <span class="cdAddonSmallSub" id="cdAddonSmallSub" data-i18n="cdAddonThirdParty">Third-Party (LAN)</span>
+            </div>
+          </div>
+          <div class="cdAddonSmallFrameWrap" id="cdAddonSmallFrameWrap">
+            <iframe id="cdAddonMiniFrame" sandbox="allow-scripts allow-same-origin allow-forms" title="Add-on Mini View" src="about:blank"></iframe>
+          </div>
+        </div>
+
+        <!-- Vehicle Summary Card -->
+        <div class="cdCard cdVehicleCard" id="cdCardVehicle">
+          <div class="cdCardTitle" data-i18n="cdVehicleHealth">Vehicle Health</div>
+          <div class="cdFuelRow">
+            <span class="cdLabel" data-i18n="fuel">Fuel</span>
+            <div class="cdFuelBar"><div class="cdFuelFill" id="cdFuelFill" style="width:0%"></div></div>
+            <span class="cdVal" id="cdFuelPct">--%</span>
+          </div>
+          <div class="cdStatsGrid">
+            <div class="cdMiniStat"><span class="cdLabel" data-i18n="range">Range</span><span class="cdVal" id="cdFuelRange">-- km</span></div>
+            <div class="cdMiniStat"><span class="cdLabel" data-i18n="cruiseControl">Cruise</span><span class="cdVal" id="cdCruiseVal">OFF</span></div>
+            <div class="cdMiniStat"><span class="cdLabel" data-i18n="cdTruckDamage">Truck Damage</span><span class="cdVal" id="cdTruckDamage">0%</span></div>
+            <div class="cdMiniStat"><span class="cdLabel" data-i18n="cdTrailerDamage">Trailer Damage</span><span class="cdVal" id="cdTrailerDamage">0%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FULL GAUGES APP -->
+      <div class="cdAppView" id="cdAppGauges">
+        <div class="cdCard cdFullGaugesCard">
+          <div class="cdCardTitle" data-i18n="cdVehicleHealth">Vehicle Health &amp; Gauges</div>
+          <div class="cdGaugesGrid">
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName">SPEED</span>
+              <span class="cdGaugeNum" id="cdGaugeSpeed">--</span>
+              <span class="cdGaugeUnit" id="cdGaugeSpeedUnit">km/h</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName">ENGINE RPM</span>
+              <span class="cdGaugeNum" id="cdGaugeRpm">--</span>
+              <span class="cdGaugeUnit">RPM</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName">GEAR</span>
+              <span class="cdGaugeNum" id="cdGaugeGear">N</span>
+              <span class="cdGaugeUnit">Transmission</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="fuel">Fuel</span>
+              <span class="cdGaugeNum" id="cdGaugeFuel">--%</span>
+              <span class="cdGaugeUnit" id="cdGaugeFuelSub">Capacity</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="range">Range</span>
+              <span class="cdGaugeNum" id="cdGaugeRange">--</span>
+              <span class="cdGaugeUnit" id="cdGaugeRangeUnit">km</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="cruiseControl">Cruise</span>
+              <span class="cdGaugeNum" id="cdGaugeCruise">OFF</span>
+              <span class="cdGaugeUnit">Target Speed</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="cdAirPressure">Air Brake Pressure</span>
+              <span class="cdGaugeNum" id="cdAirPressure">--</span>
+              <span class="cdGaugeUnit">bar</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="cdOilTemp">Oil Temperature</span>
+              <span class="cdGaugeNum" id="cdOilTemp">--</span>
+              <span class="cdGaugeUnit">°C</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="cdTruckDamage">Truck Damage</span>
+              <span class="cdGaugeNum" id="cdGaugeTruckWear">0%</span>
+              <span class="cdGaugeUnit">Wear</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="cdTrailerDamage">Trailer Damage</span>
+              <span class="cdGaugeNum" id="cdGaugeTrailerWear">0%</span>
+              <span class="cdGaugeUnit">Wear</span>
+            </div>
+            <div class="cdGaugeBox">
+              <span class="cdGaugeName" data-i18n="odometer">Odometer</span>
+              <span class="cdGaugeNum" id="cdOdometer">--</span>
+              <span class="cdGaugeUnit" id="cdOdoUnit">km</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VEHICLE CONTROLS APP -->
+      <div class="cdAppView" id="cdAppControls">
+        <div class="cdControlsWrap cdCard">
+          <div class="cdCardTitle" data-i18n="cdControls">Vehicle Controls</div>
+          <div class="cdControlsGrid">
+            <button type="button" class="cdSwitchBtn" id="cdCmdEngine" data-action="toggle_engine">
+              <span class="cdLed"></span><span>⚡</span><span data-i18n="cmdEngine">Engine</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdHandbrake" data-action="toggle_parking_brake">
+              <span class="cdLed"></span><span>🅿️</span><span data-i18n="cmdHandbrake">Handbrake</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdHazards" data-action="toggle_hazards">
+              <span class="cdLed"></span><span>⚠️</span><span data-i18n="cmdHazards">Hazards</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdLights" data-action="cycle_lights">
+              <span class="cdLed"></span><span>💡</span><span data-i18n="cmdLights">Lights</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdHighBeam" data-action="toggle_high_beam">
+              <span class="cdLed"></span><span>🔦</span><span data-i18n="cmdHighBeam">High beams</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdBeacon" data-action="toggle_beacon">
+              <span class="cdLed"></span><span>🚨</span><span data-i18n="cmdBeacon">Beacon</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdWipers" data-action="toggle_wipers">
+              <span class="cdLed"></span><span>🌧️</span><span data-i18n="cmdWipers">Wipers</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdDiff" data-action="toggle_differential">
+              <span class="cdLed"></span><span>🔒</span><span data-i18n="cmdDiff">Differential</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdAxle" data-action="toggle_lift_axle">
+              <span class="cdLed"></span><span>⬆️</span><span data-i18n="cmdLiftAxle">Lift axle</span>
+            </button>
+            <button type="button" class="cdSwitchBtn" id="cdCmdCruise" data-action="toggle_cruise_control">
+              <span class="cdLed"></span><span>🎯</span><span data-i18n="cmdCruise">Cruise</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRIP & CARGO APP -->
+      <div class="cdAppView" id="cdAppTrip">
+        <div class="cdTripContainer">
+          <div class="cdCard cdTripCard">
+            <div class="cdCardTitle" data-i18n="cdTrip">Trip &amp; Delivery</div>
+            <div class="cdCargoHeader">
+              <span class="cdCargoIcon">📦</span>
+              <div>
+                <h2 class="cdCargoName" id="cdCargoName" data-i18n="cdNoDelivery">No active delivery</h2>
+                <span class="cdCargoWeight" id="cdCargoWeight">0.0 t</span>
+              </div>
+            </div>
+            <div class="cdRouteCities">
+              <div class="cdCityItem"><span class="cdCityDot start"></span><span class="cdCityName" id="cdCitySrc">—</span></div>
+              <div class="cdCityArrow">➔</div>
+              <div class="cdCityItem"><span class="cdCityDot end"></span><span class="cdCityName" id="cdCityDst">—</span></div>
+            </div>
+            <div class="cdTripStats">
+              <div class="cdTripStat"><span class="cdLabel" data-i18n="cdPlannedIncome">Planned Income</span><span class="cdVal" id="cdJobIncome">--</span></div>
+              <div class="cdTripStat"><span class="cdLabel" data-i18n="cdDeadline">Delivery Deadline</span><span class="cdVal" id="cdJobDeadline">--</span></div>
+              <div class="cdTripStat"><span class="cdLabel" data-i18n="distanceLeft">Distance left</span><span class="cdVal" id="cdTripDist">--</span></div>
+              <div class="cdTripStat"><span class="cdLabel" data-i18n="etaGame">In-game ETA</span><span class="cdVal" id="cdTripTime">--</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXTERNAL ADD-ON APP (LAN ONLY) -->
+      <div class="cdAppView" id="cdAppAddon">
+        <div class="cdAddonContainer">
+          <div class="cdAddonTopBar">
+            <div class="cdAddonTopInfo">
+              <span class="cdAddonActiveTitle" id="cdAddonActiveTitle">Companion Add-on</span>
+              <span class="cdBadge cdBadgeAddon" data-i18n="cdAddonThirdParty">Third-Party (LAN)</span>
+            </div>
+            <div class="cdAddonTopBtns">
+              <button type="button" class="cdGlassBtn small" id="cdAddonReloadBtn" title="Reload">⟳</button>
+              <button type="button" class="cdGlassBtn small" id="cdAddonCloseBtn" title="Back to Home">✕</button>
+            </div>
+          </div>
+          <div class="cdAddonFrameWrap">
+            <iframe id="cdAddonFrame" sandbox="allow-scripts allow-same-origin allow-forms" title="Third-Party Add-on" src="about:blank"></iframe>
+            <div class="cdAddonEmptyState" id="cdAddonEmptyState">
+              <div class="cdAddonEmptyIcon">🧩</div>
+              <h3 data-i18n="cdAddonNoApp">No add-on currently loaded</h3>
+              <p data-i18n="cdAddonHelpText">Enter the local address of your companion software to view it in Car Display.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- APP LAUNCHER HOME (CarPlay Springboard) -->
+      <div class="cdAppView" id="cdAppHome">
+        <div class="cpHomeWrapper">
+          <div class="cpHomeGrid" id="cdSpringboardGrid">
+            <!-- App tiles rendered dynamically by JS with drag-and-drop -->
+          </div>
+          <div class="cpHomeDots">
+            <span class="active"></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD-ON CREATION MODAL -->
+      <div id="cdAddonModal" class="cdAddonModalBackdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="cdAddonModalTitle">
+        <div class="cdAddonModalBox">
+          <div class="cdAddonModalTitle" id="cdAddonModalTitle" data-i18n="cdAddonTitle">Add Companion Add-on</div>
+          <p class="cdAddonModalDesc" data-i18n="cdAddonDisclaimer">
+            Sandboxed frame for local applications running on your PC. Private data stays strictly on your local network.
+          </p>
+          <div class="cdAddonField">
+            <label for="cdAddonNameInput">Add-on Name:</label>
+            <input type="text" id="cdAddonNameInput" placeholder="e.g. My Music Player, Telemetry Extra" />
+          </div>
+          <div class="cdAddonField">
+            <label for="cdAddonUrlInput">Local URL (LAN):</label>
+            <input type="url" id="cdAddonUrlInput" placeholder="http://localhost:8888 or http://192.168.1.50:8888" />
+          </div>
+          <div class="cdAddonModalActions">
+            <button type="button" class="cdGlassBtn" id="cdAddonCancelBtn" data-i18n="cancel">Cancel</button>
+            <button type="button" class="cdGlassBtn primary" id="cdAddonSaveBtn">Add to Springboard</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAR DISPLAY SETTINGS -->
+      <div class="cdAppView" id="cdAppSettings">
+        <div class="cdSettingsWrap cdCard">
+          <div class="cdCardTitle" data-i18n="settingsTitle">Settings</div>
+          <div class="cdSettingsGroup">
+            <div class="cdGroupTitle" data-i18n="settingsLayoutTitle">Screen layout:</div>
+            <div class="cdSettingsRow">
+              <span data-i18n="settingsLayoutStandard">Standard dashboard</span>
+              <button type="button" class="cdGlassBtn" id="cdSwitchToStandardBtn" data-i18n="cdSwitchToStandard">Switch to standard layout</button>
+            </div>
+          </div>
+          <div class="cdSettingsGroup">
+            <div class="cdGroupTitle">CARPLAY DOCK APPS</div>
+            <p class="cdSettingsSubHint">Pin up to 4 apps to the left dock:</p>
+            <div class="cdDockConfigList" id="cdDockConfigList">
+              <!-- Dynamically populated by JS -->
+            </div>
+          </div>
+          <div class="cdSettingsGroup">
+            <div class="cdGroupTitle">CONNECTION</div>
+            <div class="cdSettingsRow">
+              <span>Status</span>
+              <span class="cdBadge" id="cdSettingsStatusBadge">Connecting...</span>
+            </div>
+            <div class="cdSettingsRow">
+              <span>Pairing Code</span>
+              <div class="cdCodeInputRow">
+                <input id="cdCodeInput" maxlength="8" placeholder="CODE" style="text-transform:uppercase" />
+                <button type="button" class="cdGlassBtn" id="cdConnectBtn">Connect</button>
+              </div>
+            </div>
+          </div>
+          <div class="cdSettingsGroup">
+            <div class="cdGroupTitle">DISPLAY &amp; UNITS</div>
+            <div class="cdSettingsRow">
+              <span data-i18n="toggleFullscreen">Fullscreen</span>
+              <button type="button" class="cdGlassBtn" id="cdToggleFsBtn">Toggle Fullscreen</button>
+            </div>
+            <div class="cdSettingsRow">
+              <span>Speed &amp; Distance</span>
+              <button type="button" class="cdGlassBtn" id="cdUnitToggleBtn">km / mi</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="infoPanel" class="noData">
