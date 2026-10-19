@@ -2581,6 +2581,28 @@ test('proxima ciudad: la de adelante, no la que acaba de quedar atras', () => {
   assert.equal(nextCityAlongRoute([[0, 0]], [salina], [0, 0]), null);
 });
 
+test('escudos de ruta: uno por ruta y por celda, solo los carteles con numero (Discord, 19-10)', () => {
+  const { roadShieldPoints } = require('./pure.js');
+  const carteles = [
+    // tres de la US-20 en la misma celda: queda el del medio
+    { x: 100, y: 100, label: 'US-20', kind: 'road' },
+    { x: 1000, y: 1000, label: 'US-20', kind: 'road' },
+    { x: 1900, y: 1900, label: 'US-20', kind: 'road' },
+    // otra ruta en el mismo cruce: tiene el suyo
+    { x: 1000, y: 1000, label: 'I-80', kind: 'road' },
+    // la misma ruta en otra celda: otro escudo
+    { x: 5000, y: 100, label: 'US-20', kind: 'road' },
+    // ETS2: nombres de ciudad, sin numero de ruta
+    { x: 300, y: 300, label: 'Berlin', kind: 'city' },
+    // datos rotos
+    { x: NaN, y: 1, label: 'US-1', kind: 'road' }, null, { x: 1, y: 1, label: '', kind: 'road' },
+  ];
+  const escudos = roadShieldPoints(carteles, 2000).map(e => `${e.label}@${e.x},${e.y}:${e.k}:${e.n}`).sort();
+  assert.deepEqual(escudos, ['I-80@1000,1000:i:80', 'US-20@1000,1000:us:20', 'US-20@5000,100:us:20']);
+  assert.deepEqual(roadShieldPoints(null, 2000), []);
+  assert.deepEqual(roadShieldPoints(carteles, 0), []);
+});
+
 test('carteles: grilla igual a la busqueda lineal', () => {
   const { buildPointGrid, nearestInGrid } = require('./pure.js');
   let seed = 7;
