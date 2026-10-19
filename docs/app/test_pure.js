@@ -3737,3 +3737,26 @@ test('compassView: la brujula aparece con el norte torcido o en navegacion, y la
   assert.deepEqual(compassView(NaN), { show: false, angle: 0 });
   assert.deepEqual(compassView(undefined, {}), { show: false, angle: 0 });
 });
+
+test('citiesOnLand y basemapFitsCities: un mapa armado en el mar no pinta el mar (Explorando a America, Discord 18-10)', () => {
+  const { citiesOnLand, basemapFitsCities } = require('./pure.js');
+  // tierra: un cuadrado de 10 grados con un lago (hueco) de 2 grados en el medio
+  const tierra = [{ properties: { k: 'land' }, geometry: { type: 'Polygon', coordinates: [
+    [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+    [[4, 4], [6, 4], [6, 6], [4, 6], [4, 4]],
+  ] } }, { properties: { k: 'lake' }, geometry: { type: 'Polygon', coordinates: [[[20, 20], [30, 20], [30, 30], [20, 20]]] } }];
+  const r = citiesOnLand([[2, 2], [8, 9], [10.3, 5], [4.3, 5], [5, 5], [15, 5], [25, 25]], tierra);
+  // adentro, a 0,3 grados de la costa del mar o del lago: en tierra (el mapa
+  // del juego no coincide con la costa real); en el medio del lago (a 1
+  // grado), a 5 grados y adentro de un lago que no es tierra: afuera
+  assert.deepEqual([r.total, r.off], [7, 3]);
+  assert.equal(citiesOnLand([[10.3, 5]], tierra, { nearDeg: 0 }).off, 1); // sin margen, a 0,3 grados es agua
+  // un mapa del juego casi todo en tierra sirve; uno con la mitad en el mar, no
+  assert.equal(basemapFitsCities({ share: 0.95, off: 5, total: 100 }), true);
+  assert.equal(basemapFitsCities({ share: 0.5, off: 300, total: 600 }), false);
+  // con muy pocas ciudades no se decide
+  assert.equal(basemapFitsCities({ share: 0, off: 5, total: 5 }), true);
+  assert.equal(basemapFitsCities(null), true);
+  // sin datos que sirvan
+  assert.deepEqual(citiesOnLand([[NaN, 1], null], tierra), { share: 1, off: 0, total: 0 });
+});
