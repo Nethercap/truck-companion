@@ -2586,6 +2586,40 @@ test('nombre del giro: el de la salida, no un cartel de destino junto al vertice
   assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(destinos, x, z, m), [0, 20]).label, 'Venezia');
 });
 
+test('nombre del giro: el cartel del cruce o el de la otra rama no nombra la salida (I-80 en Salt Lake City, Discord 19-10)', () => {
+  const { roadSignForTurn, exitSignTest, otherBranchesAt, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // La autopista llega del sur al nodo 1; la ruta sale a la derecha por la
+  // rampa (nodos 2, 3, 4) y la autopista sigue derecho (nodos 5, 6, 7).
+  const ctx = scenario({ route: [[0, -300], [0, 0], [40, 250], [120, 500], [200, 1500]],
+    extraNodes: [[0, 100], [0, 700], [0, 1500]], edges: [[1, 5], [5, 6], [6, 7]] });
+  const others = otherBranchesAt(ctx);
+  assert.equal(others.length, 1);
+  assert.deepEqual(others[0](700).map(Math.round), [0, 700]);
+  assert.equal(others[0](1600), null);
+  // El cartel de la autopista en el cruce, 14 m antes del nodo, y los de la
+  // rampa mas adelante: a 60 y 150 m el del cruce era el mas cercano, empataba
+  // con los dos de la rampa y ganaba por salir primero.
+  const signs = [{ x: 5, y: -13, label: 'I-80', kind: 'road' }, { x: -10, y: 700, label: 'I-80', kind: 'road' },
+    { x: 130, y: 520, label: 'I-84', kind: 'road' }, { x: 150, y: 800, label: 'I-84', kind: 'road' }];
+  const grid = buildPointGrid(signs);
+  const nearest = (x, z, m) => nearestInGrid(grid, x, z, m);
+  const { pointAt, cum } = ctx;
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null).label, 'I-80');
+  const onExit = exitSignTest({ ...ctx, iEnd: 1, others });
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null, { onExit }).label, 'I-84');
+  assert.equal(onExit(signs[0]), false);
+  assert.equal(onExit(signs[2]), true);
+  // El de la autopista que corre al lado de la rampa queda mas cerca de la otra rama
+  assert.equal(onExit({ x: 14, y: 200, label: 'I-80', kind: 'road' }), false);
+  // Con solo el del cruce, sin nombre: el respaldo seria ese mismo cartel
+  const solo = buildPointGrid([signs[0]]);
+  const soloNearest = (x, z, m) => nearestInGrid(solo, x, z, m);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], soloNearest, [10, 60], { onExit }), null);
+  // Sin ningun cartel de ruta cerca de la salida queda el respaldo de antes
+  const lejos = buildPointGrid([{ x: 380, y: 0, label: 'US-6', kind: 'road' }]);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(lejos, x, z, m), [10, 60], { onExit }).label, 'US-6');
+});
+
 // Navegador de mentira para createScreenKeeper: pestana, Wake Lock API con
 // pedidos que el test resuelve a mano, y videos.
 function navegadorFalso({ api = true } = {}) {
