@@ -1449,8 +1449,9 @@ const LAYOUT_DRAG_SLOP_PX = 5;
 // botones de 44. Tiene que coincidir con el paso del degradado de app.css.
 const LAYOUT_GRID_PX = 16;
 // Los paneles del mapa se mueven igual que los botones. Se los agarra
-// directamente (no tienen asa): son uno solo cada uno.
-const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel'];
+// directamente (no tienen asa): son uno solo cada uno. La brujula tambien:
+// va sola abajo a la derecha, fuera de la columna de botones.
+const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel', 'compassBtn'];
 // Fuera de modo acomodar estos paneles aparecen y desaparecen segun lo que
 // pase en el viaje; mientras se acomodan se muestran siempre, y los que se
 // llenan en vivo llevan un texto de muestra para que se vea el tamano.
@@ -1556,7 +1557,8 @@ function resizableByCorner(el) {
 
 function inResizeCorner(el, ev) {
   const r = el.getBoundingClientRect();
-  return ev.clientX > r.right - LAYOUT_RESIZE_CORNER_PX && ev.clientY > r.bottom - LAYOUT_RESIZE_CORNER_PX;
+  const c = layoutResizeCornerPx(r.width, r.height, LAYOUT_RESIZE_CORNER_PX);
+  return ev.clientX > r.right - c && ev.clientY > r.bottom - c;
 }
 
 // Mientras se acomoda, un elemento se saca de su lugar la primera vez que se
@@ -1893,6 +1895,7 @@ function ensureMapInitialized() {
   map.on('rotatestart', (e) => { if (e.originalEvent) pauseMapFollow(); });
   map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   map.on('zoom', updateTruckArrowSize);
+  map.on('rotate', updateCompass);
   map.on('styleimagemissing', loadMissingCompanyIcon);
   // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
   // zoom dinamico (si no, el proximo tick lo pisa y parece que "no se puede
@@ -4045,6 +4048,7 @@ function setNavMode(on) {
     document.getElementById('navPanel').style.display = 'none';
   }
   applyNavCamera();
+  updateCompass();
 }
 // En vertical el mini-HUD (velocidad/limite/ruta) baja al rincon inferior
 // derecho del mapa: arriba a la derecha chocaba con el panel de indicaciones
@@ -4098,6 +4102,16 @@ document.getElementById('tilt3dBtn').addEventListener('click', () => {
   saveSettings();
   applyNavCamera();
 });
+
+// La brujula (compassView en pure.js): un indicador, no un boton. La aguja
+// apunta al norte del mapa en cada giro.
+function updateCompass() {
+  const el = document.getElementById('compassBtn');
+  if (!el) return;
+  const v = compassView(map ? map.getBearing() : 0, { navMode });
+  el.style.display = v.show ? '' : 'none';
+  document.getElementById('compassNeedle').style.transform = `rotate(${v.angle}deg)`;
+}
 
 // Busca el proximo giro real en la ruta ya calculada (recortada a la
 // posicion actual por trimRouteBehindTruck), mirando hasta NAV_TURN_LOOKAHEAD_M
