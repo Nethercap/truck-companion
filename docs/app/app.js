@@ -1257,7 +1257,7 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'ferry-poi', 'road-shield', 'exit-label', 'country-label', 'city-label'];
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
@@ -1332,6 +1332,13 @@ function buildVecLayers(sourceLayer) {
       layout: { 'icon-image': ['get', 'sprite'],
                 'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 9, 0.8],
                 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
+    // Escudos de ruta (roadShieldPoints en pure.js; solo ATS: los carteles de
+    // ETS2 no traen el numero). Debajo de las salidas y las ciudades: con
+    // poco lugar, MapLibre deja los de las capas de arriba. Las
+    // interestatales antes que las US (symbol-sort-key).
+    { id: 'road-shield', type: 'symbol', source: 'road-shields', minzoom: ROAD_SHIELD_MIN_ZOOM,
+      layout: { 'icon-image': ['concat', 'road-shield:', ['get', 'label']], 'icon-padding': 6,
+                'symbol-sort-key': ['match', ['get', 'k'], 'i', 0, 1] } },
     { id: 'exit-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'exit'], minzoom: 10,
       layout: { 'text-field': ['concat', 'Exit ', ['get', 'name']], 'text-size': 11 },
       paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
@@ -1954,6 +1961,7 @@ function ensureMapInitialized() {
     map.addSource('atlas', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('car-parking', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('fuel', { type: 'geojson', data: atlasGeoJson(null) });
+    map.addSource('road-shields', { type: 'geojson', data: atlasGeoJson(null) });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     // La ruta crece con el zoom como las calles, pero siempre un poco mas
     // ancha que la autopista mas ancha (road-freeway: 1 / 3,5 / 10 px a zoom
@@ -2145,6 +2153,71 @@ async function loadRoadNames(mapInfo) {
     if (currentGame === game) roadNames = nombres;
   } catch (err) {
     if (currentGame === game) roadNames = [];
+  } finally {
+    if (currentGame === game) setRoadShieldData();
+  }
+}
+
+// Escudos de ruta en el mapa (capa 'road-shield'): uno por ruta cada
+// ROAD_SHIELD_CELL_M, desde ROAD_SHIELD_MIN_ZOOM (Discord, 19-10: "todas las
+// rutas parecen lineas"). Con roadNames vacio (lite, ETS2, mapa armado en la
+// PC sin road-names.json) no queda ninguno.
+const ROAD_SHIELD_CELL_M = 4000;
+const ROAD_SHIELD_MIN_ZOOM = 8;
+function setRoadShieldData() {
+  const src = map && map.getSource('road-shields');
+  if (!src || !toLngLat) return;
+  const escudos = roadShieldPoints(roadNames, ROAD_SHIELD_CELL_M);
+  for (const e of escudos) addRoadShieldImage(e.label, e.k, e.n);
+  src.setData({ type: 'FeatureCollection', features: escudos.map(e => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: toLngLat(e.x, e.y) }, properties: { label: e.label, k: e.k } })) });
+}
+
+// Un escudo como los de la ruta, con el numero adentro (dibujado aca, una
+// imagen por ruta: no depende de las fuentes del mapa ni de otro archivo).
+// Interestatal: franja roja arriba, azul abajo, borde y numero blancos. US:
+// blanco con borde y numero negros. Con tres cifras, mas ancho.
+function addRoadShieldImage(label, k, n) {
+  const nombre = `road-shield:${label}`;
+  if (!map || map.hasImage(nombre)) return;
+  try {
+    const W = n.length >= 3 ? 52 : 44, H = 46, m = 2, b = 3; // pixeles de la imagen (pixelRatio 2)
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    // Arriba una curva hacia adentro, los costados que se abren un poco y la
+    // punta redondeada abajo.
+    const escudo = (x, y, w, h) => {
+      g.beginPath();
+      g.moveTo(x, y + h * 0.1);
+      g.quadraticCurveTo(x + w * 0.5, y + h * 0.22, x + w, y + h * 0.1);
+      g.bezierCurveTo(x + w * 1.03, y + h * 0.5, x + w * 0.9, y + h * 0.8, x + w * 0.5, y + h);
+      g.bezierCurveTo(x + w * 0.1, y + h * 0.8, x - w * 0.03, y + h * 0.5, x, y + h * 0.1);
+      g.closePath();
+    };
+    const iw = W - 2 * (m + b), ih = H - 2 * (m + b);
+    const inter = k === 'i';
+    g.fillStyle = inter ? '#ffffff' : '#111111';
+    escudo(m, m, W - 2 * m, H - 2 * m);
+    g.fill();
+    g.save();
+    escudo(m + b, m + b, iw, ih);
+    g.clip();
+    g.fillStyle = inter ? '#1f4fb4' : '#ffffff';
+    g.fillRect(0, 0, W, H);
+    if (inter) {
+      g.fillStyle = '#c8202f';
+      g.fillRect(0, 0, W, m + b + ih * 0.32);
+    }
+    g.restore();
+    g.fillStyle = inter ? '#ffffff' : '#111111';
+    g.font = `bold ${n.length >= 3 ? 17 : 20}px Arial, Helvetica, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(n, W / 2, m + b + ih * (inter ? 0.64 : 0.55));
+    map.addImage(nombre, g.getImageData(0, 0, W, H), { pixelRatio: 2 });
+  } catch (err) {
+    console.error('No se pudo dibujar el escudo de ruta', label, err);
   }
 }
 
@@ -3963,6 +4036,7 @@ async function loadGameMap(game) {
     try { map.addLayer(layer, 'trail-line'); } catch (err) { console.error('No se pudo agregar la capa', layer.id, err); }
   }
   setAtlasData();
+  setRoadShieldData();
   applyBaseMap();
 
   map.jumpTo({ center: mapInfo.origin, zoom: 5 });
