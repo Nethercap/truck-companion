@@ -227,6 +227,7 @@ const TRANSLATIONS = {
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Lift axle',
     cmdWipers: 'Wipers',
+    cmdDiff: 'Differential',
     cmdRemap: 'Remap',
     commandResultNoKey: "This command has no key assigned - set one in Remap",
     commandResultNoWindow: "Couldn't find the game window (is it running?)",
@@ -552,6 +553,14 @@ const TRANSLATIONS = {
     cdNoDelivery: 'No active delivery',
     cdPlannedIncome: 'Planned Income',
     cdDeadline: 'Delivery Deadline',
+    cdTabAddon: 'External Add-on',
+    cdAddonTitle: 'External Add-on (LAN Only)',
+    cdAddonDisclaimer: 'Sandboxed frame for local applications running on your PC. Private data stays strictly on your local network.',
+    cdAddonThirdParty: 'Third-Party Sandboxed',
+    cdAddonLoad: 'Load Add-on',
+    cdAddonClear: 'Clear',
+    cdAddonNoApp: 'No add-on currently loaded',
+    cdAddonHelpText: 'Enter the local address of your companion software above to view it in Car Display. Compatible with any web-based truck companion add-on.',
   },
   es: {
     deadlineIn: (x) => 'vence en ' + x,
@@ -770,7 +779,8 @@ const TRANSLATIONS = {
     cmdHighBeam: 'Luces altas',
     cmdInfotainment: 'Infotainment',
     cmdLiftAxle: 'Eje elevable',
-    cmdWipers: 'Limpia­parabrisas', // guion suave: corta en dos lineas solo si no entra en el boton
+    cmdWipers: 'Limpia­parabrisas',
+    cmdDiff: 'Diferencial', // guion suave: corta en dos lineas solo si no entra en el boton
     cmdRemap: 'Remapear',
     commandResultNoKey: 'Este comando no tiene tecla asignada - configurala en Remap',
     commandResultNoWindow: 'No se encontró la ventana del juego (¿está abierto?)',
@@ -1096,6 +1106,14 @@ const TRANSLATIONS = {
     cdNoDelivery: 'Sin entrega activa',
     cdPlannedIncome: 'Ingresos previstos',
     cdDeadline: 'Plazo de entrega',
+    cdTabAddon: 'Complemento externo',
+    cdAddonTitle: 'Complemento externo (solo LAN)',
+    cdAddonDisclaimer: 'Marco aislado para aplicaciones locales en tu PC. Los datos privados quedan estrictamente en tu red local.',
+    cdAddonThirdParty: 'Terceros (aislado)',
+    cdAddonLoad: 'Cargar',
+    cdAddonClear: 'Limpiar',
+    cdAddonNoApp: 'Ningún complemento cargado',
+    cdAddonHelpText: 'Ingresa la dirección local de tu software para verlo en Car Display. Compatible con cualquier complemento web.',
   },
 };
 // Idiomas extra (de/fr/pt/pl/tr/ru) viven en i18n.js - cualquier clave que

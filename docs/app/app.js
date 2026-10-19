@@ -121,7 +121,10 @@ const _savedSettings = loadSettings();
 // (auditoria del 10-10). Lo que no es critico pasa por aca.
 function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
 function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
-let screenLayoutPref = _savedSettings.screenLayout || 'standard';
+const _urlLayoutParam = new URLSearchParams(window.location.search).get('layout');
+let screenLayoutPref = (_urlLayoutParam === 'cardisplay' || _urlLayoutParam === 'carplay')
+  ? 'cardisplay'
+  : (_savedSettings.screenLayout || 'standard');
 // El resumen de ruta minimizado a una barrita de progreso. Antes la X de
 // ese panel borraba la ruta, y quien solo queria sacarlo de encima se
 // quedaba sin ruta hasta el proximo trabajo (reporte del 30-09-2026).
@@ -7656,6 +7659,12 @@ function applyScreenLayout(layout) {
 }
 
 function switchCdApp(appName) {
+  if (appName === 'poi') {
+    const poi = document.getElementById('poiModal');
+    if (poi) poi.style.display = 'flex';
+    return;
+  }
+
   activeCdApp = appName;
   const views = document.getElementById('carDisplayViews');
   if (views) views.setAttribute('data-active-app', appName);
@@ -7665,17 +7674,36 @@ function switchCdApp(appName) {
   document.body.classList.add(`cd-view-${appName}`);
 
   // Dock buttons active state
-  document.querySelectorAll('.cdDockBtn[data-app]').forEach(btn => {
+  document.querySelectorAll('.dockSquircleBtn[data-app]').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-app') === appName);
   });
   const homeBtn = document.getElementById('cdDockHomeBtn');
   if (homeBtn) homeBtn.classList.toggle('active', appName === 'home');
 
   // App views visibility
+  const isCustomAddon = typeof appName === 'string' && appName.startsWith('addon_');
   document.querySelectorAll('.cdAppView').forEach(v => {
-    const isTarget = v.id === `cdApp${appName.charAt(0).toUpperCase() + appName.slice(1)}`;
+    let isTarget = false;
+    if (isCustomAddon) {
+      isTarget = v.id === 'cdAppAddon';
+    } else {
+      isTarget = v.id === `cdApp${appName.charAt(0).toUpperCase() + appName.slice(1)}`;
+    }
     v.classList.toggle('active', isTarget);
   });
+
+  // Load custom add-on in iframe if selected
+  if (isCustomAddon && typeof getAppMeta === 'function') {
+    const meta = getAppMeta(appName);
+    const titleEl = document.getElementById('cdAddonActiveTitle');
+    const iframe = document.getElementById('cdAddonFrame');
+    const emptyState = document.getElementById('cdAddonEmptyState');
+    if (titleEl) titleEl.textContent = meta?.name || 'Companion Add-on';
+    if (iframe && meta?.url) {
+      iframe.src = meta.url;
+      if (emptyState) emptyState.style.display = 'none';
+    }
+  }
 
   if (map) {
     try {
@@ -7737,23 +7765,28 @@ function updateCdHud(data) {
   }
   const fuelPctEl = document.getElementById('cdFuelPct');
   if (fuelPctEl) fuelPctEl.textContent = fuelPct != null ? `${fuelPct}%` : '--%';
+  const gFuelEl = document.getElementById('cdGaugeFuel');
+  if (gFuelEl) gFuelEl.textContent = fuelPct != null ? `${fuelPct}%` : '--%';
+
+  const rangeKm = fuelFigures(data).rangeKm;
+  const rangeDisplay = rangeKm != null ? Math.round(useImperial ? rangeKm * KM_TO_MI : rangeKm) : '--';
   const fuelRangeEl = document.getElementById('cdFuelRange');
-  if (fuelRangeEl) {
-    const rangeKm = fuelFigures(data).rangeKm;
-    fuelRangeEl.textContent = rangeKm != null
-      ? `${Math.round(useImperial ? rangeKm * KM_TO_MI : rangeKm)} ${useImperial ? 'mi' : 'km'}`
-      : '--';
-  }
+  if (fuelRangeEl) fuelRangeEl.textContent = rangeKm != null ? `${rangeDisplay} ${useImperial ? 'mi' : 'km'}` : '--';
+  const gRangeEl = document.getElementById('cdGaugeRange');
+  if (gRangeEl) gRangeEl.textContent = rangeDisplay;
+  const gRangeUnitEl = document.getElementById('cdGaugeRangeUnit');
+  if (gRangeUnitEl) gRangeUnitEl.textContent = useImperial ? 'mi' : 'km';
 
   // Cruise
   const cruiseEl = document.getElementById('cdCruiseVal');
-  if (cruiseEl) {
-    if (data.cruiseControl && data.cruiseControlSpeedKmh > 0) {
-      const cc = Math.round(useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh);
-      cruiseEl.textContent = `${cc} ${speedUnit}`;
-    } else {
-      cruiseEl.textContent = 'OFF';
-    }
+  const gCruiseEl = document.getElementById('cdGaugeCruise');
+  if (data.cruiseControl && data.cruiseControlSpeedKmh > 0) {
+    const cc = Math.round(useImperial ? data.cruiseControlSpeedKmh * KM_TO_MI : data.cruiseControlSpeedKmh);
+    if (cruiseEl) cruiseEl.textContent = `${cc} ${speedUnit}`;
+    if (gCruiseEl) gCruiseEl.textContent = `${cc} ${speedUnit}`;
+  } else {
+    if (cruiseEl) cruiseEl.textContent = 'OFF';
+    if (gCruiseEl) gCruiseEl.textContent = 'OFF';
   }
 
   // Damage
@@ -7762,8 +7795,12 @@ function updateCdHud(data) {
   const trailerWear = Math.round((data.wearTrailer || 0) * 100);
   const truckDmgEl = document.getElementById('cdTruckDamage');
   if (truckDmgEl) truckDmgEl.textContent = `${maxTruckWear}%`;
+  const gTruckWearEl = document.getElementById('cdGaugeTruckWear');
+  if (gTruckWearEl) gTruckWearEl.textContent = `${maxTruckWear}%`;
   const trailerDmgEl = document.getElementById('cdTrailerDamage');
   if (trailerDmgEl) trailerDmgEl.textContent = `${trailerWear}%`;
+  const gTrailerWearEl = document.getElementById('cdGaugeTrailerWear');
+  if (gTrailerWearEl) gTrailerWearEl.textContent = `${trailerWear}%`;
 
   // Pressures & Temperatures
   const airEl = document.getElementById('cdAirPressure');
@@ -7881,26 +7918,432 @@ function updateCdConnection(view) {
   }
 }
 
-function initCarDisplay() {
-  // Dock buttons
-  document.querySelectorAll('.cdDockBtn[data-app]').forEach(btn => {
-    btn.addEventListener('click', () => switchCdApp(btn.getAttribute('data-app')));
+// ============================================================================
+// CAR DISPLAY APP REGISTRY & SPRINGBOARD / DOCK SYSTEM
+// ============================================================================
+const CD_STORAGE_DOCK = 'truckdash_dock_apps';
+const CD_STORAGE_SPRINGBOARD = 'truckdash_springboard_order';
+const CD_STORAGE_ADDONS = 'truckdash_custom_addons';
+
+const CD_CORE_APPS = {
+  maps: {
+    id: 'maps',
+    defaultName: 'Maps',
+    iconClass: 'iconMaps',
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>'
+  },
+  dashboard: {
+    id: 'dashboard',
+    defaultName: 'Dashboard',
+    iconClass: 'iconDashboard',
+    svg: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="12" y="3" width="9" height="8" rx="2"/><rect x="12" y="13" width="9" height="8" rx="2"/></svg>'
+  },
+  gauges: {
+    id: 'gauges',
+    defaultName: 'Gauges',
+    iconClass: 'iconGauges',
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>'
+  },
+  trip: {
+    id: 'trip',
+    defaultName: 'Cargo & Job',
+    iconClass: 'iconTrip',
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>'
+  },
+  controls: {
+    id: 'controls',
+    defaultName: 'Vehicle',
+    iconClass: 'iconControls',
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3"/><circle cx="8.5" cy="12" r="2"/><line x1="13.5" y1="12" x2="17.5" y2="12"/></svg>'
+  },
+  poi: {
+    id: 'poi',
+    defaultName: 'Services',
+    iconClass: 'iconServices',
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3"/><path d="M4 20v-1.5a4.5 4.5 0 0 1 4.5-4.5h3a4.5 4.5 0 0 1 4.5 4.5V20"/><path d="M18 11l2 2-2 2"/></svg>'
+  },
+  settings: {
+    id: 'settings',
+    defaultName: 'Settings',
+    iconClass: 'iconSettings',
+    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+  }
+};
+
+function getCustomAddons() {
+  try {
+    const raw = localStorage.getItem(CD_STORAGE_ADDONS);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCustomAddons(addons) {
+  try {
+    localStorage.setItem(CD_STORAGE_ADDONS, JSON.stringify(addons));
+  } catch (e) {}
+}
+
+function getDockApps() {
+  try {
+    const raw = localStorage.getItem(CD_STORAGE_DOCK);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length > 0) return arr;
+    }
+  } catch (e) {}
+  // Default: core 3 apps, NO addons pinned initially
+  return ['dashboard', 'maps', 'gauges'];
+}
+
+function saveDockApps(apps) {
+  try {
+    localStorage.setItem(CD_STORAGE_DOCK, JSON.stringify(apps));
+  } catch (e) {}
+}
+
+function getSpringboardOrder() {
+  const defaultOrder = ['maps', 'dashboard', 'gauges', 'trip', 'controls', 'poi', 'settings', '__add_addon__'];
+  try {
+    const raw = localStorage.getItem(CD_STORAGE_SPRINGBOARD);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length > 0) {
+        if (!arr.includes('__add_addon__')) arr.push('__add_addon__');
+        return arr;
+      }
+    }
+  } catch (e) {}
+  return defaultOrder;
+}
+
+function saveSpringboardOrder(order) {
+  try {
+    localStorage.setItem(CD_STORAGE_SPRINGBOARD, JSON.stringify(order));
+  } catch (e) {}
+}
+
+function getAppMeta(id) {
+  if (CD_CORE_APPS[id]) {
+    const core = CD_CORE_APPS[id];
+    return { id, name: core.defaultName, iconClass: core.iconClass, svg: core.svg, isAddon: false };
+  }
+  if (id === '__add_addon__') {
+    return {
+      id: '__add_addon__',
+      name: '+ Add-on',
+      iconClass: 'iconAddonNew',
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+      isAddon: false
+    };
+  }
+  const addons = getCustomAddons();
+  const found = addons.find(a => a.id === id);
+  if (found) {
+    return {
+      id: found.id,
+      name: found.name || 'Add-on',
+      iconClass: 'iconAddonCustom',
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>',
+      isAddon: true,
+      url: found.url
+    };
+  }
+  return null;
+}
+
+function renderDockApps() {
+  const container = document.getElementById('cdDockAppGrid');
+  if (!container) return;
+  const dockApps = getDockApps();
+  container.innerHTML = '';
+
+  dockApps.forEach(appId => {
+    const meta = getAppMeta(appId);
+    if (!meta) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `dockSquircleBtn${activeCdApp === appId ? ' active' : ''}`;
+    btn.setAttribute('data-app', appId);
+    btn.setAttribute('aria-label', meta.name);
+    btn.title = meta.name;
+    btn.innerHTML = `<div class="squircleIcon ${meta.iconClass}">${meta.svg}</div>`;
+    btn.addEventListener('click', () => switchCdApp(appId));
+    container.appendChild(btn);
   });
+
+  renderDockConfigList();
+}
+
+function renderDockConfigList() {
+  const listEl = document.getElementById('cdDockConfigList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  const currentDock = getDockApps();
+
+  // All available apps (Core + Addons)
+  const available = Object.keys(CD_CORE_APPS).map(id => getAppMeta(id));
+  getCustomAddons().forEach(a => available.push(getAppMeta(a.id)));
+
+  available.forEach(meta => {
+    if (!meta || meta.id === '__add_addon__') return;
+    const item = document.createElement('label');
+    item.className = 'cdDockConfigItem';
+    const checked = currentDock.includes(meta.id);
+    item.innerHTML = `<input type="checkbox" value="${meta.id}" ${checked ? 'checked' : ''} /> <span>${meta.name}</span>`;
+    const cb = item.querySelector('input');
+    cb.addEventListener('change', () => {
+      let updated = getDockApps();
+      if (cb.checked) {
+        if (updated.length >= 4) {
+          cb.checked = false;
+          if (typeof showToast === 'function') showToast('Maximum 4 dock apps');
+          return;
+        }
+        if (!updated.includes(meta.id)) updated.push(meta.id);
+      } else {
+        if (updated.length <= 1) {
+          cb.checked = true;
+          if (typeof showToast === 'function') showToast('Minimum 1 dock app required');
+          return;
+        }
+        updated = updated.filter(id => id !== meta.id);
+      }
+      saveDockApps(updated);
+      renderDockApps();
+    });
+    listEl.appendChild(item);
+  });
+}
+
+let cdDraggedAppId = null;
+
+function renderSpringboard() {
+  const grid = document.getElementById('cdSpringboardGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const order = getSpringboardOrder();
+  const addons = getCustomAddons();
+
+  // Ensure all custom addons and core apps are in order
+  const validIds = new Set([...Object.keys(CD_CORE_APPS), ...addons.map(a => a.id), '__add_addon__']);
+  const filteredOrder = order.filter(id => validIds.has(id));
+
+  // Add any missing core apps or addons before '__add_addon__'
+  const addIdx = filteredOrder.indexOf('__add_addon__');
+  validIds.forEach(id => {
+    if (!filteredOrder.includes(id)) {
+      if (addIdx >= 0) filteredOrder.splice(addIdx, 0, id);
+      else filteredOrder.push(id);
+    }
+  });
+
+  filteredOrder.forEach((appId, index) => {
+    const meta = getAppMeta(appId);
+    if (!meta) return;
+
+    const tile = document.createElement('div');
+    tile.className = 'cpAppTile';
+    tile.setAttribute('data-app', appId);
+    tile.setAttribute('data-index', index);
+    tile.draggable = (appId !== '__add_addon__');
+    tile.innerHTML = `
+      <div class="cpTileIcon ${meta.iconClass}">
+        ${meta.svg}
+      </div>
+      <div class="cpTileLabel">${meta.name}</div>
+    `;
+
+    // Click handler
+    tile.addEventListener('click', (e) => {
+      if (tile.classList.contains('dragging')) return;
+      if (appId === '__add_addon__') {
+        openAddonModal();
+      } else {
+        switchCdApp(appId);
+      }
+    });
+
+    // HTML5 Drag and Drop Handlers
+    tile.addEventListener('dragstart', (e) => {
+      cdDraggedAppId = appId;
+      tile.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', appId);
+    });
+
+    tile.addEventListener('dragend', () => {
+      tile.classList.remove('dragging');
+      document.querySelectorAll('.cpAppTile').forEach(t => t.classList.remove('drag-over'));
+      cdDraggedAppId = null;
+    });
+
+    tile.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (cdDraggedAppId && cdDraggedAppId !== appId) {
+        tile.classList.add('drag-over');
+      }
+    });
+
+    tile.addEventListener('dragleave', () => {
+      tile.classList.remove('drag-over');
+    });
+
+    tile.addEventListener('drop', (e) => {
+      e.preventDefault();
+      tile.classList.remove('drag-over');
+      if (!cdDraggedAppId || cdDraggedAppId === appId) return;
+
+      const newOrder = [...filteredOrder];
+      const fromIdx = newOrder.indexOf(cdDraggedAppId);
+      const toIdx = newOrder.indexOf(appId);
+      if (fromIdx >= 0 && toIdx >= 0) {
+        newOrder.splice(fromIdx, 1);
+        newOrder.splice(toIdx, 0, cdDraggedAppId);
+        saveSpringboardOrder(newOrder);
+        renderSpringboard();
+      }
+    });
+
+    // Touch Drag and Drop support
+    let touchTimer = null;
+    let isTouchDragging = false;
+    let currentTouchTarget = null;
+
+    tile.addEventListener('touchstart', () => {
+      if (appId === '__add_addon__') return;
+      touchTimer = setTimeout(() => {
+        isTouchDragging = true;
+        cdDraggedAppId = appId;
+        tile.classList.add('dragging');
+      }, 250);
+    }, { passive: true });
+
+    tile.addEventListener('touchmove', (e) => {
+      if (!isTouchDragging) {
+        clearTimeout(touchTimer);
+        return;
+      }
+      e.preventDefault();
+      const touch = e.touches[0];
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetTile = el ? el.closest('.cpAppTile') : null;
+      document.querySelectorAll('.cpAppTile').forEach(t => t.classList.remove('drag-over'));
+      if (targetTile && targetTile !== tile) {
+        targetTile.classList.add('drag-over');
+        currentTouchTarget = targetTile.getAttribute('data-app');
+      } else {
+        currentTouchTarget = null;
+      }
+    }, { passive: false });
+
+    tile.addEventListener('touchend', () => {
+      clearTimeout(touchTimer);
+      if (isTouchDragging) {
+        isTouchDragging = false;
+        tile.classList.remove('dragging');
+        document.querySelectorAll('.cpAppTile').forEach(t => t.classList.remove('drag-over'));
+        if (currentTouchTarget && currentTouchTarget !== appId) {
+          const newOrder = [...filteredOrder];
+          const fromIdx = newOrder.indexOf(appId);
+          const toIdx = newOrder.indexOf(currentTouchTarget);
+          if (fromIdx >= 0 && toIdx >= 0) {
+            newOrder.splice(fromIdx, 1);
+            newOrder.splice(toIdx, 0, appId);
+            saveSpringboardOrder(newOrder);
+            renderSpringboard();
+          }
+        }
+      }
+    });
+
+    grid.appendChild(tile);
+  });
+}
+
+function openAddonModal() {
+  const modal = document.getElementById('cdAddonModal');
+  const nameInput = document.getElementById('cdAddonNameInput');
+  const urlInput = document.getElementById('cdAddonUrlInput');
+  if (nameInput) nameInput.value = '';
+  if (urlInput) urlInput.value = '';
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeAddonModal() {
+  const modal = document.getElementById('cdAddonModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function initAddonModalEvents() {
+  document.getElementById('cdAddonCancelBtn')?.addEventListener('click', closeAddonModal);
+  document.getElementById('cdAddonModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'cdAddonModal') closeAddonModal();
+  });
+
+  document.getElementById('cdAddonSaveBtn')?.addEventListener('click', () => {
+    const nameInput = document.getElementById('cdAddonNameInput');
+    const urlInput = document.getElementById('cdAddonUrlInput');
+    const name = nameInput?.value?.trim() || 'Companion Add-on';
+    const url = urlInput?.value?.trim();
+
+    if (!url) {
+      if (typeof showToast === 'function') showToast('Please enter a LAN URL');
+      return;
+    }
+
+    const newAddon = {
+      id: 'addon_' + Date.now(),
+      name,
+      url
+    };
+
+    const addons = getCustomAddons();
+    addons.push(newAddon);
+    saveCustomAddons(addons);
+
+    // Insert into springboard order before __add_addon__
+    const order = getSpringboardOrder();
+    const addIdx = order.indexOf('__add_addon__');
+    if (addIdx >= 0) order.splice(addIdx, 0, newAddon.id);
+    else order.push(newAddon.id);
+    saveSpringboardOrder(order);
+
+    closeAddonModal();
+    renderSpringboard();
+    renderDockApps();
+    if (typeof showToast === 'function') showToast(`Added "${name}" to Springboard!`);
+  });
+
+  // Top bar in Add-on view
+  document.getElementById('cdAddonReloadBtn')?.addEventListener('click', () => {
+    const iframe = document.getElementById('cdAddonFrame');
+    if (iframe && iframe.src && iframe.src !== 'about:blank') {
+      iframe.src = iframe.src;
+    }
+  });
+
+  document.getElementById('cdAddonCloseBtn')?.addEventListener('click', () => {
+    switchCdApp('home');
+  });
+}
+
+function initCarDisplay() {
+  // Render Dynamic Left Dock and Springboard
+  renderDockApps();
+  renderSpringboard();
+  initAddonModalEvents();
+
+  // Home Button in Dock
   const homeBtn = document.getElementById('cdDockHomeBtn');
   if (homeBtn) {
     homeBtn.addEventListener('click', () => {
       switchCdApp(activeCdApp === 'home' ? 'dashboard' : 'home');
     });
   }
-
-  // App launcher tiles
-  document.querySelectorAll('.cdAppTile[data-app]').forEach(tile => {
-    tile.addEventListener('click', () => switchCdApp(tile.getAttribute('data-app')));
-  });
-  document.getElementById('cdTilePoi')?.addEventListener('click', () => {
-    const poi = document.getElementById('poiModal');
-    if (poi) poi.style.display = 'flex';
-  });
 
   // Switch to standard layout button in Car Display Settings
   document.getElementById('cdSwitchToStandardBtn')?.addEventListener('click', () => {
@@ -7936,3 +8379,4 @@ function initCarDisplay() {
 }
 
 initCarDisplay();
+
