@@ -366,6 +366,14 @@ pip install -r requirements.txt
 python tray_client.py
 ```
 
+## Credits
+
+Thanks to everyone who sent code:
+[vladimirkutkovoy](https://github.com/vladimirkutkovoy) (the map following, the route
+summary and LAN mode by the PC's address), [RXTransit](https://github.com/RXTransit)
+(the Linux desktop shortcuts) and [pauloo27](https://github.com/pauloo27) (Build my map
+with EAA). And to everyone who reports bugs and tests new versions on Discord and GitHub.
+
 ## License
 
 Copyright (C) 2026 Nethercap (Truck Dash). Truck Dash is free software under
