@@ -1098,6 +1098,54 @@ def test_lan_anota_cada_ip_remota_una_vez(caplog):
     assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]
 
 
+def test_lan_datos_solo_para_las_paginas_del_cliente():
+    """El 27766 atiende a la app y a /dash/ servidas por el cliente en el
+    27765 (por IP, localhost o el nombre de la PC), no a cualquier pagina."""
+    import local_server
+    p = local_server.HTTP_PORT
+    for bueno in (None, f"http://127.0.0.1:{p}", f"http://localhost:{p}", f"http://[::1]:{p}",
+                  f"http://192.168.1.50:{p}", f"http://10.0.0.7:{p}", f"http://172.20.1.2:{p}",
+                  f"http://100.101.102.103:{p}", f"http://169.254.10.20:{p}",
+                  f"http://DESKTOP-ABC1:{p}", f"http://mi-pc.local:{p}", f"http://mi-pc.lan:{p}"):
+        assert local_server.origen_permitido(bueno), bueno
+    for malo in ("https://trucksim-dash.com", "http://evil.example", f"http://evil.example:{p}",
+                 f"http://8.8.8.8:{p}", f"https://192.168.1.50:{p}", "http://192.168.1.50:8080",
+                 "http://127.0.0.1", f"http://casa.fritz.box:{p}", "null", "", "file://"):
+        assert not local_server.origen_permitido(malo), malo
+
+
+def test_lan_datos_rechaza_el_handshake_de_otro_origen(caplog):
+    """Con un servidor de verdad (solo 127.0.0.1, sin pedir el firewall)."""
+    import asyncio
+    import logging
+    import pytest
+    import websockets
+    from websockets.asyncio.client import connect
+    import local_server
+    local_server._origenes_rechazados.clear()
+
+    async def saluda(ws):
+        await ws.send("hola")
+
+    async def probar():
+        async with websockets.serve(saluda, "127.0.0.1", 0,
+                                    process_request=local_server._solo_paginas_del_cliente) as srv:
+            uri = f"ws://127.0.0.1:{srv.sockets[0].getsockname()[1]}"
+            async with connect(uri, origin=f"http://192.168.1.50:{local_server.HTTP_PORT}") as ws:
+                assert await ws.recv() == "hola"
+            async with connect(uri) as ws:  # sin Origin: no es un navegador
+                assert await ws.recv() == "hola"
+            for _ in range(2):
+                with pytest.raises(websockets.exceptions.InvalidStatus) as err:
+                    async with connect(uri, origin="https://evil.example"):
+                        pass
+                assert err.value.response.status_code == 403
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(probar())
+    avisos = [r.getMessage() for r in caplog.records if "rechazados" in r.getMessage()]
+    assert avisos == ["LAN: datos (27766) rechazados a una pagina de https://evil.example"]
+
+
 def test_lan_en_la_red_al_arrancar_solo_si_ya_se_usaba():
     """Escuchar en la red hace que Windows pida el firewall (y la clave de
     administrador a un usuario estandar, FioJon 18-10): quien recien instala
@@ -1149,7 +1197,9 @@ def _servidor_lan_falso(monkeypatch, escuchas, web=None, ocupados=None):
     monkeypatch.setattr(local_server.http.server, "ThreadingHTTPServer",
                         lambda addr, handler: _HttpFalso(addr, handler, escuchas, ocupados))
 
-    async def serve(handler, host, port):
+    async def serve(handler, host, port, process_request=None):
+        # El filtro de origen (19-10) va en todos los arranques.
+        assert process_request is local_server._solo_paginas_del_cliente
         escuchas.append(("ws", host))
         return _WsFalso()
     monkeypatch.setattr(websockets, "serve", serve)

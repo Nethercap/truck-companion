@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- LAN mode: the client's local data connection only answers the dashboard pages the client serves
+  itself (the dashboard and the `/dash/` panel, opened by the PC's address, `localhost` or its name).
+  Web pages from anywhere else, even in a browser on the same PC, can no longer connect to it.
 - LAN mode: dashboard files left read-only in the client's web cache (an unofficial mod does this
   so they are never replaced) no longer keep LAN mode on an old copy mixed with new files. The
   client updates them like the rest.

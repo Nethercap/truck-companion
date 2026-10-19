@@ -23,12 +23,16 @@ ws:// a una IP de la LAN (mixed content, lo bloquean todos los navegadores)
 import asyncio
 import errno
 import http.server
+import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import stat
 import threading
+import time
+from http import HTTPStatus
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import red
@@ -93,6 +97,52 @@ def anotar_remoto(ip, que: str) -> None:
             return
         _remotos_vistos.add((ip, que))
     logging.info("LAN: %s desde %s", que, ip)
+
+
+# El WebSocket de datos (27766) solo atiende a las paginas que sirve este
+# mismo cliente en el 27765 (la app en modo LAN y /dash/). Antes no miraba el
+# Origin y se le conectaba cualquier pagina, tambien una web de otro lado que
+# usaba el cliente como si fuera suyo (19-10). Sin header Origin no es un
+# navegador (como en el relay, backend/main.py): pasa.
+# La pagina se abre por la IP (el QR y "Abrir aca"), localhost o el nombre de
+# la PC; un dominio con punto que no sea de la red local lo podria registrar
+# cualquiera y apuntarlo a una IP de la casa, asi que no.
+_NOMBRES_DE_LA_RED = (".local", ".lan", ".home.arpa", ".internal")
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")  # VPN de malla (Tailscale)
+_origenes_rechazados: dict = {}
+
+
+def origen_permitido(origin: str | None) -> bool:
+    if origin is None:
+        return True
+    try:
+        url = urlsplit(origin)
+        puerto = url.port
+    except ValueError:
+        return False
+    host = (url.hostname or "").lower()
+    if url.scheme != "http" or puerto != HTTP_PORT or not host or url.path or url.query:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return (host == "localhost" or bool(re.fullmatch(r"[a-z0-9-]+", host))
+                or (host.endswith(_NOMBRES_DE_LA_RED) and bool(re.fullmatch(r"[a-z0-9.-]+", host))))
+    return ip.is_loopback or ip.is_private or ip.is_link_local or ip in _CGNAT
+
+
+def _solo_paginas_del_cliente(connection, request):
+    """process_request del WebSocket: 403 a una pagina de otro origen, y una
+    linea en el log por origen y por hora (por si uno legitimo quedo afuera)."""
+    origenes = request.headers.get_all("Origin")
+    origin = origenes[0] if len(origenes) == 1 else (None if not origenes else "")
+    if origen_permitido(origin):
+        return None
+    ahora = time.time()
+    if ahora - _origenes_rechazados.get(origin, 0) > 3600:
+        _origenes_rechazados[origin] = ahora
+        logging.warning("LAN: datos (27766) rechazados a una pagina de %s", origin or "origen invalido")
+    return connection.respond(HTTPStatus.FORBIDDEN, "origin not allowed\n")
 
 
 def lan_ip() -> str | None:
@@ -465,7 +515,8 @@ class LocalServer:
         try:
             self.http_server = http.server.ThreadingHTTPServer((host, HTTP_PORT), _StaticHandler)
             threading.Thread(target=self.http_server.serve_forever, daemon=True).start()
-            self.ws_server = await websockets.serve(self._handle_viewer, host, WS_PORT)
+            self.ws_server = await websockets.serve(self._handle_viewer, host, WS_PORT,
+                                                    process_request=_solo_paginas_del_cliente)
             if host != "127.0.0.1":
                 logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d), direccion %s",
                              HTTP_PORT, WS_PORT, self.url or "sin IP de LAN")
