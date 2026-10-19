@@ -118,6 +118,19 @@ Truck Dash is free, with no ads and no paid tier, and it is made by one person. 
 costs money (the relay and the map hosting). If it is useful to you, you can
 [buy me a cup of tea on Tecito](https://tecito.app/truckdash). It is optional and does not unlock anything.
 
+## Credits
+
+Thanks to everyone who sent code:
+
+- [vladimirkutkovoy](https://github.com/vladimirkutkovoy): ideas and code for the map
+  following, the route summary and opening LAN mode by the PC's address (#1).
+- [RXTransit](https://github.com/RXTransit): the Linux desktop shortcuts for ETS2 and
+  ATS (#9), and detailed bug reports.
+- [pauloo27](https://github.com/pauloo27): Build my map with the EAA map (#60).
+
+And to everyone who reports bugs and tests new versions on Discord and GitHub. The
+Coast to Coast map data is used with the permission of its author, Homburg.
+
 ## License / transparency
 
 Copyright (C) 2026 Nethercap (Truck Dash). Licensed under the GNU Affero
