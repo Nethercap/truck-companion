@@ -13,6 +13,9 @@
 //
 // Uso: node tools/check_avisos.js            compara
 //      node tools/check_avisos.js --update   reescribe la lista (revisar el diff)
+//      node tools/check_avisos.js --cada-salida   con el ajuste "en cada salida"
+//        (navEveryExit) prendido: lista los avisos que suma, sin fallar. La
+//        lista guardada es con el ajuste apagado, como viene la app.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -55,9 +58,11 @@ function harness() {
       set: (g, cur, behind) => { routeGraph = g; currentRouteWorldPoints = cur; routeBehind = behind; },
       // Los carriles del grafo (decodeLanesBin): con ellos salen los "keep"
       // de seguir derecho donde un carril se va (laneKeepAt). Sin ellos, nada.
-      setLanes: (l) => { routeLanes = l || null; } };`,
+      setLanes: (l) => { routeLanes = l || null; },
+      // El ajuste "en cada salida" de la app (navEveryExit): apagado, como viene.
+      setEveryExit: (v) => { navEveryExit = !!v; } };`,
   ].join('\n');
-  const mod = new Function('pure', 'let routeGraph = null, routeLanes = null, currentRouteWorldPoints = null, routeBehind = []; const routeProfile = "fastest";\n' + code)(pure);
+  const mod = new Function('pure', 'let routeGraph = null, routeLanes = null, currentRouteWorldPoints = null, routeBehind = [], navEveryExit = false; const routeProfile = "fastest";\n' + code)(pure);
   const behindMax = Number((src.match(/const ROUTE_BEHIND_MAX = (\d+)/) || [])[1]) || 32;
   // Lo ya recorrido, como lo guarda la app (trimRouteBehind: por metros, y
   // adentro de una rotonda desde su entrada: keep es el node del aviso).
@@ -165,8 +170,11 @@ function diferencias(viejo, nuevo) {
 
 async function main() {
   const update = process.argv.includes('--update');
+  const cadaSalida = process.argv.includes('--cada-salida');
+  if (cadaSalida && update) throw new Error('check_avisos: --update va sin --cada-salida (la lista es con el ajuste apagado)');
   const golden = fs.existsSync(GOLDEN) ? JSON.parse(fs.readFileSync(GOLDEN, 'utf8')) : { variants: {} };
   const h = harness();
+  h.mod.setEveryExit(cadaSalida);
   const nuevo = { variants: {} };
   let falla = false;
   for (const [v, n] of Object.entries(VARIANTS)) {
@@ -191,7 +199,10 @@ async function main() {
       console.log(`${v}: el grafo de R2 cambio (${g0.graph} -> ${sha}); ${diff.length} avisos distintos. Regenerar con --update y revisar el diff.`);
       continue;
     }
-    if (diff.length) {
+    if (diff.length && cadaSalida) {
+      console.log(`${v}: con el ajuste "en cada salida", ${diff.length} avisos distintos (${total} en ${rutas.length} rutas):`);
+      for (const linea of diff) console.log(linea);
+    } else if (diff.length) {
       falla = true;
       console.log(`${v}: ${diff.length} avisos cambiaron con el mismo grafo (es el codigo):`);
       for (const linea of diff.slice(0, 80)) console.log(linea);

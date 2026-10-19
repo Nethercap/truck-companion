@@ -2950,6 +2950,24 @@ test('carriles: keep left yendo derecho cuando el de la derecha sale (Discord, 1
   assert.equal(laneKeepSide({ ...rec(0b011, [B.straight, B.straight, B.right]), drop: false }, true), null);
 });
 
+test('carriles: keep en cada salida de autopista, con el ajuste (Discord, 19-10)', () => {
+  const { everyExitKeepSide, LANE_ARROW_BITS: B } = require('./pure.js');
+  const rec = (mask, arrows, turn = B.straight) => ({ count: arrows.length, mask, turn, arrows, drop: false });
+  // el carril de desaceleracion de la derecha, sin la marca: keep left
+  assert.equal(everyExitKeepSide(rec(0b011, [B.straight, B.straight, B.slightRight])), 'left');
+  // una salida por la izquierda: keep right
+  assert.equal(everyExitKeepSide(rec(0b110, [B.slightLeft, B.straight, B.straight])), 'right');
+  // con la marca tambien (es el keep de siempre)
+  assert.equal(everyExitKeepSide({ ...rec(0b011, [B.straight, B.straight, B.slightRight]), drop: true }), 'left');
+  // el carril de la ruta va a la salida: eso es la bifurcacion, no un keep
+  assert.equal(everyExitKeepSide(rec(0b100, [B.straight, B.straight, B.slightRight], B.slightRight)), null);
+  // el carril de doblar de una esquina de ciudad no
+  assert.equal(everyExitKeepSide(rec(0b011, [B.straight, B.straight, B.right])), null);
+  // todos sirven, o no hay datos
+  assert.equal(everyExitKeepSide(rec(0b111, [B.straight, B.straight, B.straight | B.slightRight])), null);
+  assert.equal(everyExitKeepSide(null), null);
+});
+
 // Una autopista hacia el norte (z baja) por x = 0: nodo 0 en z 400, el cruce
 // de antes (1) en z 200, un nodo en z 130 (2, otro cruce con salidaAntes) y
 // la salida del aviso (3) en z 70. otros: los nodos ([x, z]) desde el 5;
