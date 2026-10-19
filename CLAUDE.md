@@ -86,6 +86,19 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   grafo son enteros y sin desempate la ruta hacia una V por un brazo del
   cruce). Andando, la ruta arranca en el tramo del camion en su sentido
   (`startArcForHeading`, `routeStartHeading`), no en el nodo mas cercano.
+- La app rutea sola y del GPS del juego solo sabe cuanto falta
+  (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
+  5 km, con 40 km o mas por delante, `routeGameAgreement`), se buscan hasta 3
+  alternativas encareciendo las aristas de la anterior (`routeAlternatives`)
+  y gana la que coincide a menos de 1,5 % sin ser mas de 5 % mas lenta
+  (`pickRouteLikeGame`, `routeLikeGame` en app.js). Solo con destino exacto
+  (`dest`/`pickup` sin `approx`) y sin waypoints; si a los 3 datos sigue sin
+  coincidir (el juego tarda en tener la ruta nueva), se prueba una vez mas
+  (`routeGameRecheck`). En Salt Lake City la app iba por la I-84 y el juego
+  por la I-80, 3 s de diferencia (Discord, 19-10). Los margenes salen de
+  250 rutas: con nuestra escala errada hasta 4 % u 8 km no se cambia ninguna;
+  con 3 %, una de cada tres. El "Copy turn report" trae las dos distancias
+  ("Route left"): con reportes reales se puede medir el error de la escala.
 - Lo que falta y la distancia al giro se miden sobre la ruta entera
   (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
   sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco

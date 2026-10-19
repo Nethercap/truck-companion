@@ -3258,16 +3258,76 @@ function dlcFilter(conElecciones) {
 // filtro: nunca peor que sin el.
 // startHeading: el rumbo del juego si el camion viene andando (ver
 // routeStartHeading); la ruta arranca en su tramo y no da la vuelta.
-function findRoute(startXY, endXY, startHeading = null) {
+// penal: Map arista -> multiplicador del costo, para buscar alternativas
+// (routeLikeGame).
+function findRoute(startXY, endXY, startHeading = null, penal = null) {
   if (!routeGraph) return null;
   const propio = dlcFilter(true);
-  let ruta = findRouteWith(startXY, endXY, propio, startHeading);
+  let ruta = findRouteWith(startXY, endXY, propio, startHeading, penal);
   if (ruta || !propio) return ruta;
   if (dlcOffFor(dlcGameOf(currentGame)).length) {
-    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading);
+    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading, penal);
     if (ruta) { ruta.usesUncheckedDlc = true; return ruta; }
   }
-  return findRouteWith(startXY, endXY, null, startHeading);
+  return findRouteWith(startXY, endXY, null, startHeading, penal);
+}
+
+// Las aristas del grafo de una ruta (sus puntos con indice de nodo) y lo que
+// tarda por ellas, en segundos del grafo.
+function routeEdgesOf(points) {
+  const out = [];
+  let prev = null;
+  for (const p of points || []) {
+    if (p[4] == null) continue;
+    if (prev != null) {
+      const d = routeGraph.dirEdge(prev, p[4]);
+      if (d !== -1) out.push(routeGraph.adjEdge[d]);
+    }
+    prev = p[4];
+  }
+  return out;
+}
+function routeSecondsOf(points) {
+  const { edgeS, edgeT } = routeGraph;
+  return routeEdgesOf(points).reduce((s, e) => s + edgeS[e] + (edgeT ? edgeT[e] / 10 : 0), 0);
+}
+
+// La ruta mas rapida, o una casi igual que va por donde el GPS del juego
+// (pickRouteLikeGame, pure.js). La app rutea sola y el juego solo dice
+// cuanto falta: con 3 s de diferencia, la app mandaba por la I-84 y el GPS
+// del juego por la I-80 (Salt Lake City, Discord 19-10). Las alternativas
+// (routeAlternatives) se buscan solo si el largo no coincide con el juego.
+// Devuelve { leg, switched }.
+function routeLikeGame(leg, from, to, rumbo, gameKm) {
+  if (!leg || routeGameAgreement(gameKmOf(leg, leg), gameKm) !== 'differ') return { leg, switched: false };
+  const rutas = routeAlternatives(leg, (penal) => findRoute(from, to, rumbo, penal), routeEdgesOf);
+  const k = pickRouteLikeGame(rutas.map(r => ({ km: gameKmOf(r, r), seconds: routeSecondsOf(r) })), gameKm);
+  return { leg: rutas[k], switched: k > 0 };
+}
+
+// Si el GPS del juego va al mismo lugar que nuestra ruta: un trabajo con la
+// empresa conocida y sin waypoints (el juego no sabe de los nuestros, y con
+// el centro de la ciudad el largo no se puede comparar).
+function gameRouteComparable(target) {
+  return !!target && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && !waypoints.length;
+}
+
+// Recien tomado el trabajo el GPS del juego puede no tener todavia la ruta
+// nueva, y la comparacion de routeLikeGame se hizo con el dato viejo. Si
+// unos datos despues todavia no coincide y una alternativa si, se recalcula
+// una vez. Despues de elegir una alternativa no: volveria a la mas rapida.
+const ROUTE_GAME_RECHECK_TICKS = 3;
+let routeGameCheck = { key: null, left: 0, ticks: 0 };
+function routeGameRecheck(routeKey, target, data) {
+  const c = routeGameCheck;
+  if (c.key !== routeKey || c.left <= 0 || !currentRouteWorldPoints || !gameRouteComparable(target)) return false;
+  const acuerdo = routeGameAgreement(gameKmOf(currentRouteWorldPoints), data.routeDistanceKm);
+  if (acuerdo === 'agree') { c.left = 0; return false; }
+  c.ticks = acuerdo === 'differ' ? c.ticks + 1 : 0;
+  if (c.ticks < ROUTE_GAME_RECHECK_TICKS) return false;
+  c.left = 0;
+  const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data);
+  return routeLikeGame(findRoute(from, [target.x, target.z], rumbo), from, [target.x, target.z], rumbo, data.routeDistanceKm).switched;
 }
 
 // El rumbo con que arranca la ruta al recalcular: el del juego, solo si el
@@ -3278,7 +3338,7 @@ function routeStartHeading(data) {
   return data && Number.isFinite(data.heading) && Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH ? data.heading : null;
 }
 
-function findRouteWith(startXY, endXY, filtro, startHeading = null) {
+function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null) {
   const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeT, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
   const blocked = filtro ? filtro.blocked : null;
   const nodeOk = filtro ? filtro.nodeOk : null;
@@ -3318,7 +3378,7 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null) {
   // aristas. Si asi no hay camino (algun rincon raro del grafo), el A* por
   // nodos de siempre: nunca peor que antes.
   const path = findArcRoute(routeGraph, startIdx, endIdx, {
-    cost: (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime),
+    cost: (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) * (penal ? (penal.get(e) || 1) : 1),
     heuristic,
     blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
     isFerry: (e) => (edgeF[e] & 1) === 1,
@@ -3767,9 +3827,13 @@ function updateDestinationMarker(data) {
   const offRoute = !destChanged
     && data.position?.x != null
     && distanceToRouteMeters(data.position.x, data.position.z) > OFF_ROUTE_THRESHOLD_M;
+  const recheck = !destChanged && !offRoute && data.position?.x != null && !!routeGraph
+    && routeGameRecheck(routeKey, target, data);
 
-  if ((destChanged || offRoute) && data.position?.x != null && routeGraph) {
+  if ((destChanged || offRoute || recheck) && data.position?.x != null && routeGraph) {
     currentRouteTarget = routeKey;
+    // Una comparacion mas con el GPS del juego, salvo despues de esta.
+    routeGameCheck = { key: routeKey, left: recheck ? 0 : 1, ticks: 0 };
     navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;
     navQuietLanesState.shown = null; navQuietLanesState.shownKey = null; navQuietLanesState.candidate = undefined; navQuietLanesState.candidateTicks = 0;
     navQuietLanes = null;
@@ -3782,6 +3846,12 @@ function updateDestinationMarker(data) {
       // El primer tramo sale del camion: con su rumbo si viene andando.
       const rumbo = legIdx === 0 ? routeStartHeading(data) : null;
       let leg = findRoute(from, to, rumbo);
+      // Casi empatada con otra, la que va por donde el GPS del juego.
+      if (leg && legs.length === 1 && gameRouteComparable(target)) {
+        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm);
+        leg = elegida.leg;
+        if (elegida.switched) routeGameCheck.left = 0;
+      }
       if (leg) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
         // Parado arranca en el nodo mas cercano: si es el cruce de adelante,
@@ -6193,6 +6263,7 @@ document.getElementById('turnReportBtn').addEventListener('click', async () => {
     client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
     now: Date.now(), items: turnLog.list(),
+    routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
     formatTime: (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
   });
   if (await copyText(text)) showToast(t('turnReportCopied'), 'success', 3000);
