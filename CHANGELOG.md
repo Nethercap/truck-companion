@@ -6,6 +6,10 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Build my map reads map mods that ship their list of cities (or companies, cargo...) in the
+  obfuscated format some mods use, like Mapa BR Brasil. Before, the build stopped with
+  "parser.mjs failed". A list it still can't read (an encrypted one) is now skipped with a note in
+  the log, and the map is built without what that list adds.
 - LAN mode: the client's local data connection only answers the dashboard pages the client serves
   itself (the dashboard and the `/dash/` panel, opened by the PC's address, `localhost` or its name).
   Web pages from anywhere else, even in a browser on the same PC, can no longer connect to it.

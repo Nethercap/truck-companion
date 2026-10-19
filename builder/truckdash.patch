@@ -494,10 +494,70 @@ index 0000000..e0b2d29
 +  );
 +}
 diff --git a/packages/clis/parser/game-files/convert-sii-to-json.ts b/packages/clis/parser/game-files/convert-sii-to-json.ts
-index ece847d..8b709b6 100644
+index ece847d..200bcc7 100644
 --- a/packages/clis/parser/game-files/convert-sii-to-json.ts
 +++ b/packages/clis/parser/game-files/convert-sii-to-json.ts
-@@ -66,9 +66,49 @@ export function convertSiiToJson<T>(
+@@ -6,22 +6,14 @@ import { parseSii } from './sii-parser';
+ import { ajv } from './sii-schemas';
+ import { jsonConverter } from './sii-visitors';
+ 
+-export function convertSiiToJson<T>(
+-  siiPath: string,
+-  entries: Entries,
+-  schema: JSONSchemaType<T>,
+-): T {
+-  logger.debug('converting', siiPath, 'to json object');
+-  const siiFile = Preconditions.checkExists(
+-    entries.files.get(siiPath),
+-    `${siiPath} does not exist`,
+-  );
+-  const buffer = siiFile.read();
+-
+-  // Some .sii files (like locale files) may be 3nk-encrypted.
+-  let sii;
+-  const magic = buffer.toString('utf8', 0, 3);
+-  if (magic === '3nK') {
++// El texto de un .sii. Los ofuscados con 3nK se desofuscan; lo usan tambien
++// las listas de @include de def/ (parseIncludeOnlySii en def-parser.ts), que
++// antes leian el archivo crudo: un mod con def/city.sii en 3nK cortaba todo el
++// armado (Mapa BR Brasil 6.1, 19-10). Los cifrados (ScsC) y los binarios
++// (BSII) no se pueden leer: el error dice cual era, para el build.log.
++export function siiText(buffer: Buffer, siiPath: string): string {
++  const magic = buffer.toString('utf8', 0, 4);
++  if (magic.startsWith('3nK')) {
+     // https://github.com/dariowouters/ts-map/blob/e73adad923f60bbbb637dd4642910d1a0b1154e3/TsMap/Helpers/MemoryHelper.cs#L109
+     if (buffer.length < 5) {
+       throw new Error();
+@@ -31,10 +23,25 @@ export function convertSiiToJson<T>(
+       buffer[i] = (((key << 2) ^ (key ^ 0xff)) << 3) ^ key ^ buffer[i];
+       key++;
+     }
+-    sii = buffer.toString('utf8', 6);
+-  } else {
+-    sii = buffer.toString();
++    return buffer.toString('utf8', 6);
++  }
++  if (magic === 'ScsC' || magic === 'BSII') {
++    throw new Error(`${siiPath} is ${magic === 'ScsC' ? 'encrypted' : 'binary'} (${magic}), can't read it`);
+   }
++  return buffer.toString();
++}
++
++export function convertSiiToJson<T>(
++  siiPath: string,
++  entries: Entries,
++  schema: JSONSchemaType<T>,
++): T {
++  logger.debug('converting', siiPath, 'to json object');
++  const siiFile = Preconditions.checkExists(
++    entries.files.get(siiPath),
++    `${siiPath} does not exist`,
++  );
++  let sii = siiText(siiFile.read(), siiPath);
+ 
+   // HACK localization.sui files just contain unwrapped properties, e.g.:
+   //   key[]: foo
+@@ -66,9 +73,49 @@ export function convertSiiToJson<T>(
    if (validate(json)) {
      return json;
    }
@@ -548,9 +608,18 @@ index ece847d..8b709b6 100644
 +  return value;
 +}
 diff --git a/packages/clis/parser/game-files/def-parser.ts b/packages/clis/parser/game-files/def-parser.ts
-index 4094551..0ab0ec9 100644
+index 4094551..a1234c4 100644
 --- a/packages/clis/parser/game-files/def-parser.ts
 +++ b/packages/clis/parser/game-files/def-parser.ts
+@@ -26,7 +26,7 @@ import type {
+ } from '@truckermudgeon/map/types';
+ import type { JSONSchemaType } from 'ajv';
+ import { logger } from '../logger';
+-import { convertSiiToJson } from './convert-sii-to-json';
++import { convertSiiToJson, siiText } from './convert-sii-to-json';
+ import { parseModelPmg } from './model-pmg-parser';
+ import { parsePrefabPpd } from './prefab-ppd-parser';
+ import type { Entries } from './scs-archive';
 @@ -101,7 +101,18 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
      p: (t: T, e: Entries) => U | undefined,
      m: Map<string, U & { dlcGuard: number }>,
@@ -571,7 +640,23 @@ index 4094551..0ab0ec9 100644
      const u = p(t, entries);
      if (u) {
        m.set(u.token, { ...u, dlcGuard });
-@@ -135,17 +146,39 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+@@ -130,22 +141,54 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+       dlcGuard = 0;
+     }
+ 
+-    const includePaths = parseIncludeOnlySii(`def/${f}`, entries);
++    // Una lista que no se puede leer (cifrada, binaria o con algo que el
++    // parser no entiende) se saltea con un aviso, como un .sii suelto en
++    // processAndAdd: antes cortaba el armado entero y no habia mapa. Sin ella
++    // faltan sus ciudades (o empresas, cargas...), pero las rutas salen.
++    let includePaths: string[];
++    try {
++      includePaths = parseIncludeOnlySii(`def/${f}`, entries);
++    } catch (err) {
++      logger.warn('skipping', `def/${f}`, '- could not read its @include list:', err);
++      continue;
++    }
+     for (const path of includePaths) {
        if (f.startsWith('city.')) {
          processAndAdd(path, dlcGuard, CitySiiSchema, processCityJson, cities);
        } else if (f.startsWith('country.')) {
@@ -621,7 +706,7 @@ index 4094551..0ab0ec9 100644
            countries.set(partialCountry.token, {
              ...partialCountry,
              truckSpeedLimits,
-@@ -234,29 +267,44 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+@@ -234,29 +277,44 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
        continue;
      }
  
@@ -689,7 +774,7 @@ index 4094551..0ab0ec9 100644
      }
    }
    logger.info('parsed', prefabs.size, 'prefab defs');
-@@ -309,12 +357,24 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+@@ -309,12 +367,24 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
    logger.info('parsed', achievements.size, 'achievements');
  
    const routes = new Map<string, Route>();
@@ -719,7 +804,21 @@ index 4094551..0ab0ec9 100644
      for (const f of def.files) {
        if (/^route\.(\w+\.)?sii$/.test(f)) {
          processRouteJson(
-@@ -370,7 +430,9 @@ function processCityJson(obj: CitySii) {
+@@ -349,10 +419,10 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+ function parseIncludeOnlySii(siiPath: string, entries: Entries): string[] {
+   logger.debug('parsing', siiPath, 'for @include directives');
+   const f = Preconditions.checkExists(entries.files.get(siiPath));
+-  const res = parseSii(f.read().toString());
++  const res = parseSii(siiText(f.read(), siiPath));
+   if (!res.ok) {
+-    logger.error('error parsing', siiPath);
+-    throw new Error();
++    const primero = res.parseErrors[0] ?? res.lexErrors[0];
++    throw new Error(`error parsing ${siiPath}: ${primero?.message ?? ''}`);
+   }
+ 
+   return includeDirectiveCollector.collect(res.cst, 'def');
+@@ -370,7 +440,9 @@ function processCityJson(obj: CitySii) {
    return {
      token: token.split('.')[1],
      name: rawCity.cityName,
@@ -730,7 +829,7 @@ index 4094551..0ab0ec9 100644
      countryToken: rawCity.country,
      population: rawCity.population ?? 0,
    };
-@@ -449,11 +511,15 @@ function processCompanyJson(
+@@ -449,11 +521,15 @@ function processCompanyJson(
    );
    if (editorFolder) {
      for (const f of editorFolder.files) {
@@ -751,7 +850,7 @@ index 4094551..0ab0ec9 100644
        for (const [, entry] of Object.entries(city.companyDef)) {
          cityTokens.push(entry.city);
        }
-@@ -466,11 +532,19 @@ function processCompanyJson(
+@@ -466,11 +542,19 @@ function processCompanyJson(
      if (directionFolder) {
        const arr = direction === 'in' ? cargoInTokens : cargoOutTokens;
        for (const f of directionFolder.files) {
@@ -776,7 +875,7 @@ index 4094551..0ab0ec9 100644
          for (const [, entry] of Object.entries(cargo.cargoDef)) {
            arr.push(entry.cargo);
          }
-@@ -530,11 +604,24 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+@@ -530,11 +614,24 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
        logger.warn(`unknown dlc guard for ${dlc} (${f}); falling back to 0`);
        dlcGuard = 0;
      }
@@ -806,7 +905,7 @@ index 4094551..0ab0ec9 100644
      const ferryConnection = json.ferryConnection;
      const key = Object.keys(ferryConnection)[0];
      // key is expected to be in form: "conn.source_token.dest_token"
-@@ -575,7 +662,7 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+@@ -575,7 +672,7 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
    return {
      token,
      name: rawFerry.ferryName,
@@ -815,7 +914,7 @@ index 4094551..0ab0ec9 100644
      connections,
    };
  }
-@@ -589,9 +676,15 @@ function processPrefabJson(
+@@ -589,9 +686,15 @@ function processPrefabJson(
      return new Map();
    }
  
@@ -832,7 +931,7 @@ index 4094551..0ab0ec9 100644
    );
    const prefabs = new Map<string, PrefabDescription & { path: string }>();
    for (const [token, path] of prefabTuples) {
-@@ -600,7 +693,25 @@ function processPrefabJson(
+@@ -600,7 +703,25 @@ function processPrefabJson(
        logger.warn(`could not find prefab file for ${token}`);
        continue;
      }
@@ -859,7 +958,7 @@ index 4094551..0ab0ec9 100644
      if (ppd.mapPoints.some(p => p.type === 'polygon')) {
        // TODO figure out a way to get building footprint information for
        //  polygons in prefabs that look like buildings.
-@@ -1094,3 +1205,13 @@ function processMileageTargetJson(
+@@ -1094,3 +1215,13 @@ function processMileageTargetJson(
    }
    return mileageTargets;
  }
@@ -2697,6 +2796,65 @@ index b8accdc..8bec80f 100644
            category: nullable(string),
            editable: nullable(stringEnum('true', 'false')),
          },
+diff --git a/packages/clis/parser/game-files/tests/sii-text.test.ts b/packages/clis/parser/game-files/tests/sii-text.test.ts
+new file mode 100644
+index 0000000..4d8e537
+--- /dev/null
++++ b/packages/clis/parser/game-files/tests/sii-text.test.ts
+@@ -0,0 +1,53 @@
++import { siiText } from '../convert-sii-to-json';
++import { parseSii } from '../sii-parser';
++import { includeDirectiveCollector } from '../sii-visitors';
++
++// Lo inverso de siiText: el mismo XOR con la misma clave que va subiendo.
++function ofuscar3nK(texto: string, clave = 0xa7): Buffer {
++  const datos = Buffer.from(texto, 'utf8');
++  const buf = Buffer.alloc(6 + datos.length);
++  buf.write('3nK', 0, 'utf8');
++  buf[3] = 0x01;
++  buf[5] = clave;
++  let key = clave;
++  for (let i = 0; i < datos.length; i++) {
++    buf[6 + i] = ((((key << 2) ^ (key ^ 0xff)) << 3) ^ key ^ datos[i]) & 0xff;
++    key++;
++  }
++  return buf;
++}
++
++const lista = `SiiNunit
++{
++@include "city/curitiba.sii"
++@include "city/salvador.sii"
++}
++`;
++
++describe('siiText', () => {
++  it('devuelve tal cual un .sii de texto', () => {
++    expect(siiText(Buffer.from(lista, 'utf8'), 'def/city.sii')).toBe(lista);
++  });
++
++  it('desofusca un def/city.sii en 3nK y sus @include se leen', () => {
++    // Un mod de mapa con la lista de ciudades en 3nK cortaba todo el armado
++    // (Mapa BR Brasil 6.1, 19-10).
++    const texto = siiText(ofuscar3nK(lista), 'def/city.sii');
++    expect(texto).toBe(lista);
++    const res = parseSii(texto);
++    expect(res.ok).toBe(true);
++    expect(includeDirectiveCollector.collect(res.cst, 'def')).toEqual([
++      'def/city/curitiba.sii',
++      'def/city/salvador.sii',
++    ]);
++  });
++
++  it('dice el formato de un .sii cifrado o binario', () => {
++    expect(() => siiText(Buffer.from('ScsC....', 'latin1'), 'def/city.sii')).toThrow(
++      /encrypted \(ScsC\)/,
++    );
++    expect(() => siiText(Buffer.from('BSII....', 'latin1'), 'def/city.sii')).toThrow(
++      /binary \(BSII\)/,
++    );
++  });
++});
 diff --git a/packages/clis/parser/game-files/zip-entries.ts b/packages/clis/parser/game-files/zip-entries.ts
 new file mode 100755
 index 0000000..38c046b
