@@ -1859,6 +1859,43 @@ test('stopsAlongRoute: ordena por lo que hay que andar, no por la recta', () => 
   assert.deepEqual(st.map(s => s.x), [100, 2900]); // la lejana del recorrido queda fuera
 });
 
+test('pickFuelStop: el area de descanso de la otra mano o ya pasada no gana a la de adelante (Grand Island, Discord 19-10)', () => {
+  // Camion en (0,0) yendo al este; el primer tramo es corto (hasta el
+  // proximo punto de la curva). Un area 200 m atras y 100 m al costado: por
+  // la linea queda "sobre la ruta" a 30 m, pero el camino da la vuelta.
+  const route = [[0, 0], [30, 0], [5000, 0]];
+  const atras = { x: -200, z: 100, dist: 224 };
+  const salida = { x: 3000, z: 150, dist: 3004 };
+  assert.equal(pickFuelStop([atras, salida], 0, 0, 90, route).x, -200); // sin el camino
+  const reach = (st) => ({ [-200]: 2800, 600: 3000, 3000: 3200 })[st.x];
+  const sinVolver = pickFuelStop([atras, salida], 0, 0, 90, route, 3, 1500, { reach });
+  assert.deepEqual([sinVolver.x, sinVolver.why], [3000, 'route']);
+  // Una a 600 m adelante pero de la otra mano (el camino da la vuelta en la
+  // salida siguiente: 3 km) y otra a 3 km, en la salida
+  const otraMano = { x: 600, z: 100, dist: 608 };
+  const stations = [atras, otraMano, salida];
+  assert.equal(pickFuelStop([otraMano, salida], 0, 0, 90, route).x, 600); // sin el camino, la de la otra mano
+  const elegida = pickFuelStop(stations, 0, 0, 90, route, 3, 1500, { reach });
+  assert.deepEqual([elegida.x, elegida.why], [3000, 'route']);
+  // Sin ruta no hay a donde volver: gana la de menos camino aunque haya que
+  // dar la vuelta (3000 m contra 3200)
+  const soloAdelante = pickFuelStop([otraMano, salida], 0, 0, 90, null, 3, 1500, { reach });
+  assert.deepEqual([soloAdelante.x, soloAdelante.why], [600, 'ahead']);
+  // La de la otra mano no da el tope: con ella, la de la salida (a 3500 m,
+  // pasado 608 * 3 + 1500) quedaba afuera
+  const lejana = { x: 3500, z: 150, dist: 3503 };
+  const conTope = pickFuelStop([otraMano, lejana], 0, 0, 90, route, 3, 1500, { reach: (st) => ({ 600: 3000, 3500: 3600 })[st.x] });
+  assert.deepEqual([conTope.x, conTope.why], [3500, 'route']);
+  // Pero si la otra queda tan lejos que ir y volver por la vuelta sale menos,
+  // la de la vuelta (2 * 3000 - 600 contra 2 * 6200 - 6000)
+  const muyLejos = { x: 6000, z: 150, dist: 6002 };
+  const conVuelta = pickFuelStop([otraMano, muyLejos], 0, 0, 90, [[0, 0], [30, 0], [9000, 0]], 3, 1500, { reach: (st) => ({ 600: 3000, 6000: 6200 })[st.x] });
+  assert.equal(conVuelta.x, 600);
+  // Sin camino a ninguna, la de siempre
+  const sinCamino = pickFuelStop([otraMano, salida], 0, 0, 90, route, 3, 1500, { reach: () => null });
+  assert.deepEqual([sinCamino.x, sinCamino.why], [600, 'route']);
+});
+
 test('stopInsertIndex: la parada nueva va primero, no despues del destino (Discord, 13-10)', () => {
   const { stopInsertIndex } = require('./pure.js');
   // Sin trabajo, yendo a un pueblo (waypoint 0) 20 km al norte: un solo tramo

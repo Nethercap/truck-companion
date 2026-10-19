@@ -683,15 +683,53 @@ function stopsAlongRoute(route, stops, maxOffM = 400, maxAlongM = 80000) {
 // La de la ruta no puede quedar mucho mas lejos que la mas cercana que no
 // esta atras: en la demo elegia una a 244 km sobre la ruta habiendo otras a
 // pocos km a un costado (maxDetourFactor veces su distancia, mas un margen).
-function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, slackM = 1500) {
+// Con reach(st) (metros por el camino desde el camion, o null) se mira si la
+// elegida obliga a dar la vuelta: estar cerca de la linea de la ruta no dice
+// de que mano queda. En la I-80 este de Grand Island (ATS, Discord 19-10) el
+// area de descanso a 99 m de la autopista era de la mano oeste: 1 km antes,
+// el camino hasta ella daba 3 km (salir, dar la vuelta y volver), y el boton
+// de descanso mandaba a darla con otras a la salida siguiente. Si el camino
+// mide mas de uTurnM sobre lo que se avanza hasta ella (along + off sobre la
+// ruta, 1,5 veces la recta fuera de ella), se elige otra vez sin ella (asi
+// tampoco da el tope) y queda la de menor 2 * camino - along: ir y volver del
+// desvio, menos lo que se avanza por la ruta. En 816 pedidos de ATS cambian
+// 83, 69 con menos camino. Ordenar todo por el camino cambiaba 30 % y en 91
+// el camino era mas largo (ganaban paradas mas lejos sobre la ruta); sacar
+// las que caen atras por la linea perdia algunas que se alcanzan en 2 km.
+// Hasta `tries` vueltas.
+function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, slackM = 1500, { reach = null, uTurnM = 1000, tries = 4 } = {}) {
   if (!stations || !stations.length) return null;
-  const notBehind = stations.filter(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return !r || r.side !== 'behind'; });
-  const ref = notBehind.length ? notBehind[0].dist : stations[0].dist;
-  const onRoute = stopsAlongRoute(route, stations).filter(st => st.along + st.off <= ref * maxDetourFactor + slackM);
-  if (onRoute.length) return { ...onRoute[0], why: 'route' };
-  const ahead = stations.find(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return r && r.side === 'ahead'; });
-  if (ahead) return { ...ahead, why: 'ahead' };
-  return { ...stations[0], why: 'nearest' };
+  const elegir = (pool) => {
+    const notBehind = pool.filter(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return !r || r.side !== 'behind'; });
+    const ref = notBehind.length ? notBehind[0].dist : pool[0].dist;
+    const onRoute = stopsAlongRoute(route, pool).filter(st => st.along + st.off <= ref * maxDetourFactor + slackM);
+    if (onRoute.length) return { ...onRoute[0], why: 'route' };
+    const ahead = pool.find(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return r && r.side === 'ahead'; });
+    if (ahead) return { ...ahead, why: 'ahead' };
+    return { ...pool[0], why: 'nearest' };
+  };
+  let pick = elegir(stations);
+  if (!reach) return pick;
+  const caminos = new Map();
+  const camino = (st) => {
+    const key = `${st.x},${st.z}`;
+    if (!caminos.has(key)) { const m = reach(st); caminos.set(key, Number.isFinite(m) ? m : null); }
+    return caminos.get(key);
+  };
+  const costo = (st) => { const m = camino(st); return m == null ? Infinity : 2 * m - (st.why === 'route' ? st.along : 0); };
+  const vuelta = (st) => {
+    const m = camino(st);
+    return m == null || m > (st.why === 'route' ? st.along + st.off : 1.5 * st.dist) + uTurnM;
+  };
+  let pool = stations, mejor = pick;
+  for (let k = 0; k < tries && pick && vuelta(pick); k++) {
+    const sacada = pick;
+    pool = pool.filter(st => st.x !== sacada.x || st.z !== sacada.z);
+    if (!pool.length) break;
+    pick = elegir(pool);
+    if (costo(pick) < costo(mejor)) mejor = pick;
+  }
+  return mejor;
 }
 
 // Donde entra una parada nueva (estacion, area de descanso, taller...) en la

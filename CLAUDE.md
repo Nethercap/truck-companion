@@ -99,6 +99,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   250 rutas: con nuestra escala errada hasta 4 % u 8 km no se cambia ninguna;
   con 3 %, una de cada tres. El "Copy turn report" trae las dos distancias
   ("Route left"): con reportes reales se puede medir el error de la escala.
+- El boton de parada (estacion o descanso, `addNearestStop`) elige con
+  `pickFuelStop` y despues mira el camino de verdad (`reach`, findRoute desde
+  el camion): si la elegida obliga a dar la vuelta (el camino mide 1 km mas
+  que lo que se avanza hasta ella), se elige otra vez sin ella y queda la de
+  menor 2 * camino - along. Cerca de la linea de la ruta no dice de que mano
+  queda: en la I-80 este de Grand Island mandaba al area de la mano oeste
+  (Discord, 19-10). Ordenar todo por el camino cambiaba 30 % de las
+  elecciones y alargaba muchas: ganaban paradas lejos sobre la ruta.
 - Lo que falta y la distancia al giro se miden sobre la ruta entera
   (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
   sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco

@@ -2880,9 +2880,20 @@ function addNearestStop(code) {
   }
   // La primera sobre la ruta que falta, o la mas cercana adelante: la mas
   // cercana en linea recta podia quedar atras y la ruta volvia a buscarla
-  // ("it was a line going behind me", Discord 10-10).
+  // ("it was a line going behind me", Discord 10-10). Y medida por el
+  // camino (reach): un area de descanso de la otra mano esta pegada a la
+  // ruta pero hay que dar la vuelta para entrar (Grand Island, Discord 19-10).
   const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
-  const best = pickFuelStop(nearestFacilities(code, pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints);
+  const rumbo = routeStartHeading(lastData);
+  const reach = routeGraph ? (st) => {
+    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo);
+    if (!r || !r.length) return null;
+    let m = 0;
+    for (let k = 1; k < r.length; k++) m += Math.hypot(r[k][0] - r[k - 1][0], r[k][1] - r[k - 1][1]);
+    const fin = r[r.length - 1];
+    return m + Math.hypot(st.x - fin[0], st.z - fin[1]);
+  } : null;
+  const best = pickFuelStop(nearestFacilities(code, pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints, undefined, undefined, { reach });
   if (!best) { showToast(t('poiNoResults'), 'danger'); return false; }
   const name = t(code === 'g' ? 'poiCatFuel' : 'poiCatRest');
   const lejos = best.why === 'route'
