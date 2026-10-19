@@ -139,6 +139,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   el rumbo del camion (`findUpcomingTurn(heading)`) contra como se entra (los
   ultimos 10 m antes del nodo, no los 60 m de `inBearing`): pasado si se
   desvio 25 grados (o la mitad del giro) hacia la salida.
+- El nombre de un aviso ("onto I-84", `roadSignForTurn`) lo votan los carteles
+  de ruta de la salida: no los del cruce ni los de antes (el punto de la ruta
+  mas cerca del cartel tiene que quedar 10 m pasado el nodo del giro), ni los
+  que quedan mas cerca de otra salida (`otherBranchesAt`) o a mas de 80 m de
+  la ruta (`exitSignTest`). Si hubo carteles y ninguno vota, sin nombre. El
+  "I-80" a 14 m del nodo nombraba la rampa a la I-84 en Salt Lake City
+  (Discord, 19-10). Medido en 450 rutas de ATS: 183 nombres mejores, 6
+  peores, unos 100 ambiguos sin nombre; ETS2 no cambia (sus carteles son de
+  destino). `check_avisos` no mira nombres: comparar a mano contra main.
 - Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
   mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
