@@ -3720,6 +3720,47 @@ test('turnReportText: mapa, versiones, el camion y los avisos, para pegar en Dis
   const largo = turnReportText({ game: 'ats', map: 'ats_c2c_promods', web: '20261017f', client: '1.5.32', truck: [-123456, -98765],
     heading: 359, now: 1792000000000, items: log.list(), formatTime: () => '23:59' });
   assert.ok(largo.length < 2000, `${largo.length} caracteres`);
+  // con lo que falta por la app y por el GPS del juego
+  const conKm = turnReportText({ game: 'ats', map: 'ats', web: 'x', client: '1.5.32', truck: [1, 2], now: 1, items: [],
+    formatTime: hora, routeKm: { app: 178.94, game: 164.2 } });
+  assert.equal(conKm.split('\n')[4], 'Route left: app 178.9 km, game GPS 164.2 km');
+  assert.ok(turnReportText({ game: 'ats', map: 'ats', web: 'x', client: null, truck: null, now: 1, items: [], formatTime: hora,
+    routeKm: { app: 12, game: null } }).includes('Route left: app 12.0 km, game GPS ?'));
+  assert.ok(!vacio.includes('Route left'));
+});
+
+test('pickRouteLikeGame: casi empatadas, la que coincide con el GPS del juego (I-80 en Salt Lake City, Discord 19-10)', () => {
+  const { pickRouteLikeGame, routeGameAgreement, routeAlternatives } = require('./pure.js');
+  // La mas rapida por la I-84 (179 km del juego), la I-80 3 s mas lenta (164 km)
+  const rutas = [{ km: 179, seconds: 428.4 }, { km: 164, seconds: 431.4 }];
+  assert.equal(routeGameAgreement(179, 164), 'differ');
+  assert.equal(pickRouteLikeGame(rutas, 164), 1);
+  // Si el juego coincide con la nuestra, o no hay dato, la nuestra
+  assert.equal(routeGameAgreement(179, 177), 'agree');
+  assert.equal(pickRouteLikeGame(rutas, 177), 0);
+  assert.equal(pickRouteLikeGame(rutas, null), 0);
+  assert.equal(pickRouteLikeGame(rutas, 0), 0);
+  // El juego muy lejos de todas: apunta a otra cosa (el remolque, otro destino)
+  assert.equal(routeGameAgreement(179, 120), 'unknown');
+  assert.equal(pickRouteLikeGame([{ km: 179, seconds: 400 }, { km: 120, seconds: 410 }], 120), 0);
+  // Cerca del final no se compara (la escala de ciudad pesa mucho), ni por
+  // menos de 5 km: el error de la escala es mas de km que de porcentaje
+  assert.equal(pickRouteLikeGame([{ km: 30, seconds: 60 }, { km: 26, seconds: 61 }], 26), 0);
+  assert.equal(routeGameAgreement(60, 56), 'agree');
+  assert.equal(pickRouteLikeGame([{ km: 60, seconds: 100 }, { km: 56, seconds: 101 }], 56), 0);
+  // Una que coincide pero es mucho mas lenta, o que no coincide del todo: no
+  assert.equal(pickRouteLikeGame([{ km: 179, seconds: 400 }, { km: 164, seconds: 430 }], 164), 0);
+  assert.equal(pickRouteLikeGame([{ km: 179, seconds: 400 }, { km: 170, seconds: 405 }], 164), 0);
+  // Entre varias que sirven, la que mas coincide
+  assert.equal(pickRouteLikeGame([{ km: 179, seconds: 400 }, { km: 166, seconds: 405 }, { km: 164.5, seconds: 410 }], 164), 2);
+  // Alternativas: cada una con las aristas de la anterior encarecidas, acumulado
+  const pedidos = [];
+  const route = (penal) => { pedidos.push(new Map(penal)); return { edges: [pedidos.length + 10] }; };
+  const alts = routeAlternatives({ edges: [1, 2] }, route, (r) => r.edges, { tries: 2, factor: 2 });
+  assert.equal(alts.length, 3);
+  assert.deepEqual([...pedidos[0]], [[1, 2], [2, 2]]);
+  assert.deepEqual([...pedidos[1]], [[1, 2], [2, 2], [11, 2]]);
+  assert.equal(routeAlternatives({ edges: [1] }, () => null, (r) => r.edges).length, 1);
 });
 
 test('turnPassed: parado en la linea de una T el giro sigue adelante; ya doblando, no (Discord 18-10)', () => {
