@@ -77,6 +77,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`findQuietLanes`, `quietLanesAhead`, `navQuietLanes`): solo salidas de
   autopista (`laneKeepSide` sin la marca), sin voz ni texto. Las de doblar
   en una esquina de ciudad no (un carril de giro en cada cuadra).
+- El ajuste "Highway exits" (`navEveryExit`, apagado por defecto; Discord,
+  19-10) convierte esas mismas salidas en un "keep" con voz
+  (`everyExitKeepSide` en pure.js, en `findUpcomingTurn` con los filtros
+  del keep por carriles). El juego no los dice: +18 avisos en ATS y +28 en
+  ETS2 en check_avisos. La lista guardada es con el ajuste apagado;
+  `check_avisos.js --cada-salida` muestra los que suma.
 - El ruteo (`findRouteWith`) es un A* por aristas sin vueltas en U en los
   nodos (`findArcRoute` en pure.js): el estado es la arista de llegada y no
   se sale a mas de 150 grados de ella, salvo en ferry/tren o si no queda

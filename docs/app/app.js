@@ -98,7 +98,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -175,6 +175,10 @@ let truckSize = truckSizeSetting(_savedSettings.truckSize);
 let clockFormat = clockFormatSetting(_savedSettings.clockFormat);
 function hour12() { return clockIs12h(clockFormat, currentLang); }
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
+// "Keep left/right" tambien en las salidas donde el juego no dice nada (el
+// carril de desaceleracion, everyExitKeepSide en pure.js). Apagado por
+// defecto: el juego no los dice y suman 13 a 18 % de avisos (Discord, 19-10).
+let navEveryExit = !!_savedSettings.navEveryExit;
 // DLC de mapa destildados por juego ({ ats: ['co'], ets2: [] }): las rutas
 // evitan sus caminos (ver dlcBlockedGuards en pure.js). Se guarda lo
 // destildado y no lo tildado, asi un DLC nuevo arranca prendido.
@@ -450,6 +454,7 @@ function initSettingsUi() {
   document.getElementById('setMiniRest').checked = miniHudSettings.rest;
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
+  document.getElementById('setEveryExit').checked = navEveryExit;
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setLiveShareRoute').checked = liveShareRoute;
   document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
@@ -698,6 +703,10 @@ document.getElementById('setVoiceTiming').addEventListener('change', (e) => {
 document.getElementById('setVoiceTest').addEventListener('click', () => {
   unlockVoice().catch(() => {});
   speakVoice('soon_turn_right');
+});
+document.getElementById('setEveryExit').addEventListener('change', (e) => {
+  navEveryExit = e.target.checked;
+  saveSettings();
 });
 document.getElementById('setDarkButtons').addEventListener('change', (e) => {
   darkButtons = e.target.checked;
@@ -4332,6 +4341,13 @@ function findUpcomingTurn(heading) {
         const deRampa = laneKeepAt(pts, i, iEnd, true);
         if (deRampa && laneFromOnRamp({ ...ctx, i }, NAV_LANE_RAMP_M)) keep = deRampa;
       }
+      // Con el ajuste "en cada salida" (navEveryExit), tambien donde el carril
+      // se agrego para la salida: las que findQuietLanes muestra sin aviso.
+      if (!keep && navEveryExit) {
+        let direction = null;
+        const lanes = laneRecordAt(pts, i, iEnd, (r) => (direction = everyExitKeepSide(r)) != null);
+        if (lanes) keep = { direction, lanes };
+      }
       const salida = keep && sideExitToward({ ...ctx, i, iEnd, rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M }, 'right', -100, 100);
       if (salida) {
         const repetido = lastKeep && lastKeep.direction === keep.direction && cum[i] - lastKeep.atM <= NAV_LANE_KEEP_REPEAT_M;
@@ -4462,7 +4478,7 @@ function findQuietLanes() {
   const ctx = { pts, cum, pointAt, bearingBetween, nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency,
     rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M };
   const q = quietLanesAhead(pts, cum, here, NAV_QUIET_LANES_M, (i, iEnd) => {
-    const rec = laneRecordAt(pts, i, iEnd, (r) => (r.turn & LANE_ARROW_BITS.straight) && laneKeepSide(r, true) != null);
+    const rec = laneRecordAt(pts, i, iEnd, (r) => everyExitKeepSide(r) != null);
     return rec && sideExitToward({ ...ctx, i, iEnd }, 'right', -100, 100) ? rec : null;
   }, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
   return q ? { kind: 'lanes', direction: null, node: q.node, distanceMeters: q.distanceMeters, lanes: q.lanes } : null;
