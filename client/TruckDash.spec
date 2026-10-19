@@ -3,9 +3,11 @@
 # (mismo comando que corre .github/workflows/build-client.yml, en Windows y en
 # Linux: el spec se adapta solo)
 
+import os
 import sys
 
 IS_WINDOWS = sys.platform == "win32"
+IS_DARWIN = sys.platform == "darwin"
 
 # --- Metadatos del .exe (issue #2: falsos positivos de antivirus) ---
 # Un .exe sin recurso de version, empaquetado con UPX y sin firmar es el
@@ -50,6 +52,8 @@ datas = [('assets/icon.png', 'assets')]  # icono de la bandeja (logo real)
 datas.append(('mapbuild/atlas-names-ats.json', 'mapbuild'))
 if IS_WINDOWS:
     datas.insert(0, ('vendor/truckdash-telemetry.dll', 'vendor'))
+elif IS_DARWIN and os.path.exists('vendor/truckdash-telemetry.dylib'):
+    datas.insert(0, ('vendor/truckdash-telemetry.dylib', 'vendor'))
 
 a = Analysis(
     ['tray_client.py'],
@@ -69,25 +73,69 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
-    [],
-    name='TruckDash',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,  # comprimir con UPX dispara detecciones heuristicas (issue #2)
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon='assets/icon.ico' if IS_WINDOWS else None,
-    version='version_info.txt' if IS_WINDOWS else None,
-)
+if IS_DARWIN:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='TruckDash',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon='assets/icon.icns' if os.path.exists('assets/icon.icns') else None,
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name='TruckDash',
+    )
+    app = BUNDLE(
+        coll,
+        name='TruckDash.app',
+        icon='assets/icon.icns' if os.path.exists('assets/icon.icns') else None,
+        bundle_identifier='com.nethercap.truckdash',
+        info_plist={
+            'CFBundleName': 'Truck Dash',
+            'CFBundleDisplayName': 'Truck Dash',
+            'CFBundleIdentifier': 'com.nethercap.truckdash',
+            'CFBundleVersion': CLIENT_VERSION,
+            'CFBundleShortVersionString': CLIENT_VERSION,
+            'NSHighResolutionCapable': 'True',
+            'LSMinimumSystemVersion': '11.0',
+        },
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        [],
+        name='TruckDash',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,  # comprimir con UPX dispara detecciones heuristicas (issue #2)
+        upx_exclude=[],
+        runtime_tmpdir=None,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon='assets/icon.ico' if IS_WINDOWS else None,
+        version='version_info.txt' if IS_WINDOWS else None,
+    )

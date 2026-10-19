@@ -195,7 +195,12 @@ class AppState:
     def refresh_title(self):
         if self.icon:
             code_part = f" - code {self.code}" if self.code else ""
-            self.icon.title = recortar_titulo(f"Truck Dash{code_part} - {self.status_text()}")
+            titulo = recortar_titulo(f"Truck Dash{code_part} - {self.status_text()}")
+            if _tk_root is not None and threading.current_thread() is not threading.main_thread():
+                icono = self.icon
+                _en_hilo_principal(lambda: setattr(icono, "title", titulo))
+            else:
+                self.icon.title = titulo
 
     def set_status(self, status: str, game: str | None = None, vehicle: str | None = None):
         changed = status != self.status or game != self.game
@@ -272,9 +277,99 @@ def make_icon_image():
     return img
 
 
+_tk_root: tk.Tk | None = None
+_cola_principal: queue.Queue = queue.Queue()
+_ventana_setup: "SetupWindow | None" = None
+
+
+def _en_hilo_principal(funcion) -> None:
+    """En macOS, AppKit y Tcl/Tk exigen correr en el hilo principal."""
+    if _tk_root is not None:
+        _cola_principal.put(funcion)
+    else:
+        funcion()
+
+
+def _bombear_cola_principal() -> None:
+    if _tk_root is None:
+        return
+    try:
+        while True:
+            try:
+                tarea = _cola_principal.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                tarea()
+            except Exception:
+                logging.exception("Fallo una tarea en el hilo principal")
+    finally:
+        try:
+            _tk_root.after(50, _bombear_cola_principal)
+        except Exception:
+            pass
+
+
+def _activar_app_macos() -> None:
+    if sys.platform != "darwin":
+        return
+    try:
+        import AppKit
+        AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+    except Exception:
+        pass
+
+
+def _aplicar_tema_oscuro_macos(ventana) -> None:
+    if sys.platform != "darwin":
+        return
+    try:
+        ventana.tk.call("tk::unsupported::MacWindowStyle", "appearance", ventana, "darkaqua")
+    except Exception:
+        pass
+
+
+class _BotonMac(tk.Label):
+    """En macOS Aqua, tk.Button ignora bg y pinta un boton claro con texto
+    blanco ilegible. Un Label con eventos de mouse respeta bg/fg exactos."""
+
+    def __init__(self, parent, text="", command=None, bg="#262b33", fg="#fff",
+                 activebackground="#333940", activeforeground="#fff", state="normal", **kw):
+        self._cmd = command
+        self._bg = bg
+        self._fg = fg
+        self._abg = activebackground
+        self._afg = activeforeground
+        self._state = state
+        kw.pop("relief", None)
+        kw.setdefault("highlightbackground", "#363d49" if bg == "#262b33" else bg)
+        kw.setdefault("highlightthickness", 1)
+        super().__init__(parent, text=text, bg=bg, fg=fg, **kw)
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<ButtonRelease-1>", self._on_click)
+
+    def _on_enter(self, _e=None):
+        if self._state != "disabled":
+            super().configure(bg=self._abg, fg=self._afg)
+
+    def _on_leave(self, _e=None):
+        if self._state != "disabled":
+            super().configure(bg=self._bg, fg=self._fg)
+
+    def _on_click(self, _e=None):
+        if self._state != "disabled" and self._cmd:
+            self._cmd()
+
+    def invoke(self):
+        if self._state != "disabled" and self._cmd:
+            return self._cmd()
+
+
 def show_text_dialog(title: str, message: str, copy_value: str | None = None):
     def _show():
-        root = tk.Tk()
+        root = tk.Toplevel(_tk_root) if _tk_root is not None else tk.Tk()
+        _aplicar_tema_oscuro_macos(root)
         root.title(title)
         root.attributes("-topmost", True)
         root.resizable(False, False)
@@ -289,9 +384,15 @@ def show_text_dialog(title: str, message: str, copy_value: str | None = None):
             root.clipboard_append(copy_value)
             tk.Label(root, text=T("copied"), fg="#4caf50", padx=12).pack()
         tk.Button(root, text=T("close"), command=root.destroy, padx=20, pady=4).pack(pady=12)
-        root.mainloop()
+        if _tk_root is not None:
+            root.lift()
+        else:
+            root.mainloop()
 
-    threading.Thread(target=_show, daemon=True).start()
+    if _tk_root is not None:
+        _en_hilo_principal(_show)
+    else:
+        threading.Thread(target=_show, daemon=True).start()
 
 
 def abrir_ajustes_de_red() -> None:
@@ -447,8 +548,41 @@ def set_client_language(codigo: str) -> None:
             pass
 
 
+def _abrir_setup_en_hilo_principal() -> None:
+    global _ventana_setup, _setup_window_open
+    if _ventana_setup is not None:
+        try:
+            if _ventana_setup.root.winfo_exists():
+                _activar_app_macos()
+                _ventana_setup.root.deiconify()
+                _ventana_setup.root.lift()
+                return
+        except Exception:
+            _ventana_setup = None
+    with _setup_window_lock:
+        _setup_window_open = True
+    ventana = SetupWindow()
+    _ventana_setup = ventana
+    _activar_app_macos()
+    ventana.show()
+
+    def _al_cerrar(event=None):
+        global _ventana_setup, _setup_window_open
+        if _ventana_setup is ventana:
+            _ventana_setup = None
+        with _setup_window_lock:
+            _setup_window_open = False
+        if getattr(ventana, "reabrir", False):
+            _en_hilo_principal(_abrir_setup_en_hilo_principal)
+
+    ventana.root.bind("<Destroy>", _al_cerrar)
+
+
 def open_setup_window(icon=None, item=None):
     global _setup_window_open
+    if _tk_root is not None:
+        _en_hilo_principal(_abrir_setup_en_hilo_principal)
+        return
     with _setup_window_lock:
         if _setup_window_open:
             return
@@ -475,7 +609,8 @@ def _setup_window_main():
 
 class SetupWindow:
     def __init__(self):
-        self.root = tk.Tk()
+        self.root = tk.Toplevel(_tk_root) if _tk_root is not None else tk.Tk()
+        _aplicar_tema_oscuro_macos(self.root)
         self.reabrir = False
         self.root.title(T("win_title", v=client_lib.CLIENT_VERSION))
         self.root.configure(bg=BG)
@@ -552,6 +687,8 @@ class SetupWindow:
         opts = dict(command=command, padx=12, pady=3, relief="flat", cursor="hand2",
                     bg=BLUE if primary else "#262b33", fg="#fff", activebackground="#2b8ef0" if primary else "#333940", activeforeground="#fff")
         opts.update(kw)
+        if sys.platform == "darwin":
+            return _BotonMac(parent, text=text, **opts)
         return tk.Button(parent, text=text, **opts)
 
     def section(self, title):
@@ -1378,8 +1515,18 @@ class SetupWindow:
         except tk.TclError:
             pass
 
+    def show(self):
+        if _tk_root is not None:
+            self.root.deiconify()
+            self.root.lift()
+        else:
+            self.root.mainloop()
+
     def run(self):
-        self.root.mainloop()
+        if _tk_root is not None:
+            self.show()
+        else:
+            self.root.mainloop()
         # Cerrar Setup a mitad de mover el overlay no lo deja agarrable.
         state.overlay.mover = False
 
@@ -1415,7 +1562,14 @@ def apagar() -> None:
     state.cuenta.cerrar_sesion()
     state.discord.close()
     icono = state.icon
-    win_integration.stop_and_exit(icono.stop if icono is not None else None)
+    if _tk_root is not None:
+        def _parar():
+            if icono is not None:
+                icono.stop()
+            _en_hilo_principal(_tk_root.quit)
+        win_integration.stop_and_exit(_parar if icono is not None else None)
+    else:
+        win_integration.stop_and_exit(icono.stop if icono is not None else None)
 
 
 def quit_app(icon, item):
@@ -1425,7 +1579,10 @@ def quit_app(icon, item):
     # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
     # que el proceso murio.
     state.discord.close()
-    icon.stop()
+    if icon is not None:
+        icon.stop()
+    if _tk_root is not None:
+        _en_hilo_principal(_tk_root.quit)
 
 
 _browser_opened = False
@@ -1859,10 +2016,13 @@ def refresh_map_mods(force: bool = False) -> bool:
 # ---------------------------------------------------------------------------
 
 def game_dir_for(game: str) -> str | None:
-    """Carpeta del juego (la de los .scs) a partir de bin/win_x64."""
+    """Carpeta del juego (la de los .scs) a partir de bin/win_x64 o .app/Contents/MacOS."""
     for install in state.installs:
         if install.get("game") == game:
-            return os.path.dirname(os.path.dirname(install["bin_dir"]))
+            bin_dir = install["bin_dir"]
+            if sys.platform == "darwin" and ".app/Contents/MacOS" in bin_dir:
+                return os.path.dirname(bin_dir.split(".app/Contents/MacOS")[0] + ".app")
+            return os.path.dirname(os.path.dirname(bin_dir))
     return None
 
 
@@ -2316,6 +2476,25 @@ def main():
     state.backend_url = args.backend
     state.autostart_mode = args.autostart
 
+    if sys.platform == "darwin":
+        global _tk_root
+        _tk_root = tk.Tk()
+        _tk_root.withdraw()
+        try:
+            import AppKit
+            app = AppKit.NSApplication.sharedApplication()
+            dark = AppKit.NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua")
+            if dark is not None:
+                app.setAppearance_(dark)
+        except Exception:
+            pass
+        try:
+            _tk_root.createcommand("::tk::mac::ReopenApplication", lambda: open_setup_window())
+            _tk_root.createcommand("::tk::mac::Quit", lambda: quit_app(state.icon, None) if state.icon else apagar())
+        except Exception:
+            pass
+        _bombear_cola_principal()
+
     # Antes de arrancar el hilo: first_run_done se guarda mas abajo.
     state.lan_en_la_red = local_server.lan_al_arrancar(win_integration.load_settings())
     start_asyncio_thread(args.backend, args.code)
@@ -2333,6 +2512,8 @@ def main():
         logging.warning(f"Sin bandeja del sistema ({PYSTRAY_ERROR}); se sigue sin icono.")
         if args.autostart:
             threading.Event().wait()
+        elif _tk_root is not None:
+            _tk_root.mainloop()
         else:
             SetupWindow().run()
         sys.exit(0)
@@ -2358,6 +2539,14 @@ def main():
     menu_items.append(pystray.MenuItem(texto_menu("menu_quit"), quit_app))
     icon = pystray.Icon("truck-dash", make_icon_image(), "Truck Dash", pystray.Menu(*menu_items))
     state.icon = icon
+
+    if _tk_root is not None:
+        icon.run_detached(setup=lambda ic: None)
+        icon.visible = True
+        state.refresh_title()
+        _tk_root.after(8000, lambda: anunciar_cuentas(icon))
+        _tk_root.mainloop()
+        sys.exit(0)
 
     def _al_mostrar_el_icono(ic):
         # pystray pide hacerlo visible a mano cuando se le pasa setup.

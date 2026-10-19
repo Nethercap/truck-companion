@@ -258,6 +258,131 @@ class UinputBackend:
         self._fd = None
 
 
+MAC_KEYCODES = {
+    "a": 0x00, "s": 0x01, "d": 0x02, "f": 0x03, "h": 0x04, "g": 0x05, "z": 0x06, "x": 0x07,
+    "c": 0x08, "v": 0x09, "b": 0x0B, "q": 0x0C, "w": 0x0D, "e": 0x0E, "r": 0x0F, "y": 0x10,
+    "t": 0x11, "1": 0x12, "2": 0x13, "3": 0x14, "4": 0x15, "6": 0x16, "5": 0x17, "=": 0x18,
+    "9": 0x19, "7": 0x1A, "-": 0x1B, "8": 0x1C, "0": 0x1D, "]": 0x1E, "o": 0x1F, "u": 0x20,
+    "[": 0x21, "i": 0x22, "p": 0x23, "enter": 0x24, "l": 0x25, "j": 0x26, "'": 0x27, "k": 0x28,
+    ";": 0x29, "\\": 0x2A, ",": 0x2B, "/": 0x2C, "n": 0x2D, "m": 0x2E, ".": 0x2F, "tab": 0x30,
+    "space": 0x31, "`": 0x32, "backspace": 0x33, "esc": 0x35,
+    "shift": 0x38, "shiftleft": 0x38, "shiftright": 0x3C,
+    "alt": 0x3A, "altleft": 0x3A, "altright": 0x3D,
+    "ctrl": 0x3B, "ctrlleft": 0x3B, "ctrlright": 0x3E,
+    "decimal": 0x41, "multiply": 0x43, "add": 0x45, "divide": 0x4B, "subtract": 0x4E,
+    "num0": 0x52, "num1": 0x53, "num2": 0x54, "num3": 0x55, "num4": 0x56,
+    "num5": 0x57, "num6": 0x58, "num7": 0x59, "num8": 0x5B, "num9": 0x5C,
+    "f5": 0x60, "f6": 0x61, "f7": 0x62, "f3": 0x63, "f8": 0x64, "f9": 0x65,
+    "f11": 0x67, "f13": 0x69, "f16": 0x6A, "f14": 0x6B, "f10": 0x6D, "f12": 0x6F,
+    "f15": 0x71, "insert": 0x72, "home": 0x73, "pageup": 0x74, "delete": 0x75,
+    "f4": 0x76, "end": 0x77, "f2": 0x78, "pagedown": 0x79, "f1": 0x7A,
+    "left": 0x7B, "right": 0x7C, "down": 0x7D, "up": 0x7E,
+    "f17": 0x40, "f18": 0x4F, "f19": 0x50, "f20": 0x5A,
+    "f21": 0x5A, "f22": 0x5A, "f23": 0x5A, "f24": 0x5A,
+}
+
+
+class MacOSBackend:
+    """Teclado virtual en macOS via CoreGraphics (CGEventCreateKeyboardEvent)."""
+
+    name = "quartz"
+    HOLD_SECONDS = 0.06
+
+    def __init__(self):
+        import ctypes
+        cg = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+        cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+        self._check_and_prompt_accessibility()
+        cg.CGEventSourceCreate.argtypes = [ctypes.c_int32]
+        cg.CGEventSourceCreate.restype = ctypes.c_void_p
+        cg.CGEventCreateKeyboardEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint16, ctypes.c_bool]
+        cg.CGEventCreateKeyboardEvent.restype = ctypes.c_void_p
+        cg.CGEventPost.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+        cg.CGEventPost.restype = None
+        cf.CFRelease.argtypes = [ctypes.c_void_p]
+        cf.CFRelease.restype = None
+        self._cg = cg
+        self._cf = cf
+        # kCGEventSourceStateHIDSystemState = 1: actualiza el estado de sesion
+        # combinada (stateID 0) que ETS2/ATS consulta con CGEventSourceKeyState.
+        self._src = cg.CGEventSourceCreate(1)
+
+    @staticmethod
+    def is_trusted() -> bool:
+        try:
+            import ctypes
+            app_services = ctypes.CDLL("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")
+            app_services.AXIsProcessTrusted.restype = ctypes.c_bool
+            return bool(app_services.AXIsProcessTrusted())
+        except Exception:
+            return True
+
+    @staticmethod
+    def request_accessibility():
+        try:
+            import subprocess
+            subprocess.run(["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"], check=False)
+        except Exception:
+            pass
+
+    def _check_and_prompt_accessibility(self):
+        if not self.is_trusted():
+            logging.warning("macOS Accessibility permission (AXIsProcessTrusted) is False; opening Privacy & Security Settings.")
+            self.request_accessibility()
+
+    def _emit(self, key: str, is_down: bool):
+        code = MAC_KEYCODES.get(key)
+        if code is None:
+            raise UnsupportedKey(f"tecla desconocida: {key}")
+        ev = self._cg.CGEventCreateKeyboardEvent(self._src, code, bool(is_down))
+        if not ev:
+            raise RuntimeError("CGEventCreateKeyboardEvent devolvio NULL")
+        try:
+            self._cg.CGEventPost(0, ev)  # kCGHIDEventTap = 0
+        finally:
+            self._cf.CFRelease(ev)
+
+    def key_down(self, key):
+        self._emit(key, True)
+
+    def key_up(self, key):
+        self._emit(key, False)
+
+    def press(self, key):
+        code = MAC_KEYCODES.get(key)
+        if code is None:
+            raise UnsupportedKey(f"tecla desconocida: {key}")
+        if not self.is_trusted():
+            self._check_and_prompt_accessibility()
+            # Intento de fallback via AppleScript System Events
+            try:
+                import subprocess
+                res = subprocess.run(
+                    ["osascript", "-e", f'tell application "System Events" to key code {code}'],
+                    capture_output=True,
+                    text=True,
+                    timeout=2.0
+                )
+                if res.returncode == 0:
+                    return
+            except Exception:
+                pass
+            raise RuntimeError("Accessibility permission required: allow TruckDash in System Settings > Privacy & Security > Accessibility")
+        self.key_down(key)
+        time.sleep(self.HOLD_SECONDS)
+        self.key_up(key)
+
+    def close(self):
+        if getattr(self, "_src", None):
+            try:
+                self._cf.CFRelease(self._src)
+            except Exception:
+                pass
+            self._src = None
+
+
+_ORIG_XTEST = XTestBackend
+_ORIG_UINPUT = UinputBackend
 _backend = None
 _reason = ""
 _tried = False
@@ -267,6 +392,11 @@ def _elegir():
     """Primer backend que arranque, con el motivo de cada uno que no."""
     if IS_WINDOWS:
         return WindowsBackend(), ""
+    if sys.platform == "darwin" and XTestBackend is _ORIG_XTEST and UinputBackend is _ORIG_UINPUT:
+        try:
+            return MacOSBackend(), ""
+        except Exception as exc:
+            return None, f"quartz: {exc}"
     fallas = []
     for clase in (XTestBackend, UinputBackend):
         try:

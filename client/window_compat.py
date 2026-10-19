@@ -208,6 +208,22 @@ def match_game_window(ventanas, titulos):
 _ultimas_vistas = None
 
 
+def _find_mac_game():
+    try:
+        from AppKit import NSWorkspace
+        ws = NSWorkspace.sharedWorkspace()
+        for app in ws.runningApplications():
+            name = (app.localizedName() or "").lower()
+            bundle = (app.bundleIdentifier() or "").lower()
+            if "euro truck simulator 2" in name or "american truck simulator" in name or \
+               "eurotrucks2" in name or "amtrucks" in name or \
+               "eurotrucksimulator2" in bundle or "americantrucksimulator" in bundle:
+                return app
+    except Exception:
+        pass
+    return None
+
+
 def find_game_window(titulos):
     """Handle de la ventana del juego, o None.
 
@@ -237,6 +253,9 @@ def find_game_window(titulos):
             _ultimas_vistas = vistas
             logging.info(f"Ventana del juego no encontrada entre {len(ventanas)} ventanas: {vistas}")
         return None
+    if sys.platform == "darwin":
+        app = _find_mac_game()
+        return app.processIdentifier() if app else None
     if _get_display() is None:
         return None
     try:
@@ -259,6 +278,21 @@ def bring_to_foreground(handle) -> None:
     gestor de ventanas; si no hay gestor, se levanta y se enfoca a mano."""
     if IS_WINDOWS:
         raise RuntimeError("en Windows lo hace client.bring_window_to_foreground")
+    if sys.platform == "darwin":
+        app = _find_mac_game()
+        if app:
+            import time
+            if not app.isActive():
+                app.activateWithOptions_(1 << 1)
+                time.sleep(0.05)
+            try:
+                bundle = app.bundleIdentifier()
+                if bundle:
+                    import subprocess
+                    subprocess.run(["osascript", "-e", f'tell application id "{bundle}" to activate'], capture_output=True, timeout=1.0)
+            except Exception:
+                pass
+        return
     from Xlib import X
     d = _get_display()
     if d is None:
@@ -293,6 +327,13 @@ def process_info(handle) -> dict | None:
     ventana. En Linux sale de _NET_WM_PID y /proc."""
     if IS_WINDOWS:
         raise RuntimeError("en Windows lo hace client.running_game_info")
+    if sys.platform == "darwin":
+        app = _find_mac_game()
+        if app:
+            url = app.executableURL()
+            exe_path = url.path() if url else None
+            return {"pid": app.processIdentifier(), "exe_path": exe_path, "elevated_guess": False}
+        return None
     from Xlib import Xatom
     d = _get_display()
     if d is None:
@@ -322,7 +363,8 @@ def process_info(handle) -> dict | None:
 
 def data_dir() -> str:
     """Carpeta que contiene "Euro Truck Simulator 2" / "American Truck
-    Simulator" con los perfiles y el game.log.txt. En Linux nativo el juego
-    no usa ningun "Documentos": escribe en XDG_DATA_HOME."""
+    Simulator" con los perfiles y el game.log.txt."""
+    if sys.platform == "darwin":
+        return os.path.expanduser("~/Library/Application Support")
     base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
     return base

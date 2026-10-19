@@ -39,6 +39,9 @@ OTHER_DLL_NAME = "scs-telemetry.dll"
 PLUGIN_DLL_VERSION = "1.12.1-truckdash.2"
 PLUGIN_DLL_SHA256 = "de81c1a25856d2f83a956feb06842ddfcd23788d6eb32d3a7584bcda4bf7d183"
 
+PLUGIN_DYLIB_NAME = "truckdash-telemetry.dylib"
+PLUGIN_DYLIB_SHA256 = ""  # Set by CI workflow when building the macOS plugin
+
 GAMES = {
     "ets2": "Euro Truck Simulator 2",
     "ats": "American Truck Simulator",
@@ -47,11 +50,27 @@ GAMES = {
 _LIBRARY_PATH_RE = re.compile(r'"path"\s+"([^"]+)"')
 
 
-def bundled_dll_path() -> str:
+def plugin_filename_for(bin_dir: str | None = None) -> str:
+    if bin_dir and ("Contents/MacOS" in bin_dir.replace("\\", "/") or (sys.platform == "darwin" and "win_x64" not in bin_dir)):
+        return PLUGIN_DYLIB_NAME
+    return PLUGIN_DLL_NAME
+
+
+def plugin_expected_sha256_for(bin_dir: str | None = None) -> str:
+    if plugin_filename_for(bin_dir) == PLUGIN_DYLIB_NAME:
+        return PLUGIN_DYLIB_SHA256
+    return PLUGIN_DLL_SHA256
+
+
+def bundled_dll_path(bin_dir: str | None = None) -> str:
     # Empaquetado: PyInstaller extrae los datas en sys._MEIPASS. Desde fuente:
     # client/vendor/ al lado de este archivo.
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base, "vendor", PLUGIN_DLL_NAME)
+    target = plugin_filename_for(bin_dir)
+    path = os.path.join(base, "vendor", target)
+    if not os.path.exists(path):
+        path = os.path.join(base, "vendor", PLUGIN_DLL_NAME)
+    return path
 
 
 def sha256_of(path: str) -> str | None:
@@ -63,6 +82,10 @@ def sha256_of(path: str) -> str | None:
 
 
 def find_steam_path() -> str | None:
+    if sys.platform == "darwin":
+        mac_steam = os.path.expanduser("~/Library/Application Support/Steam")
+        if os.path.isdir(mac_steam):
+            return mac_steam
     try:
         import winreg
     except ImportError:
@@ -121,10 +144,12 @@ def parse_libraryfolders(text: str) -> list[str]:
     (el formato usa backslashes escapados: "D:\\\\Games\\\\Steam")."""
     paths = []
     for raw in _LIBRARY_PATH_RE.findall(text):
-        # El vdf de Steam para Linux trae rutas de Linux: van por Z: de Wine.
+        clean_raw = raw.replace("\\\\", "/")
         path = os.path.normpath(unix_a_wine(raw.replace("\\\\", "\\")))
         if path not in paths:
             paths.append(path)
+        if clean_raw.startswith("/") and clean_raw not in paths:
+            paths.append(clean_raw)
     return paths
 
 
@@ -146,22 +171,26 @@ def steam_library_paths() -> list[str]:
 
 
 def plugin_path_for(bin_dir: str) -> str:
-    return os.path.join(bin_dir, "plugins", PLUGIN_DLL_NAME)
+    return os.path.join(bin_dir, "plugins", plugin_filename_for(bin_dir))
 
 
 def plugin_state(bin_dir: str) -> str:
-    """Del plugin nuestro: 'installed' (el mismo .dll que traemos),
+    """Del plugin nuestro: 'installed' (el mismo archivo que traemos),
     'outdated' (el nuestro, de otra version) o 'missing'."""
     path = plugin_path_for(bin_dir)
     if not os.path.exists(path):
         return "missing"
-    return "installed" if sha256_of(path) == PLUGIN_DLL_SHA256 else "outdated"
+    expected = plugin_expected_sha256_for(bin_dir)
+    if not expected:
+        return "installed"
+    return "installed" if sha256_of(path) == expected else "outdated"
 
 
 def has_other_plugin(bin_dir: str) -> bool:
-    """Si el juego tiene un scs-telemetry.dll: con ese solo ya hay telemetria,
-    sin los trabajos con auto de ATS 1.61."""
-    return os.path.exists(os.path.join(bin_dir, "plugins", OTHER_DLL_NAME))
+    """Si el juego tiene un scs-telemetry.dll / scs-telemetry.dylib: con ese
+    solo ya hay telemetria, sin los trabajos con auto de ATS 1.61."""
+    other_names = [OTHER_DLL_NAME, "scs-telemetry.dylib", "libscs-telemetry.dylib"]
+    return any(os.path.exists(os.path.join(bin_dir, "plugins", name)) for name in other_names)
 
 
 def same_dir(a: str, b: str) -> bool:
@@ -180,7 +209,7 @@ def same_dir(a: str, b: str) -> bool:
         return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
-GAME_EXES = ("eurotrucks2.exe", "amtrucks.exe")
+GAME_EXES = ("eurotrucks2.exe", "amtrucks.exe", "eurotrucks2", "amtrucks")
 
 
 def tiene_ejecutable(bin_dir: str) -> bool:
@@ -201,10 +230,14 @@ def find_game_installs() -> list[dict]:
     found = []
     for lib in steam_library_paths():
         for game, name in GAMES.items():
-            bin_dir = os.path.join(lib, "steamapps", "common", name, "bin", "win_x64")
-            if (tiene_ejecutable(bin_dir)
-                    and not any(same_dir(f["bin_dir"], bin_dir) for f in found)):
-                found.append(describe_install(game, bin_dir))
+            candidates = [
+                os.path.join(lib, "steamapps", "common", name, "bin", "win_x64"),
+                os.path.join(lib, "steamapps", "common", name, f"{name}.app", "Contents", "MacOS"),
+            ]
+            for bin_dir in candidates:
+                if (tiene_ejecutable(bin_dir)
+                        and not any(same_dir(f["bin_dir"], bin_dir) for f in found)):
+                    found.append(describe_install(game, bin_dir))
     return found
 
 
@@ -224,21 +257,25 @@ def describe_install(game: str, bin_dir: str, origen: str = "steam") -> dict:
 
 
 def install_plugin(bin_dir: str) -> str:
-    """Copia el .dll empaquetado a <bin_dir>\\plugins\\. Devuelve la ruta
+    """Copia el plugin empaquetado a <bin_dir>/plugins/. Devuelve la ruta
     instalada; levanta OSError si no se pudo escribir (el llamador muestra el
-    mensaje) o FileNotFoundError si el .dll empaquetado no esta."""
-    src = bundled_dll_path()
+    mensaje) o FileNotFoundError si el plugin empaquetado no esta."""
+    try:
+        src = bundled_dll_path(bin_dir)
+    except TypeError:
+        src = bundled_dll_path()
     if not os.path.exists(src):
-        raise FileNotFoundError(f"bundled {PLUGIN_DLL_NAME} not found at {src}")
-    if sha256_of(src) != PLUGIN_DLL_SHA256:
-        raise ValueError(f"bundled {PLUGIN_DLL_NAME} does not match the expected SHA-256")
+        try:
+            src = bundled_dll_path()
+        except TypeError:
+            pass
+    if not os.path.exists(src):
+        raise FileNotFoundError(f"bundled plugin not found at {src}")
+    expected_sha = plugin_expected_sha256_for(bin_dir) if os.path.basename(src) == PLUGIN_DYLIB_NAME else PLUGIN_DLL_SHA256
+    if expected_sha and sha256_of(src) != expected_sha:
+        raise ValueError(f"bundled {os.path.basename(src)} does not match the expected SHA-256")
     dst = plugin_path_for(bin_dir)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    # A un temporal y despues un reemplazo de una sola vez, nunca escribiendo
-    # encima del instalado: bajo Proton el juego abierto tiene ese archivo
-    # mapeado en memoria, y pisarlo por adentro lo puede tirar abajo. Asi el
-    # juego sigue con el viejo hasta que se reinicie. En Windows, con el juego
-    # abierto, el reemplazo falla antes de tocar nada.
     tmp = dst + ".new"
     try:
         shutil.copyfile(src, tmp)
@@ -246,7 +283,7 @@ def install_plugin(bin_dir: str) -> str:
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
-    if sha256_of(dst) != PLUGIN_DLL_SHA256:
+    if expected_sha and sha256_of(dst) != expected_sha:
         raise OSError(f"copied file at {dst} does not match the expected SHA-256")
     return dst
 
@@ -282,13 +319,21 @@ def update_own_plugin(installs: list[dict]) -> list[str]:
 
 def looks_like_game_bin_dir(path: str) -> bool:
     """Para cuando el usuario elige una carpeta a mano: acepta la carpeta del
-    juego, bin\\ o bin\\win_x64 y devuelve si ahi adentro hay un ejecutable
-    del juego."""
+    juego, bin\\ o bin\\win_x64 o .app/Contents/MacOS y devuelve si ahi adentro
+    hay un ejecutable del juego."""
     return resolve_bin_dir(path) is not None
 
 
 def resolve_bin_dir(path: str) -> str | None:
-    candidates = [path, os.path.join(path, "win_x64"), os.path.join(path, "bin", "win_x64")]
+    candidates = [
+        path,
+        os.path.join(path, "win_x64"),
+        os.path.join(path, "bin", "win_x64"),
+        os.path.join(path, "Contents", "MacOS"),
+    ]
+    for name in GAMES.values():
+        candidates.append(os.path.join(path, f"{name}.app", "Contents", "MacOS"))
+        candidates.append(os.path.join(path, "bin", "win_x64"))
     for candidate in candidates:
         if tiene_ejecutable(candidate):
             return os.path.normpath(candidate)
@@ -296,4 +341,5 @@ def resolve_bin_dir(path: str) -> str | None:
 
 
 def game_for_bin_dir(bin_dir: str) -> str:
-    return "ets2" if os.path.exists(os.path.join(bin_dir, "eurotrucks2.exe")) else "ats"
+    files = ("eurotrucks2.exe", "eurotrucks2")
+    return "ets2" if any(os.path.exists(os.path.join(bin_dir, f)) for f in files) else "ats"

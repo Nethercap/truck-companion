@@ -1365,6 +1365,40 @@ _STRINGS = {
 }
 
 
+_DARWIN_STRINGS = {
+    "en": {
+        "lan_ports": "Uses two ports: 27765 serves this page and 27766 sends the data. If the page opens but stays empty, 27766 is blocked by your firewall.",
+        "lan_hint": "Phone/tablet on the same Wi-Fi: scan the code or type the address. No pairing code needed, and it keeps working even if the internet drops. If macOS asks about incoming network connections, click Allow.",
+        "already_running": "Truck Dash is already running. Look for its icon in the menu bar, near the clock.",
+        "plugin_note": "Telemetry plugin: truckdash-telemetry.dylib v{v} (RenCloud, MIT). Installed into <game>.app/Contents/MacOS/plugins/. Restart the game after installing.",
+        "install_perm_error": "macOS didn't let me write into {dir}. Check folder permissions or copy the .dylib by hand.",
+        "pick_folder_title": "Select the game's install folder (contains Euro Truck Simulator 2.app or American Truck Simulator.app)",
+        "not_game_folder": "That folder doesn't look like an ETS2/ATS install (no Euro Truck Simulator 2.app / American Truck Simulator.app found).",
+        "language_auto": "Automatic (macOS)",
+        "autostart": "Start Truck Dash at login (opens the dashboard when the game starts)",
+        "quit_on_game_close": "Close Truck Dash when the game closes",
+        "autostart_packaged_only": "(available in the packaged TruckDash.app)",
+        "autostart_temp_folder": "Move TruckDash.app to /Applications first before enabling Start at login.",
+        "menu_autostart": "Start at login",
+    },
+    "es": {
+        "lan_ports": "Usa dos puertos: el 27765 sirve esta página y el 27766 manda los datos. Si la página abre y queda vacía, está bloqueado el 27766 por el firewall.",
+        "lan_hint": "Celular/tablet en la misma WiFi: escaneá el código o escribí la dirección. Sin código de pairing, y sigue funcionando aunque se corte internet. Si macOS pregunta por las conexiones entrantes, tocá Permitir.",
+        "already_running": "Truck Dash ya está abierto. Buscá el ícono en la barra de menú, arriba a la derecha.",
+        "plugin_note": "Plugin de telemetría: truckdash-telemetry.dylib v{v} (RenCloud, MIT). Se instala en <juego>.app/Contents/MacOS/plugins/. Reiniciá el juego después de instalar.",
+        "install_perm_error": "macOS no dejó escribir en {dir}. Revisá los permisos de la carpeta o copiá el .dylib a mano.",
+        "pick_folder_title": "Elegí la carpeta de instalación del juego (contiene Euro Truck Simulator 2.app o American Truck Simulator.app)",
+        "not_game_folder": "Esa carpeta no parece una instalación de ETS2/ATS (no está Euro Truck Simulator 2.app ni American Truck Simulator.app).",
+        "language_auto": "Automático (macOS)",
+        "autostart": "Iniciar Truck Dash al iniciar sesión en macOS (abre el tablero cuando arranca el juego)",
+        "quit_on_game_close": "Cerrar Truck Dash cuando se cierra el juego",
+        "autostart_packaged_only": "(disponible en TruckDash.app empaquetado)",
+        "autostart_temp_folder": "Mové primero TruckDash.app a /Applications antes de activar el inicio automático.",
+        "menu_autostart": "Iniciar con macOS",
+    },
+}
+
+
 def detect_language() -> str:
     """Idioma de la interfaz de Windows del usuario (no el del sistema ni el
     formato regional), reducido a los que tenemos; 'en' si no hay match."""
@@ -1385,6 +1419,14 @@ def detect_language() -> str:
             if valor and valor not in ("C", "POSIX"):
                 name = valor.split(":")[0]
                 break
+        if not name and sys.platform == "darwin":
+            try:
+                import Foundation
+                langs = Foundation.NSLocale.preferredLanguages()
+                if langs:
+                    name = str(langs[0])
+            except Exception:
+                pass
     if not name:
         try:
             name = locale.getlocale()[0] or ""
@@ -1410,5 +1452,10 @@ def set_language(code: str | None) -> str:
 
 
 def T(key: str, **kwargs) -> str:
-    text = _STRINGS.get(LANG, {}).get(key) or _STRINGS["en"].get(key) or key
+    if sys.platform == "darwin":
+        text = _DARWIN_STRINGS.get(LANG, {}).get(key) or _DARWIN_STRINGS.get("en", {}).get(key)
+        if text is None:
+            text = _STRINGS.get(LANG, {}).get(key) or _STRINGS["en"].get(key) or key
+    else:
+        text = _STRINGS.get(LANG, {}).get(key) or _STRINGS["en"].get(key) or key
     return text.format(**kwargs) if kwargs else text

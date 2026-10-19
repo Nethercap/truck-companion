@@ -36,10 +36,13 @@ LINUX_PATH = "/dev/shm/SCSTelemetry"
 # de siempre, en orden de preferencia.
 WINDOWS_NAMES = ("Local\\TruckDashTelemetry", WINDOWS_NAME)
 LINUX_PATHS = ("/dev/shm/TruckDashTelemetry", LINUX_PATH)
+DARWIN_PATH = "/tmp/SCSTelemetry"
+DARWIN_PATHS = ("/tmp/TruckDashTelemetry", DARWIN_PATH)
+POSIX_PATHS = LINUX_PATHS + DARWIN_PATHS if sys.platform == "darwin" else LINUX_PATHS
 BLOCK_SIZE = 32 * 1024  # SCS_PLUGIN_MMF_SIZE
 
 _mem = None      # SharedMemory en Windows
-_map = None      # mmap en Linux
+_map = None      # mmap en Linux/macOS
 _fd = None
 _buf = None
 _version = None
@@ -51,7 +54,7 @@ def _open_buffer():
     exista. Si no hay ninguno, levanta la excepcion del ultimo."""
     global _abierto
     error = None
-    for nombre in (WINDOWS_NAMES if IS_WINDOWS else LINUX_PATHS):
+    for nombre in (WINDOWS_NAMES if IS_WINDOWS else POSIX_PATHS):
         try:
             buf = _open_named(nombre)
         except OSError as exc:
@@ -123,4 +126,8 @@ def deinit():
 
 def block_name():
     """Para los mensajes de error: donde se espera encontrar el bloque."""
-    return " or ".join(WINDOWS_NAMES if IS_WINDOWS else LINUX_PATHS)
+    if IS_WINDOWS:
+        return " or ".join(WINDOWS_NAMES)
+    if sys.platform == "darwin":
+        return " or ".join(DARWIN_PATHS)
+    return " or ".join(LINUX_PATHS)
