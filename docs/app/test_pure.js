@@ -167,6 +167,33 @@ test('formatTurnDistance: usa metros por debajo de 1km', () => {
   assert.equal(formatTurnDistance(80), '80 m');
 });
 
+test('compartir posicion: en LAN se puede apagar si el cliente lo reenvia al relay (Discord, 20-10)', () => {
+  const { liveShareControls } = require('./pure.js');
+  // Con el codigo, como siempre: la ruta depende de compartir
+  assert.deepEqual(liveShareControls({ lan: false, lanRelay: false, enabled: true }), { shareDisabled: false, routeDisabled: false, hint: null });
+  assert.deepEqual(liveShareControls({ lan: false, lanRelay: false, enabled: false }), { shareDisabled: false, routeDisabled: true, hint: null });
+  // LAN con un cliente viejo: gris, y se dice donde se cambia
+  assert.deepEqual(liveShareControls({ lan: true, lanRelay: false, enabled: true }), { shareDisabled: true, routeDisabled: true, hint: 'liveShareLanHint' });
+  // LAN con un cliente que lo reenvia: compartir se toca, la ruta no (la manda la pestana con el codigo)
+  for (const enabled of [true, false]) {
+    assert.deepEqual(liveShareControls({ lan: true, lanRelay: true, enabled }), { shareDisabled: false, routeDisabled: true, hint: 'liveShareLanRouteHint' });
+  }
+});
+
+test('compartir posicion: viene apagado y sin tocarlo no se le dice nada al relay (20-10)', () => {
+  const { liveShareChoice } = require('./pure.js');
+  // Nunca lo cambio en este navegador (saveSettings guarda solo lo que cambia)
+  assert.equal(liveShareChoice({}), null);
+  assert.equal(liveShareChoice(null), null);
+  assert.equal(liveShareChoice({ navEveryExit: true }), null);
+  // De cuando venia prendido: liveShareV2 solo no lo prende
+  assert.equal(liveShareChoice({ liveShareV2: true }), null);
+  // Lo tildo o lo destildo (o se lo dijo el relay): eso manda
+  assert.equal(liveShareChoice({ liveShareEnabled: true }), true);
+  assert.equal(liveShareChoice({ liveShareEnabled: false, liveShareV2: true }), false);
+  assert.equal(liveShareChoice({ liveShareEnabled: 'si' }), null);
+});
+
 // ---------------------------------------------------------------------------
 // connectionViewFor: el diagnostico que ve el usuario segun el estado
 // ---------------------------------------------------------------------------

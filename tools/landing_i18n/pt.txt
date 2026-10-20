@@ -93,7 +93,7 @@ featButtonsBody: 'Pisca-alerta, giroflex, freio de mão, motor, reboque, câmera
 featStatsTitle: 'Histórico e estatísticas <span class="tag">novo</span>',
 featStatsBody: 'Com uma conta grátis opcional, cada frete fica guardado: a rota colorida pela velocidade, pagamento, combustível e tempos. Um diário de bordo, estatísticas por jogo, recordes e conquistas, amigos para seguir e um perfil público só se você quiser. <a href="#accounts">Mais abaixo</a>.',
 featLiveTitle: 'Outros motoristas, ao vivo',
-featLiveBody: 'Veja os motoristas do Truck Dash andando no <a href="/live/">mapa público ao vivo</a>, de forma anônima, com um botão para ficar de fora. Ou compartilhe um código de 6 letras com amigos e dirijam em comboio (beta), cada um no próprio jogo, sem TruckersMP.',
+featLiveBody: 'Veja os motoristas do Truck Dash andando no <a href="/live/">mapa público ao vivo</a>, de forma anônima, e você só aparece nele se ativar. Ou compartilhe um código de 6 letras com amigos e dirijam em comboio (beta), cada um no próprio jogo, sem TruckersMP.',
 featStreamTitle: 'Na live e no Discord <span class="tag">novo</span>',
 featStreamBody: 'Um <a href="/overlay/">overlay para OBS</a> grátis com sua velocidade, a próxima curva e sua viagem, e um status no Discord que mostra a viagem em andamento enquanto você dirige. Os dois ficam desligados até você ligar.',
 featMoreLink: 'Todo o resto, das opções do overlay no jogo ao atlas do Road Trip no ATS, está no guia de uso',

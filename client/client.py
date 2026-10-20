@@ -970,6 +970,11 @@ on_nav_hud = None
 # ({"type": "viewers", "count": n}), para no abrir otra pestana si ya hay uno.
 on_viewers = None
 
+# Lo define la bandeja: si la sesion del relay comparte la posicion en el mapa
+# en vivo ({"type": "live_share_state", "enabled": bool}), para el tilde del
+# tablero por LAN, que no habla con el relay.
+on_live_share = None
+
 
 async def handle_control_message(message: str, keybinds: dict, send) -> None:
     """Procesa un mensaje de control de la web (comando de botonera, get/set
@@ -997,6 +1002,9 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
         elif msg_type == "viewers":
             if on_viewers and isinstance(payload.get("count"), int):
                 on_viewers(payload["count"])
+        elif msg_type == "live_share_state":
+            if on_live_share and isinstance(payload.get("enabled"), bool):
+                on_live_share(payload["enabled"])
         elif msg_type == "nav_hud":
             if on_nav_hud:
                 on_nav_hud(payload)

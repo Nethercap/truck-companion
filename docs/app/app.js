@@ -98,7 +98,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -430,14 +430,15 @@ let detectedModNames = null;
 // a nadie), decidido asi porque no hay cuentas ni consentimiento granular.
 // hideOtherPlayers es aparte y solo local (no le dice nada al backend) -
 // podes seguir compartiendo tu posicion pero no dibujar la de los demas.
-// Desde 2026-09-21 viene ENCENDIDO por defecto: lo que se comparte es
-// anonimo (posicion, camion, carga, ciudad origen/destino y el apodo de
-// convoy solo si lo puso) y tambien alimenta el mapa en vivo publico (/live/).
-// Lo guardado antes de ese cambio (liveShareV2 ausente) se migra una sola vez
-// a encendido y se avisa con un toast al conectar; el usuario lo apaga en
-// Ajustes cuando quiera.
-let liveShareEnabled = _savedSettings.liveShareV2 ? !!_savedSettings.liveShareEnabled : true;
-let liveShareNoticePending = !_savedSettings.liveShareV2;
+// Lo que se comparte es anonimo (posicion, camion, carga, ciudad
+// origen/destino y el apodo de convoy solo si lo puso) y tambien alimenta el
+// mapa en vivo publico (/live/). Viene APAGADO (20-10, ver liveShareChoice):
+// del 21-09 al 20-10 venia prendido, y la pestana que abre el cliente en la
+// PC publicaba la posicion de quien usaba solo el modo LAN.
+let liveShareEnabled = liveShareChoice(_savedSettings) === true;
+// Se cambio en esta pestana (el tilde, o lo que dijo el relay): desde ahi
+// se reenvia al reconectar aunque localStorage no ande.
+let liveShareChosen = false;
 let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
 useImperial = !!_savedSettings.useImperial;
 renderUnitButtons();
@@ -457,7 +458,7 @@ function initSettingsUi() {
   document.getElementById('setEveryExit').checked = navEveryExit;
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setLiveShareRoute').checked = liveShareRoute;
-  document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
+  renderLiveShareControls();
   document.getElementById('setNavZoom').value = navZoom;
   document.getElementById('setTruckSize').value = truckSize;
   document.getElementById('setClockSelect').value = clockFormat;
@@ -564,6 +565,10 @@ document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
 // estado real con live_share_state.
 function sendLiveShareState(explicit = false) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  // Sin tocar el tilde, solo si este navegador ya tenia un valor: una
+  // pestana que nunca lo cambio no lo prende ni apaga lo que eligio otro
+  // dispositivo (liveShareChoice).
+  if (!explicit && !liveShareChosen && liveShareChoice(loadSettings()) === null) return;
   // Sin telemetria todavia no se sabe el juego: resolveEffectiveGame() cae
   // en 'ats' por defecto y el conductor aparecia en el mapa de ATS aunque
   // estuviera en ETS2. Se manda null (no comparte) y updateMap re-manda el
@@ -573,11 +578,6 @@ function sendLiveShareState(explicit = false) {
   // El apodo de convoy (si lo puso) es lo unico con nombre que se muestra en el mapa en vivo.
   const nick = liveShareEnabled ? (loadSettings().convoyNick || null) : null;
   ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant, nick, explicit: !!explicit }));
-  if (liveShareNoticePending && liveShareEnabled && !conn.demo && !conn.spectator) {
-    liveShareNoticePending = false;
-    saveSettings(); // persiste liveShareV2: el aviso es una sola vez
-    showToast(t('liveShareNotice'), 'info', 12000);
-  }
 }
 
 // Mapa que no conocemos: una vez por mapa y sesion (el relay tambien lo
@@ -731,9 +731,10 @@ document.getElementById('setLiteNoRouting').addEventListener('change', (e) => {
 });
 document.getElementById('setLiveShare').addEventListener('change', (e) => {
   liveShareEnabled = e.target.checked;
+  liveShareChosen = true;
   saveSettings();
   if (!liveShareEnabled) updateLivePlayers([]); // saca los marcadores ajenos ya dibujados
-  document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
+  renderLiveShareControls();
   sendLiveShareState(true);
   sendLiveRoute(true);
 });
@@ -745,22 +746,24 @@ function applyLiveShareState(enabled) {
   enabled = !!enabled;
   if (enabled === liveShareEnabled) return;
   liveShareEnabled = enabled;
+  liveShareChosen = true;
   saveSettings();
   document.getElementById('setLiveShare').checked = enabled;
-  document.getElementById('setLiveShareRoute').disabled = !enabled;
+  renderLiveShareControls();
   if (!enabled) updateLivePlayers([]);
 }
 
-// Modo LAN: el cliente no le pasa este ajuste al relay, asi que la casilla no
-// hacia nada y parecia andar. Se deshabilita y se dice donde se cambia.
-function renderLiveShareForLan() {
-  const lan = !!conn.local;
-  for (const id of ['setLiveShare', 'setLiveShareRoute']) {
-    const el = document.getElementById(id);
-    if (el) el.disabled = lan || (id === 'setLiveShareRoute' && !liveShareEnabled);
+// Modo LAN: un cliente viejo no le pasa este ajuste al relay y la casilla no
+// hacia nada; ahi queda gris y se dice donde se cambia. Uno nuevo si (con
+// liveShare en su session_state, conn.lanRelay). Ver liveShareControls.
+function renderLiveShareControls() {
+  const c = liveShareControls({ lan: !!conn.local, lanRelay: !!conn.lanRelay, enabled: liveShareEnabled });
+  document.getElementById('setLiveShare').disabled = c.shareDisabled;
+  document.getElementById('setLiveShareRoute').disabled = c.routeDisabled;
+  for (const id of ['liveShareLanHint', 'liveShareLanRouteHint']) {
+    const hint = document.getElementById(id);
+    if (hint) hint.hidden = c.hint !== id;
   }
-  const hint = document.getElementById('liveShareLanHint');
-  if (hint) hint.hidden = !lan;
 }
 document.getElementById('setLiveShareRoute').addEventListener('change', (e) => {
   liveShareRoute = e.target.checked;
@@ -6573,7 +6576,7 @@ let rememberedTries = 0;
 // (socket abierto o no), lo que dice el backend (hay un cliente local
 // conectado con este codigo?) y el diagnostico que manda el cliente
 // (client_status: waiting_game / plugin_missing / waiting_truck / live).
-const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false, everValid: false, spectator: false, waitingClient: false };
+const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, lanRelay: false, demo: false, everOpen: false, everValid: false, spectator: false, waitingClient: false };
 
 function connectionView() {
   return connectionViewFor(conn);
@@ -7175,12 +7178,13 @@ function handleTelemetry(data) {
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
   // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
-  if (liveShareEnabled && !conn.local && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) { sendLiveShareState(); sendLiveRoute(true); }
+  if (liveShareEnabled && (!conn.local || conn.lanRelay) && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) { sendLiveShareState(); sendLiveRoute(true); }
 }
 
 function connectWs(backend, code, options = {}) {
   conn.local = !!options.local;
-  renderLiveShareForLan();
+  conn.lanRelay = false; // lo dice el session_state del cliente
+  renderLiveShareControls();
   fetchLatestClientVersion(conn.local ? document.getElementById('backendUrl').value : backend);
   clearTimeout(reconnectTimer);
   // Modo LAN: el cliente sirve esta pagina y el WebSocket directo, sin
@@ -7218,12 +7222,19 @@ function connectWs(backend, code, options = {}) {
     if (data.type) flushPendingTelemetry(); // los mensajes de control se procesan en orden con la telemetria que llego antes
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
-    if (data.type === 'live_share_state') { if (!conn.local) applyLiveShareState(data.enabled); return; }
+    if (data.type === 'live_share_state') { applyLiveShareState(data.enabled); return; } // por LAN lo reenvia el cliente
     if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria
     if (data.type && data.type.startsWith('convoy_')) { if (typeof convoyHandleMessage === 'function') convoyHandleMessage(data); return; } // Convoy (beta)
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;
+      if (conn.local) {
+        // Un cliente que le pasa el tilde de compartir al relay manda la
+        // clave (null si el relay todavia no dijo nada).
+        conn.lanRelay = 'liveShare' in data;
+        if (typeof data.liveShare === 'boolean') applyLiveShareState(data.liveShare);
+        renderLiveShareControls();
+      }
       setClientOverlay(data.client_status && data.client_status.overlay);
       setObsOverlay(data.obs_overlay); // un relay viejo no lo manda: apagado
       if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);

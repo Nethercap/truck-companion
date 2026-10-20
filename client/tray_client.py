@@ -2161,6 +2161,10 @@ async def run_client(backend_url: str, fixed_code: str | None):
     # Placeholder sin conexion hasta tener codigo: telemetry_loop publica por
     # LAN igual y descarta el envio cloud mientras tanto.
     cloud = CloudLink(backend_url, "", keybinds)
+    # El tilde de "compartir mi posicion" del tablero por LAN va al relay por
+    # esta conexion, y lo que diga el relay vuelve a ese tablero.
+    local.al_relay = cloud.send
+    client_lib.on_live_share = local.avisar_live_share
     telemetry_task = vigilar(asyncio.create_task(telemetry_loop(cloud, local)), "telemetria")
     # Vacia la cola de la cuenta cada tanto. Aparte del bucle de
     # telemetria a proposito: que la API este caida no puede frenar
