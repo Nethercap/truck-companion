@@ -2240,7 +2240,19 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
 // Waterloo, ATS). Y a menos de maxDistM de la ruta: los carteles estan al
 // costado del camino, y uno de la I-290 a 126 m, junto a la autopista de al
 // lado, nombraba la rampa a la I-90 en Chicago. Devuelve sign -> boolean.
-function exitSignTest({ pts, cum, pointAt, i, at = i, iEnd = i, others = [] }, { pastM = 10, maxDistM = 80, spanM = 1400, stepM = 10, backM = 100 } = {}) {
+// Con bearingBetween, tampoco los de la otra mano: a mas de leftM a la
+// izquierda de la ruta (ATS se maneja por la derecha; los kind 'city' de
+// ETS2 no votan). En 100 rutas de ATS, los carteles que votaban quedaban a
+// 6-18 m de un lado o del otro, casi ninguno entre -5 y 5, y mas de la mitad
+// a la izquierda. Los de la autopista de enfrente anuncian sus salidas, que
+// son la ruta que se cruza (I-49 y US-71 pasando el trebol de la I-44 en
+// Joplin), y en el puente sobre la autopista recien dejada estan los de sus
+// rampas para el otro lado: "Turn left onto I-90" al final de la salida
+// (Discord, 20-10). En un tramo de un sentido la banquina izquierda tambien
+// es de esta mano (hasta -15 m), pero en el cruce de la rampa con la calle
+// los nodos del prefab son de un sentido aunque la calle sea de doble mano,
+// y con -15 ahi volvia la autopista recien dejada.
+function exitSignTest({ pts, cum, pointAt, bearingBetween, i, at = i, iEnd = i, others = [] }, { pastM = 10, maxDistM = 80, spanM = 1400, stepM = 10, backM = 100, leftM = 5 } = {}) {
   const fin = Math.min(cum[cum.length - 1], cum[iEnd] + spanM);
   const ruta = [];
   for (let m = Math.max(0, cum[i] - backM); m <= fin; m += stepM) ruta.push([m, pointAt(m)]);
@@ -2257,12 +2269,20 @@ function exitSignTest({ pts, cum, pointAt, i, at = i, iEnd = i, others = [] }, {
   return (s) => {
     const key = `${s.x},${s.y},${s.label}`;
     if (cache.has(key)) return cache.get(key);
-    let mejor = Infinity, enM = -Infinity;
-    for (const [m, p] of ruta) {
-      const d = Math.hypot(s.x - p[0], s.y - p[1]);
-      if (d < mejor) { mejor = d; enM = m; }
+    let mejor = Infinity, j = -1;
+    for (let n = 0; n < ruta.length; n++) {
+      const p = ruta[n][1], d = Math.hypot(s.x - p[0], s.y - p[1]);
+      if (d < mejor) { mejor = d; j = n; }
     }
-    const ok = enM > cum[at] + pastM && mejor <= maxDistM && !ramas.some((r) => r.some((q) => Math.hypot(s.x - q[0], s.y - q[1]) < mejor));
+    const enM = j >= 0 ? ruta[j][0] : -Infinity;
+    // De que lado: el rumbo hacia el cartel contra el de la ruta ahi
+    let otraMano = false;
+    if (bearingBetween && j >= 0 && ruta.length > 1) {
+      const a = ruta[Math.max(0, j - 1)][1], b = ruta[Math.min(ruta.length - 1, j + 1)][1];
+      const lado = normDeg(bearingBetween(ruta[j][1], [s.x, s.y]) - bearingBetween(a, b));
+      otraMano = mejor * Math.sin(lado * Math.PI / 180) < -leftM;
+    }
+    const ok = !otraMano && enM > cum[at] + pastM && mejor <= maxDistM && !ramas.some((r) => r.some((q) => Math.hypot(s.x - q[0], s.y - q[1]) < mejor));
     cache.set(key, ok);
     return ok;
   };

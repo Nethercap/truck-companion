@@ -4479,10 +4479,14 @@ function findUpcomingTurn(heading) {
       // el cartel mas cercano a un punto un poco despues del giro. No votan
       // los carteles del cruce ni los que quedan mas cerca de otra salida
       // (exitSignTest, otherBranchesAt): el "I-80" del cruce nombraba la
-      // rampa a la I-84 en Salt Lake City.
+      // rampa a la I-84 en Salt Lake City. Ni los de la otra mano.
+      // El "keep" de seguir derecho por los carriles (laneKeep, tambien el de
+      // "en cada salida") va sin nombre: la ruta sigue por la misma autopista
+      // y los carteles que vienen anuncian las salidas ("Keep left onto
+      // US-71" en el trebol de la I-44 en Joplin, Discord 20-10).
       const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
-      const nearSign = roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
-        onExit: exitSignTest({ pts, cum, pointAt, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) }),
+      const nearSign = m.laneKeep ? null : roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
+        onExit: exitSignTest({ pts, cum, pointAt, bearingBetween, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) }),
       });
       // Otra calle hacia el mismo lado antes del giro: la voz dice "turn
       // right" recien despues de pasarla (la distancia es hasta su salida).
