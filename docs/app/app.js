@@ -98,7 +98,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -430,14 +430,15 @@ let detectedModNames = null;
 // a nadie), decidido asi porque no hay cuentas ni consentimiento granular.
 // hideOtherPlayers es aparte y solo local (no le dice nada al backend) -
 // podes seguir compartiendo tu posicion pero no dibujar la de los demas.
-// Desde 2026-09-21 viene ENCENDIDO por defecto: lo que se comparte es
-// anonimo (posicion, camion, carga, ciudad origen/destino y el apodo de
-// convoy solo si lo puso) y tambien alimenta el mapa en vivo publico (/live/).
-// Lo guardado antes de ese cambio (liveShareV2 ausente) se migra una sola vez
-// a encendido y se avisa con un toast al conectar; el usuario lo apaga en
-// Ajustes cuando quiera.
-let liveShareEnabled = _savedSettings.liveShareV2 ? !!_savedSettings.liveShareEnabled : true;
-let liveShareNoticePending = !_savedSettings.liveShareV2;
+// Lo que se comparte es anonimo (posicion, camion, carga, ciudad
+// origen/destino y el apodo de convoy solo si lo puso) y tambien alimenta el
+// mapa en vivo publico (/live/). Viene APAGADO (20-10, ver liveShareChoice):
+// del 21-09 al 20-10 venia prendido, y la pestana que abre el cliente en la
+// PC publicaba la posicion de quien usaba solo el modo LAN.
+let liveShareEnabled = liveShareChoice(_savedSettings) === true;
+// Se cambio en esta pestana (el tilde, o lo que dijo el relay): desde ahi
+// se reenvia al reconectar aunque localStorage no ande.
+let liveShareChosen = false;
 let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
 useImperial = !!_savedSettings.useImperial;
 renderUnitButtons();
@@ -564,6 +565,10 @@ document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
 // estado real con live_share_state.
 function sendLiveShareState(explicit = false) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  // Sin tocar el tilde, solo si este navegador ya tenia un valor: una
+  // pestana que nunca lo cambio no lo prende ni apaga lo que eligio otro
+  // dispositivo (liveShareChoice).
+  if (!explicit && !liveShareChosen && liveShareChoice(loadSettings()) === null) return;
   // Sin telemetria todavia no se sabe el juego: resolveEffectiveGame() cae
   // en 'ats' por defecto y el conductor aparecia en el mapa de ATS aunque
   // estuviera en ETS2. Se manda null (no comparte) y updateMap re-manda el
@@ -573,13 +578,6 @@ function sendLiveShareState(explicit = false) {
   // El apodo de convoy (si lo puso) es lo unico con nombre que se muestra en el mapa en vivo.
   const nick = liveShareEnabled ? (loadSettings().convoyNick || null) : null;
   ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant, nick, explicit: !!explicit }));
-  // Por LAN el reenvio automatico no prende nada en el relay: el aviso lo da
-  // la pestana con el codigo, que es la que lo prende.
-  if (liveShareNoticePending && liveShareEnabled && !conn.demo && !conn.spectator && !conn.local) {
-    liveShareNoticePending = false;
-    saveSettings(); // persiste liveShareV2: el aviso es una sola vez
-    showToast(t('liveShareNotice'), 'info', 12000);
-  }
 }
 
 // Mapa que no conocemos: una vez por mapa y sesion (el relay tambien lo
@@ -733,6 +731,7 @@ document.getElementById('setLiteNoRouting').addEventListener('change', (e) => {
 });
 document.getElementById('setLiveShare').addEventListener('change', (e) => {
   liveShareEnabled = e.target.checked;
+  liveShareChosen = true;
   saveSettings();
   if (!liveShareEnabled) updateLivePlayers([]); // saca los marcadores ajenos ya dibujados
   renderLiveShareControls();
@@ -747,6 +746,7 @@ function applyLiveShareState(enabled) {
   enabled = !!enabled;
   if (enabled === liveShareEnabled) return;
   liveShareEnabled = enabled;
+  liveShareChosen = true;
   saveSettings();
   document.getElementById('setLiveShare').checked = enabled;
   renderLiveShareControls();

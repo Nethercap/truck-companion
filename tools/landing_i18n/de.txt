@@ -93,7 +93,7 @@ featButtonsBody: 'Warnblinker, Rundumleuchte, Handbremse, Motor, Anhänger, Kame
 featStatsTitle: 'Fahrthistorie und Statistiken <span class="tag">neu</span>',
 featStatsBody: 'Mit einem optionalen kostenlosen Konto bleibt jeder Auftrag erhalten: die Route nach Tempo eingefärbt, Lohn, Kraftstoff und Zeiten. Ein Fahrtenbuch, Statistiken pro Spiel, Rekorde und Erfolge, Freunde zum Folgen und ein öffentliches Profil nur, wenn du willst. <a href="#accounts">Mehr unten</a>.',
 featLiveTitle: 'Andere Fahrer, live',
-featLiveBody: 'Sieh Truck-Dash-Fahrern auf der <a href="/live/">öffentlichen Live-Karte</a> zu, anonym, mit einem Schalter, um selbst nicht zu erscheinen. Oder teile einen 6-stelligen Code mit Freunden und fahrt im Konvoi (Beta), jeder in seinem eigenen Spiel, ohne TruckersMP.',
+featLiveBody: 'Sieh Truck-Dash-Fahrern auf der <a href="/live/">öffentlichen Live-Karte</a> zu, anonym, und du erscheinst dort nur, wenn du es einschaltest. Oder teile einen 6-stelligen Code mit Freunden und fahrt im Konvoi (Beta), jeder in seinem eigenen Spiel, ohne TruckersMP.',
 featStreamTitle: 'Im Stream und auf Discord <span class="tag">neu</span>',
 featStreamBody: 'Ein kostenloses <a href="/overlay/">Overlay für OBS</a> mit deinem Tempo, der nächsten Abbiegung und deiner Fahrt, und ein Discord-Status, der deine laufende Tour zeigt. Beides bleibt aus, bis du es einschaltest.',
 featMoreLink: 'Alles andere, von den Einstellungen des Overlays bis zum Road-Trip-Atlas in ATS, steht in der Anleitung',

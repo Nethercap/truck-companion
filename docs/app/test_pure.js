@@ -180,6 +180,20 @@ test('compartir posicion: en LAN se puede apagar si el cliente lo reenvia al rel
   }
 });
 
+test('compartir posicion: viene apagado y sin tocarlo no se le dice nada al relay (20-10)', () => {
+  const { liveShareChoice } = require('./pure.js');
+  // Nunca lo cambio en este navegador (saveSettings guarda solo lo que cambia)
+  assert.equal(liveShareChoice({}), null);
+  assert.equal(liveShareChoice(null), null);
+  assert.equal(liveShareChoice({ navEveryExit: true }), null);
+  // De cuando venia prendido: liveShareV2 solo no lo prende
+  assert.equal(liveShareChoice({ liveShareV2: true }), null);
+  // Lo tildo o lo destildo (o se lo dijo el relay): eso manda
+  assert.equal(liveShareChoice({ liveShareEnabled: true }), true);
+  assert.equal(liveShareChoice({ liveShareEnabled: false, liveShareV2: true }), false);
+  assert.equal(liveShareChoice({ liveShareEnabled: 'si' }), null);
+});
+
 // ---------------------------------------------------------------------------
 // connectionViewFor: el diagnostico que ve el usuario segun el estado
 // ---------------------------------------------------------------------------

@@ -83,6 +83,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   cliente viejo la casilla queda gris (`liveShareControls`). La ruta en el
   mapa en vivo y los otros conductores siguen siendo de la pestana con el
   codigo (Discord, 20-10).
+- Compartir viene apagado desde el 20-10 (del 21-09 al 20-10 venia prendido
+  y lo prendia la pestana que abre el cliente en la PC). Una pestana que
+  nunca lo cambio (`liveShareChoice` null: saveSettings guarda solo lo que
+  cambia) no le manda nada al relay al conectar: ni lo prende ni apaga lo
+  que eligio otro dispositivo. Ya no hay aviso de "apareces en el mapa".
 - En el `-lanes.bin`, el giro de un paso lleva +64 (`CARRIL_QUE_SE_PIERDE`
   del constructor, `drop` de `lanesForEdge`) si se sigue derecho y un
   carril que venia de antes del cruce anterior se va por una salida: ahi
