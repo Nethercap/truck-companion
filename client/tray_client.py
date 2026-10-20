@@ -24,7 +24,7 @@ import time
 import tkinter as tk
 from tkinter import filedialog
 import urllib.parse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import red
 
@@ -2249,7 +2249,9 @@ def _focus_running_instance() -> bool:
     Setup (ver /__show-setup en local_server). Si no contesta -version vieja,
     modo LAN caido- devuelve False y se avisa con un cartel."""
     try:
-        with urlopen(f"http://127.0.0.1:{local_server.HTTP_PORT}/__show-setup", timeout=3) as resp:
+        pedido = Request(f"http://127.0.0.1:{local_server.HTTP_PORT}/__show-setup",
+                         headers={local_server.SHOW_SETUP_HEADER: local_server.SHOW_SETUP_VALUE})
+        with urlopen(pedido, timeout=3) as resp:
             return resp.status in (200, 204)
     except Exception:
         return False

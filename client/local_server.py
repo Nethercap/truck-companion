@@ -131,6 +131,39 @@ def origen_permitido(origin: str | None) -> bool:
     return ip.is_loopback or ip.is_private or ip.is_link_local or ip in _CGNAT
 
 
+# A quien le contesta el 27765 con CORS (lo que otra pagina puede leer). Lo
+# pide trucksim-dash.com en la misma PC: los mapas armados en la PC
+# (/localmap/, ver localMapRoot en app.js). Las paginas del cliente son del
+# mismo origen y no lo necesitan, pero pasan igual que en el 27766
+# (origen_permitido), y localhost en cualquier puerto (un servidor de
+# desarrollo de docs/). Antes era "*" para cualquier pagina (19-10).
+ORIGENES_WEB = ("https://trucksim-dash.com", "https://www.trucksim-dash.com")
+
+
+def origen_cors(origin: str | None) -> str | None:
+    """El Origin a devolver en Access-Control-Allow-Origin, o None."""
+    if not origin:
+        return None
+    if origin in ORIGENES_WEB or origen_permitido(origin):
+        return origin
+    try:
+        url = urlsplit(origin)
+        url.port  # un puerto roto tira ValueError
+    except ValueError:
+        return None
+    if url.scheme == "http" and (url.hostname or "").lower() in ("localhost", "127.0.0.1", "::1") \
+            and not url.path and not url.query:
+        return origin
+    return None
+
+
+# /__show-setup pide este header: una pagina no lo puede mandar sin un
+# preflight que el 27765 no autoriza, asi que una web abierta en la PC ya no
+# abre la ventana de Setup con un <img> (19-10). Lo manda _focus_running_instance.
+SHOW_SETUP_HEADER = "X-TruckDash"
+SHOW_SETUP_VALUE = "show-setup"
+
+
 def _solo_paginas_del_cliente(connection, request):
     """process_request del WebSocket: 403 a una pagina de otro origen, y una
     linea en el log por origen y por hora (por si uno legitimo quedo afuera)."""
@@ -217,11 +250,13 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_OPTIONS(self):
         # Preflight de Chrome para una pagina publica (trucksim-dash.com) que
-        # le pide algo a 127.0.0.1: sin Allow-Private-Network lo corta.
+        # le pide algo a 127.0.0.1: sin Allow-Private-Network lo corta. Solo
+        # a los origenes de origen_cors: a los demas, sin permisos.
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Range")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
+        if origen_cors(self.headers.get("Origin")):
+            self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Range")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -317,9 +352,10 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
                 return
         # Un segundo arranque del .exe (issue #4) no abre otra instancia: le
         # pide a esta que muestre su ventana de Setup y se va. Solo desde la
-        # misma maquina, no desde la red.
+        # misma maquina, no desde la red, y con SHOW_SETUP_HEADER.
         if path == "/__show-setup":
-            local = self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+            local = (self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+                     and self.headers.get(SHOW_SETUP_HEADER) == SHOW_SETUP_VALUE)
             if local and on_show_setup:
                 try:
                     on_show_setup()
@@ -345,7 +381,11 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        pedido = getattr(self, "headers", None)  # un pedido roto llega sin headers
+        origen = origen_cors(pedido.get("Origin") if pedido is not None else None)
+        if origen:
+            self.send_header("Access-Control-Allow-Origin", origen)
+        self.send_header("Vary", "Origin")
         super().end_headers()
 
     def log_message(self, format, *args):

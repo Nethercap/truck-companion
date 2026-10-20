@@ -4,6 +4,12 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- LAN mode: the client's local page server (the web copy and the maps built on the PC) only shares
+  its files with trucksim-dash.com and the client's own pages. Web pages from anywhere else can no
+  longer read them, and can no longer open the Setup window.
+
 ## 1.5.33 (2026-10-19)
 
 - The README in the download thanks the people who have sent code to Truck Dash.
