@@ -186,6 +186,21 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (Discord, 19-10). Medido en 450 rutas de ATS: 183 nombres mejores, 6
   peores, unos 100 ambiguos sin nombre; ETS2 no cambia (sus carteles son de
   destino). `check_avisos` no mira nombres: comparar a mano contra main.
+  Tampoco votan los de la otra mano: a mas de 5 m a la izquierda de la ruta
+  (`leftM` de `exitSignTest`; casi ningun cartel queda entre -5 y 5). Los
+  del puente sobre la autopista recien dejada son de sus rampas: "Turn left
+  onto I-90" al final de la salida (Discord, 20-10). Con -15 m en los tramos
+  de un sentido volvia eso: en el cruce de la rampa los nodos del prefab son
+  de un sentido. El "keep" por carriles (`laneKeep`, tambien el de "Highway
+  exits") va sin nombre: se sigue por la autopista y los carteles que vienen
+  son de las salidas ("Keep left onto US-71" en el trebol de Joplin).
+  Medido en 450 rutas de ATS contra los escudos a la derecha de la ruta de
+  0,2 a 3 km despues (lejos de los cruces), en los 716 avisos que los tienen:
+  181 mejores (124 bien, 57 sin nombre) y 46 peores (39 sin nombre, 7 con
+  otro). Siguen mal los del lado propio antes de un cruce (el "I-49" de la
+  entrada a la autopista) y los carteles con dos escudos, que solo votan el
+  primero del archivo: el "I-94" de "I-90/I-94" nombra la bifurcacion de la
+  Kennedy, que es la I-90.
 - Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
   mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).

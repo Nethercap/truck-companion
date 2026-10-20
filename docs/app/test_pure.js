@@ -2679,6 +2679,33 @@ test('nombre del giro: el cartel del cruce o el de la otra rama no nombra la sal
   assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(lejos, x, z, m), [10, 60], { onExit }).label, 'US-6');
 });
 
+test('nombre del giro: no vota el cartel de la otra mano ("Turn left onto I-90" al final de la salida, Discord 20-10)', () => {
+  const { roadSignForTurn, exitSignTest, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // La rampa llega del sur al nodo 1 y la ruta dobla a la izquierda, al
+  // oeste, por la calle que cruza la autopista recien dejada. En el puente,
+  // del lado sur (a la izquierda yendo al oeste), los carteles de sus rampas
+  // para el que viene de enfrente; la calle nueva tiene el suyo a la derecha.
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-60, 0], [-400, 0]] });
+  const { pointAt, cum } = ctx;
+  const signs = [{ x: -150, y: -12, label: 'I-90', kind: 'road' }, { x: -250, y: 10, label: 'US-20', kind: 'road' }];
+  const grid = buildPointGrid(signs);
+  const nearest = (x, z, m) => nearestInGrid(grid, x, z, m);
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  assert.equal(onExit(signs[0]), false);
+  assert.equal(onExit(signs[1]), true);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null, { onExit }).label, 'US-20');
+  // Sin rumbos (como antes) votaba la de la otra mano, que quedaba mas cerca
+  const sinLado = exitSignTest({ ...ctx, bearingBetween: undefined, iEnd: 1 });
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null, { onExit: sinLado }).label, 'I-90');
+  // Con solo ese cartel, sin nombre (no el respaldo, que lo encontraria igual)
+  const gridSolo = buildPointGrid([signs[0]]);
+  const solo = (x, z, m) => nearestInGrid(gridSolo, x, z, m);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], solo, [-70, 0], { onExit }), null);
+  // A 4 m a la izquierda todavia vota: un portico sobre la calzada queda
+  // casi en la linea de la ruta
+  assert.equal(onExit({ x: -150, y: -4, label: 'US-20', kind: 'road' }), true);
+});
+
 // Navegador de mentira para createScreenKeeper: pestana, Wake Lock API con
 // pedidos que el test resuelve a mano, y videos.
 function navegadorFalso({ api = true } = {}) {
