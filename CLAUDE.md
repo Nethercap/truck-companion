@@ -68,6 +68,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Una app nativa no manda Origin y entra igual: los terminos
   (`docs/terms.html`, "The relay and other apps", 18-10) prohiben conectar
   otras apps sin permiso escrito; bloquearlas de verdad seria otra medida.
+- En el cliente, el WebSocket LAN (27766, `origen_permitido`) y el servidor de
+  paginas (27765, `origen_cors`: lo mismo mas trucksim-dash.com y localhost
+  con cualquier puerto) devuelven CORS solo a esos origenes, nunca `*`.
+  `/__show-setup` (el segundo arranque abre Setup) pide el header
+  `X-TruckDash: show-setup`, que una pagina no puede mandar sin preflight.
 - En el `-lanes.bin`, el giro de un paso lleva +64 (`CARRIL_QUE_SE_PIERDE`
   del constructor, `drop` de `lanesForEdge`) si se sigue derecho y un
   carril que venia de antes del cruce anterior se va por una salida: ahi

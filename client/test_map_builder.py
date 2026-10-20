@@ -93,9 +93,12 @@ def test_el_mapa_local_se_sirve_por_rangos(tmp_path):
         assert cuerpo == bytes(range(10, 20))
         r, cuerpo = _pedir(srv, "/localmap/ats/vector/local_ats.pmtiles", {"Range": "bytes=-4"})
         assert r.status == 206 and cuerpo == bytes(range(252, 256))
-        r, cuerpo = _pedir(srv, "/localmap/ats/local_ats/Cities.json?v=abc")
+        r, cuerpo = _pedir(srv, "/localmap/ats/local_ats/Cities.json?v=abc", {"Origin": "https://trucksim-dash.com"})
         assert r.status == 200 and cuerpo == b"[]"
-        assert r.getheader("Access-Control-Allow-Origin") == "*"
+        # trucksim-dash.com en la misma PC lee el mapa armado; otra web no (19-10)
+        assert r.getheader("Access-Control-Allow-Origin") == "https://trucksim-dash.com"
+        r, _ = _pedir(srv, "/localmap/ats/local_ats/Cities.json", {"Origin": "https://evil.example"})
+        assert r.status == 200 and r.getheader("Access-Control-Allow-Origin") is None
     finally:
         srv.shutdown()
 
@@ -114,9 +117,11 @@ def test_el_mapa_local_no_sale_de_su_carpeta(tmp_path):
 def test_preflight_de_red_privada(tmp_path):
     srv = _servidor(tmp_path)
     try:
-        r, _ = _pedir(srv, "/localmap/ats/vector/local_ats.pmtiles", {"Access-Control-Request-Private-Network": "true"}, "OPTIONS")
+        r, _ = _pedir(srv, "/localmap/ats/vector/local_ats.pmtiles", {"Origin": "https://trucksim-dash.com",
+                      "Access-Control-Request-Private-Network": "true"}, "OPTIONS")
         assert r.status == 204
         assert r.getheader("Access-Control-Allow-Private-Network") == "true"
+        assert r.getheader("Access-Control-Allow-Origin") == "https://trucksim-dash.com"
     finally:
         srv.shutdown()
 
@@ -128,10 +133,10 @@ def test_el_mapa_local_sirve_los_logos_como_png(tmp_path):
     (tmp_path / "mapa" / "company-icons").mkdir()
     (tmp_path / "mapa" / "company-icons" / "mod_co.png").write_bytes(b"\x89PNG")
     try:
-        r, cuerpo = _pedir(srv, "/localmap/ats/company-icons/mod_co.png")
+        r, cuerpo = _pedir(srv, "/localmap/ats/company-icons/mod_co.png", {"Origin": "https://trucksim-dash.com"})
         assert r.status == 200 and cuerpo == b"\x89PNG"
         assert r.getheader("Content-Type") == "image/png"
-        assert r.getheader("Access-Control-Allow-Origin") == "*"
+        assert r.getheader("Access-Control-Allow-Origin") == "https://trucksim-dash.com"
     finally:
         srv.shutdown()
 

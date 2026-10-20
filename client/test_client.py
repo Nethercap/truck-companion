@@ -1114,6 +1114,88 @@ def test_lan_datos_solo_para_las_paginas_del_cliente():
         assert not local_server.origen_permitido(malo), malo
 
 
+def test_pagina_cors_solo_para_los_origenes_que_la_usan():
+    """El 27765 le contesta con CORS a trucksim-dash.com (los mapas armados
+    en la PC), a las paginas del cliente y a localhost; antes, "*" (19-10)."""
+    import local_server
+    p = local_server.HTTP_PORT
+    for bueno in ("https://trucksim-dash.com", "https://www.trucksim-dash.com", f"http://192.168.1.50:{p}",
+                  f"http://127.0.0.1:{p}", "http://localhost:8791", "http://127.0.0.1:8080"):
+        assert local_server.origen_cors(bueno) == bueno, bueno
+    for malo in (None, "", "null", "https://evil.example", "http://trucksim-dash.com", "http://192.168.1.50:8080",
+                 "https://localhost:8791", "http://localhost:abc"):
+        assert local_server.origen_cors(malo) is None, malo
+
+
+def _pagina_lan(monkeypatch, tmp_path):
+    """El servidor de paginas de verdad, en 127.0.0.1 y un puerto libre."""
+    import http.server
+    import local_server
+    monkeypatch.setattr(local_server, "cache_dir", lambda: str(tmp_path))
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), local_server._StaticHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def _pedir_pagina(srv, path, headers=None, metodo="GET"):
+    import http.client
+    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=5)
+    c.request(metodo, path, headers=headers or {})
+    r = c.getresponse()
+    r.read()
+    return r
+
+
+def test_pagina_preflight_solo_para_los_origenes_que_la_usan(monkeypatch, tmp_path):
+    srv = _pagina_lan(monkeypatch, tmp_path)
+    try:
+        r = _pedir_pagina(srv, "/localmap/ats/vector/x.pmtiles", {"Origin": "https://trucksim-dash.com",
+                          "Access-Control-Request-Private-Network": "true"}, "OPTIONS")
+        assert r.status == 204
+        assert r.getheader("Access-Control-Allow-Origin") == "https://trucksim-dash.com"
+        assert r.getheader("Access-Control-Allow-Private-Network") == "true"
+        r = _pedir_pagina(srv, "/localmap/ats/vector/x.pmtiles", {"Origin": "https://evil.example"}, "OPTIONS")
+        assert r.getheader("Access-Control-Allow-Origin") is None
+        assert r.getheader("Access-Control-Allow-Private-Network") is None
+    finally:
+        srv.shutdown()
+
+
+def test_show_setup_solo_con_el_header_del_segundo_arranque(monkeypatch, tmp_path):
+    """Un <img src=".../__show-setup"> de cualquier web abria Setup; ahora
+    hace falta el header que manda _focus_running_instance (19-10)."""
+    import local_server
+    llamadas = []
+    monkeypatch.setattr(local_server, "on_show_setup", lambda: llamadas.append(1))
+    srv = _pagina_lan(monkeypatch, tmp_path)
+    try:
+        assert _pedir_pagina(srv, "/__show-setup").status == 403
+        assert _pedir_pagina(srv, "/__show-setup", {"Origin": "https://evil.example"}).status == 403
+        assert llamadas == []
+        r = _pedir_pagina(srv, "/__show-setup", {local_server.SHOW_SETUP_HEADER: local_server.SHOW_SETUP_VALUE})
+        assert r.status == 204 and llamadas == [1]
+    finally:
+        srv.shutdown()
+
+
+def test_segundo_arranque_manda_el_header_de_show_setup(monkeypatch):
+    import local_server
+    import tray_client
+    pedidos = []
+
+    class Respuesta:
+        status = 204
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(tray_client, "urlopen", lambda pedido, timeout: (pedidos.append(pedido), Respuesta())[1])
+    assert tray_client._focus_running_instance() is True
+    assert pedidos[0].full_url.endswith("/__show-setup")
+    assert pedidos[0].get_header(local_server.SHOW_SETUP_HEADER.capitalize()) == local_server.SHOW_SETUP_VALUE
+
+
 def test_lan_datos_rechaza_el_handshake_de_otro_origen(caplog):
     """Con un servidor de verdad (solo 127.0.0.1, sin pedir el firewall)."""
     import asyncio
