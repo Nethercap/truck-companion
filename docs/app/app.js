@@ -2149,7 +2149,7 @@ async function loadRoadNames(mapInfo) {
   try {
     const res = await fetch(`${mapInfo.assetsDir}/road-names.json?v=${MAP_DATA_VERSION[currentGame] || ''}`, { priority: 'low' });
     if (!res.ok) return;
-    const nombres = await res.json();
+    const nombres = groupSignsByPoint(await res.json());
     if (currentGame === game) roadNames = nombres;
   } catch (err) {
     if (currentGame === game) roadNames = [];

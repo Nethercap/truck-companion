@@ -2706,6 +2706,42 @@ test('nombre del giro: no vota el cartel de la otra mano ("Turn left onto I-90" 
   assert.equal(onExit({ x: -150, y: -4, label: 'US-20', kind: 'road' }), true);
 });
 
+test('groupSignsByPoint: los escudos de un mismo cartel quedan juntos', () => {
+  const { groupSignsByPoint } = require('./pure.js');
+  const signs = groupSignsByPoint([{ x: 1, y: 2, label: 'I-94', kind: 'road' }, { x: 1, y: 2, label: 'I-90', kind: 'road' },
+    { x: 1, y: 2, label: 'I-90', kind: 'road' }, { x: 5, y: 2, label: 'US-14', kind: 'road' }]);
+  assert.deepEqual(signs[0].labels, ['I-94', 'I-90']);
+  assert.deepEqual(signs[2].labels, ['I-94', 'I-90']);
+  assert.equal(signs[3].labels, undefined);
+  assert.doesNotThrow(() => JSON.stringify(signs));
+  assert.deepEqual(groupSignsByPoint(null), null);
+});
+
+test('nombre del giro: el portico con dos escudos de una bifurcacion ("Keep left onto I-94" por la I-90 en Chicago, Discord 20-10)', () => {
+  const { roadSignForTurn, exitSignTest, otherBranchesAt, groupSignsByPoint, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // La ruta sale a la derecha por la rampa (nodos 2, 3, 4) y la otra rama
+  // sigue derecho (5, 6, 7). Pasado el nodo, el portico "I-94 / I-90" (una
+  // entrada por escudo, la I-94 primero); mas adelante, uno de la I-90 junto
+  // a la ruta (de la otra mano: no vota) y uno de la I-94 junto a la otra rama.
+  const ctx = scenario({ route: [[0, -300], [0, 0], [40, 250], [120, 500], [200, 1500]],
+    extraNodes: [[0, 100], [0, 700], [0, 1500]], edges: [[1, 5], [5, 6], [6, 7]] });
+  const { pointAt, cum } = ctx;
+  const others = otherBranchesAt(ctx);
+  const portico = [{ x: 15, y: 60, label: 'I-94', kind: 'road' }, { x: 15, y: 60, label: 'I-90', kind: 'road' }];
+  const conRamas = groupSignsByPoint([...portico.map((s) => ({ ...s })), { x: 66, y: 380, label: 'I-90', kind: 'road' }, { x: 8, y: 700, label: 'I-94', kind: 'road' }]);
+  const grid = buildPointGrid(conRamas);
+  const nearest = (x, z, m) => nearestInGrid(grid, x, z, m);
+  const onExit = exitSignTest({ ...ctx, iEnd: 1, others });
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null, { onExit }).label, 'I-90');
+  // Solo el portico, como en un tramo compartido: los dos empatan en todo y
+  // queda el primero, como antes
+  const soloGrid = buildPointGrid(groupSignsByPoint(portico.map((s) => ({ ...s }))));
+  const soloPortico = (x, z, m) => nearestInGrid(soloGrid, x, z, m);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], soloPortico, null, { onExit }).label, 'I-94');
+  // Sin agrupar (road-names.json tal cual) votaba solo el primer escudo
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(buildPointGrid(portico), x, z, m), null, { onExit }).label, 'I-94');
+});
+
 // Navegador de mentira para createScreenKeeper: pestana, Wake Lock API con
 // pedidos que el test resuelve a mano, y videos.
 function navegadorFalso({ api = true } = {}) {
