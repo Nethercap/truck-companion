@@ -198,9 +198,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   0,2 a 3 km despues (lejos de los cruces), en los 716 avisos que los tienen:
   181 mejores (124 bien, 57 sin nombre) y 46 peores (39 sin nombre, 7 con
   otro). Siguen mal los del lado propio antes de un cruce (el "I-49" de la
-  entrada a la autopista) y los carteles con dos escudos, que solo votan el
-  primero del archivo: el "I-94" de "I-90/I-94" nombra la bifurcacion de la
-  Kennedy, que es la I-90.
+  entrada a la autopista).
+  Un cartel con varios escudos (una entrada por escudo en el mismo punto,
+  `groupSignsByPoint` al cargar) vota por todos, y un empate lo gana el
+  numero con mas carteles junto a la ruta que junto a las otras ramas
+  (`labelEvidence` de `exitSignTest`, de las dos manos); si no, el primero.
+  Antes votaba solo el primero del archivo: "Keep left onto I-94" en la
+  bifurcacion de la Kennedy, que es la I-90 (Discord, 20-10). En las mismas
+  450 rutas: 175 nombres cambian, 163 entre numeros de un mismo cartel; en
+  los que se pueden juzgar, 509 -> 521 bien y 83 -> 71 mal.
 - Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
   mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
