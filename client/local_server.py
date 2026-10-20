@@ -409,6 +409,23 @@ def _refresh_file(rel: str, local_path: str) -> bool:
 
 
 
+def pedido_live_share(message) -> str | None:
+    """El set_live_share del tablero por LAN, armado de nuevo con solo sus
+    campos para mandarlo al relay; None si el mensaje es otra cosa. El relay
+    valida cada campo y decide (por LAN, el reenvio automatico no prende)."""
+    try:
+        payload = json.loads(message)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict) or payload.get("type") != "set_live_share":
+        return None
+    pedido = {"type": "set_live_share", "enabled": payload.get("enabled") is True}
+    for clave in ("explicit", "mapVariant", "nick"):
+        if clave in payload:
+            pedido[clave] = payload[clave]
+    return json.dumps(pedido)
+
+
 class _ViewerOutbox:
     """Cola de salida de un viewer LAN: la telemetria se pisa (solo el ultimo
     tick), los mensajes de estado se encolan y no se pierden."""
@@ -483,6 +500,12 @@ class LocalServer:
         self.en_la_red = en_la_red
         self._escucho = False  # start() ya intento escuchar (bien o con error)
         self._lock = asyncio.Lock()
+        # "Compartir mi posicion" es de la sesion del relay y el tablero por
+        # LAN no habla con el relay: su tilde se manda por al_relay (el send
+        # de la conexion al relay, lo pone la bandeja) y el estado real llega
+        # por avisar_live_share. None: el relay todavia no lo dijo.
+        self.al_relay = None
+        self.live_share: bool | None = None
 
     @property
     def url(self) -> str | None:
@@ -584,10 +607,18 @@ class LocalServer:
         anotar_remoto((getattr(ws, "remote_address", None) or (None,))[0], "datos (27766)")
         self.viewers.add(ws)
         try:
-            await ws.send(json.dumps({"type": "session_state", "client_connected": True, "client_status": None, "local": True}))
+            # liveShare: con la clave, la pagina sabe que este cliente le pasa
+            # su tilde al relay (uno viejo no, y la casilla queda gris).
+            await ws.send(json.dumps({"type": "session_state", "client_connected": True, "client_status": None,
+                                      "local": True, "liveShare": self.live_share}))
             if self.last_status_message:
                 await ws.send(self.last_status_message)
             async for message in ws:
+                pedido = pedido_live_share(message)
+                if pedido is not None:
+                    if self.al_relay is not None:
+                        await self.al_relay(pedido)
+                    continue
                 await client_lib.handle_control_message(message, self.keybinds, ws.send)
         except Exception:
             pass
@@ -609,6 +640,14 @@ class LocalServer:
             return
         for viewer in list(self.viewers):
             self._outbox(viewer).push(text, must_deliver=is_status)
+
+    def avisar_live_share(self, enabled: bool) -> None:
+        """Lo que dice el relay de "compartir mi posicion", a los tableros por
+        LAN (y en el session_state a los que conecten despues)."""
+        self.live_share = enabled
+        texto = json.dumps({"type": "live_share_state", "enabled": enabled})
+        for viewer in list(self.viewers):
+            self._outbox(viewer).push(texto, must_deliver=True)
 
     def _outbox(self, viewer):
         ob = self._outboxes.get(viewer)

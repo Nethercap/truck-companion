@@ -73,6 +73,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   con cualquier puerto) devuelven CORS solo a esos origenes, nunca `*`.
   `/__show-setup` (el segundo arranque abre Setup) pide el header
   `X-TruckDash: show-setup`, que una pagina no puede mandar sin preflight.
+- "Compartir mi posicion" es de la sesion del relay, y el relay recibe la
+  posicion de la telemetria del cliente aunque solo este abierto el tablero
+  por LAN. Ese tablero lo cambia a traves del cliente (`pedido_live_share`,
+  `al_relay`; en el relay `apply_set_live_share` con `from_client`) y ve el
+  estado real (`live_share_state` tambien al cliente, `liveShare` en el
+  session_state LAN). Por LAN solo prende el tilde tocado: el reenvio
+  automatico de esa pagina no publica a quien nunca lo prendio. Con un
+  cliente viejo la casilla queda gris (`liveShareControls`). La ruta en el
+  mapa en vivo y los otros conductores siguen siendo de la pestana con el
+  codigo (Discord, 20-10).
 - En el `-lanes.bin`, el giro de un paso lleva +64 (`CARRIL_QUE_SE_PIERDE`
   del constructor, `drop` de `lanesForEdge`) si se sigue derecho y un
   carril que venia de antes del cruce anterior se va por una salida: ahi

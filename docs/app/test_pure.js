@@ -167,6 +167,19 @@ test('formatTurnDistance: usa metros por debajo de 1km', () => {
   assert.equal(formatTurnDistance(80), '80 m');
 });
 
+test('compartir posicion: en LAN se puede apagar si el cliente lo reenvia al relay (Discord, 20-10)', () => {
+  const { liveShareControls } = require('./pure.js');
+  // Con el codigo, como siempre: la ruta depende de compartir
+  assert.deepEqual(liveShareControls({ lan: false, lanRelay: false, enabled: true }), { shareDisabled: false, routeDisabled: false, hint: null });
+  assert.deepEqual(liveShareControls({ lan: false, lanRelay: false, enabled: false }), { shareDisabled: false, routeDisabled: true, hint: null });
+  // LAN con un cliente viejo: gris, y se dice donde se cambia
+  assert.deepEqual(liveShareControls({ lan: true, lanRelay: false, enabled: true }), { shareDisabled: true, routeDisabled: true, hint: 'liveShareLanHint' });
+  // LAN con un cliente que lo reenvia: compartir se toca, la ruta no (la manda la pestana con el codigo)
+  for (const enabled of [true, false]) {
+    assert.deepEqual(liveShareControls({ lan: true, lanRelay: true, enabled }), { shareDisabled: false, routeDisabled: true, hint: 'liveShareLanRouteHint' });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // connectionViewFor: el diagnostico que ve el usuario segun el estado
 // ---------------------------------------------------------------------------

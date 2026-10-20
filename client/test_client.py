@@ -1098,6 +1098,55 @@ def test_lan_anota_cada_ip_remota_una_vez(caplog):
     assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]
 
 
+def test_lan_el_tilde_de_compartir_va_al_relay_y_el_estado_vuelve(monkeypatch):
+    """El tablero por LAN no habla con el relay: el cliente le pasa el tilde
+    de "compartir mi posicion" y le devuelve lo que dice el relay. Antes la
+    casilla estaba gris en LAN y no habia como apagarlo (Discord, 20-10)."""
+    import asyncio
+    import json
+    import local_server
+    assert local_server.pedido_live_share(json.dumps({"type": "command", "action": "x"})) is None
+    assert local_server.pedido_live_share("no es json") is None
+    assert local_server.pedido_live_share("[1]") is None
+    pedido = {"type": "set_live_share", "enabled": False, "explicit": True, "mapVariant": "ats", "otra": "cosa"}
+    assert json.loads(local_server.pedido_live_share(json.dumps(pedido))) == {
+        "type": "set_live_share", "enabled": False, "explicit": True, "mapVariant": "ats"}
+    assert json.loads(local_server.pedido_live_share('{"type": "set_live_share", "enabled": "si"}'))["enabled"] is False
+
+    # Lo que dice el relay llega por la conexion al relay (handle_control_message)
+    vistos = []
+    monkeypatch.setattr(client, "on_live_share", vistos.append)
+    asyncio.run(client.handle_control_message('{"type": "live_share_state", "enabled": true}', {}, None))
+    asyncio.run(client.handle_control_message('{"type": "live_share_state", "enabled": "x"}', {}, None))
+    assert vistos == [True]
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        al_relay = []
+
+        async def mandar(texto):
+            al_relay.append(json.loads(texto))
+        srv.al_relay = mandar
+        # Sin saber que dice el relay: la clave va igual (este cliente reenvia)
+        ws = _FakeWs([json.dumps({"type": "set_live_share", "enabled": False, "explicit": True})])
+        await srv._handle_viewer(ws)
+        assert json.loads(ws.sent[0])["liveShare"] is None
+        assert al_relay == [{"type": "set_live_share", "enabled": False, "explicit": True}]
+
+        # El relay dice que comparte: a los tableros conectados y a los que llegan despues
+        conectado = _FakeWs([])
+        srv.viewers.add(conectado)
+        srv.avisar_live_share(True)
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert conectado.sent == ['{"type": "live_share_state", "enabled": true}']
+        srv._drop_viewer(conectado)
+        nuevo = _FakeWs([])
+        await srv._handle_viewer(nuevo)
+        assert json.loads(nuevo.sent[0])["liveShare"] is True
+    asyncio.run(probar())
+
+
 def test_lan_datos_solo_para_las_paginas_del_cliente():
     """El 27766 atiende a la app y a /dash/ servidas por el cliente en el
     27765 (por IP, localhost o el nombre de la PC), no a cualquier pagina."""

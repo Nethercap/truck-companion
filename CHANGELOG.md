@@ -6,6 +6,10 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- LAN mode: "Share my position" (the public live map) can now be turned off, or on, from the
+  dashboard on the same Wi-Fi. Before, the box was greyed out there and only the dashboard opened
+  with the pairing code could change it. The box now shows whether your session is really sharing,
+  and the dashboard on the same Wi-Fi never turns sharing on unless you tick it.
 - LAN mode: the client's local page server (the web copy and the maps built on the PC) only shares
   its files with trucksim-dash.com and the client's own pages. Web pages from anywhere else can no
   longer read them, and can no longer open the Setup window.
