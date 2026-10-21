@@ -750,14 +750,15 @@ def _textos(widget):
     return out
 
 
-def test_armar_mi_mapa_aparece_solo_si_hace_falta(ventana, monkeypatch, tmp_path):
-    """La seccion del mapa armado en la PC no esta hasta que la web ve el
-    camion fuera del mapa con mods activos; ahi ofrece el boton, y el boton
-    con el juego abierto no arranca nada."""
+def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch, tmp_path):
+    """Sin mods no hay seccion. Con mods se puede armar a mano, sin esperar
+    a que la web vea el camion fuera del mapa (la opcion "desaparecia" si el
+    tablero no lo veia, o al reiniciar el cliente); con ese aviso se ofrece
+    primero. Con el juego abierto el boton no arranca nada."""
     v, _ = ventana
     bin_dir = _install(tmp_path, "ATS", "ats")
     tray_client.state.installs = [plugin_installer.describe_install("ats", bin_dir)]
-    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": [str(tmp_path / "mod.scs")], "ets2": None})
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": [], "ets2": None})
     monkeypatch.setattr(tray_client.state, "local_maps", {})
     monkeypatch.setattr(tray_client.state, "offmap_games", set())
     monkeypatch.setattr(tray_client.state, "map_build", None)
@@ -765,11 +766,22 @@ def test_armar_mi_mapa_aparece_solo_si_hace_falta(ventana, monkeypatch, tmp_path
     v.root.update()
     assert not v.local_map_frame.winfo_ismapped()
 
-    tray_client.state.offmap_games.add("ats")
+    tray_client.state.mounted_mods = {"ats": [str(tmp_path / "mod.scs")], "ets2": None}
     v.render_local_map()
     v.root.update()
     assert v.local_map_frame.winfo_ismapped()
-    assert tray_client.T("local_map_build") in _textos(v.local_map_body)
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_manual", game=tray_client.GAME_LABELS["ats"]) in textos
+    assert tray_client.T("local_map_needed", game=tray_client.GAME_LABELS["ats"]) not in textos
+    assert tray_client.T("local_map_build") in textos
+
+    tray_client.state.offmap_games.add("ats")
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_needed", game=tray_client.GAME_LABELS["ats"]) in textos
+    assert tray_client.T("local_map_manual", game=tray_client.GAME_LABELS["ats"]) not in textos
+    assert tray_client.T("local_map_build") in textos
 
     arrancados = []
     monkeypatch.setattr(tray_client, "start_map_build", lambda g: arrancados.append(g))
@@ -782,6 +794,15 @@ def test_armar_mi_mapa_aparece_solo_si_hace_falta(ventana, monkeypatch, tmp_path
     monkeypatch.setattr(tray_client.map_builder, "free_memory_gb", lambda: 16.0)
     v.build_my_map("ats")
     assert arrancados == ["ats"]
+
+    # Ya armado para esos mods: solo dice que esta listo, sin boton.
+    tray_client.state.offmap_games.clear()
+    tray_client.state.local_maps = {"ats": {"fingerprint": "f", "cities": 12, "built": "2026-10-21"}}
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_build") not in textos
+    assert any("12" in t for t in textos)
 
 
 def test_qr_del_celular_con_el_codigo_y_se_rehace_al_cambiarlo(ventana, monkeypatch):

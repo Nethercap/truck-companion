@@ -1127,6 +1127,7 @@ class SetupWindow:
         build = state.map_build or {}
         return (tuple(sorted((g, m.get("fingerprint")) for g, m in state.local_maps.items())),
                 tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
+                tuple(g for g in ("ats", "ets2") if can_build_map(g)),
                 build.get("game"), build.get("step"), build.get("error"), build.get("running"))
 
     def render_local_map(self):
@@ -1155,6 +1156,14 @@ class SetupWindow:
                 self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
                 self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g),
                             primary=True).pack(anchor="w")
+            elif can_build_map(game):
+                # Sin el aviso de la web, a mano: el mod tiene una version mas
+                # nueva que la nuestra, o el tablero no estuvo abierto cuando
+                # el camion salio del mapa (el aviso no sobrevive a reiniciar).
+                self.label(self.local_map_body, T("local_map_manual", game=nombre), fg=MUTED,
+                           wraplength=520).pack(anchor="w", pady=(2, 0))
+                self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
+                self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g)).pack(anchor="w")
             else:
                 continue
             filas += 1
@@ -1903,11 +1912,18 @@ def refresh_local_maps() -> bool:
     return cambio
 
 
+def can_build_map(game: str) -> bool:
+    """Hay mods activos (los del game.log.txt de la ultima partida, asi que
+    vale con el juego cerrado), se sabe donde esta el juego y no hay ya un
+    mapa armado para esos mods. Setup ofrece armarlo a mano."""
+    return (game not in state.local_maps and bool((state.mounted_mods or {}).get(game))
+            and game_dir_for(game) is not None)
+
+
 def needs_map_build(game: str) -> bool:
-    """Se ofrece armar el mapa si la web vio el camion fuera del mapa, hay
-    mods activos y no hay ya un mapa armado para ellos."""
-    return (game in state.offmap_games and game not in state.local_maps
-            and bool((state.mounted_mods or {}).get(game)) and game_dir_for(game) is not None)
+    """Ademas la web vio el camion fuera del mapa: Setup lo ofrece primero,
+    con el aviso de la bandeja."""
+    return game in state.offmap_games and can_build_map(game)
 
 
 def on_offmap(game: str):
