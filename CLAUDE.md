@@ -334,6 +334,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
     `findRouteWith` arranca o termina en el nodo mas cercano del que se sale
     o al que se llega (`routeReachability`, solo si no hay camino): la ruta
     empieza hasta 1,4 km mas alla (Kirishi) en vez de no haber ruta.
+  - ETS2: pk_medved_ru y eskadra de Veliky Novgorod quedan a 380-480 m del
+    grafo (la playa no esta en el grafo): la ruta termina afuera. Las cajas
+    de ciudad de mas de 4 km (Estambul, Barcelona, una al lado de Mitilini)
+    parecen de verdad; no se midio contra el GPS del juego.
   - Rotondas compactas de un solo prefab en ETS2: 11 de 29 sin reconocer (las
     curvas internas quedaron de doble mano en el grafo). Lo robusto es que el
     constructor marque los prefabs de rotonda por su nombre.
