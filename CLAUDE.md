@@ -426,6 +426,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   encierra (`focusTrapTarget`), cierra con Escape y lo devuelve al cerrar.
 - Animaciones nuevas: dentro de `prefers-reduced-motion` tienen que
   apagarse (cada CSS tiene su bloque). Objetivos tactiles de 24 px minimo.
+- La ventana flotante (Document Picture-in-Picture) guarda el tamano que le
+  deja el usuario, con y sin mapa (`truckdash_pip_size_text` / `_map`), y
+  abre con ese. La posicion no la puede elegir la pagina (`moveTo` no hace
+  nada): Chrome la recuerda solo en la misma pestana y si se pide el mismo
+  tamano que la vez anterior. Por eso `pipRequestSize` repite lo pedido
+  (sessionStorage `truckdash_pip_open`) si se cerro en el mismo modo; pedir
+  siempre el tamano guardado la mandaba a la esquina (medido en Chrome,
+  21-10). En otra pestana o despues de reiniciar, el tamano si y la esquina
+  de Chrome.
 - El overlay de OBS (`/overlay/`) entra al relay con `?role=obs`; el relay
   avisa `obs_overlay` en `session_state` y la pestana lider manda `nav_hud`
   si hay overlay del juego O de OBS. Campos nuevos de `nav_hud` son

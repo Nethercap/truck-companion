@@ -3606,6 +3606,35 @@ test('pipWindowSize: la ventana flotante con mapa es mas alta que la de texto', 
   assert.ok(pipWindowSize(true).height >= 400);
 });
 
+test('pipWindowSize: con el tamano que le dejo el usuario, ese (Discord, 21-10)', () => {
+  const { pipWindowSize, pipSavedSize } = require('./pure.js');
+  assert.deepEqual(pipWindowSize(true, '{"width":520,"height":610}'), { width: 520, height: 610 });
+  assert.deepEqual(pipWindowSize(false, { width: 300.4, height: 120.6 }), { width: 300, height: 121 });
+  // lo que no sirve vuelve al de fabrica: sin guardar, roto, chico o enorme
+  for (const malo of [null, '', 'x', '{}', '{"width":"a","height":200}', '{"width":20,"height":200}', '{"width":5000,"height":200}', '[1,2]']) {
+    assert.deepEqual(pipWindowSize(true, malo), { width: 400, height: 460 }, String(malo));
+  }
+  assert.equal(pipSavedSize({ width: 0, height: 0 }), null); // ventana minimizada
+});
+
+test('pipRequestSize: se pide lo mismo que la ultima vez si se cerro en el mismo modo, asi Chrome la deja donde estaba', () => {
+  const { pipRequestSize } = require('./pure.js');
+  const guardado = '{"width":520,"height":610}';
+  // Primera vez en la pestana: el tamano guardado del modo
+  assert.deepEqual(pipRequestSize(true, guardado, null), { width: 520, height: 610 });
+  // Se cerro con mapa: lo mismo que se pidio (Chrome recuerda por tamano
+  // pedido y devuelve la ventana donde y como la dejo el usuario), aunque se
+  // haya abierto sin mapa
+  const ultima = JSON.stringify({ width: 400, height: 460, closeMap: true });
+  assert.deepEqual(pipRequestSize(true, guardado, ultima), { width: 400, height: 460 });
+  assert.deepEqual(pipRequestSize(true, guardado, { width: 400, height: 160, closeMap: true }), { width: 400, height: 160 });
+  // Cerrada en el otro modo: el guardado del que se abre
+  assert.deepEqual(pipRequestSize(true, guardado, { width: 400, height: 460, closeMap: false }), { width: 520, height: 610 });
+  assert.deepEqual(pipRequestSize(false, null, ultima), { width: 400, height: 160 });
+  // sessionStorage roto: como la primera vez
+  assert.deepEqual(pipRequestSize(true, guardado, '{roto'), { width: 520, height: 610 });
+});
+
 test('createFrameRace: el cuadro sale de la primera ventana que lo da y nunca queda colgado', () => {
   const { createFrameRace } = require('./pure.js');
   // Una ventana de mentira: guarda los pedidos y los cumple con fire()
