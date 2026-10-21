@@ -2239,7 +2239,8 @@ function buildPointGrid(points, cell = 500) {
   }
   return { cell, cells };
 }
-function nearestInGrid(grid, x, z, maxDist) {
+// ok(p), si viene: solo los puntos que cumplen (roadSignForTurn).
+function nearestInGrid(grid, x, z, maxDist, ok = null) {
   if (!grid) return null;
   const { cell, cells } = grid;
   const r = Math.ceil(maxDist / cell), cx = Math.floor(x / cell), cz = Math.floor(z / cell);
@@ -2250,7 +2251,7 @@ function nearestInGrid(grid, x, z, maxDist) {
       if (!a) continue;
       for (const p of a) {
         const d = Math.hypot(p.x - x, p.y - z);
-        if (d < bestD) { bestD = d; best = p; }
+        if (d < bestD && (!ok || ok(p))) { bestD = d; best = p; }
       }
     }
   }
@@ -2265,12 +2266,13 @@ function nearestInGrid(grid, x, z, maxDist) {
 // la ruta estan al costado del camino); un voto por punto y, si empatan, gana
 // la que aparecio primero. Con mas peso en los primeros puntos, un cartel
 // de otra ruta en el cruce le ganaba a la ruta que se sigue 3 km (New
-// Orleans -> Houma: US-51 por la US-61). Votan solo los
+// Orleans -> Houma: US-51 por la US-61). Votaban solo los
 // numeros de ruta (kind 'road', los de ATS): los de destino (kind 'city',
 // todos los de ETS2) no dicen hacia donde miran, y a lo largo de la salida
 // aparecen los de la otra mano, que nombran lo que queda atras ("toward
 // FIRENZE" yendo a Venecia). Para esos, y sin ningun voto, el criterio de
-// antes: el del cruce mismo. pointAt(m): punto de la ruta a m metros del inicio.
+// antes: el del cruce mismo (hasta el 21-10, abajo). pointAt(m): punto de
+// la ruta a m metros del inicio.
 // Con opts.onExit (exitSignTest), un cartel vota solo si es de la salida:
 // el del cruce, o el que queda mas cerca de otra rama, nombra lo que sigue
 // por alla. En la I-80 este de Salt Lake City (ATS, -67313,-16853) el cartel
@@ -2290,27 +2292,63 @@ function nearestInGrid(grid, x, z, maxDist) {
 // en la I-72 al este de Jacksonville (I-72 / US-36 / US-67) empataban los
 // tres y la evidencia daba "onto US-36" (Discord, 20-10). En 450 rutas de
 // ATS cambian 8 nombres, todos de una US a la interestatal del mismo tramo.
+// Cada muestra vota con el cartel mas cercano que es de la salida, no con el
+// mas cercano a secas: si ese era del cruce, de la otra mano o de otra rama,
+// la muestra no votaba aunque a 50 m hubiera uno bueno, y el aviso salia
+// sin nombre (Lafayette -> DeRidder, ATS: el I-10 del puente tapaba los de
+// la US-165). Un cartel vota una vez aunque lo encuentren dos muestras: el
+// del cruce, a 100 m de las de 60 y 150 m, pesaba doble ("Turn right onto
+// I-90 Bus" por la I-25 en Sheridan). En una bifurcacion, los de los
+// primeros ROAD_SIGN_FORK_NEAR_M (onExit.cercaM) votan solo si no voto
+// ninguno de mas adelante: ahi las dos ramas van pegadas y el cartel puede
+// ser de la otra ("Keep right onto I-20" saliendo de la I-20 a la US-59 en
+// Shreveport, como el "I-80" de Salt Lake City). Los de destino (kind
+// 'city', ETS2) ahora votan igual, por cada ciudad del cartel: desde que no
+// votan los de la otra mano, el "toward FIRENZE" de lo que queda atras ya no
+// pasa; el respaldo seguia siendo el mas cercano a cualquier lado y en 300
+// rutas de ETS2 una de cada cuatro ciudades nombradas quedaba atras
+// ("toward TALLINN" saliendo de Tallinn a Kunda). El respaldo de destino
+// tampoco es de la otra mano ni de otra rama (onExit.lado), pero puede
+// estar antes del cruce: el cartel que lo anuncia. Medido en 450 rutas de
+// ATS contra los escudos a la derecha de 0,2 a 3 km despues (sin los keep
+// por carriles), de 448 avisos 266 -> 307 bien, 76 -> 66 mal y 100 -> 69
+// sin nombre (44 mejores, 6 peores: anunciadores de la salida siguiente);
+// en 300 de ETS2, de las ciudades nombradas que se ubican a mas de 1,5 km,
+// 246 -> 306 adelante del rumbo de la ruta y 125 -> 53 atras, con 50
+// avisos mas sin nombre. Con 150 m en vez de 200, 9 peores (los US-20 a
+// 160-190 m de la bifurcacion de la I-35 en Fort Dodge).
 const ROAD_SIGN_SAMPLES_M = [60, 150, 300, 500, 800, 1200];
+const ROAD_SIGN_FORK_NEAR_M = 200;
 // Un cartel por cada escudo de s, con su numero
 const roadSignShields = (s) => (s.labels || [s.label]).map((label) => (label === s.label ? s : { ...s, label }));
 const esInterestatal = (label) => /^I-\d+[A-Z]?$/.test(label);
 function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {}) {
   const radius = opts.radius ?? 200, fallbackRadius = opts.fallbackRadius ?? 400;
+  const salida = opts.onExit || null;
   const votes = new Map(); // en orden de aparicion: un empate lo gana la primera
   const votantes = [];
   let ajenos = 0;
   ROAD_SIGN_SAMPLES_M.forEach((d) => {
     if (fromM + d > totalM) return;
     const p = pointAt(fromM + d);
-    const s = p && nearest(p[0], p[1], radius);
-    if (!s || s.kind !== 'road') return;
-    if (opts.onExit && !opts.onExit(s)) { ajenos++; return; }
-    votantes.push(s);
+    let s = p && nearest(p[0], p[1], radius);
+    if (!s || (s.kind !== 'road' && !(s.kind === 'city' && salida))) return;
+    if (salida && !salida(s)) {
+      const tipo = s.kind, deLaSalida = (c) => c.kind === tipo && salida(c);
+      s = nearest(p[0], p[1], radius, deLaSalida);
+      if (!s || !deLaSalida(s)) { if (tipo === 'road') ajenos++; return; }
+    }
+    if (!votantes.some((o) => o.x === s.x && o.y === s.y)) votantes.push(s);
+  });
+  const cercaM = salida && salida.cercaM;
+  const lejanos = cercaM ? votantes.filter((s) => salida.desdeGiro(s) >= cercaM) : votantes;
+  const usados = lejanos.length ? lejanos : votantes;
+  for (const s of usados) {
     for (const c of roadSignShields(s)) {
       const v = votes.get(c.label);
       if (v) v.score++; else votes.set(c.label, { score: 1, sign: c });
     }
-  });
+  }
   let best = null;
   for (const v of votes.values()) if (!best || v.score > best.score) best = v;
   let empate = best ? [...votes.values()].filter((v) => v.score === best.score) : [];
@@ -2319,7 +2357,7 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
   // cartel grande del juego. Si un mismo cartel trae dos de los empatados
   // (el portico de una bifurcacion), decide labelEvidence.
   const empatados = new Set(empate.map((v) => v.sign.label));
-  const deUnCartel = votantes.some((s) => (s.labels || [s.label]).filter((l) => empatados.has(l)).length > 1);
+  const deUnCartel = usados.some((s) => (s.labels || [s.label]).filter((l) => empatados.has(l)).length > 1);
   if (!deUnCartel && empate.some((v) => esInterestatal(v.sign.label))) {
     empate = empate.filter((v) => esInterestatal(v.sign.label));
     best = empate[0];
@@ -2329,8 +2367,10 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
     for (const v of empate) if ((puntaje.get(v.sign.label) || 0) > (puntaje.get(best.sign.label) || 0)) best = v;
   }
   if (best) return best.sign;
-  if (ajenos) return null;
-  return fallbackXY ? nearest(fallbackXY[0], fallbackXY[1], fallbackRadius) : null;
+  if (ajenos || !fallbackXY) return null;
+  const respaldoOk = salida && salida.lado ? (c) => c.kind !== 'city' || salida.lado(c) : null;
+  const respaldo = nearest(fallbackXY[0], fallbackXY[1], fallbackRadius, respaldoOk);
+  return respaldo && respaldoOk && !respaldoOk(respaldo) ? null : respaldo;
 }
 
 // Si un cartel es de la salida del cruce de nodos i..iEnd de la ruta: el
@@ -2347,8 +2387,8 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
 // costado del camino, y uno de la I-290 a 126 m, junto a la autopista de al
 // lado, nombraba la rampa a la I-90 en Chicago. Devuelve sign -> boolean.
 // Con bearingBetween, tampoco los de la otra mano: a mas de leftM a la
-// izquierda de la ruta (ATS se maneja por la derecha; los kind 'city' de
-// ETS2 no votan). En 100 rutas de ATS, los carteles que votaban quedaban a
+// izquierda de la ruta (ATS se maneja por la derecha; la mano izquierda de
+// ETS2, abajo). En 100 rutas de ATS, los carteles que votaban quedaban a
 // 6-18 m de un lado o del otro, casi ninguno entre -5 y 5, y mas de la mitad
 // a la izquierda. Los de la autopista de enfrente anuncian sus salidas, que
 // son la ruta que se cruza (I-49 y US-71 pasando el trebol de la I-44 en
@@ -2358,8 +2398,21 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
 // es de esta mano (hasta -15 m), pero en el cruce de la rampa con la calle
 // los nodos del prefab son de un sentido aunque la calle sea de doble mano,
 // y con -15 ahi volvia la autopista recien dejada.
-function exitSignTest({ pts, cum, pointAt, bearingBetween, i, at = i, iEnd = i, others = [] }, { pastM = 10, maxDistM = 80, spanM = 1400, stepM = 10, backM = 100, leftM = 5 } = {}) {
+// Desde que votan los de destino de ETS2, donde se maneja por la izquierda
+// (el Reino Unido) la otra mano es la derecha: se ve en la corrida de la
+// ruta dibujada (p[6], + a la derecha), negativa ahi y positiva en el
+// continente y en ATS.
+// cercaM: lo usa roadSignForTurn en las bifurcaciones (test.cercaM y
+// test.desdeGiro, los metros pasado el giro de un cartel). test.lado: si un
+// cartel no es de la otra mano ni de otra rama, este donde este (el respaldo
+// de un cartel de destino puede ser el que anuncia el cruce, antes).
+function exitSignTest({ pts, cum, pointAt, bearingBetween, i, at = i, iEnd = i, others = [] }, { pastM = 10, maxDistM = 80, spanM = 1400, stepM = 10, backM = 100, leftM = 5, cercaM = 0 } = {}) {
   const fin = Math.min(cum[cum.length - 1], cum[iEnd] + spanM);
+  let der = 0, izq = 0;
+  for (let k = i; k < pts.length && cum[k] <= fin; k++) {
+    if (pts[k][6] > 0) der++; else if (pts[k][6] < 0) izq++;
+  }
+  const manoIzquierda = izq > der;
   const ruta = [];
   for (let m = Math.max(0, cum[i] - backM); m <= fin; m += stepM) ruta.push([m, pointAt(m)]);
   const ramas = others.map((rama) => {
@@ -2372,31 +2425,43 @@ function exitSignTest({ pts, cum, pointAt, bearingBetween, i, at = i, iEnd = i, 
     return out;
   });
   // El punto de la linea mas cerca del cartel, y si el cartel queda a mas de
-  // leftM a su izquierda (el rumbo hacia el cartel contra el de la linea ahi)
+  // leftM del lado de la otra mano (el rumbo hacia el cartel contra el de la
+  // linea ahi)
   const cercano = (linea, s) => {
     let mejor = Infinity, j = -1;
     for (let n = 0; n < linea.length; n++) {
       const d = Math.hypot(s.x - linea[n][0], s.y - linea[n][1]);
       if (d < mejor) { mejor = d; j = n; }
     }
-    let izquierda = false;
+    let otraMano = false;
     if (bearingBetween && j >= 0 && linea.length > 1) {
       const a = linea[Math.max(0, j - 1)], b = linea[Math.min(linea.length - 1, j + 1)];
       const lado = normDeg(bearingBetween(linea[j], [s.x, s.y]) - bearingBetween(a, b));
-      izquierda = mejor * Math.sin(lado * Math.PI / 180) < -leftM;
+      const derecha = mejor * Math.sin(lado * Math.PI / 180);
+      otraMano = manoIzquierda ? derecha > leftM : derecha < -leftM;
     }
-    return { mejor, j, izquierda };
+    return { mejor, j, otraMano };
   };
   const lineaRuta = ruta.map((r) => r[1]);
+  const deOtraRama = (s, mejor) => ramas.some((r) => r.some((q) => Math.hypot(s.x - q[0], s.y - q[1]) < mejor));
   const cache = new Map();
   const test = (s) => {
     const key = `${s.x},${s.y},${s.label}`;
     if (cache.has(key)) return cache.get(key);
-    const { mejor, j, izquierda } = cercano(lineaRuta, s);
+    const { mejor, j, otraMano } = cercano(lineaRuta, s);
     const enM = j >= 0 ? ruta[j][0] : -Infinity;
-    const ok = !izquierda && enM > cum[at] + pastM && mejor <= maxDistM && !ramas.some((r) => r.some((q) => Math.hypot(s.x - q[0], s.y - q[1]) < mejor));
+    const ok = !otraMano && enM > cum[at] + pastM && mejor <= maxDistM && !deOtraRama(s, mejor);
     cache.set(key, ok);
     return ok;
+  };
+  test.cercaM = cercaM;
+  test.desdeGiro = (s) => {
+    const { j } = cercano(lineaRuta, s);
+    return j >= 0 ? ruta[j][0] - cum[at] : -Infinity;
+  };
+  test.lado = (s) => {
+    const { mejor, otraMano } = cercano(lineaRuta, s);
+    return !otraMano && !deOtraRama(s, mejor);
   };
   // Para el desempate de roadSignForTurn: por cada numero, cuantos carteles
   // (de las dos manos) hay a menos de maxDistM de la ruta pasado el cruce
@@ -4887,5 +4952,5 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, slowNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
-    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }

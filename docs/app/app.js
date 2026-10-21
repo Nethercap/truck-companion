@@ -2256,10 +2256,11 @@ function updateCurrentRoad(x, z) {
 
 // Con grilla (buildPointGrid en pure.js), que se rearma al cambiar de mapa:
 // la busqueda lineal recorria los 17-54 mil carteles en cada llamada.
+// ok(cartel): solo los que cumplen (roadSignForTurn).
 let roadNameGrid = null, roadNameGridOf = null;
-function nearestRoadName(x, z, maxDist) {
+function nearestRoadName(x, z, maxDist, ok = null) {
   if (roadNameGridOf !== roadNames) { roadNameGrid = buildPointGrid(roadNames, 500); roadNameGridOf = roadNames; }
-  return nearestInGrid(roadNameGrid, x, z, maxDist); // { x, y, label, kind: 'road'|'city' } o null
+  return nearestInGrid(roadNameGrid, x, z, maxDist, ok); // { x, y, label, kind: 'road'|'city' } o null
 }
 
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
@@ -4615,9 +4616,12 @@ function findUpcomingTurn(heading) {
       // "en cada salida") va sin nombre: la ruta sigue por la misma autopista
       // y los carteles que vienen anuncian las salidas ("Keep left onto
       // US-71" en el trebol de la I-44 en Joplin, Discord 20-10).
+      // En una bifurcacion, los carteles pegados al nodo votan solo si no
+      // hay otros (ROAD_SIGN_FORK_NEAR_M): ahi las dos ramas van juntas.
       const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
       const nearSign = m.laneKeep ? null : roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
-        onExit: exitSignTest({ pts, cum, pointAt, bearingBetween, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) }),
+        onExit: exitSignTest({ pts, cum, pointAt, bearingBetween, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) },
+          m.kind === 'fork' ? { cercaM: ROAD_SIGN_FORK_NEAR_M } : undefined),
       });
       // Otra calle hacia el mismo lado antes del giro: la voz dice "turn
       // right" recien despues de pasarla (la distancia es hasta su salida).

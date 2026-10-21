@@ -266,6 +266,19 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   con `labelEvidence` (puede ser el portico de una bifurcacion). En 450
   rutas de ATS cambian 8 nombres, todos de una US a la interestatal del
   mismo tramo; la regla para todo empate cambiaba 43, con 2 peores.
+  Cada muestra vota con el cartel mas cercano que pasa `exitSignTest` (no
+  con el mas cercano a secas: si era de la otra mano tapaba al bueno y el
+  aviso salia sin nombre), un cartel vota una vez aunque lo encuentren dos
+  muestras, y en una bifurcacion los de los primeros
+  `ROAD_SIGN_FORK_NEAR_M` (200 m) votan solo si no voto ninguno de mas
+  adelante ("Keep right onto I-20" saliendo de la I-20 en Shreveport). Los
+  de destino de ETS2 votan igual (`exitSignTest`, con la mano sacada de la
+  corrida `p[6]`: negativa en el Reino Unido) y su respaldo no es de la
+  otra mano (`lado`): una de cada cuatro ciudades nombradas quedaba atras
+  ("toward TALLINN" saliendo de Tallinn). Medido el 21-10: ATS 266 -> 307
+  bien, 76 -> 66 mal, 100 -> 69 sin nombre (de 448); ETS2 125 -> 53 atras,
+  246 -> 306 adelante, 50 avisos mas sin nombre. Las rotondas no pasan por
+  `exitSignTest` (en ETS2 casi no fallan: 6 de 53).
 - Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
   mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).

@@ -2733,8 +2733,8 @@ test('nombre del giro: el de la salida, no un cartel de destino junto al vertice
   assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(g2, x, z, m), null).label, 'A');
   // Cerca del final de la ruta: solo las muestras que entran
   assert.equal(roadSignForTurn(pointAt, 0, 100, nearest, null), null);
-  // Carteles de destino (ETS2): no votan, queda el del cruce aunque mas
-  // adelante haya uno de la otra mano
+  // Carteles de destino (ETS2) sin onExit (rotondas): no votan, queda el del
+  // cruce aunque mas adelante haya uno de la otra mano
   const destinos = buildPointGrid([{ x: 60, y: 20, label: 'Venezia', kind: 'city' },
     { x: 30, y: 600, label: 'Firenze', kind: 'city' }, { x: 30, y: 900, label: 'Firenze', kind: 'city' }]);
   assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(destinos, x, z, m), [0, 20]).label, 'Venezia');
@@ -2758,7 +2758,9 @@ test('nombre del giro: el cartel del cruce o el de la otra rama no nombra la sal
   const grid = buildPointGrid(signs);
   const nearest = (x, z, m) => nearestInGrid(grid, x, z, m);
   const { pointAt, cum } = ctx;
-  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null).label, 'I-80');
+  // Sin onExit, desde el 21-10 tambien la I-84: el del cruce vota una vez
+  // aunque lo encuentren las muestras de 60 y 150 m (antes empataba 2 a 2)
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null).label, 'I-84');
   const onExit = exitSignTest({ ...ctx, iEnd: 1, others });
   assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null, { onExit }).label, 'I-84');
   assert.equal(onExit(signs[0]), false);
@@ -2799,6 +2801,87 @@ test('nombre del giro: no vota el cartel de la otra mano ("Turn left onto I-90" 
   // A 4 m a la izquierda todavia vota: un portico sobre la calzada queda
   // casi en la linea de la ruta
   assert.equal(onExit({ x: -150, y: -4, label: 'US-20', kind: 'road' }), true);
+});
+
+test('nombre del giro: vota el cartel mas cercano que es de la salida, y una vez (Lafayette -> DeRidder y Sheridan, ATS, 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // Dobla a la izquierda, al oeste, en el nodo 1 (como el de la otra mano).
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-60, 0], [-1500, 0]] });
+  const { pointAt, cum } = ctx;
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  // Uno de la otra mano junto a cada muestra tapaba al de la calle nueva, a 40 m
+  const signs = [-60, -150, -300, -500, -800, -1200].map((x) => ({ x, y: -12, label: 'I-10', kind: 'road' }));
+  signs.push({ x: -110, y: 12, label: 'US-165', kind: 'road' });
+  const grid = buildPointGrid(signs);
+  const conFiltro = (x, z, m, ok) => nearestInGrid(grid, x, z, m, ok);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], conFiltro, null, { onExit }).label, 'US-165');
+  // Con un nearest que no filtra, como antes: sin nombre (no vota el rechazado)
+  const sinFiltro = (x, z, m) => nearestInGrid(grid, x, z, m);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], sinFiltro, null, { onExit }), null);
+  // nearestInGrid con ok: el mas cercano que cumple
+  assert.equal(nearestInGrid(grid, -60, 0, 200, (s) => s.label === 'US-165').label, 'US-165');
+  assert.equal(nearestInGrid(grid, -60, 0, 200).label, 'I-10');
+  // Un cartel a 45 m de las muestras de 60 y 150 m votaba dos veces y
+  // empataba con dos de la calle nueva; ahora vota una
+  const dos = buildPointGrid([{ x: -105, y: 10, label: 'I-90 Bus', kind: 'road' },
+    { x: -300, y: 10, label: 'I-25', kind: 'road' }, { x: -500, y: 10, label: 'I-25', kind: 'road' }]);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m, ok) => nearestInGrid(dos, x, z, m, ok), null, { onExit }).label, 'I-25');
+});
+
+test('nombre del giro: en una bifurcacion, el cartel pegado al nodo vota solo si no hay otro ("Keep right onto I-20" en Shreveport, ATS, 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, otherBranchesAt, buildPointGrid, nearestInGrid, ROAD_SIGN_FORK_NEAR_M } = require('./pure.js');
+  // La ruta sale a la derecha por la rampa (nodos 2, 3, 4) y la otra rama
+  // sigue derecho (5, 6, 7). A 60 m del nodo, del lado de la rampa, un
+  // cartel de la autopista que se deja; a 600 m, el de la ruta nueva.
+  const ctx = scenario({ route: [[0, -300], [0, 0], [40, 250], [120, 500], [200, 1500]],
+    extraNodes: [[0, 100], [0, 700], [0, 1500]], edges: [[1, 5], [5, 6], [6, 7]] });
+  const { pointAt, cum } = ctx;
+  const others = otherBranchesAt(ctx);
+  const pegado = { x: 19, y: 58, label: 'I-20', kind: 'road' }, lejos = { x: 140, y: 584, label: 'US-59', kind: 'road' };
+  const nearestDe = (lista) => { const grid = buildPointGrid(lista); return (x, z, m, ok) => nearestInGrid(grid, x, z, m, ok); };
+  const fork = exitSignTest({ ...ctx, iEnd: 1, others }, { cercaM: ROAD_SIGN_FORK_NEAR_M });
+  assert.equal(fork(pegado), true);
+  assert.equal(fork.desdeGiro(pegado) < ROAD_SIGN_FORK_NEAR_M, true);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([pegado, lejos]), null, { onExit: fork }).label, 'US-59');
+  // Sin cercaM (un giro, no una bifurcacion) empatan y gana el primero
+  const giro = exitSignTest({ ...ctx, iEnd: 1, others });
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([pegado, lejos]), null, { onExit: giro }).label, 'I-20');
+  // Si es el unico que vota, nombra igual
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([pegado]), null, { onExit: fork }).label, 'I-20');
+});
+
+test('nombre del giro: los carteles de destino votan si son de la salida ("toward TALLINN" saliendo de Tallinn, ETS2, 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // Dobla a la izquierda, al oeste. Junto al cruce, de la otra mano, el de lo
+  // que queda atras; a 300 m, de esta mano, el de adonde se va.
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-60, 0], [-1500, 0]] });
+  const { pointAt, cum } = ctx;
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  const atras = { x: -100, y: -12, label: 'TALLINN', kind: 'city' }, adelante = { x: -280, y: 12, label: 'KUNDA', kind: 'city' };
+  const nearestDe = (lista) => { const grid = buildPointGrid(lista); return (x, z, m, ok) => nearestInGrid(grid, x, z, m, ok); };
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras, adelante]), [-70, 0], { onExit }).label, 'KUNDA');
+  // Sin onExit (las rotondas) no votan: el respaldo de siempre
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras, adelante]), [-70, 0]).label, 'TALLINN');
+  // El respaldo de destino no es de la otra mano, pero puede estar antes del
+  // cruce: el que lo anuncia, a la derecha de la llegada
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras]), [-70, 0], { onExit }), null);
+  const anuncia = { x: 10, y: -50, label: 'NARVA', kind: 'city' };
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras, anuncia]), [-70, 0], { onExit }).label, 'NARVA');
+  // Los de ruta (ATS) sin votos siguen con el respaldo de antes
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([{ ...atras, kind: 'road', x: -100, y: -300 }]), [-70, 0], { onExit }).label, 'TALLINN');
+});
+
+test('exitSignTest: donde se maneja por la izquierda, la otra mano es la derecha (ETS2, Reino Unido)', () => {
+  const { exitSignTest } = require('./pure.js');
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-60, 0], [-1500, 0]] });
+  const derecha = { x: -300, y: 12, label: 'A', kind: 'city' }, izquierda = { x: -300, y: -12, label: 'B', kind: 'city' };
+  const porDerecha = exitSignTest({ ...ctx, iEnd: 1 });
+  assert.deepEqual([porDerecha(derecha), porDerecha(izquierda)], [true, false]);
+  // La corrida de la ruta dibujada (p[6]) negativa: mano izquierda
+  const pts = ctx.pts.map((p) => { const q = p.slice(); q[6] = -3; return q; });
+  const porIzquierda = exitSignTest({ ...ctx, pts, iEnd: 1 });
+  assert.deepEqual([porIzquierda(derecha), porIzquierda(izquierda)], [false, true]);
+  assert.deepEqual([porIzquierda.lado(derecha), porIzquierda.lado(izquierda)], [false, true]);
 });
 
 test('groupSignsByPoint: los escudos de un mismo cartel quedan juntos', () => {
