@@ -196,6 +196,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.
   Juntar siempre no: mezcla el giro con la curva de la calle de despues.
+  Por los puntos de la curva el tramo puede pasar los 50 m del corte hasta
+  esos 60 m (la cruz de Modesto con dos brazos muertos, 21-10); un tramo sin
+  puntos de curva de 50 m o mas sigue cortando: son dos prefabs.
 - Una bifurcacion se deja al giro que viene a menos de 250 m solo si ese
   giro se anuncia (`turnAfterFork`): la curva callada de una rampa que
   termina en una T sin otra salida tapaba la salida 50 de la I-25 en

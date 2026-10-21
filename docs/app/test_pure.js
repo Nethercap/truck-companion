@@ -2162,9 +2162,19 @@ test('junctionClusterEnd: de punta a punta de la curva de un prefab (curveSpanM,
   const { cum } = routeMetrics(pts);
   assert.equal(jce(pts, cum, 1, 50, 100), 1);          // por defecto la curva corta
   assert.equal(jce(pts, cum, 1, 50, 100, undefined, 60), 4);
-  // a 50 m o mas por la curva ya no es el mismo cruce
-  const lejos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 0, null], [0, 55, 0, 1, 2], [0, 300, 0, 0, 3]];
+  // La curva puede pasar de maxGapM mientras no pase de curveSpanM: la de
+  // 55 m de la cruz de Modesto (ATS, -108128,-6338, simulaciones del 21-10)
+  // partia la esquina en dos mitades calladas
+  const curva55 = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 0, null], [0, 55, 0, 1, 2], [0, 300, 0, 0, 3]];
+  assert.equal(jce(curva55, routeMetrics(curva55).cum, 1, 50, 100, undefined, 60), 3);
+  assert.equal(jce(curva55, routeMetrics(curva55).cum, 1, 50, 100), 1); // sin curveSpanM, como siempre
+  // a mas de 60 m por la curva ya no es el mismo cruce
+  const lejos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 0, null], [0, 65, 0, 1, 2], [0, 300, 0, 0, 3]];
   assert.equal(jce(lejos, routeMetrics(lejos).cum, 1, 50, 100, undefined, 60), 1);
+  // ni 55 m de calle sin puntos de curva: son dos prefabs (Tulsa -> Ardmore,
+  // la T a 59 m de la esquina tomaba el giro de la esquina)
+  const calle = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 55, 0, 1, 2], [0, 300, 0, 0, 3]];
+  assert.equal(jce(calle, routeMetrics(calle).cum, 1, 50, 100, undefined, 60), 1);
   // ni un nodo que, por la curva, deja el cruce en mas de 60 m (dos cruces:
   // uno que se pasa derecho y la esquina, con una curva en S entre los dos)
   const dos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 1, 2], [0, 45, 0, 0, null], [0, 70, 0, 1, 3], [0, 300, 0, 0, 4]];
@@ -2194,6 +2204,27 @@ test('maneuver: T partida por la curva del prefab: el giro y la calle del otro l
   const { iEnd, m } = junctionManeuver({ ...ctx, i: 4, iEnd: 4 }, 50, 100);
   assert.equal(iEnd, 7);
   assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'left', false, 4]);
+});
+
+test('junctionManeuver: la esquina de una cruz con dos brazos muertos y 55 m de curva se avisa (Modesto, 21-10)', () => {
+  // La cruz de Modesto (ATS, -108128,-6338): se entra por el brazo sur (1) y
+  // se sale por el este (2) por una curva de 55 m; los brazos norte (3) y
+  // oeste (4) no tienen calle. Con el corte de 50 m entre nodos la esquina
+  // quedaba en dos mitades calladas y la app decia "Continue straight".
+  const pts = [[0, -300, 0, 0, 0], [0, 0, 0, 1, 1], [4, 17, 0, 0, null], [12, 28, 0, 0, null], [24, 34, 0, 0, null], [35, 35, 0, 1, 2],
+    [300, 35, 0, 0, 6], [600, 35, 0, 0, 7]];
+  const nodes = [[0, -300], [0, 0], [35, 35], [0, 70], [-35, 35], null, [300, 35], [600, 35]];
+  const adjacency = new Map();
+  const add = (a, b) => { if (!adjacency.has(a)) adjacency.set(a, []); adjacency.get(a).push([b]); };
+  for (const [a, b] of [[0, 1], [1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4], [2, 6], [6, 7]]) { add(a, b); add(b, a); }
+  const { cum, pointAt } = routeMetrics(pts);
+  const ctx = { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency };
+  const mitad = (i) => detectManeuver({ ...ctx, i, iEnd: i });
+  assert.ok(!mitad(1) || mitad(1).quiet);
+  assert.ok(!mitad(5) || mitad(5).quiet);
+  const { iEnd, m } = junctionManeuver({ ...ctx, i: 1, iEnd: 1 }, 50, 100);
+  assert.equal(iEnd, 5);
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'right', false, 1]);
 });
 
 test('maneuver: al final de una autovia, volver por la calzada contraria no es una bifurcacion (17-10)', () => {

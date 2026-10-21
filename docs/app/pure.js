@@ -361,17 +361,27 @@ function normDeg(d) { return ((d + 540) % 360) - 180; }
 // falso a 5 m (Discord, 11-10, Lightningroc771).
 // curveSpanM: los puntos de la curva de un prefab (sin nodo) tampoco cortan
 // el grupo, mientras el cruce entero no pase de curveSpanM (el prefab de
-// punta a punta, ver junctionManeuver). Por defecto 0: cortan.
+// punta a punta, ver junctionManeuver). Por defecto 0: cortan. Esa curva
+// puede medir mas que maxGapM: con el corte de 50 m, la de 55 m de una cruz
+// con dos brazos muertos partia la esquina en dos mitades calladas y decia
+// "Continue straight" (Modesto, ATS, -108128,-6338; simulaciones del
+// 21-10). Un tramo sin puntos de curva sigue cortando a maxGapM: es la calle
+// entre dos prefabs, y juntarlos ponia el giro del segundo en el primero
+// (una T a 59 m de la esquina en Tulsa -> Ardmore). En unas 1.100 rutas de
+// ATS y ETS2 (tres semillas) suma 5 avisos y no saca ninguno: esa cruz, una
+// T de San Francisco que se callaba, una Y de Modesto y la primera salida de
+// dos rotondas chicas de ETS2 ("turn right" donde no se decia nada).
 function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM, skip, curveSpanM = 0) {
   const span = maxSpanM != null ? maxSpanM : 100;
+  const gapCurva = Math.max(maxGapM, curveSpanM);
   let j = i;
   for (;;) {
     let n = j + 1;
     if (n === skip && n + 1 < pts.length - 1) n++;
     let curva = false;
-    while (curveSpanM > 0 && n < pts.length - 1 && pts[n][4] == null && cum[n] - cum[j] < maxGapM) { n++; curva = true; }
+    while (curveSpanM > 0 && n < pts.length - 1 && pts[n][4] == null && cum[n] - cum[j] < gapCurva) { n++; curva = true; }
     if (curva && cum[n] - cum[i] > curveSpanM) return j;
-    if (n >= pts.length - 1 || pts[n][3] !== 1 || cum[n] - cum[j] >= maxGapM || cum[n] - cum[i] > span) return j;
+    if (n >= pts.length - 1 || pts[n][3] !== 1 || cum[n] - cum[j] >= (curva ? gapCurva : maxGapM) || cum[n] - cum[i] > span) return j;
     j = n;
   }
 }
