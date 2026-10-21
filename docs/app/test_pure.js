@@ -3939,6 +3939,22 @@ test('startArcForHeading: los carriles de un prefab que todavia no se separan va
   assert.deepEqual(startArcForHeading(g, 50, 0.5, 90).alts, []);
 });
 
+test('routeReachability: una zona sin salida (Volkhov, ETS2) y una sin entrada (Durango, ATS)', () => {
+  const { routeReachability } = require('./pure.js');
+  // 0, 1 y 2 de doble mano (la componente fuerte mayor); 2 -> 3 de una mano
+  // y 3-4 de doble mano: se entra y no se sale. 5 -> 0 de una mano: se sale
+  // y no se entra.
+  const nodos = [[0, 0], [100, 0], [200, 0], [300, 0], [400, 0], [-100, 0]];
+  const { g } = grafoDePrueba(nodos, [
+    { a: 0, b: 1 }, { a: 1, b: 2 }, { a: 2, b: 3, uno: true }, { a: 3, b: 4 }, { a: 5, b: 0, uno: true },
+  ]);
+  const r = routeReachability(g);
+  assert.deepEqual([...r.inMain], [1, 1, 1, 0, 0, 0]);
+  assert.deepEqual([...r.reachFromMain], [1, 1, 1, 1, 1, 0]); // a 5 no se llega
+  assert.deepEqual([...r.reachesMain], [1, 1, 1, 0, 0, 1]); // de 3 y 4 no se sale
+  assert.equal(routeReachability(g), r); // una vez por grafo
+});
+
 test('slowNodes: los nodos de una calle o un prefab, para terminar la ruta en una parada y no en la autopista', () => {
   const { slowNodes, STOP_SLOW_KMH } = require('./pure.js');
   // Autopista 0-1-2 a 90 km/h; del 1 sale la entrada a una estacion (1-3, 40

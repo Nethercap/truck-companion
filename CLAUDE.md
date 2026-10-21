@@ -317,10 +317,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   siendo cierta.
 - Del barrido con simulaciones del 21-10, sin arreglar en la web (piden
   regenerar el grafo o una decision):
-  - Grafo de ETS2: la zona de Volkhov (Rusia, 278 nodos a 6 km de San
-    Petersburgo) no tiene salida: los seis carriles de prefab del borde
-    entran y ninguno sale (cruces cerca de (64750,-59810) y (65218,-56174)).
-    Desde ahi no hay ruta; hacia ahi si. En ATS no hay zonas asi de 20+ nodos.
+  - Zonas del grafo sin salida o sin entrada (carriles de prefab que
+    quedaron de un solo sentido). La peor, Volkhov en ETS2 (289 nodos a 6 km
+    de San Petersburgo, 11 empresas de Volkhov y Kirishi): los seis carriles
+    del borde entran y ninguno sale (cruces cerca de (64750,-59810) y
+    (65218,-56174)). Sin entrada: hs_mkt de Durango (ATS), chm_che_plnt de
+    Chattanooga (Coast to Coast), bn_farm de Mezquital (Reforma); sin salida:
+    Derramadero y Guadalupe y Calvo (Reforma), nbfc de Canterbury (ProMods +
+    RusMap + Roex), Canakkale (Roex). Sin empresas pero en rutas: Folkestone
+    (ProMods, 160 nodos), y en ATS pares de zonas con 1,6 a 2,2 km de
+    autopista a 90 km/h cada una en Champaign, Marion y Effingham (Illinois:
+    los cruces de la I-57 con la I-74, la I-24 y la I-70), que ninguna ruta
+    puede usar. `simular_navegacion` no las ve: listarlas con un analisis de
+    componentes fuertes del grafo. Mientras no se regenere el grafo,
+    `findRouteWith` arranca o termina en el nodo mas cercano del que se sale
+    o al que se llega (`routeReachability`, solo si no hay camino): la ruta
+    empieza hasta 1,4 km mas alla (Kirishi) en vez de no haber ruta.
   - Rotondas compactas de un solo prefab en ETS2: 11 de 29 sin reconocer (las
     curvas internas quedaron de doble mano en el grafo). Lo robusto es que el
     constructor marque los prefabs de rotonda por su nombre.
