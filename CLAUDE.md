@@ -315,6 +315,20 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   apagarlas. Si se agrega, el texto va en todos los idiomas de la app.
 - La guia no menciona las flechas sin aviso; su frase de los carriles sigue
   siendo cierta.
+- Del barrido con simulaciones del 21-10, sin arreglar en la web (piden
+  regenerar el grafo o una decision):
+  - Grafo de ETS2: la zona de Volkhov (Rusia, 278 nodos a 6 km de San
+    Petersburgo) no tiene salida: los seis carriles de prefab del borde
+    entran y ninguno sale (cruces cerca de (64750,-59810) y (65218,-56174)).
+    Desde ahi no hay ruta; hacia ahi si. En ATS no hay zonas asi de 20+ nodos.
+  - Rotondas compactas de un solo prefab en ETS2: 11 de 29 sin reconocer (las
+    curvas internas quedaron de doble mano en el grafo). Lo robusto es que el
+    constructor marque los prefabs de rotonda por su nombre.
+  - Nombres: US en vez de la interestatal en tramos compartidos con un solo
+    cartel de dos escudos (41 casos, Spokane I-90/US-395), "Bus"/"Hist" que
+    le ganan a la ruta numerada (13), y las rotondas sin `exitSignTest`.
+  - "Shortest" en la app con el GPS del juego en "fastest": `routeLikeGame`
+    corre igual y puede cambiar la ruta mas corta por una como la del juego.
 - Propuestas de afuera: pedir el codigo en un repo publico antes de mirar
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.
