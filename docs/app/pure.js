@@ -2235,8 +2235,13 @@ function roadShieldPoints(names, cellM) {
 // entrada por escudo en el mismo punto, y nearestInGrid devolvia siempre la
 // primera del archivo. Cada una lleva en `labels` los numeros de su punto,
 // para que en roadSignForTurn voten todos. Modifica las entradas y devuelve
-// la lista.
+// la lista, sin las que no son un nombre: en el road-names.json de ETS2 hay
+// 399 carteles de velocidad con la clave del juego ("traffic_rule.limit_40")
+// y 4 con un texto sin traducir ("@@fp_de_diesel@@"), y en 300 rutas 18
+// avisos decian "toward traffic_rule.limit_80" (Balcanes, Grecia).
+const signLabelOk = (label) => typeof label === 'string' && !/^traffic_rule\.|^@@.*@@$/.test(label.trim());
 function groupSignsByPoint(signs) {
+  if (Array.isArray(signs) && !signs.every((s) => signLabelOk(s.label))) signs = signs.filter((s) => signLabelOk(s.label));
   const porPunto = new Map();
   for (const s of signs || []) {
     const k = `${s.x},${s.y}`;
@@ -2346,11 +2351,28 @@ const ROAD_SIGN_FORK_NEAR_M = 200;
 // Un cartel por cada escudo de s, con su numero
 const roadSignShields = (s) => (s.labels || [s.label]).map((label) => (label === s.label ? s : { ...s, label }));
 const esInterestatal = (label) => /^I-\d+[A-Z]?$/.test(label);
+// Los escudos de las rutas historicas ("US-66 Hist", tambien pintados en el
+// asfalto) estan en las calles por donde pasaban, junto a los carteles de la
+// ruta de hoy. Votan solo si no voto ninguna otra ruta, y uno solo no
+// alcanza: en 450 rutas de ATS "Turn left onto US-66 Hist" en Kingman (la
+// ruta sigue por la US-93), en Joplin (la US-400) y saliendo de Springfield
+// a Peoria (la I-74). En Portland, de la I-205 a la I-84, "US-30 Hist" pasa
+// a "I-84".
+const esHistorica = (label) => / Hist$/.test(label);
+const ROAD_SIGN_HIST_MIN = 2;
+function sinHistoricas(votantes) {
+  const otros = votantes.filter((s) => (s.labels || [s.label]).some((l) => !esHistorica(l)));
+  if (!otros.length) return votantes.length >= ROAD_SIGN_HIST_MIN ? votantes : [];
+  return otros.map((s) => {
+    const labels = (s.labels || [s.label]).filter((l) => !esHistorica(l));
+    return labels.length === (s.labels || [s.label]).length ? s : { ...s, label: labels[0], labels };
+  });
+}
 function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {}) {
   const radius = opts.radius ?? 200, fallbackRadius = opts.fallbackRadius ?? 400;
   const salida = opts.onExit || null;
   const votes = new Map(); // en orden de aparicion: un empate lo gana la primera
-  const votantes = [];
+  let votantes = [];
   let ajenos = 0;
   ROAD_SIGN_SAMPLES_M.forEach((d) => {
     if (fromM + d > totalM) return;
@@ -2364,6 +2386,10 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
     }
     if (!votantes.some((o) => o.x === s.x && o.y === s.y)) votantes.push(s);
   });
+  // Un escudo historico solo, descartado: sin respaldo (seria el mismo)
+  const conHistoricas = votantes.length;
+  votantes = sinHistoricas(votantes);
+  if (conHistoricas && !votantes.length) ajenos++;
   const cercaM = salida && salida.cercaM;
   const lejanos = cercaM ? votantes.filter((s) => salida.desdeGiro(s) >= cercaM) : votantes;
   const usados = lejanos.length ? lejanos : votantes;
@@ -2389,6 +2415,21 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
   if (empate.length > 1 && opts.onExit && opts.onExit.labelEvidence) {
     const puntaje = opts.onExit.labelEvidence(nearest);
     for (const v of empate) if ((puntaje.get(v.sign.label) || 0) > (puntaje.get(best.sign.label) || 0)) best = v;
+    // Si la evidencia tambien empata y dos carteles o mas traen los dos
+    // escudos, es el tramo compartido y no un portico: gana la interestatal
+    // (I-435 / US-50 en Kansas City, I-82 / US-97 en Yakima, I-69 / US-59 en
+    // Houston). No si entre los empatados esta su "Bus" (el cartel de un
+    // enlace). En 450 rutas de ATS, 7 nombres de una US a la interestatal,
+    // ninguno peor contra los escudos de despues. Con un cartel solo, no: era
+    // el portico de la bifurcacion (Truckee, Cheyenne) o el de la US que se
+    // toma (Fort Smith, Columbia).
+    if (!esInterestatal(best.sign.label)) {
+      const tope = puntaje.get(best.sign.label) || 0;
+      const juntos = (l) => usados.filter((s) => { const ls = s.labels || [s.label]; return ls.includes(l) && ls.includes(best.sign.label); }).length;
+      const tramo = empate.find((v) => esInterestatal(v.sign.label) && (puntaje.get(v.sign.label) || 0) === tope
+        && juntos(v.sign.label) >= 2 && !empate.some((o) => o.sign.label.startsWith(v.sign.label + ' ')));
+      if (tramo) best = tramo;
+    }
   }
   if (best) return best.sign;
   if (ajenos || !fallbackXY) return null;

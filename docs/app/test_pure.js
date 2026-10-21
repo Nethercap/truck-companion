@@ -2923,6 +2923,10 @@ test('groupSignsByPoint: los escudos de un mismo cartel quedan juntos', () => {
   assert.equal(signs[3].labels, undefined);
   assert.doesNotThrow(() => JSON.stringify(signs));
   assert.deepEqual(groupSignsByPoint(null), null);
+  // Las claves del juego de ETS2 no son nombres ("toward traffic_rule.limit_80")
+  const ets2 = groupSignsByPoint([{ x: 1, y: 2, label: 'traffic_rule.limit_80', kind: 'city' }, { x: 3, y: 2, label: '@@fp_de_diesel@@', kind: 'city' },
+    { x: 5, y: 2, label: 'Beograd', kind: 'city' }, { x: 7, y: 2, label: 'c.nuclear', kind: 'city' }]);
+  assert.deepEqual(ets2.map((s) => s.label), ['Beograd', 'c.nuclear']);
 });
 
 test('nombre del giro: el portico con dos escudos de una bifurcacion ("Keep left onto I-94" por la I-90 en Chicago, Discord 20-10)', () => {
@@ -2975,6 +2979,40 @@ test('nombre del giro: en un tramo compartido gana la interestatal ("onto US-36"
   // bifurcacion: ahi decide labelEvidence, como antes (aca, la primera)
   const portico = buildPointGrid(groupSignsByPoint([{ x: 100, y: -10, label: 'US-36', kind: 'road' }, { x: 100, y: -10, label: 'I-72', kind: 'road' }]));
   assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(portico, x, z, m), null, { onExit }).label, 'US-36');
+});
+
+test('nombre del giro: dos carteles o mas con los dos escudos son un tramo compartido (I-435 / US-50 en Kansas City, ATS 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, groupSignsByPoint, buildPointGrid, nearestInGrid } = require('./pure.js');
+  const ctx = scenario({ route: [[0, -300], [0, 0], [60, 0], [1500, 0]] });
+  const { pointAt, cum } = ctx;
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  const cartel = (x, labels) => labels.map((label) => ({ x, y: -10, label, kind: 'road' }));
+  const de = (lista) => { const g = buildPointGrid(groupSignsByPoint(lista)); return (x, z, m) => nearestInGrid(g, x, z, m); };
+  // Dos carteles "US-50 / I-435": empatan en votos y en evidencia, y no es
+  // un portico (son dos): la interestatal
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], de([...cartel(100, ['US-50', 'I-435']), ...cartel(400, ['US-50', 'I-435'])]), null, { onExit }).label, 'I-435');
+  // Si entre los empatados esta la "Bus" de esa interestatal, es el cartel
+  // de un enlace: queda la primera, como antes
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], de([...cartel(100, ['US-50', 'I-435', 'I-435 Bus']), ...cartel(400, ['US-50', 'I-435', 'I-435 Bus'])]), null, { onExit }).label, 'US-50');
+  // Si la US tiene mas votos, gana igual
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], de([...cartel(100, ['US-50', 'I-435']), ...cartel(400, ['US-50', 'I-435']), ...cartel(1300, ['US-50'])]), null, { onExit }).label, 'US-50');
+});
+
+test('nombre del giro: el escudo pintado de la US-66 historica no le gana a la ruta de hoy (Kingman, ATS 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, groupSignsByPoint, buildPointGrid, nearestInGrid } = require('./pure.js');
+  const ctx = scenario({ route: [[0, -300], [0, 0], [60, 0], [1500, 0]] });
+  const { pointAt, cum } = ctx;
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  const de = (lista) => { const g = buildPointGrid(groupSignsByPoint(lista)); return (x, z, m) => nearestInGrid(g, x, z, m); };
+  const hist = (x) => ({ x, y: -10, label: 'US-66 Hist', kind: 'road' });
+  // Dos escudos historicos y un cartel de la US-93: la US-93
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], de([hist(100), hist(400), { x: 700, y: -10, label: 'US-93', kind: 'road' }]), null, { onExit }).label, 'US-93');
+  // En un cartel con los dos, vota por el otro
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], de([hist(100), { x: 100, y: -10, label: 'I-40 Bus', kind: 'road' }]), null, { onExit }).label, 'I-40 Bus');
+  // Uno solo no nombra el aviso, ni por el respaldo (seria el mismo)
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], de([hist(100)]), [100, 0], { onExit }), null);
+  // Dos, sin otra ruta: la calle es la US-66 historica
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], de([hist(100), hist(400)]), null, { onExit }).label, 'US-66 Hist');
 });
 
 // Navegador de mentira para createScreenKeeper: pestana, Wake Lock API con
