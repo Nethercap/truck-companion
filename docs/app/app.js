@@ -4792,24 +4792,47 @@ function pipSupported() {
   return 'documentPictureInPicture' in window;
 }
 
+// El tamano de la ventana flotante con y sin mapa, como lo dejo el usuario
+// (localStorage: sirve para la proxima vez, en otra pestana o despues de
+// reiniciar), y lo que se pidio al abrir la ultima en esta pestana con el
+// modo en que se cerro (sessionStorage: es lo que Chrome recuerda, ver
+// pipRequestSize). Se guarda un rato despues de estirarla.
+const PIP_SIZE_KEYS = { text: 'truckdash_pip_size_text', map: 'truckdash_pip_size_map' };
+const PIP_OPEN_KEY = 'truckdash_pip_open';
+const PIP_SIZE_SAVE_MS = 500;
+const pipSizeKey = (conMapa) => PIP_SIZE_KEYS[conMapa ? 'map' : 'text'];
+function ssGet(key) { try { return sessionStorage.getItem(key); } catch (e) { return null; } }
+function ssSet(key, value) { try { sessionStorage.setItem(key, value); } catch (e) {} }
+
 async function openPip() {
   if (pipWin) { try { pipWin.focus(); } catch (err) { /* nada */ } return; }
   const conMapa = pipMapWanted();
+  const pedido = pipRequestSize(conMapa, lsGet(pipSizeKey(conMapa)), ssGet(PIP_OPEN_KEY));
   let w;
   try {
-    w = await documentPictureInPicture.requestWindow(pipWindowSize(conMapa));
+    w = await documentPictureInPicture.requestWindow(pedido);
   } catch (err) {
     console.error('No se pudo abrir la ventana flotante', err);
     return;
   }
-  setupPipWindow(w, conMapa);
+  setupPipWindow(w, conMapa, pedido);
 }
 
 // Arma la ventana flotante en w (la de Document Picture-in-Picture; las
 // pruebas le pasan la de un iframe, porque el navegador de algunas
 // herramientas no abre ventanas). conMapa: arranca con el mapa adentro.
-function setupPipWindow(w, conMapa) {
+// pedido: el tamano pedido al abrirla (sin el, no se anota para la proxima).
+function setupPipWindow(w, conMapa, pedido = null) {
   pipWin = w;
+  // El tamano que le deja el usuario, para el modo que tiene al estirarla.
+  let guardarTam = null;
+  const guardarTamano = () => {
+    if (guardarTam == null) return;
+    clearTimeout(guardarTam);
+    guardarTam = null;
+    const s = pipSavedSize({ width: w.innerWidth, height: w.innerHeight });
+    if (s) lsSet(pipSizeKey(pipMapOn), JSON.stringify(s));
+  };
   const d = w.document;
   d.title = 'Truck Dash';
   const estilo = d.createElement('style');
@@ -4828,10 +4851,16 @@ function setupPipWindow(w, conMapa) {
       </div>
     </div>`;
   d.getElementById('pModo').addEventListener('click', () => {
+    // resizeTo es de la ventana entera y el tamano guardado es del contenido:
+    // se le suma la barra de arriba, medida antes de cambiar.
+    const marcoW = Math.min(200, Math.max(0, w.outerWidth - w.innerWidth));
+    const marcoH = Math.min(200, Math.max(0, w.outerHeight - w.innerHeight));
+    guardarTamano(); // el del modo que se deja, si recien la estiraron
     if (pipMapOn) pipMapOut(); else pipMapIn();
-    // El clic adentro de la ventana deja cambiarle el tamano
-    const { width, height } = pipWindowSize(pipMapOn);
-    try { w.resizeTo(width, height); } catch (err) { /* el usuario la estira a mano */ }
+    // El clic adentro de la ventana deja cambiarle el tamano: el que tenia
+    // la ultima vez en el modo nuevo
+    const { width, height } = pipWindowSize(pipMapOn, lsGet(pipSizeKey(pipMapOn)));
+    try { w.resizeTo(width + marcoW, height + marcoH); } catch (err) { /* el usuario la estira a mano */ }
   });
   // Arrastrar el mapa adentro de la ventana: el soltar llega a esta ventana
   // y no a la pestana (ver mapPointersDown). Sin esto el seguimiento del
@@ -4840,8 +4869,14 @@ function setupPipWindow(w, conMapa) {
     w.addEventListener(type, (e) => mapPointersDown.delete(e.pointerId), true);
   }
   w.addEventListener('blur', () => mapPointersDown.clear());
-  w.addEventListener('resize', () => { if (pipMapOn && map) map.resize(); });
+  w.addEventListener('resize', () => {
+    if (pipMapOn && map) map.resize();
+    clearTimeout(guardarTam);
+    guardarTam = setTimeout(guardarTamano, PIP_SIZE_SAVE_MS);
+  });
   w.addEventListener('pagehide', () => {
+    guardarTamano();
+    if (pedido) ssSet(PIP_OPEN_KEY, JSON.stringify({ ...pedido, closeMap: pipMapOn }));
     // El mapa vuelve a la pestana antes de que la ventana se destruya; la
     // preferencia queda para la proxima vez que se abra.
     pipMapOut(true);
