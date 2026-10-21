@@ -121,6 +121,27 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   salida y la entrada de un cruce para ahorrar 3 a 50 m, Discord 20-10).
   Andando, la ruta arranca en el tramo del camion en su sentido
   (`startArcForHeading`, `routeStartHeading`), no en el nodo mas cercano.
+  La distancia es a la calzada (la corrida con que se dibuja la arista), no
+  al eje: una autovia de una sola arista de doble mano tiene el eje entre
+  las calzadas y le ganaba un carril de prefab (Grimsby -> Sheffield, ETS2,
+  21-10). Los carriles de un prefab casi a la misma distancia
+  (`START_ARC_TIE_M`) van como alternativas y se sigue por el que da la ruta
+  mas barata. `tools/simular_navegacion.js` cuenta los recalculos malos.
+- Un waypoint puesto tocando el mapa (`waypointPassesBy`: sin nombre ni
+  tipo) es un punto por donde pasar: el tramo termina sobre su calle
+  (`waypointArcs`, `findArcRoute` con `endArcs`), por la calzada que le
+  queda mas a mano, y el siguiente arranca ahi en el mismo sentido
+  (`tramo` de `findRouteWith`, `.llegada`). Con el nodo mas cercano, en una
+  autovia de dos calzadas el tramo iba a la contraria y daba la vuelta: 44
+  de 600 waypoints sobre la ruta la alargaban en ATS, 26 de 589 en ETS2
+  (21-10). En medio de un cruce elige el carril sumando el tramo que sigue.
+  El de un POI (estacion, descanso, empresa) o el del lider del convoy es
+  un lugar al que entrar (`tramo.entrar`, tambien la empresa del trabajo y
+  el `reach` del boton de parada): al nodo mas cercano, pero si ese es de una
+  via rapida, al de una calle o un prefab hasta `STOP_SLOW_NODE_M` mas lejos
+  (`slowNodes`). Con el de la autopista la ruta pasaba de largo de la
+  estacion y la daba por alcanzada (36 de 325 paradas del boton en ATS; asi,
+  1). El centro de una ciudad (destino aproximado) no: cambiaba rutas.
 - La app rutea sola y del GPS del juego solo sabe cuanto falta
   (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
   5 km, con 40 km o mas por delante, `routeGameAgreement`), se buscan hasta 3
@@ -147,6 +168,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   queda: en la I-80 este de Grand Island mandaba al area de la mano oeste
   (Discord, 19-10). Ordenar todo por el camino cambiaba 30 % de las
   elecciones y alargaba muchas: ganaban paradas lejos sobre la ruta.
+  Despues se miran tambien las 8 mas cercanas y las 3 primeras sobre la
+  ruta: gana una que no obliga a volver si cuesta 1 km menos (`near`,
+  `switchM`). Por el rumbo no se veian las de al costado: elegia una a 3,6 km
+  con otra a 546 m (Austin). Dejar ganar a las que obligan a volver subia
+  esas elecciones en ATS.
 - Lo que falta y la distancia al giro se miden sobre la ruta entera
   (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
   sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco
@@ -180,6 +206,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.
   Juntar siempre no: mezcla el giro con la curva de la calle de despues.
+  Por los puntos de la curva el tramo puede pasar los 50 m del corte hasta
+  esos 60 m (la cruz de Modesto con dos brazos muertos, 21-10); un tramo sin
+  puntos de curva de 50 m o mas sigue cortando: son dos prefabs.
 - Una bifurcacion se deja al giro que viene a menos de 250 m solo si ese
   giro se anuncia (`turnAfterFork`): la curva callada de una rampa que
   termina en una T sin otra salida tapaba la salida 50 de la I-25 en
@@ -237,11 +266,30 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   con `labelEvidence` (puede ser el portico de una bifurcacion). En 450
   rutas de ATS cambian 8 nombres, todos de una US a la interestatal del
   mismo tramo; la regla para todo empate cambiaba 43, con 2 peores.
+  Cada muestra vota con el cartel mas cercano que pasa `exitSignTest` (no
+  con el mas cercano a secas: si era de la otra mano tapaba al bueno y el
+  aviso salia sin nombre), un cartel vota una vez aunque lo encuentren dos
+  muestras, y en una bifurcacion los de los primeros
+  `ROAD_SIGN_FORK_NEAR_M` (200 m) votan solo si no voto ninguno de mas
+  adelante ("Keep right onto I-20" saliendo de la I-20 en Shreveport). Los
+  de destino de ETS2 votan igual (`exitSignTest`, con la mano sacada de la
+  corrida `p[6]`: negativa en el Reino Unido) y su respaldo no es de la
+  otra mano (`lado`): una de cada cuatro ciudades nombradas quedaba atras
+  ("toward TALLINN" saliendo de Tallinn). Medido el 21-10: ATS 266 -> 307
+  bien, 76 -> 66 mal, 100 -> 69 sin nombre (de 448); ETS2 125 -> 53 atras,
+  246 -> 306 adelante, 50 avisos mas sin nombre. Las rotondas no pasan por
+  `exitSignTest` (en ETS2 casi no fallan: 6 de 53).
 - Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
   mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
   `stoppedRouteLead` le antepone una entrada sobre el rumbo del camion si el
   nodo esta adelante y la ruta no sale de ahi para atras.
+  Si se recalcula sin desviarse (cambio el destino o un waypoint) y el camion
+  sigue sobre la ruta de antes, se conservan lo recorrido (`routeBehind`) y
+  el rumbo aunque este parado (`recalcOnRoute`): adentro de un cruce la ruta
+  nueva arrancaba sin sus primeros nodos y el giro se perdia (1 de cada 5
+  recalculos a menos de 35 m de un cruce con aviso; asi, 1 de cada 35). No
+  recien calculada en el deposito ni al final del viaje.
 - Lo recorrido (`routeBehind`) incluye el comienzo de la ruta
   (`passedRoutePoints`); el simulador y `check_avisos` lo arman igual.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
@@ -267,6 +315,20 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   apagarlas. Si se agrega, el texto va en todos los idiomas de la app.
 - La guia no menciona las flechas sin aviso; su frase de los carriles sigue
   siendo cierta.
+- Del barrido con simulaciones del 21-10, sin arreglar en la web (piden
+  regenerar el grafo o una decision):
+  - Grafo de ETS2: la zona de Volkhov (Rusia, 278 nodos a 6 km de San
+    Petersburgo) no tiene salida: los seis carriles de prefab del borde
+    entran y ninguno sale (cruces cerca de (64750,-59810) y (65218,-56174)).
+    Desde ahi no hay ruta; hacia ahi si. En ATS no hay zonas asi de 20+ nodos.
+  - Rotondas compactas de un solo prefab en ETS2: 11 de 29 sin reconocer (las
+    curvas internas quedaron de doble mano en el grafo). Lo robusto es que el
+    constructor marque los prefabs de rotonda por su nombre.
+  - Nombres: US en vez de la interestatal en tramos compartidos con un solo
+    cartel de dos escudos (41 casos, Spokane I-90/US-395), "Bus"/"Hist" que
+    le ganan a la ruta numerada (13), y las rotondas sin `exitSignTest`.
+  - "Shortest" en la app con el GPS del juego en "fastest": `routeLikeGame`
+    corre igual y puede cambiar la ruta mas corta por una como la del juego.
 - Propuestas de afuera: pedir el codigo en un repo publico antes de mirar
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.

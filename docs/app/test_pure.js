@@ -1923,6 +1923,27 @@ test('pickFuelStop: el area de descanso de la otra mano o ya pasada no gana a la
   assert.deepEqual([sinCamino.x, sinCamino.why], [600, 'route']);
 });
 
+test('pickFuelStop: con el camino, la de al costado le gana a la de adelante lejos (Austin, ATS)', () => {
+  // Camion en (0,0) yendo al este, ruta que dobla al norte enseguida. Una
+  // estacion a 550 m al sur (al costado, fuera de la ruta: 750 m por el
+  // camino) y otra 3,6 km adelante (5,2 km por el camino). Por el rumbo
+  // ganaba la de adelante.
+  const route = [[0, 0], [200, 0], [200, -6000]];
+  const costado = { x: 100, z: 540, dist: 549 };
+  const adelante = { x: 3600, z: -300, dist: 3612 };
+  const camino = { 100: 750, 3600: 5200 };
+  const reach = (st) => camino[st.x];
+  assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route).x, 3600); // sin el camino
+  const elegida = pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach });
+  assert.deepEqual([elegida.x, elegida.why], [100, 'near']);
+  // Si la de al costado obliga a dar la vuelta (camino de 3 km), queda la de adelante
+  camino[100] = 3000;
+  assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach }).x, 3600);
+  // Y por poco no se cambia (switchM): 3600 contra 4500 de costo
+  camino[100] = 1800; camino[3600] = 2250;
+  assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach }).x, 3600);
+});
+
 test('stopInsertIndex: la parada nueva va primero, no despues del destino (Discord, 13-10)', () => {
   const { stopInsertIndex } = require('./pure.js');
   // Sin trabajo, yendo a un pueblo (waypoint 0) 20 km al norte: un solo tramo
@@ -2162,9 +2183,19 @@ test('junctionClusterEnd: de punta a punta de la curva de un prefab (curveSpanM,
   const { cum } = routeMetrics(pts);
   assert.equal(jce(pts, cum, 1, 50, 100), 1);          // por defecto la curva corta
   assert.equal(jce(pts, cum, 1, 50, 100, undefined, 60), 4);
-  // a 50 m o mas por la curva ya no es el mismo cruce
-  const lejos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 0, null], [0, 55, 0, 1, 2], [0, 300, 0, 0, 3]];
+  // La curva puede pasar de maxGapM mientras no pase de curveSpanM: la de
+  // 55 m de la cruz de Modesto (ATS, -108128,-6338, simulaciones del 21-10)
+  // partia la esquina en dos mitades calladas
+  const curva55 = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 0, null], [0, 55, 0, 1, 2], [0, 300, 0, 0, 3]];
+  assert.equal(jce(curva55, routeMetrics(curva55).cum, 1, 50, 100, undefined, 60), 3);
+  assert.equal(jce(curva55, routeMetrics(curva55).cum, 1, 50, 100), 1); // sin curveSpanM, como siempre
+  // a mas de 60 m por la curva ya no es el mismo cruce
+  const lejos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 0, null], [0, 65, 0, 1, 2], [0, 300, 0, 0, 3]];
   assert.equal(jce(lejos, routeMetrics(lejos).cum, 1, 50, 100, undefined, 60), 1);
+  // ni 55 m de calle sin puntos de curva: son dos prefabs (Tulsa -> Ardmore,
+  // la T a 59 m de la esquina tomaba el giro de la esquina)
+  const calle = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 55, 0, 1, 2], [0, 300, 0, 0, 3]];
+  assert.equal(jce(calle, routeMetrics(calle).cum, 1, 50, 100, undefined, 60), 1);
   // ni un nodo que, por la curva, deja el cruce en mas de 60 m (dos cruces:
   // uno que se pasa derecho y la esquina, con una curva en S entre los dos)
   const dos = [[0, -100, 0, 0, 0], [0, 0, 0, 1, 1], [0, 30, 0, 1, 2], [0, 45, 0, 0, null], [0, 70, 0, 1, 3], [0, 300, 0, 0, 4]];
@@ -2194,6 +2225,27 @@ test('maneuver: T partida por la curva del prefab: el giro y la calle del otro l
   const { iEnd, m } = junctionManeuver({ ...ctx, i: 4, iEnd: 4 }, 50, 100);
   assert.equal(iEnd, 7);
   assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'left', false, 4]);
+});
+
+test('junctionManeuver: la esquina de una cruz con dos brazos muertos y 55 m de curva se avisa (Modesto, 21-10)', () => {
+  // La cruz de Modesto (ATS, -108128,-6338): se entra por el brazo sur (1) y
+  // se sale por el este (2) por una curva de 55 m; los brazos norte (3) y
+  // oeste (4) no tienen calle. Con el corte de 50 m entre nodos la esquina
+  // quedaba en dos mitades calladas y la app decia "Continue straight".
+  const pts = [[0, -300, 0, 0, 0], [0, 0, 0, 1, 1], [4, 17, 0, 0, null], [12, 28, 0, 0, null], [24, 34, 0, 0, null], [35, 35, 0, 1, 2],
+    [300, 35, 0, 0, 6], [600, 35, 0, 0, 7]];
+  const nodes = [[0, -300], [0, 0], [35, 35], [0, 70], [-35, 35], null, [300, 35], [600, 35]];
+  const adjacency = new Map();
+  const add = (a, b) => { if (!adjacency.has(a)) adjacency.set(a, []); adjacency.get(a).push([b]); };
+  for (const [a, b] of [[0, 1], [1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4], [2, 6], [6, 7]]) { add(a, b); add(b, a); }
+  const { cum, pointAt } = routeMetrics(pts);
+  const ctx = { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency };
+  const mitad = (i) => detectManeuver({ ...ctx, i, iEnd: i });
+  assert.ok(!mitad(1) || mitad(1).quiet);
+  assert.ok(!mitad(5) || mitad(5).quiet);
+  const { iEnd, m } = junctionManeuver({ ...ctx, i: 1, iEnd: 1 }, 50, 100);
+  assert.equal(iEnd, 5);
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'right', false, 1]);
 });
 
 test('maneuver: al final de una autovia, volver por la calzada contraria no es una bifurcacion (17-10)', () => {
@@ -2608,6 +2660,22 @@ test('proxima ciudad: la de adelante, no la que acaba de quedar atras', () => {
   assert.equal(nextCityAlongRoute([[0, 0]], [salina], [0, 0]), null);
 });
 
+test('proxima ciudad: pasada una ciudad, una vuelta de la ruta que se le arrima unos metros no la vuelve a hacer proxima (Vancouver, ATS)', () => {
+  const { nextCityAlongRoute } = require('./pure.js');
+  // El camion en (0, 0) se aleja al este de Vancouver (centro a 2,21 km al
+  // oeste); 885 m adelante la ruta serpentea y queda a 2,10 km, y sigue
+  // al este hasta Yakima.
+  const ruta = [[0, 0], [300, 300], [-150, 400], [2000, 600], [5000, 350], [9000, 0]];
+  const vancouver = { Name: 'Vancouver', X: -2213, Y: 0 };
+  const yakima = { Name: 'Yakima', X: 9000, Y: 300 };
+  assert.equal(nextCityAlongRoute(ruta, [vancouver, yakima], [0, 0]), 'Yakima');
+  // Sin el margen salia Vancouver
+  assert.equal(nextCityAlongRoute(ruta, [vancouver, yakima], [0, 0], { approachM: 0 }), 'Vancouver');
+  // Una que la ruta todavia tiene que atravesar sale igual
+  const nephi = { Name: 'Nephi', X: 5000, Y: -200 };
+  assert.equal(nextCityAlongRoute(ruta, [vancouver, nephi, yakima], [0, 0]), 'Nephi');
+});
+
 test('escudos de ruta: uno por ruta y por celda, solo los carteles con numero (Discord, 19-10)', () => {
   const { roadShieldPoints } = require('./pure.js');
   const carteles = [
@@ -2665,8 +2733,8 @@ test('nombre del giro: el de la salida, no un cartel de destino junto al vertice
   assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(g2, x, z, m), null).label, 'A');
   // Cerca del final de la ruta: solo las muestras que entran
   assert.equal(roadSignForTurn(pointAt, 0, 100, nearest, null), null);
-  // Carteles de destino (ETS2): no votan, queda el del cruce aunque mas
-  // adelante haya uno de la otra mano
+  // Carteles de destino (ETS2) sin onExit (rotondas): no votan, queda el del
+  // cruce aunque mas adelante haya uno de la otra mano
   const destinos = buildPointGrid([{ x: 60, y: 20, label: 'Venezia', kind: 'city' },
     { x: 30, y: 600, label: 'Firenze', kind: 'city' }, { x: 30, y: 900, label: 'Firenze', kind: 'city' }]);
   assert.equal(roadSignForTurn(pointAt, 0, 5000, (x, z, m) => nearestInGrid(destinos, x, z, m), [0, 20]).label, 'Venezia');
@@ -2690,7 +2758,9 @@ test('nombre del giro: el cartel del cruce o el de la otra rama no nombra la sal
   const grid = buildPointGrid(signs);
   const nearest = (x, z, m) => nearestInGrid(grid, x, z, m);
   const { pointAt, cum } = ctx;
-  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null).label, 'I-80');
+  // Sin onExit, desde el 21-10 tambien la I-84: el del cruce vota una vez
+  // aunque lo encuentren las muestras de 60 y 150 m (antes empataba 2 a 2)
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null).label, 'I-84');
   const onExit = exitSignTest({ ...ctx, iEnd: 1, others });
   assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null, { onExit }).label, 'I-84');
   assert.equal(onExit(signs[0]), false);
@@ -2731,6 +2801,87 @@ test('nombre del giro: no vota el cartel de la otra mano ("Turn left onto I-90" 
   // A 4 m a la izquierda todavia vota: un portico sobre la calzada queda
   // casi en la linea de la ruta
   assert.equal(onExit({ x: -150, y: -4, label: 'US-20', kind: 'road' }), true);
+});
+
+test('nombre del giro: vota el cartel mas cercano que es de la salida, y una vez (Lafayette -> DeRidder y Sheridan, ATS, 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // Dobla a la izquierda, al oeste, en el nodo 1 (como el de la otra mano).
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-60, 0], [-1500, 0]] });
+  const { pointAt, cum } = ctx;
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  // Uno de la otra mano junto a cada muestra tapaba al de la calle nueva, a 40 m
+  const signs = [-60, -150, -300, -500, -800, -1200].map((x) => ({ x, y: -12, label: 'I-10', kind: 'road' }));
+  signs.push({ x: -110, y: 12, label: 'US-165', kind: 'road' });
+  const grid = buildPointGrid(signs);
+  const conFiltro = (x, z, m, ok) => nearestInGrid(grid, x, z, m, ok);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], conFiltro, null, { onExit }).label, 'US-165');
+  // Con un nearest que no filtra, como antes: sin nombre (no vota el rechazado)
+  const sinFiltro = (x, z, m) => nearestInGrid(grid, x, z, m);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], sinFiltro, null, { onExit }), null);
+  // nearestInGrid con ok: el mas cercano que cumple
+  assert.equal(nearestInGrid(grid, -60, 0, 200, (s) => s.label === 'US-165').label, 'US-165');
+  assert.equal(nearestInGrid(grid, -60, 0, 200).label, 'I-10');
+  // Un cartel a 45 m de las muestras de 60 y 150 m votaba dos veces y
+  // empataba con dos de la calle nueva; ahora vota una
+  const dos = buildPointGrid([{ x: -105, y: 10, label: 'I-90 Bus', kind: 'road' },
+    { x: -300, y: 10, label: 'I-25', kind: 'road' }, { x: -500, y: 10, label: 'I-25', kind: 'road' }]);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m, ok) => nearestInGrid(dos, x, z, m, ok), null, { onExit }).label, 'I-25');
+});
+
+test('nombre del giro: en una bifurcacion, el cartel pegado al nodo vota solo si no hay otro ("Keep right onto I-20" en Shreveport, ATS, 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, otherBranchesAt, buildPointGrid, nearestInGrid, ROAD_SIGN_FORK_NEAR_M } = require('./pure.js');
+  // La ruta sale a la derecha por la rampa (nodos 2, 3, 4) y la otra rama
+  // sigue derecho (5, 6, 7). A 60 m del nodo, del lado de la rampa, un
+  // cartel de la autopista que se deja; a 600 m, el de la ruta nueva.
+  const ctx = scenario({ route: [[0, -300], [0, 0], [40, 250], [120, 500], [200, 1500]],
+    extraNodes: [[0, 100], [0, 700], [0, 1500]], edges: [[1, 5], [5, 6], [6, 7]] });
+  const { pointAt, cum } = ctx;
+  const others = otherBranchesAt(ctx);
+  const pegado = { x: 19, y: 58, label: 'I-20', kind: 'road' }, lejos = { x: 140, y: 584, label: 'US-59', kind: 'road' };
+  const nearestDe = (lista) => { const grid = buildPointGrid(lista); return (x, z, m, ok) => nearestInGrid(grid, x, z, m, ok); };
+  const fork = exitSignTest({ ...ctx, iEnd: 1, others }, { cercaM: ROAD_SIGN_FORK_NEAR_M });
+  assert.equal(fork(pegado), true);
+  assert.equal(fork.desdeGiro(pegado) < ROAD_SIGN_FORK_NEAR_M, true);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([pegado, lejos]), null, { onExit: fork }).label, 'US-59');
+  // Sin cercaM (un giro, no una bifurcacion) empatan y gana el primero
+  const giro = exitSignTest({ ...ctx, iEnd: 1, others });
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([pegado, lejos]), null, { onExit: giro }).label, 'I-20');
+  // Si es el unico que vota, nombra igual
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([pegado]), null, { onExit: fork }).label, 'I-20');
+});
+
+test('nombre del giro: los carteles de destino votan si son de la salida ("toward TALLINN" saliendo de Tallinn, ETS2, 21-10)', () => {
+  const { roadSignForTurn, exitSignTest, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // Dobla a la izquierda, al oeste. Junto al cruce, de la otra mano, el de lo
+  // que queda atras; a 300 m, de esta mano, el de adonde se va.
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-60, 0], [-1500, 0]] });
+  const { pointAt, cum } = ctx;
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  const atras = { x: -100, y: -12, label: 'TALLINN', kind: 'city' }, adelante = { x: -280, y: 12, label: 'KUNDA', kind: 'city' };
+  const nearestDe = (lista) => { const grid = buildPointGrid(lista); return (x, z, m, ok) => nearestInGrid(grid, x, z, m, ok); };
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras, adelante]), [-70, 0], { onExit }).label, 'KUNDA');
+  // Sin onExit (las rotondas) no votan: el respaldo de siempre
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras, adelante]), [-70, 0]).label, 'TALLINN');
+  // El respaldo de destino no es de la otra mano, pero puede estar antes del
+  // cruce: el que lo anuncia, a la derecha de la llegada
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras]), [-70, 0], { onExit }), null);
+  const anuncia = { x: 10, y: -50, label: 'NARVA', kind: 'city' };
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([atras, anuncia]), [-70, 0], { onExit }).label, 'NARVA');
+  // Los de ruta (ATS) sin votos siguen con el respaldo de antes
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearestDe([{ ...atras, kind: 'road', x: -100, y: -300 }]), [-70, 0], { onExit }).label, 'TALLINN');
+});
+
+test('exitSignTest: donde se maneja por la izquierda, la otra mano es la derecha (ETS2, Reino Unido)', () => {
+  const { exitSignTest } = require('./pure.js');
+  const ctx = scenario({ route: [[0, -300], [0, 0], [-60, 0], [-1500, 0]] });
+  const derecha = { x: -300, y: 12, label: 'A', kind: 'city' }, izquierda = { x: -300, y: -12, label: 'B', kind: 'city' };
+  const porDerecha = exitSignTest({ ...ctx, iEnd: 1 });
+  assert.deepEqual([porDerecha(derecha), porDerecha(izquierda)], [true, false]);
+  // La corrida de la ruta dibujada (p[6]) negativa: mano izquierda
+  const pts = ctx.pts.map((p) => { const q = p.slice(); q[6] = -3; return q; });
+  const porIzquierda = exitSignTest({ ...ctx, pts, iEnd: 1 });
+  assert.deepEqual([porIzquierda(derecha), porIzquierda(izquierda)], [false, true]);
+  assert.deepEqual([porIzquierda.lado(derecha), porIzquierda.lado(izquierda)], [false, true]);
 });
 
 test('groupSignsByPoint: los escudos de un mismo cartel quedan juntos', () => {
@@ -3696,6 +3847,28 @@ test('stoppedRouteLead: parado antes de un cruce, la ruta empieza con la entrada
   assert.equal(stoppedRouteLead(ruta, NaN, 5, 0), null);
 });
 
+test('recalcOnRoute: sin desviarse, la ruta nueva sigue con lo recorrido y el rumbo (Tyler -> Lufkin, ATS)', () => {
+  const { recalcOnRoute } = require('./pure.js');
+  // Lo recorrido: 100 m al norte con los nodos de la esquina; la ruta vieja
+  // recortada arranca en el camion y sigue 200 m
+  const behind = [[0, 100, 0, 0, null], [0, 40, 0, 1, 7], [0, 0, 0, 0, null]];
+  const route = [[0, 0, 0, 0, null], [0, -60, 0, 1, 8], [0, -200, 0, 0, 9]];
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: 0, z: 0 }), true);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: 20, z: -5 }), true);
+  // Desviado, o lejos del comienzo de la ruta vieja: de cero, como siempre
+  assert.equal(recalcOnRoute({ offRoute: true, behind, route, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: 60, z: 0 }), false);
+  // Recien calculada parado en el deposito (no anduvo nada), o al final del
+  // viaje (a la ruta vieja no le queda nada): tampoco
+  assert.equal(recalcOnRoute({ offRoute: false, behind: [[0, 10, 0, 0, null], [0, 0, 0, 0, null]], route, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route: [[0, 0], [0, -20]], x: 0, z: 0 }), false);
+  // Sin ruta vieja, sin lo recorrido o sin posicion
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route: null, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind: [], route, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: NaN, z: 0 }), false);
+  assert.equal(recalcOnRoute(), false);
+});
+
 test('startArcForHeading: recalcular andando arranca en la calzada y el sentido del camion', () => {
   const { startArcForHeading } = require('./pure.js');
   // Autovia: calzada al este en z = 0 y al oeste en z = -20, de un sentido,
@@ -3727,6 +3900,101 @@ test('startArcForHeading: recalcular andando arranca en la calzada y el sentido 
   assert.equal(startArcForHeading(g, 500, -6, NaN), null);
   // edgeOk deja afuera lo que no se puede usar (DLC, islas)
   assert.equal(llegaA(startArcForHeading(g, 500, -6, 90, { edgeOk: (e) => e !== 0 })), null);
+});
+
+test('startArcForHeading: en una autovia de una sola arista cuenta la calzada, no el eje (Grimsby -> Sheffield, ETS2)', () => {
+  const { startArcForHeading } = require('./pure.js');
+  // La autovia es una arista de doble mano (0-1) dibujada 6 m a la derecha de
+  // cada sentido; un carril de prefab de un sentido (2-3) pasa a 4 m del eje,
+  // del lado de la calzada que va al este. El camion va al este por su
+  // calzada, a 6 m del eje y a 2 del carril de prefab.
+  const nodos = [[0, 0], [1000, 0], [0, 4], [1000, 4]];
+  const { g } = grafoDePrueba(nodos, [{ a: 0, b: 1 }, { a: 2, b: 3, uno: true }]);
+  g.shiftA = Int8Array.from([12, 0]); g.shiftB = Int8Array.from([12, 0]); // medios metros
+  assert.equal(startArcForHeading(g, 500, 6, 90).to, 1);
+  // La otra mano (al oeste) va 6 m del otro lado: a 6 m al norte del eje, su punta es 0
+  assert.equal(startArcForHeading(g, 500, -6, 270).to, 0);
+  // En Inglaterra la corrida es para la izquierda (negativa): el camion al
+  // este va al norte del eje, y el carril de prefab del sur ya no le gana
+  g.shiftA = Int8Array.from([-12, 0]); g.shiftB = Int8Array.from([-12, 0]);
+  assert.equal(startArcForHeading(g, 500, -6, 90).to, 1);
+  // Sin corrida (grafo v2), el eje como antes: el prefab, mas cerca
+  delete g.shiftA; delete g.shiftB;
+  assert.equal(startArcForHeading(g, 500, 6, 90).to, 3);
+});
+
+test('startArcForHeading: los carriles de un prefab que todavia no se separan van como alternativas', () => {
+  const { startArcForHeading, START_ARC_TIE_M } = require('./pure.js');
+  // Dos carriles que salen juntos y se abren: derecho (0-1) y doblando (0-2,
+  // con la curva pegada al derecho al principio); y una calle a 30 m.
+  const nodos = [[0, 0], [100, 0], [60, 60], [0, 30], [100, 30]];
+  const { g } = grafoDePrueba(nodos, [
+    { a: 0, b: 1, uno: true }, { a: 0, b: 2, uno: true, mids: [[20, 0.5], [40, 8]] }, { a: 3, b: 4, uno: true },
+  ]);
+  const r = startArcForHeading(g, 10, 0.6, 90);
+  assert.equal(r.to, 2); // el de la curva queda mas cerca
+  assert.deepEqual(r.alts.map(c => c.to), [1]);
+  assert.ok(r.alts[0].dist <= r.dist + START_ARC_TIE_M);
+  // Ya separados, una sola
+  assert.deepEqual(startArcForHeading(g, 50, 0.5, 90).alts, []);
+});
+
+test('slowNodes: los nodos de una calle o un prefab, para terminar la ruta en una parada y no en la autopista', () => {
+  const { slowNodes, STOP_SLOW_KMH } = require('./pure.js');
+  // Autopista 0-1-2 a 90 km/h; del 1 sale la entrada a una estacion (1-3, 40
+  // km/h). El 0 y el 2 son solo de autopista; el 1 y el 3, no.
+  const nodos = [[0, 0], [500, 0], [1000, 0], [520, 30]];
+  const aristas = [{ a: 0, b: 1 }, { a: 1, b: 2 }, { a: 1, b: 3 }];
+  const { g } = grafoDePrueba(nodos, aristas);
+  g.edgeM = Float32Array.from([500, 500, 36]);
+  g.edgeS = Uint16Array.from([20, 20, 3]); // 90, 90 y ~43 km/h
+  assert.deepEqual([...slowNodes(g)], [0, 1, 0, 1]);
+  assert.equal(slowNodes(g), slowNodes(g)); // una vez por grafo
+  // Con otro tope se arma de nuevo
+  assert.deepEqual([...slowNodes(g, 95)], [1, 1, 1, 1]);
+  assert.ok(STOP_SLOW_KMH > 60 && STOP_SLOW_KMH < 90);
+});
+
+test('waypointArcs y findArcRoute con endArcs: un waypoint sobre la autovia pasa por su calzada, no por el nodo mas cercano', () => {
+  const { waypointArcs, findArcRoute, waypointPassesBy, WAYPOINT_ARC_M } = require('./pure.js');
+  // Autovia de dos calzadas de una mano, 20 m entre si: la de ida (0 -> 1 ->
+  // 2, al este, z = 0) y la de vuelta (3 -> 4 -> 5, al oeste, z = -20), con
+  // un retorno en cada punta (2 -> 3, 5 -> 0). El nodo 4 (vuelta) queda a 10
+  // m del waypoint y el 1 (ida) a 60: con el nodo mas cercano, la ruta hasta
+  // el waypoint iba hasta la punta, daba la vuelta y volvia por la otra.
+  const nodos = [[0, 0], [550, 0], [1000, 0], [1000, -20], [490, -20], [0, -20], [600, 40]];
+  const aristas = [
+    { a: 0, b: 1, uno: true }, { a: 1, b: 2, uno: true }, { a: 2, b: 3, uno: true },
+    { a: 3, b: 4, uno: true }, { a: 4, b: 5, uno: true }, { a: 5, b: 0, uno: true },
+  ];
+  const { g, opts } = grafoDePrueba(nodos, aristas);
+  g.edgeF = Uint8Array.from(aristas.map(() => 2));
+  g.edgeM = Float32Array.from(aristas.map(e => Math.hypot(nodos[e.a][0] - nodos[e.b][0], nodos[e.a][1] - nodos[e.b][1])));
+  g.edgeS = Uint16Array.from([...g.edgeM].map(m => Math.round(m / 25)));
+  const wp = [490, -3]; // sobre la calzada de ida, a 3 m
+  const arcos = waypointArcs(g, wp[0], wp[1]);
+  // La de ida, y la contraria a los dos lados del nodo 4 (de una mano, para
+  // el otro lado y a la misma velocidad)
+  assert.deepEqual(arcos.map(c => g.adjEdge[c.arc]).sort(), [0, 3, 4]);
+  const ida = arcos.find(c => g.adjEdge[c.arc] === 0);
+  assert.ok(Math.abs(ida.f - 490 / 550) < 1e-6 && ida.dist < 3.01);
+  // Desde 0 por la de ida: termina en el punto del waypoint sobre ella
+  const ruta = findArcRoute(g, 0, -1, { ...opts(1), endArcs: new Map(arcos.map(c => [c.arc, c.f])) });
+  assert.deepEqual([...ruta], [0, 1]);
+  assert.equal(g.adjEdge[ruta.endArc], 0);
+  assert.ok(Math.abs(ruta.cost - 490) < 1e-6);
+  // Lejos de toda calle (un estacionamiento), ninguno: va al nodo mas cercano
+  assert.deepEqual(waypointArcs(g, 600, 40 + WAYPOINT_ARC_M + 30), []);
+  // Sin endArcs, nada cambia: hasta el nodo, y el costo
+  const normal = findArcRoute(g, 0, 2, opts(2));
+  assert.deepEqual([...normal], [0, 1, 2]);
+  assert.equal(normal.endArc, null);
+  assert.ok(Math.abs(normal.cost - 1000) < 1e-6);
+  // Solo el puesto tocando el mapa pasa por la calle; una parada, una empresa o el lider del convoy, no
+  assert.equal(waypointPassesBy({ pos: wp, label: null }), true);
+  assert.equal(waypointPassesBy({ pos: wp, label: 'Gas station (I-80)', kind: 'g' }), false);
+  assert.equal(waypointPassesBy({ pos: wp, label: 'Coastline Mining (Salt Lake City)' }), false);
+  assert.equal(waypointPassesBy(null), false);
 });
 
 test('ruteo: arrancando en el tramo del camion no se da la vuelta en el primer nodo', () => {

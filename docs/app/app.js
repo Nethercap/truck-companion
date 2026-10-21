@@ -2256,10 +2256,11 @@ function updateCurrentRoad(x, z) {
 
 // Con grilla (buildPointGrid en pure.js), que se rearma al cambiar de mapa:
 // la busqueda lineal recorria los 17-54 mil carteles en cada llamada.
+// ok(cartel): solo los que cumplen (roadSignForTurn).
 let roadNameGrid = null, roadNameGridOf = null;
-function nearestRoadName(x, z, maxDist) {
+function nearestRoadName(x, z, maxDist, ok = null) {
   if (roadNameGridOf !== roadNames) { roadNameGrid = buildPointGrid(roadNames, 500); roadNameGridOf = roadNames; }
-  return nearestInGrid(roadNameGrid, x, z, maxDist); // { x, y, label, kind: 'road'|'city' } o null
+  return nearestInGrid(roadNameGrid, x, z, maxDist, ok); // { x, y, label, kind: 'road'|'city' } o null
 }
 
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
@@ -2971,7 +2972,7 @@ function addNearestStop(code) {
   const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
   const rumbo = routeStartHeading(lastData);
   const reach = routeGraph ? (st) => {
-    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo);
+    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo, null, null, { entrar: true });
     if (!r || !r.length) return null;
     let m = 0;
     for (let k = 1; k < r.length; k++) m += Math.hypot(r[k][0] - r[k - 1][0], r[k][1] - r[k - 1][1]);
@@ -3265,8 +3266,9 @@ function buildRouteGraph(g) {
 // sola componente, pero por las dudas se admite cualquiera de este tamano.
 const MIN_REAL_COMPONENT_NODES = 300;
 
-// nodeOk: si viene, solo nodos con algun tramo que se pueda usar (DLC).
-function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeOk = null) {
+// nodeOk: si viene, solo nodos con algun tramo que se pueda usar (DLC); y
+// tambien alsoOk (slowNodes, para terminar en una parada).
+function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeOk = null, alsoOk = null) {
   let best = -1;
   let bestDist = Infinity;
   const nodes = routeGraph.nodes;
@@ -3274,6 +3276,7 @@ function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeO
   const compId = routeGraph.componentId, compSize = routeGraph.componentSize, giant = routeGraph.giantComponent;
   for (let i = 0; i < n; i++) {
     if (nodeOk && !nodeOk[i]) continue;
+    if (alsoOk && !alsoOk[i]) continue;
     const comp = compId[i];
     if (onlyComponent !== -1) {
       if (comp !== onlyComponent) continue;
@@ -3355,17 +3358,18 @@ function dlcFilter(conElecciones) {
 // startHeading: el rumbo del juego si el camion viene andando (ver
 // routeStartHeading); la ruta arranca en su tramo y no da la vuelta.
 // penal: Map arista -> multiplicador del costo, para buscar alternativas
-// (routeLikeGame), y previas, las ya encontradas (ver findRouteWith).
-function findRoute(startXY, endXY, startHeading = null, penal = null, previas = null) {
+// (routeLikeGame), y previas, las ya encontradas; tramo, para pasar por un
+// waypoint (ver findRouteWith).
+function findRoute(startXY, endXY, startHeading = null, penal = null, previas = null, tramo = null) {
   if (!routeGraph) return null;
   const propio = dlcFilter(true);
-  let ruta = findRouteWith(startXY, endXY, propio, startHeading, penal, previas);
+  let ruta = findRouteWith(startXY, endXY, propio, startHeading, penal, previas, tramo);
   if (ruta || !propio) return ruta;
   if (dlcOffFor(dlcGameOf(currentGame)).length) {
-    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading, penal, previas);
+    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading, penal, previas, tramo);
     if (ruta) { ruta.usesUncheckedDlc = true; return ruta; }
   }
-  return findRouteWith(startXY, endXY, null, startHeading, penal, previas);
+  return findRouteWith(startXY, endXY, null, startHeading, penal, previas, tramo);
 }
 
 // Las aristas del grafo de una ruta (sus puntos con indice de nodo) y lo que
@@ -3394,9 +3398,9 @@ function routeSecondsOf(points) {
 // del juego por la I-80 (Salt Lake City, Discord 19-10). Las alternativas
 // (routeAlternatives) se buscan solo si el largo no coincide con el juego.
 // Devuelve { leg, switched }.
-function routeLikeGame(leg, from, to, rumbo, gameKm) {
+function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
   if (!leg || routeGameAgreement(gameKmOf(leg, leg), gameKm) !== 'differ') return { leg, switched: false };
-  const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas), routeEdgesOf);
+  const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas, tramo), routeEdgesOf);
   const k = pickRouteLikeGame(rutas.map(r => ({ km: gameKmOf(r, r), seconds: routeSecondsOf(r) })), gameKm);
   return { leg: rutas[k], switched: k > 0 };
 }
@@ -3423,21 +3427,32 @@ function routeGameRecheck(routeKey, target, data) {
   if (c.ticks < ROUTE_GAME_RECHECK_TICKS) return false;
   c.left = 0;
   const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data);
-  return routeLikeGame(findRoute(from, [target.x, target.z], rumbo), from, [target.x, target.z], rumbo, data.routeDistanceKm).switched;
+  const tramo = { entrar: true }; // gameRouteComparable: una empresa
+  return routeLikeGame(findRoute(from, [target.x, target.z], rumbo, null, null, tramo), from, [target.x, target.z], rumbo, data.routeDistanceKm, tramo).switched;
 }
 
 // El rumbo con que arranca la ruta al recalcular: el del juego, solo si el
 // camion viene andando para adelante. Parado en el deposito el rumbo no dice
-// por donde va a salir: ahi, el nodo mas cercano como siempre.
+// por donde va a salir: ahi, el nodo mas cercano como siempre. Parado sobre
+// la ruta de antes (sobreLaRuta, recalcOnRoute en pure.js) si lo dice.
 const ROUTE_HEADING_MIN_KMH = 15;
-function routeStartHeading(data) {
-  return data && Number.isFinite(data.heading) && Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH ? data.heading : null;
+function routeStartHeading(data, sobreLaRuta = false) {
+  return data && Number.isFinite(data.heading) && (sobreLaRuta || Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH) ? data.heading : null;
 }
 
 // penal y previas: para una alternativa (routeAlternatives), las aristas
 // encarecidas y las rutas ya encontradas, de las que no se desvia por una
 // salida o un area de descanso para volver a entrar (dropRouteDetours).
-function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null, previas = null) {
+// tramo: { entrar } para un lugar al que se entra (una parada, una empresa:
+// el nodo de una calle o un prefab antes que el de la autopista), y en una
+// ruta con waypoints { desde, pasar, siguiente }. pasar: el
+// tramo llega a un waypoint y pasa por el sobre su calle (waypointArcs,
+// pure.js), no por el nodo mas cercano; la ruta devuelta trae en .llegada
+// por donde paso, y el tramo siguiente arranca ahi (desde), en el mismo
+// sentido. siguiente: { xy, pasar } del tramo que sigue, para elegir entre
+// los carriles de un cruce por el que pasa el waypoint. La ruta devuelta
+// trae en .cost lo que cuesta (sin el A* por nodos).
+function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null, previas = null, tramo = null) {
   const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeT, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
   const blocked = filtro ? filtro.blocked : null;
   const nodeOk = filtro ? filtro.nodeOk : null;
@@ -3450,15 +3465,29 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   // (startArcForHeading, pure.js): el nodo mas cercano podia ser de la
   // calzada contraria, de otra rampa o estar a cientos de metros.
   const { componentSize } = routeGraph;
-  const arranque = startHeading != null ? startArcForHeading(routeGraph, startXY[0], startXY[1], startHeading, {
-    edgeOk: (e, a) => (!blocked || !blocked[edgeG[e]]) && componentSize[componentId[a]] >= MIN_REAL_COMPONENT_NODES,
-  }) : null;
+  const arcoOk = (e, a) => (!blocked || !blocked[edgeG[e]]) && componentSize[componentId[a]] >= MIN_REAL_COMPONENT_NODES;
+  let arranque = tramo && tramo.desde ? tramo.desde
+    : startHeading != null ? startArcForHeading(routeGraph, startXY[0], startXY[1], startHeading, { edgeOk: arcoOk }) : null;
   let startIdx = arranque ? arranque.to : nearestNodeIndex(startXY[0], startXY[1], 'real', -1, nodeOk);
   let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real', -1, nodeOk);
   if (startIdx === -1 || endIdx === -1) return null;
   if (componentId[startIdx] !== componentId[endIdx]) {
     endIdx = nearestNodeIndex(endXY[0], endXY[1], false, componentId[startIdx], nodeOk);
     if (endIdx === -1) return null;
+  }
+  const metas = tramo && tramo.pasar
+    ? waypointArcs(routeGraph, endXY[0], endXY[1], { edgeOk: arcoOk }).filter(c => componentId[c.to] === componentId[startIdx]) : [];
+  // Un lugar al que se entra (estacion, area de descanso, empresa) pegado a
+  // una via rapida: el nodo de la autopista dejaba la ruta pasando de largo.
+  // El de una calle o un prefab mas cercano, si no queda mucho mas lejos
+  // (slowNodes, pure.js).
+  if (tramo && tramo.entrar) {
+    const lentos = slowNodes(routeGraph);
+    if (!lentos[endIdx]) {
+      const j = nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, lentos);
+      const dist = (i) => Math.hypot(nodes[2 * i] - endXY[0], nodes[2 * i + 1] - endXY[1]);
+      if (j !== -1 && dist(j) <= dist(endIdx) + STOP_SLOW_NODE_M) endIdx = j;
+    }
   }
 
   // Perfil de ruteo: "fastest" pesa por tiempo (prefiere autopista, como el
@@ -3467,23 +3496,92 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   // recta, a la velocidad maxima posible (90 km/h).
   const byTime = routeProfile !== 'shortest';
   const MAX_SPEED_MS = 90 / 3.6;
-  const ex = nodes[2 * endIdx], ey = nodes[2 * endIdx + 1];
+  // Pasando por un waypoint, la recta hasta el, menos lo que puede quedar
+  // corrido el punto de su calle por donde se pasa
+  let ex = nodes[2 * endIdx], ey = nodes[2 * endIdx + 1], holgura = 0;
+  if (metas.length) {
+    ex = endXY[0]; ey = endXY[1];
+    holgura = Math.max(...metas.map(c => Math.hypot(c.point[0] - ex, c.point[1] - ey)));
+  }
   const heuristic = (i) => {
-    const d = Math.hypot(nodes[2 * i] - ex, nodes[2 * i + 1] - ey);
+    const d = Math.max(0, Math.hypot(nodes[2 * i] - ex, nodes[2 * i + 1] - ey) - holgura);
     return byTime ? d / MAX_SPEED_MS : d * (1 + ROUTE_SHORT_M_PER_S / MAX_SPEED_MS);
   };
 
   // Primero sin vueltas en U en los nodos (findArcRoute, pure.js): A* por
   // aristas. Si asi no hay camino (algun rincon raro del grafo), el A* por
   // nodos de siempre: nunca peor que antes.
-  let path = findArcRoute(routeGraph, startIdx, endIdx, {
-    cost: (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) * (penal ? (penal.get(e) || 1) : 1),
+  const costo = (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) * (penal ? (penal.get(e) || 1) : 1);
+  const finales = metas.length ? new Map(metas.map(c => [c.arc, c.f])) : null;
+  const porAristas = (desde, arco, hasta = finales) => findArcRoute(routeGraph, desde, endIdx, {
+    cost: costo,
     heuristic,
     blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
     isFerry: (e) => (edgeF[e] & 1) === 1,
-    startArc: arranque ? arranque.arc : null,
-  }) || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
+    startArc: arco,
+    endArcs: hasta,
+  });
+  // El waypoint mas adelante en el mismo tramo por el que se arranca (dos
+  // waypoints en la misma arista larga): se llega derecho, sin dar la vuelta
+  const enElTramo = arranque ? metas.find(c => c.arc === arranque.arc && c.f >= arranque.f) : null;
+  if (enElTramo) {
+    const entre = arranque.rest.slice(0, Math.max(0, arranque.rest.length - enElTramo.rest.length));
+    const out = [arranque.point, ...entre, enElTramo.point].map(p => [p[0], p[1], 0, 0, null]);
+    out.llegada = enElTramo;
+    out.cost = (enElTramo.f - arranque.f) * costo(adjEdge[arranque.arc]);
+    return out;
+  }
+  let path = porAristas(startIdx, arranque ? arranque.arc : null);
+  // Andando por carriles de un prefab que todavia no se separan, el camion
+  // esta casi igual de cerca de varios (arranque.alts, startArcForHeading):
+  // sigue por el que da la ruta mas barata, contando lo que falta del tramo.
+  // Con el mas cercano solo, el camion que seguia derecho a veces doblaba
+  // por el otro carril y la ruta daba una vuelta de 1 a 10 km.
+  if (arranque && arranque.alts && arranque.alts.length) {
+    const total = (c, p) => {
+      let t = (1 - c.f) * costo(adjEdge[c.arc]);
+      for (let k = 1; k < p.length; k++) {
+        const ultimo = k === p.length - 1 && p.endArc != null;
+        const d = ultimo ? p.endArc : routeGraph.dirEdge(p[k - 1], p[k]);
+        t += d === -1 ? Infinity : costo(adjEdge[d]) * (ultimo ? finales.get(p.endArc) : 1);
+      }
+      return t;
+    };
+    let mejor = path ? total(arranque, path) : Infinity;
+    for (const c of arranque.alts) {
+      if (componentId[c.to] !== componentId[endIdx]) continue;
+      const p = porAristas(c.to, c.arc);
+      const t = p ? total(c, p) : Infinity;
+      if (t < mejor) { mejor = t; path = p; arranque = c; startIdx = c.to; }
+    }
+  }
+  if (!path && finales) {
+    // Sin camino que pase por la calle del waypoint: al nodo mas cercano, como antes
+    finales.clear();
+    ex = nodes[2 * endIdx]; ey = nodes[2 * endIdx + 1]; holgura = 0;
+    path = porAristas(startIdx, arranque ? arranque.arc : null);
+  }
+  path = path || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
   if (!path) return null;
+  let llegada = path.endArc != null ? metas.find(c => c.arc === path.endArc) || null : null;
+  // Un waypoint en medio de un cruce queda cerca de varios carriles, y el que
+  // se alcanza mas barato puede ser el de otra salida: el tramo siguiente
+  // daba la vuelta (9 de 1.189 waypoints simulados sobre la ruta). Entre ese
+  // y los dos mas cercanos, el que da menos sumando el tramo que sigue.
+  if (llegada && tramo.siguiente) {
+    const probar = [llegada, ...metas.slice(0, 2).filter(c => c !== llegada)];
+    let mejor = null;
+    for (const c of probar) {
+      const p1 = c === llegada ? path : porAristas(startIdx, arranque ? arranque.arc : null, new Map([[c.arc, c.f]]));
+      if (!p1 || p1.endArc == null) continue;
+      const r2 = probar.length > 1
+        ? findRouteWith(endXY, tramo.siguiente.xy, filtro, null, null, null, { desde: c, pasar: tramo.siguiente.pasar }) : null;
+      const t = p1.cost + (r2 && r2.cost != null ? r2.cost : 0);
+      if (probar.length > 1 && !(r2 && r2.cost != null)) continue;
+      if (!mejor || t < mejor.t) mejor = { t, p1, c };
+    }
+    if (mejor) { path = mejor.p1; llegada = mejor.c; }
+  }
   if (previas) {
     const arista = (a, b) => {
       const d = routeGraph.dirEdge(a, b);
@@ -3512,11 +3610,13 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   const out = arranque ? [arranque.point, ...arranque.rest].map(p => [p[0], p[1], 0, 0, null]) : [];
   for (let k = 0; k < path.length; k++) {
     const i = path[k];
+    // Pasando por un waypoint, el ultimo arco llega hasta su punto, no al nodo
+    const hastaWaypoint = llegada && k === path.length - 1;
     let ferry = 0;
     let desde = -1, sIni = 0, sFin = 0;
     if (k > 0) {
       const prev = path[k - 1];
-      const d = routeGraph.dirEdge(prev, i);
+      const d = hastaWaypoint ? llegada.arc : routeGraph.dirEdge(prev, i);
       if (d !== -1) {
         const e = adjEdge[d];
         ferry = edgeF[e] & 1 ? 1 : 0;
@@ -3524,13 +3624,15 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
           desde = out.length - 1;
           sIni = (adjRev[d] ? shiftB[e] : shiftA[e]) / 2;
           sFin = (adjRev[d] ? shiftA[e] : shiftB[e]) / 2;
+          if (hastaWaypoint) sFin = sIni + (sFin - sIni) * llegada.f;
         }
         const m0 = midOff[e], m1 = midOff[e + 1];
-        if (adjRev[d]) { for (let m = m1 - 1; m >= m0; m--) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
+        if (hastaWaypoint) { for (const q of llegada.before) out.push([q[0], q[1], 0, 0, null]); }
+        else if (adjRev[d]) { for (let m = m1 - 1; m >= m0; m--) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
         else { for (let m = m0; m < m1; m++) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
       }
     }
-    out.push([nodes[2 * i], nodes[2 * i + 1], ferry, degree[i] >= 3 ? 1 : 0, i]);
+    out.push(hastaWaypoint ? [llegada.point[0], llegada.point[1], ferry, 0, null] : [nodes[2 * i], nodes[2 * i + 1], ferry, degree[i] >= 3 ? 1 : 0, i]);
     if (desde >= 0) spreadEdgeShift(out, desde, sIni, sFin);
     else if (k === 0 && arranque && shiftA) {
       const e = adjEdge[arranque.arc], r = adjRev[arranque.arc];
@@ -3538,6 +3640,8 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
       spreadEdgeShift(out, 0, sCola + (sPunta - sCola) * arranque.f, sPunta);
     }
   }
+  if (llegada) out.llegada = llegada;
+  if (path.cost != null) out.cost = (arranque ? (1 - arranque.f) * costo(adjEdge[arranque.arc]) : 0) + path.cost;
   return out;
 }
 
@@ -3945,18 +4049,31 @@ function updateDestinationMarker(data) {
     navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;
     navQuietLanesState.shown = null; navQuietLanesState.shownKey = null; navQuietLanesState.candidate = undefined; navQuietLanesState.candidateTicks = 0;
     navQuietLanes = null;
-    routeBehind = [];
+    // Sin desviarse (cambio el destino o un waypoint) el camion sigue sobre
+    // la ruta de antes: lo recorrido y su rumbo siguen valiendo, o el giro
+    // del cruce en el que esta se pierde (recalcOnRoute).
+    const sobreLaRuta = recalcOnRoute({ offRoute, behind: routeBehind, route: currentRouteWorldPoints, x: data.position.x, z: data.position.z });
+    if (!sobreLaRuta) routeBehind = [];
     let routePoints = [];
     let from = [data.position.x, data.position.z];
     let complete = true;
     routeUsesUncheckedDlc = false;
+    let llegada = null;
     legs.forEach((to, legIdx) => {
       // El primer tramo sale del camion: con su rumbo si viene andando.
-      const rumbo = legIdx === 0 ? routeStartHeading(data) : null;
-      let leg = findRoute(from, to, rumbo);
+      const rumbo = legIdx === 0 ? routeStartHeading(data, sobreLaRuta) : null;
+      // Hasta un waypoint, la ruta pasa por el sobre su calle, y el tramo
+      // siguiente sigue desde ahi en el mismo sentido (findRouteWith)
+      // (solo los puestos tocando el mapa: waypointPassesBy). A una parada,
+      // una empresa o la empresa del trabajo se entra (entrar).
+      const pasa = (i) => i < waypoints.length && waypointPassesBy(waypoints[i]);
+      const entra = (i) => (i < waypoints.length ? !pasa(i) : (target.kind === 'dest' || target.kind === 'pickup') && !target.approx);
+      const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
+      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), siguiente });
+      llegada = leg ? leg.llegada || null : null;
       // Casi empatada con otra, la que va por donde el GPS del juego.
       if (leg && legs.length === 1 && gameRouteComparable(target)) {
-        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm);
+        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx) });
         leg = elegida.leg;
         if (elegida.switched) routeGameCheck.left = 0;
       }
@@ -4499,9 +4616,12 @@ function findUpcomingTurn(heading) {
       // "en cada salida") va sin nombre: la ruta sigue por la misma autopista
       // y los carteles que vienen anuncian las salidas ("Keep left onto
       // US-71" en el trebol de la I-44 en Joplin, Discord 20-10).
+      // En una bifurcacion, los carteles pegados al nodo votan solo si no
+      // hay otros (ROAD_SIGN_FORK_NEAR_M): ahi las dos ramas van juntas.
       const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
       const nearSign = m.laneKeep ? null : roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
-        onExit: exitSignTest({ pts, cum, pointAt, bearingBetween, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) }),
+        onExit: exitSignTest({ pts, cum, pointAt, bearingBetween, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) },
+          m.kind === 'fork' ? { cercaM: ROAD_SIGN_FORK_NEAR_M } : undefined),
       });
       // Otra calle hacia el mismo lado antes del giro: la voz dice "turn
       // right" recien despues de pasarla (la distancia es hasta su salida).
