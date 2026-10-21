@@ -1522,7 +1522,7 @@ function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
   const m = detectManeuver(ctx);
   if (m && !m.quiet) return { iEnd: ctx.iEnd, m };
   const iEnd = junctionClusterEnd(pts, cum, i, gapM, spanM, skip, curveSpanM);
-  if (iEnd <= ctx.iEnd) return { iEnd: ctx.iEnd, m };
+  if (iEnd <= ctx.iEnd) return mismaCruz(ctx, { iEnd: ctx.iEnd, m }, gapM, spanM, skip);
   const comoPrev = (x, end) => (x && x.kind === 'turn' ? { direction: x.direction, inBearing: x.inBearing, outBearing: x.outBearing, quiet: x.quiet, end } : null);
   let prev = comoPrev(m, cum[ctx.iEnd]);
   for (let j = ctx.iEnd + 1; j <= iEnd; j++) {
@@ -1539,7 +1539,65 @@ function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
     j = jEnd;
   }
   const todo = detectManeuver({ ...ctx, iEnd, firstRunAt: true });
-  return todo && todo.kind === 'turn' && !todo.quiet ? { iEnd, m: todo } : { iEnd: ctx.iEnd, m };
+  const r = todo && todo.kind === 'turn' && !todo.quiet ? { iEnd, m: todo } : { iEnd: ctx.iEnd, m };
+  return mismaCruz(ctx, r, gapM, spanM, skip);
+}
+
+// Un cruce cuyo grupo de nodos arranca en otro prefab pegado: de punta a
+// punta pasa de curveSpanM, junctionClusterEnd corta entre el nodo por el que
+// se entra y el que se sale, y cada mitad dobla poco y se calla. La esquina
+// de una cruz con dos brazos muertos despues de un rombo decia "Continue
+// straight" donde termina la calle (Davenport -> Quincy, ATS, 22846,-9173: el
+// rombo, 43 m, la cruz y 51 m de curva hasta la salida), y la segunda vuelta
+// de una S, una cruz a 38 m de la T de antes, no se decia (Wenatchee ->
+// Everett, -98451,-65259; asi tambien Yakima -> Portland, una T a 30 m de una
+// cruz). Si la mitad que sigue, a menos de mismaCruzM, se calla (y dobla para
+// el mismo lado que la primera, si esta dobla) y los dos nodos comparten un
+// vecino (los otros brazos se unen a los dos: es el mismo prefab), se mide
+// junto, con el aviso en el nodo de entrada. Si la primera mitad no dobla, el
+// giro se mide desde ese nodo: con la curva de la T de antes en los legM de
+// entrada, la cruz doblaba poco. Sin el vecino comun no: dos prefabs unidos
+// por una calle (la T a 59 m de una esquina en Tulsa -> Ardmore, el cruce
+// chico a 64 m de la esquina en Topeka) ponian el giro en el cruce
+// equivocado. En 900 rutas por juego: ATS +55 avisos en 12 lugares (esquinas
+// de cruz y de T, la segunda vuelta de una S; un "keep left" a una rampa pasa
+// a "turn left"), ETS2 +50 en 14 (3 son rotondas compactas que salen como
+// giro); ninguno de antes se pierde ni se mueve.
+// r: { iEnd, m } de junctionManeuver.
+function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 80, contraMaxDeg = 20) {
+  const { pts, cum, adjacency } = ctx;
+  if (!adjacency || (r.m && (r.m.kind !== 'turn' || !r.m.quiet))) return r;
+  let j = r.iEnd + 1;
+  for (; j < pts.length - 1 && pts[j][3] !== 1; j++) if (pts[j][4] != null) return r; // un nodo de calle en el medio
+  if (j >= pts.length - 1 || cum[j] - cum[r.iEnd] > mismaCruzM) return r;
+  const a = pts[r.iEnd][4], b = pts[j][4];
+  if (a == null || b == null) return r;
+  const vecinos = (n) => {
+    const s = new Set((adjacency.get(n) || []).map(([x]) => x));
+    if (ctx.incoming) for (const x of (ctx.incoming(n) || [])) s.add(x); // los que llegan (incoming del grafo)
+    return s;
+  };
+  const va = vecinos(a), vb = vecinos(b);
+  if (![...va].some(x => x !== b && vb.has(x))) return r;
+  const jEnd = junctionClusterEnd(pts, cum, j, gapM, spanM, skip);
+  const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd });
+  if (!mj || mj.kind !== 'turn' || !mj.quiet || (r.m && mj.direction !== r.m.direction)) return r;
+  // Y la curva de una mitad a la otra dobla para un solo lado: en una rotonda
+  // chica que el grafo no reconoce se entra a la derecha, se rodea la isla a
+  // la izquierda y se sale, y a la 2.a salida decia "turn right" (Oslo, ETS2,
+  // 1888,-53484: 54 grados para el otro lado).
+  const { bearingBetween } = ctx;
+  let contra = 0;
+  for (let k = r.iEnd + 1; k <= j; k++) {
+    const t = normDeg(bearingBetween(pts[k], pts[k + 1]) - bearingBetween(pts[k - 1], pts[k]));
+    if ((mj.direction === 'right') !== (t > 0)) contra += Math.abs(t);
+  }
+  if (contra > contraMaxDeg) return r;
+  // El giro, en el ultimo nodo de la primera mitad (donde empieza la esquina).
+  // Por el nodo de mas giro, con el camion adentro del cruce (o encima de un
+  // nodo) el aviso saltaba de un nodo a otro y volvia.
+  const juntos = detectManeuver({ ...ctx, i: r.m ? ctx.i : r.iEnd, iEnd: jEnd });
+  return juntos && juntos.kind === 'turn' && !juntos.quiet && juntos.direction === mj.direction ? { iEnd: jEnd, m: { ...juntos, at: r.iEnd } } : r;
 }
 
 // Si a menos de legM despues de una bifurcacion (el cruce que termina en
