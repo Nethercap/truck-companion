@@ -177,13 +177,21 @@ class AppState:
                                "items": overlay.ITEMS, "pos": None, "opacity": overlay.DEFAULT_OPACITY}
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
-                                                T("overlay_arrival_game"), T("overlay_turn_hint")))
+                                                T("overlay_arrival_game"), self.aviso_giro()))
         # Arrastrado en el modo Mover: queda en esa posicion; estirado desde
         # la esquina o con la rueda, con ese tamano.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))
         self.overlay.al_redimensionar = lambda tamano: set_overlay_layout(size=tamano)
         # Tecla rapida que prende y apaga el overlay desde el juego.
         self.overlay_tecla = overlay.TeclaRapida(lambda: tecla_del_overlay())
+
+    def aviso_giro(self) -> str:
+        """La pista del overlay sin tablero, con la tecla que lo esconde: el
+        overlay prendido sin tablero quedaba en el juego y no se sabia como
+        sacarlo (Discord, 21-10)."""
+        texto = T("overlay_turn_hint")
+        tecla = getattr(getattr(self, "overlay_tecla", None), "actual", "")
+        return f"{texto} {T('overlay_hide_hint', combo=overlay.nombre_tecla(tecla))}" if tecla else texto
 
     def status_text(self) -> str:
         text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
@@ -1403,29 +1411,33 @@ def show_log_location(icon, item):
         pass
 
 
-def apagar() -> None:
+def apagar(icono=None) -> None:
     """Cierra la aplicacion desde cualquier hilo.
 
-    quit_app sirve solo desde el menu de la bandeja (recibe el icono). Esto
-    lo llama tambien el loop de telemetria, que corre en el hilo de asyncio,
-    y tiene que funcionar igual sin bandeja (Linux sin GTK).
+    Lo llaman "Salir" de la bandeja (quit_app, con su icono) y el loop de
+    telemetria, que corre en el hilo de asyncio; tiene que funcionar igual
+    sin bandeja (Linux sin GTK).
     """
+    # El overlay del juego es un hilo de este proceso: se esconde ya (sin
+    # tocar el ajuste guardado). Mientras el proceso terminaba seguia en el
+    # juego con datos en vivo, y sin el icono de la bandeja no habia como
+    # sacarlo (Discord, 21-10: "I can't get rid of the old overlay").
+    state.overlay.set_enabled(False)
     # Antes de irse: la sesion de manejo se cierra y queda en la cola.
     # Lo que no se llegue a mandar sale en el proximo arranque.
-    state.cuenta.cerrar_sesion()
-    state.discord.close()
-    icono = state.icon
-    win_integration.stop_and_exit(icono.stop if icono is not None else None)
-
-
-def quit_app(icon, item):
-    # Salir de la bandeja tambien termina la sesion de manejo, igual que
-    # apagar(); sin esto quedaba abierta en el servidor para siempre.
     state.cuenta.cerrar_sesion()
     # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
     # que el proceso murio.
     state.discord.close()
-    icon.stop()
+    icono = icono if icono is not None else state.icon
+    win_integration.stop_and_exit(icono.stop if icono is not None else None)
+
+
+def quit_app(icon, item):
+    # Lo mismo que apagar(), con el cierre forzado a los 5 s de
+    # stop_and_exit. Antes solo paraba el icono y sys.exit esperaba a los
+    # hilos del cliente: el icono se iba y el proceso, con el overlay, seguia.
+    apagar(icon)
 
 
 _browser_opened = False
@@ -2298,11 +2310,19 @@ def main():
         win_integration.stop_and_exit()
         return
 
+    # El inicio con Windows apuntando a otra copia (la version nueva bajada a
+    # otra carpeta): desde ahora arranca esta.
+    otra_copia = win_integration.refresh_autostart_path()
+
     # Issue #4: una sola instancia. Un segundo doble clic trae al frente la
     # ventana de la que ya esta corriendo, que es lo que espera cualquiera.
+    # Si la que corre es esa otra copia, abrir su ventana confundia (se
+    # cambiaban los ajustes de la vieja): se dice cual cerrar.
     if not win_integration.acquire_single_instance(wait_seconds=12.0 if args.relaunch else 0.0):
-        logging.info("Ya hay una instancia corriendo, se le pide que muestre la ventana")
-        if not _focus_running_instance():
+        logging.info("Ya hay una instancia corriendo%s", f" (el inicio con Windows era {otra_copia})" if otra_copia else ", se le pide que muestre la ventana")
+        if otra_copia:
+            _message_box(T("other_copy_running", path=otra_copia))
+        elif not _focus_running_instance():
             _message_box(T("already_running"))
         return
 
