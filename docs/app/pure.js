@@ -4384,9 +4384,22 @@ function createNumberHeap() {
 // derecho (Fort Dodge, ATS; 589 V en 943 rutas simuladas, 15-10). Un
 // milisegundo por metro desempata por la mas corta sin cambiar el tiempo, y
 // la heuristica por tiempo sigue admisible: el costo solo sube.
+// "Mas corta" con los metros solos salia de la autopista por un area de
+// descanso o por la salida y la entrada de un cruce si cortaban la curva
+// por adentro: 7 m menos y 2 s mas de Stockton a Reno, 3 m y 10 s de
+// Jefferson City a East St. Louis (ATS; Discord 20-10). Cada segundo
+// cuenta como ROUTE_SHORT_M_PER_S metros: un tramo a 40 km/h (un prefab,
+// una rampa) tiene que ser 15 % mas corto que la autopista, y uno a
+// 60 km/h, 7 %. En 150 rutas de ATS, los desvios de la mas rapida de menos
+// de 1,5 km que ahorran menos de 5 % pasan de 37 a 10 (quedan otro carril
+// del mismo cruce o atajos de 15 a 40 m) y ninguna ruta se alarga 0,5 %;
+// en ETS2, de 32 a 17 (calles a 60 km/h) y 2 de 150 se alargan, la que
+// mas 1,2 %. Con 5 m por segundo ya se alargan rutas de ATS (2 de 150,
+// hasta 2,4 %). La heuristica (la recta, a 90 km/h) sigue admisible.
 const ROUTE_TIE_S_PER_M = 1e-3;
+const ROUTE_SHORT_M_PER_S = 4;
 function routeEdgeCost(seconds, meters, byTime) {
-  return byTime ? seconds + meters * ROUTE_TIE_S_PER_M : meters;
+  return byTime ? seconds + meters * ROUTE_TIE_S_PER_M : meters + seconds * ROUTE_SHORT_M_PER_S;
 }
 
 // Si nuestra ruta y la del GPS del juego son la misma, por lo que falta en
@@ -4430,7 +4443,8 @@ function pickRouteLikeGame(candidates, gameKm, o = ROUTE_GAME_MATCH) {
 
 // Rutas alternativas para pickRouteLikeGame: cada una con las aristas de la
 // anterior encarecidas (factor, acumulado). first: la ruta ya calculada.
-// route(penal): la ruta con penal (Map arista -> multiplicador del costo).
+// route(penal, previas): la ruta con penal (Map arista -> multiplicador del
+// costo); previas son las rutas ya encontradas, para dropRouteDetours.
 // edgesOf(ruta): sus aristas. Puede repetir rutas.
 function routeAlternatives(first, route, edgesOf, { tries = 3, factor = 1.25 } = {}) {
   const out = [first];
@@ -4438,10 +4452,70 @@ function routeAlternatives(first, route, edgesOf, { tries = 3, factor = 1.25 } =
   let prev = first;
   for (let k = 0; k < tries && prev; k++) {
     for (const e of edgesOf(prev)) penal.set(e, (penal.get(e) || 1) * factor);
-    prev = route(penal);
+    prev = route(penal, out.slice());
     if (prev) out.push(prev);
   }
   return out;
+}
+
+// Con la autopista de la ruta anterior encarecida, a una alternativa le
+// salia mas barato bajarse por la salida y volver a subir por la entrada, o
+// pasar por un area de descanso, que seguir derecho: la I-15 en la salida
+// 385, camino a Ogden (Discord, 20-10). Y esos desvios le suman largo: por
+// ellos la alternativa podia coincidir con el GPS del juego y ganar
+// (pickRouteLikeGame). En 60 rutas de ATS, 3 alternativas cada una: unos
+// 1.000 desvios de menos de 100 m (otro carril del mismo cruce) y 500 de
+// 100 m a 1 km (salidas, areas de descanso); de 1 a 1,5 km, 28, y de ahi en
+// mas otro camino de verdad. ETS2 igual.
+// path y ref: indices de nodo de la alternativa y de una ruta anterior.
+// Donde path deja a ref (llegando por la misma arista) y vuelve a ella mas
+// adelante (siguiendo por la misma arista, o en el final), sin que ref
+// mida mas de maxM entre esos nodos ni el desvio cueste menos: el tramo de
+// ref. Si sale y vuelve varias veces seguidas, hasta la vuelta en que sigue
+// por ref. edge(a, b): { m, cost } de la arista de a a b (costo sin
+// encarecer), o null. Devuelve los nodos (path si no cambia nada).
+const ROUTE_DETOUR_MAX_M = 1500;
+function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
+  if (!path || !ref || path.length < 3 || ref.length < 2) return path;
+  const pos = new Map();
+  ref.forEach((n, i) => pos.set(n, pos.has(n) ? -1 : i)); // -1: pasa dos veces
+  const tramo = (ns, a, b) => {
+    let m = 0, cost = 0;
+    for (let k = a + 1; k <= b; k++) {
+      const x = edge(ns[k - 1], ns[k]);
+      if (!x) return null;
+      m += x.m; cost += x.cost;
+    }
+    return { m, cost };
+  };
+  const out = [path[0]];
+  let cambio = false;
+  for (let s = 0; s < path.length - 1;) {
+    const ps = pos.get(path[s]);
+    const antes = out.length > 1 ? out[out.length - 2] : null;
+    let fin = -1;
+    if (ps >= 0 && ref[ps + 1] !== path[s + 1] && (antes === null ? ps === 0 : ref[ps - 1] === antes)) {
+      for (let t = s + 1; t < path.length; t++) {
+        const pt = pos.get(path[t]);
+        if (pt === undefined) continue;
+        if (pt <= ps) break;
+        if (t === path.length - 1 ? pt === ref.length - 1 : ref[pt + 1] === path[t + 1]) { fin = t; break; }
+      }
+    }
+    if (fin !== -1) {
+      const pt = pos.get(path[fin]);
+      const desvio = tramo(path, s, fin), recto = tramo(ref, ps, pt);
+      if (desvio && recto && recto.m <= maxM && desvio.cost >= recto.cost) {
+        for (let k = ps + 1; k <= pt; k++) out.push(ref[k]);
+        s = fin;
+        cambio = true;
+        continue;
+      }
+    }
+    out.push(path[s + 1]);
+    s++;
+  }
+  return cambio ? out : path;
 }
 
 // El tramo por el que va el camion, para arrancar ahi la ruta al recalcular
@@ -4611,6 +4685,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }
