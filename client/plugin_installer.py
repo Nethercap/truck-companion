@@ -43,7 +43,7 @@ PLUGIN_DLL_SHA256 = "de81c1a25856d2f83a956feb06842ddfcd23788d6eb32d3a7584bcda4bf
 # plugin/build.sh). Vacio hasta la primera compilacion; el cliente todavia no
 # la instala (soporte de macOS, PR #87).
 PLUGIN_DYLIB_NAME = "truckdash-telemetry.dylib"
-PLUGIN_DYLIB_SHA256 = ""
+PLUGIN_DYLIB_SHA256 = "07434fb806e13a56824350cad12f605189a510af65e618d1f49c9262f169a404"
 
 GAMES = {
     "ets2": "Euro Truck Simulator 2",
