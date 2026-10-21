@@ -2257,13 +2257,19 @@ function nearestInGrid(grid, x, z, maxDist) {
 // compartido, US-89 / US-12), el que aparecio primero. El portico "I-94 /
 // I-90" de la bifurcacion de la Kennedy en Chicago es de las dos ramas, y
 // por ser el primero del archivo la I-94 nombraba la que sigue por la I-90
-// (Discord, 20-10).
+// (Discord, 20-10). Antes que eso, un empate entre carteles distintos lo
+// gana la interestatal: en un tramo compartido cada escudo va en su cartel y
+// en la I-72 al este de Jacksonville (I-72 / US-36 / US-67) empataban los
+// tres y la evidencia daba "onto US-36" (Discord, 20-10). En 450 rutas de
+// ATS cambian 8 nombres, todos de una US a la interestatal del mismo tramo.
 const ROAD_SIGN_SAMPLES_M = [60, 150, 300, 500, 800, 1200];
 // Un cartel por cada escudo de s, con su numero
 const roadSignShields = (s) => (s.labels || [s.label]).map((label) => (label === s.label ? s : { ...s, label }));
+const esInterestatal = (label) => /^I-\d+[A-Z]?$/.test(label);
 function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {}) {
   const radius = opts.radius ?? 200, fallbackRadius = opts.fallbackRadius ?? 400;
   const votes = new Map(); // en orden de aparicion: un empate lo gana la primera
+  const votantes = [];
   let ajenos = 0;
   ROAD_SIGN_SAMPLES_M.forEach((d) => {
     if (fromM + d > totalM) return;
@@ -2271,6 +2277,7 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
     const s = p && nearest(p[0], p[1], radius);
     if (!s || s.kind !== 'road') return;
     if (opts.onExit && !opts.onExit(s)) { ajenos++; return; }
+    votantes.push(s);
     for (const c of roadSignShields(s)) {
       const v = votes.get(c.label);
       if (v) v.score++; else votes.set(c.label, { score: 1, sign: c });
@@ -2278,7 +2285,17 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
   });
   let best = null;
   for (const v of votes.values()) if (!best || v.score > best.score) best = v;
-  const empate = best ? [...votes.values()].filter((v) => v.score === best.score) : [];
+  let empate = best ? [...votes.values()].filter((v) => v.score === best.score) : [];
+  // Empate de carteles distintos, cada uno de la salida: la ruta lleva todos
+  // esos numeros (un tramo compartido) y gana la interestatal, como en el
+  // cartel grande del juego. Si un mismo cartel trae dos de los empatados
+  // (el portico de una bifurcacion), decide labelEvidence.
+  const empatados = new Set(empate.map((v) => v.sign.label));
+  const deUnCartel = votantes.some((s) => (s.labels || [s.label]).filter((l) => empatados.has(l)).length > 1);
+  if (!deUnCartel && empate.some((v) => esInterestatal(v.sign.label))) {
+    empate = empate.filter((v) => esInterestatal(v.sign.label));
+    best = empate[0];
+  }
   if (empate.length > 1 && opts.onExit && opts.onExit.labelEvidence) {
     const puntaje = opts.onExit.labelEvidence(nearest);
     for (const v of empate) if ((puntaje.get(v.sign.label) || 0) > (puntaje.get(best.sign.label) || 0)) best = v;

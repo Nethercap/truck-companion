@@ -2769,6 +2769,33 @@ test('nombre del giro: el portico con dos escudos de una bifurcacion ("Keep left
   assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(buildPointGrid(portico), x, z, m), null, { onExit }).label, 'I-94');
 });
 
+test('nombre del giro: en un tramo compartido gana la interestatal ("onto US-36" por la I-72 en Jacksonville, Discord 20-10)', () => {
+  const { roadSignForTurn, exitSignTest, groupSignsByPoint, buildPointGrid, nearestInGrid } = require('./pure.js');
+  // La ruta llega del norte al nodo 1 y sigue al este por la autopista. A la
+  // derecha, un escudo de la US-36 y despues uno de la I-72: dos votos cada
+  // uno, y la US-36 aparecio primero.
+  const ctx = scenario({ route: [[0, -300], [0, 0], [60, 0], [1500, 0]] });
+  const { pointAt, cum } = ctx;
+  const onExit = exitSignTest({ ...ctx, iEnd: 1 });
+  const separados = [{ x: 100, y: -10, label: 'US-36', kind: 'road' }, { x: 400, y: -10, label: 'I-72', kind: 'road' }];
+  const grid = buildPointGrid(separados);
+  const nearest = (x, z, m) => nearestInGrid(grid, x, z, m);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], nearest, null, { onExit }).label, 'I-72');
+  // Con una I- con letra tambien (I-35E con la US-77 en Dallas)
+  const conLetra = buildPointGrid([separados[0], { ...separados[1], label: 'I-35E' }]);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(conLetra, x, z, m), null, { onExit }).label, 'I-35E');
+  // Una Bus de interestatal es una calle: no le gana a la US (empate, la primera)
+  const bus = buildPointGrid([separados[0], { ...separados[1], label: 'I-72 Bus' }]);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(bus, x, z, m), null, { onExit }).label, 'US-36');
+  // Si la US tiene mas votos, gana igual
+  const masUS = buildPointGrid([...separados, { x: 800, y: -10, label: 'US-36', kind: 'road' }]);
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(masUS, x, z, m), null, { onExit }).label, 'US-36');
+  // Un solo cartel con los dos escudos puede ser el portico de una
+  // bifurcacion: ahi decide labelEvidence, como antes (aca, la primera)
+  const portico = buildPointGrid(groupSignsByPoint([{ x: 100, y: -10, label: 'US-36', kind: 'road' }, { x: 100, y: -10, label: 'I-72', kind: 'road' }]));
+  assert.equal(roadSignForTurn(pointAt, cum[1], cum[cum.length - 1], (x, z, m) => nearestInGrid(portico, x, z, m), null, { onExit }).label, 'US-36');
+});
+
 // Navegador de mentira para createScreenKeeper: pestana, Wake Lock API con
 // pedidos que el test resuelve a mano, y videos.
 function navegadorFalso({ api = true } = {}) {

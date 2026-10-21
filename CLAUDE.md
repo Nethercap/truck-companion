@@ -222,6 +222,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   bifurcacion de la Kennedy, que es la I-90 (Discord, 20-10). En las mismas
   450 rutas: 175 nombres cambian, 163 entre numeros de un mismo cartel; en
   los que se pueden juzgar, 509 -> 521 bien y 83 -> 71 mal.
+  Un empate entre carteles distintos (cada uno paso `exitSignTest`) es un
+  tramo compartido y gana la interestatal (I-35E si, I-72 Bus no), antes de
+  `labelEvidence`: "onto US-36" por la I-72 / US-36 / US-67 al este de
+  Jacksonville (Discord, 20-10). Un solo cartel con los dos escudos sigue
+  con `labelEvidence` (puede ser el portico de una bifurcacion). En 450
+  rutas de ATS cambian 8 nombres, todos de una US a la interestatal del
+  mismo tramo; la regla para todo empate cambiaba 43, con 2 peores.
 - Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
   mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
