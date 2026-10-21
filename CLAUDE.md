@@ -222,6 +222,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   21-10). Sin el vecino comun ponia el giro en otro cruce (Tulsa -> Ardmore,
   Topeka). En 900 rutas por juego: +55 avisos en ATS, +50 en ETS2, ninguno
   perdido ni movido.
+  Tambien cuando ninguna mitad llega al umbral (35 grados) y juntas si: la
+  cruz de Idaho Falls (ATS, -63981,-32641, Discord 21-10) mide 71 m por la
+  curva, dobla 61 grados en dos mitades de 21 y 26, y su brazo de enfrente,
+  cortado con barreras, no tiene calle: "Continue straight". Ese brazo se
+  mide por adentro del prefab hacia el brazo norte (+63), no derecho; aun
+  abierto habria dado "keep left". En 900 rutas de ATS y ETS2 y 600 de Coast
+  to Coast y ProMods: 11 lugares mas, ninguno perdido ni movido (T e Y
+  anchas; en Madaba, ProMods, "turn right" con otra salida a +70 del mismo
+  lado, como pasa con un grupo solo).
   Las segundas vueltas de una S que siguen calladas (Salt Lake -> Twin Falls,
   Timisoara) no tienen otra calle en el grafo: el brazo este de la T de Salt
   Lake (n84167) solo se une a la ruta y la calle oeste de la de Timisoara no

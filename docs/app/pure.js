@@ -1563,6 +1563,15 @@ function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
 // de cruz y de T, la segunda vuelta de una S; un "keep left" a una rampa pasa
 // a "turn left"), ETS2 +50 en 14 (3 son rotondas compactas que salen como
 // giro); ninguno de antes se pierde ni se mueve.
+// Tambien si ninguna mitad dobla (cada una menos que el umbral) y juntas si:
+// la cruz de Idaho Falls (ATS, -63981,-32641, Discord 21-10) mide 73 m en
+// diagonal de la entrada a la salida, dobla 61 grados a la izquierda en dos
+// mitades de 21 y 26, y el brazo de enfrente, cortado con barreras, se media
+// por adentro del prefab hacia el brazo norte: "Continue straight". En 900
+// rutas de ATS y de ETS2 y 600 de Coast to Coast y de ProMods, 11 lugares
+// mas (T e Y anchas donde hay que elegir, otra cruz con el brazo de enfrente
+// muerto en Sandpoint, la esquina de una con dos en Missoula); ninguno de
+// antes se pierde ni se mueve.
 // r: { iEnd, m } de junctionManeuver.
 function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 80, contraMaxDeg = 20) {
   const { pts, cum, adjacency } = ctx;
@@ -1581,7 +1590,12 @@ function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 80, contraMaxDeg = 20
   if (![...va].some(x => x !== b && vb.has(x))) return r;
   const jEnd = junctionClusterEnd(pts, cum, j, gapM, spanM, skip);
   const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd });
-  if (!mj || mj.kind !== 'turn' || !mj.quiet || (r.m && mj.direction !== r.m.direction)) return r;
+  if (mj ? mj.kind !== 'turn' || !mj.quiet || (r.m && mj.direction !== r.m.direction) : r.m) return r;
+  // El giro, en el ultimo nodo de la primera mitad (donde empieza la esquina).
+  // Por el nodo de mas giro, con el camion adentro del cruce (o encima de un
+  // nodo) el aviso saltaba de un nodo a otro y volvia.
+  const juntos = detectManeuver({ ...ctx, i: r.m ? ctx.i : r.iEnd, iEnd: jEnd });
+  if (!juntos || juntos.kind !== 'turn' || juntos.quiet || (mj && juntos.direction !== mj.direction)) return r;
   // Y la curva de una mitad a la otra dobla para un solo lado: en una rotonda
   // chica que el grafo no reconoce se entra a la derecha, se rodea la isla a
   // la izquierda y se sale, y a la 2.a salida decia "turn right" (Oslo, ETS2,
@@ -1590,14 +1604,9 @@ function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 80, contraMaxDeg = 20
   let contra = 0;
   for (let k = r.iEnd + 1; k <= j; k++) {
     const t = normDeg(bearingBetween(pts[k], pts[k + 1]) - bearingBetween(pts[k - 1], pts[k]));
-    if ((mj.direction === 'right') !== (t > 0)) contra += Math.abs(t);
+    if ((juntos.direction === 'right') !== (t > 0)) contra += Math.abs(t);
   }
-  if (contra > contraMaxDeg) return r;
-  // El giro, en el ultimo nodo de la primera mitad (donde empieza la esquina).
-  // Por el nodo de mas giro, con el camion adentro del cruce (o encima de un
-  // nodo) el aviso saltaba de un nodo a otro y volvia.
-  const juntos = detectManeuver({ ...ctx, i: r.m ? ctx.i : r.iEnd, iEnd: jEnd });
-  return juntos && juntos.kind === 'turn' && !juntos.quiet && juntos.direction === mj.direction ? { iEnd: jEnd, m: { ...juntos, at: r.iEnd } } : r;
+  return contra > contraMaxDeg ? r : { iEnd: jEnd, m: { ...juntos, at: r.iEnd } };
 }
 
 // Si a menos de legM despues de una bifurcacion (el cruce que termina en
