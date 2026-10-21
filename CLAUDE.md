@@ -121,6 +121,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   salida y la entrada de un cruce para ahorrar 3 a 50 m, Discord 20-10).
   Andando, la ruta arranca en el tramo del camion en su sentido
   (`startArcForHeading`, `routeStartHeading`), no en el nodo mas cercano.
+  La distancia es a la calzada (la corrida con que se dibuja la arista), no
+  al eje: una autovia de una sola arista de doble mano tiene el eje entre
+  las calzadas y le ganaba un carril de prefab (Grimsby -> Sheffield, ETS2,
+  21-10). Los carriles de un prefab casi a la misma distancia
+  (`START_ARC_TIE_M`) van como alternativas y se sigue por el que da la ruta
+  mas barata. `tools/simular_navegacion.js` cuenta los recalculos malos.
+- Un waypoint puesto tocando el mapa (`waypointPassesBy`: sin nombre ni
+  tipo) es un punto por donde pasar: el tramo termina sobre su calle
+  (`waypointArcs`, `findArcRoute` con `endArcs`), por la calzada que le
+  queda mas a mano, y el siguiente arranca ahi en el mismo sentido
+  (`tramo` de `findRouteWith`, `.llegada`). Con el nodo mas cercano, en una
+  autovia de dos calzadas el tramo iba a la contraria y daba la vuelta: 44
+  de 600 waypoints sobre la ruta la alargaban en ATS, 26 de 589 en ETS2
+  (21-10). En medio de un cruce elige el carril sumando el tramo que sigue.
+  El de un POI (estacion, descanso, empresa) o el del lider del convoy es
+  un lugar al que entrar: al nodo mas cercano, como siempre.
 - La app rutea sola y del GPS del juego solo sabe cuanto falta
   (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
   5 km, con 40 km o mas por delante, `routeGameAgreement`), se buscan hasta 3

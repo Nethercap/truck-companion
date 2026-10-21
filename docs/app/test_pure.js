@@ -3729,6 +3729,85 @@ test('startArcForHeading: recalcular andando arranca en la calzada y el sentido 
   assert.equal(llegaA(startArcForHeading(g, 500, -6, 90, { edgeOk: (e) => e !== 0 })), null);
 });
 
+test('startArcForHeading: en una autovia de una sola arista cuenta la calzada, no el eje (Grimsby -> Sheffield, ETS2)', () => {
+  const { startArcForHeading } = require('./pure.js');
+  // La autovia es una arista de doble mano (0-1) dibujada 6 m a la derecha de
+  // cada sentido; un carril de prefab de un sentido (2-3) pasa a 4 m del eje,
+  // del lado de la calzada que va al este. El camion va al este por su
+  // calzada, a 6 m del eje y a 2 del carril de prefab.
+  const nodos = [[0, 0], [1000, 0], [0, 4], [1000, 4]];
+  const { g } = grafoDePrueba(nodos, [{ a: 0, b: 1 }, { a: 2, b: 3, uno: true }]);
+  g.shiftA = Int8Array.from([12, 0]); g.shiftB = Int8Array.from([12, 0]); // medios metros
+  assert.equal(startArcForHeading(g, 500, 6, 90).to, 1);
+  // La otra mano (al oeste) va 6 m del otro lado: a 6 m al norte del eje, su punta es 0
+  assert.equal(startArcForHeading(g, 500, -6, 270).to, 0);
+  // En Inglaterra la corrida es para la izquierda (negativa): el camion al
+  // este va al norte del eje, y el carril de prefab del sur ya no le gana
+  g.shiftA = Int8Array.from([-12, 0]); g.shiftB = Int8Array.from([-12, 0]);
+  assert.equal(startArcForHeading(g, 500, -6, 90).to, 1);
+  // Sin corrida (grafo v2), el eje como antes: el prefab, mas cerca
+  delete g.shiftA; delete g.shiftB;
+  assert.equal(startArcForHeading(g, 500, 6, 90).to, 3);
+});
+
+test('startArcForHeading: los carriles de un prefab que todavia no se separan van como alternativas', () => {
+  const { startArcForHeading, START_ARC_TIE_M } = require('./pure.js');
+  // Dos carriles que salen juntos y se abren: derecho (0-1) y doblando (0-2,
+  // con la curva pegada al derecho al principio); y una calle a 30 m.
+  const nodos = [[0, 0], [100, 0], [60, 60], [0, 30], [100, 30]];
+  const { g } = grafoDePrueba(nodos, [
+    { a: 0, b: 1, uno: true }, { a: 0, b: 2, uno: true, mids: [[20, 0.5], [40, 8]] }, { a: 3, b: 4, uno: true },
+  ]);
+  const r = startArcForHeading(g, 10, 0.6, 90);
+  assert.equal(r.to, 2); // el de la curva queda mas cerca
+  assert.deepEqual(r.alts.map(c => c.to), [1]);
+  assert.ok(r.alts[0].dist <= r.dist + START_ARC_TIE_M);
+  // Ya separados, una sola
+  assert.deepEqual(startArcForHeading(g, 50, 0.5, 90).alts, []);
+});
+
+test('waypointArcs y findArcRoute con endArcs: un waypoint sobre la autovia pasa por su calzada, no por el nodo mas cercano', () => {
+  const { waypointArcs, findArcRoute, waypointPassesBy, WAYPOINT_ARC_M } = require('./pure.js');
+  // Autovia de dos calzadas de una mano, 20 m entre si: la de ida (0 -> 1 ->
+  // 2, al este, z = 0) y la de vuelta (3 -> 4 -> 5, al oeste, z = -20), con
+  // un retorno en cada punta (2 -> 3, 5 -> 0). El nodo 4 (vuelta) queda a 10
+  // m del waypoint y el 1 (ida) a 60: con el nodo mas cercano, la ruta hasta
+  // el waypoint iba hasta la punta, daba la vuelta y volvia por la otra.
+  const nodos = [[0, 0], [550, 0], [1000, 0], [1000, -20], [490, -20], [0, -20], [600, 40]];
+  const aristas = [
+    { a: 0, b: 1, uno: true }, { a: 1, b: 2, uno: true }, { a: 2, b: 3, uno: true },
+    { a: 3, b: 4, uno: true }, { a: 4, b: 5, uno: true }, { a: 5, b: 0, uno: true },
+  ];
+  const { g, opts } = grafoDePrueba(nodos, aristas);
+  g.edgeF = Uint8Array.from(aristas.map(() => 2));
+  g.edgeM = Float32Array.from(aristas.map(e => Math.hypot(nodos[e.a][0] - nodos[e.b][0], nodos[e.a][1] - nodos[e.b][1])));
+  g.edgeS = Uint16Array.from([...g.edgeM].map(m => Math.round(m / 25)));
+  const wp = [490, -3]; // sobre la calzada de ida, a 3 m
+  const arcos = waypointArcs(g, wp[0], wp[1]);
+  // La de ida, y la contraria a los dos lados del nodo 4 (de una mano, para
+  // el otro lado y a la misma velocidad)
+  assert.deepEqual(arcos.map(c => g.adjEdge[c.arc]).sort(), [0, 3, 4]);
+  const ida = arcos.find(c => g.adjEdge[c.arc] === 0);
+  assert.ok(Math.abs(ida.f - 490 / 550) < 1e-6 && ida.dist < 3.01);
+  // Desde 0 por la de ida: termina en el punto del waypoint sobre ella
+  const ruta = findArcRoute(g, 0, -1, { ...opts(1), endArcs: new Map(arcos.map(c => [c.arc, c.f])) });
+  assert.deepEqual([...ruta], [0, 1]);
+  assert.equal(g.adjEdge[ruta.endArc], 0);
+  assert.ok(Math.abs(ruta.cost - 490) < 1e-6);
+  // Lejos de toda calle (un estacionamiento), ninguno: va al nodo mas cercano
+  assert.deepEqual(waypointArcs(g, 600, 40 + WAYPOINT_ARC_M + 30), []);
+  // Sin endArcs, nada cambia: hasta el nodo, y el costo
+  const normal = findArcRoute(g, 0, 2, opts(2));
+  assert.deepEqual([...normal], [0, 1, 2]);
+  assert.equal(normal.endArc, null);
+  assert.ok(Math.abs(normal.cost - 1000) < 1e-6);
+  // Solo el puesto tocando el mapa pasa por la calle; una parada, una empresa o el lider del convoy, no
+  assert.equal(waypointPassesBy({ pos: wp, label: null }), true);
+  assert.equal(waypointPassesBy({ pos: wp, label: 'Gas station (I-80)', kind: 'g' }), false);
+  assert.equal(waypointPassesBy({ pos: wp, label: 'Coastline Mining (Salt Lake City)' }), false);
+  assert.equal(waypointPassesBy(null), false);
+});
+
 test('ruteo: arrancando en el tramo del camion no se da la vuelta en el primer nodo', () => {
   // El camion va de a hacia s (al este) y el destino z esta atras, pasando b.
   // Sin el arco de llegada, desde s la ruta volvia derecho a a.

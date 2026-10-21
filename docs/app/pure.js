@@ -4528,11 +4528,77 @@ function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
 // el cliente). Busca el arco dirigido mas cercano a menos de maxDistM, con
 // su curva, cuyo sentido difiere del rumbo menos de maxDeg. edgeOk(e, a):
 // si la arista e (que sale del nodo a) se puede usar. Devuelve { arc, to,
-// point, rest, f, dist }: el arco (indice del CSR), su nodo de llegada, el
-// punto proyectado, los puntos de la curva que quedan hasta el nodo y que
-// fraccion del arco ya se hizo; o null.
+// point, rest, f, dist, alts }: el arco (indice del CSR), su nodo de
+// llegada, el punto proyectado, los puntos de la curva que quedan hasta el
+// nodo y que fraccion del arco ya se hizo; o null.
+// La distancia es a la calzada por la que va el camion (la corrida con que
+// se dibuja la ruta, grafo v3), no al eje: una autovia de una sola arista de
+// doble mano tiene el eje entre las dos calzadas, y una arista de prefab a
+// 4 m del camion le ganaba a la suya, a 5,5 m del eje (Grimsby -> Sheffield,
+// ETS2: recalculaba por 10,7 km en vez de 6,9). alts: los otros arcos a
+// menos de START_ARC_TIE_M mas (carriles de un prefab que todavia no se
+// separan), para que findRouteWith siga por el que da la ruta mas barata.
+// Recalculando andando desde 1.600 puntos de 200 rutas por juego (en su
+// calzada, +-2 m), salian mas largas o para atras 10 a 12; con la calzada,
+// 2 a 8; con las alternativas, 0 o 1.
 function startArcForHeading(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, edgeOk = null } = {}) {
-  if (!g || !g.csr || !Number.isFinite(headingDeg) || !Number.isFinite(x) || !Number.isFinite(z)) return null;
+  if (!Number.isFinite(headingDeg)) return null;
+  const lista = arcsNearPoint(g, x, z, headingDeg, { maxDistM, maxDeg, edgeOk });
+  if (!lista.length) return null;
+  const best = lista[0];
+  // Casi a la misma distancia (carriles de un prefab que todavia no se
+  // separan): alternativas, para que la ruta elija por cual seguir.
+  best.alts = lista.slice(1).filter(c => c.dist <= best.dist + START_ARC_TIE_M).slice(0, START_ARC_MAX_ALTS);
+  return best;
+}
+const START_ARC_TIE_M = 1.5;
+const START_ARC_MAX_ALTS = 2;
+
+// Un waypoint puesto sobre una calle: los arcos por los que la ruta pasa
+// por el (findArcRoute con endArcs), en vez de ir al nodo mas cercano. En
+// una autovia de dos calzadas ese nodo podia ser de la contraria o de una
+// rampa: con el waypoint justo sobre la ruta, 44 de 600 en ATS y 26 de 589
+// en ETS2 la alargaban, a veces al doble (salir, dar la vuelta y volver);
+// asi, 0 y 1. Tocando a 0-20 m del carril, de 94 a 8 y de 49 a 6 (las que
+// quedan, sobre otra calle).
+// Los que quedan a menos de WAYPOINT_ARC_TIE_M mas que el de la calzada mas
+// cercana, la otra mano de esas mismas calles aunque quede mas lejos, y la
+// otra calzada de una autovia (de una mano, para el otro lado y a velocidad
+// parecida): un waypoint puesto en la calzada contraria hacia ir hasta la
+// salida siguiente, dar la vuelta y volver. Mas alla de WAYPOINT_ARC_M (un
+// waypoint en un estacionamiento), ninguno: la ruta va al nodo mas cercano,
+// como antes. La ruta pasa por el que le queda mas a mano (findRouteWith).
+const WAYPOINT_ARC_M = 40;
+const WAYPOINT_ARC_TIE_M = 10;
+// Solo el waypoint puesto tocando el mapa (sin nombre ni tipo) es un punto
+// por donde pasar. El de un POI (estacion, descanso, empresa) o el del lider
+// del convoy es un lugar al que entrar: si la autopista pasa a menos de 40 m
+// seguiria de largo, asi que va al nodo mas cercano, como siempre.
+function waypointPassesBy(wp) {
+  return !!wp && !wp.kind && !wp.label;
+}
+function waypointArcs(g, x, z, { edgeOk = null } = {}) {
+  const lista = arcsNearPoint(g, x, z, null, { maxDistM: WAYPOINT_ARC_M, edgeOk });
+  if (!lista.length) return [];
+  const tope = lista[0].dist + WAYPOINT_ARC_TIE_M;
+  const cerca = lista.filter(c => c.dist <= tope);
+  const aristas = new Set(cerca.map(c => g.adjEdge[c.arc]));
+  const unaMano = (c) => !!(g.edgeF && (g.edgeF[g.adjEdge[c.arc]] & 2));
+  const kmh = (c) => { const e = g.adjEdge[c.arc]; return g.edgeM[e] / Math.max(0.1, g.edgeS[e] + (g.edgeT ? g.edgeT[e] / 10 : 0)) * 3.6; };
+  const contraria = (o) => unaMano(o) && cerca.some(c => unaMano(c) && c.dir[0] * o.dir[0] + c.dir[1] * o.dir[1] < -Math.cos(Math.PI / 6) && Math.abs(kmh(c) - kmh(o)) <= 15);
+  return lista.filter(c => aristas.has(g.adjEdge[c.arc]) || contraria(c));
+}
+
+// Los arcos que pasan a menos de maxDistM de (x, z), del mas cercano al mas
+// lejano, uno por arista y sentido: { arc, to, point, before, rest, f, dist }
+// (before: los puntos de la curva desde la cola del arco hasta el punto
+// proyectado; rest, desde ahi hasta su punta; dir, el sentido de marcha en
+// ese punto, [x, z] de largo 1). Con headingDeg, solo los que
+// van como el rumbo (menos de maxDeg); con null, los dos sentidos de una
+// calle de doble mano. dist es a la calzada (la corrida de la ruta
+// dibujada, grafo v3), no al eje.
+function arcsNearPoint(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, edgeOk = null } = {}) {
+  if (!g || !g.csr || !Number.isFinite(x) || !Number.isFinite(z)) return [];
   if (!g._edgeBoxes) {
     // puntas y caja de cada arista, una vez por grafo
     const ne = g.midOff.length - 1, dirs = routeArcDirections(g);
@@ -4554,9 +4620,16 @@ function startArcForHeading(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, e
     g._edgeBoxes = { a, b, doble, box, ne };
   }
   const { a, b, doble, box, ne } = g._edgeBoxes;
-  const hx = Math.sin(headingDeg * Math.PI / 180), hz = -Math.cos(headingDeg * Math.PI / 180);
+  const conRumbo = Number.isFinite(headingDeg);
+  const hx = conRumbo ? Math.sin(headingDeg * Math.PI / 180) : 0, hz = conRumbo ? -Math.cos(headingDeg * Math.PI / 180) : 0;
   const cosMax = Math.cos(maxDeg * Math.PI / 180);
-  let best = null;
+  // El mejor tramo de cada arista y sentido
+  const porArco = new Map();
+  const guardar = (clave, c) => {
+    if (c.dist > maxDistM) return;
+    const antes = porArco.get(clave);
+    if (!antes || c.dist < antes.dist) porArco.set(clave, c);
+  };
   for (let e = 0; e < ne; e++) {
     if (a[e] < 0 || x < box[4 * e] - maxDistM || x > box[4 * e + 2] + maxDistM || z < box[4 * e + 1] - maxDistM || z > box[4 * e + 3] + maxDistM) continue;
     if ((g.edgeF && (g.edgeF[e] & 1)) || (edgeOk && !edgeOk(e, a[e]))) continue;
@@ -4566,24 +4639,36 @@ function startArcForHeading(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, e
     let largo = 0;
     const acum = [0];
     for (let j = 1; j < line.length; j++) acum.push(largo += Math.hypot(line[j][0] - line[j - 1][0], line[j][1] - line[j - 1][1]));
+    // La corrida de la ruta dibujada (grafo v3, + a la derecha del sentido de
+    // marcha, en las dos manos): el camion va por su calzada, no por el eje.
+    const sA = g.shiftA ? g.shiftA[e] / 2 : 0, sB = g.shiftB ? g.shiftB[e] / 2 : 0;
     for (let j = 1; j < line.length; j++) {
       const [x0, z0] = line[j - 1], [x1, z1] = line[j];
       const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz);
       if (L < 0.5) continue;
-      const t = Math.max(0, Math.min(1, ((x - x0) * dx + (z - z0) * dz) / (L * L)));
-      const px = x0 + dx * t, pz = z0 + dz * t, dist = Math.hypot(x - px, z - pz);
-      if (dist > maxDistM || (best && dist >= best.dist)) continue;
-      const dot = (dx * hx + dz * hz) / L;
+      const u = ((x - x0) * dx + (z - z0) * dz) / L;
+      const t = Math.max(0, Math.min(1, u / L));
+      const px = x0 + dx * t, pz = z0 + dz * t;
+      const fuera = u < 0 ? -u : u > L ? u - L : 0; // pasado la punta del tramo
+      const lado = ((x - x0) * -dz + (z - z0) * dx) / L; // + a la derecha de a -> b
       const hecho = largo > 0 ? (acum[j - 1] + L * t) / largo : 0;
-      if (dot >= cosMax) best = { e, from: a[e], to: b[e], point: [px, pz], rest: line.slice(j, -1), f: hecho, dist };
-      else if (dot <= -cosMax && doble[e]) best = { e, from: b[e], to: a[e], point: [px, pz], rest: line.slice(1, j).reverse(), f: 1 - hecho, dist };
+      const corrida = sA + (sB - sA) * hecho;
+      const dot = (dx * hx + dz * hz) / L;
+      if (conRumbo ? dot >= cosMax : true) {
+        guardar(e, { e, from: a[e], to: b[e], point: [px, pz], before: line.slice(1, j), rest: line.slice(j, -1), f: hecho, dist: Math.hypot(fuera, lado - corrida), dir: [dx / L, dz / L] });
+      }
+      if (doble[e] && (conRumbo ? dot <= -cosMax : true)) {
+        guardar(-1 - e, { e, from: b[e], to: a[e], point: [px, pz], before: line.slice(j, -1).reverse(), rest: line.slice(1, j).reverse(), f: 1 - hecho, dist: Math.hypot(fuera, lado + corrida), dir: [-dx / L, -dz / L] });
+      }
     }
   }
-  if (!best) return null;
-  for (let k = g.csr[best.from]; k < g.csr[best.from + 1]; k++) {
-    if (g.adjEdge[k] === best.e && g.adjTo[k] === best.to) return { arc: k, to: best.to, point: best.point, rest: best.rest, f: best.f, dist: best.dist };
+  const out = [];
+  for (const c of [...porArco.values()].sort((p, q) => p.dist - q.dist)) {
+    for (let k = g.csr[c.from]; k < g.csr[c.from + 1]; k++) {
+      if (g.adjEdge[k] === c.e && g.adjTo[k] === c.to) { out.push({ arc: k, to: c.to, point: c.point, before: c.before, rest: c.rest, f: c.f, dist: c.dist, dir: c.dir }); break; }
+    }
   }
-  return null;
+  return out;
 }
 
 // Parado (bajo ROUTE_HEADING_MIN_KMH) la ruta arranca en el nodo mas cercano,
@@ -4627,14 +4712,31 @@ function stoppedRouteLead(route, x, z, headingDeg, { maxM = STOPPED_LEAD_MAX_M, 
 // heuristic(i) (que tiene que ser admisible), blocked(e) opcional (DLC) e
 // isFerry(e). startArc opcional: el arco por el que el camion llega a
 // startIdx (startArcForHeading); tampoco se sale de el dandose vuelta.
+// endArcs opcional (Map arco -> fraccion): la ruta no termina en endIdx sino
+// al pasar por uno de esos arcos, en esa fraccion de su costo (un waypoint
+// sobre una calle, arcsNearPoint). Los nodos llegan hasta la punta del arco,
+// y path.endArc dice cual fue. path.cost: el costo del camino (hasta el
+// punto del arco, con endArcs).
 function findArcRoute(g, startIdx, endIdx, opts) {
-  if (startIdx === endIdx) return [startIdx];
+  const metas = opts.endArcs && opts.endArcs.size ? opts.endArcs : null;
+  if (!metas && startIdx === endIdx) return [startIdx];
   const { csr, adjTo, adjEdge } = g;
   const dirs = routeArcDirections(g);
   const total = csr[g.n];
   const gScore = new Float64Array(total).fill(Infinity);
   const cameFrom = new Int32Array(total).fill(-1);
   const done = new Uint8Array(total);
+  // Pasar por un arco de endArcs: en el heap como total + arco, con su costo
+  // hasta el punto (gMeta) y el arco de antes (-1 si sale de startIdx)
+  const gMeta = metas ? new Map() : null, antesMeta = metas ? new Map() : null;
+  const meta = (k2, g0, antes) => {
+    const f = metas.get(k2);
+    if (f == null) return;
+    const t = g0 + f * opts.cost(adjEdge[k2]);
+    if (!(t < (gMeta.has(k2) ? gMeta.get(k2) : Infinity))) return;
+    gMeta.set(k2, t); antesMeta.set(k2, antes);
+    heap.push(t, total + k2);
+  };
   const blocked = opts.blocked || null;
   const heap = createNumberHeap();
   const llegada = opts.startArc != null && opts.startArc >= 0 ? opts.startArc : -1;
@@ -4648,15 +4750,17 @@ function findArcRoute(g, startIdx, endIdx, opts) {
     if (blocked && blocked(e)) continue;
     if (llegada !== -1 && libre0 && !opts.isFerry(e) && isUTurnArc(dirs, llegada, k)) continue;
     const c = opts.cost(e);
+    if (metas) meta(k, 0, -1);
     if (c < gScore[k]) { gScore[k] = c; heap.push(c + opts.heuristic(adjTo[k]), k); }
   }
-  let fin = -1;
+  let fin = -1, finMeta = -1;
   while (heap.size > 0) {
     const k = heap.pop();
+    if (k >= total) { finMeta = k - total; break; }
     if (done[k]) continue;
     done[k] = 1;
     const u = adjTo[k];
-    if (u === endIdx) { fin = k; break; }
+    if (!metas && u === endIdx) { fin = k; break; }
     const ferryIn = opts.isFerry(adjEdge[k]);
     // Si todas las salidas son darse vuelta (calle sin salida), se puede.
     let libre = ferryIn;
@@ -4667,24 +4771,32 @@ function findArcRoute(g, startIdx, endIdx, opts) {
     }
     const g0 = gScore[k];
     for (let k2 = csr[u]; k2 < csr[u + 1]; k2++) {
-      if (done[k2]) continue;
       const e2 = adjEdge[k2];
       if (blocked && blocked(e2)) continue;
       if (libre && !ferryIn && !opts.isFerry(e2) && isUTurnArc(dirs, k, k2)) continue;
+      if (metas) meta(k2, g0, k);
+      if (done[k2]) continue;
       const t = g0 + opts.cost(e2);
       if (t < gScore[k2]) { gScore[k2] = t; cameFrom[k2] = k; heap.push(t + opts.heuristic(adjTo[k2]), k2); }
     }
   }
-  if (fin === -1) return null;
   const arcs = [];
-  for (let k = fin; k !== -1; k = cameFrom[k]) arcs.push(k);
+  if (finMeta !== -1) {
+    arcs.push(finMeta);
+    for (let k = antesMeta.get(finMeta); k !== -1; k = cameFrom[k]) arcs.push(k);
+  } else if (fin !== -1) {
+    for (let k = fin; k !== -1; k = cameFrom[k]) arcs.push(k);
+  } else return null;
   arcs.reverse();
   const path = [dirs.from[arcs[0]]];
   for (const k of arcs) path.push(adjTo[k]);
+  // Sin enumerar: el camino sigue siendo una lista de nodos
+  Object.defineProperty(path, 'endArc', { value: finMeta !== -1 ? finMeta : null });
+  Object.defineProperty(path, 'cost', { value: finMeta !== -1 ? gMeta.get(finMeta) : gScore[fin] });
   return path;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }
