@@ -23,6 +23,7 @@ GUIDE_TEXT.en = {
     settings: 'Settings and the top bar',
     convoy: 'Convoy (beta)',
     client: 'The client on your PC',
+    mymap: 'Build my map: other map mods',
     overlay: 'The in-game overlay',
     account: 'Your account (optional)',
   },
@@ -74,7 +75,7 @@ GUIDE_TEXT.en = {
 <ul>
 <li>The <b>blue line</b> behind the truck is where you have driven.</li>
 <li>With <b>Share my position</b> on, you see other Truck Dash drivers on your map and you appear on the public <a href="/live/">live map</a> as an anonymous driver, with your route drawn unless you untick <b>Also show my route on the live map</b>. You can turn it off in Settings.</li>
-<li><b>Map mods</b> have their own maps: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia and TruckersMP. The app detects them from the game, or you pick one with the puzzle button.</li>
+<li><b>Map mods</b> have their own maps: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia and TruckersMP. The app detects them from the game, or you pick one with the puzzle button. For any other one, the client can <a href="#mymap">build the map on your PC</a>.</li>
 <li><b>DLCs</b> (in Settings): uncheck the map DLCs you do not own and routes avoid their roads. If there is no way around one, the route uses it anyway and says so. With the client 1.5.28 or newer they are read from your game on their own.</li>
 </ul>
 <p>Every map button can be moved and resized: long-press one on a phone, or use <b>Move the buttons</b> in Settings.</p>`,
@@ -150,6 +151,32 @@ GUIDE_TEXT.en = {
 <li><b>Show log file</b> and <b>Report a problem</b>.</li>
 </ul>
 <div class="tip"><p>Something not working? Ask in our <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> and attach the log file: most problems are solved in a couple of messages.</p></div>`,
+    mymap: `
+<p>Truck Dash has maps for the most popular map mods (the list is in <a href="#gps">The GPS</a>). For any other one, like a South America map or a mix of mods we don't publish, the client can build the map on your PC from your game and your active mods. You build it once and the dashboard uses it on its own.</p>
+<h3>Step by step</h3>
+<ol>
+<li>Drive with your mods as usual. When your truck leaves the map Truck Dash knows, the dashboard says so and the client shows a notification next to the clock.</li>
+<li>Close the game, but leave the client running. The build needs the memory the game is using.</li>
+<li>Right-click the tray icon, open <b>Setup &amp; status</b> and, under <b>Your map mods</b>, click <b>Build my map</b>.</li>
+<li>Wait about 5 minutes while it reads the game and your mods, draws the map and works out the routes. The first time it also downloads the map builder (about 40 MB). <b>Cancel</b> stops it at any point.</li>
+<li>When it says <i>Map built on this PC</i>, with the number of cities, start the game again. The dashboard switches to your map on its own: the map's name, shown in the bottom right corner when it loads, ends in <i>(built on this PC)</i>.</li>
+</ol>
+<p>Your map comes with everything ours have: routes with directions and lane arrows, road names, cities, and fuel stations, rest areas and companies (with their logos, including the ones your mods add) in <b>Find nearby</b>.</p>
+<h3>Where you see it</h3>
+<ul>
+<li>In the browser on this PC.</li>
+<li>On a phone or tablet, only through the <b>same Wi-Fi</b> address or its QR (see <a href="#start">Getting started</a>). With the pairing code the phone keeps the map from our servers: yours never leaves your PC.</li>
+</ul>
+<h3>Good to know</h3>
+<ul>
+<li>It needs about 7 GB of free memory. With less, the client asks first: close other programs (the browser too) or try anyway.</li>
+<li>The map belongs to your exact list of mods. Add, remove, reorder or update any mod (not only maps), or update the game, and the dashboard goes back to our map; drive off it again and the client offers a new build. The last two maps of each game are kept, so going back to your previous mods uses their map again.</li>
+<li>In the app, the map mods setting (the puzzle button) has to be on <b>Automatic</b>: a map picked by hand is one of ours.</li>
+<li>A mod that can't be read (an encrypted one, hardly ever a map) is skipped and the map is built with the rest.</li>
+<li>If your mod's cities are far from the real ones (an invented world), the map is drawn on a plain background, with no sea or coastline.</li>
+<li>Maps are saved in <code>%LOCALAPPDATA%\\TruckDash\\maps</code>, about 100 MB each.</li>
+<li>If the client can't find the game folder, add it with <b>Add game folder</b>. If the build fails, the reason is in the log file: send it to us on <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
     overlay: `
 <p>A small panel the client draws over the game, so you see the essentials without looking away from the road. Windows only (not under Linux with Proton), with the game in a window or in borderless fullscreen.</p>
 <ul>
@@ -237,6 +264,7 @@ GUIDE_TEXT.es = {
     settings: 'Configuración y la barra de arriba',
     convoy: 'Convoy (beta)',
     client: 'El cliente de la PC',
+    mymap: 'Armar mi mapa: otros mods de mapa',
     overlay: 'El overlay en el juego',
     account: 'Tu cuenta (opcional)',
   },
@@ -288,7 +316,7 @@ GUIDE_TEXT.es = {
 <ul>
 <li>La <b>línea azul</b> detrás del camión es por donde anduviste.</li>
 <li>Con <b>Compartir mi posición</b> prendido ves a otros conductores de Truck Dash en tu mapa y aparecés en el <a href="/live/">mapa en vivo</a> público como un conductor anónimo, con tu ruta dibujada salvo que destildes <b>Mostrar también mi ruta en el mapa en vivo</b>. Se apaga en Configuración.</li>
-<li>Los <b>mods de mapa</b> tienen su propio mapa: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia y TruckersMP. La app los detecta desde el juego, o elegís uno con el botón del rompecabezas.</li>
+<li>Los <b>mods de mapa</b> tienen su propio mapa: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia y TruckersMP. La app los detecta desde el juego, o elegís uno con el botón del rompecabezas. Para cualquier otro, el cliente puede <a href="#mymap">armar el mapa en tu PC</a>.</li>
 <li><b>DLC</b> (en Ajustes): destildá los DLC de mapa que no tenés y las rutas evitan sus caminos. Si no hay forma de rodear uno, la ruta lo usa igual y te avisa. Con el cliente 1.5.28 o más nuevo se leen solos de tu juego.</li>
 </ul>
 <p>Todos los botones del mapa se pueden mover y agrandar: dejá apretado uno en el celular, o usá <b>Mover los botones</b> en Configuración.</p>`,
@@ -364,6 +392,32 @@ GUIDE_TEXT.es = {
 <li><b>Ver archivo de log</b> y <b>Reportar un problema</b>.</li>
 </ul>
 <div class="tip"><p>¿Algo no anda? Preguntá en nuestro <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> y adjuntá el archivo de log: la mayoría de los problemas se resuelven en un par de mensajes.</p></div>`,
+    mymap: `
+<p>Truck Dash tiene mapas para los mods de mapa más usados (la lista está en <a href="#gps">El GPS</a>). Para cualquier otro, como un mapa de Sudamérica o una combinación de mods que no publicamos, el cliente puede armar el mapa en tu PC con tu juego y tus mods activos. Se arma una vez y el tablero lo usa solo.</p>
+<h3>Paso a paso</h3>
+<ol>
+<li>Manejá con tus mods como siempre. Cuando el camión sale del mapa que conoce Truck Dash, el tablero te avisa y el cliente muestra una notificación al lado del reloj.</li>
+<li>Cerrá el juego, pero dejá el cliente abierto. Armar el mapa necesita la memoria que usa el juego.</li>
+<li>Clic derecho en el ícono de la bandeja, abrí <b>Configuración y estado</b> y, en <b>Tus mods de mapa</b>, tocá <b>Armar mi mapa</b>.</li>
+<li>Esperá unos 5 minutos mientras lee el juego y tus mods, dibuja el mapa y arma las rutas. La primera vez también baja el armador de mapas (unos 40 MB). <b>Cancelar</b> lo corta en cualquier momento.</li>
+<li>Cuando dice <i>Mapa armado en esta PC</i>, con la cantidad de ciudades, volvé a abrir el juego. El tablero pasa solo a tu mapa: el nombre del mapa, que aparece abajo a la derecha al cargarlo, termina en <i>(armado en esta PC)</i>.</li>
+</ol>
+<p>Tu mapa trae todo lo que tienen los nuestros: rutas con indicaciones y flechas de carril, nombres de ruta, ciudades, y estaciones de servicio, áreas de descanso y empresas (con sus logos, también los que agregan tus mods) en <b>Buscar cerca</b>.</p>
+<h3>Dónde se ve</h3>
+<ul>
+<li>En el navegador de esta PC.</li>
+<li>En el celular o la tablet, solo con la dirección de la <b>misma WiFi</b> o su QR (ver <a href="#start">Primeros pasos</a>). Con el código de pairing el celular sigue con el mapa de nuestros servidores: el tuyo no sale de tu PC.</li>
+</ul>
+<h3>Para tener en cuenta</h3>
+<ul>
+<li>Necesita unos 7 GB de memoria libre. Con menos, el cliente pregunta antes: cerrá otros programas (el navegador también) o intentalo igual.</li>
+<li>El mapa va con tu lista exacta de mods. Si agregás, sacás, reordenás o actualizás cualquier mod (no solo de mapa), o se actualiza el juego, el tablero vuelve a nuestro mapa; cuando salgas de él, el cliente ofrece armarlo de nuevo. Se guardan los dos últimos mapas de cada juego: si volvés a los mods de antes, se usa el suyo.</li>
+<li>En la app, el ajuste de mods de mapa (el botón del rompecabezas) tiene que estar en <b>Automático</b>: un mapa elegido a mano es uno de los nuestros.</li>
+<li>Un mod que no se puede leer (uno encriptado, casi nunca de mapa) se saltea y el mapa se arma con el resto.</li>
+<li>Si las ciudades de tu mod quedan lejos de las reales (un mundo inventado), el mapa va sobre un fondo liso, sin mar ni costa.</li>
+<li>Los mapas se guardan en <code>%LOCALAPPDATA%\\TruckDash\\maps</code>, unos 100 MB cada uno.</li>
+<li>Si el cliente no encuentra la carpeta del juego, agregala con <b>Agregar carpeta del juego</b>. Si no se pudo armar, el motivo está en el archivo de log: mandánoslo por <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
     overlay: `
 <p>Un recuadro que el cliente dibuja sobre el juego, para ver lo importante sin sacar la vista de la ruta. Solo en Windows (no en Linux con Proton), con el juego en ventana o en pantalla completa sin bordes.</p>
 <ul>

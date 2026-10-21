@@ -20,6 +20,7 @@ GUIDE_TEXT.de = {
     settings: 'Einstellungen und die obere Leiste',
     convoy: 'Konvoi (Beta)',
     client: 'Der Client auf deinem PC',
+    mymap: 'Meine Karte bauen: andere Karten-Mods',
     overlay: 'Das Overlay im Spiel',
     account: 'Dein Konto (optional)',
   },
@@ -70,7 +71,7 @@ GUIDE_TEXT.de = {
 <ul>
 <li>Die <b>blaue Linie</b> hinter dem Lkw zeigt, wo du gefahren bist.</li>
 <li>Mit <b>Meine Position teilen</b> siehst du andere Truck-Dash-Fahrer auf deiner Karte und erscheinst anonym auf der öffentlichen <a href="/live/">Live-Karte</a>, mit deiner Route, außer du deaktivierst <b>Auch meine Route auf der Live-Karte zeigen</b>. Abschalten kannst du das in den Einstellungen.</li>
-<li><b>Karten-Mods</b> haben eigene Karten: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia und TruckersMP. Die App erkennt sie im Spiel, oder du wählst sie mit dem Puzzle-Knopf.</li>
+<li><b>Karten-Mods</b> haben eigene Karten: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia und TruckersMP. Die App erkennt sie im Spiel, oder du wählst sie mit dem Puzzle-Knopf. Für jede andere kann der Client <a href="#mymap">die Karte auf deinem PC bauen</a>.</li>
 <li><b>DLCs</b> (in den Einstellungen): Entferne den Haken bei Karten-DLCs, die du nicht besitzt, dann meiden Routen ihre Straßen. Gibt es keinen Umweg, nutzt die Route sie trotzdem und sagt es dir. Ab Client 1.5.28 werden sie automatisch aus deinem Spiel gelesen.</li>
 </ul>
 <p>Alle Kartenschaltflächen lassen sich verschieben und in der Größe ändern: auf dem Handy lange drücken, oder in den Einstellungen <b>Schaltflächen verschieben</b>.</p>`,
@@ -146,6 +147,32 @@ GUIDE_TEXT.de = {
 <li><b>Logdatei anzeigen</b> und <b>Problem melden</b>.</li>
 </ul>
 <div class="tip"><p>Klappt etwas nicht? Frag auf unserem <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> und häng die Logdatei an: Die meisten Probleme sind in ein paar Nachrichten gelöst.</p></div>`,
+    mymap: `
+<p>Truck Dash hat Karten für die beliebtesten Karten-Mods (die Liste steht unter <a href="#gps">Das Navi</a>). Für jede andere, etwa eine Südamerika-Karte oder eine Mod-Kombination, die wir nicht veröffentlichen, kann der Client die Karte auf deinem PC aus deinem Spiel und deinen aktiven Mods bauen. Du baust sie einmal, und das Armaturenbrett nutzt sie von selbst.</p>
+<h3>Schritt für Schritt</h3>
+<ol>
+<li>Fahr wie immer mit deinen Mods. Wenn dein Lkw die Karte verlässt, die Truck Dash kennt, sagt das Armaturenbrett Bescheid, und der Client zeigt eine Benachrichtigung neben der Uhr.</li>
+<li>Schließ das Spiel, aber lass den Client laufen. Der Kartenbau braucht den Arbeitsspeicher, den das Spiel belegt.</li>
+<li>Rechtsklick auf das Symbol in der Taskleiste, öffne <b>Einrichtung &amp; Status</b> und klicke unter <b>Deine Karten-Mods</b> auf <b>Meine Karte bauen</b>.</li>
+<li>Warte etwa 5 Minuten, während er das Spiel und deine Mods liest, die Karte zeichnet und die Routen berechnet. Beim ersten Mal lädt er auch den Kartenbauer (etwa 40 MB). <b>Abbrechen</b> stoppt ihn jederzeit.</li>
+<li>Wenn der Client meldet, dass die Karte gebaut ist, mit der Zahl der Städte, starte das Spiel wieder. Das Armaturenbrett wechselt von selbst zu deiner Karte: Der Kartenname, der beim Laden unten rechts erscheint, endet auf <i>(auf diesem PC gebaut)</i>.</li>
+</ol>
+<p>Deine Karte hat alles, was unsere haben: Routen mit Ansagen und Fahrspurpfeilen, Straßennamen, Städte sowie Tankstellen, Rastplätze und Firmen (mit ihren Logos, auch denen aus deinen Mods) unter <b>In der Nähe suchen</b>.</p>
+<h3>Wo du sie siehst</h3>
+<ul>
+<li>Im Browser auf diesem PC.</li>
+<li>Auf Handy oder Tablet nur über die Adresse fürs <b>gleiche WLAN</b> oder ihren QR-Code (siehe <a href="#start">Erste Schritte</a>). Mit dem Pairing-Code bleibt das Handy bei der Karte von unseren Servern: Deine verlässt deinen PC nie.</li>
+</ul>
+<h3>Gut zu wissen</h3>
+<ul>
+<li>Es braucht etwa 7 GB freien Arbeitsspeicher. Mit weniger fragt der Client vorher: Schließ andere Programme (auch den Browser) oder versuch es trotzdem.</li>
+<li>Die Karte gehört zu genau deiner Mod-Liste. Fügst du eine Mod hinzu, entfernst, verschiebst oder aktualisierst du eine (egal welche, nicht nur Karten) oder bekommt das Spiel ein Update, kehrt das Armaturenbrett zu unserer Karte zurück; fährst du wieder aus ihr heraus, bietet der Client einen neuen Bau an. Die letzten zwei Karten jedes Spiels bleiben gespeichert: Gehst du zu deinen vorherigen Mods zurück, wird deren Karte wieder genutzt.</li>
+<li>In der App muss die Karten-Mod-Einstellung (der Puzzle-Knopf) auf <b>Automatisch</b> stehen: Eine von Hand gewählte Karte ist eine von unseren.</li>
+<li>Eine Mod, die sich nicht lesen lässt (eine verschlüsselte, fast nie eine Karte), wird übersprungen, und die Karte wird mit dem Rest gebaut.</li>
+<li>Liegen die Städte deiner Mod weit weg von den echten (eine erfundene Welt), kommt die Karte auf einen schlichten Hintergrund, ohne Meer und Küste.</li>
+<li>Die Karten liegen in <code>%LOCALAPPDATA%\\TruckDash\\maps</code>, je etwa 100 MB.</li>
+<li>Findet der Client den Spielordner nicht, füge ihn mit <b>Spielordner hinzufügen</b> hinzu. Schlägt der Bau fehl, steht der Grund in der Logdatei: Schick sie uns auf <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
     overlay: `
 <p>Ein kleines Feld, das der Client über das Spiel legt: das Wichtigste, ohne den Blick von der Straße zu nehmen. Nur unter Windows, mit dem Spiel im Fenster oder im randlosen Vollbild.</p>
 <ul>
@@ -233,6 +260,7 @@ GUIDE_TEXT.fr = {
     settings: 'Paramètres et barre du haut',
     convoy: 'Convoi (bêta)',
     client: 'Le client sur ton PC',
+    mymap: 'Construire ma carte : autres mods de carte',
     overlay: "L'overlay en jeu",
     account: 'Votre compte (facultatif)',
   },
@@ -283,7 +311,7 @@ GUIDE_TEXT.fr = {
 <ul>
 <li>La <b>ligne bleue</b> derrière le camion montre là où tu es passé.</li>
 <li>Avec <b>Partager ma position</b> activé, tu vois les autres conducteurs Truck Dash sur ta carte et tu apparais de façon anonyme sur la <a href="/live/">carte en direct</a> publique, avec ton itinéraire, sauf si tu décoches <b>Afficher aussi mon itinéraire sur la carte en direct</b>. Ça se désactive dans les Paramètres.</li>
-<li>Les <b>mods de carte</b> ont leur propre carte : ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia et TruckersMP. L'appli les détecte depuis le jeu, ou tu en choisis un avec le bouton puzzle.</li>
+<li>Les <b>mods de carte</b> ont leur propre carte : ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia et TruckersMP. L'appli les détecte depuis le jeu, ou tu en choisis un avec le bouton puzzle. Pour tout autre, le client peut <a href="#mymap">construire la carte sur ton PC</a>.</li>
 <li><b>DLC</b> (dans les Paramètres) : décochez les DLC de carte que vous n’avez pas et les itinéraires évitent leurs routes. S’il n’y a pas d’autre chemin, l’itinéraire les emprunte quand même et le signale. Avec le client 1.5.28 ou plus récent, ils sont lus automatiquement depuis votre jeu.</li>
 </ul>
 <p>Chaque bouton de la carte peut être déplacé et redimensionné : appui long sur téléphone, ou <b>Déplacer les boutons</b> dans les Paramètres.</p>`,
@@ -359,6 +387,32 @@ GUIDE_TEXT.fr = {
 <li><b>Voir le fichier journal</b> et <b>Signaler un problème</b>.</li>
 </ul>
 <div class="tip"><p>Quelque chose ne marche pas ? Demande sur notre <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> en joignant le fichier journal : la plupart des problèmes se règlent en quelques messages.</p></div>`,
+    mymap: `
+<p>Truck Dash a des cartes pour les mods de carte les plus utilisés (la liste est dans <a href="#gps">Le GPS</a>). Pour n'importe quel autre, comme une carte d'Amérique du Sud ou un mélange de mods que nous ne publions pas, le client peut construire la carte sur ton PC à partir de ton jeu et de tes mods actifs. Tu la construis une fois et le tableau de bord l'utilise tout seul.</p>
+<h3>Pas à pas</h3>
+<ol>
+<li>Roule avec tes mods comme d'habitude. Quand ton camion sort de la carte que Truck Dash connaît, le tableau de bord te le dit et le client affiche une notification à côté de l'horloge.</li>
+<li>Ferme le jeu, mais laisse le client tourner. La construction a besoin de la mémoire qu'utilise le jeu.</li>
+<li>Clic droit sur l'icône de la zone de notification, ouvre <b>Configuration et état</b> et, dans <b>Tes mods de carte</b>, clique sur <b>Construire ma carte</b>.</li>
+<li>Attends environ 5 minutes pendant qu'il lit le jeu et tes mods, dessine la carte et calcule les itinéraires. La première fois, il télécharge aussi le constructeur de carte (environ 40 Mo). <b>Annuler</b> l'arrête à tout moment.</li>
+<li>Quand il indique <i>Carte construite sur ce PC</i>, avec le nombre de villes, relance le jeu. Le tableau de bord passe tout seul à ta carte : son nom, qui s'affiche en bas à droite au chargement, finit par <i>(construite sur ce PC)</i>.</li>
+</ol>
+<p>Ta carte a tout ce qu'ont les nôtres : itinéraires avec indications et flèches de voie, noms de route, villes, et stations-service, aires de repos et entreprises (avec leurs logos, y compris ceux de tes mods) dans <b>Chercher à proximité</b>.</p>
+<h3>Où la voir</h3>
+<ul>
+<li>Dans le navigateur de ce PC.</li>
+<li>Sur un téléphone ou une tablette, seulement avec l'adresse <b>même Wi-Fi</b> ou son QR code (voir <a href="#start">Pour commencer</a>). Avec le code d'appairage, le téléphone garde la carte de nos serveurs : la tienne ne quitte jamais ton PC.</li>
+</ul>
+<h3>Bon à savoir</h3>
+<ul>
+<li>Il faut environ 7 Go de mémoire libre. Avec moins, le client demande d'abord : ferme d'autres programmes (le navigateur aussi) ou essaie quand même.</li>
+<li>La carte va avec ta liste exacte de mods. Si tu ajoutes, retires, réordonnes ou mets à jour un mod (n'importe lequel, pas seulement de carte), ou si le jeu se met à jour, le tableau de bord revient à notre carte ; quand tu en sors à nouveau, le client propose de la reconstruire. Les deux dernières cartes de chaque jeu sont gardées : si tu reviens à tes mods d'avant, leur carte resservira.</li>
+<li>Dans l'appli, le réglage des mods de carte (le bouton puzzle) doit être sur <b>Automatique</b> : une carte choisie à la main est l'une des nôtres.</li>
+<li>Un mod illisible (chiffré, presque jamais une carte) est ignoré et la carte est construite avec le reste.</li>
+<li>Si les villes de ton mod sont loin des vraies (un monde inventé), la carte est dessinée sur un fond uni, sans mer ni côte.</li>
+<li>Les cartes sont enregistrées dans <code>%LOCALAPPDATA%\\TruckDash\\maps</code>, environ 100 Mo chacune.</li>
+<li>Si le client ne trouve pas le dossier du jeu, ajoute-le avec <b>Ajouter le dossier du jeu</b>. Si la construction échoue, la raison est dans le fichier journal : envoie-le-nous sur <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
     overlay: `
 <p>Un petit cadre que le client dessine par-dessus le jeu, pour voir l'essentiel sans quitter la route des yeux. Windows uniquement, avec le jeu en fenêtre ou en plein écran sans bordure.</p>
 <ul>
@@ -446,6 +500,7 @@ GUIDE_TEXT.pt = {
     settings: 'Configurações e a barra de cima',
     convoy: 'Comboio (beta)',
     client: 'O cliente no seu PC',
+    mymap: 'Montar meu mapa: outros mods de mapa',
     overlay: 'O overlay no jogo',
     account: 'Sua conta (opcional)',
   },
@@ -496,7 +551,7 @@ GUIDE_TEXT.pt = {
 <ul>
 <li>A <b>linha azul</b> atrás do caminhão mostra por onde você passou.</li>
 <li>Com <b>Compartilhar minha posição</b> ligado, você vê outros motoristas do Truck Dash no seu mapa e aparece como motorista anônimo no <a href="/live/">mapa ao vivo</a> público, com a sua rota, a menos que desmarque <b>Mostrar também minha rota no mapa ao vivo</b>. Dá para desligar nas Configurações.</li>
-<li>Os <b>mods de mapa</b> têm mapa próprio: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia e TruckersMP. O app detecta pelo jogo, ou você escolhe com o botão do quebra-cabeça.</li>
+<li>Os <b>mods de mapa</b> têm mapa próprio: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia e TruckersMP. O app detecta pelo jogo, ou você escolhe com o botão do quebra-cabeça. Para qualquer outro, o cliente pode <a href="#mymap">montar o mapa no seu PC</a>.</li>
 <li><b>DLCs</b> (em Configurações): desmarque os DLCs de mapa que você não tem e as rotas evitam as estradas deles. Se não houver como contornar, a rota usa mesmo assim e avisa. Com o cliente 1.5.28 ou mais novo, eles são lidos do seu jogo sozinhos.</li>
 </ul>
 <p>Todos os botões do mapa podem ser movidos e redimensionados: segure um no celular, ou use <b>Mover os botões</b> nas Configurações.</p>`,
@@ -572,6 +627,32 @@ GUIDE_TEXT.pt = {
 <li><b>Ver arquivo de log</b> e <b>Relatar um problema</b>.</li>
 </ul>
 <div class="tip"><p>Algo não funciona? Pergunte no nosso <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> e anexe o arquivo de log: a maioria dos problemas se resolve em poucas mensagens.</p></div>`,
+    mymap: `
+<p>O Truck Dash tem mapas para os mods de mapa mais usados (a lista está em <a href="#gps">O GPS</a>). Para qualquer outro, como um mapa da América do Sul ou uma combinação de mods que não publicamos, o cliente pode montar o mapa no seu PC a partir do seu jogo e dos seus mods ativos. Você monta uma vez e o painel usa sozinho.</p>
+<h3>Passo a passo</h3>
+<ol>
+<li>Dirija com seus mods como sempre. Quando o caminhão sai do mapa que o Truck Dash conhece, o painel avisa e o cliente mostra uma notificação ao lado do relógio.</li>
+<li>Feche o jogo, mas deixe o cliente aberto. Montar o mapa precisa da memória que o jogo usa.</li>
+<li>Clique com o botão direito no ícone da bandeja, abra <b>Configuração e status</b> e, em <b>Seus mods de mapa</b>, clique em <b>Montar meu mapa</b>.</li>
+<li>Espere uns 5 minutos enquanto ele lê o jogo e seus mods, desenha o mapa e calcula as rotas. Na primeira vez ele também baixa o montador de mapas (uns 40 MB). <b>Cancelar</b> interrompe a qualquer momento.</li>
+<li>Quando aparecer <i>Mapa montado neste PC</i>, com o número de cidades, abra o jogo de novo. O painel passa sozinho para o seu mapa: o nome do mapa, que aparece no canto inferior direito ao carregar, termina em <i>(montado neste PC)</i>.</li>
+</ol>
+<p>Seu mapa tem tudo o que os nossos têm: rotas com instruções e setas de faixa, nomes de estradas, cidades, e postos de combustível, áreas de descanso e empresas (com seus logos, inclusive os que seus mods adicionam) em <b>Buscar por perto</b>.</p>
+<h3>Onde aparece</h3>
+<ul>
+<li>No navegador deste PC.</li>
+<li>No celular ou tablet, só pelo endereço da <b>mesma Wi-Fi</b> ou pelo QR code dele (veja <a href="#start">Primeiros passos</a>). Com o código de pareamento o celular continua com o mapa dos nossos servidores: o seu nunca sai do seu PC.</li>
+</ul>
+<h3>Bom saber</h3>
+<ul>
+<li>Precisa de uns 7 GB de memória livre. Com menos, o cliente pergunta antes: feche outros programas (o navegador também) ou tente assim mesmo.</li>
+<li>O mapa vale para a sua lista exata de mods. Se você adicionar, remover, reordenar ou atualizar qualquer mod (não só de mapa), ou se o jogo atualizar, o painel volta ao nosso mapa; quando você sair dele de novo, o cliente oferece montar outra vez. Os dois últimos mapas de cada jogo ficam guardados: se você voltar aos mods de antes, o mapa deles é usado de novo.</li>
+<li>No app, a configuração de mods de mapa (o botão do quebra-cabeça) tem que estar em <b>Automático</b>: um mapa escolhido à mão é um dos nossos.</li>
+<li>Um mod que não pode ser lido (criptografado, quase nunca de mapa) é pulado e o mapa é montado com o resto.</li>
+<li>Se as cidades do seu mod ficam longe das reais (um mundo inventado), o mapa vai sobre um fundo liso, sem mar nem costa.</li>
+<li>Os mapas ficam em <code>%LOCALAPPDATA%\\TruckDash\\maps</code>, uns 100 MB cada.</li>
+<li>Se o cliente não encontrar a pasta do jogo, adicione com <b>Adicionar pasta do jogo</b>. Se a montagem falhar, o motivo está no arquivo de log: mande para a gente no <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
     overlay: `
 <p>Um quadro que o cliente desenha sobre o jogo, para ver o essencial sem tirar os olhos da estrada. Só no Windows, com o jogo em janela ou em tela cheia sem bordas.</p>
 <ul>
@@ -659,6 +740,7 @@ GUIDE_TEXT.pl = {
     settings: 'Ustawienia i górny pasek',
     convoy: 'Konwój (beta)',
     client: 'Klient na twoim PC',
+    mymap: 'Zbuduj moją mapę: inne mody map',
     overlay: 'Nakładka w grze',
     account: 'Twoje konto (opcjonalne)',
   },
@@ -709,7 +791,7 @@ GUIDE_TEXT.pl = {
 <ul>
 <li><b>Niebieska linia</b> za ciężarówką pokazuje, gdzie jechałeś.</li>
 <li>Z włączonym <b>Udostępniaj moją pozycję</b> widzisz innych kierowców Truck Dash na swojej mapie i pojawiasz się anonimowo na publicznej <a href="/live/">mapie na żywo</a>, razem z trasą, chyba że odznaczysz <b>Pokazuj też moją trasę na mapie na żywo</b>. Możesz to wyłączyć w Ustawieniach.</li>
-<li><b>Mody map</b> mają własne mapy: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia i TruckersMP. Aplikacja wykrywa je z gry, albo wybierasz jedną przyciskiem z puzzlem.</li>
+<li><b>Mody map</b> mają własne mapy: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia i TruckersMP. Aplikacja wykrywa je z gry, albo wybierasz jedną przyciskiem z puzzlem. Dla każdego innego klient może <a href="#mymap">zbudować mapę na twoim PC</a>.</li>
 <li><b>DLC</b> (w Ustawieniach): odznacz DLC z mapami, których nie masz, a trasy ominą ich drogi. Jeśli nie da się ich objechać, trasa i tak przez nie poprowadzi i da znać. Z klientem 1.5.28 lub nowszym są odczytywane z gry automatycznie.</li>
 </ul>
 <p>Każdy przycisk mapy można przesunąć i zmienić jego rozmiar: przytrzymaj go na telefonie albo użyj <b>Przesuń przyciski</b> w Ustawieniach.</p>`,
@@ -785,6 +867,32 @@ GUIDE_TEXT.pl = {
 <li><b>Pokaż plik dziennika</b> i <b>Zgłoś problem</b>.</li>
 </ul>
 <div class="tip"><p>Coś nie działa? Zapytaj na naszym <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discordzie</a> i dołącz plik dziennika: większość problemów rozwiązujemy w kilku wiadomościach.</p></div>`,
+    mymap: `
+<p>Truck Dash ma mapy dla najpopularniejszych modów map (lista jest w sekcji <a href="#gps">GPS</a>). Dla każdego innego, na przykład mapy Ameryki Południowej albo zestawu modów, którego nie publikujemy, klient może zbudować mapę na twoim PC z twojej gry i aktywnych modów. Budujesz ją raz, a deska rozdzielcza używa jej sama.</p>
+<h3>Krok po kroku</h3>
+<ol>
+<li>Jedź ze swoimi modami jak zwykle. Gdy ciężarówka wyjedzie poza mapę, którą zna Truck Dash, deska rozdzielcza o tym powie, a klient pokaże powiadomienie obok zegara.</li>
+<li>Zamknij grę, ale zostaw klienta włączonego. Budowanie mapy potrzebuje pamięci, którą zajmuje gra.</li>
+<li>Kliknij prawym przyciskiem ikonę w zasobniku, otwórz <b>Konfiguracja i stan</b> i w części <b>Twoje mody map</b> kliknij <b>Zbuduj moją mapę</b>.</li>
+<li>Poczekaj około 5 minut, aż przeczyta grę i twoje mody, narysuje mapę i wyznaczy trasy. Za pierwszym razem pobiera też kreator map (około 40 MB). <b>Anuluj</b> przerywa w dowolnej chwili.</li>
+<li>Gdy pojawi się <i>Mapa zbudowana na tym PC</i> z liczbą miast, uruchom grę ponownie. Deska rozdzielcza sama przełączy się na twoją mapę: nazwa mapy, widoczna w prawym dolnym rogu przy wczytywaniu, kończy się na <i>(zbudowana na tym PC)</i>.</li>
+</ol>
+<p>Twoja mapa ma wszystko, co nasze: trasy ze wskazówkami i strzałkami pasów, nazwy dróg, miasta oraz stacje paliw, miejsca odpoczynku i firmy (z logo, także tymi z twoich modów) w <b>Szukaj w pobliżu</b>.</p>
+<h3>Gdzie ją widać</h3>
+<ul>
+<li>W przeglądarce na tym PC.</li>
+<li>Na telefonie lub tablecie tylko przez adres <b>tej samej sieci Wi-Fi</b> albo jego kod QR (zobacz <a href="#start">Pierwsze kroki</a>). Z kodem parowania telefon zostaje przy mapie z naszych serwerów: twoja nigdy nie opuszcza twojego PC.</li>
+</ul>
+<h3>Warto wiedzieć</h3>
+<ul>
+<li>Potrzeba około 7 GB wolnej pamięci. Przy mniejszej klient najpierw zapyta: zamknij inne programy (przeglądarkę też) albo spróbuj mimo to.</li>
+<li>Mapa pasuje do dokładnie twojej listy modów. Jeśli dodasz, usuniesz, przestawisz lub zaktualizujesz jakikolwiek mod (nie tylko mapę) albo gra się zaktualizuje, deska rozdzielcza wróci do naszej mapy; gdy znów z niej wyjedziesz, klient zaproponuje nową budowę. Zostają dwie ostatnie mapy każdej gry: jeśli wrócisz do poprzednich modów, znów zostanie użyta ich mapa.</li>
+<li>W aplikacji ustawienie modów map (przycisk z puzzlem) musi być na <b>Automatycznie</b>: mapa wybrana ręcznie to jedna z naszych.</li>
+<li>Mod, którego nie da się odczytać (zaszyfrowany, prawie nigdy mapa), jest pomijany, a mapa powstaje z reszty.</li>
+<li>Jeśli miasta twojego modu leżą daleko od prawdziwych (wymyślony świat), mapa jest rysowana na gładkim tle, bez morza i wybrzeża.</li>
+<li>Mapy są zapisywane w <code>%LOCALAPPDATA%\\TruckDash\\maps</code>, około 100 MB każda.</li>
+<li>Jeśli klient nie znajdzie folderu gry, dodaj go przyciskiem <b>Dodaj folder gry</b>. Jeśli budowa się nie uda, powód jest w pliku dziennika: wyślij nam go na <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discordzie</a>.</li>
+</ul>`,
     overlay: `
 <p>Małe okienko, które klient rysuje nad grą: to, co najważniejsze, bez odrywania wzroku od drogi. Tylko Windows, z grą w oknie lub w pełnym ekranie bez ramek.</p>
 <ul>
@@ -872,6 +980,7 @@ GUIDE_TEXT.tr = {
     settings: 'Ayarlar ve üst çubuk',
     convoy: 'Konvoy (beta)',
     client: 'Bilgisayarındaki istemci',
+    mymap: 'Haritamı oluştur: diğer harita modları',
     overlay: 'Oyun içi katman',
     account: 'Hesabın (isteğe bağlı)',
   },
@@ -922,7 +1031,7 @@ GUIDE_TEXT.tr = {
 <ul>
 <li>Kamyonun arkasındaki <b>mavi çizgi</b> geçtiğin yolu gösterir.</li>
 <li><b>Konumumu paylaş</b> açıkken haritanda diğer Truck Dash sürücülerini görürsün ve herkese açık <a href="/live/">canlı haritada</a> anonim bir sürücü olarak, rotanla birlikte görünürsün (<b>Rotamı da canlı haritada göster</b> işaretini kaldırmadıkça). Ayarlar'dan kapatabilirsin.</li>
-<li><b>Harita modlarının</b> kendi haritaları var: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia ve TruckersMP. Uygulama bunları oyundan algılar ya da yapboz düğmesiyle kendin seçersin.</li>
+<li><b>Harita modlarının</b> kendi haritaları var: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia ve TruckersMP. Uygulama bunları oyundan algılar ya da yapboz düğmesiyle kendin seçersin. Başka herhangi biri için istemci <a href="#mymap">haritayı bilgisayarında oluşturabilir</a>.</li>
 <li><b>DLC'ler</b> (Ayarlar'da): sahip olmadığın harita DLC'lerinin işaretini kaldır, rotalar onların yollarından kaçınır. Başka yol yoksa rota yine de kullanır ve bunu söyler. İstemci 1.5.28 veya daha yenisiyle oyunundan kendiliğinden okunur.</li>
 </ul>
 <p>Tüm harita düğmeleri taşınabilir ve boyutları değiştirilebilir: telefonda birine uzun bas ya da Ayarlar'da <b>Düğmeleri taşı</b> seçeneğini kullan.</p>`,
@@ -998,6 +1107,32 @@ GUIDE_TEXT.tr = {
 <li><b>Günlük dosyasını göster</b> ve <b>Sorun bildir</b>.</li>
 </ul>
 <div class="tip"><p>Bir şey çalışmıyor mu? <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> sunucumuzda sor ve günlük dosyasını ekle: sorunların çoğu birkaç mesajda çözülür.</p></div>`,
+    mymap: `
+<p>Truck Dash'in en çok kullanılan harita modları için haritaları var (liste <a href="#gps">GPS</a> bölümünde). Başka herhangi biri için, örneğin bir Güney Amerika haritası ya da yayınlamadığımız bir mod karışımı, istemci haritayı oyunundan ve etkin modlarından senin bilgisayarında oluşturabilir. Bir kez oluşturursun, gösterge paneli onu kendiliğinden kullanır.</p>
+<h3>Adım adım</h3>
+<ol>
+<li>Modlarınla her zamanki gibi sür. Tırın Truck Dash'in bildiği haritanın dışına çıkınca gösterge paneli bunu söyler ve istemci saatin yanında bir bildirim gösterir.</li>
+<li>Oyunu kapat, ama istemciyi açık bırak. Harita oluşturmak için oyunun kullandığı bellek gerekir.</li>
+<li>Tepsi simgesine sağ tıkla, <b>Kurulum ve durum</b>'u aç ve <b>Harita modların</b> bölümünde <b>Haritamı oluştur</b>'a tıkla.</li>
+<li>Oyunu ve modlarını okuyup haritayı çizerken ve rotaları hesaplarken yaklaşık 5 dakika bekle. İlk seferde harita oluşturucuyu da indirir (yaklaşık 40 MB). <b>İptal</b> her an durdurur.</li>
+<li>İstemci haritanın oluşturulduğunu şehir sayısıyla birlikte söyleyince oyunu yeniden başlat. Gösterge paneli kendiliğinden senin haritana geçer: yüklenirken sağ alt köşede görünen harita adının sonunda <i>(bu bilgisayarda oluşturuldu)</i> yazar.</li>
+</ol>
+<p>Haritanda bizimkilerde olan her şey var: yönlendirmeli ve şerit oklu rotalar, yol adları, şehirler, ayrıca <b>Yakında ara</b> içinde akaryakıt istasyonları, dinlenme alanları ve firmalar (logolarıyla, modlarının eklediklerininki de).</p>
+<h3>Nerede görünür</h3>
+<ul>
+<li>Bu bilgisayarın tarayıcısında.</li>
+<li>Telefonda ya da tablette yalnızca <b>aynı Wi-Fi</b> adresiyle veya QR koduyla (bkz. <a href="#start">Başlarken</a>). Eşleştirme koduyla telefon sunucularımızdaki haritayı kullanmaya devam eder: seninki bilgisayarından hiç çıkmaz.</li>
+</ul>
+<h3>Bilmekte fayda var</h3>
+<ul>
+<li>Yaklaşık 7 GB boş bellek gerekir. Daha az varsa istemci önce sorar: başka programları (tarayıcıyı da) kapat ya da yine de dene.</li>
+<li>Harita tam olarak senin mod listene aittir. Herhangi bir modu (yalnızca harita değil) ekler, kaldırır, sırasını değiştirir ya da güncellersen veya oyun güncellenirse gösterge paneli bizim haritamıza döner; yeniden haritanın dışına çıktığında istemci yeniden oluşturmayı önerir. Her oyunun son iki haritası saklanır: önceki modlarına dönersen onların haritası yeniden kullanılır.</li>
+<li>Uygulamada harita modları ayarı (yapboz düğmesi) <b>Otomatik</b> olmalı: elle seçilen harita bizimkilerden biridir.</li>
+<li>Okunamayan bir mod (şifreli, neredeyse hiç harita değildir) atlanır ve harita geri kalanlarla oluşturulur.</li>
+<li>Modunun şehirleri gerçeklerinden uzaktaysa (hayali bir dünya), harita denizsiz ve kıyısız düz bir zemin üzerine çizilir.</li>
+<li>Haritalar <code>%LOCALAPPDATA%\\TruckDash\\maps</code> klasörüne kaydedilir, her biri yaklaşık 100 MB.</li>
+<li>İstemci oyun klasörünü bulamazsa <b>Oyun klasörü ekle</b> ile ekle. Oluşturma başarısız olursa nedeni günlük dosyasındadır: onu bize <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> üzerinden gönder.</li>
+</ul>`,
     overlay: `
 <p>İstemcinin oyunun üzerine çizdiği küçük bir kutu: gözünü yoldan ayırmadan önemli bilgiler. Yalnızca Windows'ta, oyun pencerede veya kenarlıksız tam ekrandayken.</p>
 <ul>
@@ -1085,6 +1220,7 @@ GUIDE_TEXT.ru = {
     settings: 'Настройки и верхняя панель',
     convoy: 'Конвой (бета)',
     client: 'Клиент на вашем ПК',
+    mymap: 'Собрать мою карту: другие моды карт',
     overlay: 'Оверлей в игре',
     account: 'Ваш аккаунт (необязательно)',
   },
@@ -1135,7 +1271,7 @@ GUIDE_TEXT.ru = {
 <ul>
 <li><b>Синяя линия</b> за грузовиком показывает, где вы проехали.</li>
 <li>С включённым <b>Делиться моей позицией</b> вы видите других водителей Truck Dash на своей карте и анонимно отображаетесь на публичной <a href="/live/">живой карте</a>, вместе с вашим маршрутом, если не снять галочку <b>Показывать и мой маршрут на живой карте</b>. Это отключается в настройках.</li>
-<li>У <b>модов карт</b> свои карты: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia и TruckersMP. Приложение определяет их по игре, или вы выбираете вручную кнопкой с пазлом.</li>
+<li>У <b>модов карт</b> свои карты: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, Reforma, RusMap, Roextended, Grand Utopia и TruckersMP. Приложение определяет их по игре, или вы выбираете вручную кнопкой с пазлом. Для любого другого клиент может <a href="#mymap">собрать карту на вашем ПК</a>.</li>
 <li><b>DLC</b> (в Настройках): снимите отметки с картографических DLC, которых у вас нет, и маршруты будут объезжать их дороги. Если объезда нет, маршрут всё равно пройдёт по ним и предупредит. С клиентом 1.5.28 и новее они читаются из игры сами.</li>
 </ul>
 <p>Любую кнопку на карте можно переместить и изменить её размер: удерживайте её на телефоне или выберите <b>Переместить кнопки</b> в настройках.</p>`,
@@ -1211,6 +1347,32 @@ GUIDE_TEXT.ru = {
 <li><b>Показать файл журнала</b> и <b>Сообщить о проблеме</b>.</li>
 </ul>
 <div class="tip"><p>Что-то не работает? Спросите в нашем <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> и приложите файл журнала: большинство проблем решается за пару сообщений.</p></div>`,
+    mymap: `
+<p>У Truck Dash есть карты для самых популярных модов карт (список — в разделе <a href="#gps">GPS</a>). Для любого другого, например карты Южной Америки или набора модов, который мы не публикуем, клиент может собрать карту на вашем ПК из вашей игры и активных модов. Вы собираете её один раз, и панель приборов использует её сама.</p>
+<h3>Шаг за шагом</h3>
+<ol>
+<li>Ездите со своими модами как обычно. Когда грузовик выезжает за пределы карты, которую знает Truck Dash, панель приборов сообщает об этом, а клиент показывает уведомление рядом с часами.</li>
+<li>Закройте игру, но оставьте клиент запущенным. Сборке карты нужна память, которую занимает игра.</li>
+<li>Щёлкните правой кнопкой по значку в области уведомлений, откройте <b>Настройка и состояние</b> и в разделе <b>Ваши моды карт</b> нажмите <b>Собрать мою карту</b>.</li>
+<li>Подождите около 5 минут, пока он читает игру и ваши моды, рисует карту и рассчитывает маршруты. В первый раз он также скачивает сборщик карт (около 40 МБ). <b>Отмена</b> останавливает его в любой момент.</li>
+<li>Когда клиент напишет, что карта собрана, и покажет число городов, снова запустите игру. Панель приборов сама переключится на вашу карту: название карты, которое при загрузке появляется в правом нижнем углу, заканчивается на <i>(собрана на этом ПК)</i>.</li>
+</ol>
+<p>На вашей карте есть всё, что и на наших: маршруты с подсказками и стрелками полос, названия дорог, города, а также АЗС, места отдыха и компании (с логотипами, в том числе добавленными вашими модами) в <b>Найти рядом</b>.</p>
+<h3>Где её видно</h3>
+<ul>
+<li>В браузере на этом ПК.</li>
+<li>На телефоне или планшете — только по адресу для <b>той же сети Wi-Fi</b> или его QR-коду (см. <a href="#start">Начало работы</a>). С кодом сопряжения телефон остаётся с картой с наших серверов: ваша никогда не покидает ваш ПК.</li>
+</ul>
+<h3>Полезно знать</h3>
+<ul>
+<li>Нужно около 7 ГБ свободной памяти. Если меньше, клиент сначала спросит: закройте другие программы (и браузер тоже) или попробуйте всё равно.</li>
+<li>Карта привязана к точному списку ваших модов. Если вы добавите, удалите, переставите или обновите любой мод (не только карту) или игра обновится, панель приборов вернётся к нашей карте; когда вы снова выедете за её пределы, клиент предложит собрать карту заново. Хранятся две последние карты каждой игры: если вы вернётесь к прежним модам, снова будет использована их карта.</li>
+<li>В приложении настройка модов карт (кнопка с пазлом) должна стоять на <b>Автоматически</b>: карта, выбранная вручную, — одна из наших.</li>
+<li>Мод, который не удаётся прочитать (зашифрованный, почти никогда не карта), пропускается, и карта собирается из остальных.</li>
+<li>Если города вашего мода далеко от настоящих (выдуманный мир), карта рисуется на однотонном фоне, без моря и побережья.</li>
+<li>Карты сохраняются в <code>%LOCALAPPDATA%\\TruckDash\\maps</code>, около 100 МБ каждая.</li>
+<li>Если клиент не находит папку игры, добавьте её кнопкой <b>Добавить папку игры</b>. Если сборка не удалась, причина есть в файле журнала: пришлите его нам в <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
     overlay: `
 <p>Небольшое окно, которое клиент рисует поверх игры: главное, не отрывая взгляда от дороги. Только Windows, игра в окне или в полноэкранном режиме без рамки.</p>
 <ul>
