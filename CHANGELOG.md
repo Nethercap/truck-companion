@@ -13,6 +13,17 @@ updates on its own and is not versioned here.
 - LAN mode: the client's local page server (the web copy and the maps built on the PC) only shares
   its files with trucksim-dash.com and the client's own pages. Web pages from anywhere else can no
   longer read them, and can no longer open the Setup window.
+- Discord status: after a job ends (or is cancelled by calling a tow truck), your profile no longer
+  keeps showing the old job's route and cargo.
+- Quit (in the tray icon's menu) hides the in-game overlay right away and always closes the client.
+  Before, the tray icon went away but the client could keep running for a while, with the overlay
+  still in the game.
+- A new version downloaded to a different folder now takes over "Start with Windows". Before,
+  Windows kept starting the old copy, with its own overlay and settings, and opening the new one
+  just showed the old one's window. If the old copy is running, the new one now says where it is so
+  you can quit it.
+- With no dashboard open, the in-game overlay now says which key hides it (Ctrl+Shift+O by
+  default).
 
 ## 1.5.33 (2026-10-19)
 

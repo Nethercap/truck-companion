@@ -454,6 +454,51 @@ def test_in_temp_location_detects_zip_extraction(monkeypatch, tmp_path):
         assert win_integration.in_temp_location("/tmp/.mount_abc123/TruckDash") is True
 
 
+def test_exe_de_la_clave_run():
+    assert win_integration.exe_from_command('"C:\\Truck Dash\\TruckDash.exe" --autostart') == "C:\\Truck Dash\\TruckDash.exe"
+    assert win_integration.exe_from_command("C:\\TD\\TruckDash.exe --autostart") == "C:\\TD\\TruckDash.exe"
+    assert win_integration.exe_from_command("") is None
+    assert win_integration.exe_from_command(None) is None
+    assert win_integration.exe_from_command('"') is None
+
+
+def test_el_inicio_con_windows_pasa_a_la_copia_que_se_abrio(monkeypatch, tmp_path):
+    """Discord, 21-10: la version nueva bajada a otra carpeta. La clave Run
+    seguia con la vieja, que arrancaba con Windows con su overlay; la nueva
+    solo le abria la ventana. Ahora la clave pasa a la nueva y se sabe cual
+    era la otra."""
+    nuevo = str(tmp_path / "nueva" / "TruckDash.exe")
+    viejo = str(tmp_path / "vieja" / "TruckDash.exe")
+    registrados = []
+    monkeypatch.setattr(win_integration, "exe_path", lambda: nuevo)
+    monkeypatch.setattr(win_integration, "in_temp_location", lambda path=None: False)
+    monkeypatch.setattr(win_integration, "set_autostart", lambda on: registrados.append(on) or True)
+
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: viejo)
+    assert win_integration.refresh_autostart_path() == viejo
+    assert registrados == [True]
+
+    # La misma copia, sin inicio con Windows o desde el codigo: no se toca.
+    registrados.clear()
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: nuevo)
+    assert win_integration.refresh_autostart_path() is None
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: None)
+    assert win_integration.refresh_autostart_path() is None
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: viejo)
+    monkeypatch.setattr(win_integration, "exe_path", lambda: None)
+    assert win_integration.refresh_autostart_path() is None
+    # Abierta desde adentro del zip no se registra (issue #2).
+    monkeypatch.setattr(win_integration, "exe_path", lambda: nuevo)
+    monkeypatch.setattr(win_integration, "in_temp_location", lambda path=None: True)
+    assert win_integration.refresh_autostart_path() is None
+    assert registrados == []
+
+    # Si no se pudo escribir la clave, no se avisa de otra copia.
+    monkeypatch.setattr(win_integration, "in_temp_location", lambda path=None: False)
+    monkeypatch.setattr(win_integration, "set_autostart", lambda on: False)
+    assert win_integration.refresh_autostart_path() is None
+
+
 def test_pairing_code_is_reused_between_runs(monkeypatch, tmp_path):
     """Pedido de Discord: el link guardado en el celular tiene que seguir
     sirviendo, asi que el codigo se guarda y se reusa (solo si es valido)."""
@@ -513,6 +558,16 @@ def test_discord_activity_from_telemetry():
     assert dp.activity_from_telemetry(None) is None
     pausada = dp.activity_from_telemetry({"game": "ets2", "cityDst": "Praha", "paused": True})
     assert "Praha" in pausada["details"] and "km" not in pausada["state"]
+
+    # Sin trabajo (la carga externa cancelada deja los datos del viaje en el
+    # plugin) no se muestra el viaje anterior; el GPS del juego si.
+    libre = dp.activity_from_telemetry(
+        {"game": "ats", "onJob": False, "citySrc": "Salt Lake City", "cityDst": "Las Vegas",
+         "cargo": "Bulldozer", "routeDistanceKm": 30})
+    assert libre["details"] == dp._t("rpc_on_road")
+    assert "Bulldozer" not in libre["state"] and "30" in libre["state"]
+    con = dp.activity_from_telemetry({"game": "ats", "onJob": True, "cityDst": "Las Vegas"})
+    assert "Las Vegas" in con["details"]
 
 
 def test_discord_frame_encoding():

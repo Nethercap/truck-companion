@@ -266,6 +266,23 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   con `labelEvidence` (puede ser el portico de una bifurcacion). En 450
   rutas de ATS cambian 8 nombres, todos de una US a la interestatal del
   mismo tramo; la regla para todo empate cambiaba 43, con 2 peores.
+  Si tambien empatan en `labelEvidence` y dos carteles o mas traen los dos
+  escudos, es el tramo compartido y gana la interestatal, salvo que empate
+  su "Bus" (un enlace): I-435 / US-50 en Kansas City, I-82 / US-97 en
+  Yakima; en 450 rutas de ATS, 7 nombres y ninguno peor. Con un cartel solo
+  no: era el portico (Truckee, Cheyenne) o la US que se toma (Fort Smith,
+  Columbia). De los 41 avisos "US con la interestatal despues", casi todos
+  son la ruta que deja la autopista por la US (Spokane, Peoria).
+  Los escudos de rutas historicas ("US-66 Hist", `sinHistoricas`) votan
+  solo si no voto otra ruta, y desde dos: "onto US-66 Hist" en Kingman
+  era la US-93 (en 450 rutas, 6 nombres: 3 mejores, ninguno peor, 3 sin
+  escudos despues para juzgar). De las 9 "Bus" que quedan, 4 tienen 2 o 3
+  carteles junto a la ruta (se va por el loop: Bozeman, Springfield MO) y 5
+  un voto solo (Kirksville, Hot Springs); dejar sin nombre el voto solo
+  contra 3 o mas muestras sin cartel de la salida da 11 mejores, 47 peores.
+  Los carteles de ETS2 con la clave del juego (`traffic_rule.limit_80`, 399
+  de velocidad) o un texto sin traducir (`@@fp_de_diesel@@`) no son nombres:
+  `groupSignsByPoint` los saca al cargar (18 de 2124 avisos en 300 rutas).
   Cada muestra vota con el cartel mas cercano que pasa `exitSignTest` (no
   con el mas cercano a secas: si era de la otra mano tapaba al bueno y el
   aviso salia sin nombre), un cartel vota una vez aunque lo encuentren dos
@@ -278,7 +295,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   ("toward TALLINN" saliendo de Tallinn). Medido el 21-10: ATS 266 -> 307
   bien, 76 -> 66 mal, 100 -> 69 sin nombre (de 448); ETS2 125 -> 53 atras,
   246 -> 306 adelante, 50 avisos mas sin nombre. Las rotondas no pasan por
-  `exitSignTest` (en ETS2 casi no fallan: 6 de 53).
+  `exitSignTest` (en ETS2 casi no fallan: 6 de 53). Con el test desde la
+  entrada a la salida cambian 95 nombres de rotonda en ETS2 sin ganar
+  (adelante 307 -> 299, atras 53 -> 48, mas nombres locales: "centro",
+  "Péage à 400 m"); en ATS los 9 que se pueden juzgar ya estaban bien.
 - Recalculada parado (bajo `ROUTE_HEADING_MIN_KMH`), la ruta arranca en el nodo
   mas cercano: frente a una T es el del cruce, y sin nada antes el recorte lo
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
@@ -317,18 +337,41 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   siendo cierta.
 - Del barrido con simulaciones del 21-10, sin arreglar en la web (piden
   regenerar el grafo o una decision):
-  - Grafo de ETS2: la zona de Volkhov (Rusia, 278 nodos a 6 km de San
-    Petersburgo) no tiene salida: los seis carriles de prefab del borde
-    entran y ninguno sale (cruces cerca de (64750,-59810) y (65218,-56174)).
-    Desde ahi no hay ruta; hacia ahi si. En ATS no hay zonas asi de 20+ nodos.
+  - Zonas del grafo sin salida o sin entrada (carriles de prefab que
+    quedaron de un solo sentido). La peor, Volkhov en ETS2 (289 nodos a 6 km
+    de San Petersburgo, 11 empresas de Volkhov y Kirishi): los seis carriles
+    del borde entran y ninguno sale (cruces cerca de (64750,-59810) y
+    (65218,-56174)). Sin entrada: hs_mkt de Durango (ATS), chm_che_plnt de
+    Chattanooga (Coast to Coast), bn_farm de Mezquital (Reforma); sin salida:
+    Derramadero y Guadalupe y Calvo (Reforma), nbfc de Canterbury (ProMods +
+    RusMap + Roex), Canakkale (Roex). Sin empresas pero en rutas: Folkestone
+    (ProMods, 160 nodos), y en ATS pares de zonas con 1,6 a 2,2 km de
+    autopista a 90 km/h cada una en Champaign, Marion y Effingham (Illinois:
+    los cruces de la I-57 con la I-74, la I-24 y la I-70), que ninguna ruta
+    puede usar. `simular_navegacion` no las ve: `tools/zonas_sin_salida.js
+    [variante ...]` las lista con sus empresas (despues de regenerar un
+    grafo, lo ideal es 0 con empresas). Mientras no se regenere el grafo,
+    `findRouteWith` arranca o termina en el nodo mas cercano del que se sale
+    o al que se llega (`routeReachability`, solo si no hay camino): la ruta
+    empieza hasta 1,4 km mas alla (Kirishi) en vez de no haber ruta.
+  - ETS2: pk_medved_ru y eskadra de Veliky Novgorod quedan a 380-480 m del
+    grafo (la playa no esta en el grafo): la ruta termina afuera. Las cajas
+    de ciudad de mas de 4 km (Estambul, Barcelona, una al lado de Mitilini)
+    parecen de verdad; no se midio contra el GPS del juego.
   - Rotondas compactas de un solo prefab en ETS2: 11 de 29 sin reconocer (las
     curvas internas quedaron de doble mano en el grafo). Lo robusto es que el
     constructor marque los prefabs de rotonda por su nombre.
-  - Nombres: US en vez de la interestatal en tramos compartidos con un solo
-    cartel de dos escudos (41 casos, Spokane I-90/US-395), "Bus"/"Hist" que
-    le ganan a la ruta numerada (13), y las rotondas sin `exitSignTest`.
+  - Nombres (ATS, 63 mal de 447): sobre todo empates entre un cartel cerca
+    del giro y otro mas adelante; que gane el de adelante da +8/-2 contra los
+    escudos de despues y +2/-4 con los de las dos manos, sin regla segura.
+    Tampoco el I-255 / US-67 de St. Louis (un cartel de la US de mas) ni el
+    I-49 / US-82 de Shreveport (los de la autopista quedan a la izquierda).
   - "Shortest" en la app con el GPS del juego en "fastest": `routeLikeGame`
     corre igual y puede cambiar la ruta mas corta por una como la del juego.
+  - El overlay del juego (`client/overlay.py`) con el descanso en 0 (fatiga
+    apagada) dice "parar ya"; la web y el panel lo toman como sin dato
+    (`restMinutesOf`, `createFatigue`). Un test del cliente lo fija asi
+    (`test_overlay.py`): decidir cual vale.
 - Propuestas de afuera: pedir el codigo en un repo publico antes de mirar
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.

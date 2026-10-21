@@ -3562,6 +3562,21 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
     path = porAristas(startIdx, arranque ? arranque.arc : null);
   }
   path = path || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
+  if (!path) {
+    // Una zona del grafo sin salida o sin entrada (carriles de prefab al
+    // reves: Volkhov en ETS2): desde el nodo mas cercano del que se sale, y
+    // hasta el mas cercano al que se llega (routeReachability, pure.js).
+    // Mejor una ruta que empieza o termina unos metros mas alla que una recta.
+    const alcance = routeReachability(routeGraph);
+    const s2 = alcance.reachesMain[startIdx] ? startIdx : nearestNodeIndex(startXY[0], startXY[1], false, componentId[startIdx], nodeOk, alcance.reachesMain);
+    const e2 = alcance.reachFromMain[endIdx] ? endIdx : nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, alcance.reachFromMain);
+    if (s2 !== -1 && e2 !== -1 && (s2 !== startIdx || e2 !== endIdx)) {
+      if (s2 !== startIdx) { arranque = null; startIdx = s2; }
+      if (finales) finales.clear();
+      endIdx = e2; ex = nodes[2 * endIdx]; ey = nodes[2 * endIdx + 1]; holgura = 0;
+      path = porAristas(startIdx, arranque ? arranque.arc : null) || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
+    }
+  }
   if (!path) return null;
   let llegada = path.endArc != null ? metas.find(c => c.arc === path.endArc) || null : null;
   // Un waypoint en medio de un cruce queda cerca de varios carriles, y el que
@@ -5936,8 +5951,8 @@ function updateMiniHudExtra(data) {
     const rangeDisplay = useImperial ? ffRange * KM_TO_MI : ffRange;
     lines.push(`${t('range')}: ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`);
   }
-  if (miniHudSettings.eta && data.routeTimeSeconds != null) {
-    lines.push(`${t('etaGame')}: ${formatSeconds(data.routeTimeSeconds)}`);
+  if (miniHudSettings.eta && gameRouteSeconds(data) != null) {
+    lines.push(`${t('etaGame')}: ${formatSeconds(gameRouteSeconds(data))}`);
   }
   if (miniHudSettings.distance && data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
@@ -6192,7 +6207,7 @@ function updateHud(data) {
     document.getElementById('cargo').textContent = t('noCargo');
   }
 
-  const etaText = formatSeconds(data.routeTimeSeconds);
+  const etaText = formatSeconds(gameRouteSeconds(data)); // '-' sin ruta en el GPS del juego
   if (data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
     document.getElementById('etaGame').textContent = `${etaText} (${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'})`;

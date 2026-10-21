@@ -889,6 +889,30 @@ function createRefuelWatch({ minL = 20, minFrac = 0.08 } = {}) {
   };
 }
 
+// Los minutos de juego hasta el proximo descanso, o null si no dicen nada:
+// con la fatiga apagada el juego manda 0 o un valor de mas de un dia, como
+// el plazo de un trabajo sin plazo (jobDeadlineSeconds). createFatigue,
+// createRestWatch y createStatusAlerts ya lo filtraban; el panel de
+// docs/dash/ usaba el valor crudo y con la fatiga apagada decia que habia
+// que dormir antes de llegar y marcaba el descanso al principio de la barra
+// (barrido del 21-10). restStopSeconds: el nombre viejo, tambien en minutos.
+const REST_MINUTES_MAX = 24 * 60;
+function restMinutesOf(data) {
+  if (!data) return null;
+  const crudo = data.restStopMinutes != null ? data.restStopMinutes : data.restStopSeconds;
+  if (crudo == null) return null;
+  const m = Number(crudo);
+  return Number.isFinite(m) && m > 0 && m < REST_MINUTES_MAX ? m : null;
+}
+
+// Lo que el GPS del juego dice que falta, en segundos de juego, o null sin
+// ruta: sin ruta el SDK manda 0 y el mini-HUD y el panel decian "ETA (game):
+// 0h 0m" (la distancia, que tambien viene en 0, ya no se mostraba).
+function gameRouteSeconds(data) {
+  const s = data ? Number(data.routeTimeSeconds) : NaN;
+  return Number.isFinite(s) && s > 0 ? s : null;
+}
+
 // Lo mismo para el descanso: una parada en un area de descanso queda
 // cumplida al dormir, aunque haya sido en otra. Dormir sube los minutos que
 // faltan para el proximo descanso de golpe (de ~30 a ~11 h); manejar solo
@@ -2211,8 +2235,13 @@ function roadShieldPoints(names, cellM) {
 // entrada por escudo en el mismo punto, y nearestInGrid devolvia siempre la
 // primera del archivo. Cada una lleva en `labels` los numeros de su punto,
 // para que en roadSignForTurn voten todos. Modifica las entradas y devuelve
-// la lista.
+// la lista, sin las que no son un nombre: en el road-names.json de ETS2 hay
+// 399 carteles de velocidad con la clave del juego ("traffic_rule.limit_40")
+// y 4 con un texto sin traducir ("@@fp_de_diesel@@"), y en 300 rutas 18
+// avisos decian "toward traffic_rule.limit_80" (Balcanes, Grecia).
+const signLabelOk = (label) => typeof label === 'string' && !/^traffic_rule\.|^@@.*@@$/.test(label.trim());
 function groupSignsByPoint(signs) {
+  if (Array.isArray(signs) && !signs.every((s) => signLabelOk(s.label))) signs = signs.filter((s) => signLabelOk(s.label));
   const porPunto = new Map();
   for (const s of signs || []) {
     const k = `${s.x},${s.y}`;
@@ -2322,11 +2351,28 @@ const ROAD_SIGN_FORK_NEAR_M = 200;
 // Un cartel por cada escudo de s, con su numero
 const roadSignShields = (s) => (s.labels || [s.label]).map((label) => (label === s.label ? s : { ...s, label }));
 const esInterestatal = (label) => /^I-\d+[A-Z]?$/.test(label);
+// Los escudos de las rutas historicas ("US-66 Hist", tambien pintados en el
+// asfalto) estan en las calles por donde pasaban, junto a los carteles de la
+// ruta de hoy. Votan solo si no voto ninguna otra ruta, y uno solo no
+// alcanza: en 450 rutas de ATS "Turn left onto US-66 Hist" en Kingman (la
+// ruta sigue por la US-93), en Joplin (la US-400) y saliendo de Springfield
+// a Peoria (la I-74). En Portland, de la I-205 a la I-84, "US-30 Hist" pasa
+// a "I-84".
+const esHistorica = (label) => / Hist$/.test(label);
+const ROAD_SIGN_HIST_MIN = 2;
+function sinHistoricas(votantes) {
+  const otros = votantes.filter((s) => (s.labels || [s.label]).some((l) => !esHistorica(l)));
+  if (!otros.length) return votantes.length >= ROAD_SIGN_HIST_MIN ? votantes : [];
+  return otros.map((s) => {
+    const labels = (s.labels || [s.label]).filter((l) => !esHistorica(l));
+    return labels.length === (s.labels || [s.label]).length ? s : { ...s, label: labels[0], labels };
+  });
+}
 function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {}) {
   const radius = opts.radius ?? 200, fallbackRadius = opts.fallbackRadius ?? 400;
   const salida = opts.onExit || null;
   const votes = new Map(); // en orden de aparicion: un empate lo gana la primera
-  const votantes = [];
+  let votantes = [];
   let ajenos = 0;
   ROAD_SIGN_SAMPLES_M.forEach((d) => {
     if (fromM + d > totalM) return;
@@ -2340,6 +2386,10 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
     }
     if (!votantes.some((o) => o.x === s.x && o.y === s.y)) votantes.push(s);
   });
+  // Un escudo historico solo, descartado: sin respaldo (seria el mismo)
+  const conHistoricas = votantes.length;
+  votantes = sinHistoricas(votantes);
+  if (conHistoricas && !votantes.length) ajenos++;
   const cercaM = salida && salida.cercaM;
   const lejanos = cercaM ? votantes.filter((s) => salida.desdeGiro(s) >= cercaM) : votantes;
   const usados = lejanos.length ? lejanos : votantes;
@@ -2365,6 +2415,21 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
   if (empate.length > 1 && opts.onExit && opts.onExit.labelEvidence) {
     const puntaje = opts.onExit.labelEvidence(nearest);
     for (const v of empate) if ((puntaje.get(v.sign.label) || 0) > (puntaje.get(best.sign.label) || 0)) best = v;
+    // Si la evidencia tambien empata y dos carteles o mas traen los dos
+    // escudos, es el tramo compartido y no un portico: gana la interestatal
+    // (I-435 / US-50 en Kansas City, I-82 / US-97 en Yakima, I-69 / US-59 en
+    // Houston). No si entre los empatados esta su "Bus" (el cartel de un
+    // enlace). En 450 rutas de ATS, 7 nombres de una US a la interestatal,
+    // ninguno peor contra los escudos de despues. Con un cartel solo, no: era
+    // el portico de la bifurcacion (Truckee, Cheyenne) o el de la US que se
+    // toma (Fort Smith, Columbia).
+    if (!esInterestatal(best.sign.label)) {
+      const tope = puntaje.get(best.sign.label) || 0;
+      const juntos = (l) => usados.filter((s) => { const ls = s.labels || [s.label]; return ls.includes(l) && ls.includes(best.sign.label); }).length;
+      const tramo = empate.find((v) => esInterestatal(v.sign.label) && (puntaje.get(v.sign.label) || 0) === tope
+        && juntos(v.sign.label) >= 2 && !empate.some((o) => o.sign.label.startsWith(v.sign.label + ' ')));
+      if (tramo) best = tramo;
+    }
   }
   if (best) return best.sign;
   if (ajenos || !fallbackXY) return null;
@@ -4699,6 +4764,71 @@ function slowNodes(g, maxKmh = STOP_SLOW_KMH) {
   return nodos;
 }
 
+// Zonas del grafo de las que no se sale o a las que no se entra por el
+// sentido de sus aristas: carriles de prefab que quedaron solo de entrada o
+// solo de salida al armar el grafo. Desde Volkhov y Kirishi (ETS2, 11
+// empresas) no habia ruta a ningun lado, ni hacia hs_mkt de Durango (ATS),
+// chm_che_plnt de Chattanooga (Coast to Coast) y empresas de Reforma; la
+// app dibujaba una recta (barrido del 21-10, las 17 variantes). Se arregla
+// regenerando el grafo; mientras, findRouteWith arranca en el nodo mas
+// cercano desde el que se llega a la componente fuerte mayor (reachesMain)
+// y termina en el mas cercano al que se llega desde ella (reachFromMain),
+// solo si sin eso no hay camino. Una vez por grafo: { reachesMain,
+// reachFromMain, inMain } (Uint8Array por nodo).
+function routeReachability(g) {
+  if (g._alcance) return g._alcance;
+  const n = g.n, { csr, adjTo } = g;
+  // Componentes fuertes (Tarjan sin recursion)
+  const idx = new Int32Array(n).fill(-1), low = new Int32Array(n), enPila = new Uint8Array(n), comp = new Int32Array(n).fill(-1);
+  const pila = [], llamadas = [];
+  let sig = 0, nc = 0;
+  const tam = [];
+  for (let s = 0; s < n; s++) {
+    if (idx[s] !== -1) continue;
+    llamadas.push(s, csr[s]); idx[s] = low[s] = sig++; pila.push(s); enPila[s] = 1;
+    while (llamadas.length) {
+      const u = llamadas[llamadas.length - 2], k = llamadas[llamadas.length - 1];
+      if (k < csr[u + 1]) {
+        llamadas[llamadas.length - 1] = k + 1;
+        const w = adjTo[k];
+        if (idx[w] === -1) { idx[w] = low[w] = sig++; pila.push(w); enPila[w] = 1; llamadas.push(w, csr[w]); }
+        else if (enPila[w] && idx[w] < low[u]) low[u] = idx[w];
+      } else {
+        llamadas.length -= 2;
+        if (llamadas.length) { const p = llamadas[llamadas.length - 2]; if (low[u] < low[p]) low[p] = low[u]; }
+        if (low[u] === idx[u]) {
+          let w, t = 0;
+          do { w = pila.pop(); enPila[w] = 0; comp[w] = nc; t++; } while (w !== u);
+          tam.push(t); nc++;
+        }
+      }
+    }
+  }
+  let mayor = 0;
+  for (let c = 1; c < nc; c++) if (tam[c] > tam[mayor]) mayor = c;
+  const inMain = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (comp[i] === mayor) inMain[i] = 1;
+  // Desde la mayor hacia adelante, y hacia ella por las aristas al reves
+  const reachFromMain = inMain.slice(), reachesMain = inMain.slice();
+  const cola = [];
+  for (let i = 0; i < n; i++) if (inMain[i]) cola.push(i);
+  for (let q = cola.slice(); q.length;) {
+    const u = q.pop();
+    for (let k = csr[u]; k < csr[u + 1]; k++) { const w = adjTo[k]; if (!reachFromMain[w]) { reachFromMain[w] = 1; q.push(w); } }
+  }
+  const entra = new Uint32Array(n + 1);
+  for (let k = 0; k < csr[n]; k++) entra[adjTo[k] + 1]++;
+  for (let i = 0; i < n; i++) entra[i + 1] += entra[i];
+  const de = new Uint32Array(csr[n]), lleno = entra.slice(0, n);
+  for (let u = 0; u < n; u++) for (let k = csr[u]; k < csr[u + 1]; k++) de[lleno[adjTo[k]]++] = u;
+  for (let q = cola; q.length;) {
+    const u = q.pop();
+    for (let k = entra[u]; k < entra[u + 1]; k++) { const w = de[k]; if (!reachesMain[w]) { reachesMain[w] = 1; q.push(w); } }
+  }
+  g._alcance = { reachesMain, reachFromMain, inMain };
+  return g._alcance;
+}
+
 // Solo el waypoint puesto tocando el mapa (sin nombre ni tipo) es un punto
 // por donde pasar. El de un POI (estacion, descanso, empresa) o el del lider
 // del convoy es un lugar al que entrar: si la autopista pasa a menos de 40 m
@@ -4951,6 +5081,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, slowNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }

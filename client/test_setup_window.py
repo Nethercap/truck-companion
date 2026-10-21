@@ -236,21 +236,40 @@ def test_apagar_cierra_discord_y_el_icono(monkeypatch):
     assert llamadas == ["discord", ("salir", False)]
 
 
-def test_salir_de_la_bandeja_cierra_la_sesion_de_manejo(monkeypatch):
+def test_salir_de_la_bandeja_esconde_el_overlay_y_cierra(monkeypatch):
     # Visto en la prueba de manejo: "Salir" no pasaba por apagar() y la
-    # sesion quedaba sin ended_at en el servidor.
+    # sesion quedaba sin ended_at en el servidor. Y solo paraba el icono:
+    # el proceso seguia con el overlay en el juego (Discord, 21-10).
     llamadas = []
+    monkeypatch.setattr(tray_client.state.overlay, "set_enabled",
+                        lambda prender: llamadas.append(("overlay", prender)))
     monkeypatch.setattr(tray_client.state.cuenta, "cerrar_sesion",
                         lambda: llamadas.append("sesion"))
     monkeypatch.setattr(tray_client.state.discord, "close",
                         lambda: llamadas.append("discord"))
+    monkeypatch.setattr(tray_client.win_integration, "stop_and_exit",
+                        lambda cb=None: (llamadas.append("salir"), cb and cb()))
+    monkeypatch.setattr(tray_client.state, "icon", None)
 
     class Icono:
         def stop(self):
             llamadas.append("icono")
 
     tray_client.quit_app(Icono(), None)
-    assert llamadas == ["sesion", "discord", "icono"]
+    assert llamadas == [("overlay", False), "sesion", "discord", "salir", "icono"]
+
+
+def test_la_pista_del_overlay_dice_la_tecla(monkeypatch):
+    """Sin tablero, el overlay dice de donde salen los giros y con que tecla
+    se esconde: prendido, quedaba en el juego y no se sabia como sacarlo."""
+    monkeypatch.setattr(tray_client.state.overlay_tecla, "actual", "ctrl+shift+o")
+    assert tray_client.state.aviso_giro() == (
+        tray_client.T("overlay_turn_hint") + " "
+        + tray_client.T("overlay_hide_hint", combo="Ctrl+Shift+O"))
+    assert "Ctrl+Shift+O" in tray_client.state.overlay.etiquetas()[3]
+    # Sin tecla (no se pudo registrar), solo la pista de siempre.
+    monkeypatch.setattr(tray_client.state.overlay_tecla, "actual", "")
+    assert tray_client.state.aviso_giro() == tray_client.T("overlay_turn_hint")
 
 
 # ------------------------------------------------------------------ cuenta
