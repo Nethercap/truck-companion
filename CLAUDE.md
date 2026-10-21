@@ -328,8 +328,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
     (ProMods, 160 nodos), y en ATS pares de zonas con 1,6 a 2,2 km de
     autopista a 90 km/h cada una en Champaign, Marion y Effingham (Illinois:
     los cruces de la I-57 con la I-74, la I-24 y la I-70), que ninguna ruta
-    puede usar. `simular_navegacion` no las ve: listarlas con un analisis de
-    componentes fuertes del grafo. Mientras no se regenere el grafo,
+    puede usar. `simular_navegacion` no las ve: `tools/zonas_sin_salida.js
+    [variante ...]` las lista con sus empresas (despues de regenerar un
+    grafo, lo ideal es 0 con empresas). Mientras no se regenere el grafo,
     `findRouteWith` arranca o termina en el nodo mas cercano del que se sale
     o al que se llega (`routeReachability`, solo si no hay camino): la ruta
     empieza hasta 1,4 km mas alla (Kirishi) en vez de no haber ruta.
