@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.34 (2026-10-21)
 
 - LAN mode: "Share my position" (the public live map) can now be turned off, or on, from the
   dashboard on the same Wi-Fi. Before, the box was greyed out there and only the dashboard opened
