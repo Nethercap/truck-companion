@@ -585,6 +585,48 @@ def test_pin_plugin_escribe_la_dll_con_nuestro_nombre():
     assert os.path.basename(pin.VENDOR) == plugin_installer.PLUGIN_DLL_NAME
 
 
+def test_pin_plugin_fija_la_dylib_de_macos(tmp_path):
+    """La .dylib (Mach-O universal o de una arquitectura) va con su propio
+    hash, que arranca vacio, y no toca el de la DLL."""
+    pin = _pin_plugin()
+    dll_sha = "b" * 64
+    for cabecera in (b"\xca\xfe\xba\xbe", b"\xcf\xfa\xed\xfe"):
+        for antes in ("", "c" * 64):
+            fuente = f'PLUGIN_DLL_SHA256 = "{dll_sha}"\nPLUGIN_DYLIB_SHA256 = "{antes}"\n'
+            installer = tmp_path / "plugin_installer.py"
+            installer.write_text(fuente)
+            dylib = tmp_path / "nueva.dylib"
+            dylib.write_bytes(cabecera + b" nueva")
+            vendor = tmp_path / "vendor.dylib"
+
+            sha = pin.fijar(str(dylib), str(vendor), str(installer))
+
+            assert installer.read_text() == f'PLUGIN_DLL_SHA256 = "{dll_sha}"\nPLUGIN_DYLIB_SHA256 = "{sha}"\n'
+            assert vendor.read_bytes() == cabecera + b" nueva"
+    assert os.path.basename(pin.VENDOR_DYLIB) == plugin_installer.PLUGIN_DYLIB_NAME
+
+
+def test_pin_plugin_no_fija_cualquier_archivo(tmp_path):
+    pin = _pin_plugin()
+    otro = tmp_path / "otro.so"
+    otro.write_bytes(b"\x7fELF")
+    installer = tmp_path / "plugin_installer.py"
+    installer.write_text('PLUGIN_DLL_SHA256 = "' + "a" * 64 + '"\n')
+    with pytest.raises(SystemExit):
+        pin.fijar(str(otro), str(tmp_path / "vendor"), str(installer))
+    assert not (tmp_path / "vendor").exists()
+
+
+def test_la_dylib_vendoreada_es_la_del_hash():
+    """Como la DLL: si "Build plugin" dejo la .dylib, tiene que ser la del
+    hash; sin hash, todavia no hay .dylib."""
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", plugin_installer.PLUGIN_DYLIB_NAME)
+    if plugin_installer.PLUGIN_DYLIB_SHA256:
+        assert plugin_installer.sha256_of(ruta) == plugin_installer.PLUGIN_DYLIB_SHA256
+    else:
+        assert not os.path.exists(ruta)
+
+
 def test_rutas_de_linux_vistas_desde_wine():
     assert plugin_installer.unix_a_wine("/run/media/tw/SSD") == r"Z:\run\media\tw\SSD"
     assert plugin_installer.unix_a_wine(r"D:\Games") == r"D:\Games"

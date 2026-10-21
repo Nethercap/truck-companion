@@ -52,6 +52,9 @@ jobs:
       - run: pip install -r client/requirements.txt
       - run: python -m pip install pytest
       - run: xvfb-run -a python -m pytest client/ -v
+      # El plugin fuera de Windows (el mismo codigo que la .dylib de macOS):
+      # como el paso de build.ps1 en el job de Windows, avisa si no compila.
+      - run: bash plugin/build.sh "$RUNNER_TEMP/plugin"
 
   web:
     runs-on: ubuntu-latest
