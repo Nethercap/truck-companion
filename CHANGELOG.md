@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.34 (2026-10-21)
 
 - LAN mode: "Share my position" (the public live map) can now be turned off, or on, from the
   dashboard on the same Wi-Fi. Before, the box was greyed out there and only the dashboard opened
@@ -24,6 +24,8 @@ updates on its own and is not versioned here.
   you can quit it.
 - With no dashboard open, the in-game overlay now says which key hides it (Ctrl+Shift+O by
   default).
+- In-game overlay: with fatigue turned off in the game, the route bar no longer marks a rest stop
+  at the very start of the route ("stop now"). It now shows no rest stop, like the dashboard.
 
 ## 1.5.33 (2026-10-19)
 

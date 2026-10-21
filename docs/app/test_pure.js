@@ -4393,6 +4393,20 @@ test('pickRouteLikeGame: casi empatadas, la que coincide con el GPS del juego (I
   assert.deepEqual(previas, [[1], [1, 2]]);
 });
 
+test('followGameRoute: la ruta como la del juego solo con la empresa del trabajo, sin waypoints y con la mas rapida', () => {
+  const { followGameRoute } = require('./pure.js');
+  assert.equal(followGameRoute({ kind: 'dest' }, 0, 'fastest'), true);
+  assert.equal(followGameRoute({ kind: 'pickup' }, 0, 'fastest'), true);
+  // Con "shortest" no: el juego sigue en la rapida y se cambiaba la mas corta
+  // por una mas larga
+  assert.equal(followGameRoute({ kind: 'dest' }, 0, 'shortest'), false);
+  // El centro de la ciudad (destino aproximado), con waypoints o sin destino
+  assert.equal(followGameRoute({ kind: 'dest', approx: true }, 0, 'fastest'), false);
+  assert.equal(followGameRoute({ kind: 'dest' }, 1, 'fastest'), false);
+  assert.equal(followGameRoute({ kind: 'waypoint' }, 0, 'fastest'), false);
+  assert.equal(followGameRoute(null, 0, 'fastest'), false);
+});
+
 test('dropRouteDetours: la alternativa no se baja de la autopista para volver a subir (I-15, salida 385, Discord 20-10)', () => {
   const { dropRouteDetours, ROUTE_DETOUR_MAX_M } = require('./pure.js');
   // Autopista 0-1-2-3-4 (100 m y 4 s cada tramo). Salida en 1, la calle del

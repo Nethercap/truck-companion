@@ -234,6 +234,17 @@ def _zona_parada(punto_km, total_km):
     return (round(desde / total_km, 4), round(min(1.0, hasta / total_km), 4))
 
 
+# Con la fatiga apagada el juego manda 0 o mas de un dia hasta el descanso:
+# eso es sin dato, no "parar ya" (como restMinutesOf de la web y el panel).
+DESCANSO_MAX_MIN = 24 * 60
+
+
+def minutos_de_descanso(tele: dict):
+    """Los minutos de juego hasta el proximo descanso, o None si no dicen nada."""
+    m = tele.get("restStopMinutes")
+    return m if _numero(m) and 0 < m < DESCANSO_MAX_MIN else None
+
+
 def barra_paradas(tele: dict, total_km) -> dict | None:
     """La barra de la ruta: {"fuel": tramo o None, "rest": tramo o None},
     o None si no hay ruta. total_km: lo que falta (del tablero o del GPS
@@ -245,8 +256,8 @@ def barra_paradas(tele: dict, total_km) -> dict | None:
     vel = (km_ruta / (s_ruta / 3600) if _numero(km_ruta) and _numero(s_ruta) and km_ruta > 0 and s_ruta > 0
            else VEL_MEDIA_DEFECTO)
     vel = min(max(vel, VEL_MEDIA_MIN), VEL_MEDIA_MAX)
-    descanso_min = tele.get("restStopMinutes")
-    descanso = _zona_parada(descanso_min / 60 * vel, total_km) if _numero(descanso_min) else None
+    descanso_min = minutos_de_descanso(tele)
+    descanso = _zona_parada(descanso_min / 60 * vel, total_km) if descanso_min is not None else None
     return {"fuel": combustible, "rest": descanso}
 
 

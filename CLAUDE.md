@@ -148,7 +148,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   alternativas encareciendo las aristas de la anterior (`routeAlternatives`)
   y gana la que coincide a menos de 1,5 % sin ser mas de 5 % mas lenta
   (`pickRouteLikeGame`, `routeLikeGame` en app.js). Solo con destino exacto
-  (`dest`/`pickup` sin `approx`) y sin waypoints; si a los 3 datos sigue sin
+  (`dest`/`pickup` sin `approx`), sin waypoints y con "fastest"
+  (`followGameRoute`: con "shortest" el juego sigue en su ruta, casi siempre
+  la rapida, y se cambiaba la mas corta por una mas larga, 21-10); si a los 3 datos sigue sin
   coincidir (el juego tarda en tener la ruta nueva), se prueba una vez mas
   (`routeGameRecheck`). En Salt Lake City la app iba por la I-84 y el juego
   por la I-80, 3 s de diferencia (Discord, 19-10). Los margenes salen de
@@ -220,6 +222,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   21-10). Sin el vecino comun ponia el giro en otro cruce (Tulsa -> Ardmore,
   Topeka). En 900 rutas por juego: +55 avisos en ATS, +50 en ETS2, ninguno
   perdido ni movido.
+  Las segundas vueltas de una S que siguen calladas (Salt Lake -> Twin Falls,
+  Timisoara) no tienen otra calle en el grafo: el brazo este de la T de Salt
+  Lake (n84167) solo se une a la ruta y la calle oeste de la de Timisoara no
+  sale a 120 m (`leadsAway`). Es la regla del giro callado, no un error.
+  Medirlas despues de un giro anunciado con una entrada de 15 m (21-10)
+  tomaba como otra salida volver a entrar a la cruz recien dejada ("turn
+  left" despues de la cruz de Koln -> Osnabruck): sin eso quedaba 1 aviso
+  en 1.800 rutas, y no se hizo.
 - Una bifurcacion se deja al giro que viene a menos de 250 m solo si ese
   giro se anuncia (`turnAfterFork`): la curva callada de una rampa que
   termina en una T sin otra salida tapaba la salida 50 de la I-25 en
@@ -377,12 +387,21 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
     escudos de despues y +2/-4 con los de las dos manos, sin regla segura.
     Tampoco el I-255 / US-67 de St. Louis (un cartel de la US de mas) ni el
     I-49 / US-82 de Shreveport (los de la autopista quedan a la izquierda).
-  - "Shortest" en la app con el GPS del juego en "fastest": `routeLikeGame`
-    corre igual y puede cambiar la ruta mas corta por una como la del juego.
-  - El overlay del juego (`client/overlay.py`) con el descanso en 0 (fatiga
-    apagada) dice "parar ya"; la web y el panel lo toman como sin dato
-    (`restMinutesOf`, `createFatigue`). Un test del cliente lo fija asi
-    (`test_overlay.py`): decidir cual vale.
+  - "turn right" en Cedar Rapids -> Kirksville (ATS, 17744,-11442), donde la
+    ruta es la rama izquierda de la division al final de un rulo: los 60 m
+    de entrada toman la curva del rulo (+38) y la otra rama va a +71, con la
+    ruta a +8 en el cruce. Medirlo como bifurcacion cuando la otra salida
+    dobla mas para el mismo lado y la ruta dobla menos de 15 grados en el
+    cruce lo calla, pero en 1.800 rutas sacaba avisos en otros 6 lugares,
+    entre ellos dos que estan bien (la esquina de Fayetteville, "turn right"
+    en Copenhague -> Odense): sin regla segura.
+  - "turn left" en El Dorado -> Hot Springs (ATS, 13394,24184), una curva de
+    36 grados donde empieza una autovia: no se calla porque las dos calzadas
+    y el retorno hacen un lazo de un sentido de menos de 350 m y
+    `entersRing` lo toma por la entrada a una rotonda. Pedirle al lazo lo de
+    `detectRoundabout` (sin lados rectos largos) lo calla, pero en 1.800
+    rutas cambia avisos en otros 3 lugares: el "turn left" de Stockton pasa
+    a "keep left" 70 m antes, en otro cruce. Sin regla segura.
 - Propuestas de afuera: pedir el codigo en un repo publico antes de mirar
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.
