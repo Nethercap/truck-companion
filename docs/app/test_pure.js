@@ -1923,6 +1923,27 @@ test('pickFuelStop: el area de descanso de la otra mano o ya pasada no gana a la
   assert.deepEqual([sinCamino.x, sinCamino.why], [600, 'route']);
 });
 
+test('pickFuelStop: con el camino, la de al costado le gana a la de adelante lejos (Austin, ATS)', () => {
+  // Camion en (0,0) yendo al este, ruta que dobla al norte enseguida. Una
+  // estacion a 550 m al sur (al costado, fuera de la ruta: 750 m por el
+  // camino) y otra 3,6 km adelante (5,2 km por el camino). Por el rumbo
+  // ganaba la de adelante.
+  const route = [[0, 0], [200, 0], [200, -6000]];
+  const costado = { x: 100, z: 540, dist: 549 };
+  const adelante = { x: 3600, z: -300, dist: 3612 };
+  const camino = { 100: 750, 3600: 5200 };
+  const reach = (st) => camino[st.x];
+  assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route).x, 3600); // sin el camino
+  const elegida = pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach });
+  assert.deepEqual([elegida.x, elegida.why], [100, 'near']);
+  // Si la de al costado obliga a dar la vuelta (camino de 3 km), queda la de adelante
+  camino[100] = 3000;
+  assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach }).x, 3600);
+  // Y por poco no se cambia (switchM): 3600 contra 4500 de costo
+  camino[100] = 1800; camino[3600] = 2250;
+  assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach }).x, 3600);
+});
+
 test('stopInsertIndex: la parada nueva va primero, no despues del destino (Discord, 13-10)', () => {
   const { stopInsertIndex } = require('./pure.js');
   // Sin trabajo, yendo a un pueblo (waypoint 0) 20 km al norte: un solo tramo
@@ -2637,6 +2658,22 @@ test('proxima ciudad: la de adelante, no la que acaba de quedar atras', () => {
   assert.equal(nextCityAlongRoute(conAtras, [provo, salina], [0, 0]), 'Salina');
   assert.equal(nextCityAlongRoute(ruta, [lejos], [0, 0]), null);
   assert.equal(nextCityAlongRoute([[0, 0]], [salina], [0, 0]), null);
+});
+
+test('proxima ciudad: pasada una ciudad, una vuelta de la ruta que se le arrima unos metros no la vuelve a hacer proxima (Vancouver, ATS)', () => {
+  const { nextCityAlongRoute } = require('./pure.js');
+  // El camion en (0, 0) se aleja al este de Vancouver (centro a 2,21 km al
+  // oeste); 885 m adelante la ruta serpentea y queda a 2,10 km, y sigue
+  // al este hasta Yakima.
+  const ruta = [[0, 0], [300, 300], [-150, 400], [2000, 600], [5000, 350], [9000, 0]];
+  const vancouver = { Name: 'Vancouver', X: -2213, Y: 0 };
+  const yakima = { Name: 'Yakima', X: 9000, Y: 300 };
+  assert.equal(nextCityAlongRoute(ruta, [vancouver, yakima], [0, 0]), 'Yakima');
+  // Sin el margen salia Vancouver
+  assert.equal(nextCityAlongRoute(ruta, [vancouver, yakima], [0, 0], { approachM: 0 }), 'Vancouver');
+  // Una que la ruta todavia tiene que atravesar sale igual
+  const nephi = { Name: 'Nephi', X: 5000, Y: -200 };
+  assert.equal(nextCityAlongRoute(ruta, [vancouver, nephi, yakima], [0, 0]), 'Nephi');
 });
 
 test('escudos de ruta: uno por ruta y por celda, solo los carteles con numero (Discord, 19-10)', () => {
@@ -3725,6 +3762,28 @@ test('stoppedRouteLead: parado antes de un cruce, la ruta empieza con la entrada
   // Sin datos
   assert.equal(stoppedRouteLead(null, 0, 5, 0), null);
   assert.equal(stoppedRouteLead(ruta, NaN, 5, 0), null);
+});
+
+test('recalcOnRoute: sin desviarse, la ruta nueva sigue con lo recorrido y el rumbo (Tyler -> Lufkin, ATS)', () => {
+  const { recalcOnRoute } = require('./pure.js');
+  // Lo recorrido: 100 m al norte con los nodos de la esquina; la ruta vieja
+  // recortada arranca en el camion y sigue 200 m
+  const behind = [[0, 100, 0, 0, null], [0, 40, 0, 1, 7], [0, 0, 0, 0, null]];
+  const route = [[0, 0, 0, 0, null], [0, -60, 0, 1, 8], [0, -200, 0, 0, 9]];
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: 0, z: 0 }), true);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: 20, z: -5 }), true);
+  // Desviado, o lejos del comienzo de la ruta vieja: de cero, como siempre
+  assert.equal(recalcOnRoute({ offRoute: true, behind, route, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: 60, z: 0 }), false);
+  // Recien calculada parado en el deposito (no anduvo nada), o al final del
+  // viaje (a la ruta vieja no le queda nada): tampoco
+  assert.equal(recalcOnRoute({ offRoute: false, behind: [[0, 10, 0, 0, null], [0, 0, 0, 0, null]], route, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route: [[0, 0], [0, -20]], x: 0, z: 0 }), false);
+  // Sin ruta vieja, sin lo recorrido o sin posicion
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route: null, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind: [], route, x: 0, z: 0 }), false);
+  assert.equal(recalcOnRoute({ offRoute: false, behind, route, x: NaN, z: 0 }), false);
+  assert.equal(recalcOnRoute(), false);
 });
 
 test('startArcForHeading: recalcular andando arranca en la calzada y el sentido del camion', () => {

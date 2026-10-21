@@ -3429,10 +3429,11 @@ function routeGameRecheck(routeKey, target, data) {
 
 // El rumbo con que arranca la ruta al recalcular: el del juego, solo si el
 // camion viene andando para adelante. Parado en el deposito el rumbo no dice
-// por donde va a salir: ahi, el nodo mas cercano como siempre.
+// por donde va a salir: ahi, el nodo mas cercano como siempre. Parado sobre
+// la ruta de antes (sobreLaRuta, recalcOnRoute en pure.js) si lo dice.
 const ROUTE_HEADING_MIN_KMH = 15;
-function routeStartHeading(data) {
-  return data && Number.isFinite(data.heading) && Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH ? data.heading : null;
+function routeStartHeading(data, sobreLaRuta = false) {
+  return data && Number.isFinite(data.heading) && (sobreLaRuta || Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH) ? data.heading : null;
 }
 
 // penal y previas: para una alternativa (routeAlternatives), las aristas
@@ -4030,7 +4031,11 @@ function updateDestinationMarker(data) {
     navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;
     navQuietLanesState.shown = null; navQuietLanesState.shownKey = null; navQuietLanesState.candidate = undefined; navQuietLanesState.candidateTicks = 0;
     navQuietLanes = null;
-    routeBehind = [];
+    // Sin desviarse (cambio el destino o un waypoint) el camion sigue sobre
+    // la ruta de antes: lo recorrido y su rumbo siguen valiendo, o el giro
+    // del cruce en el que esta se pierde (recalcOnRoute).
+    const sobreLaRuta = recalcOnRoute({ offRoute, behind: routeBehind, route: currentRouteWorldPoints, x: data.position.x, z: data.position.z });
+    if (!sobreLaRuta) routeBehind = [];
     let routePoints = [];
     let from = [data.position.x, data.position.z];
     let complete = true;
@@ -4038,7 +4043,7 @@ function updateDestinationMarker(data) {
     let llegada = null;
     legs.forEach((to, legIdx) => {
       // El primer tramo sale del camion: con su rumbo si viene andando.
-      const rumbo = legIdx === 0 ? routeStartHeading(data) : null;
+      const rumbo = legIdx === 0 ? routeStartHeading(data, sobreLaRuta) : null;
       // Hasta un waypoint, la ruta pasa por el sobre su calle, y el tramo
       // siguiente sigue desde ahi en el mismo sentido (findRouteWith)
       // (solo los puestos tocando el mapa: waypointPassesBy)

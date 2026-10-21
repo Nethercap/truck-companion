@@ -163,6 +163,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   queda: en la I-80 este de Grand Island mandaba al area de la mano oeste
   (Discord, 19-10). Ordenar todo por el camino cambiaba 30 % de las
   elecciones y alargaba muchas: ganaban paradas lejos sobre la ruta.
+  Despues se miran tambien las 8 mas cercanas y las 3 primeras sobre la
+  ruta: gana una que no obliga a volver si cuesta 1 km menos (`near`,
+  `switchM`). Por el rumbo no se veian las de al costado: elegia una a 3,6 km
+  con otra a 546 m (Austin). Dejar ganar a las que obligan a volver subia
+  esas elecciones en ATS.
 - Lo que falta y la distancia al giro se miden sobre la ruta entera
   (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
   sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco
@@ -261,6 +266,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
   `stoppedRouteLead` le antepone una entrada sobre el rumbo del camion si el
   nodo esta adelante y la ruta no sale de ahi para atras.
+  Si se recalcula sin desviarse (cambio el destino o un waypoint) y el camion
+  sigue sobre la ruta de antes, se conservan lo recorrido (`routeBehind`) y
+  el rumbo aunque este parado (`recalcOnRoute`): adentro de un cruce la ruta
+  nueva arrancaba sin sus primeros nodos y el giro se perdia (1 de cada 5
+  recalculos a menos de 35 m de un cruce con aviso; asi, 1 de cada 35). No
+  recien calculada en el deposito ni al final del viaje.
 - Lo recorrido (`routeBehind`) incluye el comienzo de la ruta
   (`passedRoutePoints`); el simulador y `check_avisos` lo arman igual.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
