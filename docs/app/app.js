@@ -3405,11 +3405,9 @@ function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
   return { leg: rutas[k], switched: k > 0 };
 }
 
-// Si el GPS del juego va al mismo lugar que nuestra ruta: un trabajo con la
-// empresa conocida y sin waypoints (el juego no sabe de los nuestros, y con
-// el centro de la ciudad el largo no se puede comparar).
+// Si se busca la ruta como la del GPS del juego (followGameRoute, pure.js).
 function gameRouteComparable(target) {
-  return !!target && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && !waypoints.length;
+  return followGameRoute(target, waypoints.length, routeProfile);
 }
 
 // Recien tomado el trabajo el GPS del juego puede no tener todavia la ruta

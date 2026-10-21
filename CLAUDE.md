@@ -148,7 +148,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   alternativas encareciendo las aristas de la anterior (`routeAlternatives`)
   y gana la que coincide a menos de 1,5 % sin ser mas de 5 % mas lenta
   (`pickRouteLikeGame`, `routeLikeGame` en app.js). Solo con destino exacto
-  (`dest`/`pickup` sin `approx`) y sin waypoints; si a los 3 datos sigue sin
+  (`dest`/`pickup` sin `approx`), sin waypoints y con "fastest"
+  (`followGameRoute`: con "shortest" el juego sigue en su ruta, casi siempre
+  la rapida, y se cambiaba la mas corta por una mas larga, 21-10); si a los 3 datos sigue sin
   coincidir (el juego tarda en tener la ruta nueva), se prueba una vez mas
   (`routeGameRecheck`). En Salt Lake City la app iba por la I-84 y el juego
   por la I-80, 3 s de diferencia (Discord, 19-10). Los margenes salen de
@@ -385,8 +387,6 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
     escudos de despues y +2/-4 con los de las dos manos, sin regla segura.
     Tampoco el I-255 / US-67 de St. Louis (un cartel de la US de mas) ni el
     I-49 / US-82 de Shreveport (los de la autopista quedan a la izquierda).
-  - "Shortest" en la app con el GPS del juego en "fastest": `routeLikeGame`
-    corre igual y puede cambiar la ruta mas corta por una como la del juego.
   - "turn right" en Cedar Rapids -> Kirksville (ATS, 17744,-11442), donde la
     ruta es la rama izquierda de la division al final de un rulo: los 60 m
     de entrada toman la curva del rulo (+38) y la otra rama va a +71, con la
@@ -402,10 +402,6 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
     `detectRoundabout` (sin lados rectos largos) lo calla, pero en 1.800
     rutas cambia avisos en otros 3 lugares: el "turn left" de Stockton pasa
     a "keep left" 70 m antes, en otro cruce. Sin regla segura.
-  - El overlay del juego (`client/overlay.py`) con el descanso en 0 (fatiga
-    apagada) dice "parar ya"; la web y el panel lo toman como sin dato
-    (`restMinutesOf`, `createFatigue`). Un test del cliente lo fija asi
-    (`test_overlay.py`): decidir cual vale.
 - Propuestas de afuera: pedir el codigo en un repo publico antes de mirar
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.
