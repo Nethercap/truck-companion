@@ -2278,6 +2278,74 @@ test('junctionManeuver: la esquina de una cruz con dos brazos muertos y 55 m de 
   assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'right', false, 1]);
 });
 
+test('junctionManeuver: la esquina de una cruz que queda despues de un rombo se avisa (Davenport -> Quincy, 21-10)', () => {
+  // Davenport -> Quincy (ATS, 22846,-9173; el norte es +y): la ruta baja al
+  // sur por un rombo (nodos 2 y 3, con 10 y 11 a los costados), entra a la
+  // cruz por el 4 y sale al este por el 5, por una curva de 51 m. Los brazos
+  // oeste (9) y sur (8) no tienen calle y se unen al 4 y al 5. El grupo
+  // arranca en el rombo, asi que el prefab entero pasa de 60 m y cada mitad
+  // dobla poco y se calla: "Continue straight" donde se termina la calle.
+  const pts = [[-2, 232, 0, 0, 0], [-2, 73, 0, 0, 1], [0, 43, 0, 1, 2], [0, 13, 0, 1, 3], [0, 0, 0, 1, 4],
+    [2, -24, 0, 0, null], [9, -31, 0, 0, null], [23, -32, 0, 1, 5], [73, -32, 0, 0, 6], [400, -32, 0, 0, 7]];
+  const nodes = [[-2, 232], [-2, 73], [0, 43], [0, 13], [0, 0], [23, -32], [73, -32], [400, -32], [-2, -60], [-28, -27], [-25, 15], [22, 36]];
+  const cruz = (salidas) => {
+    const adjacency = new Map(Object.entries(salidas).map(([n, xs]) => [Number(n), xs.map((x) => [x])]));
+    const incoming = (n) => [...adjacency].filter(([, xs]) => xs.some(([x]) => x === n)).map(([k]) => k);
+    const { cum, pointAt } = routeMetrics(pts);
+    return { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency, incoming };
+  };
+  const ctx = cruz({ 0: [1], 1: [0, 2], 2: [1, 3, 10, 11], 3: [4, 2, 10, 11], 4: [3, 5, 8, 9], 5: [6, 4, 8, 9], 6: [5, 7], 7: [6],
+    8: [4, 5, 9], 9: [4, 5, 8], 10: [11, 2, 3], 11: [10, 2, 3] });
+  assert.equal(junctionClusterEnd(ctx.pts, ctx.cum, 2, 50, 100, undefined, 60), 4);
+  const mitad = (i, iEnd) => detectManeuver({ ...ctx, i, iEnd });
+  assert.ok(!mitad(2, 4) || mitad(2, 4).quiet);
+  assert.ok(!mitad(7, 7) || mitad(7, 7).quiet);
+  // las dos mitades comparten los brazos muertos: es la misma cruz y se avisa
+  // en el 4, donde empieza la esquina
+  const { iEnd, m } = junctionManeuver({ ...ctx, i: 2, iEnd: 4 }, 50, 100, undefined, 60);
+  assert.equal(iEnd, 7);
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'left', false, 4]);
+  // Sin un vecino comun son dos prefabs unidos por una calle (la T a 59 m de
+  // una esquina en Tulsa -> Ardmore): cada uno con su brazo muerto, callados.
+  const dos = cruz({ 0: [1], 1: [0, 2], 2: [1, 3, 10, 11], 3: [4, 2, 10, 11], 4: [3, 5, 9], 5: [6, 4, 8], 6: [5, 7], 7: [6],
+    8: [5], 9: [4], 10: [11, 2, 3], 11: [10, 2, 3] });
+  const r = junctionManeuver({ ...dos, i: 2, iEnd: 4 }, 50, 100, undefined, 60);
+  assert.equal(r.iEnd, 4);
+  assert.ok(!r.m || r.m.quiet, JSON.stringify(r.m));
+  // Ni si la curva de una mitad a la otra dobla para los dos lados: la de una
+  // rotonda chica que rodea la isla (la 2.a salida de Oslo, ETS2, 1888,-53484)
+  const ese = [...pts.slice(0, 5), [3, -12, 0, 0, null], [-6, -24, 0, 0, null], [8, -33, 0, 0, null], ...pts.slice(7)];
+  const { cum: cumS, pointAt: pointAtS } = routeMetrics(ese);
+  const s = junctionManeuver({ ...ctx, pts: ese, cum: cumS, pointAt: pointAtS, i: 2, iEnd: 4 }, 50, 100, undefined, 60);
+  assert.equal(s.iEnd, 4);
+  assert.ok(!s.m || s.m.quiet, JSON.stringify(s.m));
+});
+
+test('junctionManeuver: la segunda vuelta de una S, con la cruz pegada a la T de antes, se avisa (Wenatchee -> Everett, 21-10)', () => {
+  // Wenatchee -> Everett (ATS, -98451,-65259; el norte es +y): la ruta dobla a
+  // la derecha en una T (1 -> 2) y 38 m despues entra a una cruz por el sur
+  // (3), de donde sale al oeste (4) por una curva de 40 m. El brazo este (9)
+  // lleva a una calle (10, 11, 12) y el norte (8) no tiene calle. La salida de
+  // la T y la entrada a la cruz quedan en un grupo que no dice nada, la salida
+  // de la cruz sola dobla callada, y el "turn left" de la cruz no salia.
+  const pts = [[79, -96, 0, 0, 0], [-13, -61, 0, 1, 1], [-21, -56, 0, 0, null], [-26, -47, 0, 0, null], [-21, -32, 0, 1, 2], [0, 0, 0, 1, 3],
+    [11, 23, 0, 0, null], [8, 30, 0, 0, null], [-4, 38, 0, 1, 4], [-18, 45, 0, 0, 5], [-57, 72, 0, 0, null], [-95, 100, 0, 0, null], [-132, 131, 0, 0, 6], [-300, 270, 0, 0, 7]];
+  const nodes = [[79, -96], [-13, -61], [-21, -32], [0, 0], [-4, 38], [-18, 45], [-132, 131], [-300, 270], [30, 47], [33, 9], [60, -5], [98, -30], [300, -150], [-44, -68], [-150, -250]];
+  const salidas = { 0: [1], 1: [2, 13], 2: [3, 13], 3: [2, 4, 8, 9], 4: [3, 8, 9, 5], 5: [6, 4], 6: [5, 7], 7: [6],
+    8: [3, 4, 9], 9: [10, 3, 4, 8], 10: [11, 9], 11: [10, 12], 12: [11], 13: [2, 14], 14: [13] };
+  const adjacency = new Map(Object.entries(salidas).map(([n, xs]) => [Number(n), xs.map((x) => [x])]));
+  const incoming = (n) => [...adjacency].filter(([, xs]) => xs.some(([x]) => x === n)).map(([k]) => k);
+  const { cum, pointAt } = routeMetrics(pts);
+  const ctx = { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency, incoming };
+  assert.equal(junctionClusterEnd(pts, cum, 4, 50, 100, undefined, 60), 5);
+  assert.equal(detectManeuver({ ...ctx, i: 4, iEnd: 5 }), null);
+  assert.equal(detectManeuver({ ...ctx, i: 8, iEnd: 8 }).quiet, true);
+  // la cruz se mide desde su entrada (3), sin la curva de la T, y se avisa ahi
+  const { iEnd, m } = junctionManeuver({ ...ctx, i: 4, iEnd: 5 }, 50, 100, undefined, 60);
+  assert.equal(iEnd, 8);
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'left', false, 5]);
+});
+
 test('maneuver: al final de una autovia, volver por la calzada contraria no es una bifurcacion (17-10)', () => {
   // La US-12 al este de Aberdeen (ATS, -105601,-61480), corrida al origen: la
   // ruta llega al noreste por su calzada (nodos 3 y 4) y sigue al este; del

@@ -209,6 +209,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Por los puntos de la curva el tramo puede pasar los 50 m del corte hasta
   esos 60 m (la cruz de Modesto con dos brazos muertos, 21-10); un tramo sin
   puntos de curva de 50 m o mas sigue cortando: son dos prefabs.
+  Si el grupo arranca en otro prefab pegado y asi pasa los 60 m, la mitad
+  que sigue (a menos de 80 m) se mide con la primera cuando se calla, dobla
+  para el mismo lado (o la primera no dobla), sus nodos comparten un vecino
+  (los otros brazos se unen a los dos: es el mismo prefab) y la curva entre
+  las dos dobla para un solo lado (no la 2.a salida de una rotonda chica sin
+  reconocer, Oslo), con el aviso en el nodo de entrada (`mismaCruz`): la
+  esquina de Davenport -> Quincy despues de un rombo y la segunda vuelta de
+  una S (una cruz a 38 m de una T, Wenatchee -> Everett) se callaban (ATS,
+  21-10). Sin el vecino comun ponia el giro en otro cruce (Tulsa -> Ardmore,
+  Topeka). En 900 rutas por juego: +55 avisos en ATS, +50 en ETS2, ninguno
+  perdido ni movido.
 - Una bifurcacion se deja al giro que viene a menos de 250 m solo si ese
   giro se anuncia (`turnAfterFork`): la curva callada de una rampa que
   termina en una T sin otra salida tapaba la salida 50 de la I-25 en
