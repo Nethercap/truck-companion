@@ -346,6 +346,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
     le ganan a la ruta numerada (13), y las rotondas sin `exitSignTest`.
   - "Shortest" en la app con el GPS del juego en "fastest": `routeLikeGame`
     corre igual y puede cambiar la ruta mas corta por una como la del juego.
+  - El overlay del juego (`client/overlay.py`) con el descanso en 0 (fatiga
+    apagada) dice "parar ya"; la web y el panel lo toman como sin dato
+    (`restMinutesOf`, `createFatigue`). Un test del cliente lo fija asi
+    (`test_overlay.py`): decidir cual vale.
 - Propuestas de afuera: pedir el codigo en un repo publico antes de mirar
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.
