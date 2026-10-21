@@ -53,6 +53,10 @@ typedef const char *            scs_string_t;
 #define SCS_ARCHITECTURE_x64
 #define SCS_PF_U64 "lu"
 #define SCS_PF_S64 "ld"
+#elif defined(__aarch64__) || defined(__arm64__)
+#define SCS_ARCHITECTURE_x64
+#define SCS_PF_U64 "lu"
+#define SCS_PF_S64 "ld"
 #elif defined(__i386__)
 #define SCS_ARCHITECTURE_x86
 #define SCS_PF_U64 "llu"
