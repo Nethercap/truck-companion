@@ -4,6 +4,13 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Setup: "Build my map" is now there whenever you play with mods, not only after the dashboard
+  sees your truck off the map. Before, it only showed up after that, and not again after
+  restarting the client, so there was no way to build the map for a newer version of a map mod
+  than ours.
+
 ## 1.5.34 (2026-10-21)
 
 - LAN mode: "Share my position" (the public live map) can now be turned off, or on, from the

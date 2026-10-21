@@ -147,7 +147,9 @@ blocked. The pairing code works in all of these cases.
 
 If your truck drives off the map Truck Dash knows, the dashboard tells the
 client, and Setup offers **Build my map**: it builds the map from your game
-and your active mods, on your PC. Close the game first (it needs up to 7 GB
+and your active mods, on your PC. If you play with mods it is also in Setup
+without that, for a map mod whose roads the dashboard is missing (one we don't
+have, or a newer version than ours). Close the game first (it needs up to 7 GB
 of memory) and give it about five minutes. The first time it downloads the
 map builder (about 40 MB) from this same release and checks its SHA-256.
 
