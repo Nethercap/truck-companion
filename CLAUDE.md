@@ -136,7 +136,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   de 600 waypoints sobre la ruta la alargaban en ATS, 26 de 589 en ETS2
   (21-10). En medio de un cruce elige el carril sumando el tramo que sigue.
   El de un POI (estacion, descanso, empresa) o el del lider del convoy es
-  un lugar al que entrar: al nodo mas cercano, como siempre.
+  un lugar al que entrar (`tramo.entrar`, tambien la empresa del trabajo y
+  el `reach` del boton de parada): al nodo mas cercano, pero si ese es de una
+  via rapida, al de una calle o un prefab hasta `STOP_SLOW_NODE_M` mas lejos
+  (`slowNodes`). Con el de la autopista la ruta pasaba de largo de la
+  estacion y la daba por alcanzada (36 de 325 paradas del boton en ATS; asi,
+  1). El centro de una ciudad (destino aproximado) no: cambiaba rutas.
 - La app rutea sola y del GPS del juego solo sabe cuanto falta
   (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
   5 km, con 40 km o mas por delante, `routeGameAgreement`), se buscan hasta 3

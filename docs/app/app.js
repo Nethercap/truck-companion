@@ -2971,7 +2971,7 @@ function addNearestStop(code) {
   const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
   const rumbo = routeStartHeading(lastData);
   const reach = routeGraph ? (st) => {
-    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo);
+    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo, null, null, { entrar: true });
     if (!r || !r.length) return null;
     let m = 0;
     for (let k = 1; k < r.length; k++) m += Math.hypot(r[k][0] - r[k - 1][0], r[k][1] - r[k - 1][1]);
@@ -3265,8 +3265,9 @@ function buildRouteGraph(g) {
 // sola componente, pero por las dudas se admite cualquiera de este tamano.
 const MIN_REAL_COMPONENT_NODES = 300;
 
-// nodeOk: si viene, solo nodos con algun tramo que se pueda usar (DLC).
-function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeOk = null) {
+// nodeOk: si viene, solo nodos con algun tramo que se pueda usar (DLC); y
+// tambien alsoOk (slowNodes, para terminar en una parada).
+function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeOk = null, alsoOk = null) {
   let best = -1;
   let bestDist = Infinity;
   const nodes = routeGraph.nodes;
@@ -3274,6 +3275,7 @@ function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeO
   const compId = routeGraph.componentId, compSize = routeGraph.componentSize, giant = routeGraph.giantComponent;
   for (let i = 0; i < n; i++) {
     if (nodeOk && !nodeOk[i]) continue;
+    if (alsoOk && !alsoOk[i]) continue;
     const comp = compId[i];
     if (onlyComponent !== -1) {
       if (comp !== onlyComponent) continue;
@@ -3395,9 +3397,9 @@ function routeSecondsOf(points) {
 // del juego por la I-80 (Salt Lake City, Discord 19-10). Las alternativas
 // (routeAlternatives) se buscan solo si el largo no coincide con el juego.
 // Devuelve { leg, switched }.
-function routeLikeGame(leg, from, to, rumbo, gameKm) {
+function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
   if (!leg || routeGameAgreement(gameKmOf(leg, leg), gameKm) !== 'differ') return { leg, switched: false };
-  const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas), routeEdgesOf);
+  const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas, tramo), routeEdgesOf);
   const k = pickRouteLikeGame(rutas.map(r => ({ km: gameKmOf(r, r), seconds: routeSecondsOf(r) })), gameKm);
   return { leg: rutas[k], switched: k > 0 };
 }
@@ -3424,7 +3426,8 @@ function routeGameRecheck(routeKey, target, data) {
   if (c.ticks < ROUTE_GAME_RECHECK_TICKS) return false;
   c.left = 0;
   const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data);
-  return routeLikeGame(findRoute(from, [target.x, target.z], rumbo), from, [target.x, target.z], rumbo, data.routeDistanceKm).switched;
+  const tramo = { entrar: true }; // gameRouteComparable: una empresa
+  return routeLikeGame(findRoute(from, [target.x, target.z], rumbo, null, null, tramo), from, [target.x, target.z], rumbo, data.routeDistanceKm, tramo).switched;
 }
 
 // El rumbo con que arranca la ruta al recalcular: el del juego, solo si el
@@ -3439,7 +3442,9 @@ function routeStartHeading(data, sobreLaRuta = false) {
 // penal y previas: para una alternativa (routeAlternatives), las aristas
 // encarecidas y las rutas ya encontradas, de las que no se desvia por una
 // salida o un area de descanso para volver a entrar (dropRouteDetours).
-// tramo, en una ruta con waypoints: { desde, pasar, siguiente }. pasar: el
+// tramo: { entrar } para un lugar al que se entra (una parada, una empresa:
+// el nodo de una calle o un prefab antes que el de la autopista), y en una
+// ruta con waypoints { desde, pasar, siguiente }. pasar: el
 // tramo llega a un waypoint y pasa por el sobre su calle (waypointArcs,
 // pure.js), no por el nodo mas cercano; la ruta devuelta trae en .llegada
 // por donde paso, y el tramo siguiente arranca ahi (desde), en el mismo
@@ -3471,6 +3476,18 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   }
   const metas = tramo && tramo.pasar
     ? waypointArcs(routeGraph, endXY[0], endXY[1], { edgeOk: arcoOk }).filter(c => componentId[c.to] === componentId[startIdx]) : [];
+  // Un lugar al que se entra (estacion, area de descanso, empresa) pegado a
+  // una via rapida: el nodo de la autopista dejaba la ruta pasando de largo.
+  // El de una calle o un prefab mas cercano, si no queda mucho mas lejos
+  // (slowNodes, pure.js).
+  if (tramo && tramo.entrar) {
+    const lentos = slowNodes(routeGraph);
+    if (!lentos[endIdx]) {
+      const j = nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, lentos);
+      const dist = (i) => Math.hypot(nodes[2 * i] - endXY[0], nodes[2 * i + 1] - endXY[1]);
+      if (j !== -1 && dist(j) <= dist(endIdx) + STOP_SLOW_NODE_M) endIdx = j;
+    }
+  }
 
   // Perfil de ruteo: "fastest" pesa por tiempo (prefiere autopista, como el
   // GPS del juego), "shortest" por metros (mas unos metros por segundo:
@@ -4046,14 +4063,16 @@ function updateDestinationMarker(data) {
       const rumbo = legIdx === 0 ? routeStartHeading(data, sobreLaRuta) : null;
       // Hasta un waypoint, la ruta pasa por el sobre su calle, y el tramo
       // siguiente sigue desde ahi en el mismo sentido (findRouteWith)
-      // (solo los puestos tocando el mapa: waypointPassesBy)
+      // (solo los puestos tocando el mapa: waypointPassesBy). A una parada,
+      // una empresa o la empresa del trabajo se entra (entrar).
       const pasa = (i) => i < waypoints.length && waypointPassesBy(waypoints[i]);
+      const entra = (i) => (i < waypoints.length ? !pasa(i) : (target.kind === 'dest' || target.kind === 'pickup') && !target.approx);
       const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
-      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), siguiente });
+      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), siguiente });
       llegada = leg ? leg.llegada || null : null;
       // Casi empatada con otra, la que va por donde el GPS del juego.
       if (leg && legs.length === 1 && gameRouteComparable(target)) {
-        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm);
+        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx) });
         leg = elegida.leg;
         if (elegida.switched) routeGameCheck.left = 0;
       }

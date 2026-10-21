@@ -3856,6 +3856,22 @@ test('startArcForHeading: los carriles de un prefab que todavia no se separan va
   assert.deepEqual(startArcForHeading(g, 50, 0.5, 90).alts, []);
 });
 
+test('slowNodes: los nodos de una calle o un prefab, para terminar la ruta en una parada y no en la autopista', () => {
+  const { slowNodes, STOP_SLOW_KMH } = require('./pure.js');
+  // Autopista 0-1-2 a 90 km/h; del 1 sale la entrada a una estacion (1-3, 40
+  // km/h). El 0 y el 2 son solo de autopista; el 1 y el 3, no.
+  const nodos = [[0, 0], [500, 0], [1000, 0], [520, 30]];
+  const aristas = [{ a: 0, b: 1 }, { a: 1, b: 2 }, { a: 1, b: 3 }];
+  const { g } = grafoDePrueba(nodos, aristas);
+  g.edgeM = Float32Array.from([500, 500, 36]);
+  g.edgeS = Uint16Array.from([20, 20, 3]); // 90, 90 y ~43 km/h
+  assert.deepEqual([...slowNodes(g)], [0, 1, 0, 1]);
+  assert.equal(slowNodes(g), slowNodes(g)); // una vez por grafo
+  // Con otro tope se arma de nuevo
+  assert.deepEqual([...slowNodes(g, 95)], [1, 1, 1, 1]);
+  assert.ok(STOP_SLOW_KMH > 60 && STOP_SLOW_KMH < 90);
+});
+
 test('waypointArcs y findArcRoute con endArcs: un waypoint sobre la autovia pasa por su calzada, no por el nodo mas cercano', () => {
   const { waypointArcs, findArcRoute, waypointPassesBy, WAYPOINT_ARC_M } = require('./pure.js');
   // Autovia de dos calzadas de una mano, 20 m entre si: la de ida (0 -> 1 ->
