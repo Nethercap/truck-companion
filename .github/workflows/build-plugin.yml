@@ -7,21 +7,33 @@ name: Build plugin
 # no de la PC de nadie.
 #
 # Se corre a mano ("Run workflow") despues de cambiar algo en plugin/. No se
-# compila en cada release a proposito: cada version de Visual Studio da otros
-# bytes, y un hash nuevo hace que Setup le pida a todos reinstalar el plugin
-# y reiniciar el juego sin que nada haya cambiado.
+# compila en cada release a proposito: cada version de Visual Studio (o de
+# Xcode) da otros bytes, y un hash nuevo hace que Setup le pida a todos
+# reinstalar el plugin y reiniciar el juego sin que nada haya cambiado.
+#
+# Una plataforma por corrida: la DLL de Windows y la .dylib de macOS
+# (universal, Intel y Apple Silicon, plugin/build.sh) se fijan aparte, asi
+# compilar una no le cambia el hash a la otra, y los dos jobs no pushean a la
+# vez.
 #
 # El push lo hace el token de Actions, que no dispara otros workflows: los
 # tests de ese commit corren con el siguiente push.
 
 on:
   workflow_dispatch:
+    inputs:
+      plataforma:
+        description: 'windows (the DLL) or macos (the universal .dylib)'
+        type: choice
+        options: [windows, macos]
+        default: windows
 
 permissions:
   contents: write
 
 jobs:
   build:
+    if: inputs.plataforma != 'macos'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,3 +57,33 @@ jobs:
           if ($LASTEXITCODE -eq 0) { Write-Host "La DLL no cambio, nada que commitear"; exit 0 }
           git commit -m "plugin: DLL compilada en Actions desde plugin/" -m "Corrida: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
           git push origin "HEAD:$env:GITHUB_REF_NAME"
+
+  build-macos:
+    if: inputs.plataforma == 'macos'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build the plugin dylib
+        run: bash plugin/build.sh "$RUNNER_TEMP/plugin"
+      - name: Load and unload it
+        # La parte arm64 (la del runner) con dlopen, y el apagado sin init,
+        # que es lo que corre el destructor al soltarla: si eso rompe, que
+        # rompa aca y no en el juego de alguien.
+        run: python -c "import ctypes, sys; ctypes.CDLL(sys.argv[1]).scs_telemetry_shutdown()" "$RUNNER_TEMP/plugin/truckdash-telemetry.dylib"
+      - name: Pin it in the client
+        run: python tools/pin_plugin.py "$RUNNER_TEMP/plugin/truckdash-telemetry.dylib"
+      - name: Check the pinned files
+        run: |
+          python -m pip install pytest
+          python -m pytest client/test_plugin_installer.py -q -k "pin_plugin or dylib"
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/vendor/truckdash-telemetry.dylib client/plugin_installer.py
+          if git diff --cached --quiet; then echo "La .dylib no cambio, nada que commitear"; exit 0; fi
+          git commit -m "plugin: .dylib de macOS compilada en Actions desde plugin/" -m "Corrida: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          git push origin "HEAD:$GITHUB_REF_NAME"

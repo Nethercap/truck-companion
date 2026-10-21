@@ -35,3 +35,16 @@ Visual Studio with the C++ desktop workload:
 ```
 msbuild scs-telemetry\vs2012\scs-telemetry.vcxproj -p:Configuration=Release -p:Platform=x64
 ```
+
+macOS (Xcode command line tools), a universal `truckdash-telemetry.dylib` for
+Intel and Apple Silicon:
+
+```
+bash build.sh <output folder>
+```
+
+On Linux the same script builds a `.so`, only to check that the code still
+compiles outside Windows: the native Linux plugin is not shipped.
+
+The DLL and the dylib that the client installs are built by the "Build
+plugin" workflow (one platform per run), not on anyone's PC.

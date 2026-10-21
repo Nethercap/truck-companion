@@ -348,8 +348,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`plugin/scs-telemetry/src/sharedmemory.cpp`), compilado en un runner
   macOS para Intel y Apple Silicon; `telemetry_compat.py` y
   `plugin_installer.py` con los caminos de Mac; beta desde el codigo con
-  `client.py` (sin overlay ni botonera); despues un `.app`. Falta quien lo
-  pruebe con el juego en una Mac. Sin empezar.
+  `client.py` (sin overlay ni botonera); despues un `.app`. El autor del
+  port (uawannacry, PR #87) lo probo con el juego en su Mac. El plugin ya
+  compila fuera de Windows (`plugin/build.sh`, sus cambios de #87) y la
+  .dylib universal sale de "Build plugin" con plataforma macos, fijada en
+  `PLUGIN_DYLIB_SHA256` (21-10); el cliente de Mac sigue en #87.
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para
