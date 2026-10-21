@@ -3355,17 +3355,17 @@ function dlcFilter(conElecciones) {
 // startHeading: el rumbo del juego si el camion viene andando (ver
 // routeStartHeading); la ruta arranca en su tramo y no da la vuelta.
 // penal: Map arista -> multiplicador del costo, para buscar alternativas
-// (routeLikeGame).
-function findRoute(startXY, endXY, startHeading = null, penal = null) {
+// (routeLikeGame), y previas, las ya encontradas (ver findRouteWith).
+function findRoute(startXY, endXY, startHeading = null, penal = null, previas = null) {
   if (!routeGraph) return null;
   const propio = dlcFilter(true);
-  let ruta = findRouteWith(startXY, endXY, propio, startHeading, penal);
+  let ruta = findRouteWith(startXY, endXY, propio, startHeading, penal, previas);
   if (ruta || !propio) return ruta;
   if (dlcOffFor(dlcGameOf(currentGame)).length) {
-    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading, penal);
+    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading, penal, previas);
     if (ruta) { ruta.usesUncheckedDlc = true; return ruta; }
   }
-  return findRouteWith(startXY, endXY, null, startHeading, penal);
+  return findRouteWith(startXY, endXY, null, startHeading, penal, previas);
 }
 
 // Las aristas del grafo de una ruta (sus puntos con indice de nodo) y lo que
@@ -3396,7 +3396,7 @@ function routeSecondsOf(points) {
 // Devuelve { leg, switched }.
 function routeLikeGame(leg, from, to, rumbo, gameKm) {
   if (!leg || routeGameAgreement(gameKmOf(leg, leg), gameKm) !== 'differ') return { leg, switched: false };
-  const rutas = routeAlternatives(leg, (penal) => findRoute(from, to, rumbo, penal), routeEdgesOf);
+  const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas), routeEdgesOf);
   const k = pickRouteLikeGame(rutas.map(r => ({ km: gameKmOf(r, r), seconds: routeSecondsOf(r) })), gameKm);
   return { leg: rutas[k], switched: k > 0 };
 }
@@ -3434,7 +3434,10 @@ function routeStartHeading(data) {
   return data && Number.isFinite(data.heading) && Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH ? data.heading : null;
 }
 
-function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null) {
+// penal y previas: para una alternativa (routeAlternatives), las aristas
+// encarecidas y las rutas ya encontradas, de las que no se desvia por una
+// salida o un area de descanso para volver a entrar (dropRouteDetours).
+function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null, previas = null) {
   const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeT, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
   const blocked = filtro ? filtro.blocked : null;
   const nodeOk = filtro ? filtro.nodeOk : null;
@@ -3459,21 +3462,21 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   }
 
   // Perfil de ruteo: "fastest" pesa por tiempo (prefiere autopista, como el
-  // GPS del juego), "shortest" por metros. La heuristica de A* tiene que ser
-  // admisible: distancia recta, y para tiempo dividida por la velocidad maxima
-  // posible (90 km/h).
+  // GPS del juego), "shortest" por metros (mas unos metros por segundo:
+  // routeEdgeCost). La heuristica de A* tiene que ser admisible: distancia
+  // recta, a la velocidad maxima posible (90 km/h).
   const byTime = routeProfile !== 'shortest';
   const MAX_SPEED_MS = 90 / 3.6;
   const ex = nodes[2 * endIdx], ey = nodes[2 * endIdx + 1];
   const heuristic = (i) => {
     const d = Math.hypot(nodes[2 * i] - ex, nodes[2 * i + 1] - ey);
-    return byTime ? d / MAX_SPEED_MS : d;
+    return byTime ? d / MAX_SPEED_MS : d * (1 + ROUTE_SHORT_M_PER_S / MAX_SPEED_MS);
   };
 
   // Primero sin vueltas en U en los nodos (findArcRoute, pure.js): A* por
   // aristas. Si asi no hay camino (algun rincon raro del grafo), el A* por
   // nodos de siempre: nunca peor que antes.
-  const path = findArcRoute(routeGraph, startIdx, endIdx, {
+  let path = findArcRoute(routeGraph, startIdx, endIdx, {
     cost: (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) * (penal ? (penal.get(e) || 1) : 1),
     heuristic,
     blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
@@ -3481,6 +3484,15 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
     startArc: arranque ? arranque.arc : null,
   }) || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
   if (!path) return null;
+  if (previas) {
+    const arista = (a, b) => {
+      const d = routeGraph.dirEdge(a, b);
+      if (d === -1) return null;
+      const e = adjEdge[d];
+      return { m: edgeM[e], cost: routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) };
+    };
+    for (const r of previas) path = dropRouteDetours(path, r.filter(p => p[4] != null).map(p => p[4]), arista);
+  }
   // Cada punto: [x, y, ferry, junction]. ferry = 1 si el tramo que LLEGA a
   // el es un ferry/tren (dibujado punteado, sin anunciar giros en el mar);
   // junction = 1 si el nodo es una interseccion real (3+ vecinos), que es

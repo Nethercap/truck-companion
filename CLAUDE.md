@@ -116,7 +116,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   antes). `tools/check_avisos.js` saca las dos de app.js por nombre.
   El costo es `routeEdgeCost` (segundos + 1 ms por metro: los segundos del
   grafo son enteros y sin desempate la ruta hacia una V por un brazo del
-  cruce). Andando, la ruta arranca en el tramo del camion en su sentido
+  cruce; "shortest", metros + 4 m por segundo, `ROUTE_SHORT_M_PER_S`: con
+  los metros solos salia de la autopista por un area de descanso o por la
+  salida y la entrada de un cruce para ahorrar 3 a 50 m, Discord 20-10).
+  Andando, la ruta arranca en el tramo del camion en su sentido
   (`startArcForHeading`, `routeStartHeading`), no en el nodo mas cercano.
 - La app rutea sola y del GPS del juego solo sabe cuanto falta
   (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
@@ -131,6 +134,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   250 rutas: con nuestra escala errada hasta 4 % u 8 km no se cambia ninguna;
   con 3 %, una de cada tres. El "Copy turn report" trae las dos distancias
   ("Route left"): con reportes reales se puede medir el error de la escala.
+  Una alternativa no se desvia de una ruta anterior por menos de 1,5 km
+  (`dropRouteDetours`, `ROUTE_DETOUR_MAX_M`): con la autopista encarecida
+  se bajaba por la salida y volvia a subir, o pasaba por el area de
+  descanso, y ese largo de mas la hacia coincidir con el juego (I-15,
+  salida 385, camino a Ogden, Discord 20-10).
 - El boton de parada (estacion o descanso, `addNearestStop`) elige con
   `pickFuelStop` y despues mira el camino de verdad (`reach`, findRoute desde
   el camion): si la elegida obliga a dar la vuelta (el camino mide 1 km mas

@@ -3621,8 +3621,20 @@ test('ruteo: con los segundos redondeados, la recta del cruce le gana a la V por
   const largo = (e) => e.m || Math.hypot(nodos[e.a][0] - nodos[e.b][0], nodos[e.a][1] - nodos[e.b][1]);
   const base = { heuristic: (i) => Math.hypot(nodos[i][0] - 63, nodos[i][1]) / 25, isFerry: () => false };
   assert.deepEqual(findArcRoute(g, 0, 1, { ...base, cost: (k) => routeEdgeCost(aristas[k].s, largo(aristas[k]), true) }), [0, 1]);
-  assert.equal(routeEdgeCost(6, 63, false), 63); // por metros, los metros
   assert.ok(routeEdgeCost(6, 63, true) < routeEdgeCost(3, 34, true) + routeEdgeCost(3, 34, true));
+});
+
+test('ruteo: "mas corta" no sale de la autopista por un area de descanso para ahorrar unos metros', () => {
+  const { routeEdgeCost, ROUTE_SHORT_M_PER_S } = require('./pure.js');
+  // Por metros, mas unos metros por segundo
+  assert.equal(routeEdgeCost(6, 63, false), 63 + 6 * ROUTE_SHORT_M_PER_S);
+  const mas = (a, b) => routeEdgeCost(a.s, a.m, false) < routeEdgeCost(b.s, b.m, false);
+  // Beaumont -> Lafayette (ATS): por el cruce 748 m y 49 s, por la autopista 764 m y 41 s
+  assert.ok(mas({ m: 764, s: 41 }, { m: 748, s: 49 }));
+  // La salida y la entrada en Jefferson City: 3 m menos y 10 s mas
+  assert.ok(mas({ m: 657, s: 38 }, { m: 654, s: 48 }));
+  // Un atajo de verdad sigue ganando: Salem -> Bend, 122 m menos y 2 s mas
+  assert.ok(mas({ m: 1394, s: 86 }, { m: 1516, s: 84 }));
 });
 
 test('createCityScale: lo que falta medido sobre la ruta entera no salta al entrar al hueco entre cajas', () => {
@@ -3955,6 +3967,47 @@ test('pickRouteLikeGame: casi empatadas, la que coincide con el GPS del juego (I
   assert.deepEqual([...pedidos[0]], [[1, 2], [2, 2]]);
   assert.deepEqual([...pedidos[1]], [[1, 2], [2, 2], [11, 2]]);
   assert.equal(routeAlternatives({ edges: [1] }, () => null, (r) => r.edges).length, 1);
+  // Cada una recibe las rutas ya encontradas (para dropRouteDetours)
+  const previas = [];
+  routeAlternatives({ edges: [1] }, (penal, prev) => { previas.push(prev.map(r => r.edges[0])); return { edges: [previas.length + 1] }; }, (r) => r.edges, { tries: 2 });
+  assert.deepEqual(previas, [[1], [1, 2]]);
+});
+
+test('dropRouteDetours: la alternativa no se baja de la autopista para volver a subir (I-15, salida 385, Discord 20-10)', () => {
+  const { dropRouteDetours, ROUTE_DETOUR_MAX_M } = require('./pure.js');
+  // Autopista 0-1-2-3-4 (100 m y 4 s cada tramo). Salida en 1, la calle del
+  // cruce 5-6 y la entrada en 3; un area de descanso 7 entre 3 y 4.
+  const aristas = {
+    '0-1': [100, 4], '1-2': [100, 4], '2-3': [100, 4], '3-4': [100, 4],
+    '1-5': [80, 7], '5-6': [60, 5], '6-3': [80, 7], '3-7': [55, 6], '7-4': [55, 6],
+    '8-1': [100, 4], '2-9': [40, 3], '9-3': [40, 3],
+  };
+  const edge = (a, b) => { const x = aristas[`${a}-${b}`]; return x ? { m: x[0], cost: x[1] } : null; };
+  const ruta = [0, 1, 2, 3, 4];
+  assert.deepEqual(dropRouteDetours([0, 1, 5, 6, 3, 4], ruta, edge), ruta);
+  // Por el area de descanso, mas corta pero mas lenta: tambien
+  assert.deepEqual(dropRouteDetours([0, 1, 2, 3, 7, 4], ruta, edge), ruta);
+  // Dos seguidas: la salida y enseguida el area de descanso
+  assert.deepEqual(dropRouteDetours([0, 1, 5, 6, 3, 7, 4], ruta, edge), ruta);
+  // Lejos de la ruta anterior (mas de ROUTE_DETOUR_MAX_M) es otro camino: queda
+  const largas = (a, b) => { const x = edge(a, b); return x && { m: x.m * ROUTE_DETOUR_MAX_M / 150, cost: x.cost }; };
+  const otra = [0, 1, 5, 6, 3, 4];
+  assert.equal(dropRouteDetours(otra, ruta, largas), otra);
+  // Si el desvio cuesta menos que la anterior (que no era la mas rapida), queda
+  const atajo = [0, 1, 2, 9, 3, 4];
+  assert.equal(dropRouteDetours(atajo, [0, 1, 2, 3, 4], (a, b) => (a === 2 && b === 3 ? { m: 100, cost: 40 } : edge(a, b))), atajo);
+  // Llegando a la salida por otro lado, volviendo para atras o sin seguir
+  // por la anterior despues de volver: no se toca
+  const deOtroLado = [8, 1, 5, 6, 3, 4];
+  assert.equal(dropRouteDetours(deOtroLado, ruta, edge), deOtroLado);
+  assert.equal(dropRouteDetours([0, 1, 2, 3, 6, 5, 1], ruta, edge).join(), '0,1,2,3,6,5,1');
+  assert.equal(dropRouteDetours([0, 1, 5, 6, 3, 2], ruta, edge).join(), '0,1,5,6,3,2');
+  // Sin camino que vuelva, o sin datos de una arista: igual
+  assert.deepEqual(dropRouteDetours([0, 1, 5, 6], ruta, edge), [0, 1, 5, 6]);
+  assert.deepEqual(dropRouteDetours([0, 1, 5, 6, 3, 4], ruta, () => null), [0, 1, 5, 6, 3, 4]);
+  // Termina en el mismo nodo que la anterior: vale como volver
+  assert.deepEqual(dropRouteDetours([0, 1, 5, 6, 3], [0, 1, 2, 3], edge), [0, 1, 2, 3]);
+  assert.equal(dropRouteDetours(null, ruta, edge), null);
 });
 
 test('turnPassed: parado en la linea de una T el giro sigue adelante; ya doblando, no (Discord 18-10)', () => {
