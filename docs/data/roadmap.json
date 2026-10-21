@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-12",
+  "updated": "2026-10-21",
   "note": "Fuente unica de la seccion 'Que viene' de la landing (se renderiza en docs/index.html y docs/es/index.html). Estados: building, planned, exploring, blocked, shipped. Los shipped se muestran aparte en el orden de este archivo: lo mas nuevo primero.",
   "items": [
     {
@@ -51,6 +51,78 @@
       }
     },
     {
+      "id": "map-shields-logos",
+      "status": "shipped",
+      "en": {
+        "title": "Route shields and company logos",
+        "body": "On the ATS map, interstate and US route shields along the roads, like on the game's own map. On both games, each company shows its real logo on the map and in the search list."
+      },
+      "es": {
+        "title": "Escudos de ruta y logos de empresas",
+        "body": "En el mapa de ATS, los escudos de las interestatales y de las US a lo largo de las rutas, como en el mapa del juego. En los dos juegos, cada empresa aparece con su logo en el mapa y en la lista del buscador."
+      }
+    },
+    {
+      "id": "game-like-directions",
+      "status": "shipped",
+      "en": {
+        "title": "Directions like the game's GPS",
+        "body": "Road names come from the exit signs (\"Keep right onto I-15\"), distances in town use the game's own scale, and when two routes are almost tied the one the game's GPS takes wins. Optional: \"Keep left\" or \"Keep right\" at every highway exit."
+      },
+      "es": {
+        "title": "Indicaciones como las del GPS del juego",
+        "body": "El nombre de la ruta sale de los carteles de la salida (\"Keep right onto I-15\"), las distancias en la ciudad usan la escala del juego y, entre dos rutas casi iguales, gana la que toma el GPS del juego. Opcional: \"Mantenete a la izquierda\" o \"a la derecha\" en cada salida de autopista."
+      }
+    },
+    {
+      "id": "cab-view",
+      "status": "shipped",
+      "en": {
+        "title": "Cab screen view",
+        "body": "A separate window with just the map, the next turn with its lanes, your speed and the arrival, in big type, for mods that copy a window onto the truck's GPS screen. Open it from Settings."
+      },
+      "es": {
+        "title": "Vista para la pantalla de la cabina",
+        "body": "Una ventana aparte con el mapa, el próximo giro con sus carriles, la velocidad y la llegada, en letra grande, para los mods que copian una ventana a la pantalla del GPS del camión. Se abre desde Ajustes."
+      }
+    },
+    {
+      "id": "overlay-stops",
+      "status": "shipped",
+      "en": {
+        "title": "Fuel and rest stops in the overlay",
+        "body": "The in-game overlay can show a bar from where you are to your destination: orange where to fill up before the tank runs dry, purple where to stop to sleep. At junctions with several lanes it also shows the lane arrows."
+      },
+      "es": {
+        "title": "Paradas de combustible y descanso en el overlay",
+        "body": "El overlay del juego puede mostrar una barra desde donde estás hasta el destino: en naranja dónde cargar antes de quedarte sin combustible, en violeta dónde parar a dormir. En los cruces con varios carriles también muestra las flechas de carril."
+      }
+    },
+    {
+      "id": "lane-arrows",
+      "status": "shipped",
+      "en": {
+        "title": "Lane arrows",
+        "body": "At junctions with several lanes, one box per lane with its arrows, and the ones for your turn in blue. Also \"Keep left\" where your lane is about to become an exit, and the arrows of the next highway exit when no turn is coming."
+      },
+      "es": {
+        "title": "Flechas de carril",
+        "body": "En los cruces con varios carriles, un recuadro por carril con sus flechas y en azul los que sirven para tu giro. También \"Mantenete a la izquierda\" donde tu carril se va por una salida, y las flechas de la próxima salida de autopista aunque no venga un giro."
+      }
+    },
+    {
+      "id": "account-map-year",
+      "status": "shipped",
+      "en": {
+        "title": "Your map, trip cards and your year",
+        "body": "In your account, a map of every trip you drove, an image of any trip to share, and in December and January your year: kilometers, days on the road, deliveries, your map, favorites and records."
+      },
+      "es": {
+        "title": "Tu mapa, tarjetas de viaje y tu año",
+        "body": "En tu cuenta, un mapa con todos los viajes que manejaste, una imagen de cualquier viaje para compartir y, en diciembre y enero, tu año: kilómetros, días en la ruta, entregas, tu mapa, favoritos y récords."
+      }
+    },
+    {
       "id": "obs-overlay",
       "status": "shipped",
       "en": {
@@ -63,6 +135,18 @@
       }
     },
     {
+      "id": "nearest-stop",
+      "status": "shipped",
+      "en": {
+        "title": "Nearest fuel station or rest area",
+        "body": "One tap adds the nearest station or rest area to your route, one ahead that doesn't make you turn back. When fuel is low or a rest is due soon, the dashboard offers it on its own."
+      },
+      "es": {
+        "title": "Estación o descanso más cercano",
+        "body": "Con un toque se suma a la ruta la estación de servicio o el área de descanso más cercana, una adelante que no te haga volver. Con poco combustible o el descanso cerca, el tablero te la ofrece solo."
+      }
+    },
+    {
       "id": "ingame-overlay",
       "status": "shipped",
       "en": {
@@ -72,6 +156,18 @@
       "es": {
         "title": "Overlay dentro del juego",
         "body": "Un panel chico encima de ETS2 y ATS con velocidad y límite, el próximo giro y la próxima ciudad, lo que falta y la llegada en los dos relojes. Deja pasar los clics, nunca le saca el foco al juego y Ctrl+Shift+O lo muestra o lo esconde. En Windows, con el juego en ventana o en pantalla completa sin bordes; viene apagado y se prende en la Configuración del cliente."
+      }
+    },
+    {
+      "id": "floating-window",
+      "status": "shipped",
+      "en": {
+        "title": "Floating window",
+        "body": "Chrome and Edge on PC: a small window that stays on top of the game (borderless fullscreen) with the next turn, your speed, the arrival, a mini map and the time left until you have to rest."
+      },
+      "es": {
+        "title": "Ventana flotante",
+        "body": "Chrome y Edge en la PC: una ventana chica que queda encima del juego (en pantalla completa sin bordes) con el próximo giro, la velocidad, la llegada, un mini mapa y lo que falta para el descanso."
       }
     },
     {
