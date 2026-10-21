@@ -13,6 +13,8 @@ updates on its own and is not versioned here.
 - LAN mode: the client's local page server (the web copy and the maps built on the PC) only shares
   its files with trucksim-dash.com and the client's own pages. Web pages from anywhere else can no
   longer read them, and can no longer open the Setup window.
+- Discord status: after a job ends (or is cancelled by calling a tow truck), your profile no longer
+  keeps showing the old job's route and cargo.
 
 ## 1.5.33 (2026-10-19)
 

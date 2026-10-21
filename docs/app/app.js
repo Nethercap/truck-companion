@@ -5951,8 +5951,8 @@ function updateMiniHudExtra(data) {
     const rangeDisplay = useImperial ? ffRange * KM_TO_MI : ffRange;
     lines.push(`${t('range')}: ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`);
   }
-  if (miniHudSettings.eta && data.routeTimeSeconds != null) {
-    lines.push(`${t('etaGame')}: ${formatSeconds(data.routeTimeSeconds)}`);
+  if (miniHudSettings.eta && gameRouteSeconds(data) != null) {
+    lines.push(`${t('etaGame')}: ${formatSeconds(gameRouteSeconds(data))}`);
   }
   if (miniHudSettings.distance && data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
@@ -6207,7 +6207,7 @@ function updateHud(data) {
     document.getElementById('cargo').textContent = t('noCargo');
   }
 
-  const etaText = formatSeconds(data.routeTimeSeconds);
+  const etaText = formatSeconds(gameRouteSeconds(data)); // '-' sin ruta en el GPS del juego
   if (data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
     document.getElementById('etaGame').textContent = `${etaText} (${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'})`;

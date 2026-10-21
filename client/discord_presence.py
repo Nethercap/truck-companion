@@ -62,8 +62,13 @@ def activity_from_telemetry(data: dict, started_at: float | None = None) -> dict
     if not game:
         return None
 
-    src, dst = data.get("citySrc"), data.get("cityDst")
-    cargo = data.get("cargo")
+    # Sin trabajo el plugin puede dejar el origen, el destino y la carga del
+    # de antes (una carga externa cancelada al pedir la grua): el perfil
+    # seguia mostrando ese viaje, como el panel de la web antes de e02201f.
+    # Sin el campo (un payload de otra version) se muestra lo que haya.
+    en_viaje = data.get("onJob") is not False
+    src, dst = (data.get("citySrc"), data.get("cityDst")) if en_viaje else (None, None)
+    cargo = data.get("cargo") if en_viaje else None
     if dst and src:
         details = f"{src} → {dst}"
     elif dst:

@@ -1320,17 +1320,26 @@ def summarize_for_convoy(payload: dict, prev: Optional[dict], now: float) -> dic
     fuel_pct = None
     if payload.get("fuel") is not None and payload.get("fuelCapacity"):
         fuel_pct = max(0, min(100, round(100 * payload["fuel"] / payload["fuelCapacity"])))
+    # Sin trabajo el plugin puede dejar el origen, el destino y la carga del
+    # trabajo de antes (una carga externa cancelada al pedir la grua): los
+    # companeros del convoy y el mapa en vivo seguian viendo "A -> B" y la
+    # paga, como el panel de la web antes de e02201f. Los clientes < 1.3.1 no
+    # mandan onJob y se muestran como antes (hasJobDestination en pure.js).
+    en_viaje = payload.get("onJob") is not False
+    del_viaje = (lambda k: payload.get(k)) if en_viaje else (lambda k: None)
     return {
         "x": x, "z": z, "heading": heading, "ts": now,
         "game": payload.get("game"), "paused": bool(payload.get("paused")),
         "speedKmh": payload.get("speedKmh"),
-        "cargo": payload.get("cargo"), "cargoMassKg": payload.get("cargoMassKg"),
-        "citySrc": payload.get("citySrc"), "cityDst": payload.get("cityDst"),
-        "etaSeconds": payload.get("routeTimeSeconds"), "distanceKm": payload.get("routeDistanceKm"),
+        "cargo": del_viaje("cargo"), "cargoMassKg": del_viaje("cargoMassKg"),
+        "citySrc": del_viaje("citySrc"), "cityDst": del_viaje("cityDst"),
+        # Sin ruta en el GPS del juego el SDK manda 0: la tarjeta del convoy
+        # decia "0h 0m" (convoy.js solo mira null).
+        "etaSeconds": payload.get("routeTimeSeconds") or None, "distanceKm": payload.get("routeDistanceKm"),
         "fuelPct": fuel_pct,
         "restMin": payload.get("restStopMinutes") if payload.get("restStopMinutes") is not None else payload.get("restStopSeconds"),
         "truck": " ".join(filter(None, [payload.get("truckBrand"), payload.get("truckName")])) or None,
-        "jobIncome": payload.get("jobIncome"),
+        "jobIncome": del_viaje("jobIncome"),
     }
 
 

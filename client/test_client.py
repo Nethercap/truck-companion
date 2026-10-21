@@ -514,6 +514,16 @@ def test_discord_activity_from_telemetry():
     pausada = dp.activity_from_telemetry({"game": "ets2", "cityDst": "Praha", "paused": True})
     assert "Praha" in pausada["details"] and "km" not in pausada["state"]
 
+    # Sin trabajo (la carga externa cancelada deja los datos del viaje en el
+    # plugin) no se muestra el viaje anterior; el GPS del juego si.
+    libre = dp.activity_from_telemetry(
+        {"game": "ats", "onJob": False, "citySrc": "Salt Lake City", "cityDst": "Las Vegas",
+         "cargo": "Bulldozer", "routeDistanceKm": 30})
+    assert libre["details"] == dp._t("rpc_on_road")
+    assert "Bulldozer" not in libre["state"] and "30" in libre["state"]
+    con = dp.activity_from_telemetry({"game": "ats", "onJob": True, "cityDst": "Las Vegas"})
+    assert "Las Vegas" in con["details"]
+
 
 def test_discord_frame_encoding():
     import struct

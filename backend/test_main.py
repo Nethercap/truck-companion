@@ -931,6 +931,26 @@ def test_convoy_summary_heading_and_km(main):
     asyncio.run(scenario())
 
 
+def test_convoy_summary_sin_trabajo_no_muestra_el_viaje_anterior(main):
+    # Una carga externa cancelada (la grua) deja el origen, el destino, la
+    # carga y la paga en el plugin: con onJob false no van al convoy ni al
+    # mapa en vivo. Un cliente viejo (sin onJob) se muestra como antes.
+    viaje = {"position": {"x": 0, "z": 0}, "game": "ats", "cargo": "Beans", "cargoMassKg": 18000,
+             "citySrc": "Reno", "cityDst": "Elko", "jobIncome": 9000, "routeDistanceKm": 12}
+    t = main.time.time()
+    sin = main.summarize_for_convoy(dict(viaje, onJob=False), None, t)
+    for campo in ("cargo", "cargoMassKg", "citySrc", "cityDst", "jobIncome"):
+        assert sin[campo] is None, campo
+    assert sin["distanceKm"] == 12  # el GPS del juego puede tener una ruta sin trabajo
+    # Sin ruta en el GPS el SDK manda 0 segundos: la tarjeta decia "0h 0m"
+    assert main.summarize_for_convoy(dict(viaje, routeTimeSeconds=0), None, t)["etaSeconds"] is None
+    assert main.summarize_for_convoy(dict(viaje, routeTimeSeconds=600), None, t)["etaSeconds"] == 600
+    con = main.summarize_for_convoy(dict(viaje, onJob=True), None, t)
+    viejo = main.summarize_for_convoy(viaje, None, t)
+    for s in (con, viejo):
+        assert (s["cargo"], s["citySrc"], s["cityDst"], s["jobIncome"]) == ("Beans", "Reno", "Elko", 9000)
+
+
 def test_convoy_create_again_with_own_code_is_a_rejoin(main):
     import asyncio
 

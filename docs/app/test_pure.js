@@ -2018,6 +2018,36 @@ test('ciudades repetidas: el estado si los POIs lo traen, si no la ciudad cercan
   assert.deepEqual(citiesMatchingInput(names, conEstado, ''), []);
 });
 
+test('restMinutesOf: con la fatiga apagada no hay descanso (panel de docs/dash/, barrido del 21-10)', () => {
+  const { restMinutesOf, createFatigue, REST_MINUTES_MAX } = require('./pure.js');
+  assert.equal(restMinutesOf({ restStopMinutes: 400 }), 400);
+  // El nombre viejo del cliente (<= 1.4.1), tambien en minutos
+  assert.equal(restMinutesOf({ restStopSeconds: 90 }), 90);
+  assert.equal(restMinutesOf({ restStopMinutes: 30, restStopSeconds: 999 }), 30);
+  // Fatiga apagada: 0, o mas de un dia; y sin dato
+  assert.equal(restMinutesOf({ restStopMinutes: 0 }), null);
+  assert.equal(restMinutesOf({ restStopMinutes: REST_MINUTES_MAX }), null);
+  assert.equal(restMinutesOf({ restStopMinutes: 4294967295 }), null);
+  assert.equal(restMinutesOf({ restStopMinutes: -5 }), null);
+  assert.equal(restMinutesOf({ restStopMinutes: null }), null);
+  assert.equal(restMinutesOf({}), null);
+  assert.equal(restMinutesOf(null), null);
+  // La misma regla que la fatiga del panel de la app
+  for (const m of [0, 1, 400, 1439, 1440, 99999]) {
+    assert.equal(restMinutesOf({ restStopMinutes: m }) == null, createFatigue().push(m) == null, `con ${m}`);
+  }
+});
+
+test('gameRouteSeconds: sin ruta en el GPS del juego no hay ETA del juego, ni "0h 0m"', () => {
+  const { gameRouteSeconds } = require('./pure.js');
+  assert.equal(gameRouteSeconds({ routeTimeSeconds: 5400 }), 5400);
+  assert.equal(gameRouteSeconds({ routeTimeSeconds: 0 }), null);
+  assert.equal(gameRouteSeconds({ routeTimeSeconds: null }), null);
+  assert.equal(gameRouteSeconds({ routeTimeSeconds: -3 }), null);
+  assert.equal(gameRouteSeconds({}), null);
+  assert.equal(gameRouteSeconds(null), null);
+});
+
 test('createRestWatch: dormir cumple la parada de descanso, manejar no', () => {
   const { createRestWatch } = require('./pure.js');
   const w = createRestWatch();
