@@ -45,7 +45,12 @@ def _executable() -> str:
 
 
 def base_dir() -> str:
-    return os.path.dirname(_executable() if getattr(sys, "frozen", False) else os.path.abspath(__file__))
+    d = os.path.dirname(_executable() if getattr(sys, "frozen", False) else os.path.abspath(__file__))
+    if sys.platform == "darwin" and d.endswith("/Contents/MacOS"):
+        app_support = os.path.expanduser("~/Library/Application Support/TruckDash")
+        os.makedirs(app_support, exist_ok=True)
+        return app_support
+    return d
 
 
 def exe_path() -> str | None:
@@ -54,7 +59,15 @@ def exe_path() -> str | None:
     # En un AppImage sys.executable es el binario de adentro del montaje, que
     # deja de existir al cerrar el programa; el que sirve para volver a
     # arrancarlo es el .AppImage, y esa ruta la pasa el runtime en APPIMAGE.
-    return os.environ.get("APPIMAGE") or _executable()
+    appimage = os.environ.get("APPIMAGE")
+    if appimage:
+        return appimage
+    exe = _executable()
+    if sys.platform == "darwin" and ".app/Contents/MacOS" in exe:
+        partes = exe.split(".app/Contents/MacOS")
+        if len(partes) >= 2:
+            return partes[0] + ".app"
+    return exe
 
 
 def installed_by_winget(path: str | None = None) -> bool:
@@ -507,11 +520,50 @@ def autostart_desktop_entry() -> str | None:
     )
 
 
+LAUNCH_AGENT_NAME = "com.nethercap.truckdash.plist"
+
+
+def autostart_plist_path() -> str:
+    return os.path.expanduser(f"~/Library/LaunchAgents/{LAUNCH_AGENT_NAME}")
+
+
+def autostart_plist_entry() -> bytes | None:
+    exe = exe_path()
+    if not exe:
+        return None
+    if exe.endswith(".app"):
+        exe = os.path.join(exe, "Contents", "MacOS", "TruckDash")
+    import plistlib
+    return plistlib.dumps({
+        "Label": "com.nethercap.truckdash",
+        "ProgramArguments": [exe, AUTOSTART_FLAG],
+        "RunAtLoad": True,
+    })
+
+
 def _is_autostart_enabled_posix() -> bool:
+    if sys.platform == "darwin":
+        return os.path.isfile(autostart_plist_path())
     return os.path.isfile(autostart_desktop_path())
 
 
 def _set_autostart_posix(enabled: bool) -> bool:
+    if sys.platform == "darwin":
+        path = autostart_plist_path()
+        try:
+            if enabled:
+                entry = autostart_plist_entry()
+                if not entry:
+                    return False
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as f:
+                    f.write(entry)
+            elif os.path.exists(path):
+                os.remove(path)
+            return True
+        except OSError as exc:
+            logging.warning(f"No se pudo cambiar el inicio automatico ({exc})")
+            return False
     path = autostart_desktop_path()
     try:
         if enabled:

@@ -6,6 +6,8 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- macOS (beta): the client runs on a Mac from the source code, with the telemetry plugin built
+  for Intel and Apple Silicon. Thanks to uawannacry for the port.
 - Setup: "Build my map" is now there whenever you play with mods, not only after the dashboard
   sees your truck off the map. Before, it only showed up after that, and not again after
   restarting the client, so there was no way to build the map for a newer version of a map mod
