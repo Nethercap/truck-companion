@@ -142,6 +142,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`slowNodes`). Con el de la autopista la ruta pasaba de largo de la
   estacion y la daba por alcanzada (36 de 325 paradas del boton en ATS; asi,
   1). El centro de una ciudad (destino aproximado) no: cambiaba rutas.
+  La empresa del trabajo (`tramo.empresa`) pide mas: un nodo sin ninguna
+  arista de 75 km/h o mas, de salida ni de llegada (`yardNodes`). Todo
+  prefab del grafo va a 40 km/h, tambien los de la autopista, y para
+  `slowNodes` el nodo de un cambio de carriles de la I-25 era "de un
+  prefab": la ruta a Rail Export de Casper terminaba en la autopista y daba
+  la vuelta (22-10). Cambian 33 empresas de ATS y 9 de ETS2, ninguna queda
+  en una via rapida (dibujadas una por una: al patio, a su calle de entrada
+  o al nodo de al lado). Las paradas no: en ETS2 las calles de servicio de las
+  estaciones van a 90 y 196 de 2.074 se iban a otro nodo, a veces el de la
+  estacion de la otra mano.
 - La app rutea sola y del GPS del juego solo sabe cuanto falta
   (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
   5 km, con 40 km o mas por delante, `routeGameAgreement`), se buscan hasta 3
