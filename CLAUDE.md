@@ -241,6 +241,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   de moverlos, correr el simulador con `--rotondas`.
 - La voz habla de a una frase (`voiceQueueAction`): una nueva espera a que
   termine la que suena, salvo un aviso en el punto contra uno anticipado.
+  Lo dicho se recuerda por maniobra (`turnIdentity`) para las ultimas 8
+  (`createRecentManeuvers`, tambien el lector de pantalla), no solo la
+  ultima: al pisar el nodo de un giro el aviso pasaba al siguiente, volvia
+  un dato y la voz lo repetia ("keep right" dos veces en Salem; 11 en 480
+  rutas del simulador, 0 asi; `voz_repetida` en el simulador).
+  Los `sentido_al_reves` del simulador pueden ser falsos: la zona junta
+  varios giros y la suma pasa los 180 grados (Panevezys) o se le suma una
+  horquilla callada de antes (Albacete); un "keep right" donde la ruta
+  dobla a la izquierda y la otra rama dobla mas es correcto (Salem,
+  Wenatchee, 22-10).
 - Un giro sin otro camino se calla (`quiet` de `detectManeuver`), salvo la
   entrada a un anillo (`ringThrough`): solo tramos de un sentido y sin
   repetir nodos. Con cualquier camino dirigido, toda esquina con un brazo

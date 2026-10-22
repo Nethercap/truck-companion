@@ -559,6 +559,11 @@ function analizarRuta(ctx, ruta, hallazgos) {
     if (!ahora && !r.decoy) add('voz_sin_aviso_en_el_punto', { donde: xy(r.node), dice: `${r.kind} ${r.direction}${r.exit ? ' ' + r.exit : ''}`, primero: Math.round(r.primero.d), ultimo: Math.round(r.ultimo.d), voces: r.voces.map(x => x.clave).join(',') });
     if (!ahora && r.decoy) add('voz_callada_por_otra_calle', { donde: xy(r.node), dice: `${r.kind} ${r.direction}`, ultimo: Math.round(r.ultimo.d) });
     if (ahora && ahora.d > 160) add('voz_temprano', { donde: xy(r.node), clave: ahora.clave, metros: Math.round(ahora.d), kmh: Math.round(ahora.v * 3.6) });
+    // La misma frase dos veces para la misma maniobra: el aviso fue a otra y
+    // volvio ("keep right" dos veces en Salem, "turn left" en Cheyenne, 22-10)
+    const veces = {};
+    for (const x of r.voces) veces[x.clave] = (veces[x.clave] || 0) + 1;
+    if (Object.values(veces).some(n => n > 1)) add('voz_repetida', { donde: xy(r.node), dice: `${r.kind} ${r.direction}`, voces: r.voces.map(x => `${x.clave}@${Math.round(x.d)}`).join(',') });
     if (r.kind === 'roundabout' && r.exit > 5) add('rotonda_mas_de_5_salidas', { donde: xy(r.node), exit: r.exit, voz: r.voces.map(x => x.clave).join(',') });
   }
   // aviso que sigue en pantalla despues de pasar su nodo (3 datos seguidos o
