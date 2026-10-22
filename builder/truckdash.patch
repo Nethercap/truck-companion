@@ -3223,10 +3223,10 @@ index 0000000..e9ea575
 +}
 diff --git a/packages/clis/truckdash-builder/tiles.ts b/packages/clis/truckdash-builder/tiles.ts
 new file mode 100755
-index 0000000..82b2327
+index 0000000..f78a301
 --- /dev/null
 +++ b/packages/clis/truckdash-builder/tiles.ts
-@@ -0,0 +1,323 @@
+@@ -0,0 +1,304 @@
 +// Tiles vectoriales (.pmtiles) a partir del GeoJSON del generator, sin
 +// tippecanoe (que solo corre en Linux): para armar el mapa con mods en la PC
 +// de quien juega. Mismo resultado que el taller en lo que la app usa: una
@@ -3240,35 +3240,13 @@ index 0000000..82b2327
 +import { zxyToTileId } from 'pmtiles';
 +import vtpbf from 'vt-pbf';
 +import zlib from 'zlib';
++import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles';
 +
 +const MIN_ZOOM = 4;
 +const MAX_ZOOM = 13;
 +const EXTENT = 4096;
 +// tippecanoe -b 10: 10 pixeles de un tile de 256 -> 160 de 4096.
 +const BUFFER = 160;
-+// Los -y del taller: el resto de las propiedades no viaja.
-+const ATRIBUTOS = [
-+  'type',
-+  'dlcGuard',
-+  'zIndex',
-+  'height',
-+  'hidden',
-+  'secret',
-+  'poiType',
-+  'poiName',
-+  'sprite',
-+  'scaleRank',
-+  'capital',
-+  'roadType',
-+  'color',
-+  'name',
-+];
-+
-+interface Feature {
-+  type: 'Feature';
-+  geometry: unknown;
-+  properties: Record<string, unknown> | null;
-+}
 +
 +// tiles_light_filter.json: hasta z6 solo ciudades, paises, ferries, trenes,
 +// caminos (en z4 sin los locales) y los POI de ferry y tren.
@@ -3455,12 +3433,15 @@ index 0000000..82b2327
 +    process.exit(1);
 +  }
 +  const t0 = Date.now();
-+  const todo = (
-+    JSON.parse(fs.readFileSync(entrada, 'utf8')) as { features: Feature[] }
-+  ).features.map(limpiar);
++  const { features: todo, uniones } = unirCalles(
++    (
++      JSON.parse(fs.readFileSync(entrada, 'utf8')) as { features: Feature[] }
++    ).features.map(limpiar),
++    ATRIBUTOS,
++  );
 +  const bbox = bboxDe(todo);
 +  console.log(
-+    `${todo.length} features, bbox ${bbox.map(v => v.toFixed(3)).join(', ')}`,
++    `${todo.length} features (${uniones} calles unidas), bbox ${bbox.map(v => v.toFixed(3)).join(', ')}`,
 +  );
 +  const opciones = {
 +    maxZoom: MAX_ZOOM,
@@ -3552,13 +3533,14 @@ index 0000000..82b2327
 +main();
 diff --git a/packages/clis/truckdash-builder/tsconfig.json b/packages/clis/truckdash-builder/tsconfig.json
 new file mode 100644
-index 0000000..dc89a62
+index 0000000..03439ae
 --- /dev/null
 +++ b/packages/clis/truckdash-builder/tsconfig.json
-@@ -0,0 +1,4 @@
+@@ -0,0 +1,5 @@
 +{
 +  "extends": "../../../tsconfig.base.json",
-+  "include": ["*.ts"]
++  "include": ["*.ts"],
++  "exclude": ["*.prueba.ts"]
 +}
 diff --git a/packages/clis/truckdash-builder/types.d.ts b/packages/clis/truckdash-builder/types.d.ts
 new file mode 100644
@@ -3594,6 +3576,518 @@ index 0000000..34b3ab0
 +  };
 +  export default vtpbf;
 +}
+diff --git a/packages/clis/truckdash-builder/unir-calles.prueba.ts b/packages/clis/truckdash-builder/unir-calles.prueba.ts
+new file mode 100644
+index 0000000..2e8765e
+--- /dev/null
++++ b/packages/clis/truckdash-builder/unir-calles.prueba.ts
+@@ -0,0 +1,294 @@
++// Corre con: node --experimental-strip-types --test packages/clis/truckdash-builder/unir-calles.prueba.ts
++// (build.sh lo corre antes de empaquetar el armador).
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles.ts';
++
++const calle = (
++  coords: number[][],
++  props: Record<string, unknown> = {},
++): Feature => ({
++  type: 'Feature',
++  properties: { type: 'road', roadType: 'local', hidden: false, ...props },
++  geometry: { type: 'LineString', coordinates: coords },
++});
++const lineas = (fs: Feature[]) =>
++  fs.map(f => (f.geometry as { coordinates: number[][] }).coordinates);
++
++test('dos pedazos que siguen uno al otro quedan en una linea', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [1, 0],
++        [2, 1],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.uniones, 1);
++  assert.deepEqual(lineas(r.features), [
++    [
++      [0, 0],
++      [1, 0],
++      [2, 1],
++    ],
++  ]);
++});
++
++test('da igual para que lado va cada pedazo', () => {
++  // punta con punta (las dos ramas de la entrada a una rotonda: la estrella)
++  const v = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [5, 5],
++      ]),
++      calle([
++        [10, 0],
++        [5, 5],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.deepEqual(lineas(v.features), [
++    [
++      [0, 0],
++      [5, 5],
++      [10, 0],
++    ],
++  ]);
++  // principio con principio
++  const p = unirCalles(
++    [
++      calle([
++        [1, 0],
++        [0, 0],
++      ]),
++      calle([
++        [1, 0],
++        [2, 0],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.deepEqual(lineas(p.features), [
++    [
++      [0, 0],
++      [1, 0],
++      [2, 0],
++    ],
++  ]);
++});
++
++test('una cadena de varios pedazos, en cualquier orden', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [2, 0],
++        [3, 0],
++      ]),
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [2, 0],
++        [1, 0],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.uniones, 2);
++  assert.equal(r.features.length, 1);
++  const c = lineas(r.features)[0];
++  // queda donde estaba el primer pedazo del archivo, recorrida de punta a punta
++  assert.deepEqual(c.length, 4);
++  assert.deepEqual(
++    [c[0], c[3]].sort(),
++    [
++      [0, 0],
++      [3, 0],
++    ].sort(),
++  );
++});
++
++test('en un cruce de tres o mas no se une nada', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [1, 0],
++        [2, 0],
++      ]),
++      calle([
++        [1, 0],
++        [1, 1],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.uniones, 0);
++  assert.equal(r.features.length, 3);
++});
++
++test('no se unen calles que se dibujan distinto', () => {
++  const tipo = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle(
++        [
++          [1, 0],
++          [2, 0],
++        ],
++        { roadType: 'freeway' },
++      ),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(tipo.uniones, 0);
++  const dlc = unirCalles(
++    [
++      calle(
++        [
++          [0, 0],
++          [1, 0],
++        ],
++        { dlcGuard: 2 },
++      ),
++      calle(
++        [
++          [1, 0],
++          [2, 0],
++        ],
++        { dlcGuard: 3 },
++      ),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(dlc.uniones, 0);
++  // lo que no viaja en los tiles no cuenta (los carriles de cada pedazo)
++  const carriles = unirCalles(
++    [
++      calle(
++        [
++          [0, 0],
++          [1, 0],
++        ],
++        { leftLanes: 1 },
++      ),
++      calle(
++        [
++          [1, 0],
++          [2, 0],
++        ],
++        { leftLanes: 2 },
++      ),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(carriles.uniones, 1);
++});
++
++test('un anillo de pedazos queda cerrado y entero', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [1, 0],
++        [1, 1],
++      ]),
++      calle([
++        [1, 1],
++        [0, 0],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.features.length, 1);
++  const c = lineas(r.features)[0];
++  assert.equal(c.length, 4);
++  assert.deepEqual(c[0], c[3]);
++});
++
++test('puntas casi iguales se juntan, separadas no', () => {
++  const cerca = unirCalles(
++    [
++      calle([
++        [10, 50],
++        [10.001, 50],
++      ]),
++      calle([
++        [10.001 + 1e-9, 50],
++        [10.002, 50],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(cerca.uniones, 1);
++  const lejos = unirCalles(
++    [
++      calle([
++        [10, 50],
++        [10.001, 50],
++      ]),
++      calle([
++        [10.001 + 1e-5, 50],
++        [10.002, 50],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(lejos.uniones, 0);
++});
++
++test('lo que no es una calle queda igual y en su lugar', () => {
++  const ciudad: Feature = {
++    type: 'Feature',
++    properties: { type: 'city', name: 'Uppsala' },
++    geometry: { type: 'Point', coordinates: [1, 0] },
++  };
++  const prefab: Feature = {
++    type: 'Feature',
++    properties: { type: 'prefab' },
++    geometry: {
++      type: 'Polygon',
++      coordinates: [
++        [
++          [0, 0],
++          [1, 0],
++          [1, 1],
++          [0, 0],
++        ],
++      ],
++    },
++  };
++  const a = calle([
++      [0, 0],
++      [1, 0],
++    ]),
++    b = calle([
++      [1, 0],
++      [2, 0],
++    ]);
++  const r = unirCalles([ciudad, a, prefab, b], ATRIBUTOS);
++  assert.equal(r.features.length, 3);
++  assert.equal(r.features[0], ciudad);
++  assert.equal(r.features[2], prefab);
++  assert.deepEqual(r.features[1].properties, a.properties);
++  // sin nada que unir devuelve lo mismo
++  const nada = [ciudad, a];
++  assert.equal(unirCalles(nada, ATRIBUTOS).features, nada);
++});
+diff --git a/packages/clis/truckdash-builder/unir-calles.ts b/packages/clis/truckdash-builder/unir-calles.ts
+new file mode 100644
+index 0000000..ac4c174
+--- /dev/null
++++ b/packages/clis/truckdash-builder/unir-calles.ts
+@@ -0,0 +1,137 @@
++// Junta en una sola linea las calles que se tocan punta con punta. El
++// generator deja cada cruce en pedazos (la calle, las dos ramas de la entrada
++// a una rotonda, el anillo) y cada pedazo es una linea aparte: dibujadas con
++// el ancho de la calle y puntas cuadradas, donde terminan dos juntas en
++// angulo las dos puntas se pisan y queda una estrella (las entradas de las
++// rotondas). Unidas, ahi hay una esquina y la dibuja la union de la linea.
++//
++// Solo donde se juntan exactamente dos puntas y las dos calles se dibujan
++// igual (mismos `claves`: tipo, si esta oculta, el DLC...). En un cruce de
++// tres o mas no se toca nada. Lo usan tiles.ts (el armador de la PC) y unir.ts
++// (el taller, antes de tippecanoe). Sin dependencias: corre con node solo.
++
++// Los -y del taller (tippecanoe) y lo que guarda tiles.ts: el resto de las
++// propiedades no viaja, y dos calles que coinciden en esto se dibujan igual.
++export const ATRIBUTOS = [
++  'type',
++  'dlcGuard',
++  'zIndex',
++  'height',
++  'hidden',
++  'secret',
++  'poiType',
++  'poiName',
++  'sprite',
++  'scaleRank',
++  'capital',
++  'roadType',
++  'color',
++  'name',
++];
++
++export interface Feature {
++  type: 'Feature';
++  geometry: unknown;
++  properties: Record<string, unknown> | null;
++  id?: unknown;
++}
++
++type Punto = number[];
++
++// Dos puntas a menos de esto (en grados, ~0,1 m del mapa y ~5 mm del juego)
++// son el mismo punto: el generator calcula por separado el final de una calle
++// y el nodo del prefab donde empieza la otra.
++const PASO_GRADOS = 1e-6;
++
++function celda(p: Punto): string {
++  return `${Math.round(p[0] / PASO_GRADOS)},${Math.round(p[1] / PASO_GRADOS)}`;
++}
++
++export function unirCalles(
++  features: Feature[],
++  claves: readonly string[],
++): { features: Feature[]; uniones: number } {
++  const firma = (f: Feature) =>
++    JSON.stringify(claves.map(k => f.properties?.[k] ?? null));
++  // Las calles que se pueden unir: LineString de dos puntos o mas.
++  const lineas: number[] = [];
++  const coords: Punto[][] = [];
++  features.forEach((f, i) => {
++    const g = f.geometry as { type?: string; coordinates?: Punto[] } | null;
++    if (
++      f.properties?.type === 'road' &&
++      g?.type === 'LineString' &&
++      Array.isArray(g.coordinates) &&
++      g.coordinates.length >= 2
++    ) {
++      lineas.push(i);
++      coords.push(g.coordinates);
++    }
++  });
++  // Cada punta (linea, 0 = el primer punto, 1 = el ultimo) en su celda.
++  const puntas = new Map<string, [number, 0 | 1][]>();
++  coords.forEach((c, n) => {
++    for (const lado of [0, 1] as const) {
++      const k = celda(lado ? c[c.length - 1] : c[0]);
++      const lista = puntas.get(k);
++      if (lista) lista.push([n, lado]);
++      else puntas.set(k, [[n, lado]]);
++    }
++  });
++  // vecino[n][lado]: con que punta de que linea se une esa punta.
++  const vecino: ([number, 0 | 1] | null)[][] = coords.map(() => [null, null]);
++  let uniones = 0;
++  for (const lista of puntas.values()) {
++    if (lista.length !== 2) continue;
++    const [[a, la], [b, lb]] = lista;
++    if (a === b) continue; // una linea cerrada sobre si misma
++    if (firma(features[lineas[a]]) !== firma(features[lineas[b]])) continue;
++    vecino[a][la] = [b, lb];
++    vecino[b][lb] = [a, la];
++    uniones++;
++  }
++  if (!uniones) return { features, uniones };
++
++  // Se recorre cada cadena desde una punta suelta; lo que queda son anillos.
++  // La linea unida queda en el lugar de su primer pedazo, con sus
++  // propiedades; los demas pedazos salen. El resto, igual y en orden.
++  const usada = new Array(coords.length).fill(false);
++  const unida = new Map<number, Punto[]>(); // feature donde queda -> coordenadas
++  const fuera = new Set<number>();
++  const recorrer = (inicio: number, entraPor: 0 | 1) => {
++    const out: Punto[] = [];
++    let n = inicio,
++      lado = entraPor;
++    while (!usada[n]) {
++      usada[n] = true;
++      const c = lado === 0 ? coords[n] : coords[n].slice().reverse();
++      for (let k = out.length ? 1 : 0; k < c.length; k++) out.push(c[k]);
++      if (n !== inicio) fuera.add(lineas[n]);
++      const v = vecino[n][(1 - lado) as 0 | 1];
++      if (!v) break;
++      [n, lado] = v;
++    }
++    if (out.length > coords[inicio].length) unida.set(lineas[inicio], out);
++  };
++  coords.forEach((_, n) => {
++    if (usada[n]) return;
++    if (!vecino[n][0]) recorrer(n, 0);
++    else if (!vecino[n][1]) recorrer(n, 1);
++  });
++  coords.forEach((_, n) => {
++    if (!usada[n]) recorrer(n, 0); // anillo: todas sus puntas unidas
++  });
++
++  const resultado: Feature[] = [];
++  features.forEach((f, i) => {
++    if (fuera.has(i)) return;
++    const c = unida.get(i);
++    if (!c) resultado.push(f);
++    else
++      resultado.push({
++        ...f,
++        geometry: { type: 'LineString', coordinates: c },
++      });
++  });
++  return { features: resultado, uniones };
++}
+diff --git a/packages/clis/truckdash-builder/unir.ts b/packages/clis/truckdash-builder/unir.ts
+new file mode 100644
+index 0000000..8978173
+--- /dev/null
++++ b/packages/clis/truckdash-builder/unir.ts
+@@ -0,0 +1,63 @@
++// El taller (build_variant.py) junta las calles antes de tippecanoe con esto:
++// lee el GeoJSON del generator y escribe otro con las calles que se tocan
++// punta con punta unidas (unir-calles.ts). tiles.ts lo hace solo.
++//
++// El generator escribe un feature por linea (writeGeojsonFile) porque entero
++// no entra en un string de node (ETS2 con ProMods pasa de 1 GB): se lee y se
++// escribe igual, de a una linea.
++//
++// Uso: npx tsx packages/clis/truckdash-builder/unir.ts <entrada.geojson> <salida.geojson>
++
++import fs from 'fs';
++import readline from 'readline';
++import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles';
++
++async function leer(entrada: string): Promise<Feature[]> {
++  const features: Feature[] = [];
++  const lineas = readline.createInterface({
++    input: fs.createReadStream(entrada, 'utf8'),
++    crlfDelay: Infinity,
++  });
++  for await (const cruda of lineas) {
++    const linea = cruda.trim().replace(/,$/, '');
++    if (linea.length < 2 || linea[0] !== '{' || linea.at(-1) !== '}') continue;
++    const obj = JSON.parse(linea) as {
++      type?: string;
++      features?: Feature[];
++    };
++    if (obj.type === 'Feature') features.push(obj as unknown as Feature);
++    else if (obj.type === 'FeatureCollection' && obj.features)
++      for (const f of obj.features) features.push(f); // un archivo de una sola linea
++  }
++  return features;
++}
++
++function escribir(salida: string, features: Feature[]) {
++  const fd = fs.openSync(salida, 'w');
++  fs.writeSync(fd, '{\n"type": "FeatureCollection",\n"features":[\n');
++  features.forEach((f, i) => {
++    fs.writeSync(
++      fd,
++      JSON.stringify(f) + (i < features.length - 1 ? ',\n' : '\n'),
++    );
++  });
++  fs.writeSync(fd, ']\n}\n');
++  fs.closeSync(fd);
++}
++
++async function main() {
++  const [entrada, salida] = process.argv.slice(2);
++  if (!entrada || !salida) {
++    console.error('Uso: unir.ts <entrada.geojson> <salida.geojson>');
++    process.exit(1);
++  }
++  const t0 = Date.now();
++  const todo = await leer(entrada);
++  const { features, uniones } = unirCalles(todo, ATRIBUTOS);
++  escribir(salida, features);
++  console.log(
++    `${todo.length} -> ${features.length} features, ${uniones} uniones, ${((Date.now() - t0) / 1000).toFixed(1)} s`,
++  );
++}
++
++void main();
 diff --git a/packages/libs/map/labels.ts b/packages/libs/map/labels.ts
 index d673fef..18ef19d 100644
 --- a/packages/libs/map/labels.ts

@@ -10,6 +10,10 @@ updates on its own and is not versioned here.
   sees your truck off the map. Before, it only showed up after that, and not again after
   restarting the client, so there was no way to build the map for a newer version of a map mod
   than ours.
+- Build my map: road pieces that meet end to end are joined into one road, so the dashboard, which
+  now draws roads at their in-game width, shows clean corners and road ends instead of overlapping
+  square tips (where the two lanes of a roundabout entrance meet, for example). Maps built before
+  look the same as always until you build them again.
 
 ## 1.5.34 (2026-10-21)
 

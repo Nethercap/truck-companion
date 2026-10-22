@@ -3112,6 +3112,45 @@ function routeHasLine(feature) {
   return false;
 }
 
+// Ancho de las calles del mapa en pixeles, como 'line-width' de MapLibre. Se
+// queda el de siempre (baseStops: [zoom, px, ...], lineal) mientras sea mas
+// grueso que la calle de verdad; de ahi (zoom 10 a 11) va el ancho del juego:
+// ROAD_WIDTH_GAME_M (dos carriles de 4,5 m) por ROAD_WIDTH_SHARE, pasado a
+// metros del mapa (metersPerGameM: el juego esta comprimido unas 19 veces) y
+// a pixeles de ese zoom en esa latitud (Web Mercator, teselas de 512 px). Las
+// piezas de los cruces que arma truckermudgeon estan pensadas para dibujarse
+// con ancho, como en el mapa del juego: con la linea fina se veian sueltas y
+// cruzadas (rotonda de Uppsala, Discord 22-10). 0,8 y no 1: los ramales de un
+// carril de las rotondas se empastaban en una mancha.
+const ROAD_WIDTH_GAME_M = 9;
+const ROAD_WIDTH_SHARE = 0.8;
+const ROAD_WIDTH_MIN_ZOOM = 5;
+const ROAD_WIDTH_MAX_ZOOM = 22;
+const WEB_MERCATOR_CIRCUMFERENCE_M = 40075016.686;
+function roadLineWidth(baseStops, metersPerGameM, lat) {
+  const linear = ['interpolate', ['linear'], ['zoom'], ...baseStops];
+  if (!(metersPerGameM > 0) || !isFinite(lat)) return linear;
+  const base = z => {
+    if (z <= baseStops[0]) return baseStops[1];
+    for (let i = 2; i < baseStops.length; i += 2) {
+      if (z <= baseStops[i]) {
+        const z0 = baseStops[i - 2], w0 = baseStops[i - 1];
+        return w0 + (baseStops[i + 1] - w0) * (z - z0) / (baseStops[i] - z0);
+      }
+    }
+    return baseStops[baseStops.length - 1];
+  };
+  // Mas alla de los 78 grados (ninguna variante llega) no crece sin limite.
+  const cos = Math.max(0.2, Math.cos(lat * Math.PI / 180));
+  const stops = [];
+  for (let z = ROAD_WIDTH_MIN_ZOOM; z <= ROAD_WIDTH_MAX_ZOOM; z++) {
+    const real = ROAD_WIDTH_SHARE * ROAD_WIDTH_GAME_M * metersPerGameM * 512 * 2 ** z / (WEB_MERCATOR_CIRCUMFERENCE_M * cos);
+    stops.push(z, Math.round(Math.max(base(z), real) * 100) / 100);
+  }
+  // Base 2: entre dos zooms enteros el ancho real se duplica, como el mapa.
+  return ['interpolate', ['exponential', 2], ['zoom'], ...stops];
+}
+
 // Tamano de un elemento acomodado a mano (modo acomodar): la escala nueva
 // sale de cuanto se arrastro la manija de la esquina respecto del ancho con
 // que se empezo. Nunca mas grande de lo que entra entre donde esta y el borde
@@ -5303,6 +5342,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }

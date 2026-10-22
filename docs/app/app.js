@@ -1262,10 +1262,42 @@ function setRouteData(data) {
 // permite cambiarle la url a un source ya existente.
 const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'ferry-poi', 'road-shield', 'exit-label', 'country-label', 'city-label'];
 
+// Ancho de las calles: el de siempre de lejos y el del juego de cerca
+// (roadLineWidth en pure.js). En pixeles depende de la latitud, asi que se
+// recalcula al moverse ROAD_WIDTH_LAT_STEP grados al norte o al sur
+// (updateRoadWidths). Puntas cuadradas y esquinas en punta, como el mapa del
+// juego: redondeadas, cada pedazo de un cruce terminaba en una bolita.
+const ROAD_BASE_WIDTHS = {
+  'road-local': [5, 0.5, 12, 1.5, 17, 5],
+  'road-divided': [5, 0.8, 12, 2.5, 17, 8],
+  'road-freeway': [5, 1, 12, 3.5, 17, 10],
+};
+const ROAD_LINE_LAYOUT = { 'line-cap': 'square', 'line-join': 'miter' };
+const ROAD_WIDTH_LAT_STEP = 2;
+let roadWidthLayer = null; // 'ats' o 'ets2': de que juego son las calles dibujadas
+let roadWidthLat = null;   // latitud con la que se calcularon sus anchos
+function roadMetersPerGameM(sourceLayer) {
+  return Math.abs((sourceLayer === 'ats' ? ATS_DEF : ETS2_DEF).factor[1]) * LENGTH_OF_DEGREE;
+}
+function roadWidthFor(id) {
+  return roadLineWidth(ROAD_BASE_WIDTHS[id], roadMetersPerGameM(roadWidthLayer), roadWidthLat);
+}
+function updateRoadWidths() {
+  if (!map || roadWidthLayer === null) return;
+  const lat = map.getCenter().lat;
+  if (Math.abs(lat - roadWidthLat) < ROAD_WIDTH_LAT_STEP) return;
+  roadWidthLat = lat;
+  for (const id of Object.keys(ROAD_BASE_WIDTHS)) {
+    if (map.getLayer(id)) map.setPaintProperty(id, 'line-width', roadWidthFor(id));
+  }
+}
+
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
 function buildVecLayers(sourceLayer) {
   const L = sourceLayer;
+  roadWidthLayer = L;
+  roadWidthLat = map ? map.getCenter().lat : 45;
   return [
     { id: 'mapArea', type: 'fill', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'mapArea'],
       paint: { 'fill-color': ['match', ['get', 'color'], 0, '#454b54', 1, '#575e68', 2, '#1c1f24', 3, '#3d5238', '#454b54'], 'fill-opacity': 0.95 } },
@@ -1282,16 +1314,16 @@ function buildVecLayers(sourceLayer) {
                'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 2.5] } },
     { id: 'road-local', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'local']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#7d838c', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 12, 1.5, 17, 5] } },
+      layout: ROAD_LINE_LAYOUT,
+      paint: { 'line-color': '#7d838c', 'line-width': roadWidthFor('road-local') } },
     { id: 'road-divided', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'divided']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#cbd0d6', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 12, 2.5, 17, 8] } },
+      layout: ROAD_LINE_LAYOUT,
+      paint: { 'line-color': '#cbd0d6', 'line-width': roadWidthFor('road-divided') } },
     { id: 'road-freeway', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
+      layout: ROAD_LINE_LAYOUT,
+      paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': roadWidthFor('road-freeway') } },
     // Logos de las empresas, los del mapa del juego: el sprite del tile es el
     // token y la imagen baja de R2 cuando hace falta (loadMissingCompanyIcon).
     // Sin superponerse entre ellos: en una ciudad hay varias pegadas y se
@@ -1939,6 +1971,7 @@ function ensureMapInitialized() {
   map.on('dragstart', pauseMapFollow);
   map.on('dragend', scheduleMapFollow);
   map.on('moveend', scheduleMapFollow);
+  map.on('moveend', updateRoadWidths);
   map.on('rotatestart', (e) => { if (e.originalEvent) pauseMapFollow(); });
   map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   map.on('zoom', updateTruckArrowSize);
