@@ -4152,13 +4152,9 @@ function updateDestinationMarker(data) {
       if (leg) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
         // Parado arranca en el nodo mas cercano: si es el cruce de adelante,
-        // con su entrada, o el giro de ahi no se avisa (stoppedRouteLead).
-        // Andando, a metros de un nodo arranca en el nodo (snapRouteStartToNode)
-        // y lleva la misma entrada, salvo que siga lo recorrido.
-        const pegada = legIdx === 0 && rumbo != null ? snapRouteStartToNode(leg) : leg;
-        const conEntrada = rumbo == null || (pegada !== leg && !sobreLaRuta);
-        const entrada = legIdx === 0 && conEntrada ? stoppedRouteLead(pegada, from[0], from[1], data.heading) : null;
-        leg = entrada ? [entrada, ...pegada] : pegada;
+        // con su entrada, o el giro de ahi no se avisa. Andando, a metros de
+        // un nodo arranca en el nodo con la misma entrada (recalcRouteStart).
+        if (legIdx === 0) leg = recalcRouteStart(leg, from[0], from[1], data.heading, rumbo, sobreLaRuta);
         leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
         routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
       } else { complete = false; routePoints.push([from[0], from[1], 0, 0, null, legIdx], [to[0], to[1], 0, 0, null, legIdx]); }

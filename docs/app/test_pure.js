@@ -4110,6 +4110,25 @@ test('snapRouteStartToNode: recalculada andando a 1 m de un nodo, arranca en el 
   assert.equal(snapRouteStartToNode(null), null);
 });
 
+test('recalcRouteStart: el comienzo de la ruta recalculada, parado y andando', () => {
+  const { recalcRouteStart, STOPPED_LEAD_BACK_M } = require('./pure.js');
+  // Rumbo del juego 0 = hacia -z. Un cruce en (0, 0) y la ruta sigue al norte.
+  const nodos = [[0, 0, 0, 1, 7], [0, -50, 0, 0, null], [0, -100, 0, 1, 8]];
+  // Parado (sin rumbo): arranca en el nodo y lleva la entrada
+  assert.deepEqual(recalcRouteStart(nodos, 0, 5, 0, null)[0], [0, 5 + STOPPED_LEAD_BACK_M, 0, 0, null]);
+  // Andando a 1 m del nodo: sin el punto del tramo, con la entrada
+  const pegada = [[0.5, 1, 0, 0, null], ...nodos];
+  const r = recalcRouteStart(pegada, 0.5, 1, 0, 0);
+  assert.equal(r.length, nodos.length + 1);
+  assert.equal(r[1], nodos[0]);
+  assert.ok(r[0][4] === null && r[0][1] > 30);
+  // Igual, pero siguiendo lo recorrido: sin la entrada (la da lo recorrido)
+  assert.deepEqual(recalcRouteStart(pegada, 0.5, 1, 0, 0, true), nodos);
+  // Andando lejos del nodo: la misma ruta
+  const lejos = [[0, 20, 0, 0, null], ...nodos];
+  assert.equal(recalcRouteStart(lejos, 0, 20, 0, 0), lejos);
+});
+
 test('positionAtOrigin: el camion en 0,0 exacto es un dato sin posicion (Cheyenne, 22-10)', () => {
   const { positionAtOrigin } = require('./pure.js');
   assert.equal(positionAtOrigin({ x: 0, y: 0, z: 0 }), true);

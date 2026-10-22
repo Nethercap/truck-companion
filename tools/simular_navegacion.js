@@ -14,7 +14,10 @@
 //
 // Uso: node tools/simular_navegacion.js [--variantes ats,ets2] [--rutas 30]
 //        [--semilla 1] [--salida carpeta] [--cache carpeta] [--carriles carpeta]
-//        [--estados or,wa] [--destinos la,tx]
+//        [--estados or,wa] [--destinos la,tx] [--antesDelGiro 0]
+//
+// --antesDelGiro 0: sin recalcular antes de cada aviso (revisarAvisosTrasRecalculo:
+// con 60 rutas por juego suma unos 15 a 20 s a los 25 de cada uno).
 //
 // --estados: solo empresas de esos estados (o paises en ETS2), por la
 // sigla de EE.UU. o por el nombre de pois-<v>.json (countries). Con
@@ -726,6 +729,85 @@ function revisarRuteo(ctx, ruta, hallazgos) {
   return { us };
 }
 
+// Los avisos despues de recalcular antes de un giro. Recalculada (un desvio,
+// un destino nuevo, un salto de la posicion), la ruta arranca otra vez en el
+// camion, sin lo recorrido, y la app vacia el aviso mostrado: si el giro que
+// viene sale en otro nodo o para el otro lado, es otra identidad
+// (turnIdentity) y la voz lo vuelve a decir. Asi "Turn left onto US-85 in 0
+// ft" salio dos veces en Cheyenne (Discord 22-10): la ruta arrancaba en otro
+// carril a 1 m de un nodo (0c0f37e), y esto no lo miraba nadie (los
+// recalculos de revisarRuteo miran solo la ruta). Antes de cada aviso del
+// manejo, cada RECALC_PASO_M en los RECALC_ANTES_M de antes, se recalcula con
+// el camion sobre su carril y el comienzo como la app (recalcRouteStart), y
+// se maneja RECALC_TICKS datos: lo que se muestra a menos de RECALC_CERCA_M
+// del cruce tiene que ser un aviso del manejo sin recalcular. Solo si la
+// ruta nueva pasa por el cruce igual (la ruta nueva termina 800 m despues, y
+// lo de su final no cuenta). "al_reves": el aviso para el otro lado;
+// "distinto": del mismo lado en otro nodo o de otro tipo (la voz lo repite).
+const RECALC_ANTES_M = 120, RECALC_PASO_M = 10, RECALC_TICKS = 6, RECALC_CERCA_M = 150;
+function revisarAvisosTrasRecalculo(ctx, ruta, lista, met, hallazgos) {
+  const { g, pure, H } = ctx;
+  const { pts, nombre } = ruta;
+  const { cum } = met;
+  const L = cum[cum.length - 1];
+  const xy = (p) => `(${Math.round(p[0])},${Math.round(p[1])})`;
+  const conocidos = new Set(lista.map(r => r.id));
+  const enFerry = (d) => { const k = met.indiceEn(d); return pts[Math.min(k + 1, pts.length - 1)][2] === 1; };
+  for (const r of lista) {
+    if (!r.pasada || r.sNodo < RECALC_ANTES_M + 100 || r.sNodo + 300 > L) continue;
+    // el cruce de la ruta: su nodo y el primero 60 m despues
+    const nodo = pts[r.k][4];
+    let kDespues = r.k + 1;
+    while (kDespues < pts.length - 1 && (pts[kDespues][4] == null || cum[kDespues] - r.sNodo < 60)) kDespues++;
+    const despues = pts[kDespues][4];
+    const malos = [];
+    let ejemplo = null;
+    for (let ds = -RECALC_ANTES_M; ds <= 0; ds += RECALC_PASO_M) {
+      const s = r.sNodo + ds;
+      if (enFerry(s) || enFerry(s + 150)) continue;
+      const p = met.pointAt(s), q = met.pointAt(s + 5);
+      const head = rumbo(p, q), rb = head * Math.PI / 180;
+      const sig = pts[Math.min(met.indiceEn(s) + 1, pts.length - 1)];
+      const lado = Number.isFinite(sig[6]) ? sig[6] : 0;
+      const x = p[0] + Math.cos(rb) * lado, z = p[1] + Math.sin(rb) * lado;
+      H.mod.set(g, null, []);
+      let nueva = H.mod.findRouteWith([x, z], met.pointAt(Math.min(L, r.sNodo + 800)), null, head);
+      if (!nueva || nueva.length < 3) continue;
+      if (pure.recalcRouteStart) nueva = pure.recalcRouteStart(nueva, x, z, head, head, false);
+      const camino = nodosDeRuta(nueva);
+      const iNodo = camino.indexOf(nodo);
+      if (iNodo < 0 || camino.indexOf(despues, iNodo) < 0) continue; // va por otro lado
+      ctx.stats.recalculosAntesDelGiro++;
+      const nm = metrica(nueva);
+      let behind = [], cur = nueva, h = 0, sn = 0;
+      const state = {};
+      for (let t = 0; t < RECALC_TICKS && cur.length >= 2; t++) {
+        H.mod.set(g, cur, behind);
+        const rumboAhora = rumbo(nm.pointAt(sn), nm.pointAt(sn + 5));
+        const turn = pure.stabilizeManeuver(state, H.mod.findUpcomingTurn(rumboAhora), 2);
+        const cerca = turn && Math.hypot(turn.node[0] - r.node[0], turn.node[1] - r.node[1]) < RECALC_CERCA_M;
+        if (cerca && !conocidos.has(pure.turnIdentity(turn))) {
+          malos.push(ds);
+          if (!ejemplo) ejemplo = { aviso: `${turn.kind} ${turn.direction} ${xy(turn.node)}`, a: Math.round(turn.distanceMeters), recalculoA: ds };
+          break;
+        }
+        // como trimRouteBehindTruck: 3,5 m por dato (50 km/h)
+        const sNuevo = sn + 3.5, hn = nm.indiceEn(sNuevo);
+        for (let k = behind.length ? h + 1 : 0; k <= hn; k++) behind.push(nueva[k]);
+        behind = pure.trimRouteBehind(behind, 200, 400);
+        const aca = nm.pointAt(sNuevo), sg = nueva[Math.min(hn + 1, nueva.length - 1)];
+        cur = [[aca[0], aca[1], 0, 0, null, sg[5] != null ? sg[5] : 0, sg[6]], ...nueva.slice(hn + 1)];
+        h = hn; sn = sNuevo;
+      }
+    }
+    if (!malos.length) continue;
+    ctx.stats.avisosTrasRecalculo += malos.length;
+    const alReves = ejemplo.aviso.split(' ')[1] !== r.direction;
+    hallazgos.push({ tipo: alReves ? 'aviso_al_reves_tras_recalculo' : 'aviso_distinto_tras_recalculo', variante: ctx.v, ruta: nombre,
+      donde: xy(r.node), giro: `${r.kind} ${r.direction}`, ...ejemplo, recalculos: malos.join(',') });
+  }
+}
+
 // --- escala (resumen por ruta) ----------------------------------------------
 function escalaDeRuta(ctx, pts) {
   const { g, escala } = ctx;
@@ -982,7 +1064,7 @@ async function main() {
     };
     const ctx = { v, H, g, pure, pois, escala, cercano, manoIzq, duraciones, rotondas, dibujados: {},
       vmax: v.startsWith('ets2') ? 24 : 27, rnd: lcg(args.semilla * 7919 + v.length), dijkstra: true, recalculos: 4,
-      optimo: [], stats: { rutas: 0, sinRuta: 0, recalculos: 0, recalculoMal: 0, ticks: 0, maniobras: 0, voces: 0 } };
+      optimo: [], stats: { rutas: 0, sinRuta: 0, recalculos: 0, recalculoMal: 0, ticks: 0, maniobras: 0, voces: 0, recalculosAntesDelGiro: 0, avisosTrasRecalculo: 0 } };
     const mapa = revisarMapa(ctx, hallazgos);
     // rutas: empresa a empresa, 1 de cada 3 corta (adentro o cerca de una
     // ciudad); con --estados, de esos estados, y con --destinos, todas
@@ -1014,6 +1096,7 @@ async function main() {
       const antes = hallazgos.length;
       revisarRuteo(ctx, ruta, hallazgos);
       const res = analizarRuta(ctx, ruta, hallazgos);
+      if (args.antesDelGiro !== '0') revisarAvisosTrasRecalculo(ctx, ruta, res.lista, res.sim.met, hallazgos);
       for (let k = antes; k < hallazgos.length; k++) volcarEntorno(ctx, hallazgos[k], pts, res.lista, dibujos, Number(args.dibujos || 6));
       ctx.stats.ticks += res.sim.ticks.length;
       ctx.stats.maniobras += res.lista.length;

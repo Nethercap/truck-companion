@@ -404,6 +404,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   despues de tocar el ruteo o los avisos, con la misma `--semilla`.
   `--estados or,wa` (y `--destinos`) eligen rutas de esos estados; cada
   "turn" queda en `giros.json` con las otras salidas de su cruce.
+  Tambien recalcula cada 10 m en los 120 m antes de cada aviso, sobre el
+  carril y con el comienzo de la app (`recalcRouteStart`), y lista como
+  `aviso_al_reves_tras_recalculo` / `aviso_distinto_tras_recalculo` lo que
+  se muestra a menos de 150 m del cruce y no salio manejando sin recalcular:
+  otra identidad, y la voz lo repite. Nadie lo miraba y asi entro la
+  regresion de Cheyenne (0c0f37e). Con 60 rutas por juego y semilla 1, main
+  antes del arreglo daba 146 recalculos malos de 3.477 en ATS y 254 de 4.983
+  en ETS2 (57 y 70 avisos al reves); con el arreglo, 78 y 151 (7 y 3). Los
+  que quedan son casi todos recalculando encima del nodo o el mismo giro en
+  otro nodo de una cadena de cruces. `--antesDelGiro 0` lo saltea.
 
 ## Pendientes y decisiones (18-10)
 
