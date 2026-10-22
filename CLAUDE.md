@@ -61,10 +61,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   con puntas cuadradas y esquinas en punta. Las piezas de los cruces de
   truckermudgeon (las V de las entradas, las dos calzadas) estan pensadas
   para dibujarse con ancho: con la linea fina se veian sueltas y cruzadas.
-  Quedan pedazos rotos en algunos cruces (brazo noroeste de una rotonda de
-  Uppsala, juego 24060,-51876): los tiles de truckermudgeon tienen los
-  mismos, vienen del generador. Desde el zoom 12 la ruta es mas fina que la
-  calle y va encima, como un carril marcado.
+  Donde terminan dos pedazos juntos en angulo, las puntas cuadradas dejaban
+  una estrella: los tiles van con las calles que se tocan punta con punta
+  unidas (`unir-calles.ts` del armador, en `truckdash.patch`; el taller lo
+  corre antes de tippecanoe con `unir.ts`, parche 0005 de
+  `tm-maps-patches`). Los tiles de R2 de antes no lo tienen: se ven bien
+  igual, con alguna estrella, hasta regenerarlos (solo tippecanoe,
+  `rebuild_tiles_light.sh`). Quedan pedazos rotos en algunos cruces (brazo
+  noroeste de una rotonda de Uppsala, juego 24060,-51876): los tiles de
+  truckermudgeon tienen los mismos, vienen del generador; sacar los sueltos
+  dejaba la calle cortada antes de la rotonda. Desde el zoom 12 la ruta es
+  mas fina que la calle y va encima, como un carril marcado.
 - Un mapa armado en la PC ("Build my map") cuyas ciudades caen sobre todo
   fuera de la tierra real (Explorando a America en ATS, 18-10) va con el
   fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5
