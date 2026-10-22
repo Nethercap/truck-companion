@@ -438,6 +438,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 
 ## Pendientes y decisiones (18-10)
 
+- Grafos del constructor del 22-10 (PR #111; el del taller, en la rama del
+  mismo nombre): falta regenerarlos y subirlos. Antes de subir, correr
+  `simular_navegacion` con los de hoy (despues, la misma `--semilla`). En el
+  taller, con su `truck-companion` en esa rama: `py rebuild_graphs_only.py
+  --cambia-ruteo` (17 variantes; la consola muestra los prefabs sin
+  navCurves, el resto queda en `build_route_graph-<variante>.log`) y `py
+  upload_to_r2.py r2-upload-graphs trucksim-dash-maps`, sin el paso del
+  manifest (alcanza con `ROUTE_GRAPH_V3_REV`). Recien con todo en R2:
+  `ROUTE_GRAPH_V3_REV` de 5 a 6 y `ROUTE_PREFABS_REV` de 0 a 1, `node
+  tools/check_avisos.js --update`, `python tools/build_demo_route.py`,
+  `simular_navegacion` y mergear los dos PR, todo seguido: hasta ese merge,
+  quien baje el grafo nuevo sin `-prefabs.bin` vuelve a tener la vuelta de
+  Kiel. Con los largos nuevos se esperan cambios chicos (en 300 rutas por
+  juego: 45 en ATS y 19 en ETS2, casi empates de 1 a 4 s). Despues, mirar por
+  que les faltan las navCurves a los prefabs que lista el log (696 en ATS,
+  510 en ETS2, 801 en ProMods) y sacar este punto.
 - macOS: un usuario porto el plugin (dice que el juego en Mac lo carga) e
   hizo su propia app estilo CarPlay. Plan propio, por etapas: el plugin con
   `shm_open` o un archivo en vez de `CreateFileMapping`
