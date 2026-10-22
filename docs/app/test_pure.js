@@ -4167,6 +4167,27 @@ test('slowNodes: los nodos de una calle o un prefab, para terminar la ruta en un
   assert.ok(STOP_SLOW_KMH > 60 && STOP_SLOW_KMH < 90);
 });
 
+test('yardNodes: a la empresa del trabajo no se llega por un nodo de la autopista, aunque sus tramos de prefab sean lentos', () => {
+  const { slowNodes, yardNodes } = require('./pure.js');
+  // Como Rail Export de Casper (22-10): calzada de un sentido 0 -> 1 a 90
+  // km/h, un prefab de la autopista 1 -> 2 (8 m, 40 km/h, como todo prefab
+  // del grafo) y sigue 2 -> 3 a 90. Del otro lado, una calle 4 - 5 a 60 y
+  // el patio 5 - 6 a 40. Para slowNodes el 1 es lento (sale por el prefab);
+  // para yardNodes no: le llega la autopista.
+  const nodos = [[0, 0], [500, 0], [508, 0], [1000, 0], [300, 200], [500, 200], [550, 120]];
+  const aristas = [
+    { a: 0, b: 1, uno: true }, { a: 1, b: 2, uno: true }, { a: 2, b: 3, uno: true },
+    { a: 4, b: 5 }, { a: 5, b: 6 },
+  ];
+  const { g } = grafoDePrueba(nodos, aristas);
+  g.edgeM = Float32Array.from([500, 8, 492, 200, 94]);
+  g.edgeS = Uint16Array.from([20, 1, 20, 12, 8]); // 90, ~29, ~89, 60 y ~42 km/h
+  assert.deepEqual([...slowNodes(g)], [0, 1, 0, 0, 1, 1, 1]);
+  assert.deepEqual([...yardNodes(g)], [0, 0, 0, 0, 1, 1, 1]);
+  assert.equal(yardNodes(g), yardNodes(g)); // una vez por grafo
+  assert.deepEqual([...yardNodes(g, 95)], [1, 1, 1, 1, 1, 1, 1]);
+});
+
 test('waypointArcs y findArcRoute con endArcs: un waypoint sobre la autovia pasa por su calzada, no por el nodo mas cercano', () => {
   const { waypointArcs, findArcRoute, waypointPassesBy, WAYPOINT_ARC_M } = require('./pure.js');
   // Autovia de dos calzadas de una mano, 20 m entre si: la de ida (0 -> 1 ->
