@@ -420,9 +420,9 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
     salida = os.path.join(tmp, variante)
     grafo_json = os.path.join(tmp, f"route-graph-{variante}.json")
     build_route_graph.main(["", parser_dir, prefijo, grafo_json])
-    # -lanes.bin y -times.bin: las flechas de carril y las decimas de
-    # segundo, que van por aristas de este v3
-    for sufijo in (".bin", "-v3.bin", "-lanes.bin", "-times.bin"):
+    # -lanes.bin, -times.bin y -prefabs.bin: las flechas de carril, las
+    # decimas de segundo y de que prefab es cada arista, por aristas de este v3
+    for sufijo in (".bin", "-v3.bin", "-lanes.bin", "-times.bin", "-prefabs.bin"):
         os.replace(grafo_json[:-5] + sufijo, os.path.join(salida, f"route-graph-{variante}{sufijo}"))
     if cancel.is_set():
         raise BuildCancelled()

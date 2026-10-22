@@ -1,6 +1,6 @@
 {
   "_comment": "Fuente de verdad de los datos de mapa publicados. Se edita a mano al publicar una variante (ver mod-integration-pipeline/README.md en D:/ets2-companion). tools/check_map_mods.py lo lee, consulta las versiones upstream donde se puede y escribe map-mods-status.json; admin.html muestra ambos.",
-  "updated": "2026-10-14",
+  "updated": "2026-10-22",
   "r2Base": "https://maps.trucksim-dash.com",
   "variants": {
     "ats": {
@@ -8,7 +8,7 @@
       "game": "ats",
       "gameVersion": "1.61.2.0",
       "built": "2026-09-29",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [],
       "files": [
         "vector/ats.pmtiles",
@@ -28,7 +28,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-10-05",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [
         "c2c"
       ],
@@ -50,7 +50,7 @@
       "game": "ats",
       "gameVersion": "1.61.2.0",
       "built": "2026-09-29",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [
         "promods_canada"
       ],
@@ -72,7 +72,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-10-05",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [
         "c2c",
         "promods_canada"
@@ -95,7 +95,7 @@
       "game": "ats",
       "gameVersion": "1.61.2.0",
       "built": "2026-10-08",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [
         "western_canada",
         "eastern_canada"
@@ -118,7 +118,7 @@
       "game": "ats",
       "gameVersion": "1.61.2.0",
       "built": "2026-10-08",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [
         "c2c",
         "western_canada",
@@ -143,7 +143,7 @@
       "game": "ats",
       "gameVersion": "1.61.2.0",
       "built": "2026-10-08",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [
         "reforma",
         "reforma_mega_resources",
@@ -167,7 +167,7 @@
       "game": "ats",
       "gameVersion": "1.61.1",
       "built": "2026-10-05",
-      "mapDataVersion": "20261014",
+      "mapDataVersion": "20261022",
       "mods": [
         "c2c",
         "promods_canada",
@@ -194,7 +194,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "mapDataVersion": "20261022",
       "mods": [],
       "files": [
         "vector/ets2.pmtiles",
@@ -214,7 +214,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "mapDataVersion": "20261022",
       "mods": [
         "promods",
         "promods_me",
@@ -239,7 +239,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "mapDataVersion": "20261022",
       "mods": [
         "promods",
         "promods_me",
@@ -266,7 +266,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "mapDataVersion": "20261022",
       "mods": [
         "promods",
         "promods_me",
@@ -292,7 +292,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "mapDataVersion": "20261022",
       "mods": [
         "promods",
         "promods_me",
@@ -321,7 +321,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-10-06",
-      "mapDataVersion": "20261006",
+      "mapDataVersion": "20261022",
       "mods": [
         "grand_utopia"
       ],
@@ -343,7 +343,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-10-05",
-      "mapDataVersion": "20261005",
+      "mapDataVersion": "20261022",
       "mods": [
         "grand_utopia",
         "eu_grand_utopia"
@@ -366,7 +366,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-10-05",
-      "mapDataVersion": "20261005",
+      "mapDataVersion": "20261022",
       "mods": [
         "promods",
         "promods_me",
@@ -393,7 +393,7 @@
       "game": "ets2",
       "gameVersion": "1.61.1",
       "built": "2026-09-29",
-      "mapDataVersion": "20260929",
+      "mapDataVersion": "20261022",
       "mods": [
         "truckersmp"
       ],

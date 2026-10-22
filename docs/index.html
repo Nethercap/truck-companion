@@ -624,7 +624,7 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
       <div class="featureCard">
         <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
         <h4 data-i18n="featLiveTitle">Other drivers, live</h4>
-        <p data-i18n="featLiveBody">Watch Truck Dash drivers move on the <a href="/live/">public live map</a>, anonymous, with one toggle to stay off it. Or share a 6-letter code with friends and drive as a convoy (beta), each in your own game, no TruckersMP needed.</p>
+        <p data-i18n="featLiveBody">Watch Truck Dash drivers move on the <a href="/live/">public live map</a>, anonymous, and you only show up on it if you switch it on. Or share a 6-letter code with friends and drive as a convoy (beta), each in your own game, no TruckersMP needed.</p>
       </div>
       <div class="featureCard">
         <div class="icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><circle cx="7" cy="9" r="1.6" fill="currentColor"/><path d="M8 21h8"/></svg></div>
@@ -746,6 +746,11 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
           <a href="https://github.com/Nethercap/truck-companion/issues" target="_blank" rel="noopener" data-i18n="issuesLink">GitHub issues</a>
           <a href="mailto:nether.appdev@gmail.com">nether.appdev@gmail.com</a>
         </div>
+        <p style="margin-top:1rem"><span data-i18n="creditsCode">Thanks to everyone who sent code:</span>
+          <a href="https://github.com/vladimirkutkovoy" target="_blank" rel="noopener">vladimirkutkovoy</a> ·
+          <a href="https://github.com/RXTransit" target="_blank" rel="noopener">RXTransit</a> ·
+          <a href="https://github.com/pauloo27" target="_blank" rel="noopener">pauloo27</a>.
+          <span data-i18n="creditsTesters">And to everyone who reports bugs and tests on Discord.</span></p>
       </div>
       <div class="communityCard" id="latestJobs" hidden>
         <h3 data-i18n="latestJobsTitle">Latest jobs delivered</h3>
@@ -1018,7 +1023,7 @@ const TRANSLATIONS = {
     featStatsTitle: 'Trip history and stats <span class="tag">new</span>',
     featStatsBody: 'With an optional free account, every job is kept: the route colored by speed, pay, fuel and times. A logbook, stats per game, records and achievements, friends to follow, and a public profile only if you want one. <a href="#accounts">More below</a>.',
     featLiveTitle: 'Other drivers, live',
-    featLiveBody: 'Watch Truck Dash drivers move on the <a href="/live/">public live map</a>, anonymous, with one toggle to stay off it. Or share a 6-letter code with friends and drive as a convoy (beta), each in your own game, no TruckersMP needed.',
+    featLiveBody: 'Watch Truck Dash drivers move on the <a href="/live/">public live map</a>, anonymous, and you only show up on it if you switch it on. Or share a 6-letter code with friends and drive as a convoy (beta), each in your own game, no TruckersMP needed.',
     featStreamTitle: 'On stream and on Discord <span class="tag">new</span>',
     featStreamBody: 'A free <a href="/overlay/">overlay for OBS</a> with your speed, the next turn and your trip, and a Discord status that shows the run in progress while you drive. Both stay off until you turn them on.',
     featMoreLink: 'Everything else, from the in-game overlay settings to the Road Trip atlas in ATS, is in the user guide',
@@ -1121,6 +1126,8 @@ const TRANSLATIONS = {
     discordBody: 'Every job delivered with Truck Dash is posted live in the server. Ask for help, request a mod, share your rig.',
     contactBody: 'Bugs, ideas or questions? Discord is fastest, or:',
     issuesLink: 'GitHub issues',
+    creditsCode: 'Thanks to everyone who sent code:',
+    creditsTesters: 'And to everyone who reports bugs and tests on Discord.',
     latestJobsTitle: 'Latest jobs delivered',
     latestJobsSub: 'Live from Truck Dash drivers right now.',
     colRoute: 'Route',
@@ -1236,7 +1243,7 @@ const TRANSLATIONS = {
     featStatsTitle: 'Historial de viajes y estadísticas <span class="tag">nuevo</span>',
     featStatsBody: 'Con una cuenta gratis y opcional, cada trabajo queda guardado: la ruta coloreada por velocidad, la paga, el combustible y los tiempos. Un logbook, estadísticas por juego, récords y logros, amigos para seguir y un perfil público solo si lo querés. <a href="#accounts">Más abajo</a>.',
     featLiveTitle: 'Otros camioneros en vivo',
-    featLiveBody: 'Mirá a los camioneros de Truck Dash moverse en el <a href="/live/">mapa en vivo público</a>, de forma anónima y con un tilde para no aparecer. O compartí un código de 6 letras con amigos y manejen en convoy (beta), cada uno en su juego, sin TruckersMP.',
+    featLiveBody: 'Mirá a los camioneros de Truck Dash moverse en el <a href="/live/">mapa en vivo público</a>, de forma anónima, y aparecés solo si lo prendés. O compartí un código de 6 letras con amigos y manejen en convoy (beta), cada uno en su juego, sin TruckersMP.',
     featStreamTitle: 'En el stream y en Discord <span class="tag">nuevo</span>',
     featStreamBody: 'Un <a href="/overlay/">overlay para OBS</a> gratis con tu velocidad, el próximo giro y tu viaje, y un estado de Discord que muestra el viaje en curso mientras manejás. Los dos quedan apagados hasta que los prendés.',
     featMoreLink: 'Todo lo demás, desde los ajustes del overlay en el juego hasta el atlas del Road Trip en ATS, está en la guía de uso',
@@ -1339,6 +1346,8 @@ const TRANSLATIONS = {
     discordBody: 'Cada trabajo entregado con Truck Dash se publica en vivo en el servidor. Pedí ayuda, pedí un mod, mostrá tu equipo.',
     contactBody: '¿Errores, ideas o preguntas? Discord es lo más rápido, o:',
     issuesLink: 'Issues en GitHub',
+    creditsCode: 'Gracias a quienes mandaron código:',
+    creditsTesters: 'Y a todos los que reportan errores y prueban en Discord.',
     latestJobsTitle: 'Últimos trabajos entregados',
     latestJobsSub: 'En vivo, de los camioneros de Truck Dash ahora mismo.',
     colRoute: 'Ruta',
@@ -1587,7 +1596,7 @@ function renderRoadmap() {
     updated.textContent = new Date(roadmapData.updated + 'T12:00:00Z').toLocaleDateString(currentLang, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 }
-fetch('/data/roadmap.json?v=8').then(r => r.ok ? r.json() : null).then(data => {
+fetch('/data/roadmap.json?v=9').then(r => r.ok ? r.json() : null).then(data => {
   if (!data) return;
   roadmapData = data;
   renderRoadmap();

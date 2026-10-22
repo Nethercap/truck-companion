@@ -14,7 +14,11 @@
 //
 // Uso: node tools/simular_navegacion.js [--variantes ats,ets2] [--rutas 30]
 //        [--semilla 1] [--salida carpeta] [--cache carpeta] [--carriles carpeta]
-//        [--estados or,wa] [--destinos la,tx]
+//        [--prefabs carpeta] [--grafos carpeta]
+//        [--estados or,wa] [--destinos la,tx] [--antesDelGiro 0]
+//
+// --antesDelGiro 0: sin recalcular antes de cada aviso (revisarAvisosTrasRecalculo:
+// con 60 rutas por juego suma unos 15 a 20 s a los 25 de cada uno).
 //
 // --estados: solo empresas de esos estados (o paises en ETS2), por la
 // sigla de EE.UU. o por el nombre de pois-<v>.json (countries). Con
@@ -26,7 +30,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { harness, bajar, graphRev, timesRev, lanesRev, BASE } = require('./check_avisos');
+const { harness, bajar, graphRev, timesRev, lanesRev, prefabsRev, BASE } = require('./check_avisos');
 
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(ROOT, 'docs', 'data');
@@ -127,7 +131,14 @@ async function cargarVariante(v, cache, H) {
     if (!fs.existsSync(f)) fs.writeFileSync(f, await bajar(url));
     return fs.readFileSync(f);
   };
-  const bin = await archivo(`${v}-v3-g${rev}.bin`, `${BASE}/${v}/route-graph-${v}-v3.bin?g=${rev}`);
+  // --grafos <carpeta>: el grafo de <carpeta>/<v>/route-graph-<v>-v3.bin (como
+  // r2-upload-graphs del taller), para probar uno regenerado antes de subirlo.
+  // Sus decimas, prefabs y carriles van por indice de arista de ese grafo:
+  // salen de la misma carpeta si no se pide otra.
+  const grafos = argumentos(process.argv.slice(2)).grafos;
+  const fg = grafos && path.join(grafos, v, `route-graph-${v}-v3.bin`);
+  const bin = fg && fs.existsSync(fg) ? fs.readFileSync(fg)
+    : await archivo(`${v}-v3-g${rev}.bin`, `${BASE}/${v}/route-graph-${v}-v3.bin?g=${rev}`);
   let cities = JSON.parse(await archivo(`${v}-Cities.json`, `${BASE}/${v}/Cities.json`));
   cities = Array.isArray(cities) ? cities : Object.values(cities);
   const decoded = H.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
@@ -135,7 +146,7 @@ async function cargarVariante(v, cache, H) {
   // Las decimas de cada arista, como loadRouteTimes: de R2 si la app las
   // pide (ROUTE_TIMES_REV), o de --tiempos <carpeta>/<v>/route-graph-<v>-times.bin
   // para probar unas que todavia no se subieron.
-  const tiempos = argumentos(process.argv.slice(2)).tiempos;
+  const tiempos = argumentos(process.argv.slice(2)).tiempos || grafos;
   const ft = tiempos && path.join(tiempos, v, `route-graph-${v}-times.bin`);
   const tb = ft && fs.existsSync(ft) ? fs.readFileSync(ft)
     : timesRev() ? await archivo(`${v}-times-g${rev}-t${timesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-times.bin?g=${rev}&t=${timesRev()}`) : null;
@@ -143,10 +154,21 @@ async function cargarVariante(v, cache, H) {
     g.edgeT = H.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
     if (!g.edgeT) throw new Error(`las decimas de ${v} no son de este grafo`);
   }
+  // De que prefab es cada arista, como loadRoutePrefabs: de R2 si la app lo
+  // pide (ROUTE_PREFABS_REV), o de --prefabs <carpeta>/<v>/route-graph-<v>-prefabs.bin
+  // para probar uno sin subir (con su grafo en --cache).
+  const prefabs = argumentos(process.argv.slice(2)).prefabs || grafos;
+  const fp = prefabs && path.join(prefabs, v, `route-graph-${v}-prefabs.bin`);
+  const pb = fp && fs.existsSync(fp) ? fs.readFileSync(fp)
+    : prefabsRev() ? await archivo(`${v}-prefabs-g${rev}-p${prefabsRev()}.bin`, `${BASE}/${v}/route-graph-${v}-prefabs.bin?g=${rev}&p=${prefabsRev()}`) : null;
+  if (pb) {
+    g.edgePrefab = H.pure.decodePrefabsBin(pb.buffer.slice(pb.byteOffset, pb.byteOffset + pb.byteLength), decoded.n, decoded.ne);
+    if (!g.edgePrefab) throw new Error(`el -prefabs.bin de ${v} no es de este grafo`);
+  }
   // Los carriles, como loadRouteLanes: con ellos salen los "keep" de seguir
   // derecho donde un carril se pierde (laneKeepAt). De R2, o de --carriles
   // <carpeta>/<v>/route-graph-<v>-lanes.bin para probar unos sin subir.
-  const carriles = argumentos(process.argv.slice(2)).carriles;
+  const carriles = argumentos(process.argv.slice(2)).carriles || grafos;
   const fl = carriles && path.join(carriles, v, `route-graph-${v}-lanes.bin`);
   const lb = fl && fs.existsSync(fl) ? fs.readFileSync(fl)
     : lanesRev() ? await archivo(`${v}-lanes-g${rev}-l${lanesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-lanes.bin?g=${rev}&l=${lanesRev()}`) : null;
@@ -556,6 +578,11 @@ function analizarRuta(ctx, ruta, hallazgos) {
     if (!ahora && !r.decoy) add('voz_sin_aviso_en_el_punto', { donde: xy(r.node), dice: `${r.kind} ${r.direction}${r.exit ? ' ' + r.exit : ''}`, primero: Math.round(r.primero.d), ultimo: Math.round(r.ultimo.d), voces: r.voces.map(x => x.clave).join(',') });
     if (!ahora && r.decoy) add('voz_callada_por_otra_calle', { donde: xy(r.node), dice: `${r.kind} ${r.direction}`, ultimo: Math.round(r.ultimo.d) });
     if (ahora && ahora.d > 160) add('voz_temprano', { donde: xy(r.node), clave: ahora.clave, metros: Math.round(ahora.d), kmh: Math.round(ahora.v * 3.6) });
+    // La misma frase dos veces para la misma maniobra: el aviso fue a otra y
+    // volvio ("keep right" dos veces en Salem, "turn left" en Cheyenne, 22-10)
+    const veces = {};
+    for (const x of r.voces) veces[x.clave] = (veces[x.clave] || 0) + 1;
+    if (Object.values(veces).some(n => n > 1)) add('voz_repetida', { donde: xy(r.node), dice: `${r.kind} ${r.direction}`, voces: r.voces.map(x => `${x.clave}@${Math.round(x.d)}`).join(',') });
     if (r.kind === 'roundabout' && r.exit > 5) add('rotonda_mas_de_5_salidas', { donde: xy(r.node), exit: r.exit, voz: r.voces.map(x => x.clave).join(',') });
   }
   // aviso que sigue en pantalla despues de pasar su nodo (3 datos seguidos o
@@ -724,6 +751,89 @@ function revisarRuteo(ctx, ruta, hallazgos) {
     else if (nuevaJuego > restoJuego * 1.15 + 2000) { ctx.stats.recalculoMal++; add('recalculo_mas_largo', info); }
   }
   return { us };
+}
+
+// Los avisos despues de recalcular antes de un giro. Recalculada (un desvio,
+// un destino nuevo, un salto de la posicion), la ruta arranca otra vez en el
+// camion, sin lo recorrido, y la app vacia el aviso mostrado: si el giro que
+// viene sale en otro nodo o para el otro lado, es otra identidad
+// (turnIdentity) y la voz lo vuelve a decir. Asi "Turn left onto US-85 in 0
+// ft" salio dos veces en Cheyenne (Discord 22-10): la ruta arrancaba en otro
+// carril a 1 m de un nodo (0c0f37e), y esto no lo miraba nadie (los
+// recalculos de revisarRuteo miran solo la ruta). Antes de cada aviso del
+// manejo, cada RECALC_PASO_M en los RECALC_ANTES_M de antes, se recalcula con
+// el camion sobre su carril y el comienzo como la app (recalcRouteStart), y
+// se maneja RECALC_TICKS datos: lo que se muestra a menos de RECALC_CERCA_M
+// del cruce tiene que ser un aviso del manejo sin recalcular. Solo si la
+// ruta nueva pasa por el cruce igual (la ruta nueva termina 800 m despues, y
+// lo de su final no cuenta). "al_reves": el aviso para el otro lado;
+// "distinto": del mismo lado en otro nodo o de otro tipo (la voz lo repite).
+const RECALC_ANTES_M = 120, RECALC_PASO_M = 10, RECALC_TICKS = 6, RECALC_CERCA_M = 150;
+function revisarAvisosTrasRecalculo(ctx, ruta, lista, met, hallazgos) {
+  const { g, pure, H } = ctx;
+  const { pts, nombre } = ruta;
+  const { cum } = met;
+  const L = cum[cum.length - 1];
+  const xy = (p) => `(${Math.round(p[0])},${Math.round(p[1])})`;
+  const conocidos = new Set(lista.map(r => r.id));
+  const enFerry = (d) => { const k = met.indiceEn(d); return pts[Math.min(k + 1, pts.length - 1)][2] === 1; };
+  for (const r of lista) {
+    if (!r.pasada || r.sNodo < RECALC_ANTES_M + 100 || r.sNodo + 300 > L) continue;
+    // el cruce de la ruta: su nodo y el primero 60 m despues
+    const nodo = pts[r.k][4];
+    let kDespues = r.k + 1;
+    while (kDespues < pts.length - 1 && (pts[kDespues][4] == null || cum[kDespues] - r.sNodo < 60)) kDespues++;
+    const despues = pts[kDespues][4];
+    const malos = [];
+    let ejemplo = null;
+    for (let ds = -RECALC_ANTES_M; ds <= 0; ds += RECALC_PASO_M) {
+      const s = r.sNodo + ds;
+      if (enFerry(s) || enFerry(s + 150)) continue;
+      const p = met.pointAt(s), q = met.pointAt(s + 5);
+      const head = rumbo(p, q), rb = head * Math.PI / 180;
+      const sig = pts[Math.min(met.indiceEn(s) + 1, pts.length - 1)];
+      const lado = Number.isFinite(sig[6]) ? sig[6] : 0;
+      const x = p[0] + Math.cos(rb) * lado, z = p[1] + Math.sin(rb) * lado;
+      H.mod.set(g, null, []);
+      let nueva = H.mod.findRouteWith([x, z], met.pointAt(Math.min(L, r.sNodo + 800)), null, head);
+      if (!nueva || nueva.length < 3) continue;
+      if (pure.recalcRouteStart) nueva = pure.recalcRouteStart(nueva, x, z, head, head, false);
+      const camino = nodosDeRuta(nueva);
+      const iNodo = camino.indexOf(nodo);
+      if (iNodo < 0 || camino.indexOf(despues, iNodo) < 0) continue; // va por otro lado
+      ctx.stats.recalculosAntesDelGiro++;
+      const nm = metrica(nueva);
+      // El camion esta donde esta: no en la entrada que le antepone
+      // recalcRouteStart, 30 m mas atras
+      const pr = pure.projectAheadOnRoute(nueva, x, z, 400);
+      const s0 = pr ? nm.cum[pr.idx] + Math.hypot(pr.point[0] - nueva[pr.idx][0], pr.point[1] - nueva[pr.idx][1]) : 0;
+      let behind = [], cur = nueva, h = 0, sn = s0;
+      const state = {};
+      for (let t = 0; t < RECALC_TICKS && cur.length >= 2; t++) {
+        H.mod.set(g, cur, behind);
+        const rumboAhora = rumbo(nm.pointAt(sn), nm.pointAt(sn + 5));
+        const turn = pure.stabilizeManeuver(state, H.mod.findUpcomingTurn(rumboAhora), 2);
+        const cerca = turn && Math.hypot(turn.node[0] - r.node[0], turn.node[1] - r.node[1]) < RECALC_CERCA_M;
+        if (cerca && !conocidos.has(pure.turnIdentity(turn))) {
+          malos.push(ds);
+          if (!ejemplo) ejemplo = { aviso: `${turn.kind} ${turn.direction} ${xy(turn.node)}`, a: Math.round(turn.distanceMeters), recalculoA: ds };
+          break;
+        }
+        // como trimRouteBehindTruck: 3,5 m por dato (50 km/h)
+        const sNuevo = sn + 3.5, hn = nm.indiceEn(sNuevo);
+        for (let k = behind.length ? h + 1 : 0; k <= hn; k++) behind.push(nueva[k]);
+        behind = pure.trimRouteBehind(behind, 200, 400);
+        const aca = nm.pointAt(sNuevo), sg = nueva[Math.min(hn + 1, nueva.length - 1)];
+        cur = [[aca[0], aca[1], 0, 0, null, sg[5] != null ? sg[5] : 0, sg[6]], ...nueva.slice(hn + 1)];
+        h = hn; sn = sNuevo;
+      }
+    }
+    if (!malos.length) continue;
+    ctx.stats.avisosTrasRecalculo += malos.length;
+    const alReves = ejemplo.aviso.split(' ')[1] !== r.direction;
+    hallazgos.push({ tipo: alReves ? 'aviso_al_reves_tras_recalculo' : 'aviso_distinto_tras_recalculo', variante: ctx.v, ruta: nombre,
+      donde: xy(r.node), giro: `${r.kind} ${r.direction}`, ...ejemplo, recalculos: malos.join(',') });
+  }
 }
 
 // --- escala (resumen por ruta) ----------------------------------------------
@@ -982,7 +1092,7 @@ async function main() {
     };
     const ctx = { v, H, g, pure, pois, escala, cercano, manoIzq, duraciones, rotondas, dibujados: {},
       vmax: v.startsWith('ets2') ? 24 : 27, rnd: lcg(args.semilla * 7919 + v.length), dijkstra: true, recalculos: 4,
-      optimo: [], stats: { rutas: 0, sinRuta: 0, recalculos: 0, recalculoMal: 0, ticks: 0, maniobras: 0, voces: 0 } };
+      optimo: [], stats: { rutas: 0, sinRuta: 0, recalculos: 0, recalculoMal: 0, ticks: 0, maniobras: 0, voces: 0, recalculosAntesDelGiro: 0, avisosTrasRecalculo: 0 } };
     const mapa = revisarMapa(ctx, hallazgos);
     // rutas: empresa a empresa, 1 de cada 3 corta (adentro o cerca de una
     // ciudad); con --estados, de esos estados, y con --destinos, todas
@@ -1014,6 +1124,7 @@ async function main() {
       const antes = hallazgos.length;
       revisarRuteo(ctx, ruta, hallazgos);
       const res = analizarRuta(ctx, ruta, hallazgos);
+      if (args.antesDelGiro !== '0') revisarAvisosTrasRecalculo(ctx, ruta, res.lista, res.sim.met, hallazgos);
       for (let k = antes; k < hallazgos.length; k++) volcarEntorno(ctx, hallazgos[k], pts, res.lista, dibujos, Number(args.dibujos || 6));
       ctx.stats.ticks += res.sim.ticks.length;
       ctx.stats.maniobras += res.lista.length;

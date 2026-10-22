@@ -494,10 +494,70 @@ index 0000000..e0b2d29
 +  );
 +}
 diff --git a/packages/clis/parser/game-files/convert-sii-to-json.ts b/packages/clis/parser/game-files/convert-sii-to-json.ts
-index ece847d..8b709b6 100644
+index ece847d..200bcc7 100644
 --- a/packages/clis/parser/game-files/convert-sii-to-json.ts
 +++ b/packages/clis/parser/game-files/convert-sii-to-json.ts
-@@ -66,9 +66,49 @@ export function convertSiiToJson<T>(
+@@ -6,22 +6,14 @@ import { parseSii } from './sii-parser';
+ import { ajv } from './sii-schemas';
+ import { jsonConverter } from './sii-visitors';
+ 
+-export function convertSiiToJson<T>(
+-  siiPath: string,
+-  entries: Entries,
+-  schema: JSONSchemaType<T>,
+-): T {
+-  logger.debug('converting', siiPath, 'to json object');
+-  const siiFile = Preconditions.checkExists(
+-    entries.files.get(siiPath),
+-    `${siiPath} does not exist`,
+-  );
+-  const buffer = siiFile.read();
+-
+-  // Some .sii files (like locale files) may be 3nk-encrypted.
+-  let sii;
+-  const magic = buffer.toString('utf8', 0, 3);
+-  if (magic === '3nK') {
++// El texto de un .sii. Los ofuscados con 3nK se desofuscan; lo usan tambien
++// las listas de @include de def/ (parseIncludeOnlySii en def-parser.ts), que
++// antes leian el archivo crudo: un mod con def/city.sii en 3nK cortaba todo el
++// armado (Mapa BR Brasil 6.1, 19-10). Los cifrados (ScsC) y los binarios
++// (BSII) no se pueden leer: el error dice cual era, para el build.log.
++export function siiText(buffer: Buffer, siiPath: string): string {
++  const magic = buffer.toString('utf8', 0, 4);
++  if (magic.startsWith('3nK')) {
+     // https://github.com/dariowouters/ts-map/blob/e73adad923f60bbbb637dd4642910d1a0b1154e3/TsMap/Helpers/MemoryHelper.cs#L109
+     if (buffer.length < 5) {
+       throw new Error();
+@@ -31,10 +23,25 @@ export function convertSiiToJson<T>(
+       buffer[i] = (((key << 2) ^ (key ^ 0xff)) << 3) ^ key ^ buffer[i];
+       key++;
+     }
+-    sii = buffer.toString('utf8', 6);
+-  } else {
+-    sii = buffer.toString();
++    return buffer.toString('utf8', 6);
++  }
++  if (magic === 'ScsC' || magic === 'BSII') {
++    throw new Error(`${siiPath} is ${magic === 'ScsC' ? 'encrypted' : 'binary'} (${magic}), can't read it`);
+   }
++  return buffer.toString();
++}
++
++export function convertSiiToJson<T>(
++  siiPath: string,
++  entries: Entries,
++  schema: JSONSchemaType<T>,
++): T {
++  logger.debug('converting', siiPath, 'to json object');
++  const siiFile = Preconditions.checkExists(
++    entries.files.get(siiPath),
++    `${siiPath} does not exist`,
++  );
++  let sii = siiText(siiFile.read(), siiPath);
+ 
+   // HACK localization.sui files just contain unwrapped properties, e.g.:
+   //   key[]: foo
+@@ -66,9 +73,49 @@ export function convertSiiToJson<T>(
    if (validate(json)) {
      return json;
    }
@@ -548,9 +608,18 @@ index ece847d..8b709b6 100644
 +  return value;
 +}
 diff --git a/packages/clis/parser/game-files/def-parser.ts b/packages/clis/parser/game-files/def-parser.ts
-index 4094551..0ab0ec9 100644
+index 4094551..a1234c4 100644
 --- a/packages/clis/parser/game-files/def-parser.ts
 +++ b/packages/clis/parser/game-files/def-parser.ts
+@@ -26,7 +26,7 @@ import type {
+ } from '@truckermudgeon/map/types';
+ import type { JSONSchemaType } from 'ajv';
+ import { logger } from '../logger';
+-import { convertSiiToJson } from './convert-sii-to-json';
++import { convertSiiToJson, siiText } from './convert-sii-to-json';
+ import { parseModelPmg } from './model-pmg-parser';
+ import { parsePrefabPpd } from './prefab-ppd-parser';
+ import type { Entries } from './scs-archive';
 @@ -101,7 +101,18 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
      p: (t: T, e: Entries) => U | undefined,
      m: Map<string, U & { dlcGuard: number }>,
@@ -571,7 +640,23 @@ index 4094551..0ab0ec9 100644
      const u = p(t, entries);
      if (u) {
        m.set(u.token, { ...u, dlcGuard });
-@@ -135,17 +146,39 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+@@ -130,22 +141,54 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+       dlcGuard = 0;
+     }
+ 
+-    const includePaths = parseIncludeOnlySii(`def/${f}`, entries);
++    // Una lista que no se puede leer (cifrada, binaria o con algo que el
++    // parser no entiende) se saltea con un aviso, como un .sii suelto en
++    // processAndAdd: antes cortaba el armado entero y no habia mapa. Sin ella
++    // faltan sus ciudades (o empresas, cargas...), pero las rutas salen.
++    let includePaths: string[];
++    try {
++      includePaths = parseIncludeOnlySii(`def/${f}`, entries);
++    } catch (err) {
++      logger.warn('skipping', `def/${f}`, '- could not read its @include list:', err);
++      continue;
++    }
+     for (const path of includePaths) {
        if (f.startsWith('city.')) {
          processAndAdd(path, dlcGuard, CitySiiSchema, processCityJson, cities);
        } else if (f.startsWith('country.')) {
@@ -621,7 +706,7 @@ index 4094551..0ab0ec9 100644
            countries.set(partialCountry.token, {
              ...partialCountry,
              truckSpeedLimits,
-@@ -234,29 +267,44 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+@@ -234,29 +277,44 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
        continue;
      }
  
@@ -689,7 +774,7 @@ index 4094551..0ab0ec9 100644
      }
    }
    logger.info('parsed', prefabs.size, 'prefab defs');
-@@ -309,12 +357,24 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+@@ -309,12 +367,24 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
    logger.info('parsed', achievements.size, 'achievements');
  
    const routes = new Map<string, Route>();
@@ -719,7 +804,21 @@ index 4094551..0ab0ec9 100644
      for (const f of def.files) {
        if (/^route\.(\w+\.)?sii$/.test(f)) {
          processRouteJson(
-@@ -370,7 +430,9 @@ function processCityJson(obj: CitySii) {
+@@ -349,10 +419,10 @@ export function parseDefFiles(entries: Entries, application: 'ats' | 'eut2') {
+ function parseIncludeOnlySii(siiPath: string, entries: Entries): string[] {
+   logger.debug('parsing', siiPath, 'for @include directives');
+   const f = Preconditions.checkExists(entries.files.get(siiPath));
+-  const res = parseSii(f.read().toString());
++  const res = parseSii(siiText(f.read(), siiPath));
+   if (!res.ok) {
+-    logger.error('error parsing', siiPath);
+-    throw new Error();
++    const primero = res.parseErrors[0] ?? res.lexErrors[0];
++    throw new Error(`error parsing ${siiPath}: ${primero?.message ?? ''}`);
+   }
+ 
+   return includeDirectiveCollector.collect(res.cst, 'def');
+@@ -370,7 +440,9 @@ function processCityJson(obj: CitySii) {
    return {
      token: token.split('.')[1],
      name: rawCity.cityName,
@@ -730,7 +829,7 @@ index 4094551..0ab0ec9 100644
      countryToken: rawCity.country,
      population: rawCity.population ?? 0,
    };
-@@ -449,11 +511,15 @@ function processCompanyJson(
+@@ -449,11 +521,15 @@ function processCompanyJson(
    );
    if (editorFolder) {
      for (const f of editorFolder.files) {
@@ -751,7 +850,7 @@ index 4094551..0ab0ec9 100644
        for (const [, entry] of Object.entries(city.companyDef)) {
          cityTokens.push(entry.city);
        }
-@@ -466,11 +532,19 @@ function processCompanyJson(
+@@ -466,11 +542,19 @@ function processCompanyJson(
      if (directionFolder) {
        const arr = direction === 'in' ? cargoInTokens : cargoOutTokens;
        for (const f of directionFolder.files) {
@@ -776,7 +875,7 @@ index 4094551..0ab0ec9 100644
          for (const [, entry] of Object.entries(cargo.cargoDef)) {
            arr.push(entry.cargo);
          }
-@@ -530,11 +604,24 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+@@ -530,11 +614,24 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
        logger.warn(`unknown dlc guard for ${dlc} (${f}); falling back to 0`);
        dlcGuard = 0;
      }
@@ -806,7 +905,7 @@ index 4094551..0ab0ec9 100644
      const ferryConnection = json.ferryConnection;
      const key = Object.keys(ferryConnection)[0];
      // key is expected to be in form: "conn.source_token.dest_token"
-@@ -575,7 +662,7 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+@@ -575,7 +672,7 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
    return {
      token,
      name: rawFerry.ferryName,
@@ -815,7 +914,7 @@ index 4094551..0ab0ec9 100644
      connections,
    };
  }
-@@ -589,9 +676,15 @@ function processPrefabJson(
+@@ -589,9 +686,15 @@ function processPrefabJson(
      return new Map();
    }
  
@@ -832,7 +931,7 @@ index 4094551..0ab0ec9 100644
    );
    const prefabs = new Map<string, PrefabDescription & { path: string }>();
    for (const [token, path] of prefabTuples) {
-@@ -600,7 +693,25 @@ function processPrefabJson(
+@@ -600,7 +703,25 @@ function processPrefabJson(
        logger.warn(`could not find prefab file for ${token}`);
        continue;
      }
@@ -859,7 +958,7 @@ index 4094551..0ab0ec9 100644
      if (ppd.mapPoints.some(p => p.type === 'polygon')) {
        // TODO figure out a way to get building footprint information for
        //  polygons in prefabs that look like buildings.
-@@ -1094,3 +1205,13 @@ function processMileageTargetJson(
+@@ -1094,3 +1215,13 @@ function processMileageTargetJson(
    }
    return mileageTargets;
  }
@@ -2697,6 +2796,65 @@ index b8accdc..8bec80f 100644
            category: nullable(string),
            editable: nullable(stringEnum('true', 'false')),
          },
+diff --git a/packages/clis/parser/game-files/tests/sii-text.test.ts b/packages/clis/parser/game-files/tests/sii-text.test.ts
+new file mode 100644
+index 0000000..4d8e537
+--- /dev/null
++++ b/packages/clis/parser/game-files/tests/sii-text.test.ts
+@@ -0,0 +1,53 @@
++import { siiText } from '../convert-sii-to-json';
++import { parseSii } from '../sii-parser';
++import { includeDirectiveCollector } from '../sii-visitors';
++
++// Lo inverso de siiText: el mismo XOR con la misma clave que va subiendo.
++function ofuscar3nK(texto: string, clave = 0xa7): Buffer {
++  const datos = Buffer.from(texto, 'utf8');
++  const buf = Buffer.alloc(6 + datos.length);
++  buf.write('3nK', 0, 'utf8');
++  buf[3] = 0x01;
++  buf[5] = clave;
++  let key = clave;
++  for (let i = 0; i < datos.length; i++) {
++    buf[6 + i] = ((((key << 2) ^ (key ^ 0xff)) << 3) ^ key ^ datos[i]) & 0xff;
++    key++;
++  }
++  return buf;
++}
++
++const lista = `SiiNunit
++{
++@include "city/curitiba.sii"
++@include "city/salvador.sii"
++}
++`;
++
++describe('siiText', () => {
++  it('devuelve tal cual un .sii de texto', () => {
++    expect(siiText(Buffer.from(lista, 'utf8'), 'def/city.sii')).toBe(lista);
++  });
++
++  it('desofusca un def/city.sii en 3nK y sus @include se leen', () => {
++    // Un mod de mapa con la lista de ciudades en 3nK cortaba todo el armado
++    // (Mapa BR Brasil 6.1, 19-10).
++    const texto = siiText(ofuscar3nK(lista), 'def/city.sii');
++    expect(texto).toBe(lista);
++    const res = parseSii(texto);
++    expect(res.ok).toBe(true);
++    expect(includeDirectiveCollector.collect(res.cst, 'def')).toEqual([
++      'def/city/curitiba.sii',
++      'def/city/salvador.sii',
++    ]);
++  });
++
++  it('dice el formato de un .sii cifrado o binario', () => {
++    expect(() => siiText(Buffer.from('ScsC....', 'latin1'), 'def/city.sii')).toThrow(
++      /encrypted \(ScsC\)/,
++    );
++    expect(() => siiText(Buffer.from('BSII....', 'latin1'), 'def/city.sii')).toThrow(
++      /binary \(BSII\)/,
++    );
++  });
++});
 diff --git a/packages/clis/parser/game-files/zip-entries.ts b/packages/clis/parser/game-files/zip-entries.ts
 new file mode 100755
 index 0000000..38c046b
@@ -3065,10 +3223,10 @@ index 0000000..e9ea575
 +}
 diff --git a/packages/clis/truckdash-builder/tiles.ts b/packages/clis/truckdash-builder/tiles.ts
 new file mode 100755
-index 0000000..82b2327
+index 0000000..f78a301
 --- /dev/null
 +++ b/packages/clis/truckdash-builder/tiles.ts
-@@ -0,0 +1,323 @@
+@@ -0,0 +1,304 @@
 +// Tiles vectoriales (.pmtiles) a partir del GeoJSON del generator, sin
 +// tippecanoe (que solo corre en Linux): para armar el mapa con mods en la PC
 +// de quien juega. Mismo resultado que el taller en lo que la app usa: una
@@ -3082,35 +3240,13 @@ index 0000000..82b2327
 +import { zxyToTileId } from 'pmtiles';
 +import vtpbf from 'vt-pbf';
 +import zlib from 'zlib';
++import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles';
 +
 +const MIN_ZOOM = 4;
 +const MAX_ZOOM = 13;
 +const EXTENT = 4096;
 +// tippecanoe -b 10: 10 pixeles de un tile de 256 -> 160 de 4096.
 +const BUFFER = 160;
-+// Los -y del taller: el resto de las propiedades no viaja.
-+const ATRIBUTOS = [
-+  'type',
-+  'dlcGuard',
-+  'zIndex',
-+  'height',
-+  'hidden',
-+  'secret',
-+  'poiType',
-+  'poiName',
-+  'sprite',
-+  'scaleRank',
-+  'capital',
-+  'roadType',
-+  'color',
-+  'name',
-+];
-+
-+interface Feature {
-+  type: 'Feature';
-+  geometry: unknown;
-+  properties: Record<string, unknown> | null;
-+}
 +
 +// tiles_light_filter.json: hasta z6 solo ciudades, paises, ferries, trenes,
 +// caminos (en z4 sin los locales) y los POI de ferry y tren.
@@ -3297,12 +3433,15 @@ index 0000000..82b2327
 +    process.exit(1);
 +  }
 +  const t0 = Date.now();
-+  const todo = (
-+    JSON.parse(fs.readFileSync(entrada, 'utf8')) as { features: Feature[] }
-+  ).features.map(limpiar);
++  const { features: todo, uniones } = unirCalles(
++    (
++      JSON.parse(fs.readFileSync(entrada, 'utf8')) as { features: Feature[] }
++    ).features.map(limpiar),
++    ATRIBUTOS,
++  );
 +  const bbox = bboxDe(todo);
 +  console.log(
-+    `${todo.length} features, bbox ${bbox.map(v => v.toFixed(3)).join(', ')}`,
++    `${todo.length} features (${uniones} calles unidas), bbox ${bbox.map(v => v.toFixed(3)).join(', ')}`,
 +  );
 +  const opciones = {
 +    maxZoom: MAX_ZOOM,
@@ -3394,13 +3533,14 @@ index 0000000..82b2327
 +main();
 diff --git a/packages/clis/truckdash-builder/tsconfig.json b/packages/clis/truckdash-builder/tsconfig.json
 new file mode 100644
-index 0000000..dc89a62
+index 0000000..03439ae
 --- /dev/null
 +++ b/packages/clis/truckdash-builder/tsconfig.json
-@@ -0,0 +1,4 @@
+@@ -0,0 +1,5 @@
 +{
 +  "extends": "../../../tsconfig.base.json",
-+  "include": ["*.ts"]
++  "include": ["*.ts"],
++  "exclude": ["*.prueba.ts"]
 +}
 diff --git a/packages/clis/truckdash-builder/types.d.ts b/packages/clis/truckdash-builder/types.d.ts
 new file mode 100644
@@ -3436,6 +3576,518 @@ index 0000000..34b3ab0
 +  };
 +  export default vtpbf;
 +}
+diff --git a/packages/clis/truckdash-builder/unir-calles.prueba.ts b/packages/clis/truckdash-builder/unir-calles.prueba.ts
+new file mode 100644
+index 0000000..2e8765e
+--- /dev/null
++++ b/packages/clis/truckdash-builder/unir-calles.prueba.ts
+@@ -0,0 +1,294 @@
++// Corre con: node --experimental-strip-types --test packages/clis/truckdash-builder/unir-calles.prueba.ts
++// (build.sh lo corre antes de empaquetar el armador).
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles.ts';
++
++const calle = (
++  coords: number[][],
++  props: Record<string, unknown> = {},
++): Feature => ({
++  type: 'Feature',
++  properties: { type: 'road', roadType: 'local', hidden: false, ...props },
++  geometry: { type: 'LineString', coordinates: coords },
++});
++const lineas = (fs: Feature[]) =>
++  fs.map(f => (f.geometry as { coordinates: number[][] }).coordinates);
++
++test('dos pedazos que siguen uno al otro quedan en una linea', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [1, 0],
++        [2, 1],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.uniones, 1);
++  assert.deepEqual(lineas(r.features), [
++    [
++      [0, 0],
++      [1, 0],
++      [2, 1],
++    ],
++  ]);
++});
++
++test('da igual para que lado va cada pedazo', () => {
++  // punta con punta (las dos ramas de la entrada a una rotonda: la estrella)
++  const v = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [5, 5],
++      ]),
++      calle([
++        [10, 0],
++        [5, 5],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.deepEqual(lineas(v.features), [
++    [
++      [0, 0],
++      [5, 5],
++      [10, 0],
++    ],
++  ]);
++  // principio con principio
++  const p = unirCalles(
++    [
++      calle([
++        [1, 0],
++        [0, 0],
++      ]),
++      calle([
++        [1, 0],
++        [2, 0],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.deepEqual(lineas(p.features), [
++    [
++      [0, 0],
++      [1, 0],
++      [2, 0],
++    ],
++  ]);
++});
++
++test('una cadena de varios pedazos, en cualquier orden', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [2, 0],
++        [3, 0],
++      ]),
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [2, 0],
++        [1, 0],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.uniones, 2);
++  assert.equal(r.features.length, 1);
++  const c = lineas(r.features)[0];
++  // queda donde estaba el primer pedazo del archivo, recorrida de punta a punta
++  assert.deepEqual(c.length, 4);
++  assert.deepEqual(
++    [c[0], c[3]].sort(),
++    [
++      [0, 0],
++      [3, 0],
++    ].sort(),
++  );
++});
++
++test('en un cruce de tres o mas no se une nada', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [1, 0],
++        [2, 0],
++      ]),
++      calle([
++        [1, 0],
++        [1, 1],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.uniones, 0);
++  assert.equal(r.features.length, 3);
++});
++
++test('no se unen calles que se dibujan distinto', () => {
++  const tipo = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle(
++        [
++          [1, 0],
++          [2, 0],
++        ],
++        { roadType: 'freeway' },
++      ),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(tipo.uniones, 0);
++  const dlc = unirCalles(
++    [
++      calle(
++        [
++          [0, 0],
++          [1, 0],
++        ],
++        { dlcGuard: 2 },
++      ),
++      calle(
++        [
++          [1, 0],
++          [2, 0],
++        ],
++        { dlcGuard: 3 },
++      ),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(dlc.uniones, 0);
++  // lo que no viaja en los tiles no cuenta (los carriles de cada pedazo)
++  const carriles = unirCalles(
++    [
++      calle(
++        [
++          [0, 0],
++          [1, 0],
++        ],
++        { leftLanes: 1 },
++      ),
++      calle(
++        [
++          [1, 0],
++          [2, 0],
++        ],
++        { leftLanes: 2 },
++      ),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(carriles.uniones, 1);
++});
++
++test('un anillo de pedazos queda cerrado y entero', () => {
++  const r = unirCalles(
++    [
++      calle([
++        [0, 0],
++        [1, 0],
++      ]),
++      calle([
++        [1, 0],
++        [1, 1],
++      ]),
++      calle([
++        [1, 1],
++        [0, 0],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(r.features.length, 1);
++  const c = lineas(r.features)[0];
++  assert.equal(c.length, 4);
++  assert.deepEqual(c[0], c[3]);
++});
++
++test('puntas casi iguales se juntan, separadas no', () => {
++  const cerca = unirCalles(
++    [
++      calle([
++        [10, 50],
++        [10.001, 50],
++      ]),
++      calle([
++        [10.001 + 1e-9, 50],
++        [10.002, 50],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(cerca.uniones, 1);
++  const lejos = unirCalles(
++    [
++      calle([
++        [10, 50],
++        [10.001, 50],
++      ]),
++      calle([
++        [10.001 + 1e-5, 50],
++        [10.002, 50],
++      ]),
++    ],
++    ATRIBUTOS,
++  );
++  assert.equal(lejos.uniones, 0);
++});
++
++test('lo que no es una calle queda igual y en su lugar', () => {
++  const ciudad: Feature = {
++    type: 'Feature',
++    properties: { type: 'city', name: 'Uppsala' },
++    geometry: { type: 'Point', coordinates: [1, 0] },
++  };
++  const prefab: Feature = {
++    type: 'Feature',
++    properties: { type: 'prefab' },
++    geometry: {
++      type: 'Polygon',
++      coordinates: [
++        [
++          [0, 0],
++          [1, 0],
++          [1, 1],
++          [0, 0],
++        ],
++      ],
++    },
++  };
++  const a = calle([
++      [0, 0],
++      [1, 0],
++    ]),
++    b = calle([
++      [1, 0],
++      [2, 0],
++    ]);
++  const r = unirCalles([ciudad, a, prefab, b], ATRIBUTOS);
++  assert.equal(r.features.length, 3);
++  assert.equal(r.features[0], ciudad);
++  assert.equal(r.features[2], prefab);
++  assert.deepEqual(r.features[1].properties, a.properties);
++  // sin nada que unir devuelve lo mismo
++  const nada = [ciudad, a];
++  assert.equal(unirCalles(nada, ATRIBUTOS).features, nada);
++});
+diff --git a/packages/clis/truckdash-builder/unir-calles.ts b/packages/clis/truckdash-builder/unir-calles.ts
+new file mode 100644
+index 0000000..ac4c174
+--- /dev/null
++++ b/packages/clis/truckdash-builder/unir-calles.ts
+@@ -0,0 +1,137 @@
++// Junta en una sola linea las calles que se tocan punta con punta. El
++// generator deja cada cruce en pedazos (la calle, las dos ramas de la entrada
++// a una rotonda, el anillo) y cada pedazo es una linea aparte: dibujadas con
++// el ancho de la calle y puntas cuadradas, donde terminan dos juntas en
++// angulo las dos puntas se pisan y queda una estrella (las entradas de las
++// rotondas). Unidas, ahi hay una esquina y la dibuja la union de la linea.
++//
++// Solo donde se juntan exactamente dos puntas y las dos calles se dibujan
++// igual (mismos `claves`: tipo, si esta oculta, el DLC...). En un cruce de
++// tres o mas no se toca nada. Lo usan tiles.ts (el armador de la PC) y unir.ts
++// (el taller, antes de tippecanoe). Sin dependencias: corre con node solo.
++
++// Los -y del taller (tippecanoe) y lo que guarda tiles.ts: el resto de las
++// propiedades no viaja, y dos calles que coinciden en esto se dibujan igual.
++export const ATRIBUTOS = [
++  'type',
++  'dlcGuard',
++  'zIndex',
++  'height',
++  'hidden',
++  'secret',
++  'poiType',
++  'poiName',
++  'sprite',
++  'scaleRank',
++  'capital',
++  'roadType',
++  'color',
++  'name',
++];
++
++export interface Feature {
++  type: 'Feature';
++  geometry: unknown;
++  properties: Record<string, unknown> | null;
++  id?: unknown;
++}
++
++type Punto = number[];
++
++// Dos puntas a menos de esto (en grados, ~0,1 m del mapa y ~5 mm del juego)
++// son el mismo punto: el generator calcula por separado el final de una calle
++// y el nodo del prefab donde empieza la otra.
++const PASO_GRADOS = 1e-6;
++
++function celda(p: Punto): string {
++  return `${Math.round(p[0] / PASO_GRADOS)},${Math.round(p[1] / PASO_GRADOS)}`;
++}
++
++export function unirCalles(
++  features: Feature[],
++  claves: readonly string[],
++): { features: Feature[]; uniones: number } {
++  const firma = (f: Feature) =>
++    JSON.stringify(claves.map(k => f.properties?.[k] ?? null));
++  // Las calles que se pueden unir: LineString de dos puntos o mas.
++  const lineas: number[] = [];
++  const coords: Punto[][] = [];
++  features.forEach((f, i) => {
++    const g = f.geometry as { type?: string; coordinates?: Punto[] } | null;
++    if (
++      f.properties?.type === 'road' &&
++      g?.type === 'LineString' &&
++      Array.isArray(g.coordinates) &&
++      g.coordinates.length >= 2
++    ) {
++      lineas.push(i);
++      coords.push(g.coordinates);
++    }
++  });
++  // Cada punta (linea, 0 = el primer punto, 1 = el ultimo) en su celda.
++  const puntas = new Map<string, [number, 0 | 1][]>();
++  coords.forEach((c, n) => {
++    for (const lado of [0, 1] as const) {
++      const k = celda(lado ? c[c.length - 1] : c[0]);
++      const lista = puntas.get(k);
++      if (lista) lista.push([n, lado]);
++      else puntas.set(k, [[n, lado]]);
++    }
++  });
++  // vecino[n][lado]: con que punta de que linea se une esa punta.
++  const vecino: ([number, 0 | 1] | null)[][] = coords.map(() => [null, null]);
++  let uniones = 0;
++  for (const lista of puntas.values()) {
++    if (lista.length !== 2) continue;
++    const [[a, la], [b, lb]] = lista;
++    if (a === b) continue; // una linea cerrada sobre si misma
++    if (firma(features[lineas[a]]) !== firma(features[lineas[b]])) continue;
++    vecino[a][la] = [b, lb];
++    vecino[b][lb] = [a, la];
++    uniones++;
++  }
++  if (!uniones) return { features, uniones };
++
++  // Se recorre cada cadena desde una punta suelta; lo que queda son anillos.
++  // La linea unida queda en el lugar de su primer pedazo, con sus
++  // propiedades; los demas pedazos salen. El resto, igual y en orden.
++  const usada = new Array(coords.length).fill(false);
++  const unida = new Map<number, Punto[]>(); // feature donde queda -> coordenadas
++  const fuera = new Set<number>();
++  const recorrer = (inicio: number, entraPor: 0 | 1) => {
++    const out: Punto[] = [];
++    let n = inicio,
++      lado = entraPor;
++    while (!usada[n]) {
++      usada[n] = true;
++      const c = lado === 0 ? coords[n] : coords[n].slice().reverse();
++      for (let k = out.length ? 1 : 0; k < c.length; k++) out.push(c[k]);
++      if (n !== inicio) fuera.add(lineas[n]);
++      const v = vecino[n][(1 - lado) as 0 | 1];
++      if (!v) break;
++      [n, lado] = v;
++    }
++    if (out.length > coords[inicio].length) unida.set(lineas[inicio], out);
++  };
++  coords.forEach((_, n) => {
++    if (usada[n]) return;
++    if (!vecino[n][0]) recorrer(n, 0);
++    else if (!vecino[n][1]) recorrer(n, 1);
++  });
++  coords.forEach((_, n) => {
++    if (!usada[n]) recorrer(n, 0); // anillo: todas sus puntas unidas
++  });
++
++  const resultado: Feature[] = [];
++  features.forEach((f, i) => {
++    if (fuera.has(i)) return;
++    const c = unida.get(i);
++    if (!c) resultado.push(f);
++    else
++      resultado.push({
++        ...f,
++        geometry: { type: 'LineString', coordinates: c },
++      });
++  });
++  return { features: resultado, uniones };
++}
+diff --git a/packages/clis/truckdash-builder/unir.ts b/packages/clis/truckdash-builder/unir.ts
+new file mode 100644
+index 0000000..8978173
+--- /dev/null
++++ b/packages/clis/truckdash-builder/unir.ts
+@@ -0,0 +1,63 @@
++// El taller (build_variant.py) junta las calles antes de tippecanoe con esto:
++// lee el GeoJSON del generator y escribe otro con las calles que se tocan
++// punta con punta unidas (unir-calles.ts). tiles.ts lo hace solo.
++//
++// El generator escribe un feature por linea (writeGeojsonFile) porque entero
++// no entra en un string de node (ETS2 con ProMods pasa de 1 GB): se lee y se
++// escribe igual, de a una linea.
++//
++// Uso: npx tsx packages/clis/truckdash-builder/unir.ts <entrada.geojson> <salida.geojson>
++
++import fs from 'fs';
++import readline from 'readline';
++import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles';
++
++async function leer(entrada: string): Promise<Feature[]> {
++  const features: Feature[] = [];
++  const lineas = readline.createInterface({
++    input: fs.createReadStream(entrada, 'utf8'),
++    crlfDelay: Infinity,
++  });
++  for await (const cruda of lineas) {
++    const linea = cruda.trim().replace(/,$/, '');
++    if (linea.length < 2 || linea[0] !== '{' || linea.at(-1) !== '}') continue;
++    const obj = JSON.parse(linea) as {
++      type?: string;
++      features?: Feature[];
++    };
++    if (obj.type === 'Feature') features.push(obj as unknown as Feature);
++    else if (obj.type === 'FeatureCollection' && obj.features)
++      for (const f of obj.features) features.push(f); // un archivo de una sola linea
++  }
++  return features;
++}
++
++function escribir(salida: string, features: Feature[]) {
++  const fd = fs.openSync(salida, 'w');
++  fs.writeSync(fd, '{\n"type": "FeatureCollection",\n"features":[\n');
++  features.forEach((f, i) => {
++    fs.writeSync(
++      fd,
++      JSON.stringify(f) + (i < features.length - 1 ? ',\n' : '\n'),
++    );
++  });
++  fs.writeSync(fd, ']\n}\n');
++  fs.closeSync(fd);
++}
++
++async function main() {
++  const [entrada, salida] = process.argv.slice(2);
++  if (!entrada || !salida) {
++    console.error('Uso: unir.ts <entrada.geojson> <salida.geojson>');
++    process.exit(1);
++  }
++  const t0 = Date.now();
++  const todo = await leer(entrada);
++  const { features, uniones } = unirCalles(todo, ATRIBUTOS);
++  escribir(salida, features);
++  console.log(
++    `${todo.length} -> ${features.length} features, ${uniones} uniones, ${((Date.now() - t0) / 1000).toFixed(1)} s`,
++  );
++}
++
++void main();
 diff --git a/packages/libs/map/labels.ts b/packages/libs/map/labels.ts
 index d673fef..18ef19d 100644
 --- a/packages/libs/map/labels.ts

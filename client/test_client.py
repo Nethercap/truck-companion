@@ -454,6 +454,51 @@ def test_in_temp_location_detects_zip_extraction(monkeypatch, tmp_path):
         assert win_integration.in_temp_location("/tmp/.mount_abc123/TruckDash") is True
 
 
+def test_exe_de_la_clave_run():
+    assert win_integration.exe_from_command('"C:\\Truck Dash\\TruckDash.exe" --autostart') == "C:\\Truck Dash\\TruckDash.exe"
+    assert win_integration.exe_from_command("C:\\TD\\TruckDash.exe --autostart") == "C:\\TD\\TruckDash.exe"
+    assert win_integration.exe_from_command("") is None
+    assert win_integration.exe_from_command(None) is None
+    assert win_integration.exe_from_command('"') is None
+
+
+def test_el_inicio_con_windows_pasa_a_la_copia_que_se_abrio(monkeypatch, tmp_path):
+    """Discord, 21-10: la version nueva bajada a otra carpeta. La clave Run
+    seguia con la vieja, que arrancaba con Windows con su overlay; la nueva
+    solo le abria la ventana. Ahora la clave pasa a la nueva y se sabe cual
+    era la otra."""
+    nuevo = str(tmp_path / "nueva" / "TruckDash.exe")
+    viejo = str(tmp_path / "vieja" / "TruckDash.exe")
+    registrados = []
+    monkeypatch.setattr(win_integration, "exe_path", lambda: nuevo)
+    monkeypatch.setattr(win_integration, "in_temp_location", lambda path=None: False)
+    monkeypatch.setattr(win_integration, "set_autostart", lambda on: registrados.append(on) or True)
+
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: viejo)
+    assert win_integration.refresh_autostart_path() == viejo
+    assert registrados == [True]
+
+    # La misma copia, sin inicio con Windows o desde el codigo: no se toca.
+    registrados.clear()
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: nuevo)
+    assert win_integration.refresh_autostart_path() is None
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: None)
+    assert win_integration.refresh_autostart_path() is None
+    monkeypatch.setattr(win_integration, "autostart_exe", lambda: viejo)
+    monkeypatch.setattr(win_integration, "exe_path", lambda: None)
+    assert win_integration.refresh_autostart_path() is None
+    # Abierta desde adentro del zip no se registra (issue #2).
+    monkeypatch.setattr(win_integration, "exe_path", lambda: nuevo)
+    monkeypatch.setattr(win_integration, "in_temp_location", lambda path=None: True)
+    assert win_integration.refresh_autostart_path() is None
+    assert registrados == []
+
+    # Si no se pudo escribir la clave, no se avisa de otra copia.
+    monkeypatch.setattr(win_integration, "in_temp_location", lambda path=None: False)
+    monkeypatch.setattr(win_integration, "set_autostart", lambda on: False)
+    assert win_integration.refresh_autostart_path() is None
+
+
 def test_pairing_code_is_reused_between_runs(monkeypatch, tmp_path):
     """Pedido de Discord: el link guardado en el celular tiene que seguir
     sirviendo, asi que el codigo se guarda y se reusa (solo si es valido)."""
@@ -513,6 +558,16 @@ def test_discord_activity_from_telemetry():
     assert dp.activity_from_telemetry(None) is None
     pausada = dp.activity_from_telemetry({"game": "ets2", "cityDst": "Praha", "paused": True})
     assert "Praha" in pausada["details"] and "km" not in pausada["state"]
+
+    # Sin trabajo (la carga externa cancelada deja los datos del viaje en el
+    # plugin) no se muestra el viaje anterior; el GPS del juego si.
+    libre = dp.activity_from_telemetry(
+        {"game": "ats", "onJob": False, "citySrc": "Salt Lake City", "cityDst": "Las Vegas",
+         "cargo": "Bulldozer", "routeDistanceKm": 30})
+    assert libre["details"] == dp._t("rpc_on_road")
+    assert "Bulldozer" not in libre["state"] and "30" in libre["state"]
+    con = dp.activity_from_telemetry({"game": "ats", "onJob": True, "cityDst": "Las Vegas"})
+    assert "Las Vegas" in con["details"]
 
 
 def test_discord_frame_encoding():
@@ -1098,6 +1153,185 @@ def test_lan_anota_cada_ip_remota_una_vez(caplog):
     assert lineas == ["LAN: pagina (27765) desde 192.168.1.40", "LAN: datos (27766) desde 192.168.1.40"]
 
 
+def test_lan_el_tilde_de_compartir_va_al_relay_y_el_estado_vuelve(monkeypatch):
+    """El tablero por LAN no habla con el relay: el cliente le pasa el tilde
+    de "compartir mi posicion" y le devuelve lo que dice el relay. Antes la
+    casilla estaba gris en LAN y no habia como apagarlo (Discord, 20-10)."""
+    import asyncio
+    import json
+    import local_server
+    assert local_server.pedido_live_share(json.dumps({"type": "command", "action": "x"})) is None
+    assert local_server.pedido_live_share("no es json") is None
+    assert local_server.pedido_live_share("[1]") is None
+    pedido = {"type": "set_live_share", "enabled": False, "explicit": True, "mapVariant": "ats", "otra": "cosa"}
+    assert json.loads(local_server.pedido_live_share(json.dumps(pedido))) == {
+        "type": "set_live_share", "enabled": False, "explicit": True, "mapVariant": "ats"}
+    assert json.loads(local_server.pedido_live_share('{"type": "set_live_share", "enabled": "si"}'))["enabled"] is False
+
+    # Lo que dice el relay llega por la conexion al relay (handle_control_message)
+    vistos = []
+    monkeypatch.setattr(client, "on_live_share", vistos.append)
+    asyncio.run(client.handle_control_message('{"type": "live_share_state", "enabled": true}', {}, None))
+    asyncio.run(client.handle_control_message('{"type": "live_share_state", "enabled": "x"}', {}, None))
+    assert vistos == [True]
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        al_relay = []
+
+        async def mandar(texto):
+            al_relay.append(json.loads(texto))
+        srv.al_relay = mandar
+        # Sin saber que dice el relay: la clave va igual (este cliente reenvia)
+        ws = _FakeWs([json.dumps({"type": "set_live_share", "enabled": False, "explicit": True})])
+        await srv._handle_viewer(ws)
+        assert json.loads(ws.sent[0])["liveShare"] is None
+        assert al_relay == [{"type": "set_live_share", "enabled": False, "explicit": True}]
+
+        # El relay dice que comparte: a los tableros conectados y a los que llegan despues
+        conectado = _FakeWs([])
+        srv.viewers.add(conectado)
+        srv.avisar_live_share(True)
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert conectado.sent == ['{"type": "live_share_state", "enabled": true}']
+        srv._drop_viewer(conectado)
+        nuevo = _FakeWs([])
+        await srv._handle_viewer(nuevo)
+        assert json.loads(nuevo.sent[0])["liveShare"] is True
+    asyncio.run(probar())
+
+
+def test_lan_datos_solo_para_las_paginas_del_cliente():
+    """El 27766 atiende a la app y a /dash/ servidas por el cliente en el
+    27765 (por IP, localhost o el nombre de la PC), no a cualquier pagina."""
+    import local_server
+    p = local_server.HTTP_PORT
+    for bueno in (None, f"http://127.0.0.1:{p}", f"http://localhost:{p}", f"http://[::1]:{p}",
+                  f"http://192.168.1.50:{p}", f"http://10.0.0.7:{p}", f"http://172.20.1.2:{p}",
+                  f"http://100.101.102.103:{p}", f"http://169.254.10.20:{p}",
+                  f"http://DESKTOP-ABC1:{p}", f"http://mi-pc.local:{p}", f"http://mi-pc.lan:{p}"):
+        assert local_server.origen_permitido(bueno), bueno
+    for malo in ("https://trucksim-dash.com", "http://evil.example", f"http://evil.example:{p}",
+                 f"http://8.8.8.8:{p}", f"https://192.168.1.50:{p}", "http://192.168.1.50:8080",
+                 "http://127.0.0.1", f"http://casa.fritz.box:{p}", "null", "", "file://"):
+        assert not local_server.origen_permitido(malo), malo
+
+
+def test_pagina_cors_solo_para_los_origenes_que_la_usan():
+    """El 27765 le contesta con CORS a trucksim-dash.com (los mapas armados
+    en la PC), a las paginas del cliente y a localhost; antes, "*" (19-10)."""
+    import local_server
+    p = local_server.HTTP_PORT
+    for bueno in ("https://trucksim-dash.com", "https://www.trucksim-dash.com", f"http://192.168.1.50:{p}",
+                  f"http://127.0.0.1:{p}", "http://localhost:8791", "http://127.0.0.1:8080"):
+        assert local_server.origen_cors(bueno) == bueno, bueno
+    for malo in (None, "", "null", "https://evil.example", "http://trucksim-dash.com", "http://192.168.1.50:8080",
+                 "https://localhost:8791", "http://localhost:abc"):
+        assert local_server.origen_cors(malo) is None, malo
+
+
+def _pagina_lan(monkeypatch, tmp_path):
+    """El servidor de paginas de verdad, en 127.0.0.1 y un puerto libre."""
+    import http.server
+    import local_server
+    monkeypatch.setattr(local_server, "cache_dir", lambda: str(tmp_path))
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), local_server._StaticHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def _pedir_pagina(srv, path, headers=None, metodo="GET"):
+    import http.client
+    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=5)
+    c.request(metodo, path, headers=headers or {})
+    r = c.getresponse()
+    r.read()
+    return r
+
+
+def test_pagina_preflight_solo_para_los_origenes_que_la_usan(monkeypatch, tmp_path):
+    srv = _pagina_lan(monkeypatch, tmp_path)
+    try:
+        r = _pedir_pagina(srv, "/localmap/ats/vector/x.pmtiles", {"Origin": "https://trucksim-dash.com",
+                          "Access-Control-Request-Private-Network": "true"}, "OPTIONS")
+        assert r.status == 204
+        assert r.getheader("Access-Control-Allow-Origin") == "https://trucksim-dash.com"
+        assert r.getheader("Access-Control-Allow-Private-Network") == "true"
+        r = _pedir_pagina(srv, "/localmap/ats/vector/x.pmtiles", {"Origin": "https://evil.example"}, "OPTIONS")
+        assert r.getheader("Access-Control-Allow-Origin") is None
+        assert r.getheader("Access-Control-Allow-Private-Network") is None
+    finally:
+        srv.shutdown()
+
+
+def test_show_setup_solo_con_el_header_del_segundo_arranque(monkeypatch, tmp_path):
+    """Un <img src=".../__show-setup"> de cualquier web abria Setup; ahora
+    hace falta el header que manda _focus_running_instance (19-10)."""
+    import local_server
+    llamadas = []
+    monkeypatch.setattr(local_server, "on_show_setup", lambda: llamadas.append(1))
+    srv = _pagina_lan(monkeypatch, tmp_path)
+    try:
+        assert _pedir_pagina(srv, "/__show-setup").status == 403
+        assert _pedir_pagina(srv, "/__show-setup", {"Origin": "https://evil.example"}).status == 403
+        assert llamadas == []
+        r = _pedir_pagina(srv, "/__show-setup", {local_server.SHOW_SETUP_HEADER: local_server.SHOW_SETUP_VALUE})
+        assert r.status == 204 and llamadas == [1]
+    finally:
+        srv.shutdown()
+
+
+def test_segundo_arranque_manda_el_header_de_show_setup(monkeypatch):
+    import local_server
+    import tray_client
+    pedidos = []
+
+    class Respuesta:
+        status = 204
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(tray_client, "urlopen", lambda pedido, timeout: (pedidos.append(pedido), Respuesta())[1])
+    assert tray_client._focus_running_instance() is True
+    assert pedidos[0].full_url.endswith("/__show-setup")
+    assert pedidos[0].get_header(local_server.SHOW_SETUP_HEADER.capitalize()) == local_server.SHOW_SETUP_VALUE
+
+
+def test_lan_datos_rechaza_el_handshake_de_otro_origen(caplog):
+    """Con un servidor de verdad (solo 127.0.0.1, sin pedir el firewall)."""
+    import asyncio
+    import logging
+    import pytest
+    import websockets
+    from websockets.asyncio.client import connect
+    import local_server
+    local_server._origenes_rechazados.clear()
+
+    async def saluda(ws):
+        await ws.send("hola")
+
+    async def probar():
+        async with websockets.serve(saluda, "127.0.0.1", 0,
+                                    process_request=local_server._solo_paginas_del_cliente) as srv:
+            uri = f"ws://127.0.0.1:{srv.sockets[0].getsockname()[1]}"
+            async with connect(uri, origin=f"http://192.168.1.50:{local_server.HTTP_PORT}") as ws:
+                assert await ws.recv() == "hola"
+            async with connect(uri) as ws:  # sin Origin: no es un navegador
+                assert await ws.recv() == "hola"
+            for _ in range(2):
+                with pytest.raises(websockets.exceptions.InvalidStatus) as err:
+                    async with connect(uri, origin="https://evil.example"):
+                        pass
+                assert err.value.response.status_code == 403
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(probar())
+    avisos = [r.getMessage() for r in caplog.records if "rechazados" in r.getMessage()]
+    assert avisos == ["LAN: datos (27766) rechazados a una pagina de https://evil.example"]
+
+
 def test_lan_en_la_red_al_arrancar_solo_si_ya_se_usaba():
     """Escuchar en la red hace que Windows pida el firewall (y la clave de
     administrador a un usuario estandar, FioJon 18-10): quien recien instala
@@ -1149,7 +1383,9 @@ def _servidor_lan_falso(monkeypatch, escuchas, web=None, ocupados=None):
     monkeypatch.setattr(local_server.http.server, "ThreadingHTTPServer",
                         lambda addr, handler: _HttpFalso(addr, handler, escuchas, ocupados))
 
-    async def serve(handler, host, port):
+    async def serve(handler, host, port, process_request=None):
+        # El filtro de origen (19-10) va en todos los arranques.
+        assert process_request is local_server._solo_paginas_del_cliente
         escuchas.append(("ws", host))
         return _WsFalso()
     monkeypatch.setattr(websockets, "serve", serve)

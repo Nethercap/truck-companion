@@ -6,6 +6,55 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Setup: "Build my map" is now there whenever you play with mods, not only after the dashboard
+  sees your truck off the map. Before, it only showed up after that, and not again after
+  restarting the client, so there was no way to build the map for a newer version of a map mod
+  than ours.
+- Build my map: road pieces that meet end to end are joined into one road, so the dashboard, which
+  now draws roads at their in-game width, shows clean corners and road ends instead of overlapping
+  square tips (where the two lanes of a roundabout entrance meet, for example). Maps built before
+  look the same as always until you build them again.
+- Maps built on your PC ("Build my map"): junctions are built without the shortcuts that let a
+  route turn around inside them, like the ones that sent you back across the highway after a
+  missed exit where a divided road becomes a single two-way road. The dashboard already avoids
+  those on maps built with older versions; with this one it knows exactly where they are.
+- Maps built on your PC: a path through a junction is no longer shorter than the road drawn on
+  the map (sharp turns measured along the lane came out short), and junctions the game data
+  doesn't describe no longer let a route go the wrong way down a one-way road.
+
+## 1.5.34 (2026-10-21)
+
+- LAN mode: "Share my position" (the public live map) can now be turned off, or on, from the
+  dashboard on the same Wi-Fi. Before, the box was greyed out there and only the dashboard opened
+  with the pairing code could change it. The box now shows whether your session is really sharing,
+  and the dashboard on the same Wi-Fi never turns sharing on unless you tick it.
+- LAN mode: the client's local page server (the web copy and the maps built on the PC) only shares
+  its files with trucksim-dash.com and the client's own pages. Web pages from anywhere else can no
+  longer read them, and can no longer open the Setup window.
+- Discord status: after a job ends (or is cancelled by calling a tow truck), your profile no longer
+  keeps showing the old job's route and cargo.
+- Quit (in the tray icon's menu) hides the in-game overlay right away and always closes the client.
+  Before, the tray icon went away but the client could keep running for a while, with the overlay
+  still in the game.
+- A new version downloaded to a different folder now takes over "Start with Windows". Before,
+  Windows kept starting the old copy, with its own overlay and settings, and opening the new one
+  just showed the old one's window. If the old copy is running, the new one now says where it is so
+  you can quit it.
+- With no dashboard open, the in-game overlay now says which key hides it (Ctrl+Shift+O by
+  default).
+- In-game overlay: with fatigue turned off in the game, the route bar no longer marks a rest stop
+  at the very start of the route ("stop now"). It now shows no rest stop, like the dashboard.
+
+## 1.5.33 (2026-10-19)
+
+- The README in the download thanks the people who have sent code to Truck Dash.
+- Build my map reads map mods that ship their list of cities (or companies, cargo...) in the
+  obfuscated format some mods use, like Mapa BR Brasil. Before, the build stopped with
+  "parser.mjs failed". A list it still can't read (an encrypted one) is now skipped with a note in
+  the log, and the map is built without what that list adds.
+- LAN mode: the client's local data connection only answers the dashboard pages the client serves
+  itself (the dashboard and the `/dash/` panel, opened by the PC's address, `localhost` or its name).
+  Web pages from anywhere else, even in a browser on the same PC, can no longer connect to it.
 - LAN mode: dashboard files left read-only in the client's web cache (an unofficial mod does this
   so they are never replaced) no longer keep LAN mode on an old copy mixed with new files. The
   client updates them like the rest.

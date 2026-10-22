@@ -271,6 +271,31 @@ function formatTurnDistanceImperial(m, lang) {
   return `${ft} ft`;
 }
 
+// Casillas de "compartir mi posicion" en Ajustes: cuales se pueden tocar y
+// que aclaracion va abajo (clave de i18n, que es tambien el id del <p>).
+// Compartir es de la sesion del relay: por LAN se cambia a traves del
+// cliente si este lo reenvia (lanRelay: la clave liveShare en su
+// session_state); con un cliente viejo queda gris y se dice donde se cambia.
+// La ruta en el mapa en vivo la manda una pestana con el codigo, no la de
+// LAN. Antes en LAN no habia como apagarlo (Discord, 20-10).
+function liveShareControls({ lan, lanRelay, enabled }) {
+  if (!lan) return { shareDisabled: false, routeDisabled: !enabled, hint: null };
+  if (!lanRelay) return { shareDisabled: true, routeDisabled: true, hint: 'liveShareLanHint' };
+  return { shareDisabled: false, routeDisabled: true, hint: 'liveShareLanRouteHint' };
+}
+
+// "Compartir mi posicion" guardado en este navegador: true o false si alguna
+// vez cambio aca (el tilde, o lo que dijo el relay de la sesion), null si
+// nunca. Viene apagado (20-10): con null la pestana arranca sin compartir y
+// al conectar no le manda nada al relay, asi no lo prende ni apaga lo que
+// eligio otro dispositivo. Hasta el 20-10 venia prendido y lo prendia la
+// pestana que abre el cliente en la PC, aunque se usara solo el modo LAN.
+// saveSettings guarda solo lo que cambia: quien nunca lo toco no tiene la
+// clave, y liveShareV2 (de cuando vino prendido) no se mira mas.
+function liveShareChoice(saved) {
+  return saved && typeof saved.liveShareEnabled === 'boolean' ? saved.liveShareEnabled : null;
+}
+
 // Diagnostico de la conexion que muestra la app (chip de la barra, linea de
 // detalle y tarjeta vacia sobre el mapa) a partir del estado combinado de:
 // el socket del viewer, lo que dijo el backend (hay cliente local?), el
@@ -336,17 +361,27 @@ function normDeg(d) { return ((d + 540) % 360) - 180; }
 // falso a 5 m (Discord, 11-10, Lightningroc771).
 // curveSpanM: los puntos de la curva de un prefab (sin nodo) tampoco cortan
 // el grupo, mientras el cruce entero no pase de curveSpanM (el prefab de
-// punta a punta, ver junctionManeuver). Por defecto 0: cortan.
+// punta a punta, ver junctionManeuver). Por defecto 0: cortan. Esa curva
+// puede medir mas que maxGapM: con el corte de 50 m, la de 55 m de una cruz
+// con dos brazos muertos partia la esquina en dos mitades calladas y decia
+// "Continue straight" (Modesto, ATS, -108128,-6338; simulaciones del
+// 21-10). Un tramo sin puntos de curva sigue cortando a maxGapM: es la calle
+// entre dos prefabs, y juntarlos ponia el giro del segundo en el primero
+// (una T a 59 m de la esquina en Tulsa -> Ardmore). En unas 1.100 rutas de
+// ATS y ETS2 (tres semillas) suma 5 avisos y no saca ninguno: esa cruz, una
+// T de San Francisco que se callaba, una Y de Modesto y la primera salida de
+// dos rotondas chicas de ETS2 ("turn right" donde no se decia nada).
 function junctionClusterEnd(pts, cum, i, maxGapM, maxSpanM, skip, curveSpanM = 0) {
   const span = maxSpanM != null ? maxSpanM : 100;
+  const gapCurva = Math.max(maxGapM, curveSpanM);
   let j = i;
   for (;;) {
     let n = j + 1;
     if (n === skip && n + 1 < pts.length - 1) n++;
     let curva = false;
-    while (curveSpanM > 0 && n < pts.length - 1 && pts[n][4] == null && cum[n] - cum[j] < maxGapM) { n++; curva = true; }
+    while (curveSpanM > 0 && n < pts.length - 1 && pts[n][4] == null && cum[n] - cum[j] < gapCurva) { n++; curva = true; }
     if (curva && cum[n] - cum[i] > curveSpanM) return j;
-    if (n >= pts.length - 1 || pts[n][3] !== 1 || cum[n] - cum[j] >= maxGapM || cum[n] - cum[i] > span) return j;
+    if (n >= pts.length - 1 || pts[n][3] !== 1 || cum[n] - cum[j] >= (curva ? gapCurva : maxGapM) || cum[n] - cum[i] > span) return j;
     j = n;
   }
 }
@@ -697,7 +732,19 @@ function stopsAlongRoute(route, stops, maxOffM = 400, maxAlongM = 80000) {
 // el camino era mas largo (ganaban paradas mas lejos sobre la ruta); sacar
 // las que caen atras por la linea perdia algunas que se alcanzan en 2 km.
 // Hasta `tries` vueltas.
-function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, slackM = 1500, { reach = null, uTurnM = 1000, tries = 4 } = {}) {
+// Con el camino a mano tambien se miran las `near` mas cercanas y las
+// primeras sobre la ruta: la de adelante por el rumbo no ve las de al
+// costado. Saliendo de Austin al este (ATS) elegia una a 3,6 km, 5,2 por el
+// camino, con otra a 546 m y 744 por el camino; en una curva o una rampa el
+// rumbo dejaba "atras" un area de descanso a 515 m (977 por el camino) y
+// elegia otra a 6 km que obligaba a volver. Gana una que no obliga a dar la
+// vuelta si cuesta (2 * camino - along) switchM menos. En 1.238 pedidos de
+// ATS y 1.508 de ETS2 (rutas reales, cada 1,5 km) cambian 175 (162 con menos
+// camino) y 247 (239); las elegidas mucho peores que otra (3 km y 1,5 veces
+// el costo) pasan de 123 a 24 y de 145 a 9, y las que obligan a volver de
+// 89 a 58 y de 117 a 42. Dejando ganar tambien a las que obligan a volver
+// no quedaba ninguna mala, pero en ATS subian las de la vuelta (89 -> 103).
+function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, slackM = 1500, { reach = null, uTurnM = 1000, tries = 4, near = 8, switchM = 1000 } = {}) {
   if (!stations || !stations.length) return null;
   const elegir = (pool) => {
     const notBehind = pool.filter(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return !r || r.side !== 'behind'; });
@@ -728,6 +775,12 @@ function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, sl
     if (!pool.length) break;
     pick = elegir(pool);
     if (costo(pick) < costo(mejor)) mejor = pick;
+  }
+  const sobre = new Map(stopsAlongRoute(route, stations).map(st => [`${st.x},${st.z}`, st]));
+  for (const st0 of [...stations.slice(0, near), ...[...sobre.values()].slice(0, 3)]) {
+    const r = sobre.get(`${st0.x},${st0.z}`);
+    const st = r ? { ...r, why: 'route' } : { ...st0, why: 'near' };
+    if (!vuelta(st) && costo(st) < costo(mejor) - switchM) mejor = st;
   }
   return mejor;
 }
@@ -834,6 +887,30 @@ function createRefuelWatch({ minL = 20, minFrac = 0.08 } = {}) {
       return false;
     },
   };
+}
+
+// Los minutos de juego hasta el proximo descanso, o null si no dicen nada:
+// con la fatiga apagada el juego manda 0 o un valor de mas de un dia, como
+// el plazo de un trabajo sin plazo (jobDeadlineSeconds). createFatigue,
+// createRestWatch y createStatusAlerts ya lo filtraban; el panel de
+// docs/dash/ usaba el valor crudo y con la fatiga apagada decia que habia
+// que dormir antes de llegar y marcaba el descanso al principio de la barra
+// (barrido del 21-10). restStopSeconds: el nombre viejo, tambien en minutos.
+const REST_MINUTES_MAX = 24 * 60;
+function restMinutesOf(data) {
+  if (!data) return null;
+  const crudo = data.restStopMinutes != null ? data.restStopMinutes : data.restStopSeconds;
+  if (crudo == null) return null;
+  const m = Number(crudo);
+  return Number.isFinite(m) && m > 0 && m < REST_MINUTES_MAX ? m : null;
+}
+
+// Lo que el GPS del juego dice que falta, en segundos de juego, o null sin
+// ruta: sin ruta el SDK manda 0 y el mini-HUD y el panel decian "ETA (game):
+// 0h 0m" (la distancia, que tambien viene en 0, ya no se mostraba).
+function gameRouteSeconds(data) {
+  const s = data ? Number(data.routeTimeSeconds) : NaN;
+  return Number.isFinite(s) && s > 0 ? s : null;
 }
 
 // Lo mismo para el descanso: una parada en un area de descanso queda
@@ -1445,7 +1522,7 @@ function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
   const m = detectManeuver(ctx);
   if (m && !m.quiet) return { iEnd: ctx.iEnd, m };
   const iEnd = junctionClusterEnd(pts, cum, i, gapM, spanM, skip, curveSpanM);
-  if (iEnd <= ctx.iEnd) return { iEnd: ctx.iEnd, m };
+  if (iEnd <= ctx.iEnd) return mismaCruz(ctx, { iEnd: ctx.iEnd, m }, gapM, spanM, skip);
   const comoPrev = (x, end) => (x && x.kind === 'turn' ? { direction: x.direction, inBearing: x.inBearing, outBearing: x.outBearing, quiet: x.quiet, end } : null);
   let prev = comoPrev(m, cum[ctx.iEnd]);
   for (let j = ctx.iEnd + 1; j <= iEnd; j++) {
@@ -1462,7 +1539,74 @@ function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
     j = jEnd;
   }
   const todo = detectManeuver({ ...ctx, iEnd, firstRunAt: true });
-  return todo && todo.kind === 'turn' && !todo.quiet ? { iEnd, m: todo } : { iEnd: ctx.iEnd, m };
+  const r = todo && todo.kind === 'turn' && !todo.quiet ? { iEnd, m: todo } : { iEnd: ctx.iEnd, m };
+  return mismaCruz(ctx, r, gapM, spanM, skip);
+}
+
+// Un cruce cuyo grupo de nodos arranca en otro prefab pegado: de punta a
+// punta pasa de curveSpanM, junctionClusterEnd corta entre el nodo por el que
+// se entra y el que se sale, y cada mitad dobla poco y se calla. La esquina
+// de una cruz con dos brazos muertos despues de un rombo decia "Continue
+// straight" donde termina la calle (Davenport -> Quincy, ATS, 22846,-9173: el
+// rombo, 43 m, la cruz y 51 m de curva hasta la salida), y la segunda vuelta
+// de una S, una cruz a 38 m de la T de antes, no se decia (Wenatchee ->
+// Everett, -98451,-65259; asi tambien Yakima -> Portland, una T a 30 m de una
+// cruz). Si la mitad que sigue, a menos de mismaCruzM, se calla (y dobla para
+// el mismo lado que la primera, si esta dobla) y los dos nodos comparten un
+// vecino (los otros brazos se unen a los dos: es el mismo prefab), se mide
+// junto, con el aviso en el nodo de entrada. Si la primera mitad no dobla, el
+// giro se mide desde ese nodo: con la curva de la T de antes en los legM de
+// entrada, la cruz doblaba poco. Sin el vecino comun no: dos prefabs unidos
+// por una calle (la T a 59 m de una esquina en Tulsa -> Ardmore, el cruce
+// chico a 64 m de la esquina en Topeka) ponian el giro en el cruce
+// equivocado. En 900 rutas por juego: ATS +55 avisos en 12 lugares (esquinas
+// de cruz y de T, la segunda vuelta de una S; un "keep left" a una rampa pasa
+// a "turn left"), ETS2 +50 en 14 (3 son rotondas compactas que salen como
+// giro); ninguno de antes se pierde ni se mueve.
+// Tambien si ninguna mitad dobla (cada una menos que el umbral) y juntas si:
+// la cruz de Idaho Falls (ATS, -63981,-32641, Discord 21-10) mide 73 m en
+// diagonal de la entrada a la salida, dobla 61 grados a la izquierda en dos
+// mitades de 21 y 26, y el brazo de enfrente, cortado con barreras, se media
+// por adentro del prefab hacia el brazo norte: "Continue straight". En 900
+// rutas de ATS y de ETS2 y 600 de Coast to Coast y de ProMods, 11 lugares
+// mas (T e Y anchas donde hay que elegir, otra cruz con el brazo de enfrente
+// muerto en Sandpoint, la esquina de una con dos en Missoula); ninguno de
+// antes se pierde ni se mueve.
+// r: { iEnd, m } de junctionManeuver.
+function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 80, contraMaxDeg = 20) {
+  const { pts, cum, adjacency } = ctx;
+  if (!adjacency || (r.m && (r.m.kind !== 'turn' || !r.m.quiet))) return r;
+  let j = r.iEnd + 1;
+  for (; j < pts.length - 1 && pts[j][3] !== 1; j++) if (pts[j][4] != null) return r; // un nodo de calle en el medio
+  if (j >= pts.length - 1 || cum[j] - cum[r.iEnd] > mismaCruzM) return r;
+  const a = pts[r.iEnd][4], b = pts[j][4];
+  if (a == null || b == null) return r;
+  const vecinos = (n) => {
+    const s = new Set((adjacency.get(n) || []).map(([x]) => x));
+    if (ctx.incoming) for (const x of (ctx.incoming(n) || [])) s.add(x); // los que llegan (incoming del grafo)
+    return s;
+  };
+  const va = vecinos(a), vb = vecinos(b);
+  if (![...va].some(x => x !== b && vb.has(x))) return r;
+  const jEnd = junctionClusterEnd(pts, cum, j, gapM, spanM, skip);
+  const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd });
+  if (mj ? mj.kind !== 'turn' || !mj.quiet || (r.m && mj.direction !== r.m.direction) : r.m) return r;
+  // El giro, en el ultimo nodo de la primera mitad (donde empieza la esquina).
+  // Por el nodo de mas giro, con el camion adentro del cruce (o encima de un
+  // nodo) el aviso saltaba de un nodo a otro y volvia.
+  const juntos = detectManeuver({ ...ctx, i: r.m ? ctx.i : r.iEnd, iEnd: jEnd });
+  if (!juntos || juntos.kind !== 'turn' || juntos.quiet || (mj && juntos.direction !== mj.direction)) return r;
+  // Y la curva de una mitad a la otra dobla para un solo lado: en una rotonda
+  // chica que el grafo no reconoce se entra a la derecha, se rodea la isla a
+  // la izquierda y se sale, y a la 2.a salida decia "turn right" (Oslo, ETS2,
+  // 1888,-53484: 54 grados para el otro lado).
+  const { bearingBetween } = ctx;
+  let contra = 0;
+  for (let k = r.iEnd + 1; k <= j; k++) {
+    const t = normDeg(bearingBetween(pts[k], pts[k + 1]) - bearingBetween(pts[k - 1], pts[k]));
+    if ((juntos.direction === 'right') !== (t > 0)) contra += Math.abs(t);
+  }
+  return contra > contraMaxDeg ? r : { iEnd: jEnd, m: { ...juntos, at: r.iEnd } };
 }
 
 // Si a menos de legM despues de una bifurcacion (el cruce que termina en
@@ -2121,6 +2265,63 @@ const DEMO_ROUTE = {
   truckBrand: 'Volvo', truckName: 'VNL', jobIncome: 61158,
 };
 
+// Escudos de ruta en el mapa (I-80, US-63; Discord, 19-10): salen de los
+// carteles del juego (road-names.json, kind 'road': en ATS, 16.807 en 160
+// rutas). Uno por ruta y por celda de cellM x cellM, el cartel mas cerca del
+// centro de los de esa ruta en la celda: se repiten en cada cruce y salida,
+// y todos juntos tapaban el mapa. En ETS2 los carteles no traen el numero
+// (kind 'city'): no sale ninguno. k: 'i' interestatal, 'us' las demas; n:
+// el numero, que es lo que va adentro del escudo.
+function roadShieldPoints(names, cellM) {
+  if (!Array.isArray(names) || !(cellM > 0)) return [];
+  const grupos = new Map();
+  for (const n of names) {
+    if (!n || n.kind !== 'road' || typeof n.label !== 'string' || !n.label || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
+    const clave = `${n.label}|${Math.floor(n.x / cellM)}|${Math.floor(n.y / cellM)}`;
+    let g = grupos.get(clave);
+    if (!g) grupos.set(clave, (g = { label: n.label, pts: [] }));
+    g.pts.push(n);
+  }
+  const out = [];
+  for (const g of grupos.values()) {
+    let sx = 0, sy = 0;
+    for (const p of g.pts) { sx += p.x; sy += p.y; }
+    const cx = sx / g.pts.length, cy = sy / g.pts.length;
+    let mejor = g.pts[0], dMejor = Infinity;
+    for (const p of g.pts) {
+      const d = (p.x - cx) ** 2 + (p.y - cy) ** 2;
+      if (d < dMejor) { dMejor = d; mejor = p; }
+    }
+    out.push({ x: mejor.x, y: mejor.y, label: g.label, k: /^I-/.test(g.label) ? 'i' : 'us', n: g.label.replace(/^(I|US)-/, '') });
+  }
+  return out;
+}
+
+// Un cartel con varios escudos (el portico "I-94 / I-90" de una bifurcacion,
+// "US-89 / US-12" en un tramo compartido) viene en road-names.json como una
+// entrada por escudo en el mismo punto, y nearestInGrid devolvia siempre la
+// primera del archivo. Cada una lleva en `labels` los numeros de su punto,
+// para que en roadSignForTurn voten todos. Modifica las entradas y devuelve
+// la lista, sin las que no son un nombre: en el road-names.json de ETS2 hay
+// 399 carteles de velocidad con la clave del juego ("traffic_rule.limit_40")
+// y 4 con un texto sin traducir ("@@fp_de_diesel@@"), y en 300 rutas 18
+// avisos decian "toward traffic_rule.limit_80" (Balcanes, Grecia).
+const signLabelOk = (label) => typeof label === 'string' && !/^traffic_rule\.|^@@.*@@$/.test(label.trim());
+function groupSignsByPoint(signs) {
+  if (Array.isArray(signs) && !signs.every((s) => signLabelOk(s.label))) signs = signs.filter((s) => signLabelOk(s.label));
+  const porPunto = new Map();
+  for (const s of signs || []) {
+    const k = `${s.x},${s.y}`;
+    if (!porPunto.has(k)) porPunto.set(k, []);
+    porPunto.get(k).push(s);
+  }
+  for (const todas of porPunto.values()) {
+    const labels = [...new Set(todas.map((s) => s.label))];
+    if (labels.length > 1) for (const s of todas) s.labels = labels;
+  }
+  return signs;
+}
+
 // Indice por grilla para "el punto mas cercano a menos de maxDist" ({x, y}).
 // Los carteles de ruta son 17 mil en ATS y 54 mil en ETS2, y nearestRoadName
 // los recorria todos en cada busqueda.
@@ -2134,7 +2335,8 @@ function buildPointGrid(points, cell = 500) {
   }
   return { cell, cells };
 }
-function nearestInGrid(grid, x, z, maxDist) {
+// ok(p), si viene: solo los puntos que cumplen (roadSignForTurn).
+function nearestInGrid(grid, x, z, maxDist, ok = null) {
   if (!grid) return null;
   const { cell, cells } = grid;
   const r = Math.ceil(maxDist / cell), cx = Math.floor(x / cell), cz = Math.floor(z / cell);
@@ -2145,7 +2347,7 @@ function nearestInGrid(grid, x, z, maxDist) {
       if (!a) continue;
       for (const p of a) {
         const d = Math.hypot(p.x - x, p.y - z);
-        if (d < bestD) { bestD = d; best = p; }
+        if (d < bestD && (!ok || ok(p))) { bestD = d; best = p; }
       }
     }
   }
@@ -2160,12 +2362,13 @@ function nearestInGrid(grid, x, z, maxDist) {
 // la ruta estan al costado del camino); un voto por punto y, si empatan, gana
 // la que aparecio primero. Con mas peso en los primeros puntos, un cartel
 // de otra ruta en el cruce le ganaba a la ruta que se sigue 3 km (New
-// Orleans -> Houma: US-51 por la US-61). Votan solo los
+// Orleans -> Houma: US-51 por la US-61). Votaban solo los
 // numeros de ruta (kind 'road', los de ATS): los de destino (kind 'city',
 // todos los de ETS2) no dicen hacia donde miran, y a lo largo de la salida
 // aparecen los de la otra mano, que nombran lo que queda atras ("toward
 // FIRENZE" yendo a Venecia). Para esos, y sin ningun voto, el criterio de
-// antes: el del cruce mismo. pointAt(m): punto de la ruta a m metros del inicio.
+// antes: el del cruce mismo (hasta el 21-10, abajo). pointAt(m): punto de
+// la ruta a m metros del inicio.
 // Con opts.onExit (exitSignTest), un cartel vota solo si es de la salida:
 // el del cruce, o el que queda mas cerca de otra rama, nombra lo que sigue
 // por alla. En la I-80 este de Salt Lake City (ATS, -67313,-16853) el cartel
@@ -2174,25 +2377,132 @@ function nearestInGrid(grid, x, z, maxDist) {
 // primero ganaba: "Keep right onto I-80" por la salida a la I-15 (Discord,
 // 19-10). Si hubo carteles de ruta y ninguno voto, nada: el respaldo seria
 // ese mismo cartel del cruce.
+// Un cartel con varios escudos (groupSignsByPoint) vota por cada uno, y un
+// empate lo gana el numero con mas carteles junto a la ruta que junto a las
+// otras ramas del cruce (onExit.labelEvidence); si siguen iguales (un tramo
+// compartido, US-89 / US-12), el que aparecio primero. El portico "I-94 /
+// I-90" de la bifurcacion de la Kennedy en Chicago es de las dos ramas, y
+// por ser el primero del archivo la I-94 nombraba la que sigue por la I-90
+// (Discord, 20-10). Antes que eso, un empate entre carteles distintos lo
+// gana la interestatal: en un tramo compartido cada escudo va en su cartel y
+// en la I-72 al este de Jacksonville (I-72 / US-36 / US-67) empataban los
+// tres y la evidencia daba "onto US-36" (Discord, 20-10). En 450 rutas de
+// ATS cambian 8 nombres, todos de una US a la interestatal del mismo tramo.
+// Cada muestra vota con el cartel mas cercano que es de la salida, no con el
+// mas cercano a secas: si ese era del cruce, de la otra mano o de otra rama,
+// la muestra no votaba aunque a 50 m hubiera uno bueno, y el aviso salia
+// sin nombre (Lafayette -> DeRidder, ATS: el I-10 del puente tapaba los de
+// la US-165). Un cartel vota una vez aunque lo encuentren dos muestras: el
+// del cruce, a 100 m de las de 60 y 150 m, pesaba doble ("Turn right onto
+// I-90 Bus" por la I-25 en Sheridan). En una bifurcacion, los de los
+// primeros ROAD_SIGN_FORK_NEAR_M (onExit.cercaM) votan solo si no voto
+// ninguno de mas adelante: ahi las dos ramas van pegadas y el cartel puede
+// ser de la otra ("Keep right onto I-20" saliendo de la I-20 a la US-59 en
+// Shreveport, como el "I-80" de Salt Lake City). Los de destino (kind
+// 'city', ETS2) ahora votan igual, por cada ciudad del cartel: desde que no
+// votan los de la otra mano, el "toward FIRENZE" de lo que queda atras ya no
+// pasa; el respaldo seguia siendo el mas cercano a cualquier lado y en 300
+// rutas de ETS2 una de cada cuatro ciudades nombradas quedaba atras
+// ("toward TALLINN" saliendo de Tallinn a Kunda). El respaldo de destino
+// tampoco es de la otra mano ni de otra rama (onExit.lado), pero puede
+// estar antes del cruce: el cartel que lo anuncia. Medido en 450 rutas de
+// ATS contra los escudos a la derecha de 0,2 a 3 km despues (sin los keep
+// por carriles), de 448 avisos 266 -> 307 bien, 76 -> 66 mal y 100 -> 69
+// sin nombre (44 mejores, 6 peores: anunciadores de la salida siguiente);
+// en 300 de ETS2, de las ciudades nombradas que se ubican a mas de 1,5 km,
+// 246 -> 306 adelante del rumbo de la ruta y 125 -> 53 atras, con 50
+// avisos mas sin nombre. Con 150 m en vez de 200, 9 peores (los US-20 a
+// 160-190 m de la bifurcacion de la I-35 en Fort Dodge).
 const ROAD_SIGN_SAMPLES_M = [60, 150, 300, 500, 800, 1200];
+const ROAD_SIGN_FORK_NEAR_M = 200;
+// Un cartel por cada escudo de s, con su numero
+const roadSignShields = (s) => (s.labels || [s.label]).map((label) => (label === s.label ? s : { ...s, label }));
+const esInterestatal = (label) => /^I-\d+[A-Z]?$/.test(label);
+// Los escudos de las rutas historicas ("US-66 Hist", tambien pintados en el
+// asfalto) estan en las calles por donde pasaban, junto a los carteles de la
+// ruta de hoy. Votan solo si no voto ninguna otra ruta, y uno solo no
+// alcanza: en 450 rutas de ATS "Turn left onto US-66 Hist" en Kingman (la
+// ruta sigue por la US-93), en Joplin (la US-400) y saliendo de Springfield
+// a Peoria (la I-74). En Portland, de la I-205 a la I-84, "US-30 Hist" pasa
+// a "I-84".
+const esHistorica = (label) => / Hist$/.test(label);
+const ROAD_SIGN_HIST_MIN = 2;
+function sinHistoricas(votantes) {
+  const otros = votantes.filter((s) => (s.labels || [s.label]).some((l) => !esHistorica(l)));
+  if (!otros.length) return votantes.length >= ROAD_SIGN_HIST_MIN ? votantes : [];
+  return otros.map((s) => {
+    const labels = (s.labels || [s.label]).filter((l) => !esHistorica(l));
+    return labels.length === (s.labels || [s.label]).length ? s : { ...s, label: labels[0], labels };
+  });
+}
 function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {}) {
   const radius = opts.radius ?? 200, fallbackRadius = opts.fallbackRadius ?? 400;
+  const salida = opts.onExit || null;
   const votes = new Map(); // en orden de aparicion: un empate lo gana la primera
+  let votantes = [];
   let ajenos = 0;
   ROAD_SIGN_SAMPLES_M.forEach((d) => {
     if (fromM + d > totalM) return;
     const p = pointAt(fromM + d);
-    const s = p && nearest(p[0], p[1], radius);
-    if (!s || s.kind !== 'road') return;
-    if (opts.onExit && !opts.onExit(s)) { ajenos++; return; }
-    const v = votes.get(s.label);
-    if (v) v.score++; else votes.set(s.label, { score: 1, sign: s });
+    let s = p && nearest(p[0], p[1], radius);
+    if (!s || (s.kind !== 'road' && !(s.kind === 'city' && salida))) return;
+    if (salida && !salida(s)) {
+      const tipo = s.kind, deLaSalida = (c) => c.kind === tipo && salida(c);
+      s = nearest(p[0], p[1], radius, deLaSalida);
+      if (!s || !deLaSalida(s)) { if (tipo === 'road') ajenos++; return; }
+    }
+    if (!votantes.some((o) => o.x === s.x && o.y === s.y)) votantes.push(s);
   });
+  // Un escudo historico solo, descartado: sin respaldo (seria el mismo)
+  const conHistoricas = votantes.length;
+  votantes = sinHistoricas(votantes);
+  if (conHistoricas && !votantes.length) ajenos++;
+  const cercaM = salida && salida.cercaM;
+  const lejanos = cercaM ? votantes.filter((s) => salida.desdeGiro(s) >= cercaM) : votantes;
+  const usados = lejanos.length ? lejanos : votantes;
+  for (const s of usados) {
+    for (const c of roadSignShields(s)) {
+      const v = votes.get(c.label);
+      if (v) v.score++; else votes.set(c.label, { score: 1, sign: c });
+    }
+  }
   let best = null;
   for (const v of votes.values()) if (!best || v.score > best.score) best = v;
+  let empate = best ? [...votes.values()].filter((v) => v.score === best.score) : [];
+  // Empate de carteles distintos, cada uno de la salida: la ruta lleva todos
+  // esos numeros (un tramo compartido) y gana la interestatal, como en el
+  // cartel grande del juego. Si un mismo cartel trae dos de los empatados
+  // (el portico de una bifurcacion), decide labelEvidence.
+  const empatados = new Set(empate.map((v) => v.sign.label));
+  const deUnCartel = usados.some((s) => (s.labels || [s.label]).filter((l) => empatados.has(l)).length > 1);
+  if (!deUnCartel && empate.some((v) => esInterestatal(v.sign.label))) {
+    empate = empate.filter((v) => esInterestatal(v.sign.label));
+    best = empate[0];
+  }
+  if (empate.length > 1 && opts.onExit && opts.onExit.labelEvidence) {
+    const puntaje = opts.onExit.labelEvidence(nearest);
+    for (const v of empate) if ((puntaje.get(v.sign.label) || 0) > (puntaje.get(best.sign.label) || 0)) best = v;
+    // Si la evidencia tambien empata y dos carteles o mas traen los dos
+    // escudos, es el tramo compartido y no un portico: gana la interestatal
+    // (I-435 / US-50 en Kansas City, I-82 / US-97 en Yakima, I-69 / US-59 en
+    // Houston). No si entre los empatados esta su "Bus" (el cartel de un
+    // enlace). En 450 rutas de ATS, 7 nombres de una US a la interestatal,
+    // ninguno peor contra los escudos de despues. Con un cartel solo, no: era
+    // el portico de la bifurcacion (Truckee, Cheyenne) o el de la US que se
+    // toma (Fort Smith, Columbia).
+    if (!esInterestatal(best.sign.label)) {
+      const tope = puntaje.get(best.sign.label) || 0;
+      const juntos = (l) => usados.filter((s) => { const ls = s.labels || [s.label]; return ls.includes(l) && ls.includes(best.sign.label); }).length;
+      const tramo = empate.find((v) => esInterestatal(v.sign.label) && (puntaje.get(v.sign.label) || 0) === tope
+        && juntos(v.sign.label) >= 2 && !empate.some((o) => o.sign.label.startsWith(v.sign.label + ' ')));
+      if (tramo) best = tramo;
+    }
+  }
   if (best) return best.sign;
-  if (ajenos) return null;
-  return fallbackXY ? nearest(fallbackXY[0], fallbackXY[1], fallbackRadius) : null;
+  if (ajenos || !fallbackXY) return null;
+  const respaldoOk = salida && salida.lado ? (c) => c.kind !== 'city' || salida.lado(c) : null;
+  const respaldo = nearest(fallbackXY[0], fallbackXY[1], fallbackRadius, respaldoOk);
+  return respaldo && respaldoOk && !respaldoOk(respaldo) ? null : respaldo;
 }
 
 // Si un cartel es de la salida del cruce de nodos i..iEnd de la ruta: el
@@ -2208,8 +2518,33 @@ function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {})
 // Waterloo, ATS). Y a menos de maxDistM de la ruta: los carteles estan al
 // costado del camino, y uno de la I-290 a 126 m, junto a la autopista de al
 // lado, nombraba la rampa a la I-90 en Chicago. Devuelve sign -> boolean.
-function exitSignTest({ pts, cum, pointAt, i, at = i, iEnd = i, others = [] }, { pastM = 10, maxDistM = 80, spanM = 1400, stepM = 10, backM = 100 } = {}) {
+// Con bearingBetween, tampoco los de la otra mano: a mas de leftM a la
+// izquierda de la ruta (ATS se maneja por la derecha; la mano izquierda de
+// ETS2, abajo). En 100 rutas de ATS, los carteles que votaban quedaban a
+// 6-18 m de un lado o del otro, casi ninguno entre -5 y 5, y mas de la mitad
+// a la izquierda. Los de la autopista de enfrente anuncian sus salidas, que
+// son la ruta que se cruza (I-49 y US-71 pasando el trebol de la I-44 en
+// Joplin), y en el puente sobre la autopista recien dejada estan los de sus
+// rampas para el otro lado: "Turn left onto I-90" al final de la salida
+// (Discord, 20-10). En un tramo de un sentido la banquina izquierda tambien
+// es de esta mano (hasta -15 m), pero en el cruce de la rampa con la calle
+// los nodos del prefab son de un sentido aunque la calle sea de doble mano,
+// y con -15 ahi volvia la autopista recien dejada.
+// Desde que votan los de destino de ETS2, donde se maneja por la izquierda
+// (el Reino Unido) la otra mano es la derecha: se ve en la corrida de la
+// ruta dibujada (p[6], + a la derecha), negativa ahi y positiva en el
+// continente y en ATS.
+// cercaM: lo usa roadSignForTurn en las bifurcaciones (test.cercaM y
+// test.desdeGiro, los metros pasado el giro de un cartel). test.lado: si un
+// cartel no es de la otra mano ni de otra rama, este donde este (el respaldo
+// de un cartel de destino puede ser el que anuncia el cruce, antes).
+function exitSignTest({ pts, cum, pointAt, bearingBetween, i, at = i, iEnd = i, others = [] }, { pastM = 10, maxDistM = 80, spanM = 1400, stepM = 10, backM = 100, leftM = 5, cercaM = 0 } = {}) {
   const fin = Math.min(cum[cum.length - 1], cum[iEnd] + spanM);
+  let der = 0, izq = 0;
+  for (let k = i; k < pts.length && cum[k] <= fin; k++) {
+    if (pts[k][6] > 0) der++; else if (pts[k][6] < 0) izq++;
+  }
+  const manoIzquierda = izq > der;
   const ruta = [];
   for (let m = Math.max(0, cum[i] - backM); m <= fin; m += stepM) ruta.push([m, pointAt(m)]);
   const ramas = others.map((rama) => {
@@ -2221,19 +2556,67 @@ function exitSignTest({ pts, cum, pointAt, i, at = i, iEnd = i, others = [] }, {
     }
     return out;
   });
+  // El punto de la linea mas cerca del cartel, y si el cartel queda a mas de
+  // leftM del lado de la otra mano (el rumbo hacia el cartel contra el de la
+  // linea ahi)
+  const cercano = (linea, s) => {
+    let mejor = Infinity, j = -1;
+    for (let n = 0; n < linea.length; n++) {
+      const d = Math.hypot(s.x - linea[n][0], s.y - linea[n][1]);
+      if (d < mejor) { mejor = d; j = n; }
+    }
+    let otraMano = false;
+    if (bearingBetween && j >= 0 && linea.length > 1) {
+      const a = linea[Math.max(0, j - 1)], b = linea[Math.min(linea.length - 1, j + 1)];
+      const lado = normDeg(bearingBetween(linea[j], [s.x, s.y]) - bearingBetween(a, b));
+      const derecha = mejor * Math.sin(lado * Math.PI / 180);
+      otraMano = manoIzquierda ? derecha > leftM : derecha < -leftM;
+    }
+    return { mejor, j, otraMano };
+  };
+  const lineaRuta = ruta.map((r) => r[1]);
+  const deOtraRama = (s, mejor) => ramas.some((r) => r.some((q) => Math.hypot(s.x - q[0], s.y - q[1]) < mejor));
   const cache = new Map();
-  return (s) => {
+  const test = (s) => {
     const key = `${s.x},${s.y},${s.label}`;
     if (cache.has(key)) return cache.get(key);
-    let mejor = Infinity, enM = -Infinity;
-    for (const [m, p] of ruta) {
-      const d = Math.hypot(s.x - p[0], s.y - p[1]);
-      if (d < mejor) { mejor = d; enM = m; }
-    }
-    const ok = enM > cum[at] + pastM && mejor <= maxDistM && !ramas.some((r) => r.some((q) => Math.hypot(s.x - q[0], s.y - q[1]) < mejor));
+    const { mejor, j, otraMano } = cercano(lineaRuta, s);
+    const enM = j >= 0 ? ruta[j][0] : -Infinity;
+    const ok = !otraMano && enM > cum[at] + pastM && mejor <= maxDistM && !deOtraRama(s, mejor);
     cache.set(key, ok);
     return ok;
   };
+  test.cercaM = cercaM;
+  test.desdeGiro = (s) => {
+    const { j } = cercano(lineaRuta, s);
+    return j >= 0 ? ruta[j][0] - cum[at] : -Infinity;
+  };
+  test.lado = (s) => {
+    const { mejor, otraMano } = cercano(lineaRuta, s);
+    return !otraMano && !deOtraRama(s, mejor);
+  };
+  // Para el desempate de roadSignForTurn: por cada numero, cuantos carteles
+  // (de las dos manos) hay a menos de maxDistM de la ruta pasado el cruce
+  // menos los que quedan mas cerca de otra rama. Se buscan con nearest cada
+  // 5 * stepM sobre las dos lineas. Devuelve Map label -> puntaje.
+  test.labelEvidence = (nearest) => {
+    const vistos = new Map();
+    const mirar = (q) => {
+      const c = nearest(q[0], q[1], maxDistM);
+      if (c && c.kind === 'road') vistos.set(`${c.x},${c.y}`, c);
+    };
+    for (let n = 0; n < ruta.length; n += 5) if (ruta[n][0] > cum[at]) mirar(lineaRuta[n]);
+    for (const r of ramas) for (let n = 0; n < r.length; n += 5) mirar(r[n]);
+    const puntaje = new Map();
+    for (const c of vistos.values()) {
+      const enRuta = cercano(lineaRuta, c);
+      if (ruta[enRuta.j][0] <= cum[at]) continue; // de antes del cruce: de las dos
+      const signo = ramas.some((r) => cercano(r, c).mejor < enRuta.mejor) ? -1 : 1;
+      for (const e of roadSignShields(c)) puntaje.set(e.label, (puntaje.get(e.label) || 0) + signo);
+    }
+    return puntaje;
+  };
+  return test;
 }
 
 // Proxima ciudad sobre la ruta: la que la ruta pasa a menos de `radius` y
@@ -2243,8 +2626,18 @@ function exitSignTest({ pts, cum, pointAt, i, at = i, iEnd = i, others = [] }, {
 // ciudad que acababa de quedar atras (entre los 2 km, donde se la descartaba
 // como la actual, y los 2,5) ganaba, y en la demo la proxima ciudad saltaba
 // Salina -> Provo -> Salina (auditoria del 12-10). Coordenadas del juego.
+// Y la ruta tiene que acercarse a ella approachM mas de lo que esta el
+// camion: pasada Vancouver (WA) la ruta a Yakima se aleja serpenteando y
+// cada vuelta que quedaba unos metros mas cerca, a 2,1 km del centro, la
+// volvia a hacer proxima: Yakima > Vancouver > Yakima > Vancouver (ATS). Lo
+// mismo saliendo de una ciudad por la circunvalacion (Sevilla, Burdeos en
+// ETS2). En 150 rutas por juego, manejando de a 200 m, las idas y vueltas
+// A > B > A pasan de 52 a 15 en ATS y de 136 a 67 en ETS2, y la ciudad
+// recien dejada como proxima, de 168 a 46 y de 426 a 101; ninguna ciudad
+// por la que la ruta pasa a menos de 1 km deja de salir antes (con 300 m,
+// 24 y 95 idas y vueltas).
 function nextCityAlongRoute(points, cities, truck, opts = {}) {
-  const radius = opts.radius ?? 2500, minAhead = opts.minAhead ?? 300;
+  const radius = opts.radius ?? 2500, minAhead = opts.minAhead ?? 300, approachM = opts.approachM ?? 1000;
   const currentCity = opts.currentCityRadius ?? 2000, maxSamples = opts.maxSamples ?? 400;
   if (!points || points.length < 2 || !cities || !cities.length) return null;
   const step = Math.max(1, Math.floor(points.length / maxSamples));
@@ -2272,6 +2665,7 @@ function nextCityAlongRoute(points, cities, truck, opts = {}) {
       if (e < dMin) { dMin = e; aMin = along[k]; }
     }
     const ahead = aMin - truckAlong;
+    if (truck && Math.hypot(c.X - truck[0], c.Y - truck[1]) - dMin < approachM) continue; // ya se paso (o se pasa al costado)
     if (dMin < radius && ahead >= minAhead && ahead < bestAlong) { bestAlong = ahead; best = c.Name; }
   }
   return best;
@@ -2718,6 +3112,45 @@ function routeHasLine(feature) {
   return false;
 }
 
+// Ancho de las calles del mapa en pixeles, como 'line-width' de MapLibre. Se
+// queda el de siempre (baseStops: [zoom, px, ...], lineal) mientras sea mas
+// grueso que la calle de verdad; de ahi (zoom 10 a 11) va el ancho del juego:
+// ROAD_WIDTH_GAME_M (dos carriles de 4,5 m) por ROAD_WIDTH_SHARE, pasado a
+// metros del mapa (metersPerGameM: el juego esta comprimido unas 19 veces) y
+// a pixeles de ese zoom en esa latitud (Web Mercator, teselas de 512 px). Las
+// piezas de los cruces que arma truckermudgeon estan pensadas para dibujarse
+// con ancho, como en el mapa del juego: con la linea fina se veian sueltas y
+// cruzadas (rotonda de Uppsala, Discord 22-10). 0,8 y no 1: los ramales de un
+// carril de las rotondas se empastaban en una mancha.
+const ROAD_WIDTH_GAME_M = 9;
+const ROAD_WIDTH_SHARE = 0.8;
+const ROAD_WIDTH_MIN_ZOOM = 5;
+const ROAD_WIDTH_MAX_ZOOM = 22;
+const WEB_MERCATOR_CIRCUMFERENCE_M = 40075016.686;
+function roadLineWidth(baseStops, metersPerGameM, lat) {
+  const linear = ['interpolate', ['linear'], ['zoom'], ...baseStops];
+  if (!(metersPerGameM > 0) || !isFinite(lat)) return linear;
+  const base = z => {
+    if (z <= baseStops[0]) return baseStops[1];
+    for (let i = 2; i < baseStops.length; i += 2) {
+      if (z <= baseStops[i]) {
+        const z0 = baseStops[i - 2], w0 = baseStops[i - 1];
+        return w0 + (baseStops[i + 1] - w0) * (z - z0) / (baseStops[i] - z0);
+      }
+    }
+    return baseStops[baseStops.length - 1];
+  };
+  // Mas alla de los 78 grados (ninguna variante llega) no crece sin limite.
+  const cos = Math.max(0.2, Math.cos(lat * Math.PI / 180));
+  const stops = [];
+  for (let z = ROAD_WIDTH_MIN_ZOOM; z <= ROAD_WIDTH_MAX_ZOOM; z++) {
+    const real = ROAD_WIDTH_SHARE * ROAD_WIDTH_GAME_M * metersPerGameM * 512 * 2 ** z / (WEB_MERCATOR_CIRCUMFERENCE_M * cos);
+    stops.push(z, Math.round(Math.max(base(z), real) * 100) / 100);
+  }
+  // Base 2: entre dos zooms enteros el ancho real se duplica, como el mapa.
+  return ['interpolate', ['exponential', 2], ['zoom'], ...stops];
+}
+
 // Tamano de un elemento acomodado a mano (modo acomodar): la escala nueva
 // sale de cuanto se arrastro la manija de la esquina respecto del ancho con
 // que se empezo. Nunca mas grande de lo que entra entre donde esta y el borde
@@ -2893,6 +3326,16 @@ function insideMapBounds(bounds, x, z) {
   return x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
 }
 
+// La telemetria con el camion en 0,0 exacto no es un lugar: es un dato del
+// plugin sin el camion (Discord 22-10, Cheyenne: un aviso con el camion en
+// 0,0 a mitad de un viaje). La app lo tomaba como un salto
+// (TRAIL_JUMP_THRESHOLD_M), recalculaba desde ahi ("Keep right onto US-75 in
+// 3 mi") y otra vez al volver, sin lo recorrido: cerca de un cruce, el giro
+// salia repetido. handleTelemetry lo trata como un dato sin posicion.
+function positionAtOrigin(p) {
+  return !!p && p.x === 0 && p.z === 0;
+}
+
 // Rotonda: "tomar la segunda salida", con frase grabada hasta la octava
 // (como los ordinales de la pantalla; las de sexta a octava, desde los
 // paquetes v4 del 15-10); mas alla se dice hacia que lado sale.
@@ -2987,6 +3430,32 @@ const VOICE_TIMING_DEFAULT = 'normal';
 function voiceTimingSetting(value) {
   return Object.prototype.hasOwnProperty.call(VOICE_TIMINGS, value) ? value : VOICE_TIMING_DEFAULT;
 }
+
+// Lo ya avisado de las ultimas maniobras (por turnIdentity), no solo de la
+// ultima. Llegando a un giro el aviso puede ir a otro y volver (A, B, A): al
+// pisar el nodo de un keep se da por pasado, al dato siguiente no, y despues
+// si ("keep right" dos veces en la salida del trebol de Salem, en el
+// simulador), o un recalculo corre el giro a otro nodo y despues vuelve
+// ("turn left" 3 o 4 veces en Cheyenne, Discord 22-10). Con la ultima sola,
+// la vuelta a A se decia de nuevo. get la pone como la mas reciente; pasadas
+// max, se olvida la mas vieja.
+const RECENT_MANEUVERS_MAX = 8;
+function createRecentManeuvers(max = RECENT_MANEUVERS_MAX) {
+  const m = new Map();
+  return {
+    get(id) {
+      if (!m.has(id)) return undefined;
+      const v = m.get(id);
+      m.delete(id); m.set(id, v);
+      return v;
+    },
+    set(id, v) {
+      m.delete(id); m.set(id, v);
+      if (m.size > max) m.delete(m.keys().next().value);
+      return v;
+    },
+  };
+}
 function createVoiceGuide(opts = {}) {
   const soonSec = opts.soonSec != null ? opts.soonSec : 20;
   let timing = VOICE_TIMINGS[voiceTimingSetting(opts.timing)];
@@ -2995,13 +3464,13 @@ function createVoiceGuide(opts = {}) {
   const minSpeedMs = opts.minSpeedMs != null ? opts.minSpeedMs : 5;
   const arriveKm = opts.arriveKm != null ? opts.arriveKm : 0.3;
   const minTripKm = opts.minTripKm != null ? opts.minTripKm : 1;
-  let current = null; // { id, soon, now }
+  const dichos = createRecentManeuvers(); // id -> { soon, now }
   let arrivedKey = null;
   return {
     maneuver(turn, speedKmh) {
       if (!turn || !turn.node || !Number.isFinite(turn.distanceMeters)) return null;
       const id = turnIdentity(turn);
-      if (!current || current.id !== id) current = { id, soon: false, now: false };
+      const current = dichos.get(id) || dichos.set(id, { soon: false, now: false });
       const speedMs = Math.max(minSpeedMs, (Number(speedKmh) || 0) / 3.6);
       const seconds = turn.distanceMeters / speedMs;
       const action = voiceManeuverKey(turn);
@@ -3059,13 +3528,26 @@ function voiceQueuePick(pendingKey, newKey) {
   return voiceIsUrgent(pendingKey) && !voiceIsUrgent(newKey) ? pendingKey : newKey;
 }
 
-// La voz a usar segun el idioma de la app y la eleccion guardada (una por
-// idioma). Sin voz para ese idioma, null; con la guardada que ya no existe,
-// la primera del idioma.
+// La voz a usar: la elegida (una por idioma de la app), de cualquier idioma;
+// cada voz dice las frases en el suyo. Hasta el 22-10 solo se podian elegir
+// las del idioma de la app: en ingles se veian dos y en aleman una (Discord).
+// Sin eleccion, o con una que ya no existe, la primera del idioma de la app;
+// sin ninguna, null.
 function pickVoice(voices, lang, savedId) {
-  const own = (voices || []).filter(v => v.lang === lang);
-  if (!own.length) return null;
-  return own.find(v => v.id === savedId) || own[0];
+  const lista = voices || [];
+  return (savedId && lista.find(v => v.id === savedId)) || lista.find(v => v.lang === lang) || null;
+}
+
+// Las voces para elegir en Ajustes, todas: primero las del idioma de la app,
+// despues las demas en el orden del catalogo, con su idioma al lado
+// ("Thorsten · Deutsch"; con parentesis quedaba "Daniela (AR) (Español)").
+// langName(lang): el nombre del idioma; systemLabel: el de la voz del
+// sistema. Devuelve [{ id, label }].
+function voiceChoices(voices, lang, langName, systemLabel) {
+  const lista = voices || [];
+  const nombre = (v) => (v.system ? systemLabel : v.label);
+  return lista.filter(v => v.lang === lang).map(v => ({ id: v.id, label: nombre(v) }))
+    .concat(lista.filter(v => v.lang !== lang).map(v => ({ id: v.id, label: `${nombre(v)} · ${langName(v.lang)}` })));
 }
 
 // ------------------------------------------------------------ DLC del mapa
@@ -3776,9 +4258,48 @@ function formatGear(gear) {
 // del 16-10, Discord: "a mini map inside the small pop out window that
 // stays on top of the game") hace falta alto para ver camino adelante.
 // Chrome la achica si no entra en la pantalla.
+// saved: el tamano que el usuario le dejo a ese modo la ultima vez (Discord,
+// 21-10: "remember last size and last position"), crudo de localStorage.
 const PIP_SIZES = { text: { width: 400, height: 160 }, map: { width: 400, height: 460 } };
-function pipWindowSize(withMap) {
-  return { ...PIP_SIZES[withMap ? 'map' : 'text'] };
+function pipWindowSize(withMap, saved = null) {
+  return pipSavedSize(saved) || { ...PIP_SIZES[withMap ? 'map' : 'text'] };
+}
+
+// Un tamano guardado de la ventana flotante ({ width, height } del contenido,
+// o su JSON) si sirve para abrirla, o null. Lo que no es un numero, o es mas
+// chico que lo que deja Chrome o mas grande que una pantalla, no sirve.
+const PIP_SIZE_MIN = { width: 160, height: 60 };
+const PIP_SIZE_MAX = 4000;
+function pipSavedSize(raw) {
+  let s = raw;
+  if (typeof raw === 'string') {
+    try { s = JSON.parse(raw); } catch (e) { return null; }
+  }
+  if (!s || typeof s !== 'object') return null;
+  const width = Math.round(Number(s.width)), height = Math.round(Number(s.height));
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  if (width < PIP_SIZE_MIN.width || height < PIP_SIZE_MIN.height || width > PIP_SIZE_MAX || height > PIP_SIZE_MAX) return null;
+  return { width, height };
+}
+
+// El tamano a pedir al abrir la ventana flotante. Donde se abre lo elige
+// Chrome, no la pagina: recuerda donde y como quedo la ultima, pero solo en
+// la misma pestana, con el mismo origen y si se pide el mismo tamano que esa
+// vez. lastOpen ({ width, height, closeMap }: lo pedido al abrir la ultima y
+// si se cerro con el mapa, de sessionStorage, que tambien es de la pestana):
+// si la ultima se cerro en el modo que se abre ahora, se pide lo mismo y
+// Chrome la devuelve a su lugar con el tamano que tenia al cerrarse, aunque
+// se haya abierto en el otro modo (medido en Chrome, 21-10). Si no, el
+// guardado de ese modo (saved): la posicion es la de Chrome por defecto,
+// pero el tamano es el de la ultima vez.
+function pipRequestSize(withMap, saved = null, lastOpen = null) {
+  let l = lastOpen;
+  if (typeof l === 'string') {
+    try { l = JSON.parse(l); } catch (e) { l = null; }
+  }
+  if (!l || typeof l !== 'object') l = null;
+  const pedido = l && l.closeMap === !!withMap ? pipSavedSize(l) : null;
+  return pedido || pipWindowSize(withMap, saved);
 }
 
 // Cuadros pedidos a dos ventanas a la vez: la pestana y la ventana flotante
@@ -3854,6 +4375,50 @@ function decodeTimesBin(buf, nNodes, nEdges) {
   if (dv.getUint32(0, false) !== 0x54445453 || dv.getUint32(4, true) !== 1) return null;
   if (dv.getUint32(8, true) !== nNodes || dv.getUint32(12, true) !== nEdges) return null;
   return new Int8Array(buf, 16, nEdges);
+}
+
+// De que prefab es cada arista (route_graph_bin.py, write_prefabs): un color
+// por arista (0 = una calle, un ferry), distinto en dos prefabs que
+// comparten un nodo. Uint8Array de nEdges, o null si no es de este grafo.
+function decodePrefabsBin(buf, nNodes, nEdges) {
+  if (!buf || buf.byteLength < 16 + nEdges) return null;
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, false) !== 0x54445046 || dv.getUint32(4, true) !== 1) return null;
+  if (dv.getUint32(8, true) !== nNodes || dv.getUint32(12, true) !== nEdges) return null;
+  return new Uint8Array(buf, 16, nEdges);
+}
+
+// Los nodos de prefab sin calle (todas sus aristas, de llegada y de salida,
+// del mismo color de edgePrefab): lo que sigue es oculto y no se rutea, como
+// en el GPS del juego. Salir de ahi es volver a entrar al mismo prefab, asi
+// que no es una calle sin salida donde darse vuelta sino un brazo al que no
+// se va (Iasi, Knoxville, 22-10: la ruta se daba vuelta en el brazo de un
+// cruce). Uint8Array de n (1 = toco), o null sin edgePrefab.
+function prefabStubs(g) {
+  const pf = g.edgePrefab;
+  if (!pf) return null;
+  if (g._stubs && g._stubsOf === pf) return g._stubs;
+  const { n, csr, adjTo, adjEdge } = g;
+  // El csr tiene solo los arcos que salen: la calzada de una mano que llega
+  // se ve desde el nodo de donde sale
+  const color = new Int16Array(n).fill(-1);
+  const mezcla = new Uint8Array(n);
+  const marcar = (i, c) => {
+    if (color[i] === -1) color[i] = c;
+    else if (color[i] !== c) mezcla[i] = 1;
+  };
+  for (let i = 0; i < n; i++) {
+    for (let k = csr[i]; k < csr[i + 1]; k++) {
+      const c = pf[adjEdge[k]];
+      marcar(i, c);
+      marcar(adjTo[k], c);
+    }
+  }
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) out[i] = color[i] > 0 && !mezcla[i] ? 1 : 0;
+  g._stubs = out;
+  g._stubsOf = pf;
+  return out;
 }
 
 // Los carriles de pasar por la arista `edge` (rev: al reves, de b hacia a),
@@ -3945,6 +4510,17 @@ function laneKeepSide(rec, fromRamp = false) {
     if (!bits || (bits & ~deAPoco)) return null;
   }
   return primero === 0 ? 'left' : 'right';
+}
+
+// "Keep" en cada salida de autopista (el ajuste navEveryExit, apagado por
+// defecto; Discord, 19-10): como laneKeepSide, tambien con el carril que se
+// agrego para la salida (el de desaceleracion, sin la marca del
+// constructor), donde el juego no dice nada. Solo si el carril de la ruta
+// sigue derecho: si va a la salida, lo que se avisa es la bifurcacion. Son
+// las mismas salidas que findQuietLanes muestra sin aviso.
+function everyExitKeepSide(rec) {
+  if (!rec || !(rec.turn & LANE_ARROW_BITS.straight)) return null;
+  return laneKeepSide(rec, true);
 }
 
 // El dibujo de cada direccion en un carril de 24 x 30: el trazo desde la
@@ -4104,15 +4680,15 @@ function focusTrapTarget(count, index, back) {
 // El proximo giro para un lector de pantalla (region aria-live del panel de
 // navegacion): una vez por maniobra, con la distancia de ese momento. Poner
 // aria-live en el panel lo haria leer en cada dato, porque la distancia
-// cambia todo el tiempo. Si la ruta vuelve a la misma maniobra despues de un
-// dato sin giro, no la repite.
+// cambia todo el tiempo. Si la ruta vuelve a una maniobra ya leida (despues
+// de un dato sin giro o de otra, createRecentManeuvers), no la repite.
 function createTurnAnnouncer() {
-  let lastId = null;
+  const leidos = createRecentManeuvers();
   return {
     next(turn, text) {
       const id = turnIdentity(turn);
-      if (!id || !text || id === lastId) return null;
-      lastId = id;
+      if (!id || !text || leidos.get(id)) return null;
+      leidos.set(id, true);
       return turnTextWithoutArrow(text);
     },
   };
@@ -4135,41 +4711,119 @@ const UTURN_COS = Math.cos(UTURN_MIN_DEG * Math.PI / 180);
 // prefabs tienen tramitos de centimetros que darian cualquier rumbo.
 const ARC_DIR_MIN_M = 2;
 
+// Rumbo de salida y de llegada (vector unitario) del arco k (de i a adjTo[k],
+// con la curva de la arista), en out.depX[j]... out.arrY[j].
+function arcEndDirs(g, i, k, out, j) {
+  const { nodes, adjTo, adjEdge, adjRev, midOff, midXY } = g;
+  const b = adjTo[k], e = adjEdge[k], rev = adjRev[k];
+  const m0 = midOff ? midOff[e] : 0, cnt = midOff ? midOff[e + 1] - m0 : 0;
+  // Punto t de la arista en el sentido del arco: 0 = i, cnt + 1 = b.
+  const px = (t) => (t === 0 ? nodes[2 * i] : t === cnt + 1 ? nodes[2 * b] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1)]);
+  const py = (t) => (t === 0 ? nodes[2 * i + 1] : t === cnt + 1 ? nodes[2 * b + 1] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1) + 1]);
+  let t = 1;
+  while (t < cnt + 1 && Math.hypot(px(t) - px(0), py(t) - py(0)) < ARC_DIR_MIN_M) t++;
+  let dx = px(t) - px(0), dy = py(t) - py(0), d = Math.hypot(dx, dy) || 1;
+  out.depX[j] = dx / d; out.depY[j] = dy / d;
+  t = cnt;
+  while (t > 0 && Math.hypot(px(cnt + 1) - px(t), py(cnt + 1) - py(t)) < ARC_DIR_MIN_M) t--;
+  dx = px(cnt + 1) - px(t); dy = py(cnt + 1) - py(t); d = Math.hypot(dx, dy) || 1;
+  out.arrX[j] = dx / d; out.arrY[j] = dy / d;
+}
+
 // Rumbo de salida y de llegada (vector unitario) de cada arista dirigida del
 // grafo (indice k del CSR: de from[k] a adjTo[k]), con la curva de la arista.
 // Se calcula una vez por grafo y queda guardado en el.
 function routeArcDirections(g) {
   if (g._arcDirs) return g._arcDirs;
-  const { n, nodes, csr, adjTo, adjEdge, adjRev, midOff, midXY } = g;
+  const { n, csr } = g;
   const total = csr[n];
   const from = new Int32Array(total);
-  const depX = new Float32Array(total), depY = new Float32Array(total);
-  const arrX = new Float32Array(total), arrY = new Float32Array(total);
+  const out = { from, depX: new Float32Array(total), depY: new Float32Array(total), arrX: new Float32Array(total), arrY: new Float32Array(total) };
   for (let i = 0; i < n; i++) {
     for (let k = csr[i]; k < csr[i + 1]; k++) {
       from[k] = i;
-      const j = adjTo[k], e = adjEdge[k], rev = adjRev[k];
-      const m0 = midOff ? midOff[e] : 0, cnt = midOff ? midOff[e + 1] - m0 : 0;
-      // Punto t de la arista en el sentido del arco: 0 = i, cnt + 1 = j.
-      const px = (t) => (t === 0 ? nodes[2 * i] : t === cnt + 1 ? nodes[2 * j] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1)]);
-      const py = (t) => (t === 0 ? nodes[2 * i + 1] : t === cnt + 1 ? nodes[2 * j + 1] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1) + 1]);
-      let t = 1;
-      while (t < cnt + 1 && Math.hypot(px(t) - px(0), py(t) - py(0)) < ARC_DIR_MIN_M) t++;
-      let dx = px(t) - px(0), dy = py(t) - py(0), d = Math.hypot(dx, dy) || 1;
-      depX[k] = dx / d; depY[k] = dy / d;
-      t = cnt;
-      while (t > 0 && Math.hypot(px(cnt + 1) - px(t), py(cnt + 1) - py(t)) < ARC_DIR_MIN_M) t--;
-      dx = px(cnt + 1) - px(t); dy = py(cnt + 1) - py(t); d = Math.hypot(dx, dy) || 1;
-      arrX[k] = dx / d; arrY[k] = dy / d;
+      arcEndDirs(g, i, k, out, k);
     }
   }
-  g._arcDirs = { from, depX, depY, arrX, arrY };
+  g._arcDirs = out;
   return g._arcDirs;
 }
 
 // Si salir por el arco kOut despues de llegar por kIn es darse vuelta.
 function isUTurnArc(dirs, kIn, kOut) {
   return dirs.arrX[kIn] * dirs.depX[kOut] + dirs.arrY[kIn] * dirs.depY[kOut] < UTURN_COS;
+}
+
+// Vueltas en U por un nodo de prefab (22-10). El constructor saca el camino
+// entre dos nodos de un prefab con el grafo de navNodes del juego, y ese
+// camino podia pasar por un TERCER nodo del prefab, donde se sale a la
+// calle: queda una arista a -> b del largo de a -> c -> b. Donde una autovia
+// pasa a ser de doble mano es de la calzada que llega al nodo de la doble
+// mano (c) y de ahi a la calzada que sale: pasada una salida, la ruta
+// mandaba a cruzar al otro lado y volver (Kiel, ProMods, Discord 22-10). La
+// regla de arriba no lo ve: en la arista a -> b, c queda adentro, y por
+// a -> c -> b la vuelta se reparte en tres nodos (en Kiel, unos 30 grados en
+// a, 133 en c y 15 en b). Devuelve { k, k1, k2 }: el arco a -> b (k) con un
+// a -> c (k1) y un c -> b (k2) que suman su largo (a UTURN_SHORTCUT_TOL_M),
+// si en c se da vuelta (UTURN_MIN_DEG) o dobla UTURN_SHORTCUT_MIN_DEG y la
+// maniobra entera es darse vuelta: toda llegada a a contra toda salida de b
+// (sin contar c ni a ni b), a mas de UTURN_MIN_DEG. Asi no cuenta la esquina
+// de una T por la que la calle sigue derecho de a a b y la arista que se
+// mete en el brazo de c y sale suma lo mismo por casualidad: con solo los 90
+// grados en c cambiaban 45 de 300 rutas de ciudad a ciudad de ATS (asi, 17)
+// y 68 de ETS2 (asi, 52). buildRouteGraph saca k y findArcRoute toma
+// k1 -> k2 como vuelta en U (uTurnPairs).
+const UTURN_SHORTCUT_TOL_M = 1.5;
+const UTURN_SHORTCUT_MIN_DEG = 90;
+function uTurnShortcuts(g, tolM = UTURN_SHORTCUT_TOL_M, minDeg = UTURN_SHORTCUT_MIN_DEG) {
+  const { n, csr, adjTo, adjEdge, edgeM } = g;
+  const cosMax = Math.cos(minDeg * Math.PI / 180);
+  const tmp = { depX: new Float32Array(2), depY: new Float32Array(2), arrX: new Float32Array(2), arrY: new Float32Array(2) };
+  // Los arcos que llegan a cada nodo (y de que nodo), para la maniobra
+  // entera; se arman la primera vez que hacen falta
+  let inCsr = null, inArc = null, inFrom = null;
+  const seDaVuelta = (a, b, c) => {
+    if (!inCsr) {
+      const total = csr[n];
+      inCsr = new Uint32Array(n + 1); inArc = new Uint32Array(total); inFrom = new Uint32Array(total);
+      for (let k = 0; k < total; k++) inCsr[adjTo[k] + 1]++;
+      for (let i = 0; i < n; i++) inCsr[i + 1] += inCsr[i];
+      const pos = inCsr.slice(0, n);
+      for (let i = 0; i < n; i++) for (let k = csr[i]; k < csr[i + 1]; k++) { const j = pos[adjTo[k]]++; inArc[j] = k; inFrom[j] = i; }
+    }
+    let hay = false;
+    for (let j = inCsr[a]; j < inCsr[a + 1]; j++) {
+      if (inFrom[j] === b || inFrom[j] === c) continue;
+      arcEndDirs(g, inFrom[j], inArc[j], tmp, 0);
+      for (let k = csr[b]; k < csr[b + 1]; k++) {
+        if (adjTo[k] === a || adjTo[k] === c) continue;
+        arcEndDirs(g, b, k, tmp, 1);
+        if (tmp.arrX[0] * tmp.depX[1] + tmp.arrY[0] * tmp.depY[1] >= UTURN_COS) return false;
+        hay = true;
+      }
+    }
+    return hay;
+  };
+  const out = [];
+  for (let a = 0; a < n; a++) {
+    for (let k = csr[a]; k < csr[a + 1]; k++) {
+      const b = adjTo[k], m = edgeM[adjEdge[k]];
+      let hallado = null;
+      for (let k1 = csr[a]; !hallado && k1 < csr[a + 1]; k1++) {
+        const c = adjTo[k1], m1 = edgeM[adjEdge[k1]];
+        if (c === a || c === b || m1 >= m) continue;
+        for (let k2 = csr[c]; k2 < csr[c + 1]; k2++) {
+          if (adjTo[k2] !== b || Math.abs(m1 + edgeM[adjEdge[k2]] - m) > tolM) continue;
+          arcEndDirs(g, a, k1, tmp, 0);
+          arcEndDirs(g, c, k2, tmp, 1);
+          const dot = tmp.arrX[0] * tmp.depX[1] + tmp.arrY[0] * tmp.depY[1];
+          if (dot < UTURN_COS || (dot <= cosMax && seDaVuelta(a, b, c))) { hallado = { k, k1, k2 }; break; }
+        }
+      }
+      if (hallado) out.push(hallado);
+    }
+  }
+  return out;
 }
 
 // Min-heap de numeros (prioridad, valor) en dos arrays: el A* por aristas
@@ -4215,9 +4869,22 @@ function createNumberHeap() {
 // derecho (Fort Dodge, ATS; 589 V en 943 rutas simuladas, 15-10). Un
 // milisegundo por metro desempata por la mas corta sin cambiar el tiempo, y
 // la heuristica por tiempo sigue admisible: el costo solo sube.
+// "Mas corta" con los metros solos salia de la autopista por un area de
+// descanso o por la salida y la entrada de un cruce si cortaban la curva
+// por adentro: 7 m menos y 2 s mas de Stockton a Reno, 3 m y 10 s de
+// Jefferson City a East St. Louis (ATS; Discord 20-10). Cada segundo
+// cuenta como ROUTE_SHORT_M_PER_S metros: un tramo a 40 km/h (un prefab,
+// una rampa) tiene que ser 15 % mas corto que la autopista, y uno a
+// 60 km/h, 7 %. En 150 rutas de ATS, los desvios de la mas rapida de menos
+// de 1,5 km que ahorran menos de 5 % pasan de 37 a 10 (quedan otro carril
+// del mismo cruce o atajos de 15 a 40 m) y ninguna ruta se alarga 0,5 %;
+// en ETS2, de 32 a 17 (calles a 60 km/h) y 2 de 150 se alargan, la que
+// mas 1,2 %. Con 5 m por segundo ya se alargan rutas de ATS (2 de 150,
+// hasta 2,4 %). La heuristica (la recta, a 90 km/h) sigue admisible.
 const ROUTE_TIE_S_PER_M = 1e-3;
+const ROUTE_SHORT_M_PER_S = 4;
 function routeEdgeCost(seconds, meters, byTime) {
-  return byTime ? seconds + meters * ROUTE_TIE_S_PER_M : meters;
+  return byTime ? seconds + meters * ROUTE_TIE_S_PER_M : meters + seconds * ROUTE_SHORT_M_PER_S;
 }
 
 // Si nuestra ruta y la del GPS del juego son la misma, por lo que falta en
@@ -4259,9 +4926,21 @@ function pickRouteLikeGame(candidates, gameKm, o = ROUTE_GAME_MATCH) {
   return pick;
 }
 
+// Si se busca la ruta como la del GPS del juego (routeLikeGame): un trabajo
+// con la empresa conocida y sin waypoints (el juego no sabe de los nuestros,
+// y con el centro de la ciudad el largo no se puede comparar), y con la ruta
+// mas rapida. Con "shortest" en la app el juego seguia en su ruta (casi
+// siempre la rapida) y la alternativa que coincidia con el cambiaba la mas
+// corta por una mas larga (21-10). target: { kind, approx }.
+function followGameRoute(target, waypointCount, profile) {
+  return !!target && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx
+    && !waypointCount && profile !== 'shortest';
+}
+
 // Rutas alternativas para pickRouteLikeGame: cada una con las aristas de la
 // anterior encarecidas (factor, acumulado). first: la ruta ya calculada.
-// route(penal): la ruta con penal (Map arista -> multiplicador del costo).
+// route(penal, previas): la ruta con penal (Map arista -> multiplicador del
+// costo); previas son las rutas ya encontradas, para dropRouteDetours.
 // edgesOf(ruta): sus aristas. Puede repetir rutas.
 function routeAlternatives(first, route, edgesOf, { tries = 3, factor = 1.25 } = {}) {
   const out = [first];
@@ -4269,10 +4948,70 @@ function routeAlternatives(first, route, edgesOf, { tries = 3, factor = 1.25 } =
   let prev = first;
   for (let k = 0; k < tries && prev; k++) {
     for (const e of edgesOf(prev)) penal.set(e, (penal.get(e) || 1) * factor);
-    prev = route(penal);
+    prev = route(penal, out.slice());
     if (prev) out.push(prev);
   }
   return out;
+}
+
+// Con la autopista de la ruta anterior encarecida, a una alternativa le
+// salia mas barato bajarse por la salida y volver a subir por la entrada, o
+// pasar por un area de descanso, que seguir derecho: la I-15 en la salida
+// 385, camino a Ogden (Discord, 20-10). Y esos desvios le suman largo: por
+// ellos la alternativa podia coincidir con el GPS del juego y ganar
+// (pickRouteLikeGame). En 60 rutas de ATS, 3 alternativas cada una: unos
+// 1.000 desvios de menos de 100 m (otro carril del mismo cruce) y 500 de
+// 100 m a 1 km (salidas, areas de descanso); de 1 a 1,5 km, 28, y de ahi en
+// mas otro camino de verdad. ETS2 igual.
+// path y ref: indices de nodo de la alternativa y de una ruta anterior.
+// Donde path deja a ref (llegando por la misma arista) y vuelve a ella mas
+// adelante (siguiendo por la misma arista, o en el final), sin que ref
+// mida mas de maxM entre esos nodos ni el desvio cueste menos: el tramo de
+// ref. Si sale y vuelve varias veces seguidas, hasta la vuelta en que sigue
+// por ref. edge(a, b): { m, cost } de la arista de a a b (costo sin
+// encarecer), o null. Devuelve los nodos (path si no cambia nada).
+const ROUTE_DETOUR_MAX_M = 1500;
+function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
+  if (!path || !ref || path.length < 3 || ref.length < 2) return path;
+  const pos = new Map();
+  ref.forEach((n, i) => pos.set(n, pos.has(n) ? -1 : i)); // -1: pasa dos veces
+  const tramo = (ns, a, b) => {
+    let m = 0, cost = 0;
+    for (let k = a + 1; k <= b; k++) {
+      const x = edge(ns[k - 1], ns[k]);
+      if (!x) return null;
+      m += x.m; cost += x.cost;
+    }
+    return { m, cost };
+  };
+  const out = [path[0]];
+  let cambio = false;
+  for (let s = 0; s < path.length - 1;) {
+    const ps = pos.get(path[s]);
+    const antes = out.length > 1 ? out[out.length - 2] : null;
+    let fin = -1;
+    if (ps >= 0 && ref[ps + 1] !== path[s + 1] && (antes === null ? ps === 0 : ref[ps - 1] === antes)) {
+      for (let t = s + 1; t < path.length; t++) {
+        const pt = pos.get(path[t]);
+        if (pt === undefined) continue;
+        if (pt <= ps) break;
+        if (t === path.length - 1 ? pt === ref.length - 1 : ref[pt + 1] === path[t + 1]) { fin = t; break; }
+      }
+    }
+    if (fin !== -1) {
+      const pt = pos.get(path[fin]);
+      const desvio = tramo(path, s, fin), recto = tramo(ref, ps, pt);
+      if (desvio && recto && recto.m <= maxM && desvio.cost >= recto.cost) {
+        for (let k = ps + 1; k <= pt; k++) out.push(ref[k]);
+        s = fin;
+        cambio = true;
+        continue;
+      }
+    }
+    out.push(path[s + 1]);
+    s++;
+  }
+  return cambio ? out : path;
 }
 
 // El tramo por el que va el camion, para arrancar ahi la ruta al recalcular
@@ -4285,17 +5024,196 @@ function routeAlternatives(first, route, edgesOf, { tries = 3, factor = 1.25 } =
 // el cliente). Busca el arco dirigido mas cercano a menos de maxDistM, con
 // su curva, cuyo sentido difiere del rumbo menos de maxDeg. edgeOk(e, a):
 // si la arista e (que sale del nodo a) se puede usar. Devuelve { arc, to,
-// point, rest, f, dist }: el arco (indice del CSR), su nodo de llegada, el
-// punto proyectado, los puntos de la curva que quedan hasta el nodo y que
-// fraccion del arco ya se hizo; o null.
+// point, rest, f, dist, alts }: el arco (indice del CSR), su nodo de
+// llegada, el punto proyectado, los puntos de la curva que quedan hasta el
+// nodo y que fraccion del arco ya se hizo; o null.
+// La distancia es a la calzada por la que va el camion (la corrida con que
+// se dibuja la ruta, grafo v3), no al eje: una autovia de una sola arista de
+// doble mano tiene el eje entre las dos calzadas, y una arista de prefab a
+// 4 m del camion le ganaba a la suya, a 5,5 m del eje (Grimsby -> Sheffield,
+// ETS2: recalculaba por 10,7 km en vez de 6,9). alts: los otros arcos a
+// menos de START_ARC_TIE_M mas (carriles de un prefab que todavia no se
+// separan), para que findRouteWith siga por el que da la ruta mas barata.
+// Recalculando andando desde 1.600 puntos de 200 rutas por juego (en su
+// calzada, +-2 m), salian mas largas o para atras 10 a 12; con la calzada,
+// 2 a 8; con las alternativas, 0 o 1.
 function startArcForHeading(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, edgeOk = null } = {}) {
-  if (!g || !g.csr || !Number.isFinite(headingDeg) || !Number.isFinite(x) || !Number.isFinite(z)) return null;
+  if (!Number.isFinite(headingDeg)) return null;
+  const lista = arcsNearPoint(g, x, z, headingDeg, { maxDistM, maxDeg, edgeOk });
+  if (!lista.length) return null;
+  const best = lista[0];
+  // Casi a la misma distancia (carriles de un prefab que todavia no se
+  // separan): alternativas, para que la ruta elija por cual seguir.
+  best.alts = lista.slice(1).filter(c => c.dist <= best.dist + START_ARC_TIE_M).slice(0, START_ARC_MAX_ALTS);
+  return best;
+}
+const START_ARC_TIE_M = 1.5;
+const START_ARC_MAX_ALTS = 2;
+
+// Un waypoint puesto sobre una calle: los arcos por los que la ruta pasa
+// por el (findArcRoute con endArcs), en vez de ir al nodo mas cercano. En
+// una autovia de dos calzadas ese nodo podia ser de la contraria o de una
+// rampa: con el waypoint justo sobre la ruta, 44 de 600 en ATS y 26 de 589
+// en ETS2 la alargaban, a veces al doble (salir, dar la vuelta y volver);
+// asi, 0 y 1. Tocando a 0-20 m del carril, de 94 a 8 y de 49 a 6 (las que
+// quedan, sobre otra calle).
+// Los que quedan a menos de WAYPOINT_ARC_TIE_M mas que el de la calzada mas
+// cercana, la otra mano de esas mismas calles aunque quede mas lejos, y la
+// otra calzada de una autovia (de una mano, para el otro lado y a velocidad
+// parecida): un waypoint puesto en la calzada contraria hacia ir hasta la
+// salida siguiente, dar la vuelta y volver. Mas alla de WAYPOINT_ARC_M (un
+// waypoint en un estacionamiento), ninguno: la ruta va al nodo mas cercano,
+// como antes. La ruta pasa por el que le queda mas a mano (findRouteWith).
+const WAYPOINT_ARC_M = 40;
+const WAYPOINT_ARC_TIE_M = 10;
+// Los nodos con alguna arista de menos de maxKmh (una calle, el prefab de
+// una estacion o de una empresa), una vez por grafo. Para terminar la ruta
+// en una parada: el nodo mas cercano a una estacion o un area de descanso
+// pegada a la autopista podia ser de la autopista, y la ruta pasaba de
+// largo y daba la parada por alcanzada (36 de 325 paradas del boton en ATS,
+// 31 de 438 en ETS2; asi, 1 y 1; de todos los POI de estacion y descanso,
+// 310 de 3.146 y 355 de 6.167). El lento mas cercano queda en general 20 a
+// 30 m mas lejos (90 a 120 m en el 10 % peor): se usa si no pasa de
+// STOP_SLOW_NODE_M mas (findRouteWith, con tramo.entrar).
+const STOP_SLOW_KMH = 75;
+const STOP_SLOW_NODE_M = 150;
+const edgeKmh = (g, e) => g.edgeM[e] / Math.max(0.1, g.edgeS[e] + (g.edgeT ? g.edgeT[e] / 10 : 0)) * 3.6;
+function slowNodes(g, maxKmh = STOP_SLOW_KMH) {
+  if (g._slowNodes && g._slowNodes.kmh === maxKmh) return g._slowNodes.nodos;
+  const nodos = new Uint8Array(g.n);
+  for (let i = 0; i < g.n; i++) {
+    for (let k = g.csr[i]; k < g.csr[i + 1]; k++) {
+      if (edgeKmh(g, g.adjEdge[k]) < maxKmh) { nodos[i] = 1; break; }
+    }
+  }
+  g._slowNodes = { kmh: maxKmh, nodos };
+  return nodos;
+}
+// Para la empresa del trabajo, mas estricto: los nodos sin ninguna arista
+// de maxKmh o mas, ni de salida ni de llegada. Todo tramo de prefab del
+// grafo va a 40 km/h, tambien los de la autopista (un cambio de carriles,
+// una incorporacion), y el nodo de la I-25 a 93 m de Rail Export de Casper
+// salia lento por sus tramos de prefab: la ruta terminaba en la autopista,
+// seguia de largo y volvia por la otra mano, 2,5 km en vez de 1,2 (22-10).
+// Un patio nunca toca una via rapida: de las empresas de ATS cambian 33 (9
+// en ETS2), las que terminaban en un nodo de una via rapida, y ninguna
+// queda en una. Las paradas siguen con slowNodes: en ETS2 las calles de
+// servicio de las estaciones van a 90 km/h, y con esta regla cambiaban 196
+// de 2.074 estaciones, algunas a la de la otra mano (1,4 km mas de ruta).
+function yardNodes(g, maxKmh = STOP_SLOW_KMH) {
+  if (g._yardNodes && g._yardNodes.kmh === maxKmh) return g._yardNodes.nodos;
+  const nodos = new Uint8Array(g.n).fill(1);
+  for (let i = 0; i < g.n; i++) {
+    for (let k = g.csr[i]; k < g.csr[i + 1]; k++) {
+      if (edgeKmh(g, g.adjEdge[k]) >= maxKmh) { nodos[i] = 0; nodos[g.adjTo[k]] = 0; }
+    }
+  }
+  g._yardNodes = { kmh: maxKmh, nodos };
+  return nodos;
+}
+
+// Zonas del grafo de las que no se sale o a las que no se entra por el
+// sentido de sus aristas: carriles de prefab que quedaron solo de entrada o
+// solo de salida al armar el grafo. Desde Volkhov y Kirishi (ETS2, 11
+// empresas) no habia ruta a ningun lado, ni hacia hs_mkt de Durango (ATS),
+// chm_che_plnt de Chattanooga (Coast to Coast) y empresas de Reforma; la
+// app dibujaba una recta (barrido del 21-10, las 17 variantes). Se arregla
+// regenerando el grafo; mientras, findRouteWith arranca en el nodo mas
+// cercano desde el que se llega a la componente fuerte mayor (reachesMain)
+// y termina en el mas cercano al que se llega desde ella (reachFromMain),
+// solo si sin eso no hay camino. Una vez por grafo: { reachesMain,
+// reachFromMain, inMain } (Uint8Array por nodo).
+function routeReachability(g) {
+  if (g._alcance) return g._alcance;
+  const n = g.n, { csr, adjTo } = g;
+  // Componentes fuertes (Tarjan sin recursion)
+  const idx = new Int32Array(n).fill(-1), low = new Int32Array(n), enPila = new Uint8Array(n), comp = new Int32Array(n).fill(-1);
+  const pila = [], llamadas = [];
+  let sig = 0, nc = 0;
+  const tam = [];
+  for (let s = 0; s < n; s++) {
+    if (idx[s] !== -1) continue;
+    llamadas.push(s, csr[s]); idx[s] = low[s] = sig++; pila.push(s); enPila[s] = 1;
+    while (llamadas.length) {
+      const u = llamadas[llamadas.length - 2], k = llamadas[llamadas.length - 1];
+      if (k < csr[u + 1]) {
+        llamadas[llamadas.length - 1] = k + 1;
+        const w = adjTo[k];
+        if (idx[w] === -1) { idx[w] = low[w] = sig++; pila.push(w); enPila[w] = 1; llamadas.push(w, csr[w]); }
+        else if (enPila[w] && idx[w] < low[u]) low[u] = idx[w];
+      } else {
+        llamadas.length -= 2;
+        if (llamadas.length) { const p = llamadas[llamadas.length - 2]; if (low[u] < low[p]) low[p] = low[u]; }
+        if (low[u] === idx[u]) {
+          let w, t = 0;
+          do { w = pila.pop(); enPila[w] = 0; comp[w] = nc; t++; } while (w !== u);
+          tam.push(t); nc++;
+        }
+      }
+    }
+  }
+  let mayor = 0;
+  for (let c = 1; c < nc; c++) if (tam[c] > tam[mayor]) mayor = c;
+  const inMain = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (comp[i] === mayor) inMain[i] = 1;
+  // Desde la mayor hacia adelante, y hacia ella por las aristas al reves
+  const reachFromMain = inMain.slice(), reachesMain = inMain.slice();
+  const cola = [];
+  for (let i = 0; i < n; i++) if (inMain[i]) cola.push(i);
+  for (let q = cola.slice(); q.length;) {
+    const u = q.pop();
+    for (let k = csr[u]; k < csr[u + 1]; k++) { const w = adjTo[k]; if (!reachFromMain[w]) { reachFromMain[w] = 1; q.push(w); } }
+  }
+  const entra = new Uint32Array(n + 1);
+  for (let k = 0; k < csr[n]; k++) entra[adjTo[k] + 1]++;
+  for (let i = 0; i < n; i++) entra[i + 1] += entra[i];
+  const de = new Uint32Array(csr[n]), lleno = entra.slice(0, n);
+  for (let u = 0; u < n; u++) for (let k = csr[u]; k < csr[u + 1]; k++) de[lleno[adjTo[k]]++] = u;
+  for (let q = cola; q.length;) {
+    const u = q.pop();
+    for (let k = entra[u]; k < entra[u + 1]; k++) { const w = de[k]; if (!reachesMain[w]) { reachesMain[w] = 1; q.push(w); } }
+  }
+  g._alcance = { reachesMain, reachFromMain, inMain };
+  return g._alcance;
+}
+
+// Solo el waypoint puesto tocando el mapa (sin nombre ni tipo) es un punto
+// por donde pasar. El de un POI (estacion, descanso, empresa) o el del lider
+// del convoy es un lugar al que entrar: si la autopista pasa a menos de 40 m
+// seguiria de largo, asi que va al nodo mas cercano, como siempre.
+function waypointPassesBy(wp) {
+  return !!wp && !wp.kind && !wp.label;
+}
+function waypointArcs(g, x, z, { edgeOk = null } = {}) {
+  const lista = arcsNearPoint(g, x, z, null, { maxDistM: WAYPOINT_ARC_M, edgeOk });
+  if (!lista.length) return [];
+  const tope = lista[0].dist + WAYPOINT_ARC_TIE_M;
+  const cerca = lista.filter(c => c.dist <= tope);
+  const aristas = new Set(cerca.map(c => g.adjEdge[c.arc]));
+  const unaMano = (c) => !!(g.edgeF && (g.edgeF[g.adjEdge[c.arc]] & 2));
+  const kmh = (c) => { const e = g.adjEdge[c.arc]; return g.edgeM[e] / Math.max(0.1, g.edgeS[e] + (g.edgeT ? g.edgeT[e] / 10 : 0)) * 3.6; };
+  const contraria = (o) => unaMano(o) && cerca.some(c => unaMano(c) && c.dir[0] * o.dir[0] + c.dir[1] * o.dir[1] < -Math.cos(Math.PI / 6) && Math.abs(kmh(c) - kmh(o)) <= 15);
+  return lista.filter(c => aristas.has(g.adjEdge[c.arc]) || contraria(c));
+}
+
+// Los arcos que pasan a menos de maxDistM de (x, z), del mas cercano al mas
+// lejano, uno por arista y sentido: { arc, to, point, before, rest, f, dist }
+// (before: los puntos de la curva desde la cola del arco hasta el punto
+// proyectado; rest, desde ahi hasta su punta; dir, el sentido de marcha en
+// ese punto, [x, z] de largo 1). Con headingDeg, solo los que
+// van como el rumbo (menos de maxDeg); con null, los dos sentidos de una
+// calle de doble mano. dist es a la calzada (la corrida de la ruta
+// dibujada, grafo v3), no al eje.
+function arcsNearPoint(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, edgeOk = null } = {}) {
+  if (!g || !g.csr || !Number.isFinite(x) || !Number.isFinite(z)) return [];
   if (!g._edgeBoxes) {
     // puntas y caja de cada arista, una vez por grafo
     const ne = g.midOff.length - 1, dirs = routeArcDirections(g);
     const a = new Int32Array(ne).fill(-1), b = new Int32Array(ne), doble = new Uint8Array(ne), box = new Float32Array(4 * ne);
     for (let k = 0; k < g.csr[g.n]; k++) {
-      if (g.adjRev[k]) doble[g.adjEdge[k]] = 1;
+      // Por el arco al reves tambien: si el de ida era un atajo en U
+      // (uTurnShortcuts) quedo solo la vuelta.
+      if (g.adjRev[k]) { doble[g.adjEdge[k]] = 1; if (a[g.adjEdge[k]] < 0) { a[g.adjEdge[k]] = g.adjTo[k]; b[g.adjEdge[k]] = dirs.from[k]; } }
       else { a[g.adjEdge[k]] = dirs.from[k]; b[g.adjEdge[k]] = g.adjTo[k]; }
     }
     for (let e = 0; e < ne; e++) {
@@ -4311,9 +5229,16 @@ function startArcForHeading(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, e
     g._edgeBoxes = { a, b, doble, box, ne };
   }
   const { a, b, doble, box, ne } = g._edgeBoxes;
-  const hx = Math.sin(headingDeg * Math.PI / 180), hz = -Math.cos(headingDeg * Math.PI / 180);
+  const conRumbo = Number.isFinite(headingDeg);
+  const hx = conRumbo ? Math.sin(headingDeg * Math.PI / 180) : 0, hz = conRumbo ? -Math.cos(headingDeg * Math.PI / 180) : 0;
   const cosMax = Math.cos(maxDeg * Math.PI / 180);
-  let best = null;
+  // El mejor tramo de cada arista y sentido
+  const porArco = new Map();
+  const guardar = (clave, c) => {
+    if (c.dist > maxDistM) return;
+    const antes = porArco.get(clave);
+    if (!antes || c.dist < antes.dist) porArco.set(clave, c);
+  };
   for (let e = 0; e < ne; e++) {
     if (a[e] < 0 || x < box[4 * e] - maxDistM || x > box[4 * e + 2] + maxDistM || z < box[4 * e + 1] - maxDistM || z > box[4 * e + 3] + maxDistM) continue;
     if ((g.edgeF && (g.edgeF[e] & 1)) || (edgeOk && !edgeOk(e, a[e]))) continue;
@@ -4323,24 +5248,61 @@ function startArcForHeading(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, e
     let largo = 0;
     const acum = [0];
     for (let j = 1; j < line.length; j++) acum.push(largo += Math.hypot(line[j][0] - line[j - 1][0], line[j][1] - line[j - 1][1]));
+    // La corrida de la ruta dibujada (grafo v3, + a la derecha del sentido de
+    // marcha, en las dos manos): el camion va por su calzada, no por el eje.
+    const sA = g.shiftA ? g.shiftA[e] / 2 : 0, sB = g.shiftB ? g.shiftB[e] / 2 : 0;
     for (let j = 1; j < line.length; j++) {
       const [x0, z0] = line[j - 1], [x1, z1] = line[j];
       const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz);
       if (L < 0.5) continue;
-      const t = Math.max(0, Math.min(1, ((x - x0) * dx + (z - z0) * dz) / (L * L)));
-      const px = x0 + dx * t, pz = z0 + dz * t, dist = Math.hypot(x - px, z - pz);
-      if (dist > maxDistM || (best && dist >= best.dist)) continue;
-      const dot = (dx * hx + dz * hz) / L;
+      const u = ((x - x0) * dx + (z - z0) * dz) / L;
+      const t = Math.max(0, Math.min(1, u / L));
+      const px = x0 + dx * t, pz = z0 + dz * t;
+      const fuera = u < 0 ? -u : u > L ? u - L : 0; // pasado la punta del tramo
+      const lado = ((x - x0) * -dz + (z - z0) * dx) / L; // + a la derecha de a -> b
       const hecho = largo > 0 ? (acum[j - 1] + L * t) / largo : 0;
-      if (dot >= cosMax) best = { e, from: a[e], to: b[e], point: [px, pz], rest: line.slice(j, -1), f: hecho, dist };
-      else if (dot <= -cosMax && doble[e]) best = { e, from: b[e], to: a[e], point: [px, pz], rest: line.slice(1, j).reverse(), f: 1 - hecho, dist };
+      const corrida = sA + (sB - sA) * hecho;
+      const dot = (dx * hx + dz * hz) / L;
+      if (conRumbo ? dot >= cosMax : true) {
+        guardar(e, { e, from: a[e], to: b[e], point: [px, pz], before: line.slice(1, j), rest: line.slice(j, -1), f: hecho, dist: Math.hypot(fuera, lado - corrida), dir: [dx / L, dz / L] });
+      }
+      if (doble[e] && (conRumbo ? dot <= -cosMax : true)) {
+        guardar(-1 - e, { e, from: b[e], to: a[e], point: [px, pz], before: line.slice(j, -1).reverse(), rest: line.slice(1, j).reverse(), f: 1 - hecho, dist: Math.hypot(fuera, lado + corrida), dir: [-dx / L, -dz / L] });
+      }
     }
   }
-  if (!best) return null;
-  for (let k = g.csr[best.from]; k < g.csr[best.from + 1]; k++) {
-    if (g.adjEdge[k] === best.e && g.adjTo[k] === best.to) return { arc: k, to: best.to, point: best.point, rest: best.rest, f: best.f, dist: best.dist };
+  const out = [];
+  for (const c of [...porArco.values()].sort((p, q) => p.dist - q.dist)) {
+    for (let k = g.csr[c.from]; k < g.csr[c.from + 1]; k++) {
+      if (g.adjEdge[k] === c.e && g.adjTo[k] === c.to) { out.push({ arc: k, to: c.to, point: c.point, before: c.before, rest: c.rest, f: c.f, dist: c.dist, dir: c.dir }); break; }
+    }
   }
-  return null;
+  return out;
+}
+
+// Recalculando sin haberse desviado (cambio el destino, se puso o se
+// alcanzo un waypoint, routeGameRecheck) el camion sigue sobre la ruta de
+// antes: lo recorrido (routeBehind) sigue valiendo, y su rumbo tambien
+// aunque este parado. Con routeBehind en cero la ruta nueva arrancaba a
+// mitad de un cruce, sin sus primeros nodos, y el giro de ahi se perdia o
+// salia otro (Tyler -> Lufkin, ATS: el camion 15 m antes del segundo nodo de
+// la esquina). Recalculando a 3-35 m de un cruce con aviso, el aviso no era
+// el de andando por la ruta en 295 de 1.521 casos de ATS y 284 de 1.599 de
+// ETS2 parado (288 y 279 andando); con lo recorrido y el rumbo, 42 de 1.535
+// y 48 de 1.623. No en el deposito: el camion tiene que haber andado
+// minBehindM por la ruta vieja (recien calculada parado no) y a esa ruta le
+// tienen que quedar minAheadM (al final del viaje queda en la playa de la
+// empresa). behind: routeBehind; route: la ruta vieja recortada al camion
+// (currentRouteWorldPoints). true si se conservan lo recorrido y el rumbo.
+function recalcOnRoute({ offRoute, behind, route, x, z, nearM = 30, minBehindM = 30, minAheadM = 50 } = {}) {
+  if (offRoute || !Array.isArray(behind) || behind.length < 2 || !Array.isArray(route) || route.length < 2) return false;
+  if (!Number.isFinite(x) || !Number.isFinite(z) || !(Math.hypot(route[0][0] - x, route[0][1] - z) <= nearM)) return false;
+  const largo = (pts, tope) => {
+    let m = 0;
+    for (let k = 1; k < pts.length && m < tope; k++) m += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    return m;
+  };
+  return largo(behind, minBehindM) >= minBehindM && largo(route, minAheadM) >= minAheadM;
 }
 
 // Parado (bajo ROUTE_HEADING_MIN_KMH) la ruta arranca en el nodo mas cercano,
@@ -4378,70 +5340,149 @@ function stoppedRouteLead(route, x, z, headingDeg, { maxM = STOPPED_LEAD_MAX_M, 
   return [nodo[0] - ux * atras, nodo[1] - uz * atras, 0, 0, null];
 }
 
+// Andando, la ruta arranca en la proyeccion del camion sobre su tramo
+// (startArcForHeading), que puede ser otro carril del prefab. A 1 o 2 m del
+// nodo, esa cuerda iba para cualquier lado: era la entrada al cruce y la
+// cuerda de llegada al nodo, el giro de la US-85 se ponia en el primer nodo
+// del cruce (99 m antes de la esquina) y cada recalculo lo corria al nodo
+// siguiente, "Turn left onto US-85 in 0 ft" dos veces y la voz repitiendo
+// "turn left" (Discord 22-10, Cheyenne). A menos de minM del primer nodo la
+// ruta arranca en el nodo, y con la entrada de parado (stoppedRouteLead) si
+// no se conserva lo recorrido. Devuelve la ruta (la misma si no cambia).
+const ROUTE_START_SNAP_M = 5;
+function snapRouteStartToNode(route, minM = ROUTE_START_SNAP_M) {
+  if (!Array.isArray(route) || route.length < 3 || route[0][4] != null || route[1][4] == null) return route;
+  return Math.hypot(route[1][0] - route[0][0], route[1][1] - route[0][1]) < minM ? route.slice(1) : route;
+}
+
+// El comienzo del primer tramo de una ruta recalculada, como lo arma la app
+// (y simular_navegacion, para revisar los avisos despues de recalcular).
+// Parado (rumbo null, routeStartHeading) arranca en el nodo mas cercano, con
+// su entrada si es un cruce adelante (stoppedRouteLead). Andando, a metros
+// del primer nodo arranca en el nodo con esa entrada (snapRouteStartToNode),
+// salvo que siga lo recorrido (sobreLaRuta, recalcOnRoute). x, z: el camion;
+// headingDeg: el rumbo del juego sobre su grilla. Devuelve la ruta.
+function recalcRouteStart(route, x, z, headingDeg, rumbo, sobreLaRuta = false) {
+  const pegada = rumbo != null ? snapRouteStartToNode(route) : route;
+  const conEntrada = rumbo == null || (pegada !== route && !sobreLaRuta);
+  const entrada = conEntrada ? stoppedRouteLead(pegada, x, z, headingDeg) : null;
+  return entrada ? [entrada, ...pegada] : pegada;
+}
+
 // A* por aristas de startIdx a endIdx sin vueltas en U en los nodos. Devuelve
 // los indices de nodo del camino, o null si asi no hay camino (la app cae
 // entonces al A* por nodos de siempre). opts: cost(e) en la misma unidad que
 // heuristic(i) (que tiene que ser admisible), blocked(e) opcional (DLC) e
 // isFerry(e). startArc opcional: el arco por el que el camion llega a
 // startIdx (startArcForHeading); tampoco se sale de el dandose vuelta.
+// endArcs opcional (Map arco -> fraccion): la ruta no termina en endIdx sino
+// al pasar por uno de esos arcos, en esa fraccion de su costo (un waypoint
+// sobre una calle, arcsNearPoint). Los nodos llegan hasta la punta del arco,
+// y path.endArc dice cual fue. path.cost: el costo del camino (hasta el
+// punto del arco, con endArcs). Sin camino sin pasar por un toco
+// (prefabStubs), se busca otra vez pasando (opts.stubs false).
 function findArcRoute(g, startIdx, endIdx, opts) {
-  if (startIdx === endIdx) return [startIdx];
+  const metas = opts.endArcs && opts.endArcs.size ? opts.endArcs : null;
+  if (!metas && startIdx === endIdx) return [startIdx];
   const { csr, adjTo, adjEdge } = g;
   const dirs = routeArcDirections(g);
+  // Darse vuelta: en el nodo (isUTurnArc), por un nodo de prefab
+  // (uTurnPairs de buildRouteGraph, uTurnShortcuts) o llegando a un nodo por
+  // una arista de un prefab y saliendo por otra del mismo, que es salir del
+  // prefab y volver a entrar (g.edgePrefab, -prefabs.bin del constructor
+  // que ya no saca los caminos por un tercer nodo)
+  const pares = g.uTurnPairs && g.uTurnPairs.size ? g.uTurnPairs : null;
+  const pf = g.edgePrefab || null;
+  const vuelta = (kIn, kOut) => isUTurnArc(dirs, kIn, kOut)
+    || (pares !== null && pares.has(kIn) && pares.get(kIn).has(kOut))
+    || (pf !== null && kIn >= 0 && pf[adjEdge[kIn]] !== 0 && pf[adjEdge[kIn]] === pf[adjEdge[kOut]]);
+  // A un toco (prefabStubs) no se va salvo que sea el destino; tampoco cuenta
+  // como salida para decidir si un nodo es una calle sin salida
+  const stubs = opts.stubs === false ? null : prefabStubs(g);
+  const aToco = (k2) => stubs !== null && stubs[adjTo[k2]] === 1 && adjTo[k2] !== endIdx;
   const total = csr[g.n];
   const gScore = new Float64Array(total).fill(Infinity);
   const cameFrom = new Int32Array(total).fill(-1);
   const done = new Uint8Array(total);
+  // Pasar por un arco de endArcs: en el heap como total + arco, con su costo
+  // hasta el punto (gMeta) y el arco de antes (-1 si sale de startIdx)
+  const gMeta = metas ? new Map() : null, antesMeta = metas ? new Map() : null;
+  const meta = (k2, g0, antes) => {
+    const f = metas.get(k2);
+    if (f == null) return;
+    const t = g0 + f * opts.cost(adjEdge[k2]);
+    if (!(t < (gMeta.has(k2) ? gMeta.get(k2) : Infinity))) return;
+    gMeta.set(k2, t); antesMeta.set(k2, antes);
+    heap.push(t, total + k2);
+  };
   const blocked = opts.blocked || null;
   const heap = createNumberHeap();
   const llegada = opts.startArc != null && opts.startArc >= 0 ? opts.startArc : -1;
   let libre0 = llegada === -1;
   for (let k = csr[startIdx]; !libre0 && k < csr[startIdx + 1]; k++) {
     if (blocked && blocked(adjEdge[k])) continue;
-    if (opts.isFerry(adjEdge[k]) || !isUTurnArc(dirs, llegada, k)) libre0 = true;
+    if (aToco(k)) continue;
+    if (opts.isFerry(adjEdge[k]) || !vuelta(llegada, k)) libre0 = true;
   }
   for (let k = csr[startIdx]; k < csr[startIdx + 1]; k++) {
     const e = adjEdge[k];
     if (blocked && blocked(e)) continue;
-    if (llegada !== -1 && libre0 && !opts.isFerry(e) && isUTurnArc(dirs, llegada, k)) continue;
+    if (llegada !== -1 && libre0 && !opts.isFerry(e) && vuelta(llegada, k)) continue;
     const c = opts.cost(e);
+    if (metas) meta(k, 0, -1);
+    if (aToco(k)) continue;
     if (c < gScore[k]) { gScore[k] = c; heap.push(c + opts.heuristic(adjTo[k]), k); }
   }
-  let fin = -1;
+  let fin = -1, finMeta = -1;
   while (heap.size > 0) {
     const k = heap.pop();
+    if (k >= total) { finMeta = k - total; break; }
     if (done[k]) continue;
     done[k] = 1;
     const u = adjTo[k];
-    if (u === endIdx) { fin = k; break; }
+    if (!metas && u === endIdx) { fin = k; break; }
     const ferryIn = opts.isFerry(adjEdge[k]);
     // Si todas las salidas son darse vuelta (calle sin salida), se puede.
     let libre = ferryIn;
     for (let k2 = csr[u]; !libre && k2 < csr[u + 1]; k2++) {
       const e2 = adjEdge[k2];
       if (blocked && blocked(e2)) continue;
-      if (opts.isFerry(e2) || !isUTurnArc(dirs, k, k2)) libre = true;
+      if (aToco(k2)) continue;
+      if (opts.isFerry(e2) || !vuelta(k, k2)) libre = true;
     }
     const g0 = gScore[k];
     for (let k2 = csr[u]; k2 < csr[u + 1]; k2++) {
-      if (done[k2]) continue;
       const e2 = adjEdge[k2];
       if (blocked && blocked(e2)) continue;
-      if (libre && !ferryIn && !opts.isFerry(e2) && isUTurnArc(dirs, k, k2)) continue;
+      if (libre && !ferryIn && !opts.isFerry(e2) && vuelta(k, k2)) continue;
+      if (metas) meta(k2, g0, k);
+      if (aToco(k2)) continue;
+      if (done[k2]) continue;
       const t = g0 + opts.cost(e2);
       if (t < gScore[k2]) { gScore[k2] = t; cameFrom[k2] = k; heap.push(t + opts.heuristic(adjTo[k2]), k2); }
     }
   }
-  if (fin === -1) return null;
   const arcs = [];
-  for (let k = fin; k !== -1; k = cameFrom[k]) arcs.push(k);
+  if (finMeta !== -1) {
+    arcs.push(finMeta);
+    for (let k = antesMeta.get(finMeta); k !== -1; k = cameFrom[k]) arcs.push(k);
+  } else if (fin !== -1) {
+    for (let k = fin; k !== -1; k = cameFrom[k]) arcs.push(k);
+  } else if (stubs !== null) {
+    // La unica entrada era darse vuelta en un toco (la T de una empresa
+    // con el brazo de enfrente oculto, Charlotte): mejor eso que el A* por nodos
+    return findArcRoute(g, startIdx, endIdx, { ...opts, stubs: false });
+  } else return null;
   arcs.reverse();
   const path = [dirs.from[arcs[0]]];
   for (const k of arcs) path.push(adjTo[k]);
+  // Sin enumerar: el camino sigue siendo una lista de nodos
+  Object.defineProperty(path, 'endArc', { value: finMeta !== -1 ? finMeta : null });
+  Object.defineProperty(path, 'cost', { value: finMeta !== -1 ? gMeta.get(finMeta) : gScore[fin] });
   return path;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, routeAlternatives, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
-    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, buildPointGrid, nearestInGrid, roadSignForTurn, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }

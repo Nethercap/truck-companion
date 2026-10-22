@@ -1228,6 +1228,55 @@ def live_share_state_message(session: "Session") -> str:
     return json.dumps({"type": "live_share_state", "enabled": session.share_position})
 
 
+def apply_set_live_share(session: "Session", payload: dict, from_client: bool = False) -> None:
+    """set_live_share de una pestana, o del tablero por LAN que reenvia el
+    cliente (from_client). Opt-in de "ver/mostrar otros jugadores" -
+    reciprocidad simple: si no compartis tu posicion, tampoco ves la de nadie
+    (se resuelve solo via el filtro en broadcast_live_positions)."""
+    enabled = bool(payload.get("enabled"))
+    explicit = payload.get("explicit")
+    # Por LAN solo prende el tilde tocado: el reenvio automatico de esa
+    # pagina, con su default local, publicaba la posicion de quien usa solo
+    # el modo LAN y nunca lo habia prendido. Con la sesion ya compartiendo
+    # pasa igual (cambia la variante o el apodo); apagar, siempre (Discord, 20-10).
+    if from_client and enabled and explicit is not True and not session.share_position:
+        return
+    # explicit True = el usuario toco el tilde; False = el reenvio automatico
+    # de una pestana al (re)conectar, con su default local. Ese reenvio no
+    # puede volver a prender lo que el usuario apago a mano (apagar si,
+    # siempre). Sin la clave es una pestana vieja: se aplica como antes
+    # (auditoria del 10-10).
+    if explicit is False and enabled and session.share_off_by_user:
+        return
+    if isinstance(explicit, bool):
+        session.share_off_by_user = not enabled
+    session.share_position = enabled
+    # Solo un nombre de variante valido: una lista o un dict rompia
+    # broadcast_live_positions y /live/summary para todos (mismo chequeo que
+    # clean_offmap_report).
+    variant = payload.get("mapVariant")
+    if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
+        variant = None
+    session.map_variant = variant if session.share_position else None
+    # mismo chequeo contra el juego que reporta la telemetria
+    session.map_variant = coerce_map_variant(session.map_variant, (session.last_summary or {}).get("game"))
+    session.live_nick = clean_live_nick(payload.get("nick")) if session.share_position else None
+    if not session.share_position:
+        session.last_position = None
+        session.live_route = None
+
+
+async def notify_live_share_state(session: "Session"):
+    """A todas las pestanas, para que sincronicen el tilde (tambien a la que
+    mando un reenvio que se ignoro), y al cliente, que se lo pasa al tablero
+    por LAN. Un cliente viejo ignora el mensaje."""
+    estado = live_share_state_message(session)
+    for outbox in list(session.viewer_outboxes.values()):
+        outbox.push_control(estado)
+    if session.client_ws is not None:
+        await _safe_send(session.client_ws, estado)
+
+
 async def broadcast_session_state(session: "Session"):
     message = session_state_message(session)
     for viewer in list(session.viewer_ws_list):
@@ -1271,17 +1320,26 @@ def summarize_for_convoy(payload: dict, prev: Optional[dict], now: float) -> dic
     fuel_pct = None
     if payload.get("fuel") is not None and payload.get("fuelCapacity"):
         fuel_pct = max(0, min(100, round(100 * payload["fuel"] / payload["fuelCapacity"])))
+    # Sin trabajo el plugin puede dejar el origen, el destino y la carga del
+    # trabajo de antes (una carga externa cancelada al pedir la grua): los
+    # companeros del convoy y el mapa en vivo seguian viendo "A -> B" y la
+    # paga, como el panel de la web antes de e02201f. Los clientes < 1.3.1 no
+    # mandan onJob y se muestran como antes (hasJobDestination en pure.js).
+    en_viaje = payload.get("onJob") is not False
+    del_viaje = (lambda k: payload.get(k)) if en_viaje else (lambda k: None)
     return {
         "x": x, "z": z, "heading": heading, "ts": now,
         "game": payload.get("game"), "paused": bool(payload.get("paused")),
         "speedKmh": payload.get("speedKmh"),
-        "cargo": payload.get("cargo"), "cargoMassKg": payload.get("cargoMassKg"),
-        "citySrc": payload.get("citySrc"), "cityDst": payload.get("cityDst"),
-        "etaSeconds": payload.get("routeTimeSeconds"), "distanceKm": payload.get("routeDistanceKm"),
+        "cargo": del_viaje("cargo"), "cargoMassKg": del_viaje("cargoMassKg"),
+        "citySrc": del_viaje("citySrc"), "cityDst": del_viaje("cityDst"),
+        # Sin ruta en el GPS del juego el SDK manda 0: la tarjeta del convoy
+        # decia "0h 0m" (convoy.js solo mira null).
+        "etaSeconds": payload.get("routeTimeSeconds") or None, "distanceKm": payload.get("routeDistanceKm"),
         "fuelPct": fuel_pct,
         "restMin": payload.get("restStopMinutes") if payload.get("restStopMinutes") is not None else payload.get("restStopSeconds"),
         "truck": " ".join(filter(None, [payload.get("truckBrand"), payload.get("truckName")])) or None,
-        "jobIncome": payload.get("jobIncome"),
+        "jobIncome": del_viaje("jobIncome"),
     }
 
 
@@ -1804,6 +1862,9 @@ async def ws_client(websocket: WebSocket, code: str):
         # PUT a R2 es I/O bloqueante - correrlo en un thread para no trabar el
         # event loop (que en paralelo esta reenviando telemetria a viewers).
         asyncio.create_task(asyncio.to_thread(record_session_started))
+    # Si la sesion comparte la posicion: el cliente se lo dice al tablero por
+    # LAN, que no habla con el relay (ver notify_live_share_state).
+    await _safe_send(websocket, live_share_state_message(session))
     await broadcast_session_state(session)
     await notify_client_viewers(session)
     try:
@@ -1835,6 +1896,13 @@ async def ws_client(websocket: WebSocket, code: str):
                 # client_status de cada conexion dejaba el estado en False y el
                 # primer tick real (con el flag todavia en true desde antes)
                 # parecia una entrega nueva - una por cada redeploy/reconexion.
+                if payload.get("type") == "set_live_share":
+                    # El tilde del tablero por LAN, que no habla con el relay:
+                    # se lo pasa el cliente. Antes la casilla estaba gris en
+                    # LAN y no habia como apagarlo desde ahi (Discord, 20-10).
+                    apply_set_live_share(session, payload, from_client=True)
+                    await notify_live_share_state(session)
+                    continue
                 if payload.get("type") or "event" not in payload:
                     for outbox in list(session.viewer_outboxes.values()):
                         outbox.push_control(data)
@@ -1991,40 +2059,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     if session.client_ws is not None:
                         await session.client_ws.send_text(data)
                 elif msg_type == "set_live_share":
-                    # Opt-in de "ver/mostrar otros jugadores" - reciprocidad
-                    # simple: si no compartis tu posicion, tampoco ves la de
-                    # nadie (se resuelve solo via el filtro en
-                    # broadcast_live_positions, no hace falta nada mas aca).
-                    enabled = bool(payload.get("enabled"))
-                    explicit = payload.get("explicit")
-                    # explicit True = el usuario toco el tilde; False = el
-                    # reenvio automatico de una pestana al (re)conectar, con
-                    # su default local. Ese reenvio no puede volver a prender
-                    # lo que el usuario apago a mano (apagar si, siempre).
-                    # Sin la clave es una pestana vieja: se aplica como antes
-                    # (auditoria del 10-10).
-                    if not (explicit is False and enabled and session.share_off_by_user):
-                        if isinstance(explicit, bool):
-                            session.share_off_by_user = not enabled
-                        session.share_position = enabled
-                        # Solo un nombre de variante valido: una lista o un
-                        # dict rompia broadcast_live_positions y /live/summary
-                        # para todos (mismo chequeo que clean_offmap_report).
-                        variant = payload.get("mapVariant")
-                        if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
-                            variant = None
-                        session.map_variant = variant if session.share_position else None
-                        # mismo chequeo contra el juego que reporta la telemetria
-                        session.map_variant = coerce_map_variant(session.map_variant, (session.last_summary or {}).get("game"))
-                        session.live_nick = clean_live_nick(payload.get("nick")) if session.share_position else None
-                        if not session.share_position:
-                            session.last_position = None
-                            session.live_route = None
-                    # A todas las pestanas, para que sincronicen el tilde
-                    # (tambien a la que mando un reenvio que se ignoro).
-                    estado = live_share_state_message(session)
-                    for outbox in list(session.viewer_outboxes.values()):
-                        outbox.push_control(estado)
+                    apply_set_live_share(session, payload)
+                    await notify_live_share_state(session)
                 elif msg_type == "live_route":
                     # Sin compartir la posicion no hay mapa donde dibujarla.
                     nueva = clean_live_route(payload.get("points")) if session.share_position else None

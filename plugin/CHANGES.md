@@ -44,3 +44,22 @@ attributes `customer.prio.cargo`, `customer.prio.time`,
 logs them as "attribute not handled".
 
 The shared memory layout is unchanged (revision 12).
+
+## macOS
+
+The plugin builds on macOS as a universal dylib (`build.sh`, Intel and
+Apple Silicon), from the changes by uawannacry in PR #87:
+
+- Outside Windows the block is the file `/tmp/TruckDashTelemetry`, mapped
+  with `mmap`, instead of a named Windows mapping.
+- The Windows-only calls (`vsnprintf_s`, `strncpy_s`, `DllMain`) have
+  portable versions, and the SDK header knows arm64.
+- The dylib calls `scs_telemetry_shutdown` from a destructor when it is
+  unloaded, like `DllMain` does on Windows.
+
+`scs_telemetry_shutdown` returns at once if the block is not open. The game
+calls it before unloading the plugin and then `DllMain` (or the destructor)
+calls it again with the block already unmapped; and if `init` failed, the
+pointer was null. In both cases it wrote to memory that was not there: on
+macOS that crashed the game on exit, and unloading a dylib that was never
+initialized crashed right away.

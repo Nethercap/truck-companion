@@ -410,7 +410,8 @@ function createDashPanel({ root, money, imperial, lang, hour12 }) {
     // unidad del tramo que representa: el descanso en tiempo de juego
     // contra el tiempo de juego que queda, la carga en kilometros contra
     // los kilometros que quedan.
-    const descansoSeg = d.restStopMinutes != null ? d.restStopMinutes * 60 : null;
+    const descansoMin = restMinutesOf(d); // sin la fatiga apagada (pure.js)
+    const descansoSeg = descansoMin != null ? descansoMin * 60 : null;
     marca('bandRest', 'markRest', hecho,
           descansoSeg != null && viajeJuegoSeg ? descansoSeg / viajeJuegoSeg : null,
           t('restHere'));
@@ -533,7 +534,8 @@ function createDashPanel({ root, money, imperial, lang, hour12 }) {
       texto('fuelClaim', null);
     }
 
-    const descansoSeg = d.restStopMinutes != null ? d.restStopMinutes * 60 : null;
+    const descansoMin = restMinutesOf(d); // sin la fatiga apagada (pure.js)
+    const descansoSeg = descansoMin != null ? descansoMin * 60 : null;
     if (descansoSeg != null && viajeJuegoSeg != null) {
       const sinDormir = descansoSeg > viajeJuegoSeg;
       texto('restClaim', sinDormir ? t('sleepNone') : t('sleepNeeded'),

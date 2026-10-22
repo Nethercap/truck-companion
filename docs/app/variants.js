@@ -1,24 +1,24 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-10-14.
+// Fuente: manifest del 2026-10-22.
 const MAP_DATA_VERSION = {
-  "ats": "20261014",
-  "ats_c2c": "20261014",
-  "ats_promods": "20261014",
-  "ats_c2c_promods": "20261014",
-  "ats_canada": "20261014",
-  "ats_c2c_canada": "20261014",
-  "ats_reforma": "20261014",
-  "ats_reforma_c2c_promods": "20261014",
-  "ets2": "20260929",
-  "ets2_promods": "20260929",
-  "ets2_promods_rusmap": "20260929",
-  "ets2_promods_roex": "20260929",
-  "ets2_promods_rusmap_roex": "20260929",
-  "ets2_gu": "20261006",
-  "ets2_eugu": "20261005",
-  "ets2_promods_eugu": "20261005",
-  "ets2_tmp": "20260929"
+  "ats": "20261022",
+  "ats_c2c": "20261022",
+  "ats_promods": "20261022",
+  "ats_c2c_promods": "20261022",
+  "ats_canada": "20261022",
+  "ats_c2c_canada": "20261022",
+  "ats_reforma": "20261022",
+  "ats_reforma_c2c_promods": "20261022",
+  "ets2": "20261022",
+  "ets2_promods": "20261022",
+  "ets2_promods_rusmap": "20261022",
+  "ets2_promods_roex": "20261022",
+  "ets2_promods_rusmap_roex": "20261022",
+  "ets2_gu": "20261022",
+  "ets2_eugu": "20261022",
+  "ets2_promods_eugu": "20261022",
+  "ets2_tmp": "20261022"
 };
 
 // Metadatos por variante: etiqueta, juego, que proyeccion usa, que valor

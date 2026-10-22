@@ -433,7 +433,11 @@ def test_barra_de_paradas_combustible_y_descanso():
     # Si se llega sin parar, sin tramo
     assert overlay.barra_paradas(tele(fuelRangeKm=800, restStopMinutes=900), 500) == {"fuel": None, "rest": None}
     # Hay que parar ya: un tramo chiquito al principio, que se vea
-    assert overlay.barra_paradas(tele(fuelRangeKm=0, restStopMinutes=0), 500)["rest"] == (0.0, 0.02)
+    assert overlay.barra_paradas(tele(fuelRangeKm=0, restStopMinutes=1), 500) == {"fuel": (0.0, 0.02), "rest": (0.0, 0.02)}
+    # Con la fatiga apagada el juego manda 0 o mas de un dia: sin descanso en
+    # la barra, como en la web y el panel (decia "parar ya")
+    assert overlay.barra_paradas(tele(restStopMinutes=0), 500)["rest"] is None
+    assert overlay.barra_paradas(tele(restStopMinutes=24 * 60 * 3), 500)["rest"] is None
     # Tramo corto: al menos 20 km antes
     assert overlay.barra_paradas(tele(fuelRangeKm=40, restStopMinutes=None), 500)["fuel"] == (0.04, 0.08)
     # Sin ruta del juego, 70 km/h; y la velocidad media entre 40 y 100

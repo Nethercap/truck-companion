@@ -464,6 +464,7 @@ def test_el_aviso_de_fuera_del_mapa_llega_al_cliente(client, main):
         viewer.receive_text()  # live_share_state
         with client.websocket_connect(f"/ws/client/{code}") as local_client:
             viewer.receive_text()
+            assert main.json.loads(local_client.receive_text()) == {"type": "live_share_state", "enabled": False}
             assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 1}
             aviso = {"type": "offmap", "game": "ats"}
             viewer.send_text(main.json.dumps(aviso))
@@ -582,6 +583,7 @@ def test_cliente_nuevo_reemplaza_al_viejo_sin_que_el_viejo_lo_borre(client, main
         viewer.receive_text()  # live_share_state
         with client.websocket_connect(f"/ws/client/{code}") as viejo:
             viewer.receive_text()  # session_state (conectado)
+            viejo.receive_text()  # live_share_state
             viejo.receive_text()  # viewers
             with client.websocket_connect(f"/ws/client/{code}") as nuevo:
                 assert main.json.loads(viewer.receive_text())["client_connected"] is True
@@ -929,6 +931,26 @@ def test_convoy_summary_heading_and_km(main):
     asyncio.run(scenario())
 
 
+def test_convoy_summary_sin_trabajo_no_muestra_el_viaje_anterior(main):
+    # Una carga externa cancelada (la grua) deja el origen, el destino, la
+    # carga y la paga en el plugin: con onJob false no van al convoy ni al
+    # mapa en vivo. Un cliente viejo (sin onJob) se muestra como antes.
+    viaje = {"position": {"x": 0, "z": 0}, "game": "ats", "cargo": "Beans", "cargoMassKg": 18000,
+             "citySrc": "Reno", "cityDst": "Elko", "jobIncome": 9000, "routeDistanceKm": 12}
+    t = main.time.time()
+    sin = main.summarize_for_convoy(dict(viaje, onJob=False), None, t)
+    for campo in ("cargo", "cargoMassKg", "citySrc", "cityDst", "jobIncome"):
+        assert sin[campo] is None, campo
+    assert sin["distanceKm"] == 12  # el GPS del juego puede tener una ruta sin trabajo
+    # Sin ruta en el GPS el SDK manda 0 segundos: la tarjeta decia "0h 0m"
+    assert main.summarize_for_convoy(dict(viaje, routeTimeSeconds=0), None, t)["etaSeconds"] is None
+    assert main.summarize_for_convoy(dict(viaje, routeTimeSeconds=600), None, t)["etaSeconds"] == 600
+    con = main.summarize_for_convoy(dict(viaje, onJob=True), None, t)
+    viejo = main.summarize_for_convoy(viaje, None, t)
+    for s in (con, viejo):
+        assert (s["cargo"], s["citySrc"], s["cityDst"], s["jobIncome"]) == ("Beans", "Reno", "Elko", 9000)
+
+
 def test_convoy_create_again_with_own_code_is_a_rejoin(main):
     import asyncio
 
@@ -1178,6 +1200,56 @@ def test_el_reenvio_automatico_no_vuelve_a_prender_lo_que_el_usuario_apago(clien
             assert session.share_position is True
 
 
+def test_el_tablero_por_lan_cambia_compartir_a_traves_del_cliente(client, main):
+    """El tablero por LAN no habla con el relay: su tilde lo reenvia el
+    cliente y el estado real vuelve por el mismo camino. Antes la casilla
+    estaba gris en LAN y no habia como apagarlo desde ahi (Discord, 20-10).
+    Por LAN solo prende el tilde tocado: el reenvio automatico de esa pagina
+    no publica a quien nunca lo prendio."""
+    code = client.post("/pair/new").json()["code"]
+
+    def enviar(ws, enabled, **extra):
+        ws.send_text(main.json.dumps({"type": "set_live_share", "enabled": enabled, "mapVariant": "ats", **extra}))
+
+    def estado(ws):
+        msg = main.json.loads(ws.receive_text())
+        assert msg["type"] == "live_share_state"
+        return msg["enabled"]
+
+    with client.websocket_connect(f"/ws/client/{code}") as cliente:
+        assert estado(cliente) is False  # al conectar, para el tablero por LAN
+        assert main.json.loads(cliente.receive_text())["type"] == "viewers"
+        session = main.sessions[code]
+        enviar(cliente, True, explicit=False)  # el reenvio de la pagina LAN al conectar
+        assert estado(cliente) is False
+        assert session.share_position is False
+        enviar(cliente, True)  # sin la clave tampoco
+        assert estado(cliente) is False
+
+        with client.websocket_connect(f"/ws/live/{code}") as tab:
+            tab.receive_text()  # session_state
+            assert estado(tab) is False
+            cliente.receive_text()  # viewers
+            enviar(tab, True, explicit=False)  # la pestana con el codigo lo prende (default)
+            assert estado(tab) is True and estado(cliente) is True
+            # Ya compartiendo, el reenvio automatico de la pagina LAN pasa (variante, apodo)
+            cliente.send_text(main.json.dumps({"type": "set_live_share", "enabled": True, "mapVariant": "ats_promods", "explicit": False}))
+            assert estado(cliente) is True and estado(tab) is True
+            assert session.map_variant == "ats_promods"
+            # El usuario lo apaga en el tablero por LAN: le llega a la pestana,
+            # y su reenvio automatico ya no lo vuelve a prender
+            enviar(cliente, False, explicit=True)
+            assert estado(cliente) is False and estado(tab) is False
+            assert session.share_position is False and session.share_off_by_user is True
+            assert session.map_variant is None and session.last_position is None
+            enviar(tab, True, explicit=False)
+            assert estado(tab) is False and estado(cliente) is False
+            # Prenderlo a mano desde LAN si
+            enviar(cliente, True, explicit=True)
+            assert estado(cliente) is True and estado(tab) is True
+            assert session.share_position is True and session.map_variant == "ats"
+
+
 # --------------------------------------------------------- eventos TruckersMP
 
 def test_evento_tmp_se_recorta_y_marca_la_hora_como_utc(main):
@@ -1410,6 +1482,7 @@ def test_el_cliente_sabe_cuantos_tableros_hay(client, main):
         viewer.receive_text()
         viewer.receive_text()
         with client.websocket_connect(f"/ws/client/{code}") as local_client:
+            local_client.receive_text()  # live_share_state
             assert main.json.loads(local_client.receive_text()) == {"type": "viewers", "count": 1}
             with client.websocket_connect(f"/ws/live/{code}") as otro:
                 otro.receive_text()

@@ -1271,6 +1271,12 @@ SCSAPI_VOID scs_telemetry_shutdown() {
 #if LOGGING
   logger::flush();
 #endif
+  // Se llama dos veces: el juego al descargar el plugin y despues DllMain (o
+  // el destructor de la .dylib) al soltar la biblioteca, con el bloque ya
+  // desmapeado. Y si init no llego a abrir el bloque, telem_ptr es nulo.
+  if (telem_ptr == nullptr) {
+    return;
+  }
   // Close MemoryMap
   telem_ptr->sdkActive = false;
   telem_ptr->scs_values.game = 0;
@@ -1289,6 +1295,7 @@ SCSAPI_VOID scs_telemetry_shutdown() {
   if (telem_mem != nullptr) {
     telem_mem->Close();
   }
+  telem_ptr = nullptr;
 }
 
 // Telemetry api.

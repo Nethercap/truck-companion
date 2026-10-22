@@ -23,12 +23,16 @@ ws:// a una IP de la LAN (mixed content, lo bloquean todos los navegadores)
 import asyncio
 import errno
 import http.server
+import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import stat
 import threading
+import time
+from http import HTTPStatus
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import red
@@ -93,6 +97,85 @@ def anotar_remoto(ip, que: str) -> None:
             return
         _remotos_vistos.add((ip, que))
     logging.info("LAN: %s desde %s", que, ip)
+
+
+# El WebSocket de datos (27766) solo atiende a las paginas que sirve este
+# mismo cliente en el 27765 (la app en modo LAN y /dash/). Antes no miraba el
+# Origin y se le conectaba cualquier pagina, tambien una web de otro lado que
+# usaba el cliente como si fuera suyo (19-10). Sin header Origin no es un
+# navegador (como en el relay, backend/main.py): pasa.
+# La pagina se abre por la IP (el QR y "Abrir aca"), localhost o el nombre de
+# la PC; un dominio con punto que no sea de la red local lo podria registrar
+# cualquiera y apuntarlo a una IP de la casa, asi que no.
+_NOMBRES_DE_LA_RED = (".local", ".lan", ".home.arpa", ".internal")
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")  # VPN de malla (Tailscale)
+_origenes_rechazados: dict = {}
+
+
+def origen_permitido(origin: str | None) -> bool:
+    if origin is None:
+        return True
+    try:
+        url = urlsplit(origin)
+        puerto = url.port
+    except ValueError:
+        return False
+    host = (url.hostname or "").lower()
+    if url.scheme != "http" or puerto != HTTP_PORT or not host or url.path or url.query:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return (host == "localhost" or bool(re.fullmatch(r"[a-z0-9-]+", host))
+                or (host.endswith(_NOMBRES_DE_LA_RED) and bool(re.fullmatch(r"[a-z0-9.-]+", host))))
+    return ip.is_loopback or ip.is_private or ip.is_link_local or ip in _CGNAT
+
+
+# A quien le contesta el 27765 con CORS (lo que otra pagina puede leer). Lo
+# pide trucksim-dash.com en la misma PC: los mapas armados en la PC
+# (/localmap/, ver localMapRoot en app.js). Las paginas del cliente son del
+# mismo origen y no lo necesitan, pero pasan igual que en el 27766
+# (origen_permitido), y localhost en cualquier puerto (un servidor de
+# desarrollo de docs/). Antes era "*" para cualquier pagina (19-10).
+ORIGENES_WEB = ("https://trucksim-dash.com", "https://www.trucksim-dash.com")
+
+
+def origen_cors(origin: str | None) -> str | None:
+    """El Origin a devolver en Access-Control-Allow-Origin, o None."""
+    if not origin:
+        return None
+    if origin in ORIGENES_WEB or origen_permitido(origin):
+        return origin
+    try:
+        url = urlsplit(origin)
+        url.port  # un puerto roto tira ValueError
+    except ValueError:
+        return None
+    if url.scheme == "http" and (url.hostname or "").lower() in ("localhost", "127.0.0.1", "::1") \
+            and not url.path and not url.query:
+        return origin
+    return None
+
+
+# /__show-setup pide este header: una pagina no lo puede mandar sin un
+# preflight que el 27765 no autoriza, asi que una web abierta en la PC ya no
+# abre la ventana de Setup con un <img> (19-10). Lo manda _focus_running_instance.
+SHOW_SETUP_HEADER = "X-TruckDash"
+SHOW_SETUP_VALUE = "show-setup"
+
+
+def _solo_paginas_del_cliente(connection, request):
+    """process_request del WebSocket: 403 a una pagina de otro origen, y una
+    linea en el log por origen y por hora (por si uno legitimo quedo afuera)."""
+    origenes = request.headers.get_all("Origin")
+    origin = origenes[0] if len(origenes) == 1 else (None if not origenes else "")
+    if origen_permitido(origin):
+        return None
+    ahora = time.time()
+    if ahora - _origenes_rechazados.get(origin, 0) > 3600:
+        _origenes_rechazados[origin] = ahora
+        logging.warning("LAN: datos (27766) rechazados a una pagina de %s", origin or "origen invalido")
+    return connection.respond(HTTPStatus.FORBIDDEN, "origin not allowed\n")
 
 
 def lan_ip() -> str | None:
@@ -167,11 +250,13 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_OPTIONS(self):
         # Preflight de Chrome para una pagina publica (trucksim-dash.com) que
-        # le pide algo a 127.0.0.1: sin Allow-Private-Network lo corta.
+        # le pide algo a 127.0.0.1: sin Allow-Private-Network lo corta. Solo
+        # a los origenes de origen_cors: a los demas, sin permisos.
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Range")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
+        if origen_cors(self.headers.get("Origin")):
+            self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Range")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -267,9 +352,10 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
                 return
         # Un segundo arranque del .exe (issue #4) no abre otra instancia: le
         # pide a esta que muestre su ventana de Setup y se va. Solo desde la
-        # misma maquina, no desde la red.
+        # misma maquina, no desde la red, y con SHOW_SETUP_HEADER.
         if path == "/__show-setup":
-            local = self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+            local = (self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+                     and self.headers.get(SHOW_SETUP_HEADER) == SHOW_SETUP_VALUE)
             if local and on_show_setup:
                 try:
                     on_show_setup()
@@ -295,7 +381,11 @@ class _StaticHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        pedido = getattr(self, "headers", None)  # un pedido roto llega sin headers
+        origen = origen_cors(pedido.get("Origin") if pedido is not None else None)
+        if origen:
+            self.send_header("Access-Control-Allow-Origin", origen)
+        self.send_header("Vary", "Origin")
         super().end_headers()
 
     def log_message(self, format, *args):
@@ -317,6 +407,23 @@ def _refresh_file(rel: str, local_path: str) -> bool:
     except Exception:
         return False
 
+
+
+def pedido_live_share(message) -> str | None:
+    """El set_live_share del tablero por LAN, armado de nuevo con solo sus
+    campos para mandarlo al relay; None si el mensaje es otra cosa. El relay
+    valida cada campo y decide (por LAN, el reenvio automatico no prende)."""
+    try:
+        payload = json.loads(message)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict) or payload.get("type") != "set_live_share":
+        return None
+    pedido = {"type": "set_live_share", "enabled": payload.get("enabled") is True}
+    for clave in ("explicit", "mapVariant", "nick"):
+        if clave in payload:
+            pedido[clave] = payload[clave]
+    return json.dumps(pedido)
 
 
 class _ViewerOutbox:
@@ -393,6 +500,12 @@ class LocalServer:
         self.en_la_red = en_la_red
         self._escucho = False  # start() ya intento escuchar (bien o con error)
         self._lock = asyncio.Lock()
+        # "Compartir mi posicion" es de la sesion del relay y el tablero por
+        # LAN no habla con el relay: su tilde se manda por al_relay (el send
+        # de la conexion al relay, lo pone la bandeja) y el estado real llega
+        # por avisar_live_share. None: el relay todavia no lo dijo.
+        self.al_relay = None
+        self.live_share: bool | None = None
 
     @property
     def url(self) -> str | None:
@@ -465,7 +578,8 @@ class LocalServer:
         try:
             self.http_server = http.server.ThreadingHTTPServer((host, HTTP_PORT), _StaticHandler)
             threading.Thread(target=self.http_server.serve_forever, daemon=True).start()
-            self.ws_server = await websockets.serve(self._handle_viewer, host, WS_PORT)
+            self.ws_server = await websockets.serve(self._handle_viewer, host, WS_PORT,
+                                                    process_request=_solo_paginas_del_cliente)
             if host != "127.0.0.1":
                 logging.info("Servidor LAN escuchando en http://0.0.0.0:%d (ws %d), direccion %s",
                              HTTP_PORT, WS_PORT, self.url or "sin IP de LAN")
@@ -493,10 +607,18 @@ class LocalServer:
         anotar_remoto((getattr(ws, "remote_address", None) or (None,))[0], "datos (27766)")
         self.viewers.add(ws)
         try:
-            await ws.send(json.dumps({"type": "session_state", "client_connected": True, "client_status": None, "local": True}))
+            # liveShare: con la clave, la pagina sabe que este cliente le pasa
+            # su tilde al relay (uno viejo no, y la casilla queda gris).
+            await ws.send(json.dumps({"type": "session_state", "client_connected": True, "client_status": None,
+                                      "local": True, "liveShare": self.live_share}))
             if self.last_status_message:
                 await ws.send(self.last_status_message)
             async for message in ws:
+                pedido = pedido_live_share(message)
+                if pedido is not None:
+                    if self.al_relay is not None:
+                        await self.al_relay(pedido)
+                    continue
                 await client_lib.handle_control_message(message, self.keybinds, ws.send)
         except Exception:
             pass
@@ -518,6 +640,14 @@ class LocalServer:
             return
         for viewer in list(self.viewers):
             self._outbox(viewer).push(text, must_deliver=is_status)
+
+    def avisar_live_share(self, enabled: bool) -> None:
+        """Lo que dice el relay de "compartir mi posicion", a los tableros por
+        LAN (y en el session_state a los que conecten despues)."""
+        self.live_share = enabled
+        texto = json.dumps({"type": "live_share_state", "enabled": enabled})
+        for viewer in list(self.viewers):
+            self._outbox(viewer).push(texto, must_deliver=True)
 
     def _outbox(self, viewer):
         ob = self._outboxes.get(viewer)

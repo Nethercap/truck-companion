@@ -593,6 +593,51 @@ def is_autostart_enabled() -> bool:
         return False
 
 
+def exe_from_command(command: str | None) -> str | None:
+    """El .exe de un comando de la clave Run ('"C:\\...\\TruckDash.exe" --autostart')."""
+    command = (command or "").strip()
+    if command.startswith('"'):
+        fin = command.find('"', 1)
+        return command[1:fin] if fin > 1 else None
+    return command.split(" ", 1)[0] or None
+
+
+def same_exe(a: str, b: str) -> bool:
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def autostart_exe() -> str | None:
+    """El .exe que arranca con Windows (la clave Run), o None."""
+    if os.name != "nt":
+        return None
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            value, _ = winreg.QueryValueEx(key, RUN_VALUE_NAME)
+    except OSError:
+        return None
+    return exe_from_command(value)
+
+
+def refresh_autostart_path() -> str | None:
+    """Si el inicio con Windows apunta a otro .exe, lo pasa a este y devuelve
+    el de antes (si no, None). Bajando la version nueva a otra carpeta, la
+    clave Run seguia con la vieja: al prender la PC arrancaba esa, con sus
+    ajustes y su overlay, y la nueva solo le abria su ventana (Discord, 21-10:
+    "I can't get rid of the old overlay"). La actualizacion integrada pisa el
+    mismo .exe y no pasa por aca. is_autostart_enabled solo mira que exista."""
+    actual = exe_path()
+    if not actual or in_temp_location():
+        return None
+    viejo = autostart_exe()
+    if not viejo or same_exe(viejo, actual):
+        return None
+    if not set_autostart(True):
+        return None
+    logging.info("Inicio automatico: apuntaba a %s, ahora a este .exe (%s)", viejo, actual)
+    return viejo
+
+
 def set_autostart(enabled: bool) -> bool:
     """Devuelve True si quedo como se pidio. Solo tiene sentido empaquetado
     (corriendo desde fuente no hay un .exe que registrar)."""

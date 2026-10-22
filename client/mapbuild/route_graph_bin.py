@@ -135,6 +135,49 @@ def write_times(node_list, edges, path):
     return {"aristas": len(edges), "con_decimas": sum(1 for t in tenths if t)}
 
 
+def write_prefabs(node_list, edges, prefab_ids, path):
+    """De que prefab es cada arista ("TDPF" v1), en un archivo aparte del
+    grafo: la web toma como vuelta en U llegar a un nodo por una arista de un
+    prefab y salir por otra del mismo (se sale del prefab ahi y se vuelve a
+    entrar). El constructor ya no saca caminos que pasen por un tercer nodo
+    del prefab (prefab_nav_paths), y sin esto la vuelta de Kiel (ProMods,
+    22-10) quedaba por a -> c -> b, repartida en tres nodos.
+
+    prefab_ids: un numero por arista, igual para las del mismo prefab (0 = una
+    calle, un ferry). No se guarda el numero sino un color de 1 a 255 que no
+    repite el de ningun prefab con el que comparte un nodo: un byte por
+    arista, y en un nodo, mismo color es mismo prefab.
+
+    Layout (little-endian):
+      header  'TDPF', u32 version=1, u32 nNodes, u32 nEdges
+      color   u8[nEdges] (+pad)  0 = no es de un prefab
+    """
+    por_nodo = {}
+    for e, pid in zip(edges, prefab_ids):
+        if pid:
+            por_nodo.setdefault(int(e[0]), set()).add(pid)
+            por_nodo.setdefault(int(e[1]), set()).add(pid)
+    vecinos = {}
+    for ps in por_nodo.values():
+        for pid in ps:
+            vecinos.setdefault(pid, set()).update(ps - {pid})
+    color = {}
+    for pid in sorted(vecinos, key=lambda x: (-len(vecinos[x]), x)):
+        usados = {color[v] for v in vecinos[pid] if v in color}
+        c = 1
+        while c in usados:
+            c += 1
+        if c > 255:
+            raise ValueError(f"prefab {pid}: mas de 255 colores")
+        color[pid] = c
+    colores = bytes(color.get(pid, 0) if pid else 0 for pid in prefab_ids)
+    with open(path, "wb") as f:
+        f.write(b"TDPF" + struct.pack("<III", 1, len(node_list), len(edges)))
+        f.write(_pad4(colores))
+    return {"aristas": len(edges), "de_prefab": sum(1 for c in colores if c), "prefabs": len(color),
+            "colores": max(color.values(), default=0)}
+
+
 def write_lanes(node_list, edges, records, path):
     """Flechas de carril ("TDLN" v1), en un archivo aparte del grafo: las
     usa solo la guia (giro a giro) y no hace falta bajarlas para rutear.

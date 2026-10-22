@@ -98,7 +98,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, liveShareV2: true, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -175,6 +175,10 @@ let truckSize = truckSizeSetting(_savedSettings.truckSize);
 let clockFormat = clockFormatSetting(_savedSettings.clockFormat);
 function hour12() { return clockIs12h(clockFormat, currentLang); }
 let routeProfile = _savedSettings.routeProfile || 'fastest'; // 'fastest' (como el GPS del juego) | 'shortest'
+// "Keep left/right" tambien en las salidas donde el juego no dice nada (el
+// carril de desaceleracion, everyExitKeepSide en pure.js). Apagado por
+// defecto: el juego no los dice y suman 13 a 18 % de avisos (Discord, 19-10).
+let navEveryExit = !!_savedSettings.navEveryExit;
 // DLC de mapa destildados por juego ({ ats: ['co'], ets2: [] }): las rutas
 // evitan sus caminos (ver dlcBlockedGuards en pure.js). Se guarda lo
 // destildado y no lo tildado, asi un DLC nuevo arranca prendido.
@@ -426,14 +430,15 @@ let detectedModNames = null;
 // a nadie), decidido asi porque no hay cuentas ni consentimiento granular.
 // hideOtherPlayers es aparte y solo local (no le dice nada al backend) -
 // podes seguir compartiendo tu posicion pero no dibujar la de los demas.
-// Desde 2026-09-21 viene ENCENDIDO por defecto: lo que se comparte es
-// anonimo (posicion, camion, carga, ciudad origen/destino y el apodo de
-// convoy solo si lo puso) y tambien alimenta el mapa en vivo publico (/live/).
-// Lo guardado antes de ese cambio (liveShareV2 ausente) se migra una sola vez
-// a encendido y se avisa con un toast al conectar; el usuario lo apaga en
-// Ajustes cuando quiera.
-let liveShareEnabled = _savedSettings.liveShareV2 ? !!_savedSettings.liveShareEnabled : true;
-let liveShareNoticePending = !_savedSettings.liveShareV2;
+// Lo que se comparte es anonimo (posicion, camion, carga, ciudad
+// origen/destino y el apodo de convoy solo si lo puso) y tambien alimenta el
+// mapa en vivo publico (/live/). Viene APAGADO (20-10, ver liveShareChoice):
+// del 21-09 al 20-10 venia prendido, y la pestana que abre el cliente en la
+// PC publicaba la posicion de quien usaba solo el modo LAN.
+let liveShareEnabled = liveShareChoice(_savedSettings) === true;
+// Se cambio en esta pestana (el tilde, o lo que dijo el relay): desde ahi
+// se reenvia al reconectar aunque localStorage no ande.
+let liveShareChosen = false;
 let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
 useImperial = !!_savedSettings.useImperial;
 renderUnitButtons();
@@ -450,9 +455,10 @@ function initSettingsUi() {
   document.getElementById('setMiniRest').checked = miniHudSettings.rest;
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
+  document.getElementById('setEveryExit').checked = navEveryExit;
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setLiveShareRoute').checked = liveShareRoute;
-  document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
+  renderLiveShareControls();
   document.getElementById('setNavZoom').value = navZoom;
   document.getElementById('setTruckSize').value = truckSize;
   document.getElementById('setClockSelect').value = clockFormat;
@@ -559,6 +565,10 @@ document.querySelectorAll('input[name="ets2Mod"]').forEach(radio => {
 // estado real con live_share_state.
 function sendLiveShareState(explicit = false) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  // Sin tocar el tilde, solo si este navegador ya tenia un valor: una
+  // pestana que nunca lo cambio no lo prende ni apaga lo que eligio otro
+  // dispositivo (liveShareChoice).
+  if (!explicit && !liveShareChosen && liveShareChoice(loadSettings()) === null) return;
   // Sin telemetria todavia no se sabe el juego: resolveEffectiveGame() cae
   // en 'ats' por defecto y el conductor aparecia en el mapa de ATS aunque
   // estuviera en ETS2. Se manda null (no comparte) y updateMap re-manda el
@@ -568,11 +578,6 @@ function sendLiveShareState(explicit = false) {
   // El apodo de convoy (si lo puso) es lo unico con nombre que se muestra en el mapa en vivo.
   const nick = liveShareEnabled ? (loadSettings().convoyNick || null) : null;
   ws.send(JSON.stringify({ type: 'set_live_share', enabled: liveShareEnabled, mapVariant, nick, explicit: !!explicit }));
-  if (liveShareNoticePending && liveShareEnabled && !conn.demo && !conn.spectator) {
-    liveShareNoticePending = false;
-    saveSettings(); // persiste liveShareV2: el aviso es una sola vez
-    showToast(t('liveShareNotice'), 'info', 12000);
-  }
 }
 
 // Mapa que no conocemos: una vez por mapa y sesion (el relay tambien lo
@@ -699,6 +704,10 @@ document.getElementById('setVoiceTest').addEventListener('click', () => {
   unlockVoice().catch(() => {});
   speakVoice('soon_turn_right');
 });
+document.getElementById('setEveryExit').addEventListener('change', (e) => {
+  navEveryExit = e.target.checked;
+  saveSettings();
+});
 document.getElementById('setDarkButtons').addEventListener('change', (e) => {
   darkButtons = e.target.checked;
   saveSettings();
@@ -722,9 +731,10 @@ document.getElementById('setLiteNoRouting').addEventListener('change', (e) => {
 });
 document.getElementById('setLiveShare').addEventListener('change', (e) => {
   liveShareEnabled = e.target.checked;
+  liveShareChosen = true;
   saveSettings();
   if (!liveShareEnabled) updateLivePlayers([]); // saca los marcadores ajenos ya dibujados
-  document.getElementById('setLiveShareRoute').disabled = !liveShareEnabled;
+  renderLiveShareControls();
   sendLiveShareState(true);
   sendLiveRoute(true);
 });
@@ -736,22 +746,24 @@ function applyLiveShareState(enabled) {
   enabled = !!enabled;
   if (enabled === liveShareEnabled) return;
   liveShareEnabled = enabled;
+  liveShareChosen = true;
   saveSettings();
   document.getElementById('setLiveShare').checked = enabled;
-  document.getElementById('setLiveShareRoute').disabled = !enabled;
+  renderLiveShareControls();
   if (!enabled) updateLivePlayers([]);
 }
 
-// Modo LAN: el cliente no le pasa este ajuste al relay, asi que la casilla no
-// hacia nada y parecia andar. Se deshabilita y se dice donde se cambia.
-function renderLiveShareForLan() {
-  const lan = !!conn.local;
-  for (const id of ['setLiveShare', 'setLiveShareRoute']) {
-    const el = document.getElementById(id);
-    if (el) el.disabled = lan || (id === 'setLiveShareRoute' && !liveShareEnabled);
+// Modo LAN: un cliente viejo no le pasa este ajuste al relay y la casilla no
+// hacia nada; ahi queda gris y se dice donde se cambia. Uno nuevo si (con
+// liveShare en su session_state, conn.lanRelay). Ver liveShareControls.
+function renderLiveShareControls() {
+  const c = liveShareControls({ lan: !!conn.local, lanRelay: !!conn.lanRelay, enabled: liveShareEnabled });
+  document.getElementById('setLiveShare').disabled = c.shareDisabled;
+  document.getElementById('setLiveShareRoute').disabled = c.routeDisabled;
+  for (const id of ['liveShareLanHint', 'liveShareLanRouteHint']) {
+    const hint = document.getElementById(id);
+    if (hint) hint.hidden = c.hint !== id;
   }
-  const hint = document.getElementById('liveShareLanHint');
-  if (hint) hint.hidden = !lan;
 }
 document.getElementById('setLiveShareRoute').addEventListener('change', (e) => {
   liveShareRoute = e.target.checked;
@@ -1248,12 +1260,44 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'ferry-poi', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'ferry-poi', 'road-shield', 'exit-label', 'country-label', 'city-label'];
+
+// Ancho de las calles: el de siempre de lejos y el del juego de cerca
+// (roadLineWidth en pure.js). En pixeles depende de la latitud, asi que se
+// recalcula al moverse ROAD_WIDTH_LAT_STEP grados al norte o al sur
+// (updateRoadWidths). Puntas cuadradas y esquinas en punta, como el mapa del
+// juego: redondeadas, cada pedazo de un cruce terminaba en una bolita.
+const ROAD_BASE_WIDTHS = {
+  'road-local': [5, 0.5, 12, 1.5, 17, 5],
+  'road-divided': [5, 0.8, 12, 2.5, 17, 8],
+  'road-freeway': [5, 1, 12, 3.5, 17, 10],
+};
+const ROAD_LINE_LAYOUT = { 'line-cap': 'square', 'line-join': 'miter' };
+const ROAD_WIDTH_LAT_STEP = 2;
+let roadWidthLayer = null; // 'ats' o 'ets2': de que juego son las calles dibujadas
+let roadWidthLat = null;   // latitud con la que se calcularon sus anchos
+function roadMetersPerGameM(sourceLayer) {
+  return Math.abs((sourceLayer === 'ats' ? ATS_DEF : ETS2_DEF).factor[1]) * LENGTH_OF_DEGREE;
+}
+function roadWidthFor(id) {
+  return roadLineWidth(ROAD_BASE_WIDTHS[id], roadMetersPerGameM(roadWidthLayer), roadWidthLat);
+}
+function updateRoadWidths() {
+  if (!map || roadWidthLayer === null) return;
+  const lat = map.getCenter().lat;
+  if (Math.abs(lat - roadWidthLat) < ROAD_WIDTH_LAT_STEP) return;
+  roadWidthLat = lat;
+  for (const id of Object.keys(ROAD_BASE_WIDTHS)) {
+    if (map.getLayer(id)) map.setPaintProperty(id, 'line-width', roadWidthFor(id));
+  }
+}
 
 // Colores segun el enum MapAreaColor de truckermudgeon/maps (Road/Light/Dark/
 // Green + 5 colores "Nav*" que casi no aparecen en la practica).
 function buildVecLayers(sourceLayer) {
   const L = sourceLayer;
+  roadWidthLayer = L;
+  roadWidthLat = map ? map.getCenter().lat : 45;
   return [
     { id: 'mapArea', type: 'fill', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'mapArea'],
       paint: { 'fill-color': ['match', ['get', 'color'], 0, '#454b54', 1, '#575e68', 2, '#1c1f24', 3, '#3d5238', '#454b54'], 'fill-opacity': 0.95 } },
@@ -1270,16 +1314,16 @@ function buildVecLayers(sourceLayer) {
                'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 2.5] } },
     { id: 'road-local', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'local']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#7d838c', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 12, 1.5, 17, 5] } },
+      layout: ROAD_LINE_LAYOUT,
+      paint: { 'line-color': '#7d838c', 'line-width': roadWidthFor('road-local') } },
     { id: 'road-divided', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'divided']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#cbd0d6', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 12, 2.5, 17, 8] } },
+      layout: ROAD_LINE_LAYOUT,
+      paint: { 'line-color': '#cbd0d6', 'line-width': roadWidthFor('road-divided') } },
     { id: 'road-freeway', type: 'line', source: 'vec', 'source-layer': L,
       filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], 'freeway']],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 12, 3.5, 17, 10] } },
+      layout: ROAD_LINE_LAYOUT,
+      paint: { 'line-color': routeShown ? FREEWAY_COLOR_WITH_ROUTE : FREEWAY_COLOR, 'line-width': roadWidthFor('road-freeway') } },
     // Logos de las empresas, los del mapa del juego: el sprite del tile es el
     // token y la imagen baja de R2 cuando hace falta (loadMissingCompanyIcon).
     // Sin superponerse entre ellos: en una ciudad hay varias pegadas y se
@@ -1323,6 +1367,13 @@ function buildVecLayers(sourceLayer) {
       layout: { 'icon-image': ['get', 'sprite'],
                 'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 9, 0.8],
                 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
+    // Escudos de ruta (roadShieldPoints en pure.js; solo ATS: los carteles de
+    // ETS2 no traen el numero). Debajo de las salidas y las ciudades: con
+    // poco lugar, MapLibre deja los de las capas de arriba. Las
+    // interestatales antes que las US (symbol-sort-key).
+    { id: 'road-shield', type: 'symbol', source: 'road-shields', minzoom: ROAD_SHIELD_MIN_ZOOM,
+      layout: { 'icon-image': ['concat', 'road-shield:', ['get', 'label']], 'icon-padding': 6,
+                'symbol-sort-key': ['match', ['get', 'k'], 'i', 0, 1] } },
     { id: 'exit-label', type: 'symbol', source: 'vec', 'source-layer': L, filter: ['==', ['get', 'type'], 'exit'], minzoom: 10,
       layout: { 'text-field': ['concat', 'Exit ', ['get', 'name']], 'text-size': 11 },
       paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
@@ -1920,6 +1971,7 @@ function ensureMapInitialized() {
   map.on('dragstart', pauseMapFollow);
   map.on('dragend', scheduleMapFollow);
   map.on('moveend', scheduleMapFollow);
+  map.on('moveend', updateRoadWidths);
   map.on('rotatestart', (e) => { if (e.originalEvent) pauseMapFollow(); });
   map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   map.on('zoom', updateTruckArrowSize);
@@ -1945,6 +1997,7 @@ function ensureMapInitialized() {
     map.addSource('atlas', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('car-parking', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('fuel', { type: 'geojson', data: atlasGeoJson(null) });
+    map.addSource('road-shields', { type: 'geojson', data: atlasGeoJson(null) });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     // La ruta crece con el zoom como las calles, pero siempre un poco mas
     // ancha que la autopista mas ancha (road-freeway: 1 / 3,5 / 10 px a zoom
@@ -2132,10 +2185,75 @@ async function loadRoadNames(mapInfo) {
   try {
     const res = await fetch(`${mapInfo.assetsDir}/road-names.json?v=${MAP_DATA_VERSION[currentGame] || ''}`, { priority: 'low' });
     if (!res.ok) return;
-    const nombres = await res.json();
+    const nombres = groupSignsByPoint(await res.json());
     if (currentGame === game) roadNames = nombres;
   } catch (err) {
     if (currentGame === game) roadNames = [];
+  } finally {
+    if (currentGame === game) setRoadShieldData();
+  }
+}
+
+// Escudos de ruta en el mapa (capa 'road-shield'): uno por ruta cada
+// ROAD_SHIELD_CELL_M, desde ROAD_SHIELD_MIN_ZOOM (Discord, 19-10: "todas las
+// rutas parecen lineas"). Con roadNames vacio (lite, ETS2, mapa armado en la
+// PC sin road-names.json) no queda ninguno.
+const ROAD_SHIELD_CELL_M = 4000;
+const ROAD_SHIELD_MIN_ZOOM = 8;
+function setRoadShieldData() {
+  const src = map && map.getSource('road-shields');
+  if (!src || !toLngLat) return;
+  const escudos = roadShieldPoints(roadNames, ROAD_SHIELD_CELL_M);
+  for (const e of escudos) addRoadShieldImage(e.label, e.k, e.n);
+  src.setData({ type: 'FeatureCollection', features: escudos.map(e => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: toLngLat(e.x, e.y) }, properties: { label: e.label, k: e.k } })) });
+}
+
+// Un escudo como los de la ruta, con el numero adentro (dibujado aca, una
+// imagen por ruta: no depende de las fuentes del mapa ni de otro archivo).
+// Interestatal: franja roja arriba, azul abajo, borde y numero blancos. US:
+// blanco con borde y numero negros. Con tres cifras, mas ancho.
+function addRoadShieldImage(label, k, n) {
+  const nombre = `road-shield:${label}`;
+  if (!map || map.hasImage(nombre)) return;
+  try {
+    const W = n.length >= 3 ? 52 : 44, H = 46, m = 2, b = 3; // pixeles de la imagen (pixelRatio 2)
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    // Arriba una curva hacia adentro, los costados que se abren un poco y la
+    // punta redondeada abajo.
+    const escudo = (x, y, w, h) => {
+      g.beginPath();
+      g.moveTo(x, y + h * 0.1);
+      g.quadraticCurveTo(x + w * 0.5, y + h * 0.22, x + w, y + h * 0.1);
+      g.bezierCurveTo(x + w * 1.03, y + h * 0.5, x + w * 0.9, y + h * 0.8, x + w * 0.5, y + h);
+      g.bezierCurveTo(x + w * 0.1, y + h * 0.8, x - w * 0.03, y + h * 0.5, x, y + h * 0.1);
+      g.closePath();
+    };
+    const iw = W - 2 * (m + b), ih = H - 2 * (m + b);
+    const inter = k === 'i';
+    g.fillStyle = inter ? '#ffffff' : '#111111';
+    escudo(m, m, W - 2 * m, H - 2 * m);
+    g.fill();
+    g.save();
+    escudo(m + b, m + b, iw, ih);
+    g.clip();
+    g.fillStyle = inter ? '#1f4fb4' : '#ffffff';
+    g.fillRect(0, 0, W, H);
+    if (inter) {
+      g.fillStyle = '#c8202f';
+      g.fillRect(0, 0, W, m + b + ih * 0.32);
+    }
+    g.restore();
+    g.fillStyle = inter ? '#ffffff' : '#111111';
+    g.font = `bold ${n.length >= 3 ? 17 : 20}px Arial, Helvetica, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(n, W / 2, m + b + ih * (inter ? 0.64 : 0.55));
+    map.addImage(nombre, g.getImageData(0, 0, W, H), { pixelRatio: 2 });
+  } catch (err) {
+    console.error('No se pudo dibujar el escudo de ruta', label, err);
   }
 }
 
@@ -2171,10 +2289,11 @@ function updateCurrentRoad(x, z) {
 
 // Con grilla (buildPointGrid en pure.js), que se rearma al cambiar de mapa:
 // la busqueda lineal recorria los 17-54 mil carteles en cada llamada.
+// ok(cartel): solo los que cumplen (roadSignForTurn).
 let roadNameGrid = null, roadNameGridOf = null;
-function nearestRoadName(x, z, maxDist) {
+function nearestRoadName(x, z, maxDist, ok = null) {
   if (roadNameGridOf !== roadNames) { roadNameGrid = buildPointGrid(roadNames, 500); roadNameGridOf = roadNames; }
-  return nearestInGrid(roadNameGrid, x, z, maxDist); // { x, y, label, kind: 'road'|'city' } o null
+  return nearestInGrid(roadNameGrid, x, z, maxDist, ok); // { x, y, label, kind: 'road'|'city' } o null
 }
 
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
@@ -2886,7 +3005,7 @@ function addNearestStop(code) {
   const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
   const rumbo = routeStartHeading(lastData);
   const reach = routeGraph ? (st) => {
-    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo);
+    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo, null, null, { entrar: true });
     if (!r || !r.length) return null;
     let m = 0;
     for (let k = 1; k < r.length; k++) m += Math.hypot(r[k][0] - r[k - 1][0], r[k][1] - r[k - 1][1]);
@@ -2934,7 +3053,9 @@ function distanceToRouteMeters(x, z) {
 // (los giros a la izquierda en un trebol iban por la rampa al reves).
 // 4 = 07-10: el DLC de cada tramo, para evitar los DLC que no tenes.
 // 5 = 10-10: el derecho de los cruces de calles anchas (el lazo de Bakersfield).
-const ROUTE_GRAPH_V3_REV = 5;
+// 6 = 22-10: sin caminos por un tercer nodo del prefab (la vuelta de Kiel),
+// largos de nodo a nodo y el -prefabs.bin.
+const ROUTE_GRAPH_V3_REV = 6;
 
 // Flechas de carril (decodeLanesBin en pure.js): archivo aparte y chico
 // (~90 KB en ATS), que se baja despues del grafo y solo sirve con ESE grafo
@@ -2978,6 +3099,27 @@ async function loadRouteTimes(base, v, game, decoded, graph) {
   } catch (e) { /* sin decimas: los segundos enteros */ }
 }
 
+// De que prefab es cada arista (decodePrefabsBin en pure.js): con el,
+// findArcRoute toma como vuelta en U llegar a un nodo por una arista de un
+// prefab y salir por otra del mismo. El constructor que lo escribe ya no saca
+// caminos por un tercer nodo del prefab, la marca de la que sale uTurnPairs:
+// un grafo de ese constructor sin este archivo deja otra vez la vuelta de
+// Kiel (ProMods, 22-10). 0 = no se pide de R2 (la regla "Mapas R2" guarda los
+// 404): subirlo con el grafo regenerado y despues el numero. Los mapas
+// armados en la PC (local) lo traen desde el cliente con ese constructor, y
+// se pide siempre (el servidor del cliente no guarda nada). 1 = 22-10, con
+// ROUTE_GRAPH_V3_REV 6.
+const ROUTE_PREFABS_REV = 1;
+async function loadRoutePrefabs(base, v, game, decoded, graph, local) {
+  if (!ROUTE_PREFABS_REV && !local) return;
+  try {
+    const res = await fetch(`${base}-prefabs.bin${v}&g=${ROUTE_GRAPH_V3_REV}&p=${ROUTE_PREFABS_REV}`, { priority: 'low' });
+    if (!res.ok) return;
+    const data = decodePrefabsBin(await res.arrayBuffer(), decoded.n, decoded.ne);
+    if (data && currentGame === game && routeGraph === graph) graph.edgePrefab = data;
+  } catch (e) { /* sin el archivo: uTurnPairs, como antes */ }
+}
+
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
   routeLanes = null;
@@ -3018,6 +3160,7 @@ async function loadRouteGraph(mapInfo) {
       if (decoded.shiftA) {
         loadRouteLanes(base, v, game, decoded, g);
         loadRouteTimes(base, v, game, decoded, g);
+        loadRoutePrefabs(base, v, game, decoded, g, !mapInfo.assetsDir.startsWith(REMOTE_MAP_BASE));
       }
     }
   } catch (err) {
@@ -3096,16 +3239,38 @@ function routeGraphFromJson(data) {
 // sin flags = doble mano.
 function buildRouteGraph(g) {
   const { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA = null, shiftB = null, edgeG = null } = g;
-  const csr = new Uint32Array(n + 1);
+  let csr = new Uint32Array(n + 1);
   for (let e = 0; e < ne; e++) { csr[edgeA[e] + 1]++; if (!(edgeF[e] & 2)) csr[edgeB[e] + 1]++; }
   for (let i = 0; i < n; i++) csr[i + 1] += csr[i];
-  const nDir = csr[n];
-  const adjTo = new Uint32Array(nDir), adjEdge = new Uint32Array(nDir), adjRev = new Uint8Array(nDir);
+  let nDir = csr[n];
+  let adjTo = new Uint32Array(nDir), adjEdge = new Uint32Array(nDir), adjRev = new Uint8Array(nDir);
   const fill = csr.slice(0, n);
   for (let e = 0; e < ne; e++) {
     const a = edgeA[e], b = edgeB[e];
     let k = fill[a]++; adjTo[k] = b; adjEdge[k] = e; adjRev[k] = 0;
     if (!(edgeF[e] & 2)) { k = fill[b]++; adjTo[k] = a; adjEdge[k] = e; adjRev[k] = 1; }
+  }
+  // Las vueltas en U por un nodo de prefab (uTurnShortcuts, pure.js): sin
+  // la arista a -> b, y a -> c -> b como vuelta en U en c (uTurnPairs).
+  const atajos = uTurnShortcuts({ n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, midOff, midXY });
+  const uTurnPairs = new Map();
+  if (atajos.length) {
+    const fuera = new Uint8Array(nDir);
+    for (const { k } of atajos) fuera[k] = 1;
+    const nuevo = new Int32Array(nDir).fill(-1);
+    const csr2 = new Uint32Array(n + 1), to2 = new Uint32Array(nDir - atajos.length), edge2 = new Uint32Array(nDir - atajos.length), rev2 = new Uint8Array(nDir - atajos.length);
+    let w = 0;
+    for (let i = 0; i < n; i++) {
+      csr2[i] = w;
+      for (let k = csr[i]; k < csr[i + 1]; k++) if (!fuera[k]) { nuevo[k] = w; to2[w] = adjTo[k]; edge2[w] = adjEdge[k]; rev2[w] = adjRev[k]; w++; }
+    }
+    csr2[n] = w;
+    csr = csr2; adjTo = to2; adjEdge = edge2; adjRev = rev2; nDir = w;
+    for (const { k1, k2 } of atajos) {
+      if (nuevo[k1] < 0 || nuevo[k2] < 0) continue;
+      if (!uTurnPairs.has(nuevo[k1])) uTurnPairs.set(nuevo[k1], new Set());
+      uTurnPairs.get(nuevo[k1]).add(nuevo[k2]);
+    }
   }
   // grado y componentes sobre la version no dirigida (una arista de un
   // sentido tambien conecta topologicamente a sus dos nodos)
@@ -3142,7 +3307,7 @@ function buildRouteGraph(g) {
   let giantComponent = 0;
   for (let c = 1; c < componentSize.length; c++) if (componentSize[c] > componentSize[giantComponent]) giantComponent = c;
   const graph = {
-    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, edgeG, degree, componentId, componentSize, giantComponent,
+    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, edgeG, degree, componentId, componentSize, giantComponent, uTurnPairs,
     nodeXY: (i) => [nodes[2 * i], nodes[2 * i + 1]],
     // vista "de antes" para detectManeuver y cualquier otro consumidor:
     // adjacency.get(i) -> [[vecino, metros, segundos], ...]
@@ -3180,8 +3345,9 @@ function buildRouteGraph(g) {
 // sola componente, pero por las dudas se admite cualquiera de este tamano.
 const MIN_REAL_COMPONENT_NODES = 300;
 
-// nodeOk: si viene, solo nodos con algun tramo que se pueda usar (DLC).
-function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeOk = null) {
+// nodeOk: si viene, solo nodos con algun tramo que se pueda usar (DLC); y
+// tambien alsoOk (slowNodes, para terminar en una parada).
+function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeOk = null, alsoOk = null) {
   let best = -1;
   let bestDist = Infinity;
   const nodes = routeGraph.nodes;
@@ -3189,6 +3355,7 @@ function nearestNodeIndex(x, y, requireGiantComponent, onlyComponent = -1, nodeO
   const compId = routeGraph.componentId, compSize = routeGraph.componentSize, giant = routeGraph.giantComponent;
   for (let i = 0; i < n; i++) {
     if (nodeOk && !nodeOk[i]) continue;
+    if (alsoOk && !alsoOk[i]) continue;
     const comp = compId[i];
     if (onlyComponent !== -1) {
       if (comp !== onlyComponent) continue;
@@ -3270,17 +3437,18 @@ function dlcFilter(conElecciones) {
 // startHeading: el rumbo del juego si el camion viene andando (ver
 // routeStartHeading); la ruta arranca en su tramo y no da la vuelta.
 // penal: Map arista -> multiplicador del costo, para buscar alternativas
-// (routeLikeGame).
-function findRoute(startXY, endXY, startHeading = null, penal = null) {
+// (routeLikeGame), y previas, las ya encontradas; tramo, para pasar por un
+// waypoint (ver findRouteWith).
+function findRoute(startXY, endXY, startHeading = null, penal = null, previas = null, tramo = null) {
   if (!routeGraph) return null;
   const propio = dlcFilter(true);
-  let ruta = findRouteWith(startXY, endXY, propio, startHeading, penal);
+  let ruta = findRouteWith(startXY, endXY, propio, startHeading, penal, previas, tramo);
   if (ruta || !propio) return ruta;
   if (dlcOffFor(dlcGameOf(currentGame)).length) {
-    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading, penal);
+    ruta = findRouteWith(startXY, endXY, dlcFilter(false), startHeading, penal, previas, tramo);
     if (ruta) { ruta.usesUncheckedDlc = true; return ruta; }
   }
-  return findRouteWith(startXY, endXY, null, startHeading, penal);
+  return findRouteWith(startXY, endXY, null, startHeading, penal, previas, tramo);
 }
 
 // Las aristas del grafo de una ruta (sus puntos con indice de nodo) y lo que
@@ -3309,18 +3477,16 @@ function routeSecondsOf(points) {
 // del juego por la I-80 (Salt Lake City, Discord 19-10). Las alternativas
 // (routeAlternatives) se buscan solo si el largo no coincide con el juego.
 // Devuelve { leg, switched }.
-function routeLikeGame(leg, from, to, rumbo, gameKm) {
+function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
   if (!leg || routeGameAgreement(gameKmOf(leg, leg), gameKm) !== 'differ') return { leg, switched: false };
-  const rutas = routeAlternatives(leg, (penal) => findRoute(from, to, rumbo, penal), routeEdgesOf);
+  const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas, tramo), routeEdgesOf);
   const k = pickRouteLikeGame(rutas.map(r => ({ km: gameKmOf(r, r), seconds: routeSecondsOf(r) })), gameKm);
   return { leg: rutas[k], switched: k > 0 };
 }
 
-// Si el GPS del juego va al mismo lugar que nuestra ruta: un trabajo con la
-// empresa conocida y sin waypoints (el juego no sabe de los nuestros, y con
-// el centro de la ciudad el largo no se puede comparar).
+// Si se busca la ruta como la del GPS del juego (followGameRoute, pure.js).
 function gameRouteComparable(target) {
-  return !!target && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && !waypoints.length;
+  return followGameRoute(target, waypoints.length, routeProfile);
 }
 
 // Recien tomado el trabajo el GPS del juego puede no tener todavia la ruta
@@ -3338,18 +3504,33 @@ function routeGameRecheck(routeKey, target, data) {
   if (c.ticks < ROUTE_GAME_RECHECK_TICKS) return false;
   c.left = 0;
   const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data);
-  return routeLikeGame(findRoute(from, [target.x, target.z], rumbo), from, [target.x, target.z], rumbo, data.routeDistanceKm).switched;
+  const tramo = { entrar: true, empresa: true }; // gameRouteComparable: la empresa del trabajo
+  return routeLikeGame(findRoute(from, [target.x, target.z], rumbo, null, null, tramo), from, [target.x, target.z], rumbo, data.routeDistanceKm, tramo).switched;
 }
 
 // El rumbo con que arranca la ruta al recalcular: el del juego, solo si el
 // camion viene andando para adelante. Parado en el deposito el rumbo no dice
-// por donde va a salir: ahi, el nodo mas cercano como siempre.
+// por donde va a salir: ahi, el nodo mas cercano como siempre. Parado sobre
+// la ruta de antes (sobreLaRuta, recalcOnRoute en pure.js) si lo dice.
 const ROUTE_HEADING_MIN_KMH = 15;
-function routeStartHeading(data) {
-  return data && Number.isFinite(data.heading) && Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH ? data.heading : null;
+function routeStartHeading(data, sobreLaRuta = false) {
+  return data && Number.isFinite(data.heading) && (sobreLaRuta || Number(data.speedKmh) >= ROUTE_HEADING_MIN_KMH) ? data.heading : null;
 }
 
-function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null) {
+// penal y previas: para una alternativa (routeAlternatives), las aristas
+// encarecidas y las rutas ya encontradas, de las que no se desvia por una
+// salida o un area de descanso para volver a entrar (dropRouteDetours).
+// tramo: { entrar } para un lugar al que se entra (una parada, una empresa:
+// el nodo de una calle o un prefab antes que el de la autopista; con
+// empresa, la del trabajo, uno que no toque ninguna via rapida), y en una
+// ruta con waypoints { desde, pasar, siguiente }. pasar: el
+// tramo llega a un waypoint y pasa por el sobre su calle (waypointArcs,
+// pure.js), no por el nodo mas cercano; la ruta devuelta trae en .llegada
+// por donde paso, y el tramo siguiente arranca ahi (desde), en el mismo
+// sentido. siguiente: { xy, pasar } del tramo que sigue, para elegir entre
+// los carriles de un cruce por el que pasa el waypoint. La ruta devuelta
+// trae en .cost lo que cuesta (sin el A* por nodos).
+function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null, previas = null, tramo = null) {
   const { nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeT, edgeF, midOff, midXY, degree, componentId, edgeG } = routeGraph;
   const blocked = filtro ? filtro.blocked : null;
   const nodeOk = filtro ? filtro.nodeOk : null;
@@ -3362,9 +3543,9 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   // (startArcForHeading, pure.js): el nodo mas cercano podia ser de la
   // calzada contraria, de otra rampa o estar a cientos de metros.
   const { componentSize } = routeGraph;
-  const arranque = startHeading != null ? startArcForHeading(routeGraph, startXY[0], startXY[1], startHeading, {
-    edgeOk: (e, a) => (!blocked || !blocked[edgeG[e]]) && componentSize[componentId[a]] >= MIN_REAL_COMPONENT_NODES,
-  }) : null;
+  const arcoOk = (e, a) => (!blocked || !blocked[edgeG[e]]) && componentSize[componentId[a]] >= MIN_REAL_COMPONENT_NODES;
+  let arranque = tramo && tramo.desde ? tramo.desde
+    : startHeading != null ? startArcForHeading(routeGraph, startXY[0], startXY[1], startHeading, { edgeOk: arcoOk }) : null;
   let startIdx = arranque ? arranque.to : nearestNodeIndex(startXY[0], startXY[1], 'real', -1, nodeOk);
   let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real', -1, nodeOk);
   if (startIdx === -1 || endIdx === -1) return null;
@@ -3372,30 +3553,138 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
     endIdx = nearestNodeIndex(endXY[0], endXY[1], false, componentId[startIdx], nodeOk);
     if (endIdx === -1) return null;
   }
+  const metas = tramo && tramo.pasar
+    ? waypointArcs(routeGraph, endXY[0], endXY[1], { edgeOk: arcoOk }).filter(c => componentId[c.to] === componentId[startIdx]) : [];
+  // Un lugar al que se entra (estacion, area de descanso, empresa) pegado a
+  // una via rapida: el nodo de la autopista dejaba la ruta pasando de largo.
+  // El de una calle o un prefab mas cercano, si no queda mucho mas lejos
+  // (slowNodes, pure.js). A la empresa del trabajo (tramo.empresa), uno que
+  // no toque ninguna via rapida (yardNodes).
+  if (tramo && tramo.entrar) {
+    const lentos = tramo.empresa ? yardNodes(routeGraph) : slowNodes(routeGraph);
+    if (!lentos[endIdx]) {
+      const j = nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, lentos);
+      const dist = (i) => Math.hypot(nodes[2 * i] - endXY[0], nodes[2 * i + 1] - endXY[1]);
+      if (j !== -1 && dist(j) <= dist(endIdx) + STOP_SLOW_NODE_M) endIdx = j;
+    }
+  }
 
   // Perfil de ruteo: "fastest" pesa por tiempo (prefiere autopista, como el
-  // GPS del juego), "shortest" por metros. La heuristica de A* tiene que ser
-  // admisible: distancia recta, y para tiempo dividida por la velocidad maxima
-  // posible (90 km/h).
+  // GPS del juego), "shortest" por metros (mas unos metros por segundo:
+  // routeEdgeCost). La heuristica de A* tiene que ser admisible: distancia
+  // recta, a la velocidad maxima posible (90 km/h).
   const byTime = routeProfile !== 'shortest';
   const MAX_SPEED_MS = 90 / 3.6;
-  const ex = nodes[2 * endIdx], ey = nodes[2 * endIdx + 1];
+  // Pasando por un waypoint, la recta hasta el, menos lo que puede quedar
+  // corrido el punto de su calle por donde se pasa
+  let ex = nodes[2 * endIdx], ey = nodes[2 * endIdx + 1], holgura = 0;
+  if (metas.length) {
+    ex = endXY[0]; ey = endXY[1];
+    holgura = Math.max(...metas.map(c => Math.hypot(c.point[0] - ex, c.point[1] - ey)));
+  }
   const heuristic = (i) => {
-    const d = Math.hypot(nodes[2 * i] - ex, nodes[2 * i + 1] - ey);
-    return byTime ? d / MAX_SPEED_MS : d;
+    const d = Math.max(0, Math.hypot(nodes[2 * i] - ex, nodes[2 * i + 1] - ey) - holgura);
+    return byTime ? d / MAX_SPEED_MS : d * (1 + ROUTE_SHORT_M_PER_S / MAX_SPEED_MS);
   };
 
   // Primero sin vueltas en U en los nodos (findArcRoute, pure.js): A* por
   // aristas. Si asi no hay camino (algun rincon raro del grafo), el A* por
   // nodos de siempre: nunca peor que antes.
-  const path = findArcRoute(routeGraph, startIdx, endIdx, {
-    cost: (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) * (penal ? (penal.get(e) || 1) : 1),
+  const costo = (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) * (penal ? (penal.get(e) || 1) : 1);
+  const finales = metas.length ? new Map(metas.map(c => [c.arc, c.f])) : null;
+  const porAristas = (desde, arco, hasta = finales) => findArcRoute(routeGraph, desde, endIdx, {
+    cost: costo,
     heuristic,
     blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
     isFerry: (e) => (edgeF[e] & 1) === 1,
-    startArc: arranque ? arranque.arc : null,
-  }) || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
+    startArc: arco,
+    endArcs: hasta,
+  });
+  // El waypoint mas adelante en el mismo tramo por el que se arranca (dos
+  // waypoints en la misma arista larga): se llega derecho, sin dar la vuelta
+  const enElTramo = arranque ? metas.find(c => c.arc === arranque.arc && c.f >= arranque.f) : null;
+  if (enElTramo) {
+    const entre = arranque.rest.slice(0, Math.max(0, arranque.rest.length - enElTramo.rest.length));
+    const out = [arranque.point, ...entre, enElTramo.point].map(p => [p[0], p[1], 0, 0, null]);
+    out.llegada = enElTramo;
+    out.cost = (enElTramo.f - arranque.f) * costo(adjEdge[arranque.arc]);
+    return out;
+  }
+  let path = porAristas(startIdx, arranque ? arranque.arc : null);
+  // Andando por carriles de un prefab que todavia no se separan, el camion
+  // esta casi igual de cerca de varios (arranque.alts, startArcForHeading):
+  // sigue por el que da la ruta mas barata, contando lo que falta del tramo.
+  // Con el mas cercano solo, el camion que seguia derecho a veces doblaba
+  // por el otro carril y la ruta daba una vuelta de 1 a 10 km.
+  if (arranque && arranque.alts && arranque.alts.length) {
+    const total = (c, p) => {
+      let t = (1 - c.f) * costo(adjEdge[c.arc]);
+      for (let k = 1; k < p.length; k++) {
+        const ultimo = k === p.length - 1 && p.endArc != null;
+        const d = ultimo ? p.endArc : routeGraph.dirEdge(p[k - 1], p[k]);
+        t += d === -1 ? Infinity : costo(adjEdge[d]) * (ultimo ? finales.get(p.endArc) : 1);
+      }
+      return t;
+    };
+    let mejor = path ? total(arranque, path) : Infinity;
+    for (const c of arranque.alts) {
+      if (componentId[c.to] !== componentId[endIdx]) continue;
+      const p = porAristas(c.to, c.arc);
+      const t = p ? total(c, p) : Infinity;
+      if (t < mejor) { mejor = t; path = p; arranque = c; startIdx = c.to; }
+    }
+  }
+  if (!path && finales) {
+    // Sin camino que pase por la calle del waypoint: al nodo mas cercano, como antes
+    finales.clear();
+    ex = nodes[2 * endIdx]; ey = nodes[2 * endIdx + 1]; holgura = 0;
+    path = porAristas(startIdx, arranque ? arranque.arc : null);
+  }
+  path = path || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
+  if (!path) {
+    // Una zona del grafo sin salida o sin entrada (carriles de prefab al
+    // reves: Volkhov en ETS2): desde el nodo mas cercano del que se sale, y
+    // hasta el mas cercano al que se llega (routeReachability, pure.js).
+    // Mejor una ruta que empieza o termina unos metros mas alla que una recta.
+    const alcance = routeReachability(routeGraph);
+    const s2 = alcance.reachesMain[startIdx] ? startIdx : nearestNodeIndex(startXY[0], startXY[1], false, componentId[startIdx], nodeOk, alcance.reachesMain);
+    const e2 = alcance.reachFromMain[endIdx] ? endIdx : nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, alcance.reachFromMain);
+    if (s2 !== -1 && e2 !== -1 && (s2 !== startIdx || e2 !== endIdx)) {
+      if (s2 !== startIdx) { arranque = null; startIdx = s2; }
+      if (finales) finales.clear();
+      endIdx = e2; ex = nodes[2 * endIdx]; ey = nodes[2 * endIdx + 1]; holgura = 0;
+      path = porAristas(startIdx, arranque ? arranque.arc : null) || nodeRoutePath(startIdx, endIdx, byTime, heuristic, blocked);
+    }
+  }
   if (!path) return null;
+  let llegada = path.endArc != null ? metas.find(c => c.arc === path.endArc) || null : null;
+  // Un waypoint en medio de un cruce queda cerca de varios carriles, y el que
+  // se alcanza mas barato puede ser el de otra salida: el tramo siguiente
+  // daba la vuelta (9 de 1.189 waypoints simulados sobre la ruta). Entre ese
+  // y los dos mas cercanos, el que da menos sumando el tramo que sigue.
+  if (llegada && tramo.siguiente) {
+    const probar = [llegada, ...metas.slice(0, 2).filter(c => c !== llegada)];
+    let mejor = null;
+    for (const c of probar) {
+      const p1 = c === llegada ? path : porAristas(startIdx, arranque ? arranque.arc : null, new Map([[c.arc, c.f]]));
+      if (!p1 || p1.endArc == null) continue;
+      const r2 = probar.length > 1
+        ? findRouteWith(endXY, tramo.siguiente.xy, filtro, null, null, null, { desde: c, pasar: tramo.siguiente.pasar }) : null;
+      const t = p1.cost + (r2 && r2.cost != null ? r2.cost : 0);
+      if (probar.length > 1 && !(r2 && r2.cost != null)) continue;
+      if (!mejor || t < mejor.t) mejor = { t, p1, c };
+    }
+    if (mejor) { path = mejor.p1; llegada = mejor.c; }
+  }
+  if (previas) {
+    const arista = (a, b) => {
+      const d = routeGraph.dirEdge(a, b);
+      if (d === -1) return null;
+      const e = adjEdge[d];
+      return { m: edgeM[e], cost: routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) };
+    };
+    for (const r of previas) path = dropRouteDetours(path, r.filter(p => p[4] != null).map(p => p[4]), arista);
+  }
   // Cada punto: [x, y, ferry, junction]. ferry = 1 si el tramo que LLEGA a
   // el es un ferry/tren (dibujado punteado, sin anunciar giros en el mar);
   // junction = 1 si el nodo es una interseccion real (3+ vecinos), que es
@@ -3415,11 +3704,13 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   const out = arranque ? [arranque.point, ...arranque.rest].map(p => [p[0], p[1], 0, 0, null]) : [];
   for (let k = 0; k < path.length; k++) {
     const i = path[k];
+    // Pasando por un waypoint, el ultimo arco llega hasta su punto, no al nodo
+    const hastaWaypoint = llegada && k === path.length - 1;
     let ferry = 0;
     let desde = -1, sIni = 0, sFin = 0;
     if (k > 0) {
       const prev = path[k - 1];
-      const d = routeGraph.dirEdge(prev, i);
+      const d = hastaWaypoint ? llegada.arc : routeGraph.dirEdge(prev, i);
       if (d !== -1) {
         const e = adjEdge[d];
         ferry = edgeF[e] & 1 ? 1 : 0;
@@ -3427,13 +3718,15 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
           desde = out.length - 1;
           sIni = (adjRev[d] ? shiftB[e] : shiftA[e]) / 2;
           sFin = (adjRev[d] ? shiftA[e] : shiftB[e]) / 2;
+          if (hastaWaypoint) sFin = sIni + (sFin - sIni) * llegada.f;
         }
         const m0 = midOff[e], m1 = midOff[e + 1];
-        if (adjRev[d]) { for (let m = m1 - 1; m >= m0; m--) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
+        if (hastaWaypoint) { for (const q of llegada.before) out.push([q[0], q[1], 0, 0, null]); }
+        else if (adjRev[d]) { for (let m = m1 - 1; m >= m0; m--) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
         else { for (let m = m0; m < m1; m++) out.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]); }
       }
     }
-    out.push([nodes[2 * i], nodes[2 * i + 1], ferry, degree[i] >= 3 ? 1 : 0, i]);
+    out.push(hastaWaypoint ? [llegada.point[0], llegada.point[1], ferry, 0, null] : [nodes[2 * i], nodes[2 * i + 1], ferry, degree[i] >= 3 ? 1 : 0, i]);
     if (desde >= 0) spreadEdgeShift(out, desde, sIni, sFin);
     else if (k === 0 && arranque && shiftA) {
       const e = adjEdge[arranque.arc], r = adjRev[arranque.arc];
@@ -3441,6 +3734,8 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
       spreadEdgeShift(out, 0, sCola + (sPunta - sCola) * arranque.f, sPunta);
     }
   }
+  if (llegada) out.llegada = llegada;
+  if (path.cost != null) out.cost = (arranque ? (1 - arranque.f) * costo(adjEdge[arranque.arc]) : 0) + path.cost;
   return out;
 }
 
@@ -3848,27 +4143,42 @@ function updateDestinationMarker(data) {
     navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;
     navQuietLanesState.shown = null; navQuietLanesState.shownKey = null; navQuietLanesState.candidate = undefined; navQuietLanesState.candidateTicks = 0;
     navQuietLanes = null;
-    routeBehind = [];
+    // Sin desviarse (cambio el destino o un waypoint) el camion sigue sobre
+    // la ruta de antes: lo recorrido y su rumbo siguen valiendo, o el giro
+    // del cruce en el que esta se pierde (recalcOnRoute).
+    const sobreLaRuta = recalcOnRoute({ offRoute, behind: routeBehind, route: currentRouteWorldPoints, x: data.position.x, z: data.position.z });
+    if (!sobreLaRuta) routeBehind = [];
     let routePoints = [];
     let from = [data.position.x, data.position.z];
     let complete = true;
     routeUsesUncheckedDlc = false;
+    let llegada = null;
     legs.forEach((to, legIdx) => {
       // El primer tramo sale del camion: con su rumbo si viene andando.
-      const rumbo = legIdx === 0 ? routeStartHeading(data) : null;
-      let leg = findRoute(from, to, rumbo);
+      const rumbo = legIdx === 0 ? routeStartHeading(data, sobreLaRuta) : null;
+      // Hasta un waypoint, la ruta pasa por el sobre su calle, y el tramo
+      // siguiente sigue desde ahi en el mismo sentido (findRouteWith)
+      // (solo los puestos tocando el mapa: waypointPassesBy). A una parada,
+      // una empresa o la empresa del trabajo se entra (entrar); a la del
+      // trabajo, por un nodo que no toque una via rapida (empresa).
+      const pasa = (i) => i < waypoints.length && waypointPassesBy(waypoints[i]);
+      const empresa = (i) => i >= waypoints.length && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx;
+      const entra = (i) => (i < waypoints.length ? !pasa(i) : empresa(i));
+      const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
+      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), siguiente });
+      llegada = leg ? leg.llegada || null : null;
       // Casi empatada con otra, la que va por donde el GPS del juego.
       if (leg && legs.length === 1 && gameRouteComparable(target)) {
-        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm);
+        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx), empresa: empresa(legIdx) });
         leg = elegida.leg;
         if (elegida.switched) routeGameCheck.left = 0;
       }
       if (leg) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
         // Parado arranca en el nodo mas cercano: si es el cruce de adelante,
-        // con su entrada, o el giro de ahi no se avisa (stoppedRouteLead).
-        const entrada = legIdx === 0 && rumbo == null ? stoppedRouteLead(leg, from[0], from[1], data.heading) : null;
-        if (entrada) leg = [entrada, ...leg];
+        // con su entrada, o el giro de ahi no se avisa. Andando, a metros de
+        // un nodo arranca en el nodo con la misma entrada (recalcRouteStart).
+        if (legIdx === 0) leg = recalcRouteStart(leg, from[0], from[1], data.heading, rumbo, sobreLaRuta);
         leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
         routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
       } else { complete = false; routePoints.push([from[0], from[1], 0, 0, null, legIdx], [to[0], to[1], 0, 0, null, legIdx]); }
@@ -3954,6 +4264,7 @@ async function loadGameMap(game) {
     try { map.addLayer(layer, 'trail-line'); } catch (err) { console.error('No se pudo agregar la capa', layer.id, err); }
   }
   setAtlasData();
+  setRoadShieldData();
   applyBaseMap();
 
   map.jumpTo({ center: mapInfo.origin, zoom: 5 });
@@ -4332,6 +4643,13 @@ function findUpcomingTurn(heading) {
         const deRampa = laneKeepAt(pts, i, iEnd, true);
         if (deRampa && laneFromOnRamp({ ...ctx, i }, NAV_LANE_RAMP_M)) keep = deRampa;
       }
+      // Con el ajuste "en cada salida" (navEveryExit), tambien donde el carril
+      // se agrego para la salida: las que findQuietLanes muestra sin aviso.
+      if (!keep && navEveryExit) {
+        let direction = null;
+        const lanes = laneRecordAt(pts, i, iEnd, (r) => (direction = everyExitKeepSide(r)) != null);
+        if (lanes) keep = { direction, lanes };
+      }
       const salida = keep && sideExitToward({ ...ctx, i, iEnd, rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M }, 'right', -100, 100);
       if (salida) {
         const repetido = lastKeep && lastKeep.direction === keep.direction && cum[i] - lastKeep.atM <= NAV_LANE_KEEP_REPEAT_M;
@@ -4389,10 +4707,17 @@ function findUpcomingTurn(heading) {
       // el cartel mas cercano a un punto un poco despues del giro. No votan
       // los carteles del cruce ni los que quedan mas cerca de otra salida
       // (exitSignTest, otherBranchesAt): el "I-80" del cruce nombraba la
-      // rampa a la I-84 en Salt Lake City.
+      // rampa a la I-84 en Salt Lake City. Ni los de la otra mano.
+      // El "keep" de seguir derecho por los carriles (laneKeep, tambien el de
+      // "en cada salida") va sin nombre: la ruta sigue por la misma autopista
+      // y los carteles que vienen anuncian las salidas ("Keep left onto
+      // US-71" en el trebol de la I-44 en Joplin, Discord 20-10).
+      // En una bifurcacion, los carteles pegados al nodo votan solo si no
+      // hay otros (ROAD_SIGN_FORK_NEAR_M): ahi las dos ramas van juntas.
       const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
-      const nearSign = roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
-        onExit: exitSignTest({ pts, cum, pointAt, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) }),
+      const nearSign = m.laneKeep ? null : roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
+        onExit: exitSignTest({ pts, cum, pointAt, bearingBetween, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) },
+          m.kind === 'fork' ? { cercaM: ROAD_SIGN_FORK_NEAR_M } : undefined),
       });
       // Otra calle hacia el mismo lado antes del giro: la voz dice "turn
       // right" recien despues de pasarla (la distancia es hasta su salida).
@@ -4462,7 +4787,7 @@ function findQuietLanes() {
   const ctx = { pts, cum, pointAt, bearingBetween, nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency,
     rejoinM: NAV_LANE_KEEP_ESCAPE_M, escapeM: NAV_LANE_KEEP_ESCAPE_M };
   const q = quietLanesAhead(pts, cum, here, NAV_QUIET_LANES_M, (i, iEnd) => {
-    const rec = laneRecordAt(pts, i, iEnd, (r) => (r.turn & LANE_ARROW_BITS.straight) && laneKeepSide(r, true) != null);
+    const rec = laneRecordAt(pts, i, iEnd, (r) => everyExitKeepSide(r) != null);
     return rec && sideExitToward({ ...ctx, i, iEnd }, 'right', -100, 100) ? rec : null;
   }, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M);
   return q ? { kind: 'lanes', direction: null, node: q.node, distanceMeters: q.distanceMeters, lanes: q.lanes } : null;
@@ -4550,24 +4875,47 @@ function pipSupported() {
   return 'documentPictureInPicture' in window;
 }
 
+// El tamano de la ventana flotante con y sin mapa, como lo dejo el usuario
+// (localStorage: sirve para la proxima vez, en otra pestana o despues de
+// reiniciar), y lo que se pidio al abrir la ultima en esta pestana con el
+// modo en que se cerro (sessionStorage: es lo que Chrome recuerda, ver
+// pipRequestSize). Se guarda un rato despues de estirarla.
+const PIP_SIZE_KEYS = { text: 'truckdash_pip_size_text', map: 'truckdash_pip_size_map' };
+const PIP_OPEN_KEY = 'truckdash_pip_open';
+const PIP_SIZE_SAVE_MS = 500;
+const pipSizeKey = (conMapa) => PIP_SIZE_KEYS[conMapa ? 'map' : 'text'];
+function ssGet(key) { try { return sessionStorage.getItem(key); } catch (e) { return null; } }
+function ssSet(key, value) { try { sessionStorage.setItem(key, value); } catch (e) {} }
+
 async function openPip() {
   if (pipWin) { try { pipWin.focus(); } catch (err) { /* nada */ } return; }
   const conMapa = pipMapWanted();
+  const pedido = pipRequestSize(conMapa, lsGet(pipSizeKey(conMapa)), ssGet(PIP_OPEN_KEY));
   let w;
   try {
-    w = await documentPictureInPicture.requestWindow(pipWindowSize(conMapa));
+    w = await documentPictureInPicture.requestWindow(pedido);
   } catch (err) {
     console.error('No se pudo abrir la ventana flotante', err);
     return;
   }
-  setupPipWindow(w, conMapa);
+  setupPipWindow(w, conMapa, pedido);
 }
 
 // Arma la ventana flotante en w (la de Document Picture-in-Picture; las
 // pruebas le pasan la de un iframe, porque el navegador de algunas
 // herramientas no abre ventanas). conMapa: arranca con el mapa adentro.
-function setupPipWindow(w, conMapa) {
+// pedido: el tamano pedido al abrirla (sin el, no se anota para la proxima).
+function setupPipWindow(w, conMapa, pedido = null) {
   pipWin = w;
+  // El tamano que le deja el usuario, para el modo que tiene al estirarla.
+  let guardarTam = null;
+  const guardarTamano = () => {
+    if (guardarTam == null) return;
+    clearTimeout(guardarTam);
+    guardarTam = null;
+    const s = pipSavedSize({ width: w.innerWidth, height: w.innerHeight });
+    if (s) lsSet(pipSizeKey(pipMapOn), JSON.stringify(s));
+  };
   const d = w.document;
   d.title = 'Truck Dash';
   const estilo = d.createElement('style');
@@ -4586,10 +4934,16 @@ function setupPipWindow(w, conMapa) {
       </div>
     </div>`;
   d.getElementById('pModo').addEventListener('click', () => {
+    // resizeTo es de la ventana entera y el tamano guardado es del contenido:
+    // se le suma la barra de arriba, medida antes de cambiar.
+    const marcoW = Math.min(200, Math.max(0, w.outerWidth - w.innerWidth));
+    const marcoH = Math.min(200, Math.max(0, w.outerHeight - w.innerHeight));
+    guardarTamano(); // el del modo que se deja, si recien la estiraron
     if (pipMapOn) pipMapOut(); else pipMapIn();
-    // El clic adentro de la ventana deja cambiarle el tamano
-    const { width, height } = pipWindowSize(pipMapOn);
-    try { w.resizeTo(width, height); } catch (err) { /* el usuario la estira a mano */ }
+    // El clic adentro de la ventana deja cambiarle el tamano: el que tenia
+    // la ultima vez en el modo nuevo
+    const { width, height } = pipWindowSize(pipMapOn, lsGet(pipSizeKey(pipMapOn)));
+    try { w.resizeTo(width + marcoW, height + marcoH); } catch (err) { /* el usuario la estira a mano */ }
   });
   // Arrastrar el mapa adentro de la ventana: el soltar llega a esta ventana
   // y no a la pestana (ver mapPointersDown). Sin esto el seguimiento del
@@ -4598,8 +4952,14 @@ function setupPipWindow(w, conMapa) {
     w.addEventListener(type, (e) => mapPointersDown.delete(e.pointerId), true);
   }
   w.addEventListener('blur', () => mapPointersDown.clear());
-  w.addEventListener('resize', () => { if (pipMapOn && map) map.resize(); });
+  w.addEventListener('resize', () => {
+    if (pipMapOn && map) map.resize();
+    clearTimeout(guardarTam);
+    guardarTam = setTimeout(guardarTamano, PIP_SIZE_SAVE_MS);
+  });
   w.addEventListener('pagehide', () => {
+    guardarTamano();
+    if (pedido) ssSet(PIP_OPEN_KEY, JSON.stringify({ ...pedido, closeMap: pipMapOn }));
     // El mapa vuelve a la pestana antes de que la ventana se destruya; la
     // preferencia queda para la proxima vez que se abra.
     pipMapOut(true);
@@ -5150,14 +5510,24 @@ async function speakVoice(key) {
   voiceAudio.play().then(() => { voiceUnlocked = true; }, (err) => { voiceDone(token); voicePlayFailed(err); });
 }
 
+// El nombre de un idioma en ese idioma ("Deutsch", "Polski"): asi lo busca
+// quien lo habla. Sin Intl.DisplayNames, el codigo.
+function voiceLangName(lang) {
+  try {
+    const n = new Intl.DisplayNames([lang], { type: 'language' }).of(lang);
+    return n ? n.charAt(0).toLocaleUpperCase(lang) + n.slice(1) : lang;
+  } catch { return lang; }
+}
+
+// Todas las voces, primero las del idioma de la app (voiceChoices en pure.js)
 function fillVoiceSelect() {
   const sel = document.getElementById('setVoiceName');
   if (!sel) return;
-  const own = voiceCatalog ? voiceCatalog.voices.filter(v => v.lang === currentLang) : [];
-  sel.innerHTML = own.map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.system ? t('settingsVoiceSystem') : v.label)}</option>`).join('');
+  const opciones = voiceCatalog ? voiceChoices(voiceCatalog.voices, currentLang, voiceLangName, t('settingsVoiceSystem')) : [];
+  sel.innerHTML = opciones.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.label)}</option>`).join('');
   const chosen = currentVoice();
   if (chosen) sel.value = chosen.id;
-  sel.disabled = own.length < 2;
+  sel.disabled = opciones.length < 2;
 }
 
 function voiceManeuverTick(turn) {
@@ -5707,8 +6077,8 @@ function updateMiniHudExtra(data) {
     const rangeDisplay = useImperial ? ffRange * KM_TO_MI : ffRange;
     lines.push(`${t('range')}: ${Math.round(rangeDisplay)} ${useImperial ? 'mi' : 'km'}`);
   }
-  if (miniHudSettings.eta && data.routeTimeSeconds != null) {
-    lines.push(`${t('etaGame')}: ${formatSeconds(data.routeTimeSeconds)}`);
+  if (miniHudSettings.eta && gameRouteSeconds(data) != null) {
+    lines.push(`${t('etaGame')}: ${formatSeconds(gameRouteSeconds(data))}`);
   }
   if (miniHudSettings.distance && data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
@@ -5963,7 +6333,7 @@ function updateHud(data) {
     document.getElementById('cargo').textContent = t('noCargo');
   }
 
-  const etaText = formatSeconds(data.routeTimeSeconds);
+  const etaText = formatSeconds(gameRouteSeconds(data)); // '-' sin ruta en el GPS del juego
   if (data.routeDistanceKm) {
     const distDisplay = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
     document.getElementById('etaGame').textContent = `${etaText} (${formatDec(distDisplay, currentLang)} ${useImperial ? 'mi' : 'km'})`;
@@ -6479,7 +6849,7 @@ let rememberedTries = 0;
 // (socket abierto o no), lo que dice el backend (hay un cliente local
 // conectado con este codigo?) y el diagnostico que manda el cliente
 // (client_status: waiting_game / plugin_missing / waiting_truck / live).
-const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, demo: false, everOpen: false, everValid: false, spectator: false, waitingClient: false };
+const conn = { socket: 'idle', clientConnected: null, clientStatus: null, paused: false, invalidCode: false, hasTelemetry: false, local: false, lanRelay: false, demo: false, everOpen: false, everValid: false, spectator: false, waitingClient: false };
 
 function connectionView() {
   return connectionViewFor(conn);
@@ -7045,6 +7415,7 @@ document.getElementById('stopSuggestClose').addEventListener('click', () => {
 });
 
 function handleTelemetry(data) {
+  if (positionAtOrigin(data.position)) data = { ...data, position: null }; // 0,0: sin posicion
   trackFuel(data);
   trackStatus(data);
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
@@ -7081,12 +7452,13 @@ function handleTelemetry(data) {
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
   // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
-  if (liveShareEnabled && !conn.local && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) { sendLiveShareState(); sendLiveRoute(true); }
+  if (liveShareEnabled && (!conn.local || conn.lanRelay) && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) { sendLiveShareState(); sendLiveRoute(true); }
 }
 
 function connectWs(backend, code, options = {}) {
   conn.local = !!options.local;
-  renderLiveShareForLan();
+  conn.lanRelay = false; // lo dice el session_state del cliente
+  renderLiveShareControls();
   fetchLatestClientVersion(conn.local ? document.getElementById('backendUrl').value : backend);
   clearTimeout(reconnectTimer);
   // Modo LAN: el cliente sirve esta pagina y el WebSocket directo, sin
@@ -7124,12 +7496,19 @@ function connectWs(backend, code, options = {}) {
     if (data.type) flushPendingTelemetry(); // los mensajes de control se procesan en orden con la telemetria que llego antes
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
-    if (data.type === 'live_share_state') { if (!conn.local) applyLiveShareState(data.enabled); return; }
+    if (data.type === 'live_share_state') { applyLiveShareState(data.enabled); return; } // por LAN lo reenvia el cliente
     if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria
     if (data.type && data.type.startsWith('convoy_')) { if (typeof convoyHandleMessage === 'function') convoyHandleMessage(data); return; } // Convoy (beta)
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;
+      if (conn.local) {
+        // Un cliente que le pasa el tilde de compartir al relay manda la
+        // clave (null si el relay todavia no dijo nada).
+        conn.lanRelay = 'liveShare' in data;
+        if (typeof data.liveShare === 'boolean') applyLiveShareState(data.liveShare);
+        renderLiveShareControls();
+      }
       setClientOverlay(data.client_status && data.client_status.overlay);
       setObsOverlay(data.obs_overlay); // un relay viejo no lo manda: apagado
       if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);

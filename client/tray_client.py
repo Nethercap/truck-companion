@@ -24,7 +24,7 @@ import time
 import tkinter as tk
 from tkinter import filedialog
 import urllib.parse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import red
 
@@ -177,13 +177,21 @@ class AppState:
                                "items": overlay.ITEMS, "pos": None, "opacity": overlay.DEFAULT_OPACITY}
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
-                                                T("overlay_arrival_game"), T("overlay_turn_hint")))
+                                                T("overlay_arrival_game"), self.aviso_giro()))
         # Arrastrado en el modo Mover: queda en esa posicion; estirado desde
         # la esquina o con la rueda, con ese tamano.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))
         self.overlay.al_redimensionar = lambda tamano: set_overlay_layout(size=tamano)
         # Tecla rapida que prende y apaga el overlay desde el juego.
         self.overlay_tecla = overlay.TeclaRapida(lambda: tecla_del_overlay())
+
+    def aviso_giro(self) -> str:
+        """La pista del overlay sin tablero, con la tecla que lo esconde: el
+        overlay prendido sin tablero quedaba en el juego y no se sabia como
+        sacarlo (Discord, 21-10)."""
+        texto = T("overlay_turn_hint")
+        tecla = getattr(getattr(self, "overlay_tecla", None), "actual", "")
+        return f"{texto} {T('overlay_hide_hint', combo=overlay.nombre_tecla(tecla))}" if tecla else texto
 
     def status_text(self) -> str:
         text = T(f"status_{self.status}") if self.status in STATUS_KEYS else self.status
@@ -1256,6 +1264,7 @@ class SetupWindow:
         build = state.map_build or {}
         return (tuple(sorted((g, m.get("fingerprint")) for g, m in state.local_maps.items())),
                 tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
+                tuple(g for g in ("ats", "ets2") if can_build_map(g)),
                 build.get("game"), build.get("step"), build.get("error"), build.get("running"))
 
     def render_local_map(self):
@@ -1284,6 +1293,14 @@ class SetupWindow:
                 self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
                 self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g),
                             primary=True).pack(anchor="w")
+            elif can_build_map(game):
+                # Sin el aviso de la web, a mano: el mod tiene una version mas
+                # nueva que la nuestra, o el tablero no estuvo abierto cuando
+                # el camion salio del mapa (el aviso no sobrevive a reiniciar).
+                self.label(self.local_map_body, T("local_map_manual", game=nombre), fg=MUTED,
+                           wraplength=520).pack(anchor="w", pady=(2, 0))
+                self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
+                self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g)).pack(anchor="w")
             else:
                 continue
             filas += 1
@@ -1550,39 +1567,41 @@ def show_log_location(icon, item):
         pass
 
 
-def apagar() -> None:
+def apagar(icono=None) -> None:
     """Cierra la aplicacion desde cualquier hilo.
 
-    quit_app sirve solo desde el menu de la bandeja (recibe el icono). Esto
-    lo llama tambien el loop de telemetria, que corre en el hilo de asyncio,
-    y tiene que funcionar igual sin bandeja (Linux sin GTK).
+    Lo llaman "Salir" de la bandeja (quit_app, con su icono) y el loop de
+    telemetria, que corre en el hilo de asyncio; tiene que funcionar igual
+    sin bandeja (Linux sin GTK).
     """
+    # El overlay del juego es un hilo de este proceso: se esconde ya (sin
+    # tocar el ajuste guardado). Mientras el proceso terminaba seguia en el
+    # juego con datos en vivo, y sin el icono de la bandeja no habia como
+    # sacarlo (Discord, 21-10: "I can't get rid of the old overlay").
+    state.overlay.set_enabled(False)
     # Antes de irse: la sesion de manejo se cierra y queda en la cola.
     # Lo que no se llegue a mandar sale en el proximo arranque.
     state.cuenta.cerrar_sesion()
+    # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
+    # que el proceso murio.
     state.discord.close()
-    icono = state.icon
+    icono = icono if icono is not None else state.icon
     if _tk_root is not None:
+        # macOS: Tk corre en el hilo principal; se lo para desde ahi.
         def _parar():
             if icono is not None:
                 icono.stop()
             _en_hilo_principal(_tk_root.quit)
-        win_integration.stop_and_exit(_parar if icono is not None else None)
+        win_integration.stop_and_exit(_parar)
     else:
         win_integration.stop_and_exit(icono.stop if icono is not None else None)
 
 
 def quit_app(icon, item):
-    # Salir de la bandeja tambien termina la sesion de manejo, igual que
-    # apagar(); sin esto quedaba abierta en el servidor para siempre.
-    state.cuenta.cerrar_sesion()
-    # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
-    # que el proceso murio.
-    state.discord.close()
-    if icon is not None:
-        icon.stop()
-    if _tk_root is not None:
-        _en_hilo_principal(_tk_root.quit)
+    # Lo mismo que apagar(), con el cierre forzado a los 5 s de
+    # stop_and_exit. Antes solo paraba el icono y sys.exit esperaba a los
+    # hilos del cliente: el icono se iba y el proceso, con el overlay, seguia.
+    apagar(icon)
 
 
 _browser_opened = False
@@ -2051,11 +2070,18 @@ def refresh_local_maps() -> bool:
     return cambio
 
 
+def can_build_map(game: str) -> bool:
+    """Hay mods activos (los del game.log.txt de la ultima partida, asi que
+    vale con el juego cerrado), se sabe donde esta el juego y no hay ya un
+    mapa armado para esos mods. Setup ofrece armarlo a mano."""
+    return (game not in state.local_maps and bool((state.mounted_mods or {}).get(game))
+            and game_dir_for(game) is not None)
+
+
 def needs_map_build(game: str) -> bool:
-    """Se ofrece armar el mapa si la web vio el camion fuera del mapa, hay
-    mods activos y no hay ya un mapa armado para ellos."""
-    return (game in state.offmap_games and game not in state.local_maps
-            and bool((state.mounted_mods or {}).get(game)) and game_dir_for(game) is not None)
+    """Ademas la web vio el camion fuera del mapa: Setup lo ofrece primero,
+    con el aviso de la bandeja."""
+    return game in state.offmap_games and can_build_map(game)
 
 
 def on_offmap(game: str):
@@ -2321,6 +2347,10 @@ async def run_client(backend_url: str, fixed_code: str | None):
     # Placeholder sin conexion hasta tener codigo: telemetry_loop publica por
     # LAN igual y descarta el envio cloud mientras tanto.
     cloud = CloudLink(backend_url, "", keybinds)
+    # El tilde de "compartir mi posicion" del tablero por LAN va al relay por
+    # esta conexion, y lo que diga el relay vuelve a ese tablero.
+    local.al_relay = cloud.send
+    client_lib.on_live_share = local.avisar_live_share
     telemetry_task = vigilar(asyncio.create_task(telemetry_loop(cloud, local)), "telemetria")
     # Vacia la cola de la cuenta cada tanto. Aparte del bucle de
     # telemetria a proposito: que la API este caida no puede frenar
@@ -2409,7 +2439,9 @@ def _focus_running_instance() -> bool:
     Setup (ver /__show-setup en local_server). Si no contesta -version vieja,
     modo LAN caido- devuelve False y se avisa con un cartel."""
     try:
-        with urlopen(f"http://127.0.0.1:{local_server.HTTP_PORT}/__show-setup", timeout=3) as resp:
+        pedido = Request(f"http://127.0.0.1:{local_server.HTTP_PORT}/__show-setup",
+                         headers={local_server.SHOW_SETUP_HEADER: local_server.SHOW_SETUP_VALUE})
+        with urlopen(pedido, timeout=3) as resp:
             return resp.status in (200, 204)
     except Exception:
         return False
@@ -2452,11 +2484,19 @@ def main():
         win_integration.stop_and_exit()
         return
 
+    # El inicio con Windows apuntando a otra copia (la version nueva bajada a
+    # otra carpeta): desde ahora arranca esta.
+    otra_copia = win_integration.refresh_autostart_path()
+
     # Issue #4: una sola instancia. Un segundo doble clic trae al frente la
     # ventana de la que ya esta corriendo, que es lo que espera cualquiera.
+    # Si la que corre es esa otra copia, abrir su ventana confundia (se
+    # cambiaban los ajustes de la vieja): se dice cual cerrar.
     if not win_integration.acquire_single_instance(wait_seconds=12.0 if args.relaunch else 0.0):
-        logging.info("Ya hay una instancia corriendo, se le pide que muestre la ventana")
-        if not _focus_running_instance():
+        logging.info("Ya hay una instancia corriendo%s", f" (el inicio con Windows era {otra_copia})" if otra_copia else ", se le pide que muestre la ventana")
+        if otra_copia:
+            _message_box(T("other_copy_running", path=otra_copia))
+        elif not _focus_running_instance():
             _message_box(T("already_running"))
         return
 

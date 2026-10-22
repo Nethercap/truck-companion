@@ -38,9 +38,11 @@ OTHER_DLL_NAME = "scs-telemetry.dll"
 # La DLL y su hash los escribe el workflow "Build plugin" (tools/pin_plugin.py).
 PLUGIN_DLL_VERSION = "1.12.1-truckdash.2"
 PLUGIN_DLL_SHA256 = "de81c1a25856d2f83a956feb06842ddfcd23788d6eb32d3a7584bcda4bf7d183"
-
+# El mismo plugin para macOS, universal (Intel y Apple Silicon): la .dylib y
+# su hash tambien los escribe "Build plugin" (plataforma macos, con
+# plugin/build.sh). Sin la .dylib en vendor/ o sin hash, no se instala nada.
 PLUGIN_DYLIB_NAME = "truckdash-telemetry.dylib"
-PLUGIN_DYLIB_SHA256 = ""  # Set by CI workflow when building the macOS plugin
+PLUGIN_DYLIB_SHA256 = "07434fb806e13a56824350cad12f605189a510af65e618d1f49c9262f169a404"
 
 GAMES = {
     "ets2": "Euro Truck Simulator 2",
