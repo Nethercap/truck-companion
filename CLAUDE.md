@@ -65,9 +65,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   una estrella: los tiles van con las calles que se tocan punta con punta
   unidas (`unir-calles.ts` del armador, en `truckdash.patch`; el taller lo
   corre antes de tippecanoe con `unir.ts`, parche 0005 de
-  `tm-maps-patches`). Los tiles de R2 de antes no lo tienen: se ven bien
-  igual, con alguna estrella, hasta regenerarlos (solo tippecanoe,
-  `rebuild_tiles_light.sh`). Quedan pedazos rotos en algunos cruces (brazo
+  `tm-maps-patches`). En R2 desde `mapDataVersion` 20261022 (solo
+  tippecanoe, `rebuild_tiles_light.sh`, las 17 variantes: de 123 mil calles
+  quedan 44 mil en ATS, los .pmtiles bajan 10 a 15 %). tippecanoe nombra la
+  capa por el archivo de entrada: con el unido salia "atsunido" y la web no
+  dibujaba nada; va `-l ats` / `-l ets2`. Quedan pedazos rotos en algunos cruces (brazo
   noroeste de una rotonda de Uppsala, juego 24060,-51876): los tiles de
   truckermudgeon tienen los mismos, vienen del generador; sacar los sueltos
   dejaba la calle cortada antes de la rotonda. Desde el zoom 12 la ruta es
