@@ -68,11 +68,7 @@ def bundled_dll_path(bin_dir: str | None = None) -> str:
     # Empaquetado: PyInstaller extrae los datas en sys._MEIPASS. Desde fuente:
     # client/vendor/ al lado de este archivo.
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    target = plugin_filename_for(bin_dir)
-    path = os.path.join(base, "vendor", target)
-    if not os.path.exists(path):
-        path = os.path.join(base, "vendor", PLUGIN_DLL_NAME)
-    return path
+    return os.path.join(base, "vendor", plugin_filename_for(bin_dir))
 
 
 def sha256_of(path: str) -> str | None:
@@ -146,12 +142,14 @@ def parse_libraryfolders(text: str) -> list[str]:
     (el formato usa backslashes escapados: "D:\\\\Games\\\\Steam")."""
     paths = []
     for raw in _LIBRARY_PATH_RE.findall(text):
-        clean_raw = raw.replace("\\\\", "/")
+        # El vdf de Steam para Linux trae rutas de Linux: van por Z: de Wine.
         path = os.path.normpath(unix_a_wine(raw.replace("\\\\", "\\")))
         if path not in paths:
             paths.append(path)
-        if clean_raw.startswith("/") and clean_raw not in paths:
-            paths.append(clean_raw)
+        # En macOS la ruta va como esta (no hay Wine de por medio).
+        crudo = raw.replace("\\\\", "/")
+        if sys.platform == "darwin" and crudo.startswith("/") and crudo not in paths:
+            paths.append(crudo)
     return paths
 
 
@@ -183,8 +181,10 @@ def plugin_state(bin_dir: str) -> str:
     if not os.path.exists(path):
         return "missing"
     expected = plugin_expected_sha256_for(bin_dir)
+    # Sin hash conocido (un armado de macOS sin la .dylib de la CI) no se
+    # puede decir que el instalado es el nuestro
     if not expected:
-        return "installed"
+        return "outdated"
     return "installed" if sha256_of(path) == expected else "outdated"
 
 
@@ -211,7 +211,15 @@ def same_dir(a: str, b: str) -> bool:
         return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
-GAME_EXES = ("eurotrucks2.exe", "amtrucks.exe", "eurotrucks2", "amtrucks")
+GAME_EXES = ("eurotrucks2.exe", "amtrucks.exe")
+# En macOS el ejecutable va sin .exe, adentro de <juego>.app/Contents/MacOS.
+# Solo ahi: en Linux, bin/linux_x64 (el juego nativo) tiene esos nombres y no
+# lleva nuestra .dll.
+GAME_EXES_MAC = ("eurotrucks2", "amtrucks")
+
+
+def game_exes() -> tuple:
+    return GAME_EXES + GAME_EXES_MAC if sys.platform == "darwin" else GAME_EXES
 
 
 def tiene_ejecutable(bin_dir: str) -> bool:
@@ -223,7 +231,7 @@ def tiene_ejecutable(bin_dir: str) -> bool:
     apareciendo en Setup, y encima como "Plugin installed", al lado de la
     instalacion de verdad.
     """
-    return any(os.path.exists(os.path.join(bin_dir, exe)) for exe in GAME_EXES)
+    return any(os.path.exists(os.path.join(bin_dir, exe)) for exe in game_exes())
 
 
 def find_game_installs() -> list[dict]:
@@ -259,25 +267,28 @@ def describe_install(game: str, bin_dir: str, origen: str = "steam") -> dict:
 
 
 def install_plugin(bin_dir: str) -> str:
-    """Copia el plugin empaquetado a <bin_dir>/plugins/. Devuelve la ruta
-    instalada; levanta OSError si no se pudo escribir (el llamador muestra el
-    mensaje) o FileNotFoundError si el plugin empaquetado no esta."""
-    try:
-        src = bundled_dll_path(bin_dir)
-    except TypeError:
-        src = bundled_dll_path()
+    """Copia el plugin empaquetado (.dll, o .dylib en una instalacion de
+    macOS) a <bin_dir>/plugins/. Devuelve la ruta instalada; levanta OSError
+    si no se pudo escribir (el llamador muestra el mensaje), FileNotFoundError
+    si el plugin empaquetado no esta y ValueError si no es el que esperamos.
+    En macOS sin la .dylib o sin su hash no se instala nada (nunca la .dll de
+    Windows, que el juego de Mac no carga)."""
+    nombre = plugin_filename_for(bin_dir)
+    src = bundled_dll_path(bin_dir)
     if not os.path.exists(src):
-        try:
-            src = bundled_dll_path()
-        except TypeError:
-            pass
-    if not os.path.exists(src):
-        raise FileNotFoundError(f"bundled plugin not found at {src}")
-    expected_sha = plugin_expected_sha256_for(bin_dir) if os.path.basename(src) == PLUGIN_DYLIB_NAME else PLUGIN_DLL_SHA256
-    if expected_sha and sha256_of(src) != expected_sha:
-        raise ValueError(f"bundled {os.path.basename(src)} does not match the expected SHA-256")
+        raise FileNotFoundError(f"bundled {nombre} not found")
+    expected_sha = plugin_expected_sha256_for(bin_dir)
+    if not expected_sha:
+        raise ValueError(f"no known SHA-256 for {nombre}: this build can't install the plugin")
+    if sha256_of(src) != expected_sha:
+        raise ValueError(f"bundled {nombre} does not match the expected SHA-256")
     dst = plugin_path_for(bin_dir)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
+    # A un temporal y despues un reemplazo de una sola vez, nunca escribiendo
+    # encima del instalado: bajo Proton el juego abierto tiene ese archivo
+    # mapeado en memoria, y pisarlo por adentro lo puede tirar abajo. Asi el
+    # juego sigue con el viejo hasta que se reinicie. En Windows, con el juego
+    # abierto, el reemplazo falla antes de tocar nada.
     tmp = dst + ".new"
     try:
         shutil.copyfile(src, tmp)
@@ -285,7 +296,7 @@ def install_plugin(bin_dir: str) -> str:
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
-    if expected_sha and sha256_of(dst) != expected_sha:
+    if sha256_of(dst) != expected_sha:
         raise OSError(f"copied file at {dst} does not match the expected SHA-256")
     return dst
 

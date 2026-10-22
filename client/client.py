@@ -278,20 +278,31 @@ def installed_map_dlcs(game_root: str, game: str) -> list | None:
     return sorted(i for archivo, i in MAP_DLC_FILES.get(game, {}).items() if archivo in nombres)
 
 
+def game_roots_for_bin_dir(bin_dir: str) -> list:
+    """Donde pueden estar los .scs del juego. Con <juego>/bin/win_x64, la
+    carpeta del juego. En macOS (<juego>/<Juego>.app/Contents/MacOS), los
+    Resources de la app y la carpeta donde esta la app."""
+    bin_dir = os.path.normpath(bin_dir)
+    contents = os.path.dirname(bin_dir)
+    if os.path.basename(bin_dir) == "MacOS" and os.path.basename(contents) == "Contents":
+        return [os.path.join(contents, "Resources"), os.path.dirname(os.path.dirname(contents))]
+    return [os.path.dirname(contents)]
+
+
 def read_installed_dlcs(installs: list) -> dict:
     """{'ats': [ids], 'ets2': [ids]} de las instalaciones encontradas (las de
-    plugin_installer: bin_dir es <juego>/bin/win_x64). Con dos instalaciones
-    del mismo juego, la union. Un juego sin instalacion no aparece."""
+    plugin_installer: bin_dir es <juego>/bin/win_x64, o la app en macOS). Con
+    dos instalaciones del mismo juego, la union. Un juego sin instalacion no
+    aparece."""
     out = {}
     for inst in installs or []:
         game = inst.get("game")
         if game not in MAP_DLC_FILES or not inst.get("bin_dir"):
             continue
-        raiz = os.path.dirname(os.path.dirname(os.path.normpath(inst["bin_dir"])))
-        encontrados = installed_map_dlcs(raiz, game)
-        if encontrados is None:
+        leidas = [installed_map_dlcs(raiz, game) for raiz in game_roots_for_bin_dir(inst["bin_dir"])]
+        if all(ids is None for ids in leidas):
             continue
-        out[game] = sorted(set(out.get(game, [])) | set(encontrados))
+        out[game] = sorted(set(out.get(game, [])).union(*(ids for ids in leidas if ids is not None)))
     return out
 
 
@@ -369,8 +380,10 @@ def read_map_mods() -> dict:
 def find_controls_sii_files() -> list:
     docs = documents_folder()
     files = []
+    # En macOS el juego guarda las teclas en controls_osx.sii
+    nombre = "controls_osx.sii" if sys.platform == "darwin" else "controls.sii"
     for game_dir in ("Euro Truck Simulator 2", "American Truck Simulator"):
-        for pattern in ("steam_profiles/*/controls.sii", "profiles/*/controls.sii"):
+        for pattern in (f"steam_profiles/*/{nombre}", f"profiles/*/{nombre}"):
             files.extend(glob.glob(os.path.join(docs, game_dir, pattern)))
     # Los backups de perfil tras un update de version (ej. "steam_profiles(1.61.x).bak")
     # no son el perfil activo, hay que descartarlos.

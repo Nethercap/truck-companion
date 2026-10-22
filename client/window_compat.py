@@ -363,7 +363,9 @@ def process_info(handle) -> dict | None:
 
 def data_dir() -> str:
     """Carpeta que contiene "Euro Truck Simulator 2" / "American Truck
-    Simulator" con los perfiles y el game.log.txt."""
+    Simulator" con los perfiles y el game.log.txt. En Linux nativo el juego
+    no usa ningun "Documentos": escribe en XDG_DATA_HOME; en macOS, en
+    Application Support."""
     if sys.platform == "darwin":
         return os.path.expanduser("~/Library/Application Support")
     base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")

@@ -278,7 +278,7 @@ MAC_KEYCODES = {
     "f4": 0x76, "end": 0x77, "f2": 0x78, "pagedown": 0x79, "f1": 0x7A,
     "left": 0x7B, "right": 0x7C, "down": 0x7D, "up": 0x7E,
     "f17": 0x40, "f18": 0x4F, "f19": 0x50, "f20": 0x5A,
-    "f21": 0x5A, "f22": 0x5A, "f23": 0x5A, "f24": 0x5A,
+    # macOS no tiene codigos para F21 a F24: esas quedan como tecla desconocida
 }
 
 
@@ -325,10 +325,16 @@ class MacOSBackend:
         except Exception:
             pass
 
+    # Ajustes > Accesibilidad se abre una vez por corrida: sin el permiso,
+    # cada tecla volvia a abrirlo encima del juego.
+    _accessibility_prompted = False
+
     def _check_and_prompt_accessibility(self):
-        if not self.is_trusted():
-            logging.warning("macOS Accessibility permission (AXIsProcessTrusted) is False; opening Privacy & Security Settings.")
-            self.request_accessibility()
+        if self.is_trusted() or MacOSBackend._accessibility_prompted:
+            return
+        MacOSBackend._accessibility_prompted = True
+        logging.warning("macOS Accessibility permission (AXIsProcessTrusted) is False; opening Privacy & Security Settings.")
+        self.request_accessibility()
 
     def _emit(self, key: str, is_down: bool):
         code = MAC_KEYCODES.get(key)

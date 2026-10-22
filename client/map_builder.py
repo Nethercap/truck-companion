@@ -266,11 +266,14 @@ def ensure_builder(version: str, progress=lambda texto: None) -> str:
             raise RuntimeError(f"TRUCKDASH_MAP_BUILDER={propio} is not a map builder folder")
         return propio
     destino = builder_dir(version)
-    tiene_node = (os.path.isfile(os.path.join(destino, "node.exe"))
-                  if sys.platform == "win32" else os.path.isfile(_node(destino)))
+    # El zip trae node.exe. En Windows, una carpeta sin el (un antivirus que lo
+    # puso en cuarentena) se baja de nuevo. En macOS el Node es aparte
+    # (_ensure_macos_node): el zip se baja solo si falta el armador.
+    mac = sys.platform == "darwin"
+    tiene_node = os.path.isfile(_node(destino)) if mac else os.path.isfile(os.path.join(destino, "node.exe"))
     if _builder_ok(destino) and tiene_node:
         return destino
-    if not _builder_ok(destino):
+    if not mac or not _builder_ok(destino):
         nombre = BUILDER_ZIP.format(version=version)
         progress("download")
         with red.abrir(RELEASE_URL.format(version=version, name="SHA256SUMS.txt"), timeout=30) as resp:
@@ -314,9 +317,10 @@ def ensure_builder(version: str, progress=lambda texto: None) -> str:
 
 
 def _node(builder: str) -> str:
-    if sys.platform == "win32":
+    if sys.platform != "darwin":
         propio = os.path.join(builder, "node.exe")
         return propio if os.path.isfile(propio) else (shutil.which("node") or "node")
+    # macOS: el de nodejs.org que baja _ensure_macos_node, o el del sistema
     propio = os.path.join(builder, "node")
     if os.path.isfile(propio) and os.access(propio, os.X_OK):
         return propio

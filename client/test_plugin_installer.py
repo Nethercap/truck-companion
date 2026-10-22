@@ -63,7 +63,7 @@ def test_install_plugin_copies_bundled_dll_and_creates_plugins_dir(tmp_path, mon
     fake_dll = tmp_path / "vendor" / "truckdash-telemetry.dll"
     fake_dll.parent.mkdir()
     fake_dll.write_bytes(b"dll contents")
-    monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda: str(fake_dll))
+    monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda bin_dir=None: str(fake_dll))
     monkeypatch.setattr(plugin_installer, "PLUGIN_DLL_SHA256", hashlib.sha256(b"dll contents").hexdigest())
 
     bin_dir = tmp_path / "game" / "bin" / "win_x64"
@@ -77,7 +77,7 @@ def test_install_plugin_copies_bundled_dll_and_creates_plugins_dir(tmp_path, mon
 def test_install_plugin_refuses_tampered_bundled_dll(tmp_path, monkeypatch):
     fake_dll = tmp_path / "truckdash-telemetry.dll"
     fake_dll.write_bytes(b"tampered")
-    monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda: str(fake_dll))
+    monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda bin_dir=None: str(fake_dll))
     try:
         plugin_installer.install_plugin(str(tmp_path))
     except ValueError:
@@ -465,7 +465,7 @@ def _juego(tmp_path, monkeypatch, nombre="game", nuestro=None, otro=None):
     vendor = tmp_path / "vendor" / "truckdash-telemetry.dll"
     vendor.parent.mkdir(exist_ok=True)
     vendor.write_bytes(nuevo)
-    monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda: str(vendor))
+    monkeypatch.setattr(plugin_installer, "bundled_dll_path", lambda bin_dir=None: str(vendor))
     monkeypatch.setattr(plugin_installer, "PLUGIN_DLL_SHA256", hashlib.sha256(nuevo).hexdigest())
     bin_dir = tmp_path / nombre / "bin" / "win_x64"
     (bin_dir / "plugins").mkdir(parents=True)
