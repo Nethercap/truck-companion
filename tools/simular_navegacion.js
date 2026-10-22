@@ -14,7 +14,7 @@
 //
 // Uso: node tools/simular_navegacion.js [--variantes ats,ets2] [--rutas 30]
 //        [--semilla 1] [--salida carpeta] [--cache carpeta] [--carriles carpeta]
-//        [--prefabs carpeta]
+//        [--prefabs carpeta] [--grafos carpeta]
 //        [--estados or,wa] [--destinos la,tx] [--antesDelGiro 0]
 //
 // --antesDelGiro 0: sin recalcular antes de cada aviso (revisarAvisosTrasRecalculo:
@@ -131,7 +131,14 @@ async function cargarVariante(v, cache, H) {
     if (!fs.existsSync(f)) fs.writeFileSync(f, await bajar(url));
     return fs.readFileSync(f);
   };
-  const bin = await archivo(`${v}-v3-g${rev}.bin`, `${BASE}/${v}/route-graph-${v}-v3.bin?g=${rev}`);
+  // --grafos <carpeta>: el grafo de <carpeta>/<v>/route-graph-<v>-v3.bin (como
+  // r2-upload-graphs del taller), para probar uno regenerado antes de subirlo.
+  // Sus decimas, prefabs y carriles van por indice de arista de ese grafo:
+  // salen de la misma carpeta si no se pide otra.
+  const grafos = argumentos(process.argv.slice(2)).grafos;
+  const fg = grafos && path.join(grafos, v, `route-graph-${v}-v3.bin`);
+  const bin = fg && fs.existsSync(fg) ? fs.readFileSync(fg)
+    : await archivo(`${v}-v3-g${rev}.bin`, `${BASE}/${v}/route-graph-${v}-v3.bin?g=${rev}`);
   let cities = JSON.parse(await archivo(`${v}-Cities.json`, `${BASE}/${v}/Cities.json`));
   cities = Array.isArray(cities) ? cities : Object.values(cities);
   const decoded = H.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
@@ -139,7 +146,7 @@ async function cargarVariante(v, cache, H) {
   // Las decimas de cada arista, como loadRouteTimes: de R2 si la app las
   // pide (ROUTE_TIMES_REV), o de --tiempos <carpeta>/<v>/route-graph-<v>-times.bin
   // para probar unas que todavia no se subieron.
-  const tiempos = argumentos(process.argv.slice(2)).tiempos;
+  const tiempos = argumentos(process.argv.slice(2)).tiempos || grafos;
   const ft = tiempos && path.join(tiempos, v, `route-graph-${v}-times.bin`);
   const tb = ft && fs.existsSync(ft) ? fs.readFileSync(ft)
     : timesRev() ? await archivo(`${v}-times-g${rev}-t${timesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-times.bin?g=${rev}&t=${timesRev()}`) : null;
@@ -150,7 +157,7 @@ async function cargarVariante(v, cache, H) {
   // De que prefab es cada arista, como loadRoutePrefabs: de R2 si la app lo
   // pide (ROUTE_PREFABS_REV), o de --prefabs <carpeta>/<v>/route-graph-<v>-prefabs.bin
   // para probar uno sin subir (con su grafo en --cache).
-  const prefabs = argumentos(process.argv.slice(2)).prefabs;
+  const prefabs = argumentos(process.argv.slice(2)).prefabs || grafos;
   const fp = prefabs && path.join(prefabs, v, `route-graph-${v}-prefabs.bin`);
   const pb = fp && fs.existsSync(fp) ? fs.readFileSync(fp)
     : prefabsRev() ? await archivo(`${v}-prefabs-g${rev}-p${prefabsRev()}.bin`, `${BASE}/${v}/route-graph-${v}-prefabs.bin?g=${rev}&p=${prefabsRev()}`) : null;
@@ -161,7 +168,7 @@ async function cargarVariante(v, cache, H) {
   // Los carriles, como loadRouteLanes: con ellos salen los "keep" de seguir
   // derecho donde un carril se pierde (laneKeepAt). De R2, o de --carriles
   // <carpeta>/<v>/route-graph-<v>-lanes.bin para probar unos sin subir.
-  const carriles = argumentos(process.argv.slice(2)).carriles;
+  const carriles = argumentos(process.argv.slice(2)).carriles || grafos;
   const fl = carriles && path.join(carriles, v, `route-graph-${v}-lanes.bin`);
   const lb = fl && fs.existsSync(fl) ? fs.readFileSync(fl)
     : lanesRev() ? await archivo(`${v}-lanes-g${rev}-l${lanesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-lanes.bin?g=${rev}&l=${lanesRev()}`) : null;
