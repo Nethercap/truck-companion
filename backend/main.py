@@ -759,6 +759,20 @@ class Session:
         # reciben el nav_hud del tablero, y el tablero lo manda mientras haya
         # alguno (obs_overlay en session_state).
         self.obs_viewers: set = set()
+        # Plan de ruta de la sesion (los waypoints de la web), uno por variante
+        # de mapa: {variante: {"list": [...], "rev": ms}}. Lo ve igual cada
+        # dispositivo: se arma en la tablet y navega el celular (Discord,
+        # 22-10). rev es la hora del relay al aceptar un cambio; las pestanas la
+        # guardan y, si el relay se reinicia, la del rev mas alto lo vuelve a
+        # dejar (route_plan_hello).
+        self.route_plans: dict = {}
+        # El dispositivo que dice la guia por voz: {"device", "kind", "os",
+        # "browser"} o None (habla cada uno que la tenga prendida).
+        self.voice_device: Optional[dict] = None
+        # Pestanas que entienden route_plan y voice_device, con el id de su
+        # dispositivo. A las de antes no se les manda: toman por telemetria un
+        # mensaje con un type que no conocen.
+        self.plan_viewers: dict = {}
         self.last_seen = time.time()
 
 
@@ -1275,6 +1289,144 @@ async def notify_live_share_state(session: "Session"):
         outbox.push_control(estado)
     if session.client_ws is not None:
         await _safe_send(session.client_ws, estado)
+
+
+# Plan de ruta compartido y voz por sesion (ver Session.route_plans y
+# voice_device).
+ROUTE_PLAN_MAX_POINTS = 9  # MAX_WAYPOINTS de la web
+ROUTE_PLAN_MAX_VARIANTS = 8
+ROUTE_PLAN_LABEL_MAX = 80
+DEVICE_ID_RE = re.compile(r"^[a-z0-9]{6,32}$")
+DEVICE_KINDS = ("phone", "tablet", "computer", "other")
+DEVICE_NAME_RE = re.compile(r"^[A-Za-z0-9 ._-]{1,24}$")
+# Si se va el dispositivo de la voz, se libera a los VOICE_DEVICE_GRACE_S
+# (un corte de WiFi o el celular bloqueado no le pasa la voz a otro).
+VOICE_DEVICE_GRACE_S = 20.0
+
+
+def clean_route_plan(lista) -> Optional[list]:
+    """La lista de waypoints de un plan, o None si no tiene esa forma: [{pos:
+    [x, z], inGame, label, kind?}], como la guarda la web (plainWaypoints)."""
+    if not isinstance(lista, list) or len(lista) > ROUTE_PLAN_MAX_POINTS:
+        return None
+    out = []
+    for w in lista:
+        if not isinstance(w, dict):
+            return None
+        pos = w.get("pos")
+        if not (isinstance(pos, list) and len(pos) == 2 and all(
+                isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and abs(v) < 1e7
+                for v in pos)):
+            return None
+        label = w.get("label")
+        item = {"pos": [float(pos[0]), float(pos[1])], "inGame": bool(w.get("inGame")),
+                "label": label[:ROUTE_PLAN_LABEL_MAX] if isinstance(label, str) else None}
+        kind = w.get("kind")
+        if isinstance(kind, str) and kind:
+            item["kind"] = kind[:2]
+        out.append(item)
+    return out
+
+
+def _plan_variant(variante) -> Optional[str]:
+    return variante if isinstance(variante, str) and LIVE_MAP_VARIANT_RE.match(variante) else None
+
+
+def _store_route_plan(session: "Session", variante: str, lista: list, rev: int) -> None:
+    if variante not in session.route_plans and len(session.route_plans) >= ROUTE_PLAN_MAX_VARIANTS:
+        # La variante mas vieja deja lugar
+        mas_vieja = min(session.route_plans, key=lambda v: session.route_plans[v]["rev"])
+        del session.route_plans[mas_vieja]
+    session.route_plans[variante] = {"list": lista, "rev": rev}
+
+
+def apply_set_route_plan(session: "Session", payload: dict) -> Optional[str]:
+    """Un cambio de waypoints en una pestana (agregar, sacar, llegar a uno):
+    pasa a ser el plan de esa variante con un rev nuevo. Devuelve la variante,
+    o None si el mensaje no sirve."""
+    variante = _plan_variant(payload.get("variant"))
+    lista = clean_route_plan(payload.get("list"))
+    if variante is None or lista is None:
+        return None
+    anterior = session.route_plans.get(variante)
+    rev = int(time.time() * 1000)
+    if anterior is not None and rev <= anterior["rev"]:
+        rev = anterior["rev"] + 1
+    _store_route_plan(session, variante, lista, rev)
+    return variante
+
+
+def offer_route_plans(session: "Session", planes) -> list:
+    """Los planes que una pestana trae al conectar ({variante: {list, rev}}):
+    quedan solo si el relay no tiene ese o tiene uno mas viejo (se reinicio y
+    perdio las sesiones). Nunca pisan un cambio mas nuevo. Devuelve las
+    variantes que cambiaron."""
+    cambiadas = []
+    if not isinstance(planes, dict):
+        return cambiadas
+    for variante, plan in list(planes.items())[:ROUTE_PLAN_MAX_VARIANTS]:
+        variante = _plan_variant(variante)
+        if variante is None or not isinstance(plan, dict):
+            continue
+        lista = clean_route_plan(plan.get("list"))
+        rev = plan.get("rev")
+        if lista is None or not isinstance(rev, int) or isinstance(rev, bool) or rev < 0:
+            continue
+        actual = session.route_plans.get(variante)
+        if actual is not None and actual["rev"] >= rev:
+            continue
+        _store_route_plan(session, variante, lista, rev)
+        cambiadas.append(variante)
+    return cambiadas
+
+
+NONCE_RE = re.compile(r"^[a-z0-9]{4,16}$")
+
+
+def route_plan_message(session: "Session", variante: str, nonce: Optional[str] = None) -> str:
+    """El plan de una variante. nonce: el del set_route_plan que lo cambio,
+    para que la pestana que lo mando lo reconozca como su respuesta."""
+    plan = session.route_plans[variante]
+    msg = {"type": "route_plan", "variant": variante, "list": plan["list"], "rev": plan["rev"]}
+    if nonce is not None:
+        msg["nonce"] = nonce
+    return json.dumps(msg)
+
+
+def clean_voice_device(payload: dict) -> Optional[dict]:
+    """{device, kind, os, browser} de set_voice_device, o None (liberar)."""
+    device = payload.get("device")
+    if not isinstance(device, str) or not DEVICE_ID_RE.match(device):
+        return None
+    kind = payload.get("kind") if payload.get("kind") in DEVICE_KINDS else "other"
+    out = {"device": device, "kind": kind}
+    for clave in ("os", "browser"):
+        valor = payload.get(clave)
+        out[clave] = valor if isinstance(valor, str) and DEVICE_NAME_RE.match(valor) else None
+    return out
+
+
+def voice_device_message(session: "Session") -> str:
+    return json.dumps({"type": "voice_device", **(session.voice_device or {"device": None})})
+
+
+def push_to_plan_viewers(session: "Session", mensaje: str) -> None:
+    """A las pestanas que pidieron el plan (route_plan_hello), en orden con
+    la telemetria."""
+    for ws in list(session.plan_viewers):
+        outbox = session.viewer_outboxes.get(ws)
+        if outbox is not None:
+            outbox.push_control(mensaje)
+
+
+async def release_voice_device_later(session: "Session", device: str) -> None:
+    """Si el dispositivo de la voz no vuelve en VOICE_DEVICE_GRACE_S, la voz
+    queda libre: si no, los demas se quedaban callados para siempre."""
+    await asyncio.sleep(VOICE_DEVICE_GRACE_S)
+    if session.voice_device and session.voice_device.get("device") == device \
+            and device not in session.plan_viewers.values():
+        session.voice_device = None
+        push_to_plan_viewers(session, voice_device_message(session))
 
 
 async def broadcast_session_state(session: "Session"):
@@ -2081,6 +2233,44 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         if clave not in session.missing_companies_reported and len(session.missing_companies_reported) < MISSING_COMPANY_PER_SESSION:
                             session.missing_companies_reported.add(clave)
                             asyncio.create_task(asyncio.to_thread(record_missing_company, report))
+                elif msg_type == "route_plan_hello":
+                    # La pestana entiende el plan y la voz: se los manda desde
+                    # ahora, con lo que ya hay; lo que trae solo queda si el
+                    # relay no tenia algo mas nuevo.
+                    device = payload.get("device")
+                    session.plan_viewers[websocket] = device if isinstance(device, str) and DEVICE_ID_RE.match(device) else None
+                    cambiadas = offer_route_plans(session, payload.get("plans"))
+                    for variante in cambiadas:
+                        push_to_plan_viewers(session, route_plan_message(session, variante))
+                    outbox = session.viewer_outboxes.get(websocket)
+                    if outbox is not None:
+                        for variante in session.route_plans:
+                            if variante not in cambiadas:
+                                outbox.push_control(route_plan_message(session, variante))
+                    # La que tenia la voz antes de un corte (o de un reinicio
+                    # del relay) la recupera, si nadie la tomo mientras tanto
+                    voz = clean_voice_device(payload["voice"]) if isinstance(payload.get("voice"), dict) else None
+                    if voz is not None and session.voice_device is None:
+                        session.voice_device = voz
+                        push_to_plan_viewers(session, voice_device_message(session))
+                    elif outbox is not None:
+                        outbox.push_control(voice_device_message(session))
+                elif msg_type == "set_route_plan":
+                    session.plan_viewers.setdefault(websocket, None)
+                    variante = apply_set_route_plan(session, payload)
+                    if variante is not None:
+                        nonce = payload.get("nonce")
+                        nonce = nonce if isinstance(nonce, str) and NONCE_RE.match(nonce) else None
+                        push_to_plan_viewers(session, route_plan_message(session, variante, nonce))
+                elif msg_type == "set_voice_device":
+                    session.plan_viewers.setdefault(websocket, None)
+                    voz = clean_voice_device(payload)
+                    # Liberarla (sin device) solo la libera quien la tiene
+                    if voz is None and session.voice_device is not None \
+                            and session.voice_device.get("device") != payload.get("from"):
+                        continue
+                    session.voice_device = voz
+                    push_to_plan_viewers(session, voice_device_message(session))
                 elif msg_type == "set_currency":
                     cur = payload.get("currency")
                     session.viewer_currency = cur.upper() if is_valid_currency(cur) else None
@@ -2095,6 +2285,10 @@ async def ws_viewer(websocket: WebSocket, code: str):
     finally:
         if websocket in session.viewer_ws_list:
             session.viewer_ws_list.remove(websocket)
+        device = session.plan_viewers.pop(websocket, None)
+        if device is not None and session.voice_device and session.voice_device.get("device") == device \
+                and device not in session.plan_viewers.values():
+            asyncio.create_task(release_voice_device_later(session, device))
         outbox = session.viewer_outboxes.pop(websocket, None)
         if outbox is not None:
             outbox.close()

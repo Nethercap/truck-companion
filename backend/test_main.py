@@ -1654,3 +1654,113 @@ def test_websocket_desde_otro_dominio_no_entra(client, main):
 def test_modo_avisar_deja_pasar_otros_origenes(client, monkeypatch):
     monkeypatch.setenv("TRUCKDASH_ORIGENES", "avisar")
     assert client.get("/health", headers={"Origin": "https://copia.github.io"}).status_code == 200
+
+
+# --- Plan de ruta compartido y voz por sesion (Discord 22-10, Gargamosch) ---
+
+def _hasta_tipo(ws, main, tipo, maximo=20):
+    """El proximo mensaje de ese tipo (salteando session_state y demas)."""
+    for _ in range(maximo):
+        msg = main.json.loads(ws.receive_text())
+        if msg.get("type") == tipo:
+            return msg
+    raise AssertionError(f"no llego {tipo}")
+
+
+PLAN = [{"pos": [100.5, -200.25], "inGame": True, "label": "Fuel", "kind": "g"},
+        {"pos": [300, 400], "inGame": False, "label": None}]
+
+
+def test_el_plan_de_ruta_llega_a_las_otras_pestanas_y_a_las_que_abren_despues(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as tablet, \
+            client.websocket_connect(f"/ws/live/{code}") as celular, \
+            client.websocket_connect(f"/ws/live/{code}") as vieja:
+        for ws, device in ((tablet, "tablet01"), (celular, "celular1")):
+            ws.send_text(main.json.dumps({"type": "route_plan_hello", "device": device, "plans": {}}))
+            assert _hasta_tipo(ws, main, "voice_device")["device"] is None
+        tablet.send_text(main.json.dumps({"type": "set_route_plan", "variant": "ats", "list": PLAN, "nonce": "abc123"}))
+        msg = _hasta_tipo(celular, main, "route_plan")
+        assert msg["nonce"] == "abc123"
+        assert msg["variant"] == "ats" and msg["rev"] > 0
+        assert msg["list"] == [{"pos": [100.5, -200.25], "inGame": True, "label": "Fuel", "kind": "g"},
+                               {"pos": [300.0, 400.0], "inGame": False, "label": None}]
+        # El que lo mando tambien lo recibe (asi sabe el rev)
+        assert _hasta_tipo(tablet, main, "route_plan")["rev"] == msg["rev"]
+        # Una pestana que no saludo (web vieja) no lo recibe: lo tomaria por telemetria
+        tablet.send_text(main.json.dumps({"type": "set_live_share", "enabled": False, "explicit": True}))
+        siguientes = [main.json.loads(vieja.receive_text())["type"] for _ in range(3)]
+        assert "route_plan" not in siguientes and siguientes[-1] == "live_share_state"
+        # La que abre despues lo recibe al saludar
+        with client.websocket_connect(f"/ws/live/{code}") as pc:
+            pc.send_text(main.json.dumps({"type": "route_plan_hello", "device": "pcdelcasa", "plans": {}}))
+            assert _hasta_tipo(pc, main, "route_plan")["rev"] == msg["rev"]
+
+
+def test_lo_que_trae_una_pestana_al_conectar_no_pisa_un_plan_mas_nuevo(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as a:
+        a.send_text(main.json.dumps({"type": "route_plan_hello", "device": "aaaaaaaa", "plans": {}}))
+        a.send_text(main.json.dumps({"type": "set_route_plan", "variant": "ets2", "list": PLAN[:1]}))
+        rev = _hasta_tipo(a, main, "route_plan")["rev"]
+        with client.websocket_connect(f"/ws/live/{code}") as b:
+            # Trae uno mas viejo: no cuenta, y le llega el del relay
+            b.send_text(main.json.dumps({"type": "route_plan_hello", "device": "bbbbbbbb",
+                                         "plans": {"ets2": {"list": PLAN, "rev": rev - 1}}}))
+            msg = _hasta_tipo(b, main, "route_plan")
+            assert msg["rev"] == rev and len(msg["list"]) == 1
+    # El relay se reinicio y perdio la sesion: la pestana con el rev mas alto lo vuelve a dejar
+    session = main.sessions[code]
+    session.route_plans.clear()
+    with client.websocket_connect(f"/ws/live/{code}") as b, client.websocket_connect(f"/ws/live/{code}") as a:
+        b.send_text(main.json.dumps({"type": "route_plan_hello", "device": "bbbbbbbb",
+                                     "plans": {"ets2": {"list": PLAN, "rev": rev - 1}}}))
+        assert _hasta_tipo(b, main, "route_plan")["rev"] == rev - 1
+        a.send_text(main.json.dumps({"type": "route_plan_hello", "device": "aaaaaaaa",
+                                     "plans": {"ets2": {"list": PLAN[:1], "rev": rev}}}))
+        assert len(_hasta_tipo(b, main, "route_plan")["list"]) == 1
+        assert session.route_plans["ets2"]["rev"] == rev
+
+
+def test_un_plan_que_no_tiene_forma_de_waypoints_no_se_guarda(main):
+    session = main.Session("PLANMALO")
+    assert main.apply_set_route_plan(session, {"variant": "ats", "list": [{"pos": [1]}]}) is None
+    assert main.apply_set_route_plan(session, {"variant": "ats", "list": [{"pos": [1, 2]}] * 10}) is None
+    assert main.apply_set_route_plan(session, {"variant": "../x", "list": []}) is None
+    assert main.apply_set_route_plan(session, {"variant": "ats", "list": [{"pos": [float("nan"), 2]}]}) is None
+    # Una lista vacia si: es haberlos sacado todos
+    assert main.apply_set_route_plan(session, {"variant": "ats", "list": []}) == "ats"
+    assert session.route_plans["ats"]["list"] == []
+    assert main.clean_route_plan([{"pos": [1, 2], "label": "x" * 200, "kind": "gas"}]) == \
+        [{"pos": [1.0, 2.0], "inGame": False, "label": "x" * 80, "kind": "ga"}]
+
+
+def test_la_voz_la_toma_un_dispositivo_y_la_suelta_solo_el(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as pc, client.websocket_connect(f"/ws/live/{code}") as celular:
+        for ws, device in ((pc, "pcdelcasa"), (celular, "celular1")):
+            ws.send_text(main.json.dumps({"type": "route_plan_hello", "device": device, "plans": {}}))
+            _hasta_tipo(ws, main, "voice_device")
+        celular.send_text(main.json.dumps({"type": "set_voice_device", "device": "pcdelcasa", "kind": "computer",
+                                           "os": "Windows", "browser": "Chrome"}))
+        msg = _hasta_tipo(pc, main, "voice_device")
+        assert msg == {"type": "voice_device", "device": "pcdelcasa", "kind": "computer", "os": "Windows", "browser": "Chrome"}
+        # Soltarla solo puede el que la tiene
+        celular.send_text(main.json.dumps({"type": "set_voice_device", "device": None, "from": "celular1"}))
+        celular.send_text(main.json.dumps({"type": "set_voice_device", "device": None, "from": "pcdelcasa"}))
+        assert _hasta_tipo(pc, main, "voice_device")["device"] is None
+
+
+def test_la_voz_vuelve_al_reconectar_y_se_suelta_si_su_dispositivo_no_vuelve(client, main, monkeypatch):
+    monkeypatch.setattr(main, "VOICE_DEVICE_GRACE_S", 0.05)
+    code = client.post("/pair/new").json()["code"]
+    voz = {"device": "celular1", "kind": "phone", "os": "Android", "browser": "Chrome"}
+    with client.websocket_connect(f"/ws/live/{code}") as pc:
+        pc.send_text(main.json.dumps({"type": "route_plan_hello", "device": "pcdelcasa", "plans": {}}))
+        _hasta_tipo(pc, main, "voice_device")
+        # El celular que la tenia antes de que el relay se reiniciara la recupera
+        with client.websocket_connect(f"/ws/live/{code}") as celular:
+            celular.send_text(main.json.dumps({"type": "route_plan_hello", "device": "celular1", "plans": {}, "voice": voz}))
+            assert _hasta_tipo(pc, main, "voice_device")["device"] == "celular1"
+        # Se fue y no volvio: la voz queda libre
+        assert _hasta_tipo(pc, main, "voice_device")["device"] is None
