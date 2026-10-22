@@ -27,6 +27,7 @@
     { id: 'dash', fig: 'dash' },
     { id: 'buttons', cmds: true },
     { id: 'settings', legend: TOP_BTNS, kind: 'top' },
+    { id: 'devices' },
     { id: 'convoy' },
     { id: 'client' },
     { id: 'overlay', fig: 'overlay' },

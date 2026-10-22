@@ -21,6 +21,7 @@ GUIDE_TEXT.en = {
     dash: 'The dashboard',
     buttons: 'The button box',
     settings: 'Settings and the top bar',
+    devices: 'Several devices at once',
     convoy: 'Convoy (beta)',
     client: 'The client on your PC',
     overlay: 'The in-game overlay',
@@ -129,6 +130,14 @@ GUIDE_TEXT.en = {
 </ul>
 <p>On a narrow phone some of the top bar buttons move into Settings.</p>
 <div class="tip"><p>Every delivery is also posted in the <b>#jobs</b> channel of our <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>: route, truck, cargo, distance and pay, with no name or account attached.</p></div>`,
+    devices: `
+<p>Open Truck Dash on as many devices as you like with the same <b>pairing code</b>: the phone in the cab, a tablet as a button box, the PC next to the game. They share one trip:</p>
+<ul>
+<li><b>Waypoints</b>: add, remove or reach a waypoint on one device and it shows up on the others within a second. Fuel and rest stops too.</li>
+<li><b>Route settings</b>: <b>Fastest</b> or <b>Shortest distance</b> and your map DLC apply to every device at once, so they all work out the same route.</li>
+<li><b>Voice on one device</b>: tick <b>Speak the directions</b> (Settings, Voice guidance) on the device you want to hear. The others go quiet and say where the voice is, with a <b>Speak here</b> button to move it. Turn it off and every device with voice on speaks again.</li>
+</ul>
+<div class="tip"><p>Dashboards opened from the same Wi-Fi address share all this from client 1.5.35 on. With an older client, use the pairing code on every device.</p></div>`,
     convoy: `
 <p>Drive with friends and see each other on the map. Each one runs their own game and client: you do not need to be in the same multiplayer session.</p>
 <ul>
@@ -235,6 +244,7 @@ GUIDE_TEXT.es = {
     dash: 'El tablero',
     buttons: 'La botonera',
     settings: 'Configuración y la barra de arriba',
+    devices: 'Varios dispositivos a la vez',
     convoy: 'Convoy (beta)',
     client: 'El cliente de la PC',
     overlay: 'El overlay en el juego',
@@ -343,6 +353,14 @@ GUIDE_TEXT.es = {
 </ul>
 <p>En un celular angosto, algunos botones de la barra de arriba pasan a Configuración.</p>
 <div class="tip"><p>Cada entrega también se publica en el canal <b>#jobs</b> de nuestro <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>: ruta, camión, carga, distancia y paga, sin nombre ni cuenta.</p></div>`,
+    devices: `
+<p>Abrí Truck Dash en todos los dispositivos que quieras con el mismo <b>código de pairing</b>: el celular en la cabina, una tablet como botonera, la PC al lado del juego. Comparten el mismo viaje:</p>
+<ul>
+<li><b>Waypoints</b>: los que ponés, sacás o alcanzás en un dispositivo aparecen en los demás en un segundo. Las paradas de combustible y descanso también.</li>
+<li><b>Ajustes de ruta</b>: <b>Más rápida</b> o <b>Distancia más corta</b> y los DLC del mapa valen para todos a la vez, así todos calculan la misma ruta.</li>
+<li><b>La voz en un solo dispositivo</b>: tildá <b>Decir las indicaciones</b> (Configuración, Guía por voz) en el dispositivo que querés escuchar. Los demás se callan y dicen dónde está la voz, con el botón <b>Decirlas acá</b> para traerla. Si la apagás, vuelve a hablar cada dispositivo que la tenga prendida.</li>
+</ul>
+<div class="tip"><p>Los tableros abiertos con la dirección de la misma WiFi comparten todo esto desde el cliente 1.5.35. Con un cliente anterior, usá el código de pairing en todos los dispositivos.</p></div>`,
     convoy: `
 <p>Manejá con amigos y véanse en el mapa. Cada uno usa su propio juego y su cliente: no hace falta estar en la misma sesión multijugador.</p>
 <ul>
