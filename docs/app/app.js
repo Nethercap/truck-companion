@@ -475,17 +475,20 @@ function initSettingsUi() {
   document.getElementById('setLiveHideOthers').checked = hideOtherPlayers;
   fillCurrencySelect();
   renderTripHistory();
-  document.querySelectorAll('input[name="routeProfile"]').forEach(radio => {
-  radio.addEventListener('change', (e) => {
-    routeProfile = e.target.value;
-    saveSettings();
-    invalidateRoute(); // recalcula con el perfil nuevo en el proximo tick
-  });
-});
-document.querySelectorAll('.colorSwatch').forEach(btn => {
+  document.querySelectorAll('.colorSwatch').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.color === routeColor);
   });
 }
+// Una sola vez, no en cada apertura de Ajustes (initSettingsUi): se sumaba un
+// escuchador por apertura y cada cambio se mandaba varias veces
+document.querySelectorAll('input[name="routeProfile"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    routeProfile = e.target.value;
+    saveSettings();
+    routePrefsChanged(); // a los demas dispositivos de la sesion
+    invalidateRoute(); // recalcula con el perfil nuevo en el proximo tick
+  });
+});
 
 function initModsUi() {
   renderModsCredits();
@@ -895,6 +898,7 @@ function renderDlcLists() {
         if (input.checked) off.delete(id); else off.add(id);
         dlcOff = normalizeDlcOff({ ...dlcOff, [game]: [...off] });
         saveSettings();
+        routePrefsChanged();
         invalidateRoute();
       });
       label.appendChild(input);
@@ -918,6 +922,7 @@ document.querySelectorAll('input[name="dlcAuto"]').forEach(radio => {
     if (!auto && dlcAuto) dlcOff = normalizeDlcOff({ ats: dlcOffFor('ats'), ets2: dlcOffFor('ets2') });
     dlcAuto = auto;
     saveSettings();
+    routePrefsChanged();
     invalidateRoute();
     renderDlcLists();
   });
@@ -2446,29 +2451,126 @@ const DEVICE_ID = (() => {
   return id;
 })();
 const DEVICE_INFO = deviceInfo(navigator.userAgent, navigator.maxTouchPoints || 0);
+// El canal del plan: el WebSocket con el relay o, por LAN (donde la
+// telemetria llega por la red de la casa), una conexion solo de plan al
+// relay con el codigo que pasa el cliente (lanPlanWs, connectLanPlan). Un
+// cliente viejo no lo pasa y el tablero por LAN sigue con lo suyo.
+let lanPlanWs = null;
+let lanPlanRelay = null; // { backend, code } del session_state LAN
+let lanPlanTimer = null;
+let lanPlanFallas = 0;
+function planSocket() { return conn.local ? lanPlanWs : ws; }
+function planSend(obj) {
+  const s = planSocket();
+  if (!planShared || !s || s.readyState !== WebSocket.OPEN) return false;
+  s.send(JSON.stringify(obj));
+  return true;
+}
+// Si esta pestana usa el plan de la sesion (para la voz: en un corte breve
+// se sigue respetando quien la tiene).
+function planCapable() { return !conn.local || !!lanPlanRelay; }
 function sendRoutePlan(variant, list) {
-  if (!planShared || !ws || ws.readyState !== WebSocket.OPEN) return; // queda pending: se manda al reconectar
   const nonce = randomToken(4);
-  planNonces[variant] = nonce;
-  ws.send(JSON.stringify({ type: 'set_route_plan', variant, list, nonce }));
+  // Sin canal queda pending: se manda al reconectar
+  if (planSend({ type: 'set_route_plan', variant, list, nonce })) planNonces[variant] = nonce;
 }
 // Al (re)conectar: lo que hay aca, para que el relay recupere el plan si se
 // reinicio (solo lo toma si no tiene uno mas nuevo), y despues los cambios
 // que se hicieron sin conexion. Quien tenia la voz la pide de nuevo.
 function sendRoutePlanHello() {
   planShared = false;
+  prefsNonce = null;
   for (const k of Object.keys(planNonces)) delete planNonces[k];
-  if (conn.local || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const s = planSocket();
+  if (conn.demo || conn.spectator || !s || s.readyState !== WebSocket.OPEN) return;
   const stored = readStoredWaypoints();
   const now = Date.now();
   const voice = lsGet(VOICE_HERE_KEY) === '1' ? Object.assign({ device: DEVICE_ID }, DEVICE_INFO) : null;
-  ws.send(JSON.stringify({ type: 'route_plan_hello', device: DEVICE_ID, plans: routePlanOffers(stored, now, WAYPOINTS_MAX_AGE_MS, MAX_WAYPOINTS), voice }));
+  const prefsSync = readPrefsSync();
+  const prefs = prefsSync.pending ? null : Object.assign({ rev: Number.isInteger(prefsSync.rev) ? prefsSync.rev : 0 }, currentRoutePrefs());
+  s.send(JSON.stringify({ type: 'route_plan_hello', device: DEVICE_ID, plans: routePlanOffers(stored, now, WAYPOINTS_MAX_AGE_MS, MAX_WAYPOINTS), voice, prefs }));
   planShared = true;
   for (const [variant, entry] of Object.entries(stored)) {
     if (!entry || !entry.pending || !Number.isFinite(entry.at) || now - entry.at > WAYPOINTS_MAX_AGE_MS) continue;
     sendRoutePlan(variant, storedWaypoints(stored, variant, now, WAYPOINTS_MAX_AGE_MS, MAX_WAYPOINTS));
   }
+  if (prefsSync.pending) sendRoutePrefs();
   renderVoiceDeviceHint();
+}
+// Por LAN: la conexion solo de plan (?role=plan) al relay de la sesion. Si
+// el relay dice que el codigo no existe varias veces seguidas, el cliente lo
+// cambio ("Codigo nuevo"): se reconecta la LAN, que trae el session_state con
+// el codigo de ahora.
+function connectLanPlan(relay) {
+  const nuevo = relay && typeof relay.backend === 'string' && typeof relay.code === 'string' ? relay : null;
+  if (nuevo && lanPlanRelay && lanPlanWs && lanPlanRelay.backend === nuevo.backend && lanPlanRelay.code === nuevo.code) return;
+  clearTimeout(lanPlanTimer);
+  if (lanPlanWs) { const viejo = lanPlanWs; lanPlanWs = null; viejo.onclose = null; try { viejo.close(); } catch (e) {} }
+  if (!nuevo || !lanPlanRelay || lanPlanRelay.code !== nuevo.code) lanPlanFallas = 0;
+  lanPlanRelay = nuevo;
+  planShared = false;
+  renderVoiceDeviceHint();
+  if (!nuevo || !conn.local || conn.demo) return;
+  let s;
+  try { s = new WebSocket(`${nuevo.backend}/ws/live/${encodeURIComponent(nuevo.code)}?role=plan`); } catch (e) { return; }
+  lanPlanWs = s;
+  s.onopen = () => { if (lanPlanWs === s) { lanPlanFallas = 0; sendRoutePlanHello(); } };
+  s.onmessage = (event) => {
+    let data;
+    try { data = JSON.parse(event.data); } catch (e) { return; }
+    if (data.type === 'route_plan') applyRoutePlan(data);
+    else if (data.type === 'voice_device') applyVoiceDevice(data);
+    else if (data.type === 'route_prefs') applyRoutePrefs(data);
+  };
+  s.onclose = (ev) => {
+    if (lanPlanWs !== s) return;
+    lanPlanWs = null;
+    planShared = false;
+    lanPlanFallas++;
+    if (ev && ev.code === 4404 && lanPlanFallas >= 6) {
+      lanPlanFallas = 0;
+      if (conn.local && ws) ws.close();
+      return;
+    }
+    // Sin internet (la LAN anda igual) se reintenta cada vez mas espaciado
+    lanPlanTimer = setTimeout(() => connectLanPlan(nuevo), Math.min(60000, 5000 * 2 ** Math.min(lanPlanFallas - 1, 4)));
+  };
+}
+
+// Los ajustes de ruta de la sesion (route_prefs): mas rapida o mas corta y
+// los DLC apagados. Cambiarlos en un dispositivo los cambia en los demas.
+const ROUTE_PREFS_SYNC_KEY = 'truckdash_route_prefs_sync'; // { rev, pending }
+let prefsNonce = null;
+function readPrefsSync() {
+  try { return JSON.parse(lsGet(ROUTE_PREFS_SYNC_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function currentRoutePrefs() { return routePrefsOf(routeProfile, dlcAuto, dlcOff); }
+function sendRoutePrefs() {
+  const nonce = randomToken(4);
+  if (planSend(Object.assign({ type: 'set_route_prefs', nonce }, currentRoutePrefs()))) prefsNonce = nonce;
+}
+// Despues de que la persona cambio un ajuste de ruta aca
+function routePrefsChanged() {
+  lsSet(ROUTE_PREFS_SYNC_KEY, JSON.stringify(Object.assign(readPrefsSync(), { pending: true })));
+  sendRoutePrefs();
+}
+function applyRoutePrefs(msg) {
+  const sync = readPrefsSync();
+  const action = syncAction(msg.rev, msg.nonce, sync.rev, prefsNonce);
+  if (!action) return;
+  lsSet(ROUTE_PREFS_SYNC_KEY, JSON.stringify({ rev: msg.rev, pending: false }));
+  if (action === 'ack') { prefsNonce = null; return; }
+  const nuevos = routePrefsOf(msg.profile, msg.dlcAuto, msg.dlcOff);
+  if (sameRoutePrefs(nuevos, currentRoutePrefs())) return;
+  routeProfile = nuevos.profile;
+  dlcAuto = nuevos.dlcAuto;
+  dlcOff = normalizeDlcOff(nuevos.dlcOff);
+  saveSettings();
+  document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
+  document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
+  if (document.getElementById('dlcModal').style.display === 'flex') renderDlcLists();
+  invalidateRoute();
+  showToast(t('routePrefsSyncedToast'), 'success', 3000);
 }
 // Un plan del relay: la respuesta a un cambio de aca (se guarda su rev) o el
 // de otro dispositivo, que reemplaza los waypoints de esa variante (el del
@@ -5639,21 +5741,21 @@ function voiceManeuverTick(turn) {
 // en el celular y la voz en la PC, sin pasar el audio). Prender la voz en un
 // dispositivo la trae a ese; los demas se callan y dicen donde esta. Al
 // apagarla ahi queda libre: como antes, habla cada uno que la tenga prendida.
-// Por LAN no hay relay que lo reparta y cada uno habla (voiceSpeaksHere).
+// Por LAN va por la conexion solo de plan; con un cliente viejo, que no la
+// pasa, cada uno habla (voiceSpeaksHere).
 const VOICE_HERE_KEY = 'truckdash_voice_here';
 let voiceDevice = null; // { device, kind, os, browser } del relay, o null
 function voiceHere() {
-  return voiceSpeaksHere(voiceOn, isLeaderTab, !conn.local, voiceDevice, DEVICE_ID);
+  return voiceSpeaksHere(voiceOn, isLeaderTab, planCapable(), voiceDevice, DEVICE_ID);
 }
 function claimVoice() {
   lsSet(VOICE_HERE_KEY, '1');
-  if (!planShared || !ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify(Object.assign({ type: 'set_voice_device', device: DEVICE_ID }, DEVICE_INFO)));
+  planSend(Object.assign({ type: 'set_voice_device', device: DEVICE_ID }, DEVICE_INFO));
 }
 function releaseVoice() {
   lsSet(VOICE_HERE_KEY, '');
-  if (!planShared || !ws || ws.readyState !== WebSocket.OPEN || !voiceDevice || voiceDevice.device !== DEVICE_ID) return;
-  ws.send(JSON.stringify({ type: 'set_voice_device', device: null, from: DEVICE_ID }));
+  if (!voiceDevice || voiceDevice.device !== DEVICE_ID) return;
+  planSend({ type: 'set_voice_device', device: null, from: DEVICE_ID });
 }
 function deviceLabel(d) {
   const kind = { phone: 'deviceKindPhone', tablet: 'deviceKindTablet', computer: 'deviceKindComputer' }[d && d.kind] || 'deviceKindOther';
@@ -5671,7 +5773,7 @@ function applyVoiceDevice(msg) {
 function renderVoiceDeviceHint() {
   const hint = document.getElementById('voiceOtherDeviceHint');
   if (!hint) return;
-  const otro = voiceOn && !conn.local && voiceDevice && voiceDevice.device !== DEVICE_ID;
+  const otro = voiceOn && planCapable() && voiceDevice && voiceDevice.device !== DEVICE_ID;
   hint.hidden = !otro;
   if (otro) document.getElementById('voiceOtherDeviceText').textContent = t('voiceOtherDevice').replace('{device}', deviceLabel(voiceDevice));
 }
@@ -7597,7 +7699,7 @@ function handleTelemetry(data) {
 
 function connectWs(backend, code, options = {}) {
   conn.local = !!options.local;
-  planShared = false; // hasta que la conexion nueva salude
+  if (!options.local) planShared = false; // hasta que la conexion nueva salude (por LAN el plan va aparte)
   conn.lanRelay = false; // lo dice el session_state del cliente
   renderLiveShareControls();
   fetchLatestClientVersion(conn.local ? document.getElementById('backendUrl').value : backend);
@@ -7619,7 +7721,7 @@ function connectWs(backend, code, options = {}) {
     conn.waitingClient = false;
     renderConnectionUi();
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
-    sendRoutePlanHello(); // el plan de ruta y la voz de la sesion
+    if (!conn.local) sendRoutePlanHello(); // el plan de ruta, la voz y los ajustes de ruta de la sesion (por LAN: connectLanPlan)
     // Sin ruta propia no se manda la vacia al conectar: borraba la ruta que
     // compartia otra pestana de la misma sesion (auditoria del 10-10).
     liveRouteSig = currentRouteWorldPoints ? null : 'none'; sendLiveRoute(true);
@@ -7642,6 +7744,7 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria
     if (data.type === 'route_plan') { applyRoutePlan(data); return; } // el plan de la sesion (route_plan_hello)
     if (data.type === 'voice_device') { applyVoiceDevice(data); return; } // quien dice la guia
+    if (data.type === 'route_prefs') { applyRoutePrefs(data); return; } // perfil y DLC de la sesion
     if (data.type && data.type.startsWith('convoy_')) { if (typeof convoyHandleMessage === 'function') convoyHandleMessage(data); return; } // Convoy (beta)
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;
@@ -7651,6 +7754,8 @@ function connectWs(backend, code, options = {}) {
         // clave (null si el relay todavia no dijo nada).
         conn.lanRelay = 'liveShare' in data;
         if (typeof data.liveShare === 'boolean') applyLiveShareState(data.liveShare);
+        // El relay y el codigo de la sesion: plan de ruta, voz y ajustes compartidos
+        connectLanPlan(data.planRelay);
         renderLiveShareControls();
       }
       setClientOverlay(data.client_status && data.client_status.overlay);

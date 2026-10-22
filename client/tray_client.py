@@ -2193,6 +2193,9 @@ async def run_client(backend_url: str, fixed_code: str | None):
     # esta conexion, y lo que diga el relay vuelve a ese tablero.
     local.al_relay = cloud.send
     client_lib.on_live_share = local.avisar_live_share
+    # Con eso el tablero por LAN comparte el plan de ruta con los demas
+    local.plan_relay = lambda: ({"backend": state.backend_url, "code": state.code}
+                                if state.backend_url and state.code else None)
     telemetry_task = vigilar(asyncio.create_task(telemetry_loop(cloud, local)), "telemetria")
     # Vacia la cola de la cuenta cada tanto. Aparte del bucle de
     # telemetria a proposito: que la API este caida no puede frenar

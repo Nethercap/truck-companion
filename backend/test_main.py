@@ -1764,3 +1764,62 @@ def test_la_voz_vuelve_al_reconectar_y_se_suelta_si_su_dispositivo_no_vuelve(cli
             assert _hasta_tipo(pc, main, "voice_device")["device"] == "celular1"
         # Se fue y no volvio: la voz queda libre
         assert _hasta_tipo(pc, main, "voice_device")["device"] is None
+
+
+def test_la_conexion_solo_de_plan_no_recibe_telemetria_ni_cuenta_como_tablero(client, main):
+    """La pestana por LAN (?role=plan): la telemetria le llega por la red de la
+    casa; del relay solo el plan, la voz y los ajustes de ruta."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as cliente, \
+            client.websocket_connect(f"/ws/live/{code}") as tablero, \
+            client.websocket_connect(f"/ws/live/{code}?role=plan") as lan:
+        session = main.sessions[code]
+        assert session.viewer_ws_list and len(session.viewer_ws_list) == 1
+        lan.send_text(main.json.dumps({"type": "route_plan_hello", "device": "tabletlan", "plans": {}}))
+        assert _hasta_tipo(lan, main, "voice_device")["device"] is None
+        tablero.send_text(main.json.dumps({"type": "route_plan_hello", "device": "celular1", "plans": {}}))
+        _hasta_tipo(tablero, main, "voice_device")
+        cliente.send_text(main.json.dumps({"game": "ats", "speedKmh": 50, "position": {"x": 1, "z": 2}}))
+        assert main.json.loads(tablero.receive_text())["speedKmh"] == 50
+        # Un comando por la conexion de plan no llega al cliente: solo plan
+        lan.send_text(main.json.dumps({"type": "command", "action": "lights"}))
+        lan.send_text(main.json.dumps({"type": "set_route_plan", "variant": "ats", "list": PLAN[:1], "nonce": "lan1"}))
+        # Lo primero que le llega es su plan, no la telemetria ni el comando
+        msg = main.json.loads(lan.receive_text())
+        assert msg["type"] == "route_plan" and msg["nonce"] == "lan1"
+        assert _hasta_tipo(tablero, main, "route_plan")["rev"] == msg["rev"]
+
+
+def test_los_ajustes_de_ruta_son_de_la_sesion(client, main):
+    code = client.post("/pair/new").json()["code"]
+    prefs = {"profile": "shortest", "dlcAuto": False, "dlcOff": {"ats": ["co", "ut"], "ets2": []}}
+    with client.websocket_connect(f"/ws/live/{code}") as pc, client.websocket_connect(f"/ws/live/{code}") as celular:
+        # El primero en llegar con lo suyo (nunca sincronizado) lo deja, con rev 1
+        pc.send_text(main.json.dumps({"type": "route_plan_hello", "device": "pcdelcasa", "plans": {},
+                                      "prefs": {**prefs, "rev": 0}}))
+        assert _hasta_tipo(pc, main, "route_prefs")["rev"] == 1
+        celular.send_text(main.json.dumps({"type": "route_plan_hello", "device": "celular1", "plans": {},
+                                           "prefs": {"profile": "fastest", "dlcAuto": True, "dlcOff": {"ats": [], "ets2": []}, "rev": 0}}))
+        msg = _hasta_tipo(celular, main, "route_prefs")
+        assert msg["profile"] == "shortest" and msg["dlcOff"]["ats"] == ["co", "ut"] and msg["rev"] == 1
+        # Un cambio en el celular llega a la PC con rev de verdad
+        celular.send_text(main.json.dumps({"type": "set_route_prefs", **prefs, "profile": "fastest", "nonce": "cel1"}))
+        msg = _hasta_tipo(pc, main, "route_prefs")
+        assert msg["profile"] == "fastest" and msg["nonce"] == "cel1" and msg["rev"] > 1
+    session = main.Session("PREFSMAL")
+    assert main.apply_set_route_prefs(session, {"profile": "rapida", "dlcOff": {}}) is False
+    assert main.apply_set_route_prefs(session, {"profile": "fastest", "dlcOff": {"ats": "co"}}) is False
+    assert main.clean_route_prefs({"profile": "fastest", "dlcOff": {"ats": ["co", "../x", 3]}}) == \
+        {"profile": "fastest", "dlcAuto": False, "dlcOff": {"ats": ["co"], "ets2": []}}
+
+
+def test_dos_listas_sin_sincronizar_quedan_la_del_primero_en_los_dos(client, main):
+    """Waypoints de antes del plan compartido (rev 0) en dos dispositivos: el
+    segundo adopta el del primero, que entra con rev 1."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as a, client.websocket_connect(f"/ws/live/{code}") as b:
+        a.send_text(main.json.dumps({"type": "route_plan_hello", "device": "aaaaaaaa", "plans": {"ats": {"list": PLAN, "rev": 0}}}))
+        assert _hasta_tipo(a, main, "route_plan")["rev"] == 1
+        b.send_text(main.json.dumps({"type": "route_plan_hello", "device": "bbbbbbbb", "plans": {"ats": {"list": PLAN[:1], "rev": 0}}}))
+        msg = _hasta_tipo(b, main, "route_plan")
+        assert msg["rev"] == 1 and len(msg["list"]) == 2

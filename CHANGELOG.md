@@ -6,6 +6,10 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- LAN mode: the dashboard on the same Wi-Fi now shares waypoints, the voice device (which device
+  speaks the directions) and the route settings (fastest or shortest, map DLC) with your other
+  devices, like the dashboards opened with the pairing code already do.
+
 - Setup: "Build my map" is now there whenever you play with mods, not only after the dashboard
   sees your truck off the map. Before, it only showed up after that, and not again after
   restarting the client, so there was no way to build the map for a newer version of a map mod
