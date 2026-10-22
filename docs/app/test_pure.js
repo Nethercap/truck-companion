@@ -3895,6 +3895,38 @@ test('edgePrefab: llegar a un nodo por un prefab y salir por otra arista del mis
   assert.deepEqual(findArcRoute(g, e, f, opts(f)), [e, a, c, b, f]);
 });
 
+test('prefabStubs: en el brazo de un prefab sin calle no se da la vuelta, salvo que sea el destino', () => {
+  const { prefabStubs } = require('./pure.js');
+  // El de Kiel con un brazo s mas a mano (Iasi, Knoxville, 22-10): su calle
+  // es oculta y no esta en el grafo, asi que de s solo se vuelve al prefab
+  const nodos = [[-2, -200], [-2, 0], [0, 20], [14, 10], [14, -200], [0, 220], [6, -6]];
+  const [e, a, c, b, f, z, s] = nodos.keys();
+  const aristas = [
+    { a: e, b: a, uno: true, m: 200 }, { a, b: c, uno: true, m: 20 }, { a: c, b, uno: true, m: 17 },
+    { a: b, b: f, uno: true, m: 210 }, { a: c, b: z, m: 200 }, { a, b: s, uno: true, m: 9 },
+    { a: s, b, uno: true, m: 18 },
+  ];
+  const { g, opts } = grafoDePrueba(nodos, aristas);
+  g.edgePrefab = Uint8Array.from([0, 1, 1, 0, 0, 1, 1]);
+  assert.deepEqual([...prefabStubs(g)], [0, 0, 0, 0, 0, 0, 1]);
+  // Se da la vuelta en z, la punta de una calle de verdad, no en s
+  assert.deepEqual(findArcRoute(g, e, f, opts(f)), [e, a, c, z, c, b, f]);
+  // Si s es el destino, se llega
+  assert.deepEqual(findArcRoute(g, e, s, opts(s)), [e, a, s]);
+  // Sin c ni z, la unica forma de llegar a f es darse vuelta en s: por ahi,
+  // no sin camino (Charlotte, una T con el brazo de enfrente oculto)
+  const sinC = aristas.filter((x) => x.a !== c && x.b !== c);
+  const g3 = grafoDePrueba(nodos, sinC);
+  g3.g.edgePrefab = Uint8Array.from([0, 0, 1, 1]);
+  assert.deepEqual(findArcRoute(g3.g, e, f, g3.opts(f)), [e, a, s, b, f]);
+  // Una calle sin salida que termina en un prefab con el otro brazo oculto:
+  // la vuelta es en la punta de la calle (r), y no se queda sin camino
+  const g2 = grafoDePrueba([[0, 0], [100, 0], [110, 0]], [{ a: 0, b: 1 }, { a: 1, b: 2 }]);
+  g2.g.edgePrefab = Uint8Array.from([0, 1]);
+  const llegada = g2.g.csr[0];
+  assert.deepEqual(findArcRoute(g2.g, 1, 0, { ...g2.opts(0), startArc: llegada }), [1, 0]);
+});
+
 test('ruteo: un giro cerrado que no es vuelta en U se puede, y una calle sin salida tambien', () => {
   // 120 grados en s: se puede
   const nodos = [[0, 0], [100, 0], [50, 87]];

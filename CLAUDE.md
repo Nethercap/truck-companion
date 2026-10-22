@@ -158,6 +158,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   prefab y salir por otra del mismo (`g.edgePrefab`). Los grafos de antes
   siguen con `uTurnPairs`; los mapas armados en la PC piden el archivo
   siempre, los de R2 recien con `ROUTE_PREFABS_REV` en 1.
+  Un nodo de prefab sin calle (todas sus aristas, de llegada y de salida,
+  del mismo prefab: lo que sigue es oculto y no esta en el grafo; 25 mil en
+  ATS y 24 mil en ETS2) es un toco (`prefabStubs`): la ruta no va ahi salvo
+  que sea el destino, y no cuenta como salida para decidir si un nodo es
+  una calle sin salida. Sin eso la ruta entraba al brazo de un cruce y
+  salia (una V con un "turn left" donde se sigue derecho: los 22
+  `atajo_salteado` del simulador en 4 variantes) o se daba vuelta ahi
+  (Iasi, Knoxville, 22-10). Si sin tocos no hay camino (la T de una empresa
+  de Charlotte con el brazo de enfrente oculto), `findArcRoute` busca otra
+  vez con ellos. La vuelta pasa a la punta de calle sin salida siguiente,
+  que tambien puede ser una calle cortada por lo oculto (Knoxville, 300 m
+  mas alla): darse vuelta en una calle sin salida sigue permitido.
   El costo es `routeEdgeCost` (segundos + 1 ms por metro: los segundos del
   grafo son enteros y sin desempate la ruta hacia una V por un brazo del
   cruce; "shortest", metros + 4 m por segundo, `ROUTE_SHORT_M_PER_S`: con
@@ -439,21 +451,23 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 ## Pendientes y decisiones (18-10)
 
 - Grafos del constructor del 22-10 (PR #111; el del taller, en la rama del
-  mismo nombre): falta regenerarlos y subirlos. Antes de subir, correr
-  `simular_navegacion` con los de hoy (despues, la misma `--semilla`). En el
-  taller, con su `truck-companion` en esa rama: `py rebuild_graphs_only.py
-  --cambia-ruteo` (17 variantes; la consola muestra los prefabs sin
-  navCurves, el resto queda en `build_route_graph-<variante>.log`) y `py
+  mismo nombre): regenerados en el taller (`py rebuild_graphs_only.py
+  --cambia-ruteo`, 17 variantes; el detalle queda en
+  `build_route_graph-<variante>.log`), falta subirlos con `py
   upload_to_r2.py r2-upload-graphs trucksim-dash-maps`, sin el paso del
   manifest (alcanza con `ROUTE_GRAPH_V3_REV`). Recien con todo en R2:
   `ROUTE_GRAPH_V3_REV` de 5 a 6 y `ROUTE_PREFABS_REV` de 0 a 1, `node
   tools/check_avisos.js --update`, `python tools/build_demo_route.py`,
   `simular_navegacion` y mergear los dos PR, todo seguido: hasta ese merge,
   quien baje el grafo nuevo sin `-prefabs.bin` vuelve a tener la vuelta de
-  Kiel. Con los largos nuevos se esperan cambios chicos (en 300 rutas por
-  juego: 45 en ATS y 19 en ETS2, casi empates de 1 a 4 s). Despues, mirar por
-  que les faltan las navCurves a los prefabs que lista el log (696 en ATS,
-  510 en ETS2, 801 en ProMods) y sacar este punto.
+  Kiel. En el simulador (4 variantes, 120 rutas, semilla 7, `--grafos`)
+  cambian de largo 15 a 25 rutas por variante; las que se alargan mas de
+  5 % (Iasi, San Antonio, Knoxville) pasaban por giros que el juego no
+  tiene (salir a la izquierda de una entrada solo a la derecha, la vuelta
+  de Kiel en San Antonio). Los prefabs sin navCurves que lista el log
+  (todos contra todos, sin contramano) son patios, estaciones y talleres de
+  dos nodos, y 15 `cross_temp` de ProMods. Despues del merge, sacar este
+  punto.
 - macOS: un usuario porto el plugin (dice que el juego en Mac lo carga) e
   hizo su propia app estilo CarPlay. Plan propio, por etapas: el plugin con
   `shm_open` o un archivo en vez de `CreateFileMapping`
