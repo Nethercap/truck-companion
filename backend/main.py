@@ -650,8 +650,11 @@ class ViewerOutbox:
     mensajes de control (keybinds, command_result, client_status) si van
     en orden y sin perderse."""
 
-    def __init__(self, ws: WebSocket):
+    def __init__(self, ws: WebSocket, solo_plan: bool = False):
         self.ws = ws
+        # Conexion solo de plan (?role=plan, la pestana por LAN): ni la
+        # telemetria ni los demas mensajes, que ya le llegan por la LAN.
+        self.solo_plan = solo_plan
         self.latest: Optional[str] = None
         self.control: deque = deque()
         self.wake = asyncio.Event()
@@ -659,12 +662,16 @@ class ViewerOutbox:
         self.task = asyncio.create_task(self._run())
 
     def push_telemetry(self, text: str):
+        if self.solo_plan:
+            return
         if self.latest is not None:
             self.dropped += 1
         self.latest = text
         self.wake.set()
 
-    def push_control(self, text: str):
+    def push_control(self, text: str, plan: bool = False):
+        if self.solo_plan and not plan:
+            return
         self.control.append(text)
         self.wake.set()
 
@@ -769,6 +776,9 @@ class Session:
         # El dispositivo que dice la guia por voz: {"device", "kind", "os",
         # "browser"} o None (habla cada uno que la tenga prendida).
         self.voice_device: Optional[dict] = None
+        # Los ajustes que cambian la ruta, iguales en todos los dispositivos:
+        # {"profile", "dlcAuto", "dlcOff", "rev"} o None.
+        self.route_prefs: Optional[dict] = None
         # Pestanas que entienden route_plan y voice_device, con el id de su
         # dispositivo. A las de antes no se les manda: toman por telemetria un
         # mensaje con un type que no conocen.
@@ -1328,6 +1338,35 @@ def clean_route_plan(lista) -> Optional[list]:
     return out
 
 
+ROUTE_PREFS_PROFILES = ("fastest", "shortest")
+DLC_ID_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+DLC_OFF_MAX = 60
+
+
+def clean_route_prefs(payload) -> Optional[dict]:
+    """{profile, dlcAuto, dlcOff: {ats: [...], ets2: [...]}} de la web, o None
+    si no tiene esa forma."""
+    if not isinstance(payload, dict) or payload.get("profile") not in ROUTE_PREFS_PROFILES:
+        return None
+    dlc_off = payload.get("dlcOff")
+    if not isinstance(dlc_off, dict):
+        return None
+    limpio = {}
+    for juego in ("ats", "ets2"):
+        lista = dlc_off.get(juego, [])
+        if not isinstance(lista, list) or len(lista) > DLC_OFF_MAX:
+            return None
+        limpio[juego] = [d for d in lista if isinstance(d, str) and DLC_ID_RE.match(d)]
+    return {"profile": payload["profile"], "dlcAuto": bool(payload.get("dlcAuto")), "dlcOff": limpio}
+
+
+def route_prefs_message(session: "Session", nonce: Optional[str] = None) -> str:
+    msg = {"type": "route_prefs", **session.route_prefs}
+    if nonce is not None:
+        msg["nonce"] = nonce
+    return json.dumps(msg)
+
+
 def _plan_variant(variante) -> Optional[str]:
     return variante if isinstance(variante, str) and LIVE_MAP_VARIANT_RE.match(variante) else None
 
@@ -1372,6 +1411,10 @@ def offer_route_plans(session: "Session", planes) -> list:
         rev = plan.get("rev")
         if lista is None or not isinstance(rev, int) or isinstance(rev, bool) or rev < 0:
             continue
+        # Sin rev (nunca se sincronizo) entra con 1: asi el que llega despues
+        # con lo suyo sin sincronizar lo adopta (1 > 0), y cualquier cambio
+        # de verdad (rev = hora del relay) le gana
+        rev = max(rev, 1)
         actual = session.route_plans.get(variante)
         if actual is not None and actual["rev"] >= rev:
             continue
@@ -1381,6 +1424,34 @@ def offer_route_plans(session: "Session", planes) -> list:
 
 
 NONCE_RE = re.compile(r"^[a-z0-9]{4,16}$")
+
+
+def offer_route_prefs(session: "Session", ofrecidos) -> bool:
+    """Los ajustes que trae una pestana al conectar: quedan si el relay no
+    tiene o tiene unos mas viejos, como los planes. Devuelve si cambiaron."""
+    if not isinstance(ofrecidos, dict):
+        return False
+    limpio = clean_route_prefs(ofrecidos)
+    rev = ofrecidos.get("rev")
+    if limpio is None or not isinstance(rev, int) or isinstance(rev, bool) or rev < 0:
+        return False
+    rev = max(rev, 1)
+    if session.route_prefs is not None and session.route_prefs["rev"] >= rev:
+        return False
+    session.route_prefs = {**limpio, "rev": rev}
+    return True
+
+
+def apply_set_route_prefs(session: "Session", payload: dict) -> bool:
+    """Un cambio de ajustes de ruta en una pestana, con rev nuevo."""
+    limpio = clean_route_prefs(payload)
+    if limpio is None:
+        return False
+    rev = int(time.time() * 1000)
+    if session.route_prefs is not None and rev <= session.route_prefs["rev"]:
+        rev = session.route_prefs["rev"] + 1
+    session.route_prefs = {**limpio, "rev": rev}
+    return True
 
 
 def route_plan_message(session: "Session", variante: str, nonce: Optional[str] = None) -> str:
@@ -1416,7 +1487,7 @@ def push_to_plan_viewers(session: "Session", mensaje: str) -> None:
     for ws in list(session.plan_viewers):
         outbox = session.viewer_outboxes.get(ws)
         if outbox is not None:
-            outbox.push_control(mensaje)
+            outbox.push_control(mensaje, plan=True)
 
 
 async def release_voice_device_later(session: "Session", device: str) -> None:
@@ -2163,8 +2234,13 @@ async def ws_viewer(websocket: WebSocket, code: str):
         return
 
     await websocket.accept()
-    session.viewer_ws_list.append(websocket)
-    session.viewer_outboxes[websocket] = ViewerOutbox(websocket)
+    # ?role=plan: la pestana por LAN, que recibe la telemetria por la red de
+    # la casa y solo usa el relay para el plan de ruta, la voz y los ajustes
+    # de ruta de la sesion. No cuenta como tablero ni recibe nada mas.
+    solo_plan = websocket.query_params.get("role") == "plan"
+    if not solo_plan:
+        session.viewer_ws_list.append(websocket)
+    session.viewer_outboxes[websocket] = ViewerOutbox(websocket, solo_plan=solo_plan)
     session.last_seen = time.time()
     # El overlay de OBS se presenta en la URL. Las pestanas del tablero se
     # enteran por session_state y empiezan a mandar el nav_hud.
@@ -2172,12 +2248,13 @@ async def ws_viewer(websocket: WebSocket, code: str):
     if is_obs:
         session.obs_viewers.add(websocket)
         await broadcast_session_state(session)
-    else:
+    elif not solo_plan:
         await _safe_send(websocket, session_state_message(session))
-    # El estado real de "compartir": un dispositivo recien abierto arranca
-    # con su default local y si no se lo decimos muestra otra cosa.
-    await _safe_send(websocket, live_share_state_message(session))
-    await notify_client_viewers(session)
+    if not solo_plan:
+        # El estado real de "compartir": un dispositivo recien abierto arranca
+        # con su default local y si no se lo decimos muestra otra cosa.
+        await _safe_send(websocket, live_share_state_message(session))
+        await notify_client_viewers(session)
     try:
         while True:
             # Normalmente no esperamos nada del viewer (solo mantiene viva la
@@ -2194,6 +2271,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
             try:
                 payload = json.loads(data)
                 msg_type = payload.get("type")
+                if solo_plan and msg_type not in ("route_plan_hello", "set_route_plan", "set_voice_device", "set_route_prefs"):
+                    continue
                 # "offmap": la web vio el camion fuera del mapa que conoce; el
                 # cliente ofrece armar el mapa en la PC (map_builder.py).
                 # "nav_hud": el giro y lo que falta para el overlay en el
@@ -2246,7 +2325,11 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     if outbox is not None:
                         for variante in session.route_plans:
                             if variante not in cambiadas:
-                                outbox.push_control(route_plan_message(session, variante))
+                                outbox.push_control(route_plan_message(session, variante), plan=True)
+                    if offer_route_prefs(session, payload.get("prefs")):
+                        push_to_plan_viewers(session, route_prefs_message(session))
+                    elif outbox is not None and session.route_prefs is not None:
+                        outbox.push_control(route_prefs_message(session), plan=True)
                     # La que tenia la voz antes de un corte (o de un reinicio
                     # del relay) la recupera, si nadie la tomo mientras tanto
                     voz = clean_voice_device(payload["voice"]) if isinstance(payload.get("voice"), dict) else None
@@ -2254,7 +2337,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         session.voice_device = voz
                         push_to_plan_viewers(session, voice_device_message(session))
                     elif outbox is not None:
-                        outbox.push_control(voice_device_message(session))
+                        outbox.push_control(voice_device_message(session), plan=True)
                 elif msg_type == "set_route_plan":
                     session.plan_viewers.setdefault(websocket, None)
                     variante = apply_set_route_plan(session, payload)
@@ -2262,6 +2345,12 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         nonce = payload.get("nonce")
                         nonce = nonce if isinstance(nonce, str) and NONCE_RE.match(nonce) else None
                         push_to_plan_viewers(session, route_plan_message(session, variante, nonce))
+                elif msg_type == "set_route_prefs":
+                    session.plan_viewers.setdefault(websocket, None)
+                    if apply_set_route_prefs(session, payload):
+                        nonce = payload.get("nonce")
+                        nonce = nonce if isinstance(nonce, str) and NONCE_RE.match(nonce) else None
+                        push_to_plan_viewers(session, route_prefs_message(session, nonce))
                 elif msg_type == "set_voice_device":
                     session.plan_viewers.setdefault(websocket, None)
                     voz = clean_voice_device(payload)

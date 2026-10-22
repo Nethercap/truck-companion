@@ -1199,6 +1199,34 @@ def test_lan_el_tilde_de_compartir_va_al_relay_y_el_estado_vuelve(monkeypatch):
         nuevo = _FakeWs([])
         await srv._handle_viewer(nuevo)
         assert json.loads(nuevo.sent[0])["liveShare"] is True
+        assert "planRelay" not in json.loads(nuevo.sent[0])  # sin relay ni codigo
+    asyncio.run(probar())
+
+
+def test_lan_le_pasa_el_relay_y_el_codigo_para_el_plan_compartido():
+    """El tablero por LAN comparte waypoints, voz y ajustes de ruta por una
+    conexion solo de plan al relay: el session_state le dice a donde."""
+    import asyncio
+    import json
+    import local_server
+
+    async def probar():
+        srv = local_server.LocalServer({}, en_la_red=False)
+        codigo = {"code": "ABCD2345"}
+        srv.plan_relay = lambda: {"backend": "wss://relay.example", "code": codigo["code"]}
+        ws = _FakeWs([])
+        await srv._handle_viewer(ws)
+        assert json.loads(ws.sent[0])["planRelay"] == {"backend": "wss://relay.example", "code": "ABCD2345"}
+        # Con un codigo nuevo, la proxima conexion lleva ese
+        codigo["code"] = "ZZZZ9999"
+        otro = _FakeWs([])
+        await srv._handle_viewer(otro)
+        assert json.loads(otro.sent[0])["planRelay"]["code"] == "ZZZZ9999"
+        # Sin codigo todavia (None): sin la clave
+        srv.plan_relay = lambda: None
+        sin = _FakeWs([])
+        await srv._handle_viewer(sin)
+        assert "planRelay" not in json.loads(sin.sent[0])
     asyncio.run(probar())
 
 

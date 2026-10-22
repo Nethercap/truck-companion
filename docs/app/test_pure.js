@@ -1444,6 +1444,21 @@ test('routePlanAction: se aplica lo mas nuevo de otro, y el cambio propio vuelve
   assert.equal(samePlanList([], null), true);
 });
 
+test('syncAction y routePrefsOf: los ajustes de ruta de la sesion', () => {
+  const { syncAction, routePrefsOf, sameRoutePrefs } = require('./pure.js');
+  assert.equal(syncAction(10, undefined, 5, null), 'apply');
+  assert.equal(syncAction(5, undefined, 5, null), null);
+  assert.equal(syncAction(11, 'n1', 5, 'n1'), 'ack');
+  assert.equal(syncAction(12, undefined, 5, 'n1'), null);
+  assert.equal(syncAction('x', undefined, 0, null), null);
+  // Normalizados: perfil valido, DLC conocidos y en orden
+  const a = routePrefsOf('shortest', 0, { ats: ['ut', 'co', 'nada'], ets2: [] });
+  assert.deepEqual(a, { profile: 'shortest', dlcAuto: false, dlcOff: { ats: ['co', 'ut'], ets2: [] } });
+  assert.equal(routePrefsOf('otra', true, null).profile, 'fastest');
+  assert.equal(sameRoutePrefs(a, routePrefsOf('shortest', false, { ats: ['co', 'ut'] })), true);
+  assert.equal(sameRoutePrefs(a, routePrefsOf('fastest', false, { ats: ['co', 'ut'] })), false);
+});
+
 test('deviceInfo: telefono, tablet o computadora, con el sistema y el navegador', () => {
   const { deviceInfo } = require('./pure.js');
   assert.deepEqual(deviceInfo('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36'),

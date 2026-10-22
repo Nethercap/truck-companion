@@ -132,10 +132,21 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   mismos waypoints mostraban caminos distintos. Prender la voz en un
   dispositivo la trae a ese (`set_voice_device`, `voiceSpeaksHere`) y los
   demas dicen donde esta, con "Decirlas aca"; apagarla la suelta, y si su
-  dispositivo no vuelve en `VOICE_DEVICE_GRACE_S` (20 s) queda libre. Por LAN
-  no hay relay de por medio: cada pestana con lo suyo, como antes (fase 2:
-  que el servidor de la PC reparta el plan). `tools/probar_dispositivos.py`
-  lo prueba con el relay local, un cliente falso y dos navegadores.
+  dispositivo no vuelve en `VOICE_DEVICE_GRACE_S` (20 s) queda libre. Los
+  ajustes que cambian la ruta (mas rapida o mas corta, DLC automatico o
+  apagados: `route_prefs`, `routePrefsOf`, `syncAction`) van igual que el
+  plan: cambiarlos en un dispositivo los cambia en los demas. Por LAN la
+  telemetria sigue por la red de la casa y el plan, la voz y los ajustes van
+  por una conexion solo de plan al relay (`?role=plan`, `connectLanPlan`):
+  el cliente le pasa el relay y el codigo en el session_state (`planRelay`,
+  `LocalServer.plan_relay`). Esa conexion no recibe telemetria ni cuenta
+  como tablero. Con un cliente viejo (sin `planRelay`) la pestana por LAN
+  sigue con lo suyo; sin internet reintenta cada vez mas espaciado. Lo que
+  una pestana ofrece al conectar sin haberlo sincronizado nunca (rev 0)
+  entra con rev 1: el segundo dispositivo adopta lo del primero, y
+  cualquier cambio de verdad le gana. `tools/probar_dispositivos.py` lo
+  prueba con el relay local, un cliente falso, dos navegadores con el
+  codigo y uno por LAN (un 27766 falso).
 - En el `-lanes.bin`, el giro de un paso lleva +64 (`CARRIL_QUE_SE_PIERDE`
   del constructor, `drop` de `lanesForEdge`) si se sigue derecho y un
   carril que venia de antes del cruce anterior se va por una salida: ahi

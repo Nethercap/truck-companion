@@ -1,9 +1,12 @@
 """Prueba de punta a punta del plan de ruta y la voz compartidos por la sesion
 (Discord 22-10): el relay de backend/ en local, un cliente falso que manda la
 telemetria de la demo con una posicion en Salt Lake City, y dos navegadores
-separados (dos dispositivos) con el mismo codigo. Mira que un waypoint vaya y
-vuelva, que los dos calculen la misma ruta, que la voz pase de uno a otro y
-que despues de reiniciar el relay el plan y la voz vuelvan desde las pestanas.
+separados (dos dispositivos) con el mismo codigo, mas un tercero por LAN con
+un servidor LAN falso en el 27766 (el session_state con el relay y el codigo,
+como el de client/local_server.py). Mira que un waypoint vaya y vuelva, que
+los dos calculen la misma ruta, que la voz pase de uno a otro, que los ajustes
+de ruta y el plan crucen entre la LAN y el codigo, y que despues de reiniciar
+el relay el plan y la voz vuelvan desde las pestanas.
 
 Uso: python tools/probar_dispositivos.py   (pide uvicorn, websockets y
 playwright; baja mapas y grafos de R2 como smoke_web.py). Sale con 1 si algo
@@ -83,6 +86,44 @@ def cliente_falso(code, parar):
     asyncio.run(loop())
 
 
+def servidor_lan_falso(code, parar):
+    """El 27766 del cliente: session_state LAN con planRelay y la telemetria."""
+    tick = json.loads(subprocess.check_output(["node", "-e", (
+        "const p = require('./docs/app/pure.js'); const t = p.createDemoTelemetry({}).next();"
+        " t.position = { x: -67313, y: 0, z: -16853 }; t.heading = 0.25; process.stdout.write(JSON.stringify(t));")],
+        cwd=RAIZ))
+
+    async def atender(ws):
+        await ws.send(json.dumps({"type": "session_state", "client_connected": True, "client_status": None,
+                                  "local": True, "liveShare": None,
+                                  "planRelay": {"backend": f"ws://127.0.0.1:{PUERTO}", "code": code}}))
+        await ws.send(json.dumps({"type": "client_status", "status": "live", "game": "ats", "clientVersion": "9.9.9"}))
+        try:
+            while not parar.is_set():
+                tick["ts"] = time.time()
+                await ws.send(json.dumps(tick))
+                await asyncio.sleep(0.25)
+        except Exception:
+            pass
+
+    async def loop():
+        async with websockets.serve(atender, "127.0.0.1", 27766):
+            while not parar.is_set():
+                await asyncio.sleep(0.2)
+
+    asyncio.run(loop())
+
+
+def pestana_lan(browser, base, errores):
+    ctx = browser.new_context(viewport={"width": 1280, "height": 800}, service_workers="block")
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errores.append(f"lan: {str(e)[:200]}"))
+    page.goto(f"{base}/app/?local=1")
+    page.wait_for_function("() => typeof planShared !== 'undefined' && conn.local && planShared && lanPlanWs"
+                           " && currentGame === 'ats' && toLngLat", timeout=90000)
+    return page
+
+
 def pestana(browser, base, code, errores, nombre):
     ctx = browser.new_context(viewport={"width": 1280, "height": 800}, service_workers="block")
     page = ctx.new_page()
@@ -106,6 +147,7 @@ def main():
     code = json.loads(urllib.request.urlopen(urllib.request.Request(RELAY + "/pair/new", method="POST")).read())["code"]
     parar = threading.Event()
     threading.Thread(target=cliente_falso, args=(code, parar), daemon=True).start()
+    threading.Thread(target=servidor_lan_falso, args=(code, parar), daemon=True).start()
     errores = []
     try:
         with sync_playwright() as p:
@@ -154,7 +196,29 @@ def main():
             tablet.evaluate("document.getElementById('voiceSpeakHereBtn').click()")
             chequear("'Speak here' en la tablet la trae", esperar(celular, f"() => voiceDevice && voiceDevice.device === '{ids[0]}'"))
 
-            # 4) El relay se reinicia: el plan vuelve desde las pestanas
+            # 4) Por LAN: el plan, la voz y los ajustes de ruta cruzan con los del codigo
+            lan = pestana_lan(b, base, errores)
+            id_lan = lan.evaluate("DEVICE_ID")
+            tablet.evaluate("addWaypoint([-67000, -17200], toLngLat(-67000, -17200), true, 'Para la LAN')")
+            chequear("el waypoint de la tablet llega a la pestana por LAN",
+                     esperar(lan, "() => waypoints.length === 1 && waypoints[0].label === 'Para la LAN'"))
+            lan.evaluate("removeWaypoint(0)")
+            chequear("sacarlo por LAN lo saca en el celular", esperar(celular, "() => waypoints.length === 0"))
+            lan.evaluate("voiceOn = true; claimVoice()")
+            chequear("prender la voz por LAN la trae ahi",
+                     esperar(tablet, f"() => voiceDevice && voiceDevice.device === '{id_lan}'")
+                     and lan.evaluate("voiceHere()") is True)
+            lan.evaluate("document.getElementById('setRouteShortest').checked = true;"
+                         " document.getElementById('setRouteShortest').dispatchEvent(new Event('change'))")
+            chequear("'Mas corta' por LAN pasa a los demas",
+                     esperar(tablet, "() => routeProfile === 'shortest'") and esperar(celular, "() => routeProfile === 'shortest'"))
+            celular.evaluate("dlcOff = normalizeDlcOff({ ats: ['co'], ets2: [] }); dlcAuto = false; saveSettings(); routePrefsChanged()")
+            chequear("los DLC apagados en el celular pasan a la LAN",
+                     esperar(lan, "() => !dlcAuto && dlcOff.ats.includes('co')"))
+            tablet.evaluate("document.getElementById('voiceSpeakHereBtn').click()")
+            esperar(lan, f"() => voiceDevice && voiceDevice.device === '{ids[0]}'")
+
+            # 5) El relay se reinicia: el plan vuelve desde las pestanas
             tablet.evaluate("addWaypoint([-66500, -17500], toLngLat(-66500, -17500), true, 'Despues del reinicio')")
             esperar(celular, "() => waypoints.length === 1")
             relay.terminate()
@@ -169,6 +233,8 @@ def main():
                      esperar(nueva, "() => waypoints.length === 1 && waypoints[0].label === 'Despues del reinicio'", 20000))
             chequear("y la voz sigue en la tablet",
                      esperar(nueva, f"() => voiceDevice && voiceDevice.device === '{ids[0]}'", 10000))
+            chequear("y los ajustes de ruta tambien", esperar(nueva, "() => routeProfile === 'shortest' && dlcOff.ats.includes('co')", 10000))
+            chequear("la pestana por LAN vuelve a saludar despues del reinicio", esperar(lan, "() => planShared && lanPlanWs", 90000))
             chequear("sin errores en las paginas", not errores, "; ".join(errores[:3]))
             b.close()
     finally:

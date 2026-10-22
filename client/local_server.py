@@ -506,6 +506,12 @@ class LocalServer:
         # por avisar_live_share. None: el relay todavia no lo dijo.
         self.al_relay = None
         self.live_share: bool | None = None
+        # El relay y el codigo de la sesion ({"backend", "code"}, o None sin
+        # codigo todavia): el tablero por LAN abre con eso una conexion solo
+        # de plan al relay, y comparte waypoints, voz y ajustes de ruta con
+        # los otros dispositivos (plan de ruta compartido, 22-10). Lo pone la
+        # bandeja; se lee en cada conexion, asi va el codigo de ahora.
+        self.plan_relay = None
 
     @property
     def url(self) -> str | None:
@@ -609,8 +615,12 @@ class LocalServer:
         try:
             # liveShare: con la clave, la pagina sabe que este cliente le pasa
             # su tilde al relay (uno viejo no, y la casilla queda gris).
-            await ws.send(json.dumps({"type": "session_state", "client_connected": True, "client_status": None,
-                                      "local": True, "liveShare": self.live_share}))
+            estado = {"type": "session_state", "client_connected": True, "client_status": None,
+                      "local": True, "liveShare": self.live_share}
+            relay = self.plan_relay() if self.plan_relay is not None else None
+            if relay:
+                estado["planRelay"] = relay
+            await ws.send(json.dumps(estado))
             if self.last_status_message:
                 await ws.send(self.last_status_message)
             async for message in ws:
