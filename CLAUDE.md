@@ -178,7 +178,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   de Charlotte con el brazo de enfrente oculto), `findArcRoute` busca otra
   vez con ellos. La vuelta pasa a la punta de calle sin salida siguiente,
   que tambien puede ser una calle cortada por lo oculto (Knoxville, 300 m
-  mas alla): darse vuelta en una calle sin salida sigue permitido.
+  mas alla): darse vuelta en una calle sin salida sigue permitido, pero
+  cuesta de mas (`routeUTurnCost`: 120 s y 2 km, `ROUTE_UTURN_PENALTY_S` y
+  `_M`, en `opts.uTurnCost`): el GPS del juego no se da vuelta, y asi la
+  ruta da la vuelta a la manzana si no es mucho mas larga. En 4 variantes
+  (120 rutas, semilla 7) las vueltas en U bajan de 9 a 7 (Iasi, Akko), sin
+  rutas perdidas ni recalculos peores; con 300 s bajan a 6 pero sale un
+  recalculo mas largo. Las que quedan son puntas de calle donde la vuelta
+  por otro lado es mucho mas larga (Knoxville, Sevilla) o la unica entrada.
   El costo es `routeEdgeCost` (segundos + 1 ms por metro: los segundos del
   grafo son enteros y sin desempate la ruta hacia una V por un brazo del
   cruce; "shortest", metros + 4 m por segundo, `ROUTE_SHORT_M_PER_S`: con

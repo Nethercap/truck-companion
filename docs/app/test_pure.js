@@ -3927,6 +3927,29 @@ test('prefabStubs: en el brazo de un prefab sin calle no se da la vuelta, salvo 
   assert.deepEqual(findArcRoute(g2.g, 1, 0, { ...g2.opts(0), startArc: llegada }), [1, 0]);
 });
 
+test('uTurnCost: darse vuelta en una calle sin salida cuesta de mas, y la ruta da la vuelta a la manzana', () => {
+  const { routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M } = require('./pure.js');
+  assert.equal(routeUTurnCost(true), ROUTE_UTURN_PENALTY_S + ROUTE_UTURN_PENALTY_M * 1e-3);
+  assert.equal(routeUTurnCost(false), ROUTE_UTURN_PENALTY_M + ROUTE_UTURN_PENALTY_S * 4);
+  // El camion va al este por s y el destino w queda atras. b - d es una
+  // calle sin salida (la vuelta ahi: 420 m) y b -> p -> q -> s una manzana de
+  // una mano (460 m)
+  const nodos = [[-100, 0], [0, 0], [100, 0], [160, 0], [100, 80], [0, 80]];
+  const [w, s, b, d, p, q] = nodos.keys();
+  const { g, opts } = grafoDePrueba(nodos, [
+    { a: w, b: s }, { a: s, b }, { a: b, b: d },
+    { a: b, b: p, uno: true }, { a: p, b: q, uno: true }, { a: q, b: s, uno: true },
+  ]);
+  const llegada = g.csr[w];
+  assert.deepEqual(findArcRoute(g, s, w, { ...opts(w), startArc: llegada }), [s, b, d, b, s, w]);
+  assert.deepEqual(findArcRoute(g, s, w, { ...opts(w), startArc: llegada, uTurnCost: 100 }), [s, b, p, q, s, w]);
+  // Si la manzana es mucho mas larga que el recargo, se da vuelta igual
+  assert.deepEqual(findArcRoute(g, s, w, { ...opts(w), startArc: llegada, uTurnCost: 30 }), [s, b, d, b, s, w]);
+  // Arrancando hacia el fondo de una calle sin salida no hay otra: se da vuelta
+  const g2 = grafoDePrueba([[0, 0], [100, 0]], [{ a: 0, b: 1 }]);
+  assert.deepEqual(findArcRoute(g2.g, 1, 0, { ...g2.opts(0), startArc: g2.g.csr[0], uTurnCost: 100 }), [1, 0]);
+});
+
 test('ruteo: un giro cerrado que no es vuelta en U se puede, y una calle sin salida tambien', () => {
   // 120 grados en s: se puede
   const nodos = [[0, 0], [100, 0], [50, 87]];
