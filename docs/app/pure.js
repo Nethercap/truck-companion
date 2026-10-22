@@ -4579,41 +4579,119 @@ const UTURN_COS = Math.cos(UTURN_MIN_DEG * Math.PI / 180);
 // prefabs tienen tramitos de centimetros que darian cualquier rumbo.
 const ARC_DIR_MIN_M = 2;
 
+// Rumbo de salida y de llegada (vector unitario) del arco k (de i a adjTo[k],
+// con la curva de la arista), en out.depX[j]... out.arrY[j].
+function arcEndDirs(g, i, k, out, j) {
+  const { nodes, adjTo, adjEdge, adjRev, midOff, midXY } = g;
+  const b = adjTo[k], e = adjEdge[k], rev = adjRev[k];
+  const m0 = midOff ? midOff[e] : 0, cnt = midOff ? midOff[e + 1] - m0 : 0;
+  // Punto t de la arista en el sentido del arco: 0 = i, cnt + 1 = b.
+  const px = (t) => (t === 0 ? nodes[2 * i] : t === cnt + 1 ? nodes[2 * b] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1)]);
+  const py = (t) => (t === 0 ? nodes[2 * i + 1] : t === cnt + 1 ? nodes[2 * b + 1] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1) + 1]);
+  let t = 1;
+  while (t < cnt + 1 && Math.hypot(px(t) - px(0), py(t) - py(0)) < ARC_DIR_MIN_M) t++;
+  let dx = px(t) - px(0), dy = py(t) - py(0), d = Math.hypot(dx, dy) || 1;
+  out.depX[j] = dx / d; out.depY[j] = dy / d;
+  t = cnt;
+  while (t > 0 && Math.hypot(px(cnt + 1) - px(t), py(cnt + 1) - py(t)) < ARC_DIR_MIN_M) t--;
+  dx = px(cnt + 1) - px(t); dy = py(cnt + 1) - py(t); d = Math.hypot(dx, dy) || 1;
+  out.arrX[j] = dx / d; out.arrY[j] = dy / d;
+}
+
 // Rumbo de salida y de llegada (vector unitario) de cada arista dirigida del
 // grafo (indice k del CSR: de from[k] a adjTo[k]), con la curva de la arista.
 // Se calcula una vez por grafo y queda guardado en el.
 function routeArcDirections(g) {
   if (g._arcDirs) return g._arcDirs;
-  const { n, nodes, csr, adjTo, adjEdge, adjRev, midOff, midXY } = g;
+  const { n, csr } = g;
   const total = csr[n];
   const from = new Int32Array(total);
-  const depX = new Float32Array(total), depY = new Float32Array(total);
-  const arrX = new Float32Array(total), arrY = new Float32Array(total);
+  const out = { from, depX: new Float32Array(total), depY: new Float32Array(total), arrX: new Float32Array(total), arrY: new Float32Array(total) };
   for (let i = 0; i < n; i++) {
     for (let k = csr[i]; k < csr[i + 1]; k++) {
       from[k] = i;
-      const j = adjTo[k], e = adjEdge[k], rev = adjRev[k];
-      const m0 = midOff ? midOff[e] : 0, cnt = midOff ? midOff[e + 1] - m0 : 0;
-      // Punto t de la arista en el sentido del arco: 0 = i, cnt + 1 = j.
-      const px = (t) => (t === 0 ? nodes[2 * i] : t === cnt + 1 ? nodes[2 * j] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1)]);
-      const py = (t) => (t === 0 ? nodes[2 * i + 1] : t === cnt + 1 ? nodes[2 * j + 1] : midXY[2 * (rev ? m0 + cnt - t : m0 + t - 1) + 1]);
-      let t = 1;
-      while (t < cnt + 1 && Math.hypot(px(t) - px(0), py(t) - py(0)) < ARC_DIR_MIN_M) t++;
-      let dx = px(t) - px(0), dy = py(t) - py(0), d = Math.hypot(dx, dy) || 1;
-      depX[k] = dx / d; depY[k] = dy / d;
-      t = cnt;
-      while (t > 0 && Math.hypot(px(cnt + 1) - px(t), py(cnt + 1) - py(t)) < ARC_DIR_MIN_M) t--;
-      dx = px(cnt + 1) - px(t); dy = py(cnt + 1) - py(t); d = Math.hypot(dx, dy) || 1;
-      arrX[k] = dx / d; arrY[k] = dy / d;
+      arcEndDirs(g, i, k, out, k);
     }
   }
-  g._arcDirs = { from, depX, depY, arrX, arrY };
+  g._arcDirs = out;
   return g._arcDirs;
 }
 
 // Si salir por el arco kOut despues de llegar por kIn es darse vuelta.
 function isUTurnArc(dirs, kIn, kOut) {
   return dirs.arrX[kIn] * dirs.depX[kOut] + dirs.arrY[kIn] * dirs.depY[kOut] < UTURN_COS;
+}
+
+// Vueltas en U por un nodo de prefab (22-10). El constructor saca el camino
+// entre dos nodos de un prefab con el grafo de navNodes del juego, y ese
+// camino podia pasar por un TERCER nodo del prefab, donde se sale a la
+// calle: queda una arista a -> b del largo de a -> c -> b. Donde una autovia
+// pasa a ser de doble mano es de la calzada que llega al nodo de la doble
+// mano (c) y de ahi a la calzada que sale: pasada una salida, la ruta
+// mandaba a cruzar al otro lado y volver (Kiel, ProMods, Discord 22-10). La
+// regla de arriba no lo ve: en la arista a -> b, c queda adentro, y por
+// a -> c -> b la vuelta se reparte en tres nodos (en Kiel, unos 30 grados en
+// a, 133 en c y 15 en b). Devuelve { k, k1, k2 }: el arco a -> b (k) con un
+// a -> c (k1) y un c -> b (k2) que suman su largo (a UTURN_SHORTCUT_TOL_M),
+// si en c se da vuelta (UTURN_MIN_DEG) o dobla UTURN_SHORTCUT_MIN_DEG y la
+// maniobra entera es darse vuelta: toda llegada a a contra toda salida de b
+// (sin contar c ni a ni b), a mas de UTURN_MIN_DEG. Asi no cuenta la esquina
+// de una T por la que la calle sigue derecho de a a b y la arista que se
+// mete en el brazo de c y sale suma lo mismo por casualidad: con solo los 90
+// grados en c cambiaban 45 de 300 rutas de ciudad a ciudad de ATS (asi, 17)
+// y 68 de ETS2 (asi, 52). buildRouteGraph saca k y findArcRoute toma
+// k1 -> k2 como vuelta en U (uTurnPairs).
+const UTURN_SHORTCUT_TOL_M = 1.5;
+const UTURN_SHORTCUT_MIN_DEG = 90;
+function uTurnShortcuts(g, tolM = UTURN_SHORTCUT_TOL_M, minDeg = UTURN_SHORTCUT_MIN_DEG) {
+  const { n, csr, adjTo, adjEdge, edgeM } = g;
+  const cosMax = Math.cos(minDeg * Math.PI / 180);
+  const tmp = { depX: new Float32Array(2), depY: new Float32Array(2), arrX: new Float32Array(2), arrY: new Float32Array(2) };
+  // Los arcos que llegan a cada nodo (y de que nodo), para la maniobra
+  // entera; se arman la primera vez que hacen falta
+  let inCsr = null, inArc = null, inFrom = null;
+  const seDaVuelta = (a, b, c) => {
+    if (!inCsr) {
+      const total = csr[n];
+      inCsr = new Uint32Array(n + 1); inArc = new Uint32Array(total); inFrom = new Uint32Array(total);
+      for (let k = 0; k < total; k++) inCsr[adjTo[k] + 1]++;
+      for (let i = 0; i < n; i++) inCsr[i + 1] += inCsr[i];
+      const pos = inCsr.slice(0, n);
+      for (let i = 0; i < n; i++) for (let k = csr[i]; k < csr[i + 1]; k++) { const j = pos[adjTo[k]]++; inArc[j] = k; inFrom[j] = i; }
+    }
+    let hay = false;
+    for (let j = inCsr[a]; j < inCsr[a + 1]; j++) {
+      if (inFrom[j] === b || inFrom[j] === c) continue;
+      arcEndDirs(g, inFrom[j], inArc[j], tmp, 0);
+      for (let k = csr[b]; k < csr[b + 1]; k++) {
+        if (adjTo[k] === a || adjTo[k] === c) continue;
+        arcEndDirs(g, b, k, tmp, 1);
+        if (tmp.arrX[0] * tmp.depX[1] + tmp.arrY[0] * tmp.depY[1] >= UTURN_COS) return false;
+        hay = true;
+      }
+    }
+    return hay;
+  };
+  const out = [];
+  for (let a = 0; a < n; a++) {
+    for (let k = csr[a]; k < csr[a + 1]; k++) {
+      const b = adjTo[k], m = edgeM[adjEdge[k]];
+      let hallado = null;
+      for (let k1 = csr[a]; !hallado && k1 < csr[a + 1]; k1++) {
+        const c = adjTo[k1], m1 = edgeM[adjEdge[k1]];
+        if (c === a || c === b || m1 >= m) continue;
+        for (let k2 = csr[c]; k2 < csr[c + 1]; k2++) {
+          if (adjTo[k2] !== b || Math.abs(m1 + edgeM[adjEdge[k2]] - m) > tolM) continue;
+          arcEndDirs(g, a, k1, tmp, 0);
+          arcEndDirs(g, c, k2, tmp, 1);
+          const dot = tmp.arrX[0] * tmp.depX[1] + tmp.arrY[0] * tmp.depY[1];
+          if (dot < UTURN_COS || (dot <= cosMax && seDaVuelta(a, b, c))) { hallado = { k, k1, k2 }; break; }
+        }
+      }
+      if (hallado) out.push(hallado);
+    }
+  }
+  return out;
 }
 
 // Min-heap de numeros (prioridad, valor) en dos arrays: el A* por aristas
@@ -5001,7 +5079,9 @@ function arcsNearPoint(g, x, z, headingDeg, { maxDistM = 30, maxDeg = 60, edgeOk
     const ne = g.midOff.length - 1, dirs = routeArcDirections(g);
     const a = new Int32Array(ne).fill(-1), b = new Int32Array(ne), doble = new Uint8Array(ne), box = new Float32Array(4 * ne);
     for (let k = 0; k < g.csr[g.n]; k++) {
-      if (g.adjRev[k]) doble[g.adjEdge[k]] = 1;
+      // Por el arco al reves tambien: si el de ida era un atajo en U
+      // (uTurnShortcuts) quedo solo la vuelta.
+      if (g.adjRev[k]) { doble[g.adjEdge[k]] = 1; if (a[g.adjEdge[k]] < 0) { a[g.adjEdge[k]] = g.adjTo[k]; b[g.adjEdge[k]] = dirs.from[k]; } }
       else { a[g.adjEdge[k]] = dirs.from[k]; b[g.adjEdge[k]] = g.adjTo[k]; }
     }
     for (let e = 0; e < ne; e++) {
@@ -5144,6 +5224,10 @@ function findArcRoute(g, startIdx, endIdx, opts) {
   if (!metas && startIdx === endIdx) return [startIdx];
   const { csr, adjTo, adjEdge } = g;
   const dirs = routeArcDirections(g);
+  // Darse vuelta: en el nodo (isUTurnArc) o por un nodo de prefab
+  // (uTurnPairs de buildRouteGraph, uTurnShortcuts)
+  const pares = g.uTurnPairs && g.uTurnPairs.size ? g.uTurnPairs : null;
+  const vuelta = (kIn, kOut) => isUTurnArc(dirs, kIn, kOut) || (pares !== null && pares.has(kIn) && pares.get(kIn).has(kOut));
   const total = csr[g.n];
   const gScore = new Float64Array(total).fill(Infinity);
   const cameFrom = new Int32Array(total).fill(-1);
@@ -5165,12 +5249,12 @@ function findArcRoute(g, startIdx, endIdx, opts) {
   let libre0 = llegada === -1;
   for (let k = csr[startIdx]; !libre0 && k < csr[startIdx + 1]; k++) {
     if (blocked && blocked(adjEdge[k])) continue;
-    if (opts.isFerry(adjEdge[k]) || !isUTurnArc(dirs, llegada, k)) libre0 = true;
+    if (opts.isFerry(adjEdge[k]) || !vuelta(llegada, k)) libre0 = true;
   }
   for (let k = csr[startIdx]; k < csr[startIdx + 1]; k++) {
     const e = adjEdge[k];
     if (blocked && blocked(e)) continue;
-    if (llegada !== -1 && libre0 && !opts.isFerry(e) && isUTurnArc(dirs, llegada, k)) continue;
+    if (llegada !== -1 && libre0 && !opts.isFerry(e) && vuelta(llegada, k)) continue;
     const c = opts.cost(e);
     if (metas) meta(k, 0, -1);
     if (c < gScore[k]) { gScore[k] = c; heap.push(c + opts.heuristic(adjTo[k]), k); }
@@ -5189,13 +5273,13 @@ function findArcRoute(g, startIdx, endIdx, opts) {
     for (let k2 = csr[u]; !libre && k2 < csr[u + 1]; k2++) {
       const e2 = adjEdge[k2];
       if (blocked && blocked(e2)) continue;
-      if (opts.isFerry(e2) || !isUTurnArc(dirs, k, k2)) libre = true;
+      if (opts.isFerry(e2) || !vuelta(k, k2)) libre = true;
     }
     const g0 = gScore[k];
     for (let k2 = csr[u]; k2 < csr[u + 1]; k2++) {
       const e2 = adjEdge[k2];
       if (blocked && blocked(e2)) continue;
-      if (libre && !ferryIn && !opts.isFerry(e2) && isUTurnArc(dirs, k, k2)) continue;
+      if (libre && !ferryIn && !opts.isFerry(e2) && vuelta(k, k2)) continue;
       if (metas) meta(k2, g0, k);
       if (done[k2]) continue;
       const t = g0 + opts.cost(e2);
@@ -5219,6 +5303,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }

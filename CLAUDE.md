@@ -114,6 +114,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   se sale a mas de 150 grados de ella, salvo en ferry/tren o si no queda
   otra salida. Si asi no hay camino, `nodeRoutePath` (el A* por nodos de
   antes). `tools/check_avisos.js` saca las dos de app.js por nombre.
+  Tampoco por un nodo de prefab (`uTurnShortcuts`, 22-10): el constructor
+  (`prefab_nav_paths`) saca caminos entre dos nodos de un prefab que pasan
+  por un tercero (c), y queda una arista a -> b del largo de a -> c -> b.
+  Donde una autovia pasa a ser una sola arista de doble mano es ir de una
+  calzada a la otra dandose vuelta en c, repartido en tres nodos (unos 30,
+  133 y 15 grados en Kiel, ProMods): pasada una salida la ruta mandaba a
+  "cruzar la autopista" (Discord 22-10; 80 lugares asi a 6 km de Hamburgo,
+  a los dos lados de cada area de servicio). `buildRouteGraph` saca a -> b
+  y `findArcRoute` toma a -> c -> b como vuelta en U (`uTurnPairs`) si en c
+  dobla 150 grados, o 90 y toda llegada a a contra toda salida de b pasa los
+  150 (sin eso caia la recta de una T cuando el brazo sumaba lo mismo).
+  Despues de una salida perdida cambian 17 de 300 rutas de ATS y 149 de 300
+  de ETS2 (mediana +3 km: hasta el cruce siguiente, como el GPS del juego).
+  La arista a -> b es la marca de que c es del mismo prefab: si el
+  constructor deja de sacarla, la vuelta de Kiel vuelve (133 < 150) salvo
+  que la marca llegue de otra forma.
   El costo es `routeEdgeCost` (segundos + 1 ms por metro: los segundos del
   grafo son enteros y sin desempate la ruta hacia una V por un brazo del
   cruce; "shortest", metros + 4 m por segundo, `ROUTE_SHORT_M_PER_S`: con
