@@ -4641,3 +4641,30 @@ test('citiesOnLand y basemapFitsCities: un mapa armado en el mar no pinta el mar
   // sin datos que sirvan
   assert.deepEqual(citiesOnLand([[NaN, 1], null], tierra), { share: 1, off: 0, total: 0 });
 });
+
+test('roadLineWidth: el ancho de siempre de lejos y el de la calle del juego de cerca', () => {
+  const { roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE } = require('./pure.js');
+  const base = [5, 0.5, 12, 1.5, 17, 5]; // road-local
+  const m = 19.23; // metros del mapa por metro del juego en ETS2
+  const e = roadLineWidth(base, m, 50);
+  assert.deepEqual(e.slice(0, 3), ['interpolate', ['exponential', 2], ['zoom']]);
+  const at = (expr, z) => { const i = expr.indexOf(z, 3); assert.ok(i > 2 && (i - 3) % 2 === 0, `sin parada en ${z}`); return expr[i + 1]; };
+  const real = (z, lat) => ROAD_WIDTH_SHARE * ROAD_WIDTH_GAME_M * m * 512 * 2 ** z / (40075016.686 * Math.cos(lat * Math.PI / 180));
+  // de lejos manda el de siempre (a zoom 8 la calle real mide menos de 1 px)
+  assert.equal(at(e, 5), 0.5);
+  assert.ok(Math.abs(at(e, 8) - (0.5 + 3 / 7)) < 0.01);
+  // de cerca, la calle del juego: a zoom 12 en la latitud 50 son unos 11 px
+  // (la linea fina de siempre tenia 1,5) y se duplica con cada zoom
+  assert.ok(Math.abs(at(e, 12) - real(12, 50)) < 0.01);
+  assert.ok(at(e, 12) > 10 && at(e, 12) < 12, String(at(e, 12)));
+  assert.ok(Math.abs(at(e, 16) / at(e, 15) - 2) < 0.01);
+  // nunca mas fina que antes, y crece con el zoom
+  for (let z = 5; z <= 17; z++) assert.ok(at(e, z) >= 0.5 + (Math.min(z, 12) - 5) / 7 - 0.01, `zoom ${z}`);
+  for (let z = 6; z <= 22; z++) assert.ok(at(e, z) >= at(e, z - 1), `zoom ${z}`);
+  // mas al norte un metro ocupa mas pixeles (Mercator): Suecia contra Espana
+  assert.ok(at(roadLineWidth(base, m, 60), 13) > at(roadLineWidth(base, m, 40), 13) * 1.5);
+  // sin escala o sin latitud, la linea de siempre
+  const lineal = ['interpolate', ['linear'], ['zoom'], ...base];
+  assert.deepEqual(roadLineWidth(base, NaN, 50), lineal);
+  assert.deepEqual(roadLineWidth(base, m, undefined), lineal);
+});

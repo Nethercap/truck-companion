@@ -55,6 +55,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   forma clasica y el numero adentro (`addRoadShieldImage`). Solo ATS: los carteles de ETS2
   no traen el numero (kind 'city'). Con 2,5 km se repetia la I-80 cerca de
   Omaha; en lite no se cargan los nombres y no hay escudos.
+- Ancho de las calles (Discord 22-10, una rotonda de Suecia): de lejos el de
+  siempre y de cerca el del juego (`roadLineWidth`: 9 m por 0,8, en pixeles
+  segun la latitud del centro; `updateRoadWidths` lo rehace cada 2 grados),
+  con puntas cuadradas y esquinas en punta. Las piezas de los cruces de
+  truckermudgeon (las V de las entradas, las dos calzadas) estan pensadas
+  para dibujarse con ancho: con la linea fina se veian sueltas y cruzadas.
+  Quedan pedazos rotos en algunos cruces (brazo noroeste de una rotonda de
+  Uppsala, juego 24060,-51876): los tiles de truckermudgeon tienen los
+  mismos, vienen del generador. Desde el zoom 12 la ruta es mas fina que la
+  calle y va encima, como un carril marcado.
 - Un mapa armado en la PC ("Build my map") cuyas ciudades caen sobre todo
   fuera de la tierra real (Explorando a America en ATS, 18-10) va con el
   fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5
