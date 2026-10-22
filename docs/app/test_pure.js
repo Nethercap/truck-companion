@@ -1123,6 +1123,30 @@ test('voz: bifurcacion dice "keep"; un cruce nuevo vuelve a avisar', () => {
   assert.equal(v.maneuver(null, 90), null);
 });
 
+test('voz: si el aviso va a otra maniobra y vuelve, no la repite (Salem, Cheyenne, 22-10)', () => {
+  const v = createVoiceGuide();
+  const keep = (d) => giro(d, { kind: 'fork', node: [500, 500] });
+  const otro = (d) => giro(d, { node: [900, 900] });
+  // Salem: el keep se dice en el punto, al pisar el nodo se ve el giro que
+  // sigue y al dato siguiente vuelve el keep: no se repite
+  assert.equal(v.maneuver(keep(30), 50), 'keep_right');
+  assert.equal(v.maneuver(otro(340), 50), null);
+  assert.equal(v.maneuver(keep(0), 50), null);
+  // con el anticipado dicho, un ida y vuelta no lo repite y el del punto sale igual
+  const w = createVoiceGuide();
+  assert.equal(w.maneuver(giro(300, { node: [1, 1] }), 72), 'soon_turn_right'); // 15 s
+  assert.equal(w.maneuver(otro(280), 72), 'soon_turn_right');
+  assert.equal(w.maneuver(giro(250, { node: [1, 1] }), 72), null);
+  assert.equal(w.maneuver(giro(60, { node: [1, 1] }), 72), 'turn_right');
+  // pasadas RECENT_MANEUVERS_MAX maniobras se olvida: un cruce que vuelve
+  // mucho despues se avisa otra vez
+  const { RECENT_MANEUVERS_MAX } = require('./pure.js');
+  const x = createVoiceGuide();
+  assert.equal(x.maneuver(keep(30), 50), 'keep_right');
+  for (let k = 0; k < RECENT_MANEUVERS_MAX; k++) x.maneuver(giro(30, { node: [k * 1000, 0] }), 50);
+  assert.equal(x.maneuver(keep(30), 50), 'keep_right');
+});
+
 test('voz: llegada una vez por destino, y no al tomar un trabajo ya en la empresa', () => {
   const v = createVoiceGuide();
   assert.equal(v.arrival('job1|dest', 'dest', 5, 120), null);
@@ -3727,6 +3751,8 @@ test('giro para lector de pantalla: una vez por maniobra y sin la flecha', () =>
   assert.equal(a.next(giro(400), '↰ Turn left onto I-80 in 400 m'), null);
   // otra maniobra: si
   assert.equal(a.next(giro(2000, 900), '↰ Turn left in 2 km'), 'Turn left in 2 km');
+  // y si vuelve a la de antes (A, B, A), no la lee de nuevo
+  assert.equal(a.next(giro(300), '↰ Turn left onto I-80 in 300 m'), null);
   const rot = { kind: 'roundabout', direction: 'right', exit: 2, node: [5, 5], distanceMeters: 300 };
   assert.equal(a.next(rot, '↻ Roundabout in 300 m: take the 2nd exit'), 'Roundabout in 300 m: take the 2nd exit');
   // sin texto o sin nodo no hay nada que anunciar
