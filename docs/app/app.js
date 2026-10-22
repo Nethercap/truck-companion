@@ -3182,16 +3182,38 @@ function routeGraphFromJson(data) {
 // sin flags = doble mano.
 function buildRouteGraph(g) {
   const { n, ne, nodes, edgeA, edgeB, edgeM, edgeS, edgeF, midOff, midXY, shiftA = null, shiftB = null, edgeG = null } = g;
-  const csr = new Uint32Array(n + 1);
+  let csr = new Uint32Array(n + 1);
   for (let e = 0; e < ne; e++) { csr[edgeA[e] + 1]++; if (!(edgeF[e] & 2)) csr[edgeB[e] + 1]++; }
   for (let i = 0; i < n; i++) csr[i + 1] += csr[i];
-  const nDir = csr[n];
-  const adjTo = new Uint32Array(nDir), adjEdge = new Uint32Array(nDir), adjRev = new Uint8Array(nDir);
+  let nDir = csr[n];
+  let adjTo = new Uint32Array(nDir), adjEdge = new Uint32Array(nDir), adjRev = new Uint8Array(nDir);
   const fill = csr.slice(0, n);
   for (let e = 0; e < ne; e++) {
     const a = edgeA[e], b = edgeB[e];
     let k = fill[a]++; adjTo[k] = b; adjEdge[k] = e; adjRev[k] = 0;
     if (!(edgeF[e] & 2)) { k = fill[b]++; adjTo[k] = a; adjEdge[k] = e; adjRev[k] = 1; }
+  }
+  // Las vueltas en U por un nodo de prefab (uTurnShortcuts, pure.js): sin
+  // la arista a -> b, y a -> c -> b como vuelta en U en c (uTurnPairs).
+  const atajos = uTurnShortcuts({ n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, midOff, midXY });
+  const uTurnPairs = new Map();
+  if (atajos.length) {
+    const fuera = new Uint8Array(nDir);
+    for (const { k } of atajos) fuera[k] = 1;
+    const nuevo = new Int32Array(nDir).fill(-1);
+    const csr2 = new Uint32Array(n + 1), to2 = new Uint32Array(nDir - atajos.length), edge2 = new Uint32Array(nDir - atajos.length), rev2 = new Uint8Array(nDir - atajos.length);
+    let w = 0;
+    for (let i = 0; i < n; i++) {
+      csr2[i] = w;
+      for (let k = csr[i]; k < csr[i + 1]; k++) if (!fuera[k]) { nuevo[k] = w; to2[w] = adjTo[k]; edge2[w] = adjEdge[k]; rev2[w] = adjRev[k]; w++; }
+    }
+    csr2[n] = w;
+    csr = csr2; adjTo = to2; adjEdge = edge2; adjRev = rev2; nDir = w;
+    for (const { k1, k2 } of atajos) {
+      if (nuevo[k1] < 0 || nuevo[k2] < 0) continue;
+      if (!uTurnPairs.has(nuevo[k1])) uTurnPairs.set(nuevo[k1], new Set());
+      uTurnPairs.get(nuevo[k1]).add(nuevo[k2]);
+    }
   }
   // grado y componentes sobre la version no dirigida (una arista de un
   // sentido tambien conecta topologicamente a sus dos nodos)
@@ -3228,7 +3250,7 @@ function buildRouteGraph(g) {
   let giantComponent = 0;
   for (let c = 1; c < componentSize.length; c++) if (componentSize[c] > componentSize[giantComponent]) giantComponent = c;
   const graph = {
-    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, edgeG, degree, componentId, componentSize, giantComponent,
+    n, nodes, csr, adjTo, adjEdge, adjRev, edgeM, edgeS, edgeF, midOff, midXY, shiftA, shiftB, edgeG, degree, componentId, componentSize, giantComponent, uTurnPairs,
     nodeXY: (i) => [nodes[2 * i], nodes[2 * i + 1]],
     // vista "de antes" para detectManeuver y cualquier otro consumidor:
     // adjacency.get(i) -> [[vecino, metros, segundos], ...]

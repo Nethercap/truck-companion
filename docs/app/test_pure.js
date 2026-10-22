@@ -3792,6 +3792,38 @@ test('ruteo: no da la vuelta en el nodo donde una calzada separada pasa a doble 
   assert.ok(isUTurnArc(dirs, llegaS, aB));
 });
 
+test('uTurnShortcuts: la arista de un prefab que pasa por otro nodo dandose vuelta (Kiel, 22-10)', () => {
+  const { uTurnShortcuts } = require('./pure.js');
+  // Calzada que baja al sur (e -> a), la que sube (b -> f), y en c la calle
+  // de doble mano (c - z), que termina en z. El prefab tiene a -> c, c -> b
+  // y tambien a -> b, que es a -> c -> b (sus puntos pasan por c). En c dobla
+  // 120 grados: la vuelta se reparte entre a, c y b, como en Kiel (133).
+  // Ademas p -> q -> r derecho, con un p -> r del mismo largo: ese no.
+  const nodos = [[-2, -200], [-2, 0], [0, 20], [14, 10], [14, -200], [0, 220], [100, 0], [100, 20], [100, 40]];
+  const [e, a, c, b, f, z, p, q, r] = nodos.keys();
+  const aristas = [
+    { a: e, b: a, uno: true, m: 200 }, { a, b: c, uno: true, m: 20 }, { a: c, b, uno: true, m: 17 },
+    { a, b, uno: true, m: 37, mids: [[0, 20]] }, { a: b, b: f, uno: true, m: 210 }, { a: c, b: z, m: 200 },
+    { a: p, b: q, uno: true, m: 20 }, { a: q, b: r, uno: true, m: 20 }, { a: p, b: r, uno: true, m: 40 },
+  ];
+  const { g, opts } = grafoDePrueba(nodos, aristas);
+  g.edgeM = Float32Array.from(aristas.map(x => x.m));
+  const atajos = uTurnShortcuts(g);
+  assert.equal(atajos.length, 1);
+  const [{ k, k1, k2 }] = atajos;
+  assert.deepEqual([g.adjEdge[k], g.adjEdge[k1], g.adjEdge[k2]], [3, 1, 2]);
+  assert.ok(!isUTurnArc(routeArcDirections(g), k1, k2)); // en c sola no llega a vuelta en U
+  // Con el atajo, de la calzada que baja a la que sube sin pasar por z: la
+  // ruta "cruza al otro lado". Sin el atajo, por a -> c -> b igual.
+  assert.deepEqual(findArcRoute(g, e, f, opts(f)), [e, a, b, f]);
+  const sinAtajo = { ...opts(f), blocked: (x) => x === 3 };
+  assert.deepEqual(findArcRoute(g, e, f, sinAtajo), [e, a, c, b, f]);
+  // Como lo deja buildRouteGraph (uTurnPairs): a -> c -> b es darse vuelta,
+  // y como z no tiene salida, se da la vuelta alla
+  g.uTurnPairs = new Map([[k1, new Set([k2])]]);
+  assert.deepEqual(findArcRoute(g, e, f, sinAtajo), [e, a, c, z, c, b, f]);
+});
+
 test('ruteo: un giro cerrado que no es vuelta en U se puede, y una calle sin salida tambien', () => {
   // 120 grados en s: se puede
   const nodos = [[0, 0], [100, 0], [50, 87]];
@@ -4133,6 +4165,18 @@ test('startArcForHeading: los carriles de un prefab que todavia no se separan va
   assert.ok(r.alts[0].dist <= r.dist + START_ARC_TIE_M);
   // Ya separados, una sola
   assert.deepEqual(startArcForHeading(g, 50, 0.5, 90).alts, []);
+});
+
+test('startArcForHeading: una arista de doble mano sin el arco de ida (un atajo en U sacado) sigue de vuelta', () => {
+  const { startArcForHeading } = require('./pure.js');
+  const { g } = grafoDePrueba([[0, 0], [100, 0]], [{ a: 0, b: 1 }]);
+  // Como buildRouteGraph sin el arco 0 -> 1 (uTurnShortcuts): queda 1 -> 0
+  const k = [...g.adjRev.keys()].find(j => g.adjRev[j] === 1);
+  g.csr = Uint32Array.from([0, 0, 1]);
+  g.adjTo = Int32Array.from([g.adjTo[k]]); g.adjEdge = Int32Array.from([g.adjEdge[k]]); g.adjRev = Uint8Array.from([1]);
+  const r = startArcForHeading(g, 50, 0, 270);
+  assert.equal(r.to, 0);
+  assert.equal(startArcForHeading(g, 50, 0, 90), null);
 });
 
 test('routeReachability: una zona sin salida (Volkhov, ETS2) y una sin entrada (Durango, ATS)', () => {
