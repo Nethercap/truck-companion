@@ -377,6 +377,19 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   borraba y no se avisaba ese giro (Discord, Gargamosch, 18-10, Rockford).
   `stoppedRouteLead` le antepone una entrada sobre el rumbo del camion si el
   nodo esta adelante y la ruta no sale de ahi para atras.
+  Andando arranca en la proyeccion sobre el tramo del camion, que puede ser
+  otro carril del prefab: a 1 o 2 m de un nodo esa cuerda iba para cualquier
+  lado y el giro se ponia en el primer nodo del cruce, a 0 ft, y otro
+  recalculo lo corria al siguiente ("Turn left onto US-85 in 0 ft" dos veces
+  y la voz repitiendo, Cheyenne, Discord 22-10). A menos de 5 m del primer
+  nodo arranca en el nodo con la misma entrada (`snapRouteStartToNode`),
+  salvo que siga lo recorrido. Recalculando cada 5 m antes de cada giro en
+  30 rutas por juego, los avisos falsos pasan de 14 a 11 en ATS y de 14 a 12
+  en ETS2, sin los de sentido contrario; los que quedan ya estaban (el mismo
+  giro en otro nodo de una cadena de cruces).
+  La telemetria con el camion en 0,0 exacto es un dato sin posicion
+  (`positionAtOrigin`, en `handleTelemetry`): la app lo tomaba como un salto,
+  recalculaba desde 0,0 y otra vez al volver, sin lo recorrido.
   Si se recalcula sin desviarse (cambio el destino o un waypoint) y el camion
   sigue sobre la ruta de antes, se conservan lo recorrido (`routeBehind`) y
   el rumbo aunque este parado (`recalcOnRoute`): adentro de un cruce la ruta

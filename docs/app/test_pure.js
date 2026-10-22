@@ -4075,6 +4075,54 @@ test('stoppedRouteLead: parado antes de un cruce, la ruta empieza con la entrada
   assert.equal(stoppedRouteLead(ruta, NaN, 5, 0), null);
 });
 
+test('snapRouteStartToNode: recalculada andando a 1 m de un nodo, arranca en el nodo con la entrada de parado (US-85, Cheyenne)', () => {
+  const { snapRouteStartToNode, stoppedRouteLead, ROUTE_START_SNAP_M } = require('./pure.js');
+  // Rumbo del juego: 0 = hacia -z, horario. Una cadena de nodos de cruce
+  // hacia el norte (A, B, C y D en 99 m, como la entrada a la US-85) y la
+  // calle dobla a la izquierda despues de D. La ruta recalculada arranca en
+  // el tramo del camion a 1,4 m de A, con esa cuerda a 37 grados.
+  const rumboJuego = (p, q) => (Math.atan2(q[0] - p[0], -(q[1] - p[1])) * 180 / Math.PI + 360) % 360;
+  const resto = [[0, 0, 0, 1, 1], [0, -15, 0, 1, 2], [0, -62, 0, 1, 3], [0, -99, 0, 1, 4],
+    [-0.2, -113, 0, 0, null], [-4, -121, 0, 0, null], [-12, -126.6, 0, 0, null], [-31, -126.6, 0, 0, 5], [-400, -126.6, 0, 0, 6]];
+  const arranque = [-0.84, 1.12, 0, 0, null];
+  const recalculada = [arranque, ...resto];
+  const giro = (pts) => {
+    const { cum, pointAt } = routeMetrics(pts);
+    const i = pts.findIndex((p) => p[3] === 1);
+    const iEnd = junctionClusterEnd(pts, cum, i, 50, 100);
+    const m = detectManeuver({ pts, i, iEnd, cum, pointAt, bearingBetween: rumboJuego, nodes: null, adjacency: null });
+    return m && [m.kind, m.direction, pts[m.at][4]];
+  };
+  // Asi el giro quedaba en A, 99 m antes de la esquina: "in 0 ft"
+  assert.deepEqual(giro(recalculada), ['turn', 'left', 1]);
+  const pegada = snapRouteStartToNode(recalculada);
+  assert.equal(pegada[0], resto[0]);
+  const entrada = stoppedRouteLead(pegada, arranque[0], arranque[1], 0);
+  assert.ok(entrada && entrada[0] === 0 && entrada[1] > 30); // detras del camion, sobre su rumbo
+  assert.deepEqual(giro([entrada, ...pegada]), ['turn', 'left', 4]); // en D, la esquina
+  // Lejos del nodo, ya arrancando en un nodo (parado) o antes de un punto de
+  // la curva: la misma ruta
+  const lejos = [[0, ROUTE_START_SNAP_M + 1, 0, 0, null], ...resto];
+  assert.equal(snapRouteStartToNode(lejos), lejos);
+  assert.equal(snapRouteStartToNode(resto), resto);
+  const curva = [[-0.1, -110, 0, 0, null], ...resto.slice(4)];
+  assert.equal(snapRouteStartToNode(curva), curva);
+  assert.equal(snapRouteStartToNode(null), null);
+});
+
+test('positionAtOrigin: el camion en 0,0 exacto es un dato sin posicion (Cheyenne, 22-10)', () => {
+  const { positionAtOrigin } = require('./pure.js');
+  assert.equal(positionAtOrigin({ x: 0, y: 0, z: 0 }), true);
+  assert.equal(positionAtOrigin({ x: 0, z: 0 }), true);
+  assert.equal(positionAtOrigin({ x: 0, z: 5 }), false);
+  assert.equal(positionAtOrigin({ x: 0.4, z: 0 }), false);
+  assert.equal(positionAtOrigin({ x: -35759, y: 10, z: -16539 }), false);
+  // sin dato no es 0,0 (Number(null) es 0)
+  assert.equal(positionAtOrigin({ x: null, z: null }), false);
+  assert.equal(positionAtOrigin(null), false);
+  assert.equal(positionAtOrigin(undefined), false);
+});
+
 test('recalcOnRoute: sin desviarse, la ruta nueva sigue con lo recorrido y el rumbo (Tyler -> Lufkin, ATS)', () => {
   const { recalcOnRoute } = require('./pure.js');
   // Lo recorrido: 100 m al norte con los nodos de la esquina; la ruta vieja
