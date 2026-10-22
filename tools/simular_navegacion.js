@@ -779,7 +779,11 @@ function revisarAvisosTrasRecalculo(ctx, ruta, lista, met, hallazgos) {
       if (iNodo < 0 || camino.indexOf(despues, iNodo) < 0) continue; // va por otro lado
       ctx.stats.recalculosAntesDelGiro++;
       const nm = metrica(nueva);
-      let behind = [], cur = nueva, h = 0, sn = 0;
+      // El camion esta donde esta: no en la entrada que le antepone
+      // recalcRouteStart, 30 m mas atras
+      const pr = pure.projectAheadOnRoute(nueva, x, z, 400);
+      const s0 = pr ? nm.cum[pr.idx] + Math.hypot(pr.point[0] - nueva[pr.idx][0], pr.point[1] - nueva[pr.idx][1]) : 0;
+      let behind = [], cur = nueva, h = 0, sn = s0;
       const state = {};
       for (let t = 0; t < RECALC_TICKS && cur.length >= 2; t++) {
         H.mod.set(g, cur, behind);
