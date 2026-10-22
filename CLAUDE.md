@@ -115,6 +115,27 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   nunca lo cambio (`liveShareChoice` null: saveSettings guarda solo lo que
   cambia) no le manda nada al relay al conectar: ni lo prende ni apaga lo
   que eligio otro dispositivo. Ya no hay aviso de "apareces en el mapa".
+- Plan de ruta y voz por sesion (Discord 22-10, Gargamosch: los waypoints en
+  la tablet, la navegacion en el celular y la voz en la PC). El relay guarda
+  los waypoints de cada variante (`Session.route_plans`, con `rev` = su hora
+  al aceptar un cambio) y el dispositivo que habla (`voice_device`), y los
+  manda solo a las pestanas que saludaron (`route_plan_hello`): la web vieja
+  toma por telemetria cualquier mensaje con un type que no conoce. Un cambio
+  de aca va con `set_route_plan` y un nonce; hasta que vuelve, la pestana no
+  aplica otros planes (el relay los ordena y el ultimo que acepta es el que
+  queda en todos, `routePlanAction`). Al conectar, cada pestana ofrece lo que
+  tiene guardado con su rev y el relay solo lo toma si no tiene algo mas
+  nuevo: asi el plan sobrevive a un redeploy. Vaciar una lista que ya estaba
+  vacia no se manda (borraria el plan de los demas). La ruta la sigue
+  calculando cada dispositivo, y se rehace cuando llegan las decimas y el
+  `-prefabs.bin`: calculada antes de que llegaran, dos dispositivos con los
+  mismos waypoints mostraban caminos distintos. Prender la voz en un
+  dispositivo la trae a ese (`set_voice_device`, `voiceSpeaksHere`) y los
+  demas dicen donde esta, con "Decirlas aca"; apagarla la suelta, y si su
+  dispositivo no vuelve en `VOICE_DEVICE_GRACE_S` (20 s) queda libre. Por LAN
+  no hay relay de por medio: cada pestana con lo suyo, como antes (fase 2:
+  que el servidor de la PC reparta el plan). `tools/probar_dispositivos.py`
+  lo prueba con el relay local, un cliente falso y dos navegadores.
 - En el `-lanes.bin`, el giro de un paso lleva +64 (`CARRIL_QUE_SE_PIERDE`
   del constructor, `drop` de `lanesForEdge`) si se sigue derecho y un
   carril que venia de antes del cruce anterior se va por una salida: ahi

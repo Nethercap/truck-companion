@@ -1409,6 +1409,74 @@ test('storedWaypoints: vuelven los de la variante, vigentes y con forma de waypo
   assert.equal(storedWaypoints(muchos, 'ats', now, undefined, 9).length, 9);
 });
 
+test('routePlanOffers: al conectar se ofrece lo vigente con su rev, no lo que espera mandarse', () => {
+  const { routePlanOffers } = require('./pure.js');
+  const now = 1_000_000_000_000;
+  const stored = {
+    ats: { at: now - 1000, rev: 999, list: [{ pos: [10, 20], inGame: true, label: 'Fuel', kind: 'g' }] },
+    ets2: { at: now - 13 * 3600 * 1000, rev: 5, list: [{ pos: [5, 5] }] }, // vencido
+    ats_c2c: { at: now, list: [{ pos: [1, 2] }], pending: true }, // va como cambio
+    ats_promods: { at: now, rev: 7, list: [] }, // los saco todos: tambien cuenta
+    ets2_promods: { at: now, list: [] }, // vacio y nunca sincronizado: nada
+  };
+  assert.deepEqual(routePlanOffers(stored, now), {
+    ats: { list: [{ pos: [10, 20], inGame: true, label: 'Fuel', kind: 'g' }], rev: 999 },
+    ats_promods: { list: [], rev: 7 },
+  });
+  assert.deepEqual(routePlanOffers(null, now), {});
+});
+
+test('routePlanAction: se aplica lo mas nuevo de otro, y el cambio propio vuelve como respuesta', () => {
+  const { routePlanAction, samePlanList } = require('./pure.js');
+  const msg = (rev, nonce) => ({ type: 'route_plan', variant: 'ats', list: [], rev, nonce });
+  assert.equal(routePlanAction(msg(10), { rev: 5 }, null), 'apply');
+  assert.equal(routePlanAction(msg(10), null, null), 'apply');
+  assert.equal(routePlanAction(msg(5), { rev: 5 }, null), null); // ya lo teniamos
+  assert.equal(routePlanAction(msg(4), { rev: 5 }, null), null);
+  // Con un cambio propio en camino: solo cuenta su respuesta
+  assert.equal(routePlanAction(msg(11, 'n1'), { rev: 5 }, 'n1'), 'ack');
+  assert.equal(routePlanAction(msg(12, 'otro'), { rev: 5 }, 'n1'), null);
+  assert.equal(routePlanAction(msg(12), { rev: 5 }, 'n1'), null);
+  assert.equal(routePlanAction({ rev: 'x', list: [] }, null, null), null);
+  const a = [{ pos: [1, 2], inGame: true, label: 'A', kind: 'g' }];
+  assert.equal(samePlanList(a, [{ pos: [1, 2], inGame: true, label: 'A', kind: 'g', marker: {} }]), true);
+  assert.equal(samePlanList(a, [{ pos: [1, 2], inGame: true, label: 'B', kind: 'g' }]), false);
+  assert.equal(samePlanList([], null), true);
+});
+
+test('deviceInfo: telefono, tablet o computadora, con el sistema y el navegador', () => {
+  const { deviceInfo } = require('./pure.js');
+  assert.deepEqual(deviceInfo('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36'),
+    { kind: 'phone', os: 'Android', browser: 'Chrome' });
+  assert.deepEqual(deviceInfo('Mozilla/5.0 (Linux; Android 13; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0 Safari/537.36'),
+    { kind: 'tablet', os: 'Android', browser: 'Samsung Internet' });
+  assert.deepEqual(deviceInfo('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'),
+    { kind: 'phone', os: 'iOS', browser: 'Safari' });
+  // El iPad con Safari dice ser una Mac: lo delata la pantalla tactil
+  const ipad = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
+  assert.deepEqual(deviceInfo(ipad, 5), { kind: 'tablet', os: 'iPadOS', browser: 'Safari' });
+  assert.deepEqual(deviceInfo(ipad, 0), { kind: 'computer', os: 'macOS', browser: 'Safari' });
+  assert.deepEqual(deviceInfo('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36 Edg/129.0'),
+    { kind: 'computer', os: 'Windows', browser: 'Edge' });
+  assert.deepEqual(deviceInfo('Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0'),
+    { kind: 'computer', os: 'Linux', browser: 'Firefox' });
+  assert.deepEqual(deviceInfo(''), { kind: 'other', os: null, browser: null });
+});
+
+test('voiceSpeaksHere: con un dispositivo elegido habla solo ese; sin eleccion o por LAN, como antes', () => {
+  const { voiceSpeaksHere } = require('./pure.js');
+  const celular = { device: 'celular1', kind: 'phone' };
+  assert.equal(voiceSpeaksHere(true, true, true, celular, 'celular1'), true);
+  assert.equal(voiceSpeaksHere(true, true, true, celular, 'pcdelcasa'), false);
+  assert.equal(voiceSpeaksHere(true, true, true, null, 'pcdelcasa'), true);
+  assert.equal(voiceSpeaksHere(true, true, true, { device: null }, 'pcdelcasa'), true);
+  // Por LAN (sin el relay) no se sabe quien la tiene: habla
+  assert.equal(voiceSpeaksHere(true, true, false, celular, 'pcdelcasa'), true);
+  // Apagada, o en una pestana que no es la lider del navegador: nunca
+  assert.equal(voiceSpeaksHere(false, true, true, null, 'celular1'), false);
+  assert.equal(voiceSpeaksHere(true, false, true, celular, 'celular1'), false);
+});
+
 // ---- rotondas
 // Grafo dirigido chico: nodos [x, y] (y = norte) y aristas [a, b, dosManos].
 function grafoChico(nodos, aristas) {

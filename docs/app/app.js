@@ -51,6 +51,7 @@ function setLanguage(lang) {
   renderTripHistory();
   renderWaypointList();
   fillVoiceSelect();
+  renderVoiceDeviceHint();
   if (lastData) updateHud(lastData);
 }
 for (const id of ['langSelect', 'setLangSelect']) {
@@ -687,7 +688,13 @@ document.getElementById('setTruckSizeDefault').addEventListener('click', () => a
 document.getElementById('setVoice').addEventListener('change', (e) => {
   voiceOn = e.target.checked;
   saveSettings();
-  if (voiceOn) { unlockVoice().catch(() => {}); speakVoice('soon_turn_right'); }
+  if (voiceOn) { claimVoice(); unlockVoice().catch(() => {}); speakVoice('soon_turn_right'); } else releaseVoice();
+  renderVoiceDeviceHint();
+});
+document.getElementById('voiceSpeakHereBtn').addEventListener('click', () => {
+  claimVoice();
+  unlockVoice().catch(() => {});
+  speakVoice('soon_turn_right');
 });
 document.getElementById('setVoiceName').addEventListener('change', (e) => {
   voiceByLang[currentLang] = e.target.value;
@@ -2393,24 +2400,111 @@ function readStoredWaypoints() {
 // lider" del convoy tampoco se guarda: es del convoy en curso y despues de
 // recargar quedaba como un waypoint comun al destino viejo del lider
 // (auditoria del 10-10).
+// Cada variante guarda tambien el rev del plan de la sesion y pending si hay
+// un cambio de aca que el relay todavia no tiene (ver sendRoutePlanHello).
 function saveWaypoints() {
   if (!currentGame || conn.demo) return;
   const stored = readStoredWaypoints();
   const keep = plainWaypoints(waypoints);
-  if (keep.length) {
-    stored[currentGame] = { at: Date.now(), list: keep };
+  const prev = stored[currentGame] || null;
+  // El waypoint del convoy no cuenta: si no cambio otra cosa, no se manda.
+  // Vaciar lo que ya estaba vacio tampoco: borraria el plan de los demas
+  const cambio = prev ? !samePlanList(prev.list, keep) : keep.length > 0;
+  const rev = prev && Number.isInteger(prev.rev) ? prev.rev : 0;
+  if (keep.length || rev || cambio) {
+    stored[currentGame] = { at: Date.now(), list: keep, rev, pending: cambio || !!(prev && prev.pending) };
   } else {
     delete stored[currentGame];
   }
   try { localStorage.setItem(WAYPOINTS_KEY, JSON.stringify(stored)); } catch (e) {}
+  if (cambio) sendRoutePlan(currentGame, keep);
 }
+const WAYPOINTS_MAX_AGE_MS = 12 * 3600 * 1000;
 function restoreWaypoints() {
   if (!currentGame || !toLngLat || waypoints.length || conn.demo) return;
-  for (const w of storedWaypoints(readStoredWaypoints(), currentGame, Date.now(), 12 * 3600 * 1000, MAX_WAYPOINTS)) {
+  for (const w of storedWaypoints(readStoredWaypoints(), currentGame, Date.now(), WAYPOINTS_MAX_AGE_MS, MAX_WAYPOINTS)) {
     const lngLat = toLngLat(w.pos[0], w.pos[1]);
     waypoints.push({ pos: w.pos, lngLat, inGame: w.inGame, label: w.label, kind: w.kind || null, marker: makeWaypointMarker(lngLat, waypoints.length) });
   }
   if (waypoints.length) { renderWaypointList(); invalidateRoute(); }
+}
+
+// Plan de ruta compartido por la sesion (Discord 22-10: armar los waypoints
+// en la tablet y navegar con el celular). El relay lo guarda y lo reparte a
+// las pestanas que saludaron (route_plan_hello); cada una sigue ruteando sola
+// con esos waypoints. Por LAN no hay relay de por medio: cada uno lo suyo.
+let planShared = false; // esta conexion saludo al relay
+const planNonces = {}; // variante -> nonce del cambio de aca sin respuesta
+function randomToken(bytes) {
+  try { return Array.from(crypto.getRandomValues(new Uint8Array(bytes)), b => b.toString(16).padStart(2, '0')).join(''); } catch (e) { return Math.random().toString(16).slice(2, 2 + bytes * 2).padEnd(bytes * 2, '0'); }
+}
+// Este navegador, para el plan y la voz de la sesion
+const DEVICE_ID_KEY = 'truckdash_device';
+const DEVICE_ID = (() => {
+  let id = lsGet(DEVICE_ID_KEY);
+  if (!/^[a-z0-9]{6,32}$/.test(id || '')) { id = randomToken(6); lsSet(DEVICE_ID_KEY, id); }
+  return id;
+})();
+const DEVICE_INFO = deviceInfo(navigator.userAgent, navigator.maxTouchPoints || 0);
+function sendRoutePlan(variant, list) {
+  if (!planShared || !ws || ws.readyState !== WebSocket.OPEN) return; // queda pending: se manda al reconectar
+  const nonce = randomToken(4);
+  planNonces[variant] = nonce;
+  ws.send(JSON.stringify({ type: 'set_route_plan', variant, list, nonce }));
+}
+// Al (re)conectar: lo que hay aca, para que el relay recupere el plan si se
+// reinicio (solo lo toma si no tiene uno mas nuevo), y despues los cambios
+// que se hicieron sin conexion. Quien tenia la voz la pide de nuevo.
+function sendRoutePlanHello() {
+  planShared = false;
+  for (const k of Object.keys(planNonces)) delete planNonces[k];
+  if (conn.local || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const stored = readStoredWaypoints();
+  const now = Date.now();
+  const voice = lsGet(VOICE_HERE_KEY) === '1' ? Object.assign({ device: DEVICE_ID }, DEVICE_INFO) : null;
+  ws.send(JSON.stringify({ type: 'route_plan_hello', device: DEVICE_ID, plans: routePlanOffers(stored, now, WAYPOINTS_MAX_AGE_MS, MAX_WAYPOINTS), voice }));
+  planShared = true;
+  for (const [variant, entry] of Object.entries(stored)) {
+    if (!entry || !entry.pending || !Number.isFinite(entry.at) || now - entry.at > WAYPOINTS_MAX_AGE_MS) continue;
+    sendRoutePlan(variant, storedWaypoints(stored, variant, now, WAYPOINTS_MAX_AGE_MS, MAX_WAYPOINTS));
+  }
+  renderVoiceDeviceHint();
+}
+// Un plan del relay: la respuesta a un cambio de aca (se guarda su rev) o el
+// de otro dispositivo, que reemplaza los waypoints de esa variante (el del
+// convoy queda).
+function applyRoutePlan(msg) {
+  if (conn.demo || typeof msg.variant !== 'string') return;
+  const stored = readStoredWaypoints();
+  const entry = stored[msg.variant] || null;
+  const action = routePlanAction(msg, entry, planNonces[msg.variant]);
+  if (!action) return;
+  if (action === 'ack') {
+    delete planNonces[msg.variant];
+    if (entry) {
+      entry.rev = msg.rev; entry.pending = false;
+      try { localStorage.setItem(WAYPOINTS_KEY, JSON.stringify(stored)); } catch (e) {}
+    }
+    return;
+  }
+  const now = Date.now();
+  const list = storedWaypoints({ plan: { at: now, list: msg.list } }, 'plan', now, WAYPOINTS_MAX_AGE_MS, MAX_WAYPOINTS);
+  stored[msg.variant] = { at: now, list, rev: msg.rev, pending: false };
+  try { localStorage.setItem(WAYPOINTS_KEY, JSON.stringify(stored)); } catch (e) {}
+  if (msg.variant !== currentGame || !toLngLat || samePlanList(plainWaypoints(waypoints), list)) return;
+  const convoyFollow = waypoints.filter(w => w.convoyFollow);
+  for (const wp of waypoints) if (!wp.convoyFollow && wp.marker) wp.marker.remove();
+  waypoints = [];
+  for (const w of list) {
+    const lngLat = toLngLat(w.pos[0], w.pos[1]);
+    waypoints.push({ pos: w.pos, lngLat, inGame: w.inGame, label: w.label, kind: w.kind || null, marker: makeWaypointMarker(lngLat, waypoints.length) });
+  }
+  waypoints.push(...convoyFollow);
+  renumberWaypointMarkers();
+  if (!list.length) forgetWaypointTrip();
+  renderWaypointList();
+  invalidateRoute();
+  showToast(t('waypointsSyncedToast'), 'success', 3000);
 }
 
 // kind: codigo del POI ('g' estacion de servicio...) si salio del buscador.
@@ -2546,7 +2640,7 @@ function checkWaypointReached(x, z) {
     // (voiceGuide.waypointReached), con la ruta de antes de sacarlo.
     if (voiceOn) {
       const llegada = voiceGuide.waypointReached(routeProgressState.key, waypoints.length === 1, routeProgressState.kind, routeProgressState.total);
-      if (llegada && isLeaderTab) speakVoice(llegada);
+      if (llegada && voiceHere()) speakVoice(llegada);
     }
     removeWaypoint(0);
   }
@@ -3095,7 +3189,10 @@ async function loadRouteTimes(base, v, game, decoded, graph) {
     const res = await fetch(`${base}-times.bin${v}&g=${ROUTE_GRAPH_V3_REV}&t=${ROUTE_TIMES_REV}`, { priority: 'low' });
     if (!res.ok) return;
     const data = decodeTimesBin(await res.arrayBuffer(), decoded.n, decoded.ne);
-    if (data && currentGame === game && routeGraph === graph) graph.edgeT = data;
+    // La ruta calculada antes de que llegaran se rehace con ellas (como con
+    // el -prefabs.bin): si no, dos dispositivos con los mismos waypoints
+    // mostraban caminos distintos segun cuando abrieron el mapa
+    if (data && currentGame === game && routeGraph === graph) { graph.edgeT = data; currentRouteTarget = null; }
   } catch (e) { /* sin decimas: los segundos enteros */ }
 }
 
@@ -3116,7 +3213,8 @@ async function loadRoutePrefabs(base, v, game, decoded, graph, local) {
     const res = await fetch(`${base}-prefabs.bin${v}&g=${ROUTE_GRAPH_V3_REV}&p=${ROUTE_PREFABS_REV}`, { priority: 'low' });
     if (!res.ok) return;
     const data = decodePrefabsBin(await res.arrayBuffer(), decoded.n, decoded.ne);
-    if (data && currentGame === game && routeGraph === graph) graph.edgePrefab = data;
+    // La ruta calculada sin el (vueltas de Kiel, tocos) se rehace con el
+    if (data && currentGame === game && routeGraph === graph) { graph.edgePrefab = data; currentRouteTarget = null; }
   } catch (e) { /* sin el archivo: uTurnPairs, como antes */ }
 }
 
@@ -3992,7 +4090,7 @@ function updateRouteSummary(data) {
   routeProgressState.total = total;
   if (voiceOn) {
     const arrived = voiceGuide.arrival(key, target.kind, remainingKm, routeProgressState.total);
-    if (arrived && isLeaderTab) speakVoice(arrived);
+    if (arrived && voiceHere()) speakVoice(arrived);
   }
   const percent = remainingKm == null || routeProgressState.total <= 0 ? 0
     : Math.max(0, Math.min(100, (1 - remainingKm / routeProgressState.total) * 100));
@@ -5534,7 +5632,48 @@ function fillVoiceSelect() {
 function voiceManeuverTick(turn) {
   if (!voiceOn) return;
   const key = voiceGuide.maneuver(turn, Math.abs(Number(lastData && lastData.speedKmh) || 0));
-  if (key && isLeaderTab) speakVoice(key);
+  if (key && voiceHere()) speakVoice(key);
+}
+
+// Que dispositivo dice la guia, uno por sesion (Discord 22-10: los waypoints
+// en el celular y la voz en la PC, sin pasar el audio). Prender la voz en un
+// dispositivo la trae a ese; los demas se callan y dicen donde esta. Al
+// apagarla ahi queda libre: como antes, habla cada uno que la tenga prendida.
+// Por LAN no hay relay que lo reparta y cada uno habla (voiceSpeaksHere).
+const VOICE_HERE_KEY = 'truckdash_voice_here';
+let voiceDevice = null; // { device, kind, os, browser } del relay, o null
+function voiceHere() {
+  return voiceSpeaksHere(voiceOn, isLeaderTab, !conn.local, voiceDevice, DEVICE_ID);
+}
+function claimVoice() {
+  lsSet(VOICE_HERE_KEY, '1');
+  if (!planShared || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify(Object.assign({ type: 'set_voice_device', device: DEVICE_ID }, DEVICE_INFO)));
+}
+function releaseVoice() {
+  lsSet(VOICE_HERE_KEY, '');
+  if (!planShared || !ws || ws.readyState !== WebSocket.OPEN || !voiceDevice || voiceDevice.device !== DEVICE_ID) return;
+  ws.send(JSON.stringify({ type: 'set_voice_device', device: null, from: DEVICE_ID }));
+}
+function deviceLabel(d) {
+  const kind = { phone: 'deviceKindPhone', tablet: 'deviceKindTablet', computer: 'deviceKindComputer' }[d && d.kind] || 'deviceKindOther';
+  return [t(kind), d && d.os, d && d.browser].filter(Boolean).join(' · ');
+}
+function applyVoiceDevice(msg) {
+  const antes = voiceDevice;
+  voiceDevice = msg.device ? { device: msg.device, kind: msg.kind, os: msg.os, browser: msg.browser } : null;
+  const otro = voiceDevice && voiceDevice.device !== DEVICE_ID;
+  if (otro) lsSet(VOICE_HERE_KEY, '');
+  // Hablaba aca y la tomo otro: que no parezca que se rompio
+  if (voiceOn && otro && antes && antes.device === DEVICE_ID) showToast(t('voiceMovedToast').replace('{device}', deviceLabel(voiceDevice)), '', 5000);
+  renderVoiceDeviceHint();
+}
+function renderVoiceDeviceHint() {
+  const hint = document.getElementById('voiceOtherDeviceHint');
+  if (!hint) return;
+  const otro = voiceOn && !conn.local && voiceDevice && voiceDevice.device !== DEVICE_ID;
+  hint.hidden = !otro;
+  if (otro) document.getElementById('voiceOtherDeviceText').textContent = t('voiceOtherDevice').replace('{device}', deviceLabel(voiceDevice));
 }
 
 if (voiceOn) loadVoiceCatalog().then(() => loadVoicePack(currentVoice()));
@@ -7382,7 +7521,7 @@ let stopSuggestKind = null;
 function trackStatus(data) {
   if (conn.demo) return;
   const st = statusAlerts.push(data);
-  if (st.say && voiceOn && isLeaderTab) speakVoice(st.say);
+  if (st.say && voiceHere()) speakVoice(st.say);
   if (restWatch.push(data.restStopMinutes)) {
     const i = waypoints.findIndex(w => w.kind === 'p');
     if (i >= 0) {
@@ -7458,6 +7597,7 @@ function handleTelemetry(data) {
 
 function connectWs(backend, code, options = {}) {
   conn.local = !!options.local;
+  planShared = false; // hasta que la conexion nueva salude
   conn.lanRelay = false; // lo dice el session_state del cliente
   renderLiveShareControls();
   fetchLatestClientVersion(conn.local ? document.getElementById('backendUrl').value : backend);
@@ -7479,6 +7619,7 @@ function connectWs(backend, code, options = {}) {
     conn.waitingClient = false;
     renderConnectionUi();
     sendLiveShareState(); // re-establecer el opt-in tras (re)conectar - el backend no lo recuerda entre conexiones
+    sendRoutePlanHello(); // el plan de ruta y la voz de la sesion
     // Sin ruta propia no se manda la vacia al conectar: borraba la ruta que
     // compartia otra pestana de la misma sesion (auditoria del 10-10).
     liveRouteSig = currentRouteWorldPoints ? null : 'none'; sendLiveRoute(true);
@@ -7499,6 +7640,8 @@ function connectWs(backend, code, options = {}) {
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria
     if (data.type === 'live_share_state') { applyLiveShareState(data.enabled); return; } // por LAN lo reenvia el cliente
     if (data.type === 'command_result') { handleCommandResult(data); return; } // no es telemetria
+    if (data.type === 'route_plan') { applyRoutePlan(data); return; } // el plan de la sesion (route_plan_hello)
+    if (data.type === 'voice_device') { applyVoiceDevice(data); return; } // quien dice la guia
     if (data.type && data.type.startsWith('convoy_')) { if (typeof convoyHandleMessage === 'function') convoyHandleMessage(data); return; } // Convoy (beta)
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;

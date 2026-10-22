@@ -3866,6 +3866,82 @@ function storedWaypoints(stored, variant, now, maxAgeMs = 12 * 3600 * 1000, max 
   return out;
 }
 
+// Plan de ruta compartido entre los dispositivos de una sesion (relay:
+// route_plan_hello, set_route_plan, route_plan; Discord 22-10: armar los
+// waypoints en la tablet y navegar con el celular). Lo guardado en el
+// navegador de cada variante lleva el rev del relay (su hora al aceptar el
+// cambio) y pending mientras un cambio de esta pestana no se mando.
+
+// Lo que se ofrece al conectar: los planes de este navegador que no
+// vencieron, con su rev (0 si nunca se sincronizaron). El relay los toma solo
+// si no tiene uno mas nuevo (se reinicio y perdio las sesiones). Los que
+// esperan mandarse van aparte, como un cambio (set_route_plan).
+function routePlanOffers(stored, now, maxAgeMs = 12 * 3600 * 1000, max = 9) {
+  const out = {};
+  if (!stored || typeof stored !== 'object') return out;
+  for (const [variant, entry] of Object.entries(stored)) {
+    if (!entry || !Number.isFinite(entry.at) || now - entry.at > maxAgeMs || entry.pending) continue;
+    const rev = Number.isInteger(entry.rev) && entry.rev > 0 ? entry.rev : 0;
+    const list = storedWaypoints(stored, variant, now, maxAgeMs, max);
+    if (!list.length && !rev) continue;
+    out[variant] = { list, rev };
+  }
+  return out;
+}
+
+// Que hacer con un route_plan del relay. entry: lo guardado de esa variante;
+// pendingNonce: el del cambio de esta pestana que todavia no volvio. 'ack':
+// es ese cambio (se guarda su rev, la lista ya esta). 'apply': otro
+// dispositivo cambio el plan. null: nada (uno que ya teniamos, o uno de otro
+// mientras el de esta pestana va en camino: el relay acepto antes el otro y
+// el de esta, que llega despues, es el que queda).
+function routePlanAction(msg, entry, pendingNonce) {
+  if (!msg || !Number.isInteger(msg.rev) || !Array.isArray(msg.list)) return null;
+  if (pendingNonce) return msg.nonce === pendingNonce ? 'ack' : null;
+  const rev = entry && Number.isInteger(entry.rev) ? entry.rev : 0;
+  return msg.rev > rev ? 'apply' : null;
+}
+
+// Si dos listas de waypoints son el mismo plan (posicion, nombre y tipo).
+function samePlanList(a, b) {
+  const clave = (l) => JSON.stringify((l || []).map(w => [w.pos[0], w.pos[1], !!w.inGame, w.label || null, w.kind || null]));
+  return clave(a) === clave(b);
+}
+
+// De que dispositivo es esta pestana, para decir donde suena la voz:
+// kind (phone, tablet, computer u other) se traduce; os y browser son
+// nombres propios. El iPad con Safari se presenta como una Mac: se lo
+// distingue por la pantalla tactil.
+function deviceInfo(ua, maxTouchPoints = 0) {
+  const s = String(ua || '');
+  let os = null, kind = 'other';
+  if (/iPhone|iPod/.test(s)) { os = 'iOS'; kind = 'phone'; }
+  else if (/iPad/.test(s) || (/Macintosh/.test(s) && maxTouchPoints > 1)) { os = 'iPadOS'; kind = 'tablet'; }
+  else if (/Android/.test(s)) { os = 'Android'; kind = /Mobile/.test(s) ? 'phone' : 'tablet'; }
+  else if (/CrOS/.test(s)) { os = 'ChromeOS'; kind = 'computer'; }
+  else if (/Windows/.test(s)) { os = 'Windows'; kind = 'computer'; }
+  else if (/Macintosh|Mac OS X/.test(s)) { os = 'macOS'; kind = 'computer'; }
+  else if (/Linux/.test(s)) { os = 'Linux'; kind = 'computer'; }
+  let browser = null;
+  if (/Edg\//.test(s)) browser = 'Edge';
+  else if (/OPR\//.test(s)) browser = 'Opera';
+  else if (/SamsungBrowser\//.test(s)) browser = 'Samsung Internet';
+  else if (/Firefox\/|FxiOS\//.test(s)) browser = 'Firefox';
+  else if (/Chrome\/|CriOS\//.test(s)) browser = 'Chrome';
+  else if (/Safari\//.test(s)) browser = 'Safari';
+  return { kind, os, browser };
+}
+
+// Si esta pestana dice la guia por voz. Con el relay que reparte la eleccion
+// (shared: la pestana saludo con route_plan_hello) habla solo el dispositivo
+// elegido (voiceDevice, set_voice_device); sin eleccion, o por LAN, como
+// antes: cada navegador con la voz prendida, en su pestana lider.
+function voiceSpeaksHere(voiceOn, isLeader, shared, voiceDevice, deviceId) {
+  if (!voiceOn || !isLeader) return false;
+  if (!shared || !voiceDevice || !voiceDevice.device) return true;
+  return voiceDevice.device === deviceId;
+}
+
 // Mods de mapa detectados por el cliente ({ets2: {...}|null, ats: {...}|null}).
 // null quiere decir que game.log.txt todavia no lista los mods: el juego lo
 // reescribe al arrancar y la lista aparece recien al cargar el perfil, unos
@@ -5504,6 +5580,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, samePlanList, deviceInfo, voiceSpeaksHere, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }
