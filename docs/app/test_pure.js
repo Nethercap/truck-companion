@@ -1170,12 +1170,28 @@ test('voz: el ultimo waypoint sin trabajo es el destino (Gargamosch, Discord 18-
   assert.equal(v.waypointReached('wp|b', true, 'waypoint', 30), null);
 });
 
-test('voz: elige la guardada del idioma, si no la primera, y null sin voces', () => {
+test('voz: la elegida aunque sea de otro idioma; si no, la primera del idioma (Discord 22-10)', () => {
   const voices = [{ id: 'en-a', lang: 'en' }, { id: 'en-b', lang: 'en' }, { id: 'es-a', lang: 'es' }];
   assert.equal(pickVoice(voices, 'en', 'en-b').id, 'en-b');
-  assert.equal(pickVoice(voices, 'en', 'es-a').id, 'en-a');
+  // con la app en ingles se puede elegir la voz en castellano
+  assert.equal(pickVoice(voices, 'en', 'es-a').id, 'es-a');
   assert.equal(pickVoice(voices, 'en', null).id, 'en-a');
+  assert.equal(pickVoice(voices, 'en', 'ya-no-existe').id, 'en-a');
   assert.equal(pickVoice(voices, 'pl', null), null);
+  assert.equal(pickVoice(voices, 'pl', 'es-a').id, 'es-a');
+  assert.equal(pickVoice(null, 'en', null), null);
+});
+
+test('voz: en Ajustes estan todas, primero las del idioma de la app y las otras con su idioma', () => {
+  const { voiceChoices } = require('./pure.js');
+  const voices = [{ id: 'en-k', lang: 'en', label: 'Kristin' }, { id: 'en-j', lang: 'en', label: 'Joe' },
+    { id: 'de-t', lang: 'de', label: 'Thorsten' }, { id: 'tr-s', lang: 'tr', system: true }];
+  const nombre = (l) => ({ en: 'English', de: 'Deutsch', tr: 'Türkçe' })[l];
+  assert.deepEqual(voiceChoices(voices, 'de', nombre, 'System voice'), [
+    { id: 'de-t', label: 'Thorsten' }, { id: 'en-k', label: 'Kristin · English' },
+    { id: 'en-j', label: 'Joe · English' }, { id: 'tr-s', label: 'System voice · Türkçe' }]);
+  assert.deepEqual(voiceChoices(voices, 'en', nombre, 'System voice').map(o => o.id), ['en-k', 'en-j', 'de-t', 'tr-s']);
+  assert.deepEqual(voiceChoices(null, 'en', nombre, 'x'), []);
 });
 
 

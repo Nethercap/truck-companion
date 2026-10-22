@@ -5486,14 +5486,24 @@ async function speakVoice(key) {
   voiceAudio.play().then(() => { voiceUnlocked = true; }, (err) => { voiceDone(token); voicePlayFailed(err); });
 }
 
+// El nombre de un idioma en ese idioma ("Deutsch", "Polski"): asi lo busca
+// quien lo habla. Sin Intl.DisplayNames, el codigo.
+function voiceLangName(lang) {
+  try {
+    const n = new Intl.DisplayNames([lang], { type: 'language' }).of(lang);
+    return n ? n.charAt(0).toLocaleUpperCase(lang) + n.slice(1) : lang;
+  } catch { return lang; }
+}
+
+// Todas las voces, primero las del idioma de la app (voiceChoices en pure.js)
 function fillVoiceSelect() {
   const sel = document.getElementById('setVoiceName');
   if (!sel) return;
-  const own = voiceCatalog ? voiceCatalog.voices.filter(v => v.lang === currentLang) : [];
-  sel.innerHTML = own.map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.system ? t('settingsVoiceSystem') : v.label)}</option>`).join('');
+  const opciones = voiceCatalog ? voiceChoices(voiceCatalog.voices, currentLang, voiceLangName, t('settingsVoiceSystem')) : [];
+  sel.innerHTML = opciones.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.label)}</option>`).join('');
   const chosen = currentVoice();
   if (chosen) sel.value = chosen.id;
-  sel.disabled = own.length < 2;
+  sel.disabled = opciones.length < 2;
 }
 
 function voiceManeuverTick(turn) {
