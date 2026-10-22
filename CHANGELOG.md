@@ -14,6 +14,10 @@ updates on its own and is not versioned here.
   now draws roads at their in-game width, shows clean corners and road ends instead of overlapping
   square tips (where the two lanes of a roundabout entrance meet, for example). Maps built before
   look the same as always until you build them again.
+- Maps built on your PC ("Build my map"): junctions are built without the shortcuts that let a
+  route turn around inside them, like the ones that sent you back across the highway after a
+  missed exit where a divided road becomes a single two-way road. The dashboard already avoids
+  those on maps built with older versions; with this one it knows exactly where they are.
 
 ## 1.5.34 (2026-10-21)
 

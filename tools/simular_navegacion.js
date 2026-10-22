@@ -14,6 +14,7 @@
 //
 // Uso: node tools/simular_navegacion.js [--variantes ats,ets2] [--rutas 30]
 //        [--semilla 1] [--salida carpeta] [--cache carpeta] [--carriles carpeta]
+//        [--prefabs carpeta]
 //        [--estados or,wa] [--destinos la,tx] [--antesDelGiro 0]
 //
 // --antesDelGiro 0: sin recalcular antes de cada aviso (revisarAvisosTrasRecalculo:
@@ -29,7 +30,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { harness, bajar, graphRev, timesRev, lanesRev, BASE } = require('./check_avisos');
+const { harness, bajar, graphRev, timesRev, lanesRev, prefabsRev, BASE } = require('./check_avisos');
 
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(ROOT, 'docs', 'data');
@@ -145,6 +146,17 @@ async function cargarVariante(v, cache, H) {
   if (tb) {
     g.edgeT = H.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
     if (!g.edgeT) throw new Error(`las decimas de ${v} no son de este grafo`);
+  }
+  // De que prefab es cada arista, como loadRoutePrefabs: de R2 si la app lo
+  // pide (ROUTE_PREFABS_REV), o de --prefabs <carpeta>/<v>/route-graph-<v>-prefabs.bin
+  // para probar uno sin subir (con su grafo en --cache).
+  const prefabs = argumentos(process.argv.slice(2)).prefabs;
+  const fp = prefabs && path.join(prefabs, v, `route-graph-${v}-prefabs.bin`);
+  const pb = fp && fs.existsSync(fp) ? fs.readFileSync(fp)
+    : prefabsRev() ? await archivo(`${v}-prefabs-g${rev}-p${prefabsRev()}.bin`, `${BASE}/${v}/route-graph-${v}-prefabs.bin?g=${rev}&p=${prefabsRev()}`) : null;
+  if (pb) {
+    g.edgePrefab = H.pure.decodePrefabsBin(pb.buffer.slice(pb.byteOffset, pb.byteOffset + pb.byteLength), decoded.n, decoded.ne);
+    if (!g.edgePrefab) throw new Error(`el -prefabs.bin de ${v} no es de este grafo`);
   }
   // Los carriles, como loadRouteLanes: con ellos salen los "keep" de seguir
   // derecho donde un carril se pierde (laneKeepAt). De R2, o de --carriles

@@ -3097,6 +3097,26 @@ async function loadRouteTimes(base, v, game, decoded, graph) {
   } catch (e) { /* sin decimas: los segundos enteros */ }
 }
 
+// De que prefab es cada arista (decodePrefabsBin en pure.js): con el,
+// findArcRoute toma como vuelta en U llegar a un nodo por una arista de un
+// prefab y salir por otra del mismo. El constructor que lo escribe ya no saca
+// caminos por un tercer nodo del prefab, la marca de la que sale uTurnPairs:
+// un grafo de ese constructor sin este archivo deja otra vez la vuelta de
+// Kiel (ProMods, 22-10). 0 = no se pide de R2 (la regla "Mapas R2" guarda los
+// 404): subirlo con el grafo regenerado y despues el numero. Los mapas
+// armados en la PC (local) lo traen desde el cliente con ese constructor, y
+// se pide siempre (el servidor del cliente no guarda nada).
+const ROUTE_PREFABS_REV = 0;
+async function loadRoutePrefabs(base, v, game, decoded, graph, local) {
+  if (!ROUTE_PREFABS_REV && !local) return;
+  try {
+    const res = await fetch(`${base}-prefabs.bin${v}&g=${ROUTE_GRAPH_V3_REV}&p=${ROUTE_PREFABS_REV}`, { priority: 'low' });
+    if (!res.ok) return;
+    const data = decodePrefabsBin(await res.arrayBuffer(), decoded.n, decoded.ne);
+    if (data && currentGame === game && routeGraph === graph) graph.edgePrefab = data;
+  } catch (e) { /* sin el archivo: uTurnPairs, como antes */ }
+}
+
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
   routeLanes = null;
@@ -3137,6 +3157,7 @@ async function loadRouteGraph(mapInfo) {
       if (decoded.shiftA) {
         loadRouteLanes(base, v, game, decoded, g);
         loadRouteTimes(base, v, game, decoded, g);
+        loadRoutePrefabs(base, v, game, decoded, g, !mapInfo.assetsDir.startsWith(REMOTE_MAP_BASE));
       }
     }
   } catch (err) {

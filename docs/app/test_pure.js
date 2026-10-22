@@ -3866,6 +3866,35 @@ test('uTurnShortcuts: la arista de un prefab que pasa por otro nodo dandose vuel
   assert.deepEqual(findArcRoute(g, e, f, sinAtajo), [e, a, c, z, c, b, f]);
 });
 
+test('edgePrefab: llegar a un nodo por un prefab y salir por otra arista del mismo es darse vuelta', () => {
+  const { decodePrefabsBin } = require('./pure.js');
+  // Kiel como lo deja el constructor nuevo: sin el atajo a -> b. e -> a y
+  // b -> f calzadas, a -> c y c -> b del prefab, c - z la doble mano.
+  const nodos = [[-2, -200], [-2, 0], [0, 20], [14, 10], [14, -200], [0, 220]];
+  const [e, a, c, b, f, z] = nodos.keys();
+  const aristas = [
+    { a: e, b: a, uno: true, m: 200 }, { a, b: c, uno: true, m: 20 }, { a: c, b, uno: true, m: 17 },
+    { a: b, b: f, uno: true, m: 210 }, { a: c, b: z, m: 200 },
+  ];
+  const { g, opts } = grafoDePrueba(nodos, aristas);
+  // Sin el archivo, la vuelta queda (120 grados en c)
+  assert.deepEqual(findArcRoute(g, e, f, opts(f)), [e, a, c, b, f]);
+  // -prefabs.bin: TDPF v1, nNodes, nEdges, un color por arista
+  const buf = new ArrayBuffer(16 + 8);
+  const dv = new DataView(buf);
+  dv.setUint32(0, 0x54445046, false); dv.setUint32(4, 1, true); dv.setUint32(8, 6, true); dv.setUint32(12, 5, true);
+  new Uint8Array(buf, 16, 5).set([0, 1, 1, 0, 0]);
+  assert.equal(decodePrefabsBin(buf, 6, 4), null); // de otro grafo
+  g.edgePrefab = decodePrefabsBin(buf, 6, 5);
+  assert.deepEqual([...g.edgePrefab], [0, 1, 1, 0, 0]);
+  // Con el: a -> c -> b es salir del prefab y volver; se da la vuelta en z,
+  // que no tiene salida
+  assert.deepEqual(findArcRoute(g, e, f, opts(f)), [e, a, c, z, c, b, f]);
+  // Dos prefabs distintos pegados en c (colores distintos): se pasa
+  g.edgePrefab = Uint8Array.from([0, 1, 2, 0, 0]);
+  assert.deepEqual(findArcRoute(g, e, f, opts(f)), [e, a, c, b, f]);
+});
+
 test('ruteo: un giro cerrado que no es vuelta en U se puede, y una calle sin salida tambien', () => {
   // 120 grados en s: se puede
   const nodos = [[0, 0], [100, 0], [50, 87]];

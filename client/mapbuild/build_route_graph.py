@@ -154,6 +154,13 @@ def prefab_nav_paths(desc):
             d, u = heapq.heappop(queue)
             if d > dist.get(u, float("inf")):
                 continue
+            # Por otro nodo del prefab no se pasa: ahi se sale a la calle. Donde
+            # una autovia pasa a ser de doble mano iba de la calzada que llega a
+            # la de doble mano y de ahi a la que sale, una vuelta en U en ese
+            # nodo (Kiel, ProMods, 22-10). Que esa vuelta no se haga por
+            # a -> c -> b lo dice -prefabs.bin (write_prefabs).
+            if u != src and u in physical:
+                continue
             for conn in nav_nodes[u].get("connections") or []:
                 v = conn.get("targetNavNodeIndex")
                 if v is None or v >= len(nav_nodes):
@@ -985,8 +992,13 @@ def main(argv=None):
     one_way_edges = []
     dropped_turns = []
     n_dropped = 0
+    # De que prefab es cada arista (1 + su indice; las calles y los ferries,
+    # 0), por id de la lista de la arista, y los giros borrados por par: van
+    # a -prefabs.bin (write_prefabs).
+    prefab_de_arista = {}
+    prefab_de_giro = {}
     collect_prefab_node_shifts()
-    for p in prefabs:
+    for pi, p in enumerate(prefabs):
         uids = [u for u in p.get("nodeUids", []) if u in uid_to_index]
         desc = prefab_descs.get(p.get("token"))
         note_prefab_shifts(p, uids, desc)
@@ -1106,6 +1118,7 @@ def main(argv=None):
                     # Ese giro no existe en el juego. Se anota por si hay que
                     # devolverlo para no dejar a alguien sin llegada.
                     dropped_turns.append((key[0], key[1], dist))
+                    prefab_de_giro[(key[0], key[1])] = pi + 1
                     n_dropped += 1
                 else:
                     emit.append((key[0], key[1], dist, None, False))
@@ -1121,6 +1134,7 @@ def main(argv=None):
             # muchos cruces, como hace el GPS del juego.
             edge = [a, b, round(length, 1), flags, seconds(length, 40.0), mids]
             edges.append(edge)
+            prefab_de_arista[id(edge)] = pi + 1
             if flags & 2:
                 one_way_edges.append(edge)
     print(f"Aristas de prefab con geometria real (navCurves): {n_prefab_geom}"
@@ -1332,8 +1346,12 @@ def main(argv=None):
     if ENFORCE_TURNS and (one_way_edges or dropped_turns):
         print(f"Giros respetados: {len(one_way_edges)} de un solo sentido, {len(dropped_turns)} borrados; "
               "revisando que no dejen nodos sin llegada...")
-        relax_turns(len(node_list), edges, one_way_edges, dropped_turns,
-                    lambda a, b, d: [a, b, round(d, 1), 0, seconds(d, 40.0), None])
+        def giro_devuelto(a, b, d):
+            edge = [a, b, round(d, 1), 0, seconds(d, 40.0), None]
+            prefab_de_arista[id(edge)] = prefab_de_giro.get((a, b), 0)
+            return edge
+
+        relax_turns(len(node_list), edges, one_way_edges, dropped_turns, giro_devuelto)
 
     graph = {"nodes": node_list, "edges": [[e[0], e[1], e[2], int(e[3] or 0) & 3] + list(e[4:]) for e in edges]}
 
@@ -1382,6 +1400,17 @@ def main(argv=None):
     times_path = bin_path[:-4] + "-times.bin"
     stats_t = write_times(node_list, edges, times_path)
     print(f"Decimas en {times_path} ({os.path.getsize(times_path) / 1024:.0f} KB): {stats_t}")
+
+    # De que prefab es cada arista, aparte y por indice del v3 (write_prefabs):
+    # la web toma como vuelta en U entrar a un nodo por una arista de un prefab
+    # y salir por otra del mismo.
+    try:
+        from .route_graph_bin import write_prefabs
+    except ImportError:
+        from route_graph_bin import write_prefabs
+    prefabs_path = bin_path[:-4] + "-prefabs.bin"
+    stats_p = write_prefabs(node_list, edges, [prefab_de_arista.get(id(e), 0) for e in edges], prefabs_path)
+    print(f"Prefabs en {prefabs_path} ({os.path.getsize(prefabs_path) / 1024:.0f} KB): {stats_p}")
 
 
 if __name__ == "__main__":

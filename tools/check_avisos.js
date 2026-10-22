@@ -106,6 +106,13 @@ function timesRev() {
   return m ? Number(m[1]) : 0;
 }
 
+// De que prefab es cada arista, como loadRoutePrefabs de app.js: con
+// ROUTE_PREFABS_REV en 0 la app no lo pide de R2 y aca tampoco.
+function prefabsRev() {
+  const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/const ROUTE_PREFABS_REV = (\d+);/);
+  return m ? Number(m[1]) : 0;
+}
+
 // Fuera del navegador, los mapas de R2 piden este header: la regla de
 // Cloudflare deja pasar lo que trae Referer de trucksim-dash.com o de la
 // copia LAN, y lo demas solo con el secreto (TRUCKDASH_MAPS_KEY: el de
@@ -188,6 +195,11 @@ async function main() {
       const tb = await bajar(`${BASE}/${v}/route-graph-${v}-times.bin?g=${graphRev()}&t=${timesRev()}`);
       g.edgeT = h.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
     }
+    if (prefabsRev()) {
+      const pb = await bajar(`${BASE}/${v}/route-graph-${v}-prefabs.bin?g=${graphRev()}&p=${prefabsRev()}`);
+      g.edgePrefab = h.pure.decodePrefabsBin(pb.buffer.slice(pb.byteOffset, pb.byteOffset + pb.byteLength), decoded.n, decoded.ne);
+      if (!g.edgePrefab) throw new Error(`check_avisos: el -prefabs.bin de ${v} no es de este grafo`);
+    }
     h.mod.setLanes(await bajarCarriles(h.pure, v, decoded));
     const rutas = simular(h, g, Array.isArray(cities) ? cities : Object.values(cities), n);
     const total = rutas.reduce((s, r) => s + r.man.length, 0);
@@ -233,4 +245,4 @@ if (require.main === module) main().catch(e => {
   console.error(e);
   process.exit(2);
 });
-module.exports = { harness, bajar, bajarCarriles, graphRev, timesRev, lanesRev, BASE };
+module.exports = { harness, bajar, bajarCarriles, graphRev, timesRev, lanesRev, prefabsRev, BASE };
