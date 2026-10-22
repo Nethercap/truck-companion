@@ -32,9 +32,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `-prefabs.bin` (de que prefab es cada arista, `decodePrefabsBin`, desde el
   22-10; los de antes no lo tienen). Si se regenera el grafo, se regeneran y
   suben los cinco juntos (`rebuild_graphs_only.py` del taller) y se sube
-  `ROUTE_GRAPH_V3_REV` en `app.js`, y la primera vez `ROUTE_PREFABS_REV` (de
-  0 a 1): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
-  la vuelta de Kiel (ver el ruteo). Si solo cambian los carriles,
+  `ROUTE_GRAPH_V3_REV` en `app.js` (6 desde el 22-10, con `ROUTE_PREFABS_REV`
+  en 1): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
+  la vuelta de Kiel (ver el ruteo). Los prefabs sin navCurves que lista el
+  log del constructor (unidos todos contra todos, sin contramano) son
+  patios, estaciones y talleres de dos nodos, y 15 `cross_temp` de ProMods.
+  Antes de subir un grafo regenerado, `simular_navegacion --grafos
+  <carpeta>` contra el publicado con la misma `--semilla`. Si solo cambian los carriles,
   `ROUTE_LANES_REV`, y si solo las decimas, `ROUTE_TIMES_REV`
   (`generar_carriles.py` y `generar_tiempos.py` del taller). Al subir `ROUTE_GRAPH_V3_REV` o la version de ATS en
   `variants.js`, correr `python tools/build_demo_route.py`.
@@ -157,7 +161,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `findArcRoute` toma como vuelta en U llegar a un nodo por una arista de un
   prefab y salir por otra del mismo (`g.edgePrefab`). Los grafos de antes
   siguen con `uTurnPairs`; los mapas armados en la PC piden el archivo
-  siempre, los de R2 recien con `ROUTE_PREFABS_REV` en 1.
+  siempre, los de R2 desde el 22-10 (`ROUTE_PREFABS_REV` 1). Con esos
+  grafos (4 variantes, 120 rutas, semilla 7) cambian de largo 15 a 25 rutas
+  por variante; las que se alargan mas de 5 % (Iasi, San Antonio, Knoxville,
+  y en check_avisos la salida de Pendleton) pasaban por giros que el juego
+  no tiene: salir a la izquierda de una entrada solo a la derecha, o la
+  vuelta de Kiel misma.
   Un nodo de prefab sin calle (todas sus aristas, de llegada y de salida,
   del mismo prefab: lo que sigue es oculto y no esta en el grafo; 25 mil en
   ATS y 24 mil en ETS2) es un toco (`prefabStubs`): la ruta no va ahi salvo
@@ -450,24 +459,6 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 
 ## Pendientes y decisiones (18-10)
 
-- Grafos del constructor del 22-10 (PR #111; el del taller, en la rama del
-  mismo nombre): regenerados en el taller (`py rebuild_graphs_only.py
-  --cambia-ruteo`, 17 variantes; el detalle queda en
-  `build_route_graph-<variante>.log`), falta subirlos con `py
-  upload_to_r2.py r2-upload-graphs trucksim-dash-maps`, sin el paso del
-  manifest (alcanza con `ROUTE_GRAPH_V3_REV`). Recien con todo en R2:
-  `ROUTE_GRAPH_V3_REV` de 5 a 6 y `ROUTE_PREFABS_REV` de 0 a 1, `node
-  tools/check_avisos.js --update`, `python tools/build_demo_route.py`,
-  `simular_navegacion` y mergear los dos PR, todo seguido: hasta ese merge,
-  quien baje el grafo nuevo sin `-prefabs.bin` vuelve a tener la vuelta de
-  Kiel. En el simulador (4 variantes, 120 rutas, semilla 7, `--grafos`)
-  cambian de largo 15 a 25 rutas por variante; las que se alargan mas de
-  5 % (Iasi, San Antonio, Knoxville) pasaban por giros que el juego no
-  tiene (salir a la izquierda de una entrada solo a la derecha, la vuelta
-  de Kiel en San Antonio). Los prefabs sin navCurves que lista el log
-  (todos contra todos, sin contramano) son patios, estaciones y talleres de
-  dos nodos, y 15 `cross_temp` de ProMods. Despues del merge, sacar este
-  punto.
 - macOS: un usuario porto el plugin (dice que el juego en Mac lo carga) e
   hizo su propia app estilo CarPlay. Plan propio, por etapas: el plugin con
   `shm_open` o un archivo en vez de `CreateFileMapping`
