@@ -4153,8 +4153,12 @@ function updateDestinationMarker(data) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
         // Parado arranca en el nodo mas cercano: si es el cruce de adelante,
         // con su entrada, o el giro de ahi no se avisa (stoppedRouteLead).
-        const entrada = legIdx === 0 && rumbo == null ? stoppedRouteLead(leg, from[0], from[1], data.heading) : null;
-        if (entrada) leg = [entrada, ...leg];
+        // Andando, a metros de un nodo arranca en el nodo (snapRouteStartToNode)
+        // y lleva la misma entrada, salvo que siga lo recorrido.
+        const pegada = legIdx === 0 && rumbo != null ? snapRouteStartToNode(leg) : leg;
+        const conEntrada = rumbo == null || (pegada !== leg && !sobreLaRuta);
+        const entrada = legIdx === 0 && conEntrada ? stoppedRouteLead(pegada, from[0], from[1], data.heading) : null;
+        leg = entrada ? [entrada, ...pegada] : pegada;
         leg = leg.map(p => { const q = p.slice(); q[5] = legIdx; return q; });
         routePoints = routePoints.length ? routePoints.concat(leg.slice(1)) : leg;
       } else { complete = false; routePoints.push([from[0], from[1], 0, 0, null, legIdx], [to[0], to[1], 0, 0, null, legIdx]); }
@@ -7381,6 +7385,7 @@ document.getElementById('stopSuggestClose').addEventListener('click', () => {
 });
 
 function handleTelemetry(data) {
+  if (positionAtOrigin(data.position)) data = { ...data, position: null }; // 0,0: sin posicion
   trackFuel(data);
   trackStatus(data);
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
