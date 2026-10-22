@@ -21,6 +21,7 @@ import json
 import os
 import math
 import sys
+from collections import Counter
 
 
 def load_json(path):
@@ -454,6 +455,11 @@ def align_to_nodes(points, start, end):
         t = s / total
         out.append((x + (1 - t) * d0[0] + t * d1[0], y + (1 - t) * d0[1] + t * d1[1]))
     return out
+
+
+def largo_de(points):
+    """Largo de una polilinea."""
+    return sum(math.dist(p, q) for p, q in zip(points, points[1:]))
 
 
 def prefab_mid_points(points, start, end, tol=2.5, min_bulge=4.0):
@@ -997,6 +1003,26 @@ def main(argv=None):
     # a -prefabs.bin (write_prefabs).
     prefab_de_arista = {}
     prefab_de_giro = {}
+    # Por que nodos se entra a un prefab y por cuales se sale, segun las calles
+    # (hasta aca en edges solo hay calles). Para los prefabs sin navCurves: un
+    # nodo sin calle (pegado a otro prefab, o un brazo sin nada) vale para los dos.
+    llega_por_calle, sale_por_calle = set(), set()
+    for e in edges:
+        sale_por_calle.add(e[0])
+        llega_por_calle.add(e[1])
+        if not e[3] & 2:
+            sale_por_calle.add(e[1])
+            llega_por_calle.add(e[0])
+
+    def se_entra(u):
+        return u in llega_por_calle or u not in sale_por_calle
+
+    def se_sale(u):
+        return u in sale_por_calle or u not in llega_por_calle
+
+    sin_curvas_por = {}
+    tokens_sin_curvas = Counter()
+    n_contramano = 0
     collect_prefab_node_shifts()
     for pi, p in enumerate(prefabs):
         uids = [u for u in p.get("nodeUids", []) if u in uid_to_index]
@@ -1050,8 +1076,6 @@ def main(argv=None):
                             carriles = carriles[:3] + (carriles[3] | CARRIL_QUE_SE_PIERDE,)
                             n_se_pierde += 1
                         lane_records[(a, b)] = carriles
-                    if (a, b) in directed and directed[(a, b)][0] <= length:
-                        continue
                     world = [tx(x, y) for x, y in curve_chain_points(desc, chain)]
                     # Las navCurves son el eje del CARRIL, asi que arrancan un
                     # par de metros al costado del nodo: eso esta bien. Lo que
@@ -1064,11 +1088,23 @@ def main(argv=None):
                         # no quedaba en directed, el modo full lo borraba como
                         # "giro inexistente": sin el derecho, la ruta entraba a
                         # un brazo, daba la vuelta en U en su nodo y seguia (el
-                        # lazo de Bakersfield).
-                        directed[(a, b)] = (length, None)
+                        # lazo de Bakersfield). Tampoco mas corto que la recta.
+                        largo = max(length, math.dist(node_list[a], node_list[b]))
+                        if (a, b) not in directed or largo < directed[(a, b)][0]:
+                            directed[(a, b)] = (largo, None)
                         continue
                     world = align_to_nodes(world, node_list[a], node_list[b])
-                    directed[(a, b)] = (length, prefab_mid_points(world, node_list[a], node_list[b]))
+                    # El largo es el del recorrido de nodo a nodo, el que se
+                    # dibuja y con el que la web mide lo que falta. El de las
+                    # navCurves (la recta de punta a punta de cada curva, por el
+                    # eje del carril) en un giro hacia adentro daba menos que la
+                    # recta entre los nodos: 19.761 aristas de ATS, 136 km de
+                    # menos (22-10). Si el del carril es mayor (un giro hacia
+                    # afuera), ese.
+                    largo = max(length, largo_de(world))
+                    if (a, b) in directed and directed[(a, b)][0] <= largo:
+                        continue
+                    directed[(a, b)] = (largo, prefab_mid_points(world, node_list[a], node_list[b]))
                 one_way = {(a, b) for (a, b) in seen_dir if (b, a) not in seen_dir}
 
         # Lo que se emite: (a, b, largo, puntos, solo_de_a_hacia_b).
@@ -1097,13 +1133,23 @@ def main(argv=None):
                 (x, y), (l, m) = ((key[0], key[1]), ida) if ida else ((key[1], key[0]), vuelta)
                 emit.append((x, y, l, m, bool(ENFORCE_TURNS)))
         # Sin navCurves utiles no hay de donde sacar que giros existen, asi
-        # que ese prefab sigue como siempre: todos contra todos, doble
-        # sentido. Con navCurves, en cambio, los pares que no aparecen es
-        # porque el giro no existe.
+        # que ese prefab une todos sus nodos con todos, pero no de
+        # contramano: no se entra por un nodo cuyas calles solo salen del
+        # prefab ni se sale por uno cuyas calles solo llegan (`se_entra`,
+        # `se_sale`). Antes era todo de doble sentido: de 696 prefabs asi en
+        # ATS, 510 en ETS2 y 801 en ProMods, en 4, 3 y 6 se podia tomar una
+        # calle de un sentido al reves (16, 14 y 21 pasos; ninguna de 300
+        # rutas por juego pasaba por ahi, 22-10). Con navCurves, en cambio,
+        # los pares que no aparecen es porque el giro no existe.
         # Modo 2 (TRUCKDASH_ENFORCE_TURNS=flags): no se borra ningun par, solo
         # se marcan los de un solo sentido. Mas conservador: no puede dejar un
         # destino sin camino de entrada.
         borrar = ENFORCE_TURNS and ENFORCE_MODE == "full" and one_way is not None
+        sin_curvas = ENFORCE_TURNS and one_way is None
+        if one_way is None and len(uids) > 1:
+            razon = "sin descripcion" if not desc else ("sin navCurves" if not paths else "sin ubicar")
+            sin_curvas_por[razon] = sin_curvas_por.get(razon, 0) + 1
+            tokens_sin_curvas[p.get("token")] += 1
         for i in range(len(uids)):
             for j in range(i + 1, len(uids)):
                 a, b = uid_to_index[uids[i]], uid_to_index[uids[j]]
@@ -1114,7 +1160,18 @@ def main(argv=None):
                 ax, ay = node_list[a]
                 bx, by = node_list[b]
                 dist = math.hypot(ax - bx, ay - by)
-                if borrar:
+                ida = vuelta = not borrar
+                if sin_curvas:
+                    ida = se_entra(key[0]) and se_sale(key[1])
+                    vuelta = se_entra(key[1]) and se_sale(key[0])
+                    if not (ida and vuelta):
+                        n_contramano += 1
+                if ida and vuelta:
+                    emit.append((key[0], key[1], dist, None, False))
+                elif ida or vuelta:
+                    x, y = (key[0], key[1]) if ida else (key[1], key[0])
+                    emit.append((x, y, dist, None, True))
+                elif ENFORCE_MODE == "full":
                     # Ese giro no existe en el juego. Se anota por si hay que
                     # devolverlo para no dejar a alguien sin llegada.
                     dropped_turns.append((key[0], key[1], dist))
@@ -1140,6 +1197,13 @@ def main(argv=None):
     print(f"Aristas de prefab con geometria real (navCurves): {n_prefab_geom}"
           + (f", de un solo sentido: {n_one_way}" if ENFORCE_TURNS else "")
           + (f", giros inexistentes borrados: {n_dropped}" if n_dropped else ""))
+    if sin_curvas_por:
+        # Para ver por que les faltan: los tokens se buscan en las descripciones.
+        print("Prefabs sin navCurves (todos contra todos): "
+              + ", ".join(f"{razon} {n}" for razon, n in sorted(sin_curvas_por.items()))
+              + (f"; {n_contramano} pares que serian de contramano" if ENFORCE_TURNS else ""))
+        print("  los que mas se repiten: "
+              + ", ".join(f"{token} x{n}" for token, n in tokens_sin_curvas.most_common(15)))
 
     print(f"Edges de roads+prefabs: {len(edges)} (roads sin resolver: {skipped})")
 
