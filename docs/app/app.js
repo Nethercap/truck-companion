@@ -3599,6 +3599,7 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
     isFerry: (e) => (edgeF[e] & 1) === 1,
     startArc: arco,
     endArcs: hasta,
+    uTurnCost: routeUTurnCost(byTime),
   });
   // El waypoint mas adelante en el mismo tramo por el que se arranca (dos
   // waypoints en la misma arista larga): se llega derecho, sin dar la vuelta
