@@ -3053,7 +3053,9 @@ function distanceToRouteMeters(x, z) {
 // (los giros a la izquierda en un trebol iban por la rampa al reves).
 // 4 = 07-10: el DLC de cada tramo, para evitar los DLC que no tenes.
 // 5 = 10-10: el derecho de los cruces de calles anchas (el lazo de Bakersfield).
-const ROUTE_GRAPH_V3_REV = 5;
+// 6 = 22-10: sin caminos por un tercer nodo del prefab (la vuelta de Kiel),
+// largos de nodo a nodo y el -prefabs.bin.
+const ROUTE_GRAPH_V3_REV = 6;
 
 // Flechas de carril (decodeLanesBin en pure.js): archivo aparte y chico
 // (~90 KB en ATS), que se baja despues del grafo y solo sirve con ESE grafo
@@ -3097,6 +3099,27 @@ async function loadRouteTimes(base, v, game, decoded, graph) {
   } catch (e) { /* sin decimas: los segundos enteros */ }
 }
 
+// De que prefab es cada arista (decodePrefabsBin en pure.js): con el,
+// findArcRoute toma como vuelta en U llegar a un nodo por una arista de un
+// prefab y salir por otra del mismo. El constructor que lo escribe ya no saca
+// caminos por un tercer nodo del prefab, la marca de la que sale uTurnPairs:
+// un grafo de ese constructor sin este archivo deja otra vez la vuelta de
+// Kiel (ProMods, 22-10). 0 = no se pide de R2 (la regla "Mapas R2" guarda los
+// 404): subirlo con el grafo regenerado y despues el numero. Los mapas
+// armados en la PC (local) lo traen desde el cliente con ese constructor, y
+// se pide siempre (el servidor del cliente no guarda nada). 1 = 22-10, con
+// ROUTE_GRAPH_V3_REV 6.
+const ROUTE_PREFABS_REV = 1;
+async function loadRoutePrefabs(base, v, game, decoded, graph, local) {
+  if (!ROUTE_PREFABS_REV && !local) return;
+  try {
+    const res = await fetch(`${base}-prefabs.bin${v}&g=${ROUTE_GRAPH_V3_REV}&p=${ROUTE_PREFABS_REV}`, { priority: 'low' });
+    if (!res.ok) return;
+    const data = decodePrefabsBin(await res.arrayBuffer(), decoded.n, decoded.ne);
+    if (data && currentGame === game && routeGraph === graph) graph.edgePrefab = data;
+  } catch (e) { /* sin el archivo: uTurnPairs, como antes */ }
+}
+
 async function loadRouteGraph(mapInfo) {
   routeGraph = null;
   routeLanes = null;
@@ -3137,6 +3160,7 @@ async function loadRouteGraph(mapInfo) {
       if (decoded.shiftA) {
         loadRouteLanes(base, v, game, decoded, g);
         loadRouteTimes(base, v, game, decoded, g);
+        loadRoutePrefabs(base, v, game, decoded, g, !mapInfo.assetsDir.startsWith(REMOTE_MAP_BASE));
       }
     }
   } catch (err) {

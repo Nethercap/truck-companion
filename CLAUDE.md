@@ -26,11 +26,19 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 
 ## Datos de mapa y R2
 
-- El grafo de una variante son cuatro archivos: `.bin` (v2, web vieja),
-  `-v3.bin`, `-lanes.bin` (carriles por arista, `decodeLanesBin`) y
-  `-times.bin` (decimas de segundo por arista, `decodeTimesBin`). Si se
-  regenera el grafo, se regeneran y suben los cuatro juntos y se sube
-  `ROUTE_GRAPH_V3_REV` en `app.js`; si solo cambian los carriles,
+- El grafo de una variante son cinco archivos: `.bin` (v2, web vieja),
+  `-v3.bin`, `-lanes.bin` (carriles por arista, `decodeLanesBin`),
+  `-times.bin` (decimas de segundo por arista, `decodeTimesBin`) y
+  `-prefabs.bin` (de que prefab es cada arista, `decodePrefabsBin`, desde el
+  22-10; los de antes no lo tienen). Si se regenera el grafo, se regeneran y
+  suben los cinco juntos (`rebuild_graphs_only.py` del taller) y se sube
+  `ROUTE_GRAPH_V3_REV` en `app.js` (6 desde el 22-10, con `ROUTE_PREFABS_REV`
+  en 1): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
+  la vuelta de Kiel (ver el ruteo). Los prefabs sin navCurves que lista el
+  log del constructor (unidos todos contra todos, sin contramano) son
+  patios, estaciones y talleres de dos nodos, y 15 `cross_temp` de ProMods.
+  Antes de subir un grafo regenerado, `simular_navegacion --grafos
+  <carpeta>` contra el publicado con la misma `--semilla`. Si solo cambian los carriles,
   `ROUTE_LANES_REV`, y si solo las decimas, `ROUTE_TIMES_REV`
   (`generar_carriles.py` y `generar_tiempos.py` del taller). Al subir `ROUTE_GRAPH_V3_REV` o la version de ATS en
   `variants.js`, correr `python tools/build_demo_route.py`.
@@ -146,9 +154,31 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   150 (sin eso caia la recta de una T cuando el brazo sumaba lo mismo).
   Despues de una salida perdida cambian 17 de 300 rutas de ATS y 149 de 300
   de ETS2 (mediana +3 km: hasta el cruce siguiente, como el GPS del juego).
-  La arista a -> b es la marca de que c es del mismo prefab: si el
-  constructor deja de sacarla, la vuelta de Kiel vuelve (133 < 150) salvo
-  que la marca llegue de otra forma.
+  La arista a -> b era la marca de que c es del mismo prefab, y desde el
+  22-10 el constructor ya no la saca (`prefab_nav_paths` no pasa por otro
+  nodo del prefab): la marca es `-prefabs.bin` (`write_prefabs`, un color
+  por arista, distinto en dos prefabs que comparten un nodo), y
+  `findArcRoute` toma como vuelta en U llegar a un nodo por una arista de un
+  prefab y salir por otra del mismo (`g.edgePrefab`). Los grafos de antes
+  siguen con `uTurnPairs`; los mapas armados en la PC piden el archivo
+  siempre, los de R2 desde el 22-10 (`ROUTE_PREFABS_REV` 1). Con esos
+  grafos (4 variantes, 120 rutas, semilla 7) cambian de largo 15 a 25 rutas
+  por variante; las que se alargan mas de 5 % (Iasi, San Antonio, Knoxville,
+  y en check_avisos la salida de Pendleton) pasaban por giros que el juego
+  no tiene: salir a la izquierda de una entrada solo a la derecha, o la
+  vuelta de Kiel misma.
+  Un nodo de prefab sin calle (todas sus aristas, de llegada y de salida,
+  del mismo prefab: lo que sigue es oculto y no esta en el grafo; 25 mil en
+  ATS y 24 mil en ETS2) es un toco (`prefabStubs`): la ruta no va ahi salvo
+  que sea el destino, y no cuenta como salida para decidir si un nodo es
+  una calle sin salida. Sin eso la ruta entraba al brazo de un cruce y
+  salia (una V con un "turn left" donde se sigue derecho: los 22
+  `atajo_salteado` del simulador en 4 variantes) o se daba vuelta ahi
+  (Iasi, Knoxville, 22-10). Si sin tocos no hay camino (la T de una empresa
+  de Charlotte con el brazo de enfrente oculto), `findArcRoute` busca otra
+  vez con ellos. La vuelta pasa a la punta de calle sin salida siguiente,
+  que tambien puede ser una calle cortada por lo oculto (Knoxville, 300 m
+  mas alla): darse vuelta en una calle sin salida sigue permitido.
   El costo es `routeEdgeCost` (segundos + 1 ms por metro: los segundos del
   grafo son enteros y sin desempate la ruta hacia una V por un brazo del
   cruce; "shortest", metros + 4 m por segundo, `ROUTE_SHORT_M_PER_S`: con
