@@ -2697,6 +2697,33 @@ test('maneuver: bifurcacion pareja con los carriles del juego: manda la flecha d
   assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(null, B.slightRight) }), null);
 });
 
+test('maneuver: la autopista dobla en una salida y los carriles del juego dicen que sigue derecho -> nada, o keep sin nombre (I-90, 23-10)', () => {
+  const B = { slightLeft: 2, straight: 4, slightRight: 8 };
+  // la ruta (la autopista) dobla 10 grados a la izquierda y la salida se va
+  // casi derecho por la derecha: por angulo, "keep left"
+  const geo = { route: [[0, -300], [0, 0], [-8, 46], [-45, 250], [-110, 500]],
+                extraNodes: [[4, 46], [30, 400]], edges: [[1, 5], [5, 6]] };
+  const m = detectManeuver(scenario(geo));
+  assert.deepEqual([m.kind, m.direction], ['fork', 'left']);
+  const flechas = (ruta, otra) => (a, b) => (a === 1 && b === 2 ? ruta : a === 1 && b === 5 ? otra : null);
+  // sin flechas en la ruta (sirven todos los carriles) y la otra "slight
+  // right": seguir por la autopista al lado de una salida, nada (I-90 al
+  // este de Missoula, -68763,-52020)
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(null, B.slightRight) }), null);
+  // la ruta es la "straight" del juego pero no la sirven todos los carriles:
+  // keep como antes, sin el nombre del cartel ("Keep left onto US-395" 1 km
+  // antes de la salida a la US-395, -79816,-58949)
+  const derecho = detectManeuver({ ...scenario(geo), laneTurn: flechas(B.straight, B.slightRight) });
+  assert.deepEqual([derecho.kind, derecho.direction, derecho.through], ['fork', 'left', true]);
+  // la ruta es la "slight left" del juego: una bifurcacion de verdad (la US-93
+  // y la I-90 en Missoula, -72993,-55079), con nombre
+  const izq = detectManeuver({ ...scenario(geo), laneTurn: flechas(B.slightLeft, B.straight) });
+  assert.deepEqual([izq.kind, izq.direction, izq.through], ['fork', 'left', undefined]);
+  // las dos derecho: no se sabe, manda el angulo
+  const dos = detectManeuver({ ...scenario(geo), laneTurn: flechas(B.straight, B.straight) });
+  assert.deepEqual([dos.kind, dos.through], ['fork', undefined]);
+});
+
 test('turnAfterFork: la curva callada de la rampa no tapa la salida (I-25 en Walsenburg, Discord 18-10)', () => {
   const { turnAfterFork } = require('./pure.js');
   // la ruta sale a la derecha en el nodo 1 (la autopista sigue derecho por
@@ -2727,6 +2754,35 @@ test('turnAfterFork: la curva callada de la rampa no tapa la salida (I-25 en Wal
   const dobleMano = geo([[35, 400], [40, 700]]);
   dobleMano.adjacency.get(6).push([1]);
   assert.equal(turnAfterFork(dobleMano, 1, 250, 50, 100, undefined, 60, 'right'), true);
+});
+
+test('turnAfterFork: la cruz que sigue a la curva callada de la rampa no tapa la salida (US-395 en Spokane, 23-10)', () => {
+  const { turnAfterFork, continuesTurn, junctionManeuver } = require('./pure.js');
+  // la ruta sale a la derecha de la autopista en el nodo 1, la rampa dobla a
+  // la derecha sin otra calle en el nodo 5 (callada) y 20 m despues cruza
+  // derecho una cruz (nodo 7). Medido con 60 m de entrada, en la cruz "dobla"
+  // 45 grados y hay otras calles: un giro que se anuncia, pero
+  // findUpcomingTurn lo junta con la curva callada (continuesTurn) y no dice
+  // nada. Contarlo dejaba sin aviso la salida ("Continue straight" en la
+  // salida a la US-395 norte, ATS, -80764,-58654)
+  const ctx = scenario({ route: [[0, -300], [0, 0], [13, 44], [22, 114], [24, 170], [38, 188], [43, 188], [58, 188], [103, 187], [200, 186]],
+    extraNodes: [[-4, 46], [-10, 400], [81, 209], [100, 400], [81, 165], [100, -50]],
+    edges: [[1, 10], [10, 11], [7, 12], [12, 13], [7, 14], [14, 15]] });
+  ctx.pts[5][3] = 1;
+  ctx.pts[7][3] = 1;
+  const geoCtx = { ...ctx, legM: 60, turnThreshold: 35 };
+  // asi lo ve findUpcomingTurn: la curva callada y la cruz que la sigue
+  const curva = junctionManeuver({ ...geoCtx, i: 5, iEnd: 5 }, 50, 100, 0, 60).m;
+  const cruz = junctionManeuver({ ...geoCtx, i: 7, iEnd: 7 }, 50, 100, 0, 60).m;
+  assert.deepEqual([curva.kind, curva.quiet, cruz.kind, cruz.quiet], ['turn', true, 'turn', false]);
+  assert.ok(continuesTurn({ direction: curva.direction, outBearing: curva.outBearing, quiet: true, end: ctx.cum[5] }, cruz, ctx.cum[7], 80, 135, 35));
+  assert.equal(turnAfterFork(geoCtx, 1, 250, 50, 100, 0, 60, 'right'), false);
+  // sin la curva callada antes, la cruz que dobla de verdad sigue contando
+  const sinCurva = scenario({ route: [[0, -300], [0, 0], [13, 44], [22, 114], [24, 170], [70, 220], [120, 230]],
+    extraNodes: [[-4, 46], [-10, 400], [24, 300], [24, 500]],
+    edges: [[1, 7], [7, 8], [4, 9], [9, 10]] });
+  sinCurva.pts[4][3] = 1;
+  assert.equal(turnAfterFork({ ...sinCurva, legM: 60, turnThreshold: 35 }, 1, 250, 50, 100, 0, 60, 'right'), true);
 });
 
 test('maneuver: seguir por la autopista cuando sale una rampa suave -> nada (la ruta es la mas recta)', () => {
