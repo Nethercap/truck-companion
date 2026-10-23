@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261022m" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261022m" />
-<link rel="stylesheet" href="app.css?v=20261022m" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261022n" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261022n" />
+<link rel="stylesheet" href="app.css?v=20261022n" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -151,6 +151,18 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
       <p class="settingsSectionTitle" data-i18n="settingsEveryExitTitle">Highway exits:</p>
       <label class="settingsRow"><input type="checkbox" id="setEveryExit" /> <span data-i18n="settingsEveryExit">Say "Keep left" or "Keep right" at every highway exit</span></label>
       <p class="settingsHint" data-i18n="settingsEveryExitHint">The in-game GPS only says it where a lane ends at the exit. With this on, Truck Dash also says it where the exit has a lane of its own, with the lane arrows and the voice (if it is on).</p>
+
+      <p class="settingsSectionTitle" data-i18n="settingsRestWarnTitle">Rest warning:</p>
+      <label class="voiceRow restWarnRow" for="setRestWarn"><span data-i18n="settingsRestWarn">Warn me before a rest is due:</span>
+        <select id="setRestWarn" class="settingsLinkBtn settingsSelect">
+          <option value="180">3h</option>
+          <option value="150">2h 30m</option>
+          <option value="120">2h</option>
+          <option value="90">1h 30m</option>
+          <option value="60">1h</option>
+        </select>
+      </label>
+      <p class="settingsHint" data-i18n="settingsRestWarnHint">In game time. The voice (if it is on) says it and a shortcut to the nearest rest area shows up above the map. The in-game GPS warns about 2 hours before.</p>
 
       <p class="settingsSectionTitle" data-i18n="settingsCurrencyTitle">Job pay in your currency:</p>
       <select id="setCurrency" class="settingsLinkBtn settingsSelect"></select>
@@ -715,14 +727,14 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261022m"></script>
-<script src="pure.js?v=20261022m"></script>
-<script src="i18n.js?v=20261022m"></script>
-<script src="i18n_en_es.js?v=20261022m"></script>
-<script src="../dash/dash.js?v=20261022m"></script>
-<script src="../dash/classic.js?v=20261022m"></script>
-<script src="app.js?v=20261022m"></script>
-<script src="convoy.js?v=20261022m"></script>
-<script src="livemap.js?v=20261022m"></script>
+<script src="variants.js?v=20261022n"></script>
+<script src="pure.js?v=20261022n"></script>
+<script src="i18n.js?v=20261022n"></script>
+<script src="i18n_en_es.js?v=20261022n"></script>
+<script src="../dash/dash.js?v=20261022n"></script>
+<script src="../dash/classic.js?v=20261022n"></script>
+<script src="app.js?v=20261022n"></script>
+<script src="convoy.js?v=20261022n"></script>
+<script src="livemap.js?v=20261022n"></script>
 </body>
 </html>

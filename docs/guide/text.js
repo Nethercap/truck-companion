@@ -119,6 +119,7 @@ GUIDE_TEXT.en = {
 <li><b>Real base map</b>: coastline, lakes, rivers and built-up areas under the roads (about 1 MB more).</li>
 <li><b>Lite mode</b> for old phones and tablets: lighter rendering, and optionally no routing at all to save the most memory.</li>
 <li><b>Route preference</b>: fastest or shortest.</li>
+<li><b>Rest warning</b>: how long before a rest is due (in game time) the voice and the shortcut to the nearest rest area come up, from 1 to 3 hours.</li>
 <li><b>Job pay in your currency</b>, next to the game's € or $.</li>
 <li><b>Route line color</b>: red, blue or green.</li>
 <li><b>Map zoom in navigation mode</b>.</li>
@@ -342,6 +343,7 @@ GUIDE_TEXT.es = {
 <li><b>Mapa base real</b>: costa, lagos, ríos y zonas urbanas debajo de las rutas (alrededor de 1 MB más).</li>
 <li><b>Modo liviano</b> para celulares y tablets viejos: dibujo más liviano y, si hace falta, sin cálculo de ruta, para ahorrar la mayor cantidad de memoria.</li>
 <li><b>Preferencia de ruta</b>: la más rápida o la más corta.</li>
+<li><b>Aviso de descanso</b>: cuánto antes de que toque descansar (en tiempo del juego) avisan la voz y el atajo al área de descanso más cercana, de 1 a 3 horas.</li>
 <li><b>Pago del trabajo en tu moneda</b>, al lado de los € o $ del juego.</li>
 <li><b>Color de la línea de ruta</b>: rojo, azul o verde.</li>
 <li><b>Zoom del mapa en modo navegación</b>.</li>

@@ -115,6 +115,7 @@ GUIDE_TEXT.de = {
 <li><b>Echte Basiskarte</b>: Küsten, Seen, Flüsse und bebaute Flächen unter den Straßen (etwa 1 MB mehr).</li>
 <li><b>Sparmodus</b> für alte Handys und Tablets: leichtere Darstellung und auf Wunsch ganz ohne Routenberechnung, um am meisten Speicher zu sparen.</li>
 <li><b>Routenpräferenz</b>: schnellste oder kürzeste.</li>
+<li><b>Pausenhinweis</b>: wie lange vor der fälligen Pause (in Spielzeit) die Stimme und die Abkürzung zum nächsten Rastplatz kommen, 1 bis 3 Stunden.</li>
 <li><b>Auftragslohn in deiner Währung</b>, neben den € oder $ des Spiels.</li>
 <li><b>Farbe der Routenlinie</b>: Rot, Blau oder Grün.</li>
 <li><b>Kartenzoom im Navigationsmodus</b>.</li>
@@ -337,6 +338,7 @@ GUIDE_TEXT.fr = {
 <li><b>Vrai fond de carte</b> : côtes, lacs, rivières et zones bâties sous les routes (environ 1 Mo de plus).</li>
 <li><b>Mode léger</b> pour les vieux téléphones et tablettes : rendu allégé et, si besoin, sans calcul d'itinéraire pour économiser le plus de mémoire.</li>
 <li><b>Préférence d'itinéraire</b> : le plus rapide ou le plus court.</li>
+<li><b>Alerte de repos</b> : combien de temps avant la pause obligatoire (en temps de jeu) arrivent la voix et le raccourci vers l'aire de repos la plus proche, de 1 à 3 heures.</li>
 <li><b>Paie dans ta devise</b>, à côté des € ou $ du jeu.</li>
 <li><b>Couleur de l'itinéraire</b> : rouge, bleu ou vert.</li>
 <li><b>Zoom de la carte en mode navigation</b>.</li>
@@ -559,6 +561,7 @@ GUIDE_TEXT.pt = {
 <li><b>Mapa base real</b>: litoral, lagos, rios e áreas urbanas embaixo das estradas (cerca de 1 MB a mais).</li>
 <li><b>Modo leve</b> para celulares e tablets antigos: desenho mais leve e, se quiser, sem cálculo de rota, para economizar o máximo de memória.</li>
 <li><b>Preferência de rota</b>: a mais rápida ou a mais curta.</li>
+<li><b>Aviso de descanso</b>: quanto tempo antes da hora de descansar (em tempo de jogo) aparecem a voz e o atalho para a área de descanso mais próxima, de 1 a 3 horas.</li>
 <li><b>Pagamento na sua moeda</b>, ao lado do € ou $ do jogo.</li>
 <li><b>Cor da linha da rota</b>: vermelho, azul ou verde.</li>
 <li><b>Zoom do mapa no modo navegação</b>.</li>
@@ -781,6 +784,7 @@ GUIDE_TEXT.pl = {
 <li><b>Prawdziwa mapa bazowa</b>: wybrzeża, jeziora, rzeki i tereny zabudowane pod drogami (około 1 MB więcej).</li>
 <li><b>Tryb lekki</b> dla starych telefonów i tabletów: lżejsze rysowanie i opcjonalnie bez wyznaczania trasy, by oszczędzić najwięcej pamięci.</li>
 <li><b>Preferencja trasy</b>: najszybsza lub najkrótsza.</li>
+<li><b>Przypomnienie o odpoczynku</b>: jak długo przed wymaganym odpoczynkiem (w czasie gry) odzywa się głos i pojawia się skrót do najbliższego parkingu, od 1 do 3 godzin.</li>
 <li><b>Zapłata w twojej walucie</b>, obok € lub $ z gry.</li>
 <li><b>Kolor linii trasy</b>: czerwony, niebieski lub zielony.</li>
 <li><b>Przybliżenie mapy w trybie nawigacji</b>.</li>
@@ -1003,6 +1007,7 @@ GUIDE_TEXT.tr = {
 <li><b>Gerçek altlık harita</b>: yolların altında kıyı şeridi, göller, nehirler ve yerleşim alanları (yaklaşık 1 MB daha).</li>
 <li><b>Hafif mod</b> eski telefonlar ve tabletler için: daha hafif çizim ve istersen hiç rota hesaplamadan, en fazla belleği korumak için.</li>
 <li><b>Rota tercihi</b>: en hızlı veya en kısa.</li>
+<li><b>Mola uyarısı</b>: mola zamanından ne kadar önce (oyun saatiyle) sesin ve en yakın dinlenme alanına giden kısayolun geleceği, 1 ile 3 saat arası.</li>
 <li><b>Kendi para biriminde ücret</b>, oyunun € veya $ değerinin yanında.</li>
 <li><b>Rota çizgisi rengi</b>: kırmızı, mavi veya yeşil.</li>
 <li><b>Navigasyon modunda harita yakınlaştırması</b>.</li>
@@ -1225,6 +1230,7 @@ GUIDE_TEXT.ru = {
 <li><b>Настоящая подложка</b>: береговая линия, озёра, реки и застройка под дорогами (примерно на 1 МБ больше).</li>
 <li><b>Лёгкий режим</b> для старых телефонов и планшетов: упрощённая отрисовка и, при желании, без расчёта маршрута, чтобы сэкономить больше всего памяти.</li>
 <li><b>Предпочтение маршрута</b>: самый быстрый или самый короткий.</li>
+<li><b>Напоминание об отдыхе</b>: за сколько до обязательного отдыха (по игровому времени) звучит голос и появляется ярлык к ближайшей зоне отдыха, от 1 до 3 часов.</li>
 <li><b>Оплата в вашей валюте</b> рядом с € или $ из игры.</li>
 <li><b>Цвет линии маршрута</b>: красный, синий или зелёный.</li>
 <li><b>Масштаб карты в режиме навигации</b>.</li>
