@@ -110,7 +110,7 @@ def test_bundled_dll_publica_en_su_propio_bloque():
 def test_bundled_dll_se_descarga_sin_caerse():
     """El juego llama a scs_telemetry_shutdown y despues suelta la DLL, y
     DllMain la vuelve a llamar: la DLL del 30-09 escribia ahi en el bloque ya
-    cerrado y el juego se caia en cada cierre (Discord, 23-10).
+    cerrado y el juego se caia en cada cierre (Visor de eventos, 23-10).
     tools/probar_plugin.py la carga y la suelta como el juego, con init y sin
     init. Lo corre tambien "Build plugin" despues de fijar una DLL nueva."""
     import importlib.util

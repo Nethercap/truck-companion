@@ -6,6 +6,11 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Fixed: the game crashed every time you quit it, because of the Truck Dash telemetry plugin
+  (`truckdash-telemetry.dll`). The client replaces the plugin on its own the next time the game
+  is closed. The `scs-telemetry.dll` that other apps install has the same bug; Truck Dash never
+  touches that file.
+
 - LAN mode: the dashboard on the same Wi-Fi now shares waypoints, the voice device (which device
   speaks the directions) and the route settings (fastest or shortest, map DLC) with your other
   devices, like the dashboards opened with the pairing code already do.
