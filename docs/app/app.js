@@ -3208,7 +3208,10 @@ function addNearestStop(code) {
     const fin = r[r.length - 1];
     return m + Math.hypot(st.x - fin[0], st.z - fin[1]);
   } : null;
-  const best = pickFuelStop(nearestFacilities(code, pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints, undefined, undefined, { reach });
+  // El descanso, una que se alcance antes de que se acabe (restReachMeters):
+  // una sobre la ruta mas adelante le ganaba a otra al costado (Discord 22-10).
+  const maxReachM = code === 'p' ? restReachMeters(restMinutesOf(lastData), gameTimeScale.value() ?? distanceScale()) : Infinity;
+  const best = pickFuelStop(nearestFacilities(code, pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints, undefined, undefined, { reach, maxReachM });
   if (!best) { showToast(t('poiNoResults'), 'danger'); return false; }
   const name = t(code === 'g' ? 'poiCatFuel' : 'poiCatRest');
   const lejos = best.why === 'route'

@@ -2067,6 +2067,37 @@ test('pickFuelStop: con el camino, la de al costado le gana a la de adelante lej
   assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach }).x, 3600);
 });
 
+test('pickFuelStop: el descanso, una que se alcance antes de que se acabe (Discord 22-10)', () => {
+  // Camion en (0,0) yendo al este por la ruta. Un area sobre la ruta a 6 km
+  // (6,1 por el camino) y otra al costado a 2,8 km (3,3 por el camino). Sin
+  // tope gana la de la ruta: ir al costado y volver cuesta mas.
+  const route = [[0, 0], [20000, 0]];
+  const sobre = { x: 6000, z: -50, dist: 6000 };
+  const costado = { x: 2000, z: 2000, dist: 2828 };
+  const camino = { 6000: 6100, 2000: 3300 };
+  const reach = (st) => camino[st.x];
+  const elegir = (maxReachM) => pickFuelStop([costado, sobre], 0, 0, 90, route, 3, 1500, { reach, maxReachM }).x;
+  assert.equal(elegir(Infinity), 6000);
+  assert.equal(elegir(7000), 6000);  // se llega a la de la ruta
+  assert.equal(elegir(5000), 2000);  // no se llega: la que si
+  assert.equal(elegir(2000), 2000);  // ninguna: la mas cercana por el camino
+  // Sin el camino no hay tope que mirar
+  assert.equal(pickFuelStop([costado, sobre], 0, 0, 90, route, 3, 1500, { maxReachM: 2000 }).x, 6000);
+  // Entre las que se alcanzan, primero las que no obligan a volver
+  const vuelta = { x: 1000, z: 300, dist: 1044 };
+  camino[1000] = 4000; // 4 km por el camino para 1 km de recta: dar la vuelta
+  assert.equal(pickFuelStop([vuelta, costado, sobre], 0, 0, 90, route, 3, 1500, { reach, maxReachM: 5000 }).x, 2000);
+});
+
+test('restReachMeters: los metros de mundo hasta el descanso a 70 km/h', () => {
+  const { restReachMeters, REST_REACH_KMH } = require('./pure.js');
+  assert.equal(REST_REACH_KMH, 70);
+  assert.equal(Math.round(restReachMeters(150, 20)), 8750); // ATS, en la ruta
+  assert.equal(Math.round(restReachMeters(90, 3)), 35000);  // en la ciudad el reloj va mas lento
+  assert.equal(restReachMeters(null, 20), Infinity);
+  assert.equal(restReachMeters(90, 0), Infinity);
+});
+
 test('stopInsertIndex: la parada nueva va primero, no despues del destino (Discord, 13-10)', () => {
   const { stopInsertIndex } = require('./pure.js');
   // Sin trabajo, yendo a un pueblo (waypoint 0) 20 km al norte: un solo tramo
@@ -2233,10 +2264,12 @@ test('createStatusAlerts: poco combustible y descanso, una vez cada uno hasta ca
   const b = createStatusAlerts();
   assert.equal(b.push({ ...base, fuel: 60 }).say, 'fuel_low');
 
-  // Descanso: aviso al bajar de 90 min de juego, de nuevo recien despues de dormir.
+  // Descanso: aviso al bajar de 150 min de juego (antes que el juego, a las
+  // ~2 h: Discord 22-10), de nuevo recien despues de dormir.
   const c = createStatusAlerts();
   c.push({ ...base, fuel: 500 });
-  r = c.push({ ...base, fuel: 500, restStopMinutes: 85 });
+  assert.equal(c.push({ ...base, fuel: 500, restStopMinutes: 160 }).restSoon, false);
+  r = c.push({ ...base, fuel: 500, restStopMinutes: 145 });
   assert.equal(r.say, 'rest_soon');
   assert.equal(r.restSoon, true);
   assert.equal(c.push({ ...base, fuel: 500, restStopMinutes: 30 }).say, null);
