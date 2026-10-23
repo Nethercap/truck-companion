@@ -114,7 +114,7 @@ GUIDE_TEXT.en = {
 <ul>
 <li><b>Units</b> (km or miles) and <b>language</b>: English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Mini-HUD</b>: what to show when the info panel is hidden.</li>
-<li><b>Other players nearby</b>: share your position, or hide other drivers' markers.</li>
+<li><b>Other players nearby</b>: share your position, or hide other drivers' markers. When you play on TruckersMP, the players around you show up on the map with their name and where they're heading (you can hide them too).</li>
 <li><b>Map buttons</b>: dark style to match the map, fade them while driving (they come back on touch), and <b>Move the buttons</b>: drag any button or panel, drag its corner to resize it, with a grid and a Reset.</li>
 <li><b>Real base map</b>: coastline, lakes, rivers and built-up areas under the roads (about 1 MB more).</li>
 <li><b>Lite mode</b> for old phones and tablets: lighter rendering, and optionally no routing at all to save the most memory.</li>
@@ -338,7 +338,7 @@ GUIDE_TEXT.es = {
 <ul>
 <li><b>Unidades</b> (km o millas) e <b>idioma</b>: English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Mini-HUD</b>: qué mostrar cuando el panel de info está oculto.</li>
-<li><b>Otros jugadores cerca</b>: compartir tu posición, u ocultar los marcadores de los demás.</li>
+<li><b>Otros jugadores cerca</b>: compartir tu posición, u ocultar los marcadores de los demás. Si jugás en TruckersMP, los jugadores que tenés alrededor aparecen en el mapa con su nombre y hacia dónde van (también los podés ocultar).</li>
 <li><b>Botones del mapa</b>: estilo oscuro para que combinen con el mapa, atenuarlos al manejar (vuelven al tocar la pantalla), y <b>Mover los botones</b>: arrastrá cualquier botón o panel, y su esquina para cambiarle el tamaño, con grilla y un Restablecer.</li>
 <li><b>Mapa base real</b>: costa, lagos, ríos y zonas urbanas debajo de las rutas (alrededor de 1 MB más).</li>
 <li><b>Modo liviano</b> para celulares y tablets viejos: dibujo más liviano y, si hace falta, sin cálculo de ruta, para ahorrar la mayor cantidad de memoria.</li>

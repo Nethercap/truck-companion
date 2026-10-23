@@ -110,7 +110,7 @@ GUIDE_TEXT.de = {
 <ul>
 <li><b>Einheiten</b> (km oder Meilen) und <b>Sprache</b>: English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Mini-HUD</b>: was angezeigt wird, wenn das Infopanel ausgeblendet ist.</li>
-<li><b>Andere Fahrer in der Nähe</b>: deine Position teilen, oder die Markierungen der anderen ausblenden.</li>
+<li><b>Andere Fahrer in der Nähe</b>: deine Position teilen, oder die Markierungen der anderen ausblenden. Wenn du auf TruckersMP spielst, erscheinen die Spieler um dich herum mit Namen und Fahrtrichtung auf der Karte (auch die kannst du ausblenden).</li>
 <li><b>Kartenschaltflächen</b>: dunkler Stil passend zur Karte, beim Fahren ausblenden (sie kommen bei Berührung zurück), und <b>Schaltflächen verschieben</b>: jeden Knopf oder jedes Panel ziehen, an der Ecke die Größe ändern, mit Raster und Zurücksetzen.</li>
 <li><b>Echte Basiskarte</b>: Küsten, Seen, Flüsse und bebaute Flächen unter den Straßen (etwa 1 MB mehr).</li>
 <li><b>Sparmodus</b> für alte Handys und Tablets: leichtere Darstellung und auf Wunsch ganz ohne Routenberechnung, um am meisten Speicher zu sparen.</li>
@@ -333,7 +333,7 @@ GUIDE_TEXT.fr = {
 <ul>
 <li><b>Unités</b> (km ou miles) et <b>langue</b> : English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Mini-HUD</b> : quoi afficher quand le panneau d'infos est masqué.</li>
-<li><b>Autres conducteurs à proximité</b> : partager ta position, ou masquer les marqueurs des autres.</li>
+<li><b>Autres conducteurs à proximité</b> : partager ta position, ou masquer les marqueurs des autres. Quand tu joues sur TruckersMP, les joueurs autour de toi apparaissent sur la carte avec leur nom et leur direction (tu peux aussi les masquer).</li>
 <li><b>Boutons de la carte</b> : style sombre assorti à la carte, les estomper pendant la conduite (ils reviennent au toucher), et <b>Déplacer les boutons</b> : fais glisser n'importe quel bouton ou panneau, et son coin pour le redimensionner, avec une grille et un Réinitialiser.</li>
 <li><b>Vrai fond de carte</b> : côtes, lacs, rivières et zones bâties sous les routes (environ 1 Mo de plus).</li>
 <li><b>Mode léger</b> pour les vieux téléphones et tablettes : rendu allégé et, si besoin, sans calcul d'itinéraire pour économiser le plus de mémoire.</li>
@@ -556,7 +556,7 @@ GUIDE_TEXT.pt = {
 <ul>
 <li><b>Unidades</b> (km ou milhas) e <b>idioma</b>: English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Mini-HUD</b>: o que mostrar quando o painel de informações está oculto.</li>
-<li><b>Outros motoristas por perto</b>: compartilhar sua posição, ou esconder os marcadores dos outros.</li>
+<li><b>Outros motoristas por perto</b>: compartilhar sua posição, ou esconder os marcadores dos outros. Quando você joga no TruckersMP, os jogadores ao seu redor aparecem no mapa com o nome e a direção (também dá para escondê-los).</li>
 <li><b>Botões do mapa</b>: estilo escuro para combinar com o mapa, esmaecer ao dirigir (voltam ao tocar), e <b>Mover os botões</b>: arraste qualquer botão ou painel, e o canto para redimensionar, com grade e um Restaurar.</li>
 <li><b>Mapa base real</b>: litoral, lagos, rios e áreas urbanas embaixo das estradas (cerca de 1 MB a mais).</li>
 <li><b>Modo leve</b> para celulares e tablets antigos: desenho mais leve e, se quiser, sem cálculo de rota, para economizar o máximo de memória.</li>
@@ -779,7 +779,7 @@ GUIDE_TEXT.pl = {
 <ul>
 <li><b>Jednostki</b> (km lub mile) i <b>język</b>: English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Mini-HUD</b>: co pokazywać, gdy panel informacji jest ukryty.</li>
-<li><b>Inni kierowcy w pobliżu</b>: udostępniaj swoją pozycję albo ukryj znaczniki innych.</li>
+<li><b>Inni kierowcy w pobliżu</b>: udostępniaj swoją pozycję albo ukryj znaczniki innych. Gdy grasz na TruckersMP, gracze wokół ciebie pojawiają się na mapie z nazwą i kierunkiem jazdy (ich też możesz ukryć).</li>
 <li><b>Przyciski mapy</b>: ciemny styl pasujący do mapy, przygaszanie podczas jazdy (wracają po dotknięciu) i <b>Przesuń przyciski</b>: przeciągnij dowolny przycisk lub panel, a jego róg, by zmienić rozmiar, z siatką i przyciskiem Przywróć.</li>
 <li><b>Prawdziwa mapa bazowa</b>: wybrzeża, jeziora, rzeki i tereny zabudowane pod drogami (około 1 MB więcej).</li>
 <li><b>Tryb lekki</b> dla starych telefonów i tabletów: lżejsze rysowanie i opcjonalnie bez wyznaczania trasy, by oszczędzić najwięcej pamięci.</li>
@@ -1002,7 +1002,7 @@ GUIDE_TEXT.tr = {
 <ul>
 <li><b>Birimler</b> (km veya mil) ve <b>dil</b>: English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Mini-HUD</b>: bilgi paneli gizliyken ne gösterileceği.</li>
-<li><b>Yakındaki diğer sürücüler</b>: konumunu paylaş ya da diğerlerinin işaretlerini gizle.</li>
+<li><b>Yakındaki diğer sürücüler</b>: konumunu paylaş ya da diğerlerinin işaretlerini gizle. TruckersMP'de oynarken etrafındaki oyuncular adları ve gittikleri yönle haritada görünür (onları da gizleyebilirsin).</li>
 <li><b>Harita düğmeleri</b>: haritaya uyan koyu stil, sürerken soluklaştırma (dokununca geri gelir) ve <b>Düğmeleri taşı</b>: herhangi bir düğmeyi veya paneli sürükle, köşesinden boyutunu değiştir; ızgara ve Sıfırla ile.</li>
 <li><b>Gerçek altlık harita</b>: yolların altında kıyı şeridi, göller, nehirler ve yerleşim alanları (yaklaşık 1 MB daha).</li>
 <li><b>Hafif mod</b> eski telefonlar ve tabletler için: daha hafif çizim ve istersen hiç rota hesaplamadan, en fazla belleği korumak için.</li>
@@ -1225,7 +1225,7 @@ GUIDE_TEXT.ru = {
 <ul>
 <li><b>Единицы</b> (км или мили) и <b>язык</b>: English, Español, Deutsch, Français, Português, Polski, Türkçe, Русский.</li>
 <li><b>Мини-HUD</b>: что показывать, когда панель информации скрыта.</li>
-<li><b>Другие водители рядом</b>: делиться своей позицией или скрыть метки других.</li>
+<li><b>Другие водители рядом</b>: делиться своей позицией или скрыть метки других. Если вы играете в TruckersMP, игроки рядом с вами появляются на карте с именем и направлением движения (их тоже можно скрыть).</li>
 <li><b>Кнопки на карте</b>: тёмный стиль под цвет карты, приглушение во время езды (возвращаются при касании) и <b>Переместить кнопки</b>: перетащите любую кнопку или панель, а за угол измените размер; есть сетка и сброс.</li>
 <li><b>Настоящая подложка</b>: береговая линия, озёра, реки и застройка под дорогами (примерно на 1 МБ больше).</li>
 <li><b>Лёгкий режим</b> для старых телефонов и планшетов: упрощённая отрисовка и, при желании, без расчёта маршрута, чтобы сэкономить больше всего памяти.</li>
