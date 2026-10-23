@@ -42,6 +42,11 @@ jobs:
           python-version: '3.12'
       - name: Build the plugin DLL
         run: powershell -File plugin/build.ps1 -OutDir "$env:RUNNER_TEMP\plugin"
+      - name: Load and unload it
+        # Como el juego (init, shutdown y FreeLibrary) y tambien sin init. La
+        # DLL del 30-09 se caia al soltarla y el juego con ella en cada
+        # cierre: que rompa aca y no en el juego de alguien.
+        run: python tools/probar_plugin.py "$env:RUNNER_TEMP\plugin\scs-telemetry.dll"
       - name: Pin it in the client
         run: python tools/pin_plugin.py "$env:RUNNER_TEMP\plugin\scs-telemetry.dll"
       - name: Check the client still passes its plugin tests

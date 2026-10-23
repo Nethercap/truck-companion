@@ -34,6 +34,8 @@ jobs:
       # El plugin (plugin/) no se compila en cada push, solo con "Build
       # plugin": esto avisa en el momento si un cambio no compila.
       - run: powershell -File plugin/build.ps1 -OutDir "$env:RUNNER_TEMP\plugin"
+      # Y que se suelte sin caerse, como la carga y la descarga el juego.
+      - run: python tools/probar_plugin.py "$env:RUNNER_TEMP\plugin\scs-telemetry.dll"
 
   # El cliente tambien corre en Linux (bajo Proton, y algun dia nativo), y
   # ahi hay cosas que en Windows no se ven: las rutas distinguen mayusculas y
