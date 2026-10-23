@@ -37,7 +37,7 @@ OTHER_DLL_NAME = "scs-telemetry.dll"
 # Fork de RenCloud 1.12.1 con los trabajos con auto de ATS 1.61 (plugin/).
 # La DLL y su hash los escribe el workflow "Build plugin" (tools/pin_plugin.py).
 PLUGIN_DLL_VERSION = "1.12.1-truckdash.2"
-PLUGIN_DLL_SHA256 = "de81c1a25856d2f83a956feb06842ddfcd23788d6eb32d3a7584bcda4bf7d183"
+PLUGIN_DLL_SHA256 = "b63ceb24efb50336e96bbd90f955ef8dd831240c182777936db58f97783d9df9"
 # El mismo plugin para macOS, universal (Intel y Apple Silicon): la .dylib y
 # su hash tambien los escribe "Build plugin" (plataforma macos, con
 # plugin/build.sh). Vacio hasta la primera compilacion; el cliente todavia no
