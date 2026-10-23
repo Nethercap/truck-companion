@@ -99,7 +99,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -210,6 +210,9 @@ let voiceByLang = (_savedSettings.voiceByLang && typeof _savedSettings.voiceByLa
 // Cuando se dice "turn right" en el punto: 'early' | 'normal' | 'late' (ver
 // VOICE_TIMINGS en pure.js).
 let voiceTiming = voiceTimingSetting(_savedSettings.voiceTiming);
+// Cuantos minutos de juego antes del descanso avisa "Rest soon" (ver
+// REST_WARN_OPTIONS en pure.js).
+let restWarnMin = restWarnSetting(_savedSettings.restWarnMin);
 
 // ---------------------------------------------------------------------------
 // Pago en la moneda "real" del usuario. El SDK paga en la moneda interna del
@@ -465,6 +468,7 @@ function initSettingsUi() {
   document.getElementById('setClockSelect').value = clockFormat;
   document.getElementById('setVoice').checked = voiceOn;
   document.getElementById('setVoiceTiming').value = voiceTiming;
+  document.getElementById('setRestWarn').value = String(restWarnMin);
   loadVoiceCatalog().then(fillVoiceSelect);
   document.getElementById('setDarkButtons').checked = darkButtons;
   document.getElementById('setFadeButtons').checked = fadeButtons;
@@ -708,6 +712,11 @@ document.getElementById('setVoiceName').addEventListener('change', (e) => {
 document.getElementById('setVoiceTiming').addEventListener('change', (e) => {
   voiceTiming = voiceTimingSetting(e.target.value);
   voiceGuide.setTiming(voiceTiming);
+  saveSettings();
+});
+document.getElementById('setRestWarn').addEventListener('change', (e) => {
+  restWarnMin = restWarnSetting(e.target.value);
+  statusAlerts.setRestSoonMin(restWarnMin);
   saveSettings();
 });
 document.getElementById('setVoiceTest').addEventListener('click', () => {
@@ -7619,7 +7628,7 @@ function fuelFigures(data) {
 // arriba del mapa a la estacion o al area de descanso mas cercana. La parada
 // de descanso se da por cumplida al dormir (createRestWatch), como la de
 // estacion al cargar.
-const statusAlerts = createStatusAlerts();
+const statusAlerts = createStatusAlerts({ restSoonMin: restWarnMin });
 const restWatch = createRestWatch();
 const stopSuggestion = createStopSuggestion();
 let stopSuggestKind = null;

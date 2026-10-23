@@ -2245,6 +2245,39 @@ test('createStatusAlerts: trabajo nuevo solo si aparece con la pagina abierta y 
   assert.equal(a.push({ ...base, ts: 1001, onJob: true, trailerAttached: false, routeDistanceKm: 3 }).say, 'job_new');
 });
 
+test('createStatusAlerts: el aviso de descanso de Ajustes (REST_WARN_OPTIONS)', () => {
+  const { createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel } = require('./pure.js');
+  assert.deepEqual(REST_WARN_OPTIONS, [180, 150, 120, 90, 60]);
+  assert.equal(REST_WARN_DEFAULT, 150);
+  assert.equal(restWarnSetting(undefined), 150);
+  assert.equal(restWarnSetting('90'), 90);  // el <select> da texto
+  assert.equal(restWarnSetting(100), 150);
+  assert.deepEqual(REST_WARN_OPTIONS.map(restWarnLabel), ['3h', '2h 30m', '2h', '1h 30m', '1h']);
+  const base = { ts: 1000, onJob: false, fuelCapacity: 600, fuel: 500 };
+  // A 60: nada a los 100 minutos, si a los 55
+  const a = createStatusAlerts({ restSoonMin: 60 });
+  assert.equal(a.push({ ...base, restStopMinutes: 100 }).restSoon, false);
+  assert.equal(a.push({ ...base, restStopMinutes: 55 }).say, 'rest_soon');
+  // Ya avisado a 150 con 100 por delante: bajarlo a 90 avisa otra vez a los 90
+  const b = createStatusAlerts();
+  b.push({ ...base, restStopMinutes: 300 });
+  assert.equal(b.push({ ...base, restStopMinutes: 100 }).say, 'rest_soon');
+  b.setRestSoonMin(90);
+  assert.equal(b.push({ ...base, restStopMinutes: 95 }).say, null);
+  assert.equal(b.push({ ...base, restStopMinutes: 88 }).say, 'rest_soon');
+  // Subirlo con lo que falta adentro del nuevo avisa enseguida
+  const c = createStatusAlerts({ restSoonMin: 60 });
+  assert.equal(c.push({ ...base, restStopMinutes: 100 }).say, null);
+  c.setRestSoonMin(120);
+  assert.equal(c.push({ ...base, restStopMinutes: 99 }).say, 'rest_soon');
+  // Bajarlo con lo que falta ya por debajo del nuevo no repite
+  const d = createStatusAlerts();
+  d.push({ ...base, restStopMinutes: 300 });
+  assert.equal(d.push({ ...base, restStopMinutes: 50 }).say, 'rest_soon');
+  d.setRestSoonMin(60);
+  assert.equal(d.push({ ...base, restStopMinutes: 45 }).say, null);
+});
+
 test('createStatusAlerts: poco combustible y descanso, una vez cada uno hasta cargar o dormir', () => {
   const { createStatusAlerts } = require('./pure.js');
   const base = { ts: 1000, onJob: false, fuelCapacity: 600, restStopMinutes: 600 };
