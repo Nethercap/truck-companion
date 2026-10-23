@@ -935,6 +935,10 @@
   .convoyMarker .convoyLabel small { font-weight: 500; opacity: 0.8; }
   .convoyMarker.dim { opacity: 0.55; }
   .convoyMarker.paused .convoyArrow { opacity: 0.5; }
+  /* jugadores de TruckersMP cerca: como los companeros, mas chicos y en gris */
+  .tmpPlayerMarker { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+  .tmpPlayerMarker .tmpPlayerArrow { filter: drop-shadow(0 0 2px #000); transform-origin: 50% 50%; }
+  .tmpPlayerMarker .tmpPlayerLabel { font-size: 0.62rem; font-weight: 600; color: #e8eaed; background: rgba(0,0,0,0.55); padding: 0 4px; border-radius: 4px; white-space: nowrap; margin-top: -2px; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
   .convoyEdgeLayer { position: absolute; inset: 0; pointer-events: none; z-index: 1050; overflow: hidden; }
   .convoyEdge { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; background: rgba(23, 26, 31, 0.92); border: 2px solid; border-radius: 999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; color: #fff; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
   .convoyEdgeArrow { display: inline-block; }

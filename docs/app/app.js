@@ -99,7 +99,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -444,6 +444,12 @@ let liveShareEnabled = liveShareChoice(_savedSettings) === true;
 // se reenvia al reconectar aunque localStorage no ande.
 let liveShareChosen = false;
 let hideOtherPlayers = _savedSettings.hideOtherPlayers || false;
+// Jugadores de TruckersMP cerca (tmpPlayers del cliente de la PC, ver
+// tmpPlayersUpdate en pure.js). Prendido por defecto: sin TruckersMP no llega
+// nada. Solo se ven aca: el relay no los pasa al mapa en vivo ni al convoy.
+let showTmpPlayers = _savedSettings.showTmpPlayers !== false;
+let tmpPlayers = null;
+const tmpPlayerMarkers = new Map(); // id del jugador en el servidor de TMP -> { marker, arrow, label }
 useImperial = !!_savedSettings.useImperial;
 renderUnitButtons();
 const livePlayerMarkers = new Map(); // id de sesion -> maplibregl.Marker
@@ -462,6 +468,7 @@ function initSettingsUi() {
   document.getElementById('setEveryExit').checked = navEveryExit;
   document.getElementById('setLiveShare').checked = liveShareEnabled;
   document.getElementById('setLiveShareRoute').checked = liveShareRoute;
+  document.getElementById('setTmpPlayers').checked = showTmpPlayers;
   renderLiveShareControls();
   document.getElementById('setNavZoom').value = navZoom;
   document.getElementById('setTruckSize').value = truckSize;
@@ -794,6 +801,11 @@ document.getElementById('setLiveHideOthers').addEventListener('change', (e) => {
   saveSettings();
   if (hideOtherPlayers) updateLivePlayers([]);
 });
+document.getElementById('setTmpPlayers').addEventListener('change', (e) => {
+  showTmpPlayers = e.target.checked;
+  saveSettings();
+  renderTmpPlayers();
+});
 
 // Dibuja los marcadores de "otros jugadores" recibidos del backend - id de
 // sesion (efimero, cambia si se reconecta) en vez de nada personal. Reusa
@@ -820,6 +832,42 @@ function updateLivePlayers(players) {
     if (!seen.has(id)) { marker.remove(); livePlayerMarkers.delete(id); }
   }
 }
+
+// Los jugadores de TruckersMP: flecha con el rumbo y el nombre, como los
+// companeros del convoy pero en el gris de los otros jugadores. Se redibuja
+// cuando llega otra lista, cuando vence y al girar el mapa.
+function renderTmpPlayers() {
+  const seen = new Set();
+  if (map && toLngLat && showTmpPlayers && tmpPlayers) {
+    const bearing = map.getBearing();
+    for (const p of tmpPlayers.list) {
+      seen.add(p.id);
+      const lngLat = toLngLat(p.x, p.z);
+      let entry = tmpPlayerMarkers.get(p.id);
+      if (!entry) {
+        const el = document.createElement('div');
+        el.className = 'tmpPlayerMarker';
+        el.innerHTML = '<div class="tmpPlayerArrow"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2 L20 21 L12 16 L4 21 Z" fill="#9aa4b2" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg></div><div class="tmpPlayerLabel"></div>';
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map);
+        entry = { marker, arrow: el.firstChild, label: el.lastChild };
+        tmpPlayerMarkers.set(p.id, entry);
+      } else {
+        entry.marker.setLngLat(lngLat);
+      }
+      // El rumbo viene sobre la grilla del juego: a geografico, como el propio.
+      entry.arrow.style.transform = `rotate(${gridHeadingToGeo(p.heading, p.x, p.z, toLngLat) - bearing}deg)`;
+      entry.label.textContent = p.name;
+    }
+  }
+  for (const [id, entry] of tmpPlayerMarkers) {
+    if (!seen.has(id)) { entry.marker.remove(); tmpPlayerMarkers.delete(id); }
+  }
+}
+// Vencen solos aunque no llegue mas telemetria (el juego se cerro).
+setInterval(() => {
+  const next = tmpPlayersUpdate(tmpPlayers, null, Date.now());
+  if (next !== tmpPlayers) { tmpPlayers = next; renderTmpPlayers(); }
+}, 1000);
 
 const MINI_HUD_CHECKBOXES = {
   setMiniFuelPct: 'fuelPct',
@@ -1997,6 +2045,7 @@ function ensureMapInitialized() {
   map.on('rotateend', (e) => { if (e.originalEvent) scheduleMapFollow(); });
   map.on('zoom', updateTruckArrowSize);
   map.on('rotate', updateCompass);
+  map.on('rotate', () => { if (tmpPlayerMarkers.size) renderTmpPlayers(); });
   map.on('styleimagemissing', loadMissingCompanyIcon);
   // Si el usuario zoomea a mano en modo navegacion, dejamos de forzar el
   // zoom dinamico (si no, el proximo tick lo pisa y parece que "no se puede
@@ -7697,6 +7746,8 @@ function handleTelemetry(data) {
     renderConnectionUi();
   }
   updateHud(data);
+  const tmpNext = tmpPlayersUpdate(tmpPlayers, data, Date.now());
+  if (tmpNext !== tmpPlayers) { tmpPlayers = tmpNext; renderTmpPlayers(); }
   if (dashPanel) dashPanel.update(data);
   updateMap(data.position || {}, data.game, data.heading);
   updateDestinationMarker(data);
