@@ -6,6 +6,11 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- TruckersMP: the players around you show up on your dashboard's map, with their name and where
+  they're heading, while you play on TruckersMP. They come from TruckersMP's own client (their
+  Client SDK), only you see them, and you can hide them in Settings. The client installs the new
+  plugin on its own the next time the game is closed.
+
 - Fixed: the game crashed every time you quit it, because of the Truck Dash telemetry plugin
   (`truckdash-telemetry.dll`). The client replaces the plugin on its own the next time the game
   is closed. The `scs-telemetry.dll` that other apps install has the same bug; Truck Dash never
