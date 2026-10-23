@@ -155,12 +155,16 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
     seen = set()
     del_parser = _cargar(path)
     # Los garajes del jugador traen un surtidor en el prefab (un spawn GasPos,
-    # que el parser vuelve gas_ico), pero el juego no lo muestra en su mapa y
-    # la web no sabe cuales son del jugador (no lee la partida): cada garaje,
-    # comprado o no, salia como estacion de servicio (Discord 23-10,
-    # Chillaxingone). Es el surtidor del mismo prefab que el lugar de comprar
-    # el garaje (BuyPos, garage_large_ico): asi tambien los garajes de los
-    # mods, que no estan en prefab/garage_player ni en garage_scandinavia.
+    # que el parser vuelve gas_ico), y cada garaje, comprado o no, salia como
+    # estacion de servicio (Discord 23-10, Chillaxingone). En el juego ese
+    # surtidor anda solo en los garajes propios agrandados a "large" (afuera,
+    # a la izquierda del edificio; Gargamosch y Snaike Plyskin en el mismo
+    # hilo), y la web no sabe cuales son del jugador ni de que tamano (esta en
+    # la partida, que no se lee): mostrarlos todos mandaba a cargar a garajes
+    # ajenos o chicos, y el boton de la estacion mas cercana podia elegirlos.
+    # Es el surtidor del mismo prefab que el lugar de comprar el garaje
+    # (BuyPos, garage_large_ico): asi tambien los garajes de los mods, que no
+    # estan en prefab/garage_player ni en garage_scandinavia.
     garajes = {p["prefabUid"] for p in del_parser if p.get("icon") == "garage_large_ico" and p.get("prefabUid")}
     for p in del_parser:
         x, z = round(p["x"]), round(p["y"])

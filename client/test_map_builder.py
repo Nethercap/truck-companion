@@ -201,9 +201,10 @@ def test_pois_surtidores_solo_para_auto(tmp_path):
 
 def test_pois_sin_el_surtidor_de_los_garajes(tmp_path):
     """Cada garaje trae un surtidor en el prefab y salia como estacion de
-    servicio, comprado o no; el juego no lo muestra (Discord 23-10). Se saca
-    el del mismo prefab que el garaje, con la carpeta que sea (mods); el de
-    una estacion de al lado queda."""
+    servicio, comprado o no; en el juego solo anda en los garajes propios
+    agrandados, y la web no sabe cuales son (Discord 23-10). Se saca el del
+    mismo prefab que el garaje, con la carpeta que sea (mods); el de una
+    estacion de al lado queda."""
     import json
     from mapbuild import pois
     (tmp_path / "usa-pois.json").write_text(json.dumps([
