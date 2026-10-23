@@ -317,6 +317,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   compactos sin isla (`compactIslandM`: cruces de ATS con curvas cuadradas).
   Los umbrales salen de medir contra el nombre del prefab del parser; antes
   de moverlos, correr el simulador con `--rotondas`.
+  Las rotondas ovaladas armadas con calles (sin prefab de rotonda, sin
+  nombre que ayude) pasan por otra regla (`ovalRing`, `OVAL_RING`): hasta
+  x2 de redondez, a lo sumo dos lados rectos (el tercero, `straightRuns`,
+  menos de 0,06 de la vuelta), convexas, de 150 a 450 m y con 3 salidas. El
+  ovalo de Colville (ATS, -81881,-63722, turn report del 23-10) decia "turn
+  left" dos veces. Las manzanas de ATS tienen las esquinas cortadas en dos de
+  45 grados y doblan tan parejo como un ovalo: lo que las separa son los
+  cuatro lados rectos. En ATS, ETS2, Coast to Coast y ProMods entran 21
+  anillos, todos ovalos, y ninguna manzana, rombo de autovia ni estrella.
 - La voz habla de a una frase (`voiceQueueAction`): una nueva espera a que
   termine la que suena, salvo un aviso en el punto contra uno anticipado.
   Lo dicho se recuerda por maniobra (`turnIdentity`) para las ultimas 8

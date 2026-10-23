@@ -1634,6 +1634,46 @@ test('detectRoundabout: un tramo corto de calle dividida o una manzana de una ma
   assert.equal(detectRoundabout(base), null);
 });
 
+test('detectRoundabout: rotonda ovalada armada con calles, dos lados rectos y las puntas redondas (Colville, 23-10)', () => {
+  const { detectRoundabout, ovalRing, ringOutline, roundish, longestStraightFrac, RING_MAX_STRAIGHT } = require('./pure.js');
+  // como el ovalo de Colville (ATS, -81881,-63722): puntas de radio 27,5 y
+  // lados rectos de 40 m, 253 m de vuelta, antihorario desde el sur. Nodos
+  // cada 22,5 grados en las puntas: 0 sur, 4 abajo del lado este, 9 norte,
+  // 13 arriba del lado oeste
+  const punta = (cy, grados) => [27.5 * Math.cos(grados * Math.PI / 180), cy + 27.5 * Math.sin(grados * Math.PI / 180)];
+  const anillo = [];
+  for (let a = -90; a <= 0; a += 22.5) anillo.push(punta(-20, a));
+  for (let a = 0; a <= 180; a += 22.5) anillo.push(punta(20, a));
+  for (let a = 202.5; a < 270; a += 22.5) anillo.push(punta(-20, a));
+  const armar = (conBrazos) => {
+    const nodos = anillo.map(p => [...p]), aristas = nodos.map((_, k) => [k, (k + 1) % nodos.length, false]);
+    const b = conBrazos(nodos, aristas);
+    return { nodos, b, g: grafoChico(nodos, aristas) };
+  };
+  const { nodos, b, g } = armar((n, a) => ({ sur: conCalle(n, a, 0, 0, -300), este: conCalle(n, a, 4, 300, 0), norte: conCalle(n, a, 9, 0, 300), oeste: conCalle(n, a, 13, -300, 0) }));
+  // la regla de siempre no la toma: alargada y con lados rectos
+  const contorno = ringOutline([...anillo.keys()], g.nodeAt, null);
+  assert.equal(roundish(contorno, 1.3) && longestStraightFrac(contorno) < RING_MAX_STRAIGHT, false);
+  const ctx = (ids) => ({ ...rutaPor(nodos, ids), i: 1, iEnd: 1, ...g, bearingBetween: planarBearing });
+  // del sur al oeste: tercera salida (este, norte, oeste), antihoraria
+  const r = detectRoundabout(ctx([b.sur, ...Array.from({ length: 14 }, (_, k) => k), b.oeste]));
+  assert.deepEqual([r.exit, r.ccw], [3, true]);
+  assert.equal(detectRoundabout(ctx([b.sur, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, b.norte])).exit, 2);
+  // con dos brazos (un lazo o la vuelta de una calle) no
+  assert.equal(ovalRing(contorno, () => 2), false);
+  assert.equal(ovalRing(contorno, () => 3), true);
+  const dos = armar((n, a) => ({ sur: conCalle(n, a, 0, 0, -300), norte: conCalle(n, a, 9, 0, 300) }));
+  assert.equal(detectRoundabout({ ...rutaPor(dos.nodos, [dos.b.sur, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, dos.b.norte]), i: 1, iEnd: 1, ...dos.g, bearingBetween: planarBearing }), null);
+  // una manzana de calles de una mano del mismo tamano, con las esquinas
+  // cortadas como en ATS: cuatro lados rectos, no
+  const manzana = [[0, -35], [37, -35], [45, -27], [45, 27], [37, 35], [0, 35], [-37, 35], [-45, 27], [-45, -27], [-37, -35]];
+  const am = manzana.map((_, k) => [k, (k + 1) % manzana.length, false]);
+  const ms = conCalle(manzana, am, 0, 0, -300); conCalle(manzana, am, 2, 300, 0); conCalle(manzana, am, 5, 0, 300); const mo = conCalle(manzana, am, 7, -300, 0);
+  const gm = grafoChico(manzana, am);
+  assert.equal(ovalRing(ringOutline([...Array(10).keys()], gm.nodeAt, null), () => 4), false);
+  assert.equal(detectRoundabout({ ...rutaPor(manzana, [ms, 0, 1, 2, 3, 4, 5, 6, 7, mo]), i: 1, iEnd: 1, ...gm, bearingBetween: planarBearing }), null);
+});
+
 test('detectRoundabout: rotonda compacta de un prefab, las salidas por el largo de su curva', () => {
   const { detectRoundabout } = require('./pure.js');
   // brazos a 25 m del centro: 0 sur (entrada), 1 este, 2 norte, 3 oeste; curvas antihorarias
