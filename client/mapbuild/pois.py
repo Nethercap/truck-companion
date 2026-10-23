@@ -153,8 +153,19 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
     facilities = []
     companies = []
     seen = set()
-    for p in _cargar(path):
+    del_parser = _cargar(path)
+    # Los garajes del jugador traen un surtidor en el prefab (un spawn GasPos,
+    # que el parser vuelve gas_ico), pero el juego no lo muestra en su mapa y
+    # la web no sabe cuales son del jugador (no lee la partida): cada garaje,
+    # comprado o no, salia como estacion de servicio (Discord 23-10,
+    # Chillaxingone). Es el surtidor del mismo prefab que el lugar de comprar
+    # el garaje (BuyPos, garage_large_ico): asi tambien los garajes de los
+    # mods, que no estan en prefab/garage_player ni en garage_scandinavia.
+    garajes = {p["prefabUid"] for p in del_parser if p.get("icon") == "garage_large_ico" and p.get("prefabUid")}
+    for p in del_parser:
         x, z = round(p["x"]), round(p["y"])
+        if p.get("icon") == "gas_ico" and p.get("prefabUid") in garajes:
+            continue
         # Se filtra por ICONO y no por tipo: weigh_ico viene como type="road"
         # (es el cartel de la bascula al costado de la ruta, no un prefab con
         # playa), y con el filtro por tipo se caian los 34 de ETS2.

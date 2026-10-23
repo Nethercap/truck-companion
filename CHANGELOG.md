@@ -24,6 +24,9 @@ updates on its own and is not versioned here.
   sees your truck off the map. Before, it only showed up after that, and not again after
   restarting the client, so there was no way to build the map for a newer version of a map mod
   than ours.
+- Build my map: player garages no longer show up as fuel stations on the map. Every garage, owned
+  or not, had a fuel stop that the game doesn't show and the nearest-fuel button could pick. Maps
+  built before keep it until you build them again.
 - Build my map: road pieces that meet end to end are joined into one road, so the dashboard, which
   now draws roads at their in-game width, shows clean corners and road ends instead of overlapping
   square tips (where the two lanes of a roundabout entrance meet, for example). Maps built before

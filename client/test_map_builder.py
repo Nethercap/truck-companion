@@ -199,6 +199,24 @@ def test_pois_surtidores_solo_para_auto(tmp_path):
     assert {f[2] for f in pois.build(str(tmp_path), "europe")["facilities"]} == {"g"}
 
 
+def test_pois_sin_el_surtidor_de_los_garajes(tmp_path):
+    """Cada garaje trae un surtidor en el prefab y salia como estacion de
+    servicio, comprado o no; el juego no lo muestra (Discord 23-10). Se saca
+    el del mismo prefab que el garaje, con la carpeta que sea (mods); el de
+    una estacion de al lado queda."""
+    import json
+    from mapbuild import pois
+    (tmp_path / "usa-pois.json").write_text(json.dumps([
+        {"x": 100, "y": 100, "type": "facility", "icon": "garage_large_ico", "prefabUid": "g1", "prefabPath": "prefab/garage_player/garage_medium_01.ppd"},
+        {"x": 120, "y": 130, "type": "facility", "icon": "gas_ico", "prefabUid": "g1", "prefabPath": "prefab/garage_player/garage_medium_01.ppd"},
+        {"x": 5000, "y": 100, "type": "facility", "icon": "garage_large_ico", "prefabUid": "g2", "prefabPath": "prefab/garage/c2c_garage.ppd"},
+        {"x": 5020, "y": 110, "type": "facility", "icon": "gas_ico", "prefabUid": "g2", "prefabPath": "prefab/garage/c2c_garage.ppd"},
+        {"x": 250, "y": 100, "type": "facility", "icon": "gas_ico", "prefabUid": "e1", "prefabPath": "prefab/gas/us_gas_driver_truck_5rows_roof.ppd"},
+    ]))
+    datos = pois.build(str(tmp_path), "usa")
+    assert sorted(datos["facilities"]) == sorted([[100, 100, "r"], [5000, 100, "r"], [250, 100, "g"]])
+
+
 def test_pois_guarda_el_estado_de_cada_ciudad(tmp_path):
     """Tres Jackson en ATS + C2C: sin el estado, en el buscador de la web no
     se sabia cual era cual (Discord 11-10)."""
