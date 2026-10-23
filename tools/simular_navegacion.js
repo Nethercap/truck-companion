@@ -331,7 +331,13 @@ function salidaPorAngulo(ctx, pts, kEnter, manoIzq) {
   let ring = null;
   for (const [maxM, depth, budget] of [[700, 40, 300], [1500, 80, 600]]) {
     const r = pure.oneWayRing(g.adjacency, g.nodeXY, v, u, maxM, depth, budget);
-    if (r && r.length >= 4 && pure.roundish(pure.ringOutline(r, g.nodeXY, (a, b) => lineaArista(g, a, b)), 1.3)) { ring = r; break; }
+    if (!r || r.length < 4) continue;
+    const contorno = pure.ringOutline(r, g.nodeXY, (a, b) => lineaArista(g, a, b));
+    // las ovaladas armadas con calles tambien (ovalRing): por angulo se
+    // cuentan igual
+    const set = new Set(r);
+    const salidas = () => r.reduce((s, w) => s + (g.adjacency.get(w) || []).filter(([n]) => !set.has(n) && pure.leadsAway(g.adjacency, g.nodeXY, w, n, set, 120)).length, 0);
+    if (pure.roundish(contorno, 1.3) || pure.ovalRing(contorno, salidas)) { ring = r; break; }
   }
   const ang = (p, c) => Math.atan2(-(p[1] - c[1]), p[0] - c[0]) * 180 / Math.PI;
   const dirs = pure.routeArcDirections(g);
