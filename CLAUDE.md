@@ -379,6 +379,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Tampoco si el giro es para el otro lado despues de una salida de una mano
   (`salidaDeUnaMano`): salir a la derecha y doblar a la izquierda al final de
   la rampa avisa la salida primero (salida 115 de Rockford, 18-10).
+  Ni si findUpcomingTurn lo junta con una curva callada de antes
+  (`continuesTurn`): la rampa a la US-395 norte en Spokane dobla sin otra
+  calle y 20 m despues cruza derecho una cruz que con la curva en la entrada
+  "dobla" 43 grados; no se decia nada en la salida (turn report, 23-10).
 - Una salida que a los 150 m vuelve por donde se vino (la calzada contraria
   donde termina una autovia) no es rama de una bifurcacion (`forkInCurve`).
 - Dos calzadas de un sentido que se separan casi paralelas (la colectora al
@@ -386,6 +390,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   ya van a 10 m y la ruta toma la que se abre, es "keep" (`parallelFork`).
   Con carriles manda la flecha del juego de la rama de la ruta (`laneTurn`
   en el ctx): sin flecha a un costado, la ruta es la autopista y no se avisa.
+  En la bifurcacion por angulo, lo mismo cuando la rama de la ruta no tiene
+  flechas (sirven todos los carriles) y la otra sale a un costado: la
+  autopista que dobla 8 a 10 grados en una salida comun daba "keep left"
+  (I-90 en Montana e Idaho, turn report del 23-10). Si la ruta tiene flecha
+  derecho pero no la sirven todos los carriles, se avisa igual, sin nombre
+  (`through`): "Keep left onto US-395" salia del cartel de la salida que
+  viene, 1 km antes, y esa salida es a la derecha.
 - Un giro no se da por pasado por estar en el primer nodo del cruce: parado en
   la linea de una T el camion queda ahi y decia "Continue straight" (Discord,
   Gargamosch, 18-10). `turnPassed`: hasta 15 m despues del ultimo nodo decide

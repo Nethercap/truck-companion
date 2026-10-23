@@ -1588,7 +1588,36 @@ function detectManeuver(ctx) {
   if (!laterTurn && Math.abs(delta) >= forkTurnMinDeg && Math.abs(routeDelta) >= forkTurnDeg && Math.abs(bestAlt) <= forkTurnAltMaxDeg) {
     return { kind: 'turn', direction, delta: routeDelta, at: i, inBearing, outBearing: (inBearing + routeDelta + 360) % 360, quiet: false };
   }
-  return { kind: 'fork', direction, delta: routeDelta, at: i };
+  // Con los carriles del juego (ctx.laneTurn), contra la otra salida que sale
+  // a un costado (sin flecha derecho). Si la rama de la ruta no tiene flechas
+  // (sirven todos los carriles), es seguir por la calle al lado de una salida
+  // y no se avisa, como en parallelFork: la autopista que dobla 8 a 10 grados
+  // en una salida comun daba "keep left" (I-90 al este de Missoula y de
+  // Spokane, ATS, -68763,-52020 y -74949,-56623, turn report del 23-10), y en
+  // check_avisos 7 mas en salidas y en cruces que la ruta pasa derecho (en
+  // 400 rutas del simulador, 28 avisos menos en ATS y 7 en ETS2).
+  // Si la rama de la ruta sigue derecho pero no todos los carriles la sirven,
+  // se avisa como antes (la rampa de New Orleans que se parte con el carril
+  // de la izquierda a otro lado), pero sin nombre (through, como el "keep"
+  // por carriles): los carteles de la ruta anuncian las salidas que vienen, y
+  // en la I-90 decia "Keep left onto US-395" 1 km antes de la salida a la
+  // US-395, que es a la derecha (-79816,-58949).
+  let through = false;
+  if (ctx.laneTurn && !laterTurn) {
+    const e = altDeltas().indexOf(bestAlt);
+    const [k, idx, n] = altExits()[e];
+    let sig = null;
+    for (let j = k + 1; j < pts.length && sig == null; j++) sig = pts[j][4];
+    const tr = sig != null ? ctx.laneTurn(idx, sig) : null;
+    const ta = ctx.laneTurn(idx, n);
+    if (ta != null && !(ta & LANE_ARROW_BITS.straight)) {
+      if (tr == null) return null;
+      through = !!(tr & LANE_ARROW_BITS.straight);
+    }
+  }
+  const fork = { kind: 'fork', direction, delta: routeDelta, at: i };
+  if (through) fork.through = true;
+  return fork;
 }
 
 // La maniobra del cruce que empieza en el nodo ctx.i, con ctx.iEnd el grupo
@@ -1715,6 +1744,12 @@ function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 80, contraMaxDeg = 20
 // 18-10: 196 m de rampa). La esquina que la bifurcacion confundia dobla para
 // el mismo lado; en el prefab de una rotonda o de un cruce grande la
 // bifurcacion es parte del giro (Gothenburg, ETS2: keep left y a 136 m turn right).
+// Tampoco el giro que sigue a una curva callada y findUpcomingTurn junta con
+// ella (continuesTurn, con ctx.legM y ctx.turnThreshold): la rampa a la US-395
+// norte en Spokane (ATS, -80764,-58654, 23-10) dobla a la derecha sin otra
+// calle y 20 m despues cruza derecho una cruz que, con la curva en los 60 m de
+// entrada, "dobla" 43 grados. Esa cruz contaba, findUpcomingTurn no la decia
+// por ser la misma curva, y la salida quedaba con "Continue straight".
 // gapM, spanM, skip y curveSpanM: los de junctionManeuver.
 function salidaDeUnaMano({ adjacency }, n) {
   const outs = adjacency && n != null ? (adjacency.get(n) || []) : [];
@@ -1722,16 +1757,28 @@ function salidaDeUnaMano({ adjacency }, n) {
 }
 function turnAfterFork(ctx, iEnd, legM = 250, gapM = 50, spanM = 100, skip, curveSpanM = 60, forkDirection = null) {
   const { pts, cum } = ctx;
+  const turnLegM = ctx.legM != null ? ctx.legM : 60;
+  const turnThreshold = ctx.turnThreshold != null ? ctx.turnThreshold : 35;
+  let callada = null; // la ultima curva callada, como prevTurn en findUpcomingTurn
   for (let j = iEnd + 1; j < pts.length - 1 && cum[j] - cum[iEnd] <= legM; j++) {
     if (pts[j][3] !== 1) continue;
     const jEnd = junctionClusterEnd(pts, cum, j, gapM, spanM);
     const mj = detectManeuver({ ...ctx, i: j, iEnd: jEnd, adjacency: null });
     if (mj && mj.kind === 'turn') {
       const conCalles = ctx.adjacency ? junctionManeuver({ ...ctx, i: j, iEnd: jEnd }, gapM, spanM, skip, curveSpanM).m : null;
+      if (continuesTurn(callada, conCalles, cum[j], turnLegM + 20, 135, turnThreshold)) {
+        callada.end = cum[jEnd];
+        callada.outBearing = conCalles.outBearing;
+        j = jEnd;
+        continue;
+      }
       if (!conCalles || conCalles.kind !== 'turn' || !conCalles.quiet) {
         const giro = conCalles && conCalles.kind === 'turn' ? conCalles : mj;
         return !forkDirection || giro.direction === forkDirection || !salidaDeUnaMano(ctx, pts[iEnd][4]);
       }
+      callada = { direction: conCalles.direction, inBearing: conCalles.inBearing, outBearing: conCalles.outBearing, quiet: true, end: cum[jEnd] };
+    } else {
+      callada = null;
     }
     j = jEnd;
   }

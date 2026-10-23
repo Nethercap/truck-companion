@@ -4973,11 +4973,14 @@ function findUpcomingTurn(heading) {
       // El "keep" de seguir derecho por los carriles (laneKeep, tambien el de
       // "en cada salida") va sin nombre: la ruta sigue por la misma autopista
       // y los carteles que vienen anuncian las salidas ("Keep left onto
-      // US-71" en el trebol de la I-44 en Joplin, Discord 20-10).
+      // US-71" en el trebol de la I-44 en Joplin, Discord 20-10). Tampoco la
+      // bifurcacion cuya rama, segun las flechas del juego, sigue derecho
+      // (through, detectManeuver): "Keep left onto US-395" en la I-90, 1 km
+      // antes de la salida a la US-395 (turn report, 23-10).
       // En una bifurcacion, los carteles pegados al nodo votan solo si no
       // hay otros (ROAD_SIGN_FORK_NEAR_M): ahi las dos ramas van juntas.
       const afterTurnIdx = Math.min(iEnd + 2, pts.length - 1);
-      const nearSign = m.laneKeep ? null : roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
+      const nearSign = m.laneKeep || m.through ? null : roadSignForTurn(pointAt, cum[iEnd], cum[cum.length - 1], nearestRoadName, pts[afterTurnIdx], {
         onExit: exitSignTest({ pts, cum, pointAt, bearingBetween, i, at, iEnd, others: otherBranchesAt({ ...ctx, i, iEnd }) },
           m.kind === 'fork' ? { cercaM: ROAD_SIGN_FORK_NEAR_M } : undefined),
       });
