@@ -289,6 +289,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `switchM`). Por el rumbo no se veian las de al costado: elegia una a 3,6 km
   con otra a 546 m (Austin). Dejar ganar a las que obligan a volver subia
   esas elecciones en ATS.
+  El descanso tiene plazo: con los minutos que faltan (`restReachMeters`, a
+  70 km/h de velocimetro con la escala de tiempo medida), si la elegida no
+  se alcanza gana la de menor costo entre las que si (`maxReachM`), y si no
+  se alcanza ninguna, la mas cercana por el camino (Discord 22-10,
+  Chillaxingone). El aviso "Rest soon" salta a los 150 minutos de juego
+  (antes 90; el juego avisa a las ~2 h): en 40 rutas largas de ATS el area
+  elegida quedaba fuera de alcance en 68 de 370 lugares, y asi en 5, donde
+  no hay ninguna a mano.
 - Lo que falta y la distancia al giro se miden sobre la ruta entera
   (`routeMeters` de `createCityScale`, con `currentRouteFull`), nunca solo
   sobre la ruta recortada al camion: asi saltaban 5 km al entrar al hueco
