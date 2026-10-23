@@ -57,9 +57,24 @@ Apple Silicon), from the changes by uawannacry in PR #87:
 - The dylib calls `scs_telemetry_shutdown` from a destructor when it is
   unloaded, like `DllMain` does on Windows.
 
+## Shutdown after the block is closed
+
 `scs_telemetry_shutdown` returns at once if the block is not open. The game
 calls it before unloading the plugin and then `DllMain` (or the destructor)
 calls it again with the block already unmapped; and if `init` failed, the
-pointer was null. In both cases it wrote to memory that was not there: on
-macOS that crashed the game on exit, and unloading a dylib that was never
-initialized crashed right away.
+pointer was null. In both cases it wrote to memory that was not there.
+Upstream has the same code.
+
+- On Windows the game crashed on every exit: an access violation in the
+  plugin, which the Event Viewer shows as an "Application Error" in
+  `truckdash-telemetry.dll` at offset `0x537d` (the DLL of 2026-09-30;
+  upstream's `scs-telemetry.dll` crashes at the same offset). `FreeLibrary`
+  on its own swallows that exception, but the game's crash handler sees it
+  first.
+- On macOS it crashed the game on exit, and unloading a dylib that was never
+  initialized crashed right away.
+
+`tools/probar_plugin.py` loads and unloads the DLL like the game, with and
+without `init`, under a vectored exception handler like the game's. "Build
+plugin" runs it before pinning a new DLL, and the tests run it on every
+push.

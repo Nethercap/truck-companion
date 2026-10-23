@@ -3,6 +3,7 @@
 import hashlib
 import io
 import os
+import sys
 import zipfile
 
 import pytest
@@ -103,6 +104,21 @@ def test_bundled_dll_publica_en_su_propio_bloque():
         datos = f.read()
     assert "Local\\TruckDashTelemetry".encode("utf-16-le") in datos
     assert "Local\\SCSTelemetry".encode("utf-16-le") not in datos
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="la DLL es de Windows")
+def test_bundled_dll_se_descarga_sin_caerse():
+    """El juego llama a scs_telemetry_shutdown y despues suelta la DLL, y
+    DllMain la vuelve a llamar: la DLL del 30-09 escribia ahi en el bloque ya
+    cerrado y el juego se caia en cada cierre (Discord, 23-10).
+    tools/probar_plugin.py la carga y la suelta como el juego, con init y sin
+    init. Lo corre tambien "Build plugin" despues de fijar una DLL nueva."""
+    import importlib.util
+    ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "probar_plugin.py")
+    spec = importlib.util.spec_from_file_location("probar_plugin", ruta)
+    probar_plugin = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(probar_plugin)
+    assert probar_plugin.probar(plugin_installer.bundled_dll_path()) == []
 
 
 def test_resolve_bin_dir_accepts_game_root_bin_or_win_x64(tmp_path):
