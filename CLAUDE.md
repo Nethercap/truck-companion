@@ -518,6 +518,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   compila fuera de Windows (`plugin/build.sh`, sus cambios de #87) y la
   .dylib universal sale de "Build plugin" con plataforma macos, fijada en
   `PLUGIN_DYLIB_SHA256` (21-10); el cliente de Mac sigue en #87.
+- TruckersMP (23-10): la DLL es tambien plugin de TMP (`truckersmp_init`,
+  Client SDK v1.1.0 en `plugin/truckersmp_sdk/`) y publica los jugadores
+  cerca en `Local\TruckDashTMP` (`truckersmp_players.hpp`, revision 1). El
+  cliente los lee una vez por segundo (`tmp_players.py`) y los manda como
+  `tmpPlayers` (los 32 mas cercanos); la app los dibuja con flecha y nombre
+  (`tmpPlayersUpdate`: vencen a los 5 s sin otra lista; ajuste
+  `showTmpPlayers`, prendido). El relay no los mira: van solo a las pestanas
+  del codigo, nunca al mapa en vivo ni al convoy (`docs/privacy.html` lo
+  dice). El rumbo sale del cuaternion (frente -Z) y no se probo en el juego.
+  `tools/probar_plugin.py` lo prueba con un TMP falso. Si cambia la
+  disposicion del bloque, cambia en los dos lados y sube la revision
+  (`test_tmp_players.py` compara el .hpp con el lector).
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para

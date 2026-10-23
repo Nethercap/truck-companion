@@ -112,7 +112,8 @@ def test_bundled_dll_se_descarga_sin_caerse():
     DllMain la vuelve a llamar: la DLL del 30-09 escribia ahi en el bloque ya
     cerrado y el juego se caia en cada cierre (Visor de eventos, 23-10).
     tools/probar_plugin.py la carga y la suelta como el juego, con init y sin
-    init. Lo corre tambien "Build plugin" despues de fijar una DLL nueva."""
+    init, y la parte de TruckersMP con un TMP de mentira. Lo corre tambien
+    "Build plugin" despues de fijar una DLL nueva."""
     import importlib.util
     ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "probar_plugin.py")
     spec = importlib.util.spec_from_file_location("probar_plugin", ruta)

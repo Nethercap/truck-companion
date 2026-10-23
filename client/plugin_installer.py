@@ -34,10 +34,12 @@ PLUGIN_DLL_NAME = "truckdash-telemetry.dll"
 # si esta, para saber que el juego ya publica telemetria (en "SCSTelemetry",
 # que el cliente tambien lee).
 OTHER_DLL_NAME = "scs-telemetry.dll"
-# Fork de RenCloud 1.12.1 con los trabajos con auto de ATS 1.61 (plugin/).
-# La DLL y su hash los escribe el workflow "Build plugin" (tools/pin_plugin.py).
-PLUGIN_DLL_VERSION = "1.12.1-truckdash.3"
-PLUGIN_DLL_SHA256 = "b63ceb24efb50336e96bbd90f955ef8dd831240c182777936db58f97783d9df9"
+# Fork de RenCloud 1.12.1 con los trabajos con auto de ATS 1.61 y los
+# jugadores de TruckersMP (plugin/). La DLL y su hash los escribe el workflow
+# "Build plugin" (tools/pin_plugin.py). La version tambien va en
+# truckersmp_init (plugin/scs-telemetry/src/truckersmp_players.cpp).
+PLUGIN_DLL_VERSION = "1.12.1-truckdash.4"
+PLUGIN_DLL_SHA256 = "3bcbb076b317b244a41173337c120b35103b0132578bfe5c6394ba676f7bd176"
 # El mismo plugin para macOS, universal (Intel y Apple Silicon): la .dylib y
 # su hash tambien los escribe "Build plugin" (plataforma macos, con
 # plugin/build.sh). Vacio hasta la primera compilacion; el cliente todavia no

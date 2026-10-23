@@ -48,6 +48,7 @@ import overlay
 import account
 import account_sync
 import plugin_installer
+import tmp_players
 import win_integration
 import i18n
 from i18n import T
@@ -2036,6 +2037,8 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
     inactive_since = None
     last_status_sent = None
     last_cloud_send = 0.0
+    lector_tmp = tmp_players.Lector()
+    ultimo_tmp = 0.0
 
     async def publish_status():
         nonlocal last_status_sent
@@ -2127,9 +2130,21 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             # del bloque crudo: si se calcularan de fuentes distintas,
             # terminarian mostrando dos numeros para el mismo viaje.
             state.cuenta.tick(payload, raw)
-            text = json.dumps(payload)
             now_send = time.time()
-            if now_send - last_cloud_send >= client_lib.CLOUD_SEND_INTERVAL_SECONDS or client_lib.payload_has_event(payload):
+            # Los jugadores de TruckersMP (tmp_players.py) van una vez por
+            # segundo, despues del overlay, Discord y la cuenta, que no los
+            # usan. Ese payload va al relay aunque no le toque: es el unico
+            # del segundo que los lleva.
+            con_tmp = False
+            if now_send - ultimo_tmp >= tmp_players.CADA_S:
+                ultimo_tmp = now_send
+                jugadores = lector_tmp.leer()
+                if jugadores is not None:
+                    payload["tmpPlayers"] = jugadores
+                    con_tmp = True
+            text = json.dumps(payload)
+            if (now_send - last_cloud_send >= client_lib.CLOUD_SEND_INTERVAL_SECONDS
+                    or client_lib.payload_has_event(payload) or con_tmp):
                 last_cloud_send = now_send
                 await cloud.send(text)
             await local.broadcast(text)

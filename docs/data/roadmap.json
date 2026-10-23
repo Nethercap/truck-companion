@@ -28,14 +28,14 @@
     },
     {
       "id": "truckersmp-nearby",
-      "status": "blocked",
+      "status": "planned",
       "en": {
         "title": "TruckersMP trucks near you",
-        "body": "Seeing other TruckersMP players around you on the map. TruckersMP has no public API for positions, so this needs their go-ahead first: we are not going to scrape it."
+        "body": "The TruckersMP players around you on your map, with their name and heading. TruckersMP gave us their Client SDK, so it comes straight from their client, with the next Truck Dash client update. Only you see them."
       },
       "es": {
         "title": "Camiones de TruckersMP cerca tuyo",
-        "body": "Ver en el mapa a otros jugadores de TruckersMP alrededor. TruckersMP no tiene una API pública de posiciones, así que primero hace falta su permiso: no lo vamos a scrapear."
+        "body": "Los jugadores de TruckersMP que tenés alrededor, en tu mapa, con su nombre y hacia dónde van. TruckersMP nos dio su Client SDK, así que sale de su propio cliente, con la próxima versión del cliente de Truck Dash. Solo los ves vos."
       }
     },
     {

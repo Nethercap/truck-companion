@@ -5,7 +5,9 @@
   [RenCloud/scs-sdk-plugin](https://github.com/RenCloud/scs-sdk-plugin)
   V.1.12.1, with the car jobs of ATS 1.61, publishing in its own shared
   memory block (`Local\TruckDashTelemetry`); the source and the list of
-  changes are in `plugin/` at the root of this repository.
+  changes are in `plugin/` at the root of this repository. It is built with
+  the TruckersMP Client SDK (MIT License, `plugin/truckersmp_sdk/LICENSE`)
+  to publish the TruckersMP players nearby when TruckersMP loads it.
 
   The Truck Dash client bundles this file so it can install it into the
   game's `bin\win_x64\plugins\` folder for the user with one click. It goes

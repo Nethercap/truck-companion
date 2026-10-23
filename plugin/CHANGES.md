@@ -78,3 +78,31 @@ Upstream has the same code.
 without `init`, under a vectored exception handler like the game's. "Build
 plugin" runs it before pinning a new DLL, and the tests run it on every
 push.
+
+## TruckersMP players
+
+New, not in upstream: `truckersmp_init` and `truckersmp_shutdown`, the two
+exports of a TruckersMP Client SDK plugin (`src/truckersmp_players.cpp`,
+SDK v1.1.0 in `truckersmp_sdk/`, Windows x64 only).
+
+- It keeps the IDs of the players TruckersMP streams in (stream in / out
+  events, and `GetAllPlayers` once at init) and, at most every 250 ms on
+  pre-render, writes their vehicles to `Local\TruckDashTMP`: position,
+  heading, speed, distance, account ID and username, the closest first,
+  up to 64 (`inc/truckersmp_players.hpp`, revision 1). The local player and
+  players without a vehicle are left out.
+- The heading is the vehicle's forward (-Z) rotated by its quaternion, as
+  `<0,1)` counterclockwise from north like the SCS SDK's. Not yet checked
+  in the game.
+- The block has a sequence number (odd while writing) and the tick of the
+  last write: the reader drops a half-written or stale copy.
+- The session is a plain pointer freed only by `truckersmp_shutdown`: the
+  Session destructor calls the TruckersMP client to remove its listeners,
+  and as a global it would also run at process exit, maybe after the
+  TruckersMP client is gone.
+- The telemetry block and its layout do not change.
+
+`tools/probar_plugin.py` tests it with a fake TruckersMP client: players
+streaming in and out, pre-render, a disconnect and `truckersmp_shutdown`,
+reading the block with the client's reader; and a client without the
+players API, which init has to refuse cleanly.

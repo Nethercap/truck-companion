@@ -5010,3 +5010,33 @@ test('roadLineWidth: el ancho de siempre de lejos y el de la calle del juego de 
   assert.deepEqual(roadLineWidth(base, NaN, 50), lineal);
   assert.deepEqual(roadLineWidth(base, m, undefined), lineal);
 });
+
+test('tmpPlayersUpdate: la lista de TruckersMP dura hasta la siguiente y vence sin otra', () => {
+  const { tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX } = require('./pure.js');
+  const ana = { id: 7, name: 'Ana', x: 100, z: -50.1, heading: 270, speedKmh: 36 };
+  // El payload que los trae (uno por segundo).
+  const a = tmpPlayersUpdate(null, { tmpPlayers: [ana] }, 1000);
+  assert.deepEqual(a, { list: [ana], at: 1000 });
+  // Los payloads del medio no los traen: la misma lista, el mismo objeto.
+  assert.equal(tmpPlayersUpdate(a, { speed: 20 }, 1500), a);
+  assert.equal(tmpPlayersUpdate(a, null, 1000 + TMP_PLAYERS_STALE_MS), a);
+  // Sin otra a tiempo (TMP o el juego se cerraron, o un cliente viejo).
+  assert.equal(tmpPlayersUpdate(a, null, 1001 + TMP_PLAYERS_STALE_MS), null);
+  assert.equal(tmpPlayersUpdate(null, { speed: 20 }, 9e9), null);
+  // Sin servidor llega vacia: se borran.
+  assert.deepEqual(tmpPlayersUpdate(a, { tmpPlayers: [] }, 2000), { list: [], at: 2000 });
+});
+
+test('tmpPlayersUpdate: descarta lo que no se puede dibujar', () => {
+  const { tmpPlayersUpdate, TMP_PLAYERS_MAX } = require('./pure.js');
+  const r = tmpPlayersUpdate(null, { tmpPlayers: [
+    null,
+    { id: 1, name: 'sin posicion', x: null, z: 3 },
+    { id: 2, name: 'x'.repeat(200), x: 1, z: 2 },
+    { id: 2, name: 'repetido', x: 5, z: 5 },
+    { id: 3, name: 7, x: 1, z: 2, heading: 'norte', speedKmh: NaN },
+  ] }, 0);
+  assert.deepEqual(r.list.map(p => [p.id, p.name.length, p.heading, p.speedKmh]), [[2, 64, 0, null], [3, 0, 0, null]]);
+  const muchos = Array.from({ length: 50 }, (_, i) => ({ id: i, name: '', x: i, z: i }));
+  assert.equal(tmpPlayersUpdate(null, { tmpPlayers: muchos }, 0).list.length, TMP_PLAYERS_MAX);
+});

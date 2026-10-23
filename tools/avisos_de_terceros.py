@@ -166,10 +166,12 @@ def armar() -> str:
     if sys.platform == "win32":
         bloques.append(_bloque(
             "Truck Dash telemetry plugin (vendor/truckdash-telemetry.dll)",
-            ["A fork of RenCloud's scs-sdk-plugin. License: MIT",
+            ["A fork of RenCloud's scs-sdk-plugin, built with the TruckersMP Client SDK.",
+             "License: MIT",
              "Source: https://github.com/Nethercap/truck-companion/tree/main/plugin"],
             [("LICENSE", leer("client", "vendor", "LICENSE-scs-sdk-plugin.txt")),
-             ("SCS SDK license", leer("plugin", "scs_sdk", "sdk_license.txt"))]))
+             ("SCS SDK license", leer("plugin", "scs_sdk", "sdk_license.txt")),
+             ("TruckersMP Client SDK license", leer("plugin", "truckersmp_sdk", "LICENSE"))]))
     bloques.append(_bloque(
         "PyInstaller bootloader",
         ["License: GPL-2.0-or-later with the PyInstaller bootloader exception, which",

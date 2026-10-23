@@ -1054,6 +1054,7 @@ def test_avisos_de_terceros_del_zip():
     if sys.platform == "win32":
         assert "pydirectinput" in nombres
         assert "Copyright (c) 2014 Hans" in texto and "Copyright (C) 2016 SCS Software" in texto
+        assert "Copyright (c) 2026 TruckersMP" in texto
     # Leer la metadata de todos los paquetes deja mucha basura: si se junta en
     # el medio de test_setup_window, borra variables de tkinter con la ventana
     # ya cerrada y pytest avisa. Se junta aca.

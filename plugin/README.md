@@ -17,6 +17,15 @@ MIT License (see `LICENSE`), taken from upstream commit `d7216cb`
 `scs_sdk/` are by SCS Software, under their own license
 (`scs_sdk/sdk_license.txt`).
 
+The same DLL is also a TruckersMP plugin: the TruckersMP client loads the
+DLLs in `plugins\` and calls `truckersmp_init` in the ones that export it.
+That part (`src/truckersmp_players.cpp`) publishes the TruckersMP players
+around the truck in a block of its own, `Local\TruckDashTMP`, for the map of
+the app. It is built with the TruckersMP Client SDK v1.1.0
+([TruckersMP/GameClientSDK](https://github.com/TruckersMP/GameClientSDK),
+`bee3b9e`, MIT License, header-only) in `truckersmp_sdk/`. Without
+TruckersMP that code never runs.
+
 ## Why a fork
 
 ATS 1.61 added drivable cars and, with them, two new job types in the SDK:
