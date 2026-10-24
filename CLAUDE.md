@@ -231,6 +231,25 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   21-10). Los carriles de un prefab casi a la misma distancia
   (`START_ARC_TIE_M`) van como alternativas y se sigue por el que da la ruta
   mas barata. `tools/simular_navegacion.js` cuenta los recalculos malos.
+- La ruta no se baja por una salida para volver a subir a la misma calle
+  (`dropRampDetours`, en `porAristas` de `findRouteWith`; turn report del
+  24-10, US-6 en Price, Utah: "Keep right onto US-191" y "onto US-6" en las
+  salidas 240 y 241). Ahi la US-6 es una calle de doble mano a 60 km/h en el
+  grafo (carriles `road.local` en `LANE_SPEEDS` del constructor) y las rampas
+  van a 90 (`motorway`): bajar, cruzar derecho la calle de abajo y subir
+  salia 2 s mas rapido que el puente. Vuelve a la calle donde la ruta la deja
+  en a y la retoma en b si de a a b no tiene cruces, el desvio pasa por uno,
+  no es mas corto, ahorra hasta `ROUTE_RAMP_DETOUR_MAX_S` (10 s) y la calle
+  es la que sigue derecho desde la llegada (`ROUTE_RAMP_STRAIGHT_TOL_DEG`,
+  al primer nodo a 15 m): sin esto ultimo cambiaba de carril en 20 prefabs
+  de ETS2 y tomaba el giro libre de las rotondas. En todo el grafo, 20
+  lugares de ATS (Price, Wenatchee, Odessa, St. Joseph, Victoria TX con un
+  "turn left" falso) y 9 de ETS2 (Pamplona, Granada, Patras, Tirana); el de
+  Primm (ahorra 22 s y el desvio es el que sigue derecho) queda. check_avisos
+  y 240 rutas del simulador (semilla 7) no cambian; 120 de UT, WA, TX y CO
+  (semilla 3) pierden 2 avisos falsos. Lo de fondo es el constructor (una
+  US con cruces a distinto nivel no es una calle local): al regenerar el
+  grafo, medir de nuevo.
 - Un waypoint puesto tocando el mapa (`waypointPassesBy`: sin nombre ni
   tipo) es un punto por donde pasar: el tramo termina sobre su calle
   (`waypointArcs`, `findArcRoute` con `endArcs`), por la calzada que le

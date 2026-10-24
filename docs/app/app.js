@@ -3853,15 +3853,20 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   // nodos de siempre: nunca peor que antes.
   const costo = (e) => routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) * (penal ? (penal.get(e) || 1) : 1);
   const finales = metas.length ? new Map(metas.map(c => [c.arc, c.f])) : null;
-  const porAristas = (desde, arco, hasta = finales) => findArcRoute(routeGraph, desde, endIdx, {
+  // Sin bajarse por una salida para volver a subir a la misma calle
+  // (dropRampDetours, pure.js): la US-6 de Price va a 60 km/h en el grafo y
+  // sus rampas a 90, y la ruta salia en cada cruce (turn report, 24-10).
+  const bloqueada = blocked ? (e) => !!blocked[edgeG[e]] : null;
+  const esFerry = (e) => (edgeF[e] & 1) === 1;
+  const porAristas = (desde, arco, hasta = finales) => dropRampDetours(findArcRoute(routeGraph, desde, endIdx, {
     cost: costo,
     heuristic,
-    blocked: blocked ? (e) => !!blocked[edgeG[e]] : null,
-    isFerry: (e) => (edgeF[e] & 1) === 1,
+    blocked: bloqueada,
+    isFerry: esFerry,
     startArc: arco,
     endArcs: hasta,
     uTurnCost: routeUTurnCost(byTime),
-  });
+  }), routeGraph, { cost: costo, startArc: arco, blocked: bloqueada, isFerry: esFerry, maxExtra: routeEdgeCost(ROUTE_RAMP_DETOUR_MAX_S, 0, byTime) });
   // El waypoint mas adelante en el mismo tramo por el que se arranca (dos
   // waypoints en la misma arista larga): se llega derecho, sin dar la vuelta
   const enElTramo = arranque ? metas.find(c => c.arc === arranque.arc && c.f >= arranque.f) : null;

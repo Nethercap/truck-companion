@@ -5007,6 +5007,83 @@ test('dropRouteDetours: la alternativa no se baja de la autopista para volver a 
   assert.equal(dropRouteDetours(null, ruta, edge), null);
 });
 
+test('dropRampDetours: la ruta no se baja por la salida para volver a subir a la misma calle (US-6 en Price, 24-10)', () => {
+  const { dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S } = require('./pure.js');
+  // La US-6 al este, de doble mano y a 60 km/h: w - a - m1 - m2 - b - e
+  // (100 m y 6 s cada tramo de a a b). La salida a -> r1 -> j -> r2 -> b va
+  // por rampas de un sentido a 90 km/h y cruza derecho la calle de abajo
+  // (j, con x1 y x2): 306 m en 17,2 s contra 300 m en 18 s por la calle.
+  const armar = (nodos, aristas) => {
+    const { g, opts } = grafoDePrueba(nodos, aristas);
+    g.edgeM = Float64Array.from(aristas.map(e => e.m || Math.hypot(nodos[e.a][0] - nodos[e.b][0], nodos[e.a][1] - nodos[e.b][1])));
+    const vecinos = nodos.map(() => new Set());
+    aristas.forEach(e => { vecinos[e.a].add(e.b); vecinos[e.b].add(e.a); });
+    g.degree = Uint8Array.from(vecinos.map(v => v.size));
+    return { g, opts: (fin) => ({ ...opts(fin), cost: (k) => aristas[k].s }) };
+  };
+  const nodos = [[-200, 0], [0, 0], [100, 0], [200, 0], [300, 0], [500, 0], [100, 20], [150, 30], [200, 20], [150, 200], [150, -150]];
+  const [w, a, m1, m2, b, e, r1, j, r2, x1, x2] = nodos.keys();
+  const calle = [{ a: w, b: a, s: 12 }, { a, b: m1, s: 6 }, { a: m1, b: m2, s: 6 }, { a: m2, b, s: 6 }, { a: b, b: e, s: 12 }];
+  const rampas = [{ a, b: r1, uno: true, s: 4 }, { a: r1, b: j, uno: true, s: 4.6 }, { a: j, b: r2, uno: true, s: 4.6 }, { a: r2, b, uno: true, s: 4 },
+    { a: j, b: x1, s: 10 }, { a: j, b: x2, s: 10 }];
+  const { g, opts } = armar(nodos, [...calle, ...rampas]);
+  const ruta = findArcRoute(g, w, e, opts(e));
+  assert.deepEqual(ruta, [w, a, r1, j, r2, b, e]); // por la salida: 0,8 s menos
+  const sinDesvio = dropRampDetours(ruta, g, { cost: opts(e).cost });
+  assert.deepEqual(sinDesvio, [w, a, m1, m2, b, e]);
+  assert.ok(Math.abs(sinDesvio.cost - ruta.cost - 0.8) < 1e-9);
+  assert.equal(sinDesvio.endArc, null);
+  assert.ok(ROUTE_RAMP_DETOUR_MAX_S >= 5);
+  // Si bajarse ahorra mas que maxExtra, o la ruta termina abajo (una
+  // estacion en el cruce), o se sigue de largo por el cruce: queda
+  assert.equal(dropRampDetours(ruta, g, { cost: opts(e).cost, maxExtra: 0.5 }), ruta);
+  const alCruce = findArcRoute(g, w, j, opts(j));
+  assert.equal(dropRampDetours(alCruce, g, { cost: opts(j).cost }), alCruce);
+  const porElCruce = findArcRoute(g, w, x1, opts(x1));
+  assert.equal(dropRampDetours(porElCruce, g, { cost: opts(x1).cost }), porElCruce);
+  // Arrancando en a sin saber por donde se llega: no se sabe cual es la calle
+  const desdeA = findArcRoute(g, a, e, opts(e));
+  assert.equal(dropRampDetours(desdeA, g, { cost: opts(e).cost }), desdeA);
+  const arcoDe = (gg, p, q) => [...gg.adjTo.keys()].find(k => routeArcDirections(gg).from[k] === p && gg.adjTo[k] === q);
+  assert.deepEqual(dropRampDetours(desdeA, g, { cost: opts(e).cost, startArc: arcoDe(g, w, a) }), [a, m1, m2, b, e]);
+  // Termina en b: por la calle, salvo que pase por un waypoint al llegar
+  // (endArc, el de la rampa)
+  const hastaB = findArcRoute(g, w, b, opts(b));
+  assert.deepEqual(dropRampDetours(hastaB, g, { cost: opts(b).cost }), [w, a, m1, m2, b]);
+  const alWaypoint = [...hastaB];
+  Object.defineProperty(alWaypoint, 'endArc', { value: arcoDe(g, r2, b) });
+  assert.equal(dropRampDetours(alWaypoint, g, { cost: opts(b).cost }), alWaypoint);
+  // Si la calle es mas larga que el desvio, o si de la calle en b lo que
+  // sigue es darse vuelta (b -> f, solo por la rampa): queda
+  const larga = armar(nodos, [...calle.map(x => (x.s === 6 ? { ...x, m: 110 } : x)), ...rampas]);
+  const rl = findArcRoute(larga.g, w, e, larga.opts(e));
+  assert.equal(dropRampDetours(rl, larga.g, { cost: larga.opts(e).cost }), rl);
+  const vuelve = armar([...nodos, [209.4, -42.3]], [...calle, ...rampas, { a: b, b: 11, uno: true, s: 6 }]);
+  const rv = findArcRoute(vuelve.g, w, 11, vuelve.opts(11));
+  assert.deepEqual(rv, [w, a, r1, j, r2, b, 11]);
+  assert.equal(dropRampDetours(rv, vuelve.g, { cost: vuelve.opts(11).cost }), rv);
+  // Un desvio sin cruce (otro carril de un sentido al lado de la calle) no es
+  // bajarse: queda
+  const sinCruce = armar(nodos, [...calle, ...rampas.slice(0, 4)]);
+  const r1c = findArcRoute(sinCruce.g, w, e, sinCruce.opts(e));
+  assert.deepEqual(r1c, [w, a, r1, j, r2, b, e]);
+  assert.equal(dropRampDetours(r1c, sinCruce.g, { cost: sinCruce.opts(e).cost }), r1c);
+  // Con un cruce en la calle entre a y b ya no es la misma calle sin salidas
+  const conCalle = armar([...nodos, [100, -100]], [...calle, ...rampas, { a: m1, b: 11, s: 10 }]);
+  const r2c = findArcRoute(conCalle.g, w, e, conCalle.opts(e));
+  assert.equal(dropRampDetours(r2c, conCalle.g, { cost: conCalle.opts(e).cost }), r2c);
+  // La "calle" dobla y el desvio sigue derecho (un carril de un prefab que se
+  // aparta, el giro libre de una rotonda): no es la calle por la que se venia
+  const nodos2 = [[-200, 0], [0, 0], [86.6, -50], [300, 0], [500, 0], [100, 0], [150, 0], [250, 0], [150, 200]];
+  const [, , c1, b2, e2, s1, j2, s2, y1] = nodos2.keys();
+  const dobla = armar(nodos2, [{ a: w, b: a, s: 12 }, { a, b: c1, m: 140, s: 12 }, { a: c1, b: b2, m: 140, s: 12 }, { a: b2, b: e2, s: 12 },
+    { a, b: s1, uno: true, s: 4 }, { a: s1, b: j2, uno: true, s: 4.6 }, { a: j2, b: s2, uno: true, s: 4.6 }, { a: s2, b: b2, uno: true, s: 4 }, { a: j2, b: y1, s: 10 }]);
+  const r3 = findArcRoute(dobla.g, w, e2, dobla.opts(e2));
+  assert.deepEqual(r3, [w, a, s1, j2, s2, b2, e2]);
+  assert.equal(dropRampDetours(r3, dobla.g, { cost: dobla.opts(e2).cost }), r3);
+  assert.equal(dropRampDetours(null, g, { cost: opts(e).cost }), null);
+});
+
 test('turnPassed: parado en la linea de una T el giro sigue adelante; ya doblando, no (Discord 18-10)', () => {
   const { turnPassed } = require('./pure.js');
   // T a la derecha: se entra mirando al norte (0) y se sale al este (90); el cruce va de 100 a 160 m
