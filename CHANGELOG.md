@@ -45,6 +45,10 @@ updates on its own and is not versioned here.
 - Maps built on your PC: a path through a junction is no longer shorter than the road drawn on
   the map (sharp turns measured along the lane came out short), and junctions the game data
   doesn't describe no longer let a route go the wrong way down a one-way road.
+- Build my map: it no longer stops with "unexpected end of file" on some mods packed in the
+  older .scs format (common in big map combos). Those mods are now read the way the game reads
+  them, and a mod that still can't be read is skipped, with its name in the log, instead of
+  stopping the whole build.
 
 ## 1.5.34 (2026-10-21)
 
