@@ -87,6 +87,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5
   grados de margen por la costa, y `basemapFitsCities`, 80 %). Los de R2 no
   se miden (99 % en ATS, 95 a 98 % en ETS2).
+  El mapa base de ATS (`usa.geojson`, `build_basemap.py` del taller) llega a
+  Alaska y Hawaii desde `BASEMAP_VERSION` 20261025 (issue #132): antes
+  cortaba en -142 y 64 grados y un mod con Alaska caia en el mar. Fuera de
+  la caja de cada juego todo es mar.
 - Desde un navegador, el relay (`SoloOrigenesPropios` en backend/main.py)
   solo atiende a trucksim-dash.com y a la copia LAN del cliente
   (`http://<ip>:27765`, localhost, IPs privadas); sin header Origin (cliente,

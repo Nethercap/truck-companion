@@ -1123,8 +1123,12 @@ const PROJECTIONS = {
 // archivo por juego, compartido por las 13 variantes: agregar un mod de mapa
 // no obliga a regenerarlo (ver build_basemap.py). Grand Utopia queda afuera:
 // su proyeccion lo deja en medio del Atlantico, donde no hay tierra real.
+// Desde 20261025 el de ATS llega a Alaska y Hawaii (antes cortaba en -142 y
+// 64 grados y las rutas de un mod con Alaska caian en el mar, issue #132).
+// Subir este numero solo con el archivo nuevo ya en R2: Cloudflare guarda
+// los 404.
 const BASEMAP_BY_PROJECTION = { ats: 'usa', ets2: 'europe', gu: null };
-const BASEMAP_VERSION = '20260923';
+const BASEMAP_VERSION = '20261025';
 const BASE_LAYER_IDS = ['base-land', 'base-urban', 'base-lake', 'base-river'];
 // Con el mapa base apagado el fondo es el gris de siempre; con el prendido el
 // fondo pasa a ser el mar y la tierra se pinta con ese mismo gris, asi lo
