@@ -2302,7 +2302,7 @@ index 10fdc04..46f7831 100644
      }),
      navNodes: rawPrefab.navNodes.map(rn => {
 diff --git a/packages/clis/parser/game-files/scs-archive.ts b/packages/clis/parser/game-files/scs-archive.ts
-index 73a4a8f..a5c0605 100644
+index 73a4a8f..36ad9ab 100644
 --- a/packages/clis/parser/game-files/scs-archive.ts
 +++ b/packages/clis/parser/game-files/scs-archive.ts
 @@ -6,18 +6,33 @@ import type { BaseOf } from 'restructure';
@@ -2374,7 +2374,7 @@ index 73a4a8f..a5c0605 100644
  
      const entryHeaders = new r.Array(
        EntryHeader,
-@@ -222,6 +244,57 @@ export class ScsArchive {
+@@ -222,6 +244,69 @@ export class ScsArchive {
      return this.entries;
    }
  
@@ -2396,6 +2396,7 @@ index 73a4a8f..a5c0605 100644
 +    const directories: DirectoryEntry[] = [];
 +    const files: FileEntry[] = [];
 +    let encrypted = 0;
++    let unreadable = 0;
 +    for (let i = 0; i < count; i++) {
 +      const o = i * 32;
 +      const flags = table.readUInt32LE(o + 16);
@@ -2412,15 +2413,26 @@ index 73a4a8f..a5c0605 100644
 +        isDirectory: (flags & 1) !== 0,
 +      };
 +      if (metadata.isDirectory) {
-+        directories.push(
-+          new ScsArchiveDirectoryV1(this.fd, metadata, this.scsSource),
-+        );
++        // Un listado que no se puede leer ni asi se saltea solo: lo demas del
++        // mod (y los otros mods) se arma igual.
++        try {
++          directories.push(
++            new ScsArchiveDirectoryV1(this.fd, metadata, this.scsSource),
++          );
++        } catch {
++          unreadable++;
++        }
 +      } else {
 +        files.push(new ScsArchiveFile(this.fd, metadata, this.scsSource));
 +      }
 +    }
 +    if (encrypted) {
 +      logger.warn(`${this.path}: ${encrypted} encrypted entries skipped.`);
++    }
++    if (unreadable) {
++      logger.warn(
++        `${this.path}: ${unreadable} directory listings could not be read, skipped.`,
++      );
 +    }
 +    const hash = salt ? (key: string) => city64(`${salt}${key}`) : city64;
 +    return {
@@ -2432,7 +2444,7 @@ index 73a4a8f..a5c0605 100644
    private createMetadataMap(
      entryHeaders: BaseOf<typeof EntryHeader>[],
    ): Map<number, MetadataEntry> {
-@@ -313,10 +386,13 @@ export class ScsArchive {
+@@ -313,10 +398,13 @@ export class ScsArchive {
    }
  }
  
@@ -2448,7 +2460,38 @@ index 73a4a8f..a5c0605 100644
    };
  }
  
-@@ -623,6 +699,34 @@ function closestPowerOf2(n: number): number {
+@@ -471,7 +559,7 @@ abstract class ScsArchiveEntry {
+       case Compression.NONE:
+         return rawData;
+       case Compression.ZLIB:
+-        return zlib.inflateSync(rawData);
++        return inflateComoElJuego(rawData, this.metadata.uncompressedSize);
+       case Compression.GDEFLATE: {
+         const tileStreamHeader = TileStreamHeader.decode(
+           new r.DecodeStream(rawData),
+@@ -618,11 +706,56 @@ class ScsArchiveTobjFile extends ScsArchiveFile {
+   }
+ }
+ 
++// Hay mods "protegidos" con el zlib cortado antes del final (sin el ultimo
++// bloque o sin el adler32): el juego lee lo que dice el tamano de la entrada
++// y Node tira "unexpected end of file", que frenaba todo "Build my map" sin
++// decir que mod era (issue #135). Sin pedir el final, y solo si sale justo
++// del tamano que dice la entrada.
++export function inflateComoElJuego(data: Buffer, size: number): Buffer {
++  try {
++    return zlib.inflateSync(data);
++  } catch (err) {
++    const out = zlib.inflateSync(data, {
++      finishFlush: zlib.constants.Z_SYNC_FLUSH,
++    });
++    if (out.length !== size) throw err;
++    return out;
++  }
++}
++
+ function closestPowerOf2(n: number): number {
+   const lg = Math.floor(Math.log2(n));
    return Math.pow(2, lg);
  }
  
@@ -3019,10 +3062,10 @@ index 8a13c01..3ec05a7 100755
  }
 diff --git a/packages/clis/parser/run-with-mod.ts b/packages/clis/parser/run-with-mod.ts
 new file mode 100755
-index 0000000..b9823be
+index 0000000..921ff98
 --- /dev/null
 +++ b/packages/clis/parser/run-with-mod.ts
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,199 @@
 +#!/usr/bin/env -S NODE_OPTIONS=--max-old-space-size=12288 npx tsx
 +// Corre el parser de truckermudgeon/maps incluyendo un mod de mapa que viene
 +// como carpeta ya extraida en disco (en vez de un .scs real), inyectandolo
@@ -3128,14 +3171,33 @@ index 0000000..b9823be
 +    fs.closeSync(fd);
 +    const source = path.basename(modPath);
 +    if (magic.toString('latin1') === 'SCS#')
-+      return new ScsArchive(modPath, source);
++      return abrirOSaltear(modPath, () => new ScsArchive(modPath, source));
 +    if (magic[0] === 0x50 && magic[1] === 0x4b)
-+      return new ZipEntries(modPath, source);
++      return abrirOSaltear(modPath, () => new ZipEntries(modPath, source));
 +    // Uno cifrado o de otro formato (un cruce de tren, no un mapa) frenaba todo.
 +    console.warn(`${modPath}: no es un .scs que conozcamos (ni HashFS ni ZIP), se saltea`);
 +    return null;
 +  }
 +  return createDirArchive(modPath);
++}
++
++// El indice de un mod se lee aca, no en la primera busqueda del parser: si
++// uno no se puede leer, se saltea con su nombre. Antes el error salia de
++// parseVersionSii sin decir que archivo era, con 85 mods en la lista (#135).
++function abrirOSaltear<A extends { isValid(): boolean; parseEntries(): unknown; dispose(): void }>(
++  modPath: string,
++  abrir: () => A,
++): A | null {
++  let archive: A | null = null;
++  try {
++    archive = abrir();
++    if (archive.isValid()) archive.parseEntries();
++    return archive;
++  } catch (err) {
++    console.warn(`${modPath}: no se pudo leer (${err instanceof Error ? err.message : String(err)}), se saltea`);
++    archive?.dispose();
++    return null;
++  }
 +}
 +
 +function createDirArchive(extractedDir: string) {
@@ -4138,3 +4200,92 @@ index d3eff1b..70f9a03 100644
  
    if (isUk) {
      x = x / ukScaleFactor - calais[0] / 2;
+diff --git a/packages/clis/parser/game-files/tests/scs-archive-v1.test.ts b/packages/clis/parser/game-files/tests/scs-archive-v1.test.ts
+new file mode 100644
+index 0000000..ad1a987
+--- /dev/null
++++ b/packages/clis/parser/game-files/tests/scs-archive-v1.test.ts
+@@ -0,0 +1,83 @@
++import fs from 'fs';
++import os from 'os';
++import path from 'path';
++import zlib from 'zlib';
++import { city64 } from '../cityhash';
++import { inflateComoElJuego, ScsArchive } from '../scs-archive';
++
++// Un zlib "protegido": sin los 4 bytes del adler32 del final.
++function sinFinal(datos: Buffer): Buffer {
++  const z = zlib.deflateSync(datos);
++  return z.subarray(0, z.length - 4);
++}
++
++// Un HashFS v1 con las entradas dadas: cabecera de 20 bytes, los datos y la
++// tabla de 32 bytes por entrada al final (como lo lee parseEntriesV1).
++function hashfsV1(
++  entradas: { ruta: string; datos: Buffer; tamano: number; flags: number }[],
++): string {
++  const partes: Buffer[] = [Buffer.alloc(20)];
++  let offset = 20;
++  const tabla = Buffer.alloc(entradas.length * 32);
++  entradas.forEach((e, i) => {
++    tabla.writeBigUInt64LE(city64(e.ruta), i * 32);
++    tabla.writeBigUInt64LE(BigInt(offset), i * 32 + 8);
++    tabla.writeUInt32LE(e.flags, i * 32 + 16);
++    tabla.writeUInt32LE(e.tamano, i * 32 + 24);
++    tabla.writeUInt32LE(e.datos.length, i * 32 + 28);
++    partes.push(e.datos);
++    offset += e.datos.length;
++  });
++  const cabecera = partes[0];
++  cabecera.write('SCS#', 0, 'latin1');
++  cabecera.writeUInt16LE(1, 4);
++  cabecera.writeUInt16LE(0, 6);
++  cabecera.write('CITY', 8, 'latin1');
++  cabecera.writeUInt32LE(entradas.length, 12);
++  cabecera.writeUInt32LE(offset, 16);
++  partes.push(tabla, Buffer.alloc(64)); // la cabecera de v2 que se lee igual es mas larga
++  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hashfs-v1-')), 'mod.scs');
++  fs.writeFileSync(archivo, Buffer.concat(partes));
++  return archivo;
++}
++
++describe('inflateComoElJuego', () => {
++  const texto = Buffer.from('*def\n*map\nversion.sii\n'.repeat(20), 'utf8');
++
++  it('lee un zlib entero como siempre', () => {
++    expect(inflateComoElJuego(zlib.deflateSync(texto), texto.length)).toEqual(texto);
++  });
++
++  it('lee un zlib sin el final si sale del tamano de la entrada (#135)', () => {
++    expect(() => zlib.inflateSync(sinFinal(texto))).toThrow(/unexpected end of file/);
++    expect(inflateComoElJuego(sinFinal(texto), texto.length)).toEqual(texto);
++  });
++
++  it('tira el error de siempre si lo que sale no es del tamano', () => {
++    const cortado = zlib.deflateSync(texto).subarray(0, 8);
++    expect(() => inflateComoElJuego(cortado, texto.length)).toThrow(/unexpected end of file/);
++  });
++});
++
++describe('ScsArchive HashFS v1', () => {
++  it('lee los listados con el zlib sin final y saltea el que no se puede leer', () => {
++    const raiz = Buffer.from('*def\n*map\n', 'utf8');
++    const def = Buffer.from('city.sii\n', 'utf8');
++    const ciudad = Buffer.from('SiiNunit\n{\n}\n', 'utf8');
++    const archivo = hashfsV1([
++      { ruta: '', datos: sinFinal(raiz), tamano: raiz.length, flags: 1 | 2 },
++      { ruta: 'def', datos: sinFinal(def), tamano: def.length, flags: 1 | 2 },
++      // basura marcada como zlib: antes frenaba todo el armado
++      { ruta: 'map', datos: Buffer.from('no es zlib', 'latin1'), tamano: 40, flags: 1 | 2 },
++      { ruta: 'def/city.sii', datos: sinFinal(ciudad), tamano: ciudad.length, flags: 2 },
++    ]);
++    const scs = new ScsArchive(archivo, 'mod.scs');
++    expect(scs.isValid()).toBe(true);
++    const entries = scs.parseEntries();
++    expect(entries.directories.get('')?.subdirectories).toEqual(['def', 'map']);
++    expect(entries.directories.get('def')?.files).toEqual(['city.sii']);
++    expect(entries.directories.get('map')).toBeUndefined();
++    expect(entries.files.get('def/city.sii')?.read()).toEqual(ciudad);
++    scs.dispose();
++  });
++});
