@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.35 (2026-10-25)
 
 - TruckersMP: the players around you show up on your dashboard's map, with their name and where
   they're heading, while you play on TruckersMP. They come from TruckersMP's own client (their
