@@ -367,12 +367,12 @@ test('maneuver: una salida que vuelve enseguida a la ruta o que no lleva a ningu
   assert.equal(detectManeuver(calle).quiet, false);
 });
 
-test('maneuver: una rama que vuelve a la ruta pasados los 100 m pero cerca del cruce no es otro camino (Tonopah, 25-10)', () => {
+test('maneuver: una calzada que se abre en dos y se junta entre los 100 y los 120 m no es otro camino (Tonopah, 25-10)', () => {
   // La US-6 al oeste de Tonopah (ATS, -98772,-5680): la calzada se abre en dos
   // en el nodo 1, la ruta sigue por la izquierda (2, 3) y la rama de la
-  // derecha (6, 7) vuelve a la ruta en el 3, a 112 m por la ruta y a menos de
-  // 120 m del cruce. Pasados los 100 m de rejoinM salia del cruce por la ruta
-  // misma y se decia "keep left".
+  // derecha (6, 7, de un solo sentido) vuelve a la ruta en el 3, a 112 m.
+  // Pasados los 100 m de rejoinM y antes de los 120 de escapeM, salia del
+  // cruce por la ruta misma y se decia "keep left".
   const { otherBranchesAt } = require('./pure.js');
   const route = [[0, -300], [0, 0], [-10, 60], [-20, 110], [-60, 400], [-100, 700]];
   const ctx = scenario({ route, extraNodes: [[20, 40], [15, 90]], edges: [[1, 6], [6, 7], [7, 3]] });
@@ -381,6 +381,10 @@ test('maneuver: una rama que vuelve a la ruta pasados los 100 m pero cerca del c
   // si la rama sigue a otra calle antes de juntarse, si es otro camino
   const calle = scenario({ route, extraNodes: [[20, 40], [15, 90], [300, 90]], edges: [[1, 6], [6, 7], [7, 3], [7, 8]] });
   assert.deepEqual([detectManeuver(calle).kind, detectManeuver(calle).direction], ['fork', 'left']);
+  // y una calle de doble mano que vuelve igual (un triangulo de calles, Cody
+  // y El Centro) se sigue avisando como antes
+  const triangulo = scenario({ route, extraNodes: [[20, 40], [15, 90]], edges: [[1, 6], [6, 1], [6, 7], [7, 6], [7, 3], [3, 7]] });
+  assert.deepEqual([detectManeuver(triangulo).kind, detectManeuver(triangulo).direction], ['fork', 'left']);
 });
 
 test('maneuver: la entrada a una rotonda se anuncia aunque no tenga otra salida', () => {
