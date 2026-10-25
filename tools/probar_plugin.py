@@ -25,17 +25,28 @@ quedaba un access violation en truckdash-telemetry.dll+0x537d en cada cierre
 de ETS2 y de ATS. Por eso el proceso de prueba pone un manejador vectorizado,
 que ve la excepcion antes que el loader, como el del juego.
 
+Antes de las pasadas mira que DLLs importa (`runtime_de_visual_cpp`): con el
+runtime de C++ en una DLL aparte (MSVCP140, VCRUNTIME140) el plugin no carga
+en una PC sin el Visual C++ Redistributable, el juego no muestra el dialogo
+del SDK y Setup dice "the game hasn't loaded it" (Reddit, 25-10, Windows 11).
+El runner de Actions trae ese runtime y la carga de aca no lo ve.
+
 Lo corren "Build plugin" antes de fijar una DLL nueva, los tests con la DLL
 recien compilada y el test del cliente con la que trae el cliente.
 """
 
 import ctypes
 import os
+import re
+import struct
 import subprocess
 import sys
 import time
 
 PASADAS = ("init", "sin-init", "tmp", "tmp-rechazado")
+# Las DLLs del Visual C++ Redistributable, que Windows no trae. El CRT
+# universal (ucrtbase, api-ms-win-crt-*) y msvcrt.dll si vienen con Windows.
+RUNTIME_VISUAL_CPP = re.compile(r"^(vcruntime|msvcp|msvcr|concrt|vccorlib|vcomp)\d", re.IGNORECASE)
 ACCESS_VIOLATION = 0xC0000005
 # SCS_TELEMETRY_VERSION_1_01 y la version del SDK de ETS2 de los headers
 # (SCS_MAKE_VERSION(1, 18)): con esas init registra todos los canales.
@@ -428,10 +439,56 @@ def _hijo(pasada: str, dll: str) -> None:
     k32.FreeLibrary(h)
 
 
+def dlls_importadas(dll: str) -> list[str]:
+    """Los nombres de la tabla de importaciones de una DLL (PE32 o PE32+),
+    leida del archivo: anda en cualquier sistema, sin cargarla."""
+    with open(dll, "rb") as f:
+        datos = f.read()
+    pe = struct.unpack_from("<I", datos, 0x3C)[0]
+    if datos[:2] != b"MZ" or datos[pe:pe + 4] != b"PE\0\0":
+        raise ValueError(f"{dll} no es una DLL")
+    secciones_n, opcional_tam = struct.unpack_from("<H12xH", datos, pe + 6)
+    opcional = pe + 24
+    # El directorio de importaciones es el segundo de la lista, que empieza
+    # en 96 (PE32) o en 112 (PE32+) de la cabecera opcional.
+    dirs = opcional + (112 if struct.unpack_from("<H", datos, opcional)[0] == 0x20B else 96)
+    importaciones = struct.unpack_from("<I", datos, dirs + 8)[0]
+    secciones = [struct.unpack_from("<8xIIII", datos, opcional + opcional_tam + 40 * i)
+                 for i in range(secciones_n)]
+
+    def en_archivo(rva):
+        for tam_virtual, va, tam_crudo, crudo in secciones:
+            if va <= rva < va + max(tam_virtual, tam_crudo):
+                return rva - va + crudo
+        raise ValueError(f"RVA {rva:#x} fuera de las secciones")
+
+    nombres = []
+    if not importaciones:
+        return nombres
+    descriptor = en_archivo(importaciones)
+    while True:
+        entrada = datos[descriptor:descriptor + 20]
+        if entrada == bytes(20):
+            return nombres
+        nombre = en_archivo(struct.unpack_from("<I", entrada, 12)[0])
+        nombres.append(datos[nombre:datos.index(b"\0", nombre)].decode("ascii"))
+        descriptor += 20
+
+
+def runtime_de_visual_cpp(dll: str) -> list[str]:
+    """Las DLLs del Visual C++ Redistributable que pide la DLL (vacia si
+    lleva el runtime adentro, /MT)."""
+    return [n for n in dlls_importadas(dll) if RUNTIME_VISUAL_CPP.match(n)]
+
+
 def probar(dll: str) -> list[str]:
     """Las pasadas en las que la DLL se cayo o hizo algo mal (vacia si
-    ninguna)."""
+    ninguna). "runtime" si pide el Visual C++ Redistributable."""
     caidas = []
+    runtime = runtime_de_visual_cpp(dll)
+    print(f"runtime: {'ok' if not runtime else 'pide ' + ', '.join(runtime) + ' (compilar con /MT)'}")
+    if runtime:
+        caidas.append("runtime")
     for pasada in PASADAS:
         r = subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "--hijo", pasada, dll],
                            capture_output=True, text=True, encoding="utf-8", errors="replace")
