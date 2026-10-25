@@ -11,6 +11,12 @@ updates on its own and is not versioned here.
   Client SDK), only you see them, and you can hide them in Settings. The client installs the new
   plugin on its own the next time the game is closed.
 
+- Fixed: on some PCs the game never loaded the telemetry plugin. It didn't show the "Advanced
+  SDK features" dialog, and Setup kept saying the plugin is in place but the game hasn't loaded
+  it, however many times you restarted the game. The plugin needed the Microsoft Visual C++
+  Redistributable, which Windows doesn't include; it now carries what it needs. The client
+  replaces the plugin on its own the next time the game is closed.
+
 - Fixed: the game crashed every time you quit it, because of the Truck Dash telemetry plugin
   (`truckdash-telemetry.dll`). The client replaces the plugin on its own the next time the game
   is closed. The `scs-telemetry.dll` that other apps install has the same bug; Truck Dash never

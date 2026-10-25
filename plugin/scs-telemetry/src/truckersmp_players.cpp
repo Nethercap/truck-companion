@@ -148,7 +148,7 @@ TMP_EXPORT bool TMP_API truckersmp_init(const TruckersMP_Host* host, TruckersMP_
   PluginInfo info;
   info.m_name = "Truck Dash";
   info.m_author = "Truck Dash";
-  info.m_version = "1.12.1-truckdash.4";  // PLUGIN_DLL_VERSION in client/plugin_installer.py
+  info.m_version = "1.12.1-truckdash.5";  // PLUGIN_DLL_VERSION in client/plugin_installer.py
   info.m_description =
       "Shows the TruckersMP players around you on the map of the Truck Dash app. "
       "It only hands them to the Truck Dash client on this PC.";

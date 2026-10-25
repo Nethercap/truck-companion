@@ -106,3 +106,21 @@ SDK v1.1.0 in `truckersmp_sdk/`, Windows x64 only).
 streaming in and out, pre-render, a disconnect and `truckersmp_shutdown`,
 reading the block with the client's reader; and a client without the
 players API, which init has to refuse cleanly.
+
+## C++ runtime inside the DLL
+
+The Release builds link the C++ runtime statically (`/MT`, `MultiThreaded`
+in the `.vcxproj`) instead of using `MSVCP140.dll`, `VCRUNTIME140.dll` and
+`VCRUNTIME140_1.dll`. Windows does not ship those: they come with the
+Visual C++ Redistributable, which most PCs have from some other program,
+but not all. Without them Windows refuses to load the plugin, so the game
+skips it, never shows the "Advanced SDK features" dialog, and the client
+says the plugin is in place but the game hasn't loaded it (a Windows 11
+user, 25-10). Upstream has the same dependency.
+
+The DLL now imports only `KERNEL32.dll`. Nothing crosses the plugin
+boundary that needs a shared runtime: the SCS SDK and the TruckersMP SDK
+pass plain C types, and memory from TruckersMP goes back through its own
+`Free`. `tools/probar_plugin.py` reads the import table and fails on any
+Visual C++ runtime DLL; the Actions runner has the redistributable, so
+loading the DLL there would not show it.

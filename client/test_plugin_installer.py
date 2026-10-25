@@ -106,6 +106,22 @@ def test_bundled_dll_publica_en_su_propio_bloque():
     assert "Local\\SCSTelemetry".encode("utf-16-le") not in datos
 
 
+def test_bundled_dll_no_pide_el_runtime_de_visual_cpp():
+    """Con MSVCP140 / VCRUNTIME140 en la tabla de importaciones, en una PC
+    sin el Visual C++ Redistributable Windows no carga el plugin: el juego no
+    muestra el dialogo del SDK y Setup dice "the game hasn't loaded it"
+    (Reddit, 25-10, Windows 11). Va compilada con /MT. Se lee del archivo,
+    asi que corre tambien en Linux."""
+    import importlib.util
+    ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "probar_plugin.py")
+    spec = importlib.util.spec_from_file_location("probar_plugin", ruta)
+    probar_plugin = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(probar_plugin)
+    dll = plugin_installer.bundled_dll_path()
+    assert "KERNEL32.dll" in probar_plugin.dlls_importadas(dll)
+    assert probar_plugin.runtime_de_visual_cpp(dll) == []
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="la DLL es de Windows")
 def test_bundled_dll_se_descarga_sin_caerse():
     """El juego llama a scs_telemetry_shutdown y despues suelta la DLL, y
