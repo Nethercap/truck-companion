@@ -843,6 +843,13 @@ function stopsAlongRoute(route, stops, maxOffM = 400, maxAlongM = 80000) {
 // el costo) pasan de 123 a 24 y de 145 a 9, y las que obligan a volver de
 // 89 a 58 y de 117 a 42. Dejando ganar tambien a las que obligan a volver
 // no quedaba ninguna mala, pero en ATS subian las de la vuelta (89 -> 103).
+// Entre dos sobre la ruta alcanza con switchRouteM: las dos quedan a menos de
+// 400 m de la linea y no se sabe de que mano estan. Bajando a la I-37 sur en
+// George West (ATS, -10480,59835, Discord 25-10, Chillaxingone) ganaba el area
+// de la otra mano (salir, cruzar el puente y volver: 779 m mas que lo que se
+// avanza) contra la de la derecha (388 m), 642 m mas barata. Bajar switchM
+// para todas cambiaba tambien una fuera de la ruta por otra sobre la ruta de 3
+// a 7 km mas lejos.
 // El descanso tiene plazo (maxReachM: los metros de mundo que se andan antes
 // de que se acabe, restReachMeters): si la elegida queda mas lejos por el
 // camino, gana la de menor costo entre las que se alcanzan (primero las que
@@ -850,7 +857,7 @@ function stopsAlongRoute(route, stops, maxOffM = 400, maxAlongM = 80000) {
 // camino. Una sobre la ruta pero mas lejos le ganaba a una al costado que se
 // alcanzaba ("won't take you off your route for a rest stop even though
 // another stop may be closer", Discord 22-10, Chillaxingone).
-function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, slackM = 1500, { reach = null, uTurnM = 1000, tries = 4, near = 8, switchM = 1000, maxReachM = Infinity } = {}) {
+function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, slackM = 1500, { reach = null, uTurnM = 1000, tries = 4, near = 8, switchM = 1000, switchRouteM = 500, maxReachM = Infinity } = {}) {
   if (!stations || !stations.length) return null;
   const elegir = (pool) => {
     const notBehind = pool.filter(st => { const r = poiRelative(x, z, headingDeg, st.x, st.z); return !r || r.side !== 'behind'; });
@@ -888,7 +895,8 @@ function pickFuelStop(stations, x, z, headingDeg, route, maxDetourFactor = 3, sl
     return r ? { ...r, why: 'route' } : { ...st0, why: 'near' };
   });
   for (const st of vistas) {
-    if (!vuelta(st) && costo(st) < costo(mejor) - switchM) mejor = st;
+    const margen = st.why === 'route' && mejor.why === 'route' ? switchRouteM : switchM;
+    if (!vuelta(st) && costo(st) < costo(mejor) - margen) mejor = st;
   }
   if (Number.isFinite(maxReachM) && !(camino(mejor) <= maxReachM)) {
     const llegan = vistas.filter(st => camino(st) != null && camino(st) <= maxReachM);

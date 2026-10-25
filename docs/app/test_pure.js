@@ -2107,6 +2107,25 @@ test('pickFuelStop: con el camino, la de al costado le gana a la de adelante lej
   assert.equal(pickFuelStop([costado, adelante], 0, 0, 90, route, 3, 1500, { reach }).x, 3600);
 });
 
+test('pickFuelStop: entre dos sobre la ruta, la de la mano propia aunque la otra quede mas cerca de la linea (George West, Discord 25-10)', () => {
+  // Camion en (0,0) yendo al este por la autopista. Las dos areas quedan
+  // "sobre la ruta": la de la otra mano a 166 m de la linea, la de la derecha
+  // a 230. Por el camino, la de la otra mano es salir, cruzar el puente y
+  // volver (779 m mas que lo que se avanza) y la de la derecha, 388.
+  const route = [[0, 0], [30, 0], [5000, 0]];
+  const otraMano = { x: 1769, z: -166, dist: 1777 };
+  const derecha = { x: 1909, z: 230, dist: 1923 };
+  const reach = (st) => ({ 1769: 2548, 1909: 2297 })[st.x];
+  assert.equal(pickFuelStop([otraMano, derecha], 0, 0, 90, route).x, 1769); // sin el camino
+  // 2 * 2297 - 1909 = 2685 contra 2 * 2548 - 1769 = 3327: 642 menos
+  const elegida = pickFuelStop([otraMano, derecha], 0, 0, 90, route, 3, 1500, { reach });
+  assert.deepEqual([elegida.x, elegida.why], [1909, 'route']);
+  // Con el margen de siempre (1 km) se quedaba la de la otra mano
+  assert.equal(pickFuelStop([otraMano, derecha], 0, 0, 90, route, 3, 1500, { reach, switchRouteM: 1000 }).x, 1769);
+  // Por menos de switchRouteM no se cambia
+  assert.equal(pickFuelStop([otraMano, derecha], 0, 0, 90, route, 3, 1500, { reach: (st) => ({ 1769: 2548, 1909: 2550 })[st.x] }).x, 1769);
+});
+
 test('pickFuelStop: el descanso, una que se alcance antes de que se acabe (Discord 22-10)', () => {
   // Camion en (0,0) yendo al este por la ruta. Un area sobre la ruta a 6 km
   // (6,1 por el camino) y otra al costado a 2,8 km (3,3 por el camino). Sin
