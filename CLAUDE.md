@@ -421,6 +421,20 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   "dobla" 43 grados; no se decia nada en la salida (turn report, 23-10).
 - Una salida que a los 150 m vuelve por donde se vino (la calzada contraria
   donde termina una autovia) no es rama de una bifurcacion (`forkInCurve`).
+- Una salida que vuelve a la ruta no es otro camino: tiene que llegar a 120 m
+  del cruce (`escapeM` de `leadsAway`) sin pisar la ruta de los 100 m que
+  siguen (`rejoinM`), y si es de un solo sentido (una calzada que se abre
+  alrededor de una isleta) tampoco la de los primeros 120 m
+  (`branchLeadsAway`, en detectManeuver, sideExitToward y otherBranchesAt).
+  En la US-6 al oeste de Tonopah (ATS, -98772,-5680, turn report del 25-10)
+  la calzada se abre en dos y se junta a 100,0 m: la rama salia del cruce
+  por la ruta misma, y se decia "keep left" pegado al "turn right" de 400 m
+  despues. Las calles de doble mano siguen con los 100 m: bloquear toda la
+  ruta a menos de 120 m callaba triangulos y lazos de calles que el juego
+  avisa (El Centro, Cody, Bloomington, Belgrado). En 500 rutas por variante
+  (semilla 11) cambian solo calzadas partidas: 1 aviso en ATS (Medford), 3
+  en ATS ProMods (Medford y una curva cerca de Penticton con los dos
+  carriles separados), ninguno en ETS2 ni ETS2 ProMods; ningun nombre.
 - Dos calzadas de un sentido que se separan casi paralelas (la colectora al
   lado de la autopista) no llegan a los grados de una bifurcacion: si a 100 m
   ya van a 10 m y la ruta toma la que se abre, es "keep" (`parallelFork`).
