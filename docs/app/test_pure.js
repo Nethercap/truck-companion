@@ -2737,6 +2737,42 @@ test('maneuver: bifurcacion pareja con los carriles del juego: manda la flecha d
   assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(null, B.slightRight) }), null);
 });
 
+test('maneuver: bifurcacion pareja donde la ruta es la mas recta por angulo pero el juego le pone flecha al costado -> keep (I-35, San Antonio, 25-10)', () => {
+  const B = { slightLeft: 2, straight: 4, slightRight: 8 };
+  // a 100 m la ruta va 3,3 grados a la derecha y la otra 3,8 a la izquierda,
+  // 12 m entre las dos: por angulo la ruta es la autopista y no se decia nada
+  const geo = { route: [[0, -300], [0, 0], [7, 120], [12, 250], [20, 520]],
+                extraNodes: [[-8, 120], [-30, 400]], edges: [[1, 5], [5, 6]] };
+  const flechas = (ruta, otra) => (a, b) => (a === 1 && b === 2 ? ruta : a === 1 && b === 5 ? otra : null);
+  assert.equal(detectManeuver(scenario(geo)), null);
+  // el juego: la ruta por los carriles de la derecha con flecha a la derecha,
+  // la otra derecho
+  const m = detectManeuver({ ...scenario(geo), laneTurn: flechas(B.slightRight, B.straight) });
+  assert.deepEqual([m.kind, m.direction, m.parallel], ['fork', 'right', true]);
+  // la ruta sigue derecho segun el juego: nada, como sin carriles
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(B.straight, B.slightLeft) }), null);
+  // con los carriles de San Antonio (de 3, la ruta los dos de la derecha y la
+  // otra los dos de la izquierda): keep right igual
+  const sa = { ...scenario(geo), laneTurn: flechas(B.slightRight, B.straight), laneMask: flechas(6, 3) };
+  assert.deepEqual([detectManeuver(sa).kind, detectManeuver(sa).direction], ['fork', 'right']);
+  // la ruta se lleva dos carriles y la otra uno: la ruta es la autopista y la
+  // otra un carril que sale (ATS, cerca de Lewiston, -79849,-52508): nada
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(B.slightRight, B.straight), laneMask: flechas(6, 1) }), null);
+  // el lado lo dan los carriles, no la flecha: la ruta por el de la derecha
+  // con flecha "slight left" (ETS2, 1785,-21153) es keep right
+  const flechaAlReves = detectManeuver({ ...scenario(geo), laneTurn: flechas(B.slightLeft, B.straight), laneMask: flechas(4, 3) });
+  assert.deepEqual([flechaAlReves.kind, flechaAlReves.direction], ['fork', 'right']);
+  // carriles mezclados (la ruta el 0 y el 2, la otra el 1): no dicen el lado, nada
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(B.slightRight, B.straight), laneMask: flechas(5, 2) }), null);
+  // la otra sin flechas (sirven todos los carriles): no hay con que comparar, nada
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(B.slightRight, null) }), null);
+  // espejado: la ruta es la de la izquierda
+  const espejo = (p) => [-p[0], p[1]];
+  const izq = { ...geo, route: geo.route.map(espejo), extraNodes: geo.extraNodes.map(espejo) };
+  const l = detectManeuver({ ...scenario(izq), laneTurn: flechas(B.slightLeft, B.straight) });
+  assert.deepEqual([l.kind, l.direction, l.parallel], ['fork', 'left', true]);
+});
+
 test('maneuver: la autopista dobla en una salida y los carriles del juego dicen que sigue derecho -> nada, o keep sin nombre (I-90, 23-10)', () => {
   const B = { slightLeft: 2, straight: 4, slightRight: 8 };
   // la ruta (la autopista) dobla 10 grados a la izquierda y la salida se va

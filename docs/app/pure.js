@@ -1594,26 +1594,51 @@ function detectManeuver(ctx) {
   // va a un costado y no derecho. Sin flecha en la ruta y con flecha en la
   // otra, la otra es una salida y la ruta sigue: nada (una autopista que
   // dobla al lado de una rampa recta daba "keep left" en el I-15 de Helena).
+  // Si las flechas dicen que la otra sigue derecho y la ruta se abre a un
+  // costado, mandan aunque por angulo la ruta sea la mas recta: viniendo en
+  // curva, las dos calzadas del I-35 norte en San Antonio salen a +3,5 y
+  // -3,9 grados, la ruta por los dos carriles de la derecha y con flecha a la
+  // derecha, y a los 400 m se cruzan por un puente. No se decia nada y el
+  // camion siguio por la otra (turn report del 25-10, -13248,54085). Salvo
+  // que la ruta se lleve mas carriles que la otra (ctx.laneMask): ahi la
+  // ruta es la autopista y la otra un carril que sale, como antes.
   const parallelForkM = ctx.parallelForkM != null ? ctx.parallelForkM : 100;
   const parallelForkSepM = ctx.parallelForkSepM != null ? ctx.parallelForkSepM : 10;
   const parallelFork = () => {
     const B = LANE_ARROW_BITS;
+    const carriles = (mask) => { let c = 0; for (let x = mask; x; x >>= 1) c += x & 1; return c; };
+    // De que lado quedan los carriles que van solo por la ruta contra los que
+    // van solo por la otra (bit 0, el de la izquierda), o null si se mezclan.
+    // Es el lado de verdad: la flecha sale del rumbo en las puntas del prefab
+    // y en una salida a la derecha puede ser "slight left" (ETS2, 1785,-21153).
+    const ladoDeCarriles = (mr, ma) => {
+      const r = mr & ~ma, a = ma & ~mr;
+      if (!r || !a) return null;
+      const bajo = (m) => 31 - Math.clz32(m & -m), alto = (m) => 31 - Math.clz32(m);
+      return bajo(r) > alto(a) ? 'right' : alto(r) < bajo(a) ? 'left' : null;
+    };
     const ruta = pointAt(cum[i] + parallelForkM);
     const rutaDelta = normDeg(bearingBetween(pts[i], ruta) - inBearing);
     for (const [k, idx, n] of altExits()) {
       const otra = walkPointAt(idx, n, parallelForkM - (cum[k] - cum[i]));
       if (!otra) continue;
       const otraDelta = normDeg(bearingBetween(pts[i], otra) - inBearing);
-      if (Math.abs(otraDelta) >= Math.abs(rutaDelta)) continue;
       if (Math.hypot(otra[0] - ruta[0], otra[1] - ruta[1]) < parallelForkSepM) continue;
       let direction = rutaDelta > otraDelta ? 'right' : 'left';
       let sig = null;
       for (let j = k + 1; j < pts.length && sig == null; j++) sig = pts[j][4];
       const tr = ctx.laneTurn && sig != null ? ctx.laneTurn(idx, sig) : null;
       const ta = ctx.laneTurn ? ctx.laneTurn(idx, n) : null;
+      const mr = ctx.laneMask && sig != null ? ctx.laneMask(idx, sig) : null;
+      const ma = ctx.laneMask ? ctx.laneMask(idx, n) : null;
+      const mascaras = mr != null && ma != null;
+      const lado = mascaras ? ladoDeCarriles(mr, ma) : null;
+      const porCarriles = tr != null && ta != null && (ta & B.straight) && !(tr & B.straight)
+        && !(mascaras && (!lado || carriles(mr) > carriles(ma)));
+      if (!porCarriles && Math.abs(otraDelta) >= Math.abs(rutaDelta)) continue;
       if (tr != null || ta != null) {
         if (tr == null || (tr & B.straight) || !(tr & (B.left | B.slightLeft | B.right | B.slightRight))) continue;
-        direction = tr & (B.right | B.slightRight) ? 'right' : 'left';
+        direction = porCarriles && lado ? lado : tr & (B.right | B.slightRight) ? 'right' : 'left';
       }
       return { kind: 'fork', direction, delta: rutaDelta, at: i, parallel: true };
     }

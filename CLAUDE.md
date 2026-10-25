@@ -418,6 +418,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   ya van a 10 m y la ruta toma la que se abre, es "keep" (`parallelFork`).
   Con carriles manda la flecha del juego de la rama de la ruta (`laneTurn`
   en el ctx): sin flecha a un costado, la ruta es la autopista y no se avisa.
+  Y si la flecha de la ruta va a un costado y la de la otra derecho, se avisa
+  aunque por angulo la ruta sea la mas recta: llegando en curva al I-35 norte
+  en San Antonio (ATS, -13248,54085, turn report del 25-10) la ruta sale a
+  +3,5 grados y la otra calzada a -3,9, y a los 400 m se cruzan por un
+  puente; no se decia nada y el camion siguio por la otra. Salvo que la ruta
+  se lleve mas carriles que la otra (`laneMask`: es la autopista y la otra
+  un carril que sale), y el lado lo dan los carriles que van solo por cada
+  rama, no la flecha (sale del rumbo en las puntas del prefab: en ETS2 hay
+  salidas a la derecha con "slight left"); si se mezclan, nada. En todo el
+  grafo cambian 34 lugares de ATS y 168 de ETS2, casi todos salidas de una
+  autopista que dobla donde no se decia nada; 2 y 11 pasan de "keep left" a
+  "keep right" en el mismo nodo, ramas que se cruzan como la de San Antonio.
   En la bifurcacion por angulo, lo mismo cuando la rama de la ruta no tiene
   flechas (sirven todos los carriles) y la otra sale a un costado: la
   autopista que dobla 8 a 10 grados en una salida comun daba "keep left"

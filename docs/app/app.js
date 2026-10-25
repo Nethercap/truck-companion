@@ -4841,13 +4841,14 @@ function findUpcomingTurn(heading) {
   } : null;
   // La flecha de carril del juego para pasar de a a b (LANE_ARROW_BITS), o
   // null si ese paso no tiene carriles: detectManeuver la usa para saber
-  // cual rama de una bifurcacion pareja es la que sigue.
-  const laneTurn = routeLanes && routeGraph ? (a, b) => {
+  // cual rama de una bifurcacion pareja es la que sigue. Y que carriles
+  // llevan ahi (laneMask): la rama que se lleva mas es la autopista.
+  const laneRec = (a, b) => {
     const k = routeGraph.dirEdge(a, b);
-    if (k === -1) return null;
-    const rec = lanesForEdge(routeLanes, routeGraph.adjEdge[k], routeGraph.adjRev[k]);
-    return rec ? rec.turn : null;
-  } : null;
+    return k === -1 ? null : lanesForEdge(routeLanes, routeGraph.adjEdge[k], routeGraph.adjRev[k]);
+  };
+  const laneTurn = routeLanes && routeGraph ? (a, b) => { const rec = laneRec(a, b); return rec ? rec.turn : null; } : null;
+  const laneMask = routeLanes && routeGraph ? (a, b) => { const rec = laneRec(a, b); return rec ? rec.mask : null; } : null;
 
   // Se arranca por los nodos ya pasados: si el camion esta adentro de un
   // cruce, el grupo se arma entero y su giro se reconoce como ya hecho. Si
@@ -4887,7 +4888,7 @@ function findUpcomingTurn(heading) {
       i = Math.max(iEnd, rb.leave);
       continue;
     }
-    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, incoming: graph.incoming, edgeLine, laneTurn,
+    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, incoming: graph.incoming, edgeLine, laneTurn, laneMask,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     // Si ahi no hay nada que avisar, el prefab entero, de punta a punta de
     // su curva (junctionManeuver): partida en dos, una T se callaba.
