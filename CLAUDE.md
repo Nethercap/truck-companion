@@ -629,6 +629,54 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.
 
+## Pendientes del 25-10
+
+- Plugin con el runtime de C++ adentro (#134, mergeado): la DLL pedia
+  MSVCP140 / VCRUNTIME140 / VCRUNTIME140_1 y sin el Visual C++
+  Redistributable el juego no la cargaba (no sale el dialogo "Advanced SDK
+  features", Setup dice "the game hasn't loaded it"; Spanner1995 en Reddit,
+  Windows 11). La 1.12.1-truckdash.5 va con `/MT` e importa solo KERNEL32;
+  `probar_plugin.py` y `test_bundled_dll_no_pide_el_runtime_de_visual_cpp`
+  fallan si vuelve a pedirlo. Falta: publicar el cliente (esta en
+  Unreleased del CHANGELOG); hasta entonces, a quien le pase, instalar el
+  redistributable x64 a mano (aka.ms/vs/17/release/vc_redist.x64.exe). No
+  se probo en el juego ni en una PC sin el redistributable. Si con el
+  redistributable sigue sin cargar, sospechar del antivirus y pedir el
+  game.log.txt.
+- Alaska en el mapa base de ATS (#132): armado en la rama
+  `claude/new-session-7yky9t` de truckdash-storage (df6de7f, la caja de
+  `build_basemap.py` a (-180, 11, -52, 72): 3,02 MB, 0,89 MB en el aire) y
+  de este repo (db1eaf0, `BASEMAP_VERSION` 20261025 con `CACHE_NAME` y
+  `?v=`). Falta, en orden: en la PC `py build_basemap.py --only usa` y
+  `upload_to_r2.py basemap trucksim-dash-maps basemap`; recien despues
+  mergear la web (Cloudflare guarda el 404). Se le pregunto al del issue
+  que mod usa: si no pone Alaska en su lugar real, esto no lo arregla.
+- Giro donde la calle de enfrente esta cortada con barreras (#107): la T
+  con un solo brazo muerto se calla a proposito (`detectManeuver`, la
+  esquina en escuadra pide dos brazos muertos). Propuesta sin medir:
+  avisar tambien con uno solo si ese brazo sigue derecho la calle de
+  llegada (a menos de unos 20 grados). La autopista que termina en una
+  salida tampoco se avisa (no hay otra rama contra la que comparar). Se le
+  pidieron "Copy turn report" de los dos lugares al autor (25-10); con
+  eso, `check_avisos` y el simulador antes y despues (piden
+  `TRUCKDASH_MAPS_KEY`).
+- Boton de parada en un cruce con descanso a las dos manos (ATS, puente
+  de la 59, captura del maintainer del 25-10): eligio el de la izquierda,
+  cruzando la autopista, con otro a la derecha a la salida. `pickFuelStop`
+  elige primero por la proyeccion sobre la ruta y el camino de verdad solo
+  la cambia con 1 km de diferencia (`uTurnM` y `switchM`, metros del
+  mundo, unas 12 millas del GPS del juego); cruzar y volver son unos
+  cientos de metros. Propuesta: que otra gane si cuesta 1 km o un 30 %
+  menos, lo que sea mas chico. Antes, medir como los 1.238 pedidos de ATS
+  y 1.508 de ETS2 que fijaron el kilometro (el script no esta en tools/) y
+  un test con el turn report de ese cruce.
+- Chequeo de servicios (`uptime.yml`): esta cada 10 minutos pero GitHub lo
+  corre cada 2 a 5 horas (159 corridas en un mes), asi que una caida se ve
+  horas despues; tampoco prueba los mapas de R2. Propuesta: un monitor de
+  afuera cada 5 minutos (UptimeRobot, Better Stack) y un archivo chico de
+  R2 en la lista. El 25-10 a las 12:30 UTC andaba todo: relay en 4dc1dbf
+  (al dia), cuentas con esquema 0017, web, mapas y backup diario.
+
 ## Modales, overlay de OBS y accesibilidad (13-10)
 
 - Un modal nuevo de la app es un `.settingsOverlay` con su `h3` y un boton
