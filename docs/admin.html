@@ -85,6 +85,19 @@
   .titleForm .msg.ok { color: var(--ok); }
   .titulo { color: #ffb020; font-size: 0.78rem; }
   td .linkish { background: none; border: none; padding: 0; color: var(--blue); cursor: pointer; font-size: inherit; }
+  /* Reportes de navegacion: lo que escribio la persona y el turn report a
+     lo ancho; resolver en la misma fila. */
+  .pill.open { background: #3a2a10; color: #ffb020; }
+  .pill.fixed { background: #16351f; color: var(--ok); }
+  .pill.duplicate, .pill.wontfix { background: #2a2d33; color: var(--muted); }
+  .reportBar { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin: 0 0 0.6rem; font-size: 0.85rem; }
+  .reportBar select, .resolveForm select { font-size: 0.85rem; padding: 0.35rem; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+  td.desc { white-space: normal; min-width: 14rem; max-width: 28rem; }
+  td.desc details { margin-top: 0.3rem; }
+  td.desc pre { white-space: pre-wrap; word-break: break-word; font-size: 0.75rem; background: var(--panel-alt); padding: 0.5rem; border-radius: 6px; margin: 0.3rem 0; }
+  .resolveForm { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; margin-top: 0.4rem; }
+  .resolveForm input { min-width: 12rem; font-size: 0.82rem; padding: 0.3rem 0.5rem; }
+  .resolveForm button, .reportBar button { font-size: 0.8rem; padding: 0.3rem 0.7rem; }
 </style>
 </head>
 <body>
@@ -95,6 +108,36 @@
     <button id="forgetBtn" style="background:var(--panel-alt);border:1px solid var(--border);">Forget key</button>
   </div>
   <div class="status" id="status">Enter the admin key to load stats.</div>
+
+  <!-- ------------------------------------------------ reportes de navegacion -->
+  <!-- Los de la app (Ajustes > "Report a navigation problem"), en la API de
+       cuentas (/admin/nav-reports). Se arreglan de a tandas: con 10 abiertos
+       o los viernes. "Copy open reports" los junta en un texto para pegar
+       en una sesion de Claude; al resolverlos, la nota dice el PR. -->
+  <details class="sec" data-sec="navReports" open id="reportsSec" hidden>
+    <summary>Navigation reports <span class="note" id="reportsNote"></span></summary>
+    <div class="body">
+      <div class="cards">
+        <div class="card"><div class="label">Open</div><div class="value" id="repOpen">-</div><div class="sub">batch at 10, or on Fridays</div></div>
+        <div class="card"><div class="label">Fixed</div><div class="value small" id="repFixed">-</div></div>
+        <div class="card"><div class="label">Duplicate</div><div class="value small" id="repDuplicate">-</div></div>
+        <div class="card"><div class="label">Won't fix</div><div class="value small" id="repWontfix">-</div></div>
+      </div>
+      <div class="reportBar">
+        <label>Show <select id="reportsFilter">
+          <option value="open">open</option><option value="fixed">fixed</option><option value="duplicate">duplicate</option>
+          <option value="wontfix">won't fix</option><option value="all">all</option>
+        </select></label>
+        <button type="button" id="copyOpenBtn">Copy open reports</button>
+        <span class="muted" id="reportsMsg"></span>
+      </div>
+      <div class="tableWrap"><table>
+        <thead><tr><th>#</th><th>Sent</th><th>Kind</th><th>What they said</th><th>From</th><th>Map</th><th>Status</th></tr></thead>
+        <tbody id="reportsBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="reportsBody"></div>
+    </div>
+  </details>
 
   <!-- ------------------------------------------------ relay (en vivo) -->
   <details class="sec" data-sec="relay" open id="relaySec" hidden>
@@ -226,6 +269,7 @@ const SECTIONS_KEY = 'truckdash_admin_closed';
 const RELAY_URL = 'https://truck-companion-production.up.railway.app/admin/stats';
 const ACCOUNTS_URL = 'https://api.trucksim-dash.com/admin/stats';
 const TITLE_URL = 'https://api.trucksim-dash.com/admin/title';
+const REPORTS_URL = 'https://api.trucksim-dash.com/admin/nav-reports';
 const PAGE = 10;
 
 const statusEl = document.getElementById('status');
@@ -373,6 +417,92 @@ function pintarCuentas(d) {
   $('accountsSec').hidden = false;
 }
 
+// ---- reportes de navegacion ----
+const KINDS = { wrong_warning: 'Wrong warning', missing_warning: 'Missing warning', road_name: 'Road name',
+  route: 'Route', voice: 'Voice', other: 'Other' };
+const REPORT_ERRORS = { estado_invalido: 'unknown status', nota_larga: 'note too long (1000 characters)', no_existe: 'no such report', prohibido: 'invalid key (403)' };
+let reportesVistos = {}; // id -> reporte, para copiar y resolver
+function textoReporte(r) {
+  const cabeza = [`#${r.id}`, fecha(r.created_at), r.kind, [r.game, r.map].filter(Boolean).join(' / '),
+    r.web && `web ${r.web}`, r.client && `client ${r.client}`, r.user && `user ${r.user}`].filter(Boolean).join(' · ');
+  return `${cabeza}\nWhat they said: ${r.description || '(nothing)'}\n${r.report}`;
+}
+function pintarReportes(d) {
+  const c = d.counts || {};
+  $('repOpen').textContent = fmt(c.open);
+  $('repOpen').classList.toggle('warn', (c.open || 0) >= 10);
+  $('repFixed').textContent = fmt(c.fixed);
+  $('repDuplicate').textContent = fmt(c.duplicate);
+  $('repWontfix').textContent = fmt(c.wontfix);
+  reportesVistos = {};
+  for (const r of d.reports || []) reportesVistos[r.id] = r;
+  const opciones = (actual) => ['open', 'fixed', 'duplicate', 'wontfix']
+    .map(e => `<option value="${e}" ${e === actual ? 'selected' : ''}>${e === 'wontfix' ? "won't fix" : e}</option>`).join('');
+  paginar('reportsBody', (d.reports || []).map(r => `
+    <tr>
+      <td><b>#${r.id}</b></td>
+      <td>${fecha(r.created_at)}</td>
+      <td>${escapeHtml(KINDS[r.kind] || r.kind)}</td>
+      <td class="desc">${r.description ? escapeHtml(r.description) : '<span class="muted">(nothing written)</span>'}
+        <details><summary class="muted">turn report</summary><pre>${escapeHtml(r.report)}</pre>
+          <button type="button" class="linkish" data-copy-report="${r.id}">copy</button></details>
+        <form class="resolveForm" data-resolve="${r.id}">
+          <select name="status">${opciones(r.status)}</select>
+          <input name="resolution" maxlength="1000" placeholder="note: PR #, duplicate of #, why not" value="${escapeHtml(r.resolution || '')}" />
+          <button type="submit">Save</button>
+        </form></td>
+      <td>${escapeHtml(r.user || '—')}</td>
+      <td class="muted">${escapeHtml([(r.game || '').toUpperCase(), r.map].filter(Boolean).join(' · ') || '-')}<br>${escapeHtml(r.web ? `web ${r.web}` : '')}</td>
+      <td><span class="pill ${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>${r.resolved_at ? `<br><span class="muted">${fecha(r.resolved_at)}</span>` : ''}</td>
+    </tr>`), 'No reports here', 7);
+  $('reportsSec').hidden = false;
+}
+async function cargarReportes(key) {
+  const r = await traer(`${REPORTS_URL}?status=${encodeURIComponent($('reportsFilter').value)}`, key);
+  if (r.datos) pintarReportes(r.datos);
+  return r;
+}
+$('reportsFilter').addEventListener('change', () => cargarReportes(keyInput.value.trim()).catch(e => { $('reportsMsg').textContent = e.message; }));
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-copy-report]');
+  if (!b) return;
+  try { await navigator.clipboard.writeText(textoReporte(reportesVistos[b.dataset.copyReport])); b.textContent = 'copied'; }
+  catch (err) { b.textContent = 'could not copy'; }
+});
+document.addEventListener('submit', async (e) => {
+  const form = e.target.closest('[data-resolve]');
+  if (!form) return;
+  e.preventDefault();
+  const boton = form.querySelector('button');
+  boton.disabled = true;
+  try {
+    const res = await fetch(`${REPORTS_URL}/${form.dataset.resolve}`, { method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': keyInput.value.trim() },
+      body: JSON.stringify({ status: form.status.value, resolution: form.resolution.value.trim() || null }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(REPORT_ERRORS[d.error] || `HTTP ${res.status}`);
+    $('reportsMsg').textContent = `#${form.dataset.resolve}: ${d.report.status}`;
+    await cargarReportes(keyInput.value.trim());
+  } catch (err) {
+    $('reportsMsg').textContent = `#${form.dataset.resolve}: ${err.message}`;
+    boton.disabled = false;
+  }
+});
+// Todos los abiertos en un texto, para pegarlo en una sesion de Claude y
+// arreglarlos juntos (los numeros van en el PR).
+$('copyOpenBtn').addEventListener('click', async () => {
+  try {
+    const r = await traer(`${REPORTS_URL}?status=open&limit=500`, keyInput.value.trim());
+    if (!r.datos) throw new Error('invalid key (403)');
+    const lista = r.datos.reports.slice().reverse();
+    const texto = `Truck Dash navigation reports, ${lista.length} open (oldest first)\n\n` + lista.map(textoReporte).join('\n\n');
+    await navigator.clipboard.writeText(texto);
+    $('reportsMsg').textContent = `${lista.length} open reports copied`;
+  } catch (err) {
+    $('reportsMsg').textContent = err.message;
+  }
+});
+
 async function traer(url, key) {
   const res = await fetch(url, { headers: { 'X-Admin-Key': key } });
   if (res.status === 403) return { prohibido: true };
@@ -385,8 +515,10 @@ async function loadStats() {
   if (!key) { statusEl.textContent = 'Enter the admin key to load stats.'; statusEl.className = 'status'; return; }
   statusEl.textContent = 'Loading...';
   statusEl.className = 'status';
-  const [relay, cuentas] = await Promise.allSettled([traer(RELAY_URL, key), traer(ACCOUNTS_URL, key)]);
+  const [relay, cuentas, reportes] = await Promise.allSettled([traer(RELAY_URL, key), traer(ACCOUNTS_URL, key), cargarReportes(key)]);
   const partes = [];
+  if (reportes.status === 'fulfilled' && reportes.value.datos) partes.push('reports ok');
+  else partes.push(reportes.status === 'fulfilled' ? 'reports: invalid key (403)' : `reports: ${reportes.reason.message}`);
   if (relay.status === 'fulfilled' && relay.value.datos) { pintarRelay(relay.value.datos); partes.push('relay ok'); }
   else partes.push(relay.status === 'fulfilled' ? 'relay: invalid key (403)' : `relay: ${relay.reason.message}`);
   if (cuentas.status === 'fulfilled' && cuentas.value.datos) { pintarCuentas(cuentas.value.datos); partes.push('accounts ok'); }
@@ -445,6 +577,7 @@ $('forgetBtn').addEventListener('click', () => {
   keyInput.value = '';
   $('relaySec').hidden = true;
   $('accountsSec').hidden = true;
+  $('reportsSec').hidden = true;
   statusEl.textContent = 'Key forgotten. Enter the admin key to load stats.';
   statusEl.className = 'status';
 });

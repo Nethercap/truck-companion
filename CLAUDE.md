@@ -578,6 +578,32 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   que quedan son casi todos recalculando encima del nodo o el mismo giro en
   otro nodo de una cadena de cruces. `--antesDelGiro 0` lo saltea.
 
+## Reportes de navegacion (25-10)
+
+- Ajustes > "Report a navigation problem" (`navReportModal`; `navReportBody`,
+  `navReportCredentials` y `navReportOutcome` en pure.js) manda lo que la
+  persona elige (`NAV_REPORT_KINDS`) y escribe, mas el turn report entero,
+  a POST /nav-reports del servicio de cuentas (repo truckdash-loginapp,
+  tabla `nav_reports`, migracion 0018). Sin cuenta tambien; con cuenta queda
+  de quien es, va en su exportacion y se borra con ella (`docs/privacy.html`
+  lo dice). Techos: 5 por hora por IP (en memoria) y 200 por dia. La copia
+  LAN entra solo a esa ruta y sin credenciales: la cookie va solo desde
+  trucksim-dash.com. Si no sale (sin internet, la API vieja, un 400), la
+  ventana ofrece copiarlo como antes: la web puede salir antes que la API.
+- El turn report lleva la linea "Route:" (perfil, destino y waypoints,
+  `route` de `turnReportText`): sin ella, reproducir el de Tonopah era
+  adivinar la empresa hasta que la ruta pasara por los avisos.
+- Se leen y resuelven en `docs/admin.html` (seccion "Navigation reports",
+  GET y PATCH /admin/nav-reports con X-Admin-Key) y se arreglan de a tandas:
+  con 10 abiertos o los viernes. "Copy open reports" los junta en un texto.
+  Para reproducir uno, la ruta del aviso mas viejo al destino de "Route:",
+  manejada con el codigo de la app (como `simular_navegacion`), y antes y
+  despues del arreglo `check_avisos` y el simulador con la misma semilla. Al
+  resolverlo, la nota lleva el PR. Los resueltos se borran a los 180 dias.
+- Un tipo nuevo va en los dos lados a la vez (`NAV_REPORT_KINDS` y
+  `reportes.TIPOS` de la API) y su texto en los 8 idiomas: la API rechaza
+  con 400 un tipo que no conoce.
+
 ## Pendientes y decisiones (18-10)
 
 - macOS: un usuario porto el plugin (dice que el juego en Mac lo carga) e
