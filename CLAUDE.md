@@ -307,7 +307,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   ruta: gana una que no obliga a volver si cuesta 1 km menos (`near`,
   `switchM`). Por el rumbo no se veian las de al costado: elegia una a 3,6 km
   con otra a 546 m (Austin). Dejar ganar a las que obligan a volver subia
-  esas elecciones en ATS.
+  esas elecciones en ATS. Si la elegida y la otra estan las dos sobre la
+  ruta alcanza con 500 m (`switchRouteM`): bajando por la I-37 en George
+  West (Discord 25-10, Chillaxingone) ganaba el area de la otra mano (salir,
+  cruzar el puente y volver) contra la de la derecha, 642 m mas barata.
+  Medido cada 1,5 km en 100 rutas por variante (semilla 3): cambian 37 de
+  1.392 pedidos en ATS (36 con menos camino), 15 de 1.638 en ETS2 (12; los
+  otros, hasta 286 m mas) y 8 y 14 en Coast to Coast y ProMods. Bajar
+  `switchM` para todas cambiaba tambien una fuera de la ruta por otra sobre
+  la ruta de 3 a 7 km mas lejos.
   El descanso tiene plazo: con los minutos que faltan (`restReachMeters`, a
   70 km/h de velocimetro con la escala de tiempo medida), si la elegida no
   se alcanza gana la de menor costo entre las que si (`maxReachM`), y si no
