@@ -137,6 +137,17 @@ input[type="text"], #usernameInput {
 }
 .logins li:last-child, .sessions li:last-child { border-bottom: none; }
 .sessions .when { color: var(--muted); font-size: 0.85rem; }
+/* Reportes de navegacion (Ajustes): cada uno con su estado a la derecha */
+.reportes { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.reportes li {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--line);
+}
+.reportes li:last-child { border-bottom: none; }
+.reportes li > div { min-width: 0; overflow-wrap: anywhere; }
+.estado-reporte { flex: none; font-size: 0.75rem; border-radius: 999px; padding: 0.05rem 0.55rem; border: 1px solid var(--line); color: var(--muted); }
+.estado-reporte.abierto { color: var(--warn); border-color: var(--warn); }
+.estado-reporte.arreglado { color: var(--ok); border-color: var(--ok); }
 .tag { font-size: 0.75rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0.05rem 0.5rem; }
 
 .loading { text-align: center; color: var(--muted); padding: 3rem 0; }

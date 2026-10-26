@@ -603,6 +603,19 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - Un tipo nuevo va en los dos lados a la vez (`NAV_REPORT_KINDS` y
   `reportes.TIPOS` de la API) y su texto en los 8 idiomas: la API rechaza
   con 400 un tipo que no conoce.
+- Tambien se abre desde el link "Report navigation error" de arriba del mapa
+  (`mapAboveBar`, `openNavReport`; oculto en pantalla completa y en cabina).
+- Aviso de arreglado (26-10): cada reporte tiene una clave al azar (columna
+  `token`, migracion 0019) que la app guarda con su numero en el
+  dispositivo (`NAV_REPORTS_KEY`, `navReportsAdd`). Al abrir y cada 3 horas
+  pregunta POST /nav-reports/status con las claves (sin cookie; la API solo
+  da estado y fecha, y nada de un reporte con otra clave) y avisa una vez
+  por cada "fixed" (`navReportsAfterStatus`: lo guardado se lee otra vez
+  antes de avisar, por las otras pestanas). Duplicado y "won't fix" salen
+  de la lista sin aviso: si un duplicado quedo arreglado con el otro,
+  marcarlo "fixed" con la nota "duplicate of #N" para que le llegue. Con
+  sesion, la pagina de la cuenta los lista con su estado (Ajustes,
+  "Navigation reports", GET /user/nav-reports).
 
 ## Pendientes y decisiones (18-10)
 

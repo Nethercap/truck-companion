@@ -113,13 +113,15 @@
   <!-- Los de la app (Ajustes > "Report a navigation problem"), en la API de
        cuentas (/admin/nav-reports). Se arreglan de a tandas: con 10 abiertos
        o los viernes. "Copy open reports" los junta en un texto para pegar
-       en una sesion de Claude; al resolverlos, la nota dice el PR. -->
+       en una sesion de Claude; al resolverlos, la nota dice el PR. Marcar
+       "fixed" se lo avisa a quien lo mando, en la app (y lo ve en su
+       cuenta); duplicado y "won't fix" no avisan. -->
   <details class="sec" data-sec="navReports" open id="reportsSec" hidden>
     <summary>Navigation reports <span class="note" id="reportsNote"></span></summary>
     <div class="body">
       <div class="cards">
         <div class="card"><div class="label">Open</div><div class="value" id="repOpen">-</div><div class="sub">batch at 10, or on Fridays</div></div>
-        <div class="card"><div class="label">Fixed</div><div class="value small" id="repFixed">-</div></div>
+        <div class="card"><div class="label">Fixed</div><div class="value small" id="repFixed">-</div><div class="sub">the sender is told in the app</div></div>
         <div class="card"><div class="label">Duplicate</div><div class="value small" id="repDuplicate">-</div></div>
         <div class="card"><div class="label">Won't fix</div><div class="value small" id="repWontfix">-</div></div>
       </div>

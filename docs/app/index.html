@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261025e" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261025e" />
-<link rel="stylesheet" href="app.css?v=20261025e" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261026a" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261026a" />
+<link rel="stylesheet" href="app.css?v=20261026a" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -401,6 +401,12 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
     <button id="layoutDoneBtn" class="settingsLinkBtn" data-i18n="layoutDone">Done</button>
   </div>
 
+  <!-- Reportar un error de navegacion a mano, sin entrar a Ajustes: la
+       misma ventana que "Report a navigation problem" (openNavReport). -->
+  <div class="mapAboveBar" id="mapAboveBar">
+    <button type="button" id="navReportLink" class="navReportLink" data-i18n="navReportLink">Report navigation error</button>
+  </div>
+
   <div class="layout" id="layout">
    <div class="rowWrap">
     <div id="mapPanel">
@@ -756,14 +762,14 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 <script src="vendor/maplibre-gl-4.7.1.js"></script>
 <script src="vendor/pmtiles-3.2.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261025e"></script>
-<script src="pure.js?v=20261025e"></script>
-<script src="i18n.js?v=20261025e"></script>
-<script src="i18n_en_es.js?v=20261025e"></script>
-<script src="../dash/dash.js?v=20261025e"></script>
-<script src="../dash/classic.js?v=20261025e"></script>
-<script src="app.js?v=20261025e"></script>
-<script src="convoy.js?v=20261025e"></script>
-<script src="livemap.js?v=20261025e"></script>
+<script src="variants.js?v=20261026a"></script>
+<script src="pure.js?v=20261026a"></script>
+<script src="i18n.js?v=20261026a"></script>
+<script src="i18n_en_es.js?v=20261026a"></script>
+<script src="../dash/dash.js?v=20261026a"></script>
+<script src="../dash/classic.js?v=20261026a"></script>
+<script src="app.js?v=20261026a"></script>
+<script src="convoy.js?v=20261026a"></script>
+<script src="livemap.js?v=20261026a"></script>
 </body>
 </html>
