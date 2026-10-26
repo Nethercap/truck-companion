@@ -286,13 +286,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Con el mas barato siempre, sin el km, cambiaba donde termina la ruta en
   casi todos los pedidos por unos metros. Con el boton cada 1,5 km en 100
   rutas por variante (semilla 11): cambia la elegida en 48 de 1.790 pedidos
-  en ATS, 42 de 1.976 en ETS2 y 39 de 1.562 en Coast to Coast; el camino
-  queda mas corto en 56, 48 y 45 (hasta 7 km: la estacion de Yakima ->
-  Seattle se alcanzaba pasandola y volviendo por el enlace) y mas largo en
-  7, 7 y 4 (casi todas por elegir una mas adelante sobre la ruta, el costo
-  de `pickFuelStop`); las que obligan a volver bajan de 131 a 117, 98 a 90
-  y 97 a 86. Queda una peor (Wichita Falls, 514 m mas y con vuelta): una
-  con vuelta que ahora cuesta parecido y `switchM` no la cambia.
+  en ATS, 42 de 1.976 en ETS2, 39 de 1.562 en Coast to Coast y 33 de 1.288
+  en ProMods; el camino queda mas corto en 56, 48, 45 y 42 (hasta 7 km: la
+  estacion de Yakima -> Seattle se alcanzaba pasandola y volviendo por el
+  enlace) y mas largo en 7, 7, 4 y 2 (casi todas por elegir una mas adelante
+  sobre la ruta, el costo de `pickFuelStop`); las que obligan a volver bajan
+  de 131 a 117, 98 a 90, 97 a 86 y 85 a 75. Queda una peor (Wichita Falls,
+  514 m mas y con vuelta): una con vuelta que ahora cuesta parecido y
+  `switchM` no la cambia.
 - La app rutea sola y del GPS del juego solo sabe cuanto falta
   (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
   5 km, con 40 km o mas por delante, `routeGameAgreement`), se buscan hasta 3
