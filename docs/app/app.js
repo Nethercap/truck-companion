@@ -6993,7 +6993,8 @@ document.getElementById('turnReportBtn').addEventListener('click', () => copyTur
 let navReportText = '';
 function setNavReportStatus(text) { document.getElementById('navReportStatus').textContent = text || ''; }
 
-document.getElementById('navReportBtn').addEventListener('click', () => {
+// Se abre desde Ajustes y desde el link de arriba del mapa (navReportLink).
+function openNavReport() {
   document.getElementById('settingsModal').style.display = 'none';
   navReportText = buildTurnReport();
   document.getElementById('navReportPreview').textContent = navReportText;
@@ -7003,7 +7004,9 @@ document.getElementById('navReportBtn').addEventListener('click', () => {
   document.getElementById('navReportCopyBtn').hidden = true;
   setNavReportStatus(conn.demo ? t('navReportDemo') : '');
   document.getElementById('navReportModal').style.display = 'flex';
-});
+}
+document.getElementById('navReportBtn').addEventListener('click', openNavReport);
+document.getElementById('navReportLink').addEventListener('click', openNavReport);
 
 document.getElementById('navReportSendBtn').addEventListener('click', async () => {
   if (conn.demo) { setNavReportStatus(t('navReportDemo')); return; }
@@ -7028,6 +7031,9 @@ document.getElementById('navReportSendBtn').addEventListener('click', async () =
   } catch (e) { status = 0; }
   const fin = navReportOutcome(status, body);
   if (fin.state === 'sent') {
+    // Para avisar cuando se arregle (checkNavReports)
+    const ahora = Date.now();
+    lsSet(NAV_REPORTS_KEY, JSON.stringify(navReportsAdd(navReportsParse(lsGet(NAV_REPORTS_KEY), ahora), fin, ahora)));
     setNavReportStatus(t('navReportSent', fin.id));
     showToast(t('navReportSent', fin.id), 'success', 4000);
     return; // el boton queda apagado: ya se mando
@@ -7038,6 +7044,31 @@ document.getElementById('navReportSendBtn').addEventListener('click', async () =
 });
 
 document.getElementById('navReportCopyBtn').addEventListener('click', () => copyTurnReport(navReportText));
+
+// Si ya se arreglo alguno de los reportes que mando este dispositivo: al
+// abrir y cada NAV_REPORT_CHECK_MS, con la clave de cada uno (sin cookie: la
+// clave alcanza, y asi anda tambien desde la copia LAN). Un aviso por
+// reporte arreglado (navReportsAfterStatus en pure.js). Lo guardado se lee
+// otra vez antes de avisar: con dos pestanas, la segunda ya no lo tiene.
+async function checkNavReports() {
+  if (cabMode) return;
+  const lista = navReportsParse(lsGet(NAV_REPORTS_KEY), Date.now());
+  if (!lista.length) return;
+  let estados = null;
+  try {
+    const res = await fetch(NAV_REPORT_STATUS_URL, {
+      method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reports: lista.map(r => ({ id: r.id, token: r.token })) }),
+    });
+    if (res.ok) estados = (await res.json()).reports;
+  } catch (e) { return; } // sin internet: la proxima vez
+  if (!Array.isArray(estados)) return;
+  const { list, fixed } = navReportsAfterStatus(navReportsParse(lsGet(NAV_REPORTS_KEY), Date.now()), estados);
+  lsSet(NAV_REPORTS_KEY, JSON.stringify(list));
+  fixed.forEach(id => showToast(t('navReportFixed', id), 'success', 10000));
+}
+setTimeout(checkNavReports, 8000);
+setInterval(checkNavReports, NAV_REPORT_CHECK_MS);
 document.getElementById('navReportCloseBtn').addEventListener('click', () => {
   document.getElementById('navReportModal').style.display = 'none';
 });

@@ -128,7 +128,8 @@
   body.fsMode .setup,
   body.fsMode #status,
   body.fsMode .setupHints,
-  body.fsMode #updateBanner { display: none !important; }
+  body.fsMode #updateBanner,
+  body.fsMode .mapAboveBar { display: none !important; }
   body.fsMode .layout { border-radius: 0; }
   body.fsMode #mapPanel { border-radius: 0; }
   body.fsMode #infoPanel { border-radius: 0; }
@@ -911,6 +912,12 @@
      el texto del usuario a todo el ancho y lo que se manda, chico y con
      scroll (el turn report entero mide 10 a 15 renglones). Los radios con
      su renglon entero de 24 px para tocar. */
+  /* El link de reportar, arriba del mapa: chico y apagado, que no compita
+     con el mapa; con su renglon de 24 px para tocar. */
+  .mapAboveBar { display: flex; flex-shrink: 0; margin: 0 0 0.2rem; }
+  .navReportLink { background: none; border: none; padding: 0.15rem 0; min-height: 24px; color: var(--muted);
+    font: inherit; font-size: 0.78rem; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .navReportLink:hover, .navReportLink:focus-visible { color: var(--text); }
   .navReportKinds { border: none; margin: 0; padding: 0; }
   .navReportKinds legend { padding: 0; }
   .navReportKinds .settingsRow { min-height: 24px; }
@@ -1102,7 +1109,7 @@
    centimetros: la letra va en vmin y crece con la ventana que copia el mod.
    La clase la pone el <head>, antes de pintar. */
 .cab body { padding: 0; }
-.cab .appTitle, .cab .setup, .cab #status, .cab .setupHints, .cab #updateBanner, .cab #layoutBar,
+.cab .appTitle, .cab .setup, .cab #status, .cab .setupHints, .cab #updateBanner, .cab #layoutBar, .cab .mapAboveBar,
 .cab #infoPanel, .cab #commandsDrawer, .cab #mapLeftControls, .cab #topRightControls, .cab #navPanel,
 .cab #routeSummary, .cab #stopSuggest, .cab #bottomRightHud, .cab #toastContainer, .cab #convoyMsgPop,
 .cab #dashOverlay { display: none !important; }

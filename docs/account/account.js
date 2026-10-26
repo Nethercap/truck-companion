@@ -453,6 +453,18 @@
       codigo_invalido: 'That sign-in link was already used. Try again.',
       proveedor_no_responde: 'The provider is not answering. Try again in a minute.',
       proveedor_no_configurado: 'That sign-in method is not available yet.',
+      navReportsTitle: 'Navigation reports',
+      navReportsHint: 'The navigation problems you reported from the app while signed in, and how each one ended. The app also tells you when one is fixed.',
+      navReportStatusOpen: 'Open',
+      navReportStatusFixed: 'Fixed',
+      navReportStatusDuplicate: 'Already reported',
+      navReportStatusWontfix: 'Reviewed, no change',
+      navReportKindWrong: 'A warning was wrong (wrong side, or a turn that isn\'t there)',
+      navReportKindMissing: 'A turn had no warning',
+      navReportKindName: 'Wrong road name',
+      navReportKindRoute: 'The route went a strange way',
+      navReportKindVoice: 'The voice spoke too early, too late or twice',
+      navReportKindOther: 'Something else',
       error: 'Something went wrong. Try again.'
     },
     es: {
@@ -836,6 +848,18 @@
       codigo_invalido: 'Ese link de inicio de sesion ya se uso. Proba de nuevo.',
       proveedor_no_responde: 'El proveedor no responde. Proba en un minuto.',
       proveedor_no_configurado: 'Esa forma de entrar todavia no esta disponible.',
+      navReportsTitle: 'Reportes de navegación',
+      navReportsHint: 'Los problemas de navegación que reportaste desde la app con la sesión iniciada, y en qué quedó cada uno. La app también te avisa cuando se arregla uno.',
+      navReportStatusOpen: 'Abierto',
+      navReportStatusFixed: 'Arreglado',
+      navReportStatusDuplicate: 'Ya reportado',
+      navReportStatusWontfix: 'Revisado, sin cambios',
+      navReportKindWrong: 'Un aviso estuvo mal (para el lado equivocado, o un giro que no existe)',
+      navReportKindMissing: 'Un giro no tuvo aviso',
+      navReportKindName: 'Nombre de ruta equivocado',
+      navReportKindRoute: 'La ruta fue por un lado raro',
+      navReportKindVoice: 'La voz habló muy temprano, muy tarde o dos veces',
+      navReportKindOther: 'Otra cosa',
       error: 'Algo salio mal. Proba de nuevo.'
     }
   };
@@ -2867,6 +2891,43 @@
     if (actual === 'following' && usuario) traerSeguir();
     if (actual === 'map' && usuario && !modoPublico) abrirMapa();
     if (actual === 'wrapped' && usuario && !modoPublico) abrirResumenAno();
+    if (actual === 'settings' && usuario && !modoPublico) traerReportes();
+  }
+
+  // ---------------------------------------------- reportes de navegacion
+  // Los que mando desde la app con la sesion abierta, con en que quedo cada
+  // uno (GET /user/nav-reports). Sin ninguno la tarjeta no se ve. Los de
+  // otros dispositivos sin sesion no estan: esos los avisa la app.
+  const TIPO_REPORTE = { wrong_warning: 'navReportKindWrong', missing_warning: 'navReportKindMissing',
+    road_name: 'navReportKindName', route: 'navReportKindRoute', voice: 'navReportKindVoice', other: 'navReportKindOther' };
+  const ESTADO_REPORTE = { open: 'navReportStatusOpen', fixed: 'navReportStatusFixed',
+    duplicate: 'navReportStatusDuplicate', wontfix: 'navReportStatusWontfix' };
+
+  async function traerReportes() {
+    const r = await pedir('/user/nav-reports');
+    const lista = r.ok && Array.isArray(r.datos.reports) ? r.datos.reports : [];
+    const ul = $('navReportsList');
+    ul.textContent = '';
+    lista.forEach((rep) => {
+      const li = document.createElement('li');
+      const texto = document.createElement('div');
+      const cabeza = document.createElement('div');
+      cabeza.textContent = `#${rep.id} · ${fechaCorta(rep.created_at)} · ${t(TIPO_REPORTE[rep.kind] || 'navReportKindOther')}`;
+      texto.appendChild(cabeza);
+      if (rep.description) {
+        const desc = document.createElement('div');
+        desc.className = 'muted small';
+        desc.textContent = rep.description;
+        texto.appendChild(desc);
+      }
+      const estado = document.createElement('span');
+      estado.className = 'estado-reporte ' + (rep.status === 'fixed' ? 'arreglado' : rep.status === 'open' ? 'abierto' : 'cerrado');
+      estado.textContent = t(ESTADO_REPORTE[rep.status] || 'navReportStatusOpen');
+      li.appendChild(texto);
+      li.appendChild(estado);
+      ul.appendChild(li);
+    });
+    $('cardNavReports').hidden = !lista.length;
   }
 
   // ---------------------------------------------------- resumen del ano

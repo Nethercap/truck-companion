@@ -5326,9 +5326,39 @@ test('reporte de navegacion: el pedido, la cookie y que decir despues', () => {
   assert.equal(navReportCredentials('localhost'), 'omit');
   assert.equal(navReportCredentials('eviltrucksim-dash.com'), 'omit');
   // lo que vuelve
-  assert.deepEqual(navReportOutcome(200, { ok: true, id: 12 }), { state: 'sent', id: 12 });
+  assert.deepEqual(navReportOutcome(200, { ok: true, id: 12, token: 'k' }), { state: 'sent', id: 12, token: 'k' });
+  assert.deepEqual(navReportOutcome(200, { ok: true, id: 12 }), { state: 'sent', id: 12, token: null });
   assert.deepEqual(navReportOutcome(429, { error: 'demasiados_reportes' }), { state: 'tooMany' });
   for (const [st, body] of [[0, null], [404, null], [400, { error: 'tipo_invalido' }], [500, null], [200, { ok: true }]]) {
     assert.deepEqual(navReportOutcome(st, body), { state: 'failed' }, String(st));
   }
+});
+
+test('reportes mandados: se guardan, se pregunta por ellos y se avisa una vez al arreglarse (26-10)', () => {
+  const { navReportsParse, navReportsAdd, navReportsAfterStatus, NAV_REPORTS_MAX, NAV_REPORTS_DAYS } = require('./pure.js');
+  const dia = 86400000, ahora = 1792000000000;
+  // lo guardado: sin lo roto ni lo vencido
+  const guardado = JSON.stringify([{ id: 3, token: 'c', sent: ahora - dia }, { id: 'x', token: 'a', sent: ahora },
+    { id: 2, token: '', sent: ahora }, { id: 1, token: 'a', sent: ahora - (NAV_REPORTS_DAYS + 1) * dia }]);
+  assert.deepEqual(navReportsParse(guardado, ahora), [{ id: 3, token: 'c', sent: ahora - dia }]);
+  assert.deepEqual(navReportsParse('no es json', ahora), []);
+  assert.deepEqual(navReportsParse('{"id":1}', ahora), []);
+  assert.deepEqual(navReportsParse(null, ahora), []);
+  // uno nuevo adelante, sin repetir, con tope
+  let lista = navReportsAdd([{ id: 3, token: 'c', sent: 1 }], { id: 4, token: 'd' }, ahora);
+  assert.deepEqual(lista.map(r => r.id), [4, 3]);
+  assert.deepEqual(navReportsAdd(lista, { id: 3, token: 'c2' }, ahora).map(r => [r.id, r.token]), [[3, 'c2'], [4, 'd']]);
+  assert.equal(navReportsAdd(lista, { id: 5, token: null }, ahora), lista); // la API vieja no da clave
+  let muchos = [];
+  for (let k = 0; k < NAV_REPORTS_MAX + 5; k++) muchos = navReportsAdd(muchos, { id: k, token: 't' }, ahora);
+  assert.equal(muchos.length, NAV_REPORTS_MAX);
+  assert.equal(muchos[0].id, NAV_REPORTS_MAX + 4);
+  // la respuesta: arreglado avisa y sale; duplicado y no se arregla salen callados; abierto o sin respuesta quedan
+  lista = [5, 6, 7, 8, 9].map(id => ({ id, token: 't', sent: ahora }));
+  const { list, fixed } = navReportsAfterStatus(lista,
+    [{ id: 5, status: 'fixed' }, { id: 6, status: 'duplicate' }, { id: 7, status: 'wontfix' }, { id: 8, status: 'open' }]);
+  assert.deepEqual(fixed, [5]);
+  assert.deepEqual(list.map(r => r.id), [8, 9]);
+  // otra pestana ya aviso (ya no esta en lo guardado): no se avisa dos veces
+  assert.deepEqual(navReportsAfterStatus(list, [{ id: 5, status: 'fixed' }]).fixed, []);
 });
