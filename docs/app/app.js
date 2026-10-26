@@ -6954,21 +6954,95 @@ async function copyText(text) {
   return ok;
 }
 
-// Donde estaba cada aviso de giro, para pegar en Discord cuando uno estuvo
-// mal (turnReportText en pure.js). Con las coordenadas y la variante se
-// reproduce el cruce en el simulador.
-document.getElementById('turnReportBtn').addEventListener('click', async () => {
+// Donde estaba cada aviso de giro y a donde va la ruta (turnReportText en
+// pure.js). Con las coordenadas, el destino y la variante se reproduce el
+// cruce en el simulador. Lo copia el boton de Ajustes y lo lleva el reporte
+// de navegacion. El destino, sin tocar el estado de la ruta borrada a mano
+// (resolveRouteTarget la da por terminada si cambio el viaje).
+function buildTurnReport() {
   const pos = lastData && lastData.position;
-  const text = turnReportText({
+  const target = lastData ? resolveRawRouteTarget(lastData) : null;
+  return turnReportText({
     game: lastData && lastData.game, map: currentGame, web: webVersion(),
     client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
     now: Date.now(), items: turnLog.list(),
     routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
+    route: {
+      profile: routeProfile,
+      to: target && target.kind !== 'waypoint' ? { kind: target.kind, x: target.x, z: target.z, approx: !!target.approx } : null,
+      via: waypoints.map(wp => wp.pos),
+    },
     formatTime: (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
   });
+}
+
+async function copyTurnReport(text) {
   if (await copyText(text)) showToast(t('turnReportCopied'), 'success', 3000);
   else prompt(t('turnReportCopy'), text);
+}
+
+document.getElementById('turnReportBtn').addEventListener('click', () => copyTurnReport(buildTurnReport()));
+
+// Reportar un problema de navegacion (25-10): en vez de pegar el turn report
+// en Discord, se manda al servicio de cuentas con lo que la persona elige y
+// escribe, y queda numerado para arreglarlo con los demas (navReportBody en
+// pure.js). El reporte se arma al abrir: lo que se ve en "What gets sent" es
+// lo que se manda. Si no sale (sin internet, la API todavia sin la ruta), se
+// ofrece copiarlo, como antes.
+let navReportText = '';
+function setNavReportStatus(text) { document.getElementById('navReportStatus').textContent = text || ''; }
+
+document.getElementById('navReportBtn').addEventListener('click', () => {
+  document.getElementById('settingsModal').style.display = 'none';
+  navReportText = buildTurnReport();
+  document.getElementById('navReportPreview').textContent = navReportText;
+  document.querySelectorAll('input[name="navReportKind"]').forEach(r => { r.checked = false; });
+  document.getElementById('navReportText').value = '';
+  document.getElementById('navReportSendBtn').disabled = false;
+  document.getElementById('navReportCopyBtn').hidden = true;
+  setNavReportStatus(conn.demo ? t('navReportDemo') : '');
+  document.getElementById('navReportModal').style.display = 'flex';
+});
+
+document.getElementById('navReportSendBtn').addEventListener('click', async () => {
+  if (conn.demo) { setNavReportStatus(t('navReportDemo')); return; }
+  const kind = document.querySelector('input[name="navReportKind"]:checked')?.value || null;
+  const pedido = navReportBody({
+    kind, description: document.getElementById('navReportText').value, report: navReportText,
+    game: lastData && lastData.game, map: currentGame, web: webVersion(),
+    client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
+  });
+  if (pedido.error) { setNavReportStatus(t('navReportNeedKind')); return; }
+  const btn = document.getElementById('navReportSendBtn');
+  btn.disabled = true;
+  setNavReportStatus(t('navReportSending'));
+  let status = 0, body = null;
+  try {
+    const res = await fetch(NAV_REPORT_URL, {
+      method: 'POST', credentials: navReportCredentials(location.hostname),
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pedido.body),
+    });
+    status = res.status;
+    body = await res.json().catch(() => null);
+  } catch (e) { status = 0; }
+  const fin = navReportOutcome(status, body);
+  if (fin.state === 'sent') {
+    setNavReportStatus(t('navReportSent', fin.id));
+    showToast(t('navReportSent', fin.id), 'success', 4000);
+    return; // el boton queda apagado: ya se mando
+  }
+  btn.disabled = false;
+  setNavReportStatus(t(fin.state === 'tooMany' ? 'navReportTooMany' : 'navReportFailed'));
+  document.getElementById('navReportCopyBtn').hidden = fin.state === 'tooMany';
+});
+
+document.getElementById('navReportCopyBtn').addEventListener('click', () => copyTurnReport(navReportText));
+document.getElementById('navReportCloseBtn').addEventListener('click', () => {
+  document.getElementById('navReportModal').style.display = 'none';
+});
+document.getElementById('navReportModal').addEventListener('click', (e) => {
+  if (e.target.id === 'navReportModal') document.getElementById('navReportModal').style.display = 'none';
 });
 
 function renderTripHistory() {

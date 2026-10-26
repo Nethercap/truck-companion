@@ -5288,3 +5288,47 @@ test('tmpPlayersUpdate: descarta lo que no se puede dibujar', () => {
   const muchos = Array.from({ length: 50 }, (_, i) => ({ id: i, name: '', x: i, z: i }));
   assert.equal(tmpPlayersUpdate(null, { tmpPlayers: muchos }, 0).list.length, TMP_PLAYERS_MAX);
 });
+
+test('turnReportText: a donde va la ruta, para reproducirla (Tonopah, 25-10)', () => {
+  const { turnReportText, TURN_REPORT_VIA_MAX } = require('./pure.js');
+  const base = { game: 'ats', map: 'ats', web: 'x', client: '1.5.35', truck: [-100462, -6374], now: 1, items: [], formatTime: () => 'h' };
+  const linea = (route) => turnReportText({ ...base, route }).split('\n').find(l => l.startsWith('Route: ')) || null;
+  assert.equal(linea({ profile: 'fastest', to: { kind: 'dest', x: -106153.4, z: 326.2 }, via: [] }), 'Route: fastest, to dest at -106153, 326');
+  assert.equal(linea({ profile: 'shortest', to: { kind: 'pickup', x: 10, z: 20, approx: true }, via: [[1.4, 2.6], [3, 4]] }),
+    'Route: shortest, to pickup (approx) at 10, 20, via 1, 3 / 3, 4');
+  // solo waypoints (sin trabajo)
+  assert.equal(linea({ profile: 'fastest', to: null, via: [[5, 6]] }), 'Route: fastest, via 5, 6');
+  // sin destino ni waypoints, o sin route: no va la linea
+  assert.equal(linea({ profile: 'fastest', to: null, via: [] }), null);
+  assert.equal(linea(null), null);
+  // muchos waypoints: los primeros y cuantos faltan
+  const muchos = Array.from({ length: TURN_REPORT_VIA_MAX + 3 }, (_, k) => [k, k]);
+  assert.ok(linea({ profile: 'fastest', to: null, via: muchos }).endsWith(' (+3 more)'));
+});
+
+test('reporte de navegacion: el pedido, la cookie y que decir despues', () => {
+  const { navReportBody, navReportCredentials, navReportOutcome, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX } = require('./pure.js');
+  const datos = { kind: 'wrong_warning', description: '  dos avisos pegados  ', report: 'Truck Dash turn report', game: 'ats', map: 'ats', web: 'w', client: null };
+  assert.deepEqual(navReportBody(datos).body,
+    { kind: 'wrong_warning', description: 'dos avisos pegados', report: 'Truck Dash turn report', game: 'ats', map: 'ats', web: 'w', client: null });
+  // sin tipo elegido, o uno que la API no conoce
+  assert.equal(navReportBody({ ...datos, kind: null }).error, 'kind');
+  assert.equal(navReportBody({ ...datos, kind: 'otra' }).error, 'kind');
+  assert.equal(navReportBody({ ...datos, report: '' }).error, 'report');
+  // la descripcion es opcional y se recorta al tope de la API
+  assert.equal(navReportBody({ ...datos, description: '   ' }).body.description, null);
+  assert.equal(navReportBody({ ...datos, description: 'x'.repeat(NAV_REPORT_DESC_MAX + 50) }).body.description.length, NAV_REPORT_DESC_MAX);
+  assert.ok(NAV_REPORT_KINDS.includes('missing_warning') && NAV_REPORT_KINDS.includes('other'));
+  // la cookie de la cuenta solo desde nuestro dominio
+  assert.equal(navReportCredentials('trucksim-dash.com'), 'include');
+  assert.equal(navReportCredentials('www.trucksim-dash.com'), 'include');
+  assert.equal(navReportCredentials('192.168.1.20'), 'omit');
+  assert.equal(navReportCredentials('localhost'), 'omit');
+  assert.equal(navReportCredentials('eviltrucksim-dash.com'), 'omit');
+  // lo que vuelve
+  assert.deepEqual(navReportOutcome(200, { ok: true, id: 12 }), { state: 'sent', id: 12 });
+  assert.deepEqual(navReportOutcome(429, { error: 'demasiados_reportes' }), { state: 'tooMany' });
+  for (const [st, body] of [[0, null], [404, null], [400, { error: 'tipo_invalido' }], [500, null], [200, { ok: true }]]) {
+    assert.deepEqual(navReportOutcome(st, body), { state: 'failed' }, String(st));
+  }
+});
