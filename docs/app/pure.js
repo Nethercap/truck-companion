@@ -1340,6 +1340,7 @@ function ringThrough(adjacency, nodeAt, start, from, maxLenM = 350, maxDepth = 2
 // pts[k] = [x, z, ferry, junction, nodeIdx]; adjacency: Map nodeIdx -> [[to, ...]]
 // (dirigida: en una via de un solo sentido solo aparecen las salidas
 // reales, asi que una rampa de INGRESO que se une por atras no es candidata).
+// stubs (opcional): los tocos de prefabStubs, por indice de nodo.
 function detectManeuver(ctx) {
   const { pts, i, cum, pointAt, bearingBetween, nodes, adjacency } = ctx;
   // nodes puede ser un array de [x,y] (tests) o un Float32Array plano del
@@ -1550,9 +1551,38 @@ function detectManeuver(ctx) {
       // Gargamosch). Con un brazo muerto, o con la calle curvandose antes o
       // despues (sierras, horquillas, zigzags), sigue callado: asi decia "turn"
       // en curvas sin otro camino (Discord 17-10, Oregon; check_avisos).
-      if (quiet && alt == null && esquinaEnEscuadra()) {
+      // Ni la de una cruz con el brazo de enfrente oculto: desde el nodo de
+      // entrada, un toco (ctx.stubs, prefabStubs: brazo del prefab con la
+      // calle oculta) sigue derecho (a menos de straightLegDeg de como se
+      // llega), se une a otro toco del mismo nodo (los brazos de un prefab
+      // se unen todos entre si) y queda mas lejos que el brazo por donde
+      // sale la ruta (el de enfrente es el mas lejano: si no, la ruta cruza
+      // derecho y lo que dobla es la calle). La calle de enfrente se ve y la
+      // ruta dobla, aunque la de despues se enderece enseguida. En
+      // Bakersfield (ATS, -104665,7299, reporte del 26-10) la cruz con
+      // semaforos tiene ocultos el brazo norte y el este; la ruta dobla 90
+      // grados al oeste y a los 10 m la calzada partida vuelve al norte:
+      // medido a legM dobla 40 y no se decia nada. Una T sigue como antes,
+      // tambien la de Messina (ETS2, 18399,70950), pegada a otro prefab con
+      // un toco que no es suyo; el cruce chico en medio de una curva que se
+      // pasa derecho (Moline, Coast to Coast, 23224,-15659: llegando en curva,
+      // un brazo del costado quedaba a 20 grados); y la vuelta en U por una
+      // rotonda con los otros brazos ocultos (de mas de 120 grados, como la
+      // escuadra: "turn left" en Sevilla -> Olhao, ProMods, -77848,63486).
+      if (quiet && alt == null) {
         altExits();
-        if (new Set(deads.map(([, , n]) => n)).size >= 2) quiet = false;
+        const enfrente = () => {
+          if (!ctx.stubs || Math.abs(delta) > 120) return false;
+          let sale = null;
+          for (let k = i + 1; k < pts.length && sale == null; k++) sale = pts[k][4];
+          if (sale == null) return false;
+          const lejos = (n) => Math.hypot(nodeAt(n)[0] - pts[i][0], nodeAt(n)[1] - pts[i][1]);
+          const tocos = new Set(deads.filter(([k, , n]) => k === i && ctx.stubs[n] === 1).map(([, , n]) => n));
+          const deLaCruz = (n) => (adjacency.get(n) || []).some(([m]) => m !== n && tocos.has(m));
+          return [...tocos].some(n => deLaCruz(n) && lejos(n) > lejos(sale)
+            && Math.abs(normDeg(bearingBetween(pts[i], nodeAt(n)) - inBearing)) < straightLegDeg);
+        };
+        if (new Set(deads.map(([, , n]) => n)).size >= 2 && (esquinaEnEscuadra() || enfrente())) quiet = false;
       }
       // Salvo que la otra salida arranque pareja con la ruta: es una
       // bifurcacion en una curva (el rulo de un trebol que se abre en dos

@@ -373,6 +373,23 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   una cruz con dos brazos muertos: la calle se termina y hay que doblar
   (salida 115 de Rockford, Discord 18-10, Gargamosch). Con un brazo muerto o
   con la calle curvandose (sierras, zigzags), callada.
+  Salvo que el brazo de enfrente sea un toco (`prefabStubs`, en `ctx.stubs`):
+  desde el nodo de entrada sigue derecho (20 grados), se une a otro toco del
+  mismo nodo y queda mas lejos que el brazo por donde sale la ruta, y la
+  ruta dobla hasta 120 grados. La cruz con semaforos de Bakersfield (ATS,
+  -104665,7299, reporte del 26-10) tiene ocultos el brazo norte y el este,
+  la ruta dobla 90 grados al oeste y a los 10 m la calzada vuelve al norte:
+  a 60 m dobla 40 y se callaba. Cada condicion saco falsos: con "dos brazos
+  muertos" a secas, la T de Tulsa (el otro "brazo" era el rombo de la calle
+  de despues); con tocos de dos prefabs pegados, una T de Messina; sin lo
+  de "mas lejos", los cruces chicos que se pasan derecho en una curva
+  (Moline, Olbia: llegando en curva, un brazo del costado queda a 20
+  grados); sin el tope, la vuelta en U por una rotonda con los brazos
+  ocultos (Sevilla -> Olhao, ProMods). En check_avisos suma 2 cruces de
+  campo (Helena, Yankton); ETS2 igual. En el simulador (semilla 7, 120
+  rutas de ATS, ETS2, Coast to Coast y ProMods) suma 45 avisos, dibujados
+  uno por uno: cruces con el brazo de enfrente oculto, y tres rotondas sin
+  reconocer con brazos ocultos que dicen "turn right" en la primera salida.
 - Los puntos de la curva de un prefab cortan el grupo de nodos de cruce
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.
