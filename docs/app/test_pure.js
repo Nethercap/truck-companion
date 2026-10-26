@@ -435,6 +435,37 @@ test('maneuver: la esquina en escuadra de una cruz con dos brazos muertos se anu
   assert.equal(detectManeuver(cruz(zigzag)).quiet, true);
 });
 
+test('maneuver: la cruz con el brazo de enfrente oculto se anuncia aunque la calle se enderece enseguida (Bakersfield, reporte del 26-10)', () => {
+  // La cruz con semaforos de Bakersfield (ATS, -104665,7299): se entra por el
+  // brazo sur (1), se sale por el oeste (2) y a los 10 m la calzada vuelve
+  // al norte, asi que a 60 m dobla 43 grados. Los brazos norte (5) y este (6)
+  // son tocos: su calle es oculta y no esta en el grafo.
+  const route = [[0, -300], [0, 0], [-30, 30], [-40, 40], [-40, 340]];
+  const brazos = [[1, 5], [1, 6], [5, 6], [6, 5], [5, 2], [6, 2], [2, 5], [2, 6]];
+  const cruz = (edges, stubs) => ({ ...scenario({ route, extraNodes: [[0, 60], [30, 30]], edges }), stubs });
+  const tocos = [0, 0, 0, 0, 0, 1, 1];
+  // sin los tocos (un grafo sin -prefabs.bin), como antes: la curva de la calle
+  assert.deepEqual([detectManeuver(cruz(brazos)).kind, detectManeuver(cruz(brazos)).quiet], ['turn', true]);
+  const m = detectManeuver(cruz(brazos, tocos));
+  assert.deepEqual([m.kind, m.direction, m.quiet], ['turn', 'left', false]);
+  // una T (el brazo de enfrente es el unico toco): callada, como en Tulsa
+  assert.equal(detectManeuver(cruz([[1, 5], [5, 2], [2, 5]], [0, 0, 0, 0, 0, 1])).quiet, true);
+  // dos tocos que no se unen entre si son de dos prefabs pegados (Messina): callada
+  assert.equal(detectManeuver(cruz([[1, 5], [1, 6], [5, 2], [6, 2]], tocos)).quiet, true);
+  // con los tocos al costado y ninguno enfrente, tambien
+  const costado = { ...scenario({ route, extraNodes: [[30, 30], [20, -20]], edges: brazos }), stubs: tocos };
+  assert.equal(detectManeuver(costado).quiet, true);
+  // y un cruce chico que se pasa derecho en medio de una curva (Moline, Coast
+  // to Coast): un brazo del costado queda a 15 grados de como se llega, pero
+  // mas cerca que el de enfrente, por donde sale la ruta
+  const curva = scenario({ route: [[0, -300], [0, 0], [11, 20], [40, 45], [300, 100]], extraNodes: [[-5, 19], [25, 5]],
+    edges: [[1, 5], [1, 6], [5, 6], [6, 5], [5, 2], [6, 2], [2, 5], [2, 6]] });
+  assert.deepEqual([detectManeuver({ ...curva, stubs: tocos }).kind, detectManeuver({ ...curva, stubs: tocos }).quiet], ['turn', true]);
+  // ni la vuelta en U por ahi (una rotonda con los otros brazos ocultos, Sevilla -> Olhao)
+  const vuelta = scenario({ route: [[0, -300], [0, 0], [-10, 20], [-20, 0], [-20, -300]], extraNodes: [[0, 60], [30, 30]], edges: brazos });
+  assert.equal(detectManeuver({ ...vuelta, stubs: tocos }).quiet, true);
+});
+
 test('continuesTurn: una esquina partida en dos nodos se anuncia una vez; dos giros de verdad, dos', () => {
   const prev = { direction: 'left', inBearing: 0, outBearing: 315, quiet: false, end: 1000 };
   // segunda mitad de la misma esquina: de la entrada (norte) a la salida (oeste) son 90 grados

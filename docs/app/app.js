@@ -4831,7 +4831,9 @@ function findUpcomingTurn(heading) {
   };
   const rumbo = Number.isFinite(heading) ? heading
     : (cum[here] >= 15 ? bearingBetween(pointAt(cum[here] - 15), pts[here]) : null);
-  const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency, incoming: routeGraph.incoming } : {};
+  // stubs: los brazos de prefab con la calle oculta (prefabStubs), para la
+  // cruz con el brazo de enfrente oculto (detectManeuver, Bakersfield).
+  const graph = routeGraph ? { nodes: routeGraph.nodes, nodeXY: routeGraph.nodeXY, adjacency: routeGraph.adjacency, incoming: routeGraph.incoming, stubs: prefabStubs(routeGraph) } : {};
   // La curva de un tramo del grafo (para reconocer rotondas de un prefab).
   const edgeLine = routeGraph ? (a, b) => {
     const k = routeGraph.dirEdge(a, b);
@@ -4891,7 +4893,7 @@ function findUpcomingTurn(heading) {
       i = Math.max(iEnd, rb.leave);
       continue;
     }
-    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, incoming: graph.incoming, edgeLine, laneTurn, laneMask,
+    const ctx = { pts, cum, pointAt, bearingBetween, nodes: graph.nodes, nodeXY: graph.nodeXY, adjacency: graph.adjacency, incoming: graph.incoming, stubs: graph.stubs, edgeLine, laneTurn, laneMask,
       turnThreshold: NAV_TURN_ANGLE_THRESHOLD_DEG, legM: NAV_TURN_LEG_M, forkLegM: NAV_FORK_LEG_M };
     // Si ahi no hay nada que avisar, el prefab entero, de punta a punta de
     // su curva (junctionManeuver): partida en dos, una T se callaba.
