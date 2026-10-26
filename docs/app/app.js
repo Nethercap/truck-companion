@@ -3824,12 +3824,21 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   // El de una calle o un prefab mas cercano, si no queda mucho mas lejos
   // (slowNodes, pure.js). A la empresa del trabajo (tramo.empresa), uno que
   // no toque ninguna via rapida (yardNodes).
+  // A una parada (no a la empresa), los otros nodos lentos casi igual de
+  // cercanos (stopEndNodes): si entrar por alguno ahorra mas de
+  // STOP_SIDE_SWITCH_M, se entra por ese (mas abajo). El icono de un area de
+  // descanso entre las dos calzadas llevaba a la de la otra mano.
+  let paradas = null;
   if (tramo && tramo.entrar) {
     const lentos = tramo.empresa ? yardNodes(routeGraph) : slowNodes(routeGraph);
     if (!lentos[endIdx]) {
       const j = nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, lentos);
       const dist = (i) => Math.hypot(nodes[2 * i] - endXY[0], nodes[2 * i + 1] - endXY[1]);
       if (j !== -1 && dist(j) <= dist(endIdx) + STOP_SLOW_NODE_M) endIdx = j;
+    }
+    if (!tramo.empresa && !metas.length && lentos[endIdx]) {
+      const cerca = stopEndNodes(routeGraph, endXY[0], endXY[1], endIdx, lentos, STOP_SLOW_TIE_M, nodeOk);
+      if (cerca.length > 1 && !cerca.includes(startIdx)) paradas = cerca;
     }
   }
 
@@ -3903,6 +3912,20 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
       const t = p ? total(c, p) : Infinity;
       if (t < mejor) { mejor = t; path = p; arranque = c; startIdx = c.to; }
     }
+  }
+  // La parada entrando por cualquiera de sus nodos (stopEndNodes), por
+  // cualquier tramo que llegue a el (f = 1): gana si ahorra mas de
+  // STOP_SIDE_SWITCH_M. Asi no cambia donde termina la ruta por unos metros
+  // (la calle de enfrente de una estacion en vez de su entrada), solo la
+  // vuelta por la otra mano.
+  if (path && paradas) {
+    const llegan = new Map();
+    for (const j of paradas) for (const a of routeGraph.incoming(j)) { const k = routeGraph.dirEdge(a, j); if (k !== -1) llegan.set(k, 1); }
+    holgura = Math.max(...paradas.map(j => Math.hypot(nodes[2 * j] - ex, nodes[2 * j + 1] - ey)));
+    const otra = porAristas(startIdx, arranque ? arranque.arc : null, llegan);
+    const metros = (p) => { let m = 0; for (let k = 1; k < p.length; k++) { const d = routeGraph.dirEdge(p[k - 1], p[k]); m += d === -1 ? Infinity : edgeM[adjEdge[d]]; } return m; };
+    if (otra && metros(path) - metros(otra) > STOP_SIDE_SWITCH_M) path = otra;
+    holgura = 0;
   }
   if (!path && finales) {
     // Sin camino que pase por la calle del waypoint: al nodo mas cercano, como antes

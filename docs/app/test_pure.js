@@ -2778,6 +2778,19 @@ test('maneuver: rampa que sale a la derecha y cruza por arriba de la autopista, 
   assert.equal(detectManeuver(sinCruzar), null);
 });
 
+test('maneuver: rampa que se abre de a poco a la derecha y cruza por arriba -> nada, no "keep right" (I-70, turn report #5, 26-10)', () => {
+  // La I-70 en Colorado (-48320,-6177): la salida va 17 m a la derecha a los
+  // 100 m pero a los 250 solo 6 grados (no llega a forkMinSep), pasa por
+  // arriba de la autopista y a 500 m queda a la izquierda. Se decia "keep
+  // right" y el camion se fue por la salida.
+  const ruta = [[0, -300], [0, 0], [0, 100], [10, 250], [60, 400], [200, 450]];
+  const rampa = [[17, 98], [35, 250], [45, 400], [40, 560]];
+  const ctx = scenario({ route: ruta, extraNodes: rampa, edges: [[1, 6], [6, 7], [7, 8], [8, 9]] });
+  assert.equal(detectManeuver(ctx), null);
+  const espejo = (p) => [-p[0], p[1]];
+  assert.equal(detectManeuver(scenario({ route: ruta.map(espejo), extraNodes: rampa.map(espejo), edges: [[1, 6], [6, 7], [7, 8], [8, 9]] })), null);
+});
+
 test('maneuver: el conector se parte en dos calzadas casi paralelas y la ruta toma la que se abre -> keep right (Council Bluffs, 17-10)', () => {
   // del I-29 al I-80: a 120 m la ruta (la colectora) va 5 grados a la
   // derecha y la otra (el I-80) 3 a la izquierda, 16 m entre las dos; por
@@ -4753,6 +4766,20 @@ test('slowNodes: los nodos de una calle o un prefab, para terminar la ruta en un
   // Con otro tope se arma de nuevo
   assert.deepEqual([...slowNodes(g, 95)], [1, 1, 1, 1]);
   assert.ok(STOP_SLOW_KMH > 60 && STOP_SLOW_KMH < 90);
+});
+
+test('stopEndNodes: los nodos lentos casi igual de cerca de una parada, para entrar por la mano que queda a mano (turn report #6, 26-10)', () => {
+  const { stopEndNodes, STOP_SLOW_TIE_M } = require('./pure.js');
+  // El icono de un area de descanso entre las dos calzadas (en 0,0): el area
+  // de la otra mano a 23 m (nodo 0, el elegido), la suya a 48 (1), otra calle
+  // a 70 (2, mas de 40 m mas lejos), la autopista a 10 (3, rapido) y un nodo
+  // de otra componente a 30 (4)
+  const g = { n: 5, nodes: Float32Array.from([0, -23, 0, 48, 70, 0, 0, 10, 30, 0]), componentId: Int32Array.from([0, 0, 0, 0, 1]) };
+  const lentos = Uint8Array.from([1, 1, 1, 0, 1]);
+  assert.deepEqual(stopEndNodes(g, 0, 0, 0, lentos), [0, 1]);
+  assert.deepEqual(stopEndNodes(g, 0, 0, 0, lentos, 50), [0, 1, 2]);
+  // los que no pasa nodeOk (DLC apagado) no cuentan
+  assert.deepEqual(stopEndNodes(g, 0, 0, 0, lentos, STOP_SLOW_TIE_M, Uint8Array.from([1, 0, 1, 1, 1])), [0]);
 });
 
 test('yardNodes: a la empresa del trabajo no se llega por un nodo de la autopista, aunque sus tramos de prefab sean lentos', () => {

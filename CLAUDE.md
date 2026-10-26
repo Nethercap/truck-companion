@@ -275,6 +275,25 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   o al nodo de al lado). Las paradas no: en ETS2 las calles de servicio de las
   estaciones van a 90 y 196 de 2.074 se iban a otro nodo, a veces el de la
   estacion de la otra mano.
+  A una parada se entra por otro nodo lento hasta `STOP_SLOW_TIE_M` (40 m)
+  mas lejos que el mas cercano (`stopEndNodes`) si ahorra mas de
+  `STOP_SIDE_SWITCH_M` (1 km): el icono de un area de descanso puede caer
+  entre las dos calzadas. El de la I-80 al este de Council Bluffs (ATS,
+  7245,-14697, turn report #6, 26-10) es del area de la mano este (lo dice la
+  caja del trigger), pero el lento mas cercano era el de la otra mano: 10,6
+  km con la vuelta en vez de 3,6, y apenas pasada la salida a otra area en
+  el pueblo el boton de descanso elegia esa (8,4 km, tambien con vuelta).
+  Con el mas barato siempre, sin el km, cambiaba donde termina la ruta en
+  casi todos los pedidos por unos metros. Con el boton cada 1,5 km en 100
+  rutas por variante (semilla 11): cambia la elegida en 48 de 1.790 pedidos
+  en ATS, 42 de 1.976 en ETS2, 39 de 1.562 en Coast to Coast y 33 de 1.288
+  en ProMods; el camino queda mas corto en 56, 48, 45 y 42 (hasta 7 km: la
+  estacion de Yakima -> Seattle se alcanzaba pasandola y volviendo por el
+  enlace) y mas largo en 7, 7, 4 y 2 (casi todas por elegir una mas adelante
+  sobre la ruta, el costo de `pickFuelStop`); las que obligan a volver bajan
+  de 131 a 117, 98 a 90, 97 a 86 y 85 a 75. Queda una peor (Wichita Falls,
+  514 m mas y con vuelta): una con vuelta que ahora cuesta parecido y
+  `switchM` no la cambia.
 - La app rutea sola y del GPS del juego solo sabe cuanto falta
   (`routeDistanceKm`). Si nuestra ruta no coincide con eso (mas de 5 % y de
   5 km, con 40 km o mas por delante, `routeGameAgreement`), se buscan hasta 3
@@ -476,6 +495,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   derecho pero no la sirven todos los carriles, se avisa igual, sin nombre
   (`through`): "Keep left onto US-395" salia del cartel de la salida que
   viene, 1 km antes, y esa salida es a la derecha.
+- La bifurcacion lejana (`farFork`, a 500 m) no cuenta una rama que se separo
+  para un lado y lejos queda del otro: cruzo la ruta por un puente y el lado
+  es donde se separan (US-63 en Columbia, 16-10). Ademas de los 8 grados a
+  250 m, vale estar a `parallelForkSepM` (10 m) a `parallelForkM` (100 m):
+  la salida de la I-70 en Colorado (-48320,-6177, turn report #5, 26-10) va
+  17 m a la derecha a los 100 m pero solo 4 grados a los 250, y pasa por
+  arriba a los 350; se decia "keep right" donde la ruta sigue por la
+  autopista y el camion salio. En 300 rutas por variante (ATS, ETS2, Coast
+  to Coast, ProMods) cambian 9 lugares, todos ramas que se abren de un lado
+  y lejos quedan del otro: 8 "keep" de mas y uno que pasa a "keep left"
+  (Marysville -> Kansas City, la ruta es la de la izquierda).
 - Un giro no se da por pasado por estar en el primer nodo del cruce: parado en
   la linea de una T el camion queda ahi y decia "Continue straight" (Discord,
   Gargamosch, 18-10). `turnPassed`: hasta 15 m despues del ultimo nodo decide
