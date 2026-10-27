@@ -3868,17 +3868,25 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   // Sin bajarse por una salida para volver a subir a la misma calle
   // (dropRampDetours, pure.js): la US-6 de Price va a 60 km/h en el grafo y
   // sus rampas a 90, y la ruta salia en cada cruce (turn report, 24-10).
+  // Ni dejar la avenida por una calle de empresas que sale a la ruta un poco
+  // mas adelante (dropSideStreetShortcuts): en Amarillo ahorraba 1,6 s y
+  // salia a la colectora a 67 m de la rampa de la I-40 (reporte #7, 27-10).
   const bloqueada = blocked ? (e) => !!blocked[edgeG[e]] : null;
   const esFerry = (e) => (edgeF[e] & 1) === 1;
-  const porAristas = (desde, arco, hasta = finales) => dropRampDetours(findArcRoute(routeGraph, desde, endIdx, {
-    cost: costo,
-    heuristic,
-    blocked: bloqueada,
-    isFerry: esFerry,
-    startArc: arco,
-    endArcs: hasta,
-    uTurnCost: routeUTurnCost(byTime),
-  }), routeGraph, { cost: costo, startArc: arco, blocked: bloqueada, isFerry: esFerry, maxExtra: routeEdgeCost(ROUTE_RAMP_DETOUR_MAX_S, 0, byTime) });
+  const porAristas = (desde, arco, hasta = finales) => {
+    const p = findArcRoute(routeGraph, desde, endIdx, {
+      cost: costo,
+      heuristic,
+      blocked: bloqueada,
+      isFerry: esFerry,
+      startArc: arco,
+      endArcs: hasta,
+      uTurnCost: routeUTurnCost(byTime),
+    });
+    const comun = { cost: costo, startArc: arco, blocked: bloqueada, isFerry: esFerry };
+    return dropSideStreetShortcuts(dropRampDetours(p, routeGraph, { ...comun, maxExtra: routeEdgeCost(ROUTE_RAMP_DETOUR_MAX_S, 0, byTime) }),
+      routeGraph, { ...comun, maxExtra: routeEdgeCost(ROUTE_SIDE_STREET_MAX_S, 0, byTime) });
+  };
   // El waypoint mas adelante en el mismo tramo por el que se arranca (dos
   // waypoints en la misma arista larga): se llega derecho, sin dar la vuelta
   const enElTramo = arranque ? metas.find(c => c.arc === arranque.arc && c.f >= arranque.f) : null;
