@@ -2386,6 +2386,19 @@ let currentRouteWorldPoints = null; // puntos de la ruta actual en coordenadas d
 // currentRouteWorldPoints, routeMeters mide como antes.
 let currentRouteFull = null;
 const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calculada, se recalcula (como un GPS) - en interconexiones con rampas paralelas cercanas, 400 tardaba en detectar que se tomo una rampa distinta
+// Antes de eso, la otra rama de una bifurcacion que corre al lado de la ruta
+// (offRouteBranch, pure.js): siguiendo por la colectora en vez de subir a la
+// I-40 en Amarillo, la app recalculo 260 m despues (reporte #7, 27-10). Dos
+// datos seguidos, para no recalcular por uno suelto.
+const OFF_BRANCH_TICKS = 2;
+let offBranchTicks = 0;
+function tookOtherBranch(data) {
+  const rama = routeGraph && currentRouteWorldPoints
+    ? offRouteBranch(routeGraph, routeBehind, currentRouteWorldPoints, data.position.x, data.position.z, routeStartHeading(data))
+    : null;
+  offBranchTicks = rama ? offBranchTicks + 1 : 0;
+  return offBranchTicks >= OFF_BRANCH_TICKS;
+}
 
 // Waypoints intermedios puestos a mano desde la app (posicion -> wp1 -> wp2
 // ... -> destino), en orden. El SDK del juego no sabe nada de esto - si el
@@ -4425,12 +4438,13 @@ function updateDestinationMarker(data) {
   const destChanged = routeKey !== currentRouteTarget;
   const offRoute = !destChanged
     && data.position?.x != null
-    && distanceToRouteMeters(data.position.x, data.position.z) > OFF_ROUTE_THRESHOLD_M;
+    && (distanceToRouteMeters(data.position.x, data.position.z) > OFF_ROUTE_THRESHOLD_M || tookOtherBranch(data));
   const recheck = !destChanged && !offRoute && data.position?.x != null && !!routeGraph
     && routeGameRecheck(routeKey, target, data);
 
   if ((destChanged || offRoute || recheck) && data.position?.x != null && routeGraph) {
     currentRouteTarget = routeKey;
+    offBranchTicks = 0;
     // Una comparacion mas con el GPS del juego, salvo despues de esta.
     routeGameCheck = { key: routeKey, left: recheck ? 0 : 1, ticks: 0 };
     navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;

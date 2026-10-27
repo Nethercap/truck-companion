@@ -608,6 +608,26 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   recien calculada en el deposito ni al final del viaje.
 - Lo recorrido (`routeBehind`) incluye el comienzo de la ruta
   (`passedRoutePoints`); el simulador y `check_avisos` lo arman igual.
+- Se recalcula tambien al tomar la otra rama de una bifurcacion, sin esperar
+  los 200 m de `OFF_ROUTE_THRESHOLD_M` (`offRouteBranch` en pure.js,
+  `tookOtherBranch` en app.js, dos datos seguidos; reporte #7, 27-10). En
+  Amarillo la ruta subia de la colectora a la rampa de la I-40 (-25691,21145)
+  y el camion siguio por la colectora: van a 15 m a los 60 m y a 52 a los
+  200, la app mostro el aviso siguiente de la I-40 y recalculo 260 m despues
+  con la vuelta encima ("turn right in 0 ft"); asi, a los 63 m (la app con
+  telemetria falsa, Playwright). Mira las otras salidas de los nodos de lo
+  recorrido (200 m), cada una siguiendo lo mas derecho 300 m salvo que
+  vuelva a la ruta: es esa si el camion va a 12 m o mas de la ruta (a la
+  calzada, `routeDrawShift`: la autovia de una sola arista tiene el eje
+  entre las calzadas), tres veces mas cerca de la rama, pasado 12 m por ella
+  y con su rumbo (35 grados); parado (sin rumbo), nada. Si lo recorrido ya
+  no tiene el nodo de antes de la bifurcacion (una arista larga), como se
+  llega sale del ultimo tramo. Medido en 158 rutas de ATS, ETS2, Coast to
+  Coast y ProMods (semilla 7): manejando 8.100 km sobre la ruta corrido
+  -3,5, 0, 3,5 y 6 m, ningun recalculo de mas; tomando cada otra salida de
+  cada cruce (3.098), salta en 3.023, mediana 36 m y p90 60 a 102 m (con los
+  200 m, 1.073 en los primeros 300 m, mediana 225 m). Las que no saltan son
+  tocos de 40 a 100 m que se apartan 12 a 17 m. Unos 4 us por dato.
 - `tools/simular_navegacion.js` maneja rutas de las 17 variantes con el codigo
   de app.js y pure.js y lista sospechosos (escala, recalculos, avisos, voz,
   rotondas); `tools/dibujar_simulacion.py` dibuja cada uno. Correrlo antes y
