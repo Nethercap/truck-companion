@@ -250,6 +250,29 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (semilla 3) pierden 2 avisos falsos. Lo de fondo es el constructor (una
   US con cruces a distinto nivel no es una calle local): al regenerar el
   grafo, medir de nuevo.
+- Tampoco deja una avenida que sigue derecho por una calle lateral que sale
+  a la ruta mas adelante (`dropSideStreetShortcuts`, despues de
+  `dropRampDetours`; reporte #7, 27-10, Amarillo: "Turned me right early
+  onto a side street"). Al norte por la US-287 la ruta doblaba en la cruz de
+  -25866,21351 por una calle de empresas (`us 1-1`, 60 km/h) que sale a la
+  colectora de la I-40 a 67 m de la rampa: 1,6 s menos que la US-287 (80
+  km/h, pero cada cruce es un prefab a 40). El camion no llego a subir y la
+  ruta lo hizo dar la vuelta a la manzana dos veces. Llegando por una calle
+  de `ROUTE_MAIN_ROAD_KMH` (75) o mas, si la que sigue derecho (30 grados,
+  por los prefabs hasta la primera calle) tambien lo es y la ruta sale por
+  una mas lenta y de doble mano, se busca volver a la ruta por la derecha (a
+  1 km, sin vueltas en U) con menos metros lentos y hasta
+  `ROUTE_SIDE_STREET_MAX_S` (5 s) mas. De doble mano: el carril de giro a la
+  derecha que corta la esquina antes del cruce (Kalispell, Cheyenne) es de
+  un sentido y el juego lo usa. Necesita el `-prefabs.bin` para saber que es
+  calle y que prefab. En 1.750 rutas de ATS, ETS2, Coast to Coast y ProMods
+  (semillas 7 y 11) cambian 19, dibujadas una por una: todas dejaban la
+  avenida por una calle paralela (Elko, Salina, Toulouse, Peoria, Cagliari),
+  de 14 m menos a 115 m mas. check_avisos: Rock Springs -> Rawlins da la
+  vuelta a la manzana por la calle principal (2 avisos en vez de 3). El
+  simulador (semilla 7, 120 rutas) pierde un `sentido_al_reves` y un
+  `giro_sin_otra_salida` de Woodward -> Guymon; nada nuevo. Lo de fondo es
+  el constructor (un prefab que se cruza derecho no va a 40 km/h).
 - Un waypoint puesto tocando el mapa (`waypointPassesBy`: sin nombre ni
   tipo) es un punto por donde pasar: el tramo termina sobre su calle
   (`waypointArcs`, `findArcRoute` con `endArcs`), por la calzada que le
