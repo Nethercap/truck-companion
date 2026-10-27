@@ -353,6 +353,20 @@ Notes from that setup:
   telemetry shared memory has been gone for a minute, so being in a menu or
   paused does not count as closing the game.
 
+**No tray icon?** Truck Dash doesn't draw the icon itself: Wine's
+`explorer.exe` in the prefix hands it to your desktop's tray, and it can only
+do that through X11 (Wine's Wayland driver has no tray support). The game
+starts that explorer, so how the game runs decides. If it runs on Wine's
+Wayland driver (`PROTON_ENABLE_WAYLAND=1`, or a Proton build that uses it by
+default) or inside gamescope, which is a display of its own with no tray, the
+icon has nowhere to go, though Truck Dash keeps running. On GNOME the tray
+also needs an extension (AppIndicator and KStatusNotifierItem Support).
+
+To get to Setup without the icon, launch Truck Dash again the same way (same
+Proton build, same prefix). Instead of starting a second copy, it opens the
+Setup window of the one already running, with the pairing code. It closes
+itself with the game (see above), so you don't need the tray's Quit either.
+
 **Native Linux builds of the game** are a different story: they need a
 Linux build of the telemetry plugin, which exists as a test build but has
 not been confirmed against the game yet, and there is no native client. If
