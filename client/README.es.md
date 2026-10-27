@@ -264,6 +264,22 @@ Detalles de esa instalacion:
   bajo Proton. Espera a que la memoria compartida de la telemetria lleve un
   minuto ausente, asi estar en un menu o en pausa no cuenta como cerrar.
 
+**¿No aparece el icono en la bandeja?** El icono no lo dibuja Truck Dash: lo
+pasa a la bandeja de tu escritorio el `explorer.exe` de Wine del prefijo, y
+eso solo funciona por X11 (el driver de Wayland de Wine no tiene bandeja). Ese
+explorer lo arranca el juego, asi que manda como corre el juego: si corre con
+el driver de Wayland de Wine (`PROTON_ENABLE_WAYLAND=1`, o un build de Proton
+que lo usa por defecto) o adentro de gamescope, que es una pantalla aparte sin
+bandeja, el icono no tiene donde ir, aunque Truck Dash sigue corriendo. En
+GNOME la bandeja necesita ademas una extension (AppIndicator and
+KStatusNotifierItem Support).
+
+Para llegar a Setup sin el icono, lanza Truck Dash otra vez de la misma forma
+(mismo build de Proton, mismo prefijo). En vez de abrir una segunda copia,
+abre la ventana de Setup de la que ya esta corriendo, con el codigo de
+pairing. Se cierra sola con el juego (ver arriba), asi que tampoco hace falta
+el "Salir" de la bandeja.
+
 **La version nativa de Linux del juego** es otra historia: necesita un plugin
 de telemetria compilado para Linux, que existe como build de prueba pero
 todavia nadie confirmo contra el juego, y no hay cliente nativo. Si jugas la

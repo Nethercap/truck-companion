@@ -10,6 +10,10 @@ updates on its own and is not versioned here.
   has a comma in it (like "FREE-TM DAF 2021 XF, XG & XG+ Multicolor Skin"). The name was cut at
   the comma and the builder looked for a file that doesn't exist.
 
+- Linux (Proton): the client's README explains why the tray icon can be missing (the game running
+  on Wine's Wayland driver or inside gamescope) and how to reach Setup without it: launch Truck
+  Dash again and it opens the window of the copy already running.
+
 ## 1.5.35 (2026-10-25)
 
 - TruckersMP: the players around you show up on your dashboard's map, with their name and where
