@@ -27,6 +27,10 @@ as a separate program.
   its end (some protected mods) is read up to its stated size, as the game
   does, and a mod that still can't be read is skipped with its name in the
   log instead of stopping the build.
+- The mods can be given in a file, one per line (`@list.txt` instead of a
+  comma-separated list): that is how the client passes them, so a mod with
+  a comma in its file name stays whole. A builder from before this doesn't
+  work with the current client.
 - A standalone map from a mod (its own `.mbd` and sector folder, with no
   sectors added to `europe`/`usa`) is parsed instead of the game's map; with
   two `.mbd` files the game's one wins if the mod adds sectors to it.

@@ -3062,10 +3062,10 @@ index 8a13c01..3ec05a7 100755
  }
 diff --git a/packages/clis/parser/run-with-mod.ts b/packages/clis/parser/run-with-mod.ts
 new file mode 100755
-index 0000000..921ff98
+index 0000000..65b2ca1
 --- /dev/null
 +++ b/packages/clis/parser/run-with-mod.ts
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,211 @@
 +#!/usr/bin/env -S NODE_OPTIONS=--max-old-space-size=12288 npx tsx
 +// Corre el parser de truckermudgeon/maps incluyendo un mod de mapa que viene
 +// como carpeta ya extraida en disco (en vez de un .scs real), inyectandolo
@@ -3212,11 +3212,23 @@ index 0000000..921ff98
 +  };
 +}
 +
++// La lista de mods: separados por coma (el taller, carpetas sin comas en el
++// nombre) o en un archivo con uno por linea, "@lista.txt" (el cliente): el
++// nombre de un mod puede tener comas ("FREE-TM DAF 2021 XF, XG & XG+ ...",
++// #142) y la linea de comandos de Windows no pasa de 32 mil caracteres.
++function listaDeMods(arg: string): string[] {
++  if (!arg.startsWith('@')) return arg.split(',');
++  return fs
++    .readFileSync(arg.slice(1), 'utf8')
++    .split(/\r?\n/)
++    .filter(linea => linea.trim() !== '');
++}
++
 +function main() {
 +  const [inputDir, modDirsArg, outputDir] = process.argv.slice(2);
 +  if (!inputDir || !modDirsArg || !outputDir) {
 +    console.error(
-+      'Uso: npx tsx run-with-mod.ts <inputDir> <modExtractedDir1,modExtractedDir2,...> <outputDir>',
++      'Uso: npx tsx run-with-mod.ts <inputDir> <modDir1,modDir2,...|@lista.txt> <outputDir>',
 +    );
 +    process.exit(1);
 +  }
@@ -3227,10 +3239,10 @@ index 0000000..921ff98
 +    .map(e => path.join(inputDir, e.name));
 +
 +  // Varios paquetes de un mismo mod (ej. ProMods viene separado en "map" +
-+  // "dlcsupport") se pasan separados por coma y se combinan como archivos
++  // "dlcsupport") van en la lista y se combinan como archivos
 +  // independientes - el orden importa para paths duplicados (el ultimo gana,
 +  // igual que con .scs reales, ver CombinedEntries.files.get).
-+  const modArchives = modDirsArg.split(',').map(createModArchive).filter(a => a !== null);
++  const modArchives = listaDeMods(modDirsArg).map(createModArchive).filter(a => a !== null);
 +
 +  const result = parseMapFiles(scsFilePaths, {
 +    includeDlc: true,

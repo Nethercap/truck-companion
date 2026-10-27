@@ -6,6 +6,8 @@ import json
 import os
 import threading
 
+import pytest
+
 import local_server
 import map_builder
 
@@ -63,6 +65,32 @@ def test_un_mapa_a_medias_no_cuenta(tmp_path, monkeypatch):
     assert map_builder.built_map("ats", "abc")["dir"] == str(carpeta)
     (carpeta / "manifest.json").write_text(json.dumps({"format": map_builder.MAP_FORMAT - 1, "fingerprint": "abc"}))
     assert map_builder.built_map("ats", "abc") is None
+
+
+def test_los_mods_van_al_parser_en_una_lista_y_no_separados_por_coma(tmp_path, monkeypatch):
+    """Un mod con coma en el nombre se partia en dos y el parser no
+    encontraba el primer pedazo (#142)."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(map_builder, "ensure_builder", lambda version, progress: str(tmp_path / "armador"))
+    comandos = []
+
+    def correr(cmd, log_path, cancel, env):
+        comandos.append(cmd)
+        raise map_builder.BuildCancelled()
+
+    monkeypatch.setattr(map_builder, "_correr", correr)
+    mods = [os.path.normpath("C:/x/mod/FREE-TM DAF 2021 XF, XG & XG+ Multicolor Skin_locked.scs"),
+            os.path.normpath("D:/Steam/steamapps/workshop/content/227300/123/universal")]
+    with pytest.raises(map_builder.BuildCancelled):
+        map_builder.build_map("ets2", str(tmp_path / "juego"), mods, "1.5.36")
+    lista = comandos[0][3]
+    assert lista.startswith("@")
+    with open(lista[1:], encoding="utf-8") as f:
+        assert f.read().splitlines() == mods
+    # Lo que la persona adjunta cuando falla tiene que decir con que mods
+    log = os.path.join(os.path.dirname(lista[1:]), "build.log")
+    with open(log, encoding="utf-8") as f:
+        assert f"  {mods[0]}\n" in f.read()
 
 
 def _servidor(tmp_path):

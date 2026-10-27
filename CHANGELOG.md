@@ -4,6 +4,12 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Build my map: it no longer stops with "parser.mjs failed" when the file name of one of your mods
+  has a comma in it (like "FREE-TM DAF 2021 XF, XG & XG+ Multicolor Skin"). The name was cut at
+  the comma and the builder looked for a file that doesn't exist.
+
 ## 1.5.35 (2026-10-25)
 
 - TruckersMP: the players around you show up on your dashboard's map, with their name and where

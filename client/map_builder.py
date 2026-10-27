@@ -271,6 +271,19 @@ def _correr(cmd: list, log_path: str, cancel: threading.Event, env: dict):
         raise RuntimeError(f"{os.path.basename(cmd[1])} failed (exit {proc.returncode}), see {log_path}")
 
 
+def write_mod_list(mod_paths: list, lista: str, log_path: str) -> str:
+    """Los mods para el parser, uno por linea ("@lista" en su linea de
+    comandos). Separados por coma se partia un mod con coma en el nombre
+    ("FREE-TM DAF 2021 XF, XG & XG+ ...", #142), y con muchos la linea pasaria
+    los 32 mil caracteres de Windows. Van tambien al log: es lo que manda la
+    persona cuando falla."""
+    with open(lista, "w", encoding="utf-8", newline="\n") as f:
+        f.write("".join(f"{ruta}\n" for ruta in mod_paths))
+    with open(log_path, "a", encoding="utf-8", errors="replace") as log:
+        log.write(f"Mods ({len(mod_paths)}):\n" + "".join(f"  {ruta}\n" for ruta in mod_paths))
+    return lista
+
+
 STEPS = ("download", "parser", "generator", "tiles", "graph", "finish")
 
 # Lo que la web acepta como token de logo (companyIconToken en pure.js).
@@ -331,7 +344,8 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
     bin_ = os.path.join(builder, "bin")
 
     progress("parser")
-    _correr([node, os.path.join(bin_, "parser.mjs"), game_dir, ",".join(mod_paths), os.path.join(tmp, "parser")],
+    lista = write_mod_list(mod_paths, os.path.join(tmp, "mods.txt"), log_path)
+    _correr([node, os.path.join(bin_, "parser.mjs"), game_dir, "@" + lista, os.path.join(tmp, "parser")],
             log_path, cancel, env)
     progress("generator")
     _correr([node, os.path.join(bin_, "generator.mjs"), "map", "-m", prefijo, "-i", os.path.join(tmp, "parser"),
