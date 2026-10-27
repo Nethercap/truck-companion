@@ -5140,6 +5140,44 @@ test('dropRouteDetours: la alternativa no se baja de la autopista para volver a 
   assert.equal(dropRouteDetours(null, ruta, edge), null);
 });
 
+test('offRouteBranch: el camion siguio por la colectora en vez de subir a la rampa (reporte #7, Amarillo, 27-10)', () => {
+  const { offRouteBranch } = require('./pure.js');
+  // La colectora al este, de un sentido: w -> a -> c1 -> c2. En a la ruta
+  // sube a la rampa, que se abre al norte (-z): a -> r1 -> r2 -> r3.
+  const nodos = [[-200, 0], [0, 0], [60, -6], [200, -40], [400, -40], [60, 0], [300, 0]];
+  const [w, a, r1, r2, r3, c1, c2] = nodos.keys();
+  const armar = (otra) => grafoDePrueba(nodos, [
+    { a: w, b: a, uno: true }, { a, b: r1, uno: true }, { a: r1, b: r2, uno: true }, { a: r2, b: r3, uno: true },
+    { a, b: c1, uno: true }, otra,
+  ]).g;
+  const g = armar({ a: c1, b: c2, uno: true });
+  const P = (i, nodo = true) => [nodos[i][0], nodos[i][1], 0, 0, nodo ? i : null];
+  // El camion a 100 m de a por la colectora: la app lo proyecta sobre la
+  // rampa (95, -14.5), a 15 m, y lo recorrido llega hasta r1
+  const behind = [P(w), P(a), P(r1)];
+  const ahead = [[95, -14.5, 0, 0, null], P(r2), P(r3)];
+  const r = offRouteBranch(g, behind, ahead, 100, 0, 90);
+  assert.ok(r);
+  assert.equal(r.node, a);
+  assert.equal(r.branch, c1);
+  assert.ok(r.dRoute > 15 && r.dRoute < 16 && r.dBranch < 1e-9);
+  // Sobre la rampa, o todavia pegado a la bifurcacion (a 4 m de la ruta): no
+  assert.equal(offRouteBranch(g, behind, ahead, 100, -15.7, 76), null);
+  assert.equal(offRouteBranch(g, [P(w), P(a)], [[39.6, -4, 0, 0, null], P(r1), P(r2), P(r3)], 40, 0, 90), null);
+  // Parado (sin rumbo), o mirando para el otro lado: no
+  assert.equal(offRouteBranch(g, behind, ahead, 100, 0, null), null);
+  assert.equal(offRouteBranch(g, behind, ahead, 100, 0, 270), null);
+  // Una rama que vuelve a la ruta (la calzada que se abre alrededor de una
+  // isleta) no es otro camino
+  assert.equal(offRouteBranch(armar({ a: c1, b: r2, uno: true }), behind, ahead, 100, 0, 90), null);
+  // La bifurcacion quedo mas atras que backM
+  assert.equal(offRouteBranch(g, behind, ahead, 100, 0, 90, { backM: 50 }), null);
+  // Lo recorrido sin el nodo de antes de la bifurcacion (una arista larga):
+  // como se llega sale del ultimo tramo
+  const sinW = offRouteBranch(g, [[-150, 0, 0, 0, null], P(a), P(r1)], ahead, 100, 0, 90);
+  assert.ok(sinW && sinW.branch === c1);
+});
+
 test('dropRampDetours: la ruta no se baja por la salida para volver a subir a la misma calle (US-6 en Price, 24-10)', () => {
   const { dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S } = require('./pure.js');
   // La US-6 al este, de doble mano y a 60 km/h: w - a - m1 - m2 - b - e

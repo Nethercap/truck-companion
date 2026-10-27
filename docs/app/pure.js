@@ -5825,6 +5825,133 @@ function dropSideStreetShortcuts(path, g, opts) {
   return out;
 }
 
+// El camion siguio por la otra rama de una bifurcacion que corre al lado de
+// la ruta (reporte #7, 27-10, ATS, Amarillo). La ruta subia de la colectora
+// a la rampa de la I-40 ("keep left" en -25691,21145) y el camion siguio por
+// la colectora: las dos van casi juntas (15 m a los 60 m, 30 a los 100, 52
+// a los 200) y por OFF_ROUTE_THRESHOLD_M (200 m de la ruta entera) la app
+// recalculo recien 260 m despues, con el giro de la vuelta encima ("turn
+// right in 0 ft"). Mientras tanto mostraba el aviso siguiente, el de la
+// I-40. Con los nodos de la ruta de los ultimos backM (lo recorrido,
+// routeBehind): por cada otra salida de esos nodos (no darse vuelta, no un
+// ferry), la rama siguiendo lo mas derecho hasta followM, salvo que vuelva a
+// la ruta. Es la otra rama si el camion va a minM o mas de la ruta (desde el
+// nodo de la bifurcacion hasta 2 * followM), ratio veces mas cerca de la
+// rama, pasado minM por ella y con su rumbo (a maxDeg). Las distancias, a la
+// calzada (la corrida de routeDrawShift): una autovia de una sola arista de
+// doble mano tiene el eje entre las calzadas, a mas de minM del camion.
+// behind / ahead: routeBehind y la ruta desde el camion
+// (currentRouteWorldPoints), con el nodo en p[4] y la corrida en p[6].
+// headingDeg: el del juego sobre su grilla (0 al norte, -z), null parado.
+// Devuelve { node, branch, dRoute, dBranch } o null.
+const OFF_BRANCH_BACK_M = 200;
+const OFF_BRANCH_FOLLOW_M = 300;
+const OFF_BRANCH_MIN_M = 12;
+const OFF_BRANCH_RATIO = 3;
+const OFF_BRANCH_MAX_DEG = 35;
+function offRouteBranch(g, behind, ahead, x, z, headingDeg, opts = {}) {
+  if (!g || !g.csr || !Array.isArray(behind) || !Array.isArray(ahead) || ahead.length < 2
+    || !Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(headingDeg)) return null;
+  const backM = opts.backM != null ? opts.backM : OFF_BRANCH_BACK_M;
+  const followM = opts.followM != null ? opts.followM : OFF_BRANCH_FOLLOW_M;
+  const minM = opts.minM != null ? opts.minM : OFF_BRANCH_MIN_M;
+  const ratio = opts.ratio != null ? opts.ratio : OFF_BRANCH_RATIO;
+  const cosMax = Math.cos((opts.maxDeg != null ? opts.maxDeg : OFF_BRANCH_MAX_DEG) * Math.PI / 180);
+  const { nodes, csr, adjTo, adjEdge, adjRev, midOff, midXY, shiftA, shiftB } = g;
+  // Lo recorrido y lo que sigue hasta donde puede llegar a mirarse
+  const ruta = behind.slice();
+  for (let i = 0, m = 0; i < ahead.length && m <= backM + 2 * followM; i++) {
+    if (i > 0) m += Math.hypot(ahead[i][0] - ahead[i - 1][0], ahead[i][1] - ahead[i - 1][1]);
+    ruta.push(ahead[i]);
+  }
+  const cum = [0];
+  for (let i = 1; i < ruta.length; i++) cum.push(cum[i - 1] + Math.hypot(ruta[i][0] - ruta[i - 1][0], ruta[i][1] - ruta[i - 1][1]));
+  const camion = cum[Math.max(0, behind.length - 1)];
+  // Las bifurcaciones: nodos de lo recorrido a menos de backM
+  let desde = -1;
+  for (let i = behind.length - 1; i >= 0 && camion - cum[i] <= backM; i--) if (ruta[i][4] != null) desde = i;
+  if (desde === -1) return null;
+  // Distancia (y donde cae y el rumbo del tramo) de x, z a pts[i0..i1]
+  const proyectar = (pts, i0 = 0, i1 = pts.length - 1) => {
+    let mejor = { d: Infinity, along: 0, dir: [0, 0] };
+    for (let i = i0, a = 0; i < i1; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
+      if (L > 0) {
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (L * L)));
+        const d = Math.hypot(x - ax - t * dx, z - az - t * dz);
+        if (d < mejor.d) mejor = { d, along: a + t * L, dir: [dx / L, dz / L] };
+      }
+      a += L;
+    }
+    return mejor;
+  };
+  // Cerca de la ruta: va por ella (lo de siempre, y lo barato)
+  let hasta = desde;
+  while (hasta < ruta.length - 1 && cum[hasta] - cum[desde] < camion - cum[desde] + 2 * followM) hasta++;
+  const dRoute = proyectar(routeDrawShift(ruta), desde, hasta).d;
+  if (dRoute < minM) return null;
+  const enRuta = new Set();
+  for (let i = 0; i <= hasta; i++) if (ruta[i][4] != null) enRuta.add(ruta[i][4]);
+  const dirs = routeArcDirections(g);
+  const vuelta = routeUTurnTest(g);
+  const sirve = (e) => !(g.edgeF && (g.edgeF[e] & 1));
+  const arco = (a, b) => {
+    for (let k = csr[a]; k < csr[a + 1]; k++) if (adjTo[k] === b) return k;
+    return -1;
+  };
+  // Los puntos del arco k, con su corrida en p[6] como los de la ruta
+  const lineaArco = (k) => {
+    const e = adjEdge[k], a = dirs.from[k], b = adjTo[k], mids = [];
+    for (let m = midOff[e]; m < midOff[e + 1]; m++) mids.push([midXY[2 * m], midXY[2 * m + 1], 0, 0, null]);
+    if (adjRev[k]) mids.reverse();
+    const pts = [[nodes[2 * a], nodes[2 * a + 1], 0, 0, a], ...mids, [nodes[2 * b], nodes[2 * b + 1], 0, 0, b]];
+    if (shiftA) spreadEdgeShift(pts, 0, (adjRev[k] ? shiftB[e] : shiftA[e]) / 2, (adjRev[k] ? shiftA[e] : shiftB[e]) / 2);
+    return pts;
+  };
+  const hx = Math.sin(headingDeg * Math.PI / 180), hz = -Math.cos(headingDeg * Math.PI / 180);
+  for (let i = Math.max(desde, 1); i < behind.length; i++) {
+    const a = ruta[i][4];
+    if (a == null) continue;
+    let u = null, b = null;
+    for (let j = i - 1; j >= 0 && u == null; j--) if (ruta[j][4] != null) u = ruta[j][4];
+    for (let j = i + 1; j < ruta.length && b == null; j++) if (ruta[j][4] != null) b = ruta[j][4];
+    const kOut = b == null ? -1 : arco(a, b);
+    if (kOut === -1) continue;
+    // Como se llega a a: por el arco desde el nodo anterior, o si lo recorrido
+    // ya no lo tiene (una arista larga antes de la bifurcacion), por el rumbo
+    // del ultimo tramo
+    const kIn = u == null ? -1 : arco(u, a);
+    const lx = ruta[i][0] - ruta[i - 1][0], lz = ruta[i][1] - ruta[i - 1][1], ll = Math.hypot(lx, lz) || 1;
+    const seVuelve = (k) => (kIn !== -1 ? vuelta(kIn, k) : (lx * dirs.depX[k] + lz * dirs.depY[k]) / ll < UTURN_COS);
+    for (let k = csr[a]; k < csr[a + 1]; k++) {
+      if (k === kOut || !sirve(adjEdge[k]) || seVuelve(k) || enRuta.has(adjTo[k])) continue;
+      const pts = lineaArco(k);
+      let largo = 0;
+      for (let j = 1; j < pts.length; j++) largo += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]);
+      let kk = k, vuelve = false;
+      while (largo < followM) {
+        let sig = -1, cosMejor = -2;
+        for (let k2 = csr[adjTo[kk]]; k2 < csr[adjTo[kk] + 1]; k2++) {
+          if (!sirve(adjEdge[k2]) || vuelta(kk, k2)) continue;
+          const c = dirs.arrX[kk] * dirs.arrX[k2] + dirs.arrY[kk] * dirs.arrY[k2];
+          if (c > cosMejor) { cosMejor = c; sig = k2; }
+        }
+        if (sig === -1) break;
+        if (enRuta.has(adjTo[sig])) { vuelve = true; break; }
+        const mas = lineaArco(sig);
+        for (let j = 1; j < mas.length; j++) { largo += Math.hypot(mas[j][0] - mas[j - 1][0], mas[j][1] - mas[j - 1][1]); pts.push(mas[j]); }
+        kk = sig;
+      }
+      if (vuelve) continue;
+      const p = proyectar(routeDrawShift(pts));
+      if (p.along < minM || p.d * ratio > dRoute || p.dir[0] * hx + p.dir[1] * hz < cosMax) continue;
+      return { node: a, branch: adjTo[k], dRoute, dBranch: p.d };
+    }
+  }
+  return null;
+}
+
 // El tramo por el que va el camion, para arrancar ahi la ruta al recalcular
 // andando (desvio, waypoint alcanzado, trabajo nuevo). Con el nodo mas
 // cercano, sin mirar el rumbo, 160 de 3.044 recalculos simulados (15-10)
@@ -6313,6 +6440,6 @@ function findArcRoute(g, startIdx, endIdx, opts) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG,LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
+  module.exports = { roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, pickRouteLikeGame, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, DLC_GUARDS, DLC_LIST, dlcGameOf, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
 }
