@@ -5255,6 +5255,73 @@ test('dropRampDetours: la ruta no se baja por la salida para volver a subir a la
   assert.equal(dropRampDetours(null, g, { cost: opts(e).cost }), null);
 });
 
+test('dropSideStreetShortcuts: la ruta no deja la avenida por una calle de empresas que sale un poco mas adelante (reporte #7, Amarillo, 27-10)', () => {
+  const { dropSideStreetShortcuts, ROUTE_SIDE_STREET_MAX_S } = require('./pure.js');
+  // La avenida al norte (s0 -> a -> p1 -> j -> n, a 80 km/h salvo los
+  // prefabs) y en j el enlace a la colectora (j -> f1, de un sentido, al
+  // este). En la cruz de a sale al este una calle de empresas a 60 km/h
+  // (a -> q -> q2 -> q3) que llega a la colectora en f1: 25,2 s contra 26,1
+  // por la avenida. La colectora sigue al este (f1 -> r -> e).
+  const nodos = [[0, 400], [0, 300], [40, 300], [100, 300], [100, 50], [100, 0], [200, 0], [400, 0], [0, 260], [0, 0], [0, -100]];
+  const [s0, a, q, q2, q3, f1, r, e, p1, j, n] = nodos.keys();
+  const armar = (cambios = {}) => {
+    const aristas = [
+      { a: s0, b: a, s: 4.5 }, { a, b: q, pf: 1, s: 3.6 }, { a: q, b: q2, s: 3.6 }, { a: q2, b: q3, s: 15 },
+      { a: q3, b: f1, uno: true, pf: 2, s: 3 }, { a: f1, b: r, uno: true, s: 4.5 }, { a: r, b: e, uno: true, s: 9 },
+      { a, b: p1, pf: 1, s: 3.6 }, { a: p1, b: j, s: 11.7 }, { a: j, b: f1, uno: true, pf: 3, m: 120, s: 10.8 }, { a: j, b: n, s: 4.5 },
+    ].map((x, k) => ({ ...x, ...(cambios[k] || {}) }));
+    const { g, opts } = grafoDePrueba(nodos, aristas);
+    g.edgeM = Float64Array.from(aristas.map(x => x.m || Math.hypot(nodos[x.a][0] - nodos[x.b][0], nodos[x.a][1] - nodos[x.b][1])));
+    g.edgeS = Uint16Array.from(aristas.map(x => Math.floor(x.s)));
+    g.edgeT = Int8Array.from(aristas.map(x => Math.round((x.s - Math.floor(x.s)) * 10)));
+    g.edgePrefab = Uint32Array.from(aristas.map(x => x.pf || 0));
+    const vecinos = nodos.map(() => new Set());
+    aristas.forEach(x => { vecinos[x.a].add(x.b); vecinos[x.b].add(x.a); });
+    g.degree = Uint8Array.from(vecinos.map(v => v.size));
+    // Costo en segundos: la heuristica en metros de grafoDePrueba no sirve
+    return { g, opts: (fin) => ({ ...opts(fin), cost: (k) => aristas[k].s, heuristic: () => 0 }) };
+  };
+  const { g, opts } = armar();
+  const ruta = findArcRoute(g, s0, e, opts(e));
+  assert.deepEqual(ruta, [s0, a, q, q2, q3, f1, r, e]); // por la calle: 0,9 s menos
+  const porLaAvenida = dropSideStreetShortcuts(ruta, g, { cost: opts(e).cost });
+  assert.deepEqual(porLaAvenida, [s0, a, p1, j, f1, r, e]);
+  assert.ok(Math.abs(porLaAvenida.cost - ruta.cost - 0.9) < 1e-9);
+  assert.equal(porLaAvenida.endArc, null);
+  assert.ok(ROUTE_SIDE_STREET_MAX_S >= 1 && ROUTE_SIDE_STREET_MAX_S <= 10);
+  // Si la calle ahorra mas que maxExtra: queda
+  assert.equal(dropSideStreetShortcuts(ruta, g, { cost: opts(e).cost, maxExtra: 0.5 }), ruta);
+  // Si la empresa esta en la calle, la avenida no vuelve a la ruta: queda
+  const alPatio = findArcRoute(g, s0, q3, opts(q3));
+  assert.equal(dropSideStreetShortcuts(alPatio, g, { cost: opts(q3).cost }), alPatio);
+  // Llegando por una calle lenta (s0 -> a a 60 km/h), o si la calle es otra
+  // avenida (a 80 km/h): no es dejar la avenida por una calle de empresas
+  const lenta = armar({ 0: { s: 6 } });
+  const rl = findArcRoute(lenta.g, s0, e, lenta.opts(e));
+  assert.deepEqual(rl, ruta);
+  assert.equal(dropSideStreetShortcuts(rl, lenta.g, { cost: lenta.opts(e).cost }), rl);
+  const otra = armar({ 2: { s: 2.7 }, 3: { s: 11.3 } });
+  const ro = findArcRoute(otra.g, s0, e, otra.opts(e));
+  assert.deepEqual(ro, ruta);
+  assert.equal(dropSideStreetShortcuts(ro, otra.g, { cost: otra.opts(e).cost }), ro);
+  // Un carril de un sentido que corta la esquina antes del cruce (el giro a
+  // la derecha de Kalispell y Cheyenne) no es una calle de empresas: queda
+  const carril = armar({ 2: { uno: true }, 3: { uno: true } });
+  const rc = findArcRoute(carril.g, s0, e, carril.opts(e));
+  assert.deepEqual(rc, ruta);
+  assert.equal(dropSideStreetShortcuts(rc, carril.g, { cost: carril.opts(e).cost }), rc);
+  // Arrancando en a sin saber por donde se llega: no se sabe cual es la avenida
+  const desdeA = findArcRoute(g, a, e, opts(e));
+  assert.equal(dropSideStreetShortcuts(desdeA, g, { cost: opts(e).cost }), desdeA);
+  const arcoDe = (gg, x, y) => [...gg.adjTo.keys()].find(k => routeArcDirections(gg).from[k] === x && gg.adjTo[k] === y);
+  assert.deepEqual(dropSideStreetShortcuts(desdeA, g, { cost: opts(e).cost, startArc: arcoDe(g, s0, a) }), [a, p1, j, f1, r, e]);
+  // Sin el -prefabs.bin no se distingue una calle de un prefab: queda
+  const sinPrefabs = armar();
+  delete sinPrefabs.g.edgePrefab;
+  assert.equal(dropSideStreetShortcuts(ruta, sinPrefabs.g, { cost: opts(e).cost }), ruta);
+  assert.equal(dropSideStreetShortcuts(null, g, { cost: opts(e).cost }), null);
+});
+
 test('turnPassed: parado en la linea de una T el giro sigue adelante; ya doblando, no (Discord 18-10)', () => {
   const { turnPassed } = require('./pure.js');
   // T a la derecha: se entra mirando al norte (0) y se sale al este (90); el cruce va de 100 a 160 m
