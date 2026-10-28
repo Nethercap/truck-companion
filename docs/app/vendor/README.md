@@ -16,9 +16,9 @@ avisa si falta la ultima).
 
 | Archivo | Paquete | Licencia | SHA-256 |
 |---|---|---|---|
-| `maplibre-gl-4.7.1.js` | `maplibre-gl@4.7.1` `dist/maplibre-gl.js` | BSD-3-Clause, `LICENSE-maplibre-gl.txt` | `be9633c4d870e26fb37f1cfe5c5a77181667114003ea16207ac7850d8da8add1` |
-| `maplibre-gl-4.7.1.css` | `maplibre-gl@4.7.1` `dist/maplibre-gl.css` | BSD-3-Clause | `576b085fdd9487a65a19215328c1e086c07ce5bf6da09b666b3806d3d008dae9` |
-| `pmtiles-3.2.0.js` | `pmtiles@3.2.0` `dist/pmtiles.js` | BSD-3-Clause, https://github.com/protomaps/PMTiles/blob/main/LICENSE | `367c19f8936d1d6c1b1820b0dee053f793fc29277655c3e471f5ed4d37b5f045` |
+| `maplibre-gl-5.24.0.js` | `maplibre-gl@5.24.0` `dist/maplibre-gl.js` | BSD-3-Clause, `LICENSE-maplibre-gl.txt` | `45a9b07a9189ce56054c620a947ccf41e291e58c95e9b61533b740aaa65ee5cb` |
+| `maplibre-gl-5.24.0.css` | `maplibre-gl@5.24.0` `dist/maplibre-gl.css` | BSD-3-Clause | `ab1e70d59ec40465bae7e7030da2f3ccf28133fd502e62bd598eefbadfd7a732` |
+| `pmtiles-4.5.0.js` | `pmtiles@4.5.0` `dist/pmtiles.js` | BSD-3-Clause, https://github.com/protomaps/PMTiles/blob/main/LICENSE | `caf981bc46f6327ee7e65d5dc964d89d38a69f60edca2bd4c5c890c21b554c6c` |
 | `proj4-2.15.0.js` | `proj4@2.15.0` `dist/proj4.js` | MIT, `LICENSE-proj4.md` | `5c73f2719b0c33c8d8e709fc3d71056b39623d5f9182fb06a7b8e5173cfd8651` |
 
 ## Glifos del mapa

@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- LAN mode: the client keeps a copy of the new map library the website uses (MapLibre 5), so the
+  map on your phone still loads when the PC has no internet.
+
 - Build my map: it no longer stops with "parser.mjs failed" when the file name of one of your mods
   has a comma in it (like "FREE-TM DAF 2021 XF, XG & XG+ Multicolor Skin"). The name was cut at
   the comma and the builder looked for a file that doesn't exist.
