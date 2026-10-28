@@ -52,8 +52,8 @@ WEB_FILES = [
     "app/variants.js", "app/convoy.js", "app/livemap.js",
     "app/assets/logo.svg", "app/assets/icon-192.png", "app/assets/icon-512.png",
     # El mapa. Antes venian de jsDelivr y en LAN sin internet no habia mapa.
-    "app/vendor/maplibre-gl-4.7.1.js", "app/vendor/maplibre-gl-4.7.1.css",
-    "app/vendor/pmtiles-3.2.0.js", "app/vendor/proj4-2.15.0.js",
+    "app/vendor/maplibre-gl-5.24.0.js", "app/vendor/maplibre-gl-5.24.0.css",
+    "app/vendor/pmtiles-4.5.0.js", "app/vendor/proj4-2.15.0.js",
     # El panel de tablero: la app lo muestra a pantalla completa y
     # ademas se sirve solo en /dash/ para un segundo dispositivo.
     "dash/index.html", "dash/dash.js", "dash/dash.css", "dash/page.js",

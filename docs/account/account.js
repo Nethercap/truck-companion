@@ -3391,10 +3391,10 @@
     if (!mapaLibs) {
       const css = document.createElement('link');
       css.rel = 'stylesheet';
-      css.href = MAPA_VENDOR + 'maplibre-gl-4.7.1.css';
+      css.href = MAPA_VENDOR + 'maplibre-gl-5.24.0.css';
       document.head.appendChild(css);
       // variants.js por MAP_DATA_VERSION: el ?v= de los tiles, como en la app
-      mapaLibs = Promise.all([MAPA_VENDOR + 'maplibre-gl-4.7.1.js', MAPA_VENDOR + 'pmtiles-3.2.0.js', '../app/variants.js']
+      mapaLibs = Promise.all([MAPA_VENDOR + 'maplibre-gl-5.24.0.js', MAPA_VENDOR + 'pmtiles-4.5.0.js', '../app/variants.js']
         .map(cargarScript))
         .then(() => { maplibregl.addProtocol('pmtiles', new pmtiles.Protocol().tile); });
       mapaLibs.catch(() => { mapaLibs = null; });
@@ -3530,8 +3530,9 @@
         attributionControl: false, transformRequest: glifosLocales,
         // En el celular, un dedo hace scroll de la pagina y dos mueven el mapa
         cooperativeGestures: true, dragRotate: false, pitchWithRotate: false,
-        // Para poder guardar la imagen del mapa (resumen del ano)
-        preserveDrawingBuffer: true,
+        // Para poder guardar la imagen del mapa (resumen del ano). Desde
+        // MapLibre 5 va adentro de canvasContextAttributes: suelto se ignora.
+        canvasContextAttributes: { preserveDrawingBuffer: true },
       });
       mapaMl.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       const cargado = new Promise((ok) => mapaMl.once('load', ok));
