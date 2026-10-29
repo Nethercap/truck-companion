@@ -13,6 +13,11 @@ updates on its own and is not versioned here.
   has a comma in it (like "FREE-TM DAF 2021 XF, XG & XG+ Multicolor Skin"). The name was cut at
   the comma and the builder looked for a file that doesn't exist.
 
+- Build my map: when the build stops, the error is easier to find in `build.log`. Each file of
+  your mods that the builder skips now takes one line with the reason, instead of some 27 lines
+  with the whole file and a stack trace. With a lot of mods the log grew past the 25,000 lines
+  that sites like mclo.gs keep, and the error that stopped the build was cut off.
+
 - Linux (Proton): the client's README explains why the tray icon can be missing (the game running
   on Wine's Wayland driver or inside gamescope) and how to reach Setup without it: launch Truck
   Dash again and it opens the window of the copy already running.
