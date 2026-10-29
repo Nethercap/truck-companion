@@ -4,6 +4,7 @@ import http.client
 import http.server
 import json
 import os
+import sys
 import threading
 
 import pytest
@@ -91,6 +92,121 @@ def test_los_mods_van_al_parser_en_una_lista_y_no_separados_por_coma(tmp_path, m
     log = os.path.join(os.path.dirname(lista[1:]), "build.log")
     with open(log, encoding="utf-8") as f:
         assert f"  {mods[0]}\n" in f.read()
+
+
+# Un .sii salteado como lo escribe el parser de la 1.5.35, con sus colores
+# (build.log de #135, 28-10: 922 de estos en un perfil de 292 mods)
+SALTEADO = """\x1b[31m✖\x1b[39m error validating def/company/acc/out/ARCHIVO.sii
+{
+  "cargoDef": {
+    ".ARCHIVO": {
+      "cargo": ""
+    }
+  }
+}
+\x1b[31m✖\x1b[39m data/cargoDef/.ARCHIVO/cargo must match pattern "^cargo\\.[0-9a-zA-Z_.]{1,40}$"
+\x1b[31m✖\x1b[39m [ { instancePath: \x1b[32m'/cargoDef/.ARCHIVO/cargo'\x1b[39m,
+    schemaPath:
+     \x1b[32m'#/properties/cargoDef/patternProperties/%5E%5C.%3F%5B0-9a-zA-Z_.%5D%7B1%2C40%7D%24/properties/cargo/pattern'\x1b[39m,
+    keyword: \x1b[32m'pattern'\x1b[39m,
+    params: { pattern: \x1b[32m'^cargo\\\\.[0-9a-zA-Z_.]{1,40}$'\x1b[39m },
+    message: \x1b[32m'must match pattern "^cargo\\\\.[0-9a-zA-Z_.]{1,40}$"'\x1b[39m } ]
+\x1b[33m⚠\x1b[39m skipping def/company/acc/out/ARCHIVO.sii - failed to parse/validate: \n\
+
+    \x1b[90mat \x1b[39mconvertSiiToJson (\x1b[36m/C:/x/bin/parser.mjs:26788:9\x1b[39m)
+    \x1b[90mat \x1b[39mprocessCompanyJson (\x1b[36m/C:/x/bin/parser.mjs:30072:19\x1b[39m)
+    \x1b[90mat \x1b[39masync asyncRunEntryPointWithESMLoader (\x1b[36mnode:internal/modules/run_main:101:5\x1b[39m)
+"""
+
+
+def _salteado(archivo):
+    return SALTEADO.replace("ARCHIVO", archivo)
+
+
+def _compactar(texto):
+    lineas = []
+    filtro = map_builder.LogCompacto(lineas.append)
+    for linea in texto.splitlines(keepends=True):
+        filtro.linea(linea)
+    filtro.cerrar()
+    return lineas
+
+
+def test_el_build_log_deja_cada_archivo_salteado_en_una_linea():
+    """Con 27 lineas por archivo el log pasaba las 25.000 de mclo.gs y el
+    error que corto el armado quedaba afuera (#135)."""
+    texto = "adding base.scs\n" + _salteado("exhausts_c") + _salteado("seal_bearing") + "parsing map files...\n"
+    assert _compactar(texto) == [
+        "adding base.scs",
+        "⚠ skipping def/company/acc/out/exhausts_c.sii - failed to parse/validate: "
+        'data/cargoDef/.exhausts_c/cargo must match pattern "^cargo\\.[0-9a-zA-Z_.]{1,40}$"',
+        "⚠ skipping def/company/acc/out/seal_bearing.sii - failed to parse/validate: "
+        'data/cargoDef/.seal_bearing/cargo must match pattern "^cargo\\.[0-9a-zA-Z_.]{1,40}$"',
+        "parsing map files...",
+    ]
+
+
+def test_un_archivo_que_corta_el_armado_queda_con_el_json_recortado():
+    """Sin el aviso de que se saltea, el error de despues es el que importa:
+    queda entero, con su pila."""
+    adentro = [f'  "k{i}": {i},' for i in range(49)]
+    fatal = ["file:///C:/x/bin/parser.mjs:26791", "  throw new Error();", "  ^", "", "Error",
+             "    at convertSiiToJson (file:///C:/x/bin/parser.mjs:26791:9)", "", "Node.js v22.12.0"]
+    texto = "\n".join(["\x1b[31m✖\x1b[39m error validating def/city/x.sii", "{", *adentro, "}",
+                       "\x1b[31m✖\x1b[39m data must have required property 'name'",
+                       "\x1b[31m✖\x1b[39m [ { instancePath: '',", "    keyword: 'required' } ]", *fatal]) + "\n"
+    assert _compactar(texto) == [
+        "✖ error validating def/city/x.sii", "{", *adentro[:19], "  ... (30 more lines)", "}",
+        "✖ data must have required property 'name'", "✖ [ { instancePath: '',", "    keyword: 'required' } ]",
+        *fatal]
+
+
+def test_un_archivo_que_no_valida_y_no_se_saltea_no_se_junta_con_el_siguiente():
+    texto = "\x1b[31m✖\x1b[39m error validating def/a.sii\n{\n}\n\x1b[31m✖\x1b[39m data must be object\n" + _salteado("b")
+    lineas = _compactar(texto)
+    assert lineas[:4] == ["✖ error validating def/a.sii", "{", "}", "✖ data must be object"]
+    assert lineas[4:] == ["⚠ skipping def/company/acc/out/b.sii - failed to parse/validate: "
+                          'data/cargoDef/.b/cargo must match pattern "^cargo\\.[0-9a-zA-Z_.]{1,40}$"']
+
+
+def test_los_avisos_van_sin_su_pila():
+    texto = ("\x1b[33m⚠\x1b[39m skipping def/city.mod.sii - could not read its @include list: Error: zlib\n"
+             "\n    at leer (/C:/x/bin/parser.mjs:1:1)\n    at main (/C:/x/bin/parser.mjs:2:2)\n"
+             "parsing map files...\n    at no es una pila de un aviso\n")
+    assert _compactar(texto) == [
+        "⚠ skipping def/city.mod.sii - could not read its @include list: Error: zlib",
+        "parsing map files...",
+        "    at no es una pila de un aviso",
+    ]
+
+
+def _programa(tmp_path, cuerpo):
+    script = tmp_path / "parser.py"
+    script.write_text(cuerpo, encoding="utf-8")
+    return [sys.executable, str(script)]
+
+
+def test_correr_pasa_la_salida_del_armador_por_el_filtro(tmp_path):
+    salida = _salteado("tyres") + "\x1b[31m✖\x1b[39m Error: se corto\n"
+    cmd = _programa(tmp_path, f"import sys\nsys.stdout.buffer.write({salida.encode('utf-8')!r})\nsys.exit(3)\n")
+    log = tmp_path / "build.log"
+    with pytest.raises(RuntimeError, match=r"parser\.py failed \(exit 3\)"):
+        map_builder._correr(cmd, str(log), threading.Event(), dict(os.environ))
+    assert log.read_text(encoding="utf-8").splitlines()[2:] == [
+        "⚠ skipping def/company/acc/out/tyres.sii - failed to parse/validate: "
+        'data/cargoDef/.tyres/cargo must match pattern "^cargo\\.[0-9a-zA-Z_.]{1,40}$"',
+        "✖ Error: se corto",
+    ]
+
+
+def test_cancelar_corta_el_paso_aunque_no_escriba_nada(tmp_path):
+    cmd = _programa(tmp_path, "import sys, time\nprint('arranco', flush=True)\ntime.sleep(60)\n")
+    log = tmp_path / "build.log"
+    cancel = threading.Event()
+    threading.Timer(1.0, cancel.set).start()
+    with pytest.raises(map_builder.BuildCancelled):
+        map_builder._correr(cmd, str(log), cancel, dict(os.environ))
+    assert "arranco" in log.read_text(encoding="utf-8")
 
 
 def _servidor(tmp_path):

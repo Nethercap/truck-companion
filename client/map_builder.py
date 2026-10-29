@@ -251,22 +251,137 @@ def _node(builder: str) -> str:
     return propio if os.path.isfile(propio) else (shutil.which("node") or "node")
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Los simbolos de consola (el logger del parser), con los de reemplazo de una
+# consola sin unicode
+_VALIDANDO_RE = re.compile(r"[✖×] error validating (.+)")
+_SALTEA_RE = re.compile(r"[⚠‼] skipping (.*)")
+_AVISO_RE = re.compile(r"[⚠‼] ")
+_ERROR_RE = re.compile(r"[✖×] ")
+_PILA_RE = re.compile(r"\s+at \S")
+LOG_JSON_LINEAS = 20
+LOG_BLOQUE_LINEAS = 200
+
+
+class LogCompacto:
+    """La salida del armador para el build.log. Por cada .sii que no valida,
+    el parser escribe el archivo entero en JSON, los errores de AJV dos veces
+    y, al saltearlo, la pila del aviso: unas 27 lineas. Con 922 en un perfil
+    de 292 mods (#135, 28-10) el log pasaba las 25.000 lineas que guarda
+    mclo.gs y el error que corto el armado quedaba afuera. Asi va sin colores,
+    cada archivo salteado en una linea con el motivo y los avisos sin su pila.
+    Un archivo que no valida y no se saltea (el que corta el armado) queda
+    como antes, con el JSON recortado a LOG_JSON_LINEAS."""
+
+    def __init__(self, escribir):
+        self._escribir = escribir
+        self._ruta = None
+        self._bloque = []
+        self._cierre = None
+        self._lineas_json = 0
+        self._json_de_mas = 0
+        self._tras_aviso = False
+
+    def linea(self, texto: str):
+        texto = _ANSI_RE.sub("", texto).rstrip("\r\n")
+        if self._ruta is not None and self._en_bloque(texto):
+            return
+        if self._tras_aviso:
+            if not texto.strip() or _PILA_RE.match(texto):
+                return
+            self._tras_aviso = False
+        m = _VALIDANDO_RE.match(texto)
+        if m:
+            self._ruta, self._bloque, self._cierre = m.group(1), [texto], None
+            self._lineas_json = self._json_de_mas = 0
+            return
+        self._escribir(texto)
+        self._tras_aviso = bool(_AVISO_RE.match(texto))
+
+    def cerrar(self):
+        if self._ruta is not None:
+            self._soltar()
+
+    def _en_bloque(self, texto: str) -> bool:
+        """True si la linea es del bloque de "error validating" abierto."""
+        if len(self._bloque) == 1 and self._lineas_json == 0 and texto in ("{", "["):
+            self._cierre = "}" if texto == "{" else "]"
+            self._bloque.append(texto)
+            self._lineas_json = 1
+            return True
+        if self._cierre is not None:
+            if texto == self._cierre:
+                if self._json_de_mas:
+                    self._bloque.append(f"  ... ({self._json_de_mas} more lines)")
+                self._bloque.append(texto)
+                self._cierre = None
+            elif self._lineas_json < LOG_JSON_LINEAS:
+                self._bloque.append(texto)
+                self._lineas_json += 1
+            else:
+                self._json_de_mas += 1
+            return True
+        m = _SALTEA_RE.match(texto)
+        if m and m.group(1).startswith(self._ruta + " - "):
+            motivo = next((l[2:] for l in self._bloque[1:] if _ERROR_RE.match(l)), "")
+            compacta = texto.rstrip()
+            if motivo:
+                compacta += (" " if compacta.endswith(":") else "; ") + motivo
+            self._escribir(compacta)
+            self._ruta = None
+            self._tras_aviso = True
+            return True
+        # Los errores de AJV: el texto y el objeto, de varias lineas con sangria
+        de_ajv = _ERROR_RE.match(texto) or texto[:1].isspace()
+        if de_ajv and not _VALIDANDO_RE.match(texto) and len(self._bloque) < LOG_BLOQUE_LINEAS:
+            self._bloque.append(texto)
+            return True
+        self._soltar()
+        return False
+
+    def _soltar(self):
+        if self._cierre is not None and self._json_de_mas:
+            self._bloque.append(f"  ... ({self._json_de_mas} more lines)")
+        for l in self._bloque:
+            self._escribir(l)
+        self._ruta = None
+        self._bloque = []
+        self._cierre = None
+
+
+def _copiar_salida(salida, log, filtro: LogCompacto):
+    for crudo in salida:
+        texto = crudo.decode("utf-8", "replace")
+        try:
+            filtro.linea(texto)
+        except Exception:
+            # El filtro no puede frenar al armador: con el pipe lleno se cuelga
+            log.write(texto)
+    salida.close()
+
+
 def _correr(cmd: list, log_path: str, cancel: threading.Event, env: dict):
     """Un paso del armador, con prioridad baja y sin ventana. Corta si se
-    cancela. La salida va al log (el parser escribe mucho)."""
+    cancela. La salida va al log (el parser escribe mucho) por LogCompacto."""
     flags = 0
     if sys.platform == "win32":
         flags = subprocess.BELOW_NORMAL_PRIORITY_CLASS | subprocess.CREATE_NO_WINDOW
     with open(log_path, "a", encoding="utf-8", errors="replace") as log:
         log.write(f"\n$ {' '.join(cmd)}\n")
         log.flush()
-        proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env, creationflags=flags)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, creationflags=flags)
+        filtro = LogCompacto(lambda linea: log.write(linea + "\n"))
+        lector = threading.Thread(target=_copiar_salida, args=(proc.stdout, log, filtro), daemon=True)
+        lector.start()
         while proc.poll() is None:
             if cancel.is_set():
                 proc.kill()
                 proc.wait()
+                lector.join(5)
                 raise BuildCancelled()
             time.sleep(0.5)
+        lector.join()
+        filtro.cerrar()
     if proc.returncode != 0:
         raise RuntimeError(f"{os.path.basename(cmd[1])} failed (exit {proc.returncode}), see {log_path}")
 
