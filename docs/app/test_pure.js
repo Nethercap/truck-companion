@@ -5243,6 +5243,17 @@ test('dropRampDetours: la ruta no se baja por la salida para volver a subir a la
   const conCalle = armar([...nodos, [100, -100]], [...calle, ...rampas, { a: m1, b: 11, s: 10 }]);
   const r2c = findArcRoute(conCalle.g, w, e, conCalle.opts(e));
   assert.equal(dropRampDetours(r2c, conCalle.g, { cost: conCalle.opts(e).cost }), r2c);
+  // Una rampa que solo entra a la calle no es una salida: se sigue por un solo
+  // lado (reporte #10, 29-10, Lincoln NE: la rampa de la I-80 este se suma a
+  // la US-77 entre la salida a la US-6 y la entrada de despues)
+  const seSuma = armar([...nodos, [100, -100]], [...calle, ...rampas, { a: 11, b: m1, uno: true, s: 10 }]);
+  const rs = findArcRoute(seSuma.g, w, e, seSuma.opts(e));
+  assert.deepEqual(rs, [w, a, r1, j, r2, b, e]);
+  assert.deepEqual(dropRampDetours(rs, seSuma.g, { cost: seSuma.opts(e).cost }), [w, a, m1, m2, b, e]);
+  // Una que solo sale si es otro camino
+  const seVa = armar([...nodos, [100, -100]], [...calle, ...rampas, { a: m1, b: 11, uno: true, s: 10 }]);
+  const rv2 = findArcRoute(seVa.g, w, e, seVa.opts(e));
+  assert.equal(dropRampDetours(rv2, seVa.g, { cost: seVa.opts(e).cost }), rv2);
   // La "calle" dobla y el desvio sigue derecho (un carril de un prefab que se
   // aparta, el giro libre de una rotonda): no es la calle por la que se venia
   const nodos2 = [[-200, 0], [0, 0], [86.6, -50], [300, 0], [500, 0], [100, 0], [150, 0], [250, 0], [150, 200]];
