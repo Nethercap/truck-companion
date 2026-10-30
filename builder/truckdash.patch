@@ -973,7 +973,7 @@ index 4094551..a1234c4 100644
 +  return value && /^@@.+@@$/.test(value) ? value : fallback;
 +}
 diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
-index b65d4c8..05a7a61 100644
+index b65d4c8..ca9207b 100644
 --- a/packages/clis/parser/game-files/map-files-parser.ts
 +++ b/packages/clis/parser/game-files/map-files-parser.ts
 @@ -54,7 +54,18 @@ import {
@@ -1163,7 +1163,7 @@ index b65d4c8..05a7a61 100644
      sector.items = sector.items.concat(
        parsedSector.items.map(item =>
          withDlcGuard(item, map, baseFile.scsSource),
-@@ -284,11 +397,15 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
+@@ -284,25 +397,46 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
        l10nStrings,
      );
      for (const f of localeSubdir.files) {
@@ -1180,7 +1180,45 @@ index b65d4c8..05a7a61 100644
        ) {
          continue;
        }
-@@ -404,12 +521,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+-      const json = convertSiiToJson(
+-        `locale/${subdir}/${f}`,
+-        entries,
+-        LocalizationSiiSchema,
+-      );
+-      const l10n = json.localizationDb['.localization'];
++      // Uno que no se puede leer se saltea con un aviso (con el mod que lo
++      // trae), como los de def/: un local_module de un mod con comillas
++      // alemanas („...“) en vez de "..." cortaba todo el armado (#135,
++      // 29-10). Se pierden solo las traducciones de ese archivo.
++      const p = `locale/${subdir}/${f}`;
++      let l10n;
++      try {
++        l10n = convertSiiToJson(p, entries, LocalizationSiiSchema)
++          .localizationDb['.localization'];
++      } catch (err) {
++        const mod = entries.files.get(p)?.scsSource;
++        logger.warn('skipping', p, `- failed to parse/validate (${mod}):`, err);
++        continue;
++      }
+       if (Object.keys(l10n).length === 0) {
+         continue;
+       }
++      // El schema deja que falte key o val: antes, un TypeError o el assert
++      // cortaban el armado.
+       const { key, val } = l10n;
+-      assert(key.length === val.length);
++      if (key?.length !== val?.length) {
++        logger.warn(
++          'skipping',
++          p,
++          `- ${key?.length ?? 0} keys and ${val?.length ?? 0} values`,
++        );
++        continue;
++      }
+       for (let i = 0; i < key.length; i++) {
+         localeMap.set(key[i], val[i]);
+       }
+@@ -404,12 +538,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
      // .dds pixel data. Assume that the concrete instance of the FileEntry for
      // the .tobj file is an ScsArchiveTobjFile, whose .read() returns a complete
      // header-ful .dds file.
@@ -1218,7 +1256,7 @@ index b65d4c8..05a7a61 100644
    // verify that mapX pngs are square
    const size = mapPngs[0].width;
    assert(mapPngs.every(p => p.width === p.height && p.width === size));
-@@ -611,288 +749,317 @@ function postProcess(
+@@ -611,288 +766,317 @@ function postProcess(
      nodeUid: bigint;
    }[] = [];
    for (const item of poifulItems) {
@@ -1784,7 +1822,7 @@ index b65d4c8..05a7a61 100644
      }
    }
  
-@@ -1156,12 +1323,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
+@@ -1156,12 +1340,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
      if (o.nameLocalized && !l10n.has(o.nameLocalized.replaceAll('@', ''))) {
        logger.warn('no localized name for', o.nameLocalized, `(${o.name})`);
      }

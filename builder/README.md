@@ -44,6 +44,9 @@ as a separate program.
 - The `@include` lists in `def/` (cities, companies, cargo...) are read with
   the same 3nK de-obfuscation as the other `.sii` files, and one that still
   can't be read is skipped with a warning instead of stopping the build.
+- A translation file from a mod (`locale/*/local_module.*.sii`) that can't
+  be read is skipped with a warning naming the mod, instead of stopping the
+  build. One with German quotes („...“) instead of `"` did.
 
 ## Building it
 

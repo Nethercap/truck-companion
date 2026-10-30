@@ -18,6 +18,14 @@ updates on its own and is not versioned here.
   with the whole file and a stack trace. With a lot of mods the log grew past the 25,000 lines
   that sites like mclo.gs keep, and the error that stopped the build was cut off.
 
+- Build my map: it no longer stops at "parsing locale files" when one of your mods has a
+  translation file the builder can't read (one with German quotes, „...“, instead of `"`). That
+  file is skipped and named in `build.log`, and the map is built without its translations.
+
+- Build my map: files the builder can't parse at all, and empty ferry files, also take one line
+  each in `build.log`. A profile with many map mods wrote over 6,000 of them, about 37 lines
+  each, and the log still passed 200,000 lines.
+
 - Linux (Proton): the client's README explains why the tray icon can be missing (the game running
   on Wine's Wayland driver or inside gamescope) and how to reach Setup without it: launch Truck
   Dash again and it opens the window of the copy already running.
