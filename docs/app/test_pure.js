@@ -233,12 +233,20 @@ test('conn: cliente conectado sin diagnostico ni telemetria -> esperando el jueg
   assert.equal(v.chip, 'chipWaitingGame');
 });
 
-test('conn: plugin no instalado / faltante -> tarjeta del plugin', () => {
-  for (const status of ['plugin_missing', 'plugin_not_installed']) {
-    const v = view({ clientConnected: true, clientStatus: { status } });
-    assert.equal(v.chip, 'chipPluginMissing');
-    assert.equal(v.empty[0], 'emptyPluginTitle');
-  }
+test('conn: plugin no instalado (juego cerrado) -> tarjeta del plugin', () => {
+  const v = view({ clientConnected: true, clientStatus: { status: 'plugin_not_installed' } });
+  assert.equal(v.chip, 'chipPluginMissing');
+  assert.equal(v.empty[0], 'emptyPluginTitle');
+});
+
+test('conn: juego abierto sin telemetria (plugin_missing) -> no dice "no instalado"', () => {
+  // Con el plugin en su lugar y sin cargar, la tablet decia "Plugin not
+  // installed" y Setup en la PC "instalado" (Discord 30-10).
+  const v = view({ clientConnected: true, clientStatus: { status: 'plugin_missing', detail: 'The plugin file is in place but the game hasn\'t loaded it' } });
+  assert.equal(v.chip, 'chipNoTelemetry');
+  assert.equal(v.cls, 'warn');
+  assert.equal(v.detail, 'detailNoTelemetry');
+  assert.equal(v.empty[0], 'emptyNoTelemetryTitle');
 });
 
 test('conn: en el menu (waiting_truck) -> "ya casi", sin telemetria todavia', () => {

@@ -351,7 +351,15 @@ function connectionViewFor(conn) {
   if (conn.socket === 'closed') return { chip: 'chipReconnecting', cls: 'err', detail: null, empty: ['emptyReconnectTitle', 'emptyReconnectBody', '📡'] };
   if (conn.clientConnected === false) return { chip: 'chipNoClient', cls: 'err', detail: 'detailNoClient', empty: ['emptyNoClientTitle', 'emptyNoClientBody', '💻', true] };
   const st = conn.clientStatus ? conn.clientStatus.status : undefined;
-  if (st === 'plugin_missing' || st === 'plugin_not_installed') return { chip: 'chipPluginMissing', cls: 'warn', detail: 'detailPluginMissing', empty: ['emptyPluginTitle', 'emptyPluginBody', '🧩'] };
+  // plugin_not_installed: el juego esta cerrado y ninguna copia que encontro
+  // el cliente tiene el plugin. plugin_missing: el juego esta abierto y no
+  // llega telemetria, casi siempre con el plugin en su lugar (el juego no lo
+  // cargo, juego como administrador, Smart App Control); el porque viene en
+  // clientStatus.detail. Los dos decian "Plugin not installed" y Setup en la
+  // PC decia instalado: se reinstalaba sin arreglar nada (Discord 30-10,
+  // Lightningroc771).
+  if (st === 'plugin_not_installed') return { chip: 'chipPluginMissing', cls: 'warn', detail: 'detailPluginMissing', empty: ['emptyPluginTitle', 'emptyPluginBody', '🧩'] };
+  if (st === 'plugin_missing') return { chip: 'chipNoTelemetry', cls: 'warn', detail: 'detailNoTelemetry', empty: ['emptyNoTelemetryTitle', 'emptyNoTelemetryBody', '🧩'] };
   if (st === 'waiting_game' || (!conn.hasTelemetry && st !== 'waiting_truck' && st !== 'live')) return { chip: 'chipWaitingGame', cls: 'warn', detail: 'detailWaitingGame', empty: ['emptyWaitingGameTitle', 'emptyWaitingGameBody', '🎮'] };
   if (st === 'waiting_truck' || !conn.hasTelemetry) return { chip: 'chipWaitingTruck', cls: 'info', detail: 'detailWaitingTruck', empty: ['emptyWaitingTruckTitle', 'emptyWaitingTruckBody', '🚚'] };
   return { chip: conn.paused ? 'chipPaused' : 'chipLive', cls: 'live', detail: null, empty: null, live: true };
