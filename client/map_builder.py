@@ -255,12 +255,28 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 # Los simbolos de consola (el logger del parser), con los de reemplazo de una
 # consola sin unicode
 _VALIDANDO_RE = re.compile(r"[✖×] error validating (.+)")
+_PARSEANDO_RE = re.compile(r"[✖×] error parsing (.+)")
+# El arreglo de errores de chevrotain ("[ { NotAllInputParsedException: ...")
+_EXCEPCION_RE = re.compile(r"[✖×] \[ \{ (.*)")
 _SALTEA_RE = re.compile(r"[⚠‼] skipping (.*)")
 _AVISO_RE = re.compile(r"[⚠‼] ")
 _ERROR_RE = re.compile(r"[✖×] ")
 _PILA_RE = re.compile(r"\s+at \S")
 LOG_JSON_LINEAS = 20
 LOG_BLOQUE_LINEAS = 200
+# Las dos lineas del .sii que muestra el parser, mas las vacias de un CRLF
+LOG_EXTRACTO_LINEAS = 4
+LOG_EXTRACTO_CHARS = 100
+
+
+def _aviso_de(texto: str, ruta: str) -> bool:
+    """Si la linea es el aviso de que se saltea ese archivo. Los de ferry lo
+    nombran sin la carpeta ("skipping ferry connection calais_kobe.sii")."""
+    m = _SALTEA_RE.match(texto)
+    if not m:
+        return False
+    archivo = ruta.rsplit("/", 1)[-1]
+    return any(t.rsplit("/", 1)[-1] == archivo for t in m.group(1).split(" - ", 1)[0].split())
 
 
 class LogCompacto:
@@ -271,7 +287,12 @@ class LogCompacto:
     mclo.gs y el error que corto el armado quedaba afuera. Asi va sin colores,
     cada archivo salteado en una linea con el motivo y los avisos sin su pila.
     Un archivo que no valida y no se saltea (el que corta el armado) queda
-    como antes, con el JSON recortado a LOG_JSON_LINEAS."""
+    como antes, con el JSON recortado a LOG_JSON_LINEAS.
+
+    Lo mismo con los que no se pueden parsear ("error parsing": las lineas
+    del .sii y el error de chevrotain con su pila, unas 37 lineas). El
+    build.log de #135 del 29-10 tenia 6.072 asi (archivos de ferry vacios de
+    un mod, con una llave de mas): 205 mil lineas aun sin los de validar."""
 
     def __init__(self, escribir):
         self._escribir = escribir
@@ -281,10 +302,14 @@ class LogCompacto:
         self._lineas_json = 0
         self._json_de_mas = 0
         self._tras_aviso = False
+        self._parseo = None
+        self._excepcion = False
 
     def linea(self, texto: str):
         texto = _ANSI_RE.sub("", texto).rstrip("\r\n")
         if self._ruta is not None and self._en_bloque(texto):
+            return
+        if self._parseo is not None and self._en_parseo(texto):
             return
         if self._tras_aviso:
             if not texto.strip() or _PILA_RE.match(texto):
@@ -295,17 +320,73 @@ class LogCompacto:
             self._ruta, self._bloque, self._cierre = m.group(1), [texto], None
             self._lineas_json = self._json_de_mas = 0
             return
+        m = _PARSEANDO_RE.match(texto)
+        if m:
+            self._parseo, self._bloque, self._excepcion = m.group(1), [texto], False
+            return
         self._escribir(texto)
         self._tras_aviso = bool(_AVISO_RE.match(texto))
 
     def cerrar(self):
-        if self._ruta is not None:
+        if self._ruta is not None or self._parseo is not None:
             self._soltar()
+
+    def _en_parseo(self, texto: str) -> bool:
+        """True si la linea es del bloque de "error parsing" abierto: primero
+        las lineas del .sii (la primera con el simbolo, las otras sin nada),
+        despues el error de chevrotain con sangria y al final el aviso de que
+        se saltea. Lo que no encaja (la pila del throw que corta el armado)
+        suelta el bloque entero."""
+        if not self._excepcion:
+            if _EXCEPCION_RE.match(texto):
+                self._excepcion = True
+                self._bloque.append(texto)
+                return True
+            if (len(self._bloque) <= LOG_EXTRACTO_LINEAS and not _VALIDANDO_RE.match(texto)
+                    and not _PARSEANDO_RE.match(texto) and not _AVISO_RE.match(texto)):
+                self._bloque.append(texto)
+                return True
+        elif texto[:1].isspace() and len(self._bloque) < LOG_BLOQUE_LINEAS:
+            self._bloque.append(texto)
+            return True
+        elif _aviso_de(texto, self._parseo):
+            self._escribir(self._aviso_parseo(texto.rstrip()))
+            self._parseo = None
+            self._bloque = []
+            self._tras_aviso = True
+            return True
+        self._soltar()
+        return False
+
+    def _aviso_parseo(self, aviso: str) -> str:
+        """El aviso con el motivo, la linea y como empieza en el .sii."""
+        i = next(i for i, l in enumerate(self._bloque) if _EXCEPCION_RE.match(l))
+        excepcion = self._bloque[i:]
+        motivo = _EXCEPCION_RE.match(excepcion[0]).group(1).strip()
+        # Los del lexer van en un objeto: { offset: .., message: '...' }
+        mensaje = re.search(r"message: '(.*?)'", " ".join(excepcion))
+        if mensaje and not re.match(r"\w+Exception:", motivo):
+            motivo = mensaje.group(1)
+        else:
+            encontro = next((l.strip() for l in excepcion[1:] if l.strip().startswith("but found:")), None)
+            if encontro and "but found" not in motivo:
+                motivo += " ... " + encontro
+        n = next((m.group(1) for m in map(re.compile(r"startLine: (\d+)").search, excepcion) if m), None)
+        extracto = self._bloque[1][2:].strip() if i > 1 and _ERROR_RE.match(self._bloque[1]) else ""
+        if len(extracto) > LOG_EXTRACTO_CHARS:
+            extracto = extracto[:LOG_EXTRACTO_CHARS] + "..."
+        donde = f"line {n}: {extracto}" if n and extracto else (f"line {n}" if n else extracto)
+        return aviso + (" " if aviso.endswith(":") else "; ") + motivo + (f" ({donde})" if donde else "")
 
     def _en_bloque(self, texto: str) -> bool:
         """True si la linea es del bloque de "error validating" abierto."""
         if len(self._bloque) == 1 and self._lineas_json == 0 and texto in ("{", "["):
             self._cierre = "}" if texto == "{" else "]"
+            self._bloque.append(texto)
+            self._lineas_json = 1
+            return True
+        # Un archivo sin nada (los de ferry de #135): el JSON en una linea
+        if len(self._bloque) == 1 and self._lineas_json == 0 and texto in ("{}", "[]"):
             self._bloque.append(texto)
             self._lineas_json = 1
             return True
@@ -321,8 +402,7 @@ class LogCompacto:
             else:
                 self._json_de_mas += 1
             return True
-        m = _SALTEA_RE.match(texto)
-        if m and m.group(1).startswith(self._ruta + " - "):
+        if _aviso_de(texto, self._ruta):
             motivo = next((l[2:] for l in self._bloque[1:] if _ERROR_RE.match(l)), "")
             compacta = texto.rstrip()
             if motivo:
@@ -333,7 +413,8 @@ class LogCompacto:
             return True
         # Los errores de AJV: el texto y el objeto, de varias lineas con sangria
         de_ajv = _ERROR_RE.match(texto) or texto[:1].isspace()
-        if de_ajv and not _VALIDANDO_RE.match(texto) and len(self._bloque) < LOG_BLOQUE_LINEAS:
+        nuevo = _VALIDANDO_RE.match(texto) or _PARSEANDO_RE.match(texto)
+        if de_ajv and not nuevo and len(self._bloque) < LOG_BLOQUE_LINEAS:
             self._bloque.append(texto)
             return True
         self._soltar()
@@ -345,6 +426,7 @@ class LogCompacto:
         for l in self._bloque:
             self._escribir(l)
         self._ruta = None
+        self._parseo = None
         self._bloque = []
         self._cierre = None
 

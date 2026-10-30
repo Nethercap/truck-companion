@@ -180,6 +180,125 @@ def test_los_avisos_van_sin_su_pila():
     ]
 
 
+# Un .sii que no se puede parsear, como lo escribe el parser de la 1.5.35
+# (build.log de #135, 29-10: 6.072 de estos, archivos de ferry vacios con una
+# llave de mas, SiiNunit { } } con CRLF)
+NO_PARSEA = """\x1b[31m✖\x1b[39m error parsing def/ferry/connection/ARCHIVO.sii
+\x1b[31m✖\x1b[39m }
+\x1b[31m✖\x1b[39m [ { NotAllInputParsedException: Redundant input, expecting EOF but found: }
+      at RecognizerEngine2.ruleFinallyStateUpdate (file:///C:/x/bin/parser.mjs:15062:29)
+      at parseSii (file:///C:/x/bin/parser.mjs:26088:22)
+    token:
+     { image: \x1b[32m'}'\x1b[39m,
+       startOffset: \x1b[33m18\x1b[39m,
+       startLine: \x1b[33m5\x1b[39m,
+       tokenType: \x1b[36m[Object]\x1b[39m },
+    resyncedTokens: [],
+    context: { ruleStack: [], ruleOccurrenceStack: [] } } ]
+\x1b[33m⚠\x1b[39m skipping ferry connection ARCHIVO.sii - failed to parse/validate: \n\
+\n\
+    \x1b[90mat \x1b[39mconvertSiiToJson (\x1b[36m/C:/x/bin/parser.mjs:26768:11\x1b[39m)
+    \x1b[90mat \x1b[39mprocessFerryJson (\x1b[36m/C:/x/bin/parser.mjs:30128:14\x1b[39m)
+"""
+
+# El que cortaba el armado de #135 el 29-10: comillas alemanas en un
+# local_module de un mod. El parser muestra la linea y la que sigue (vacia por
+# el CRLF); el aviso de que se saltea es del armador nuevo.
+NO_PARSEA_LOCALE = """\x1b[31m✖\x1b[39m error parsing locale/de_de/local_module.trigger_actions.sii
+\x1b[31m✖\x1b[39m \tval[]: „Zur Erinnerung: Unterstützt keine kostenpflichtigen Mods. Dies verstößt gegen die Endbenutzer-Lizenzvereinbarung von SCS Software.“\r
+\r
+\x1b[31m✖\x1b[39m [ { NoViableAltException: Expecting: one of these possible Token sequences:
+    1. [AtInclude]
+    2. [Property, Colon, Property, LCurly]
+  but found: 'tzt'
+      at ErrorHandler2.raiseNoAltException (file:///C:/x/bin/parser.mjs:15260:33)
+    token:
+     { image: \x1b[32m'tzt'\x1b[39m,
+       startLine: \x1b[33m927\x1b[39m,
+       tokenType: \x1b[36m[Object]\x1b[39m },
+    resyncedTokens: [],
+    context: { ruleStack: \x1b[36m[Array]\x1b[39m, ruleOccurrenceStack: \x1b[36m[Array]\x1b[39m } } ]
+"""
+
+FATAL = ["file:///C:/x/bin/parser.mjs:26768", "    throw new Error();", "          ^", "", "Error",
+         "    at convertSiiToJson (file:///C:/x/bin/parser.mjs:26768:11)",
+         "    at parseLocaleFiles (file:///C:/x/bin/parser.mjs:32368:20)", "", "Node.js v24.19.0"]
+
+
+def test_un_archivo_que_no_se_puede_parsear_queda_en_una_linea():
+    """Con 37 lineas por archivo, el build.log de #135 del 29-10 tenia 383 mil
+    lineas: 205 mil aun compactando los que no validan."""
+    texto = "adding base.scs\n" + NO_PARSEA.replace("ARCHIVO", "aomori_hakodate") \
+        + NO_PARSEA.replace("ARCHIVO", "calais_kobe") + "parsing map files...\n"
+    assert _compactar(texto) == [
+        "adding base.scs",
+        "⚠ skipping ferry connection aomori_hakodate.sii - failed to parse/validate: "
+        "NotAllInputParsedException: Redundant input, expecting EOF but found: } (line 5: })",
+        "⚠ skipping ferry connection calais_kobe.sii - failed to parse/validate: "
+        "NotAllInputParsedException: Redundant input, expecting EOF but found: } (line 5: })",
+        "parsing map files...",
+    ]
+
+
+def test_el_aviso_de_un_archivo_que_no_parsea_trae_lo_que_encontro_y_la_linea():
+    aviso = ("\x1b[33m⚠\x1b[39m skipping locale/de_de/local_module.trigger_actions.sii"
+             " - failed to parse/validate (trigger_actions.scs): \n\n    at convertSiiToJson (/C:/x:1:1)\n")
+    assert _compactar("parsing locale files...\n" + NO_PARSEA_LOCALE + aviso) == [
+        "parsing locale files...",
+        "⚠ skipping locale/de_de/local_module.trigger_actions.sii - failed to parse/validate"
+        " (trigger_actions.scs): NoViableAltException: Expecting: one of these possible Token sequences:"
+        " ... but found: 'tzt' (line 927: val[]: „Zur Erinnerung: Unterstützt keine kostenpflichtigen Mods."
+        " Dies verstößt gegen die Endbenutze...)",
+    ]
+
+
+def test_un_error_del_lexer_se_resume_con_su_mensaje():
+    texto = ("\x1b[31m✖\x1b[39m error parsing def/city/x.sii\n"
+             "\x1b[31m✖\x1b[39m [ { offset: 40,\n    line: 3,\n    column: 9,\n    length: 1,\n"
+             "    message: 'unexpected character: ->„<- at offset: 40, skipped 1 characters.' } ]\n"
+             "\x1b[33m⚠\x1b[39m skipping def/city/x.sii - failed to parse/validate: \n")
+    assert _compactar(texto) == [
+        "⚠ skipping def/city/x.sii - failed to parse/validate: "
+        "unexpected character: ->„<- at offset: 40, skipped 1 characters.",
+    ]
+
+
+def test_un_archivo_que_no_parsea_y_corta_el_armado_queda_entero():
+    """Es el error que hay que ver: sin el aviso de que se saltea, el bloque
+    sale como vino, con el throw y su pila."""
+    lineas = _compactar(NO_PARSEA_LOCALE + "\n".join(FATAL) + "\n")
+    assert lineas[0] == "✖ error parsing locale/de_de/local_module.trigger_actions.sii"
+    assert lineas[1].startswith("✖ \tval[]: „Zur Erinnerung")
+    assert lineas[3] == "✖ [ { NoViableAltException: Expecting: one of these possible Token sequences:"
+    assert "  but found: 'tzt'" in lineas
+    assert lineas[-len(FATAL):] == FATAL
+    assert len(lineas) == NO_PARSEA_LOCALE.count("\n") + len(FATAL)
+
+
+def test_un_ferry_vacio_que_no_valida_queda_en_una_linea():
+    """El JSON de un archivo sin nada es "{}" en una linea, y el aviso de los
+    ferry nombra el archivo sin la carpeta (4.969 asi en #135)."""
+    texto = ("\x1b[31m✖\x1b[39m error validating def/ferry/connection/calais_merak.sii\n{}\n"
+             "\x1b[31m✖\x1b[39m data must have required property 'ferryConnection'\n"
+             "\x1b[31m✖\x1b[39m [ { instancePath: '',\n    schemaPath: '#/required',\n    keyword: 'required',\n"
+             "    params: { missingProperty: 'ferryConnection' },\n"
+             "    message: \"must have required property 'ferryConnection'\" } ]\n"
+             "\x1b[33m⚠\x1b[39m skipping ferry connection calais_merak.sii - failed to parse/validate: \n\n"
+             "    at convertSiiToJson (/C:/x:1:1)\n")
+    assert _compactar(texto) == [
+        "⚠ skipping ferry connection calais_merak.sii - failed to parse/validate: "
+        "data must have required property 'ferryConnection'",
+    ]
+
+
+def test_el_aviso_de_otro_archivo_no_cierra_el_bloque():
+    otro = NO_PARSEA.replace("ARCHIVO", "aomori_hakodate").replace(
+        "skipping ferry connection aomori_hakodate.sii", "skipping ferry connection hakodate_aomori.sii")
+    lineas = _compactar(otro)
+    assert lineas[0] == "✖ error parsing def/ferry/connection/aomori_hakodate.sii"
+    assert lineas[-1] == "⚠ skipping ferry connection hakodate_aomori.sii - failed to parse/validate: "
+
+
 def _programa(tmp_path, cuerpo):
     script = tmp_path / "parser.py"
     script.write_text(cuerpo, encoding="utf-8")
