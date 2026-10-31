@@ -250,6 +250,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (semilla 3) pierden 2 avisos falsos. Lo de fondo es el constructor (una
   US con cruces a distinto nivel no es una calle local): al regenerar el
   grafo, medir de nuevo.
+  "Sin cruces" es sin salidas: una rampa que solo entra a la calle no la
+  corta (reporte #10, 29-10, Lincoln NE, -4994,-9915: de la I-80 oeste a la
+  US-77 sur, la rampa se abre a la salida a la US-6, que cruza derecho la
+  calle de abajo y vuelve a subir; por la US-77 se suma la rampa de la I-80
+  este, un prefab a 40 km/h, y la salida ahorraba 1,1 s). Con los 2 vecinos
+  de antes no se veia. Barriendo todo el grafo (cada salida de cada nodo
+  con un desvio mas barato que vuelve a la calle, por el `dropRampDetours`
+  de main y el nuevo): cambian 11 lugares de ATS, 13 de ETS2 (6 la playa de
+  la misma estacion de servicio de autopista), 11 de Coast to Coast y 18 de
+  ProMods, ninguno al reves; dibujados uno por uno, la ruta dejaba la calle
+  por una colectora, un area de servicio, una rotonda o una calle de al
+  lado y volvia (Galveston, carriles de un sentido a 30 km/h: da igual).
+  check_avisos no cambia; en el simulador (semilla 7, 120 rutas de ATS,
+  ETS2, Coast to Coast y ProMods) cambia una ruta, Vyborg -> Lappeenranta
+  (ProMods), que ya no se mete al estacionamiento del costado de
+  51356,-58843 con un "turn right".
 - Tampoco deja una avenida que sigue derecho por una calle lateral que sale
   a la ruta mas adelante (`dropSideStreetShortcuts`, despues de
   `dropRampDetours`; reporte #7, 27-10, Amarillo: "Turned me right early

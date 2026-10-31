@@ -5573,8 +5573,8 @@ function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
 // Donde la ruta deja en a la calle por la que venia (la que sigue mas
 // derecho, a ROUTE_RAMP_STRAIGHT_TOL_DEG, medido al primer nodo a
 // ROUTE_RAMP_STRAIGHT_M o mas) y vuelve a ella en b: si la calle de a a b no
-// tiene cruces (es la misma calle: sus nodos tienen 2 vecinos) y el desvio
-// pasa por uno, no mide menos que la calle ni ahorra mas de maxExtra (en
+// tiene salidas (en cada nodo se sigue por un solo lado) y el desvio pasa
+// por un cruce, no mide menos que la calle ni ahorra mas de maxExtra (en
 // unidades de cost; ROUTE_RAMP_DETOUR_MAX_S en la app), la ruta va por la
 // calle. Sin la calle derecha, en ETS2 cambiaba de carril dentro de un
 // prefab (20 lugares de 171 m) y tomaba el carril de giro libre de una
@@ -5582,6 +5582,17 @@ function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
 // St. Joseph, Victoria...) y 9 en ETS2 (Pamplona, Granada, Patras,
 // Tirana...), que ahorraban de 0,1 a 8,6 s; el de Primm, con el desvio
 // derecho y 22 s menos, queda.
+// Una rampa que se suma a la calle (el nodo tiene 3 vecinos, pero se sigue
+// por un solo lado) no la corta: antes se pedian 2 vecinos (reporte #10,
+// 29-10, Lincoln NE: de la I-80 oeste a la US-77 sur, la rampa se abre a la
+// salida a la US-6, que cruza la calle de abajo y sube otra vez; por la
+// US-77 se suma la rampa de la I-80 este, un prefab a 40 km/h, y la salida
+// ahorraba 1,1 s). Asi cambian 11 lugares de ATS, 13 de ETS2 (6 por la
+// playa de una estacion de servicio de autopista), 11 de Coast to Coast y
+// 18 de ProMods, dibujados uno por uno: la ruta dejaba la calle por una
+// colectora, un area de servicio, una rotonda o una calle de al lado y
+// volvia. El de Galveston es una red de carriles de un sentido a 30 km/h:
+// da lo mismo uno u otro.
 // path: nodos de findArcRoute (con endArc y cost). opts: cost(e), startArc
 // (por donde se llega a path[0]), blocked(e), isFerry(e), maxM, maxExtra.
 // Devuelve los nodos (path si no cambia nada), con endArc y cost.
@@ -5639,14 +5650,15 @@ function dropRampDetours(path, g, opts) {
         if (aparta(kIn, path[s], nodos) > aparta(kIn, path[s], path.slice(s + 1, t + 1)) + ROUTE_RAMP_STRAIGHT_TOL_DEG) return null;
         return { nodos, t, extra, ultimo: k };
       }
-      if (degree[u] >= 3) return null;
+      // Otra calle que solo entra (la rampa que se suma) no es una salida
       nodos.push(u);
       let sig = -1;
-      for (let k2 = csr[u]; k2 < csr[u + 1] && sig === -1; k2++) {
-        const e2 = adjEdge[k2];
-        if (adjTo[k2] !== prev && !vuelta(k, k2) && !(blocked && blocked(e2)) && !isFerry(e2)) sig = k2;
+      for (let k2 = csr[u]; k2 < csr[u + 1]; k2++) {
+        if (adjTo[k2] === prev || vuelta(k, k2)) continue;
+        if (sig !== -1) return null;
+        sig = k2;
       }
-      if (sig === -1) return null;
+      if (sig === -1 || (blocked && blocked(adjEdge[sig])) || isFerry(adjEdge[sig])) return null;
       prev = u; k = sig;
       m += edgeM[adjEdge[k]]; c += cost(adjEdge[k]);
     }
