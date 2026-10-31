@@ -1121,6 +1121,54 @@ def test_dlc_de_mapa_instalados_por_los_archivos_de_la_carpeta(tmp_path):
                      {"game": "ets2", "bin_dir": str(tmp_path / "no-existe" / "bin" / "win_x64")}]
     # ETS2 sin carpeta legible: no aparece, que no es lo mismo que "ninguno"
     assert client.read_installed_dlcs(instalaciones) == {"ats": ["co", "sd"]}
+    # Con la ruta tal como esta en disco (el mapa armado mira sus fechas)
+    assert client.installed_map_dlc_files(str(raiz), "ats") == {
+        "co": str(raiz / "dlc_co.scs"), "sd": str(raiz / "DLC_SD.scs")}
+    assert client.installed_map_dlc_files(str(tmp_path / "no-existe"), "ats") is None
+
+
+def test_el_mapa_armado_antes_de_comprar_un_dlc_no_se_usa(tmp_path, monkeypatch):
+    """Discord, 31-10: con Colorado comprado esa manana el tablero seguia con
+    el mapa armado en la PC, sin Colorado ("Grand Junction is not on our
+    map"). Se deja de usar y Setup ofrece armarlo de nuevo."""
+    import json
+    import local_server
+    import map_builder
+    import tray_client
+    st = tray_client.state
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    raiz = tmp_path / "American Truck Simulator"
+    (raiz / "bin" / "win_x64").mkdir(parents=True)
+    for nombre in ("version.scs", "dlc_ut.scs", "dlc_co.scs"):
+        (raiz / nombre).write_bytes(b"x")
+    mods = [str(tmp_path / "mod.scs")]
+    monkeypatch.setattr(st, "installs", [{"game": "ats", "bin_dir": str(raiz / "bin" / "win_x64")}])
+    monkeypatch.setattr(st, "mounted_mods", {"ats": mods, "ets2": None})
+    monkeypatch.setattr(st, "local_maps", {})
+    monkeypatch.setattr(st, "local_maps_dlc_stale", {})
+    monkeypatch.setattr(local_server, "local_map_dirs", {})
+    monkeypatch.setattr(st, "offmap_games", set())
+    fp = map_builder.fingerprint("ats", str(raiz), mods)
+    carpeta = tmp_path / "TruckDash" / "maps" / f"ats-{fp}"
+    carpeta.mkdir(parents=True)
+
+    def armado(dlcs):
+        (carpeta / "manifest.json").write_text(json.dumps(
+            {"format": map_builder.MAP_FORMAT, "fingerprint": fp, "mapDlcs": dlcs}))
+
+    armado(["ut"])
+    tray_client.refresh_local_maps()
+    assert st.local_maps == {}
+    assert local_server.local_map_dirs == {}
+    assert st.local_maps_dlc_stale == {"ats": ["+co"]}
+    assert tray_client.can_build_map("ats")
+    # Armado de nuevo con los dos: se usa
+    armado(["co", "ut"])
+    assert tray_client.refresh_local_maps() is True
+    assert st.local_maps["ats"]["fingerprint"] == fp
+    assert local_server.local_map_dirs == {"ats": str(carpeta)}
+    assert st.local_maps_dlc_stale == {}
+    assert not tray_client.can_build_map("ats")
 
 
 def test_dlc_de_mapa_los_mismos_ids_que_la_web():

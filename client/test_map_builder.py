@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import threading
+import time
 
 import pytest
 
@@ -66,6 +67,86 @@ def test_un_mapa_a_medias_no_cuenta(tmp_path, monkeypatch):
     assert map_builder.built_map("ats", "abc")["dir"] == str(carpeta)
     (carpeta / "manifest.json").write_text(json.dumps({"format": map_builder.MAP_FORMAT - 1, "fingerprint": "abc"}))
     assert map_builder.built_map("ats", "abc") is None
+
+
+def _dlcs(carpeta, *ids):
+    """Los .scs de esos DLC en la carpeta del juego, como installed_map_dlc_files."""
+    carpeta.mkdir(parents=True, exist_ok=True)
+    rutas = {}
+    for i in ids:
+        ruta = carpeta / f"dlc_{i}.scs"
+        ruta.write_bytes(b"")
+        rutas[i] = str(ruta)
+    return rutas
+
+
+def test_un_dlc_de_mapa_comprado_despues_deja_de_lado_el_mapa_armado(tmp_path):
+    """Discord, 31-10: Colorado comprado esa manana, el mapa armado antes. El
+    parser lee los DLC de la carpeta del juego pero la huella no los mira, y
+    la web decia "Grand Junction is not on our map" con el mapa vacio."""
+    man = {"format": map_builder.MAP_FORMAT, "fingerprint": "abc", "mapDlcs": ["ut", "wa"]}
+    assert map_builder.dlc_changes(man, _dlcs(tmp_path / "a", "ut", "wa")) == []
+    assert map_builder.dlc_changes(man, _dlcs(tmp_path / "b", "co", "ut", "wa")) == ["+co"]
+    # Uno sacado (desactivado en Steam): el mapa tiene rutas que el juego no
+    assert map_builder.dlc_changes(man, _dlcs(tmp_path / "c", "ut")) == ["-wa"]
+    # Carpeta ilegible: no se sabe, se sigue usando
+    assert map_builder.dlc_changes(man, None) == []
+    assert map_builder.dlc_changes(None, _dlcs(tmp_path / "d", "co")) == []
+
+
+def test_un_mapa_armado_sin_la_lista_de_dlc_se_compara_por_fecha(tmp_path):
+    """Los armados con la 1.5.35 o antes no guardan los DLC: cuenta como
+    cambio un DLC cuyo archivo aparecio despues de empezar el armado."""
+    dlcs = _dlcs(tmp_path / "juego", "co", "ut")
+    hora = lambda t: time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(t))
+    antes = {"format": map_builder.MAP_FORMAT, "built": hora(time.time() - 3600), "seconds": 900}
+    assert map_builder.dlc_changes(antes, dlcs) == ["+co", "+ut"]
+    # Armado despues de que aparecieran los dos archivos: sirve
+    despues = {"format": map_builder.MAP_FORMAT, "built": hora(time.time() + 3600), "seconds": 900}
+    assert map_builder.dlc_changes(despues, dlcs) == []
+    # Termino despues de que aparecieran, pero el parser ya habia leido la
+    # carpeta: cuenta desde que empezo ("built" es el final)
+    largo = {"format": map_builder.MAP_FORMAT, "built": hora(time.time() + 600), "seconds": 3600}
+    assert map_builder.dlc_changes(largo, dlcs) == ["+co", "+ut"]
+    # Sin fecha legible no se descarta (como antes)
+    assert map_builder.dlc_changes({"built": "ayer"}, dlcs) == []
+    assert map_builder.dlc_changes({"format": map_builder.MAP_FORMAT}, dlcs) == []
+
+
+def test_el_manifest_guarda_los_dlc_de_mapa_del_armado(tmp_path, monkeypatch):
+    from mapbuild import build_cities_json, build_route_graph, extract_road_names
+    from mapbuild import pois as mapbuild_pois
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(map_builder, "ensure_builder", lambda version, progress: str(tmp_path / "armador"))
+
+    def correr(cmd, log_path, cancel, env):
+        if cmd[1].endswith("parser.mjs"):
+            with open(os.path.join(cmd[4], "usa-cities.json"), "w", encoding="utf-8") as f:
+                f.write("[]")
+
+    def grafo(args):
+        for sufijo in (".bin", "-v3.bin", "-lanes.bin", "-times.bin", "-prefabs.bin"):
+            with open(args[3][:-5] + sufijo, "wb") as f:
+                f.write(b"")
+
+    monkeypatch.setattr(map_builder, "_correr", correr)
+    monkeypatch.setattr(build_route_graph, "main", grafo)
+    monkeypatch.setattr(build_cities_json, "main", lambda args: None)
+    monkeypatch.setattr(extract_road_names, "main", lambda args: None)
+    monkeypatch.setattr(mapbuild_pois, "build", lambda carpeta, prefijo: None)
+    juego = tmp_path / "juego"
+    juego.mkdir()
+    mods = [str(tmp_path / "mod.scs")]
+    man = map_builder.build_map("ats", str(juego), mods, "1.5.36", map_dlcs=["ut", "co"])
+    assert man["mapDlcs"] == ["co", "ut"]
+    guardado = map_builder.built_map("ats", map_builder.fingerprint("ats", str(juego), mods))
+    assert guardado["mapDlcs"] == ["co", "ut"]
+    assert map_builder.dlc_changes(guardado, _dlcs(juego, "co", "ut")) == []
+    assert map_builder.dlc_changes(guardado, _dlcs(juego, "co", "ut", "wy")) == ["+wy"]
+    # Sin poder leer la carpeta del juego al empezar, sin el campo (va por fecha)
+    sin = map_builder.build_map("ats", str(juego), mods, "1.5.36")
+    assert "mapDlcs" not in sin
 
 
 def test_los_mods_van_al_parser_en_una_lista_y_no_separados_por_coma(tmp_path, monkeypatch):

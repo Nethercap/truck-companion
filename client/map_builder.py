@@ -13,6 +13,8 @@ El resultado queda en %LOCALAPPDATA%\\TruckDash\\maps\\<juego>-<huella>\\ con
 los nombres de archivo que la web espera de una variante ("local_ats",
 "local_ets2"), y el servidor local lo sirve en /localmap/. Solo se usa si la
 huella coincide con los mods activos ahora: cambiar de mods lo deja de lado.
+Tampoco si cambiaron los DLC de mapa (dlc_changes): el parser lee todos los
+.scs de la carpeta del juego, y un DLC comprado despues no cambia la huella.
 
 Pide el juego cerrado (el parser llega a ~6-7 GB de memoria) y corre con
 prioridad baja.
@@ -133,6 +135,51 @@ def built_map(game: str, fp: str) -> dict | None:
         return None
     man["dir"] = os.path.dirname(path)
     return man
+
+
+def _aparecio(ruta: str) -> float | None:
+    """Cuando aparecio o se reescribio el archivo. En Windows la fecha de
+    creacion (st_birthtime desde Python 3.12, antes st_ctime) es la de la
+    descarga aunque Steam deje otra de modificacion."""
+    try:
+        st = os.stat(ruta)
+    except OSError:
+        return None
+    return max(st.st_mtime, st.st_ctime, getattr(st, "st_birthtime", 0) or 0)
+
+
+def _inicio_del_armado(man: dict) -> float | None:
+    """Hora local en que empezo el armado ("built" es el final)."""
+    try:
+        fin = time.mktime(time.strptime(str(man["built"]), "%Y-%m-%dT%H:%M:%S"))
+        return fin - float(man.get("seconds") or 0)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+
+def dlc_changes(man: dict, dlcs: dict | None) -> list:
+    """Los DLC de mapa que cambiaron desde que se armo el mapa: "+co" si se
+    agrego Colorado, "-wa" si se saco Washington. Lista vacia si el mapa
+    sirve. dlcs: {id: ruta del .scs} de la carpeta del juego ahora
+    (client.installed_map_dlc_files); None si no se pudo leer, y entonces no
+    se descarta nada.
+
+    El parser lee todos los .scs de la carpeta del juego, DLC incluidos, pero
+    la huella mira solo version.scs y los mods: con Colorado comprado despues
+    de armar el mapa se seguia usando el de antes, sin Colorado, y la web
+    decia "Grand Junction is not on our map" con el mapa vacio (Discord,
+    31-10). Los mapas armados antes de guardar "mapDlcs" se comparan por
+    fecha: un DLC que aparecio despues de empezar el armado no esta."""
+    if not man or dlcs is None:
+        return []
+    armado = man.get("mapDlcs")
+    if isinstance(armado, list):
+        return sorted([f"+{i}" for i in set(dlcs) - set(armado)]
+                      + [f"-{i}" for i in set(armado) - set(dlcs)])
+    inicio = _inicio_del_armado(man)
+    if inicio is None:
+        return []
+    return sorted(f"+{i}" for i, ruta in dlcs.items() if (_aparecio(ruta) or 0) > inicio)
 
 
 def prune_old_maps(game: str, keep: str, max_keep: int = 2):
@@ -511,10 +558,12 @@ def copy_company_icons(parser_dir: str, prefijo: str, destino: str) -> int:
 
 def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
               progress=lambda paso: None, cancel: threading.Event | None = None,
-              mod_names: list | None = None) -> dict:
+              mod_names: list | None = None, map_dlcs: list | None = None) -> dict:
     """Arma el mapa y devuelve su manifest. progress(paso) con un nombre de
     STEPS. Tira BuildCancelled si se cancela y RuntimeError si algo falla (el
-    detalle queda en build.log de la carpeta a medias)."""
+    detalle queda en build.log de la carpeta a medias). map_dlcs: los ids de
+    los DLC de mapa de la carpeta del juego al empezar (dlc_changes), None si
+    no se pudo leer."""
     from mapbuild import build_cities_json, build_route_graph, extract_road_names
     from mapbuild import pois as mapbuild_pois
 
@@ -587,6 +636,10 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
         "companyIcons": logos,
         "clientVersion": client_version,
     }
+    # Sin el campo (mapas armados con la 1.5.35 o antes), dlc_changes compara
+    # las fechas de los archivos de los DLC con la del armado.
+    if map_dlcs is not None:
+        manifest["mapDlcs"] = sorted(map_dlcs)
     with open(os.path.join(tmp, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=1)
     shutil.rmtree(final, ignore_errors=True)

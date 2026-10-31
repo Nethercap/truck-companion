@@ -6,6 +6,12 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Build my map: a map you built before buying (or removing) a map DLC is no longer used. It didn't
+  have that DLC's roads, so the dashboard showed an empty map there and said the delivery city was
+  "not on our map" (Grand Junction, after buying Colorado). The dashboard goes back to the map on
+  our servers, and Setup says why and offers to build yours again. This also works for maps built
+  with earlier versions.
+
 - LAN mode: the client keeps a copy of the new map library the website uses (MapLibre 5), so the
   map on your phone still loads when the PC has no internet.
 

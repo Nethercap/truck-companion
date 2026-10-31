@@ -795,6 +795,17 @@ def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch
     v.build_my_map("ats")
     assert arrancados == ["ats"]
 
+    # Armado antes de un cambio en los DLC de mapa: lo dice y lo ofrece primero
+    monkeypatch.setattr(tray_client.state, "local_maps_dlc_stale", {"ats": ["+co"]})
+    tray_client.state.offmap_games.clear()
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_dlc_changed", game=tray_client.GAME_LABELS["ats"]) in textos
+    assert tray_client.T("local_map_manual", game=tray_client.GAME_LABELS["ats"]) not in textos
+    assert tray_client.T("local_map_build") in textos
+    tray_client.state.local_maps_dlc_stale = {}
+
     # Ya armado para esos mods: solo dice que esta listo, sin boton.
     tray_client.state.offmap_games.clear()
     tray_client.state.local_maps = {"ats": {"fingerprint": "f", "cities": 12, "built": "2026-10-21"}}

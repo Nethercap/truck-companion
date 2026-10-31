@@ -154,9 +154,11 @@ of memory) and give it about five minutes. The first time it downloads the
 map builder (about 40 MB) from this same release and checks its SHA-256.
 
 The map is saved in `%LOCALAPPDATA%\TruckDash\maps\` and used while the same
-mods are active. It shows on that PC and on your Wi-Fi in LAN mode; a phone
-connected with the pairing code from somewhere else keeps the map from our
-servers. The builder is GPL-3.0, see [`builder/`](../builder/).
+mods and map DLCs are active. After you buy or remove a map DLC the dashboard
+goes back to the map from our servers until you build yours again. It shows
+on that PC and on your Wi-Fi in LAN mode; a phone connected with the pairing
+code from somewhere else keeps the map from our servers. The builder is
+GPL-3.0, see [`builder/`](../builder/).
 
 ### Windows SmartScreen ("unrecognized app")
 

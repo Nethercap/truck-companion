@@ -268,14 +268,24 @@ MAP_DLC_FILES = {
 }
 
 
+def installed_map_dlc_files(game_root: str, game: str) -> dict | None:
+    """{id: ruta del .scs} de los DLC de mapa instalados en esa carpeta del
+    juego. None si la carpeta no se puede leer (no es lo mismo que no tener
+    ninguno). El mapa armado en la PC (map_builder.dlc_changes) mira tambien
+    cuando aparecio cada archivo."""
+    try:
+        nombres = {n.lower(): n for n in os.listdir(game_root)}
+    except OSError:
+        return None
+    return {i: os.path.join(game_root, nombres[archivo])
+            for archivo, i in MAP_DLC_FILES.get(game, {}).items() if archivo in nombres}
+
+
 def installed_map_dlcs(game_root: str, game: str) -> list | None:
     """Ids de los DLC de mapa instalados en esa carpeta del juego, ordenados.
     None si la carpeta no se puede leer (no es lo mismo que no tener ninguno)."""
-    try:
-        nombres = {n.lower() for n in os.listdir(game_root)}
-    except OSError:
-        return None
-    return sorted(i for archivo, i in MAP_DLC_FILES.get(game, {}).items() if archivo in nombres)
+    archivos = installed_map_dlc_files(game_root, game)
+    return None if archivos is None else sorted(archivos)
 
 
 def read_installed_dlcs(installs: list) -> dict:

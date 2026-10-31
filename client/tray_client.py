@@ -147,6 +147,9 @@ class AppState:
         # y el armado en curso.
         self.mounted_mods: dict | None = None
         self.local_maps: dict = {}
+        # Mapas armados que se dejaron de usar porque cambiaron los DLC de
+        # mapa ({'ats': ['+co']}): para anotarlo en el log una vez.
+        self.local_maps_dlc_stale: dict = {}
         self.offmap_games: set = set()
         self.cloud_viewers = None  # tableros conectados por el relay (None: no se sabe todavia)
         self.last_known_mods: dict = {}  # ultimos mods de mapa no-None por juego
@@ -1129,6 +1132,7 @@ class SetupWindow:
         return (tuple(sorted((g, m.get("fingerprint")) for g, m in state.local_maps.items())),
                 tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
                 tuple(g for g in ("ats", "ets2") if can_build_map(g)),
+                tuple(sorted(state.local_maps_dlc_stale)),
                 build.get("game"), build.get("step"), build.get("error"), build.get("running"))
 
     def render_local_map(self):
@@ -1152,6 +1156,12 @@ class SetupWindow:
                 self.label(self.local_map_body, T("local_map_ready", game=nombre, cities=man.get("cities", "?"),
                                                   date=str(man.get("built", ""))[:10]),
                            fg=GREEN, wraplength=520).pack(anchor="w", pady=2)
+            elif can_build_map(game) and game in state.local_maps_dlc_stale:
+                # Lo tenia armado y lo usaba: el de R2 no alcanza, va primero.
+                self.label(self.local_map_body, T("local_map_dlc_changed", game=nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
+                self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
+                self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g),
+                            primary=True).pack(anchor="w")
             elif needs_map_build(game):
                 self.label(self.local_map_body, T("local_map_needed", game=nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
                 self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
@@ -1889,20 +1899,31 @@ def game_dir_for(game: str) -> str | None:
 
 
 def refresh_local_maps() -> bool:
-    """Que mapa armado sirve para los mods activos ahora (huella igual). Le
-    dice al servidor local que carpeta servir. Devuelve True si cambio."""
+    """Que mapa armado sirve para los mods activos ahora (huella igual y los
+    mismos DLC de mapa). Le dice al servidor local que carpeta servir.
+    Devuelve True si cambio. Uno armado antes de comprar un DLC no lo tiene:
+    se deja de usar (la web vuelve al de R2) y Setup ofrece armarlo de nuevo."""
     nuevos = {}
+    viejos = {}
     for game, rutas in (state.mounted_mods or {}).items():
         carpeta = game_dir_for(game)
         if not rutas or not carpeta:
             continue
         try:
             man = map_builder.built_map(game, map_builder.fingerprint(game, carpeta, rutas))
+            cambios = map_builder.dlc_changes(man, client_lib.installed_map_dlc_files(carpeta, game)) if man else []
         except Exception:
             logging.exception("built_map failed")
-            man = None
-        if man:
+            man, cambios = None, []
+        if cambios:
+            viejos[game] = cambios
+        elif man:
             nuevos[game] = man
+    if viejos != state.local_maps_dlc_stale:
+        for game, cambios in viejos.items():
+            logging.info("The %s map built on this PC has other map DLCs than the game now (%s): not used, "
+                         "Setup offers to build it again", game, " ".join(cambios))
+        state.local_maps_dlc_stale = viejos
     cambio = {g: m.get("fingerprint") for g, m in nuevos.items()} != \
         {g: m.get("fingerprint") for g, m in state.local_maps.items()}
     state.local_maps = nuevos
@@ -1948,6 +1969,8 @@ def start_map_build(game: str) -> bool:
     rutas = list((state.mounted_mods or {}).get(game) or [])
     carpeta = game_dir_for(game)
     nombres = list((state.active_mods or {}).get(game) or [])
+    # Los DLC de mapa al empezar: el parser los lee de la carpeta del juego
+    dlcs = client_lib.installed_map_dlcs(carpeta, game) if carpeta else None
     state.map_build_cancel.clear()
     state.map_build = {"game": game, "step": "download", "error": None, "running": True}
 
@@ -1957,7 +1980,7 @@ def start_map_build(game: str) -> bool:
     def correr():
         try:
             map_builder.build_map(game, carpeta, rutas, client_lib.CLIENT_VERSION, progress=paso,
-                                  cancel=state.map_build_cancel, mod_names=nombres)
+                                  cancel=state.map_build_cancel, mod_names=nombres, map_dlcs=dlcs)
             refresh_local_maps()
             state.map_build = {"game": game, "step": "done", "error": None, "running": False}
         except map_builder.BuildCancelled:
