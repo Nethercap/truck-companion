@@ -2791,6 +2791,26 @@ test('maneuver: rampa que se abre de a poco a la derecha y cruza por arriba -> n
   assert.equal(detectManeuver(scenario({ route: ruta.map(espejo), extraNodes: rampa.map(espejo), edges: [[1, 6], [6, 7], [7, 8], [8, 9]] })), null);
 });
 
+test('maneuver: cruz que se pasa derecho con la calle doblando despues -> nada, no "keep right" (reporte #12, ATS, 30-10)', () => {
+  // Cerca de la US-95 (-77362,-48018), un carril por mano: la calle de al
+  // lado cruza a -20 grados y la ruta sigue derecho 150 m antes de doblar a
+  // la derecha; a 250 m va 13 grados y la bifurcacion por angulo decia "keep
+  // right".
+  const ruta = [[0, -300], [0, 0], [0, 150], [50, 230], [200, 300]];
+  const calle = [[-34, 94], [-103, 282], [34, -94]];
+  const ida = [[1, 5], [5, 6], [1, 7]], vuelta = [[5, 1], [6, 5], [7, 1]];
+  assert.equal(detectManeuver(scenario({ route: ruta, extraNodes: calle, edges: [...ida, ...vuelta] })), null);
+  const espejo = (p) => [-p[0], p[1]];
+  assert.equal(detectManeuver(scenario({ route: ruta.map(espejo), extraNodes: calle.map(espejo), edges: [...ida, ...vuelta] })), null);
+  // Una rama de un sentido (la rampa que se abre en dos) sigue siendo keep.
+  const m = detectManeuver(scenario({ route: ruta, extraNodes: calle, edges: ida }));
+  assert.deepEqual([m.kind, m.direction], ['fork', 'right']);
+  // Y si a los 100 m la ruta ya dobla, la bifurcacion es de verdad.
+  const ruta2 = [[0, -300], [0, 0], [12, 100], [50, 230], [200, 300]];
+  const m2 = detectManeuver(scenario({ route: ruta2, extraNodes: calle, edges: [...ida, ...vuelta] }));
+  assert.deepEqual([m2.kind, m2.direction], ['fork', 'right']);
+});
+
 test('maneuver: el conector se parte en dos calzadas casi paralelas y la ruta toma la que se abre -> keep right (Council Bluffs, 17-10)', () => {
   // del I-29 al I-80: a 120 m la ruta (la colectora) va 5 grados a la
   // derecha y la otra (el I-80) 3 a la izquierda, 16 m entre las dos; por

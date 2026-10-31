@@ -1471,8 +1471,9 @@ function detectManeuver(ctx) {
     }
   };
   // Lo mismo, pero el punto justo a lenM metros (null si la salida se termina
-  // antes): para comparar con la ruta a la misma distancia.
-  const walkPointAt = (from, n, lenM) => {
+  // antes): para comparar con la ruta a la misma distancia. En tramo, si se
+  // pasa, quedan los dos nodos del tramo donde cae el punto.
+  const walkPointAt = (from, n, lenM, tramo = null) => {
     let prev = from, cur = n, len = 0, steps = 0;
     const seen = new Set([from, n]);
     for (;;) {
@@ -1480,6 +1481,7 @@ function detectManeuver(ctx) {
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
       if (len + L >= lenM) {
         const t = L > 0 ? (lenM - len) / L : 0;
+        if (tramo) { tramo[0] = prev; tramo[1] = cur; }
         return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
       }
       len += L;
@@ -1786,6 +1788,27 @@ function detectManeuver(ctx) {
       if (tr == null) return null;
       through = !!(tr & LANE_ARROW_BITS.straight);
     }
+  }
+  // Una calle de doble mano que sale del cruce mientras la ruta sigue derecho:
+  // si a parallelForkM la ruta no se desvio forkMinDev, la otra salida ya se
+  // abrio forkMinSep y ahi es de doble mano, el cruce se pasa derecho y lo
+  // que dobla a forkLegM es la curva de la calle de despues, no esta rama. En
+  // la cruz del reporte #12 (ATS, -77362,-48018, cerca de la US-95; un carril
+  // por mano) la calle de al lado va a -35 grados a los 100 m, la ruta a 0,3
+  // y dobla a la derecha recien a los 150 m: se decia "keep right" donde se
+  // sigue derecho. Las ramas de un sentido (la autopista que se parte, la
+  // rampa que se abre en dos) siguen como antes, y tambien lo que avisan los
+  // carriles (through). Se mira a parallelForkM y no en el nodo porque los
+  // tramos de adentro del prefab son de un sentido aunque la calle no.
+  if (!laterTurn && !through) {
+    const e = altDeltas().indexOf(bestAlt);
+    const [k, idx, n] = altExits()[e];
+    const rutaCerca = normDeg(bearingBetween(pts[i], pointAt(cum[i] + parallelForkM)) - inBearing);
+    const tramo = [];
+    const otra = walkPointAt(idx, n, parallelForkM - (cum[k] - cum[i]), tramo);
+    if (otra && Math.abs(rutaCerca) < forkMinDev
+      && Math.abs(normDeg(rutaCerca - normDeg(bearingBetween(pts[i], otra) - inBearing))) >= forkMinSep
+      && (adjacency.get(tramo[1]) || []).some(([m]) => m === tramo[0])) return null;
   }
   const fork = { kind: 'fork', direction, delta: routeDelta, at: i };
   if (through) fork.through = true;
