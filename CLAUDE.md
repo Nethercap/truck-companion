@@ -545,6 +545,25 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   to Coast, ProMods) cambian 9 lugares, todos ramas que se abren de un lado
   y lejos quedan del otro: 8 "keep" de mas y uno que pasa a "keep left"
   (Marysville -> Kansas City, la ruta es la de la izquierda).
+- La bifurcacion por angulo (a 250 m) no cuenta la curva de la calle de
+  despues de un cruce que se pasa derecho: si a `parallelForkM` (100 m) la
+  ruta no se desvio `forkMinDev` (6 grados), la otra salida ya se abrio
+  `forkMinSep` (8) y ahi es de doble mano, nada. En la cruz del reporte #12
+  (ATS, -77362,-48018, cerca de la US-95; 30-10: "keep right" con un solo
+  carril y yendo derecho) la calle de al lado va a -35 grados a los 100 m y
+  la ruta a 0,3, y dobla a la derecha recien a los 150 m (22 grados a los
+  250). La doble mano se mira a los 100 m porque los tramos de adentro del
+  prefab son de un sentido aunque la calle no. Sin esa condicion cambiaban
+  27 lugares, casi todos ramas de un sentido de autopista que se separan de
+  a poco con la ruta derecha (la rampa que se abre en dos en Sheridan ->
+  Casper, "keep right" bien dicho). Con ella, en 1.129 rutas (300 por
+  variante de ATS, ETS2, Coast to Coast y ProMods, semilla 7) cambian 4
+  lugares, dibujados: 3 "keep" menos en una cruz o una Y de calles
+  (Columbus -> Sioux City, Porto -> O Barco, Folkestone -> Portsmouth) y en
+  Edirne -> Corlu (ProMods) el "keep right" pasa a "turn right" 70 m
+  despues, en el nodo donde la ruta dobla 40 grados. check_avisos igual; el
+  simulador (60 rutas por variante, semilla 7): 3 avisos menos en ETS2 y 1
+  en Coast to Coast, ningun sospechoso nuevo.
 - Un giro no se da por pasado por estar en el primer nodo del cruce: parado en
   la linea de una T el camion queda ahi y decia "Continue straight" (Discord,
   Gargamosch, 18-10). `turnPassed`: hasta 15 m despues del ultimo nodo decide
