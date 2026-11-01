@@ -99,7 +99,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
+  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -138,6 +138,9 @@ let realBase = _savedSettings.realBase === undefined ? !_savedSettings.liteMode 
 // resultaban fuertes a varios, y en el telefono son muchos a la vez.
 let darkButtons = _savedSettings.darkButtons === undefined ? true : !!_savedSettings.darkButtons;
 let fadeButtons = _savedSettings.fadeButtons === undefined ? true : !!_savedSettings.fadeButtons;
+// La brujula es un indicador, no un boton: con los botones desvanecidos queda
+// a la vista salvo que se apague (Discord 01-11, el mapa en el 2.º monitor).
+let keepCompass = _savedSettings.keepCompass === undefined ? true : !!_savedSettings.keepCompass;
 // { groups: { mapLeftControls: {x, y} }, buttons: { poiBtn: {x, y} } }, en %
 // del mapa. La primera version guardaba solo los grupos, en el primer nivel:
 // si aparece asi, se migra en vez de tirarlo.
@@ -479,6 +482,8 @@ function initSettingsUi() {
   loadVoiceCatalog().then(fillVoiceSelect);
   document.getElementById('setDarkButtons').checked = darkButtons;
   document.getElementById('setFadeButtons').checked = fadeButtons;
+  document.getElementById('setKeepCompass').checked = keepCompass;
+  document.getElementById('setKeepCompass').disabled = !fadeButtons;
   document.getElementById('setRealBase').checked = realBase;
   document.getElementById('setLiteMode').checked = liteMode;
   document.getElementById('setLiteNoRouting').checked = liteNoRouting;
@@ -741,6 +746,12 @@ document.getElementById('setDarkButtons').addEventListener('change', (e) => {
 });
 document.getElementById('setFadeButtons').addEventListener('change', (e) => {
   fadeButtons = e.target.checked;
+  document.getElementById('setKeepCompass').disabled = !fadeButtons;
+  saveSettings();
+  applyButtonPrefs();
+});
+document.getElementById('setKeepCompass').addEventListener('change', (e) => {
+  keepCompass = e.target.checked;
   saveSettings();
   applyButtonPrefs();
 });
@@ -1575,6 +1586,7 @@ function wakeButtons() {
 function applyButtonPrefs() {
   document.body.classList.toggle('darkBtns', darkButtons);
   document.body.classList.toggle('fadeBtns', fadeButtons);
+  document.body.classList.toggle('keepCompass', keepCompass);
   clearTimeout(btnIdleTimer);
   document.body.classList.remove('btnsIdle');
   if (fadeButtons) wakeButtons();

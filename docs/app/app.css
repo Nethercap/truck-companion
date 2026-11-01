@@ -255,6 +255,8 @@
   body.darkBtns .mapBtn:hover { background: #262c36; }
   body.fadeBtns .mapBtn { transition: opacity 0.5s ease; }
   body.fadeBtns.btnsIdle .mapBtn { opacity: 0.25; }
+  /* La brujula no es un boton: con keepCompass (Ajustes) no se desvanece. */
+  body.fadeBtns.btnsIdle.keepCompass #compassBtn { opacity: 1; }
 
   /* Resumen de la ruta, abajo al centro del mapa (PR #1). */
   .routeSummary {
