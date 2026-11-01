@@ -361,7 +361,7 @@ def test_parse_active_mods_none_without_list():
     assert client.parse_active_mods("00:00:01 : [hashfs] base.scs: Created") is None
 
 
-NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "canada_expansion": False, "truckersmp": False}
+NO_MODS = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "canada_expansion": False, "ats_expansion": False, "truckersmp": False}
 
 
 def test_parse_custom_key():
@@ -1093,6 +1093,19 @@ def test_canada_expansion_no_es_promods_canada():
     assert client.detect_map_mods(con_c2c) == {**NO_MODS, "canada_expansion": True, "c2c": True}
     pm = [{"file": "promods-canada-def-v164.scs", "name": "ProMods Canada Definition"}]
     assert client.detect_map_mods(pm) == {**NO_MODS, "promods_canada": True}
+
+
+def test_ats_expansion():
+    """ATS Expansion (Sineptorro) tiene variante propia (ats_expansion, y con
+    Coast to Coast ats_c2c_expansion): no es ninguna de las de Canada."""
+    ae = [{"file": "ATS_Expansion_v23.0_1.61.scs", "name": "ATS Expansion v23.0"}]
+    assert client.detect_map_mods(ae) == {**NO_MODS, "ats_expansion": True}
+    # Desde el Workshop el archivo es un numero: alcanza con el nombre
+    assert client.detect_map_mods([{"file": "3301234568", "name": "ATS Expansion v23.0"}])["ats_expansion"]
+    con_c2c = ae + [{"file": "Coast_to_Coast_v2.24.61.2.scs", "name": "Coast to Coast v2.24.61.2"}]
+    assert client.detect_map_mods(con_c2c) == {**NO_MODS, "ats_expansion": True, "c2c": True}
+    canada = [{"file": "Western_Canada_Expansion_v1.7.3.scs", "name": "Western Canada Expansion v1.7.3"}]
+    assert client.detect_map_mods(canada)["ats_expansion"] is False
 
 
 

@@ -200,7 +200,7 @@ def detect_map_mods(mods: list) -> dict:
     """{promods, promods_canada, c2c} a partir de nombres/archivos de mods.
     ProMods Europa y sus addons (ME, Maghreb, TGS) cuentan como 'promods';
     'ProMods Canada' es el pack de ATS."""
-    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "canada_expansion": False, "truckersmp": False}
+    flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "canada_expansion": False, "ats_expansion": False, "truckersmp": False}
     for mod in mods:
         text = f"{mod.get('file', '')} {mod.get('name', '')}".lower()
         if "promods" in text or "pm-" in text or "cnx-pm" in text:
@@ -231,6 +231,10 @@ def detect_map_mods(mods: list) -> dict:
         # ProMods Canada, que no dice "western" ni "eastern".
         if re.search(r"(western|eastern)[ _-]?canada", text):
             flags["canada_expansion"] = True
+        # ATS Expansion (Sineptorro): "ATS_Expansion_v23.0_1.61.scs", "ATS
+        # Expansion v23.0". Otro mapa que los de Canada, que dicen "canada".
+        if re.search(r"\bats[ _-]?expansion", text):
+            flags["ats_expansion"] = True
     return flags
 
 

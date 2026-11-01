@@ -34,6 +34,7 @@ MANUAL = {
     "ats_c2c_promods": "c2c_promods_canada", "ats_reforma": "reforma",
     "ats_reforma_c2c_promods": "reforma_c2c_promods_canada",
     "ats_canada": "canada", "ats_c2c_canada": "c2c_canada",
+    "ats_expansion": "expansion", "ats_c2c_expansion": "c2c_expansion",
     "ets2": "none", "ets2_promods": "promods", "ets2_promods_rusmap": "promods_rusmap",
     "ets2_promods_roex": "promods_roex", "ets2_promods_rusmap_roex": "promods_rusmap_roex",
     "ets2_gu": "gu", "ets2_tmp": "tmp",

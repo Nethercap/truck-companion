@@ -24,13 +24,15 @@ from mapbuild.pois import FACILITY_CODES  # noqa: E402,F401  (lo importa check_m
 # variante de mapa en la web -> (carpeta del parser, prefijo)
 VARIANTS = {
     "ats": ("parser-output-ats", "usa"),
-    "ats_c2c": ("parser-output-ats_c2c", "usa"),  # Coast to Coast 2.24.61.0
-    "ats_promods": ("parser-output-ats-promods-v164", "usa"),
-    "ats_c2c_promods": ("parser-output-ats_c2c_promods", "usa"),  # C2C 2.24.61.0 + ProMods Canada 1.64
+    "ats_c2c": ("parser-output-ats_c2c", "usa"),  # Coast to Coast 2.24.61.2
+    "ats_promods": ("parser-output-ats_promods", "usa"),  # ProMods Canada 1.70
+    "ats_c2c_promods": ("parser-output-ats_c2c_promods", "usa"),  # C2C 2.24.61.2 + ProMods Canada 1.70
     "ats_reforma": ("parser-output-ats_reforma", "usa"),  # Reforma 3.0.1.161 + Mega Resources + Sierra Nevada 1.19
-    "ats_reforma_c2c_promods": ("parser-output-ats_reforma_c2c_promods", "usa"),  # Reforma 2.9.9 + C2C + ProMods Canada + OtherMaps Patch 37
+    "ats_reforma_c2c_promods": ("parser-output-ats_reforma_c2c_promods", "usa"),  # Reforma 3.0.1 + C2C + ProMods Canada + OtherMaps Patch 40
     "ats_canada": ("parser-output-ats_canada", "usa"),  # Western Canada Expansion 1.7.3 + Eastern 1.2.1
-    "ats_c2c_canada": ("parser-output-ats_c2c_canada", "usa"),  # C2C 2.24.61.0 + Western/Eastern Canada + sus conectores C2C
+    "ats_c2c_canada": ("parser-output-ats_c2c_canada", "usa"),  # C2C 2.24.61.2 + Western/Eastern Canada + sus conectores C2C
+    "ats_expansion": ("parser-output-ats_expansion", "usa"),  # ATS Expansion 23.0 (Sineptorro)
+    "ats_c2c_expansion": ("parser-output-ats_c2c_expansion", "usa"),  # C2C 2.24.61.2 + ATS Expansion 23.0 (este arriba)
     "ets2": ("parser-output-ets2", "europe"),
     "ets2_promods": ("parser-output-ets2_promods", "europe"),  # ProMods 2.84 + ME 2.84 + Maghreb 1.04 + TGS 1.70
     "ets2_promods_rusmap": ("parser-output-ets2_promods_rusmap", "europe"),  # + RusMap 2.61 + conector 2.84/2.61
