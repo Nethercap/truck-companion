@@ -7038,16 +7038,24 @@ document.getElementById('turnReportBtn').addEventListener('click', () => copyTur
 // lo que se manda. Si no sale (sin internet, la API todavia sin la ruta), se
 // ofrece copiarlo, como antes.
 let navReportText = '';
+// Sin avisos de giro y sin nada escrito, el primer toque de "Send report"
+// pide confirmar (navReportLooksEmpty); el segundo lo manda igual.
+let navReportHasTurns = false;
+let navReportConfirmed = false;
 function setNavReportStatus(text) { document.getElementById('navReportStatus').textContent = text || ''; }
 
 // Se abre desde Ajustes y desde el link de arriba del mapa (navReportLink).
 function openNavReport() {
   document.getElementById('settingsModal').style.display = 'none';
   navReportText = buildTurnReport();
+  navReportHasTurns = turnLog.list().length > 0;
+  navReportConfirmed = false;
+  document.getElementById('navReportOnlyNav').hidden = navReportHasTurns;
   document.getElementById('navReportPreview').textContent = navReportText;
   document.querySelectorAll('input[name="navReportKind"]').forEach(r => { r.checked = false; });
   document.getElementById('navReportText').value = '';
   document.getElementById('navReportSendBtn').disabled = false;
+  document.getElementById('navReportSendBtn').textContent = t('navReportSend');
   document.getElementById('navReportCopyBtn').hidden = true;
   setNavReportStatus(conn.demo ? t('navReportDemo') : '');
   document.getElementById('navReportModal').style.display = 'flex';
@@ -7065,6 +7073,13 @@ document.getElementById('navReportSendBtn').addEventListener('click', async () =
   });
   if (pedido.error) { setNavReportStatus(t('navReportNeedKind')); return; }
   const btn = document.getElementById('navReportSendBtn');
+  if (!navReportConfirmed && navReportLooksEmpty({ hasTurns: navReportHasTurns, description: pedido.body.description })) {
+    navReportConfirmed = true;
+    btn.textContent = t('navReportSendAnyway');
+    setNavReportStatus(t('navReportLooksEmpty'));
+    return;
+  }
+  btn.textContent = t('navReportSend');
   btn.disabled = true;
   setNavReportStatus(t('navReportSending'));
   let status = 0, body = null;
