@@ -5528,6 +5528,16 @@ test('reporte de navegacion: el pedido, la cookie y que decir despues', () => {
   }
 });
 
+test('reporte de navegacion: sin avisos de giro y sin nada escrito pide confirmar', () => {
+  const { navReportLooksEmpty } = require('./pure.js');
+  assert.equal(navReportLooksEmpty({ hasTurns: false, description: '' }), true);
+  assert.equal(navReportLooksEmpty({ hasTurns: false, description: '   \n ' }), true);
+  assert.equal(navReportLooksEmpty({ hasTurns: false, description: null }), true);
+  // con algo escrito, o con avisos, se manda de una
+  assert.equal(navReportLooksEmpty({ hasTurns: false, description: 'el nombre de la ruta' }), false);
+  assert.equal(navReportLooksEmpty({ hasTurns: true, description: '' }), false);
+});
+
 test('reportes mandados: se guardan, se pregunta por ellos y se avisa una vez al arreglarse (26-10)', () => {
   const { navReportsParse, navReportsAdd, navReportsAfterStatus, NAV_REPORTS_MAX, NAV_REPORTS_DAYS } = require('./pure.js');
   const dia = 86400000, ahora = 1792000000000;

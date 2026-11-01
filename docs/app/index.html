@@ -244,6 +244,9 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
     <div class="settingsPanel">
       <h3 data-i18n="navReportOpen">Report a navigation problem</h3>
       <p class="settingsHint" data-i18n="navReportIntro">It's saved with your position, where the route goes and the last warnings, so the same route can be driven again to fix it.</p>
+      <!-- Sin avisos de giro en el reporte (navReportLooksEmpty en pure.js):
+           es solo para navegacion, lo demas va a Discord. -->
+      <p id="navReportOnlyNav" class="navReportNote" hidden><span data-i18n="navReportOnlyNav">This is only for navigation problems: turn warnings, the route, road names, the voice. This report has no turn warnings yet: send it right after it happens, with navigation on. For anything else (the connection, the client, the map, ideas), ask on Discord:</span> <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">discord.gg/K7Xq4628tg</a></p>
       <fieldset class="navReportKinds">
         <legend class="settingsSectionTitle" data-i18n="navReportKindLabel">What went wrong?</legend>
         <label class="settingsRow"><input type="radio" name="navReportKind" value="wrong_warning"> <span data-i18n="navReportKindWrong">A warning was wrong (wrong side, or a turn that isn't there)</span></label>
