@@ -5,9 +5,12 @@
 // mas cercano que sirve, routeReachability en pure.js). El simulador no las
 // ve: las rutas al azar casi nunca pasan por ahi.
 //
-// Uso: node tools/zonas_sin_salida.js [variante ...] [--min 5]
+// Uso: node tools/zonas_sin_salida.js [variante ...] [--min 5] [--grafos carpeta]
 // Por defecto ats y ets2. Los grafos se bajan de R2 con el ?g= de la app
 // (bajar de check_avisos: con TRUCKDASH_MAPS_KEY fuera del navegador).
+// --grafos <carpeta>: el de <carpeta>/<v>/route-graph-<v>-v3.bin y su
+// Cities.json (como el simulador: la carpeta r2-upload-<v> del taller),
+// para medir uno regenerado antes de subirlo.
 // Correrlo despues de regenerar un grafo: lo ideal es 0 zonas con empresas.
 'use strict';
 const fs = require('fs');
@@ -16,9 +19,11 @@ const { harness, bajar, graphRev, BASE } = require('./check_avisos');
 
 const DATA = path.join(__dirname, '..', 'docs', 'data');
 
-async function revisar(h, v, minNodos) {
-  const bin = await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?g=${graphRev()}`);
-  let cities = JSON.parse(await bajar(`${BASE}/${v}/Cities.json`));
+async function revisar(h, v, minNodos, grafos) {
+  const bin = grafos ? fs.readFileSync(path.join(grafos, v, `route-graph-${v}-v3.bin`))
+    : await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?g=${graphRev()}`);
+  let cities = JSON.parse(grafos ? fs.readFileSync(path.join(grafos, v, 'Cities.json'), 'utf8')
+    : await bajar(`${BASE}/${v}/Cities.json`));
   cities = Array.isArray(cities) ? cities : Object.values(cities);
   const g = h.mod.buildRouteGraph(h.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength)));
   const { inMain, reachesMain, reachFromMain } = h.pure.routeReachability(g);
@@ -80,9 +85,11 @@ async function main() {
   const args = process.argv.slice(2);
   const i = args.indexOf('--min');
   const minNodos = i >= 0 ? Number(args.splice(i, 2)[1]) : 5;
+  const j = args.indexOf('--grafos');
+  const grafos = j >= 0 ? args.splice(j, 2)[1] : null;
   const variantes = args.length ? args : ['ats', 'ets2'];
   const h = harness();
-  for (const v of variantes) await revisar(h, v, minNodos);
+  for (const v of variantes) await revisar(h, v, minNodos, grafos);
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(2); });

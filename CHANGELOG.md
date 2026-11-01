@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Map mods: ATS Expansion (Sineptorro) is detected from your active mods, and the app loads its map
+  (alone, or with Coast to Coast). Until now the app showed the plain ATS map with it.
+
 - LAN mode: the client keeps a copy of the new map library the website uses (MapLibre 5), so the
   map on your phone still loads when the PC has no internet.
 

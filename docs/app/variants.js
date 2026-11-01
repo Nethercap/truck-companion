@@ -1,15 +1,17 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-10-22.
+// Fuente: manifest del 2026-11-01.
 const MAP_DATA_VERSION = {
   "ats": "20261022",
-  "ats_c2c": "20261022",
-  "ats_promods": "20261022",
-  "ats_c2c_promods": "20261022",
+  "ats_c2c": "20261101",
+  "ats_promods": "20261101",
+  "ats_c2c_promods": "20261101",
   "ats_canada": "20261022",
-  "ats_c2c_canada": "20261022",
+  "ats_c2c_canada": "20261101",
+  "ats_expansion": "20261101",
+  "ats_c2c_expansion": "20261101",
   "ats_reforma": "20261022",
-  "ats_reforma_c2c_promods": "20261022",
+  "ats_reforma_c2c_promods": "20261101",
   "ets2": "20261022",
   "ets2_promods": "20261022",
   "ets2_promods_rusmap": "20261022",
@@ -103,6 +105,33 @@ const VARIANT_META = {
       "western_canada",
       "eastern_canada",
       "cnx_canada_c2c"
+    ]
+  },
+  "ats_expansion": {
+    "label": "American Truck Simulator + ATS Expansion",
+    "game": "ats",
+    "projection": "ats",
+    "origin": [
+      -96,
+      39
+    ],
+    "manual": "expansion",
+    "mods": [
+      "ats_expansion"
+    ]
+  },
+  "ats_c2c_expansion": {
+    "label": "American Truck Simulator + Coast to Coast + ATS Expansion",
+    "game": "ats",
+    "projection": "ats",
+    "origin": [
+      -96,
+      39
+    ],
+    "manual": "c2c_expansion",
+    "mods": [
+      "c2c",
+      "ats_expansion"
     ]
   },
   "ats_reforma": {
@@ -382,5 +411,10 @@ const MAP_MOD_CREDITS = {
     "name": "Western/Eastern Canada C2C Only Connections",
     "author": null,
     "homepage": null
+  },
+  "ats_expansion": {
+    "name": "ATS Expansion",
+    "author": "Sineptorro, Driver47",
+    "homepage": "https://forum.scssoft.com/viewtopic.php?t=312717"
   }
 };

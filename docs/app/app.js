@@ -522,6 +522,10 @@ function initModsUi() {
   document.getElementById('setC2CCanada').checked = atsMod === 'c2c_canada';
   document.getElementById('setCanada').closest('label').hidden = !MAP_DATA_VERSION.ats_canada;
   document.getElementById('setC2CCanada').closest('label').hidden = !MAP_DATA_VERSION.ats_c2c_canada;
+  document.getElementById('setExpansion').checked = atsMod === 'expansion';
+  document.getElementById('setC2CExpansion').checked = atsMod === 'c2c_expansion';
+  document.getElementById('setExpansion').closest('label').hidden = !MAP_DATA_VERSION.ats_expansion;
+  document.getElementById('setC2CExpansion').closest('label').hidden = !MAP_DATA_VERSION.ats_c2c_expansion;
   document.getElementById('setEts2ModNone').checked = ets2Mod === 'none';
   document.getElementById('setProMods').checked = ets2Mod === 'promods';
   document.getElementById('setProModsRusMap').checked = ets2Mod === 'promods_rusmap';
@@ -6217,6 +6221,12 @@ function resolveEffectiveGame(game) {
     }
     if (g === 'ats' && det.c2c && det.promods_canada) return 'ats_c2c_promods';
     if (g === 'ats' && det.promods_canada) return 'ats_promods';
+    // ATS Expansion (Sineptorro) no tiene variante con ProMods Canada ni con
+    // las de Canada: ahi ganan esas, que suman regiones enteras.
+    if (g === 'ats' && det.ats_expansion) {
+      return det.c2c ? publishedVariant('ats_c2c_expansion', 'ats_c2c')
+                     : publishedVariant('ats_expansion', 'ats');
+    }
     if (g === 'ats' && det.c2c) return 'ats_c2c';
     // European Grand Utopia pega el archipielago a Europa (y pide el Grand
     // Utopia original cargado, asi que grand_utopia tambien viene en true):
@@ -6243,6 +6253,8 @@ function resolveEffectiveGame(game) {
   if (g === 'ats' && atsMod === 'reforma') return 'ats_reforma';
   if (g === 'ats' && atsMod === 'canada') return publishedVariant('ats_canada', 'ats');
   if (g === 'ats' && atsMod === 'c2c_canada') return publishedVariant('ats_c2c_canada', 'ats_c2c');
+  if (g === 'ats' && atsMod === 'expansion') return publishedVariant('ats_expansion', 'ats');
+  if (g === 'ats' && atsMod === 'c2c_expansion') return publishedVariant('ats_c2c_expansion', 'ats_c2c');
   if (g === 'ats' && atsMod === 'c2c_promods_canada') return 'ats_c2c_promods';
   if (g === 'ats' && atsMod === 'c2c') return 'ats_c2c';
   if (g === 'ats' && atsMod === 'promods_canada') return 'ats_promods';
@@ -6270,6 +6282,7 @@ function describeDetectedMods(game) {
   if (det.truckersmp) names.push('TruckersMP');
   if (det.promods_canada) names.push('ProMods Canada');
   if (det.canada_expansion) names.push('Western/Eastern Canada');
+  if (det.ats_expansion) names.push('ATS Expansion');
   if (det.c2c) names.push('Coast to Coast');
   if (det.reforma) names.push('Reforma');
   return names.length ? t('modsDetected').replace('{mods}', names.join(' + ')) : t('modsDetectedNone');
