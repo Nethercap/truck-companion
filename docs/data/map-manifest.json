@@ -331,8 +331,8 @@
       "label": "ETS2 + ProMods + Roextended (Hybrid)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-29",
-      "mapDataVersion": "20261022",
+      "built": "2026-11-03",
+      "mapDataVersion": "20261103",
       "mods": [
         "promods",
         "promods_me",
@@ -357,8 +357,8 @@
       "label": "ETS2 + ProMods + RusMap + Roextended (Hybrid)",
       "game": "ets2",
       "gameVersion": "1.61.1",
-      "built": "2026-09-29",
-      "mapDataVersion": "20261022",
+      "built": "2026-11-03",
+      "mapDataVersion": "20261103",
       "mods": [
         "promods",
         "promods_me",
