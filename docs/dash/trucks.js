@@ -24,10 +24,11 @@
 //
 // Tambien va en la vista del mapa (mapDashHosts en pure.js): embedded es el
 // cuadro entero en un lugar fijo, sin la franja del trabajo (la app ya la
-// tiene). Con mapHole los relojes se separan y la pantalla del medio crece:
-// ese hueco es para el mapa, que la app pone encima (onHole le dice donde
-// queda en la pantalla), y debajo queda la pantalla de siempre, que se ve
-// cuando la app saca el mapa.
+// tiene). Con mapHole ('middle', 'left' o 'right') queda un hueco para el
+// mapa: entre los relojes, que se separan, o a un costado del cuadro, como
+// la pantalla grande de algunos camiones. La app pone el mapa encima (onHole
+// le dice donde queda en la pantalla), y debajo queda la pantalla de
+// siempre, que se ve cuando la app saca el mapa.
 //
 // Misma interfaz que createDashPanel y createClassicDash, mas destroy().
 // Necesita dash.js (DASH_ICONS, DASH_NOMINAL_SCALE) y pure.js
@@ -170,6 +171,20 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
     node.setAttribute('height', h == null ? w : h);
   }
   function cortar(t, n) { return t && t.length > n ? t.slice(0, n - 1) + '…' : t; }
+  // La pantalla del medio en una caja de otra forma (el hueco del mapa es mas
+  // ancho o mas alto que ella): el viewBox crece hasta la forma de la caja,
+  // con lo dibujado (vw x vh) al medio. Devuelve cuanto crecio de cada lado,
+  // para estirar lo que va de borde a borde. Sin esto la pantalla quedaba
+  // chica adentro del marco del hueco (Discord, 03-11).
+  function encajar(svgEl, vw, vh, w, h) {
+    const r = w / h;
+    const W = Math.max(vw, vh * r), H = Math.max(vh, vw / r);
+    const dx = (W - vw) / 2, dy = (H - vh) / 2;
+    svgEl.setAttribute('viewBox', `${-dx} ${-dy} ${W} ${H}`);
+    return { dx, dy, W, H };
+  }
+  // Cuanto de la caja llena algo de proporcion n (1 = toda).
+  const llena = (r, n) => Math.min(r / n, n / r);
 
   // --- formato ---
   function dist(km) {
@@ -547,21 +562,27 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
     const info = tiraTestigos(TD_LAMPS_INFO);
     const avisos = tiraTestigos(TD_LAMPS_WARN);
 
-    // La pantalla del medio.
+    // La pantalla del medio: la hora arriba, el cambio con el cartel y los
+    // renglones del viaje. En una caja ancha (el hueco del mapa entre los
+    // relojes) van en dos columnas, el cambio a la izquierda.
     const pant = s('svg', { viewBox: '0 0 380 460', class: 'tdScreen' });
-    s('rect', { x: 2, y: 2, width: 376, height: 456, rx: 18, fill: `url(#${pref}screen)`, class: 'tdScreenBg' }, pant);
-    icono(pant, 'globe', 16, 12, 22, 'tdDim');
-    const pReloj = texto(pant, 46, 24, 'tdTxt tdTxtM', 'start');
-    const pOdo = texto(pant, 364, 24, 'tdTxt tdTxtS tdDim', 'end');
-    s('line', { x1: 14, y1: 46, x2: 366, y2: 46, class: 'tdSep' }, pant);
-    const pMarcha = texto(pant, 190, 148, 'tdGear');
-    const pCartel = cartel(pant, 322, 92, 32);
-    const pRet = texto(pant, 24, 92, 'tdTxt tdTxtM tdRetTxt', 'start');
-    const pCrucero = s('g', {}, pant);
+    const pFondo = s('rect', { x: 2, y: 2, width: 376, height: 456, rx: 18, fill: `url(#${pref}screen)`, class: 'tdScreenBg' }, pant);
+    const arriba = s('g', {}, pant);
+    const pGlobo = icono(arriba, 'globe', 16, 12, 22, 'tdDim');
+    const pReloj = texto(arriba, 46, 24, 'tdTxt tdTxtM', 'start');
+    const pOdo = texto(arriba, 364, 24, 'tdTxt tdTxtS tdDim', 'end');
+    const sepArriba = s('line', { x1: 14, y1: 46, x2: 366, y2: 46, class: 'tdSep' }, pant);
+    const bloque = s('g', {}, pant);
+    const pMarcha = texto(bloque, 190, 148, 'tdGear');
+    const pCartel = cartel(bloque, 322, 92, 32);
+    const pRet = texto(bloque, 24, 92, 'tdTxt tdTxtM tdRetTxt', 'start');
+    const pCrucero = s('g', {}, bloque);
     icono(pCrucero, 'cruise', 128, 216, 26, 'tdCcIco');
     const pCruceroTxt = texto(pCrucero, 162, 229, 'tdCcTxt', 'start');
-    s('line', { x1: 14, y1: 258, x2: 366, y2: 258, class: 'tdSep' }, pant);
-    const filas = ['flag', 'clock', 'bed', 'fuelLow'].map((clave, i) => renglon(pant, 18, 288 + i * 48, 346, clave, 24));
+    const sepMedio = s('line', { x1: 14, y1: 258, x2: 366, y2: 258, class: 'tdSep' }, pant);
+    const lista = s('g', {}, pant);
+    const filas = ['flag', 'clock', 'bed', 'fuelLow'].map((clave, i) => renglon(lista, 18, 288 + i * 48, 346, clave, 24));
+    const linea = (l, x1, y1, x2, y2) => { for (const [k, v] of Object.entries({ x1, y1, x2, y2 })) l.setAttribute(k, v); };
 
     const piezas = [tacho.svg, velo.svg, pant, info.svg, avisos.svg];
     piezas.forEach(p => lienzo.appendChild(p));
@@ -576,8 +597,38 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
                     cajas: [[20, 20, 560], [1420, 20, 560], [600, 62, 800, 476], [600, 12, 800, 44], [600, 546, 800, 44]] },
         mapaTall: { vb: [1000, 1500], hueco: [20, 580, 960, 840],
                     cajas: [[20, 86, 470], [510, 86, 470], [20, 580, 960, 840], [60, 14, 880, 60], [100, 1432, 800, 56]] },
+        // El mapa a la derecha del cuadro, de alto entero; los testigos van
+        // arriba y abajo de los relojes. La del mapa a la izquierda es esta
+        // en espejo (espejo, mas abajo).
+        ladoDer: { vb: [1600, 600], hueco: [1000, 24, 576, 552],
+                   cajas: [[26, 84, 450], [516, 84, 450], [1000, 24, 576, 552], [261, 14, 470, 44], [296, 548, 400, 44]] },
       },
       piezas,
+      pantalla(w, h) {
+        // Una columna (380 x 460) o dos (760 x 460): la que llena mas.
+        const r = w / h;
+        const dos = llena(r, 760 / 460) > llena(r, 380 / 460);
+        const { dx, dy, W, H } = encajar(pant, dos ? 760 : 380, 460, w, h);
+        const izq = -dx, der = W - dx;
+        colocar(pFondo, [izq + 2, -dy + 2, W - 4, H - 4]);
+        // La hora y el odometro contra el borde de arriba, en las puntas.
+        arriba.setAttribute('transform', `translate(0 ${-dy})`);
+        pGlobo.setAttribute('x', izq + 16);
+        pReloj.setAttribute('x', izq + 46);
+        pOdo.setAttribute('x', der - 16);
+        linea(sepArriba, izq + 14, 46 - dy, der - 14, 46 - dy);
+        if (dos) {
+          // El cambio y el cartel al medio de la izquierda, los renglones al
+          // medio de la derecha y una raya entre los dos.
+          bloque.setAttribute('transform', 'translate(0 102)');
+          lista.setAttribute('transform', 'translate(380 -107)');
+          linea(sepMedio, 380, 70, 380, 436);
+        } else {
+          bloque.removeAttribute('transform');
+          lista.removeAttribute('transform');
+          linea(sepMedio, izq + 14, 258, der - 14, 258);
+        }
+      },
       fondo(g, f) {
         const ancha = f.vb[1] <= 600;
         s('rect', { x: 4, y: 4, width: f.vb[0] - 8, height: f.vb[1] - 8, rx: ancha ? 120 : 70, class: 'tdHousing' }, g);
@@ -666,6 +717,8 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
                     cajas: [[10, 30, 560], [1430, 30, 560], [590, 62, 820, 476], [578, 10, 844, 44], [600, 548, 800, 44]] },
         mapaTall: { vb: [1000, 1500], hueco: [20, 590, 960, 830],
                     cajas: [[10, 80, 490], [500, 80, 490], [20, 590, 960, 830], [60, 12, 880, 60], [100, 1432, 800, 56]] },
+        ladoDer: { vb: [1600, 600], hueco: [1000, 24, 576, 552],
+                   cajas: [[20, 66, 470], [500, 66, 470], [1000, 24, 576, 552], [261, 12, 470, 44], [296, 548, 400, 44]] },
       },
       piezas,
       fondo(g, f) {
@@ -759,7 +812,7 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
 
     // El display del medio: la marcha, el crucero, el descanso y el odometro.
     const lcd = s('svg', { viewBox: '0 0 260 100', class: 'tdUsLcdBox' });
-    s('rect', { x: 2, y: 2, width: 256, height: 96, rx: 10, class: 'tdUsLcd' }, lcd);
+    const lFondo = s('rect', { x: 2, y: 2, width: 256, height: 96, rx: 10, class: 'tdUsLcd' }, lcd);
     const lMarcha = texto(lcd, 58, 52, 'tdUsLcdGear');
     s('line', { x1: 112, y1: 14, x2: 112, y2: 86, class: 'tdUsLcdSep' }, lcd);
     const lCc = texto(lcd, 246, 24, 'tdUsLcdTxt tdUsLcdCc', 'end');
@@ -796,8 +849,21 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
                             [20, 126, 470], [510, 126, 470],
                             [15, 1425, 235], [260, 1425, 235], [505, 1425, 235], [750, 1425, 235],
                             [20, 610, 960, 560], [60, 10, 880, 56], [200, 70, 600, 48]] },
+        // El mapa a la derecha: el tacometro y el velocimetro a los lados de
+        // una columna con los ocho relojitos, de a dos.
+        ladoDer: { vb: [1600, 600], hueco: [1040, 24, 536, 552],
+                   cajas: [[378, 18, 138], [522, 18, 138], [378, 162, 138], [522, 162, 138],
+                           [10, 130, 360], [668, 130, 360],
+                           [378, 306, 138], [522, 306, 138], [378, 450, 138], [522, 450, 138],
+                           [1040, 24, 536, 552], [10, 40, 360, 44], [668, 40, 360, 44]] },
       },
       piezas,
+      // El display de la marcha en el hueco del mapa: el fondo hasta los
+      // bordes y lo escrito al medio.
+      pantalla(w, h) {
+        const { dx, dy, W, H } = encajar(lcd, 260, 100, w, h);
+        colocar(lFondo, [-dx + 2, -dy + 2, W - 4, H - 4]);
+      },
       fondo(g, f) {
         s('rect', { x: 2, y: 2, width: f.vb[0] - 4, height: f.vb[1] - 4, rx: 28, fill: `url(#${pref}panel)`, class: 'tdPanel' }, g);
       },
@@ -1020,8 +1086,25 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
       lados: [[10, 20, 300, base.vb[1] - 40], [base.vb[0] + TD_SIDE_W + 10, 20, 300, base.vb[1] - 40]],
     };
   }
+  // El mapa a la izquierda: la de la derecha dada vuelta (en el europeo
+  // queda el velocimetro al lado del mapa, como en algunos camiones).
+  function espejo(f) {
+    const dar = (c) => c && [f.vb[0] - c[0] - c[2], c[1], c[2], c[3]];
+    return { vb: f.vb, cajas: f.cajas.map(dar), hueco: dar(f.hueco) };
+  }
+  cuadro.formas.ladoIzq = espejo(cuadro.formas.ladoDer);
   cuadro.formas.ultra = conLados(cuadro.formas.wide);
   cuadro.formas.mapaUltra = conLados(cuadro.formas.mapaWide);
+  cuadro.formas.ladoDerUltra = conLados(cuadro.formas.ladoDer);
+  cuadro.formas.ladoIzqUltra = conLados(cuadro.formas.ladoIzq);
+  // Las formas de cada lugar del hueco: apaisada, parada y de 32:9. Parado,
+  // el mapa va siempre entre los relojes.
+  const FORMAS_HUECO = {
+    middle: ['mapaWide', 'mapaTall', 'mapaUltra'],
+    left: ['ladoIzq', 'mapaTall', 'ladoIzqUltra'],
+    right: ['ladoDer', 'mapaTall', 'ladoDerUltra'],
+  };
+  const formasUsadas = mapHole ? FORMAS_HUECO[mapHole] || FORMAS_HUECO.middle : ['wide', 'tall', 'ultra'];
   // El lugar del mapa: un rectangulo sin pintar en el hueco, para medir donde
   // quedo en la pantalla.
   const huecoEl = s('rect', { fill: 'none', 'pointer-events': 'none' }, lienzo);
@@ -1037,7 +1120,7 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
     if (!w || !h) return;
     const alto = h + (franja.hidden ? 0 : franja.offsetHeight + (parseFloat(getComputedStyle(root).rowGap) || 0));
     const area = ([vw, vh]) => Math.pow(Math.min(w / vw, h / vh), 2) * vw * vh;
-    const [ancha, parada, larga] = mapHole ? ['mapaWide', 'mapaTall', 'mapaUltra'] : ['wide', 'tall', 'ultra'];
+    const [ancha, parada, larga] = formasUsadas;
     const nueva = (!embebido || mapHole) && w / alto >= TD_ULTRA_RATIO ? larga
       : area(cuadro.formas[parada].vb) > area(cuadro.formas[ancha].vb) ? parada : ancha;
     if (nueva !== forma) {
@@ -1052,6 +1135,8 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
         colocar(huecoEl, f.hueco);
       }
       cuadro.piezas.forEach((p, i) => colocar(p, f.cajas[i]));
+      const caja = f.cajas[cuadro.nombres.screen];
+      if (cuadro.pantalla) cuadro.pantalla(caja[2], caja[3] == null ? caja[2] : caja[3]);
       lados.forEach((l, i) => {
         ver(l.svg, !!f.lados);
         if (f.lados) colocar(l.svg, f.lados[i]);

@@ -106,9 +106,8 @@ GUIDE_TEXT.de = {
 <h3>Auf der Karte</h3>
 <p>In den Einstellungen setzt <b>Armaturenbrett auf der Karte</b> das europäische, digitale oder amerikanische Armaturenbrett in die GPS-Ansicht:</p>
 <ul>
-<li><b>Das ganze Armaturenbrett, über der Karte</b>: mit <b>Schaltflächen verschieben</b> verschieben und in der Größe ändern.</li>
 <li><b>Die Karte in der Mitte des Armaturenbretts</b>: die Karte sitzt an der Stelle des mittleren Displays. <b>Karte</b> und <b>Display</b> oben wechseln zwischen beiden; das Display zur Seite wischen, um zur Karte zurückzukehren.</li>
-<li><b>Das Armaturenbrett neben der Karte</b>: die Karte wird kleiner und macht Platz.</li>
+<li><b>Die Karte links im Armaturenbrett</b> und <b>rechts</b>: die Karte steht in voller Höhe an einer Seite des Armaturenbretts, wie das große Display mancher Lkw. <b>Karte</b> und <b>Display</b> funktionieren genauso.</li>
 </ul>
 <h3>Auf einem zweiten Bildschirm</h3>
 <p>Öffne <a href="/dash/">trucksim-dash.com/dash</a> auf einem anderen Gerät (Tablet, altes Handy, zweiter Monitor) und gib denselben Pairing-Code ein. Navi und Armaturenbrett können gleichzeitig laufen. In den Einstellungen gibt es den Knopf <b>Link zum Armaturenbrett kopieren</b>.</p>`,
@@ -338,9 +337,8 @@ GUIDE_TEXT.fr = {
 <h3>Sur la carte</h3>
 <p>Dans Paramètres, <b>Tableau de bord sur la carte</b> place le tableau Européen, Numérique ou Américain dans la vue GPS :</p>
 <ul>
-<li><b>Le tableau de bord entier, sur la carte</b> : déplacez-le et changez sa taille avec <b>Déplacer les boutons</b>.</li>
 <li><b>La carte au milieu du tableau de bord</b> : la carte prend la place de l'écran central. <b>Carte</b> et <b>Écran</b>, en haut, passent de l'un à l'autre ; faites glisser l'écran sur le côté pour revenir à la carte.</li>
-<li><b>Le tableau de bord à côté de la carte</b> : la carte se réduit pour lui laisser la place.</li>
+<li><b>La carte à gauche du tableau de bord</b> et <b>à droite</b> : la carte occupe toute la hauteur d'un côté du tableau, comme le grand écran de certains camions. <b>Carte</b> et <b>Écran</b> fonctionnent de la même façon.</li>
 </ul>
 <h3>Sur un second écran</h3>
 <p>Ouvre <a href="/dash/">trucksim-dash.com/dash</a> sur un autre appareil (tablette, vieux téléphone, second écran) et tape le même code d'appairage. Le GPS et le tableau de bord peuvent tourner en même temps. Les Paramètres ont un bouton <b>Copier le lien du tableau de bord</b>.</p>`,
@@ -570,9 +568,8 @@ GUIDE_TEXT.pt = {
 <h3>No mapa</h3>
 <p>Em Configurações, <b>Painel no mapa</b> coloca o painel Europeu, Digital ou Americano na tela do GPS:</p>
 <ul>
-<li><b>O painel inteiro, sobre o mapa</b>: mova e mude o tamanho com <b>Mover os botões</b>.</li>
 <li><b>O mapa no meio do painel</b>: o mapa fica no lugar da tela do meio. <b>Mapa</b> e <b>Tela</b>, em cima, trocam entre os dois; deslize a tela para o lado para voltar ao mapa.</li>
-<li><b>O painel ao lado do mapa</b>: o mapa diminui para dar espaço.</li>
+<li><b>O mapa à esquerda do painel</b> e <b>à direita</b>: o mapa ocupa a altura toda de um lado do painel, como a tela grande de alguns caminhões. <b>Mapa</b> e <b>Tela</b> funcionam igual.</li>
 </ul>
 <h3>Numa segunda tela</h3>
 <p>Abra <a href="/dash/">trucksim-dash.com/dash</a> em outro aparelho (tablet, celular antigo, segundo monitor) e digite o mesmo código de pareamento. O GPS e o painel podem rodar ao mesmo tempo. Nas Configurações há o botão <b>Copiar o link do painel</b>.</p>`,
@@ -802,9 +799,8 @@ GUIDE_TEXT.pl = {
 <h3>Na mapie</h3>
 <p>W Ustawieniach <b>Deska na mapie</b> umieszcza deskę Europejską, Cyfrową lub Amerykańską w widoku GPS:</p>
 <ul>
-<li><b>Cała deska, na mapie</b>: przesuwasz ją i zmieniasz rozmiar przez <b>Przesuń przyciski</b>.</li>
 <li><b>Mapa na środku deski</b>: mapa zajmuje miejsce środkowego ekranu. <b>Mapa</b> i <b>Ekran</b> u góry przełączają między nimi; przesuń ekran w bok, żeby wrócić do mapy.</li>
-<li><b>Deska obok mapy</b>: mapa się zmniejsza, żeby zrobić miejsce.</li>
+<li><b>Mapa po lewej stronie deski</b> i <b>po prawej</b>: mapa zajmuje całą wysokość z jednej strony deski, jak duży ekran w niektórych ciężarówkach. <b>Mapa</b> i <b>Ekran</b> działają tak samo.</li>
 </ul>
 <h3>Na drugim ekranie</h3>
 <p>Otwórz <a href="/dash/">trucksim-dash.com/dash</a> na innym urządzeniu (tablet, stary telefon, drugi monitor) i wpisz ten sam kod parowania. GPS i deska rozdzielcza mogą działać jednocześnie. W Ustawieniach jest przycisk <b>Skopiuj link do deski rozdzielczej</b>.</p>`,
@@ -1034,9 +1030,8 @@ GUIDE_TEXT.tr = {
 <h3>Haritada</h3>
 <p>Ayarlar'daki <b>Haritada gösterge paneli</b>, Avrupa, Dijital veya Amerikan paneli GPS görünümüne koyar:</p>
 <ul>
-<li><b>Tüm gösterge paneli, haritanın üstünde</b>: <b>Düğmeleri taşı</b> ile taşıyıp boyutunu değiştirebilirsin.</li>
 <li><b>Harita gösterge panelinin ortasında</b>: harita orta ekranın yerini alır. Üstteki <b>Harita</b> ve <b>Ekran</b> ikisi arasında geçiş yapar; haritaya dönmek için ekranı yana kaydır.</li>
-<li><b>Gösterge paneli haritanın yanında</b>: harita yer açmak için küçülür.</li>
+<li><b>Harita gösterge panelinin solunda</b> ve <b>sağında</b>: harita, bazı tırlardaki büyük ekran gibi panelin bir yanında tam boy durur. <b>Harita</b> ve <b>Ekran</b> aynı şekilde çalışır.</li>
 </ul>
 <h3>İkinci ekranda</h3>
 <p>Başka bir cihazda (tablet, eski bir telefon, ikinci monitör) <a href="/dash/">trucksim-dash.com/dash</a> adresini aç ve aynı eşleştirme kodunu yaz. GPS ve gösterge paneli aynı anda çalışabilir. Ayarlar'da <b>Panel bağlantısını kopyala</b> düğmesi var.</p>`,
@@ -1266,9 +1261,8 @@ GUIDE_TEXT.ru = {
 <h3>На карте</h3>
 <p>В Настройках пункт <b>Приборная панель на карте</b> показывает Европейскую, Цифровую или Американскую панель в окне GPS:</p>
 <ul>
-<li><b>Вся панель поверх карты</b>: перемещайте и меняйте размер через <b>Переместить кнопки</b>.</li>
 <li><b>Карта в середине панели</b>: карта занимает место центрального экрана. <b>Карта</b> и <b>Экран</b> вверху переключают между ними; смахните экран в сторону, чтобы вернуться к карте.</li>
-<li><b>Панель рядом с картой</b>: карта уменьшается, освобождая место.</li>
+<li><b>Карта слева на панели</b> и <b>справа</b>: карта во всю высоту с одной стороны панели, как большой экран в некоторых грузовиках. <b>Карта</b> и <b>Экран</b> работают так же.</li>
 </ul>
 <h3>На втором экране</h3>
 <p>Откройте <a href="/dash/">trucksim-dash.com/dash</a> на другом устройстве (планшет, старый телефон, второй монитор) и введите тот же код сопряжения. GPS и панель приборов могут работать одновременно. В настройках есть кнопка <b>Скопировать ссылку на панель</b>.</p>`,
