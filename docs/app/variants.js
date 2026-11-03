@@ -1,8 +1,9 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-11-01.
+// Fuente: manifest del 2026-11-03.
 const MAP_DATA_VERSION = {
-  "ats": "20261022",
+  "ats": "20261103",
+  "ats_161": "20261103",
   "ats_c2c": "20261101",
   "ats_promods": "20261101",
   "ats_c2c_promods": "20261101",
@@ -35,7 +36,20 @@ const VARIANT_META = {
       39
     ],
     "manual": "none",
-    "mods": []
+    "mods": [],
+    "gameVersion": "1.62.1.1"
+  },
+  "ats_161": {
+    "label": "American Truck Simulator 1.61",
+    "game": "ats",
+    "projection": "ats",
+    "origin": [
+      -96,
+      39
+    ],
+    "manual": null,
+    "mods": [],
+    "gameVersion": "1.61.2.0"
   },
   "ats_c2c": {
     "label": "American Truck Simulator + Coast to Coast",
@@ -48,7 +62,8 @@ const VARIANT_META = {
     "manual": "c2c",
     "mods": [
       "c2c"
-    ]
+    ],
+    "gameVersion": "1.61.3.18"
   },
   "ats_promods": {
     "label": "American Truck Simulator + ProMods Canada",
@@ -61,7 +76,8 @@ const VARIANT_META = {
     "manual": "promods_canada",
     "mods": [
       "promods_canada"
-    ]
+    ],
+    "gameVersion": "1.61.3.18"
   },
   "ats_c2c_promods": {
     "label": "American Truck Simulator + Coast to Coast + ProMods Canada",
@@ -75,7 +91,8 @@ const VARIANT_META = {
     "mods": [
       "c2c",
       "promods_canada"
-    ]
+    ],
+    "gameVersion": "1.61.3.18"
   },
   "ats_canada": {
     "label": "American Truck Simulator + Western/Eastern Canada",
@@ -89,7 +106,8 @@ const VARIANT_META = {
     "mods": [
       "western_canada",
       "eastern_canada"
-    ]
+    ],
+    "gameVersion": "1.61.2.0"
   },
   "ats_c2c_canada": {
     "label": "American Truck Simulator + Coast to Coast + Western/Eastern Canada",
@@ -105,7 +123,8 @@ const VARIANT_META = {
       "western_canada",
       "eastern_canada",
       "cnx_canada_c2c"
-    ]
+    ],
+    "gameVersion": "1.61.3.18"
   },
   "ats_expansion": {
     "label": "American Truck Simulator + ATS Expansion",
@@ -118,7 +137,8 @@ const VARIANT_META = {
     "manual": "expansion",
     "mods": [
       "ats_expansion"
-    ]
+    ],
+    "gameVersion": "1.61.3.18"
   },
   "ats_c2c_expansion": {
     "label": "American Truck Simulator + Coast to Coast + ATS Expansion",
@@ -132,7 +152,8 @@ const VARIANT_META = {
     "mods": [
       "c2c",
       "ats_expansion"
-    ]
+    ],
+    "gameVersion": "1.61.3.18"
   },
   "ats_reforma": {
     "label": "American Truck Simulator + Reforma",
@@ -147,7 +168,8 @@ const VARIANT_META = {
       "reforma",
       "reforma_mega_resources",
       "reforma_sierra_nevada"
-    ]
+    ],
+    "gameVersion": "1.61.2.0"
   },
   "ats_reforma_c2c_promods": {
     "label": "American Truck Simulator + Coast to Coast + ProMods Canada + Reforma",
@@ -165,7 +187,8 @@ const VARIANT_META = {
       "reforma_mega_resources",
       "reforma_sierra_nevada",
       "reforma_othermaps_patch"
-    ]
+    ],
+    "gameVersion": "1.61.3.18"
   },
   "ets2": {
     "label": "Euro Truck Simulator 2",
@@ -176,7 +199,8 @@ const VARIANT_META = {
       50
     ],
     "manual": "none",
-    "mods": []
+    "mods": [],
+    "gameVersion": "1.61.1"
   },
   "ets2_promods": {
     "label": "Euro Truck Simulator 2 + ProMods (Europe + addons)",
@@ -192,7 +216,8 @@ const VARIANT_META = {
       "promods_me",
       "promods_maghreb",
       "promods_tgs"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   },
   "ets2_promods_rusmap": {
     "label": "Euro Truck Simulator 2 + ProMods + RusMap",
@@ -210,7 +235,8 @@ const VARIANT_META = {
       "promods_tgs",
       "rusmap",
       "cnx_promods_rusmap"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   },
   "ets2_promods_roex": {
     "label": "Euro Truck Simulator 2 + ProMods + Roextended",
@@ -227,7 +253,8 @@ const VARIANT_META = {
       "promods_maghreb",
       "promods_tgs",
       "roextended"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   },
   "ets2_promods_rusmap_roex": {
     "label": "Euro Truck Simulator 2 + ProMods + RusMap + Roextended",
@@ -247,7 +274,8 @@ const VARIANT_META = {
       "cnx_promods_rusmap",
       "roextended",
       "cnx_roex_rusmap"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   },
   "ets2_gu": {
     "label": "Euro Truck Simulator 2 + Grand Utopia",
@@ -260,7 +288,8 @@ const VARIANT_META = {
     "manual": "gu",
     "mods": [
       "grand_utopia"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   },
   "ets2_eugu": {
     "label": "Euro Truck Simulator 2 + European Grand Utopia",
@@ -274,7 +303,8 @@ const VARIANT_META = {
     "mods": [
       "grand_utopia",
       "eu_grand_utopia"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   },
   "ets2_promods_eugu": {
     "label": "Euro Truck Simulator 2 + ProMods + European Grand Utopia",
@@ -292,7 +322,8 @@ const VARIANT_META = {
       "promods_tgs",
       "grand_utopia",
       "eu_grand_utopia"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   },
   "ets2_tmp": {
     "label": "Euro Truck Simulator 2 + TruckersMP",
@@ -305,7 +336,8 @@ const VARIANT_META = {
     "manual": "tmp",
     "mods": [
       "truckersmp"
-    ]
+    ],
+    "gameVersion": "1.61.1"
   }
 };
 
