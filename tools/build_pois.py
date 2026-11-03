@@ -23,7 +23,10 @@ from mapbuild.pois import FACILITY_CODES  # noqa: E402,F401  (lo importa check_m
 
 # variante de mapa en la web -> (carpeta del parser, prefijo)
 VARIANTS = {
-    "ats": ("parser-output-ats", "usa"),
+    "ats": ("parser-output-ats", "usa"),  # ATS 1.62.1.1
+    # ATS 1.61.2.0, el mapa de antes de la 1.62: no se vuelve a parsear (en
+    # el taller no hay parser-output-ats_161), queda el json publicado
+    "ats_161": ("parser-output-ats_161", "usa"),
     "ats_c2c": ("parser-output-ats_c2c", "usa"),  # Coast to Coast 2.24.61.2
     "ats_promods": ("parser-output-ats_promods", "usa"),  # ProMods Canada 1.70
     "ats_c2c_promods": ("parser-output-ats_c2c_promods", "usa"),  # C2C 2.24.61.2 + ProMods Canada 1.70

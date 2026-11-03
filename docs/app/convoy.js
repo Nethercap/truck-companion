@@ -57,7 +57,8 @@ function convoySaveSettings() {
 
 function convoyInRoom() { return !!(convoy.code && convoy.you); }
 function convoyAvailable() { return !conn.local && !conn.demo && !convoy.spectator; }
-function convoyMyVariant() { return resolveEffectiveGame(lastData?.game); }
+// Otra version de ATS es el mismo mundo: va como `ats` (sharedMapVariant).
+function convoyMyVariant() { return sharedMapVariant(resolveEffectiveGame(lastData?.game)); }
 function convoyMyGame() { return lastData?.game || null; }
 function convoyMe() { return convoy.members.find(m => m.id === convoy.you) || null; }
 function convoyLeader() { return convoy.members.find(m => m.id === convoy.creatorId) || null; }
@@ -124,7 +125,7 @@ function convoyOnTelemetry(data) {
   if (!convoyInRoom()) return;
   convoyUpdateFollow();
   if (!convoy.active) return; // la pestana que entro es la que manda
-  const v = resolveEffectiveGame(data.game);
+  const v = sharedMapVariant(resolveEffectiveGame(data.game));
   if (v !== convoy.lastVariantSent) {
     convoy.lastVariantSent = v;
     convoySend({ type: 'convoy_variant', mapVariant: v, shareIncome: convoyShareIncome });

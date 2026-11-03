@@ -58,6 +58,8 @@ def build():
             "origin": var["origin"],
             "manual": MANUAL.get(name),
             "mods": var["mods"],
+            # Ajustes muestra la de ATS al lado de "La de ahora" (atsVersionVariant)
+            "gameVersion": var.get("gameVersion"),
         }
     credits = {}
     for mod_id, mod in manifest.get("mods", {}).items():

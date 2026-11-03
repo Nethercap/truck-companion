@@ -99,7 +99,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
+  return { miniHud: miniHudSettings, routeColor, atsMod, atsVersion, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -420,6 +420,9 @@ function fillCurrencySelect() {
 // excluyentes (no se pueden combinar), por eso es un selector unico
 // ('none'|'c2c'|'promods_canada') en vez de dos checkboxes independientes.
 let atsMod = _savedSettings.atsMod || 'none';
+// Version de ATS del mapa base: 'latest' o '1.61' (atsVersionVariant en
+// pure.js). Va aparte de los mods porque vale tambien en automatico.
+let atsVersion = atsVersionSetting(_savedSettings.atsVersion);
 // Selector manual de ETS2: 'none' | 'promods' | 'promods_rusmap'. Antes era un
 // booleano hasProMods; lo guardado viejo se migra.
 let ets2Mod = _savedSettings.ets2Mod || (_savedSettings.hasProMods ? 'promods' : 'none');
@@ -540,6 +543,10 @@ function initModsUi() {
   document.getElementById('setProModsEuGrandUtopia').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_eugu;
   document.getElementById('setTruckersMP').checked = ets2Mod === 'tmp';
   document.getElementById('setTruckersMP').closest('label').hidden = !MAP_DATA_VERSION.ets2_tmp;
+  document.getElementById('atsVersionBlock').hidden = !MAP_DATA_VERSION.ats_161;
+  document.getElementById('setAtsVersionLatest').checked = atsVersion === 'latest';
+  document.getElementById('setAtsVersion161').checked = atsVersion === '1.61';
+  document.getElementById('atsVersionLatestNum').textContent = gameVersionTag(VARIANT_META.ats && VARIANT_META.ats.gameVersion);
 }
 
 document.querySelectorAll('input[name="modsAuto"]').forEach(radio => {
@@ -558,6 +565,14 @@ document.querySelectorAll('input[name="atsMod"]').forEach(radio => {
     // Fuerza un reload del mapa actual con la variante correcta la proxima
     // vez que llegue un tick de telemetria (updateMap ya resuelve la variante).
     currentGame = null;
+  });
+});
+document.querySelectorAll('input[name="atsVersion"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    if (!e.target.checked) return;
+    atsVersion = atsVersionSetting(e.target.value);
+    saveSettings();
+    currentGame = null; // recarga con el mapa de esa version (updateMap)
   });
 });
 document.getElementById('setCurrency').addEventListener('change', (e) => {
@@ -597,7 +612,7 @@ function sendLiveShareState(explicit = false) {
   // en 'ats' por defecto y el conductor aparecia en el mapa de ATS aunque
   // estuviera en ETS2. Se manda null (no comparte) y updateMap re-manda el
   // estado apenas llega el primer tick con el juego real.
-  const mapVariant = liveShareEnabled && lastData?.game ? resolveEffectiveGame(lastData.game) : null;
+  const mapVariant = liveShareEnabled && lastData?.game ? sharedMapVariant(resolveEffectiveGame(lastData.game)) : null;
   lastSentMapVariant = mapVariant;
   // El apodo de convoy (si lo puso) es lo unico con nombre que se muestra en el mapa en vivo.
   const nick = liveShareEnabled ? (loadSettings().convoyNick || null) : null;
@@ -6202,7 +6217,13 @@ function offMapCheckReady(game) {
   return Date.now() - (conn.openedAt || 0) > OFFMAP_GRACE_MS;
 }
 
+// Mapa de la version de ATS elegida en Ajustes, sobre el de los mods
+// (atsVersionVariant: solo cambia el mapa base).
 function resolveEffectiveGame(game) {
+  return atsVersionVariant(resolveModVariant(game), atsVersion, MAP_DATA_VERSION);
+}
+
+function resolveModVariant(game) {
   const g = game || 'ats';
   // Armado en la PC para los mods activos: se armo justo porque el de R2 no
   // alcanzaba, asi que va primero.
@@ -7961,7 +7982,7 @@ function handleTelemetry(data) {
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider
   // Si cambio la variante de mapa efectiva (ej. activaste ProMods a
   // mitad de sesion), hay que avisarle al backend para que reagrupe bien.
-  if (liveShareEnabled && (!conn.local || conn.lanRelay) && data.game && resolveEffectiveGame(data.game) !== lastSentMapVariant) { sendLiveShareState(); sendLiveRoute(true); }
+  if (liveShareEnabled && (!conn.local || conn.lanRelay) && data.game && sharedMapVariant(resolveEffectiveGame(data.game)) !== lastSentMapVariant) { sendLiveShareState(); sendLiveRoute(true); }
 }
 
 function connectWs(backend, code, options = {}) {
