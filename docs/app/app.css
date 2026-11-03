@@ -398,7 +398,7 @@
      marca. Es fondo y no un pseudo-elemento: ::after ya lo usa el texto de
      muestra de los paneles vacios. */
   body.editLayout #miniHud, body.editLayout #miniHudExtra, body.editLayout #navPanel, body.editLayout #compassBtn,
-  body.editLayout .mapBtn.moved {
+  body.editLayout .mapBtn.moved, body.editLayout .mapDashPart {
     background-image: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
     background-size: 14px 14px; background-position: right bottom; background-repeat: no-repeat;
   }
@@ -1037,7 +1037,7 @@
   .dashOverlayBar #dashStyleGroup { margin-left: auto; }
   .dashOverlayBar #dashStyleGroup:not([hidden]) + .sizeGroup { margin-left: 0.4rem; }
   #dashStyleGroup[hidden] { display: none; }
-  #dashStyleGroup .iconBtn { width: auto; padding: 0 0.6rem; font-size: 0.8rem; }
+  select#dashStyleGroup { width: auto; padding: 0 0.4rem; font-size: 0.8rem; }
 
 /* DLC de mapa: casillas en columnas para que entren los de ATS. */
 .dlcGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); column-gap: 0.6rem; }
@@ -1118,7 +1118,7 @@
 .cab .appTitle, .cab .setup, .cab #status, .cab .setupHints, .cab #updateBanner, .cab #layoutBar, .cab .mapAboveBar,
 .cab #infoPanel, .cab #commandsDrawer, .cab #mapLeftControls, .cab #topRightControls, .cab #navPanel,
 .cab #routeSummary, .cab #stopSuggest, .cab #bottomRightHud, .cab #toastContainer, .cab #convoyMsgPop,
-.cab #dashOverlay { display: none !important; }
+.cab #dashOverlay, .cab .mapDashHome, .cab .mapDashPart, .cab .mapDashStage, .cab .mapDashSide, .cab .mapDashPager { display: none !important; }
 /* Abierta sin codigo en el link: la fila de conectar, hasta que se conecta */
 .cab.cabNeedsCode .setup { display: flex !important; padding: 0.6rem 0.8rem 0; }
 .cab .layout { border-radius: 0; }
@@ -1176,3 +1176,51 @@
 
 /* App de Android: sin links de donar (ver el script del <head>). */
 .twa [data-donate] { display: none !important; }
+
+/* El tablero de camion en la vista del mapa (applyMapDash en app.js,
+   mapDashHosts en pure.js). Flotante: sin mover va abajo al medio, encima
+   del resumen de la ruta; movido cuelga del mapa como el mini-HUD y se
+   agranda con la misma esquina. El tamano es el de 1: lo demas lo pone
+   "Mover los botones". */
+.mapDashHome {
+  position: absolute; left: 50%; bottom: 2.1rem; transform: translateX(-50%); z-index: 1050;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem; pointer-events: none;
+}
+#mapPanel.hasRouteSummary .mapDashHome { bottom: calc(var(--route-summary-h, 3.3rem) + 2.4rem); }
+.mapDashHome > * { pointer-events: auto; }
+.mapDashPart[hidden] { display: none !important; }
+#mapPanel .mapDashPart.moved { position: absolute; z-index: 1100; }
+#mapDashFloat { width: 440px; height: 165px; display: flex; flex-direction: column; }
+#mapDashFloat > .tdRoot { flex: 1; min-height: 0; }
+/* Con el mapa adentro del tablero: la fila es del tablero y el mapa va
+   encima del hueco de la pantalla del medio (placeMapInDash). Para ver la
+   pantalla, el mapa se corre para el costado y se apaga. */
+body.mapDashMiddle .rowWrap { position: relative; }
+.mapDashStage, .mapDashSide { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.mapDashStage[hidden], .mapDashSide[hidden] { display: none !important; }
+.mapDashStage { flex: 1 1 auto; }
+.mapDashStage > .tdRoot, .mapDashSide > .tdRoot { flex: 1; min-height: 0; }
+body.mapDashMiddle #mapPanel {
+  position: absolute; z-index: 5; border-radius: 10px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+body.mapDashMiddle.mapDashScreenOn #mapPanel { transform: translateX(-12%); opacity: 0; pointer-events: none; }
+/* Al costado: el tablero a la izquierda y el mapa con lo que queda. */
+.mapDashSide { flex: 0 0 46%; }
+.mapDashPager {
+  position: absolute; top: 0.6rem; left: 50%; transform: translateX(-50%); z-index: 6;
+  display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(23, 26, 31, 0.92); border: 1px solid #333;
+}
+.mapDashPager[hidden] { display: none; }
+.mapDashPager button {
+  border: 0; border-radius: 999px; padding: 0.3rem 0.8rem; min-height: 28px; font-size: 0.8rem; font-weight: 600;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.mapDashPager button.active { background: var(--accent); color: #06121f; }
+@media (prefers-reduced-motion: reduce) {
+  body.mapDashMiddle #mapPanel { transition: none; }
+}
+/* Telefono parado: la fila va en columna, y al costado pasa a ser arriba. */
+@media (max-width: 900px) and (orientation: portrait) {
+  .mapDashSide { flex: 0 0 34vh; }
+}

@@ -101,6 +101,15 @@ GUIDE_TEXT.de = {
 <li>Summen der Sitzung: gefahrene Strecke, Zeit am Steuer, Durchschnitts- und Höchstgeschwindigkeit, verbrauchter Kraftstoff und Nettoeinnahmen.</li>
 </ul>
 <p>S, M und L ändern die Größe; das X führt zurück zur Karte.</p>
+<h3>Stile</h3>
+<p>Das Menü oben wählt das Aussehen: <b>Modern</b> (Karten), <b>Klassisch</b> (18 Zeigerinstrumente) und drei im Stil der Kabinen im Spiel: <b>Europäisch</b> (zwei große Rundinstrumente mit dem Display in der Mitte), <b>Digital</b> (ein ganzes Display) und <b>Amerikanisch</b> (weiße Instrumente mit Chromringen). Sie füllen den Bildschirm quer und hochkant, und auf einem 32:9-Streifen (etwa 2560×720) bekommen Fahrt und Lkw je ein Feld an der Seite.</p>
+<h3>Auf der Karte</h3>
+<p>In den Einstellungen setzt <b>Armaturenbrett auf der Karte</b> das europäische, digitale oder amerikanische Armaturenbrett in die GPS-Ansicht:</p>
+<ul>
+<li><b>Das ganze Armaturenbrett, über der Karte</b>: mit <b>Schaltflächen verschieben</b> verschieben und in der Größe ändern.</li>
+<li><b>Die Karte in der Mitte des Armaturenbretts</b>: die Karte sitzt an der Stelle des mittleren Displays. <b>Karte</b> und <b>Display</b> oben wechseln zwischen beiden; das Display zur Seite wischen, um zur Karte zurückzukehren.</li>
+<li><b>Das Armaturenbrett neben der Karte</b>: die Karte wird kleiner und macht Platz.</li>
+</ul>
 <h3>Auf einem zweiten Bildschirm</h3>
 <p>Öffne <a href="/dash/">trucksim-dash.com/dash</a> auf einem anderen Gerät (Tablet, altes Handy, zweiter Monitor) und gib denselben Pairing-Code ein. Navi und Armaturenbrett können gleichzeitig laufen. In den Einstellungen gibt es den Knopf <b>Link zum Armaturenbrett kopieren</b>.</p>`,
     buttons: `
@@ -324,6 +333,15 @@ GUIDE_TEXT.fr = {
 <li>Totaux de la session : distance parcourue, temps au volant, vitesse moyenne et maximale, carburant consommé et revenu net.</li>
 </ul>
 <p>S, M et L changent la taille ; la croix revient à la carte.</p>
+<h3>Styles</h3>
+<p>Le menu du haut choisit l'apparence : <b>Moderne</b> (cartes), <b>Classique</b> (18 cadrans à aiguille) et trois à la manière des cabines du jeu : <b>Européen</b> (deux grands cadrans avec l'écran au milieu), <b>Numérique</b> (un seul grand écran) et <b>Américain</b> (cadrans blancs à cerclage chromé). Ils occupent tout l'écran en paysage et en portrait, et sur une bande 32:9 (comme 2560×720) le trajet et le camion ont chacun un panneau sur le côté.</p>
+<h3>Sur la carte</h3>
+<p>Dans Paramètres, <b>Tableau de bord sur la carte</b> place le tableau Européen, Numérique ou Américain dans la vue GPS :</p>
+<ul>
+<li><b>Le tableau de bord entier, sur la carte</b> : déplacez-le et changez sa taille avec <b>Déplacer les boutons</b>.</li>
+<li><b>La carte au milieu du tableau de bord</b> : la carte prend la place de l'écran central. <b>Carte</b> et <b>Écran</b>, en haut, passent de l'un à l'autre ; faites glisser l'écran sur le côté pour revenir à la carte.</li>
+<li><b>Le tableau de bord à côté de la carte</b> : la carte se réduit pour lui laisser la place.</li>
+</ul>
 <h3>Sur un second écran</h3>
 <p>Ouvre <a href="/dash/">trucksim-dash.com/dash</a> sur un autre appareil (tablette, vieux téléphone, second écran) et tape le même code d'appairage. Le GPS et le tableau de bord peuvent tourner en même temps. Les Paramètres ont un bouton <b>Copier le lien du tableau de bord</b>.</p>`,
     buttons: `
@@ -547,6 +565,15 @@ GUIDE_TEXT.pt = {
 <li>Totais da sessão: distância rodada, tempo ao volante, velocidade média e máxima, combustível gasto e ganho líquido.</li>
 </ul>
 <p>S, M e L mudam o tamanho; o X volta para o mapa.</p>
+<h3>Estilos</h3>
+<p>O menu de cima escolhe o visual: <b>Moderno</b> (cartões), <b>Clássico</b> (18 mostradores de ponteiro) e três no estilo das cabines do jogo: <b>Europeu</b> (dois mostradores grandes com a tela no meio), <b>Digital</b> (uma tela inteira) e <b>Americano</b> (mostradores brancos com aro cromado). Eles ocupam a tela na horizontal e na vertical, e numa faixa 32:9 (como 2560×720) a viagem e o caminhão ganham um painel de cada lado.</p>
+<h3>No mapa</h3>
+<p>Em Configurações, <b>Painel no mapa</b> coloca o painel Europeu, Digital ou Americano na tela do GPS:</p>
+<ul>
+<li><b>O painel inteiro, sobre o mapa</b>: mova e mude o tamanho com <b>Mover os botões</b>.</li>
+<li><b>O mapa no meio do painel</b>: o mapa fica no lugar da tela do meio. <b>Mapa</b> e <b>Tela</b>, em cima, trocam entre os dois; deslize a tela para o lado para voltar ao mapa.</li>
+<li><b>O painel ao lado do mapa</b>: o mapa diminui para dar espaço.</li>
+</ul>
 <h3>Numa segunda tela</h3>
 <p>Abra <a href="/dash/">trucksim-dash.com/dash</a> em outro aparelho (tablet, celular antigo, segundo monitor) e digite o mesmo código de pareamento. O GPS e o painel podem rodar ao mesmo tempo. Nas Configurações há o botão <b>Copiar o link do painel</b>.</p>`,
     buttons: `
@@ -770,6 +797,15 @@ GUIDE_TEXT.pl = {
 <li>Podsumowanie sesji: przejechany dystans, czas za kierownicą, średnia i maksymalna prędkość, zużyte paliwo i zysk netto.</li>
 </ul>
 <p>S, M i L zmieniają rozmiar; X wraca do mapy.</p>
+<h3>Style</h3>
+<p>Menu na górze wybiera wygląd: <b>Nowoczesny</b> (karty), <b>Klasyczny</b> (18 wskaźników ze wskazówkami) i trzy w stylu kabin z gry: <b>Europejski</b> (dwa duże zegary z ekranem pośrodku), <b>Cyfrowy</b> (jeden cały ekran) i <b>Amerykański</b> (białe zegary z chromowanymi obwódkami). Wypełniają ekran w poziomie i w pionie, a na pasku 32:9 (np. 2560×720) trasa i ciężarówka dostają po panelu z boku.</p>
+<h3>Na mapie</h3>
+<p>W Ustawieniach <b>Deska na mapie</b> umieszcza deskę Europejską, Cyfrową lub Amerykańską w widoku GPS:</p>
+<ul>
+<li><b>Cała deska, na mapie</b>: przesuwasz ją i zmieniasz rozmiar przez <b>Przesuń przyciski</b>.</li>
+<li><b>Mapa na środku deski</b>: mapa zajmuje miejsce środkowego ekranu. <b>Mapa</b> i <b>Ekran</b> u góry przełączają między nimi; przesuń ekran w bok, żeby wrócić do mapy.</li>
+<li><b>Deska obok mapy</b>: mapa się zmniejsza, żeby zrobić miejsce.</li>
+</ul>
 <h3>Na drugim ekranie</h3>
 <p>Otwórz <a href="/dash/">trucksim-dash.com/dash</a> na innym urządzeniu (tablet, stary telefon, drugi monitor) i wpisz ten sam kod parowania. GPS i deska rozdzielcza mogą działać jednocześnie. W Ustawieniach jest przycisk <b>Skopiuj link do deski rozdzielczej</b>.</p>`,
     buttons: `
@@ -993,6 +1029,15 @@ GUIDE_TEXT.tr = {
 <li>Oturum toplamları: sürülen mesafe, direksiyonda geçen süre, ortalama ve azami hız, harcanan yakıt ve net kazanç.</li>
 </ul>
 <p>S, M ve L boyutu değiştirir; X haritaya döner.</p>
+<h3>Stiller</h3>
+<p>Üstteki menü görünümü seçer: <b>Modern</b> (kartlar), <b>Klasik</b> (18 ibreli gösterge) ve oyundaki kabinler tarzında üç tane: <b>Avrupa</b> (ortada ekranlı iki büyük gösterge), <b>Dijital</b> (tek bir tam ekran) ve <b>Amerikan</b> (krom çerçeveli beyaz göstergeler). Yatayda ve dikeyde ekranı doldururlar; 32:9 bir şeritte (2560×720 gibi) yolculuk ve tır her iki yanda birer panel alır.</p>
+<h3>Haritada</h3>
+<p>Ayarlar'daki <b>Haritada gösterge paneli</b>, Avrupa, Dijital veya Amerikan paneli GPS görünümüne koyar:</p>
+<ul>
+<li><b>Tüm gösterge paneli, haritanın üstünde</b>: <b>Düğmeleri taşı</b> ile taşıyıp boyutunu değiştirebilirsin.</li>
+<li><b>Harita gösterge panelinin ortasında</b>: harita orta ekranın yerini alır. Üstteki <b>Harita</b> ve <b>Ekran</b> ikisi arasında geçiş yapar; haritaya dönmek için ekranı yana kaydır.</li>
+<li><b>Gösterge paneli haritanın yanında</b>: harita yer açmak için küçülür.</li>
+</ul>
 <h3>İkinci ekranda</h3>
 <p>Başka bir cihazda (tablet, eski bir telefon, ikinci monitör) <a href="/dash/">trucksim-dash.com/dash</a> adresini aç ve aynı eşleştirme kodunu yaz. GPS ve gösterge paneli aynı anda çalışabilir. Ayarlar'da <b>Panel bağlantısını kopyala</b> düğmesi var.</p>`,
     buttons: `
@@ -1216,6 +1261,15 @@ GUIDE_TEXT.ru = {
 <li>Итоги сессии: пройденное расстояние, время за рулём, средняя и максимальная скорость, израсходованное топливо и чистый доход.</li>
 </ul>
 <p>S, M и L меняют размер; крестик возвращает к карте.</p>
+<h3>Стили</h3>
+<p>Меню вверху выбирает вид: <b>Современный</b> (карточки), <b>Классический</b> (18 стрелочных приборов) и три в духе кабин из игры: <b>Европейский</b> (два больших прибора с экраном посередине), <b>Цифровой</b> (один большой экран) и <b>Американский</b> (белые приборы в хромированных ободках). Они занимают весь экран в горизонтальном и вертикальном положении, а на полосе 32:9 (например, 2560×720) у поездки и грузовика появляется по панели по бокам.</p>
+<h3>На карте</h3>
+<p>В Настройках пункт <b>Приборная панель на карте</b> показывает Европейскую, Цифровую или Американскую панель в окне GPS:</p>
+<ul>
+<li><b>Вся панель поверх карты</b>: перемещайте и меняйте размер через <b>Переместить кнопки</b>.</li>
+<li><b>Карта в середине панели</b>: карта занимает место центрального экрана. <b>Карта</b> и <b>Экран</b> вверху переключают между ними; смахните экран в сторону, чтобы вернуться к карте.</li>
+<li><b>Панель рядом с картой</b>: карта уменьшается, освобождая место.</li>
+</ul>
 <h3>На втором экране</h3>
 <p>Откройте <a href="/dash/">trucksim-dash.com/dash</a> на другом устройстве (планшет, старый телефон, второй монитор) и введите тот же код сопряжения. GPS и панель приборов могут работать одновременно. В настройках есть кнопка <b>Скопировать ссылку на панель</b>.</p>`,
     buttons: `

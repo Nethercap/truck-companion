@@ -435,32 +435,36 @@ function createClassicDash({ root, imperial, lang, hour12 }) {
   };
 }
 
-// Los dos estilos del tablero juntos, con la interfaz de uno solo. Los dos
-// reciben cada dato (el moderno suma la sesion aunque no se vea; el clasico
-// mide el consumo); solo el elegido dibuja. La eleccion se guarda en
-// localStorage y es una por navegador: la pagina suelta y la app comparten
-// la clave.
+// Los estilos del tablero juntos, con la interfaz de uno solo. Todos reciben
+// cada dato (el moderno suma la sesion aunque no se vea; los demas miden el
+// consumo); solo el elegido dibuja. La eleccion se guarda en localStorage y
+// es una por navegador: la pagina suelta y la app comparten la clave.
+// Los tableros de camion (trucks.js) se suman si el archivo esta: un cliente
+// viejo en modo LAN no lo sirve, y ahi quedan los dos de siempre.
 const DASH_STYLE_KEY = 'truckdash_dash_style';
 const DASH_STYLES = ['modern', 'classic'];
 
 function createDashStyles({ root, money, imperial, lang, hour12, style }) {
-  const raizModerno = root.appendChild(document.createElement('div'));
-  const raizClasico = root.appendChild(document.createElement('div'));
+  const estilos = typeof createTruckDash === 'function' ? DASH_STYLES.concat(TRUCK_LAYOUTS) : DASH_STYLES;
+  const raices = {};
+  for (const k of estilos) raices[k] = root.appendChild(document.createElement('div'));
   const paneles = {
-    modern: createDashPanel({ root: raizModerno, money, imperial, lang, hour12 }),
-    classic: createClassicDash({ root: raizClasico, imperial, lang, hour12 }),
+    modern: createDashPanel({ root: raices.modern, money, imperial, lang, hour12 }),
+    classic: createClassicDash({ root: raices.classic, imperial, lang, hour12 }),
   };
-  const raices = { modern: raizModerno, classic: raizClasico };
-  let actual = DASH_STYLES.includes(style) ? style : 'modern';
+  for (const k of estilos) {
+    if (!paneles[k]) paneles[k] = createTruckDash({ root: raices[k], money, imperial, lang, hour12, layout: k });
+  }
+  let actual = estilos.includes(style) ? style : 'modern';
   let visible = true;
   function aplicar() {
-    for (const k of DASH_STYLES) {
+    for (const k of estilos) {
       raices[k].hidden = k !== actual;
       paneles[k].setVisible(visible && k === actual);
     }
   }
   aplicar();
-  const todos = (fn) => DASH_STYLES.forEach(k => fn(paneles[k]));
+  const todos = (fn) => estilos.forEach(k => fn(paneles[k]));
   return {
     applyTranslations() { todos(p => p.applyTranslations()); },
     update(data) { todos(p => p.update(data)); },
@@ -469,15 +473,16 @@ function createDashStyles({ root, money, imperial, lang, hour12, style }) {
     resetSession() { paneles.modern.resetSession(); },
     hasData() { return paneles[actual].hasData(); },
     setStyle(st) {
-      if (!DASH_STYLES.includes(st)) return;
+      if (!estilos.includes(st)) return;
       actual = st;
       try { localStorage.setItem(DASH_STYLE_KEY, st); } catch (e) {}
       aplicar();
     },
     style() { return actual; },
+    styles() { return estilos.slice(); },
     // La escala va en cada raiz: .dashRoot define su propia --d-scale y la
     // del padre no le llega.
-    setScale(valor) { for (const k of DASH_STYLES) raices[k].style.setProperty('--d-scale', valor); },
+    setScale(valor) { for (const k of estilos) raices[k].style.setProperty('--d-scale', valor); },
   };
 }
 
