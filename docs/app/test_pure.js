@@ -2527,19 +2527,39 @@ test('truckDashLamps: testigos del cuadro, alerta del juego primero y escondidos
   assert.deepEqual(truckDashLamps(null), {});
 });
 
-test('mapDashSetting y mapDashHosts: el tablero en la vista del mapa, flotante, con el mapa adentro o al costado', () => {
+test('mapDashSetting y mapDashHosts: el tablero en la vista del mapa, con el mapa al medio o a un costado', () => {
   const { mapDashSetting, mapDashHosts } = require('./pure.js');
   // Lo que no se conoce vuelve al valor de siempre: apagado y europeo.
   assert.deepEqual(mapDashSetting(undefined), { mode: 'off', style: 'euro' });
   assert.deepEqual(mapDashSetting({ mode: 'raro', style: 'pink' }), { mode: 'off', style: 'euro' });
   assert.deepEqual(mapDashSetting({ mode: 'middle', style: 'american' }), { mode: 'middle', style: 'american' });
+  assert.deepEqual(mapDashSetting({ mode: 'left', style: 'digital' }), { mode: 'left', style: 'digital' });
   // El de cada reloj suelto ya no existe: lo guardado asi queda apagado.
   assert.equal(mapDashSetting({ mode: 'parts', parts: ['tach'] }).mode, 'off');
+  // El flotante y el del costado del mapa se fueron: pasan al mapa en el
+  // medio y al mapa a la derecha, con su estilo.
+  assert.deepEqual(mapDashSetting({ mode: 'float', style: 'digital' }), { mode: 'middle', style: 'digital' });
+  assert.deepEqual(mapDashSetting({ mode: 'side' }), { mode: 'right', style: 'euro' });
   assert.deepEqual(mapDashHosts({ mode: 'off' }), []);
-  assert.deepEqual(mapDashHosts({ mode: 'float' }), [{ id: 'mapDashFloat' }]);
-  // Con el mapa adentro, el cuadro deja el hueco; al costado, no.
-  assert.deepEqual(mapDashHosts({ mode: 'middle' }), [{ id: 'mapDashStage', mapHole: true }]);
-  assert.deepEqual(mapDashHosts({ mode: 'side' }), [{ id: 'mapDashSide' }]);
+  // Siempre en la fila del mapa, con el hueco donde va el mapa.
+  assert.deepEqual(mapDashHosts({ mode: 'middle' }), [{ id: 'mapDashStage', mapHole: 'middle' }]);
+  assert.deepEqual(mapDashHosts({ mode: 'left' }), [{ id: 'mapDashStage', mapHole: 'left' }]);
+  assert.deepEqual(mapDashHosts({ mode: 'right' }), [{ id: 'mapDashStage', mapHole: 'right' }]);
+  assert.deepEqual(mapDashHosts({ mode: 'side' }), [{ id: 'mapDashStage', mapHole: 'right' }]);
+});
+
+test('mapHoleCompact: botones chicos con el mapa en un hueco chico', () => {
+  const { mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H } = require('./pure.js');
+  // Telefono acostado (el mapa a un costado, unos 290 x 280) y parado (el
+  // del medio, unos 360 x 210): chicos.
+  assert.equal(mapHoleCompact(290, 280), true);
+  assert.equal(mapHoleCompact(360, 210), true);
+  // El del medio en una pantalla de 1920 x 1080: los de siempre.
+  assert.equal(mapHoleCompact(780, 670), false);
+  // Basta con que falte de un lado.
+  assert.equal(mapHoleCompact(MAP_HOLE_COMPACT_W - 1, 900), true);
+  assert.equal(mapHoleCompact(900, MAP_HOLE_COMPACT_H - 1), true);
+  assert.equal(mapHoleCompact(MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H), false);
 });
 
 test('truckGaugeScales: rpm con aire sobre el tope, bateria de 12 o 24 V y velocidad por unidades', () => {
@@ -3202,6 +3222,13 @@ test('noRouteReason: sin trabajo, la ruta del GPS del juego se explica en vez de
   // con trabajo o waypoint la app tiene a donde ir: si no hay indicaciones es por otra cosa
   assert.equal(noRouteReason({ hasTarget: true, hasRoute: false, gameRouteKm: 312.4 }), null);
   assert.equal(noRouteReason({ hasTarget: false, hasRoute: true, gameRouteKm: 312.4 }), null);
+  // Con destino y sin grafo de rutas: por que no hay ruta, no "No destination
+  // set" (la demo en un telefono, 03-11).
+  assert.equal(noRouteReason({ hasTarget: true, hasRoute: false, routing: 'loading' }), 'graph_loading');
+  assert.equal(noRouteReason({ hasTarget: true, hasRoute: false, routing: 'failed' }), 'graph_failed');
+  assert.equal(noRouteReason({ hasTarget: true, hasRoute: false, routing: 'off' }), 'routing_off');
+  assert.equal(noRouteReason({ hasTarget: true, hasRoute: false, routing: 'ready' }), null);
+  assert.equal(noRouteReason({ hasTarget: true, hasRoute: true, routing: 'failed' }), null);
 });
 
 test('gameRouteDistanceText: entero lejos, un decimal cerca, en millas con imperial', () => {

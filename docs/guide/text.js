@@ -110,9 +110,8 @@ GUIDE_TEXT.en = {
 <h3>On the map</h3>
 <p>In Settings, <b>Dashboard on the map</b> puts the European, Digital or American dashboard in the GPS view:</p>
 <ul>
-<li><b>The whole dashboard, over the map</b>: move it and change its size with <b>Move the buttons</b>.</li>
 <li><b>The map in the middle of the dashboard</b>: the map takes the place of its center screen. <b>Map</b> and <b>Screen</b>, at the top, switch between the two; swipe the screen sideways to go back to the map.</li>
-<li><b>The dashboard beside the map</b>: the map gets smaller to make room.</li>
+<li><b>The map on the left of the dashboard</b> and <b>on the right</b>: the map goes full height at one side of the dashboard, like the big screen in some trucks. <b>Map</b> and <b>Screen</b> work the same way.</li>
 </ul>
 <h3>On a second screen</h3>
 <p>Open <a href="/dash/">trucksim-dash.com/dash</a> on another device (a tablet, an old phone, a second monitor) and type the same pairing code. The GPS and the dashboard can run at the same time. Settings has a <b>Copy the panel link</b> button.</p>`,
@@ -343,9 +342,8 @@ GUIDE_TEXT.es = {
 <h3>En el mapa</h3>
 <p>En Configuración, <b>Tablero en el mapa</b> pone el tablero Europeo, Digital o Americano en la vista del GPS:</p>
 <ul>
-<li><b>El tablero entero, sobre el mapa</b>: se mueve y se agranda con <b>Mover los botones</b>.</li>
 <li><b>El mapa en el medio del tablero</b>: el mapa va en el lugar de su pantalla del medio. <b>Mapa</b> y <b>Pantalla</b>, arriba, cambian de uno a otro; deslizá la pantalla de costado para volver al mapa.</li>
-<li><b>El tablero al costado del mapa</b>: el mapa se achica para dejarle lugar.</li>
+<li><b>El mapa a la izquierda del tablero</b> y <b>a la derecha</b>: el mapa va de alto entero a un costado del cuadro, como la pantalla grande de algunos camiones. <b>Mapa</b> y <b>Pantalla</b> andan igual.</li>
 </ul>
 <h3>En una segunda pantalla</h3>
 <p>Abrí <a href="/dash/">trucksim-dash.com/dash</a> en otro dispositivo (una tablet, un celular viejo, un segundo monitor) y escribí el mismo código. El GPS y el tablero pueden andar a la vez. En Configuración está el botón <b>Copiar el link del panel</b>.</p>`,

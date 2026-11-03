@@ -788,9 +788,8 @@ document.getElementById('setKeepCompass').addEventListener('change', (e) => {
 function renderMapDashSettings() {
   document.getElementById('setMapDashMode').value = mapDash.mode;
   document.getElementById('setMapDashStyle').value = mapDash.style;
-  // El estilo solo dice algo con el tablero prendido, y moverlo solo flotando.
+  // El estilo solo dice algo con el tablero prendido.
   document.getElementById('mapDashStyleRow').hidden = mapDash.mode === 'off';
-  document.getElementById('mapDashHint').hidden = mapDash.mode !== 'float';
 }
 function changeMapDash(cambios) {
   mapDash = mapDashSetting(Object.assign({}, mapDash, cambios));
@@ -1659,9 +1658,7 @@ const LAYOUT_GRID_PX = 16;
 // Los paneles del mapa se mueven igual que los botones. Se los agarra
 // directamente (no tienen asa): son uno solo cada uno. La brujula tambien:
 // va sola abajo a la derecha, fuera de la columna de botones.
-const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel', 'compassBtn',
-  // El tablero entero sobre el mapa (applyMapDash).
-  'mapDashFloat'];
+const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel', 'compassBtn'];
 // Fuera de modo acomodar estos paneles aparecen y desaparecen segun lo que
 // pase en el viaje; mientras se acomodan se muestran siempre, y los que se
 // llenan en vivo llevan un texto de muestra para que se vea el tamano.
@@ -1985,7 +1982,7 @@ applyBtnLayout();
 // largo sin querer seria una sorpresa.
 const LONG_PRESS_MS = 600;
 const LONG_PRESS_SLOP_PX = 10;
-const LONG_PRESS_SELECTOR = '#mapPanel .mapBtn, #miniHud, #miniHudExtra, #navPanel, .mapDashPart';
+const LONG_PRESS_SELECTOR = '#mapPanel .mapBtn, #miniHud, #miniHudExtra, #navPanel';
 let longPressTimer = null;
 let longPressFrom = null;
 
@@ -2431,6 +2428,10 @@ function nearestRoadName(x, z, maxDist, ok = null) {
 // Grafo de rutas (roads + prefabs) preprocesado con build_route_graph.py a partir
 // del output de truckermudgeon/maps. nodes: [[x,y], ...], edges: [[fromIdx, toIdx, weight], ...]
 let routeGraph = null; // typed arrays + CSR, ver buildRouteGraph()
+// Como esta el grafo: 'loading' (bajando o reintentando), 'ready', 'failed'
+// u 'off' (modo liviano sin ruteo, espectador). Con destino y sin grafo, el
+// panel de indicaciones dice cual (noRouteReason).
+let routeGraphState = 'loading';
 // La ruta actual pasa por un DLC destildado porque no hay otro camino.
 let routeUsesUncheckedDlc = false;
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
@@ -3456,9 +3457,14 @@ async function loadRoutePrefabs(base, v, game, decoded, graph, local) {
   } catch (e) { /* sin el archivo: uTurnPairs, como antes */ }
 }
 
-async function loadRouteGraph(mapInfo) {
+// Si el grafo no baja (el telefono perdio la senal un momento, un corte del
+// R2), se prueba otra vez a los 3, 10 y 30 s: antes quedaba sin ruta hasta
+// recargar, sin decir nada.
+const ROUTE_GRAPH_RETRY_S = [3, 10, 30];
+async function loadRouteGraph(mapInfo, intento = 0) {
   routeGraph = null;
   routeLanes = null;
+  routeGraphState = 'loading';
   // Baja por detras del mapa (ver loadGameMap): si mientras tanto se cambio
   // de variante, el grafo que llega tarde no pisa el de la nueva.
   const game = currentGame;
@@ -3476,7 +3482,7 @@ async function loadRouteGraph(mapInfo) {
       const res = await fetch(jsonUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const g = buildRouteGraph(routeGraphFromJson(await res.json()));
-      if (currentGame === game) routeGraph = g;
+      if (currentGame === game) { routeGraph = g; routeGraphState = 'ready'; }
       return;
     }
     // Primero el v3 (con la corrida para dibujar la ruta sobre la calzada de
@@ -3492,6 +3498,7 @@ async function loadRouteGraph(mapInfo) {
     const g = buildRouteGraph(decoded);
     if (currentGame === game) {
       routeGraph = g;
+      routeGraphState = 'ready';
       // Solo con el v3: el archivo de carriles va por sus aristas
       if (decoded.shiftA) {
         loadRouteLanes(base, v, game, decoded, g);
@@ -3502,7 +3509,15 @@ async function loadRouteGraph(mapInfo) {
   } catch (err) {
     // Sin grafo el mapa y el tablero siguen andando; lo que no hay es ruteo.
     console.warn('no se pudo cargar el grafo de rutas', err);
-    if (currentGame === game) routeGraph = null;
+    if (currentGame !== game) return;
+    routeGraph = null;
+    if (intento < ROUTE_GRAPH_RETRY_S.length) {
+      // Mientras espera sigue 'loading', y la barra de carga tambien.
+      await new Promise(r => setTimeout(r, ROUTE_GRAPH_RETRY_S[intento] * 1000));
+      if (currentGame === game) return loadRouteGraph(mapInfo, intento + 1);
+      return;
+    }
+    routeGraphState = 'failed';
   }
 }
 
@@ -4461,7 +4476,8 @@ function updateDestinationMarker(data) {
     gameRouteKmNow = data.routeDistanceKm || 0;
     return;
   }
-  noRouteNow = null;
+  // Con destino, sin grafo no hay ruta: el panel dice por que.
+  noRouteNow = noRouteReason({ hasTarget: true, hasRoute: !!routeGraph, routing: routeGraphState });
   const destLngLat = toLngLat(target.x, target.z);
   if (target.kind === 'waypoint') {
     // El ultimo waypoint ya tiene su propio marcador - no duplicar bandera.
@@ -4601,6 +4617,7 @@ async function loadGameMap(game) {
     // navega, asi que el grafo (10-25 MB) y los nombres de ruta sobran - el
     // mapa abre en segundos y la pestana no se queda sin memoria.
     routeGraph = null;
+    routeGraphState = 'off';
     roadNames = [];
   } else {
     // El grafo (4,5 a 25 MB) y los nombres de ruta bajan por detras. Antes se
@@ -5661,10 +5678,11 @@ function navLanesFor(turn) {
 
 // Lo que se dice sin indicaciones: si el GPS del juego tiene una ruta que la
 // app no puede seguir (sin trabajo, #56), sus km en vez de "No destination set".
+// Con destino y sin grafo, que pasa con el grafo (noRouteReason).
+const NO_ROUTE_TEXT = { graph_loading: 'navRouteLoading', graph_failed: 'navRouteFailed', routing_off: 'navRouteOff' };
 function noRouteText() {
-  return noRouteNow === 'game_gps'
-    ? t('navGameRouteOnly', gameRouteDistanceText(gameRouteKmNow, useImperial, currentLang))
-    : t('navNoRoute');
+  if (noRouteNow === 'game_gps') return t('navGameRouteOnly', gameRouteDistanceText(gameRouteKmNow, useImperial, currentLang));
+  return t(NO_ROUTE_TEXT[noRouteNow] || 'navNoRoute');
 }
 
 function navPanelHtml(turn) {
@@ -8427,32 +8445,27 @@ const DASH_SCALE_KEY = 'truckdash_dash_scale';
 const dashOverlay = document.getElementById('dashOverlay');
 let dashPanel = null;
 
-// El tablero de camion en la vista del mapa (Ajustes > Tablero en el mapa).
-// Se arma de nuevo al cambiar el modo o el estilo. Los lugares estan en
-// index.html desde el arranque: asi "Mover los botones" conoce el flotante y
-// le pone donde quedo antes de que haya tablero. Sin trucks.js (cliente
-// viejo en modo LAN) no hay ninguno.
-const MAP_DASH_IDS = ['mapDashFloat', 'mapDashStage', 'mapDashSide'];
+// El tablero de camion en la vista del mapa (Ajustes > Tablero en el mapa),
+// con el mapa adentro: al medio o a un costado del cuadro. Se arma de nuevo
+// al cambiar el modo o el estilo. Sin trucks.js (cliente viejo en modo LAN)
+// no hay ninguno, y en la vista de cabina tampoco: ahi va el mapa solo.
 function applyMapDash() {
   if (mapDashPanel) { mapDashPanel.destroy(); mapDashPanel = null; }
-  const lugares = typeof createTruckDash === 'function' ? mapDashHosts(mapDash) : [];
-  for (const id of MAP_DASH_IDS) {
-    const el = document.getElementById(id);
-    el.hidden = !lugares.some(l => l.id === id);
-    el.dataset.style = mapDash.style;
-  }
-  const adentro = lugares.length > 0 && !!lugares[0].mapHole;
-  document.body.classList.toggle('mapDashMiddle', adentro);
-  if (!adentro) {
+  const lugar = !cabMode && typeof createTruckDash === 'function' ? mapDashHosts(mapDash)[0] : null;
+  const escenario = document.getElementById('mapDashStage');
+  escenario.hidden = !lugar;
+  escenario.dataset.style = mapDash.style;
+  document.body.classList.toggle('mapInDash', !!lugar);
+  if (!lugar) {
     // El mapa vuelve a su lugar en la fila.
     const panel = document.getElementById('mapPanel');
     panel.style.left = panel.style.top = panel.style.width = panel.style.height = '';
+    document.body.classList.remove('mapDashSmall');
     mapDashPage = 'map';
   }
-  if (lugares.length) {
+  if (lugar) {
     mapDashPanel = createTruckDash({
-      root: document.getElementById(lugares[0].id), embedded: true, mapHole: adentro,
-      onHole: adentro ? placeMapInDash : null,
+      root: escenario, embedded: true, mapHole: lugar.mapHole, onHole: placeMapInDash,
       money: moneyLine, imperial: () => useImperial, lang: () => currentLang, hour12, layout: mapDash.style,
     });
     mapDashPanel.applyTranslations();
@@ -8462,21 +8475,43 @@ function applyMapDash() {
   setTimeout(() => { if (map) map.resize(); }, 50);
 }
 
-// Con el mapa adentro del tablero, el mapa se pone encima del hueco de la
-// pantalla del medio: la fila queda para el tablero (y el panel de datos al
-// costado) y el mapa pasa a absoluto, con la caja que dice el tablero cada
-// vez que se acomoda.
+// El mapa se pone encima del hueco del tablero: la fila queda para el
+// tablero (y el panel de datos al costado) y el mapa pasa a absoluto, con la
+// caja que dice el tablero cada vez que se acomoda. En un hueco chico los
+// botones del mapa van mas chicos (mapHoleCompact en pure.js).
 function placeMapInDash(hueco) {
   const fila = document.querySelector('.rowWrap');
   const panel = document.getElementById('mapPanel');
   const base = fila.getBoundingClientRect();
   const izq = hueco.left - base.left, arriba = hueco.top - base.top;
   Object.assign(panel.style, { left: izq + 'px', top: arriba + 'px', width: hueco.width + 'px', height: hueco.height + 'px' });
+  document.body.classList.toggle('mapDashSmall', mapHoleCompact(hueco.width, hueco.height));
   const selector = document.getElementById('mapDashPager');
   selector.style.left = (izq + hueco.width / 2) + 'px';
-  selector.style.top = (arriba + 8) + 'px';
+  selector.style.top = arriba + 'px';
   if (map) map.resize();
+  measureLeftColumn();
 }
+
+// En un hueco chico la columna de botones de la izquierda se parte en dos si
+// no entra: el giro del modo navegacion empieza donde termina (--map-left-w,
+// app.css). Se mide por los botones: una columna flex que se parte no se
+// ensancha en todos los navegadores.
+function measureLeftColumn() {
+  const panel = document.getElementById('mapPanel');
+  const col = document.getElementById('mapLeftControls');
+  if (!panel || !col) return;
+  // Llevada a otro lado con "Mover los botones": el giro, donde siempre.
+  if (col.classList.contains('moved')) { panel.style.removeProperty('--map-left-w'); return; }
+  const izq = panel.getBoundingClientRect().left;
+  let der = 0;
+  for (const b of col.children) {
+    const r = b.getBoundingClientRect();
+    if (r.width) der = Math.max(der, r.right - izq);
+  }
+  panel.style.setProperty('--map-left-w', Math.round(der) + 'px');
+}
+if (typeof ResizeObserver === 'function') new ResizeObserver(measureLeftColumn).observe(document.getElementById('mapLeftControls'));
 
 // Con el mapa adentro, el centro es el mapa o la pantalla de siempre del
 // tablero, que queda debajo. Se cambia con el selector de arriba del hueco, o
@@ -8485,7 +8520,7 @@ function placeMapInDash(hueco) {
 // se guarda: al volver, el mapa.
 let mapDashPage = 'map';
 function renderMapDashPage() {
-  const adentro = document.body.classList.contains('mapDashMiddle') && !!mapDashPanel;
+  const adentro = document.body.classList.contains('mapInDash') && !!mapDashPanel;
   document.getElementById('mapDashPager').hidden = !adentro;
   document.body.classList.toggle('mapDashScreenOn', adentro && mapDashPage === 'screen');
   document.querySelectorAll('[data-map-dash-page]').forEach(b => {
