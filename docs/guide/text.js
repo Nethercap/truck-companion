@@ -105,6 +105,15 @@ GUIDE_TEXT.en = {
 <li>Session totals: distance driven, time at the wheel, average and top speed, fuel used and net income.</li>
 </ul>
 <p>S, M and L change the size; the X goes back to the map.</p>
+<h3>Styles</h3>
+<p>The menu at the top picks the look: <b>Modern</b> (cards), <b>Classic</b> (18 needle gauges) and three in the style of the cabs in the game: <b>European</b> (two big dials with the screen in the middle), <b>Digital</b> (one full screen) and <b>American</b> (white gauges with chrome rims). They fill the screen in landscape and portrait, and on a 32:9 strip (like 2560×720) the trip and the truck get a panel on each side.</p>
+<h3>On the map</h3>
+<p>In Settings, <b>Dashboard on the map</b> puts the European, Digital or American dashboard in the GPS view:</p>
+<ul>
+<li><b>The whole dashboard, over the map</b>: move it and change its size with <b>Move the buttons</b>.</li>
+<li><b>The map in the middle of the dashboard</b>: the map takes the place of its center screen. <b>Map</b> and <b>Screen</b>, at the top, switch between the two; swipe the screen sideways to go back to the map.</li>
+<li><b>The dashboard beside the map</b>: the map gets smaller to make room.</li>
+</ul>
 <h3>On a second screen</h3>
 <p>Open <a href="/dash/">trucksim-dash.com/dash</a> on another device (a tablet, an old phone, a second monitor) and type the same pairing code. The GPS and the dashboard can run at the same time. Settings has a <b>Copy the panel link</b> button.</p>`,
     buttons: `
@@ -329,6 +338,15 @@ GUIDE_TEXT.es = {
 <li>Totales de la sesión: distancia manejada, tiempo al volante, velocidad promedio y máxima, combustible gastado e ingreso neto.</li>
 </ul>
 <p>S, M y L cambian el tamaño; la X vuelve al mapa.</p>
+<h3>Estilos</h3>
+<p>El menú de arriba elige cómo se ve: <b>Moderno</b> (tarjetas), <b>Clásico</b> (18 relojes de aguja) y tres a la manera de las cabinas del juego: <b>Europeo</b> (dos relojes grandes con la pantalla en el medio), <b>Digital</b> (una pantalla entera) y <b>Americano</b> (relojes blancos con aro cromado). Llenan la pantalla en horizontal y en vertical, y en una tira de 32:9 (como 2560×720) el viaje y el camión van en un panel a cada lado.</p>
+<h3>En el mapa</h3>
+<p>En Configuración, <b>Tablero en el mapa</b> pone el tablero Europeo, Digital o Americano en la vista del GPS:</p>
+<ul>
+<li><b>El tablero entero, sobre el mapa</b>: se mueve y se agranda con <b>Mover los botones</b>.</li>
+<li><b>El mapa en el medio del tablero</b>: el mapa va en el lugar de su pantalla del medio. <b>Mapa</b> y <b>Pantalla</b>, arriba, cambian de uno a otro; deslizá la pantalla de costado para volver al mapa.</li>
+<li><b>El tablero al costado del mapa</b>: el mapa se achica para dejarle lugar.</li>
+</ul>
 <h3>En una segunda pantalla</h3>
 <p>Abrí <a href="/dash/">trucksim-dash.com/dash</a> en otro dispositivo (una tablet, un celular viejo, un segundo monitor) y escribí el mismo código. El GPS y el tablero pueden andar a la vez. En Configuración está el botón <b>Copiar el link del panel</b>.</p>`,
     buttons: `

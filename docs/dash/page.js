@@ -40,9 +40,10 @@ function money(amount, game) {
   return simbolo + Math.round(amount || 0).toLocaleString(currentLang);
 }
 
-// Dos estilos, moderno y clasico (classic.js). Un cliente viejo en modo LAN
-// no sirve classic.js (no esta en su lista de archivos): sin el, el moderno
-// solo y sin selector.
+// Los estilos: moderno, clasico (classic.js) y los de camion (trucks.js). Un
+// cliente viejo en modo LAN no sirve los archivos que no estan en su lista:
+// sin classic.js, el moderno solo y sin selector; sin trucks.js, los dos de
+// antes.
 const conEstilos = typeof createDashStyles === 'function';
 // El formato de hora se elige en Ajustes de la app (misma clave de ajustes)
 const panelOpts = { root: panelRoot, money, imperial: () => useImperial, lang: () => currentLang,
@@ -50,17 +51,19 @@ const panelOpts = { root: panelRoot, money, imperial: () => useImperial, lang: (
 const panel = conEstilos
   ? createDashStyles(Object.assign({ style: params.get('style') || savedDashStyle() }, panelOpts))
   : createDashPanel(panelOpts);
+const styleSelect = document.getElementById('styleSelect');
 function renderStyle() {
-  const grupo = document.getElementById('styleGroup');
-  grupo.hidden = !conEstilos;
+  styleSelect.hidden = !conEstilos;
   if (!conEstilos) return;
-  grupo.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === panel.style()));
+  const hay = panel.styles ? panel.styles() : DASH_STYLES;
+  for (const o of [...styleSelect.options]) if (!hay.includes(o.value)) o.remove();
+  styleSelect.value = panel.style();
 }
-document.querySelectorAll('[data-style]').forEach(b => b.addEventListener('click', () => {
-  panel.setStyle(b.dataset.style);
+styleSelect.addEventListener('change', () => {
+  panel.setStyle(styleSelect.value);
   renderStyle();
   renderStatus();
-}));
+});
 
 // --- estado de la conexion ---
 function renderStatus() {

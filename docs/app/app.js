@@ -47,6 +47,7 @@ function setLanguage(lang) {
   for (const id of ['langSelect', 'setLangSelect']) document.getElementById(id).value = lang;
   applyTranslations();
   if (dashPanel) dashPanel.applyTranslations();
+  if (mapDashPanel) mapDashPanel.applyTranslations();
   renderConnectionUi();
   renderTripHistory();
   renderWaypointList();
@@ -77,6 +78,7 @@ function toggleUnits() {
   saveSettings();
   if (lastData) updateHud(lastData);
   if (dashPanel) dashPanel.refresh();
+  if (mapDashPanel) mapDashPanel.refresh();
 }
 document.getElementById('unitToggle').addEventListener('click', toggleUnits);
 document.getElementById('setUnitToggle').addEventListener('click', toggleUnits);
@@ -85,6 +87,7 @@ document.getElementById('setClockSelect').addEventListener('change', (e) => {
   saveSettings();
   if (lastData) updateHud(lastData);
   if (dashPanel) dashPanel.refresh();
+  if (mapDashPanel) mapDashPanel.refresh();
 });
 let lastData = null;
 
@@ -99,7 +102,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, atsVersion, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
+  return { miniHud: miniHudSettings, routeColor, atsMod, atsVersion, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, mapDash, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -141,6 +144,13 @@ let fadeButtons = _savedSettings.fadeButtons === undefined ? true : !!_savedSett
 // La brujula es un indicador, no un boton: con los botones desvanecidos queda
 // a la vista salvo que se apague (Discord 01-11, el mapa en el 2.º monitor).
 let keepCompass = _savedSettings.keepCompass === undefined ? true : !!_savedSettings.keepCompass;
+// Un tablero de camion en la vista del mapa: apagado, flotando, con el mapa
+// adentro o al costado del mapa (mapDashSetting y mapDashHosts en pure.js,
+// applyMapDash).
+let mapDash = mapDashSetting(_savedSettings.mapDash);
+// Declarado aca arriba y no con applyMapDash: lo nombran el tick de
+// telemetria y el cambio de idioma, que pueden llegar antes.
+let mapDashPanel = null;
 // { groups: { mapLeftControls: {x, y} }, buttons: { poiBtn: {x, y} } }, en %
 // del mapa. La primera version guardaba solo los grupos, en el primer nivel:
 // si aparece asi, se migra en vez de tirarlo.
@@ -487,6 +497,7 @@ function initSettingsUi() {
   document.getElementById('setFadeButtons').checked = fadeButtons;
   document.getElementById('setKeepCompass').checked = keepCompass;
   document.getElementById('setKeepCompass').disabled = !fadeButtons;
+  renderMapDashSettings();
   document.getElementById('setRealBase').checked = realBase;
   document.getElementById('setLiteMode').checked = liteMode;
   document.getElementById('setLiteNoRouting').checked = liteNoRouting;
@@ -774,6 +785,21 @@ document.getElementById('setKeepCompass').addEventListener('change', (e) => {
   saveSettings();
   applyButtonPrefs();
 });
+function renderMapDashSettings() {
+  document.getElementById('setMapDashMode').value = mapDash.mode;
+  document.getElementById('setMapDashStyle').value = mapDash.style;
+  // El estilo solo dice algo con el tablero prendido, y moverlo solo flotando.
+  document.getElementById('mapDashStyleRow').hidden = mapDash.mode === 'off';
+  document.getElementById('mapDashHint').hidden = mapDash.mode !== 'float';
+}
+function changeMapDash(cambios) {
+  mapDash = mapDashSetting(Object.assign({}, mapDash, cambios));
+  saveSettings();
+  applyMapDash();
+  renderMapDashSettings();
+}
+document.getElementById('setMapDashMode').addEventListener('change', (e) => changeMapDash({ mode: e.target.value }));
+document.getElementById('setMapDashStyle').addEventListener('change', (e) => changeMapDash({ style: e.target.value }));
 document.getElementById('setRealBase').addEventListener('change', (e) => {
   realBase = e.target.checked;
   saveSettings();
@@ -1633,7 +1659,9 @@ const LAYOUT_GRID_PX = 16;
 // Los paneles del mapa se mueven igual que los botones. Se los agarra
 // directamente (no tienen asa): son uno solo cada uno. La brujula tambien:
 // va sola abajo a la derecha, fuera de la columna de botones.
-const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel', 'compassBtn'];
+const MOVABLE_PANEL_IDS = ['miniHud', 'miniHudExtra', 'navPanel', 'compassBtn',
+  // El tablero entero sobre el mapa (applyMapDash).
+  'mapDashFloat'];
 // Fuera de modo acomodar estos paneles aparecen y desaparecen segun lo que
 // pase en el viaje; mientras se acomodan se muestran siempre, y los que se
 // llenan en vivo llevan un texto de muestra para que se vea el tamano.
@@ -1957,7 +1985,7 @@ applyBtnLayout();
 // largo sin querer seria una sorpresa.
 const LONG_PRESS_MS = 600;
 const LONG_PRESS_SLOP_PX = 10;
-const LONG_PRESS_SELECTOR = '#mapPanel .mapBtn, #miniHud, #miniHudExtra, #navPanel';
+const LONG_PRESS_SELECTOR = '#mapPanel .mapBtn, #miniHud, #miniHudExtra, #navPanel, .mapDashPart';
 let longPressTimer = null;
 let longPressFrom = null;
 
@@ -7974,6 +8002,7 @@ function handleTelemetry(data) {
   const tmpNext = tmpPlayersUpdate(tmpPlayers, data, Date.now());
   if (tmpNext !== tmpPlayers) { tmpPlayers = tmpNext; renderTmpPlayers(); }
   if (dashPanel) dashPanel.update(data);
+  if (mapDashPanel) mapDashPanel.update(data);
   updateMap(data.position || {}, data.game, data.heading);
   updateDestinationMarker(data);
   updateRouteSummary(data);
@@ -8398,8 +8427,100 @@ const DASH_SCALE_KEY = 'truckdash_dash_scale';
 const dashOverlay = document.getElementById('dashOverlay');
 let dashPanel = null;
 
-// Moderno o clasico (classic.js, createDashStyles). Un cliente viejo en modo
-// LAN no sirve classic.js: queda el moderno solo y sin selector.
+// El tablero de camion en la vista del mapa (Ajustes > Tablero en el mapa).
+// Se arma de nuevo al cambiar el modo o el estilo. Los lugares estan en
+// index.html desde el arranque: asi "Mover los botones" conoce el flotante y
+// le pone donde quedo antes de que haya tablero. Sin trucks.js (cliente
+// viejo en modo LAN) no hay ninguno.
+const MAP_DASH_IDS = ['mapDashFloat', 'mapDashStage', 'mapDashSide'];
+function applyMapDash() {
+  if (mapDashPanel) { mapDashPanel.destroy(); mapDashPanel = null; }
+  const lugares = typeof createTruckDash === 'function' ? mapDashHosts(mapDash) : [];
+  for (const id of MAP_DASH_IDS) {
+    const el = document.getElementById(id);
+    el.hidden = !lugares.some(l => l.id === id);
+    el.dataset.style = mapDash.style;
+  }
+  const adentro = lugares.length > 0 && !!lugares[0].mapHole;
+  document.body.classList.toggle('mapDashMiddle', adentro);
+  if (!adentro) {
+    // El mapa vuelve a su lugar en la fila.
+    const panel = document.getElementById('mapPanel');
+    panel.style.left = panel.style.top = panel.style.width = panel.style.height = '';
+    mapDashPage = 'map';
+  }
+  if (lugares.length) {
+    mapDashPanel = createTruckDash({
+      root: document.getElementById(lugares[0].id), embedded: true, mapHole: adentro,
+      onHole: adentro ? placeMapInDash : null,
+      money: moneyLine, imperial: () => useImperial, lang: () => currentLang, hour12, layout: mapDash.style,
+    });
+    mapDashPanel.applyTranslations();
+    if (lastData) mapDashPanel.update(lastData);
+  }
+  renderMapDashPage();
+  setTimeout(() => { if (map) map.resize(); }, 50);
+}
+
+// Con el mapa adentro del tablero, el mapa se pone encima del hueco de la
+// pantalla del medio: la fila queda para el tablero (y el panel de datos al
+// costado) y el mapa pasa a absoluto, con la caja que dice el tablero cada
+// vez que se acomoda.
+function placeMapInDash(hueco) {
+  const fila = document.querySelector('.rowWrap');
+  const panel = document.getElementById('mapPanel');
+  const base = fila.getBoundingClientRect();
+  const izq = hueco.left - base.left, arriba = hueco.top - base.top;
+  Object.assign(panel.style, { left: izq + 'px', top: arriba + 'px', width: hueco.width + 'px', height: hueco.height + 'px' });
+  const selector = document.getElementById('mapDashPager');
+  selector.style.left = (izq + hueco.width / 2) + 'px';
+  selector.style.top = (arriba + 8) + 'px';
+  if (map) map.resize();
+}
+
+// Con el mapa adentro, el centro es el mapa o la pantalla de siempre del
+// tablero, que queda debajo. Se cambia con el selector de arriba del hueco, o
+// deslizando la pantalla de costado para volver al mapa. Al mapa no se le
+// puede pedir que se deslice: arrastrarlo lo mueve. Es de esta pestana y no
+// se guarda: al volver, el mapa.
+let mapDashPage = 'map';
+function renderMapDashPage() {
+  const adentro = document.body.classList.contains('mapDashMiddle') && !!mapDashPanel;
+  document.getElementById('mapDashPager').hidden = !adentro;
+  document.body.classList.toggle('mapDashScreenOn', adentro && mapDashPage === 'screen');
+  document.querySelectorAll('[data-map-dash-page]').forEach(b => {
+    const activo = b.dataset.mapDashPage === mapDashPage;
+    b.classList.toggle('active', activo);
+    b.setAttribute('aria-selected', String(activo));
+  });
+}
+document.querySelectorAll('[data-map-dash-page]').forEach(b => b.addEventListener('click', () => {
+  mapDashPage = b.dataset.mapDashPage;
+  renderMapDashPage();
+}));
+// Deslizar la pantalla de costado (mas de 60 px, y mas de costado que para
+// arriba) vuelve al mapa.
+{
+  const escenario = document.getElementById('mapDashStage');
+  let desde = null;
+  escenario.addEventListener('pointerdown', (e) => { desde = { x: e.clientX, y: e.clientY }; });
+  escenario.addEventListener('pointerup', (e) => {
+    if (!desde) return;
+    const dx = e.clientX - desde.x, dy = e.clientY - desde.y;
+    desde = null;
+    if (mapDashPage === 'screen' && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      mapDashPage = 'map';
+      renderMapDashPage();
+    }
+  });
+  escenario.addEventListener('pointercancel', () => { desde = null; });
+}
+applyMapDash();
+
+// Moderno, clasico o de camion (classic.js y trucks.js, createDashStyles). Un
+// cliente viejo en modo LAN no sirve los archivos que no estan en su lista:
+// sin classic.js queda el moderno solo y sin selector; sin trucks.js, los dos
+// de antes.
 function ensureDashPanel() {
   if (dashPanel) return dashPanel;
   const opts = {
@@ -8421,13 +8542,16 @@ function ensureDashPanel() {
 
 function renderDashStyle() {
   if (!dashPanel || !dashPanel.style) return;
-  document.querySelectorAll('[data-dash-style]').forEach(b => b.classList.toggle('active', b.dataset.dashStyle === dashPanel.style()));
+  const select = document.getElementById('dashStyleGroup');
+  const hay = dashPanel.styles ? dashPanel.styles() : DASH_STYLES;
+  for (const o of [...select.options]) if (!hay.includes(o.value)) o.remove();
+  select.value = dashPanel.style();
 }
-document.querySelectorAll('[data-dash-style]').forEach(b => b.addEventListener('click', () => {
-  ensureDashPanel().setStyle(b.dataset.dashStyle);
+document.getElementById('dashStyleGroup').addEventListener('change', (e) => {
+  ensureDashPanel().setStyle(e.target.value);
   renderDashStyle();
-  dashPanel.refresh(); // los dos estilos ya tienen el ultimo dato
-}));
+  dashPanel.refresh(); // todos los estilos ya tienen el ultimo dato
+});
 
 function setDashScale(valor) {
   if (dashPanel && dashPanel.setScale) dashPanel.setScale(valor);

@@ -12,9 +12,10 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="stylesheet" href="dash.css?v=20261103b" />
-<link rel="stylesheet" href="classic.css?v=20261103b" />
-<link rel="stylesheet" href="page.css?v=20261103b" />
+<link rel="stylesheet" href="dash.css?v=20261103c" />
+<link rel="stylesheet" href="classic.css?v=20261103c" />
+<link rel="stylesheet" href="trucks.css?v=20261103c" />
+<link rel="stylesheet" href="page.css?v=20261103c" />
 </head>
 <body>
   <div class="pageTop">
@@ -34,10 +35,13 @@
         <option value="tr">TR</option>
         <option value="ru">RU</option>
       </select>
-      <div class="sizeGroup" id="styleGroup" data-i18n-title="dashStyle" hidden>
-        <button class="pageBtn" data-style="modern" data-i18n="dashStyleModern">Modern</button>
-        <button class="pageBtn" data-style="classic" data-i18n="dashStyleClassic">Classic</button>
-      </div>
+      <select class="pageBtn" id="styleSelect" data-i18n-title="dashStyle" hidden>
+        <option value="modern" data-i18n="dashStyleModern">Modern</option>
+        <option value="classic" data-i18n="dashStyleClassic">Classic</option>
+        <option value="euro" data-i18n="dashStyleEuro">European</option>
+        <option value="digital" data-i18n="dashStyleDigital">Digital</option>
+        <option value="american" data-i18n="dashStyleAmerican">American</option>
+      </select>
       <div class="sizeGroup" data-i18n-title="dashSize">
         <button class="pageBtn" data-scale="0.85">S</button>
         <button class="pageBtn" data-scale="1">M</button>
@@ -61,11 +65,12 @@
   <div class="waiting" id="waiting" hidden><span id="waitingText"></span></div>
   <div id="panel" hidden></div>
 
-<script src="../app/i18n.js?v=20261103b"></script>
-<script src="../app/i18n_en_es.js?v=20261103b"></script>
-<script src="../app/pure.js?v=20261103b"></script>
-<script src="dash.js?v=20261103b"></script>
-<script src="classic.js?v=20261103b"></script>
-<script src="page.js?v=20261103b"></script>
+<script src="../app/i18n.js?v=20261103c"></script>
+<script src="../app/i18n_en_es.js?v=20261103c"></script>
+<script src="../app/pure.js?v=20261103c"></script>
+<script src="dash.js?v=20261103c"></script>
+<script src="classic.js?v=20261103c"></script>
+<script src="trucks.js?v=20261103c"></script>
+<script src="page.js?v=20261103c"></script>
 </body>
 </html>

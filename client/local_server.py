@@ -58,6 +58,9 @@ WEB_FILES = [
     # ademas se sirve solo en /dash/ para un segundo dispositivo.
     "dash/index.html", "dash/dash.js", "dash/dash.css", "dash/page.js",
     "dash/page.css", "dash/manifest.json", "dash/classic.js", "dash/classic.css",
+    # Los tableros de camion (europeo, digital y americano): sin ellos el
+    # selector muestra solo el moderno y el clasico.
+    "dash/trucks.js", "dash/trucks.css",
     # Guia por voz: el catalogo y un paquete por voz (la version va en el
     # nombre, como vendor/: no se vuelven a bajar). Ver tools/build_voice_packs.py.
     "app/voice/voices.json",
