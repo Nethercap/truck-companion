@@ -325,7 +325,70 @@ def test_cancelar_corta_el_paso_aunque_no_escriba_nada(tmp_path):
     threading.Timer(1.0, cancel.set).start()
     with pytest.raises(map_builder.BuildCancelled):
         map_builder._correr(cmd, str(log), cancel, dict(os.environ))
-    assert "arranco" in log.read_text(encoding="utf-8")
+    texto = log.read_text(encoding="utf-8")
+    assert "arranco" in texto
+    assert texto.splitlines()[-1] == map_builder.LOG_CANCELADO
+
+
+def _build_log(tmp_path, nombre, hora, texto="✖ Error: se corto\n"):
+    carpeta = tmp_path / "TruckDash" / "maps" / nombre
+    carpeta.mkdir(parents=True)
+    log = carpeta / "build.log"
+    log.write_text(texto, encoding="utf-8")
+    os.utime(log, (hora, hora))
+    return str(log)
+
+
+def test_el_reporte_toma_el_build_log_del_armado_que_fallo_en_esta_sesion(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    ahora = 1_800_000_000
+    _build_log(tmp_path, "ats-viejo.part", ahora - 3600)
+    otro_juego = _build_log(tmp_path, "ets2-def.part", ahora + 60)
+    fallo = {"game": "ats", "step": "error", "error": "parser.mjs failed (exit 1)", "running": False, "started": ahora}
+    # Fallo la descarga del armador: el .part de ahora no tiene build.log y
+    # el de antes es de otro armado
+    assert map_builder.failed_build_log(fallo) is None
+    nuevo = _build_log(tmp_path, "ats-abc.part", ahora + 30)
+    assert map_builder.failed_build_log(fallo) == nuevo
+    assert map_builder.failed_build_log({**fallo, "game": "ets2"}) == otro_juego
+    for paso in ("done", "cancelled", "parser"):
+        assert map_builder.failed_build_log({**fallo, "step": paso, "error": None}) is None
+
+
+def test_despues_de_reiniciar_el_reporte_toma_el_part_si_fue_el_ultimo_armado(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    ahora = 1_800_000_000
+    assert map_builder.failed_build_log(None, ahora) is None  # sin carpeta de mapas
+    _build_log(tmp_path, "ets2-bueno", ahora - 7200)
+    part = _build_log(tmp_path, "ats-abc.part", ahora - 3600)
+    assert map_builder.failed_build_log(None, ahora) == part
+    # Hace mas de una semana: ya es otro problema
+    assert map_builder.failed_build_log(None, ahora + map_builder.BUILD_LOG_MAX_EDAD_S) is None
+    # Despues salio bien otro armado (su build.log queda en el mapa terminado)
+    _build_log(tmp_path, "ets2-nuevo", ahora - 60)
+    assert map_builder.failed_build_log(None, ahora) is None
+
+
+def test_un_armado_cancelado_no_va_al_reporte_despues_de_reiniciar(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    ahora = 1_800_000_000
+    _build_log(tmp_path, "ats-abc.part", ahora - 60, f"$ node parser.mjs\narranco\n{map_builder.LOG_CANCELADO}\n\n")
+    assert map_builder.failed_build_log(None, ahora) is None
+
+
+def test_el_final_del_build_log_para_el_reporte(tmp_path):
+    """Solo el final, sin las lineas vacias de abajo y con las largas
+    recortadas, aunque el log pese mas de lo que se lee."""
+    log = tmp_path / "build.log"
+    relleno = "".join(f"⚠ skipping def/ferry/f{i}.sii - failed to parse\n" for i in range(3000))
+    error = ["Error: ENOENT: no such file or directory, stat 'C:\\mod\\FREE-TM DAF 2021 XF'",
+             "    at Object.statSync (node:fs:1795:25)", "x" * 500]
+    log.write_text(relleno + "\n".join(error) + "\n\n\n", encoding="utf-8")
+    assert log.stat().st_size > 64 * 1024
+    final = map_builder.build_log_tail(str(log), lineas=5, ancho=100).splitlines()
+    assert final == ["⚠ skipping def/ferry/f2998.sii - failed to parse", "⚠ skipping def/ferry/f2999.sii - failed to parse",
+                     *error[:2], "x" * 100 + "..."]
+    assert map_builder.build_log_tail(str(tmp_path / "no-esta.log")) == ""
 
 
 def _servidor(tmp_path):

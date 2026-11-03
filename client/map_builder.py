@@ -267,6 +267,9 @@ LOG_BLOQUE_LINEAS = 200
 # Las dos lineas del .sii que muestra el parser, mas las vacias de un CRLF
 LOG_EXTRACTO_LINEAS = 4
 LOG_EXTRACTO_CHARS = 100
+# La ultima linea del build.log de un armado cancelado: despues de reiniciar
+# el cliente, su .part no es un armado que fallo (failed_build_log)
+LOG_CANCELADO = "Build cancelled."
 
 
 def _aviso_de(texto: str, ruta: str) -> bool:
@@ -460,6 +463,7 @@ def _correr(cmd: list, log_path: str, cancel: threading.Event, env: dict):
                 proc.kill()
                 proc.wait()
                 lector.join(5)
+                log.write(f"{LOG_CANCELADO}\n")
                 raise BuildCancelled()
             time.sleep(0.5)
         lector.join()
@@ -561,6 +565,8 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
     for sufijo in (".bin", "-v3.bin", "-lanes.bin", "-times.bin", "-prefabs.bin"):
         os.replace(grafo_json[:-5] + sufijo, os.path.join(salida, f"route-graph-{variante}{sufijo}"))
     if cancel.is_set():
+        with open(log_path, "a", encoding="utf-8") as log:
+            log.write(f"{LOG_CANCELADO}\n")
         raise BuildCancelled()
     build_cities_json.main(["", os.path.join(parser_dir, f"{prefijo}-cities.json"), os.path.join(salida, "Cities.json")])
     extract_road_names.main(["", os.path.join(parser_dir, f"{prefijo}-signs.json"), os.path.join(salida, "road-names.json")])
@@ -595,3 +601,86 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
     logging.info("Map built for %s (%s): %d cities in %d s", game, fp, ciudades, manifest["seconds"])
     manifest["dir"] = final
     return manifest
+
+
+# ---------------------------------------------------------------- reportes
+
+# Lo que "Report a problem" suma del build.log: las ultimas lineas, donde
+# LogCompacto deja el error que corto el armado con su pila (21 en el de
+# #142), cada una hasta BUILD_LOG_ANCHO caracteres.
+BUILD_LOG_LINEAS = 40
+BUILD_LOG_ANCHO = 300
+# Un .part queda hasta el proximo armado bueno de ese juego: si es mas viejo,
+# lo que se reporta ya es otra cosa.
+BUILD_LOG_MAX_EDAD_S = 7 * 24 * 3600
+
+
+def _final_del_archivo(ruta: str, n: int, max_bytes: int = 64 * 1024) -> list:
+    """Las ultimas n lineas, sin las vacias del final. Lee solo el final: el
+    build.log de un perfil con muchos mods pesa MB."""
+    with open(ruta, "rb") as f:
+        tam = f.seek(0, os.SEEK_END)
+        f.seek(max(0, tam - max_bytes))
+        lineas = f.read().decode("utf-8", "replace").splitlines()
+    if tam > max_bytes:
+        lineas = lineas[1:]  # la primera quedo cortada
+    while lineas and not lineas[-1].strip():
+        lineas.pop()
+    return lineas[-n:]
+
+
+def failed_build_log(armado: dict | None, ahora: float | None = None) -> str | None:
+    """El build.log del ultimo "Build my map" si fallo, o None. "Report a
+    problem" lo suma al issue: el truckdash.log solo dice "parser.mjs failed
+    (exit 1)" y el motivo esta en el build.log (#142 y #157 pidieron una
+    segunda vuelta para tenerlo).
+
+    armado es state.map_build. Si hubo un armado en esta sesion, vale solo si
+    termino con error, y es el de su .part escrito desde que arranco (si fallo
+    la descarga del armador no hay: el error esta en el truckdash.log). Sin
+    armado en esta sesion (se reinicio el cliente), el build.log mas nuevo de
+    maps_dir() si es de un .part (el ultimo armado no termino), no se cancelo
+    y tiene menos de BUILD_LOG_MAX_EDAD_S. Los mapas terminados guardan su
+    build.log: uno bueno despues del .part gana."""
+    carpeta = maps_dir()
+    try:
+        nombres = os.listdir(carpeta)
+    except OSError:
+        return None
+    logs = []
+    for nombre in nombres:
+        ruta = os.path.join(carpeta, nombre, "build.log")
+        try:
+            logs.append((os.path.getmtime(ruta), nombre, ruta))
+        except OSError:
+            pass
+    if armado is not None:
+        if armado.get("step") != "error":
+            return None
+        desde = armado.get("started", 0) - 2  # la hora de un archivo en FAT va de a 2 s
+        propios = [log for log in logs if log[1].startswith(f"{armado.get('game')}-")
+                   and log[1].endswith(".part") and log[0] >= desde]
+        return max(propios)[2] if propios else None
+    if not logs:
+        return None
+    hora, nombre, ruta = max(logs)
+    ahora = time.time() if ahora is None else ahora
+    if not nombre.endswith(".part") or ahora - hora > BUILD_LOG_MAX_EDAD_S:
+        return None
+    try:
+        if _final_del_archivo(ruta, 1) == [LOG_CANCELADO]:
+            return None
+    except OSError:
+        return None
+    return ruta
+
+
+def build_log_tail(ruta: str, lineas: int = BUILD_LOG_LINEAS, ancho: int = BUILD_LOG_ANCHO) -> str:
+    """Las ultimas lineas del build.log para el reporte, cada una hasta ancho
+    caracteres (la del comando o el aviso de un mod pueden ser largas). Vacio
+    si no se puede leer."""
+    try:
+        final = _final_del_archivo(ruta, lineas)
+    except OSError:
+        return ""
+    return "\n".join(linea if len(linea) <= ancho else linea[:ancho] + "..." for linea in final)
