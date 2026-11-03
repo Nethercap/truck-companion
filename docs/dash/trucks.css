@@ -1,0 +1,166 @@
+/* Tableros de camion (trucks.js): europeo, digital y americano. Como
+   classic.css, todo cuelga de .tdRoot porque la app tambien los muestra
+   sobre el mapa. */
+
+.tdRoot {
+  --d-scale: 1;
+  display: flex; flex-direction: column; gap: 0.4rem; min-height: 0;
+  padding: 0.4rem; box-sizing: border-box; border-radius: 6px;
+  color: #e8ecf2; background: #08090b;
+  /* Bahnschrift es la DIN de Windows: numeros de tablero sin bajar nada. */
+  font-family: Bahnschrift, 'DIN Alternate', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
+}
+.tdRoot[hidden] { display: none; }
+.tdRoot [hidden] { display: none !important; }
+.td-digital { background: #020305; }
+.td-american { background: #101012; }
+
+/* El lienzo se centra con margin:auto y no con align-items: con la escala
+   L el SVG es mas grande que el lugar, y centrado con flex se cortaba arriba
+   sin poder llegar con el scroll. */
+.tdStage { flex: 1 1 0; min-height: 0; display: flex; overflow: auto; }
+.tdCluster {
+  display: block; margin: auto; flex-shrink: 0;
+  width: calc(100% * var(--d-scale)); height: calc(100% * var(--d-scale));
+}
+.tdWaiting { margin: auto; color: #9aa4b2; }
+.tdRoot text { dominant-baseline: central; }
+
+/* En la vista del mapa (mapDashHosts): el cuadro entero en un lugar fijo,
+   sin margen ni fondo propio. */
+.tdRoot.tdEmbed { padding: 0; gap: 0; background: transparent; border-radius: 0; }
+/* El marco del hueco donde la app pone el mapa. */
+.tdHoleBezel { fill: #000; stroke: #2a3038; stroke-width: 3; }
+.td-american .tdHoleBezel { stroke: #8e949c; stroke-width: 4; }
+
+/* --- la franja del trabajo --- */
+.tdJob {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; flex-shrink: 0;
+  gap: 0.15rem 1.2rem; padding: 0.3rem 0.9rem; border-radius: 6px;
+  font-size: 0.95rem; font-weight: 600; letter-spacing: 0.01em;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid #1f242b;
+}
+.tdJobRoute, .tdJobPay { color: #9aa4b2; }
+.tdJob .bien { color: #35e35b; }
+.tdJob .mal { color: #ff5a3c; }
+
+/* --- fondos --- */
+.tdHousing { fill: #0e1013; stroke: #1d2026; stroke-width: 3; }
+.tdGlass { stroke: #111a26; stroke-width: 3; }
+.tdPanel { stroke: #2f3034; stroke-width: 3; }
+
+/* --- relojes de aguja --- */
+.tdZoneRed, .tdZoneGreen { fill: none; stroke-width: 5; }
+.tdZoneRed { stroke: #e0301e; }
+.tdZoneGreen { stroke: #2fbf55; }
+.tdTickMajor { stroke: #eef2f7; stroke-width: 3; }
+.tdTickMinor { stroke: #aeb6c2; stroke-width: 1.5; }
+.tdNum { fill: #eef2f7; font-size: 15px; font-weight: 600; text-anchor: middle; }
+.tdDial-us .tdTickMajor { stroke: #121212; stroke-width: 2.6; }
+.tdDial-us .tdTickMinor { stroke: #3a3a3a; stroke-width: 1.2; }
+.tdDial-us .tdNum { fill: #141414; font-size: 16px; font-weight: 800; }
+.tdDial-us .tdNumSmall { font-size: 17px; }
+.tdDial .tdTickRed { stroke: #e0301e; }
+.tdTickInner { stroke: #c8281a; stroke-width: 1.4; }
+.tdNumInner { fill: #c8281a; font-size: 10px; font-weight: 700; }
+.tdNeedle, .tdMark { transform-box: view-box; transform-origin: 0 0; }
+.tdNeedle { transition: transform 0.25s linear; }
+.tdSweeping .tdNeedle { transition: transform 0.65s ease-in-out; }
+.tdNeedleBody { fill: #ff3a1e; }
+.tdDial-eu .tdNeedle { filter: drop-shadow(0 0 3px rgba(255, 70, 30, 0.75)); }
+.tdDial-us .tdNeedleBody { fill: #e2401a; }
+.tdNeedleTail { fill: #111; }
+.tdHubCap { fill: #1a1a1a; }
+.tdMarkLimit { fill: #ff4a36; }
+.tdMarkCruise { fill: #33e05a; }
+.tdUnit { fill: #9fb0c4; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.tdLcdBox { fill: #020304; stroke: #2c333c; }
+.tdLcd { fill: #e9f2ff; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tdSegOff { fill: #1d2229; }
+.tdSegOn { fill: #e8eef6; }
+.tdSegOn.tdSegBad { fill: #ff4a36; }
+.tdSegIco { color: #7c8796; }
+
+/* --- testigos --- */
+.tdLamp { color: #1c2026; }
+.td-american .tdLamp { color: #45464c; }
+.tdLamp.on.tdLamp-g { color: #35e35b; filter: drop-shadow(0 0 4px rgba(53, 227, 91, 0.7)); }
+.tdLamp.on.tdLamp-b { color: #3d9bff; filter: drop-shadow(0 0 4px rgba(61, 155, 255, 0.7)); }
+.tdLamp.on.tdLamp-a { color: #ffb21f; filter: drop-shadow(0 0 4px rgba(255, 178, 31, 0.7)); }
+.tdLamp.on.tdLamp-r { color: #ff3b30; filter: drop-shadow(0 0 4px rgba(255, 59, 48, 0.7)); }
+
+/* --- textos de las pantallas --- */
+.tdScreenBg { stroke: #27303c; stroke-width: 2; }
+.tdSep { stroke: #222a35; stroke-width: 1.5; }
+.tdTxt { fill: #e8eef6; }
+.tdTxtS { font-size: 17px; }
+.tdTxtM { font-size: 22px; font-weight: 600; }
+.tdTxtL { font-size: 28px; font-weight: 700; }
+.tdTxtXL { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tdIco.tdDim { color: #8b97a8; }
+.tdTxt.tdDim { fill: #8b97a8; }
+.tdTxt.tdOk { fill: #35e35b; }
+.tdTxt.tdBad { fill: #ff5a3c; }
+.tdGear { fill: #fff; font-size: 118px; font-weight: 700; text-anchor: middle; }
+.tdCcIco { color: #35e35b; }
+.tdCcTxt { fill: #35e35b; font-size: 22px; font-weight: 700; }
+.tdRetTxt { fill: #ffb21f; }
+.tdSignBg { fill: #fff; }
+.tdSignRing { fill: none; stroke: #e0301e; }
+.tdSignTxt { fill: #111; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tdSign.over .tdSignBg { fill: #ffd9d2; }
+
+/* --- digital --- */
+.tdTrack { fill: none; stroke: #141b25; stroke-width: 16; }
+.tdFill { fill: none; stroke-width: 16; stroke-dasharray: 1000 1000; transition: stroke-dashoffset 0.25s linear; }
+.tdSweeping .tdFill { transition: stroke-dashoffset 0.65s ease-in-out; }
+.tdFill.over { stroke: #ff5a3c; }
+.tdRingDial .tdTickMajor { stroke: #c9d6e6; stroke-width: 2.5; }
+.tdRingDial .tdTickMinor { stroke: #3e4a5a; stroke-width: 1.4; }
+.tdRingDial { overflow: visible; }
+.tdRingDial .tdNum { fill: #7f90a6; font-size: 12px; }
+.tdRingDial .tdZoneRed, .tdRingDial .tdZoneGreen { stroke-width: 3; }
+.tdBig { fill: #fff; font-size: 66px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.tdUnitD { fill: #8fa0b5; font-size: 14px; text-anchor: middle; }
+.tdCc { fill: #35e35b; font-size: 17px; font-weight: 700; text-anchor: middle; }
+.tdRet { fill: #ffb21f; font-size: 15px; font-weight: 700; text-anchor: middle; }
+.tdCard { fill: rgba(16, 26, 40, 0.78); stroke: #1e2a3a; stroke-width: 1.5; }
+.tdTxt.tdAccent { fill: #5fd0ff; }
+.tdBarTrack { fill: #1a2330; }
+.tdBarFill { fill: #3cc4ff; }
+.tdBarFill.tdBarBad { fill: #ff5a3c; }
+.tdBarDot { fill: #fff; stroke: #3cc4ff; stroke-width: 3; }
+
+/* --- americano --- */
+.tdUsLabel { fill: #141414; font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; text-anchor: middle; }
+.tdUsUnit { fill: #3a3a3a; font-size: 11px; font-weight: 700; text-anchor: middle; }
+.tdUsVal { fill: #6b4a10; font-size: 14px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.tdUsInnerLabel { fill: #c8281a; font-size: 10px; font-weight: 700; text-anchor: middle; }
+.tdDial-us.alerta .tdUsVal { fill: #d0261a; }
+.tdUsLcd { fill: #070604; stroke: #3a352c; stroke-width: 2; }
+.tdUsLcdSep { stroke: #2a251d; stroke-width: 1.5; }
+.tdUsLcdGear { fill: #ffb43a; font-size: 50px; font-weight: 700; text-anchor: middle; }
+.tdUsLcdTxt { fill: #ffb43a; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tdUsLcdTxt.tdUsLcdCc { fill: #47e06a; }
+.tdUsLcdTxt.tdUsLcdDim { fill: #a87a2a; }
+.tdUsLcdTxt.tdBad { fill: #ff5a3c; }
+.tdUsLcdIco { color: #a87a2a; }
+
+/* --- paneles de los costados (32:9) --- */
+.tdSideBg { stroke-width: 2; }
+.td-euro .tdSideBg { fill: #0b1018; stroke: #27303c; }
+.td-digital .tdSideBg { fill: rgba(16, 26, 40, 0.78); stroke: #1e2a3a; }
+.td-american .tdSideBg { fill: #0a0907; stroke: #3a352c; }
+.td-american .tdSide .tdTxt { fill: #ffd08a; }
+.td-american .tdSide .tdTxt.tdDim { fill: #a87a2a; }
+.td-american .tdSide .tdIco.tdDim { color: #a87a2a; }
+.td-american .tdSide .tdTxt.tdOk { fill: #47e06a; }
+.td-american .tdSide .tdTxt.tdBad { fill: #ff5a3c; }
+.tdLevel-bien { fill: #35e35b; }
+.tdLevel-medio { fill: #c6d93a; }
+.tdLevel-alto { fill: #ffb21f; }
+.tdLevel-mal { fill: #ff5a3c; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tdNeedle, .tdSweeping .tdNeedle, .tdFill, .tdSweeping .tdFill { transition: none; }
+}

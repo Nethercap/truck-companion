@@ -15,9 +15,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-5.24.0.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261101c" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261101c" />
-<link rel="stylesheet" href="app.css?v=20261101c" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261103a" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261103a" />
+<link rel="stylesheet" href="../dash/trucks.css?v=20261103a" />
+<link rel="stylesheet" href="app.css?v=20261103a" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -72,10 +73,13 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
   <div id="dashOverlay" class="dashOverlay" hidden>
     <div class="dashOverlayBar">
       <span class="dashOverlayTitle" data-i18n="dashTitle">Dashboard</span>
-      <div class="sizeGroup" id="dashStyleGroup" data-i18n-title="dashStyle" hidden>
-        <button class="iconBtn secondary" data-dash-style="modern" data-i18n="dashStyleModern">Modern</button>
-        <button class="iconBtn secondary" data-dash-style="classic" data-i18n="dashStyleClassic">Classic</button>
-      </div>
+      <select class="iconBtn secondary" id="dashStyleGroup" data-i18n-title="dashStyle" hidden>
+        <option value="modern" data-i18n="dashStyleModern">Modern</option>
+        <option value="classic" data-i18n="dashStyleClassic">Classic</option>
+        <option value="euro" data-i18n="dashStyleEuro">European</option>
+        <option value="digital" data-i18n="dashStyleDigital">Digital</option>
+        <option value="american" data-i18n="dashStyleAmerican">American</option>
+      </select>
       <div class="sizeGroup" id="dashSizeGroup" data-i18n-title="dashSize">
         <button class="iconBtn secondary" data-dash-scale="0.85">S</button>
         <button class="iconBtn secondary" data-dash-scale="1">M</button>
@@ -137,6 +141,24 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
       <label class="settingsRow"><input type="checkbox" id="setFadeButtons" /> <span data-i18n="settingsFadeButtons">Fade them out while driving and bring them back on touch</span></label>
       <label class="settingsRow"><input type="checkbox" id="setKeepCompass" /> <span data-i18n="settingsKeepCompass">Keep the north arrow visible</span></label>
       <button id="setMoveButtonsBtn" class="settingsLinkBtn" data-i18n="settingsMoveButtons">Move the buttons</button>
+
+      <p class="settingsSectionTitle" data-i18n="settingsMapDashTitle">Dashboard on the map:</p>
+      <label class="voiceRow" for="setMapDashMode"><span data-i18n="settingsMapDashMode">Show:</span>
+        <select id="setMapDashMode" class="settingsLinkBtn settingsSelect">
+          <option value="off" data-i18n="mapDashOff">Nothing</option>
+          <option value="float" data-i18n="mapDashFloat">The whole dashboard, over the map</option>
+          <option value="middle" data-i18n="mapDashMiddle">The map in the middle of the dashboard</option>
+          <option value="side" data-i18n="mapDashSide">The dashboard beside the map</option>
+        </select>
+      </label>
+      <label class="voiceRow" for="setMapDashStyle" id="mapDashStyleRow"><span data-i18n="dashStyle">Dashboard style</span>
+        <select id="setMapDashStyle" class="settingsLinkBtn settingsSelect">
+          <option value="euro" data-i18n="dashStyleEuro">European</option>
+          <option value="digital" data-i18n="dashStyleDigital">Digital</option>
+          <option value="american" data-i18n="dashStyleAmerican">American</option>
+        </select>
+      </label>
+      <p class="settingsHint" id="mapDashHint" data-i18n="settingsMapDashHint">Drag it and change its size with "Move the buttons".</p>
 
       <p class="settingsSectionTitle" data-i18n="settingsBaseTitle">Base map:</p>
       <label class="settingsRow"><input type="checkbox" id="setRealBase" /> <span data-i18n="settingsRealBase">Real base map: coastline, lakes, rivers and built-up areas under the roads</span></label>
@@ -415,6 +437,16 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 
   <div class="layout" id="layout">
    <div class="rowWrap">
+    <!-- El tablero entero en la fila del mapa (Ajustes > Tablero en el mapa,
+         mapDashHosts en pure.js): con el mapa adentro, en el hueco de la
+         pantalla del medio (el mapa se pone encima, placeMapInDash), o al
+         costado del mapa, que se achica. -->
+    <div id="mapDashStage" class="mapDashStage" hidden></div>
+    <div id="mapDashSide" class="mapDashSide" hidden></div>
+    <div id="mapDashPager" class="mapDashPager" role="tablist" hidden>
+      <button type="button" role="tab" data-map-dash-page="map" data-i18n="mapDashPageMap">Map</button>
+      <button type="button" role="tab" data-map-dash-page="screen" data-i18n="mapDashPageScreen">Screen</button>
+    </div>
     <div id="mapPanel">
       <div id="mapCanvas"></div>
       <!-- El mapa se mudo a la ventana flotante (pipMapIn en app.js) -->
@@ -458,6 +490,11 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
       <div id="bottomRightHud" class="bottomRightHud">
         <div id="miniHudExtra" class="miniHudExtra"></div>
         <div id="compassBtn" class="mapBtn compassIndicator" role="img" data-i18n-title="compassTitle" title="North" style="display:none"><svg id="compassNeedle" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><text x="12" y="6.4" text-anchor="middle" font-size="6.5" font-weight="800" font-family="system-ui, sans-serif" fill="#ef4444">N</text><path d="M12 7.6 L14.9 14.6 L9.1 14.6 Z" fill="#ef4444"/><path d="M12 21.6 L14.9 14.6 L9.1 14.6 Z" fill="currentColor" opacity="0.6"/></svg></div>
+      </div>
+      <!-- El tablero entero sobre el mapa. Sin mover va abajo al medio; se
+           acomoda con "Mover los botones" como el mini-HUD. -->
+      <div id="mapDashHome" class="mapDashHome">
+        <div id="mapDashFloat" class="mapDashPart" hidden></div>
       </div>
       <div class="mapHint" id="mapHint" data-i18n="mapNotLoaded">Map not loaded</div>
       <div class="mapNoWebgl" id="mapNoWebgl" hidden>
@@ -768,14 +805,15 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 <script src="vendor/maplibre-gl-5.24.0.js"></script>
 <script src="vendor/pmtiles-4.5.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261101c"></script>
-<script src="pure.js?v=20261101c"></script>
-<script src="i18n.js?v=20261101c"></script>
-<script src="i18n_en_es.js?v=20261101c"></script>
-<script src="../dash/dash.js?v=20261101c"></script>
-<script src="../dash/classic.js?v=20261101c"></script>
-<script src="app.js?v=20261101c"></script>
-<script src="convoy.js?v=20261101c"></script>
-<script src="livemap.js?v=20261101c"></script>
+<script src="variants.js?v=20261103a"></script>
+<script src="pure.js?v=20261103a"></script>
+<script src="i18n.js?v=20261103a"></script>
+<script src="i18n_en_es.js?v=20261103a"></script>
+<script src="../dash/dash.js?v=20261103a"></script>
+<script src="../dash/classic.js?v=20261103a"></script>
+<script src="../dash/trucks.js?v=20261103a"></script>
+<script src="app.js?v=20261103a"></script>
+<script src="convoy.js?v=20261103a"></script>
+<script src="livemap.js?v=20261103a"></script>
 </body>
 </html>

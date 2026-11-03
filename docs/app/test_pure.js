@@ -2457,6 +2457,78 @@ test('gaugeAngle y gaugeScaleMax: la aguja queda en el rango y la escala no salt
   assert.equal(gaugeScaleMax(undefined, [500, 1000, 2000]), 500);
 });
 
+test('truckDashLamps: testigos del cuadro, alerta del juego primero y escondidos si no hay dato', () => {
+  const { truckDashLamps } = require('./pure.js');
+  const d = {
+    lights: { blinkerLeft: true, blinkerRight: false, beamLow: true, beamHigh: false, parking: true, hazards: false, beacon: false },
+    wipers: false, cruiseControl: true, cruiseControlSpeedKmh: 90, motorBrake: false, retarder: 2, retarderSteps: 3,
+    differentialLock: false, parkingBrake: true, liftAxle: false, trailerAttached: true,
+    batteryVoltage: 25.6, oilPressure: 60, waterTemperature: 90, airPressure: 120,
+    fuel: 300, fuelCapacity: 600, adblue: 40, adblueCapacity: 80,
+    mechanicalWarnings: { batteryVoltage: false, oilPressure: false, waterTemperature: true, airPressure: false, fuel: false, adblue: false },
+  };
+  const l = truckDashLamps(d);
+  assert.equal(l.blinkerLeft, true);
+  assert.equal(l.beamHigh, false);
+  assert.equal(l.cruise, true);
+  assert.equal(l.retarder, true);
+  assert.equal(l.parkingBrake, true);
+  assert.equal(l.waterTemp, true);      // la alerta del juego, aunque marque 90
+  assert.equal(l.adblueLow, false);
+  // Crucero prendido sin velocidad puesta no es crucero.
+  assert.equal(truckDashLamps(Object.assign({}, d, { cruiseControlSpeedKmh: 0 })).cruise, false);
+  // Sin retarder, sin AdBlue o sin el dato: el testigo no existe.
+  const viejo = truckDashLamps({ lights: {}, retarderSteps: 0, adblueCapacity: 0, adblue: 0, mechanicalWarnings: { adblue: false } });
+  assert.equal(viejo.retarder, undefined);
+  assert.equal(viejo.adblueLow, undefined);
+  assert.equal(viejo.beamLow, undefined);
+  assert.equal(viejo.battery, undefined);
+  // Un cliente sin las alertas usa el umbral de la zona roja.
+  const sinAlertas = truckDashLamps({ batteryVoltage: 12.2, oilPressure: 0, waterTemperature: 110, airPressure: 40,
+                                      fuel: 50, fuelCapacity: 600, adblue: 30, adblueCapacity: 80 });
+  assert.deepEqual([sinAlertas.battery, sinAlertas.oilPressure, sinAlertas.waterTemp, sinAlertas.airPressure,
+                    sinAlertas.fuelLow, sinAlertas.adblueLow], [false, true, true, true, true, false]);
+  assert.equal(truckDashLamps({ batteryVoltage: 20 }).battery, true);   // 24 V caida
+  assert.deepEqual(truckDashLamps(null), {});
+});
+
+test('mapDashSetting y mapDashHosts: el tablero en la vista del mapa, flotante, con el mapa adentro o al costado', () => {
+  const { mapDashSetting, mapDashHosts } = require('./pure.js');
+  // Lo que no se conoce vuelve al valor de siempre: apagado y europeo.
+  assert.deepEqual(mapDashSetting(undefined), { mode: 'off', style: 'euro' });
+  assert.deepEqual(mapDashSetting({ mode: 'raro', style: 'pink' }), { mode: 'off', style: 'euro' });
+  assert.deepEqual(mapDashSetting({ mode: 'middle', style: 'american' }), { mode: 'middle', style: 'american' });
+  // El de cada reloj suelto ya no existe: lo guardado asi queda apagado.
+  assert.equal(mapDashSetting({ mode: 'parts', parts: ['tach'] }).mode, 'off');
+  assert.deepEqual(mapDashHosts({ mode: 'off' }), []);
+  assert.deepEqual(mapDashHosts({ mode: 'float' }), [{ id: 'mapDashFloat' }]);
+  // Con el mapa adentro, el cuadro deja el hueco; al costado, no.
+  assert.deepEqual(mapDashHosts({ mode: 'middle' }), [{ id: 'mapDashStage', mapHole: true }]);
+  assert.deepEqual(mapDashHosts({ mode: 'side' }), [{ id: 'mapDashSide' }]);
+});
+
+test('truckGaugeScales: rpm con aire sobre el tope, bateria de 12 o 24 V y velocidad por unidades', () => {
+  const { truckGaugeScales } = require('./pure.js');
+  const camion = truckGaugeScales({ engineRpmMax: 2500, batteryVoltage: 25.4 }, false);
+  assert.equal(camion.rpm.max, 3000);
+  assert.deepEqual(camion.rpm.red, [[2500, 3000]]);
+  assert.deepEqual(camion.rpm.green, [[1000, 1500]]);
+  assert.equal(camion.rpm.major, 500);
+  assert.equal(camion.battery.max, 32);
+  assert.equal(camion.speed.max, 125);
+  assert.equal(truckGaugeScales({}, true).speed.max, 85);
+  // Sin el dato del motor, el de un diesel de camion.
+  assert.equal(truckGaugeScales({}, false).rpm.max, 3000);
+  // Un auto del Road Trip: hasta 7000, de a mil y sin la franja verde.
+  const auto = truckGaugeScales({ engineRpmMax: 6000, batteryVoltage: 12.6 }, true);
+  assert.equal(auto.rpm.max, 7000);
+  assert.equal(auto.rpm.major, 1000);
+  assert.equal(auto.rpm.green, null);
+  assert.equal(auto.battery.max, 16);
+  // La escala no salta con el tope del motor: 2100 y 2250 caen en la misma.
+  assert.equal(truckGaugeScales({ engineRpmMax: 2100 }).rpm.max, truckGaugeScales({ engineRpmMax: 2250 }).rpm.max);
+});
+
 test('miniDialReadings: cuatro relojitos, alerta del juego primero, F en millas', () => {
   const { miniDialReadings } = require('./pure.js');
   const d = { airPressure: 120, brakeTemperature: 320, waterTemperature: 90, oilPressure: 50,
