@@ -1548,6 +1548,76 @@ def test_lan_la_bandeja_lo_prende_y_main_decide_antes_de_guardar_first_run(monke
     assert decide < fuente.index("start_asyncio_thread(") < fuente.index('settings["first_run_done"] = True')
 
 
+def _cuerpo_del_issue(url):
+    import urllib.parse
+    return urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)["body"][0]
+
+
+def test_issue_sin_armado_fallido_va_como_antes():
+    import tray_client
+    url = tray_client.issue_url(["- Client version: 1.5.36"], "linea 1\nlinea 2\n")
+    assert _cuerpo_del_issue(url) == "\n".join([
+        "- Client version: 1.5.36", "", "Last log lines:", "```", "linea 1", "linea 2", "```", "</details>"])
+
+
+def test_issue_con_build_log_entra_en_la_url_recortando_primero_el_truckdash_log():
+    """#142 y #157: el truckdash.log solo dice "parser.mjs failed" y el
+    motivo esta en el build.log. Con los dos, la URL no pasa de ~8 KB: se
+    recorta el truckdash.log desde arriba, despues el build.log."""
+    import tray_client
+    diagnostico = [f"- Linea de diagnostico {i}" for i in range(8)]
+    log = [f"2026-10-31 18:{i:02d}:09,769 INFO Ventana del juego no encontrada: ['explorer.exe', 'simhub.exe']"
+           for i in range(25)]
+    log[-1] = "RuntimeError: parser.mjs failed (exit 1), see C:\\TruckDash\\maps\\ats-f6346e0ff771.part\\build.log"
+    build = [f"⚠ skipping def/ferry/f{i}.sii - failed to parse: Expecting token of type --> RCurly <-- "
+             f"but found --> '}}' <-- (line 3: ferry_connection : conn.f{i} {{)" for i in range(38)]
+    build += ["Error: ENOENT: no such file or directory, stat 'C:\\mod\\FREE-TM DAF 2021 XF'", "Node.js v24.19.0"]
+    entra = tray_client.issue_url(diagnostico, "\n".join(log[-5:]), "\n".join(build[-5:]))
+    cuerpo = _cuerpo_del_issue(entra)
+    assert "\n".join(["Map builder log (end of build.log):", "```", *build[-5:], "```", "</details>"]) in cuerpo
+    assert "\n".join(log[-5:]) in cuerpo
+
+    url = tray_client.issue_url(diagnostico, "\n".join(log), "\n".join(build))
+    assert len(url) <= tray_client.ISSUE_URL_MAX
+    cuerpo = _cuerpo_del_issue(url)
+    assert cuerpo.startswith("\n".join(diagnostico))
+    queda_log = cuerpo.split("Last log lines:\n```\n")[1].split("\n```")[0].splitlines()
+    queda_build = cuerpo.split("Map builder log (end of build.log):\n```\n")[1].split("\n```")[0].splitlines()
+    assert queda_log == log[-tray_client.ISSUE_LOG_MIN_LINEAS:]
+    assert queda_build == build[-len(queda_build):] and len(queda_build) > 10
+    # Con una linea mas del build.log ya no entraba
+    sin_recortar = tray_client.issue_url(diagnostico, "\n".join(queda_log), "\n".join(build[-len(queda_build) - 1:]),
+                                         maximo=10 ** 6)
+    assert len(sin_recortar) > tray_client.ISSUE_URL_MAX
+
+
+def test_reportar_un_problema_suma_el_build_log_del_armado_que_fallo(monkeypatch, tmp_path):
+    import time
+    import tray_client
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    part = tmp_path / "TruckDash" / "maps" / "ats-f6346e0ff771.part"
+    part.mkdir(parents=True)
+    (part / "build.log").write_text("$ node parser.mjs\nError: ENOENT: no such file or directory\n"
+                                    "    at Object.statSync (node:fs:1795:25)\n\nNode.js v24.19.0\n", encoding="utf-8")
+    truckdash_log = tmp_path / "truckdash.log"
+    truckdash_log.write_text("ERROR Map build failed\nRuntimeError: parser.mjs failed (exit 1)\n", encoding="utf-8")
+    monkeypatch.setattr(tray_client, "LOG_PATH", str(truckdash_log))
+    monkeypatch.setattr(tray_client.win_integration, "is_autostart_enabled", lambda: False)
+    abiertas = []
+    monkeypatch.setattr(tray_client, "abrir_navegador", abiertas.append)
+    monkeypatch.setattr(tray_client.state, "map_build", {"game": "ats", "step": "error", "error": "parser.mjs failed",
+                                                         "running": False, "started": time.time() - 60})
+    tray_client.report_problem(None, None)
+    cuerpo = _cuerpo_del_issue(abiertas[0])
+    assert "RuntimeError: parser.mjs failed (exit 1)\n```" in cuerpo
+    assert "Map builder log (end of build.log):\n```\n$ node parser.mjs\nError: ENOENT" in cuerpo
+    assert cuerpo.endswith("\n\nNode.js v24.19.0\n```\n</details>")
+    # Si el armado salio bien despues, no va
+    monkeypatch.setattr(tray_client.state, "map_build", {"game": "ats", "step": "done", "error": None, "running": False})
+    tray_client.report_problem(None, None)
+    assert "Map builder log" not in _cuerpo_del_issue(abiertas[1])
+
+
 def test_web_cache_pisa_los_archivos_en_solo_lectura(monkeypatch, tmp_path, caplog):
     # Un mod (18-10) deja app.js y compania en solo lectura: al volver al
     # cliente oficial, la cache tiene que quedar con lo que se bajo.

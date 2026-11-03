@@ -151,7 +151,7 @@ class AppState:
         self.cloud_viewers = None  # tableros conectados por el relay (None: no se sabe todavia)
         self.last_known_mods: dict = {}  # ultimos mods de mapa no-None por juego
         self.offmap_notified: set = set()
-        self.map_build: dict | None = None  # {'game', 'step', 'error', 'running'}
+        self.map_build: dict | None = None  # {'game', 'step', 'error', 'running', 'started'}
         self.map_build_cancel = threading.Event()
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
@@ -1606,23 +1606,56 @@ def check_for_update_menu_item(icon, item):
         show_text_dialog("Truck Dash", T("up_to_date", v=client_lib.CLIENT_VERSION))
 
 
+ISSUE_URL = "https://github.com/Nethercap/truck-companion/issues/new"
+# GitHub no abre un issue prellenado con la URL mucho mas larga que 8 KB
+ISSUE_URL_MAX = 8000
+# Lo que queda del truckdash.log antes de recortar el build.log: la pila de
+# "Map build failed" son 6 lineas
+ISSUE_LOG_MIN_LINEAS = 6
+
+
+def issue_url(diagnostico: list, log_tail: str, build_tail: str = "", maximo: int = ISSUE_URL_MAX) -> str:
+    """La URL del issue con el diagnostico, las ultimas lineas del
+    truckdash.log y, si el ultimo armado del mapa fallo, las del build.log
+    ("Map builder log"). Si pasa de maximo (medido ya codificada), se sacan
+    lineas de arriba: primero del truckdash.log hasta ISSUE_LOG_MIN_LINEAS,
+    despues del build.log (abajo queda el error) y por ultimo el resto."""
+    log = log_tail.strip().splitlines()
+    build = build_tail.strip().splitlines()
+    con_build = bool(build)
+    while True:
+        cuerpo = diagnostico + ["", "Last log lines:", "```", *log, "```"]
+        if con_build:
+            cuerpo += ["", "Map builder log (end of build.log):", "```", *build, "```"]
+        cuerpo.append("</details>")
+        url = ISSUE_URL + "?" + urllib.parse.urlencode({"title": "[client] ", "body": "\n".join(cuerpo), "labels": "bug"})
+        if len(url) <= maximo or not (log or build):
+            return url
+        if build and len(log) <= ISSUE_LOG_MIN_LINEAS:
+            build.pop(0)
+        else:
+            log.pop(0)
+
+
 def report_problem(icon, item):
     """Abre un issue de GitHub con el diagnostico ya cargado (version, estado,
-    juegos detectados, LAN, Windows y las ultimas lineas del log). El usuario
-    ve y edita todo antes de publicar - no se manda nada solo."""
+    juegos detectados, LAN, Windows, las ultimas lineas del log y el final del
+    build.log si fallo "Build my map"). El usuario ve y edita todo antes de
+    publicar - no se manda nada solo."""
     import platform
-    import urllib.parse
 
     try:
         with open(LOG_PATH, encoding="utf-8", errors="ignore") as f:
             tail = "".join(f.readlines()[-25:])[-2500:]
     except OSError:
         tail = "(no log)"
+    build_log = map_builder.failed_build_log(state.map_build)
+    build_tail = map_builder.build_log_tail(build_log) if build_log else ""
     installs = ", ".join(f"{i['game']}={i['state']}" for i in state.installs) or "none detected"
     lan = state.local
     lan_text = ("unavailable" if not lan or lan.error or not lan.web_ready
                 else "ok" if lan.en_la_red else "this PC only (not turned on)")
-    body = "\n".join([
+    diagnostico = [
         "**What happened?**", "", "(describe the problem here)", "", "**Steps to reproduce**", "", "1. ", "",
         "---", "<details><summary>Diagnostics (auto-filled)</summary>", "",
         f"- Client version: {client_lib.CLIENT_VERSION}",
@@ -1632,10 +1665,8 @@ def report_problem(icon, item):
         f"- LAN mode: {lan_text}",
         f"- Autostart: {win_integration.is_autostart_enabled()}",
         f"- Windows: {platform.platform()}",
-        "", "Last log lines:", "```", tail.strip(), "```", "</details>",
-    ])
-    query = urllib.parse.urlencode({"title": "[client] ", "body": body, "labels": "bug"})
-    abrir_navegador(f"https://github.com/Nethercap/truck-companion/issues/new?{query}")
+    ]
+    abrir_navegador(issue_url(diagnostico, tail, build_tail))
 
 
 def set_overlay(enabled: bool) -> None:
@@ -1949,7 +1980,8 @@ def start_map_build(game: str) -> bool:
     carpeta = game_dir_for(game)
     nombres = list((state.active_mods or {}).get(game) or [])
     state.map_build_cancel.clear()
-    state.map_build = {"game": game, "step": "download", "error": None, "running": True}
+    inicio = time.time()
+    state.map_build = {"game": game, "step": "download", "error": None, "running": True, "started": inicio}
 
     def paso(nombre):
         state.map_build["step"] = nombre
@@ -1965,7 +1997,8 @@ def start_map_build(game: str) -> bool:
             state.map_build = {"game": game, "step": "cancelled", "error": None, "running": False}
         except Exception as exc:
             logging.exception("Map build failed")
-            state.map_build = {"game": game, "step": "error", "error": str(exc), "running": False}
+            state.map_build = {"game": game, "step": "error", "error": str(exc), "running": False,
+                               "started": inicio}
 
     threading.Thread(target=vigilar_hilo(correr, "map build"), daemon=True).start()
     return True

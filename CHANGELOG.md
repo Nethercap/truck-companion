@@ -6,6 +6,11 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Report a problem: when "Build my map" failed, the report also brings the end of `build.log`
+  (under "Map builder log"), with the error that stopped the build. Until now it only said
+  "parser.mjs failed", and we had to ask you for the file. As before, you see and can edit
+  everything before you post it.
+
 - Build my map: the 56 new Road Trip atlas places of ATS 1.62 show their names. Until now they
   showed codes like "poi_ar1_01".
 
