@@ -6,6 +6,9 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Build my map: the 56 new Road Trip atlas places of ATS 1.62 show their names. Until now they
+  showed codes like "poi_ar1_01".
+
 - Map mods: ATS Expansion (Sineptorro) is detected from your active mods, and the app loads its map
   (alone, or with Coast to Coast). Until now the app showed the plain ATS map with it.
 

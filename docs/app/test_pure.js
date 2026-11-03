@@ -1294,6 +1294,41 @@ test('DLC: juego de la variante y ajustes guardados limpios', () => {
   assert.deepEqual(normalizeDlcOff(undefined), { ats: [], ets2: [] });
 });
 
+test('version de ATS: la 1.61 cambia solo el mapa base, si esta publicada', () => {
+  const { atsVersionSetting, atsVersionVariant, dlcGameOf } = require('./pure.js');
+  const publicadas = { ats: '20261103', ats_161: '20261103', ats_c2c: '20261101' };
+  assert.equal(atsVersionVariant('ats', '1.61', publicadas), 'ats_161');
+  assert.equal(atsVersionVariant('ats', 'latest', publicadas), 'ats');
+  // Los mods siguen en su variante (armada sobre la version de su mod), y el
+  // mapa armado en la PC es el del juego instalado
+  assert.equal(atsVersionVariant('ats_c2c', '1.61', publicadas), 'ats_c2c');
+  assert.equal(atsVersionVariant('local_ats', '1.61', publicadas), 'local_ats');
+  assert.equal(atsVersionVariant('ets2', '1.61', publicadas), 'ets2');
+  // Sin el mapa de la 1.61 publicado, el de ahora
+  assert.equal(atsVersionVariant('ats', '1.61', { ats: '20261103' }), 'ats');
+  // Lo guardado que no es una version conocida es "la de ahora"
+  assert.equal(atsVersionSetting(undefined), 'latest');
+  assert.equal(atsVersionSetting('1.60'), 'latest');
+  assert.equal(atsVersionSetting('__proto__'), 'latest');
+  assert.equal(atsVersionVariant('ats', '__proto__', publicadas), 'ats');
+  assert.equal(dlcGameOf('ats_161'), 'ats');
+});
+
+test('version de ATS: el mapa en vivo y el convoy juntan la 1.61 con ats', () => {
+  const { sharedMapVariant } = require('./pure.js');
+  assert.equal(sharedMapVariant('ats_161'), 'ats');
+  assert.equal(sharedMapVariant('ats'), 'ats');
+  assert.equal(sharedMapVariant('ats_c2c'), 'ats_c2c');
+  assert.equal(sharedMapVariant(null), null);
+});
+
+test('version de ATS: la etiqueta lleva mayor y menor', () => {
+  const { gameVersionTag } = require('./pure.js');
+  assert.equal(gameVersionTag('1.62.1.1'), '(1.62)');
+  assert.equal(gameVersionTag(undefined), '');
+  assert.equal(gameVersionTag('x'), '');
+});
+
 test('DLC: automatico usa lo que encontro el cliente; sin datos, todos; manual, lo elegido', () => {
   const { effectiveDlcOff, DLC_LIST } = require('./pure.js');
   const todosAts = DLC_LIST.ats.map(d => d[0]);

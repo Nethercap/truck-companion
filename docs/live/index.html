@@ -180,6 +180,9 @@
     const entries = Object.entries(manifest.variants);
     let hue = 0;
     await Promise.all(entries.map(async ([key, v], idx) => {
+      // El mapa de la version anterior del juego (ats_161) es el mismo mundo:
+      // quien lo usa aparece en el de ahora (sharedMapVariant en pure.js)
+      if (v.previousVersionOf) return;
       let cities;
       try {
         const r = await fetch(`${MAPS}/${key}/Cities.json?v=${v.mapDataVersion || ''}`);
