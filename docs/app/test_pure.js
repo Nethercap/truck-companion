@@ -5700,3 +5700,138 @@ test('reportes mandados: se guardan, se pregunta por ellos y se avisa una vez al
   // otra pestana ya aviso (ya no esta en lo guardado): no se avisa dos veces
   assert.deepEqual(navReportsAfterStatus(list, [{ id: 5, status: 'fixed' }]).fixed, []);
 });
+
+test('nearStopCandidates: las mas cercanas, las primeras sobre la ruta y las primeras adelante, sin repetir', () => {
+  const { nearStopCandidates } = require('./pure.js');
+  const key = (l) => l.map(st => `${st.x},${st.z}`);
+  // Al norte (-z). 9 cercanas atras; sobre la ruta y adelante, mas lejos.
+  const atras = Array.from({ length: 9 }, (_, i) => ({ x: 0, z: 100 + i * 100, dist: 100 + i * 100 }));
+  const adelante = [1, 2, 3, 4, 5].map(k => ({ x: 0, z: -3000 * k, dist: 3000 * k }));
+  const estaciones = [...atras, ...adelante];
+  const ruta = [[0, 0], [0, -100000]];
+  const conRuta = key(nearStopCandidates(estaciones, 0, 0, 0, ruta));
+  assert.deepEqual(conRuta, [...key(atras.slice(0, 8)), ...key(adelante.slice(0, 3))]);
+  // Sin ruta quedan las de adelante: las 8 cercanas pueden estar todas atras
+  assert.deepEqual(key(nearStopCandidates(estaciones, 0, 0, 0, null)), [...key(atras.slice(0, 8)), ...key(adelante.slice(0, 2))]);
+  // Sin rumbo (parado en el deposito), solo las cercanas
+  assert.deepEqual(key(nearStopCandidates(estaciones, 0, 0, null, null)), key(atras.slice(0, 8)));
+  assert.deepEqual(nearStopCandidates([], 0, 0, 0, ruta), []);
+});
+
+test('createNearStopPick: la de menos camino sin alejarse primero, de a una busqueda por vez', () => {
+  const { createNearStopPick } = require('./pure.js');
+  const recta = (st) => [[0, 0], [st.x, st.z]];
+  const correr = (estaciones, caminos) => {
+    const pick = createNearStopPick(estaciones, 0, 0, 0, null);
+    let busquedas = 0, vueltas = 0;
+    for (let listo = false; !listo; vueltas++) {
+      const antes = busquedas;
+      listo = pick.step((st) => { busquedas++; return caminos(st); });
+      assert.ok(busquedas - antes <= 1, 'una sola busqueda por vez');
+    }
+    return { best: pick.best(), busquedas, vueltas };
+  };
+  const a = { x: 0, z: -1000, dist: 1000 };
+  const b = { x: 200, z: -2000, dist: 2010 };
+  // La de menos camino, aunque no sea la mas cercana en recta
+  let r = correr([a, b], (st) => (st === a ? { path: recta(a), m: 5000 } : { path: recta(b), m: 2100 }));
+  assert.equal(r.best.st, b);
+  assert.equal(r.best.m, 2100);
+  assert.equal(r.busquedas, 2);
+  // La de la otra mano: 100 m en recta, pero hay que alejarse hasta la salida
+  // siguiente y volver. Gana la de adelante, aunque tenga mas camino.
+  const otraMano = { x: 40, z: -100, dist: 108 };
+  const vueltaLarga = [[0, 0], [0, -1500], [40, -1500], [40, -100]];
+  r = correr([otraMano, a], (st) => (st === otraMano ? { path: vueltaLarga, m: 2900 } : { path: recta(a), m: 3500 }));
+  assert.equal(r.best.st, a);
+  // Un camino con curvas no se aleja: largo contra la recta, pero vale
+  const curvas = [[0, 0], [300, -300], [-300, -600], [0, -1000]];
+  r = correr([a, b], (st) => (st === a ? { path: curvas, m: 2600 } : { path: recta(b), m: 4000 }));
+  assert.equal(r.best.st, a);
+  // Si todas obligan a alejarse, la de menos camino: algo hay que decir
+  r = correr([otraMano], () => ({ path: vueltaLarga, m: 2900 }));
+  assert.equal(r.best.st, otraMano);
+  // Sin camino a ninguna, o sin paradas, nada
+  assert.equal(correr([a, b], () => null).best, null);
+  r = correr([], () => null);
+  assert.equal(r.best, null);
+  assert.equal(r.busquedas, 0);
+});
+
+test('createNearStops: sigue al camion por el camino y dice cuando volver a elegir', () => {
+  const { createNearStops } = require('./pure.js');
+  const largo = (p) => p.slice(1).reduce((m, q, i) => m + Math.hypot(q[0] - p[i][0], q[1] - p[i][1]), 0);
+  const n = createNearStops({ repickM: 1000, offM: 100, minGapMs: 10000, hideM: 1000 });
+  const camino = [[0, 0], [0, -3000], [500, -3000]];
+  // Sin elegir todavia: de a uno, en orden, y nada para mostrar
+  assert.equal(n.due(['g', 'p'], 'r', 0), 'g');
+  assert.equal(n.left('g'), null);
+  n.put('g', camino, { x: 0, z: 0, now: 0, routeKey: 'r' });
+  assert.equal(n.due(['g', 'p'], 'r', 0), 'p');
+  n.put('p', null, { x: 0, z: 0, now: 0, routeKey: 'r' });
+  assert.equal(n.due(['g', 'p'], 'r', 0), null);
+  // No hay parada: nada para mostrar, y parado no se vuelve a buscar
+  assert.equal(n.left('p'), null);
+  assert.equal(n.due(['g', 'p'], 'r', 3600000), null);
+  // Lo que falta baja con lo andado y deja el camino entero para medirlo
+  n.move(5, -800);
+  const p = n.left('g');
+  assert.ok(Math.abs(largo(p.left) - 2700) < 1, String(largo(p.left)));
+  assert.equal(p.full, camino);
+  assert.equal(p.left[1], camino[1], 'los puntos del camino, para routeMeters');
+  assert.equal(n.due(['g', 'p'], 'r', 100000), null);
+  // Andado repickM se vuelve a elegir, primero la que se eligio hace mas
+  n.move(0, -1000);
+  n.put('p', null, { x: 0, z: -1000, now: 500, routeKey: 'r' });
+  assert.equal(n.due(['g', 'p'], 'r', 1000), 'g');
+  // Otra ruta: se elige de nuevo, pero no en cada dato
+  const m = createNearStops({ repickM: 1000, offM: 100, minGapMs: 10000, hideM: 1000 });
+  m.put('g', [[0, 0], [0, -3000]], { x: 0, z: 0, now: 0, routeKey: 'r' });
+  assert.equal(m.due(['g'], 'otra', 5000), null);
+  assert.equal(m.due(['g'], 'otra', 10000), 'g');
+  // Fuera del camino: igual, con el mismo tope
+  m.move(150, -50);
+  assert.equal(m.due(['g'], 'r', 5000), null);
+  assert.equal(m.due(['g'], 'r', 10000), 'g');
+  assert.ok(m.left('g'), 'cerca del camino el numero sigue');
+  // Lejos (un ferry, el taller) el numero no dice nada hasta elegir de nuevo
+  m.move(5000, 0);
+  assert.equal(m.left('g'), null);
+  assert.equal(m.due(['g'], 'r', 0), 'g', 'lo andado no espera el tope');
+  // reset: otra variante u otro vehiculo
+  m.reset();
+  assert.equal(m.left('g'), null);
+  assert.equal(m.due(['g'], 'r', 0), 'g');
+});
+
+test('createNearStops: la elegida se queda hasta pasarla o que aparezca una mas cerca', () => {
+  const { createNearStops } = require('./pure.js');
+  const largo = (p) => p.slice(1).reduce((m, q, i) => m + Math.hypot(q[0] - p[i][0], q[1] - p[i][1]), 0);
+  const falta = (n) => Math.round(largo(n.left('g').left));
+  const n = createNearStops({ repickM: 1000, offM: 100, minGapMs: 10000, hideM: 1000 });
+  n.put('g', [[0, 0], [0, -3000]], { x: 0, z: 0, now: 0, routeKey: 'r' });
+  n.move(0, -1000);
+  assert.equal(n.due(['g'], 'r', 1000), 'g');
+  // Se eligio otra mas lejos, o ninguna: el numero no sube y no se vuelve a
+  // pedir hasta andar otro tanto
+  n.put('g', [[0, -1000], [0, -9000]], { x: 0, z: -1000, now: 1000, routeKey: 'r' });
+  assert.equal(falta(n), 2000);
+  assert.equal(n.due(['g'], 'r', 1000), null);
+  n.move(0, -1500);
+  n.put('g', null, { x: 0, z: -1500, now: 2000, routeKey: 'r' });
+  assert.equal(falta(n), 1500);
+  // Una mas cerca le gana
+  n.put('g', [[0, -1500], [0, -2000]], { x: 0, z: -1500, now: 3000, routeKey: 'r' });
+  assert.equal(falta(n), 500);
+  // Pasada de largo (fuera del camino): entra la siguiente aunque este mas lejos
+  n.move(150, -1900);
+  n.put('g', [[150, -1900], [150, -9000]], { x: 150, z: -1900, now: 20000, routeKey: 'r' });
+  assert.equal(falta(n), 7100);
+  // Otra ruta: tambien, la que venia puede no ser de esta
+  n.put('g', [[150, -1900], [150, -9500]], { x: 150, z: -1900, now: 40000, routeKey: 'otra' });
+  assert.equal(falta(n), 7600);
+  // Ya no hay ninguna al pasar de largo: nada para mostrar
+  n.move(400, -1900);
+  n.put('g', null, { x: 400, z: -1900, now: 60000, routeKey: 'otra' });
+  assert.equal(n.left('g'), null);
+});

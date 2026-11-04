@@ -51,13 +51,17 @@ DEFAULT_OPACITY = 90  # antes fija en 88; de a SIZE_STEP como el deslizador
 # velocidad con el limite, la del control de crucero (solo si esta puesto),
 # la marcha, lo que falta, la hora de llegada real (la de tu reloj, la
 # calcula la web) y la del reloj del juego (la que importa contra el plazo).
-ITEMS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival", "stops")
+ITEMS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival", "stops", "near_stops")
 DATOS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival")
 # La barra de la ruta ("stops", idea del usuario del 09-10): de aca al
 # destino, con el tramo donde conviene cargar combustible y el tramo donde
 # conviene dormir, solo con colores. Cada tramo es el ultimo cuarto antes de
 # quedarse sin combustible o sin poder manejar mas (al menos 20 km).
 PARADA_VENTANA, PARADA_VENTANA_MIN_KM = 0.25, 20.0
+# Lo que falta hasta la estacion y el area de descanso mas cercanas
+# ("near_stops"): las elige y las mide el tablero, que es el que tiene el mapa.
+# Sirve jugando por Moonlight o con una sola pantalla, sin nada que tocar.
+TIPOS_CERCANAS = ("g", "p")
 # Para pasar los minutos de juego hasta el descanso a km: la velocidad media
 # de la ruta del GPS del juego, entre estos topes; sin ruta, la del medio.
 VEL_MEDIA_MIN, VEL_MEDIA_MAX, VEL_MEDIA_DEFECTO = 40.0, 100.0, 70.0
@@ -153,10 +157,24 @@ def carriles(rec):
             for k, bits in enumerate(rec["arrows"][:rec["count"]])]
 
 
+def paradas_cercanas(lista):
+    """La parada mas cercana de cada tipo como llega en nav_hud, o None: el
+    tablero manda textos, ya en su idioma y su unidad. Sin distancia no hay
+    nada que mostrar."""
+    if not isinstance(lista, list):
+        return None
+    out = []
+    for p in lista[:len(TIPOS_CERCANAS)]:
+        if isinstance(p, dict) and p.get("kind") in TIPOS_CERCANAS and _texto(p.get("dist"), 16):
+            out.append({"kind": p["kind"], "label": _texto(p.get("label"), 32), "dist": _texto(p.get("dist"), 16)})
+    return out or None
+
+
 def limpiar_nav(msg: dict) -> dict:
     """El mensaje nav_hud de la web, con solo lo que se usa."""
     return {
         "lanes": carriles_validos(msg.get("lanes")),
+        "near": paradas_cercanas(msg.get("near")),
         "turn": _texto(msg.get("turn")),
         "next": _texto(msg.get("next")),
         "remaining": _texto(msg.get("remaining"), 24),
@@ -347,6 +365,9 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         # si no el del GPS del juego
         "stops": barra_paradas(tele, nav["remainingKm"] if nav_ok and nav.get("remainingKm") else tele.get("routeDistanceKm"))
         if "stops" in items else None,
+        # Como el giro, solo mientras el tablero manda: a 90 km/h son 0,5 km
+        # del juego por segundo y un numero viejo miente enseguida.
+        "near_stops": nav.get("near") if nav_ok and "near_stops" in items else None,
         # Las etiquetas, en el idioma del tablero aunque ya no mande (el giro
         # viene en ese idioma); las del cliente (idioma de Windows) solo si
         # nunca hubo tablero.
@@ -356,7 +377,7 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
     }
     # Nada para mostrar (todo destildado, o solo el giro y no hay ruta): no
     # se deja un recuadro vacio arriba del juego.
-    if not any(datos[k] for k in DATOS) and not datos["hint"] and not datos["stops"]:
+    if not any(datos[k] for k in DATOS) and not datos["hint"] and not datos["stops"] and not datos["near_stops"]:
         return None
     return datos
 
@@ -403,6 +424,9 @@ def ejemplo(items, etiquetas) -> dict:
                             "arrows": [CARRIL_BITS["straight"], CARRIL_BITS["straight"] | CARRIL_BITS["right"],
                                        CARRIL_BITS["right"]]})}
     d["stops"] = {"fuel": (0.45, 0.6), "rest": (0.7, 0.93)} if "stops" in items else None
+    # Sin nombres: los manda el tablero y aca alcanza con el alto de verdad.
+    d["near_stops"] = ([{"kind": "g", "label": "", "dist": "12 km"}, {"kind": "p", "label": "", "dist": "34 km"}]
+                       if "near_stops" in items else None)
     if "turn" not in items:
         d["turn"] = ""
         d["lanes"] = None
@@ -837,6 +861,11 @@ class _Ventana:
         carril_w, carril_h, carril_sep = round(30 * k), round(36 * k), round(4 * k)
         if lanes:
             ancho = max(ancho, 2 * pad + len(lanes) * (carril_w + carril_sep) - carril_sep)
+        cercanas = d.get("near_stops") or []
+        if cercanas:
+            ancho = max(ancho, 2 * pad + sep * (len(cercanas) - 1) + sum(
+                round(16 * k) + (mide(p["label"], fuente(13)) + round(6 * k) if p["label"] else 0)
+                + mide(p["dist"], fuente(17, True)) for p in cercanas))
         y = pad
         if d["turn"]:
             t = c.create_text(pad, y, text=d["turn"], fill=FG, anchor="nw",
@@ -858,7 +887,8 @@ class _Ventana:
             y = c.bbox(t)[3] + round(8 * k)
 
         if not (d["speed"] or d["cruise"] or d["gear"] or columnas):
-            alto = self._barra_paradas(d.get("stops"), y - round(8 * k), ancho, pad, k) + pad
+            y = self._fila_cercanas(cercanas, y - round(8 * k), pad, sep, k, fuente)
+            alto = self._barra_paradas(d.get("stops"), y, ancho, pad, k) + pad
             self._marco_mover(ancho, alto, k)
             c.configure(width=ancho, height=alto)
             return ancho, alto
@@ -901,10 +931,32 @@ class _Ventana:
             a = c.create_text(derecha, medio - round(2 * k), text=valor, fill=FG, anchor="se", font=fuente(19, True))
             b = c.create_text(derecha, medio + round(1 * k), text=etiqueta, fill=MUTED, anchor="ne", font=fuente(11))
             derecha = min(c.bbox(a)[0], c.bbox(b)[0]) - sep
-        alto = self._barra_paradas(d.get("stops"), y + fila, ancho, pad, k) + pad
+        y = self._fila_cercanas(cercanas, y + fila, pad, sep, k, fuente)
+        alto = self._barra_paradas(d.get("stops"), y, ancho, pad, k) + pad
         self._marco_mover(ancho, alto, k)
         c.configure(width=ancho, height=alto)
         return ancho, alto
+
+    def _fila_cercanas(self, cercanas, y: int, pad: int, sep: int, k: float, fuente) -> int:
+        """La parada mas cercana de cada tipo: un punto del color de la barra
+        de la ruta, el nombre y lo que falta. Devuelve donde termina."""
+        if not cercanas:
+            return y
+        c = self.canvas
+        y += round(8 * k)
+        medio = y + round(11 * k)
+        r = round(5 * k)
+        x = pad
+        for p in cercanas:
+            color = BARRA_COMBUSTIBLE if p["kind"] == "g" else BARRA_DESCANSO
+            c.create_oval(x, medio - r, x + 2 * r, medio + r, fill=color, outline="")
+            x += 2 * r + round(6 * k)
+            if p["label"]:
+                t = c.create_text(x, medio, text=p["label"], fill=MUTED, anchor="w", font=fuente(13))
+                x = c.bbox(t)[2] + round(6 * k)
+            t = c.create_text(x, medio, text=p["dist"], fill=FG, anchor="w", font=fuente(17, True))
+            x = c.bbox(t)[2] + sep
+        return y + round(22 * k)
 
     def _barra_paradas(self, barra, y: int, ancho: int, pad: int, k: float) -> int:
         """La barra de la ruta debajo de todo: de aca (izquierda) al destino,

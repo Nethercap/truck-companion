@@ -175,6 +175,7 @@ GUIDE_TEXT.en = {
 <li><b>Next turn and next city</b>, <b>distance left</b> and <b>arrival</b> in real time. These come from the dashboard, so keep it open with a route (on your phone, a tablet or this PC). Without it, the distance left comes from the game's own GPS. At junctions with several lanes, the lane arrows show up under the turn, with the ones for your turn in blue.</li>
 <li><b>Arrival on the game clock</b>, to check against your job's deadline. This one works without the dashboard.</li>
 <li><b>Fuel and rest stops</b>: a bar from where you are to your destination. An orange stripe marks where to fill up before the tank runs dry, a purple one where to stop to sleep. No stripe means you get there without stopping.</li>
+<li><b>Nearest fuel and rest</b>: how far the nearest fuel station and rest area are by road, with or without a route, so you can see it with nothing to press (handy when you stream the game with Moonlight or only have one screen). The rest area only shows with fatigue on. These come from the dashboard, so keep it open (on your phone, a tablet or this PC).</li>
 </ul>
 <h3>Turning it on</h3>
 <p>In <b>Setup &amp; status</b>, section <b>In-game overlay</b>, or from the tray menu. In the game, <b>Ctrl+Shift+O</b> shows and hides it (you can pick another shortcut, or none).</p>
@@ -407,6 +408,7 @@ GUIDE_TEXT.es = {
 <li><b>Próximo giro y próxima ciudad</b>, <b>lo que falta</b> y la <b>llegada</b> en hora real. Salen del tablero, así que tenelo abierto con una ruta (en el celular, una tablet o esta PC). Sin el tablero, lo que falta sale del GPS del propio juego. En cruces con varios carriles, abajo del giro aparecen las flechas de carril, con las de tu giro en azul.</li>
 <li><b>Llegada en el reloj del juego</b>, para compararla con el plazo del trabajo. Esta anda sin el tablero.</li>
 <li><b>Paradas de combustible y descanso</b>: una barra desde donde estás hasta el destino. Una franja naranja marca dónde cargar antes de quedarte sin combustible y una violeta, dónde parar a dormir. Sin franja, llegás sin parar.</li>
+<li><b>Paradas cercanas</b>: a cuánto quedan por el camino la estación de servicio y el área de descanso más cercanas, con ruta o sin ruta, para verlo sin tocar nada (sirve si jugás por Moonlight o con una sola pantalla). El área de descanso solo se ve con la fatiga prendida. Salen del tablero, así que dejalo abierto (en el celular, una tablet o esta PC).</li>
 </ul>
 <h3>Cómo prenderlo</h3>
 <p>En <b>Configuración y estado</b>, sección <b>Overlay en el juego</b>, o desde el menú de la bandeja. En el juego, <b>Ctrl+Shift+O</b> lo muestra y lo esconde (podés elegir otro atajo, o ninguno).</p>

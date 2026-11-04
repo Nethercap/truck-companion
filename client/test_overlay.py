@@ -465,3 +465,44 @@ def test_barra_de_paradas_en_el_overlay():
         assert overlay.limpiar_nav({"remainingKm": malo})["remainingKm"] is None
     assert overlay.ejemplo(overlay.ITEMS, ("F", "R", "J"))["stops"]
     assert overlay.ejemplo(("speed",), ("F", "R", "J"))["stops"] is None
+
+
+CERCANAS = [{"kind": "g", "label": "Fuel station", "dist": "12 km"}, {"kind": "p", "label": "Rest area", "dist": "34 km"}]
+
+
+def test_paradas_cercanas_en_el_overlay():
+    t = tele()
+    n = overlay.limpiar_nav({"turn": "x", "near": CERCANAS})
+    # La que el tablero manda, tal cual
+    assert overlay.contenido(t, 100, n, 99, 100)["near_stops"] == CERCANAS
+    # Solo si se elige
+    assert overlay.contenido(t, 100, n, 99, 100, items=("speed",))["near_stops"] is None
+    # Sola alcanza para que se vea, aunque no haya ruta ni giro
+    solo = overlay.limpiar_nav({"near": CERCANAS})
+    assert overlay.contenido(t, 100, solo, 99, 100, items=("near_stops",))["near_stops"] == CERCANAS
+    # Un tablero callado ya no cuenta: el numero cambia 0,5 km por segundo
+    assert overlay.contenido(t, 100, n, 90, 100)["near_stops"] is None
+    assert overlay.contenido(t, 100, solo, 90, 100, items=("near_stops",)) is None
+    # Una web de antes no la manda
+    assert overlay.contenido(t, 100, overlay.limpiar_nav({"turn": "x"}), 99, 100)["near_stops"] is None
+    assert overlay.contenido(t, 100, None, 0, 100)["near_stops"] is None
+
+
+def test_paradas_cercanas_se_limpian():
+    assert overlay.paradas_cercanas(CERCANAS) == CERCANAS
+    for malo in (None, "12 km", 3, {"kind": "g"}, []):
+        assert overlay.paradas_cercanas(malo) is None
+    # Sin distancia o de un tipo que no se conoce, esa no va
+    assert overlay.paradas_cercanas([{"kind": "x", "dist": "1 km"}, {"kind": "p", "dist": 5}, "z"]) is None
+    assert overlay.paradas_cercanas([{"kind": "x", "dist": "1 km"}, CERCANAS[1]]) == [CERCANAS[1]]
+    # Sin nombre sigue sirviendo y los textos se recortan
+    largo = overlay.paradas_cercanas([{"kind": "g", "label": "x" * 99, "dist": "1" * 99}])[0]
+    assert len(largo["label"]) == 32 and len(largo["dist"]) == 16
+    assert overlay.paradas_cercanas([{"kind": "g", "dist": "1 km"}]) == [{"kind": "g", "label": "", "dist": "1 km"}]
+    # Nunca mas que una por tipo
+    assert len(overlay.paradas_cercanas(CERCANAS * 3)) == 2
+
+
+def test_el_ejemplo_del_modo_mover_trae_las_paradas_cercanas():
+    assert len(overlay.ejemplo(overlay.ITEMS, ("F", "R", "J"))["near_stops"]) == 2
+    assert overlay.ejemplo(("speed",), ("F", "R", "J"))["near_stops"] is None

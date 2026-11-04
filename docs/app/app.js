@@ -3133,7 +3133,9 @@ function searchCompanies(query, x, z, limit) {
 // la ruta hasta el), para medir cada parte a su escala: una estacion a 250 m
 // en el centro decia 3 mi a 1:20 (ver createCityScale).
 function formatPoiDistance(rawMeters, path) {
-  const meters = path ? gameScale().routeMeters(currentRouteFull, path, rawMeters) : rawMeters * distanceScale();
+  return formatGameMeters(path ? gameScale().routeMeters(currentRouteFull, path, rawMeters) : rawMeters * distanceScale());
+}
+function formatGameMeters(meters) {
   if (useImperial) { const mi = meters / 1609.34; return mi < 10 ? `${formatDec(mi, currentLang)} mi` : `${Math.round(mi)} mi`; }
   const km = meters / 1000;
   return km < 10 ? `${formatDec(km, currentLang)} km` : `${Math.round(km)} km`;
@@ -3315,6 +3317,16 @@ document.querySelectorAll('.poiChip').forEach(chip => chip.addEventListener('cli
   document.getElementById('poiSearchInput').value = '';
   renderPoiResults();
 }));
+// El camino desde el camion hasta una parada: { path, m } con la ruta y sus
+// metros de mundo hasta la parada misma, o null si no se llega.
+function stopRoad(pos, rumbo, st) {
+  const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo, null, null, { entrar: true });
+  if (!r || !r.length) return null;
+  let m = 0;
+  for (let k = 1; k < r.length; k++) m += Math.hypot(r[k][0] - r[k - 1][0], r[k][1] - r[k - 1][1]);
+  const fin = r[r.length - 1];
+  return { path: r, m: m + Math.hypot(st.x - fin[0], st.z - fin[1]) };
+}
 // Atajo: la estacion de servicio ('g') o el area de descanso ('p') mas
 // cercana como waypoint, en un toque. Lo usan el buscador y el aviso de
 // arriba del mapa (renderStopSuggest). false si todavia no se puede.
@@ -3335,12 +3347,8 @@ function addNearestStop(code) {
   const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
   const rumbo = routeStartHeading(lastData);
   const reach = routeGraph ? (st) => {
-    const r = findRoute([pos.x, pos.z], [st.x, st.z], rumbo, null, null, { entrar: true });
-    if (!r || !r.length) return null;
-    let m = 0;
-    for (let k = 1; k < r.length; k++) m += Math.hypot(r[k][0] - r[k - 1][0], r[k][1] - r[k - 1][1]);
-    const fin = r[r.length - 1];
-    return m + Math.hypot(st.x - fin[0], st.z - fin[1]);
+    const c = stopRoad(pos, rumbo, st);
+    return c ? c.m : null;
   } : null;
   // El descanso, una que se alcance antes de que se acabe (restReachMeters):
   // una sobre la ruta mas adelante le ganaba a otra al costado (Discord 22-10).
@@ -5728,6 +5736,67 @@ const NAV_HUD_KEEPALIVE_MS = 3000;
 // cliente se queda con uno mientras siga mandando (overlay.OverlayData).
 const NAV_HUD_SRC = Math.random().toString(36).slice(2, 10);
 
+// Lo que falta hasta la parada mas cercana de cada tipo, para el overlay del
+// juego ("near" en nav_hud): se juega por Moonlight o con una sola pantalla y no
+// hay donde tocar nada. Elige createNearStopPick, con una busqueda de ruta por
+// dato y sin timers: en una pestana detras del juego una cadena de timers queda
+// en uno por minuto. Solo con el overlay del cliente, el de OBS no la muestra.
+const nearStops = createNearStops();
+let nearStopsPick = null; // lo que se esta eligiendo: uno por vez
+let nearStopsFor = null;  // cada variante y vehiculo tienen sus paradas
+
+function nearStopPickStep() {
+  const { kind, pos, rumbo, pick, routeKey } = nearStopsPick;
+  if (!pick.step((st) => stopRoad(pos, rumbo, st))) return;
+  nearStopsPick = null;
+  const best = pick.best();
+  const path = best ? [[pos.x, pos.z], ...best.path, [best.st.x, best.st.z]] : null;
+  nearStops.put(kind, path, { x: pos.x, z: pos.z, now: Date.now(), routeKey });
+}
+
+function nearStopsHud() {
+  const pos = lastWorldPos;
+  // Sin grafo no hay camino: el numero es lo que falta andando, no la recta.
+  if (!clientOverlayOn || !pos || !routeGraph) return null;
+  const variant = poiVariantNow();
+  if (!pois || poisVariant !== variant) {
+    if (variant && !poisLoading && !poisError) loadPois(variant);
+    return null;
+  }
+  try {
+    const para = `${variant}|${drivingCar}`;
+    if (para !== nearStopsFor) {
+      nearStopsFor = para;
+      nearStopsPick = null;
+      nearStops.reset();
+    }
+    nearStops.move(pos.x, pos.z);
+    // Con la fatiga apagada no hay descanso que buscar, como en la barra de
+    // paradas del overlay.
+    const kinds = restMinutesOf(lastData) == null ? ['g'] : ['g', 'p'];
+    if (!nearStopsPick) {
+      const kind = nearStops.due(kinds, currentRouteFull, Date.now());
+      if (kind) {
+        const heading = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
+        const pick = createNearStopPick(nearestFacilities(kind, pos.x, pos.z, 60), pos.x, pos.z, heading, currentRouteWorldPoints);
+        nearStopsPick = { kind, pos, rumbo: routeStartHeading(lastData), pick, routeKey: currentRouteFull };
+      }
+    }
+    if (nearStopsPick) nearStopPickStep();
+    const near = [];
+    for (const kind of kinds) {
+      const p = nearStops.left(kind);
+      if (p) near.push({ kind, label: t(POI_CODES[kind]), dist: formatGameMeters(gameScale().routeMeters(p.full, p.left)) });
+    }
+    return near.length ? near : null;
+  } catch (err) {
+    // Que una parada no le saque el giro al overlay
+    console.error('near stops', err);
+    nearStopsPick = null;
+    return null;
+  }
+}
+
 function sendNavHud() {
   if (!isLeaderTab) return; // ver requestLeadership
   if ((!clientOverlayOn && !obsOverlayOn) || conn.demo || conn.spectator || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -5747,6 +5816,7 @@ function sendNavHud() {
     nextCity: overlayTurnParts ? overlayTurnParts.nextCity.slice(0, 60) : '',
     // Los carriles del giro (laneHudRecord): numeros, cada overlay los dibuja
     lanes: overlayTurnParts ? overlayTurnParts.lanes : null,
+    near: nearStopsHud(),
     remainingKm: numeros && Number.isFinite(numeros.remainingKm) ? Math.round(numeros.remainingKm * 10) / 10 : null,
     seconds: numeros && Number.isFinite(numeros.seconds) ? Math.round(numeros.seconds / 10) * 10 : null,
     remaining: resumen ? $('routeRemaining').textContent.trim() : '',

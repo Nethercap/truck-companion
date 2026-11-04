@@ -4,6 +4,13 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- In-game overlay: a new line shows how far the nearest fuel station and rest area are by road, with
+  or without a route, so you can see it with nothing to press (handy when you stream the game with
+  Moonlight or only have one screen). It comes from the dashboard, so keep it open on your phone, a
+  tablet or this PC. Turn it on or off in Setup, Show, "Nearest fuel and rest".
+
 ## 1.5.36 (2026-11-04)
 
 - Report a problem: when "Build my map" failed, the report also brings the end of `build.log`

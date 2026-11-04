@@ -357,6 +357,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   se bajaba por la salida y volvia a subir, o pasaba por el area de
   descanso, y ese largo de mas la hacia coincidir con el juego (I-15,
   salida 385, camino a Ogden, Discord 20-10).
+- La distancia a la parada mas cercana en el overlay del juego ("near" en
+  `nav_hud`, item `near_stops` del cliente, para jugar por Moonlight o con una
+  sola pantalla) no usa `pickFuelStop`: lo que elige el boton cambia seguido
+  andando (62, 207 y a los 16 km 84). Es la de menos camino sin alejarse
+  primero (`createNearStopPick`, `NEAR_STOP_AWAY_M`) y queda pegada hasta
+  pasarla o que aparezca una mas cerca (`createNearStops`): el numero solo
+  sube al pasar de largo. Puede no ser la que elige el boton, a proposito.
+  Una busqueda de ruta por dato y sin timers: en una pestana detras del juego
+  una cadena de timers queda en uno por minuto.
 - El boton de parada (estacion o descanso, `addNearestStop`) elige con
   `pickFuelStop` y despues mira el camino de verdad (`reach`, findRoute desde
   el camion): si la elegida obliga a dar la vuelta (el camino mide 1 km mas
