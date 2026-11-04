@@ -40,6 +40,11 @@ updates on its own and is not versioned here.
   each in `build.log`. A profile with many map mods wrote over 6,000 of them, about 37 lines
   each, and the log still passed 200,000 lines.
 
+- Build my map: each ferry connection file of your mods is read once, not once per port. An empty
+  one used to be reported again for every ferry and train terminal: with the Russian map mods of
+  one profile (363 terminals, 73 empty files) that was the same warning 26,499 times, and the log
+  passed the 25,000 lines that mclo.gs keeps. Now it's 73 lines, and that step is faster.
+
 - Linux (Proton): the client's README explains why the tray icon can be missing (the game running
   on Wine's Wayland driver or inside gamescope) and how to reach Setup without it: launch Truck
   Dash again and it opens the window of the copy already running.

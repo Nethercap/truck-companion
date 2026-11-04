@@ -47,6 +47,9 @@ as a separate program.
 - A translation file from a mod (`locale/*/local_module.*.sii`) that can't
   be read is skipped with a warning naming the mod, instead of stopping the
   build. One with German quotes („...“) instead of `"` did.
+- The files in `def/ferry/connection` are read once per build, not once per
+  ferry terminal (upstream's own TODO): an empty one was warned about once
+  for every terminal.
 
 ## Building it
 

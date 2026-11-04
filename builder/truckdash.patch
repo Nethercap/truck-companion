@@ -608,7 +608,7 @@ index ece847d..200bcc7 100644
 +  return value;
 +}
 diff --git a/packages/clis/parser/game-files/def-parser.ts b/packages/clis/parser/game-files/def-parser.ts
-index 4094551..a1234c4 100644
+index 4094551..32d3e05 100644
 --- a/packages/clis/parser/game-files/def-parser.ts
 +++ b/packages/clis/parser/game-files/def-parser.ts
 @@ -26,7 +26,7 @@ import type {
@@ -875,15 +875,38 @@ index 4094551..a1234c4 100644
          for (const [, entry] of Object.entries(cargo.cargoDef)) {
            arr.push(entry.cargo);
          }
-@@ -530,11 +614,24 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
-       logger.warn(`unknown dlc guard for ${dlc} (${f}); falling back to 0`);
-       dlcGuard = 0;
-     }
--    const json = convertSiiToJson(
--      `def/ferry/connection/${f}`,
--      entries,
--      FerryConnectionSiiSchema,
--    );
+@@ -503,6 +587,58 @@ function processCargoJson(obj: CargoDataSii): Omit<Cargo, 'dlcGuard'> {
+   };
+ }
+ 
++type FerryConnectionJson =
++  typeof FerryConnectionSiiSchema extends JSONSchemaType<infer T> ? T : never;
++
++// Los archivos de def/ferry/connection ya leidos, por cada Entries (uno por
++// armado): el nombre, el .sii validado y su dlc guard. Uno que no se puede
++// leer se avisa una vez y queda afuera.
++const ferryConnectionCache = new WeakMap<
++  Entries,
++  { f: string; json: FerryConnectionJson; dlcGuard: number }[]
++>();
++
++function ferryConnectionFiles(entries: Entries, files: readonly string[]) {
++  const cached = ferryConnectionCache.get(entries);
++  if (cached) {
++    return cached;
++  }
++  const out: { f: string; json: FerryConnectionJson; dlcGuard: number }[] = [];
++  for (const f of files) {
++    const dlc = /dlc_[^.]+/.exec(f)?.[0] ?? '';
++    let dlcGuard: number | undefined =
++      dlc === ''
++        ? 0
++        : (AtsScsSourceToDlcGuard[dlc + '.scs'] ??
++          Ets2ScsSourceToDlcGuard[dlc + '.scs']);
++    if (dlcGuard == null) {
++      logger.warn(`unknown dlc guard for ${dlc} (${f}); falling back to 0`);
++      dlcGuard = 0;
++    }
 +    // Ver comentario en processAndAdd - algunos mods traen archivos de
 +    // conexion de ferry vacios/invalidos (ej. ProMods ATS/Canada).
 +    let json;
@@ -902,10 +925,49 @@ index 4094551..a1234c4 100644
 +      );
 +      continue;
 +    }
++    out.push({ f, json, dlcGuard });
++  }
++  ferryConnectionCache.set(entries, out);
++  return out;
++}
++
+ function processFerryJson(obj: FerrySii, entries: Entries) {
+   const objEntries = Object.entries(obj.ferryData);
+   const [tokenPath, rawFerry] = objEntries[0];
+@@ -517,24 +653,14 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+ 
+   // find matching connection file for `token`.
+   // do this because file names don't always match up with ferry tokens (i'm looking at you, travemunde_p).
+-  // this is A LOT of repeated work.
+-  // TODO read every file in the def/ferry/connections folder once, then match things up based on tokens.
+-  for (const f of defFerryConnection.files) {
+-    const dlc = /dlc_[^.]+/.exec(f)?.[0] ?? '';
+-    let dlcGuard: number | undefined =
+-      dlc === ''
+-        ? 0
+-        : (AtsScsSourceToDlcGuard[dlc + '.scs'] ??
+-          Ets2ScsSourceToDlcGuard[dlc + '.scs']);
+-    if (dlcGuard == null) {
+-      logger.warn(`unknown dlc guard for ${dlc} (${f}); falling back to 0`);
+-      dlcGuard = 0;
+-    }
+-    const json = convertSiiToJson(
+-      `def/ferry/connection/${f}`,
+-      entries,
+-      FerryConnectionSiiSchema,
+-    );
++  // Cada archivo se lee una sola vez por armado (ferryConnectionFiles): antes
++  // se leian todos para cada terminal, y un perfil con mapas rusos (363
++  // terminales, 73 conexiones vacias) dejo el mismo aviso 26.499 veces en
++  // el build.log, mas de las 25.000 lineas que guarda mclo.gs (04-11).
++  for (const { f, json, dlcGuard } of ferryConnectionFiles(
++    entries,
++    defFerryConnection.files,
++  )) {
      const ferryConnection = json.ferryConnection;
      const key = Object.keys(ferryConnection)[0];
      // key is expected to be in form: "conn.source_token.dest_token"
-@@ -575,7 +672,7 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
+@@ -575,7 +701,7 @@ function processFerryJson(obj: FerrySii, entries: Entries) {
    return {
      token,
      name: rawFerry.ferryName,
@@ -914,7 +976,7 @@ index 4094551..a1234c4 100644
      connections,
    };
  }
-@@ -589,9 +686,15 @@ function processPrefabJson(
+@@ -589,9 +715,15 @@ function processPrefabJson(
      return new Map();
    }
  
@@ -931,7 +993,7 @@ index 4094551..a1234c4 100644
    );
    const prefabs = new Map<string, PrefabDescription & { path: string }>();
    for (const [token, path] of prefabTuples) {
-@@ -600,7 +703,25 @@ function processPrefabJson(
+@@ -600,7 +732,25 @@ function processPrefabJson(
        logger.warn(`could not find prefab file for ${token}`);
        continue;
      }
@@ -958,7 +1020,7 @@ index 4094551..a1234c4 100644
      if (ppd.mapPoints.some(p => p.type === 'polygon')) {
        // TODO figure out a way to get building footprint information for
        //  polygons in prefabs that look like buildings.
-@@ -1094,3 +1215,13 @@ function processMileageTargetJson(
+@@ -1094,3 +1244,13 @@ function processMileageTargetJson(
    }
    return mileageTargets;
  }
