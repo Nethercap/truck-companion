@@ -23,7 +23,8 @@ as a separate program.
 ## What the patch changes
 
 - Mods can be read as they come (a folder, a HashFS v1 or v2 `.scs` or a
-  ZIP `.scs`), without extracting them first. A zlib entry cut short before
+  ZIP `.scs`, also one with its headers scrambled, starting with `AEM!`),
+  without extracting them first. A zlib entry cut short before
   its end (some protected mods) is read up to its stated size, as the game
   does, and a mod that still can't be read is skipped with its name in the
   log instead of stopping the build.

@@ -3103,7 +3103,7 @@ new file mode 100755
 index 0000000..65b2ca1
 --- /dev/null
 +++ b/packages/clis/parser/run-with-mod.ts
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,215 @@
 +#!/usr/bin/env -S NODE_OPTIONS=--max-old-space-size=12288 npx tsx
 +// Corre el parser de truckermudgeon/maps incluyendo un mod de mapa que viene
 +// como carpeta ya extraida en disco (en vez de un .scs real), inyectandolo
@@ -3208,9 +3208,13 @@ index 0000000..65b2ca1
 +    fs.readSync(fd, magic, 0, 4, 0);
 +    fs.closeSync(fd);
 +    const source = path.basename(modPath);
-+    if (magic.toString('latin1') === 'SCS#')
++    const firma = magic.toString('latin1');
++    if (firma === 'SCS#')
 +      return abrirOSaltear(modPath, () => new ScsArchive(modPath, source));
-+    if (magic[0] === 0x50 && magic[1] === 0x4b)
++    // AEM!: un ZIP con las firmas cambiadas, CRC falsos y el flag de cifrado
++    // prendido, pero los datos van sin cifrar. ZipEntries solo usa el indice
++    // central, asi que lo lee igual (Project Russia, NNMap, M12, Altai; #135).
++    if (firma.startsWith('PK') || firma === 'AEM!')
 +      return abrirOSaltear(modPath, () => new ZipEntries(modPath, source));
 +    // Uno cifrado o de otro formato (un cruce de tren, no un mapa) frenaba todo.
 +    console.warn(`${modPath}: no es un .scs que conozcamos (ni HashFS ni ZIP), se saltea`);
@@ -4338,4 +4342,89 @@ index 0000000..ad1a987
 +    expect(entries.files.get('def/city.sii')?.read()).toEqual(ciudad);
 +    scs.dispose();
 +  });
++});
+diff --git a/packages/clis/parser/game-files/zip-entries.prueba.ts b/packages/clis/parser/game-files/zip-entries.prueba.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/clis/parser/game-files/zip-entries.prueba.ts
+@@ -0,0 +1,80 @@
++// Pruebas de zip-entries.ts con un .scs armado aca, sin los mods de verdad.
++// node --experimental-transform-types --test (el constructor usa parameter
++// properties, que --experimental-strip-types no acepta).
++
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { test } from 'node:test';
++import zlib from 'node:zlib';
++import { ZipEntries } from './zip-entries.ts';
++
++const FIRMA_CENTRAL = 0x02014b50;
++const FIRMA_FINAL = 0x06054b50;
++
++// Como vienen NNMap, Project Russia, M12 Vostok y Altai Map (#135): "AEM!" en
++// vez de la firma de cada cabecera local, un nombre de relleno en esa cabecera,
++// flag de cifrado y CRC falso, un tamano del indice que se pasa del final del
++// archivo, un registro final vacio antes del de verdad, y una entrada central
++// suelta despues. Los datos van sin cifrar.
++function scsAem(archivos: Record<string, { texto: string; metodo: 0 | 8 }>): string {
++  const partes: Buffer[] = [];
++  const centrales: Buffer[] = [];
++  let offset = 0;
++  for (const [nombre, { texto, metodo }] of Object.entries(archivos)) {
++    const crudo = Buffer.from(texto, 'utf8');
++    const datos = metodo === 8 ? zlib.deflateRawSync(crudo) : crudo;
++    const relleno = Buffer.from('\0\0\0AEM!\0\0\0\0AEM!\0', 'latin1');
++    const local = Buffer.alloc(30);
++    local.write('AEM!', 0, 'latin1');
++    local.writeUInt16LE(relleno.length, 26);
++    const central = Buffer.alloc(46);
++    central.writeUInt32LE(FIRMA_CENTRAL, 0);
++    central.writeUInt16LE(1, 8); // flag de cifrado
++    central.writeUInt16LE(metodo, 10);
++    central.writeUInt32LE(0x53c09734, 16); // CRC falso
++    central.writeUInt32LE(datos.length, 20);
++    central.writeUInt32LE(crudo.length, 24);
++    central.writeUInt16LE(Buffer.byteLength(nombre), 28);
++    central.writeUInt32LE(offset, 42);
++    partes.push(local, relleno, datos);
++    centrales.push(central, Buffer.from(nombre, 'utf8'));
++    offset += local.length + relleno.length + datos.length;
++  }
++  const indice = Buffer.concat(centrales);
++  const vacio = Buffer.alloc(22);
++  vacio.writeUInt32LE(FIRMA_FINAL, 0);
++  const comentario = Buffer.from('AEM0123456789', 'latin1');
++  const final = Buffer.alloc(22);
++  final.writeUInt32LE(FIRMA_FINAL, 0);
++  final.writeUInt16LE(Object.keys(archivos).length, 8);
++  final.writeUInt16LE(Object.keys(archivos).length, 10);
++  final.writeUInt32LE(indice.length + 100000, 12);
++  final.writeUInt32LE(offset, 16);
++  final.writeUInt16LE(comentario.length, 20);
++  const suelta = Buffer.alloc(46);
++  suelta.writeUInt32LE(FIRMA_CENTRAL, 0);
++  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'aem-')), 'mod.scs');
++  fs.writeFileSync(archivo, Buffer.concat([...partes, indice, vacio, final, comentario, suelta]));
++  return archivo;
++}
++
++test('lee un .scs con las firmas cambiadas y el indice mentiroso', () => {
++  const ciudad = 'SiiNunit\n{\ncity_data: city.kovrov\n{\n}\n}\n'.repeat(20);
++  const sector = 'datos del sector, guardados sin comprimir';
++  const zip = new ZipEntries(
++    scsAem({
++      'def/city/kovrov.sii': { texto: ciudad, metodo: 8 },
++      'map/europe/sec+0023-0013.base': { texto: sector, metodo: 0 },
++    }),
++    'mod.scs',
++  );
++  assert.equal(zip.isValid(), true);
++  const entries = zip.parseEntries();
++  assert.equal(entries.files.get('def/city/kovrov.sii')?.read().toString(), ciudad);
++  assert.equal(entries.files.get('map/europe/sec+0023-0013.base')?.read().toString(), sector);
++  assert.deepEqual(entries.directories.get('map/europe')?.files, ['sec+0023-0013.base']);
++  assert.deepEqual(entries.directories.get('')?.subdirectories, ['def', 'map']);
++  zip.dispose();
 +});

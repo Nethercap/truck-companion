@@ -45,10 +45,13 @@ empaquetar() {
     "--banner:js=$BANNER" --outfile="$DEST/bin/$salida")
 }
 # Lo que es nuestro y se puede probar sin el juego: unir-calles.ts (tiles.ts
-# lo usa para juntar las calles que se tocan punta con punta).
+# lo usa para juntar las calles que se tocan punta con punta) y zip-entries.ts
+# (lee los .scs que son ZIP, tambien los de firmas cambiadas).
 echo "== pruebas"
 (cd "$WORK/maps" && node --experimental-strip-types --no-warnings --test \
   packages/clis/truckdash-builder/unir-calles.prueba.ts)
+(cd "$WORK/maps" && node --experimental-transform-types --no-warnings --test \
+  packages/clis/parser/game-files/zip-entries.prueba.ts)
 
 echo "== esbuild"
 empaquetar packages/clis/parser/run-with-mod.ts parser.mjs
