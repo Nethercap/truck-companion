@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.36 (2026-11-04)
 
 - Report a problem: when "Build my map" failed, the report also brings the end of `build.log`
   (under "Map builder log"), with the error that stopped the build. Until now it only said
