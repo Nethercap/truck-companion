@@ -523,6 +523,12 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
         valor.classList.toggle('tdOk', estado === 'bien');
         valor.classList.toggle('tdBad', estado === 'mal');
       },
+      // Corrido dx a la derecha y con otro ancho (la pantalla digital en el
+      // hueco del mapa): lo chico de la derecha sigue contra el borde.
+      mover(dx, nuevoAncho) {
+        g.setAttribute('transform', `translate(${dx} 0)`);
+        sub.setAttribute('x', x + nuevoAncho);
+      },
     };
   }
 
@@ -530,16 +536,28 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
   function barraDigital(padre, y, clave, malo) {
     const g = s('g', {}, padre);
     icono(g, clave, 18, y - 12, 24, 'tdDim');
-    s('rect', { x: 56, y: y - 5, width: 232, height: 10, rx: 5, class: 'tdBarTrack' }, g);
+    const pista = s('rect', { x: 56, y: y - 5, width: 232, height: 10, rx: 5, class: 'tdBarTrack' }, g);
     const lleno = s('rect', { x: 56, y: y - 5, width: 0, height: 10, rx: 5, class: 'tdBarFill' }, g);
     const valor = texto(g, 402, y, 'tdTxt tdTxtS', 'end');
+    let largo = 232, frac = 0;
     return {
-      poner(frac, v, alerta) {
-        ver(g, frac != null);
-        if (frac == null) return;
-        lleno.setAttribute('width', (232 * lim(frac)).toFixed(1));
-        lleno.classList.toggle('tdBarBad', !!alerta || malo(lim(frac)));
+      y,
+      poner(f, v, alerta) {
+        ver(g, f != null);
+        if (f == null) return;
+        frac = lim(f);
+        lleno.setAttribute('width', (largo * frac).toFixed(1));
+        lleno.classList.toggle('tdBarBad', !!alerta || malo(frac));
         txt(valor, v);
+      },
+      // En una tarjeta de otro ancho (la de 418 es la de siempre), corrida
+      // dx y dy: la barra se estira y el numero queda contra el borde.
+      mover(dx, dy, anchoTarjeta) {
+        g.setAttribute('transform', `translate(${dx} ${dy})`);
+        largo = anchoTarjeta - 186;
+        pista.setAttribute('width', largo);
+        lleno.setAttribute('width', (largo * frac).toFixed(1));
+        valor.setAttribute('x', anchoTarjeta - 16);
       },
     };
   }
@@ -688,23 +706,26 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
 
     // La columna del medio: el viaje arriba y los medidores abajo.
     const col = s('svg', { viewBox: '0 0 420 470', class: 'tdColumn' });
-    s('rect', { x: 1, y: 1, width: 418, height: 268, rx: 16, class: 'tdCard' }, col);
-    const cTitulo = texto(col, 22, 38, 'tdTxt tdTxtL', 'start');
-    const cSub = texto(col, 22, 68, 'tdTxt tdTxtS tdDim', 'start');
-    const cGrande = texto(col, 22, 114, 'tdTxt tdTxtXL tdAccent', 'start');
-    const cGrandeSub = texto(col, 22, 146, 'tdTxt tdTxtS tdDim', 'start');
-    const avance = s('g', {}, col);
-    s('rect', { x: 22, y: 164, width: 376, height: 8, rx: 4, class: 'tdBarTrack' }, avance);
+    const tViaje = s('rect', { x: 1, y: 1, width: 418, height: 268, rx: 16, class: 'tdCard' }, col);
+    const viaje = s('g', {}, col);
+    const cTitulo = texto(viaje, 22, 38, 'tdTxt tdTxtL', 'start');
+    const cSub = texto(viaje, 22, 68, 'tdTxt tdTxtS tdDim', 'start');
+    const cGrande = texto(viaje, 22, 114, 'tdTxt tdTxtXL tdAccent', 'start');
+    const cGrandeSub = texto(viaje, 22, 146, 'tdTxt tdTxtS tdDim', 'start');
+    const avance = s('g', {}, viaje);
+    const avancePista = s('rect', { x: 22, y: 164, width: 376, height: 8, rx: 4, class: 'tdBarTrack' }, avance);
     const avanceHecho = s('rect', { x: 22, y: 164, width: 0, height: 8, rx: 4, class: 'tdBarFill' }, avance);
     const avancePunto = s('circle', { cx: 22, cy: 168, r: 7, class: 'tdBarDot' }, avance);
-    const fLlegada = renglon(col, 22, 206, 376, 'clock', 22);
-    const fDescanso = renglon(col, 22, 244, 160, 'bed', 22);
-    const fPlazo = renglon(col, 214, 244, 184, 'deadline', 22);
-    s('rect', { x: 1, y: 284, width: 418, height: 185, rx: 16, class: 'tdCard' }, col);
+    let avanceLargo = 376;
+    const fLlegada = renglon(viaje, 22, 206, 376, 'clock', 22);
+    const fDescanso = renglon(viaje, 22, 244, 160, 'bed', 22);
+    const fPlazo = renglon(viaje, 214, 244, 184, 'deadline', 22);
+    const tMedidores = s('rect', { x: 1, y: 284, width: 418, height: 185, rx: 16, class: 'tdCard' }, col);
     const bNafta = barraDigital(col, 314, 'fuelLow', (f) => f < 0.15);
     const bAdblue = barraDigital(col, 356, 'adblueLow', (f) => f < 0.1);
     const bAgua = barraDigital(col, 398, 'waterTemp', (f) => f > 0.81);
     const bAire = barraDigital(col, 440, 'airPressure', (f) => f < 0.4);
+    const barras = [bNafta, bAdblue, bAgua, bAire];
 
     const piezas = [vel.svg, rpm.svg, col, info.svg, avisos.svg];
     piezas.forEach(p => lienzo.appendChild(p));
@@ -721,6 +742,40 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
                    cajas: [[20, 66, 470], [500, 66, 470], [1000, 24, 576, 552], [261, 12, 470, 44], [296, 548, 400, 44]] },
       },
       piezas,
+      // La columna en el hueco del mapa: las tarjetas hasta los bordes, como
+      // la pantalla del europeo. Sin esto quedaba de 420 x 470 al medio del
+      // hueco de 820 x 476, con media pantalla negra (Discord, 04-11). En
+      // uno ancho van una al lado de la otra (860 x 470), y lo escrito queda
+      // al medio de su tarjeta: arriba al medio del hueco va Mapa / Pantalla.
+      pantalla(w, h) {
+        const r = w / h;
+        const dos = llena(r, 860 / 470) > llena(r, 420 / 470);
+        const { dx, dy, W, H } = encajar(col, dos ? 860 : 420, 470, w, h);
+        const x0 = -dx + 1, y0 = -dy + 1, ancho = W - 2, alto = H - 2;
+        let cv, cm;
+        if (dos) {
+          const a = (ancho - 20) / 2;
+          cv = [x0, y0, a, alto];
+          cm = [x0 + a + 20, y0, a, alto];
+        } else {
+          // Lo que sobra de alto, mitad para cada una.
+          const extra = (alto - 468) / 2;
+          cv = [x0, y0, ancho, 268 + extra];
+          cm = [x0, y0 + 268 + extra + 15, ancho, 185 + extra];
+        }
+        colocar(tViaje, cv);
+        colocar(tMedidores, cm);
+        viaje.setAttribute('transform', `translate(${cv[0] - 1} ${cv[1] - 1 + (cv[3] - 268) / 2})`);
+        avanceLargo = cv[2] - 42;
+        avancePista.setAttribute('width', avanceLargo);
+        fLlegada.mover(0, cv[2] - 42);
+        fPlazo.mover(cv[2] / 2 - 209, cv[2] / 2 - 25);
+        // Los medidores, repartidos en el alto: en la tarjeta de siempre
+        // (185) quedan donde estaban, a 42 uno del otro.
+        const paso = Math.max(42, Math.min(90, cm[3] / 5.5));
+        const centro = cm[1] + 93 + (cm[3] - 185) / 2;
+        barras.forEach((b, i) => b.mover(cm[0] - 1, centro + (i - 1.5) * paso - b.y, cm[2]));
+      },
       fondo(g, f) {
         s('rect', { x: 2, y: 2, width: f.vb[0] - 4, height: f.vb[1] - 4, rx: 36, fill: `url(#${pref}glass)`, class: 'tdGlass' }, g);
       },
@@ -758,8 +813,8 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
         }
         ver(avance, L.progreso != null);
         if (L.progreso != null) {
-          avanceHecho.setAttribute('width', (376 * L.progreso).toFixed(1));
-          avancePunto.setAttribute('cx', (22 + 376 * L.progreso).toFixed(1));
+          avanceHecho.setAttribute('width', (avanceLargo * L.progreso).toFixed(1));
+          avancePunto.setAttribute('cx', (22 + avanceLargo * L.progreso).toFixed(1));
         }
         fLlegada.poner(L.llegada, L.llegadaJuego ? L.llegadaJuego + ' ' + t('inGameShort') : null);
         fDescanso.poner(L.descansoSeg != null ? hm(L.descansoSeg) : null, null,
