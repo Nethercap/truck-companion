@@ -171,6 +171,7 @@ GUIDE_TEXT.de = {
 <li><b>Nächste Abbiegung und nächste Stadt</b>, <b>Restweg</b> und <b>Ankunft</b> in Echtzeit. Das kommt vom Armaturenbrett, lass es also mit einer Route offen (Handy, Tablet oder dieser PC). Ohne es kommt der Restweg vom Navi des Spiels. An Kreuzungen mit mehreren Spuren erscheinen unter der Abbiegung die Spurpfeile, die für deine Abbiegung in Blau.</li>
 <li><b>Ankunft auf der Spieluhr</b>, zum Vergleich mit der Lieferfrist. Das geht auch ohne Armaturenbrett.</li>
 <li><b>Tank- und Ruhepausen</b>: ein Balken von deiner Position bis zum Ziel. Ein oranger Streifen zeigt, wo du tanken solltest, bevor der Tank leer ist, ein violetter, wo du zum Schlafen anhalten solltest. Ohne Streifen kommst du ohne Halt an.</li>
+<li><b>Nächste Stopps</b>: wie weit die nächste Tankstelle und der nächste Rastplatz auf der Straße entfernt sind, mit oder ohne Route. So siehst du es, ohne etwas zu drücken (praktisch beim Streamen mit Moonlight oder mit nur einem Bildschirm). Der Rastplatz erscheint nur mit aktivierter Müdigkeit. Das kommt vom Dashboard, lass es also offen (auf dem Handy, einem Tablet oder diesem PC).</li>
 </ul>
 <h3>Einschalten</h3>
 <p>In <b>Einrichtung &amp; Status</b>, Abschnitt <b>Overlay im Spiel</b>, oder im Menü des Tray-Symbols. Im Spiel blendest du es mit <b>Strg+Umschalt+O</b> ein und aus (anderes Kürzel oder keins wählbar).</p>
@@ -402,6 +403,7 @@ GUIDE_TEXT.fr = {
 <li><b>Prochain virage et prochaine ville</b>, <b>distance restante</b> et <b>arrivée</b> en temps réel. Ils viennent du tableau de bord : garde-le ouvert avec un itinéraire (téléphone, tablette ou ce PC). Sans lui, la distance restante vient du GPS du jeu. Aux carrefours à plusieurs voies, les flèches de voie s'affichent sous le virage, celles de ton virage en bleu.</li>
 <li><b>Arrivée à l'horloge du jeu</b>, à comparer avec le délai de la mission. Elle marche sans le tableau de bord.</li>
 <li><b>Arrêts carburant et repos</b> : une barre de ta position jusqu'à la destination. Une bande orange indique où faire le plein avant que le réservoir soit vide, une violette où t'arrêter pour dormir. Sans bande, tu arrives sans t'arrêter.</li>
+<li><b>Station et aire les plus proches</b> : la distance par la route jusqu'à la station-service et l'aire de repos les plus proches, avec ou sans itinéraire, pour la voir sans rien toucher (pratique en jouant avec Moonlight ou avec un seul écran). L'aire de repos ne s'affiche qu'avec la fatigue activée. Ces données viennent du tableau de bord : laisse-le ouvert (sur ton téléphone, une tablette ou ce PC).</li>
 </ul>
 <h3>L'activer</h3>
 <p>Dans <b>Configuration et état</b>, section <b>Overlay en jeu</b>, ou depuis le menu de l'icône. En jeu, <b>Ctrl+Maj+O</b> l'affiche et le cache (tu peux choisir un autre raccourci, ou aucun).</p>
@@ -633,6 +635,7 @@ GUIDE_TEXT.pt = {
 <li><b>Próxima curva e próxima cidade</b>, <b>distância restante</b> e <b>chegada</b> no horário real. Vêm do painel, então deixe-o aberto com uma rota (celular, tablet ou este PC). Sem ele, a distância restante vem do GPS do próprio jogo. Em cruzamentos com várias faixas, as setas de faixa aparecem embaixo da curva, com as da sua curva em azul.</li>
 <li><b>Chegada no relógio do jogo</b>, para comparar com o prazo da entrega. Esta funciona sem o painel.</li>
 <li><b>Paradas para combustível e descanso</b>: uma barra de onde você está até o destino. Uma listra laranja marca onde abastecer antes de o tanque secar, e uma roxa, onde parar para dormir. Sem listra, você chega sem parar.</li>
+<li><b>Paradas próximas</b>: a que distância pela estrada ficam o posto de combustível e a área de descanso mais próximos, com ou sem rota, para ver sem tocar em nada (útil ao jogar pelo Moonlight ou com uma só tela). A área de descanso só aparece com a fadiga ligada. Isso vem do painel, então deixe-o aberto (no celular, em um tablet ou neste PC).</li>
 </ul>
 <h3>Como ligar</h3>
 <p>Em <b>Configuração e status</b>, seção <b>Overlay no jogo</b>, ou pelo menu da bandeja. No jogo, <b>Ctrl+Shift+O</b> mostra e esconde (dá para escolher outro atalho, ou nenhum).</p>
@@ -864,6 +867,7 @@ GUIDE_TEXT.pl = {
 <li><b>Następny skręt i następne miasto</b>, <b>pozostały dystans</b> i <b>przyjazd</b> w czasie rzeczywistym. Pochodzą z pulpitu, więc miej go otwartego z trasą (telefon, tablet lub ten PC). Bez niego pozostały dystans bierze się z GPS gry. Na skrzyżowaniach z kilkoma pasami pod skrętem pojawiają się strzałki pasów, te dla twojego skrętu na niebiesko.</li>
 <li><b>Przyjazd według zegara gry</b>, do porównania z terminem zlecenia. Działa bez pulpitu.</li>
 <li><b>Postoje na paliwo i odpoczynek</b>: pasek od miejsca, w którym jesteś, do celu. Pomarańczowy odcinek pokazuje, gdzie zatankować, zanim skończy się paliwo, a fioletowy, gdzie zatrzymać się na sen. Bez odcinków dojedziesz bez postoju.</li>
+<li><b>Najbliższe postoje</b>: jak daleko drogą są najbliższa stacja paliw i parking, z trasą lub bez, żeby widzieć to bez dotykania czegokolwiek (przydatne przy graniu przez Moonlight lub na jednym ekranie). Parking widać tylko z włączonym zmęczeniem. Te dane pochodzą z panelu, więc zostaw go otwartego (na telefonie, tablecie lub tym PC).</li>
 </ul>
 <h3>Włączanie</h3>
 <p>W <b>Konfiguracja i stan</b>, sekcja <b>Nakładka w grze</b>, albo z menu ikony w zasobniku. W grze <b>Ctrl+Shift+O</b> ją pokazuje i ukrywa (możesz wybrać inny skrót albo żaden).</p>
@@ -1095,6 +1099,7 @@ GUIDE_TEXT.tr = {
 <li><b>Sonraki dönüş ve sonraki şehir</b>, <b>kalan mesafe</b> ve gerçek saatle <b>varış</b>. Bunlar panodan gelir, bu yüzden panoyu bir rotayla açık tut (telefon, tablet veya bu PC). Pano yoksa kalan mesafe oyunun kendi GPS'inden gelir. Birden fazla şeritli kavşaklarda dönüşün altında şerit okları çıkar; senin dönüşünün okları mavidir.</li>
 <li><b>Oyun saatine göre varış</b>, işin teslim süresiyle karşılaştırmak için. Bu, pano olmadan da çalışır.</li>
 <li><b>Yakıt ve mola durakları</b>: bulunduğun yerden varış noktasına kadar bir çubuk. Turuncu bant, depo bitmeden nerede yakıt alman gerektiğini, mor bant da uyumak için nerede durman gerektiğini gösterir. Bant yoksa durmadan varırsın.</li>
+<li><b>En yakın istasyon ve mola yeri</b>: en yakın yakıt istasyonu ve dinlenme alanının yol üzerinden uzaklığı, rotalı ya da rotasız; hiçbir şeye dokunmadan görürsün (Moonlight ile oynarken veya tek ekranda işe yarar). Dinlenme alanı yalnızca yorgunluk açıkken görünür. Bu bilgiler panelden gelir, o yüzden paneli açık bırak (telefonda, tablette veya bu bilgisayarda).</li>
 </ul>
 <h3>Açmak için</h3>
 <p><b>Kurulum ve durum</b> içinde <b>Oyun içi katman</b> bölümünden ya da tepsi menüsünden. Oyunda <b>Ctrl+Shift+O</b> onu gösterir ve gizler (başka bir kısayol seçebilir ya da hiç kullanmayabilirsin).</p>
@@ -1326,6 +1331,7 @@ GUIDE_TEXT.ru = {
 <li><b>Следующий поворот и следующий город</b>, <b>оставшееся расстояние</b> и <b>прибытие</b> по реальному времени. Это приходит с панели, поэтому держите её открытой с маршрутом (телефон, планшет или этот ПК). Без неё оставшееся расстояние берётся из навигатора игры. На перекрёстках с несколькими полосами под поворотом появляются стрелки полос, а нужные для вашего поворота — синие.</li>
 <li><b>Прибытие по часам игры</b>, чтобы сравнить со сроком заказа. Работает и без панели.</li>
 <li><b>Остановки: топливо и отдых</b>: шкала от вашего места до пункта назначения. Оранжевый участок показывает, где заправиться, пока бак не опустел, фиолетовый — где остановиться на сон. Без участков вы доедете без остановок.</li>
+<li><b>Ближайшие остановки</b>: сколько по дороге до ближайшей АЗС и стоянки, с маршрутом или без него, чтобы видеть это, ничего не нажимая (удобно при игре через Moonlight или на одном экране). Стоянка показывается только при включённой усталости. Эти данные приходят из панели, поэтому держите её открытой (на телефоне, планшете или этом ПК).</li>
 </ul>
 <h3>Как включить</h3>
 <p>В <b>Настройка и состояние</b>, раздел <b>Оверлей в игре</b>, или в меню значка в трее. В игре <b>Ctrl+Shift+O</b> показывает и скрывает его (можно выбрать другое сочетание или никакое).</p>
