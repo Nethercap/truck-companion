@@ -3162,10 +3162,10 @@ index 8a13c01..3ec05a7 100755
  }
 diff --git a/packages/clis/parser/run-with-mod.ts b/packages/clis/parser/run-with-mod.ts
 new file mode 100755
-index 0000000..65b2ca1
+index 0000000..657c666
 --- /dev/null
 +++ b/packages/clis/parser/run-with-mod.ts
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,252 @@
 +#!/usr/bin/env -S NODE_OPTIONS=--max-old-space-size=12288 npx tsx
 +// Corre el parser de truckermudgeon/maps incluyendo un mod de mapa que viene
 +// como carpeta ya extraida en disco (en vez de un .scs real), inyectandolo
@@ -3275,12 +3275,51 @@ index 0000000..65b2ca1
 +    if (magic[0] === 0x50 && magic[1] === 0x4b)
 +      return abrirOSaltear(modPath, () => new ZipEntries(modPath, source));
 +    // Uno cifrado o de otro formato (un cruce de tren, no un mapa) frenaba todo.
-+    console.warn(`${modPath}: no es un .scs que conozcamos (ni HashFS ni ZIP), se saltea`);
++    console.warn(
++      `${modPath}: no es un .scs que conozcamos (ni HashFS ni ZIP), se saltea: ${huellaDelMod(modPath)}`,
++    );
 +    return null;
 +  }
 +  return createDirArchive(modPath);
 +}
 +
++// Lo que dice el build.log de un mod que se saltea: el tamano, los primeros
++// y los ultimos bytes y si tiene el indice de un ZIP (PK 05 06) cerca del
++// final. Con eso se sabe de que formato es sin pedirle el archivo a nadie:
++// los mapas rusos que se salteaban (04-11: Project Russia, Altai, M12
++// Vostok, nnmap, rfex) no empiezan ni con SCS# ni con PK.
++function huellaDelMod(modPath: string): string {
++  try {
++    const fd = fs.openSync(modPath, 'r');
++    try {
++      const tam = fs.fstatSync(fd).size;
++      const leer = (desde: number, cuanto: number) => {
++        const b = Buffer.alloc(Math.max(0, Math.min(cuanto, tam - desde)));
++        fs.readSync(fd, b, 0, b.length, desde);
++        return b;
++      };
++      const hex = (b: Buffer) =>
++        [...b].map(x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
++      const texto = (b: Buffer) =>
++        [...b].map(x => (x >= 0x20 && x < 0x7f ? String.fromCharCode(x) : '.')).join('');
++      const inicio = leer(0, 32);
++      const fin = leer(Math.max(0, tam - 32), 32);
++      // El final del indice central de un ZIP: 22 bytes y un comentario de
++      // hasta 64 KB.
++      const cola = leer(Math.max(0, tam - 65557), 65557);
++      const eocd = cola.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
++      const zip =
++        eocd < 0
++          ? 'sin indice de ZIP al final'
++          : `indice de ZIP a ${cola.length - eocd} bytes del final`;
++      return `${tam} bytes, empieza con ${hex(inicio)} (${texto(inicio)}), termina con ${hex(fin)}, ${zip}`;
++    } finally {
++      fs.closeSync(fd);
++    }
++  } catch (err) {
++    return `no se pudo mirar (${err instanceof Error ? err.message : String(err)})`;
++  }
++}
 +// El indice de un mod se lee aca, no en la primera busqueda del parser: si
 +// uno no se puede leer, se saltea con su nombre. Antes el error salia de
 +// parseVersionSii sin decir que archivo era, con 85 mods en la lista (#135).
@@ -3294,7 +3333,9 @@ index 0000000..65b2ca1
 +    if (archive.isValid()) archive.parseEntries();
 +    return archive;
 +  } catch (err) {
-+    console.warn(`${modPath}: no se pudo leer (${err instanceof Error ? err.message : String(err)}), se saltea`);
++    console.warn(
++      `${modPath}: no se pudo leer (${err instanceof Error ? err.message : String(err)}), se saltea: ${huellaDelMod(modPath)}`,
++    );
 +    archive?.dispose();
 +    return null;
 +  }

@@ -45,6 +45,10 @@ updates on its own and is not versioned here.
   one profile (363 terminals, 73 empty files) that was the same warning 26,499 times, and the log
   passed the 25,000 lines that mclo.gs keeps. Now it's 73 lines, and that step is faster.
 
+- Build my map: when it skips one of your mods because it can't read its format, `build.log` also
+  says the file's size and its first and last few bytes. That's enough for us to see what format
+  it is, so you don't have to send us the mod.
+
 - Linux (Proton): the client's README explains why the tray icon can be missing (the game running
   on Wine's Wayland driver or inside gamescope) and how to reach Setup without it: launch Truck
   Dash again and it opens the window of the copy already running.

@@ -26,7 +26,9 @@ as a separate program.
   ZIP `.scs`), without extracting them first. A zlib entry cut short before
   its end (some protected mods) is read up to its stated size, as the game
   does, and a mod that still can't be read is skipped with its name in the
-  log instead of stopping the build.
+  log instead of stopping the build. The log line also has the file's size,
+  its first and last 32 bytes and whether it has a ZIP index near the end,
+  to tell its format without asking for the file.
 - The mods can be given in a file, one per line (`@list.txt` instead of a
   comma-separated list): that is how the client passes them, so a mod with
   a comma in its file name stays whole. A builder from before this doesn't
