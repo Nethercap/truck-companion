@@ -40,6 +40,10 @@ updates on its own and is not versioned here.
   each in `build.log`. A profile with many map mods wrote over 6,000 of them, about 37 lines
   each, and the log still passed 200,000 lines.
 
+- Build my map: it reads map mods packed with scrambled headers, which it used to skip as a format
+  it didn't know: Project Russia, NNMap, M12 Vostok, Altai Map and any other packed the same way.
+  Their roads, cities and companies are now on the map you build, on your PC and your local network.
+
 - Linux (Proton): the client's README explains why the tray icon can be missing (the game running
   on Wine's Wayland driver or inside gamescope) and how to reach Setup without it: launch Truck
   Dash again and it opens the window of the copy already running.

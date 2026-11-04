@@ -57,6 +57,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   porque el modo LAN pide desde direcciones que cambian en cada casa.
 - Un archivo de mapa nuevo es opcional en la web: sin el, la app hace lo
   de antes (sin flechas de carril, por ejemplo), nunca deja de rutear.
+- Los mods con firma `AEM!` (ZIP con las cabeceras cambiadas: Project Russia,
+  NNMap, M12 Vostok, Altai Map) los lee solo "Build my map", en la PC de quien
+  ya los tiene. No van a `variants.json` ni a R2: lo decidio el maintainer el
+  04-11, porque sus autores los protegieron a proposito.
 - Escudos de ruta en el mapa (capa `road-shield`, Discord 19-10): salen de
   `road-names.json` (`roadShieldPoints`, uno por ruta cada
   `ROAD_SHIELD_CELL_M` = 4 km, desde zoom 8), dibujados en un canvas con la
