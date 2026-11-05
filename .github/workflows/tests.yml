@@ -57,6 +57,9 @@ jobs:
       # El plugin fuera de Windows (el mismo codigo que la .dylib de macOS):
       # como el paso de build.ps1 en el job de Windows, avisa si no compila.
       - run: bash plugin/build.sh "$RUNNER_TEMP/plugin"
+      # Y que el .so cargado como el juego nativo publique donde lee el
+      # cliente (escribia en /tmp y el cliente leia /dev/shm, issue #7).
+      - run: python tools/probar_plugin_linux.py "$RUNNER_TEMP/plugin/truckdash-telemetry.so"
 
   web:
     runs-on: ubuntu-latest

@@ -50,12 +50,32 @@ The shared memory layout is unchanged (revision 12).
 The plugin builds on macOS as a universal dylib (`build.sh`, Intel and
 Apple Silicon), from the changes by uawannacry in PR #87:
 
-- Outside Windows the block is the file `/tmp/TruckDashTelemetry`, mapped
-  with `mmap`, instead of a named Windows mapping.
+- Outside Windows the block is a file mapped with `mmap`, instead of a
+  named Windows mapping: `/tmp/TruckDashTelemetry` on macOS and
+  `/dev/shm/TruckDashTelemetry` on Linux (see below).
 - The Windows-only calls (`vsnprintf_s`, `strncpy_s`, `DllMain`) have
   portable versions, and the SDK header knows arm64.
 - The dylib calls `scs_telemetry_shutdown` from a destructor when it is
   unloaded, like `DllMain` does on Windows.
+
+## Linux
+
+The native Linux builds of ETS2 and ATS load `truckdash-telemetry.so` from
+`bin/linux_x64/plugins/`. The client does not install it: it is a test
+package for now (`linux/`, issue #7), built by the "Build plugin" workflow
+with platform `linux`.
+
+- The block is `/dev/shm/TruckDashTelemetry`, where the client looks for it
+  on Linux. Until 2026-11-05 the Linux build used the macOS path in `/tmp`,
+  so the client would never have seen it; nobody had run it in the game.
+  `/dev/shm` is also what the Steam Runtime container shares with the host.
+- `libstdc++` and `libgcc` are linked in (`build.sh`): the game runs inside
+  the Steam Runtime, which brings its own `libstdc++`. The `.so` only needs
+  `libc`.
+- `tools/probar_plugin_linux.py` loads it like the game (init, a few frames
+  with speed and position, shutdown, unload, and unload without init) and
+  reads the block with the client's reader and with the test package's
+  `check-telemetry.py`. The Linux tests run it on every push.
 
 ## Shutdown after the block is closed
 
