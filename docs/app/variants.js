@@ -1,6 +1,6 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-11-03.
+// Fuente: manifest del 2026-11-05.
 const MAP_DATA_VERSION = {
   "ats": "20261103",
   "ats_161": "20261103",
@@ -13,7 +13,8 @@ const MAP_DATA_VERSION = {
   "ats_c2c_expansion": "20261101",
   "ats_reforma": "20261022",
   "ats_reforma_c2c_promods": "20261101",
-  "ets2": "20261022",
+  "ets2": "20261105",
+  "ets2_161": "20261105",
   "ets2_promods": "20261022",
   "ets2_promods_rusmap": "20261022",
   "ets2_promods_roex": "20261103",
@@ -200,7 +201,19 @@ const VARIANT_META = {
     ],
     "manual": "none",
     "mods": [],
-    "gameVersion": "1.61.1"
+    "gameVersion": "1.62.1.0"
+  },
+  "ets2_161": {
+    "label": "Euro Truck Simulator 2 1.61",
+    "game": "ets2",
+    "projection": "ets2",
+    "origin": [
+      15,
+      50
+    ],
+    "manual": null,
+    "mods": [],
+    "gameVersion": "1.61.1.0"
   },
   "ets2_promods": {
     "label": "Euro Truck Simulator 2 + ProMods (Europe + addons)",

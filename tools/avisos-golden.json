@@ -1,4 +1,4 @@
-{"variants":{"ats":{"graph":"483f9cfedc6c4983","routes":[
+{"variants":{"ats":{"graph":"895946a6b345fb10","routes":[
 {"from":"St. Louis","to":"Rolla","man":[["fork","right",25421,2190],["fork","left",23804,2117],["fork","left",22730,2353],["fork","right",19439,5265],["turn","left",19134,5385]]},
 {"from":"Helena","to":"Butte","man":[["turn","right",-62333,-49691],["turn","right",-62259,-49698],["fork","right",-63676,-45093],["turn","right",-66318,-45989],["turn","left",-66394,-45889],["fork","left",-65477,-45704]]},
 {"from":"Pendleton","to":"Kennewick","man":[["fork","right",-90681,-49989],["turn","left",-90519,-49663],["turn","right",-90169,-49743],["fork","right",-91049,-50162],["fork","left",-90789,-52238],["fork","right",-90932,-52923]]},
@@ -23,7 +23,7 @@
 {"from":"Fort Collins","to":"Steamboat Springs","man":[["turn","right",-39448,-9957],["fork","right",-43920,-8383],["turn","right",-46890,-11632]]},
 {"from":"McAllen","to":"Laredo","man":[["fork","left",-12695,71147],["fork","right",-17835,65603]]},
 {"from":"Fort Collins","to":"Scottsbluff","man":[["turn","left",-39158,-11562],["fork","left",-38105,-11169],["fork","left",-36577,-14486],["fork","left",-36575,-15245],["fork","left",-36558,-15566],["fork","right",-36805,-20004]]},
-{"from":"Steamboat Springs","to":"Rangely","man":[["turn","right",-46890,-11632],["turn","left",-55189,-11115]]}]},"ets2":{"graph":"f4854671eea53f5d","routes":[
+{"from":"Steamboat Springs","to":"Rangely","man":[["turn","right",-46890,-11632],["turn","left",-55189,-11115]]}]},"ets2":{"graph":"a413163b953e6c5a","routes":[
 {"from":"Metz","to":"Dijon","man":[["turn","right",-16376,7272],["fork","right",-16435,7792],["fork","left",-18723,12776],["turn","right",-20725,15663],["turn","left",-20831,15688],["fork","right",-21548,16539]]},
 {"from":"Banská Bystrica","to":"Bratislava","man":[["turn","right",24251,14534]]},
 {"from":"Odense","to":"Copenhagen","man":[["turn","left",1235,-26141],["turn","right",1603,-26206],["fork","right",7327,-26918],["turn","left",7504,-27008],["turn","right",7254,-27294],["turn","left",7327,-27488],["turn","right",7165,-27666],["turn","left",7266,-27795],["turn","left",7561,-28218]]},
@@ -37,7 +37,7 @@
 {"from":"Bremen","to":"Magdeburg","man":[["turn","left",-5427,-14643],["fork","right",-4991,-15040],["fork","left",-4182,-14043],["fork","left",-3999,-13816],["turn","right",-796,-12767],["fork","right",-246,-10754],["turn","right",-152,-10240],["fork","left",-29,-10206]]},
 {"from":"Bordeaux","to":"Golfech","man":[["fork","left",-45794,27368],["fork","right",-45325,27192],["fork","right",-45175,29296],["fork","left",-45214,30022],["turn","right",-41104,32922],["fork","left",-40611,32646]]},
 {"from":"Bremen","to":"Dortmund","man":[["turn","left",-5427,-14643],["fork","right",-4991,-15040],["fork","left",-4182,-14043],["fork","right",-3999,-13816],["fork","right",-3952,-13736],["fork","left",-8861,-10104],["fork","right",-9461,-7526],["fork","right",-9466,-7459],["fork","right",-12194,-7522],["fork","right",-12277,-7479]]},
-{"from":"Bijelo Polje","to":"Tirana","man":[["fork","right",36391,43556],["roundabout","right",34870,45271,1],["roundabout","left",34704,45759,2]]},
+{"from":"Bijelo Polje","to":"Tirana","man":[["fork","right",36391,43556],["roundabout","right",34870,45271,1],["roundabout","left",34704,45759,2],["fork","left",35802,45651]]},
 {"from":"Kristiansund","to":"Dombås","man":[["turn","right",-4805,-68621],["fork","left",-5346,-67411],["turn","right",-2630,-67642]]},
 {"from":"Copenhagen","to":"Odense","man":[["turn","right",7560,-28252],["turn","right",7283,-27825],["turn","left",7164,-27701],["turn","right",7327,-27488],["turn","left",7248,-27329],["turn","right",7438,-27140],["fork","left",7224,-26876],["fork","right",1811,-25971],["turn","left",1598,-26398],["turn","right",1377,-26372],["turn","left",1318,-26546],["turn","right",1197,-26557]]},
 {"from":"Oulu","to":"Kajaani","man":[["fork","right",41850,-82822],["turn","left",41778,-82682],["fork","right",48453,-80114],["fork","left",47834,-79062]]},

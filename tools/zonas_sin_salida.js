@@ -15,15 +15,15 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { harness, bajar, graphRev, BASE } = require('./check_avisos');
+const { harness, bajar, mapRev, graphRev, BASE } = require('./check_avisos');
 
 const DATA = path.join(__dirname, '..', 'docs', 'data');
 
 async function revisar(h, v, minNodos, grafos) {
   const bin = grafos ? fs.readFileSync(path.join(grafos, v, `route-graph-${v}-v3.bin`))
-    : await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?g=${graphRev()}`);
+    : await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?v=${mapRev(v)}&g=${graphRev()}`);
   let cities = JSON.parse(grafos ? fs.readFileSync(path.join(grafos, v, 'Cities.json'), 'utf8')
-    : await bajar(`${BASE}/${v}/Cities.json`));
+    : await bajar(`${BASE}/${v}/Cities.json?v=${mapRev(v)}`));
   cities = Array.isArray(cities) ? cities : Object.values(cities);
   const g = h.mod.buildRouteGraph(h.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength)));
   const { inMain, reachesMain, reachFromMain } = h.pure.routeReachability(g);

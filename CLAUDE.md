@@ -45,6 +45,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - La regla de cache "Mapas R2" de Cloudflare guarda tambien los 404, por
   variante de compresion: nunca pedir desde la web un archivo antes de que
   este en R2. Si paso, subir el numero de su `?` (paso con `l=1` el 13-10).
+  check_avisos, el simulador y `zonas_sin_salida` piden con el mismo `?v=` que la
+  app (con solo `?g=` Cloudflare les daba el grafo de antes de la 1.62): el PR
+  que sube la version de `ats` o `ets2` se abre con el mapa ya en R2 y trae
+  `tools/avisos-golden.json` regenerado (`check_avisos.js --update`).
 - Otra regla de Cloudflare (WAF, plan Free: sin regex) bloquea los mapas
   sin Referer de trucksim-dash.com o de la copia LAN (`http://`), salvo con
   el header `x-truckdash-tools` igual al secreto `TRUCKDASH_MAPS_KEY` (en

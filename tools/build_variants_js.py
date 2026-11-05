@@ -58,7 +58,7 @@ def build():
             "origin": var["origin"],
             "manual": MANUAL.get(name),
             "mods": var["mods"],
-            # Ajustes muestra la de ATS al lado de "La de ahora" (atsVersionVariant)
+            # Ajustes la muestra al lado de "La de ahora" (gameVersionVariant)
             "gameVersion": var.get("gameVersion"),
         }
     credits = {}
