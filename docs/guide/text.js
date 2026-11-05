@@ -59,6 +59,7 @@ GUIDE_TEXT.en = {
 </ul>`,
     gps: `
 <p>The route to your job's destination is drawn <b>automatically</b> as soon as you take a job: quick jobs and freight market, including the car jobs from Road Trip: Ford (client 1.5.21 or newer). It follows your preference in Settings: fastest, like the game's GPS, or shortest.</p>
+<p>If the job starts at another company, it first takes you there to pick up the cargo or the trailer, and the route to the delivery starts once it's loaded or hooked up.</p>
 <p>The <b>route summary</b> at the bottom of the map shows distance left, time left and arrival time, with a progress bar. The arrow shrinks it to a thin progress bar (tap the bar to open it again), and the crossed-out route button clears the route from the map.</p>
 <h3>Navigation mode</h3>
 <p>The map turns with your heading, zooms in before turns and shows directions at the top, such as <i>Keep right onto I-15 toward Provo</i>. Choose how close it follows you in Settings. You can still pinch to zoom; the recenter button takes you back.</p>
@@ -292,6 +293,7 @@ GUIDE_TEXT.es = {
 </ul>`,
     gps: `
 <p>La ruta al destino del trabajo se dibuja <b>sola</b> apenas tomás un trabajo: trabajos rápidos y mercado de cargas, incluidos los trabajos con auto de Road Trip: Ford (cliente 1.5.21 o más nuevo). Sigue tu preferencia de Configuración: la más rápida, como el GPS del juego, o la más corta.</p>
+<p>Si el trabajo empieza en otra empresa, primero te lleva ahí a buscar la carga o el remolque, y la ruta a la entrega arranca cuando está cargado o enganchado.</p>
 <p>El <b>resumen de la ruta</b>, abajo del mapa, muestra lo que falta, el tiempo restante y la hora de llegada, con una barra de progreso. La flecha lo achica a una barrita de progreso (tocala para abrirlo de nuevo), y el botón de la ruta tachada borra la ruta del mapa.</p>
 <h3>Modo navegación</h3>
 <p>El mapa gira con tu rumbo, se acerca antes de las curvas y muestra las indicaciones arriba, por ejemplo <i>Mantenete a la derecha por I-15 hacia Provo</i>. En Configuración elegís qué tan cerca te sigue. Igual podés hacer zoom con los dedos; el botón de centrar te devuelve.</p>

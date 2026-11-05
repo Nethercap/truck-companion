@@ -883,6 +883,10 @@ Revisar cada cambio contra esta lista:
    market y external_* el GPS del juego apunta primero al remolque, no al
    destino. `is_cargo_loaded` es true fuera de cargo_market. `sdkActive` solo
    se apaga al salir bien del juego: un cuelgue se detecta por `renderTime`.
+   Por eso, en esos mercados la ruta va a la empresa de origen hasta enganchar
+   el remolque una vez en ESE trabajo (`createTrailerPickupWatch`, 05-11,
+   guardado en `truckdash_trailer_hooked`): soltado despues, el remolque esta
+   donde se dejo y el SDK no da su posicion, asi que sigue a la entrega.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el
    usuario escriba las tildes (`foldText`).
