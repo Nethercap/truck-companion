@@ -5835,3 +5835,89 @@ test('createNearStops: la elegida se queda hasta pasarla o que aparezca una mas 
   n.put('g', null, { x: 400, z: -1900, now: 60000, routeKey: 'otra' });
   assert.equal(n.left('g'), null);
 });
+
+test('createTrailerPickupWatch: en el freight market la ruta va al remolque hasta engancharlo (Discord 05-11)', () => {
+  const { createTrailerPickupWatch } = require('./pure.js');
+  let guardado = null;
+  const load = () => guardado;
+  const save = (v) => { guardado = v; };
+  const trabajo = { game: 'ets2', onJob: true, jobMarket: 'freight_market', isCargoLoaded: true,
+    companySrcId: 'tradeaux', citySrcId: 'berlin', companyDstId: 'posped', cityDstId: 'praha',
+    cargo: 'Apples', plannedDistanceKm: 350, jobIncome: 9400, trailerAttached: false };
+  const w = createTrailerPickupWatch(load, save);
+  // recien tomado, sin enganchar: ir a buscarlo
+  assert.equal(w.update(trabajo), true);
+  assert.equal(guardado, null);
+  // enganchado: a la entrega, y queda guardado
+  assert.equal(w.update({ ...trabajo, trailerAttached: true }), false);
+  assert.ok(guardado);
+  // soltado a mitad del viaje: esta donde se dejo, no en el origen
+  assert.equal(w.update(trabajo), false);
+  // recargar la pagina (u otro dispositivo) con el remolque suelto: tampoco
+  assert.equal(createTrailerPickupWatch(load, save).update(trabajo), false);
+  // otro trabajo: al remolque otra vez
+  assert.equal(w.update({ ...trabajo, cityDstId: 'wien', jobIncome: 11200 }), true);
+});
+
+test('createTrailerPickupWatch: cargo market, quick job, clientes viejos y sin trabajo no cambian', () => {
+  const { createTrailerPickupWatch } = require('./pure.js');
+  const w = createTrailerPickupWatch(() => null, () => {});
+  const base = { game: 'ats', onJob: true, isCargoLoaded: true, companySrcId: 'wal', citySrcId: 'reno',
+    companyDstId: 'tree_et', cityDstId: 'elko', cargo: 'Lumber', trailerAttached: false };
+  // contratos de World of Trucks: igual que el freight market
+  assert.equal(w.update({ ...base, jobMarket: 'external_contracts' }), true);
+  // el cargo market sale por isCargoLoaded; el quick job arranca enganchado
+  assert.equal(w.update({ ...base, jobMarket: 'cargo_market', isCargoLoaded: false }), false);
+  assert.equal(w.update({ ...base, jobMarket: 'quick_job' }), false);
+  // cliente sin trailerAttached, o sin mercado: la ruta a la entrega, como antes
+  const sinDato = { ...base, jobMarket: 'freight_market' };
+  delete sinDato.trailerAttached;
+  assert.equal(w.update(sinDato), false);
+  assert.equal(w.update({ ...base, jobMarket: null }), false);
+  // sin trabajo, o sin dato
+  assert.equal(w.update({ ...base, jobMarket: 'freight_market', onJob: false }), false);
+  assert.equal(w.update(null), false);
+  // sin almacenamiento (localStorage que tira excepcion): sigue andando
+  const roto = createTrailerPickupWatch(() => { throw new Error('x'); }, () => { throw new Error('x'); });
+  assert.equal(roto.update({ ...base, jobMarket: 'freight_market' }), true);
+  assert.equal(roto.update({ ...base, jobMarket: 'freight_market', trailerAttached: true }), false);
+  assert.equal(roto.update({ ...base, jobMarket: 'freight_market' }), false);
+});
+
+test('createTrailerPickupWatch: el enganche que vio otra pestana, y el mismo viaje despues de entregar', () => {
+  const { createTrailerPickupWatch, trailerPickupJobKey } = require('./pure.js');
+  let guardado = null;
+  const load = () => guardado;
+  const save = (v) => { guardado = v; };
+  const trabajo = { game: 'ets2', onJob: true, jobMarket: 'freight_market', isCargoLoaded: true,
+    companySrcId: 'tradeaux', citySrcId: 'berlin', companyDstId: 'posped', cityDstId: 'praha',
+    cargo: 'Apples', plannedDistanceKm: 350, jobIncome: 9400, trailerAttached: false };
+  // el celular estaba apagado al enganchar; la PC lo vio y lo guardo
+  const celular = createTrailerPickupWatch(load, save);
+  assert.equal(celular.update(trabajo), true);
+  guardado = trailerPickupJobKey(trabajo);
+  assert.equal(celular.update(trabajo), false);
+  // onJob en false un momento (el menu, una partida cargando): no se olvida
+  assert.equal(celular.update({ ...trabajo, onJob: false }), false);
+  assert.equal(celular.update(trabajo), false);
+  // entregado: el mismo viaje otra vez es otro trabajo
+  assert.equal(celular.update({ onJob: false, event: { jobDelivered: true } }), false);
+  assert.equal(guardado, null);
+  assert.equal(celular.update(trabajo), true);
+  // cancelado, igual
+  celular.update({ ...trabajo, trailerAttached: true });
+  assert.ok(guardado);
+  celular.update({ onJob: false, event: { jobCancelled: true } });
+  assert.equal(celular.update(trabajo), true);
+});
+
+test('routeIdentity: enganchar el remolque del freight market cambia el viaje, sin cambiar los demas', () => {
+  const { routeIdentity } = require('./pure.js');
+  const viaje = { game: 'ets2', citySrc: 'Berlin', cityDst: 'Praha', companySrcId: 'tradeaux', companyDstId: 'posped',
+    onJob: true, isCargoLoaded: true, cargo: 'Apples' };
+  // la ruta al remolque borrada a mano vuelve, ya a la entrega, al engancharlo
+  assert.notEqual(routeIdentity({ ...viaje, trailerPickup: true }), routeIdentity(viaje));
+  // sin la marca, la clave de siempre (la barra de progreso guardada no se reinicia)
+  assert.equal(routeIdentity(viaje),
+    JSON.stringify(['ets2', 'Berlin', 'Praha', 'tradeaux', 'posped', true, true, 'Apples']));
+});

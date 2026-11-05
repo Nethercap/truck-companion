@@ -647,6 +647,16 @@ function sendOffMapReport(x, z) {
 // trabajo, pero manda solo la lider; el relay ademas repite una vez por sesion.
 // Los mapas armados en la PC (local_*) no: sus datos no son los nuestros.
 const missingCompanyWatch = createMissingCompanyWatch();
+
+// Ir a buscar el remolque del freight market y external_* antes de la entrega
+// (createTrailerPickupWatch en pure.js; handleTelemetry marca el dato con
+// trailerPickup). El trabajo cuyo remolque ya se engancho queda guardado:
+// recargar a mitad del viaje con el remolque suelto no manda al origen.
+const TRAILER_HOOKED_KEY = 'truckdash_trailer_hooked';
+const trailerPickupWatch = createTrailerPickupWatch(
+  () => lsGet(TRAILER_HOOKED_KEY),
+  (clave) => lsSet(TRAILER_HOOKED_KEY, clave || ''));
+
 function checkMissingCompanies(data) {
   if (conn.demo || conn.spectator || conn.local) return;
   // Sin los POIs de esta variante no se sabe: se da por conocida (sin
@@ -4238,7 +4248,10 @@ function resolveRawRouteTarget(data) {
   // ORIGEN (antes caia al destino, que es justo a donde no hay que ir aun).
   // Clientes < 1.3.1 no mandan onJob/isCargoLoaded/companySrcId y quedan
   // con la ruta al destino - por eso el aviso de actualizacion.
-  if (data.onJob && data.isCargoLoaded === false) {
+  // En el freight market y external_* la carga figura cargada desde el
+  // principio: lo que falta es el remolque, que espera en la misma empresa de
+  // origen (trailerPickup, createTrailerPickupWatch en pure.js).
+  if (data.onJob && (data.isCargoLoaded === false || data.trailerPickup)) {
     const pickup = (data.companySrcId ? findCompanyPoi(data.companySrcId, data.citySrcId) : null)
       || findCompanyPoiByName(data.companySrc, data.citySrcId);
     if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${pickup.token}@${pickup.city}` };
@@ -4403,11 +4416,13 @@ function updateRouteSummary(data) {
   const origen = [data.companySrc, data.citySrc].filter(Boolean).join(', ') || '?';
   const destino = [data.companyDst, data.cityDst].filter(Boolean).join(', ') || '?';
   // Freight market y parecidos: el remolque es de la empresa y espera en el
-  // origen; la carga cuenta como cargada desde el principio (asi lo informa
-  // el SDK fuera del cargo market), asi que la ruta ya va a la entrega.
-  const sinRemolque = data.onJob && data.trailerAttached === false && target.kind === 'dest'
-    && data.jobMarket && data.jobMarket !== 'cargo_market' && data.jobMarket !== 'quick_job';
-  const pickup = target.kind === 'pickup' ? t('routePickupNotice', origen, destino)
+  // origen, y la ruta va ahi hasta engancharlo (trailerPickup). Si la empresa
+  // de origen no esta en el mapa (ni su ciudad), queda la ruta a la entrega
+  // con el aviso de que el GPS del juego lleva al remolque. Un remolque
+  // soltado a mitad del viaje no tiene aviso: esta donde se dejo.
+  const sinRemolque = data.trailerPickup && target.kind === 'dest';
+  const pickup = target.kind === 'pickup'
+    ? t(data.trailerPickup ? 'routeTrailerPickupNotice' : 'routePickupNotice', origen, destino)
     : sinRemolque ? t('routeTrailerNotice', origen) : null;
   renderRouteSummary({
     pickup,
@@ -8060,6 +8075,9 @@ document.getElementById('stopSuggestClose').addEventListener('click', () => {
 
 function handleTelemetry(data) {
   if (positionAtOrigin(data.position)) data = { ...data, position: null }; // 0,0: sin posicion
+  // Antes de todo lo que lee el trabajo (ruta, resumen, lastData): falta
+  // enganchar el remolque que espera en el origen (createTrailerPickupWatch).
+  if (trailerPickupWatch.update(data)) data = { ...data, trailerPickup: true };
   trackFuel(data);
   trackStatus(data);
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice

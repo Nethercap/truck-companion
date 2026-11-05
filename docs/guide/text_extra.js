@@ -55,6 +55,7 @@ GUIDE_TEXT.de = {
 </ul>`,
     gps: `
 <p>Die Route zum Ziel deines Auftrags wird <b>automatisch</b> gezeichnet, sobald du einen Auftrag annimmst: Schnellaufträge und Frachtmarkt, auch die Autoaufträge aus Road Trip: Ford (Client 1.5.21 oder neuer). Sie folgt deiner Wahl in den Einstellungen: die schnellste, wie das Navi im Spiel, oder die kürzeste.</p>
+<p>Beginnt der Auftrag bei einer anderen Firma, führt sie dich zuerst dorthin, um die Ladung oder den Auflieger abzuholen. Die Route zur Lieferung beginnt, sobald geladen oder angekuppelt ist.</p>
 <p>Die <b>Routenübersicht</b> unten auf der Karte zeigt Reststrecke, Restzeit und Ankunftszeit mit einem Fortschrittsbalken. Der Pfeil verkleinert sie zu einem schmalen Fortschrittsbalken (antippen, um sie wieder zu öffnen), und der Knopf mit der durchgestrichenen Route entfernt die Route von der Karte.</p>
 <h3>Navigationsmodus</h3>
 <p>Die Karte dreht sich mit deiner Fahrtrichtung, zoomt vor Abzweigungen heran und zeigt oben Anweisungen wie <i>Rechts halten auf I-15 Richtung Provo</i>. Wie nah sie dir folgt, stellst du in den Einstellungen ein. Mit zwei Fingern zoomen geht trotzdem; der Zentrieren-Knopf holt dich zurück.</p>
@@ -287,6 +288,7 @@ GUIDE_TEXT.fr = {
 </ul>`,
     gps: `
 <p>L'itinéraire vers la destination de ta livraison se trace <b>tout seul</b> dès que tu prends un contrat : contrats rapides et marché du fret, y compris les livraisons de voitures de Road Trip: Ford (client 1.5.21 ou plus récent). Il suit ta préférence dans les Paramètres : le plus rapide, comme le GPS du jeu, ou le plus court.</p>
+<p>Si le contrat commence dans une autre entreprise, il t'y conduit d'abord pour prendre la cargaison ou la remorque, et l'itinéraire vers la livraison commence une fois chargé ou attelé.</p>
 <p>Le <b>résumé de l'itinéraire</b>, en bas de la carte, affiche la distance et le temps restants et l'heure d'arrivée, avec une barre de progression. La flèche le réduit à une fine barre de progression (touche-la pour le rouvrir), et le bouton à l'itinéraire barré efface l'itinéraire de la carte.</p>
 <h3>Mode navigation</h3>
 <p>La carte tourne avec ton cap, zoome avant les virages et affiche les indications en haut, par exemple <i>Serrez à droite sur I-15 vers Provo</i>. Tu choisis dans les Paramètres à quelle distance elle te suit. Tu peux toujours zoomer avec deux doigts ; le bouton recentrer te ramène.</p>
@@ -519,6 +521,7 @@ GUIDE_TEXT.pt = {
 </ul>`,
     gps: `
 <p>A rota até o destino do frete é desenhada <b>sozinha</b> assim que você pega um frete: fretes rápidos e mercado de fretes, incluindo os fretes de carro do Road Trip: Ford (cliente 1.5.21 ou mais novo). Ela segue a sua preferência nas Configurações: a mais rápida, como o GPS do jogo, ou a mais curta.</p>
+<p>Se o frete começa em outra empresa, primeiro ela te leva até lá para buscar a carga ou o reboque, e a rota até a entrega começa quando estiver carregado ou engatado.</p>
 <p>O <b>resumo da rota</b>, embaixo do mapa, mostra a distância e o tempo que faltam e a hora de chegada, com uma barra de progresso. A seta reduz ele a uma barrinha de progresso (toque nela para abrir de novo), e o botão da rota riscada apaga a rota do mapa.</p>
 <h3>Modo navegação</h3>
 <p>O mapa gira com a sua direção, aproxima antes das curvas e mostra as instruções no alto, como <i>Mantenha-se à direita na I-15 sentido Provo</i>. Nas Configurações você escolhe o quão perto ele te acompanha. Dá para dar zoom com os dedos; o botão de centralizar te traz de volta.</p>
@@ -751,6 +754,7 @@ GUIDE_TEXT.pl = {
 </ul>`,
     gps: `
 <p>Trasa do celu zlecenia rysuje się <b>sama</b>, gdy tylko weźmiesz zlecenie: szybkie zlecenia i giełda frachtów, w tym zlecenia z samochodami z Road Trip: Ford (klient 1.5.21 lub nowszy). Trasa uwzględnia twój wybór w Ustawieniach: najszybsza, jak GPS w grze, albo najkrótsza.</p>
+<p>Jeśli zlecenie zaczyna się w innej firmie, najpierw prowadzi cię tam po ładunek albo naczepę, a trasa do dostawy zaczyna się po załadunku lub podpięciu.</p>
 <p><b>Podsumowanie trasy</b> na dole mapy pokazuje pozostały dystans, pozostały czas i godzinę przyjazdu, z paskiem postępu. Strzałka zwija je do cienkiego paska postępu (dotknij go, by otworzyć ponownie), a przycisk z przekreśloną trasą usuwa trasę z mapy.</p>
 <h3>Tryb nawigacji</h3>
 <p>Mapa obraca się zgodnie z kierunkiem jazdy, przybliża się przed skrętami i pokazuje wskazówki u góry, np. <i>Trzymaj się prawej na I-15 w kierunku Provo</i>. W Ustawieniach wybierzesz, jak blisko mapa za tobą podąża. Nadal możesz przybliżać dwoma palcami; przycisk wyśrodkowania przywraca widok.</p>
@@ -983,6 +987,7 @@ GUIDE_TEXT.tr = {
 </ul>`,
     gps: `
 <p>Bir iş aldığın anda, işin varış noktasına giden rota <b>otomatik olarak</b> çizilir: hızlı işler ve yük pazarı, Road Trip: Ford'daki araba taşıma işleri de dahil (istemci 1.5.21 veya daha yenisi). Rota, Ayarlar'daki tercihine uyar: oyunun GPS'i gibi en hızlı veya en kısa.</p>
+<p>İş başka bir firmada başlıyorsa, rota önce yükü ya da dorseyi almak için seni oraya götürür; teslimat rotası yükleme bitince ya da dorse bağlanınca başlar.</p>
 <p>Haritanın altındaki <b>rota özeti</b> kalan mesafeyi, kalan süreyi ve varış saatini bir ilerleme çubuğuyla gösterir. Ok onu ince bir ilerleme çubuğuna küçültür (tekrar açmak için çubuğa dokun); üstü çizili rota düğmesi ise rotayı haritadan kaldırır.</p>
 <h3>Navigasyon modu</h3>
 <p>Harita gidiş yönünle birlikte döner, dönüşlerden önce yakınlaşır ve üstte <i>I-15 üzerinden Provo yönüne sağdan devam et</i> gibi yönlendirmeler gösterir. Ne kadar yakından takip edeceğini Ayarlar'da seçersin. İki parmakla yakınlaştırmaya devam edebilirsin; ortalama düğmesi seni geri getirir.</p>
@@ -1215,6 +1220,7 @@ GUIDE_TEXT.ru = {
 </ul>`,
     gps: `
 <p>Маршрут до пункта назначения заказа рисуется <b>автоматически</b>, как только вы берёте заказ: быстрые заказы и биржа грузов, включая перевозку автомобилей из Road Trip: Ford (клиент 1.5.21 или новее). Он учитывает ваш выбор в настройках: самый быстрый, как GPS в игре, или самый короткий.</p>
+<p>Если заказ начинается в другой компании, маршрут сначала ведёт туда за грузом или прицепом, а маршрут до доставки начинается после погрузки или сцепки.</p>
 <p><b>Сводка маршрута</b> внизу карты показывает оставшееся расстояние, оставшееся время и время прибытия с полосой прогресса. Стрелка сворачивает её в тонкую полосу прогресса (нажмите на полосу, чтобы развернуть), а кнопка с перечёркнутым маршрутом убирает маршрут с карты.</p>
 <h3>Режим навигации</h3>
 <p>Карта поворачивается по направлению движения, приближается перед поворотами и показывает подсказки сверху, например <i>Держитесь правее на I-15 в сторону Provo</i>. Насколько близко она следует за вами, выбирается в настройках. Масштабировать двумя пальцами по-прежнему можно; кнопка центрирования вернёт вид.</p>
