@@ -57,7 +57,7 @@ function convoySaveSettings() {
 
 function convoyInRoom() { return !!(convoy.code && convoy.you); }
 function convoyAvailable() { return !conn.local && !conn.demo && !convoy.spectator; }
-// Otra version de ATS es el mismo mundo: va como `ats` (sharedMapVariant).
+// Otra version del juego es el mismo mundo: va como la de ahora (sharedMapVariant).
 function convoyMyVariant() { return sharedMapVariant(resolveEffectiveGame(lastData?.game)); }
 function convoyMyGame() { return lastData?.game || null; }
 function convoyMe() { return convoy.members.find(m => m.id === convoy.you) || null; }

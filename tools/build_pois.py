@@ -36,7 +36,9 @@ VARIANTS = {
     "ats_c2c_canada": ("parser-output-ats_c2c_canada", "usa"),  # C2C 2.24.61.2 + Western/Eastern Canada + sus conectores C2C
     "ats_expansion": ("parser-output-ats_expansion", "usa"),  # ATS Expansion 23.0 (Sineptorro)
     "ats_c2c_expansion": ("parser-output-ats_c2c_expansion", "usa"),  # C2C 2.24.61.2 + ATS Expansion 23.0 (este arriba)
-    "ets2": ("parser-output-ets2", "europe"),
+    "ets2": ("parser-output-ets2", "europe"),  # ETS2 1.62.1.0
+    # ETS2 1.61.1.0, para quien volvio a la 1.61 en Steam
+    "ets2_161": ("parser-output-ets2_161", "europe"),
     "ets2_promods": ("parser-output-ets2_promods", "europe"),  # ProMods 2.84 + ME 2.84 + Maghreb 1.04 + TGS 1.70
     "ets2_promods_rusmap": ("parser-output-ets2_promods_rusmap", "europe"),  # + RusMap 2.61 + conector 2.84/2.61
     "ets2_promods_roex": ("parser-output-ets2_promods_roex", "europe"),  # ProMods + Roextended Hybrid 1.61 v3 + ROEX53PMME284

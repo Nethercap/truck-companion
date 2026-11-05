@@ -102,7 +102,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, atsVersion, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, mapDash, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
+  return { miniHud: miniHudSettings, routeColor, atsMod, atsVersion, ets2Version, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, mapDash, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -430,9 +430,10 @@ function fillCurrencySelect() {
 // excluyentes (no se pueden combinar), por eso es un selector unico
 // ('none'|'c2c'|'promods_canada') en vez de dos checkboxes independientes.
 let atsMod = _savedSettings.atsMod || 'none';
-// Version de ATS del mapa base: 'latest' o '1.61' (atsVersionVariant en
+// Version del juego del mapa base: 'latest' o '1.61' (gameVersionVariant en
 // pure.js). Va aparte de los mods porque vale tambien en automatico.
-let atsVersion = atsVersionSetting(_savedSettings.atsVersion);
+let atsVersion = gameVersionSetting('ats', _savedSettings.atsVersion);
+let ets2Version = gameVersionSetting('ets2', _savedSettings.ets2Version);
 // Selector manual de ETS2: 'none' | 'promods' | 'promods_rusmap'. Antes era un
 // booleano hasProMods; lo guardado viejo se migra.
 let ets2Mod = _savedSettings.ets2Mod || (_savedSettings.hasProMods ? 'promods' : 'none');
@@ -554,10 +555,15 @@ function initModsUi() {
   document.getElementById('setProModsEuGrandUtopia').closest('label').hidden = !MAP_DATA_VERSION.ets2_promods_eugu;
   document.getElementById('setTruckersMP').checked = ets2Mod === 'tmp';
   document.getElementById('setTruckersMP').closest('label').hidden = !MAP_DATA_VERSION.ets2_tmp;
+  document.getElementById('gameVersionBlock').hidden = !MAP_DATA_VERSION.ats_161 && !MAP_DATA_VERSION.ets2_161;
   document.getElementById('atsVersionBlock').hidden = !MAP_DATA_VERSION.ats_161;
   document.getElementById('setAtsVersionLatest').checked = atsVersion === 'latest';
   document.getElementById('setAtsVersion161').checked = atsVersion === '1.61';
   document.getElementById('atsVersionLatestNum').textContent = gameVersionTag(VARIANT_META.ats && VARIANT_META.ats.gameVersion);
+  document.getElementById('ets2VersionBlock').hidden = !MAP_DATA_VERSION.ets2_161;
+  document.getElementById('setEts2VersionLatest').checked = ets2Version === 'latest';
+  document.getElementById('setEts2Version161').checked = ets2Version === '1.61';
+  document.getElementById('ets2VersionLatestNum').textContent = gameVersionTag(VARIANT_META.ets2 && VARIANT_META.ets2.gameVersion);
 }
 
 document.querySelectorAll('input[name="modsAuto"]').forEach(radio => {
@@ -581,7 +587,15 @@ document.querySelectorAll('input[name="atsMod"]').forEach(radio => {
 document.querySelectorAll('input[name="atsVersion"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
     if (!e.target.checked) return;
-    atsVersion = atsVersionSetting(e.target.value);
+    atsVersion = gameVersionSetting('ats', e.target.value);
+    saveSettings();
+    currentGame = null; // recarga con el mapa de esa version (updateMap)
+  });
+});
+document.querySelectorAll('input[name="ets2Version"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    if (!e.target.checked) return;
+    ets2Version = gameVersionSetting('ets2', e.target.value);
     saveSettings();
     currentGame = null; // recarga con el mapa de esa version (updateMap)
   });
@@ -6348,10 +6362,10 @@ function offMapCheckReady(game) {
   return Date.now() - (conn.openedAt || 0) > OFFMAP_GRACE_MS;
 }
 
-// Mapa de la version de ATS elegida en Ajustes, sobre el de los mods
-// (atsVersionVariant: solo cambia el mapa base).
+// Mapa de la version del juego elegida en Ajustes, sobre el de los mods
+// (gameVersionVariant: solo cambia el mapa base).
 function resolveEffectiveGame(game) {
-  return atsVersionVariant(resolveModVariant(game), atsVersion, MAP_DATA_VERSION);
+  return gameVersionVariant(resolveModVariant(game), { ats: atsVersion, ets2: ets2Version }, MAP_DATA_VERSION);
 }
 
 function resolveModVariant(game) {

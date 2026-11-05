@@ -1294,35 +1294,52 @@ test('DLC: juego de la variante y ajustes guardados limpios', () => {
   assert.deepEqual(normalizeDlcOff(undefined), { ats: [], ets2: [] });
 });
 
-test('version de ATS: la 1.61 cambia solo el mapa base, si esta publicada', () => {
-  const { atsVersionSetting, atsVersionVariant, dlcGameOf } = require('./pure.js');
-  const publicadas = { ats: '20261103', ats_161: '20261103', ats_c2c: '20261101' };
-  assert.equal(atsVersionVariant('ats', '1.61', publicadas), 'ats_161');
-  assert.equal(atsVersionVariant('ats', 'latest', publicadas), 'ats');
+test('version del juego: la 1.61 cambia solo el mapa base, si esta publicada', () => {
+  const { gameVersionSetting, gameVersionVariant, dlcGameOf } = require('./pure.js');
+  const publicadas = { ats: '20261103', ats_161: '20261103', ats_c2c: '20261101', ets2: '20261105', ets2_161: '20261105', ets2_promods: '20261022' };
+  assert.equal(gameVersionVariant('ats', { ats: '1.61' }, publicadas), 'ats_161');
+  assert.equal(gameVersionVariant('ats', { ats: 'latest' }, publicadas), 'ats');
+  assert.equal(gameVersionVariant('ets2', { ets2: '1.61' }, publicadas), 'ets2_161');
+  assert.equal(gameVersionVariant('ets2', { ets2: 'latest' }, publicadas), 'ets2');
+  // Cada juego con lo suyo: elegir la 1.61 en uno no mueve al otro
+  assert.equal(gameVersionVariant('ets2', { ats: '1.61', ets2: 'latest' }, publicadas), 'ets2');
+  assert.equal(gameVersionVariant('ats', { ats: 'latest', ets2: '1.61' }, publicadas), 'ats');
   // Los mods siguen en su variante (armada sobre la version de su mod), y el
   // mapa armado en la PC es el del juego instalado
-  assert.equal(atsVersionVariant('ats_c2c', '1.61', publicadas), 'ats_c2c');
-  assert.equal(atsVersionVariant('local_ats', '1.61', publicadas), 'local_ats');
-  assert.equal(atsVersionVariant('ets2', '1.61', publicadas), 'ets2');
+  const las161 = { ats: '1.61', ets2: '1.61' };
+  assert.equal(gameVersionVariant('ats_c2c', las161, publicadas), 'ats_c2c');
+  assert.equal(gameVersionVariant('local_ats', las161, publicadas), 'local_ats');
+  assert.equal(gameVersionVariant('ets2_promods', las161, publicadas), 'ets2_promods');
+  assert.equal(gameVersionVariant('local_ets2', las161, publicadas), 'local_ets2');
   // Sin el mapa de la 1.61 publicado, el de ahora
-  assert.equal(atsVersionVariant('ats', '1.61', { ats: '20261103' }), 'ats');
+  assert.equal(gameVersionVariant('ats', las161, { ats: '20261103' }), 'ats');
+  assert.equal(gameVersionVariant('ets2', las161, { ets2: '20261105' }), 'ets2');
   // Lo guardado que no es una version conocida es "la de ahora"
-  assert.equal(atsVersionSetting(undefined), 'latest');
-  assert.equal(atsVersionSetting('1.60'), 'latest');
-  assert.equal(atsVersionSetting('__proto__'), 'latest');
-  assert.equal(atsVersionVariant('ats', '__proto__', publicadas), 'ats');
+  assert.equal(gameVersionSetting('ats', undefined), 'latest');
+  assert.equal(gameVersionSetting('ets2', undefined), 'latest');
+  assert.equal(gameVersionSetting('ets2', '1.60'), 'latest');
+  assert.equal(gameVersionSetting('ats', '__proto__'), 'latest');
+  assert.equal(gameVersionSetting('__proto__', '1.61'), 'latest');
+  assert.equal(gameVersionSetting('ets2', '1.61'), '1.61');
+  assert.equal(gameVersionVariant('ats', { ats: '__proto__' }, publicadas), 'ats');
+  assert.equal(gameVersionVariant('__proto__', las161, publicadas), '__proto__');
+  assert.equal(gameVersionVariant('ats', undefined, publicadas), 'ats');
   assert.equal(dlcGameOf('ats_161'), 'ats');
+  assert.equal(dlcGameOf('ets2_161'), 'ets2');
 });
 
-test('version de ATS: el mapa en vivo y el convoy juntan la 1.61 con ats', () => {
+test('version del juego: el mapa en vivo y el convoy juntan la 1.61 con la de ahora', () => {
   const { sharedMapVariant } = require('./pure.js');
   assert.equal(sharedMapVariant('ats_161'), 'ats');
   assert.equal(sharedMapVariant('ats'), 'ats');
   assert.equal(sharedMapVariant('ats_c2c'), 'ats_c2c');
+  assert.equal(sharedMapVariant('ets2_161'), 'ets2');
+  assert.equal(sharedMapVariant('ets2'), 'ets2');
+  assert.equal(sharedMapVariant('ets2_promods'), 'ets2_promods');
   assert.equal(sharedMapVariant(null), null);
 });
 
-test('version de ATS: la etiqueta lleva mayor y menor', () => {
+test('version del juego: la etiqueta lleva mayor y menor', () => {
   const { gameVersionTag } = require('./pure.js');
   assert.equal(gameVersionTag('1.62.1.1'), '(1.62)');
   assert.equal(gameVersionTag(undefined), '');
