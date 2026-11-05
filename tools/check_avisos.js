@@ -74,6 +74,14 @@ function harness() {
   return { mod, pure, behind };
 }
 
+// El ?v= de la variante, como la app. Cloudflare guarda cada URL: con solo ?g=
+// siguio sirviendo los grafos de antes de ATS 1.62 y ETS2 1.62 aunque R2 ya
+// tuviera los nuevos, y esto comparaba contra un mapa que nadie usa (05-11).
+function mapRev(v) {
+  const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'data', 'map-manifest.json'), 'utf8'));
+  return (m.variants[v] || {}).mapDataVersion || '';
+}
+
 function graphRev() {
   const m = fs.readFileSync(path.join(APP, 'app.js'), 'utf8').match(/const ROUTE_GRAPH_V3_REV = (\d+);/);
   return m ? m[1] : '';
@@ -95,7 +103,7 @@ async function bajarCarriles(pure, v, decoded) {
   const local = process.env.TRUCKDASH_LANES_DIR;
   const lb = local
     ? fs.readFileSync(path.join(local, v, `route-graph-${v}-lanes.bin`))
-    : await bajar(`${BASE}/${v}/route-graph-${v}-lanes.bin?g=${graphRev()}&l=${lanesRev()}`);
+    : await bajar(`${BASE}/${v}/route-graph-${v}-lanes.bin?v=${mapRev(v)}&g=${graphRev()}&l=${lanesRev()}`);
   return pure.decodeLanesBin(lb.buffer.slice(lb.byteOffset, lb.byteOffset + lb.byteLength), decoded.n, decoded.ne);
 }
 
@@ -185,18 +193,18 @@ async function main() {
   const nuevo = { variants: {} };
   let falla = false;
   for (const [v, n] of Object.entries(VARIANTS)) {
-    // Con el ?g= de la app: sin el, el CDN puede servir el grafo anterior.
-    const bin = await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?g=${graphRev()}`);
-    const cities = JSON.parse(await bajar(`${BASE}/${v}/Cities.json`));
+    // Con el ?v= y el ?g= de la app: sin ellos, el CDN puede servir el grafo anterior.
+    const bin = await bajar(`${BASE}/${v}/route-graph-${v}-v3.bin?v=${mapRev(v)}&g=${graphRev()}`);
+    const cities = JSON.parse(await bajar(`${BASE}/${v}/Cities.json?v=${mapRev(v)}`));
     const sha = crypto.createHash('sha256').update(bin).digest('hex').slice(0, 16);
     const decoded = h.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
     const g = h.mod.buildRouteGraph(decoded);
     if (timesRev()) {
-      const tb = await bajar(`${BASE}/${v}/route-graph-${v}-times.bin?g=${graphRev()}&t=${timesRev()}`);
+      const tb = await bajar(`${BASE}/${v}/route-graph-${v}-times.bin?v=${mapRev(v)}&g=${graphRev()}&t=${timesRev()}`);
       g.edgeT = h.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
     }
     if (prefabsRev()) {
-      const pb = await bajar(`${BASE}/${v}/route-graph-${v}-prefabs.bin?g=${graphRev()}&p=${prefabsRev()}`);
+      const pb = await bajar(`${BASE}/${v}/route-graph-${v}-prefabs.bin?v=${mapRev(v)}&g=${graphRev()}&p=${prefabsRev()}`);
       g.edgePrefab = h.pure.decodePrefabsBin(pb.buffer.slice(pb.byteOffset, pb.byteOffset + pb.byteLength), decoded.n, decoded.ne);
       if (!g.edgePrefab) throw new Error(`check_avisos: el -prefabs.bin de ${v} no es de este grafo`);
     }
@@ -245,4 +253,4 @@ if (require.main === module) main().catch(e => {
   console.error(e);
   process.exit(2);
 });
-module.exports = { harness, bajar, bajarCarriles, graphRev, timesRev, lanesRev, prefabsRev, BASE };
+module.exports = { harness, bajar, bajarCarriles, mapRev, graphRev, timesRev, lanesRev, prefabsRev, BASE };

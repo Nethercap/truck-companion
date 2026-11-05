@@ -10,7 +10,7 @@
 // grafo (cuanto dobla la ruta en cada cruce y si habia otra salida).
 //
 // No es un test: lista sospechosos para mirar uno por uno. Los grafos se
-// bajan de R2 (con el ?g= de la app) y quedan en --cache.
+// bajan de R2 (con el ?v= y el ?g= de la app) y quedan en --cache.
 //
 // Uso: node tools/simular_navegacion.js [--variantes ats,ets2] [--rutas 30]
 //        [--semilla 1] [--salida carpeta] [--cache carpeta] [--carriles carpeta]
@@ -30,7 +30,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { harness, bajar, graphRev, timesRev, lanesRev, prefabsRev, BASE } = require('./check_avisos');
+const { harness, bajar, mapRev, graphRev, timesRev, lanesRev, prefabsRev, BASE } = require('./check_avisos');
 
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(ROOT, 'docs', 'data');
@@ -126,6 +126,8 @@ function mp3Segundos(buf) {
 async function cargarVariante(v, cache, H) {
   fs.mkdirSync(cache, { recursive: true });
   const rev = graphRev();
+  // En el nombre del cache va la version del mapa, para no releer el de antes
+  const m = mapRev(v);
   const archivo = async (nombre, url) => {
     const f = path.join(cache, nombre);
     if (!fs.existsSync(f)) fs.writeFileSync(f, await bajar(url));
@@ -138,8 +140,8 @@ async function cargarVariante(v, cache, H) {
   const grafos = argumentos(process.argv.slice(2)).grafos;
   const fg = grafos && path.join(grafos, v, `route-graph-${v}-v3.bin`);
   const bin = fg && fs.existsSync(fg) ? fs.readFileSync(fg)
-    : await archivo(`${v}-v3-g${rev}.bin`, `${BASE}/${v}/route-graph-${v}-v3.bin?g=${rev}`);
-  let cities = JSON.parse(await archivo(`${v}-Cities.json`, `${BASE}/${v}/Cities.json`));
+    : await archivo(`${v}-m${m}-v3-g${rev}.bin`, `${BASE}/${v}/route-graph-${v}-v3.bin?v=${m}&g=${rev}`);
+  let cities = JSON.parse(await archivo(`${v}-m${m}-Cities.json`, `${BASE}/${v}/Cities.json?v=${m}`));
   cities = Array.isArray(cities) ? cities : Object.values(cities);
   const decoded = H.mod.decodeRouteGraphBin(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
   const g = H.mod.buildRouteGraph(decoded);
@@ -149,7 +151,7 @@ async function cargarVariante(v, cache, H) {
   const tiempos = argumentos(process.argv.slice(2)).tiempos || grafos;
   const ft = tiempos && path.join(tiempos, v, `route-graph-${v}-times.bin`);
   const tb = ft && fs.existsSync(ft) ? fs.readFileSync(ft)
-    : timesRev() ? await archivo(`${v}-times-g${rev}-t${timesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-times.bin?g=${rev}&t=${timesRev()}`) : null;
+    : timesRev() ? await archivo(`${v}-m${m}-times-g${rev}-t${timesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-times.bin?v=${m}&g=${rev}&t=${timesRev()}`) : null;
   if (tb) {
     g.edgeT = H.pure.decodeTimesBin(tb.buffer.slice(tb.byteOffset, tb.byteOffset + tb.byteLength), decoded.n, decoded.ne);
     if (!g.edgeT) throw new Error(`las decimas de ${v} no son de este grafo`);
@@ -160,7 +162,7 @@ async function cargarVariante(v, cache, H) {
   const prefabs = argumentos(process.argv.slice(2)).prefabs || grafos;
   const fp = prefabs && path.join(prefabs, v, `route-graph-${v}-prefabs.bin`);
   const pb = fp && fs.existsSync(fp) ? fs.readFileSync(fp)
-    : prefabsRev() ? await archivo(`${v}-prefabs-g${rev}-p${prefabsRev()}.bin`, `${BASE}/${v}/route-graph-${v}-prefabs.bin?g=${rev}&p=${prefabsRev()}`) : null;
+    : prefabsRev() ? await archivo(`${v}-m${m}-prefabs-g${rev}-p${prefabsRev()}.bin`, `${BASE}/${v}/route-graph-${v}-prefabs.bin?v=${m}&g=${rev}&p=${prefabsRev()}`) : null;
   if (pb) {
     g.edgePrefab = H.pure.decodePrefabsBin(pb.buffer.slice(pb.byteOffset, pb.byteOffset + pb.byteLength), decoded.n, decoded.ne);
     if (!g.edgePrefab) throw new Error(`el -prefabs.bin de ${v} no es de este grafo`);
@@ -171,7 +173,7 @@ async function cargarVariante(v, cache, H) {
   const carriles = argumentos(process.argv.slice(2)).carriles || grafos;
   const fl = carriles && path.join(carriles, v, `route-graph-${v}-lanes.bin`);
   const lb = fl && fs.existsSync(fl) ? fs.readFileSync(fl)
-    : lanesRev() ? await archivo(`${v}-lanes-g${rev}-l${lanesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-lanes.bin?g=${rev}&l=${lanesRev()}`) : null;
+    : lanesRev() ? await archivo(`${v}-m${m}-lanes-g${rev}-l${lanesRev()}.bin`, `${BASE}/${v}/route-graph-${v}-lanes.bin?v=${m}&g=${rev}&l=${lanesRev()}`) : null;
   const lanes = lb ? H.pure.decodeLanesBin(lb.buffer.slice(lb.byteOffset, lb.byteOffset + lb.byteLength), decoded.n, decoded.ne) : null;
   if (lb && !lanes) throw new Error(`los carriles de ${v} no son de este grafo`);
   const pois = JSON.parse(fs.readFileSync(path.join(DATA, `pois-${v}.json`), 'utf8'));
