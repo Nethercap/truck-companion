@@ -35,7 +35,7 @@ commit="$(git -C "$raiz" rev-parse HEAD 2>/dev/null || echo desconocido)"
   if [ -n "${GITHUB_RUN_ID:-}" ]; then
     echo "run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
   fi
-  echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ), $(ldd --version | head -1), $(g++ --version | head -1)"
+  echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ), $(ldd --version 2>&1 | sed -n 1p), $(g++ --version | sed -n 1p)"
   # La glibc mas nueva que pide el .so: la PC tiene que tener esa o una mas nueva.
   echo "needs: $(objdump -T "$dir/truckdash-telemetry.so" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)"
 } > "$dir/BUILD.txt"
