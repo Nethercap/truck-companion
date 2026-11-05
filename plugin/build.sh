@@ -8,9 +8,13 @@
 # workflow "Build plugin" con plataforma macos, asi la .dylib sale de su log
 # y no de la Mac de nadie, igual que la DLL.
 #
-# En Linux deja un .so solo para saber que el codigo compila fuera de
-# Windows (tests): el plugin nativo de Linux no se publica (build-linux en
-# build-client.yml explica por que).
+# En Linux deja truckdash-telemetry.so, para los builds nativos de Linux de
+# los juegos (<juego>/bin/linux_x64/plugins/). No lo instala el cliente: sale
+# de "Build plugin" con plataforma linux como paquete de prueba (plugin/linux/,
+# issue #7), y los tests lo compilan para saber que el codigo anda fuera de
+# Windows. Va con libstdc++ y libgcc adentro: el juego corre en el Steam
+# Runtime, que trae su propia libstdc++, y con la del sistema el .so podia no
+# cargar o mezclar dos. --exclude-libs no exporta lo de esas dos.
 set -euo pipefail
 
 out="${1:?uso: bash plugin/build.sh <carpeta>}"
@@ -39,7 +43,8 @@ if [ "$(uname)" = Darwin ]; then
   sha="$(shasum -a 256 "$lib" | cut -d' ' -f1)"
 else
   lib="$out/truckdash-telemetry.so"
-  g++ "${flags[@]}" -shared "${fuentes[@]}" -o "$lib"
+  g++ "${flags[@]}" -shared -static-libstdc++ -static-libgcc -Wl,--exclude-libs,ALL \
+    "${fuentes[@]}" -o "$lib"
   exportados="$(nm -D --defined-only "$lib")"
   sha="$(sha256sum "$lib" | cut -d' ' -f1)"
 fi

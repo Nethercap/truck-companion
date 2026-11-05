@@ -52,8 +52,10 @@ Intel and Apple Silicon:
 bash build.sh <output folder>
 ```
 
-On Linux the same script builds a `.so`, only to check that the code still
-compiles outside Windows: the native Linux plugin is not shipped.
+On Linux the same script builds `truckdash-telemetry.so` for the native
+Linux builds of the games. It is not shipped with the client yet: `linux/`
+has a test package for whoever plays the native build (`install.sh`,
+`check-telemetry.py`), which "Build plugin" builds with platform `linux`.
 
 The DLL and the dylib that the client installs are built by the "Build
 plugin" workflow (one platform per run), not on anyone's PC.

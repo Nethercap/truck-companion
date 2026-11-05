@@ -26,10 +26,15 @@
 // is installed next to whatever scs-telemetry.dll the game already has
 // (Trucky and other apps ship upstream's and check that it is untouched), so
 // the two plugins run side by side and must not write to the same block.
+// Outside Windows it is a file mapped with mmap: on Linux in /dev/shm, where
+// client/telemetry_compat.py looks for it (and where the Steam Runtime
+// container shares it with the host); macOS has no /dev/shm.
 #ifdef _WIN32
 #define SCS_PLUGIN_MMF_NAME TEXT("Local\\TruckDashTelemetry")
-#else
+#elif defined(__APPLE__)
 #define SCS_PLUGIN_MMF_NAME "/tmp/TruckDashTelemetry"
+#else
+#define SCS_PLUGIN_MMF_NAME "/dev/shm/TruckDashTelemetry"
 #endif
 #define SCS_PLUGIN_MMF_SIZE (32*1024)
 /**

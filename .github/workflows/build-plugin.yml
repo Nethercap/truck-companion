@@ -16,6 +16,10 @@ name: Build plugin
 # compilar una no le cambia el hash a la otra, y los dos jobs no pushean a la
 # vez.
 #
+# Con linux no se fija ni se commitea nada: arma el paquete de prueba para el
+# juego nativo de Linux (plugin/linux/, issue #7) y lo deja como artefacto de
+# la corrida, para mandarselo a quien lo prueba con el link a este log.
+#
 # El push lo hace el token de Actions, que no dispara otros workflows: los
 # tests de ese commit corren con el siguiente push.
 
@@ -23,9 +27,9 @@ on:
   workflow_dispatch:
     inputs:
       plataforma:
-        description: 'windows (the DLL) or macos (the universal .dylib)'
+        description: 'windows (the DLL), macos (the universal .dylib) or linux (test package, not pinned)'
         type: choice
-        options: [windows, macos]
+        options: [windows, macos, linux]
         default: windows
 
 permissions:
@@ -33,7 +37,7 @@ permissions:
 
 jobs:
   build:
-    if: inputs.plataforma != 'macos'
+    if: inputs.plataforma == 'windows'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,3 +96,25 @@ jobs:
           if git diff --cached --quiet; then echo "La .dylib no cambio, nada que commitear"; exit 0; fi
           git commit -m "plugin: .dylib de macOS compilada en Actions desde plugin/" -m "Corrida: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           git push origin "HEAD:$GITHUB_REF_NAME"
+
+  build-linux:
+    if: inputs.plataforma == 'linux'
+    # La LTS mas vieja que hay, como el cliente de Linux en build-client.yml:
+    # el .so pide la glibc de donde se compila.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build the test package
+        run: bash plugin/linux/empaquetar.sh "$RUNNER_TEMP/paquete"
+      - name: Load it like the game and read it like the client
+        run: |
+          pip install truck_telemetry
+          python tools/probar_plugin_linux.py "$RUNNER_TEMP"/paquete/truckdash-linux-native-test-*/truckdash-telemetry.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: truckdash-linux-native-test
+          path: ${{ runner.temp }}/paquete/*.tar.gz
+          retention-days: 90

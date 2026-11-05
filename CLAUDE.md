@@ -768,6 +768,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   compila fuera de Windows (`plugin/build.sh`, sus cambios de #87) y la
   .dylib universal sale de "Build plugin" con plataforma macos, fijada en
   `PLUGIN_DYLIB_SHA256` (21-10); el cliente de Mac sigue en #87.
+- Linux nativo (05-11, issue #7): el `.so` del plugin (`plugin/build.sh`,
+  con libstdc++ adentro) publica en `/dev/shm/TruckDashTelemetry`, donde lo
+  lee `telemetry_compat.py`; hasta el 05-11 escribia en el `/tmp` de macOS y
+  el cliente no lo hubiera visto nunca. El cliente no lo instala: va como
+  paquete de prueba (`plugin/linux/`, "Build plugin" con plataforma linux,
+  artefacto de la corrida sin fijar nada). `tools/probar_plugin_linux.py`
+  lo carga como el juego y lo lee como el cliente, en los tests de Linux.
+  Nadie lo probo todavia en el juego.
 - TruckersMP (23-10): la DLL es tambien plugin de TMP (`truckersmp_init`,
   Client SDK v1.1.0 en `plugin/truckersmp_sdk/`) y publica los jugadores
   cerca en `Local\TruckDashTMP` (`truckersmp_players.hpp`, revision 1). El
