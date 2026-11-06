@@ -899,6 +899,15 @@ Revisar cada cambio contra esta lista:
    el remolque una vez en ESE trabajo (`createTrailerPickupWatch`, 05-11,
    guardado en `truckdash_trailer_hooked`): soltado despues, el remolque esta
    donde se dejo y el SDK no da su posicion, asi que sigue a la entrega.
+   Eso pide que el trabajo este en la telemetria, y el 06-11 (ETS2 1.62, Bilbao)
+   no estaba: trabajo recien tomado, GPS del juego al remolque a 4,0 km, reporte
+   sin "Route:". Atlas esta en los POIs y a 4,02 km por nuestra ruta: no es el
+   mapa. Sin confirmar si el SDK no lo manda hasta enganchar (ETCARS documenta
+   eso; el video del 10-10 lo tenia antes de enganchar) o si lo perdio, por
+   ejemplo al soltar un remolque propio (foro de SCS). Lo dira la linea `Job:`
+   del turn report y `Trabajo:` del log (`log_job_change`, cliente siguiente).
+   Mientras, `gameGpsCandidates` ofrece en el panel las empresas a esa distancia
+   (un toque, sin rutear solo: un destino a mano tambien coincide a veces).
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el
    usuario escriba las tildes (`foldText`).

@@ -883,8 +883,33 @@ _last_job_snapshot = {"citySrc": None, "cityDst": None, "truckBrand": None, "tru
                       "cargo": None, "jobMarket": None, "specialJob": False}
 
 
+# El trabajo como lo da el SDK, en el log y solo cuando cambia. El log que manda
+# la gente no decia nada del trabajo: en el reporte del 06-11 (freight market,
+# el GPS del juego yendo al remolque y la web sin trabajo) no se pudo saber si
+# el SDK lo mandaba y en que momento. Va tambien si el GPS tiene ruta y el
+# remolque: asi se ve que llega primero al tomarlo y al engancharlo.
+_last_job_log = None
+
+
+def log_job_change(raw: dict):
+    global _last_job_log
+    remolque = bool((raw.get("trailer") or [{}])[0].get("attached"))
+    gps_m = raw.get("routeDistance") or 0
+    origen = f"{raw.get('compSrcId') or raw.get('compSrc') or '?'}@{raw.get('citySrcId') or raw.get('citySrc') or '?'}"
+    destino = f"{raw.get('compDstId') or raw.get('compDst') or '?'}@{raw.get('cityDstId') or raw.get('cityDst') or '?'}"
+    en_viaje = bool(raw.get("onJob"))
+    clave = (en_viaje, raw.get("jobMarket") or None, origen, destino, bool(raw.get("isCargoLoaded")), remolque, gps_m > 0)
+    if clave == _last_job_log:
+        return
+    _last_job_log = clave
+    viaje = f"{raw.get('jobMarket') or '?'}, {origen} -> {destino}" if en_viaje else "ninguno"
+    logging.info("Trabajo: %s, carga %s, remolque %s, GPS del juego %.1f km", viaje,
+                 "si" if raw.get("isCargoLoaded") else "no", "si" if remolque else "no", gps_m / 1000)
+
+
 def update_job_snapshot(raw: dict):
     global _last_job_snapshot
+    log_job_change(raw)
     if raw.get("onJob") and raw.get("cityDst"):
         _last_job_snapshot = {
             "citySrc": raw.get("citySrc") or None,

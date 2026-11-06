@@ -4,6 +4,11 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- The log now records each change in the job the game reports (job or none, the trailer, and whether
+  the in-game GPS has a route), to help with reports about routes that don't appear.
+
 ## 1.5.37 (2026-11-06)
 
 - In-game overlay: a new line shows how far the nearest fuel station and rest area are by road, with
