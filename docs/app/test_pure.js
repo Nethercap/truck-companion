@@ -5260,6 +5260,47 @@ test('pickRouteLikeGame: casi empatadas, la que coincide con el GPS del juego (I
   assert.deepEqual(previas, [[1], [1, 2]]);
 });
 
+test('pickRouteLikeGame: en un viaje largo, otro corredor aunque el largo este a menos de 5 % (reporte #28, Pamplona -> A Coruna)', () => {
+  const { pickRouteLikeGame, routeGameAgreement, routeGameMayDiffer } = require('./pure.js');
+  // La app por Burgos y Leon, 871,2 km. El juego por la costa, 843,6 km. Los
+  // numeros son los de la ruta real: la de 845,2 km sigue por Burgos y entra
+  // al destino por otro lado; coincide mejor que la costa, pero no es.
+  const rutas = [
+    { km: 871.2, seconds: 2319, shared: 1 },
+    { km: 834.7, seconds: 2356, shared: 0.203 },
+    { km: 845.2, seconds: 2374, shared: 0.899 },
+    { km: 836.9, seconds: 2353, shared: 0.203 },
+  ];
+  assert.equal(routeGameAgreement(871.2, 843.6), 'near');
+  assert.equal(routeGameMayDiffer('near'), true);
+  assert.equal(pickRouteLikeGame(rutas, 843.6), 3);
+  // Coincide con el juego, pero es la misma con una vuelta distinta: queda la nuestra
+  assert.equal(pickRouteLikeGame([rutas[0], rutas[2]], 843.6), 0);
+  // Sin saber cuanto comparte, tampoco
+  assert.equal(pickRouteLikeGame([rutas[0], { km: 836.9, seconds: 2353 }], 843.6), 0);
+  // Otro corredor mucho mas lento, o que no coincide del todo: no
+  assert.equal(pickRouteLikeGame([rutas[0], { km: 836.9, seconds: 2500, shared: 0.2 }], 843.6), 0);
+  assert.equal(pickRouteLikeGame([rutas[0], { km: 820, seconds: 2353, shared: 0.2 }], 843.6), 0);
+  // Hasta 2,5 % o 15 km es el error de la escala: no se busca nada
+  assert.equal(routeGameAgreement(860, 843.6), 'agree');
+  assert.equal(pickRouteLikeGame([{ km: 860, seconds: 2319, shared: 1 }, { km: 845, seconds: 2353, shared: 0.2 }], 843.6), 0);
+  assert.equal(routeGameAgreement(314.9, 300), 'agree');
+  assert.equal(routeGameMayDiffer('agree'), false);
+  assert.equal(routeGameMayDiffer('unknown'), false);
+  // De 5 % para arriba es 'differ' como siempre, y no pide otro corredor
+  assert.equal(routeGameAgreement(900, 843.6), 'differ');
+  assert.equal(pickRouteLikeGame([{ km: 900, seconds: 2319, shared: 1 }, { km: 845, seconds: 2353, shared: 0.9 }], 843.6), 1);
+});
+
+test('routeSharedFrac: que parte de una ruta va por las aristas de otra, en metros', () => {
+  const { routeSharedFrac } = require('./pure.js');
+  const edgeM = [100, 300, 600];
+  assert.equal(routeSharedFrac([0, 1, 2], [0, 1, 2], edgeM), 1);
+  assert.equal(routeSharedFrac([1, 2], [0], edgeM), 0);
+  assert.equal(routeSharedFrac([0, 1, 2], [1], edgeM), 0.3);
+  assert.equal(routeSharedFrac([], [1], edgeM), 1);
+});
+
 test('followGameRoute: la ruta como la del juego solo con la empresa del trabajo, sin waypoints y con la mas rapida', () => {
   const { followGameRoute } = require('./pure.js');
   assert.equal(followGameRoute({ kind: 'dest' }, 0, 'fastest'), true);

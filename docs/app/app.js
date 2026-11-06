@@ -3861,9 +3861,12 @@ function routeSecondsOf(points) {
 // (routeAlternatives) se buscan solo si el largo no coincide con el juego.
 // Devuelve { leg, switched }.
 function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
-  if (!leg || routeGameAgreement(gameKmOf(leg, leg), gameKm) !== 'differ') return { leg, switched: false };
+  if (!leg || !routeGameMayDiffer(routeGameAgreement(gameKmOf(leg, leg), gameKm))) return { leg, switched: false };
   const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas, tramo), routeEdgesOf);
-  const k = pickRouteLikeGame(rutas.map(r => ({ km: gameKmOf(r, r), seconds: routeSecondsOf(r) })), gameKm);
+  const base = routeEdgesOf(leg);
+  const k = pickRouteLikeGame(rutas.map(r => ({
+    km: gameKmOf(r, r), seconds: routeSecondsOf(r), shared: routeSharedFrac(routeEdgesOf(r), base, routeGraph.edgeM),
+  })), gameKm);
   return { leg: rutas[k], switched: k > 0 };
 }
 
@@ -3883,7 +3886,7 @@ function routeGameRecheck(routeKey, target, data) {
   if (c.key !== routeKey || c.left <= 0 || !currentRouteWorldPoints || !gameRouteComparable(target)) return false;
   const acuerdo = routeGameAgreement(gameKmOf(currentRouteWorldPoints), data.routeDistanceKm);
   if (acuerdo === 'agree') { c.left = 0; return false; }
-  c.ticks = acuerdo === 'differ' ? c.ticks + 1 : 0;
+  c.ticks = routeGameMayDiffer(acuerdo) ? c.ticks + 1 : 0;
   if (c.ticks < ROUTE_GAME_RECHECK_TICKS) return false;
   c.left = 0;
   const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data);
