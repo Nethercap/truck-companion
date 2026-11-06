@@ -1,5 +1,9 @@
 package com.trucksimdash.app
 
+import org.junit.Assert.assertFalse
+import com.trucksimdash.app.nav.aparienciaGuardada
+import com.trucksimdash.app.nav.AparienciaMapa
+import com.trucksimdash.app.mapa.tamanoFlecha
 import com.trucksimdash.app.core.JsonLaxo
 import com.trucksimdash.app.mapa.CatalogoMapas
 import com.trucksimdash.app.mapa.LineaRuta
@@ -24,6 +28,58 @@ import org.junit.Test
 import java.io.File
 
 class MapaTest {
+    private val atsVainilla = VarianteMapa("ats", "ATS", "ats", "ats", "20261101", null, LngLat(-96.0, 39.0))
+
+    private fun local() = atsVainilla.copy(id = "local_ats", nombre = "ATS (PC)", version = "h1", raiz = "http://10.0.0.5:27765/localmap/ats")
+
+    @Test
+    fun `un mapa armado en la PC se pide a la PC y gana en automatico`() {
+        val c = CatalogoMapas(mapOf("ats" to atsVainilla)).conLocales(listOf(local()))
+        assertEquals("local_ats", c.resolver("ats", null, null))
+        // Lo elegido a mano sigue mandando, y ETS2 no se entera.
+        assertEquals("ats", c.resolver("ats", null, "ats"))
+        assertEquals("ets2", c.resolver("ets2", null, null))
+        val v = c.variantes.getValue("local_ats")
+        assertEquals("http://10.0.0.5:27765/localmap/ats/vector/local_ats.pmtiles?v=h1", v.urlDeDescarga)
+        assertEquals("http://10.0.0.5:27765/localmap/ats/local_ats/Cities.json?v=h1", v.urlCiudades)
+        assertNull("sin mapa base: puede no tener nada que ver con la tierra", v.mapaBase)
+    }
+
+    @Test
+    fun `un mapa local no se ofrece para bajar ni en el mapa en vivo`() {
+        val c = CatalogoMapas(mapOf("ats" to atsVainilla)).conLocales(listOf(local()))
+        assertEquals(listOf("ats"), c.publicadas.map { it.id })
+        assertEquals(listOf("ats"), c.paraMapaEnVivo.map { it.id })
+        assertEquals(listOf("ats"), c.deJuego("ats").map { it.id })
+        // Sin mapa local (otra red, o se desconecto) vuelve el de R2.
+        assertEquals("ats", c.conLocales(emptyList()).resolver("ats", null, null))
+    }
+
+    @Test
+    fun `el estilo respeta los ajustes de la web`() {
+        val normal = estiloDe(atsVainilla, 45.0)
+        assertTrue("#a30000" in normal && "route-casing" in normal && "\"base\"" in normal)
+        val otro = estiloDe(atsVainilla, 45.0, AparienciaMapa(colorRuta = "#4caf50", baseReal = false, liviano = true, tamanoCamion = 2.0))
+        val o = JsonLaxo.parseToJsonElement(otro).jsonObject
+        assertFalse("el mapa base apagado no se baja", "base" in o.getValue("sources").jsonObject)
+        assertFalse("liviano no dibuja el borde", "route-casing" in otro)
+        assertTrue("#4caf50" in otro && "#a30000" !in otro)
+        assertTrue("el camion crece", "2.6" in tamanoFlecha(2.0))
+    }
+
+    @Test
+    fun `lo guardado por la web se lee sin el motor`() {
+        assertEquals(AparienciaMapa(), aparienciaGuardada(null))
+        assertEquals(AparienciaMapa(), aparienciaGuardada("no es json"))
+        val a = aparienciaGuardada("""{"routeColor":"#3b9eff","truckSize":1.5,"liteMode":true,"fadeButtons":false}""")
+        assertEquals("#3b9eff", a.colorRuta)
+        assertEquals(1.5, a.tamanoCamion, 0.0)
+        assertTrue(a.liviano)
+        assertFalse("liviano apaga la base si nunca se eligio", a.baseReal)
+        assertFalse(a.desvanecerBotones)
+        assertTrue(aparienciaGuardada("""{"liteMode":true,"realBase":true}""").baseReal)
+    }
+
     private val manifest = File("../../docs/data/map-manifest.json").readText()
     private val catalogo = CatalogoMapas.desdeManifest(manifest)!!
 

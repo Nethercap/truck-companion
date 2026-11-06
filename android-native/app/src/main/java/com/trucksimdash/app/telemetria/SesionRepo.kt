@@ -9,6 +9,8 @@ import com.trucksimdash.app.core.usaMillas
 import com.trucksimdash.app.mapa.CatalogoMapas
 import com.trucksimdash.app.mapa.VarianteMapa
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -72,6 +74,10 @@ class SesionRepo(
 
     var oyente: OyenteSesion? = null
 
+    /** Los mapas armados en la PC que se pudieron leer: [raiz] de cada uno por juego. */
+    var alMapasLocales: (Map<String, MapaLocal>, String?) -> Unit = { _, _ -> }
+    private var firmaLocales: String? = null
+
     private val _teclas = MutableStateFlow<Map<String, String>?>(null)
     /** Lo que contesto el cliente a get_keybinds; null hasta que conteste. */
     val teclas: StateFlow<Map<String, String>?> = _teclas.asStateFlow()
@@ -132,6 +138,8 @@ class SesionRepo(
     /** Lo pide la persona: se olvida el destino para no volver solo. */
     fun desconectar() {
         destino = null
+        firmaLocales = null
+        alMapasLocales(emptyMap(), null)
         prefs.ultimoDestino = null
         reconexion?.cancel()
         generacion++
@@ -243,7 +251,15 @@ class SesionRepo(
                 val variante = juego?.let { c.variantes[c.resolver(it, _estado.value.mods, prefs.mapaManual(it))] ?: c.variantes[it] }
                 oyente?.telemetria(texto, variante, usaMillas(ajustes.value.unidades, juego))
             }
-            is MensajeRelay.EstadoDeSesion, is MensajeRelay.EstadoCliente, MensajeRelay.Otro -> oyente?.mensaje(texto)
+            is MensajeRelay.EstadoDeSesion -> {
+                probarMapasLocales(m.estado)
+                oyente?.mensaje(texto)
+            }
+            is MensajeRelay.EstadoCliente -> {
+                probarMapasLocales(m.estado)
+                oyente?.mensaje(texto)
+            }
+            MensajeRelay.Otro -> oyente?.mensaje(texto)
             is MensajeRelay.Teclas -> _teclas.value = m.teclas
             is MensajeRelay.ResultadoComando ->
                 if (!m.ok) _avisos.tryEmit(AvisoSesion.ComandoFallo(m.razon))
@@ -254,6 +270,32 @@ class SesionRepo(
                 oyente?.compartir(m.activo, varianteDeSesion())
             }
             else -> Unit
+        }
+    }
+
+    /**
+     * applyLocalMaps de la web. Se sirven en el puerto de las paginas del cliente, y se llega
+     * solo por la red de la casa: con el codigo la web prueba 127.0.0.1, y un telefono no llega.
+     * Se prueba antes: el cliente pudo haberlo borrado, o la red de Windows lo puede bloquear.
+     */
+    private fun probarMapasLocales(pc: EstadoPc?) {
+        val host = (destino as? Destino.Lan)?.host
+        val mapas = if (host != null) pc?.mapasLocales.orEmpty() else emptyMap()
+        val base = host?.let { "http://$it:${pc?.puertoMapas ?: PUERTO_PAGINAS}" }
+        val firma = "$mapas|$base"
+        if (firma == firmaLocales) return
+        firmaLocales = firma
+        alcance.launch {
+            val usables = withContext(Dispatchers.IO) {
+                mapas.filter { (juego, m) ->
+                    if (m.variante != "local_$juego") return@filter false
+                    val url = "$base/localmap/$juego/${m.variante}/Cities.json?v=${m.huella}"
+                    runCatching {
+                        http.newCall(Request.Builder().url(url).head().build()).execute().use { it.isSuccessful }
+                    }.getOrDefault(false)
+                }
+            }
+            if (firma == firmaLocales) alMapasLocales(usables, base)
         }
     }
 
@@ -351,3 +393,6 @@ class SesionRepo(
         const val SOCKET_MUERTO_MS = 10_000L
     }
 }
+
+/** PORT del servidor de paginas del cliente, por si uno viejo no lo dice. */
+private const val PUERTO_PAGINAS = 27765

@@ -96,8 +96,6 @@
     <string name="cmd_tecla_mala">Le client PC n\'accepte pas cette touche</string>
     <string name="cmd_fallo">Échec de la commande : %1$s</string>
     <string name="aviso_multa">Amende : %1$s</string>
-    <string name="aviso_entregado">Mission livrée %1$s</string>
-    <string name="aviso_cancelado">Mission annulée</string>
 
     <string name="mapa_sin_camion">Pas encore de camion</string>
     <string name="mapa_sin_camion_ayuda">Connecte-toi à ton PC pour voir ton camion sur la carte.</string>
@@ -334,4 +332,14 @@
     <string name="sin_internet_listo">Téléchargée · %1$d Mo</string>
     <string name="sin_internet_borrar">Supprimer</string>
     <string name="sin_internet_error">Le téléchargement a échoué. Vérifiez votre connexion et réessayez.</string>
+    <string name="convoy_mirar">Regarder un convoi</string>
+    <string name="ajustes_segundo_plano">Continuer la navigation en arrière-plan</string>
+    <string name="ajustes_segundo_plano_ayuda">La voix, l\'overlay du jeu et votre itinéraire continuent quand vous passez à une autre appli, comme Moonlight. Affiche une notification et consomme plus de batterie.</string>
+    <string name="ajustes_flotante">Fenêtre flottante en quittant l\'appli</string>
+    <string name="ajustes_flotante_ayuda">Si vous quittez l\'appli en conduisant, une petite fenêtre avec la carte et la prochaine direction reste au-dessus de l\'autre appli.</string>
+    <string name="servicio_canal">Navigation</string>
+    <string name="servicio_activo">Navigation en arrière-plan</string>
+    <string name="mapa_local">construite sur le PC</string>
+    <string name="compartir">Partager</string>
+    <string name="stats_buscar_conductor">Chercher un conducteur</string>
 </resources>

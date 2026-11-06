@@ -45,6 +45,8 @@ data class MarcaConvoy(
     val color: String,
     val nombre: String,
     val tenue: Boolean,
+    /** Lo que dice la chapita del borde del mapa; mirando sin juego no hay de donde medir. */
+    val distancia: String?,
 )
 
 /** Lo que convoy.js tiene en sus ventanas y su carrusel. */
@@ -55,6 +57,9 @@ data class EstadoConvoy(
     val conectado: Boolean,
     val aviso: String?,
     val codigo: String?,
+    /** Mirando con el link, sin juego (`?convoy=CODE` en la web). */
+    val mirando: Boolean,
+    val varianteMirada: String?,
     val apodo: String,
     val compartirIngresos: Boolean,
     val silencio: Boolean,
@@ -101,6 +106,8 @@ internal fun parsearConvoy(texto: String): EstadoConvoy? {
         conectado = d.logico("conectado") ?: false,
         aviso = d.texto("aviso"),
         codigo = d.texto("codigo"),
+        mirando = d.logico("mirando") ?: false,
+        varianteMirada = d.texto("varianteMirada"),
         apodo = d.texto("apodo").orEmpty(),
         compartirIngresos = d.logico("compartirIngresos") ?: false,
         silencio = d.logico("silencio") ?: false,
@@ -147,6 +154,7 @@ internal fun parsearConvoy(texto: String): EstadoConvoy? {
                 m.texto("color") ?: "#3b9eff",
                 m.texto("nombre").orEmpty(),
                 m.logico("tenue") ?: false,
+                m.texto("distancia"),
             )
         } ?: emptyList(),
         siguiendo = d.logico("siguiendo") ?: false,

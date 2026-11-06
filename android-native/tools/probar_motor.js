@@ -103,9 +103,10 @@ async function bajar(url) {
 
 // Un motor recien armado y lo que hace MotorNav.kt alrededor. Con grabar, cada llamada queda
 // en pasos con lo que dio despues: eso es el guion.
-function abrir({ variante = 'ats', lang = 'en', imperial = true, voz = false, grabar = false, almacen = null } = {}) {
+function abrir({ variante = 'ats', lang = 'en', imperial = true, voz = false, grabar = false, almacen = null, zona = null, tasas = null } = {}) {
   const contexto = vm.createContext({});
   vm.runInContext(PRELUDIO, contexto);
+  if (zona) vm.runInContext(`var zonaTelefono = ${JSON.stringify(zona)};`, contexto);
   if (almacen) vm.runInContext(`var almacenInicial = ${JSON.stringify(almacen)};`, contexto);
   vm.runInContext(TEXTO, contexto, { filename: 'motor.js' });
   vm.runInContext(DIGESTO, contexto);
@@ -144,6 +145,7 @@ function abrir({ variante = 'ats', lang = 'en', imperial = true, voz = false, gr
       m.sockets.push(...s.sockets);
       m.demo.push(...s.demo);
       if (s.reporte) m.reporte = s.reporte;
+      if (s.entrega) m.entrega = s.entrega;
       if (s.ruta) m.rutaNueva = s.ruta;
       for (const a of s.audio) {
         m.audios.push(a);
@@ -154,6 +156,12 @@ function abrir({ variante = 'ats', lang = 'en', imperial = true, voz = false, gr
         if (p.method) {
           const r = m.alPost(p);
           motor.respuesta(p.id, r.status, r.cuerpo);
+          continue;
+        }
+        // Las tasas cambian todos los dias: en una prueba, las que pide la prueba.
+        if (p.url.endsWith('/rates')) {
+          if (tasas) motor.respuesta(p.id, 200, JSON.stringify({ base: 'USD', rates: tasas }));
+          else motor.respuesta(p.id, 500, '');
           continue;
         }
         const r = await bajar(p.url);
@@ -248,6 +256,152 @@ async function conRuta(opciones) {
 }
 
 const ESCENARIOS = {
+  // Lo que la web muestra al entregar: pago, multas y peajes del viaje, y una sola vez.
+  async tarjetaDeEntrega() {
+    const m = await conRuta();
+    const puntos = puntosDeRuta(m);
+    const con = (event) => {
+      const d = JSON.parse(dato(m, TRABAJO_DEMO, puntos[5][0], puntos[5][1], 90));
+      d.onJob = true;
+      d.event = event;
+      return JSON.stringify(d);
+    };
+    await m.paso('telemetria', [con({})]);
+    await m.paso('telemetria', [con({ tollgate: true, tollgatePayAmount: 120 })]);
+    await m.paso('telemetria', [con({})]);
+    await m.paso('telemetria', [con({ fined: true, fineAmount: 300 })]);
+    await m.paso('telemetria', [con({})]);
+    chequear(!m.entrega, 'tarjeta antes de entregar');
+    const sesion = m.nav().sesion;
+    chequear(sesion.hayAlgo && /120/.test(sesion.filas[0][1]) && /300/.test(sesion.filas[1][1]), `totales: ${JSON.stringify(sesion)}`);
+    const entrega = { jobDelivered: true, jobSrc: 'Reno', jobDst: 'Elko', jobCargo: 'Madera', jobDeliveredRevenue: 5000, jobEarnedXp: 250, jobDeliveredDistanceKm: 400, jobDeliveryTime: 205, jobCargoDamage: 0.02 };
+    await m.paso('telemetria', [con(entrega)]);
+    const t = m.entrega;
+    chequear(t && t.ruta === 'Reno → Elko' && t.carga === 'Madera', `tarjeta: ${JSON.stringify(t)}`);
+    const filas = Object.fromEntries((t ? t.filas : []));
+    const texto = JSON.stringify(filas);
+    chequear(/5,000/.test(texto) && /\+250 XP/.test(texto) && /249 mi|400 km/.test(texto) && /3 h 25/.test(texto), `filas: ${texto}`);
+    chequear(/120/.test(texto) && /300/.test(texto), `sin peajes o multas: ${texto}`);
+    m.entrega = null;
+    await m.paso('telemetria', [con(entrega)]);
+    chequear(!m.entrega, 'la misma entrega dos veces');
+    chequear(JSON.parse(m.motor.viajes()).lista.length === 1, 'la entrega no quedo en el historial');
+    // El trabajo que sigue arranca sin los costos de este.
+    await m.paso('telemetria', [con({})]);
+    await m.paso('telemetria', [con({ ...entrega, jobDst: 'Ely' })]);
+    chequear(m.entrega && !/120/.test(JSON.stringify(m.entrega.filas)), `costos del viaje anterior: ${JSON.stringify(m.entrega)}`);
+    await m.paso('reiniciarSesion');
+    chequear(!m.nav().sesion.hayAlgo, 'no reinicia la sesion');
+    chequear(!m.errores.length, m.errores.join('; '));
+  },
+
+  // Los ajustes del mapa y del tablero se guardan como en la web y sobreviven a reabrir.
+  async ajustesDeApariencia() {
+    const m = await conRuta();
+    await m.paso('apariencia', ['color', '#4caf50']);
+    await m.paso('apariencia', ['zoom', 11.3]);
+    await m.paso('apariencia', ['camion', 2]);
+    await m.paso('apariencia', ['base', false]);
+    await m.paso('apariencia', ['desvanecer', false]);
+    await m.paso('miniHud', ['fuelPct', true]);
+    await m.paso('miniHud', ['cruise', false]);
+    await m.paso('reloj', ['12']);
+    await m.paso('moneda', ['off']);
+    await m.paso('rutaEnVivo', [false]);
+    await m.paso('liviano', [true, true]);
+    const a = JSON.parse(m.motor.ajustesNav());
+    chequear(a.colorRuta === '#4caf50' && a.zoomNav === 11.5 && a.tamanoCamion === 2, `apariencia: ${a.colorRuta} ${a.zoomNav} ${a.tamanoCamion}`);
+    chequear(a.baseReal === false && a.desvanecerBotones === false && a.liviano === true && a.livianoSinRuteo === true, 'base o liviano');
+    chequear(a.reloj === '12' && a.moneda === 'off' && a.rutaEnVivo === false, 'reloj, moneda o ruta en vivo');
+    chequear(a.miniHud.find((x) => x.id === 'fuelPct').activo && !a.miniHud.find((x) => x.id === 'cruise').activo, 'mini-HUD');
+    chequear(m.nav().hora12 === true && m.nav().zoomNav === 11.5, 'la navegacion no se entero');
+    const guardado = m.guardado.truckdash_settings;
+    chequear(guardado && /"liteMode":true/.test(guardado) && /"routeColor":"#4caf50"/.test(guardado), `guardado: ${guardado}`);
+    const otra = abrir({ almacen: { truckdash_settings: guardado } });
+    await otra.iniciar();
+    const b = JSON.parse(otra.motor.ajustesNav());
+    chequear(b.colorRuta === '#4caf50' && b.zoomNav === 11.5 && b.reloj === '12' && b.liviano, 'no sobrevivio a reabrir');
+    // Liviano sin ruteo no baja el grafo.
+    const puntos = puntosDeRuta(m);
+    await otra.paso('telemetria', [dato(otra, TRABAJO_DEMO, puntos[5][0], puntos[5][1], 90)]);
+    await otra.tragar();
+    chequear(otra.j('routeGraphState') === 'off' && !otra.nav().hayRuta, `liviano sin ruteo: ${otra.j('routeGraphState')}`);
+  },
+
+  // La moneda local sale de la zona del telefono, y el pago la muestra al lado.
+  async pagoEnMoneda() {
+    const m = abrir({ zona: 'America/Argentina/Buenos_Aires', tasas: { USD: 1, EUR: 0.9, ARS: 1000 } });
+    await m.iniciar();
+    await m.tragar();
+    const a = JSON.parse(m.motor.ajustesNav());
+    chequear(a.moneda === 'auto' && /ARS/.test(a.monedas[0].label), `la zona no dio la moneda: ${a.monedas[0].label}`);
+    chequear(a.monedas.some((x) => x.id === 'ARS' && x.codigo), 'ARS no esta en la lista');
+    const d = JSON.parse(dato(m, TRABAJO_DEMO, -100000, 10000, 90));
+    d.jobIncome = 5000;
+    d.game = 'ats';
+    await m.paso('telemetria', [JSON.stringify(d)]);
+    chequear(/\$5,000 · ≈ AR\$5,000,000/.test(m.nav().pagoTrabajo), `pago: ${m.nav().pagoTrabajo}`);
+    await m.paso('moneda', ['off']);
+    chequear(m.nav().pagoTrabajo === '$5,000', `apagado: ${m.nav().pagoTrabajo}`);
+    await m.paso('conexion', [true, false]);
+    await m.paso('moneda', ['EUR']);
+    chequear(m.mensajes.some((x) => x.type === 'set_currency' && x.currency === 'EUR'), 'no le avisa al relay');
+  },
+
+  // Un mapa armado en la PC: todo se pide al cliente, por la red de la casa.
+  async mapaLocal() {
+    const m = abrir({});
+    await m.paso('iniciar', [JSON.stringify({ lang: 'en', imperial: true, voz: false, version: 'android-test' })]);
+    const raiz = 'http://192.168.1.10:27765/localmap/ats';
+    await m.paso('ponerVariante', ['local_ats', 'huella1', 'ats', 'ats', 'ATS (local)', -96, 39, raiz, true]);
+    chequear(m.j("resolveEffectiveGame('ats')") === 'local_ats', 'no eligio el mapa local');
+    chequear(m.j('GAME_MAPS.local_ats.assetsDir') === `${raiz}/local_ats`, 'assetsDir');
+    chequear(m.j('GAME_MAPS.local_ats.poisUrl') === `${raiz}/pois-local_ats.json`, 'poisUrl');
+    chequear(m.j('GAME_MAPS.local_ats.companyIconsBase') === `${raiz}/company-icons`, 'logos');
+    chequear(typeof m.j('GAME_MAPS.local_ats.toLngLat') === 'function', 'sin proyeccion');
+    chequear(m.j('MAP_DATA_VERSION.local_ats') === 'huella1', 'version');
+    // Otro host: no queda el de antes.
+    await m.paso('ponerVariante', ['local_ats', 'huella2', 'ats', 'ats', 'ATS (local)', -96, 39, 'http://192.168.1.11:27765/localmap/ats', false]);
+    chequear(/192\.168\.1\.11/.test(m.j('GAME_MAPS.local_ats.assetsDir')) && m.j('GAME_MAPS.local_ats.companyIconsBase') === null, 'quedo el host de antes');
+    // Sin raiz sigue siendo el de R2.
+    const v = MANIFEST.variants.ats;
+    await m.paso('ponerVariante', ['ats', v.mapDataVersion, 'ats', 'ats', v.label, v.origin ? v.origin[0] : -96, v.origin ? v.origin[1] : 39, '', false]);
+    chequear(/maps\.trucksim-dash\.com/.test(m.j('GAME_MAPS.ats.assetsDir')), 'el de R2 cambio');
+  },
+
+  // Mirar un convoy con su link: sin juego, sin grafo y con una salida.
+  async mirarConvoy() {
+    const m = abrir({});
+    await m.iniciar();
+    await m.paso('convoyMirar', ['abc']);
+    chequear(m.avisos.length && !m.sockets.length, 'un codigo corto no se intenta');
+    m.j("relayApp = 'wss://relay.test'");
+    await m.paso('convoyMirar', ['abc123']);
+    const abierto = m.sockets.find((s) => s[0] === 'abrir');
+    chequear(abierto && abierto[2] === 'wss://relay.test/ws/convoy/ABC123', `socket: ${JSON.stringify(abierto)}`);
+    const id = abierto[1];
+    await m.paso('socket', [id, 'open', '', 0]);
+    const estado = {
+      type: 'convoy_state', code: 'ABC123', creatorId: 'a', spectators: 2,
+      members: [
+        { id: 'a', nickname: 'Lider', creator: true, online: true, game: 'ats', variant: 'ats', x: -100000, z: 10000, heading: 0, speedKmh: 80 },
+        { id: 'b', nickname: 'Otro', online: true, game: 'ats', variant: 'ats', x: -90000, z: 12000, heading: 0 },
+      ],
+    };
+    await m.paso('socket', [id, 'message', JSON.stringify(estado), 0]);
+    await m.tragar();
+    let c = JSON.parse(m.motor.convoyEstado());
+    chequear(c.mirando && c.enSala && c.varianteMirada === 'ats' && c.marcas.length === 2, `estado: ${JSON.stringify({ m: c.mirando, s: c.enSala, v: c.varianteMirada, n: c.marcas.length })}`);
+    chequear(c.marcas.every((x) => x.distancia === null) && c.tarjetas.every((x) => !x.puedeSeguir), 'mirando no hay distancia ni seguir');
+    chequear(m.j('routeGraphState') === 'off', `bajo el grafo mirando: ${m.j('routeGraphState')}`);
+    await m.paso('convoyDejarDeMirar');
+    c = JSON.parse(m.motor.convoyEstado());
+    chequear(!c.mirando && !c.enSala && !c.marcas.length, 'no salio');
+    chequear(m.sockets.some((s) => s[0] === 'cerrar' && s[1] === id), 'no cerro el socket');
+    chequear(m.j('conn.spectator') === false, 'sigue de espectador');
+    chequear(!m.errores.length, m.errores.join('; '));
+  },
+
   async manejo() {
     const t0 = Date.now();
     const m = await conRuta({ voz: true });

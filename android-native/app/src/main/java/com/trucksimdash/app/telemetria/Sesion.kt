@@ -2,6 +2,7 @@ package com.trucksimdash.app.telemetria
 
 import androidx.compose.runtime.Immutable
 import com.trucksimdash.app.core.comoObjeto
+import com.trucksimdash.app.core.entero
 import com.trucksimdash.app.core.identificador
 import com.trucksimdash.app.core.lista
 import com.trucksimdash.app.core.logico
@@ -54,8 +55,6 @@ data class PuntoRastro(val x: Double, val z: Double)
 sealed interface AvisoSesion {
     data class ComandoFallo(val razon: String?) : AvisoSesion
     data class Multa(val monto: Double?) : AvisoSesion
-    data class Entregado(val pago: Double?) : AvisoSesion
-    data class Cancelado(val penalidad: Double?) : AvisoSesion
 }
 
 sealed interface MensajeRelay {
@@ -77,7 +76,27 @@ sealed interface MensajeRelay {
 }
 
 @Immutable
-data class EstadoPc(val estado: String?, val detalle: String?, val mods: ModsDetectados?)
+data class EstadoPc(
+    val estado: String?,
+    val detalle: String?,
+    val mods: ModsDetectados?,
+    val mapasLocales: Map<String, MapaLocal> = emptyMap(),
+    val puertoMapas: Int? = null,
+)
+
+/** Un mapa armado con "Build my map": `localMaps` en client_status. */
+@Immutable
+data class MapaLocal(val variante: String, val huella: String, val conLogos: Boolean)
+
+private fun parsearMapasLocales(o: JsonObject?): Map<String, MapaLocal> {
+    if (o == null) return emptyMap()
+    return o.entries.mapNotNull { (juego, valor) ->
+        val m = valor.comoObjeto() ?: return@mapNotNull null
+        val variante = m.texto("variant") ?: return@mapNotNull null
+        val huella = m.texto("fingerprint") ?: return@mapNotNull null
+        juego to MapaLocal(variante, huella, (m.numero("companyIcons") ?: 0.0) > 0)
+    }.toMap()
+}
 
 private fun parsearMods(o: JsonObject?): ModsDetectados? {
     if (o == null) return null
@@ -97,6 +116,8 @@ private fun parsearEstadoPc(o: JsonObject) = EstadoPc(
     estado = o.texto("status"),
     detalle = o.texto("detail"),
     mods = parsearMods(o.objeto("mapMods")),
+    mapasLocales = parsearMapasLocales(o.objeto("localMaps")),
+    puertoMapas = o.entero("localMapPort"),
 )
 
 /** Un mensaje del socket, relay o LAN: hablan el mismo protocolo. */
@@ -201,8 +222,6 @@ internal fun EstadoSesion.aplicar(m: MensajeRelay, ahoraMs: Long): EstadoSesion 
 /** Los pulsos del SDK que merecen un aviso. */
 internal fun avisosDe(t: Telemetria): List<AvisoSesion> = buildList {
     if (t.evento.multa) add(AvisoSesion.Multa(t.evento.montoMulta))
-    if (t.evento.entregado) add(AvisoSesion.Entregado(t.evento.pagoEntrega))
-    if (t.evento.cancelado) add(AvisoSesion.Cancelado(t.evento.penalidad))
 }
 
 // ------------------------------------------------------------ reconexion

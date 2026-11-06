@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,6 +70,7 @@ fun PanelScreen(
     motor: MotorNav,
     prefs: Preferencias,
     alVerMapaEnVivo: () -> Unit,
+    alMirarConvoy: (String) -> Unit,
     alAjustes: () -> Unit,
 ) {
     var botonEditado by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -78,7 +80,7 @@ fun PanelScreen(
     val cortada = estado.fase == Fase.Reintentando || estado.fase == Fase.Conectando
     when {
         estado.fase == Fase.Apagada || estado.fase == Fase.CodigoInvalido ->
-            ConectarContenido(estado, sesion, guardado, motor, alVerMapaEnVivo, alAjustes)
+            ConectarContenido(estado, sesion, guardado, motor, alVerMapaEnVivo, alMirarConvoy, alAjustes)
         t != null && (estado.enVivo || cortada) -> TableroContenido(estado, ajustes, sesion, apaisado, { botonEditado = it }, motor, alAjustes)
         else -> EsperandoContenido(estado, sesion, alAjustes)
     }
@@ -86,7 +88,7 @@ fun PanelScreen(
 
 /** En vivo o no, la hora del juego y los ajustes, siempre a la vista. */
 @Composable
-private fun BarraEstado(estado: EstadoSesion, alAjustes: () -> Unit) {
+private fun BarraEstado(estado: EstadoSesion, hora12: Boolean, alAjustes: () -> Unit) {
     val t = estado.telemetria
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         when {
@@ -96,7 +98,7 @@ private fun BarraEstado(estado: EstadoSesion, alAjustes: () -> Unit) {
         }
         Spacer(Modifier.weight(1f))
         t?.relojMinutos?.let { minutos ->
-            val (dia, hora) = relojDelJuego(minutos)
+            val (dia, hora) = relojDelJuego(minutos, hora12)
             Text(
                 stringArrayResource(R.array.dias_semana)[dia] + " " + hora,
                 style = MaterialTheme.typography.labelLarge.merge(NumerosTabulares),
@@ -148,7 +150,7 @@ private fun TableroContenido(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                BarraEstado(estado, alAjustes)
+                BarraEstado(estado, nav.hora12, alAjustes)
                 AvisosTablero(estado, sesion, motor, nav.actualizarCliente)
                 BloqueManejo(t, millas, compacto = true)
                 FilaTestigos(t)
@@ -167,7 +169,8 @@ private fun TableroContenido(
                     alApretarPropio = { sesion.enviarTecla(it) },
                     alEditarPropio = { alEditarBoton(it ?: NUEVO_BOTON) },
                 )
-                BloqueTrabajo(t, millas)
+                BloqueTrabajo(t, millas, nav.pagoTrabajo)
+                BloqueSesion(nav.sesion, { motor.reiniciarSesion() })
                 BloqueCamion(t, millas)
             }
         }
@@ -176,7 +179,7 @@ private fun TableroContenido(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            BarraEstado(estado, alAjustes)
+            BarraEstado(estado, nav.hora12, alAjustes)
             AvisosTablero(estado, sesion, motor, nav.actualizarCliente)
             TarjetaNav(nav, trazos)
             BloqueManejo(t, millas)
@@ -189,7 +192,8 @@ private fun TableroContenido(
                 alApretarPropio = { sesion.enviarTecla(it) },
                 alEditarPropio = { alEditarBoton(it ?: NUEVO_BOTON) },
             )
-            BloqueTrabajo(t, millas)
+            BloqueTrabajo(t, millas, nav.pagoTrabajo)
+            BloqueSesion(nav.sesion, { motor.reiniciarSesion() })
             BloqueCamion(t, millas)
         }
     }
@@ -247,8 +251,11 @@ private fun ConectarContenido(
     guardado: Destino?,
     motor: MotorNav,
     alVerMapaEnVivo: () -> Unit,
+    alMirarConvoy: (String) -> Unit,
     alAjustes: () -> Unit,
 ) {
+    var mirar by rememberSaveable { mutableStateOf(false) }
+    if (mirar) DialogoMirarConvoy(motor, { mirar = false }, alMirarConvoy)
     var modo by rememberSaveable { mutableIntStateOf(if (guardado is Destino.Lan) ModoAlta.Lan.ordinal else ModoAlta.Codigo.ordinal) }
     var codigo by rememberSaveable { mutableStateOf((guardado as? Destino.Codigo)?.codigo ?: "") }
     var host by rememberSaveable { mutableStateOf((guardado as? Destino.Lan)?.host ?: "") }
@@ -343,8 +350,46 @@ private fun ConectarContenido(
             if (demo != null) {
                 TextButton(onClick = { sesion.empezarDemo() }, modifier = Modifier.fillMaxWidth()) { Text(demo) }
             }
+            TextButton(onClick = { mirar = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.convoy_mirar))
+            }
         }
     }
+}
+
+/** El link de un convoy (`?convoy=CODE`), con el codigo a mano: sin juego ni cliente. */
+@Composable
+private fun DialogoMirarConvoy(motor: MotorNav, alCerrar: () -> Unit, alMirar: (String) -> Unit) {
+    val t = textosWeb(motor, "detailSpectator", "close")
+    var codigo by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = alCerrar,
+        containerColor = Paleta.Superficie,
+        title = { Text(stringResource(R.string.convoy_mirar)) },
+        text = {
+            Column {
+                Text(t["detailSpectator"].orEmpty(), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+                OutlinedTextField(
+                    value = codigo,
+                    onValueChange = { codigo = it.uppercase().filter(Char::isLetterOrDigit).take(6) },
+                    singleLine = true,
+                    placeholder = { Text("ABC123") },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, keyboardType = KeyboardType.Ascii),
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = codigo.length == 6,
+                onClick = {
+                    alCerrar()
+                    alMirar(codigo)
+                },
+            ) { Text(stringResource(R.string.convoy_mirar)) }
+        },
+        dismissButton = { TextButton(onClick = alCerrar) { Text(t["close"].orEmpty()) } },
+    )
 }
 
 /** El nombre con que este telefono aparece en la lista de dispositivos de la cuenta. */

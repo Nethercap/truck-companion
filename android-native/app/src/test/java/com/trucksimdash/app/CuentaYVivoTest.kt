@@ -149,6 +149,8 @@ class CuentaYVivoTest {
         assertEquals("-", porcentajeTexto(1, 0))
         assertEquals("50 %", porcentajeTexto(1, 2))
         assertEquals(1 to "00:30", relojDelJuego(1440.0 + 30))
+        assertEquals(1 to "12:30 AM", relojDelJuego(1440.0 + 30, hora12 = true))
+        assertEquals(0 to "1:05 PM", relojDelJuego(13 * 60.0 + 5, hora12 = true))
     }
 
     @Test

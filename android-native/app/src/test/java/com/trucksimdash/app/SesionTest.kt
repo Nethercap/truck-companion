@@ -1,5 +1,6 @@
 package com.trucksimdash.app
 
+import com.trucksimdash.app.telemetria.MapaLocal
 import com.trucksimdash.app.telemetria.AvisoSesion
 import com.trucksimdash.app.telemetria.CODIGO_DESCONOCIDO
 import com.trucksimdash.app.telemetria.DEMORA_BASE_MS
@@ -158,9 +159,24 @@ class SesionTest {
     }
 
     @Test
-    fun `los pulsos del SDK dan un aviso cada uno`() {
+    fun `los mapas armados en la PC se leen del estado del cliente`() {
+        val m = interpretarMensaje(
+            """{"type":"client_status","status":"live","localMapPort":27765,"localMaps":{
+              "ats":{"variant":"local_ats","fingerprint":"abc","companyIcons":12},
+              "ets2":{"variant":"local_ets2","fingerprint":"def"}}}""",
+        ) as MensajeRelay.EstadoCliente
+        assertEquals(27765, m.estado.puertoMapas)
+        assertEquals(MapaLocal("local_ats", "abc", true), m.estado.mapasLocales["ats"])
+        assertEquals(MapaLocal("local_ets2", "def", false), m.estado.mapasLocales["ets2"])
+        // Un cliente viejo no los manda: nada, sin romperse.
+        val viejo = interpretarMensaje("""{"type":"client_status","status":"live"}""") as MensajeRelay.EstadoCliente
+        assertTrue(viejo.estado.mapasLocales.isEmpty())
+    }
+
+    @Test
+    fun `una multa da un aviso, la entrega la muestra la web`() {
         val t = parsearTelemetria(parsearObjeto("""{"event":{"fined":true,"fineAmount":300,"jobDelivered":true,"jobDeliveredRevenue":9000}}""")!!)
-        assertEquals(listOf(AvisoSesion.Multa(300.0), AvisoSesion.Entregado(9000.0)), avisosDe(t))
+        assertEquals(listOf(AvisoSesion.Multa(300.0)), avisosDe(t))
         assertTrue(avisosDe(parsearTelemetria(parsearObjeto("{}")!!)).isEmpty())
     }
 

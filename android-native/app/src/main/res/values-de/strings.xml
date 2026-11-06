@@ -96,8 +96,6 @@
     <string name="cmd_tecla_mala">Der PC-Client akzeptiert diese Taste nicht</string>
     <string name="cmd_fallo">Befehl fehlgeschlagen: %1$s</string>
     <string name="aviso_multa">Strafe: %1$s</string>
-    <string name="aviso_entregado">Auftrag geliefert %1$s</string>
-    <string name="aviso_cancelado">Auftrag abgebrochen</string>
 
     <string name="mapa_sin_camion">Noch kein Lkw</string>
     <string name="mapa_sin_camion_ayuda">Verbinde dich mit deinem PC, um deinen Lkw auf der Karte zu sehen.</string>
@@ -328,4 +326,14 @@
     <string name="sin_internet_listo">Heruntergeladen · %1$d MB</string>
     <string name="sin_internet_borrar">Löschen</string>
     <string name="sin_internet_error">Download fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="convoy_mirar">Einem Konvoi zusehen</string>
+    <string name="ajustes_segundo_plano">Im Hintergrund weiter navigieren</string>
+    <string name="ajustes_segundo_plano_ayuda">Die Sprachansagen, das Overlay im Spiel und deine Route laufen weiter, wenn du zu einer anderen App wechselst, zum Beispiel Moonlight. Zeigt eine Benachrichtigung und braucht mehr Akku.</string>
+    <string name="ajustes_flotante">Schwebendes Fenster beim Verlassen der App</string>
+    <string name="ajustes_flotante_ayuda">Wenn du die App während der Fahrt verlässt, bleibt ein kleines Fenster mit der Karte und der nächsten Abbiegung über der anderen App.</string>
+    <string name="servicio_canal">Navigation</string>
+    <string name="servicio_activo">Navigiert im Hintergrund weiter</string>
+    <string name="mapa_local">auf dem PC gebaut</string>
+    <string name="compartir">Teilen</string>
+    <string name="stats_buscar_conductor">Fahrer suchen</string>
 </resources>

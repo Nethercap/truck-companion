@@ -21,11 +21,15 @@ Muestra lo que la app le manda (comandos, compartir, nav_hud) para ver que llegu
 """
 import argparse
 import asyncio
+import http.server
 import json
 import math
 import os
+import re
 import sys
+import threading
 import time
+import urllib.parse
 import urllib.request
 
 import websockets
@@ -58,6 +62,7 @@ with open(os.path.join(RAIZ, "docs", "app", "demo-route-ats.json"), encoding="ut
 
 class Camion:
     def __init__(self):
+        self.arranque = time.monotonic()
         self.tramo = 0
         self.en_tramo = 0.0
         self.inicio = time.time()
@@ -113,7 +118,30 @@ class Camion:
             "liftAxleIndicator": False, "motorBrake": False, "retarderBrake": 0, "retarderStepCount": 4,
             "trailer": [{"attached": True}], "airPressureWarning": False, "fuelWarning": False,
         }
-        return json.dumps(cliente.build_payload(crudo))
+        dato = cliente.build_payload(crudo)
+        if ENTREGA_S is not None:
+            dato.setdefault("event", {}).update(self.evento_de_entrega())
+        return json.dumps(dato)
+
+    def evento_de_entrega(self):
+        """Un peaje, una multa y, a los ENTREGA_S segundos, la entrega: lo que pide la tarjeta."""
+        s = time.monotonic() - self.arranque
+        if ENTREGA_S - 8 <= s < ENTREGA_S - 7:
+            return {"tollgate": True, "tollgatePayAmount": 120}
+        if ENTREGA_S - 5 <= s < ENTREGA_S - 4:
+            return {"fined": True, "fineAmount": 300}
+        if ENTREGA_S <= s < ENTREGA_S + 2:
+            return {
+                "jobDelivered": True, "jobDeliveredRevenue": 61158, "jobEarnedXp": 840, "jobDeliveredDistanceKm": 672,
+                "jobDeliveryTime": 512, "jobCargoDamage": 0.013, "jobSrc": "Salt Lake City", "jobDst": "Las Vegas",
+                "jobCargo": "Bulldozer",
+            }
+        return {}
+
+
+ENTREGA_S = None
+MAPA_LOCAL = None
+PUERTO_PAGINAS = 27765
 
 
 def relay_del_plan(base):
@@ -127,11 +155,63 @@ def relay_del_plan(base):
     return {"backend": backend, "code": codigo}
 
 
+class PaginasLocales(http.server.BaseHTTPRequestHandler):
+    """/localmap/<juego>/... desde una carpeta, como client/local_server.py."""
+
+    def _archivo(self):
+        ruta = urllib.parse.urlparse(self.path).path
+        if not ruta.startswith("/localmap/"):
+            return None
+        p = os.path.normpath(os.path.join(MAPA_LOCAL, ruta[len("/localmap/"):]))
+        return p if p.startswith(os.path.normpath(MAPA_LOCAL)) and os.path.isfile(p) else None
+
+    def _responder(self, con_cuerpo):
+        p = self._archivo()
+        print("<- mapa local:", self.command, self.path, "bien" if p else "404", flush=True)
+        if not p:
+            self.send_error(404)
+            return
+        total = os.path.getsize(p)
+        desde, hasta, codigo = 0, total - 1, 200
+        m = re.match(r"bytes=(\d+)-(\d*)", self.headers.get("Range", ""))
+        if m:
+            desde = int(m.group(1))
+            hasta = min(int(m.group(2)) if m.group(2) else total - 1, total - 1)
+            codigo = 206
+        self.send_response(codigo)
+        self.send_header("Content-Length", str(hasta - desde + 1))
+        self.send_header("Accept-Ranges", "bytes")
+        if codigo == 206:
+            self.send_header("Content-Range", f"bytes {desde}-{hasta}/{total}")
+        self.end_headers()
+        if con_cuerpo:
+            with open(p, "rb") as f:
+                f.seek(desde)
+                self.wfile.write(f.read(hasta - desde + 1))
+
+    def do_HEAD(self):
+        self._responder(False)
+
+    def do_GET(self):
+        self._responder(True)
+
+    def log_message(self, *a):
+        pass
+
+
+def servir_mapa_local(carpeta):
+    global MAPA_LOCAL
+    MAPA_LOCAL = carpeta
+    servidor = http.server.ThreadingHTTPServer(("0.0.0.0", PUERTO_PAGINAS), PaginasLocales)
+    threading.Thread(target=servidor.serve_forever, daemon=True).start()
+
+
 def estado_cliente():
     return {
         "type": "client_status", "status": "live", "game": "ats", "clientVersion": VERSION_CLIENTE or cliente.CLIENT_VERSION,
-        "detail": None, "mapMods": {"ats": {}, "ets2": None}, "activeMods": {}, "mapDlcs": {}, "localMaps": {},
-        "localMapPort": None, "overlay": CON_OVERLAY,
+        "detail": None, "mapMods": {"ats": {}, "ets2": None}, "activeMods": {}, "mapDlcs": {},
+        "localMaps": {"ats": {"variant": "local_ats", "fingerprint": "prueba1", "companyIcons": 0}} if MAPA_LOCAL else {},
+        "localMapPort": PUERTO_PAGINAS if MAPA_LOCAL else None, "overlay": CON_OVERLAY,
     }
 
 
@@ -224,16 +304,21 @@ def main():
     ap.add_argument("--viejo", action="store_true")
     ap.add_argument("--overlay", action="store_true")
     ap.add_argument("--poco", action="store_true")
+    ap.add_argument("--entrega", type=float, metavar="S", help="a los S segundos entrega el trabajo, con un peaje y una multa antes")
+    ap.add_argument("--mapa-local", metavar="CARPETA", help="sirve /localmap/ desde ahi, como un mapa armado con Build my map")
     args = ap.parse_args()
     # Redirigido a un archivo en Windows es cp1252: una flecha de nav_hud tiraba la tarea
     # que lee, sin avisar, y a los 40 s se cortaba la conexion por falta de pong.
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    global CON_OVERLAY, COMBUSTIBLE, DESCANSO_MIN, PLAN_RELAY, VERSION_CLIENTE
+    global CON_OVERLAY, COMBUSTIBLE, DESCANSO_MIN, ENTREGA_S, PLAN_RELAY, VERSION_CLIENTE
     if args.viejo:
         VERSION_CLIENTE = "0.9.0"
     if args.plan_relay:
         PLAN_RELAY = relay_del_plan(args.plan_relay)
     CON_OVERLAY = args.overlay
+    ENTREGA_S = args.entrega
+    if args.mapa_local:
+        servir_mapa_local(args.mapa_local)
     if args.poco:
         COMBUSTIBLE, DESCANSO_MIN = 50.0, 40
     asyncio.run(lan() if args.lan else relay(args.relay, args.codigo))

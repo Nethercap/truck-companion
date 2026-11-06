@@ -96,8 +96,6 @@
     <string name="cmd_tecla_mala">PC istemcisi bu tuşu kabul etmiyor</string>
     <string name="cmd_fallo">Komut başarısız: %1$s</string>
     <string name="aviso_multa">Ceza kesildi %1$s</string>
-    <string name="aviso_entregado">İş teslim edildi %1$s</string>
-    <string name="aviso_cancelado">İş iptal edildi</string>
 
     <string name="mapa_sin_camion">Henüz kamyon yok</string>
     <string name="mapa_sin_camion_ayuda">Kamyonunu haritada görmek için PC\'ne bağlan.</string>
@@ -328,4 +326,14 @@
     <string name="sin_internet_listo">İndirildi · %1$d MB</string>
     <string name="sin_internet_borrar">Sil</string>
     <string name="sin_internet_error">İndirilemedi. Bağlantını kontrol edip tekrar dene.</string>
+    <string name="convoy_mirar">Bir konvoyu izle</string>
+    <string name="ajustes_segundo_plano">Arka planda gezinmeye devam et</string>
+    <string name="ajustes_segundo_plano_ayuda">Başka bir uygulamaya (örneğin Moonlight) geçtiğinde ses, oyun içi katman ve rotan çalışmaya devam eder. Bildirim gösterir ve daha fazla pil kullanır.</string>
+    <string name="ajustes_flotante">Uygulamadan çıkınca yüzen pencere</string>
+    <string name="ajustes_flotante_ayuda">Sürerken uygulamadan çıkarsan, diğer uygulamanın üstünde harita ve sonraki dönüşle küçük bir pencere kalır.</string>
+    <string name="servicio_canal">Navigasyon</string>
+    <string name="servicio_activo">Arka planda gezinmeye devam ediyor</string>
+    <string name="mapa_local">bilgisayarda oluşturuldu</string>
+    <string name="compartir">Paylaş</string>
+    <string name="stats_buscar_conductor">Sürücü ara</string>
 </resources>

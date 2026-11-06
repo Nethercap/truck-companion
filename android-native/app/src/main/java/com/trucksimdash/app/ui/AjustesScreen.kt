@@ -1,5 +1,6 @@
 package com.trucksimdash.app.ui
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trucksimdash.app.BuildConfig
 import com.trucksimdash.app.R
 import com.trucksimdash.app.core.Ajustes
@@ -46,6 +48,7 @@ import com.trucksimdash.app.core.Preferencias
 import com.trucksimdash.app.core.Red
 import com.trucksimdash.app.core.Unidades
 import com.trucksimdash.app.mapa.CatalogoMapas
+import com.trucksimdash.app.nav.AjustesNav
 import com.trucksimdash.app.nav.MotorNav
 import com.trucksimdash.app.telemetria.EstadoSesion
 import com.trucksimdash.app.telemetria.Fase
@@ -66,6 +69,7 @@ fun AjustesScreen(
     alVolver: () -> Unit,
 ) {
     BackHandler { alVolver() }
+    val nav by motor.ajustesNav.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(stringResource(R.string.ajustes)) },
@@ -79,13 +83,15 @@ fun AjustesScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TarjetaConexion(estado, sesion)
-            TarjetaCompartir(estado, ajustes, prefs, sesion)
+            TarjetaCompartir(estado, ajustes, prefs, sesion, nav, motor)
             AjustesNavegacion(ajustes, prefs, motor, alReportar)
+            AjustesDelMapa(motor)
             TarjetaTeclas(motor, alTeclas)
             TarjetaHistorial(motor)
-            TarjetaUnidades(ajustes, prefs)
+            TarjetaUnidades(ajustes, prefs, nav, motor)
             TarjetaPantalla(ajustes, prefs)
             TarjetaMapaManual(prefs, catalogo, alMapasSinInternet)
+            OtrosDispositivos(motor, prefs)
             if (BuildConfig.DEBUG) TarjetaPruebas(prefs)
             TarjetaAcerca()
         }
@@ -122,7 +128,7 @@ internal fun FilaInterruptor(titulo: String, ayuda: String?, valor: Boolean, hab
 }
 
 @Composable
-private fun TarjetaCompartir(estado: EstadoSesion, ajustes: Ajustes, prefs: Preferencias, sesion: SesionRepo) {
+private fun TarjetaCompartir(estado: EstadoSesion, ajustes: Ajustes, prefs: Preferencias, sesion: SesionRepo, nav: AjustesNav?, motor: MotorNav) {
     val conectada = estado.fase == Fase.Abierta
     var apodo by rememberSaveable { mutableStateOf(ajustes.apodo) }
     Tarjeta {
@@ -134,6 +140,9 @@ private fun TarjetaCompartir(estado: EstadoSesion, ajustes: Ajustes, prefs: Pref
             estado.compartiendo ?: (prefs.compartirElegido == true),
             habilitado = conectada,
         ) { sesion.compartir(it) }
+        nav?.let { n ->
+            FilaInterruptor(n.t("settingsLiveShareRoute"), null, n.rutaEnVivo, habilitado = estado.compartiendo == true) { motor.rutaEnVivo(it) }
+        }
         OutlinedTextField(
             value = apodo,
             onValueChange = {
@@ -150,12 +159,15 @@ private fun TarjetaCompartir(estado: EstadoSesion, ajustes: Ajustes, prefs: Pref
             stringResource(R.string.ajustes_ver_otros_ayuda),
             ajustes.mostrarOtros,
         ) { prefs.ponerMostrarOtros(it) }
+        nav?.let { n ->
+            FilaInterruptor(n.t("settingsTmpPlayers"), n.t("settingsTmpPlayersHint"), ajustes.mostrarTmp) { prefs.ponerMostrarTmp(it) }
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TarjetaUnidades(ajustes: Ajustes, prefs: Preferencias) {
+private fun TarjetaUnidades(ajustes: Ajustes, prefs: Preferencias, nav: AjustesNav?, motor: MotorNav) {
     Tarjeta {
         TituloSeccion(stringResource(R.string.ajustes_unidades))
         val opciones = listOf(
@@ -175,6 +187,7 @@ private fun TarjetaUnidades(ajustes: Ajustes, prefs: Preferencias) {
         }
         Spacer(Modifier.height(6.dp))
         Text(stringResource(R.string.unidades_ayuda), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+        nav?.let { n -> Selector(null, n.relojes, n.reloj) { motor.reloj(it) } }
     }
 }
 
@@ -186,6 +199,18 @@ private fun TarjetaPantalla(ajustes: Ajustes, prefs: Preferencias) {
             stringResource(R.string.ajustes_pantalla_ayuda),
             ajustes.pantallaEncendida,
         ) { prefs.ponerPantallaEncendida(it) }
+        FilaInterruptor(
+            stringResource(R.string.ajustes_segundo_plano),
+            stringResource(R.string.ajustes_segundo_plano_ayuda),
+            ajustes.segundoPlano,
+        ) { prefs.ponerSegundoPlano(it) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            FilaInterruptor(
+                stringResource(R.string.ajustes_flotante),
+                stringResource(R.string.ajustes_flotante_ayuda),
+                ajustes.flotanteAlSalir,
+            ) { prefs.ponerFlotanteAlSalir(it) }
+        }
     }
 }
 

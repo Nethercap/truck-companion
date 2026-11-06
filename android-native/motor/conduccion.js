@@ -3,7 +3,7 @@
 // una decision de ruteo o de avisos va en pure.js o app.js, y entra sola al compilar.
 //
 // Si una de estas se renombra en app.js, armar_motor.js falla al compilar y avisa:
-// RAICES: ["updateMap", "updateDestinationMarker", "updateRouteSummary", "navTurnParts", "navLanesFor", "loadCities", "loadRouteGraph", "loadRoadNames", "loadPois", "computeRealEtaSeconds", "noRouteText", "resolveRouteTarget", "sendNavHud", "speakVoice", "voiceDone", "applyRoutePlan", "applyRoutePrefs", "applyVoiceDevice", "sendRoutePlanHello", "applyDetectedDlcs", "setClientOverlay", "setObsOverlay", "clearWaypoint", "restoreWaypoints", "claimVoice", "releaseVoice", "deviceLabel", "planCapable", "navTargetZoom", "sendLiveRoute", "setAtlasData", "setRoadShieldData", "applyVehicleMode", "startDemo", "fetchLatestClientVersion", "loadTrips", "recordTrip", "saveSettings", "currentSettings", "currentVoice", "loadVoiceCatalog", "connectLanPlan", "buildTurnReport", "checkNavReports"]
+// RAICES: ["updateMap", "updateDestinationMarker", "updateRouteSummary", "navTurnParts", "navLanesFor", "loadCities", "loadRouteGraph", "loadRoadNames", "loadPois", "computeRealEtaSeconds", "noRouteText", "resolveRouteTarget", "sendNavHud", "speakVoice", "voiceDone", "applyRoutePlan", "applyRoutePrefs", "applyVoiceDevice", "sendRoutePlanHello", "applyDetectedDlcs", "setClientOverlay", "setObsOverlay", "clearWaypoint", "restoreWaypoints", "claimVoice", "releaseVoice", "deviceLabel", "planCapable", "navTargetZoom", "sendLiveRoute", "setAtlasData", "setRoadShieldData", "applyVehicleMode", "startDemo", "fetchLatestClientVersion", "loadTrips", "recordTrip", "saveSettings", "currentSettings", "currentVoice", "loadVoiceCatalog", "connectLanPlan", "buildTurnReport", "checkNavReports", "updateSessionEvents", "resetSessionTotals", "fetchExchangeRates", "sendCurrencyPref", "restInfo"]
 
 // ------------------------------------------------------ lo que no se dibuja
 var fuentesRuta = { route: null, 'route-next': null, 'route-ferry': null };
@@ -113,8 +113,15 @@ function loadGameMap(game) {
   // El grafo, los nombres y los POIs bajan por detras, como en la web: mientras no
   // llegan no hay ruta, y updateDestinationMarker vuelve a probar en cada dato.
   loadCities(mapInfo).then(() => {
-    if (game === currentGame) return Promise.all([loadRouteGraph(mapInfo), loadRoadNames(mapInfo)]);
-    return null;
+    if (game !== currentGame) return null;
+    // Como la web: el que mira un convoy y el liviano sin ruteo no navegan, y el grafo pesa.
+    if (conn.spectator || liteNoRouting) {
+      routeGraph = null;
+      routeGraphState = 'off';
+      roadNames = [];
+      return null;
+    }
+    return Promise.all([loadRouteGraph(mapInfo), liteMode ? null : loadRoadNames(mapInfo)]);
   }).catch((e) => console.error('cargar mapa', e));
   loadPois(game);
   roadNames = [];
@@ -193,6 +200,10 @@ function volcar() {
     fuera.reporte = estadoReporte;
     estadoReporte = null;
   }
+  if (entregaNueva) {
+    fuera.entrega = entregaNueva;
+    entregaNueva = null;
+  }
   if (rutaCambio && (currentRouteFull !== rutaEnviadaDe || Date.now() - rutaEnviadaEn >= RUTA_CADA_MS)) {
     rutaCambio = false;
     rutaEnviadaEn = Date.now();
@@ -234,8 +245,78 @@ function navegacion() {
     avisoRuta: avisoDeRuta(resumenRuta),
     actualizarCliente: avisoDeVersion(),
     perfil: routeProfile,
+    pagoTrabajo: lastData && lastData.jobIncome ? moneyLine(lastData.jobIncome, lastData.game) : null,
+    hora12: hour12(),
+    miniHud: lineasMiniHud(lastData),
+    sesion: totalesDeSesion(),
   };
 }
+
+// updateMiniHudExtra sin el HTML. Sin "GPS directions": en la app el giro va siempre arriba
+// del mapa, y aca saldria dos veces.
+function lineasMiniHud(data) {
+  if (!data) return [];
+  const lineas = [];
+  if (miniHudSettings.fuelPct && data.fuel != null && data.fuelCapacity) {
+    const pct = Math.max(0, Math.min(100, (data.fuel / data.fuelCapacity) * 100));
+    lineas.push(`${t('fuel')}: ${Math.round(pct)}%`);
+  }
+  const alcance = fuelFigures(data).rangeKm;
+  if (miniHudSettings.fuelRange && alcance != null) {
+    lineas.push(`${t('range')}: ${Math.round(useImperial ? alcance * KM_TO_MI : alcance)} ${useImperial ? 'mi' : 'km'}`);
+  }
+  if (miniHudSettings.eta && gameRouteSeconds(data) != null) {
+    lineas.push(`${t('etaGame')}: ${formatSeconds(gameRouteSeconds(data))}`);
+  }
+  if (miniHudSettings.distance && data.routeDistanceKm) {
+    const d = useImperial ? data.routeDistanceKm * KM_TO_MI : data.routeDistanceKm;
+    lineas.push(`${t('distanceLeft')}: ${formatDec(d, currentLang)} ${useImperial ? 'mi' : 'km'}`);
+  }
+  const descanso = miniHudSettings.rest ? restInfo(data) : null;
+  if (descanso) lineas.push(`${t('nextRest')}: ${descanso.text}`);
+  if (miniHudSettings.cruise && data.cruiseControl) {
+    const v = Number(data.cruiseControlSpeedKmh) || 0;
+    lineas.push(`${t('cruiseControl')}: ${Math.round(useImperial ? v * KM_TO_MI : v)} ${useImperial ? 'mph' : 'km/h'}`);
+  }
+  return lineas;
+}
+
+// La tarjeta de la sesion de la web: viven en memoria, y a cero al cambiar de juego.
+function totalesDeSesion() {
+  const juego = sessionTotals.game || (lastData && lastData.game);
+  return {
+    filas: [
+      [t('tolls'), moneyLine(sessionTotals.tolls, juego)],
+      [t('fines'), moneyLine(sessionTotals.fines, juego)],
+      [t('ferryTrain'), String(sessionTotals.ferryTrainCount)],
+    ],
+    hayAlgo: !!(sessionTotals.tolls || sessionTotals.fines || sessionTotals.ferryTrainCount),
+    reiniciar: t('sessionReset'),
+  };
+}
+
+// La tarjeta "Trabajo entregado": la web la escribe en la pagina, y aca la dibuja Kotlin.
+var entregaNueva = null;
+showDeliveryCard = function (event, costs, game) {
+  const r = deliverySummary(event, costs);
+  if (!r) return;
+  const valor = ([, tipo, v]) => {
+    if (tipo === 'money') return moneyLine(v, game);
+    if (tipo === 'xp') return `+${formatInt(v, currentLang)} XP`;
+    if (tipo === 'km') return `${formatInt(useImperial ? v * 0.621371 : v, currentLang)} ${useImperial ? 'mi' : 'km'}`;
+    if (tipo === 'minutes') return formatGameMinutes(v, t('hourShort'), t('minShort'));
+    if (tipo === 'percent') return `${v < 10 && v > 0 ? formatDec(v, currentLang) : Math.round(v)}\u00a0%`;
+    return String(v);
+  };
+  entregaNueva = {
+    titulo: t('deliveredTitle'),
+    ruta: r.route,
+    carga: r.cargo,
+    filas: r.rows.map((f) => [t(f[0]), valor(f)]),
+    cerrar: t('close'),
+    ms: DELIVERY_CARD_MS,
+  };
+};
 
 // checkUpdateBanner: el cliente de la PC tiene una version nueva.
 function avisoDeVersion() {
@@ -281,7 +362,7 @@ convoyPlaySound = function (tipo) {
 function tarjetaConvoy(m) {
   const mia = convoyMyVariant();
   const otroJuego = m.game && !convoySameGame(m) ? t('convoyOtherGame').replace('{game}', (m.game || '').toUpperCase()) : null;
-  const dist = m.online && m.x != null && convoySameGame(m) ? convoyDistanceTo(m) : null;
+  const dist = !convoy.spectator && m.online && m.x != null && convoySameGame(m) ? convoyDistanceTo(m) : null;
   const distancia = dist ? (dist.behind ? t('convoyBehind') : t('convoyAway')).replace('{d}', convoyFormatDistance(dist.meters)) : '';
   const estado = !m.online ? t('convoyOffline') : (m.paused ? t('convoyInMenu') : null);
   const nota = convoy.msgNotes.get(m.id);
@@ -308,20 +389,23 @@ function tarjetaConvoy(m) {
     estado: estado || otroJuego || distancia || '',
     nota: nota && nota.until > Date.now() ? `${(CONVOY_QUICK.find((q) => q.key === nota.key) || {}).icon || ''} ${t(`convoyMsg_${nota.key}`)}` : null,
     filas,
-    puedeSeguir: !!m.creator && !otroJuego,
+    puedeSeguir: !convoy.spectator && !!m.creator && !otroJuego,
   };
 }
 
 function marcasConvoy() {
   if (!convoyShowMarkers || !toLngLat) return [];
-  const mia = convoyMyVariant();
+  const mia = convoy.spectator ? null : convoyMyVariant();
   return convoy.members
     .filter((m) => m.id !== convoy.you && m.online && m.x != null && convoySameGame(m))
     .map((m) => {
       const [lng, lat] = toLngLat(m.x, m.z);
       const otra = !!(mia && m.variant && m.variant !== mia);
+      // Lo que dice la chapita del borde del mapa (convoyRenderEdgeIndicators).
+      const dist = convoy.spectator ? null : convoyDistanceTo(m);
       return {
         id: m.id, lng, lat,
+        distancia: dist ? convoyFormatDistance(dist.meters) : null,
         rumbo: gridHeadingToGeo(m.heading || 0, m.x, m.z, toLngLat),
         color: convoyColor(m),
         nombre: otra ? `${m.nickname} (${convoyVariantLabel(m.variant)})` : m.nickname,
@@ -331,19 +415,21 @@ function marcasConvoy() {
 }
 
 function convoyEstado() {
-  const enSala = convoyInRoom();
+  const enSala = convoyInRoom() || convoy.spectator;
   const yo = convoyMe();
   const textos = {};
   for (const k of ['convoyTitle', 'convoyIntro', 'convoyNickLabel', 'convoyShareIncome', 'convoyCreateTitle', 'convoyPostSummary',
     'convoyCreate', 'convoyJoinTitle', 'convoyJoin', 'convoyNotConnected', 'convoyPrivacyHint', 'convoyCopyLink', 'convoyCopied',
     'convoyShowMarkers', 'convoyMute', 'convoyLeave', 'convoyCloseConvoy', 'convoyKick', 'convoyLeaderTag', 'convoyFollow',
-    'convoyUnfollow', 'convoyHideRoute', 'convoyShowRoute', 'convoyMsgBtn', 'close']) textos[k] = t(k);
+    'convoyUnfollow', 'convoyHideRoute', 'convoyShowRoute', 'convoyMsgBtn', 'close', 'chipSpectator', 'detailSpectator']) textos[k] = t(k);
   return {
     enSala,
     disponible: convoyAvailable(),
     conectado: conn.socket === 'open',
     aviso: conn.local ? t('convoyUnavailableLan') : null,
     codigo: convoy.code,
+    mirando: convoy.spectator,
+    varianteMirada: convoy.spectator ? currentGame : null,
     apodo: convoyNick,
     compartirIngresos: convoyShareIncome,
     silencio: convoyMuted,
@@ -389,13 +475,6 @@ function urlsDeMapa(id, version) {
 
 // ------------------------------------------------------ el historial de viajes
 // Solo de este telefono, como en la web: los de la cuenta los guarda el cliente de la PC.
-var entregaVista = false;
-function anotarViaje(data) {
-  const e = data.event || {};
-  if (e.jobDelivered && !entregaVista) recordTrip(e);
-  entregaVista = !!e.jobDelivered;
-}
-
 function historialViajes() {
   return {
     titulo: t('settingsHistoryTitle'),
@@ -427,7 +506,12 @@ function ajustesNav() {
   const claves = ['settingsVoiceTitle', 'settingsVoiceTest', 'settingsVoiceHint', 'settingsVoiceTiming', 'settingsRouteTitle',
     'settingsRouteFastest', 'settingsRouteShortest', 'settingsEveryExitTitle', 'settingsEveryExit', 'settingsEveryExitHint',
     'settingsRestWarnTitle', 'settingsRestWarn', 'settingsRestWarnHint', 'dlcTitle', 'dlcHint', 'dlcAutoLabel', 'modsManualLabel',
-    'close', 'navReportOpen'];
+    'close', 'navReportOpen', 'settingsMiniHudTitle', 'settingsLiveShareRoute', 'settingsTmpPlayers', 'settingsTmpPlayersHint',
+    'settingsButtonsTitle', 'settingsFadeButtons', 'settingsKeepCompass', 'settingsBaseTitle', 'settingsRealBase', 'settingsRealBaseHint',
+    'settingsLiteTitle', 'settingsLiteMode', 'settingsLiteNoRouting', 'settingsLiteHint', 'settingsCurrencyTitle', 'currencyHint',
+    'settingsRouteColorTitle', 'settingsNavZoomTitle', 'settingsNavZoomHint', 'navZoomFar', 'navZoomNear', 'navZoomDefault',
+    'settingsTruckSizeTitle', 'truckSizeNormal', 'truckSizeHuge', 'dashSecondDeviceTitle', 'dashConnectHint', 'dashCopyLink',
+    'obsOverlayLink', 'convoyCopied', 'pipOverlay'];
   const textos = {};
   for (const k of claves) textos[k] = t(k);
   return {
@@ -439,6 +523,25 @@ function ajustesNav() {
     descansos: REST_WARN_OPTIONS.map((m) => ({ id: String(m), label: `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` })),
     descanso: String(restWarnMin),
     cadaSalida: navEveryExit,
+    moneda: currencyPref,
+    monedas: monedasPosibles(),
+    reloj: clockFormat,
+    relojes: [['auto', 'clockAuto'], ['24', 'clock24'], ['12', 'clock12']].map(([id, k]) => ({ id, label: t(k) })),
+    colorRuta: routeColor,
+    colores: [['#a30000', 'colorRed'], ['#3b9eff', 'colorBlue'], ['#4caf50', 'colorGreen']].map(([id, k]) => ({ id, label: t(k) })),
+    zoomNav: navZoom,
+    zoomDefecto: NAV_ZOOM_DEFAULT,
+    tamanoCamion: truckSize,
+    tamanoDefecto: TRUCK_SIZE_DEFAULT,
+    baseReal: realBase,
+    // Se aplican al volver a abrir, como en la web al recargar: se leen de lo guardado.
+    liviano: !!loadSettings().liteMode,
+    livianoSinRuteo: !!loadSettings().liteNoRouting,
+    desvanecerBotones: fadeButtons,
+    mantenerBrujula: keepCompass,
+    rutaEnVivo: liveShareRoute,
+    miniHud: [['fuelPct', 'fuel'], ['fuelRange', 'range'], ['eta', 'etaGame'], ['distance', 'distanceLeft'], ['cruise', 'cruiseControl'], ['rest', 'nextRest']]
+      .map(([id, k]) => ({ id, label: t(k), activo: !!miniHudSettings[id] })),
     dlcAuto,
     dlcEstado: detectado.length ? `${t('dlcDetected')} ${detectado.join(' · ')}` : t('dlcAutoWaiting'),
     dlc: juegos.map((juego) => ({
@@ -448,6 +551,20 @@ function ajustesNav() {
     })),
     textos,
   };
+}
+
+// fillCurrencySelect sin el select. El nombre de cada moneda lo pone Kotlin, que tiene los de
+// todos los idiomas: aca Intl es de mentira.
+function monedasPosibles() {
+  const auto = browserCurrency();
+  const codigos = new Set(Object.values(REGION_CURRENCY));
+  if (exchangeRates && exchangeRates.rates) Object.keys(exchangeRates.rates).forEach((c) => codigos.add(c));
+  if (currencyPref !== 'auto' && currencyPref !== 'off') codigos.add(currencyPref);
+  return [
+    { id: 'auto', label: auto ? t('currencyAuto').replace('{cur}', auto) : t('currencyAutoUnknown') },
+    { id: 'off', label: t('currencyOff') },
+    ...[...codigos].sort().map((c) => ({ id: c, label: c, codigo: true })),
+  ];
 }
 
 // ------------------------------------------------------ el reporte de navegacion
@@ -523,6 +640,22 @@ async function mandarReporte(tipo, descripcion) {
     : { estado: 'fallo', texto: t('navReportFailed') };
 }
 
+// El onclose de la web vuelve a conectar si no termino: al salir, sin onclose.
+function convoyDejarDeMirar() {
+  const s = convoy.spectatorWs;
+  if (s) {
+    s.onclose = null;
+    s.close();
+  }
+  convoy.spectatorWs = null;
+  if (!convoy.spectator) return;
+  convoy.spectator = false;
+  convoy.spectatorGame = null;
+  conn.spectator = false;
+  convoyReset();
+  currentGame = null; // el mapa que venga, con grafo y todo
+}
+
 // ------------------------------------------------------ lo que entra
 var motor = {
   iniciar(texto) {
@@ -540,6 +673,12 @@ var motor = {
     if (o.apodo && !convoyNick) convoyNick = String(o.apodo).trim().slice(0, 16);
     motor.ajustes(JSON.stringify(o));
     settingsBaseline = JSON.parse(JSON.stringify(currentSettings()));
+    // Las tasas guardadas: en la web lo hace un bloque suelto de app.js, que aca no entra.
+    try {
+      const tasas = JSON.parse(lsGet(RATES_KEY) || 'null');
+      if (tasas && tasas.rates && Date.now() - (tasas.savedAt || 0) < RATES_MAX_AGE_MS) exchangeRates = tasas;
+    } catch (e) {}
+    fetchExchangeRates();
     // Si ya se arreglo alguno de los reportes de este telefono, como al abrir la pagina.
     setTimeout(checkNavReports, 8000);
     setInterval(checkNavReports, NAV_REPORT_CHECK_MS);
@@ -553,9 +692,19 @@ var motor = {
   },
 
   /** La variante y, si esta app no la conocia, sus datos del manifest. */
-  ponerVariante(id, version, juego, proyeccion, nombre, lng, lat) {
+  ponerVariante(id, version, juego, proyeccion, nombre, lng, lat, raiz, conLogos) {
     MAP_DATA_VERSION[id] = version;
-    if (!GAME_MAPS[id]) {
+    if (raiz) {
+      // applyLocalMaps: el mapa armado en la PC, con los datos que sirve el cliente.
+      GAME_MAPS[id] = {
+        ...GAME_MAPS[juego],
+        assetsDir: `${raiz}/${id}`,
+        pmtilesUrl: `${raiz}/vector/${id}.pmtiles`,
+        label: nombre,
+        poisUrl: `${raiz}/pois-${id}.json`,
+        companyIconsBase: conLogos ? `${raiz}/company-icons` : null,
+      };
+    } else if (!GAME_MAPS[id]) {
       const p = PROJECTIONS[proyeccion] || PROJECTIONS[juego];
       GAME_MAPS[id] = {
         assetsDir: `${REMOTE_MAP_BASE}/${id}`,
@@ -597,7 +746,8 @@ var motor = {
     updateRouteSummary(data);
     checkMissingCompanies(data);
     if (clientOverlayOn || obsOverlayOn) sendNavHud();
-    anotarViaje(data);
+    // Peajes y multas del trabajo, la tarjeta de entrega y el historial, como updateHud.
+    updateSessionEvents(data.event || {}, data.game, data.onJob);
     convoyOnTelemetry(data);
     if (convoyInRoom()) convoyCambio = true; // las distancias, con cada dato
     return JSON.stringify(navegacion());
@@ -647,12 +797,16 @@ var motor = {
   },
 
   conexion(abierta, porLan) {
+    if (abierta) convoyDejarDeMirar(); // con una sesion de verdad, se maneja
     ws.readyState = abierta ? 1 : 3;
     conn.local = !!porLan;
     conn.socket = abierta ? 'open' : 'closed';
     // Se paso del LAN al relay: el plan vuelve a ir por la conexion de siempre.
     if (abierta && !porLan && lanPlanRelay) connectLanPlan(null);
-    if (abierta && !porLan) sendRoutePlanHello();
+    if (abierta && !porLan) {
+      sendRoutePlanHello();
+      sendCurrencyPref(); // la moneda para el post de Discord
+    }
     if (abierta && relayApp && !latestClientVersion) fetchLatestClientVersion(relayApp);
     if (abierta) {
       convoyOnSocketOpen(); // el relay no se acuerda: se vuelve a entrar con lo que se sabia
@@ -821,6 +975,47 @@ var motor = {
     ajustesCambiaron = true;
   },
 
+  moneda(valor) {
+    currencyPref = valor;
+    saveSettings();
+    fetchExchangeRates();
+    sendCurrencyPref();
+    ajustesCambiaron = true;
+  },
+  reloj(valor) {
+    clockFormat = clockFormatSetting(valor);
+    saveSettings();
+    ajustesCambiaron = true;
+  },
+  miniHud(clave, valor) {
+    miniHudSettings[clave] = !!valor;
+    saveSettings();
+    ajustesCambiaron = true;
+  },
+  /** Lo del mapa que dibuja Kotlin: aca se guarda, como todos los ajustes de la web. */
+  apariencia(clave, valor) {
+    if (clave === 'color') routeColor = String(valor);
+    else if (clave === 'zoom') navZoom = navZoomSetting(valor);
+    else if (clave === 'camion') truckSize = truckSizeSetting(valor);
+    else if (clave === 'base') realBase = !!valor;
+    else if (clave === 'desvanecer') fadeButtons = !!valor;
+    else if (clave === 'brujula') keepCompass = !!valor;
+    saveSettings();
+    ajustesCambiaron = true;
+  },
+  /** liteMode es const en la web: se escribe directo y vale al volver a abrir. */
+  liviano(modo, sinRuteo) {
+    lsSet(SETTINGS_KEY, JSON.stringify(Object.assign(loadSettings(), { liteMode: !!modo, liteNoRouting: !!modo && !!sinRuteo })));
+    ajustesCambiaron = true;
+  },
+  rutaEnVivo(valor) {
+    liveShareRoute = !!valor;
+    saveSettings();
+    sendLiveRoute(true);
+    ajustesCambiaron = true;
+  },
+  reiniciarSesion() { resetSessionTotals(lastData && lastData.game); },
+
   demo() { startDemo(); },
   urlsDeMapa: (id, version) => JSON.stringify(urlsDeMapa(id, version)),
 
@@ -830,6 +1025,7 @@ var motor = {
       clearTimeout(demoTimer);
       conn.demo = false;
     }
+    convoyDejarDeMirar();
     convoyReset();
     convoyRenderAll();
   },
@@ -876,6 +1072,21 @@ var motor = {
     convoyShowMarkers = !!valor;
     convoySaveSettings();
     convoyCambio = true;
+  },
+  /** Mirar un convoy con su link, sin juego: la pagina con ?convoy=CODE. */
+  convoyMirar(codigo) {
+    const code = String(codigo || '').trim().toUpperCase();
+    if (code.length !== 6) {
+      showToast(t('convoyErrNotFound'));
+      return;
+    }
+    convoyDejarDeMirar();
+    convoyStartSpectator(code, relayApp);
+    convoyCambio = true;
+  },
+  convoyDejarDeMirar() {
+    convoyDejarDeMirar();
+    convoyRenderAll();
   },
   convoySalir() { convoyLeaveRoom(); },
   convoyTerminar() {

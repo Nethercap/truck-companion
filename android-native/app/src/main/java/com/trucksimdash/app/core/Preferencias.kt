@@ -71,9 +71,14 @@ data class Ajustes(
     val unidades: Unidades = Unidades.Auto,
     val pantallaEncendida: Boolean = true,
     val mostrarOtros: Boolean = true,
+    val mostrarTmp: Boolean = true,
     val apodo: String = "",
     val voz: Boolean = false,
     val botones: List<BotonPropio> = emptyList(),
+    /** Seguir con otra app adelante, con su notificacion (ServicioManejo). */
+    val segundoPlano: Boolean = true,
+    /** Al salir de la app manejando, queda la ventana flotante. */
+    val flotanteAlSalir: Boolean = false,
 )
 
 /**
@@ -88,9 +93,12 @@ class Preferencias(contexto: Context) {
             unidades = runCatching { Unidades.valueOf(sp.getString("unidades", "") ?: "") }.getOrDefault(Unidades.Auto),
             pantallaEncendida = sp.getBoolean("pantallaEncendida", true),
             mostrarOtros = sp.getBoolean("mostrarOtros", true),
+            mostrarTmp = sp.getBoolean("mostrarTmp", true),
             apodo = sp.getString("apodo", "") ?: "",
             voz = sp.getBoolean("voz", false),
             botones = leerBotones(sp.getString("botones", null)),
+            segundoPlano = sp.getBoolean("segundoPlano", true),
+            flotanteAlSalir = sp.getBoolean("flotanteAlSalir", false),
         ),
     )
     val ajustes: StateFlow<Ajustes> = _ajustes.asStateFlow()
@@ -109,6 +117,26 @@ class Preferencias(contexto: Context) {
         sp.edit { putBoolean("mostrarOtros", valor) }
         _ajustes.value = _ajustes.value.copy(mostrarOtros = valor)
     }
+
+    fun ponerMostrarTmp(valor: Boolean) {
+        sp.edit { putBoolean("mostrarTmp", valor) }
+        _ajustes.value = _ajustes.value.copy(mostrarTmp = valor)
+    }
+
+    fun ponerSegundoPlano(valor: Boolean) {
+        sp.edit { putBoolean("segundoPlano", valor) }
+        _ajustes.value = _ajustes.value.copy(segundoPlano = valor)
+    }
+
+    fun ponerFlotanteAlSalir(valor: Boolean) {
+        sp.edit { putBoolean("flotanteAlSalir", valor) }
+        _ajustes.value = _ajustes.value.copy(flotanteAlSalir = valor)
+    }
+
+    /** El permiso de notificaciones se pide una sola vez: si lo negaron, el servicio anda igual. */
+    var notificacionesPedidas: Boolean
+        get() = sp.getBoolean("notificacionesPedidas", false)
+        set(valor) = sp.edit { putBoolean("notificacionesPedidas", valor) }
 
     fun ponerApodo(valor: String) {
         sp.edit { putString("apodo", valor) }

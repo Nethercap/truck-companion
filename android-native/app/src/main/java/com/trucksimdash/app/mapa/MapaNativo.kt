@@ -14,7 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.trucksimdash.app.TruckDashApp
 import com.trucksimdash.app.core.Red
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
@@ -33,10 +35,20 @@ fun MapaNativo(
     val alcance = rememberCoroutineScope()
     var control by remember { mutableStateOf<ControlMapa?>(null) }
 
+    val motor = (contexto.applicationContext as TruckDashApp).contenedor.nav
+    val apariencia by motor.apariencia.collectAsStateWithLifecycle()
+
     val vista = remember {
         val opciones = MapLibreMapOptions.createFromAttributes(contexto)
+        // Liviano vale desde que nace el mapa, como en la web (pixelRatio y maxZoom al crearlo).
+        if (motor.apariencia.value.liviano) {
+            opciones.pixelRatio(1f)
+            opciones.maxZoomPreference(15.0)
+        }
         MapView(contexto, opciones).apply { onCreate(null) }
     }
+
+    LaunchedEffect(control, apariencia) { control?.apariencia = apariencia }
 
     DisposableEffect(ciclo, vista) {
         var arrancada = false
@@ -62,6 +74,7 @@ fun MapaNativo(
     LaunchedEffect(vista) {
         vista.getMapAsync { mapa ->
             val c = ControlMapa(vista, mapa, Red.http, alcance)
+            c.apariencia = motor.apariencia.value
             control = c
             alListo(c)
         }

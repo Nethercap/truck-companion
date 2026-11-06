@@ -62,7 +62,7 @@ import com.trucksimdash.app.nav.TarjetaConvoy
 import java.text.DateFormat
 import java.util.Date
 
-private fun colorDe(hex: String): Color =
+internal fun colorDe(hex: String): Color =
     runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(Color.Gray)
 
 @Composable
@@ -84,7 +84,7 @@ private fun FilaTilde(texto: String, valor: Boolean, alCambiar: (Boolean) -> Uni
 /** La ventana del convoy de la web: entrar o crear, y adentro los miembros y lo que se puede hacer. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConvoyScreen(motor: MotorNav, apodoGuardado: String, alVolver: () -> Unit) {
+fun ConvoyScreen(motor: MotorNav, apodoGuardado: String, codigoInicial: String? = null, alVolver: () -> Unit) {
     BackHandler { alVolver() }
     val convoy by motor.convoy.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { motor.pedirConvoy() }
@@ -102,15 +102,15 @@ fun ConvoyScreen(motor: MotorNav, apodoGuardado: String, alVolver: () -> Unit) {
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (c.enSala) Adentro(c, motor, alVolver) else Afuera(c, motor, apodoGuardado)
+            if (c.enSala) Adentro(c, motor, alVolver) else Afuera(c, motor, apodoGuardado, codigoInicial)
         }
     }
 }
 
 @Composable
-private fun Afuera(c: EstadoConvoy, motor: MotorNav, apodoGuardado: String) {
+private fun Afuera(c: EstadoConvoy, motor: MotorNav, apodoGuardado: String, codigoInicial: String?) {
     var apodo by rememberSaveable { mutableStateOf(c.apodo.ifEmpty { apodoGuardado }) }
-    var codigo by rememberSaveable { mutableStateOf("") }
+    var codigo by rememberSaveable { mutableStateOf(codigoInicial.orEmpty()) }
     var avisar by rememberSaveable { mutableStateOf(false) }
     val puede = c.disponible && c.conectado
 

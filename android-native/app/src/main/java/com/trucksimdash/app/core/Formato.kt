@@ -60,11 +60,15 @@ fun duracionMinutos(minutos: Double): String {
 }
 
 /** El reloj del juego: minutos absolutos a dia de la semana (0 = lunes) y hora. */
-fun relojDelJuego(minutos: Double): Pair<Int, String> {
+fun relojDelJuego(minutos: Double, hora12: Boolean = false): Pair<Int, String> {
     val total = floor(minutos).toLong().coerceAtLeast(0)
     val dia = ((total / 1440) % 7).toInt()
     val delDia = (total % 1440).toInt()
-    return dia to "%02d:%02d".format(Locale.ROOT, delDia / 60, delDia % 60)
+    val h = delDia / 60
+    val m = delDia % 60
+    // formatClockHM en pure.js: 12 h vale para todos los relojes, tambien el del juego.
+    if (hora12) return dia to "%d:%02d %s".format(Locale.ROOT, if (h % 12 == 0) 12 else h % 12, m, if (h < 12) "AM" else "PM")
+    return dia to "%02d:%02d".format(Locale.ROOT, h, m)
 }
 
 /** "R" en reversa, "N" en punto muerto, el numero de la marcha si no. */

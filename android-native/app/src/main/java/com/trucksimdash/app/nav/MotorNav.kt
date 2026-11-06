@@ -23,6 +23,8 @@ import com.whl.quickjs.wrapper.QuickJSContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -42,6 +44,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -94,6 +97,10 @@ class MotorNav(
     /** Lo de Ajustes que vive en el motor: el perfil y los DLC los cambia tambien otro dispositivo. */
     val ajustesNav: StateFlow<AjustesNav?> = _ajustesNav.asStateFlow()
 
+    private val _entrega = MutableStateFlow<EntregaNav?>(null)
+    val entrega: StateFlow<EntregaNav?> = _entrega.asStateFlow()
+    private var cierreEntrega: Job? = null
+
     private val _reporte = MutableStateFlow<EstadoReporte?>(null)
     val reporte: StateFlow<EstadoReporte?> = _reporte.asStateFlow()
 
@@ -103,6 +110,9 @@ class MotorNav(
     }
     private val voz = Voz(contexto) { id -> enMotor { llamar("audioTermino", id) } }
     private val almacen = contexto.getSharedPreferences("truckdash_motor", Context.MODE_PRIVATE)
+
+    private val _apariencia = MutableStateFlow(aparienciaGuardada(almacen.getString("truckdash_settings", null)))
+    val apariencia: StateFlow<AparienciaMapa> = _apariencia.asStateFlow()
 
     private var js: QuickJSContext? = null
     private val funciones = HashMap<String, JSFunction>()
@@ -142,7 +152,12 @@ class MotorNav(
             val guardado = JSONObject()
             for ((k, v) in almacen.all) if (v is String) guardado.put(k, v)
             val tablet = contexto.resources.configuration.smallestScreenWidthDp >= 600
-            c.evaluate("var almacenInicial = $guardado; var esTablet = $tablet;", "almacen.js")
+            val zona = JSONObject.quote(TimeZone.getDefault().id)
+            val idioma = JSONObject.quote(Locale.getDefault().toLanguageTag())
+            c.evaluate(
+                "var almacenInicial = $guardado; var esTablet = $tablet; var zonaTelefono = $zona; var idiomaTelefono = $idioma;",
+                "almacen.js",
+            )
             val fuente = contexto.assets.open("motor/motor.js").bufferedReader().use { it.readText() }
             c.evaluate(fuente, "motor.js")
             motorObjeto = c.globalObject.getJSObject("motor")
@@ -207,11 +222,12 @@ class MotorNav(
     }
 
     fun ponerVariante(v: VarianteMapa) {
-        if (v.id == varianteActual) return
-        varianteActual = v.id
+        val clave = "${v.id}|${v.raiz}"
+        if (clave == varianteActual) return
+        varianteActual = clave
         enMotor {
             if (asegurarIniciado()) {
-                llamar("ponerVariante", v.id, v.version, v.juego, v.proyeccion, v.nombre, v.centro.lng, v.centro.lat)
+                llamar("ponerVariante", v.id, v.version, v.juego, v.proyeccion, v.nombre, v.centro.lng, v.centro.lat, v.raiz.orEmpty(), v.logosPropios)
             }
         }
     }
@@ -248,6 +264,17 @@ class MotorNav(
     fun cadaSalida(valor: Boolean) = pedir("cadaSalida", valor)
     fun dlcAutomatico(auto: Boolean) = pedir("dlcAutomatico", auto)
     fun dlcActivo(juego: String, id: String, activo: Boolean) = pedir("dlcActivo", juego, id, activo)
+    fun moneda(valor: String) = pedir("moneda", valor)
+    fun reloj(valor: String) = pedir("reloj", valor)
+    fun miniHud(clave: String, valor: Boolean) = pedir("miniHud", clave, valor)
+    fun apariencia(clave: String, valor: Any) = pedir("apariencia", clave, valor)
+    fun liviano(modo: Boolean, sinRuteo: Boolean) = pedir("liviano", modo, sinRuteo)
+    fun rutaEnVivo(valor: Boolean) = pedir("rutaEnVivo", valor)
+    fun reiniciarSesion() = pedir("reiniciarSesion")
+    fun cerrarEntrega() {
+        cierreEntrega?.cancel()
+        _entrega.value = null
+    }
 
     fun empezarDemo() = pedir("demo")
 
@@ -287,6 +314,8 @@ class MotorNav(
     fun convoyIngresos(valor: Boolean) = pedir("convoyIngresos", valor)
     fun convoySilencio(valor: Boolean) = pedir("convoySilencio", valor)
     fun convoyMarcas(valor: Boolean) = pedir("convoyMarcas", valor)
+    fun convoyMirar(codigo: String) = pedir("convoyMirar", codigo)
+    fun convoyDejarDeMirar() = pedir("convoyDejarDeMirar")
     fun convoySalir() = pedir("convoySalir")
     fun convoyTerminar() = pedir("convoyTerminar")
     fun convoyEchar(id: String) = pedir("convoyEchar", id)
@@ -324,7 +353,16 @@ class MotorNav(
     }
 
     private fun leerAjustes() {
-        (llamarDirecto("ajustesNav") as? String)?.let(::parsearAjustesNav)?.let { _ajustesNav.value = it }
+        val a = (llamarDirecto("ajustesNav") as? String)?.let(::parsearAjustesNav) ?: return
+        _ajustesNav.value = a
+        _apariencia.value = _apariencia.value.copy(
+            colorRuta = a.colorRuta,
+            tamanoCamion = a.tamanoCamion,
+            baseReal = a.baseReal,
+            desvanecerBotones = a.desvanecerBotones,
+            mantenerBrujula = a.mantenerBrujula,
+            // liviano no: vale al volver a abrir, y el mapa ya nacio con el de antes.
+        )
     }
 
     /** Lo que se ve es lo que se manda: el texto se arma al abrir, como en la web. */
@@ -416,6 +454,15 @@ class MotorNav(
                 180,
             )
         }
+        s.objeto("entrega")?.let { e ->
+            val tarjeta = parsearEntrega(e)
+            _entrega.value = tarjeta
+            cierreEntrega?.cancel()
+            cierreEntrega = alcance.launch {
+                delay(tarjeta.duraMs)
+                _entrega.value = null
+            }
+        }
         s.objeto("reporte")?.let { r ->
             _reporte.value = EstadoReporte(r.texto("estado").orEmpty(), r.texto("texto").orEmpty(), r.texto("boton"))
         }
@@ -480,10 +527,12 @@ class MotorNav(
     }
 
     private fun bajar(id: Int, url: String) {
-        _bajando.value += 1
+        // El aviso dice "bajando las rutas": las tasas o las voces no son eso, y sin red tardan.
+        val esGrafo = ArchivosMapa.esBinario(url)
+        if (esGrafo) _bajando.value += 1
         alcance.launch {
             val r = archivos.pedir(url)
-            _bajando.value -= 1
+            if (esGrafo) _bajando.value -= 1
             enMotor {
                 val cuerpo: Any = when {
                     r.bytes == null -> ""

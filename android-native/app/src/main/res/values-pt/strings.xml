@@ -96,8 +96,6 @@
     <string name="cmd_tecla_mala">O cliente do PC não aceita essa tecla</string>
     <string name="cmd_fallo">Falha no comando: %1$s</string>
     <string name="aviso_multa">Multa de %1$s</string>
-    <string name="aviso_entregado">Frete entregue %1$s</string>
-    <string name="aviso_cancelado">Frete cancelado</string>
 
     <string name="mapa_sin_camion">Ainda sem caminhão</string>
     <string name="mapa_sin_camion_ayuda">Conecte ao seu PC para ver seu caminhão no mapa.</string>
@@ -334,4 +332,14 @@
     <string name="sin_internet_listo">Baixado · %1$d MB</string>
     <string name="sin_internet_borrar">Apagar</string>
     <string name="sin_internet_error">Não foi possível baixar. Verifique sua conexão e tente de novo.</string>
+    <string name="convoy_mirar">Assistir a um comboio</string>
+    <string name="ajustes_segundo_plano">Continuar navegando em segundo plano</string>
+    <string name="ajustes_segundo_plano_ayuda">A voz, o overlay do jogo e a sua rota continuam quando você muda para outro app, como o Moonlight. Mostra uma notificação e gasta mais bateria.</string>
+    <string name="ajustes_flotante">Janela flutuante ao sair do app</string>
+    <string name="ajustes_flotante_ayuda">Se você sair do app dirigindo, fica uma janelinha com o mapa e a próxima curva por cima do outro app.</string>
+    <string name="servicio_canal">Navegação</string>
+    <string name="servicio_activo">Navegando em segundo plano</string>
+    <string name="mapa_local">montado no PC</string>
+    <string name="compartir">Compartilhar</string>
+    <string name="stats_buscar_conductor">Procurar um motorista</string>
 </resources>

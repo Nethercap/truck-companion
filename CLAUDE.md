@@ -894,6 +894,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   voz (lider es por navegador, ver `requestLeadership`: otro dispositivo no le saca nada).
   Por LAN abre la conexion solo de plan (`connectLanPlan`) como la web. Los viajes de la
   cuenta los guarda el cliente de la PC; la app guarda su historial local, como la web.
+- Con una sesion abierta corre `ServicioManejo` (foreground, `connectedDevice`: dataSync se
+  corta a las 6 horas), o Android congela la app con otra adelante y se queda sin voz, overlay
+  ni ruta en el mapa en vivo (quien juega por Moonlight en el mismo telefono). Lo prende y lo
+  apaga `Contenedor`, solo con la app adelante porque Android no deja desde atras. Sale solo
+  a los 10 min sin juego (supuesto 8). Apagado en Ajustes, se corta al minuto como antes.
+  La ventana flotante es el PiP de Android: `MainActivity`, `flotante` de `MapaScreen`.
+- Lo de apariencia del mapa (`AparienciaMapa`) lo guarda la web como todos sus ajustes y Kotlin
+  lo lee de `truckdash_settings` sin esperar al motor: liviano tiene que estar antes de que
+  nazca el mapa. `liteMode` vale al volver a abrir, como en la web al recargar.
+- Mapas armados en la PC: solo por LAN (`probarMapasLocales`), con `raiz` en `VarianteMapa` y en
+  `ponerVariante`. No se ofrecen para bajar ni en el mapa en vivo (`esLocal`).
 - La navegacion es el codigo de la web corriendo en QuickJS, no una copia en Kotlin:
   `tools/armar_motor.js` arma al compilar `motor/puente.js` (un navegador de mentira), proj4,
   `variants.js`, `pure.js`, i18n, las declaraciones de `app.js` que hacen falta (por clausura
@@ -927,8 +938,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   una copia de cuando se compilo. Publicar un mapa no pide una version nueva de la app.
 - Una ruta nativa nueva se prueba con `android-native/tools/pc_falsa.py` (camion por la
   ruta demo con `build_payload` real, por LAN o contra un relay local) en el emulador.
-  Sin probar todavia: un telefono de verdad, el juego de verdad, una cuenta de verdad y oir
-  la voz.
+  Con `--entrega S` manda un peaje, una multa y la entrega, y con `--mapa-local` sirve
+  `/localmap/` con Range como el cliente. Sin probar todavia: un telefono de verdad, el juego
+  de verdad, una cuenta de verdad y oir la voz.
 
 ## Supuestos que ya rompieron cosas (10-10-2026)
 

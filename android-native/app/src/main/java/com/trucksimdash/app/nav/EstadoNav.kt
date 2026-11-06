@@ -75,6 +75,42 @@ data class EstadoNav(
     val avisoRuta: String? = null,
     val actualizarCliente: AvisoVersion? = null,
     val perfil: String = "fastest",
+    /** El pago con la conversion a la moneda de la persona, si la eligio. */
+    val pagoTrabajo: String? = null,
+    val hora12: Boolean = false,
+    /** Lo que se eligio en Ajustes para el mini-HUD, ya en texto. */
+    val miniHud: List<String> = emptyList(),
+    val sesion: TotalesSesion? = null,
+)
+
+/** Peajes, multas y ferries desde que se abrio: la tarjeta de la sesion de la web. */
+@Immutable
+data class TotalesSesion(val filas: List<Pair<String, String>>, val hayAlgo: Boolean, val reiniciar: String)
+
+/** "Trabajo entregado": lo que paso en el viaje, tal como lo arma deliverySummary. */
+@Immutable
+data class EntregaNav(
+    val titulo: String,
+    val ruta: String?,
+    val carga: String?,
+    val filas: List<Pair<String, String>>,
+    val cerrar: String,
+    val duraMs: Long,
+)
+
+private fun pares(lista: kotlinx.serialization.json.JsonArray?): List<Pair<String, String>> = lista?.mapNotNull { fila ->
+    val a = fila as? kotlinx.serialization.json.JsonArray ?: return@mapNotNull null
+    val k = (a.getOrNull(0) as? JsonPrimitive)?.content ?: return@mapNotNull null
+    k to ((a.getOrNull(1) as? JsonPrimitive)?.content ?: "")
+} ?: emptyList()
+
+internal fun parsearEntrega(o: JsonObject): EntregaNav = EntregaNav(
+    titulo = o.texto("titulo").orEmpty(),
+    ruta = o.texto("ruta"),
+    carga = o.texto("carga"),
+    filas = pares(o.lista("filas")),
+    cerrar = o.texto("cerrar").orEmpty(),
+    duraMs = o.numero("ms")?.toLong() ?: 90_000L,
 )
 
 /** El cliente de la PC tiene una version nueva. */
@@ -177,6 +213,12 @@ internal fun parsearNavegacion(texto: String): EstadoNav? {
             AvisoVersion(a.texto("texto").orEmpty(), a.texto("boton").orEmpty(), a.texto("url") ?: return@let null)
         },
         perfil = d.texto("perfil") ?: "fastest",
+        pagoTrabajo = d.texto("pagoTrabajo"),
+        hora12 = d.logico("hora12") ?: false,
+        miniHud = d.lista("miniHud")?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList(),
+        sesion = d.objeto("sesion")?.let {
+            TotalesSesion(pares(it.lista("filas")), it.logico("hayAlgo") ?: false, it.texto("reiniciar").orEmpty())
+        },
     )
 }
 

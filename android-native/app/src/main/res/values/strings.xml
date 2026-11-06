@@ -101,8 +101,6 @@
     <string name="cmd_tecla_mala">The PC client doesn\'t accept that key</string>
     <string name="cmd_fallo">Command failed: %1$s</string>
     <string name="aviso_multa">Fined %1$s</string>
-    <string name="aviso_entregado">Job delivered %1$s</string>
-    <string name="aviso_cancelado">Job cancelled</string>
 
     <!-- Mapa -->
     <string name="mapa_sin_camion">No truck yet</string>
@@ -340,4 +338,14 @@
     <string name="sin_internet_listo">Downloaded · %1$d MB</string>
     <string name="sin_internet_borrar">Delete</string>
     <string name="sin_internet_error">It didn\'t download. Check your connection and try again.</string>
+    <string name="convoy_mirar">Watch a convoy</string>
+    <string name="ajustes_segundo_plano">Keep navigating in the background</string>
+    <string name="ajustes_segundo_plano_ayuda">The voice, the in-game overlay and your route keep going when you switch to another app, like Moonlight. It shows a notification and uses more battery.</string>
+    <string name="ajustes_flotante">Floating window when leaving the app</string>
+    <string name="ajustes_flotante_ayuda">If you leave the app while driving, a small window with the map and the next turn stays on top of the other app.</string>
+    <string name="servicio_canal">Navigation</string>
+    <string name="servicio_activo">Still navigating in the background</string>
+    <string name="mapa_local">built on the PC</string>
+    <string name="compartir">Share</string>
+    <string name="stats_buscar_conductor">Look up a driver</string>
 </resources>

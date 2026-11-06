@@ -25,14 +25,21 @@ data class VarianteMapa(
     /** La variante de la que esta es la version anterior del juego. */
     val anteriorDe: String?,
     val centro: LngLat,
+    /** Armado con "Build my map": se lee de la PC por la red de la casa (/localmap/<juego>). */
+    val raiz: String? = null,
+    val logosPropios: Boolean = false,
 ) {
-    val urlDeDescarga: String get() = "${Red.MAPAS}/vector/$id.pmtiles?v=$version"
+    val esLocal: Boolean get() = raiz != null
+    val urlDeDescarga: String get() = "${raiz ?: Red.MAPAS}/vector/$id.pmtiles?v=$version"
     val urlTiles: String get() = "pmtiles://$urlDeDescarga"
-    val urlCiudades: String get() = "${Red.MAPAS}/$id/Cities.json?v=$version"
+    val urlCiudades: String get() = "${raiz ?: Red.MAPAS}/$id/Cities.json?v=$version"
 
-    /** El mapa base real (costa, lagos, rios) debajo de las rutas. */
+    /**
+     * El mapa base real (costa, lagos, rios) debajo de las rutas. Uno armado puede no tener
+     * nada que ver con la tierra de verdad (basemapFitsCities en la web lo mide): va liso.
+     */
     val mapaBase: String?
-        get() = BASE_POR_PROYECCION[proyeccion]?.let { "${Red.MAPAS}/basemap/$it.geojson?v=$VERSION_MAPA_BASE" }
+        get() = if (esLocal) null else BASE_POR_PROYECCION[proyeccion]?.let { "${Red.MAPAS}/basemap/$it.geojson?v=$VERSION_MAPA_BASE" }
 
     private companion object {
         // BASEMAP_BY_PROJECTION en app.js.
@@ -59,6 +66,8 @@ class CatalogoMapas(val variantes: Map<String, VarianteMapa>) {
     /** Lo que va al mapa de este juego: lo elegido a mano, o lo detectado. */
     fun resolver(juego: String, mods: ModsDetectados?, manual: String?): String {
         if (manual != null && variantes[manual]?.juego == juego) return manual
+        // `modsAuto && localMaps[g]` en resolveModVariant: gana el que armo la persona.
+        locales.firstOrNull { it.juego == juego }?.let { return it.id }
         return resolverPorMods(juego, mods?.get(juego))
     }
 
@@ -108,9 +117,17 @@ class CatalogoMapas(val variantes: Map<String, VarianteMapa>) {
     fun varianteCompartida(id: String): String = variantes[id]?.anteriorDe ?: id
 
     /** Las que se ofrecen en el mapa en vivo: sin las versiones anteriores. */
-    val paraMapaEnVivo: List<VarianteMapa> get() = variantes.values.filter { it.anteriorDe == null }
+    val paraMapaEnVivo: List<VarianteMapa> get() = variantes.values.filter { it.anteriorDe == null && !it.esLocal }
 
-    fun deJuego(juego: String): List<VarianteMapa> = variantes.values.filter { it.juego == juego }
+    fun deJuego(juego: String): List<VarianteMapa> = variantes.values.filter { it.juego == juego && !it.esLocal }
+
+    val locales: List<VarianteMapa> get() = variantes.values.filter { it.esLocal }
+
+    /** Los mapas de R2, los que se puede bajar sin red. */
+    val publicadas: List<VarianteMapa> get() = variantes.values.filter { !it.esLocal }
+
+    fun conLocales(lista: List<VarianteMapa>): CatalogoMapas =
+        CatalogoMapas(variantes.filterValues { !it.esLocal } + lista.associateBy { it.id })
 
     companion object {
         val VACIO = CatalogoMapas(emptyMap())

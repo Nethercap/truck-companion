@@ -1,5 +1,7 @@
 package com.trucksimdash.app.ui
 
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.OutlinedIconButton
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -97,11 +99,11 @@ fun StatsScreen(cuenta: CuentaRepo, ajustes: Ajustes, catalogo: CatalogoMapas, a
     val estado by cuenta.estado.collectAsStateWithLifecycle()
     var pantalla by rememberSaveable { mutableStateOf("") }
     var perfil by rememberSaveable { mutableStateOf<String?>(null) }
+    perfil?.let { nombre ->
+        PerfilScreen(cuenta, nombre, ajustes) { perfil = null }
+        return
+    }
     if (estado is EstadoCuenta.Vinculada) {
-        perfil?.let { nombre ->
-            PerfilScreen(cuenta, nombre, ajustes) { perfil = null }
-            return
-        }
         when (pantalla) {
             "mapa" -> {
                 val juego = cuenta.datos.collectAsStateWithLifecycle().value.resumenes.firstOrNull()?.juego ?: "ats"
@@ -121,7 +123,7 @@ fun StatsScreen(cuenta: CuentaRepo, ajustes: Ajustes, catalogo: CatalogoMapas, a
     when (val e = estado) {
         EstadoCuenta.Cargando -> Centrado { CircularProgressIndicator(strokeWidth = 3.dp) }
         EstadoCuenta.SinVincular, EstadoCuenta.VinculoVencido -> Box(Modifier.fillMaxSize()) {
-            SinVincular(cuenta, vencido = e == EstadoCuenta.VinculoVencido)
+            SinVincular(cuenta, vencido = e == EstadoCuenta.VinculoVencido) { perfil = it }
             BotonAjustes(alAjustes, Modifier.align(Alignment.TopEnd))
         }
         is EstadoCuenta.Vinculando -> Vinculando(e, cuenta)
@@ -139,10 +141,11 @@ private fun Centrado(contenido: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SinVincular(cuenta: CuentaRepo, vencido: Boolean) {
+private fun SinVincular(cuenta: CuentaRepo, vencido: Boolean, alPerfil: (String) -> Unit) {
     val contexto = LocalContext.current
     val alcance = rememberCoroutineScope()
     var error by remember { mutableStateOf(false) }
+    var buscado by rememberSaveable { mutableStateOf("") }
     Centrado {
         Column(Modifier.widthIn(max = 420.dp)) {
             Text(stringResource(R.string.stats_titulo), style = MaterialTheme.typography.headlineMedium)
@@ -169,6 +172,23 @@ private fun SinVincular(cuenta: CuentaRepo, vencido: Boolean) {
             ) { Text(stringResource(R.string.stats_vincular)) }
             Spacer(Modifier.height(10.dp))
             Text(stringResource(R.string.stats_sin_contrasena), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoApagado)
+            // El perfil publico de otro conductor no pide cuenta, igual que /u/?nombre en la web.
+            Spacer(Modifier.height(24.dp))
+            Text(stringResource(R.string.stats_buscar_conductor), style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = buscado,
+                    onValueChange = { buscado = it.take(32) },
+                    label = { Text(stringResource(R.string.seguir_nombre)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedIconButton(
+                    onClick = { alPerfil(buscado.trim()) },
+                    enabled = buscado.isNotBlank(),
+                    modifier = Modifier.padding(start = 8.dp),
+                ) { Icon(Icons.Filled.Search, stringResource(R.string.stats_buscar_conductor)) }
+            }
         }
     }
 }

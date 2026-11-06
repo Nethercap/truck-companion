@@ -94,7 +94,11 @@ var AbortController = class { constructor() { this.signal = {}; } abort() {} };
 var navigator = {
   // deviceInfo de la web: Android sin "Mobile" es una tablet. Es lo que los demas dispositivos
   // de la sesion leen cuando la voz esta aca.
-  language: 'en', languages: ['en'], platform: 'Android', maxTouchPoints: 5,
+  // El idioma del telefono solo sirve para adivinar la moneda (countryFromLanguages): la web
+  // usa el suyo, que le dice Kotlin.
+  language: typeof idiomaTelefono !== 'undefined' ? idiomaTelefono : 'en',
+  languages: [typeof idiomaTelefono !== 'undefined' ? idiomaTelefono : 'en'],
+  platform: 'Android', maxTouchPoints: 5,
   userAgent: typeof esTablet !== 'undefined' && esTablet ? 'TruckDash-Android' : 'TruckDash-Android Mobile',
   clipboard: nada, onLine: true, standalone: false,
 };
@@ -291,7 +295,9 @@ Number.prototype.toLocaleString = function (lang, op) {
 };
 var Intl = {
   DateTimeFormat: function () {
-    return { resolvedOptions: () => ({ hour12: false, timeZone: 'UTC', locale: 'en' }), format: (d) => String(d), formatToParts: () => [] };
+    // La zona del telefono: de ahi sale la moneda local (browserCurrency).
+    const timeZone = typeof zonaTelefono !== 'undefined' ? zonaTelefono : 'UTC';
+    return { resolvedOptions: () => ({ hour12: false, timeZone, locale: 'en' }), format: (d) => String(d), formatToParts: () => [] };
   },
   NumberFormat: function (lang, op) { return { format: (n) => Number(n).toLocaleString(lang, op) }; },
   Collator: function () { return { compare: (a, b) => (a < b ? -1 : a > b ? 1 : 0) }; },

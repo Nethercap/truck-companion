@@ -1,6 +1,14 @@
 package com.trucksimdash.app.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +30,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,12 +41,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trucksimdash.app.R
 import com.trucksimdash.app.core.Ajustes
+import com.trucksimdash.app.core.Destino
 import com.trucksimdash.app.core.Preferencias
+import com.trucksimdash.app.core.Red
 import com.trucksimdash.app.nav.AjustesNav
 import com.trucksimdash.app.nav.MotorNav
 import com.trucksimdash.app.nav.OpcionNav
@@ -69,6 +84,131 @@ private fun TarjetaVoz(ajustes: Ajustes, prefs: Preferencias, motor: MotorNav, n
         Selector(nav.t("settingsVoiceTiming"), nav.momentos, nav.momento) { motor.momentoVoz(it) }
         Spacer(Modifier.height(6.dp))
         Text(nav.t("settingsVoiceHint"), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+    }
+}
+
+/** Como se ve el mapa y lo que muestra: las mismas partes de Ajustes de la web, con sus textos. */
+@Composable
+fun AjustesDelMapa(motor: MotorNav) {
+    val nav by motor.ajustesNav.collectAsStateWithLifecycle()
+    val n = nav ?: return
+    Tarjeta {
+        TituloSeccion(n.t("settingsMiniHudTitle").substringBefore('(').trim().trimEnd(':'))
+        n.miniHud.forEach { item ->
+            Row(
+                Modifier.fillMaxWidth().clickable { motor.miniHud(item.id, !item.activo) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = item.activo, onCheckedChange = null, modifier = Modifier.padding(10.dp))
+                Text(item.texto, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+    Tarjeta {
+        TituloSeccion(n.t("settingsRouteColorTitle").trimEnd(':'))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 6.dp, bottom = 10.dp)) {
+            n.colores.forEach { c ->
+                val elegido = n.colorRuta.equals(c.id, ignoreCase = true)
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(colorDe(c.id))
+                        .border(if (elegido) 3.dp else 1.dp, if (elegido) Paleta.Texto else Paleta.Borde, CircleShape)
+                        .clickable(onClickLabel = c.texto) { motor.apariencia("color", c.id) }
+                        .semantics { contentDescription = c.texto },
+                )
+            }
+        }
+        Deslizador(
+            n.t("settingsNavZoomTitle"), n.t("navZoomFar"), n.t("navZoomNear"), n.t("navZoomDefault"),
+            n.zoomNav, 8.0..13.0, 0.5, n.zoomDefecto,
+        ) { motor.apariencia("zoom", it) }
+        Text(n.t("settingsNavZoomHint"), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+        Spacer(Modifier.height(10.dp))
+        Deslizador(
+            n.t("settingsTruckSizeTitle"), n.t("truckSizeNormal"), n.t("truckSizeHuge"), n.t("navZoomDefault"),
+            n.tamanoCamion, 1.0..3.0, 0.25, n.tamanoDefecto,
+        ) { motor.apariencia("camion", it) }
+    }
+    Tarjeta {
+        TituloSeccion(n.t("settingsButtonsTitle").trimEnd(':'))
+        FilaInterruptor(n.t("settingsFadeButtons"), null, n.desvanecerBotones) { motor.apariencia("desvanecer", it) }
+        FilaInterruptor(n.t("settingsKeepCompass"), null, n.mantenerBrujula) { motor.apariencia("brujula", it) }
+    }
+    Tarjeta {
+        TituloSeccion(n.t("settingsBaseTitle").trimEnd(':'))
+        FilaInterruptor(n.t("settingsRealBase"), n.t("settingsRealBaseHint"), n.baseReal) { motor.apariencia("base", it) }
+        Spacer(Modifier.height(6.dp))
+        TituloSeccion(n.t("settingsLiteTitle").trimEnd(':'))
+        FilaInterruptor(n.t("settingsLiteMode"), null, n.liviano) { motor.liviano(it, n.livianoSinRuteo) }
+        FilaInterruptor(n.t("settingsLiteNoRouting"), n.t("settingsLiteHint"), n.livianoSinRuteo, habilitado = n.liviano) {
+            motor.liviano(true, it)
+        }
+    }
+    Tarjeta {
+        TituloSeccion(n.t("settingsCurrencyTitle").trimEnd(':'))
+        Selector(null, n.monedas, n.moneda) { motor.moneda(it) }
+        Text(n.t("currencyHint"), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+    }
+}
+
+/** Con el zoom y el camion, el mapa no se ve desde Ajustes: el numero dice como quedo. */
+@Composable
+private fun Deslizador(
+    titulo: String,
+    izquierda: String,
+    derecha: String,
+    defecto: String,
+    valor: Double,
+    rango: ClosedFloatingPointRange<Double>,
+    paso: Double,
+    valorDefecto: Double,
+    alCambiar: (Double) -> Unit,
+) {
+    var arrastrando by remember { mutableStateOf<Float?>(null) }
+    val pasos = ((rango.endInclusive - rango.start) / paso).toInt() - 1
+    Text(titulo.trimEnd(':'), style = MaterialTheme.typography.labelMedium, color = Paleta.TextoSuave)
+    Slider(
+        value = arrastrando ?: valor.toFloat(),
+        onValueChange = { arrastrando = it },
+        onValueChangeFinished = {
+            arrastrando?.let { alCambiar(it.toDouble()) }
+            arrastrando = null
+        },
+        valueRange = rango.start.toFloat()..rango.endInclusive.toFloat(),
+        steps = pasos,
+    )
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(izquierda, style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+        Spacer(Modifier.weight(1f))
+        Text(derecha, style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+    }
+    if (valor != valorDefecto) TextButton(onClick = { alCambiar(valorDefecto) }) { Text(defecto) }
+}
+
+/** El panel de la web en otro aparato, con el codigo puesto, y el overlay para OBS. */
+@Composable
+fun OtrosDispositivos(motor: MotorNav, prefs: Preferencias) {
+    val nav by motor.ajustesNav.collectAsStateWithLifecycle()
+    val n = nav ?: return
+    val contexto = LocalContext.current
+    val codigo = (prefs.ultimoDestino as? Destino.Codigo)?.codigo
+    Tarjeta {
+        TituloSeccion(n.t("dashSecondDeviceTitle").trimEnd(':'))
+        Text(n.t("dashConnectHint"), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+        OutlinedButton(
+            onClick = {
+                val url = "${Red.WEB}/dash/" + if (codigo != null) "?code=$codigo" else ""
+                contexto.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Truck Dash", url))
+                Toast.makeText(contexto, n.t("convoyCopied"), Toast.LENGTH_SHORT).show()
+            },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        ) { Text(n.t("dashCopyLink")) }
+        OutlinedButton(
+            onClick = { abrirEnNavegador(contexto, "${Red.WEB}/overlay/?setup=1" + if (codigo != null) "&code=$codigo" else "") },
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        ) { Text(n.t("obsOverlayLink")) }
     }
 }
 
@@ -104,7 +244,7 @@ private fun TarjetaRuta(nav: AjustesNav, motor: MotorNav, alReportar: () -> Unit
 }
 
 @Composable
-private fun Selector(
+internal fun Selector(
     titulo: String?,
     opciones: List<OpcionNav>,
     elegida: String?,

@@ -1,5 +1,6 @@
 package com.trucksimdash.app.mapa
 
+import com.trucksimdash.app.nav.AparienciaMapa
 import kotlinx.serialization.json.JsonPrimitive
 
 // El estilo del mapa, port de buildVecLayers y buildBaseLayers de app.js: los
@@ -74,11 +75,31 @@ internal const val COLOR_AUTOPISTA = "#ff8a3d"
 
 /** Con una ruta en pantalla la autopista se apaga, o se confunde con ella (FREEWAY_COLOR_WITH_ROUTE). */
 internal const val COLOR_AUTOPISTA_CON_RUTA = "#e3e6ea"
-private const val COLOR_RUTA = "#a30000" // routeColor por defecto de la web
 
-internal fun estiloDe(v: VarianteMapa, latCentro: Double): String {
+/**
+ * updateTruckArrowSize de app.js: la flecha crece al acercarse, entre 0,8 y 1,3 (a zoom 10, 1),
+ * por el tamano elegido en Ajustes.
+ */
+internal fun tamanoFlecha(k: Double): String =
+    """["interpolate",["linear"],["zoom"],8.34,${0.8 * k},12.5,${1.3 * k}]"""
+
+internal fun estiloDe(v: VarianteMapa, latCentro: Double, a: AparienciaMapa = AparienciaMapa()): String {
     val l = cadena(v.juego)
-    val base = v.mapaBase
+    val base = if (a.baseReal) v.mapaBase else null
+    // Lo que el modo liviano de la web saca: el borde de la ruta y los POIs de lejos.
+    val zoomPoi = if (a.liviano) 9 else 7
+    val bordeRuta = if (a.liviano) {
+        ""
+    } else {
+        """{"id":"route-casing","type":"line","source":"${CapasMapa.FUENTE_RUTA}","layout":{"line-cap":"round","line-join":"round"},
+         "paint":{"line-color":"#0d0f12","line-width":["interpolate",["linear"],["zoom"],5,5.5,12,9,17,18],"line-opacity":0.85}},"""
+    }
+    val bordeSiguiente = if (a.liviano) {
+        ""
+    } else {
+        """{"id":"route-next-casing","type":"line","source":"${CapasMapa.FUENTE_RUTA_SIGUIENTE}","layout":{"line-cap":"round","line-join":"round"},
+         "paint":{"line-color":"#0d0f12","line-width":["interpolate",["linear"],["zoom"],5,4.5,12,7.5,17,15],"line-opacity":0.6}},"""
+    }
     val iconosPoi = CapasMapa.ICONOS_POI.joinToString(",") { cadena(it) }
     val fuenteBase = if (base != null) """"base":{"type":"geojson","data":${cadena(base)}},""" else ""
     val capasBase = if (base != null) {
@@ -136,12 +157,12 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double): String {
          "filter":["all",["==",["get","type"],"poi"],["==",["get","poiType"],"company"]],
          "layout":{"icon-image":["concat",${cadena(CapasMapa.PREFIJO_EMPRESA)},["get","sprite"]],
                    "icon-size":["interpolate",["linear"],["zoom"],9,0.55,12,0.8,15,1],"icon-padding":1}},
-        {"id":"poi","type":"symbol","source":"vec","source-layer":$l,"minzoom":7,
+        {"id":"poi","type":"symbol","source":"vec","source-layer":$l,"minzoom":$zoomPoi,
          "filter":["all",["==",["get","type"],"poi"],["in",["get","sprite"],["literal",[$iconosPoi]]],["!",["in",["get","poiType"],["literal",["ferry","train"]]]]],
          "layout":{"icon-image":["get","sprite"],"icon-size":0.8,"icon-allow-overlap":true,"icon-ignore-placement":true}},
-        {"id":"car-parking","type":"symbol","source":"${CapasMapa.FUENTE_ESTACIONAMIENTO}","minzoom":7,
+        {"id":"car-parking","type":"symbol","source":"${CapasMapa.FUENTE_ESTACIONAMIENTO}","minzoom":$zoomPoi,
          "layout":{"icon-image":"car_parking","icon-size":0.8,"icon-allow-overlap":true,"icon-ignore-placement":true,"visibility":"none"}},
-        {"id":"fuel","type":"symbol","source":"${CapasMapa.FUENTE_COMBUSTIBLE}","minzoom":7,
+        {"id":"fuel","type":"symbol","source":"${CapasMapa.FUENTE_COMBUSTIBLE}","minzoom":$zoomPoi,
          "layout":{"icon-image":"gas_ico","icon-size":0.8,"icon-allow-overlap":true,"icon-ignore-placement":true}},
         {"id":"atlas","type":"symbol","source":"${CapasMapa.FUENTE_ATLAS}","minzoom":6,
          "filter":["any",["==",["get","k"],"t"],[">=",["zoom"],8]],
@@ -167,14 +188,12 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double): String {
          "paint":{"text-color":"#ffffff","text-halo-color":"#000","text-halo-width":1.4}},
         {"id":"rastro-line","type":"line","source":"${CapasMapa.FUENTE_RASTRO}",
          "layout":{"line-cap":"round","line-join":"round"},"paint":{"line-color":"#3b9eff","line-width":3,"line-opacity":0.55}},
-        {"id":"route-casing","type":"line","source":"${CapasMapa.FUENTE_RUTA}","layout":{"line-cap":"round","line-join":"round"},
-         "paint":{"line-color":"#0d0f12","line-width":["interpolate",["linear"],["zoom"],5,5.5,12,9,17,18],"line-opacity":0.85}},
+        $bordeRuta
         {"id":"route-line","type":"line","source":"${CapasMapa.FUENTE_RUTA}","layout":{"line-cap":"round","line-join":"round"},
-         "paint":{"line-color":"$COLOR_RUTA","line-width":["interpolate",["linear"],["zoom"],5,3,12,5.5,17,13],"line-opacity":0.95}},
-        {"id":"route-next-casing","type":"line","source":"${CapasMapa.FUENTE_RUTA_SIGUIENTE}","layout":{"line-cap":"round","line-join":"round"},
-         "paint":{"line-color":"#0d0f12","line-width":["interpolate",["linear"],["zoom"],5,4.5,12,7.5,17,15],"line-opacity":0.6}},
+         "paint":{"line-color":"${a.colorRuta}","line-width":["interpolate",["linear"],["zoom"],5,3,12,5.5,17,13],"line-opacity":0.95}},
+        $bordeSiguiente
         {"id":"route-next-line","type":"line","source":"${CapasMapa.FUENTE_RUTA_SIGUIENTE}","layout":{"line-cap":"round","line-join":"round"},
-         "paint":{"line-color":"$COLOR_RUTA","line-width":["interpolate",["linear"],["zoom"],5,2.5,12,4.5,17,11],"line-opacity":0.55,"line-dasharray":[1.5,1.5]}},
+         "paint":{"line-color":"${a.colorRuta}","line-width":["interpolate",["linear"],["zoom"],5,2.5,12,4.5,17,11],"line-opacity":0.55,"line-dasharray":[1.5,1.5]}},
         {"id":"route-ferry-line","type":"line","source":"${CapasMapa.FUENTE_RUTA_FERRY}",
          "paint":{"line-color":"#3b9eff","line-width":3,"line-opacity":0.9,"line-dasharray":[1.5,2]}},
         {"id":"viajes","type":"line","source":"${CapasMapa.FUENTE_RECORRIDO}","layout":{"line-cap":"round","line-join":"round"},
@@ -204,7 +223,7 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double): String {
          "paint":{"icon-opacity":["case",["==",["get","pausado"],1],0.45,1],
                   "text-color":"#e8ecf1","text-halo-color":"#000","text-halo-width":1.2}},
         {"id":"camion-sym","type":"symbol","source":"${CapasMapa.FUENTE_CAMION}",
-         "layout":{"icon-image":"${CapasMapa.IMAGEN_CAMION}","icon-rotate":["get","rumbo"],"icon-rotation-alignment":"map",
+         "layout":{"icon-image":"${CapasMapa.IMAGEN_CAMION}","icon-size":${tamanoFlecha(a.tamanoCamion)},"icon-rotate":["get","rumbo"],"icon-rotation-alignment":"map",
                    "icon-allow-overlap":true,"icon-ignore-placement":true}}
       ]
     }

@@ -6,10 +6,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.util.DisplayMetrics
 import com.trucksimdash.app.core.Red
 import com.trucksimdash.app.cuenta.MapaRecorrido
+import com.trucksimdash.app.nav.AparienciaMapa
 import com.trucksimdash.app.nav.CapasNav
 import com.trucksimdash.app.nav.DestinoNav
 import com.trucksimdash.app.nav.EscudoRuta
@@ -58,6 +61,21 @@ class ControlMapa(
     /** La persona movio el mapa: la camara deja de seguir al camion. */
     var alMoverConLaMano: () -> Unit = {}
 
+    /** Se movio la camara, a lo sumo cinco veces por segundo: las chapitas del convoy. */
+    var alMoverCamara: (() -> Unit)? = null
+    private var ultimoAvisoCamaraMs = 0L
+
+    /** Lo de Ajustes. La base real pide otro estilo; lo demas se le cambia al que esta. */
+    var apariencia: AparienciaMapa = AparienciaMapa()
+        set(valor) {
+            val antes = field
+            field = valor
+            if (antes == valor) return
+            aplicarApariencia()
+            if (antes.baseReal != valor.baseReal) variante?.let { cargar(it, forzar = true, alListo = alListoDeEstilo) }
+        }
+    private var alListoDeEstilo: () -> Unit = {}
+
     /** Mantener apretado sobre el mapa: ahi va un waypoint. */
     var alMantenerApretado: ((LngLat) -> Unit)? = null
 
@@ -94,15 +112,26 @@ class ControlMapa(
             isRotateGesturesEnabled = true
             isTiltGesturesEnabled = false
             isCompassEnabled = true
-            // Abajo, arriba de los botones: arriba va el panel del giro.
-            compassGravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+            // A la izquierda, arriba del mini-HUD: arriba va el panel del giro, y a la derecha los
+            // botones, cuantos sean. Queda siempre a la vista si se pidio en Ajustes.
+            compassGravity = android.view.Gravity.BOTTOM or android.view.Gravity.START
             val d = mapView.resources.displayMetrics.density
-            setCompassMargins(0, 0, (16 * d).toInt(), (190 * d).toInt())
+            setCompassMargins((16 * d).toInt(), 0, 0, (210 * d).toInt())
         }
         mapa.addOnCameraMoveStartedListener { razon ->
             if (razon == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) alMoverConLaMano()
         }
-        mapa.addOnCameraIdleListener { actualizarAnchos() }
+        mapa.addOnCameraIdleListener {
+            actualizarAnchos()
+            alMoverCamara?.invoke()
+        }
+        mapa.addOnCameraMoveListener {
+            val ahora = SystemClock.uptimeMillis()
+            if (ahora - ultimoAvisoCamaraMs >= MS_ENTRE_AVISOS_CAMARA) {
+                ultimoAvisoCamaraMs = ahora
+                alMoverCamara?.invoke()
+            }
+        }
         mapa.addOnMapLongClickListener { punto ->
             val accion = alMantenerApretado ?: return@addOnMapLongClickListener false
             accion(LngLat(punto.longitude, punto.latitude))
@@ -121,9 +150,10 @@ class ControlMapa(
     }
 
     /** Cambia de mapa. Sin efecto si ya es esa variante y version. */
-    fun cargar(v: VarianteMapa, alListo: () -> Unit = {}) {
+    fun cargar(v: VarianteMapa, forzar: Boolean = false, alListo: () -> Unit = {}) {
         val anterior = variante
-        if (anterior != null && anterior.id == v.id && anterior.version == v.version) return
+        if (!forzar && anterior != null && anterior.id == v.id && anterior.version == v.version) return
+        alListoDeEstilo = alListo
         val mismoMundo = anterior?.proyeccion == v.proyeccion
         variante = v
         proyeccion = Proyecciones.de(v.proyeccion)
@@ -132,10 +162,12 @@ class ControlMapa(
         escudosDibujados.clear()
         val lat = if (mismoMundo) mapa.cameraPosition.target?.latitude ?: v.centro.lat else v.centro.lat
         latDeAnchos = lat
-        mapa.setStyle(Style.Builder().fromJson(estiloDe(v, lat))) { s ->
+        val aplicada = apariencia
+        mapa.setStyle(Style.Builder().fromJson(estiloDe(v, lat, aplicada))) { s ->
             if (variante !== v) return@setStyle
             estilo = s
-            s.addImage(CapasMapa.IMAGEN_CAMION, flecha(Color.parseColor("#3B9EFF"), Color.WHITE, 3f))
+            // Se agranda hasta 3,9 veces en Ajustes: va con pixeles de sobra, para que no se vea borrosa.
+            s.addImage(CapasMapa.IMAGEN_CAMION, flecha(Color.parseColor("#3B9EFF"), Color.WHITE, 3f, nitidez = 4))
             for (tono in TONOS_CONDUCTOR + COLOR_OTRO) {
                 s.addImage(CapasMapa.PREFIJO_FLECHA + tono, flecha(Color.parseColor(tono), Color.parseColor("#0D0F12"), 2f))
             }
@@ -146,9 +178,29 @@ class ControlMapa(
                 mapa.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(v.centro.lat, v.centro.lng)).zoom(4.0).bearing(0.0).tilt(0.0).build()
             }
+            if (apariencia != aplicada) aplicarApariencia()
             alListo()
         }
     }
+
+    private fun aplicarApariencia() {
+        mapa.uiSettings.setCompassFadeFacingNorth(!apariencia.mantenerBrujula)
+        val s = estilo ?: return
+        for (id in listOf("route-line", "route-next-line")) {
+            s.getLayer(id)?.setProperties(PropertyFactory.lineColor(apariencia.colorRuta))
+        }
+        s.getLayer("camion-sym")?.setProperties(PropertyFactory.iconSize(Expression.raw(tamanoFlecha(apariencia.tamanoCamion))))
+    }
+
+    /** En la ventana flotante no entra ni se puede tocar. */
+    fun mostrarBrujula(valor: Boolean) {
+        mapa.uiSettings.isCompassEnabled = valor
+    }
+
+    /** Un punto del mapa en la pantalla, en pixeles. */
+    fun aPantalla(p: LngLat): PointF = mapa.projection.toScreenLocation(LatLng(p.lat, p.lng))
+    val anchoPx: Int get() = mapView.width
+    val altoPx: Int get() = mapView.height
 
     private fun bajarIconos(s: Style) {
         val nombres = CapasMapa.ICONOS_POI + CapasMapa.ICONOS_FERRY + CapasMapa.ICONOS_ATLAS
@@ -165,8 +217,12 @@ class ControlMapa(
         // companyIconToken en pure.js: el sprite viene de los tiles, no de la red.
         if (!TOKEN_EMPRESA.matches(token) || !iconosPedidos.add(id)) return
         val s = estilo ?: return
+        // Los de un mapa armado, con los de sus mods; los demas estan en R2 (companyIconUrls).
+        val propio = variante?.takeIf { it.logosPropios }?.raiz?.let { "$it/company-icons/$token.png" }
         alcance.launch {
-            val b = bajarPng("${Red.MAPAS}/vector/company-icons/$token.png?v=$REV_LOGOS_EMPRESA") ?: return@launch
+            val b = propio?.let { bajarPng(it) }
+                ?: bajarPng("${Red.MAPAS}/vector/company-icons/$token.png?v=$REV_LOGOS_EMPRESA")
+                ?: return@launch
             if (estilo === s) s.addImage(id, b)
         }
     }
@@ -240,7 +296,8 @@ class ControlMapa(
             CameraUpdateFactory.newCameraPosition(
                 CameraPosition.Builder(mapa.cameraPosition)
                     .padding(0.0, arriba, 0.0, 0.0)
-                    .tilt(if (conRumbo) 45.0 else 0.0)
+                    // Sin 3D en liviano, como la web.
+                    .tilt(if (conRumbo && !apariencia.liviano) 45.0 else 0.0)
                     .apply { if (!conRumbo) bearing(0.0) }
                     .build(),
             ),
@@ -413,8 +470,8 @@ class ControlMapa(
         return b
     }
 
-    private fun flecha(relleno: Int, borde: Int, anchoBorde: Float): Bitmap {
-        val densidad = mapView.resources.displayMetrics.density
+    private fun flecha(relleno: Int, borde: Int, anchoBorde: Float, nitidez: Int = 1): Bitmap {
+        val densidad = mapView.resources.displayMetrics.density * nitidez
         val lado = (34 * densidad).toInt()
         val b = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
         val c = Canvas(b)
@@ -436,7 +493,7 @@ class ControlMapa(
                 strokeJoin = Paint.Join.ROUND
             },
         )
-        b.density = mapView.resources.displayMetrics.densityDpi
+        b.density = mapView.resources.displayMetrics.densityDpi * nitidez
         return b
     }
 
@@ -490,6 +547,7 @@ class ControlMapa(
         const val ZOOM_SEGUIR = 11.0
         const val ZOOM_SEGUIR_MIN = 7.0
         const val PASO_LAT_ANCHOS = 2.0
+        const val MS_ENTRE_AVISOS_CAMARA = 200L
     }
 }
 

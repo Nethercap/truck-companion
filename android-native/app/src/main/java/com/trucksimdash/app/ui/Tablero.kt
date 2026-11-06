@@ -41,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trucksimdash.app.R
+import com.trucksimdash.app.nav.TotalesSesion
 import com.trucksimdash.app.core.consumo
 import com.trucksimdash.app.core.distancia
 import com.trucksimdash.app.core.duracionMinutos
@@ -392,7 +394,7 @@ fun BloqueViaje(t: Telemetria, millas: Boolean, modifier: Modifier = Modifier) {
 
 /** El trabajo en curso. Sin trabajo no se muestra. */
 @Composable
-fun BloqueTrabajo(t: Telemetria, millas: Boolean, modifier: Modifier = Modifier) {
+fun BloqueTrabajo(t: Telemetria, millas: Boolean, pagoConMoneda: String? = null, modifier: Modifier = Modifier) {
     if (!t.enTrabajo && t.carga == null) return
     Tarjeta(modifier) {
         TituloSeccion(stringResource(R.string.trabajo))
@@ -421,12 +423,22 @@ fun BloqueTrabajo(t: Telemetria, millas: Boolean, modifier: Modifier = Modifier)
             FilaDato(stringResource(R.string.carga), listOfNotNull(it, t.cargaKg?.takeIf { k -> k > 0 }?.let { k -> masa(k, millas) }).joinToString(" · "))
         }
         t.pagoTrabajo?.takeIf { it > 0 }?.let {
-            FilaDato(stringResource(R.string.pago), plata(it, if (t.juego == "ats") "USD" else "EUR"))
+            FilaDato(stringResource(R.string.pago), pagoConMoneda ?: plata(it, if (t.juego == "ats") "USD" else "EUR"))
         }
         t.plazoSegundos?.let { FilaDato(stringResource(R.string.plazo), duracionMinutos(it / 60), colorValor = if (it < 0) Paleta.Rojo else Paleta.Texto) }
         t.danoCarga?.takeIf { it > 0 }?.let {
             FilaDato(stringResource(R.string.dano_carga), "${porcentaje(it)} %", colorValor = if (it > 0.02) Paleta.Ambar else Paleta.Texto)
         }
+    }
+}
+
+/** Peajes, multas y ferries desde que se abrio, con su boton de reiniciar. */
+@Composable
+fun BloqueSesion(sesion: TotalesSesion?, alReiniciar: () -> Unit, modifier: Modifier = Modifier) {
+    if (sesion?.hayAlgo != true) return
+    Tarjeta(modifier) {
+        sesion.filas.forEach { (etiqueta, valor) -> FilaDato(etiqueta, valor) }
+        TextButton(onClick = alReiniciar, modifier = Modifier.align(Alignment.End)) { Text(sesion.reiniciar) }
     }
 }
 

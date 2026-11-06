@@ -96,8 +96,6 @@
     <string name="cmd_tecla_mala">Клиент на ПК не принимает эту клавишу</string>
     <string name="cmd_fallo">Не удалось выполнить команду: %1$s</string>
     <string name="aviso_multa">Штраф: %1$s</string>
-    <string name="aviso_entregado">Заказ доставлен: %1$s</string>
-    <string name="aviso_cancelado">Заказ отменён</string>
 
     <string name="mapa_sin_camion">Грузовика пока нет</string>
     <string name="mapa_sin_camion_ayuda">Подключитесь к ПК, чтобы увидеть свой грузовик на карте.</string>
@@ -340,4 +338,14 @@
     <string name="sin_internet_listo">Скачано · %1$d МБ</string>
     <string name="sin_internet_borrar">Удалить</string>
     <string name="sin_internet_error">Не удалось скачать. Проверьте подключение и попробуйте снова.</string>
+    <string name="convoy_mirar">Смотреть конвой</string>
+    <string name="ajustes_segundo_plano">Продолжать навигацию в фоне</string>
+    <string name="ajustes_segundo_plano_ayuda">Голос, оверлей в игре и ваш маршрут продолжают работать, когда вы переходите в другое приложение, например Moonlight. Показывает уведомление и расходует больше заряда.</string>
+    <string name="ajustes_flotante">Плавающее окно при выходе из приложения</string>
+    <string name="ajustes_flotante_ayuda">Если выйти из приложения во время езды, поверх другого приложения останется маленькое окно с картой и следующим поворотом.</string>
+    <string name="servicio_canal">Навигация</string>
+    <string name="servicio_activo">Навигация работает в фоне</string>
+    <string name="mapa_local">собрана на ПК</string>
+    <string name="compartir">Поделиться</string>
+    <string name="stats_buscar_conductor">Найти водителя</string>
 </resources>

@@ -48,10 +48,6 @@ data class Alertas(
 data class Evento(
     val multa: Boolean = false,
     val montoMulta: Double? = null,
-    val entregado: Boolean = false,
-    val pagoEntrega: Double? = null,
-    val cancelado: Boolean = false,
-    val penalidad: Double? = null,
 )
 
 @Immutable
@@ -221,10 +217,6 @@ internal fun parsearTelemetria(d: JsonObject): Telemetria {
         evento = Evento(
             multa = evento?.logico("fined") ?: false,
             montoMulta = evento?.numero("fineAmount"),
-            entregado = evento?.logico("jobDelivered") ?: false,
-            pagoEntrega = evento?.numero("jobDeliveredRevenue"),
-            cancelado = evento?.logico("jobCancelled") ?: false,
-            penalidad = evento?.numero("jobCancelledPenalty"),
         ),
         jugadoresTmp = d.lista("tmpPlayers")?.mapNotNull { fila ->
             val p = fila.comoObjeto() ?: return@mapNotNull null

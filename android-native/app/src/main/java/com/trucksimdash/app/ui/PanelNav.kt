@@ -49,7 +49,7 @@ import com.trucksimdash.app.nav.GiroNav
 import com.trucksimdash.app.nav.Maniobra
 import com.trucksimdash.app.nav.TrazoCarril
 
-private fun iconoDe(m: Maniobra): ImageVector = when (m) {
+internal fun iconoDe(m: Maniobra): ImageVector = when (m) {
     Maniobra.Derecho -> Icons.Filled.Straight
     Maniobra.GiroIzquierda -> Icons.Filled.TurnLeft
     Maniobra.GiroDerecha -> Icons.Filled.TurnRight

@@ -96,8 +96,6 @@
     <string name="cmd_tecla_mala">El cliente de la PC no acepta esa tecla</string>
     <string name="cmd_fallo">Falló el comando: %1$s</string>
     <string name="aviso_multa">Multa de %1$s</string>
-    <string name="aviso_entregado">Trabajo entregado %1$s</string>
-    <string name="aviso_cancelado">Trabajo cancelado</string>
 
     <string name="mapa_sin_camion">Todavía no hay camión</string>
     <string name="mapa_sin_camion_ayuda">Conectá tu PC para ver tu camión en el mapa.</string>
@@ -330,4 +328,14 @@
     <string name="sin_internet_listo">Bajado · %1$d MB</string>
     <string name="sin_internet_borrar">Borrar</string>
     <string name="sin_internet_error">No se bajó. Revisá la conexión y probá otra vez.</string>
+    <string name="convoy_mirar">Mirar un convoy</string>
+    <string name="ajustes_segundo_plano">Seguir navegando en segundo plano</string>
+    <string name="ajustes_segundo_plano_ayuda">La voz, el overlay del juego y tu ruta siguen cuando cambiás a otra app, como Moonlight. Muestra una notificación y gasta más batería.</string>
+    <string name="ajustes_flotante">Ventana flotante al salir de la app</string>
+    <string name="ajustes_flotante_ayuda">Si salís de la app mientras manejás, queda una ventanita con el mapa y el próximo giro arriba de la otra app.</string>
+    <string name="servicio_canal">Navegación</string>
+    <string name="servicio_activo">Sigue navegando en segundo plano</string>
+    <string name="mapa_local">armado en la PC</string>
+    <string name="compartir">Compartir</string>
+    <string name="stats_buscar_conductor">Buscar un conductor</string>
 </resources>

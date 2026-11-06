@@ -96,8 +96,6 @@
     <string name="cmd_tecla_mala">Klient na komputerze nie przyjmuje tego klawisza</string>
     <string name="cmd_fallo">Polecenie nie powiodło się: %1$s</string>
     <string name="aviso_multa">Mandat %1$s</string>
-    <string name="aviso_entregado">Zlecenie dostarczone %1$s</string>
-    <string name="aviso_cancelado">Zlecenie anulowane</string>
 
     <string name="mapa_sin_camion">Brak ciężarówki</string>
     <string name="mapa_sin_camion_ayuda">Połącz z komputerem, aby zobaczyć swoją ciężarówkę na mapie.</string>
@@ -340,4 +338,14 @@
     <string name="sin_internet_listo">Pobrano · %1$d MB</string>
     <string name="sin_internet_borrar">Usuń</string>
     <string name="sin_internet_error">Nie udało się pobrać. Sprawdź połączenie i spróbuj ponownie.</string>
+    <string name="convoy_mirar">Oglądaj konwój</string>
+    <string name="ajustes_segundo_plano">Nawiguj dalej w tle</string>
+    <string name="ajustes_segundo_plano_ayuda">Głos, nakładka w grze i Twoja trasa działają dalej po przejściu do innej aplikacji, np. Moonlight. Pokazuje powiadomienie i zużywa więcej baterii.</string>
+    <string name="ajustes_flotante">Pływające okno po wyjściu z aplikacji</string>
+    <string name="ajustes_flotante_ayuda">Gdy wyjdziesz z aplikacji w trakcie jazdy, nad drugą aplikacją zostanie małe okno z mapą i następnym skrętem.</string>
+    <string name="servicio_canal">Nawigacja</string>
+    <string name="servicio_activo">Nawigacja działa w tle</string>
+    <string name="mapa_local">zbudowana na PC</string>
+    <string name="compartir">Udostępnij</string>
+    <string name="stats_buscar_conductor">Znajdź kierowcę</string>
 </resources>

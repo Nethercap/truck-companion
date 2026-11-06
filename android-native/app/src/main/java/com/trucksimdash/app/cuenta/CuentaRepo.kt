@@ -208,11 +208,14 @@ class CuentaRepo(
         return parsearNovedades(pedir("/follow/feed", token = token).datos)
     }
 
-    /** Sin cuenta vinculada o sin seguirlo, lo que la API deje ver. */
+    /** cargarPublico de la cuenta: sin vincular o sin seguirlo, el perfil publico si lo tiene. */
     suspend fun perfil(nombre: String): PerfilAjeno? {
-        val token = boveda.token ?: return null
-        val r = pedir("/follow/user/" + java.net.URLEncoder.encode(nombre, "UTF-8"), token = token)
-        return if (r.codigo == 200) parsearPerfil(r.datos) else null
+        val ruta = java.net.URLEncoder.encode(nombre, "UTF-8")
+        val token = boveda.token
+        val mio = token?.let { pedir("/follow/user/$ruta", token = it) }?.takeIf { it.codigo == 200 }?.let { parsearPerfil(it.datos) }
+        if (mio != null && (mio.soyYo || mio.completo || !mio.publico)) return mio
+        val publico = pedir("/public/$ruta").takeIf { it.codigo == 200 }?.let { parsearPerfil(it.datos) } ?: return mio
+        return publico.copy(publico = true, loSigo = mio?.loSigo, meSigue = mio?.meSigue)
     }
 
     /** /follow/request y compania. Devuelve la clave del error, o null si salio bien. */

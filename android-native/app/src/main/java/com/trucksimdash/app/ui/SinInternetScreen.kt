@@ -57,7 +57,7 @@ fun SinInternetScreen(catalogo: CatalogoMapas, mapas: MapasSinInternet, alVolver
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
             }
-            items(catalogo.variantes.values.sortedBy { it.nombre }, key = { it.id }) { v ->
+            items(catalogo.publicadas.sortedBy { it.nombre }, key = { it.id }) { v ->
                 val e = estado[v.id]
                 val guardados = mapas.bajado(v)
                 Tarjeta {

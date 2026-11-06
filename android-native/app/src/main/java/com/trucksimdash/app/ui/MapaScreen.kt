@@ -1,8 +1,12 @@
 package com.trucksimdash.app.ui
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import android.os.Build
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowColumn
@@ -21,6 +25,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -38,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +51,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -71,11 +83,16 @@ import com.trucksimdash.app.mapa.MarcaJugador
 import com.trucksimdash.app.mapa.Proyecciones
 import com.trucksimdash.app.mapa.VarianteMapa
 import com.trucksimdash.app.mapa.rumboDeGrillaAGeo
+import com.trucksimdash.app.nav.EstadoNav
+import com.trucksimdash.app.nav.MarcaConvoy
 import com.trucksimdash.app.nav.MotorNav
 import com.trucksimdash.app.nav.ResumenNav
 import com.trucksimdash.app.nav.SugerenciaNav
 import com.trucksimdash.app.telemetria.EstadoSesion
 import com.trucksimdash.app.telemetria.Telemetria
+import kotlinx.coroutines.delay
+import kotlin.math.abs
+import kotlin.math.atan2
 
 /** El mapa propio: el camion en vivo, por donde paso y quien anda cerca. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -88,6 +105,9 @@ fun MapaScreen(
     motor: MotorNav,
     alReportar: () -> Unit,
     alConvoy: () -> Unit,
+    alFlotante: () -> Unit = {},
+    /** En la ventana chica: sin botones, y el camion siempre en el centro con el rumbo arriba. */
+    flotante: Boolean = false,
     alConectar: () -> Unit,
 ) {
     val convoy by motor.convoy.collectAsStateWithLifecycle()
@@ -101,17 +121,21 @@ fun MapaScreen(
     var control by remember { mutableStateOf<ControlMapa?>(null) }
     var versionEstilo by remember { mutableIntStateOf(0) }
     var seguir by rememberSaveable { mutableStateOf(true) }
-    var conRumbo by rememberSaveable { mutableStateOf(false) }
+    var conRumbo by rememberSaveable { mutableStateOf(flotante) }
     var hojaAbierta by rememberSaveable { mutableStateOf(false) }
+    var camara by remember { mutableIntStateOf(0) }
+    val apariencia by motor.apariencia.collectAsStateWithLifecycle()
     val vibrar = LocalHapticFeedback.current
     val t = estado.telemetria
     val juego = t?.juego
 
-    val variante: VarianteMapa? = remember(juego, estado.mods, catalogo) {
+    val mirando = convoy?.mirando == true
+    val varianteMirada = convoy?.varianteMirada
+    val variante: VarianteMapa? = remember(juego, estado.mods, catalogo, varianteMirada) {
         val id = if (juego != null) {
             catalogo.resolver(juego, estado.mods, prefs.mapaManual(juego))
         } else {
-            prefs.ultimaVariante ?: "ets2"
+            varianteMirada ?: prefs.ultimaVariante ?: "ets2"
         }
         catalogo.variantes[id] ?: catalogo.variantes[juego ?: "ets2"]
     }
@@ -123,10 +147,32 @@ fun MapaScreen(
         c.cargar(v) { versionEstilo++ }
     }
     LaunchedEffect(control, seguir) { control?.seguir = seguir }
-    LaunchedEffect(control, conRumbo) {
+    LaunchedEffect(control, flotante) { control?.mostrarBrujula(!flotante) }
+    LaunchedEffect(control, conRumbo, nav.zoomNav) {
         control?.conRumbo = conRumbo
         if (conRumbo) nav.zoomNav?.let { control?.zoomDeNavegacion(it) }
     }
+    // El que mira sin juego no tiene camion que seguir: se encuadra a los que estan.
+    var encuadrado by remember(control, versionEstilo, convoy?.codigo) { mutableStateOf(false) }
+    LaunchedEffect(control, versionEstilo, mirando, convoy?.marcas) {
+        val marcas = convoy?.marcas.orEmpty()
+        if (!mirando || encuadrado || marcas.isEmpty() || versionEstilo == 0) return@LaunchedEffect
+        control?.encuadrar(marcas.map { LngLat(it.lng, it.lat) })
+        encuadrado = true
+    }
+    // "Que se desvanezcan mientras manejas y vuelvan al tocar": BTN_IDLE_MS en la web.
+    // El toque va en un arreglo y no en un estado: arrastrando el mapa llegan muchos por segundo, y
+    // la pantalla no tiene por que rehacerse en cada uno.
+    val ultimoToqueMs = remember { longArrayOf(SystemClock.uptimeMillis()) }
+    var botonesQuietos by remember { mutableStateOf(false) }
+    LaunchedEffect(apariencia.desvanecerBotones) {
+        botonesQuietos = false
+        while (apariencia.desvanecerBotones) {
+            delay(1000)
+            botonesQuietos = SystemClock.uptimeMillis() - ultimoToqueMs[0] >= BOTONES_QUIETOS_MS
+        }
+    }
+    val opacidadBotones by animateFloatAsState(if (botonesQuietos) 0.3f else 1f, label = "botones")
     LaunchedEffect(control, versionEstilo, ruta) { control?.ponerRuta(ruta) }
     LaunchedEffect(control, versionEstilo, nav.destino) { control?.ponerDestino(nav.destino) }
     val capas by motor.capas.collectAsStateWithLifecycle()
@@ -146,22 +192,18 @@ fun MapaScreen(
         val c = control ?: return@LaunchedEffect
         c.ponerRastro(estado.rastro.mapNotNull { c.proyectar(it.x, it.z) })
     }
-    LaunchedEffect(control, versionEstilo, estado.otros, estado.jugadoresTmp, ajustes.mostrarOtros, variante, convoy?.marcas) {
+    LaunchedEffect(control, versionEstilo, estado.otros, estado.jugadoresTmp, ajustes.mostrarOtros, ajustes.mostrarTmp, variante, convoy?.marcas) {
         val c = control ?: return@LaunchedEffect
         val v = variante ?: return@LaunchedEffect
         // Los del convoy son los companeros: no dependen de "ver a otros conductores".
         val delConvoy = convoy?.marcas.orEmpty().map {
             MarcaJugador("c" + it.id, LngLat(it.lng, it.lat), it.rumbo, it.color, it.nombre, pausado = it.tenue, seguido = true)
         }
-        if (!ajustes.mostrarOtros) {
-            c.ponerJugadores(delConvoy)
-            return@LaunchedEffect
-        }
         val p = Proyecciones.de(v.proyeccion)
-        val cerca = estado.otros.map {
+        val cerca = if (!ajustes.mostrarOtros) emptyList() else estado.otros.map {
             MarcaJugador("o" + it.id, p.aLngLat(it.x, it.z), 0.0, COLOR_OTRO, "", pausado = false, seguido = false)
         }
-        val tmp = estado.jugadoresTmp.map {
+        val tmp = if (!ajustes.mostrarTmp) emptyList() else estado.jugadoresTmp.map {
             MarcaJugador(
                 "t" + it.id,
                 p.aLngLat(it.x, it.z),
@@ -175,8 +217,20 @@ fun MapaScreen(
         c.ponerJugadores(cerca + tmp + delConvoy)
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            // Sin consumir nada: el toque sigue viaje al mapa o al boton.
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(PointerEventPass.Initial)
+                    ultimoToqueMs[0] = SystemClock.uptimeMillis()
+                    botonesQuietos = false
+                }
+            }
+        },
+    ) {
         MapaNativo(Modifier.fillMaxSize()) { c ->
+            c.alMoverCamara = { camara++ }
             c.alMoverConLaMano = { seguir = false }
             c.alMantenerApretado = { p ->
                 vibrar.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -186,16 +240,23 @@ fun MapaScreen(
         }
 
         val giro = nav.giro
+        if (flotante) {
+            ContenidoFlotante(t, usaMillas(ajustes.unidades, t?.juego), nav)
+            return@Box
+        }
         Column(
             Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            convoy?.takeIf { it.mirando }?.let { co ->
+                AvisoConBoton("${co.t("chipSpectator")} · ${co.codigo.orEmpty()}", co.t("close")) { motor.convoyDejarDeMirar() }
+            }
             if (giro != null) {
                 PanelGiro(giro, nav.carriles, trazos, nav.proximaCiudad)
             } else if (nav.rutaOculta) {
                 // El destino sigue ahi, y la salida a la vista (ver CLAUDE.md, supuesto 8).
                 AvisoConBoton(nav.textoRutaOculta, nav.textoMostrarRuta) { motor.mostrarRuta() }
-            } else if (t != null && nav.sinRuta != null) {
+            } else if (t != null && nav.sinRuta != null && !mirando) {
                 AvisoMapa(nav.sinRuta.orEmpty())
             }
             nav.sugerencia?.let { s ->
@@ -235,12 +296,12 @@ fun MapaScreen(
         // De costado no entran uno arriba del otro: con el convoy pisaban el panel del giro.
         val pantalla = LocalConfiguration.current
         FlowColumn(
-            Modifier.align(Alignment.BottomEnd).padding(12.dp),
+            Modifier.align(Alignment.BottomEnd).padding(12.dp).alpha(opacidadBotones),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             maxItemsInEachColumn = if (pantalla.screenWidthDp > pantalla.screenHeightDp) 4 else 8,
         ) {
-            convoy?.takeIf { it.enSala }?.let { co ->
+            convoy?.takeIf { it.enSala && !it.mirando }?.let { co ->
                 Box {
                     BotonMapa(Icons.AutoMirrored.Filled.Chat, co.t("convoyMsgBtn"), activo = false) { mensajesAbiertos = true }
                     DropdownMenu(expanded = mensajesAbiertos, onDismissRequest = { mensajesAbiertos = false }) {
@@ -256,25 +317,35 @@ fun MapaScreen(
                     }
                 }
             }
-            BotonMapa(Icons.Filled.Groups, stringResource(R.string.convoy), activo = convoy?.enSala == true, alTocar = alConvoy)
-            BotonMapa(Icons.Filled.Search, stringResource(R.string.nav_buscar), activo = nav.waypoints.isNotEmpty()) {
-                hojaAbierta = true
+            if (!mirando) {
+                BotonMapa(Icons.Filled.Groups, stringResource(R.string.convoy), activo = convoy?.enSala == true, alTocar = alConvoy)
+                BotonMapa(Icons.Filled.Search, stringResource(R.string.nav_buscar), activo = nav.waypoints.isNotEmpty()) {
+                    hojaAbierta = true
+                }
+                BotonMapa(
+                    icono = if (ajustes.voz) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                    descripcion = stringResource(if (ajustes.voz) R.string.nav_voz_apagar else R.string.nav_voz_prender),
+                    activo = ajustes.voz,
+                ) {
+                    prefs.ponerVoz(!ajustes.voz)
+                    motor.ponerVoz(!ajustes.voz)
+                }
+                BotonMapa(
+                    icono = if (conRumbo) Icons.Filled.Navigation else Icons.Filled.Explore,
+                    descripcion = stringResource(if (conRumbo) R.string.mapa_norte_arriba else R.string.mapa_con_rumbo),
+                    activo = conRumbo,
+                ) { conRumbo = !conRumbo }
             }
-            BotonMapa(
-                icono = if (ajustes.voz) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                descripcion = stringResource(if (ajustes.voz) R.string.nav_voz_apagar else R.string.nav_voz_prender),
-                activo = ajustes.voz,
-            ) {
-                prefs.ponerVoz(!ajustes.voz)
-                motor.ponerVoz(!ajustes.voz)
+            if (!mirando && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val texto = textosWeb(motor, "pipOverlay")["pipOverlay"].orEmpty()
+                BotonMapa(Icons.Filled.PictureInPictureAlt, texto, activo = false, alTocar = alFlotante)
             }
-            BotonMapa(
-                icono = if (conRumbo) Icons.Filled.Navigation else Icons.Filled.Explore,
-                descripcion = stringResource(if (conRumbo) R.string.mapa_norte_arriba else R.string.mapa_con_rumbo),
-                activo = conRumbo,
-            ) { conRumbo = !conRumbo }
             if (!seguir && t?.tienePosicion == true) {
-                BotonMapa(Icons.Filled.MyLocation, stringResource(R.string.mapa_recentrar), activo = false) { seguir = true }
+                BotonMapa(Icons.Filled.MyLocation, stringResource(R.string.mapa_recentrar), activo = false) {
+                    seguir = true
+                    // Vuelve al zoom elegido en Ajustes, como dice su ayuda.
+                    if (conRumbo) nav.zoomNav?.let { control?.zoomDeNavegacion(it) }
+                }
             }
         }
 
@@ -289,8 +360,8 @@ fun MapaScreen(
         }
 
         if (t != null) {
-            MiniHud(t, usaMillas(ajustes.unidades, t.juego), nav.resumen, Modifier.align(Alignment.BottomStart).padding(12.dp))
-        } else {
+            MiniHud(t, usaMillas(ajustes.unidades, t.juego), nav.resumen, nav.miniHud, Modifier.align(Alignment.BottomStart).padding(12.dp))
+        } else if (!mirando) {
             Surface(
                 shape = MaterialTheme.shapes.large,
                 color = Paleta.Superficie,
@@ -307,6 +378,16 @@ fun MapaScreen(
                     )
                     Spacer(Modifier.size(12.dp))
                     Button(onClick = alConectar) { Text(stringResource(R.string.conectar)) }
+                }
+            }
+        }
+
+        // Al final, arriba de todo: la mayoria de las veces el companero esta atras, y abajo va el mini-HUD.
+        control?.let { c ->
+            convoy?.takeIf { it.enSala && it.marcas.isNotEmpty() }?.let { co ->
+                ChipsConvoy(co.marcas, c, camara) { m ->
+                    seguir = false
+                    c.irA(LngLat(m.lng, m.lat))
                 }
             }
         }
@@ -331,6 +412,106 @@ private fun SugerenciaParada(s: SugerenciaNav, alAceptar: () -> Unit, alCerrar: 
             )
             TextButton(onClick = alAceptar) { Text(s.boton, maxLines = 1) }
             IconButton(onClick = alCerrar) { Icon(Icons.Filled.Close, stringResource(R.string.cerrar), tint = Paleta.TextoSuave) }
+        }
+    }
+}
+
+/** Lo que entra en la ventana flotante: el proximo giro arriba y la velocidad abajo. */
+@Composable
+private fun BoxScope.ContenidoFlotante(t: Telemetria?, millas: Boolean, nav: EstadoNav) {
+    nav.giro?.let { g ->
+        Surface(
+            color = Paleta.Fondo.copy(alpha = 0.88f),
+            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+        ) {
+            Row(Modifier.padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(iconoDe(g.maniobra), null, tint = Paleta.Acento, modifier = Modifier.size(22.dp))
+                Text(
+                    g.texto,
+                    color = Paleta.Texto,
+                    fontSize = 11.sp,
+                    lineHeight = 12.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+        }
+    }
+    if (t != null) {
+        Surface(
+            color = Paleta.Fondo.copy(alpha = 0.88f),
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.align(Alignment.BottomStart).padding(4.dp),
+        ) {
+            Row(Modifier.padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.Bottom) {
+                Text(
+                    velocidadEnUnidad(t.velocidadKmh, millas).toString(),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (t.excedido) Paleta.Rojo else Paleta.Texto,
+                    style = NumerosTabulares,
+                )
+                nav.resumen?.llegada?.let {
+                    Text(it, fontSize = 11.sp, color = Paleta.TextoSuave, modifier = Modifier.padding(start = 6.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Los companeros fuera de pantalla: una chapita pegada al borde, del lado en que estan, con
+ * apodo y distancia (convoyRenderEdgeIndicators en convoy.js). Se rehace al mover el mapa.
+ */
+@Composable
+private fun ChipsConvoy(marcas: List<MarcaConvoy>, control: ControlMapa, camara: Int, alTocar: (MarcaConvoy) -> Unit) {
+    val ancho = control.anchoPx.toFloat()
+    val alto = control.altoPx.toFloat()
+    if (ancho <= 0f || alto <= 0f || camara < 0) return
+    val d = LocalDensity.current
+    val margen = with(d) { 30.dp.toPx() }
+    // Arriba va el giro y abajo el mini-HUD, que con lo elegido en Ajustes crece.
+    val margenArriba = with(d) { 110.dp.toPx() }
+    val margenAbajo = with(d) { 170.dp.toPx() }
+    marcas.forEach { m ->
+        val p = control.aPantalla(LngLat(m.lng, m.lat))
+        if (p.x in 0f..ancho && p.y in 0f..alto) return@forEach
+        val cx = ancho / 2
+        val cy = alto / 2
+        val dx = (p.x - cx).let { if (it == 0f) 1e-6f else it }
+        val dy = (p.y - cy).let { if (it == 0f) 1e-6f else it }
+        val k = minOf((cx - margen) / abs(dx), (cy - if (dy > 0) margenAbajo else margenArriba) / abs(dy))
+        val x = cx + dx * k
+        val y = cy + dy * k
+        val grados = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+        key(m.id) {
+            Surface(
+                onClick = { alTocar(m) },
+                shape = MaterialTheme.shapes.small,
+                color = Paleta.Fondo.copy(alpha = 0.9f),
+                border = BorderStroke(1.5.dp, colorDe(m.color)),
+                modifier = Modifier.layout { medible, limites ->
+                    val pieza = medible.measure(limites.copy(minWidth = 0, minHeight = 0))
+                    layout(limites.maxWidth, limites.maxHeight) {
+                        pieza.place(
+                            (x - pieza.width / 2).toInt().coerceIn(0, (limites.maxWidth - pieza.width).coerceAtLeast(0)),
+                            (y - pieza.height / 2).toInt().coerceIn(0, (limites.maxHeight - pieza.height).coerceAtLeast(0)),
+                        )
+                    }
+                },
+            ) {
+                Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("➤", color = colorDe(m.color), modifier = Modifier.rotate(grados))
+                    Text(
+                        listOfNotNull(m.nombre, m.distancia).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 4.dp).widthIn(max = 150.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -386,14 +567,15 @@ private fun BotonMapa(
 
 /** Lo minimo para no tener que cambiar de pantalla mientras se maneja. */
 @Composable
-private fun MiniHud(t: Telemetria, millas: Boolean, resumen: ResumenNav?, modifier: Modifier = Modifier) {
+private fun MiniHud(t: Telemetria, millas: Boolean, resumen: ResumenNav?, extra: List<String>, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
         color = Paleta.Fondo.copy(alpha = 0.88f),
         border = BorderStroke(1.dp, Paleta.Borde),
     ) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     velocidadEnUnidad(t.velocidadKmh, millas).toString(),
@@ -431,5 +613,10 @@ private fun MiniHud(t: Telemetria, millas: Boolean, resumen: ResumenNav?, modifi
                 }
             }
         }
+        // Lo que se eligio en Ajustes.
+        extra.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = Paleta.TextoSuave) }
+        }
     }
 }
+
+private const val BOTONES_QUIETOS_MS = 6000L

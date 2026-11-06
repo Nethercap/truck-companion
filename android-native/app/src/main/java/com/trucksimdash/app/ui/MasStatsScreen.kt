@@ -1,5 +1,12 @@
 package com.trucksimdash.app.ui
 
+import com.trucksimdash.app.cuenta.EstadoCuenta
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.draw.drawWithContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -168,6 +175,10 @@ fun AnoScreen(cuenta: CuentaRepo, ajustes: Ajustes, alVolver: () -> Unit) {
         datos = cuenta.resumenAno(ano)
         cargando = false
     }
+    // Lo mismo que se ve, entero aunque no entre en la pantalla: es lo que se comparte.
+    val capa = rememberGraphicsLayer()
+    val contexto = LocalContext.current
+    val alcance = rememberCoroutineScope()
     Pantalla(stringResource(R.string.stats_ano_titulo, ano), alVolver) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -182,7 +193,26 @@ fun AnoScreen(cuenta: CuentaRepo, ajustes: Ajustes, alVolver: () -> Unit) {
             val d = datos
             when {
                 d == null && !cargando -> Text(stringResource(R.string.stats_sin_red), color = Paleta.TextoSuave)
-                d != null -> ContenidoAno(d, ajustes)
+                d != null -> {
+                    Column(
+                        Modifier
+                            .drawWithContent {
+                                capa.record { this@drawWithContent.drawContent() }
+                                drawLayer(capa)
+                            }
+                            .background(Paleta.Fondo)
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text("Truck Dash · $ano", style = MaterialTheme.typography.titleLarge)
+                        ContenidoAno(d, ajustes)
+                        Text("trucksim-dash.com", style = MaterialTheme.typography.labelMedium, color = Paleta.TextoSuave)
+                    }
+                    OutlinedButton(
+                        onClick = { alcance.launch { compartirImagen(contexto, capa.toImageBitmap().asAndroidBitmap(), "truckdash-$ano.png") } },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.compartir)) }
+                }
             }
         }
     }
@@ -400,7 +430,9 @@ fun PerfilScreen(cuenta: CuentaRepo, nombre: String, ajustes: Ajustes, alVolver:
             }
             p.titulo?.let { Text(it, color = Paleta.TextoSuave) }
             if (p.manejando) Text(stringResource(R.string.seguir_manejando), color = Paleta.Verde)
-            if (!p.soyYo) {
+            // Sin cuenta vinculada se ve el perfil publico, pero no se puede pedir seguir.
+            val conCuenta = cuenta.estado.collectAsStateWithLifecycle().value is EstadoCuenta.Vinculada
+            if (!p.soyYo && conCuenta) {
                 when (p.loSigo) {
                     "accepted" -> OutlinedButton(onClick = { accion("/follow/unfollow") }) { Text(stringResource(R.string.seguir_dejar)) }
                     "pending" -> OutlinedButton(onClick = { accion("/follow/unfollow") }) { Text(stringResource(R.string.seguir_cancelar)) }
@@ -413,7 +445,7 @@ fun PerfilScreen(cuenta: CuentaRepo, nombre: String, ajustes: Ajustes, alVolver:
                     }
                 }
             }
-            if (!p.completo && !p.soyYo) {
+            if (!p.completo && !p.publico && !p.soyYo) {
                 Text(stringResource(R.string.seguir_privado), style = MaterialTheme.typography.bodyMedium, color = Paleta.TextoSuave)
             }
             p.resumenes.forEach { r ->

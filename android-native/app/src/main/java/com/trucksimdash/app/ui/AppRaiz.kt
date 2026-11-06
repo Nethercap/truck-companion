@@ -1,5 +1,9 @@
 package com.trucksimdash.app.ui
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -43,6 +48,7 @@ import com.trucksimdash.app.Contenedor
 import com.trucksimdash.app.R
 import com.trucksimdash.app.core.plata
 import com.trucksimdash.app.telemetria.AvisoSesion
+import com.trucksimdash.app.telemetria.Fase
 
 enum class Seccion(val titulo: Int, val icono: ImageVector) {
     Panel(R.string.sec_panel, Icons.Filled.Speed),
@@ -52,7 +58,28 @@ enum class Seccion(val titulo: Int, val icono: ImageVector) {
 }
 
 @Composable
-fun AppRaiz(c: Contenedor) {
+fun AppRaiz(c: Contenedor, flotante: Boolean, alFlotante: () -> Unit) {
+    if (flotante) {
+        VentanaFlotante(c)
+        return
+    }
+    Box(Modifier.fillMaxSize()) {
+        Pantallas(c, alFlotante)
+        TarjetaEntrega(c.nav, Modifier.align(Alignment.TopCenter))
+    }
+}
+
+/** En la ventana chica no hay nada para tocar: el mapa, el giro y la velocidad. */
+@Composable
+private fun VentanaFlotante(c: Contenedor) {
+    val estado by c.sesion.estado.collectAsStateWithLifecycle()
+    val ajustes by c.prefs.ajustes.collectAsStateWithLifecycle()
+    val catalogo by c.catalogo.collectAsStateWithLifecycle()
+    MapaScreen(estado, ajustes, catalogo, c.prefs, c.nav, alReportar = {}, alConvoy = {}, flotante = true) {}
+}
+
+@Composable
+private fun Pantallas(c: Contenedor, alFlotante: () -> Unit) {
     val estado by c.sesion.estado.collectAsStateWithLifecycle()
     val ajustes by c.prefs.ajustes.collectAsStateWithLifecycle()
     val catalogo by c.catalogo.collectAsStateWithLifecycle()
@@ -60,6 +87,7 @@ fun AppRaiz(c: Contenedor) {
     var enAjustes by rememberSaveable { mutableStateOf(false) }
     var enReporte by rememberSaveable { mutableStateOf(false) }
     var enConvoy by rememberSaveable { mutableStateOf(false) }
+    var codigoConvoy by rememberSaveable { mutableStateOf<String?>(null) }
     var enTeclas by rememberSaveable { mutableStateOf(false) }
     var enSinInternet by rememberSaveable { mutableStateOf(false) }
     val config = LocalConfiguration.current
@@ -75,6 +103,33 @@ fun AppRaiz(c: Contenedor) {
         onDispose { vista.keepScreenOn = false }
     }
 
+    fun mirarConvoy(codigo: String) {
+        c.nav.convoyMirar(codigo)
+        seccion = Seccion.Mapa
+    }
+
+    // Un link de un convoy: con el juego andando es para entrar, y si no, para mirarlo.
+    val enlace by c.enlaceConvoy.collectAsStateWithLifecycle()
+    LaunchedEffect(enlace) {
+        val codigo = enlace ?: return@LaunchedEffect
+        c.enlaceConvoy.value = null
+        if (estado.fase == Fase.Apagada || estado.fase == Fase.CodigoInvalido) {
+            mirarConvoy(codigo)
+        } else {
+            codigoConvoy = codigo
+            enConvoy = true
+        }
+    }
+
+    // Sin el permiso el servicio anda igual, pero la notificacion no se ve (Android 13 en adelante).
+    val pedirPermiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(estado.enVivo, ajustes.segundoPlano) {
+        if (estado.enVivo && ajustes.segundoPlano && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !c.prefs.notificacionesPedidas) {
+            c.prefs.notificacionesPedidas = true
+            pedirPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     LaunchedEffect(Unit) { c.nav.avisos.collect { avisos.showSnackbar(it) } }
     LaunchedEffect(Unit) {
         c.sesion.avisos.collect { a ->
@@ -88,8 +143,6 @@ fun AppRaiz(c: Contenedor) {
                     else -> contexto.getString(R.string.cmd_fallo, a.razon ?: "?")
                 }
                 is AvisoSesion.Multa -> contexto.getString(R.string.aviso_multa, a.monto?.let { plata(it, moneda) } ?: "")
-                is AvisoSesion.Entregado -> contexto.getString(R.string.aviso_entregado, a.pago?.let { plata(it, moneda) } ?: "")
-                is AvisoSesion.Cancelado -> contexto.getString(R.string.aviso_cancelado)
             }
             avisos.showSnackbar(texto)
         }
@@ -118,7 +171,10 @@ fun AppRaiz(c: Contenedor) {
 
     if (enConvoy) {
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            ConvoyScreen(c.nav, ajustes.apodo) { enConvoy = false }
+            ConvoyScreen(c.nav, ajustes.apodo, codigoConvoy) {
+                enConvoy = false
+                codigoConvoy = null
+            }
         }
         return
     }
@@ -142,9 +198,10 @@ fun AppRaiz(c: Contenedor) {
                     c.nav,
                     c.prefs,
                     alVerMapaEnVivo = { seccion = Seccion.EnVivo },
+                    alMirarConvoy = ::mirarConvoy,
                     alAjustes = { enAjustes = true },
                 )
-                Seccion.Mapa -> MapaScreen(estado, ajustes, catalogo, c.prefs, c.nav, alReportar = { enReporte = true }, alConvoy = { enConvoy = true }) { seccion = Seccion.Panel }
+                Seccion.Mapa -> MapaScreen(estado, ajustes, catalogo, c.prefs, c.nav, alReportar = { enReporte = true }, alConvoy = { enConvoy = true }, alFlotante = alFlotante) { seccion = Seccion.Panel }
                 Seccion.EnVivo -> EnVivoScreen(c.vivo, catalogo, ajustes) { enAjustes = true }
                 Seccion.Stats -> StatsScreen(c.cuenta, ajustes, catalogo) { enAjustes = true }
             }
