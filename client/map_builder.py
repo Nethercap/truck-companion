@@ -34,7 +34,7 @@ import red
 
 # Sube cuando cambia lo que se arma (formato, archivos): un mapa armado con
 # otro formato no se usa y se ofrece armarlo de nuevo.
-MAP_FORMAT = 1
+MAP_FORMAT = 2  # 2: el armador lee los sectores de formatos viejos, antes se perdian
 NODE_MEMORY_MB = 8192
 # Memoria libre por debajo de la cual se avisa antes de arrancar (el parser
 # llega a ~7 GB con mapas grandes).
