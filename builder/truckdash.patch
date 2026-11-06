@@ -2564,6 +2564,429 @@ index 73a4a8f..36ad9ab 100644
  class ScsArchiveDirectory extends ScsArchiveEntry implements DirectoryEntry {
    readonly type = 'directory';
    readonly subdirectories: readonly string[];
+diff --git a/packages/clis/parser/game-files/sector-parser.ts b/packages/clis/parser/game-files/sector-parser.ts
+index 3f1cd15..671815b 100644
+--- a/packages/clis/parser/game-files/sector-parser.ts
++++ b/packages/clis/parser/game-files/sector-parser.ts
+@@ -78,6 +78,40 @@ const vegetationSpheres = new r.Array(
+   r.uint32le,
+ );
+ 
++const signOverrideItems = new r.Array(
++  new r.Struct({
++    id: r.uint32le,
++    areaName: token64,
++    attributes: new r.Array(
++      new r.VersionedStruct(r.uint16le, {
++        header: {
++          index: r.uint32le,
++        },
++        1: {
++          value: r.int8,
++        },
++        2: {
++          value: r.int32le,
++        },
++        3: {
++          value: r.uint32le,
++        },
++        4: {
++          value: r.floatle,
++        },
++        5: {
++          value: uint64String,
++        },
++        6: {
++          value: uint64le,
++        },
++      }),
++      r.uint32le,
++    ),
++  }),
++  r.uint32le,
++);
++
+ const SimpleItemStruct = {
+   header: {
+     // Note: care must be taken to _not_ reuse header keys
+@@ -365,39 +399,7 @@ const SimpleItemStruct = {
+           }),
+           r.uint32le,
+         ),
+-        items: new r.Array(
+-          new r.Struct({
+-            id: r.uint32le,
+-            areaName: token64,
+-            attributes: new r.Array(
+-              new r.VersionedStruct(r.uint16le, {
+-                header: {
+-                  index: r.uint32le,
+-                },
+-                1: {
+-                  value: r.int8,
+-                },
+-                2: {
+-                  value: r.int32le,
+-                },
+-                3: {
+-                  value: r.uint32le,
+-                },
+-                4: {
+-                  value: r.floatle,
+-                },
+-                5: {
+-                  value: uint64String,
+-                },
+-                6: {
+-                  value: uint64le,
+-                },
+-              }),
+-              r.uint32le,
+-            ),
+-          }),
+-          r.uint32le,
+-        ),
++        items: signOverrideItems,
+         //debugStruct,
+       }),
+       (parent: { overrideTemplate: string }) => parent.overrideTemplate != '',
+@@ -599,6 +601,106 @@ const Sector = new r.Struct({
+   visibleAreaChildUids: new r.Array(uint64le, r.uint32le),
+ });
+ 
++// Formatos viejos de sector. Cada mod guarda sus sectores con la version del
++// editor con que se hicieron: un mapa para 1.58 los trae casi todos en 906, y
++// aun los mapas de hoy traen algunos de 880 a 905. Leerlos con el layout de 907
++// desalinea la lectura desde el primer item que cambio y se pierde el sector
++// entero, con sus calles (Estambul a mas de 10.000 km con ProMods 2.81).
++// Solo van los items que cambiaron, y solo los comprobados contra sectores
++// reales de 898 en adelante; de antes solo aparecieron sectores vacios, que
++// leen bien sin mas que el final distinto de 891. parseSector sigue exigiendo
++// que la lectura termine justo al final del archivo: un layout errado no pasa
++// callado, el sector se saltea como hasta ahora.
++const LATEST_SECTOR_VERSION = 907;
++const OLDEST_SECTOR_VERSION = 898;
++
++function simpleItemStructFor(version: number) {
++  const { previousLength: _previousLength, ...terrainBefore903 } =
++    SimpleItemStruct[ItemType.Terrain];
++  const { unknown: _unknown, ...noWeatherBefore901 } =
++    SimpleItemStruct[ItemType.NoWeather];
++  const company = SimpleItemStruct[ItemType.Company];
++
++  return {
++    ...SimpleItemStruct,
++    ...(version < 907 && {
++      [ItemType.Curve]: {
++        model: token64,
++        startNodeUid: uint64le,
++        endNodeUid: uint64le,
++        paddingUids: new r.Array(uint64le, 2),
++        length: r.floatle,
++        randomSeed: r.uint32le,
++        stretchCoef: r.floatle,
++        scale: r.floatle,
++        fixedStep: r.floatle,
++        material: token64,
++        color: r.uint32le,
++        terrainRot: r.floatle,
++        firstPart: token64,
++        lastPart: token64,
++        centerPartVariation: token64,
++        modelLook: token64,
++        heightOffsets: new r.Array(r.floatle, r.uint32le),
++      },
++    }),
++    ...(version < 906 && {
++      [ItemType.Sign]: {
++        ...SimpleItemStruct[ItemType.Sign],
++        overrides: new r.Optional(
++          new r.Struct({ items: signOverrideItems }),
++          (parent: { overrideTemplate: string }) =>
++            parent.overrideTemplate != '',
++        ),
++      },
++    }),
++    ...(version < 903 && {
++      [ItemType.Terrain]: terrainBefore903,
++      [ItemType.Company]: {
++        overlayName: company.overlayName,
++        cityName: company.cityName,
++        prefabUid: company.prefabUid,
++        nodeUid: company.nodeUid,
++        nodes: company.nodes,
++      },
++    }),
++    ...(version < 901 && { [ItemType.NoWeather]: noWeatherBefore901 }),
++  };
++}
++
++const oldSectors = new Map<number, typeof Sector>();
++
++function sectorStructFor(version: number): typeof Sector {
++  if (version >= LATEST_SECTOR_VERSION) {
++    return Sector;
++  }
++  let sector = oldSectors.get(version);
++  if (!sector) {
++    const items = simpleItemStructFor(version);
++    const simpleItem = new r.VersionedStruct(r.uint32le, items);
++    const complexItem = new r.VersionedStruct(r.uint32le, {
++      ...items,
++      [ItemType.Compound]: {
++        nodeUid: uint64le,
++        childItems: new r.Array(simpleItem, r.uint32le),
++        childNodes: new r.Array(SectorNode, r.uint32le),
++      },
++    });
++    sector = new r.Struct({
++      version: r.uint32le,
++      gameId: token64,
++      padding: new r.Reserved(r.uint32le),
++      items: new r.Array(complexItem, r.uint32le),
++      nodes: new r.Array(SectorNode, r.uint32le),
++      ...(version >= 891 && {
++        visibleAreaChildUids: new r.Array(uint64le, r.uint32le),
++      }),
++    }) as unknown as typeof Sector;
++    oldSectors.set(version, sector);
++  }
++  return sector;
++}
++
+ const versionWarnings = new Set<number>();
+ 
+ export function parseSector(
+@@ -606,7 +708,7 @@ export function parseSector(
+   ignoreNodeUids: ReadonlySet<bigint>,
+ ) {
+   const version = buffer.readUint32LE();
+-  if (version !== 907) {
++  if (version > LATEST_SECTOR_VERSION || version < OLDEST_SECTOR_VERSION) {
+     if (!versionWarnings.has(version)) {
+       logger.warn('unknown .base file version', version);
+       logger.warn('errors may come up, and parse results may be inaccurate.');
+@@ -615,7 +717,7 @@ export function parseSector(
+   }
+ 
+   const str = new r.DecodeStream(buffer);
+-  const sector = Sector.decode(str);
++  const sector = sectorStructFor(version).decode(str);
+   if (str.pos !== buffer.length) {
+     logger.error(
+       'not enough bytes read; expected / actual',
+@@ -873,17 +975,21 @@ function toBuilding(
+ }
+ 
+ function toCurve(rawItem: SectorItem<ItemType.Curve>): Curve | undefined {
+-  assert(rawItem.subcurves.length >= 1, 'curve has no subcurves');
++  // Antes de 907 el item mismo es la unica subcurva.
++  const subcurves = (rawItem.subcurves as
++    | typeof rawItem.subcurves
++    | undefined) ?? [rawItem as unknown as (typeof rawItem.subcurves)[number]];
++  assert(subcurves.length >= 1, 'curve has no subcurves');
+   if (
+-    rawItem.subcurves.every(sc => sc.model !== '0i03a') &&
+-    rawItem.subcurves.every(sc => sc.model !== '0i03b')
++    subcurves.every(sc => sc.model !== '0i03a') &&
++    subcurves.every(sc => sc.model !== '0i03b')
+   ) {
+     return;
+   }
+ 
+   return {
+     ...toBaseItem(rawItem),
+-    subcurves: rawItem.subcurves.map(sc => ({
++    subcurves: subcurves.map(sc => ({
+       model: sc.model,
+       look: sc.modelLook,
+       numBuildings: sc.heightOffsets.length,
+diff --git a/packages/clis/parser/game-files/tests/sector-versions.test.ts b/packages/clis/parser/game-files/tests/sector-versions.test.ts
+new file mode 100644
+index 0000000..f54d9b7
+--- /dev/null
++++ b/packages/clis/parser/game-files/tests/sector-versions.test.ts
+@@ -0,0 +1,180 @@
++import { ItemType } from '@truckermudgeon/map/constants';
++import { parseSector } from '../sector-parser';
++
++const LETRAS = '\x000123456789abcdefghijklmnopqrstuvwxyz_';
++
++function u32(n: number): Buffer {
++  const b = Buffer.alloc(4);
++  b.writeUInt32LE(n);
++  return b;
++}
++
++function u64(n: bigint | number): Buffer {
++  const b = Buffer.alloc(8);
++  b.writeBigUInt64LE(BigInt(n));
++  return b;
++}
++
++function token(s: string): Buffer {
++  let n = 0n;
++  [...s].reverse().forEach(c => {
++    n = n * 38n + BigInt(LETRAS.indexOf(c));
++  });
++  return u64(n);
++}
++
++function texto(s: string): Buffer {
++  return Buffer.concat([u64(s.length), Buffer.from(s)]);
++}
++
++// tipo, uid, posiciones, flags y distancia de vista: 57 bytes.
++function cabecera(tipo: ItemType, uid: number): Buffer {
++  return Buffer.concat([u32(tipo), u64(uid), Buffer.alloc(45)]);
++}
++
++function sector(version: number, items: Buffer[], conFinal = true): Buffer {
++  return Buffer.concat([
++    u32(version),
++    u64(0),
++    u32(0),
++    u32(items.length),
++    ...items,
++    u32(0), // nodos
++    ...(conFinal ? [u32(0)] : []), // hijos de las areas de visibilidad, desde 891
++  ]);
++}
++
++// Lo que tiene una curva despues de los nodos, igual en una vieja y en una
++// subcurva de 907 (que suma flags y lo que va despues de las alturas).
++function medioDeCurva(): Buffer {
++  return Buffer.concat([
++    Buffer.alloc(16), // semilla, estiramiento, escala, paso
++    token('mat'),
++    Buffer.alloc(8), // color, giro
++    token('first'),
++    token('last'),
++    token('center'),
++    token('mirada'),
++    u32(2),
++    Buffer.alloc(8), // dos alturas
++  ]);
++}
++
++function nodosDeCurva(): Buffer {
++  return Buffer.concat([u64(1), u64(2), Buffer.alloc(16), Buffer.alloc(4)]);
++}
++
++function curvaVieja(uid: number): Buffer {
++  return Buffer.concat([
++    cabecera(ItemType.Curve, uid),
++    token('0i03a'),
++    nodosDeCurva(),
++    medioDeCurva(),
++  ]);
++}
++
++function curva907(uid: number): Buffer {
++  return Buffer.concat([
++    cabecera(ItemType.Curve, uid),
++    nodosDeCurva(),
++    u32(1), // una subcurva
++    token('0i03a'),
++    u32(0),
++    medioDeCurva(),
++    Buffer.alloc(20),
++  ]);
++}
++
++function cartel(uid: number, conBoards: boolean): Buffer {
++  return Buffer.concat([
++    cabecera(ItemType.Sign, uid),
++    token('modelo'),
++    u64(1),
++    token('look'),
++    token('variant'),
++    Buffer.from([0]), // sin carteles del modelo
++    texto('plantilla'),
++    ...(conBoards ? [u32(0)] : []),
++    u32(1),
++    u32(0),
++    token('area'),
++    u32(1),
++    Buffer.from([5, 0]), // atributo de tipo 5, un texto
++    u32(0),
++    texto('Istanbul'),
++  ]);
++}
++
++function empresa(uid: number, version: number): Buffer {
++  const nombre = token('agronord');
++  const ciudad = token('istanbul');
++  return Buffer.concat([
++    cabecera(ItemType.Company, uid),
++    ...(version < 903
++      ? [nombre, ciudad, u64(7)]
++      : [ciudad, u64(7), nombre]),
++    u64(1),
++    u32(0),
++  ]);
++}
++
++describe('parseSector con formatos viejos', () => {
++  const sinNodos = new Set<bigint>();
++  const curvaEsperada = {
++    model: '0i03a',
++    look: 'mirada',
++    numBuildings: 2,
++  };
++
++  it('lee las curvas de antes de 907 y sigue con el item de despues', () => {
++    const { items } = parseSector(
++      sector(906, [curvaVieja(1), curvaVieja(2)]),
++      sinNodos,
++    );
++    expect(items.map(i => i.uid)).toEqual([1n, 2n]);
++    expect(items[1]).toMatchObject({ subcurves: [curvaEsperada] });
++  });
++
++  it('907 sigue igual', () => {
++    const { items } = parseSector(sector(907, [curva907(1)]), sinNodos);
++    expect(items[0]).toMatchObject({ subcurves: [curvaEsperada] });
++  });
++
++  it('los carteles tienen la lista de boards recien desde 906', () => {
++    for (const [version, conBoards] of [
++      [905, false],
++      [906, true],
++    ] as const) {
++      const { items } = parseSector(
++        sector(version, [cartel(1, conBoards)]),
++        sinNodos,
++      );
++      expect(items[0]).toMatchObject({ textItems: ['Istanbul'] });
++    }
++  });
++
++  it('el nombre de la empresa va primero antes de 903', () => {
++    for (const version of [901, 903]) {
++      const { items } = parseSector(
++        sector(version, [empresa(1, version)]),
++        sinNodos,
++      );
++      expect(items[0]).toMatchObject({
++        token: 'agronord',
++        cityToken: 'istanbul',
++        prefabUid: 7n,
++      });
++    }
++  });
++
++  it('antes de 891 el sector termina en los nodos', () => {
++    const { items } = parseSector(sector(888, [], false), sinNodos);
++    expect(items).toEqual([]);
++  });
++
++  it('un layout que no cierra sigue tirando error', () => {
++    expect(() =>
++      parseSector(sector(906, [curva907(1)]), sinNodos),
++    ).toThrow();
++  });
++});
 diff --git a/packages/clis/parser/game-files/sii-schemas.ts b/packages/clis/parser/game-files/sii-schemas.ts
 index b8accdc..8bec80f 100644
 --- a/packages/clis/parser/game-files/sii-schemas.ts

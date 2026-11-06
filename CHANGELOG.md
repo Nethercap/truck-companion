@@ -4,12 +4,18 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.37 (2026-11-06)
 
 - In-game overlay: a new line shows how far the nearest fuel station and rest area are by road, with
   or without a route, so you can see it with nothing to press (handy when you stream the game with
   Moonlight or only have one screen). It comes from the dashboard, so keep it open on your phone, a
   tablet or this PC. Turn it on or off in Setup, Show, "Nearest fuel and rest".
+
+- Build my map: map mods saved in the map format of an older game version build complete. The
+  builder only knew the format of game 1.59 and later, and it dropped every older map file it could
+  not read, with its roads, ferries and cities, without stopping the build. With ETS2 1.58 and
+  ProMods 2.81 whole regions went missing, and a route to Istanbul showed over 10,000 km. A map you
+  already built has to be built again: Setup offers it after this update.
 
 ## 1.5.36 (2026-11-04)
 

@@ -28,6 +28,10 @@ as a separate program.
   its end (some protected mods) is read up to its stated size, as the game
   does, and a mod that still can't be read is skipped with its name in the
   log instead of stopping the build.
+- Map sectors in older formats are read with the layout of their version
+  (898 to 906, the game versions before 1.59; from 880 on, if they have no
+  items). Mods keep the format of the game they were made with. A sector that
+  still can't be read is skipped with its name in the log.
 - The mods can be given in a file, one per line (`@list.txt` instead of a
   comma-separated list): that is how the client passes them, so a mod with
   a comma in its file name stays whole. A builder from before this doesn't
