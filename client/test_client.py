@@ -1725,3 +1725,23 @@ def test_lan_sirve_los_glifos_que_pide_la_app():
         assert rel in local_server.WEB_FILES, rel
         assert os.path.exists(os.path.join(raiz, "docs", *rel.split("/"))), rel
 
+
+def test_log_job_change_solo_cuando_cambia(monkeypatch, caplog):
+    """El log dice que manda el SDK al tomar el trabajo y al enganchar (06-11)."""
+    import logging
+    monkeypatch.setattr(client, "_last_job_log", None)
+    trabajo = {"onJob": True, "jobMarket": "freight_market", "compSrcId": "ts_atlas", "citySrcId": "bilbao",
+               "compDstId": "acc", "cityDstId": "santander", "isCargoLoaded": True,
+               "routeDistance": 4000.0, "trailer": [{"attached": False}]}
+    with caplog.at_level(logging.INFO):
+        client.log_job_change({"onJob": False, "routeDistance": 4000.0})
+        client.log_job_change({"onJob": False, "routeDistance": 3900.0})  # los km solos no cuentan
+        client.log_job_change(trabajo)
+        client.log_job_change({**trabajo, "routeDistance": 3000.0})
+        client.log_job_change({**trabajo, "trailer": [{"attached": True}]})
+    lineas = [r.getMessage() for r in caplog.records if r.getMessage().startswith("Trabajo:")]
+    assert lineas == [
+        "Trabajo: ninguno, carga no, remolque no, GPS del juego 4.0 km",
+        "Trabajo: freight_market, ts_atlas@bilbao -> acc@santander, carga si, remolque no, GPS del juego 4.0 km",
+        "Trabajo: freight_market, ts_atlas@bilbao -> acc@santander, carga si, remolque si, GPS del juego 4.0 km",
+    ]

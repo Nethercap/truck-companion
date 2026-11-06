@@ -5653,6 +5653,52 @@ let navPanelParts = null; // lo ultimo que mostro el panel, para el mini-HUD
 const turnAnnouncer = createTurnAnnouncer();
 // Los ultimos avisos mostrados, para "Copy turn report" (createTurnLog)
 const turnLog = createTurnLog();
+
+// Las empresas que quedan a la distancia del GPS del juego cuando la app no
+// tiene a donde ir (gameGpsCandidates en pure.js, un toque = destino). list:
+// { x, z, label } para el panel. run: la busqueda en curso, que se corta sola si
+// otra la reemplaza. Son decenas de rutas: de a poco, para no trabar el mapa.
+let gameGpsGuess = { km: null, list: [], run: 0 };
+function clearGameGpsGuess() {
+  gameGpsGuess = { km: null, list: [], run: gameGpsGuess.run + 1 };
+}
+function updateGameGpsGuess(data) {
+  const sirve = noRouteNow === 'game_gps' && routeGraph && pois && poisVariant === currentGame && data.position?.x != null;
+  if (!sirve) {
+    if (gameGpsGuess.km != null) clearGameGpsGuess();
+    return;
+  }
+  const paso = gameGpsGuessStep(gameGpsGuess.km, data.routeDistanceKm, data.speedKmh);
+  if (paso === 'clear') { if (gameGpsGuess.km != null) clearGameGpsGuess(); }
+  else if (paso === 'search') searchGameGpsGuess(data);
+}
+function searchGameGpsGuess(data) {
+  const km = data.routeDistanceKm;
+  const run = gameGpsGuess.run + 1;
+  gameGpsGuess = { km, list: gameGpsGuess.list, run };
+  const from = [data.position.x, data.position.z];
+  const rumbo = routeStartHeading(data);
+  const recta = (c) => { const p = [from, [c[0], c[1]]]; return gameKmOf(p, p); };
+  const candidatas = gameGpsCandidates(pois.companies, km, recta);
+  const halladas = [];
+  let i = 0;
+  const seguir = () => {
+    if (run !== gameGpsGuess.run) return;
+    const inicio = performance.now();
+    while (i < candidatas.length && performance.now() - inicio < 8) {
+      const company = candidatas[i++];
+      const r = findRoute(from, [company[0], company[1]], rumbo, null, null, { entrar: true, empresa: true });
+      if (r && r.length) halladas.push({ company, km: gameKmOf(r, r) });
+    }
+    if (i < candidatas.length) { setTimeout(seguir, 0); return; }
+    gameGpsGuess.list = gameGpsGuessList(halladas, km).map(({ company: c }) => {
+      const ciudad = (pois.cities && pois.cities[c[4]]) || c[4];
+      return { x: c[0], z: c[1], label: ciudad ? `${c[3]} (${ciudad})` : c[3] };
+    });
+  };
+  setTimeout(seguir, 0);
+}
+
 function updateNavPanel(turn) {
   if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
     document.getElementById('navPanel').style.display = 'none';
@@ -5664,8 +5710,12 @@ function updateNavPanel(turn) {
   // Ruta en el GPS del juego que la app no puede seguir: por que, y el
   // buscador para ponerle el destino aca (openPoiModal, un toque = waypoint).
   if (!navPanelParts && noRouteNow === 'game_gps') {
-    html += `<span class="navNext navHint">${escapeHtml(t('navGameRouteHint'))}</span>`
-      + `<button type="button" class="navSearchBtn" data-nav-search>${escapeHtml(t('navSearchDestination'))}</button>`;
+    // Con empresas a esa distancia, ellas en vez de la explicacion larga.
+    html += gameGpsGuess.list.length
+      ? `<span class="navNext navHint">${escapeHtml(t('navGameRouteGuess'))}</span>`
+        + gameGpsGuess.list.map((c, i) => `<button type="button" class="navSearchBtn" data-nav-guess="${i}">${escapeHtml(c.label)}</button>`).join('')
+      : `<span class="navNext navHint">${escapeHtml(t('navGameRouteHint'))}</span>`;
+    html += `<button type="button" class="navSearchBtn" data-nav-search>${escapeHtml(t('navSearchDestination'))}</button>`;
   }
   // Solo si cambio: con el boton adentro, rehacerlo en cada dato se comia el
   // toque (y el foco del teclado) si caia entre que se apreta y se suelta.
@@ -5714,7 +5764,7 @@ function navLanesFor(turn) {
 }
 
 // Lo que se dice sin indicaciones: si el GPS del juego tiene una ruta que la
-// app no puede seguir (sin trabajo, #56), sus km en vez de "No destination set".
+// app no puede seguir (el SDK no da a donde va, #56), sus km en vez de "No destination set".
 // Con destino y sin grafo, que pasa con el grafo (noRouteReason).
 const NO_ROUTE_TEXT = { graph_loading: 'navRouteLoading', graph_failed: 'navRouteFailed', routing_off: 'navRouteOff' };
 function noRouteText() {
@@ -5733,7 +5783,11 @@ function navPanelHtml(turn) {
 // porque el contenido se rehace cuando cambia.
 document.getElementById('navPanel').addEventListener('click', (e) => {
   if (document.body.classList.contains('editLayout')) return; // acomodando, un toque mueve
-  if (e.target.closest && e.target.closest('[data-nav-search]')) openPoiModal();
+  if (!e.target.closest) return;
+  if (e.target.closest('[data-nav-search]')) { openPoiModal(); return; }
+  const adivinada = e.target.closest('[data-nav-guess]');
+  const c = adivinada && gameGpsGuess.list[Number(adivinada.dataset.navGuess)];
+  if (c) addPoiWaypoint([c.x, c.z], c.label);
 });
 
 // ---------------------------------------------------------------------------
@@ -7204,7 +7258,7 @@ function buildTurnReport() {
     game: lastData && lastData.game, map: currentGame, web: webVersion(),
     client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
-    now: Date.now(), items: turnLog.list(),
+    now: Date.now(), items: turnLog.list(), job: turnReportJobLine(lastData),
     routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
     route: {
       profile: routeProfile,
@@ -8125,6 +8179,7 @@ function handleTelemetry(data) {
   if (mapDashPanel) mapDashPanel.update(data);
   updateMap(data.position || {}, data.game, data.heading);
   updateDestinationMarker(data);
+  updateGameGpsGuess(data);
   updateRouteSummary(data);
   checkMissingCompanies(data);
   checkUpdateBanner(data.clientVersion);

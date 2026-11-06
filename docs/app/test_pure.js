@@ -5938,3 +5938,74 @@ test('routeIdentity: enganchar el remolque del freight market cambia el viaje, s
   assert.equal(routeIdentity(viaje),
     JSON.stringify(['ets2', 'Berlin', 'Praha', 'tradeaux', 'posped', true, true, 'Apples']));
 });
+
+test('gameGpsCandidates y gameGpsGuessList: Bilbao, el remolque a 4,0 km sin trabajo en la telemetria (06-11)', () => {
+  const { gameGpsCandidates, gameGpsGuessList, gameGpsKmMatches, GAME_GPS_GUESS_MAX_KM } = require('./pure.js');
+  // los km de ruta del caso real desde el camion del reporte
+  const rutas = [['gallia_ferry', 2.19], ['vitas_pwr', 2.22], ['ns_oil', 2.48], ['ts_atlas', 4.02], ['acc', 63.67], ['spinelli', 69.5]]
+    .map(([company, km]) => ({ company, km }));
+  assert.deepEqual(gameGpsGuessList(rutas, 4.0).map(f => f.company), ['ts_atlas']);
+  // la mas parecida primero
+  assert.deepEqual(gameGpsGuessList(rutas, 2.2).map(f => f.company), ['gallia_ferry', 'vitas_pwr']);
+  // nada a esa distancia, o sin datos
+  assert.deepEqual(gameGpsGuessList(rutas, 30), []);
+  assert.deepEqual(gameGpsGuessList(null, 4), []);
+  assert.deepEqual(gameGpsGuessList([{ company: 'x', km: null }], 4), []);
+  // mas de 3 no dicen nada: la lista queda vacia y sigue la explicacion
+  const muchas = ['a', 'b', 'c', 'd'].map(company => ({ company, km: 100 }));
+  assert.deepEqual(gameGpsGuessList(muchas, 100), []);
+  assert.equal(gameGpsGuessList(muchas.slice(0, 3), 100).length, 3);
+  // de cerca la tolerancia es fija, de lejos proporcional
+  assert.equal(gameGpsKmMatches(4.14, 4), true);
+  assert.equal(gameGpsKmMatches(4.2, 4), false);
+  assert.equal(gameGpsKmMatches(203, 200), true);
+  assert.equal(gameGpsKmMatches(204, 200), false);
+  // solo se calculan las que la recta deja: 7 km de recta no entran en 4 km de ruta
+  const empresas = [{ id: 'cerca', d: 1 }, { id: 'justo', d: 4.3 }, { id: 'lejos', d: 7 }];
+  const recta = (c) => c.d;
+  assert.deepEqual(gameGpsCandidates(empresas, 4, recta).map(c => c.id), ['cerca', 'justo']);
+  assert.deepEqual(gameGpsCandidates(empresas, 0, recta), []);
+  assert.deepEqual(gameGpsCandidates(empresas, GAME_GPS_GUESS_MAX_KM + 1, recta), []);
+  assert.deepEqual(gameGpsCandidates(null, 4, recta), []);
+});
+
+test('gameGpsGuessStep: se busca parado, sigue valiendo al acercarse y se borra si el GPS va a otro lado', () => {
+  const { gameGpsGuessStep, GAME_GPS_GUESS_MAX_KM } = require('./pure.js');
+  // primera vez: parado se busca, andando se espera
+  assert.equal(gameGpsGuessStep(null, 4, 0), 'search');
+  assert.equal(gameGpsGuessStep(null, 4, 80), 'keep');
+  assert.equal(gameGpsGuessStep(null, 4, undefined), 'search');
+  assert.equal(gameGpsGuessStep(null, 4, -3), 'search'); // marcha atras despacio
+  // los mismos km: nada que hacer
+  assert.equal(gameGpsGuessStep(4, 4.1, 0), 'keep');
+  // andando hacia alla: lo mismo; al parar, de nuevo desde ahi
+  assert.equal(gameGpsGuessStep(40, 30, 80), 'keep');
+  assert.equal(gameGpsGuessStep(40, 30, 0), 'search');
+  // los km suben: el GPS va a otro lado
+  assert.equal(gameGpsGuessStep(4, 90, 80), 'clear');
+  assert.equal(gameGpsGuessStep(4, 90, 0), 'search');
+  // sin ruta en el GPS o demasiado lejos
+  assert.equal(gameGpsGuessStep(4, 0, 0), 'clear');
+  assert.equal(gameGpsGuessStep(4, undefined, 0), 'clear');
+  assert.equal(gameGpsGuessStep(null, GAME_GPS_GUESS_MAX_KM + 1, 0), 'clear');
+});
+
+test('turnReportJobLine: dice si la web tenia el trabajo, para separar el SDK del mapa (06-11)', () => {
+  const { turnReportJobLine, turnReportText } = require('./pure.js');
+  const viaje = { jobMarket: 'freight_market', companySrcId: 'ts_atlas', citySrcId: 'bilbao', companyDstId: 'acc', cityDstId: 'santander' };
+  assert.equal(turnReportJobLine({ ...viaje, onJob: true, trailerAttached: false, isCargoLoaded: true, trailerPickup: true }),
+    'Job: market freight_market, from ts_atlas@bilbao, to acc@santander, trailer off, cargo loaded, going to the trailer');
+  // lo del reporte de Bilbao: sin trabajo y sin nada de antes
+  assert.equal(turnReportJobLine({ onJob: false, trailerAttached: false, isCargoLoaded: false }), 'Job: none, trailer off, cargo not loaded');
+  assert.equal(turnReportJobLine({ onJob: false, cityDst: 'Santander', ...viaje, trailerAttached: true, isCargoLoaded: true, paused: true }),
+    'Job: none (left over: market freight_market, from ts_atlas@bilbao, to acc@santander), trailer on, cargo loaded, paused');
+  // sin el id, el nombre; sin nada, un signo
+  assert.equal(turnReportJobLine({ onJob: true, companySrc: 'TS Atlas', citySrc: 'Bilbao' }),
+    'Job: market ?, from TS Atlas@Bilbao, to ?@?, trailer off, cargo not loaded');
+  assert.equal(turnReportJobLine({}), 'Job: ? (client without onJob)');
+  assert.equal(turnReportJobLine(null), null);
+  // va en el reporte despues de la ruta, y sin ella el reporte queda como antes
+  const base = { game: 'ets2', map: 'ets2', web: 'x', client: '1.5.37', truck: [1, 2], now: 1, items: [], formatTime: () => 'h' };
+  assert.ok(turnReportText({ ...base, job: 'Job: none, trailer off, cargo not loaded' }).includes('\nJob: none, trailer off, cargo not loaded\n'));
+  assert.ok(!turnReportText(base).includes('Job:'));
+});
