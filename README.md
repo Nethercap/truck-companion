@@ -29,6 +29,10 @@ that client does and does not do.
   system-tray `.exe`).
 - [`backend/`](backend/) — FastAPI relay backend (pairing + WebSocket relay),
   deployed on Railway.
+- [`android/`](android/) — the Android app on Google Play, a Trusted Web Activity
+  around the web app.
+- [`android-native/`](android-native/) — a native Android app in progress (Kotlin,
+  Compose, MapLibre Native), with its own interface.
 - [`docs/`](docs/) — the public web app and landing page, served via GitHub
   Pages at trucksim-dash.com. Map tiles and route graphs (~800MB) are hosted
   separately on Cloudflare R2, not in this repo. `docs/es/index.html` is

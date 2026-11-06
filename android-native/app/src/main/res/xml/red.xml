@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El modo LAN habla con el cliente de la PC por ws://<ip>:27766 y las IP de
+     cada casa no se pueden listar aca, asi que hay que permitir texto plano.
+     Lo demas (relay, mapas, API) va siempre por https/wss, escrito en Red.kt. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

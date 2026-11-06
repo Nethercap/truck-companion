@@ -1,0 +1,5 @@
+# gradlew corre en Linux en CI: con CRLF no arranca.
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
