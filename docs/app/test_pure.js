@@ -5969,6 +5969,23 @@ test('gameGpsCandidates y gameGpsGuessList: Bilbao, el remolque a 4,0 km sin tra
   assert.deepEqual(gameGpsCandidates(null, 4, recta), []);
 });
 
+test('gameGpsGuessPanelShown: sin modo navegacion, solo parado y con empresas para ofrecer (Discord 06-11, ShadE)', () => {
+  const { gameGpsGuessPanelShown } = require('./pure.js');
+  const base = { reason: 'game_gps', guesses: 1, speedKmh: 0 };
+  assert.equal(gameGpsGuessPanelShown(base), true);
+  // Marcha atras o maniobrando en la playa tambien es estar parado
+  assert.equal(gameGpsGuessPanelShown({ ...base, speedKmh: -3 }), true);
+  assert.equal(gameGpsGuessPanelShown({ ...base, speedKmh: undefined }), true);
+  // Sin empresas no se abre: la explicacion larga es para el modo navegacion
+  assert.equal(gameGpsGuessPanelShown({ ...base, guesses: 0 }), false);
+  // Andando la lista sigue valiendo, pero el panel no tapa el mapa
+  assert.equal(gameGpsGuessPanelShown({ ...base, speedKmh: 60 }), false);
+  assert.equal(gameGpsGuessPanelShown({ ...base, speedKmh: -6 }), false);
+  // Con otra razon (trabajo, waypoint, sin ruta en el juego) no hay nada que ofrecer
+  assert.equal(gameGpsGuessPanelShown({ ...base, reason: null }), false);
+  assert.equal(gameGpsGuessPanelShown({ ...base, reason: 'none' }), false);
+});
+
 test('gameGpsGuessStep: se busca parado, sigue valiendo al acercarse y se borra si el GPS va a otro lado', () => {
   const { gameGpsGuessStep, GAME_GPS_GUESS_MAX_KM } = require('./pure.js');
   // primera vez: parado se busca, andando se espera

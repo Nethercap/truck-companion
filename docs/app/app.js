@@ -5699,6 +5699,15 @@ function searchGameGpsGuess(data) {
   setTimeout(seguir, 0);
 }
 
+// Con la navegacion prendida el panel lo maneja updateMap. Apagada, solo se abre
+// para ofrecer las empresas (gameGpsGuessPanelShown, pure.js).
+function updateGameGpsGuessPanel(data) {
+  if (navMode) return;
+  const abierto = gameGpsGuessPanelShown({ reason: noRouteNow, guesses: gameGpsGuess.list.length, speedKmh: data.speedKmh });
+  if (abierto) updateNavPanel(null);
+  else document.getElementById('navPanel').style.display = 'none';
+}
+
 function updateNavPanel(turn) {
   if (lastData && dismissedRouteIdentity === routeIdentity(lastData)) {
     document.getElementById('navPanel').style.display = 'none';
@@ -8180,6 +8189,7 @@ function handleTelemetry(data) {
   updateMap(data.position || {}, data.game, data.heading);
   updateDestinationMarker(data);
   updateGameGpsGuess(data);
+  updateGameGpsGuessPanel(data);
   updateRouteSummary(data);
   checkMissingCompanies(data);
   checkUpdateBanner(data.clientVersion);
