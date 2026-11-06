@@ -356,6 +356,19 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   250 rutas: con nuestra escala errada hasta 4 % u 8 km no se cambia ninguna;
   con 3 %, una de cada tres. El "Copy turn report" trae las dos distancias
   ("Route left"): con reportes reales se puede medir el error de la escala.
+  Entre 2,5 % (con mas de 15 km) y esos 5 %, `routeGameAgreement` da 'near' y
+  se buscan igual, pero solo gana la que comparte hasta la mitad de sus
+  metros con la nuestra (`nearShared`, `routeSharedFrac`): otro corredor
+  entero (reporte #28, 06-11, Pamplona -> A Coruna: la app por Burgos y Leon,
+  871 km; el GPS por la costa, 844, y la costa medida da 837, 0,8 % de error,
+  el unico dato real hasta ahora). Por el largo solo ganaba otra que sigue por
+  Burgos y entra a A Coruna por otro lado, 845 km. 300 rutas largas por
+  variante (ETS2, ATS, ProMods, Coast to Coast, semilla 7, 650 a 740 km de
+  mediana): con la escala errada hasta 2 % no cambia ninguna; con 2,5 %, 1 de
+  100; con 3 %, 2 a 4 (10 sin `nearShared`). Con el juego de verdad por otro
+  corredor en esa banda se lo encuentra siempre (152 pruebas). Lo de fondo
+  sigue siendo el tiempo: la calle de Pamplona al norte (N-121-A en los carteles) va a 60 km/h en el
+  grafo (`road.local`) y es lo que hace mas lenta la costa, 37 s de 2.319.
   Una alternativa no se desvia de una ruta anterior por menos de 1,5 km
   (`dropRouteDetours`, `ROUTE_DETOUR_MAX_M`): con la autopista encarecida
   se bajaba por la salida y volvia a subir, o pasaba por el area de
