@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.37 (2026-11-06)
 
 - In-game overlay: a new line shows how far the nearest fuel station and rest area are by road, with
   or without a route, so you can see it with nothing to press (handy when you stream the game with
