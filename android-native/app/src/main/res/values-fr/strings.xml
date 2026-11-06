@@ -342,4 +342,7 @@
     <string name="mapa_local">construite sur le PC</string>
     <string name="compartir">Partager</string>
     <string name="stats_buscar_conductor">Chercher un conducteur</string>
+    <string name="fallo_titulo">Truck Dash s\'est fermé de façon inattendue</string>
+    <string name="fallo_texto">Vous pouvez partager un rapport avec la personne qui vous a donné cette bêta. Il contient l\'erreur, le journal récent de l\'appli et le modèle de votre téléphone, mais ni votre compte ni vos codes.</string>
+    <string name="fallo_seguir">Continuer</string>
 </resources>

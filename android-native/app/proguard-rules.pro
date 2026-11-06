@@ -1,3 +1,7 @@
+# Los informes de cierre (core/Fallos.kt) tienen que leerse sin el mapping: el codigo es publico.
+-dontobfuscate
+-keepattributes SourceFile,LineNumberTable
+
 # MapLibre llama a estas clases desde el codigo nativo por nombre (JNI).
 -keep class org.maplibre.** { *; }
 -dontwarn org.maplibre.**

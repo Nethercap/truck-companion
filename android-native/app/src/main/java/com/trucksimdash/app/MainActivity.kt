@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.trucksimdash.app.ui.AppRaiz
+import com.trucksimdash.app.ui.AvisoDeFallo
 import com.trucksimdash.app.ui.Paleta
 import com.trucksimdash.app.ui.TemaTruckDash
 import kotlinx.coroutines.flow.combine
@@ -28,7 +29,8 @@ private val FORMA_FLOTANTE = Rational(16, 9)
 
 class MainActivity : ComponentActivity() {
     private val flotante = mutableStateOf(false)
-    private val contenedor get() = (application as TruckDashApp).contenedor
+    private val app get() = application as TruckDashApp
+    private val contenedor get() = app.contenedor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -36,8 +38,29 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-        leerEnlace(intent)
         addOnPictureInPictureModeChangedListener { flotante.value = it.isInPictureInPictureMode }
+        val arrancada = mutableStateOf(app.arrancada)
+        if (app.arrancada) empezar()
+        setContent {
+            TemaTruckDash {
+                Box(Modifier.fillMaxSize().background(Paleta.Fondo)) {
+                    if (arrancada.value) {
+                        AppRaiz(contenedor, flotante.value, ::abrirFlotante)
+                    } else {
+                        AvisoDeFallo(app.fallos) {
+                            app.fallos.olvidar()
+                            app.arrancar()
+                            empezar()
+                            arrancada.value = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun empezar() {
+        leerEnlace(intent)
         // Desde Android 12 el sistema entra solo y con la animacion buena, si se le avisa antes.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             lifecycleScope.launch {
@@ -46,13 +69,6 @@ class MainActivity : ComponentActivity() {
                     .collect { auto ->
                         setPictureInPictureParams(PictureInPictureParams.Builder().setAspectRatio(FORMA_FLOTANTE).setAutoEnterEnabled(auto).build())
                     }
-            }
-        }
-        setContent {
-            TemaTruckDash {
-                Box(Modifier.fillMaxSize().background(Paleta.Fondo)) {
-                    AppRaiz(contenedor, flotante.value, ::abrirFlotante)
-                }
             }
         }
     }
@@ -66,13 +82,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || !app.arrancada) return
         if (contenedor.prefs.ajustes.value.flotanteAlSalir && contenedor.sesion.estado.value.enVivo) abrirFlotante()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        leerEnlace(intent)
+        // Con el aviso de un cierre todavia en pantalla, lo lee empezar().
+        if (app.arrancada) leerEnlace(intent) else setIntent(intent)
     }
 
     private fun leerEnlace(intent: Intent?) {

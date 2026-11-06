@@ -336,4 +336,7 @@
     <string name="mapa_local">bilgisayarda oluşturuldu</string>
     <string name="compartir">Paylaş</string>
     <string name="stats_buscar_conductor">Sürücü ara</string>
+    <string name="fallo_titulo">Truck Dash beklenmedik şekilde kapandı</string>
+    <string name="fallo_texto">Bu betayı sana veren kişiyle bir rapor paylaşabilirsin. Raporda hata, uygulamanın son günlüğü ve telefon modelin var; hesabın ve kodların yok.</string>
+    <string name="fallo_seguir">Devam et</string>
 </resources>

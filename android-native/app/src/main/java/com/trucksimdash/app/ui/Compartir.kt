@@ -26,3 +26,17 @@ internal suspend fun compartirImagen(contexto: Context, imagen: Bitmap, nombre: 
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     contexto.startActivity(Intent.createChooser(intent, null))
 }
+
+/** Un texto largo como archivo: por Discord o WhatsApp, pegado en el mensaje no entra. */
+internal suspend fun compartirTexto(contexto: Context, texto: String, nombre: String) {
+    val archivo = withContext(Dispatchers.IO) {
+        val carpeta = File(contexto.cacheDir, "compartir").apply { mkdirs() }
+        File(carpeta, nombre).apply { writeText(texto) }
+    }
+    val uri = FileProvider.getUriForFile(contexto, "${contexto.packageName}.archivos", archivo)
+    val intent = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_STREAM, uri)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    contexto.startActivity(Intent.createChooser(intent, null))
+}

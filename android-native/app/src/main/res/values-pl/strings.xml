@@ -348,4 +348,7 @@
     <string name="mapa_local">zbudowana na PC</string>
     <string name="compartir">Udostępnij</string>
     <string name="stats_buscar_conductor">Znajdź kierowcę</string>
+    <string name="fallo_titulo">Truck Dash nieoczekiwanie się zamknął</string>
+    <string name="fallo_texto">Możesz udostępnić raport osobie, od której masz tę wersję beta. Zawiera błąd, ostatni dziennik aplikacji i model telefonu, ale nie Twoje konto ani kody.</string>
+    <string name="fallo_seguir">Kontynuuj</string>
 </resources>

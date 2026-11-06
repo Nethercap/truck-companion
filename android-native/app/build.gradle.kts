@@ -78,8 +78,11 @@ android {
         applicationId = "com.trucksimdash.app.nativa"
         minSdk = 24
         targetSdk = 36
-        versionCode = (System.getenv("TD_VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("TD_VERSION_NAME") ?: "0.1.0"
+        // Se suben a mano en cada beta: Android no instala una con un versionCode mas bajo.
+        versionCode = (System.getenv("TD_VERSION_CODE") ?: "2").toInt()
+        versionName = System.getenv("TD_VERSION_NAME") ?: "0.2.0"
+        // En el telefono esta al lado de la TWA de Play: que el icono diga cual es.
+        manifestPlaceholders["etiqueta"] = "Truck Dash Beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

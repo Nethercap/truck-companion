@@ -119,6 +119,32 @@ with the debug key:
 fine to try on a phone, not for Play. The debug build also adds a card in Settings to
 point the app at a local relay and a local account API.
 
+## Beta
+
+Handing the APK to testers, without Play. `BETA.md` is the text for them.
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools/armar_beta.ps1
+```
+
+The first time, it creates a signing key in your user folder. It asks for the password each
+time and never stores it. It leaves the APKs, named with the version, in `app/build/beta/`.
+Keep a copy of the key: installed apps only update from the same key, and a different one means
+uninstalling, which loses the settings and the linked account. Raise `versionCode` and
+`versionName` in `app/build.gradle.kts` for each beta.
+
+If the app closes by itself, the next launch offers a report to share before anything else starts,
+so a crash during startup can still be reported (`core/Fallos.kt`). There's no server behind it:
+the tester sends the file. Names in its stack traces are readable because R8 doesn't obfuscate.
+
+A GitHub release for a beta has two traps. Its tag can't start with `v`, which would build the
+Windows client and announce it on Discord. And it can't become "latest", because the website's
+download button points at `releases/latest/download/TruckDash-windows.zip`.
+
+```bash
+gh release create android-0.2.0 --target claude/app-nativa --prerelease --latest=false --title "Truck Dash Beta 0.2.0" --notes-file BETA.md app/build/beta/*.apk
+```
+
 ## Testing
 
 Unit tests run on the JVM. What's ported from the web is checked against the web itself,

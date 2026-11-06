@@ -6,6 +6,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.trucksimdash.app.core.Boveda
+import com.trucksimdash.app.core.Fallos
 import com.trucksimdash.app.core.Preferencias
 import com.trucksimdash.app.core.Red
 import com.trucksimdash.app.cuenta.CuentaRepo
@@ -181,9 +182,21 @@ class Contenedor(private val app: Application) {
 class TruckDashApp : Application() {
     lateinit var contenedor: Contenedor
         private set
+    lateinit var fallos: Fallos
+        private set
+    val arrancada get() = ::contenedor.isInitialized
 
     override fun onCreate() {
         super.onCreate()
+        fallos = Fallos(this)
+        fallos.instalar()
+        // Con un cierre sin contar, primero el aviso (MainActivity): si lo que se cierra es el
+        // arranque, despues de esto no se llegaria nunca a mostrarlo.
+        if (!fallos.hayPendiente) arrancar()
+    }
+
+    fun arrancar() {
+        if (arrancada) return
         Red.iniciar(cacheDir)
         MapLibre.getInstance(this)
         // Todo pedido del mapa pasa por el mismo cliente, con su Referer (ver Red).

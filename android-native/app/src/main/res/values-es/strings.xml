@@ -338,4 +338,7 @@
     <string name="mapa_local">armado en la PC</string>
     <string name="compartir">Compartir</string>
     <string name="stats_buscar_conductor">Buscar un conductor</string>
+    <string name="fallo_titulo">Truck Dash se cerró de golpe</string>
+    <string name="fallo_texto">Podés compartir un informe con quien te pasó esta beta. Lleva el error, el registro reciente de la app y el modelo de tu teléfono, no tu cuenta ni tus códigos.</string>
+    <string name="fallo_seguir">Continuar</string>
 </resources>

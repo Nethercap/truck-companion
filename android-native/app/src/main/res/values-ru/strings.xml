@@ -348,4 +348,7 @@
     <string name="mapa_local">собрана на ПК</string>
     <string name="compartir">Поделиться</string>
     <string name="stats_buscar_conductor">Найти водителя</string>
+    <string name="fallo_titulo">Truck Dash неожиданно закрылся</string>
+    <string name="fallo_texto">Можно поделиться отчётом с тем, кто дал вам эту бету. В нём ошибка, недавний журнал приложения и модель телефона, но нет вашей учётной записи и кодов.</string>
+    <string name="fallo_seguir">Продолжить</string>
 </resources>

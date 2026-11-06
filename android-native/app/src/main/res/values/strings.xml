@@ -348,4 +348,7 @@
     <string name="mapa_local">built on the PC</string>
     <string name="compartir">Share</string>
     <string name="stats_buscar_conductor">Look up a driver</string>
+    <string name="fallo_titulo">Truck Dash closed unexpectedly</string>
+    <string name="fallo_texto">You can share a report with whoever gave you this beta. It has the error, the app\'s recent log and your phone model, not your account or your codes.</string>
+    <string name="fallo_seguir">Continue</string>
 </resources>

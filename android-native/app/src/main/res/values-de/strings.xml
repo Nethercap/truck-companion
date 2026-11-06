@@ -336,4 +336,7 @@
     <string name="mapa_local">auf dem PC gebaut</string>
     <string name="compartir">Teilen</string>
     <string name="stats_buscar_conductor">Fahrer suchen</string>
+    <string name="fallo_titulo">Truck Dash wurde unerwartet beendet</string>
+    <string name="fallo_texto">Du kannst einen Bericht an die Person schicken, von der du diese Beta hast. Er enthält den Fehler, das aktuelle Protokoll der App und dein Telefonmodell, aber nicht dein Konto oder deine Codes.</string>
+    <string name="fallo_seguir">Weiter</string>
 </resources>

@@ -941,6 +941,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Con `--entrega S` manda un peaje, una multa y la entrega, y con `--mapa-local` sirve
   `/localmap/` con Range como el cliente. Sin probar todavia: un telefono de verdad, el juego
   de verdad, una cuenta de verdad y oir la voz.
+- Beta sin Play (`tools/armar_beta.ps1`, `BETA.md`, pasos en el README): clave propia y fuera del
+  repo, version a mano en `app/build.gradle.kts`. Una release de GitHub va con tag que no empiece
+  con `v` (compila el cliente y lo anuncia en Discord) y `--prerelease --latest=false` (el boton de
+  descarga de la web es `releases/latest/download/TruckDash-windows.zip`).
+- `core/Fallos.kt` guarda un cierre de Kotlin y lee de Android los nativos y los ANR. Con uno sin
+  contar, `TruckDashApp` no arranca nada hasta pasar el aviso (`AvisoDeFallo`): un cierre del
+  arranque tambien se puede contar. El informe lo manda la persona, no hay servidor. Promete no
+  llevar la cuenta ni los codigos: lo nuevo que se anote con `Log` tiene que seguir cumpliendolo
+  (`TextoFallo.limpiar` saca los de las URL, `legible` la memoria de una traza nativa).
 
 ## Supuestos que ya rompieron cosas (10-10-2026)
 

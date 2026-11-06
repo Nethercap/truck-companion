@@ -342,4 +342,7 @@
     <string name="mapa_local">montado no PC</string>
     <string name="compartir">Compartilhar</string>
     <string name="stats_buscar_conductor">Procurar um motorista</string>
+    <string name="fallo_titulo">O Truck Dash fechou inesperadamente</string>
+    <string name="fallo_texto">Você pode compartilhar um relatório com quem lhe passou esta beta. Ele traz o erro, o registro recente do app e o modelo do seu celular, mas não a sua conta nem os seus códigos.</string>
+    <string name="fallo_seguir">Continuar</string>
 </resources>
