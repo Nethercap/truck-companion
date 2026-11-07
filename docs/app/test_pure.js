@@ -5814,7 +5814,15 @@ test('reporte de navegacion: el pedido, la cookie y que decir despues', () => {
   }
 });
 
-test('reporte de navegacion: sin avisos de giro y sin nada escrito pide confirmar', () => {
+test('reporte de navegacion: en la web se manda solo con avisos de giro y con ruta, si no va a Discord', () => {
+  const { navReportCanSend } = require('./pure.js');
+  assert.equal(navReportCanSend({ hasTurns: true, hasRoute: true }), true);
+  assert.equal(navReportCanSend({ hasTurns: false, hasRoute: true }), false);
+  assert.equal(navReportCanSend({ hasTurns: true, hasRoute: false }), false);
+  assert.equal(navReportCanSend({ hasTurns: false, hasRoute: false }), false);
+});
+
+test('reporte de navegacion: la app nativa, sin avisos de giro y sin nada escrito pide confirmar', () => {
   const { navReportLooksEmpty } = require('./pure.js');
   assert.equal(navReportLooksEmpty({ hasTurns: false, description: '' }), true);
   assert.equal(navReportLooksEmpty({ hasTurns: false, description: '   \n ' }), true);

@@ -747,6 +747,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   y eso se mandaba (07-11, ShadE: tomo el trabajo y veia el reporte de antes). A pantalla
   completa no estan el link ni los ajustes: ahi hay un boton sobre el mapa
   (`navReportFsBtn`), que no sale fuera de ese modo ni en `?cab=1`.
+- Sin avisos de giro o sin ruta no se manda, aunque traiga algo escrito
+  (`navReportCanSend`, 07-11): no se puede reproducir. La ventana lleva a Discord, con el
+  reporte para copiar. Si aparecen mientras esta abierta, vuelve el formulario. Solo lo
+  frena la web: una pestana vieja o la API directa siguen pudiendo mandarlo, y la app
+  nativa sigue con `navReportLooksEmpty` y sus textos (`navReportOnlyNav`,
+  `navReportSendAnyway`), que por eso no se borran. De los reportes de ShadE, #30 y el
+  siguiente (`Job:`) ya no habrian salido por aca.
 - Ajustes > "Report a navigation problem" (`navReportModal`; `navReportBody`,
   `navReportCredentials` y `navReportOutcome` en pure.js) manda lo que la
   persona elige (`NAV_REPORT_KINDS`) y escribe, mas el turn report entero,
