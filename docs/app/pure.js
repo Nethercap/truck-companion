@@ -5990,15 +5990,24 @@ function routeAlternatives(first, route, edgesOf, { tries = 3, factor = 1.25 } =
 // 1.000 desvios de menos de 100 m (otro carril del mismo cruce) y 500 de
 // 100 m a 1 km (salidas, areas de descanso); de 1 a 1,5 km, 28, y de ahi en
 // mas otro camino de verdad. ETS2 igual.
+// Un desvio que ahorra poco tampoco es otro camino: dropRampDetours saca de
+// la ruta las rampas que ahorran hasta ROUTE_RAMP_DETOUR_MAX_S, pero con la
+// calle encarecida ya no conviene sacarlas. Al norte de Pamplona (N-121-A,
+// reporte #33, 07-11) la alternativa dejaba la calle 2+1 por la rampa y el
+// camino viejo de un carril, 3 s menos en el grafo y 2,3 km mas, y por ese
+// largo coincidia mejor con el juego. Salvo que el desvio vaya por otra de las
+// rutas (otras): ahi lo encarecido era el, y ref es la que se aparto (Jonesboro,
+// la alternativa siguiendo a la mas rapida por la calle derecha, ATS 07-11).
 // path y ref: indices de nodo de la alternativa y de una ruta anterior.
 // Donde path deja a ref (llegando por la misma arista) y vuelve a ella mas
 // adelante (siguiendo por la misma arista, o en el final), sin que ref
-// mida mas de maxM entre esos nodos ni el desvio cueste menos: el tramo de
-// ref. Si sale y vuelve varias veces seguidas, hasta la vuelta en que sigue
-// por ref. edge(a, b): { m, cost } de la arista de a a b (costo sin
-// encarecer), o null. Devuelve los nodos (path si no cambia nada).
+// mida mas de maxM entre esos nodos ni el desvio ahorre mas de maxSave: el
+// tramo de ref. Si sale y vuelve varias veces seguidas, hasta la vuelta en
+// que sigue por ref. edge(a, b): { m, cost } de la arista de a a b (costo sin
+// encarecer), o null. maxSave, en unidades de cost. otras: los nodos de las
+// demas rutas ya encontradas. Devuelve los nodos (path si no cambia nada).
 const ROUTE_DETOUR_MAX_M = 1500;
-function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
+function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M, maxSave = ROUTE_RAMP_DETOUR_MAX_S, otras = null) {
   if (!path || !ref || path.length < 3 || ref.length < 2) return path;
   const pos = new Map();
   ref.forEach((n, i) => pos.set(n, pos.has(n) ? -1 : i)); // -1: pasa dos veces
@@ -6010,6 +6019,15 @@ function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
       m += x.m; cost += x.cost;
     }
     return { m, cost };
+  };
+  let arcos = null;
+  const vaPorOtra = (a, b) => {
+    if (!arcos) {
+      arcos = new Set();
+      for (const r of otras || []) for (let k = 1; k < r.length; k++) arcos.add(`${r[k - 1]}>${r[k]}`);
+    }
+    for (let k = a + 1; k <= b; k++) if (arcos.has(`${path[k - 1]}>${path[k]}`)) return true;
+    return false;
   };
   const out = [path[0]];
   let cambio = false;
@@ -6028,7 +6046,7 @@ function dropRouteDetours(path, ref, edge, maxM = ROUTE_DETOUR_MAX_M) {
     if (fin !== -1) {
       const pt = pos.get(path[fin]);
       const desvio = tramo(path, s, fin), recto = tramo(ref, ps, pt);
-      if (desvio && recto && recto.m <= maxM && desvio.cost >= recto.cost) {
+      if (desvio && recto && recto.m <= maxM && (desvio.cost >= recto.cost || (desvio.cost + maxSave >= recto.cost && !vaPorOtra(s, fin)))) {
         for (let k = ps + 1; k <= pt; k++) out.push(ref[k]);
         s = fin;
         cambio = true;

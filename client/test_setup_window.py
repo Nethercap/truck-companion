@@ -9,6 +9,7 @@ botones es lo unico que lo agarra.
 Necesitan una pantalla: se saltean solos donde no la hay (CI en Linux).
 """
 
+import gc
 import os
 import threading
 import types
@@ -909,6 +910,97 @@ def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch
     textos = _textos(v.local_map_body)
     assert tray_client.T("local_map_build") not in textos
     assert any("12" in t for t in textos)
+
+
+def _armado_que_falla(monkeypatch, tmp_path, armar):
+    """start_map_build con build_map de mentira y los mapas en una carpeta
+    temporal. Espera a que termine y devuelve state.map_build."""
+    # Que la basura de Tk de otros tests no se junte en el hilo del armado, donde
+    # tira "main thread is not in main loop"
+    gc.collect()
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(tray_client.state, "map_build", None)
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": [str(tmp_path / "mod.scs")], "ets2": None})
+    monkeypatch.setattr(tray_client, "game_dir_for", lambda game: str(tmp_path / "juego"))
+    monkeypatch.setattr(tray_client, "refresh_local_maps", lambda: False)
+    if armar:
+        monkeypatch.setattr(tray_client.map_builder, "build_map", armar)
+    assert tray_client.start_map_build("ats")
+    limite = tray_client.time.monotonic() + 60
+    while tray_client.state.map_build.get("running"):
+        assert tray_client.time.monotonic() < limite
+        tray_client.time.sleep(0.02)
+    return tray_client.state.map_build
+
+
+def _setup_con_el_error(v, monkeypatch, tmp_path):
+    bin_dir = _install(tmp_path, "ATS", "ats")
+    tray_client.state.installs = [plugin_installer.describe_install("ats", bin_dir)]
+    monkeypatch.setattr(tray_client.state, "local_maps", {})
+    monkeypatch.setattr(tray_client.state, "offmap_games", set())
+    v.render_local_map()
+    v.root.update()
+    return _textos(v.local_map_body)
+
+
+def test_setup_dice_que_el_armado_se_quedo_sin_memoria_con_node_de_verdad(ventana, monkeypatch, tmp_path):
+    """De punta a punta: el boton de Setup no, pero si lo que arranca, un node
+    que se queda sin heap, lo que queda en disco, el reporte y el texto."""
+    node = tray_client.map_builder.shutil.which("node")
+    if not node:
+        pytest.skip("sin node")
+    v, _ = ventana
+    bin_ = tmp_path / "armador" / "bin"
+    bin_.mkdir(parents=True)
+    (bin_ / "parser.mjs").write_text("const a = [];\nfor (;;) a.push({ n: a.length, s: 'x'.repeat(8) + a.length });\n",
+                                     encoding="utf-8")
+    (bin_ / "generator.mjs").write_text("", encoding="utf-8")
+    (bin_ / "tiles.mjs").write_text("", encoding="utf-8")
+    monkeypatch.setenv("TRUCKDASH_MAP_BUILDER", str(tmp_path / "armador"))
+    monkeypatch.setattr(tray_client.map_builder, "node_memory_mb", lambda total_gb: 32)
+    armado = _armado_que_falla(monkeypatch, tmp_path, None)
+
+    assert armado["step"] == "error" and armado["out_of_memory"] is True
+    textos = _setup_con_el_error(v, monkeypatch, tmp_path)
+    assert tray_client.T("local_map_out_of_memory") in textos
+    assert tray_client.T("local_map_error", err=armado["error"]) not in textos
+    # Se puede volver a armar
+    assert tray_client.T("local_map_build") in textos
+    # Lo intermedio no queda, y "Report a problem" tiene el error
+    log = tray_client.map_builder.failed_build_log(armado)
+    assert sorted(os.listdir(os.path.dirname(log))) == ["build.log", "mods.txt"]
+    final = tray_client.map_builder.build_log_tail(log)
+    assert "JavaScript heap out of memory" in final
+    assert "builder limit 32 MB" in final
+
+
+def test_el_grafo_sin_memoria_dice_lo_mismo(ventana, monkeypatch, tmp_path):
+    """El paso del grafo corre en el cliente: ahi no es node el que avisa."""
+    v, _ = ventana
+
+    def armar(*args, **kwargs):
+        raise MemoryError()
+
+    armado = _armado_que_falla(monkeypatch, tmp_path, armar)
+    assert armado["out_of_memory"] is True
+    assert tray_client.T("local_map_out_of_memory") in _setup_con_el_error(v, monkeypatch, tmp_path)
+
+
+def test_otro_error_del_armado_sigue_con_su_texto_y_limpia_lo_intermedio(ventana, monkeypatch, tmp_path):
+    v, _ = ventana
+    part = tmp_path / "TruckDash" / "maps" / "ats-abc.part"
+
+    def armar(*args, **kwargs):
+        (part / "parser").mkdir(parents=True)
+        (part / "build.log").write_text("✖ Error: se corto\n", encoding="utf-8")
+        raise RuntimeError("parser.mjs failed (exit 1)")
+
+    armado = _armado_que_falla(monkeypatch, tmp_path, armar)
+    assert armado["step"] == "error" and armado["out_of_memory"] is False
+    textos = _setup_con_el_error(v, monkeypatch, tmp_path)
+    assert tray_client.T("local_map_error", err="parser.mjs failed (exit 1)") in textos
+    assert tray_client.T("local_map_out_of_memory") not in textos
+    assert os.listdir(part) == ["build.log"]
 
 
 def test_qr_del_celular_con_el_codigo_y_se_rehace_al_cambiarlo(ventana, monkeypatch):

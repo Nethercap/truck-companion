@@ -4,11 +4,13 @@ import http.client
 import http.server
 import json
 import os
+import shutil
 import sys
 import threading
 
 import pytest
 
+import i18n
 import local_server
 import map_builder
 
@@ -330,6 +332,166 @@ def test_cancelar_corta_el_paso_aunque_no_escriba_nada(tmp_path):
     assert texto.splitlines()[-1] == map_builder.LOG_CANCELADO
 
 
+@pytest.mark.parametrize("total_gb, limite", [
+    (None, 8192),  # fuera de Windows, o si falla la consulta: el de siempre
+    (4, 8192), (7.9, 8192), (12, 8192),  # nunca menos que el de siempre
+    (15.9, 12288), (16, 12288),  # Windows da un poco menos que lo que dice la caja
+    (24, 20480),
+    (28, 24576), (31.9, 24576), (64, 24576), (128, 24576),  # el tope
+])
+def test_el_limite_de_memoria_sale_de_la_ram_de_la_pc(total_gb, limite):
+    assert map_builder.node_memory_mb(total_gb) == limite
+
+
+def test_la_memoria_de_esta_pc():
+    if sys.platform != "win32":
+        assert map_builder.total_memory_gb() is None and map_builder.free_memory_gb() is None
+        return
+    total = map_builder.total_memory_gb()
+    assert 0 < map_builder.free_memory_gb() <= total
+
+
+def _node_o_saltear():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("sin node")
+    return node
+
+
+# Se queda sin heap de verdad: con 32 MB de limite tarda menos de un segundo
+SIN_HEAP = ("const a = [];\nconsole.log('parsing europe sector files...');\n"
+            "for (;;) a.push({ n: a.length, s: 'x'.repeat(8) + a.length });\n")
+MENSAJE_SIN_HEAP = "FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory"
+
+
+def test_node_de_verdad_sin_heap_es_falta_de_memoria(tmp_path):
+    script = tmp_path / "parser.mjs"
+    script.write_text(SIN_HEAP, encoding="utf-8")
+    log = tmp_path / "build.log"
+    env = dict(os.environ, NODE_OPTIONS="--max-old-space-size=32")
+    with pytest.raises(map_builder.BuildOutOfMemory, match=r"parser\.mjs ran out of memory \(exit "):
+        map_builder._correr([_node_o_saltear(), str(script)], str(log), threading.Event(), env)
+    texto = log.read_text(encoding="utf-8")
+    assert "parsing europe sector files..." in texto
+    assert "JavaScript heap out of memory" in texto
+    # Lo que suma "Report a problem" alcanza para ver el error
+    assert "JavaScript heap out of memory" in map_builder.build_log_tail(str(log))
+
+
+def test_un_armado_de_verdad_sin_memoria_usa_el_limite_y_lo_anota(tmp_path, monkeypatch):
+    """build_map con un armador cuyo parser se queda sin heap: si NODE_OPTIONS
+    no le llegara a node, este tardaria mucho mas y usaria GB."""
+    _node_o_saltear()
+    bin_ = tmp_path / "armador" / "bin"
+    bin_.mkdir(parents=True)
+    (bin_ / "parser.mjs").write_text(SIN_HEAP, encoding="utf-8")
+    (bin_ / "generator.mjs").write_text("", encoding="utf-8")
+    (bin_ / "tiles.mjs").write_text("", encoding="utf-8")
+    monkeypatch.setenv("TRUCKDASH_MAP_BUILDER", str(tmp_path / "armador"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(map_builder, "node_memory_mb", lambda total_gb: 32)
+    monkeypatch.setattr(map_builder, "total_memory_gb", lambda: 15.9)
+    monkeypatch.setattr(map_builder, "free_memory_gb", lambda: 9.0)
+    with pytest.raises(map_builder.BuildOutOfMemory):
+        map_builder.build_map("ats", str(tmp_path / "juego"), [str(tmp_path / "mod.scs")], "1.5.37")
+    log = os.path.join(map_builder.maps_dir(), os.listdir(map_builder.maps_dir())[0], "build.log")
+    with open(log, encoding="utf-8") as f:
+        lineas = f.read().splitlines()
+    linea = "Memory: 15.9 GB total, 9.0 GB free, builder limit 32 MB"
+    assert lineas[0] == linea
+    assert lineas[1] == "Mods (1):"
+    assert any("JavaScript heap out of memory" in lin for lin in lineas)
+    assert map_builder.build_log_tail(log, lineas=3).splitlines()[-1] == linea
+
+
+def test_sin_saber_la_memoria_el_log_igual_dice_el_limite():
+    assert (map_builder._linea_de_memoria(None, None, 8192)
+            == "Memory: ? GB total, ? GB free, builder limit 8192 MB")
+
+
+@pytest.mark.parametrize("linea", [
+    MENSAJE_SIN_HEAP,
+    "FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory",
+    "FATAL ERROR: Zone Allocation failed - process out of memory",
+    "# Fatal JavaScript out of memory: Ineffective mark-compacts near heap limit",
+    "RangeError: Array buffer allocation failed",
+    "Error: ENOMEM: not enough memory, read",
+])
+def test_lo_que_dice_node_al_quedarse_sin_memoria(linea):
+    filtro = map_builder.LogCompacto(lambda texto: None)
+    filtro.linea("\x1b[31m" + linea + "\x1b[39m\r\n")
+    assert filtro.sin_memoria
+
+
+@pytest.mark.parametrize("linea", [
+    "✖ Error: ENOENT: no such file or directory",
+    "RangeError: Invalid string length",  # otro tope, no se arregla cerrando programas
+    "⚠ skipping def/memory/out_of.sii - failed to parse/validate: memory",
+])
+def test_otros_errores_no_son_falta_de_memoria(linea):
+    filtro = map_builder.LogCompacto(lambda texto: None)
+    filtro.linea(linea)
+    assert not filtro.sin_memoria
+
+
+def test_quedarse_sin_memoria_en_medio_de_un_archivo_que_no_valida_queda_en_el_log():
+    """Adentro del JSON, lo que pasa de LOG_JSON_LINEAS se recorta."""
+    lineas = []
+    filtro = map_builder.LogCompacto(lineas.append)
+    filtro.linea("✖ error validating def/company/acc/out/tyres.sii")
+    filtro.linea("{")
+    for i in range(map_builder.LOG_JSON_LINEAS + 5):
+        filtro.linea(f'  "campo{i}": {i},')
+    filtro.linea(MENSAJE_SIN_HEAP)
+    filtro.cerrar()
+    assert filtro.sin_memoria
+    assert lineas[-1] == MENSAJE_SIN_HEAP
+
+
+def test_un_paso_que_falla_por_otra_cosa_no_es_falta_de_memoria(tmp_path):
+    cmd = _programa(tmp_path, "import sys\nprint('Error: se corto', flush=True)\nsys.exit(1)\n")
+    with pytest.raises(RuntimeError, match=r"parser\.py failed \(exit 1\)") as error:
+        map_builder._correr(cmd, str(tmp_path / "build.log"), threading.Event(), dict(os.environ))
+    assert not isinstance(error.value, map_builder.BuildOutOfMemory)
+
+
+def test_el_texto_sin_salir_con_error_no_corta_el_armado(tmp_path):
+    """El parser muestra lineas de los .sii de los mods: el texto solo no alcanza."""
+    cmd = _programa(tmp_path, f"print({MENSAJE_SIN_HEAP!r}, flush=True)\n")
+    map_builder._correr(cmd, str(tmp_path / "build.log"), threading.Event(), dict(os.environ))
+
+
+def test_el_texto_de_sin_memoria_esta_en_todas_las_lenguas():
+    ingles = i18n._STRINGS["en"]["local_map_out_of_memory"]
+    for lang, textos in i18n._STRINGS.items():
+        assert textos.get("local_map_out_of_memory"), lang
+        assert lang == "en" or textos["local_map_out_of_memory"] != ingles, lang
+
+
+def test_limpiar_un_armado_que_fallo_deja_lo_del_reporte_y_nada_de_otros(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    maps = tmp_path / "TruckDash" / "maps"
+    for carpeta in ("ats-a.part", "ats-b.part", "ets2-a.part", "ats-c"):
+        (maps / carpeta / "parser" / "icons").mkdir(parents=True)
+        (maps / carpeta / "parser" / "usa-nodes.json").write_text("[]", encoding="utf-8")
+        (maps / carpeta / "build.log").write_text("✖ Error: se corto\n", encoding="utf-8")
+        (maps / carpeta / "mods.txt").write_text("mod.scs\n", encoding="utf-8")
+        (maps / carpeta / "route-graph-local_ats.json").write_text("{}", encoding="utf-8")
+    map_builder.limpiar_armados_fallidos("ats")
+    for carpeta in ("ats-a.part", "ats-b.part"):
+        assert sorted(os.listdir(maps / carpeta)) == ["build.log", "mods.txt"]
+    # Otro juego y un mapa terminado no se tocan
+    assert (maps / "ets2-a.part" / "parser" / "usa-nodes.json").exists()
+    assert (maps / "ats-c" / "parser" / "usa-nodes.json").exists()
+    # El reporte sigue encontrando el log, y borrar lo demas no cambia su hora
+    assert map_builder.failed_build_log({"game": "ats", "step": "error", "started": 0}).endswith("build.log")
+
+
+def test_limpiar_sin_carpeta_de_mapas_no_falla(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    map_builder.limpiar_armados_fallidos("ats")
+
+
 def _build_log(tmp_path, nombre, hora, texto="✖ Error: se corto\n"):
     carpeta = tmp_path / "TruckDash" / "maps" / nombre
     carpeta.mkdir(parents=True)
@@ -426,6 +588,18 @@ def test_el_final_del_build_log_para_el_reporte(tmp_path):
     assert final == ["⚠ skipping def/ferry/f2998.sii - failed to parse", "⚠ skipping def/ferry/f2999.sii - failed to parse",
                      *error[:2], "x" * 100 + "..."]
     assert map_builder.build_log_tail(str(tmp_path / "no-esta.log")) == ""
+
+
+def test_el_final_del_build_log_lleva_la_memoria_aunque_este_lejos(tmp_path):
+    """Es la primera linea, y el reporte suma solo las ultimas. Va al final:
+    issue_url recorta de arriba."""
+    log = tmp_path / "build.log"
+    memoria = "Memory: 31.9 GB total, 12.7 GB free, builder limit 24576 MB"
+    log.write_text(memoria + "\n" + "".join(f"linea {i}\n" for i in range(100)), encoding="utf-8")
+    assert map_builder.build_log_tail(str(log), lineas=2).splitlines() == ["linea 98", "linea 99", memoria]
+    # Si ya esta entre las ultimas, una sola vez
+    log.write_text(memoria + "\nlinea 0\n", encoding="utf-8")
+    assert map_builder.build_log_tail(str(log)).splitlines() == [memoria, "linea 0"]
 
 
 def _servidor(tmp_path):

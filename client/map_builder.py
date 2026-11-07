@@ -37,8 +37,15 @@ import red
 # otro formato no se usa y se ofrece armarlo de nuevo.
 MAP_FORMAT = 2  # 2: el armador lee los sectores de formatos viejos, antes se perdian
 NODE_MEMORY_MB = 8192
-# Memoria libre por debajo de la cual se avisa antes de arrancar (el parser
-# llega a ~7 GB con mapas grandes).
+# El limite de node sale de la RAM de la PC (node_memory_mb): lo de arriba como
+# piso, NODE_RESERVA_GB para el sistema y un tope. Lo publicado se arma con 12 GB,
+# que es lo que da una PC de 16. El tope es a ojo, 3 veces el limite de antes: no
+# hay medido cuanto pide un perfil grande (uno de 273 mods no entro en 8 GB).
+NODE_RESERVA_GB = 4
+NODE_MEMORY_MAX_MB = 24576
+# Memoria libre por debajo de la cual se avisa antes de arrancar: lo que pide un
+# armado comun (el parser llega a ~7 GB con mapas grandes). Un perfil con muchos
+# mods de mapa pide mas, pero no hay como saber cuanto antes de armarlo.
 MIN_FREE_GB = 7.0
 # Cada cuanto se mira, durante el armado, si se abrio el juego (es un tasklist).
 GAME_WATCH_SECONDS = 5.0
@@ -150,10 +157,27 @@ def prune_old_maps(game: str, keep: str, max_keep: int = 2):
             shutil.rmtree(os.path.join(maps_dir(), n), ignore_errors=True)
 
 
+def limpiar_armados_fallidos(game: str):
+    """Lo de un armado que fallo tampoco se vuelve a usar, y sin esto queda en
+    disco hasta el proximo armado bueno, o para siempre si la persona se rinde. Lo
+    que necesita "Report a problem" es el build.log (failed_build_log), y queda."""
+    try:
+        nombres = os.listdir(maps_dir())
+    except OSError:
+        return
+    for nombre in nombres:
+        if nombre.startswith(f"{game}-") and nombre.endswith(".part"):
+            try:
+                _dejar_solo_el_log(os.path.join(maps_dir(), nombre))
+            except OSError:
+                pass
+
+
 # ---------------------------------------------------------------- chequeos
 
 
-def free_memory_gb() -> float | None:
+def _estado_de_la_memoria():
+    """GlobalMemoryStatusEx, o None fuera de Windows o si falla."""
     if sys.platform != "win32":
         return None
     import ctypes
@@ -169,7 +193,26 @@ def free_memory_gb() -> float | None:
     st.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
     if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
         return None
-    return st.ullAvailPhys / 1024 ** 3
+    return st
+
+
+def free_memory_gb() -> float | None:
+    st = _estado_de_la_memoria()
+    return st.ullAvailPhys / 1024 ** 3 if st else None
+
+
+def total_memory_gb() -> float | None:
+    st = _estado_de_la_memoria()
+    return st.ullTotalPhys / 1024 ** 3 if st else None
+
+
+def node_memory_mb(total_gb: float | None) -> int:
+    """El limite de heap de node para el armador con esa RAM total, en MB. Con
+    12 GB o menos, el de siempre: el juego cerrado deja lugar y si no hay, lo pone
+    el archivo de paginacion. round porque Windows da 15,9 GB en una PC de 16."""
+    if total_gb is None:
+        return NODE_MEMORY_MB
+    return max(NODE_MEMORY_MB, min(NODE_MEMORY_MAX_MB, (round(total_gb) - NODE_RESERVA_GB) * 1024))
 
 
 def game_running() -> bool:
@@ -189,6 +232,10 @@ def game_running() -> bool:
 
 class BuildCancelled(Exception):
     pass
+
+
+class BuildOutOfMemory(RuntimeError):
+    """Un paso del armador se quedo sin memoria (LogCompacto.sin_memoria)."""
 
 
 def builder_dir(version: str) -> str:
@@ -265,6 +312,11 @@ _SALTEA_RE = re.compile(r"[⚠‼] skipping (.*)")
 _AVISO_RE = re.compile(r"[⚠‼] ")
 _ERROR_RE = re.compile(r"[✖×] ")
 _PILA_RE = re.compile(r"\s+at \S")
+# Lo que dice node al quedarse sin memoria, con el heap al limite ("FATAL ERROR:
+# Reached heap limit Allocation failed - JavaScript heap out of memory") o porque
+# Windows no le da mas ("process out of memory", una ArrayBuffer que no entra)
+_SIN_MEMORIA_RE = re.compile(r"heap out of memory|process out of memory|Fatal JavaScript out of memory"
+                             r"|Array buffer allocation failed|ERR_MEMORY_ALLOCATION_FAILED|ENOMEM")
 LOG_JSON_LINEAS = 20
 LOG_BLOQUE_LINEAS = 200
 # Las dos lineas del .sii que muestra el parser, mas las vacias de un CRLF
@@ -273,6 +325,8 @@ LOG_EXTRACTO_CHARS = 100
 # La ultima linea del build.log de un armado cancelado: despues de reiniciar
 # el cliente, su .part no es un armado que fallo (failed_build_log)
 LOG_CANCELADO = "Build cancelled."
+# Con esto empieza la primera linea del build.log: la RAM y el limite usado
+LOG_MEMORIA = "Memory: "
 
 
 def _aviso_de(texto: str, ruta: str) -> bool:
@@ -310,9 +364,19 @@ class LogCompacto:
         self._tras_aviso = False
         self._parseo = None
         self._excepcion = False
+        self.sin_memoria = False
 
     def linea(self, texto: str):
         texto = _ANSI_RE.sub("", texto).rstrip("\r\n")
+        if _SIN_MEMORIA_RE.search(texto):
+            # Antes de mirar los bloques: adentro del JSON de un archivo que no
+            # valida, esta linea se contaria entre las que se recortan
+            self.sin_memoria = True
+            if self._ruta is not None or self._parseo is not None:
+                self._soltar()
+            self._tras_aviso = False
+            self._escribir(texto)
+            return
         if self._ruta is not None and self._en_bloque(texto):
             return
         if self._parseo is not None and self._en_parseo(texto):
@@ -450,7 +514,8 @@ def _copiar_salida(salida, log, filtro: LogCompacto):
 
 def _correr(cmd: list, log_path: str, cancel: threading.Event, env: dict):
     """Un paso del armador, con prioridad baja y sin ventana. Corta si se
-    cancela. La salida va al log (el parser escribe mucho) por LogCompacto."""
+    cancela. La salida va al log (el parser escribe mucho) por LogCompacto. Tira
+    BuildOutOfMemory si fallo sin memoria y RuntimeError si fallo por otra cosa."""
     flags = 0
     if sys.platform == "win32":
         flags = subprocess.BELOW_NORMAL_PRIORITY_CLASS | subprocess.CREATE_NO_WINDOW
@@ -472,7 +537,16 @@ def _correr(cmd: list, log_path: str, cancel: threading.Event, env: dict):
         lector.join()
         filtro.cerrar()
     if proc.returncode != 0:
-        raise RuntimeError(f"{os.path.basename(cmd[1])} failed (exit {proc.returncode}), see {log_path}")
+        detalle = f"(exit {proc.returncode}), see {log_path}"
+        if filtro.sin_memoria:
+            raise BuildOutOfMemory(f"{os.path.basename(cmd[1])} ran out of memory {detalle}")
+        raise RuntimeError(f"{os.path.basename(cmd[1])} failed {detalle}")
+
+
+def _linea_de_memoria(total_gb: float | None, libre_gb: float | None, limite_mb: int) -> str:
+    def gb(valor):
+        return "?" if valor is None else f"{valor:.1f}"
+    return f"{LOG_MEMORIA}{gb(total_gb)} GB total, {gb(libre_gb)} GB free, builder limit {limite_mb} MB"
 
 
 def write_mod_list(mod_paths: list, lista: str, log_path: str) -> str:
@@ -558,8 +632,12 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
 
     builder = ensure_builder(client_version, progress)
     node = _node(builder)
+    total_gb = total_memory_gb()
+    limite_mb = node_memory_mb(total_gb)
+    with open(log_path, "a", encoding="utf-8") as log:
+        log.write(_linea_de_memoria(total_gb, free_memory_gb(), limite_mb) + "\n")
     env = dict(os.environ)
-    env["NODE_OPTIONS"] = f"--max-old-space-size={NODE_MEMORY_MB}"
+    env["NODE_OPTIONS"] = f"--max-old-space-size={limite_mb}"
     env["TM_SECTORS_ONLY_MOD"] = "0"
     env["TM_NO_UK_HACK"] = "0"
     bin_ = os.path.join(builder, "bin")
@@ -702,9 +780,14 @@ def failed_build_log(armado: dict | None, ahora: float | None = None) -> str | N
 def build_log_tail(ruta: str, lineas: int = BUILD_LOG_LINEAS, ancho: int = BUILD_LOG_ANCHO) -> str:
     """Las ultimas lineas del build.log para el reporte, cada una hasta ancho
     caracteres (la del comando o el aviso de un mod pueden ser largas). Vacio
-    si no se puede leer."""
+    si no se puede leer. Al final la linea de la memoria, que es la primera del
+    log: arriba la sacaria issue_url, que recorta de arriba."""
     try:
         final = _final_del_archivo(ruta, lineas)
+        with open(ruta, encoding="utf-8", errors="replace") as f:
+            primera = f.readline(ancho).strip()
     except OSError:
         return ""
+    if primera.startswith(LOG_MEMORIA) and primera not in final:
+        final.append(primera)
     return "\n".join(linea if len(linea) <= ancho else linea[:ancho] + "..." for linea in final)
