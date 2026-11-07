@@ -96,7 +96,7 @@ function connect(code) {
 
   socket.onopen = () => { conn.socket = 'open'; renderStatus(); };
   socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
+    const data = parseWsJson(event.data); // NaN o Infinity del cliente: null (pure.js)
     if (data.type === 'session_state') {
       conn.clientConnected = !!data.client_connected;
       if (data.client_status) conn.clientStatus = data.client_status;

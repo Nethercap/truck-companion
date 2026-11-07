@@ -6,6 +6,11 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- The dashboard no longer stays on "In the menu" while you drive with some trucks or trailers. If
+  the game reported a number that isn't one (a mod truck can report an endless fuel range), the
+  client sent it in a form the website could not read, and every update was lost: no speed and no
+  map, on every device. And a truck or trailer name of 64 letters or more, or one cut in the middle
+  of an accented letter, stopped the client from reading the game at all. Both now go through.
 - Build my map: when the dashboard can't find your job's destination on the map, Setup and the tray
   now offer to build it and name the place, even if your truck is still inside the map.
 - Build my map: if you open the game while the map is being built, the build now stops and tells

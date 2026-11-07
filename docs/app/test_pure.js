@@ -4904,6 +4904,32 @@ test('positionAtOrigin: el camion en 0,0 exacto es un dato sin posicion (Cheyenn
   assert.equal(positionAtOrigin(undefined), false);
 });
 
+test('parseWsJson: NaN e Infinity del json.dumps del cliente son null, no un dato perdido (Discord 07-11)', () => {
+  const { parseWsJson } = require('./pure.js');
+  // Lo que manda el cliente con un float del juego que no es un numero
+  const texto = '{"speedKmh": 52.3, "fuelRangeKm": Infinity, "fuelAvgConsumption": NaN, "x": -Infinity, '
+    + '"position": {"x": 10.5, "z": -3}, "lista": [NaN, 1, Infinity]}';
+  assert.throws(() => JSON.parse(texto));
+  const d = parseWsJson(texto);
+  assert.equal(d.speedKmh, 52.3);
+  assert.equal(d.fuelRangeKm, null);
+  assert.equal(d.fuelAvgConsumption, null);
+  assert.equal(d.x, null);
+  assert.deepEqual(d.position, { x: 10.5, z: -3 });
+  assert.deepEqual(d.lista, [null, 1, null]);
+  // Adentro de un texto no se toca, tampoco con comillas escapadas
+  const nombres = parseWsJson('{"truckName": "NaN Infinity \\"NaN\\"", "cargo": "a\\\\", "v": NaN}');
+  assert.equal(nombres.truckName, 'NaN Infinity "NaN"');
+  assert.equal(nombres.cargo, 'a\\');
+  assert.equal(nombres.v, null);
+  // El JSON valido sale igual que con JSON.parse
+  assert.deepEqual(parseWsJson('{"type": "client_status", "status": "live", "n": 1e3}'), { type: 'client_status', status: 'live', n: 1000 });
+  // Otro error sigue siendo un error
+  assert.throws(() => parseWsJson('{"a": '), SyntaxError);
+  assert.throws(() => parseWsJson('{"a": NaN'), SyntaxError);
+  assert.throws(() => parseWsJson('{"a": nan}'), SyntaxError);
+});
+
 test('recalcOnRoute: sin desviarse, la ruta nueva sigue con lo recorrido y el rumbo (Tyler -> Lufkin, ATS)', () => {
   const { recalcOnRoute } = require('./pure.js');
   // Lo recorrido: 100 m al norte con los nodos de la esquina; la ruta vieja

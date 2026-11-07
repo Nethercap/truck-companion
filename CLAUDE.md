@@ -1065,3 +1065,13 @@ Revisar cada cambio contra esta lista:
 9. **Varias pestanas escriben el mismo localStorage.** Escribir solo lo que
    cambio esta pestana (`settingsChangedKeys`), nunca todo lo que tiene en
    memoria.
+10. **Lo que el juego manda tal cual.** Un float puede ser NaN o infinito (un
+    camion de mod) y un texto de 64 bytes o mas llega sin el 0 y cortado
+    (`strncpy` del plugin). Con el primero el `json.dumps` del cliente escribia
+    NaN/Infinity, el `JSON.parse` de la web tiraba cada dato y el tablero
+    quedaba en "In the menu" con el juego andando; con el segundo
+    `truck_telemetry` levantaba en cada lectura y el cliente no mandaba nada
+    (Discord 07-11, warrensiks). El cliente los manda como null
+    (`sin_no_finitos`) y lee los textos sin romperse (`telemetry_compat`), y la
+    web acepta NaN/Infinity de clientes viejos (`parseWsJson`): todo socket que
+    lea telemetria o algo armado con ella usa `parseWsJson`, no `JSON.parse`.
