@@ -16,6 +16,11 @@ updates on its own and is not versioned here.
 - Build my map: if you open the game while the map is being built, the build now stops and tells
   you, instead of competing with the game for up to 7 GB of memory. Quitting Truck Dash stops it
   too, and a cancelled build no longer leaves gigabytes of temporary files on the disk.
+- Build my map: maps from very large mod lists can now be built. The map builder wrote and read each of
+  its working files as one piece, and one over 512 MB stopped the build with `parser.mjs failed` after
+  all the reading, however much memory the PC had. The map it builds doesn't change, so the maps you
+  already have stay as they are. If a build still reaches a fixed size limit, Setup now says the map is
+  too big for the builder.
 - The log now records each change in the job the game reports (job or none, the trailer, and whether
   the in-game GPS has a route), to help with reports about routes that don't appear.
 - Build my map: the map builder can use more memory on PCs with more than 12 GB of RAM, up to 24 GB

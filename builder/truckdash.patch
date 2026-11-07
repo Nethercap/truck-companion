@@ -3762,10 +3762,10 @@ index 0000000..e9ea575
 +}
 diff --git a/packages/clis/truckdash-builder/tiles.ts b/packages/clis/truckdash-builder/tiles.ts
 new file mode 100755
-index 0000000..f78a301
+index 0000000..37cee06
 --- /dev/null
 +++ b/packages/clis/truckdash-builder/tiles.ts
-@@ -0,0 +1,304 @@
+@@ -0,0 +1,303 @@
 +// Tiles vectoriales (.pmtiles) a partir del GeoJSON del generator, sin
 +// tippecanoe (que solo corre en Linux): para armar el mapa con mods en la PC
 +// de quien juega. Mismo resultado que el taller en lo que la app usa: una
@@ -3779,6 +3779,7 @@ index 0000000..f78a301
 +import { zxyToTileId } from 'pmtiles';
 +import vtpbf from 'vt-pbf';
 +import zlib from 'zlib';
++import { leerFeatures } from './leer-geojson';
 +import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles';
 +
 +const MIN_ZOOM = 4;
@@ -3965,7 +3966,7 @@ index 0000000..f78a301
 +}
 +
 +// -------------------------------------------------------------------- main
-+function main() {
++async function main() {
 +  const [entrada, capa, salida] = process.argv.slice(2);
 +  if (!entrada || !capa || !salida) {
 +    console.error('Uso: tiles.ts <entrada.geojson> <capa> <salida.pmtiles>');
@@ -3973,9 +3974,7 @@ index 0000000..f78a301
 +  }
 +  const t0 = Date.now();
 +  const { features: todo, uniones } = unirCalles(
-+    (
-+      JSON.parse(fs.readFileSync(entrada, 'utf8')) as { features: Feature[] }
-+    ).features.map(limpiar),
++    await leerFeatures(entrada, limpiar),
 +    ATRIBUTOS,
 +  );
 +  const bbox = bboxDe(todo);
@@ -4069,7 +4068,7 @@ index 0000000..f78a301
 +  );
 +}
 +
-+main();
++await main();
 diff --git a/packages/clis/truckdash-builder/tsconfig.json b/packages/clis/truckdash-builder/tsconfig.json
 new file mode 100644
 index 0000000..03439ae
@@ -4560,43 +4559,21 @@ index 0000000..ac4c174
 +}
 diff --git a/packages/clis/truckdash-builder/unir.ts b/packages/clis/truckdash-builder/unir.ts
 new file mode 100644
-index 0000000..8978173
+index 0000000..70d8626
 --- /dev/null
 +++ b/packages/clis/truckdash-builder/unir.ts
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,41 @@
 +// El taller (build_variant.py) junta las calles antes de tippecanoe con esto:
 +// lee el GeoJSON del generator y escribe otro con las calles que se tocan
 +// punta con punta unidas (unir-calles.ts). tiles.ts lo hace solo.
 +//
-+// El generator escribe un feature por linea (writeGeojsonFile) porque entero
-+// no entra en un string de node (ETS2 con ProMods pasa de 1 GB): se lee y se
-+// escribe igual, de a una linea.
++// Se escribe como lo escribe el generator, un feature por linea (leer-geojson.ts).
 +//
 +// Uso: npx tsx packages/clis/truckdash-builder/unir.ts <entrada.geojson> <salida.geojson>
 +
 +import fs from 'fs';
-+import readline from 'readline';
++import { leerFeatures } from './leer-geojson';
 +import { ATRIBUTOS, unirCalles, type Feature } from './unir-calles';
-+
-+async function leer(entrada: string): Promise<Feature[]> {
-+  const features: Feature[] = [];
-+  const lineas = readline.createInterface({
-+    input: fs.createReadStream(entrada, 'utf8'),
-+    crlfDelay: Infinity,
-+  });
-+  for await (const cruda of lineas) {
-+    const linea = cruda.trim().replace(/,$/, '');
-+    if (linea.length < 2 || linea[0] !== '{' || linea.at(-1) !== '}') continue;
-+    const obj = JSON.parse(linea) as {
-+      type?: string;
-+      features?: Feature[];
-+    };
-+    if (obj.type === 'Feature') features.push(obj as unknown as Feature);
-+    else if (obj.type === 'FeatureCollection' && obj.features)
-+      for (const f of obj.features) features.push(f); // un archivo de una sola linea
-+  }
-+  return features;
-+}
 +
 +function escribir(salida: string, features: Feature[]) {
 +  const fd = fs.openSync(salida, 'w');
@@ -4618,7 +4595,7 @@ index 0000000..8978173
 +    process.exit(1);
 +  }
 +  const t0 = Date.now();
-+  const todo = await leer(entrada);
++  const todo = await leerFeatures(entrada, f => f);
 +  const { features, uniones } = unirCalles(todo, ATRIBUTOS);
 +  escribir(salida, features);
 +  console.log(
@@ -4627,6 +4604,523 @@ index 0000000..8978173
 +}
 +
 +void main();
+diff --git a/packages/clis/truckdash-builder/leer-geojson.prueba.ts b/packages/clis/truckdash-builder/leer-geojson.prueba.ts
+new file mode 100644
+index 0000000..fdae20e
+--- /dev/null
++++ b/packages/clis/truckdash-builder/leer-geojson.prueba.ts
+@@ -0,0 +1,66 @@
++// Leer el GeoJSON del generator por el codigo real (writeGeojsonFile y
++// leerFeatures). Corre con: npx tsx --test packages/clis/truckdash-builder/leer-geojson.prueba.ts
++// (build.sh lo corre antes de empaquetar el armador).
++import { writeGeojsonFile } from '@truckermudgeon/io';
++import assert from 'node:assert/strict';
++import { constants } from 'node:buffer';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { test } from 'node:test';
++import { leerFeatures } from './leer-geojson';
++
++async function enCarpeta(prueba: (archivo: string) => Promise<void>) {
++  const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'leer-geojson-'));
++  try {
++    await prueba(path.join(carpeta, 'mapa.geojson'));
++  } finally {
++    fs.rmSync(carpeta, { recursive: true, force: true });
++  }
++}
++
++const punto = (i: number, name: string): GeoJSON.Feature => ({
++  type: 'Feature',
++  properties: { type: 'city', name },
++  geometry: { type: 'Point', coordinates: [i, -i] },
++});
++
++test('lee lo que escribe writeGeojsonFile, en orden y con cada feature transformado', () =>
++  enCarpeta(async archivo => {
++    const features = [punto(1, 'São Paulo, {a}'), punto(2, 'Москва'), punto(3, '[,]')];
++    writeGeojsonFile(archivo, { type: 'FeatureCollection', features });
++    assert.deepEqual(await leerFeatures(archivo, f => f), features);
++    assert.deepEqual(await leerFeatures(archivo, f => f.properties?.name as string), [
++      'São Paulo, {a}',
++      'Москва',
++      '[,]',
++    ]);
++  }));
++
++test('sin features', () =>
++  enCarpeta(async archivo => {
++    writeGeojsonFile(archivo, { type: 'FeatureCollection', features: [] });
++    assert.deepEqual(await leerFeatures(archivo, f => f), []);
++  }));
++
++test('un archivo de una sola linea', () =>
++  enCarpeta(async archivo => {
++    const features = [punto(1, 'a'), punto(2, 'b')];
++    fs.writeFileSync(archivo, JSON.stringify({ type: 'FeatureCollection', features }));
++    assert.deepEqual(await leerFeatures(archivo, f => f), features);
++  }));
++
++test('un GeoJSON de mas de 512 MB', () =>
++  enCarpeta(async archivo => {
++    // Nombres largos, para no tener GB en memoria: el archivo es lo que importa.
++    const nombre = 'ñ'.repeat(500_000);
++    const features = Array.from({ length: 600 }, (_, i) => punto(i, nombre));
++    writeGeojsonFile(archivo, { type: 'FeatureCollection', features });
++    const tam = fs.statSync(archivo).size;
++    assert.ok(tam > constants.MAX_STRING_LENGTH, `el archivo tiene solo ${tam} bytes`);
++    const leidos = await leerFeatures(archivo, f => (f.geometry as GeoJSON.Point).coordinates[0]);
++    assert.deepEqual(
++      leidos,
++      features.map((_, i) => i),
++    );
++  }));
+diff --git a/packages/clis/truckdash-builder/leer-geojson.ts b/packages/clis/truckdash-builder/leer-geojson.ts
+new file mode 100644
+index 0000000..fbe53e6
+--- /dev/null
++++ b/packages/clis/truckdash-builder/leer-geojson.ts
+@@ -0,0 +1,31 @@
++// Lee el GeoJSON del generator de a una linea: writeGeojsonFile escribe un
++// feature por linea porque entero puede no entrar en un string de V8 (512 MB).
++// Lo usan tiles.ts (el armador de la PC) y unir.ts (el taller).
++
++import fs from 'fs';
++import readline from 'readline';
++import type { Feature } from './unir-calles';
++
++export async function leerFeatures<T>(
++  entrada: string,
++  transformar: (f: Feature) => T,
++): Promise<T[]> {
++  const features: T[] = [];
++  const lineas = readline.createInterface({
++    input: fs.createReadStream(entrada, 'utf8'),
++    crlfDelay: Infinity,
++  });
++  for await (const cruda of lineas) {
++    const linea = cruda.trim().replace(/,$/, '');
++    if (linea.length < 2 || linea[0] !== '{' || linea.at(-1) !== '}') continue;
++    const obj = JSON.parse(linea) as {
++      type?: string;
++      features?: Feature[];
++    };
++    if (obj.type === 'Feature')
++      features.push(transformar(obj as unknown as Feature));
++    else if (obj.type === 'FeatureCollection' && obj.features)
++      for (const f of obj.features) features.push(transformar(f)); // un archivo de una sola linea
++  }
++  return features;
++}
+diff --git a/packages/libs/io/arreglo-json.prueba.ts b/packages/libs/io/arreglo-json.prueba.ts
+new file mode 100644
+index 0000000..d241de6
+--- /dev/null
++++ b/packages/libs/io/arreglo-json.prueba.ts
+@@ -0,0 +1,164 @@
++// Escribir y leer arreglos de a pedazos, por el codigo real (writeArrayFile y
++// readMapData). Corre con: npx tsx --test packages/libs/io/arreglo-json.prueba.ts
++// (build.sh lo corre antes de empaquetar el armador).
++import assert from 'node:assert/strict';
++import { constants } from 'node:buffer';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { test } from 'node:test';
++import { parseJsonArray } from './arreglo-json';
++import { fromDir, readMapData, writeArrayFile } from './index';
++
++function enCarpeta(prueba: (carpeta: string) => void) {
++  const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'arreglo-json-'));
++  try {
++    prueba(carpeta);
++  } finally {
++    fs.rmSync(carpeta, { recursive: true, force: true });
++  }
++}
++
++const trozos = (texto: string, tam: number) => {
++  const bytes = Buffer.from(texto);
++  const salida: Buffer[] = [];
++  for (let i = 0; i < bytes.length; i += tam) {
++    salida.push(bytes.subarray(i, i + tam));
++  }
++  return salida;
++};
++
++// Comas, llaves y comillas adentro de strings, un corchete suelto, letras de
++// varios bytes y elementos que no son objetos.
++const DIFICIL = [
++  { a: 'coma, adentro', 'clave,rara': ['[', ']', '{', '}', '"', '\\', '\\"'] },
++  [1, [2, [3, []]], {}],
++  'São Paulo, Köln — Москва 東京 🚚',
++  12.5,
++  null,
++  true,
++  '',
++  { uid: 'abc', vacio: {}, lista: [] },
++];
++
++test('parseJsonArray da lo mismo que JSON.parse con cualquier corte de pedazos', () => {
++  for (const espacio of [0, 2]) {
++    const texto = JSON.stringify(DIFICIL, null, espacio);
++    for (let tam = 1; tam <= 40; tam++) {
++      assert.deepEqual(parseJsonArray(trozos(texto, tam)), DIFICIL, `corte ${tam}`);
++    }
++    assert.deepEqual(parseJsonArray([Buffer.from(texto)]), DIFICIL);
++  }
++});
++
++test('parseJsonArray: blancos, vacios y un elemento mas largo que el pedazo', () => {
++  assert.deepEqual(parseJsonArray([Buffer.from('[]')]), []);
++  assert.deepEqual(parseJsonArray(trozos(' \r\n\t[ \n ] \r\n', 1)), []);
++  assert.deepEqual(parseJsonArray(trozos(' [ 1 , 2 ]\n', 3)), [1, 2]);
++  const largo = 'x'.repeat(100_000);
++  assert.deepEqual(parseJsonArray(trozos(JSON.stringify([largo, 1]), 7_000)), [largo, 1]);
++});
++
++test('parseJsonArray rechaza lo que JSON.parse rechaza', () => {
++  for (const malo of [
++    '',
++    '   ',
++    '{}',
++    '"[1]"',
++    '[',
++    '[1',
++    '[1,',
++    '[1,]',
++    '[,1]',
++    '[,]',
++    '[1,,2]',
++    '[1 2]',
++    '[{]}',
++    '[1]]',
++    '[1] 2',
++    '["sin cerrar]',
++  ]) {
++    for (const tam of [1, 2, 100]) {
++      assert.throws(() => parseJsonArray(trozos(malo, tam)), SyntaxError, `${malo} de a ${tam}`);
++    }
++  }
++});
++
++test('parseJsonArray: el reviver llega a cada elemento', () => {
++  const texto = JSON.stringify([{ uid: 'ff' }, { uid: '10', n: [{ otroUid: 'a' }] }]);
++  const reviver = (clave: string, valor: unknown) =>
++    clave.endsWith('id') || clave.endsWith('Uid') ? BigInt(`0x${valor as string}`) : valor;
++  assert.deepEqual(parseJsonArray(trozos(texto, 5), reviver), [
++    { uid: 255n },
++    { uid: 16n, n: [{ otroUid: 10n }] },
++  ]);
++});
++
++test('writeArrayFile escribe byte a byte lo de JSON.stringify(array, null, 2)', () => {
++  enCarpeta(carpeta => {
++    const archivo = path.join(carpeta, 'a.json');
++    const conHuecos = [1, undefined, () => 1, { a: undefined, b: 2 }];
++    // Mas que WRITE_CHUNK_CHARS, para que escriba mas de un pedazo.
++    const grande = Array.from({ length: 30 }, (_, i) => ({ i, texto: 'ñ'.repeat(100_000) }));
++    for (const arreglo of [[], [1], DIFICIL, conHuecos, grande]) {
++      writeArrayFile(arreglo as never, archivo);
++      assert.equal(fs.readFileSync(archivo, 'utf8'), JSON.stringify(arreglo, null, 2));
++    }
++  });
++});
++
++test('writeArrayFile sobreescribe un archivo mas largo', () => {
++  enCarpeta(carpeta => {
++    const archivo = path.join(carpeta, 'a.json');
++    fs.writeFileSync(archivo, 'x'.repeat(1000));
++    writeArrayFile([1] as never, archivo);
++    assert.equal(fs.readFileSync(archivo, 'utf8'), '[\n  1\n]');
++  });
++});
++
++test('fromDir.readChunks devuelve el archivo tal cual y lo suelta si se corta a medias', () => {
++  enCarpeta(carpeta => {
++    const contenido = Buffer.alloc(3 * 1024 * 1024 + 123, 'ñ');
++    fs.writeFileSync(path.join(carpeta, 'a'), contenido);
++    fs.writeFileSync(path.join(carpeta, 'vacio'), '');
++    const fuente = fromDir(carpeta);
++    assert.ok(Buffer.concat([...fuente.readChunks('a')]).equals(contenido));
++    assert.deepEqual([...fuente.readChunks('vacio')], []);
++    for (const _ of fuente.readChunks('a')) break;
++  });
++});
++
++// Un nodo como los de europe-nodes.json, que es el archivo mas grande.
++const nodo = (i: number) => ({
++  uid: (0x5a00000000000000n + BigInt(i)).toString(16),
++  x: -41234.5625 + i,
++  y: 18234.3828125 - i,
++  z: 123.45703125,
++  rotation: 2.7960175648368786,
++  rotationQuat: [0.575005292892456, 0, 0.8181496858596802, 0],
++  forwardItemUid: (0x4b00000000000000n + BigInt(i)).toString(16),
++  backwardItemUid: (0x3c00000000000000n + BigInt(i)).toString(16),
++  forwardCountryId: 13,
++  backwardCountryId: 13,
++});
++
++test('un arreglo de mas de 512 MB se escribe y se lee con readMapData', () => {
++  enCarpeta(carpeta => {
++    const nodos = Array.from({ length: 1_800_000 }, (_, i) => nodo(i));
++    writeArrayFile(nodos as never, path.join(carpeta, 'usa-nodes.json'));
++    for (const vacio of ['usa-cities.json', 'usa-companies.json']) {
++      writeArrayFile([] as never, path.join(carpeta, vacio));
++    }
++    const tam = fs.statSync(path.join(carpeta, 'usa-nodes.json')).size;
++    assert.ok(tam > constants.MAX_STRING_LENGTH, `el archivo tiene solo ${tam} bytes`);
++
++    const leido = readMapData(carpeta, 'usa', { mapDataKeys: ['nodes'] }).nodes;
++    assert.equal(leido.size, nodos.length);
++    for (const i of [0, 1_000_000, nodos.length - 1]) {
++      const uid = BigInt(`0x${nodos[i].uid}`);
++      const n = leido.get(uid)!;
++      assert.equal(n.x, nodos[i].x);
++      assert.equal(n.forwardItemUid, BigInt(`0x${nodos[i].forwardItemUid}`));
++    }
++  });
++});
+diff --git a/packages/libs/io/arreglo-json.ts b/packages/libs/io/arreglo-json.ts
+new file mode 100644
+index 0000000..45c9e3f
+--- /dev/null
++++ b/packages/libs/io/arreglo-json.ts
+@@ -0,0 +1,101 @@
++// Leer un arreglo JSON de un archivo de cualquier tamano: V8 no puede tener un
++// string de mas de 512 MB, asi que JSON.parse(leer todo) no llega. Se parsea de
++// a tandas: las que entran en un pedazo de bytes y terminan en una coma del
++// arreglo de afuera. Lo que no encaja (una coma de mas, llaves cruzadas) lo sigue
++// rechazando JSON.parse, que parsea cada tanda.
++//
++// Se mira byte a byte y no hace falta decodificar: en UTF-8 los bytes de una
++// letra acentuada nunca se confunden con una comilla o una llave.
++
++type Reviver = (this: unknown, key: string, value: unknown) => unknown;
++
++const COMILLA = 0x22;
++const COMA = 0x2c;
++const BARRA = 0x5c;
++const ABRE_CORCHETE = 0x5b;
++const CIERRA_CORCHETE = 0x5d;
++const ABRE_LLAVE = 0x7b;
++const CIERRA_LLAVE = 0x7d;
++
++function esBlanco(byte: number): boolean {
++  return byte === 0x20 || byte === 0x0a || byte === 0x0d || byte === 0x09;
++}
++
++/** Los elementos del arreglo JSON que traen los pedazos, de cualquier tamano. */
++export function parseJsonArray(
++  pedazos: Iterable<Buffer>,
++  reviver?: Reviver,
++): unknown[] {
++  const resultado: unknown[] = [];
++  // Los bytes de la tanda que todavia no se parseo.
++  let pendientes: Buffer[] = [];
++  let abrio = false; // ya se vio el corchete que abre
++  let termino = false; // ya se vio el que cierra
++  let hayComa = false;
++  let enString = false;
++  let escapado = false;
++  let profundidad = 0;
++
++  const parsear = (ultimo: Buffer) => {
++    const texto = Buffer.concat([...pendientes, ultimo]).toString('utf8');
++    const tanda = JSON.parse(`[${texto}]`, reviver) as unknown[];
++    // Vacia despues de una coma: "[1,]" o "[,1]". JSON.parse no la ve porque la
++    // coma quedo afuera de la tanda.
++    if (tanda.length === 0 && hayComa) {
++      throw new SyntaxError('coma de mas en el arreglo JSON');
++    }
++    // Con un for: push(...tanda) pasa del limite de argumentos de una llamada.
++    for (const elemento of tanda) resultado.push(elemento);
++    pendientes = [];
++  };
++
++  for (const pedazo of pedazos) {
++    let desde = 0;
++    let ultimaComa = -1;
++    let cierre = -1;
++    for (let i = 0; i < pedazo.length; i++) {
++      const byte = pedazo[i];
++      if (termino) {
++        if (!esBlanco(byte)) {
++          throw new SyntaxError('hay algo despues del arreglo JSON');
++        }
++      } else if (enString) {
++        if (escapado) escapado = false;
++        else if (byte === BARRA) escapado = true;
++        else if (byte === COMILLA) enString = false;
++      } else if (!abrio) {
++        if (byte === ABRE_CORCHETE) {
++          abrio = true;
++          profundidad = 1;
++          desde = i + 1;
++        } else if (!esBlanco(byte)) {
++          throw new SyntaxError('el archivo no es un arreglo JSON');
++        }
++      } else if (byte === COMILLA) {
++        enString = true;
++      } else if (byte === ABRE_CORCHETE || byte === ABRE_LLAVE) {
++        profundidad++;
++      } else if (byte === CIERRA_CORCHETE || byte === CIERRA_LLAVE) {
++        profundidad--;
++        if (profundidad === 0) {
++          termino = true;
++          cierre = i;
++        }
++      } else if (byte === COMA && profundidad === 1) {
++        ultimaComa = i;
++      }
++    }
++    if (ultimaComa >= 0) {
++      hayComa = true;
++      parsear(pedazo.subarray(desde, ultimaComa));
++      desde = ultimaComa + 1;
++    }
++    if (cierre >= 0) {
++      parsear(pedazo.subarray(desde, cierre));
++    } else if (abrio && !termino) {
++      pendientes.push(pedazo.subarray(desde));
++    }
++  }
++  if (!termino) throw new SyntaxError('el arreglo JSON no termina');
++  return resultado;
++}
+diff --git a/packages/libs/io/file-source.ts b/packages/libs/io/file-source.ts
+index d2dc5d5..f4aaf38 100644
+--- a/packages/libs/io/file-source.ts
++++ b/packages/libs/io/file-source.ts
+@@ -12,14 +12,39 @@ import path from 'path';
+ export interface FileSource {
+   has(name: string): boolean;
+   readUtf8(name: string): string;
++  /** Lo mismo de a pedazos: un archivo puede no entrar en un string de V8 (512 MB). */
++  readChunks(name: string): Iterable<Buffer>;
+   /** Human-readable identifier used in error messages. */
+   describe(): string;
+ }
+ 
++const CHUNK_BYTES = 1024 * 1024;
++
++function* fileChunks(file: string): Generator<Buffer> {
++  const fd = fs.openSync(file, 'r');
++  try {
++    for (;;) {
++      const chunk = Buffer.allocUnsafe(CHUNK_BYTES);
++      const read = fs.readSync(fd, chunk, 0, CHUNK_BYTES, null);
++      if (read === 0) return;
++      yield chunk.subarray(0, read);
++    }
++  } finally {
++    fs.closeSync(fd);
++  }
++}
++
++function* bufferChunks(data: Buffer): Generator<Buffer> {
++  for (let start = 0; start < data.length; start += CHUNK_BYTES) {
++    yield data.subarray(start, start + CHUNK_BYTES);
++  }
++}
++
+ export function fromDir(dir: string): FileSource {
+   return {
+     has: name => fs.existsSync(path.join(dir, name)),
+     readUtf8: name => fs.readFileSync(path.join(dir, name), 'utf-8'),
++    readChunks: name => fileChunks(path.join(dir, name)),
+     describe: () => dir,
+   };
+ }
+@@ -33,15 +58,17 @@ export function fromZip(zipPath: string): FileSource {
+     if (entry.isDirectory) continue;
+     entriesByName.set(path.basename(entry.entryName), entry);
+   }
++  const entryData = (name: string) => {
++    const entry = entriesByName.get(name);
++    if (!entry) {
++      throw new Error(`zip ${zipPath} has no entry named ${name}`);
++    }
++    return entry.getData();
++  };
+   return {
+     has: name => entriesByName.has(name),
+-    readUtf8: name => {
+-      const entry = entriesByName.get(name);
+-      if (!entry) {
+-        throw new Error(`zip ${zipPath} has no entry named ${name}`);
+-      }
+-      return entry.getData().toString('utf-8');
+-    },
++    readUtf8: name => entryData(name).toString('utf-8'),
++    readChunks: name => bufferChunks(entryData(name)),
+     describe: () => zipPath,
+   };
+ }
+diff --git a/packages/libs/io/mapped-data.ts b/packages/libs/io/mapped-data.ts
+index e5fce40..ca352cd 100644
+--- a/packages/libs/io/mapped-data.ts
++++ b/packages/libs/io/mapped-data.ts
+@@ -38,6 +38,7 @@ import type {
+ } from '@truckermudgeon/map/types';
+ import path from 'path';
+ import process from 'process';
++import { parseJsonArray } from './arreglo-json';
+ import type { FileSource } from './file-source';
+ import { fromDir, fromZip } from './file-source';
+ import { logger } from './logger';
+@@ -621,10 +622,7 @@ function readArrayFile<T>(
+     basename.endsWith('nodes')
+       ? undefined
+       : bigintReviver;
+-  const results: unknown = JSON.parse(source.readUtf8(filename), reviver);
+-  if (!Array.isArray(results)) {
+-    throw new Error();
+-  }
++  const results = parseJsonArray(source.readChunks(filename), reviver);
+ 
+   const { transform, filter } = options;
+   const transformed = transform
+diff --git a/packages/libs/io/write.ts b/packages/libs/io/write.ts
+index 409e503..b37b94e 100644
+--- a/packages/libs/io/write.ts
++++ b/packages/libs/io/write.ts
+@@ -5,12 +5,32 @@ import type {
+ } from '@truckermudgeon/map/types';
+ import * as fs from 'node:fs';
+ 
++const WRITE_CHUNK_CHARS = 1024 * 1024;
++
+ export function writeArrayFile(
+   array: MapData[keyof MapData],
+   outputFile: string,
+ ): void;
+ export function writeArrayFile(array: unknown[], outputFile: string): void {
+-  fs.writeFileSync(outputFile, JSON.stringify(array, null, 2));
++  // De a pedazos: entero no entra en un string de V8 (512 MB, con cualquier limite
++  // de memoria). Sale byte a byte lo mismo que JSON.stringify(array, null, 2).
++  const fd = fs.openSync(outputFile, 'w');
++  try {
++    let pedazo = array.length > 0 ? '[\n' : '[]';
++    for (let i = 0; i < array.length; i++) {
++      // Con el corchete y sacandolo, para que JSON.stringify le ponga la sangria
++      // de adentro del arreglo, y null a un undefined.
++      pedazo += JSON.stringify([array[i]], null, 2).slice(2, -2);
++      pedazo += i < array.length - 1 ? ',\n' : '\n]';
++      if (pedazo.length >= WRITE_CHUNK_CHARS) {
++        fs.writeFileSync(fd, pedazo);
++        pedazo = '';
++      }
++    }
++    fs.writeFileSync(fd, pedazo);
++  } finally {
++    fs.closeSync(fd);
++  }
+ }
+ 
+ export function writeGraphFile(graph: GraphData, outputFile: string): void {
 diff --git a/packages/libs/map/labels.ts b/packages/libs/map/labels.ts
 index d673fef..18ef19d 100644
 --- a/packages/libs/map/labels.ts
