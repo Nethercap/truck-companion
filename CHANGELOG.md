@@ -8,6 +8,9 @@ updates on its own and is not versioned here.
 
 - Build my map: when the dashboard can't find your job's destination on the map, Setup and the tray
   now offer to build it and name the place, even if your truck is still inside the map.
+- Build my map: if you open the game while the map is being built, the build now stops and tells
+  you, instead of competing with the game for up to 7 GB of memory. Quitting Truck Dash stops it
+  too, and a cancelled build no longer leaves gigabytes of temporary files on the disk.
 - The log now records each change in the job the game reports (job or none, the trailer, and whether
   the in-game GPS has a route), to help with reports about routes that don't appear.
 - Build my map: the map builder can use more memory on PCs with more than 12 GB of RAM, up to 24 GB
