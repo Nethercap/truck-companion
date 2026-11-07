@@ -148,6 +148,7 @@ class AppState:
         self.mounted_mods: dict | None = None
         self.local_maps: dict = {}
         self.offmap_games: set = set()
+        self.offmap_places: dict = {}  # juego -> destino de un trabajo que no esta en el mapa de la web
         self.cloud_viewers = None  # tableros conectados por el relay (None: no se sabe todavia)
         self.last_known_mods: dict = {}  # ultimos mods de mapa no-None por juego
         self.offmap_notified: set = set()
@@ -1127,6 +1128,7 @@ class SetupWindow:
     def _local_map_signature(self):
         build = state.map_build or {}
         return (tuple(sorted((g, m.get("fingerprint")) for g, m in state.local_maps.items())),
+                tuple(sorted(state.offmap_places.items())), tuple(sorted(state.offmap_games)),
                 tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
                 tuple(g for g in ("ats", "ets2") if can_build_map(g)),
                 build.get("game"), build.get("step"), build.get("error"), build.get("running"))
@@ -1153,7 +1155,7 @@ class SetupWindow:
                                                   date=str(man.get("built", ""))[:10]),
                            fg=GREEN, wraplength=520).pack(anchor="w", pady=2)
             elif needs_map_build(game):
-                self.label(self.local_map_body, T("local_map_needed", game=nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
+                self.label(self.local_map_body, local_map_needed_text(game, nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
                 self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
                 self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g),
                             primary=True).pack(anchor="w")
@@ -1896,6 +1898,7 @@ def refresh_map_mods(force: bool = False) -> bool:
             if valor is not None and valor != state.last_known_mods.get(game):
                 if game in state.last_known_mods:
                     state.offmap_games.discard(game)
+                    state.offmap_places.pop(game, None)
                 state.last_known_mods[game] = valor
         # Para etiquetar la sesion y el viaje de la cuenta con los mods. Con
         # el None de mientras carga el juego se mantienen los ultimos: la
@@ -1953,9 +1956,33 @@ def can_build_map(game: str) -> bool:
 
 
 def needs_map_build(game: str) -> bool:
-    """Ademas la web vio el camion fuera del mapa: Setup lo ofrece primero,
-    con el aviso de la bandeja."""
-    return game in state.offmap_games and can_build_map(game)
+    """Ademas la web vio el camion, o el destino del trabajo, fuera del mapa:
+    Setup lo ofrece primero, con el aviso de la bandeja."""
+    return (game in state.offmap_games or game in state.offmap_places) and can_build_map(game)
+
+
+def local_map_needed_text(game: str, nombre: str) -> str:
+    """Con el camion adentro del mapa, "salio del mapa" no seria cierto."""
+    place = state.offmap_places.get(game)
+    if place and game not in state.offmap_games:
+        return T("local_map_needed_place", game=nombre, place=place)
+    return T("local_map_needed", game=nombre)
+
+
+def on_offmap_place(game: str, place: str):
+    """La web avisa que el destino del trabajo no esta en ningun mapa que le
+    sirva a esos mods. Puede ser un evento y no un mod (Brackenreach): los
+    textos dicen "si lo agrega uno de tus mods"."""
+    if state.offmap_places.get(game) == place:
+        return
+    state.offmap_places[game] = place
+    logging.info("Dashboard reports the job destination %s off the known %s map", place, game)
+    if needs_map_build(game) and game not in state.offmap_notified and state.icon:
+        state.offmap_notified.add(game)
+        try:
+            state.icon.notify(T("notify_local_map_place", place=place), "Truck Dash")
+        except Exception as exc:
+            logging.info("No se pudo mostrar el aviso del mapa: %s", exc)
 
 
 def on_offmap(game: str):
@@ -2395,6 +2422,7 @@ def main():
 
     local_server.on_show_setup = open_setup_window
     client_lib.on_offmap = on_offmap
+    client_lib.on_offmap_place = on_offmap_place
     client_lib.on_nav_hud = state.overlay_data.navegacion
     client_lib.on_viewers = lambda n: setattr(state, "cloud_viewers", n)
     ajustes_overlay = win_integration.overlay_settings()

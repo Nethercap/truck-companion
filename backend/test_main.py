@@ -469,6 +469,10 @@ def test_el_aviso_de_fuera_del_mapa_llega_al_cliente(client, main):
             aviso = {"type": "offmap", "game": "ats"}
             viewer.send_text(main.json.dumps(aviso))
             assert main.json.loads(local_client.receive_text()) == aviso
+            # Lo mismo con el destino del trabajo, con el camion dentro del mapa
+            aviso = {"type": "offmap_place", "game": "ets2", "place": "Kherson"}
+            viewer.send_text(main.json.dumps(aviso))
+            assert main.json.loads(local_client.receive_text()) == aviso
 
 
 def test_el_overlay_de_obs_recibe_el_giro_del_tablero(client, main):
