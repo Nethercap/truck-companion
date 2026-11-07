@@ -5980,6 +5980,19 @@ test('routeIdentity: enganchar el remolque del freight market cambia el viaje, s
     JSON.stringify(['ets2', 'Berlin', 'Praha', 'tradeaux', 'posped', true, true, 'Apples']));
 });
 
+test('gameGpsGuessList: Nuremberg, SellPlan a 7,04 km por nuestra ruta y 6,5 en el GPS del juego (reporte #30)', () => {
+  const { gameGpsGuessList, gameGpsCandidates } = require('./pure.js');
+  // Los km de ruta del caso real desde el camion del reporte. La empresa la dijo el
+  // reporte siguiente: Job: from sellplan@nurnberg
+  const rutas = [['dfh', 0.77], ['lkwlog', 0.94], ['rt_log', 2.14], ['cnp', 2.45], ['sellplan', 7.04],
+    ['volvo_dlr', 7.65], ['ai', 7.83], ['kathode', 8.81], ['sanbuilders', 10.34]].map(([company, km]) => ({ company, km }));
+  assert.deepEqual(gameGpsGuessList(rutas, 6.5).map(f => f.company), ['sellplan']);
+  // Con el camion mas adelante (la foto del mismo viaje, 5,8 km en el GPS)
+  assert.deepEqual(gameGpsGuessList([{ company: 'sellplan', km: 6.34 }, { company: 'volvo_dlr', km: 6.95 }], 5.8).map(f => f.company), ['sellplan']);
+  // Una empresa que la recta deja justo: el juego puede dar menos que nuestra ruta
+  assert.equal(gameGpsCandidates([{ d: 7.5 }], 6.5, (c) => c.d).length, 1);
+});
+
 test('gameGpsCandidates y gameGpsGuessList: Bilbao, el remolque a 4,0 km sin trabajo en la telemetria (06-11)', () => {
   const { gameGpsCandidates, gameGpsGuessList, gameGpsKmMatches, GAME_GPS_GUESS_MAX_KM } = require('./pure.js');
   // los km de ruta del caso real desde el camion del reporte
@@ -5987,7 +6000,7 @@ test('gameGpsCandidates y gameGpsGuessList: Bilbao, el remolque a 4,0 km sin tra
     .map(([company, km]) => ({ company, km }));
   assert.deepEqual(gameGpsGuessList(rutas, 4.0).map(f => f.company), ['ts_atlas']);
   // la mas parecida primero
-  assert.deepEqual(gameGpsGuessList(rutas, 2.2).map(f => f.company), ['gallia_ferry', 'vitas_pwr']);
+  assert.deepEqual(gameGpsGuessList(rutas, 2.2).map(f => f.company), ['gallia_ferry', 'vitas_pwr', 'ns_oil']);
   // nada a esa distancia, o sin datos
   assert.deepEqual(gameGpsGuessList(rutas, 30), []);
   assert.deepEqual(gameGpsGuessList(null, 4), []);
@@ -5997,8 +6010,8 @@ test('gameGpsCandidates y gameGpsGuessList: Bilbao, el remolque a 4,0 km sin tra
   assert.deepEqual(gameGpsGuessList(muchas, 100), []);
   assert.equal(gameGpsGuessList(muchas.slice(0, 3), 100).length, 3);
   // de cerca la tolerancia es fija, de lejos proporcional
-  assert.equal(gameGpsKmMatches(4.14, 4), true);
-  assert.equal(gameGpsKmMatches(4.2, 4), false);
+  assert.equal(gameGpsKmMatches(4.7, 4), true);
+  assert.equal(gameGpsKmMatches(4.8, 4), false);
   assert.equal(gameGpsKmMatches(203, 200), true);
   assert.equal(gameGpsKmMatches(204, 200), false);
   // solo se calculan las que la recta deja: 7 km de recta no entran en 4 km de ruta
