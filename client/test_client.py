@@ -643,6 +643,74 @@ def test_telemetry_compat_prefiere_el_bloque_de_truck_dash(monkeypatch):
     assert telemetry_compat.opened_block() is None
 
 
+def _bloque_v12(textos: dict) -> bytearray:
+    """Un bloque de 32 KB de la revision 12 (la del plugin) con textos puestos
+    en crudo en su lugar, como los deja el strncpy del plugin."""
+    import struct
+    from truck_telemetry.telemetry_version import v1_12
+
+    bloque = bytearray(32 * 1024)
+    struct.pack_into("<I", bloque, 40, 12)
+    bloque[0] = 1  # sdkActive
+    lugar = 0
+    for nombre, tipo in v1_12.struct_telemetry._DictStruct__fields:
+        if nombre in textos:
+            crudo = textos[nombre]
+            bloque[lugar:lugar + len(crudo)] = crudo
+        lugar += tipo.size
+    return bloque
+
+
+def test_telemetry_compat_lee_textos_sin_cero_o_cortados(monkeypatch):
+    """Un texto de 64 bytes o mas queda sin el 0 del final (strncpy del
+    plugin), y cortado puede partir una letra con tilde. El paquete
+    truck_telemetry levantaba con eso en cada lectura y el cliente no mandaba
+    nada con ese camion (Discord 07-11: el tablero en "In the menu" jugando)."""
+    import telemetry_compat
+
+    largo = "Freightshaker Cascadia 125 Raised Roof Sleeper Personal Edition 2026".encode()
+    assert len(largo) >= 64
+    bloque = _bloque_v12({
+        "truckName": largo[:64],
+        "truckBrand": b"Cami\xc3\xb3n d\xc3",  # la o con tilde y una letra partida
+        "cargo": b"Mobilier\x00",
+    })
+    monkeypatch.setattr(telemetry_compat, "_open_named", lambda nombre: bloque)
+    try:
+        telemetry_compat.init()
+        datos = telemetry_compat.get_data()
+    finally:
+        telemetry_compat.deinit()
+    assert datos["sdkActive"] is True
+    assert datos["truckName"] == largo[:64].decode()
+    assert datos["truckBrand"] == "Camión d"
+    assert datos["cargo"] == "Mobilier"
+    assert datos["citySrc"] == ""
+
+
+def test_build_payload_sin_nan_ni_infinito():
+    """json.dumps escribe NaN e Infinity, que el JSON.parse de la web no
+    acepta: se perdia el dato entero en cada tick y el tablero quedaba en
+    "In the menu" (Discord 07-11). Van como None, tambien en las listas."""
+    import json
+    import math
+
+    raw = {"game": 1, "speed": 10.0, "fuelRange": math.inf, "fuelAvgConsumption": math.nan,
+           "oilTemperature": -math.inf, "coordinateX": 100.5, "coordinateZ": -20.0,
+           "trailer": [{"attached": True, "cargoDamage": math.nan, "wearChassis": 0.1}]}
+    payload = client.build_payload(raw)
+    texto = json.dumps(payload, allow_nan=False)  # levanta si queda alguno
+    assert payload["fuelRangeKm"] is None
+    assert payload["fuelAvgConsumption"] is None
+    assert payload["oilTemperature"] is None
+    assert payload["cargoDamage"] is None
+    assert payload["trailerWear"] == {"chassis": 0.1, "wheels": None, "body": None}
+    assert payload["speedKmh"] == 36.0
+    assert payload["position"] == {"x": 100.5, "y": None, "z": -20.0}
+    assert '"game": "ets2"' in texto
+    assert client.sin_no_finitos([1, math.nan, {"a": [math.inf, "NaN", True]}]) == [1, None, {"a": [None, "NaN", True]}]
+
+
 def test_todas_las_teclas_permitidas_existen_en_los_tres_backends():
     """La lista blanca de teclas custom es una sola, pero se manda por tres
     caminos distintos (pydirectinput, XTEST, uinput). Si alguien suma una
@@ -1745,3 +1813,22 @@ def test_log_job_change_solo_cuando_cambia(monkeypatch, caplog):
         "Trabajo: freight_market, ts_atlas@bilbao -> acc@santander, carga si, remolque no, GPS del juego 4.0 km",
         "Trabajo: freight_market, ts_atlas@bilbao -> acc@santander, carga si, remolque si, GPS del juego 4.0 km",
     ]
+
+
+def test_el_destino_fuera_del_mapa_llega_a_la_bandeja(monkeypatch):
+    """La web manda el nombre del lugar: lo que no sirva no llega al aviso."""
+    import asyncio
+    import json
+    vistos = []
+    monkeypatch.setattr(client, "on_offmap_place", lambda game, place: vistos.append((game, place)))
+
+    def mandar(**campos):
+        asyncio.run(client.handle_control_message(json.dumps({"type": "offmap_place", **campos}), {}, None))
+
+    mandar(game="ets2", place=" Kherson ")
+    mandar(game="ats", place="x" * 500)
+    mandar(game="otro", place="Kherson")
+    mandar(game="ets2", place="   ")
+    mandar(game="ets2", place=5)
+    mandar(game="ets2")
+    assert vistos == [("ets2", "Kherson"), ("ats", "x" * client.OFFMAP_PLACE_MAX)]

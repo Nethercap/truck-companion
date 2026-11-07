@@ -118,6 +118,7 @@ fun MapaScreen(
     val ruta by motor.ruta.collectAsStateWithLifecycle()
     val trazos by motor.trazos.collectAsStateWithLifecycle()
     val bajando by motor.bajando.collectAsStateWithLifecycle()
+    val ocupado by motor.ocupado.collectAsStateWithLifecycle()
     var control by remember { mutableStateOf<ControlMapa?>(null) }
     var versionEstilo by remember { mutableIntStateOf(0) }
     var seguir by rememberSaveable { mutableStateOf(true) }
@@ -256,7 +257,7 @@ fun MapaScreen(
             } else if (nav.rutaOculta) {
                 // El destino sigue ahi, y la salida a la vista (ver CLAUDE.md, supuesto 8).
                 AvisoConBoton(nav.textoRutaOculta, nav.textoMostrarRuta) { motor.mostrarRuta() }
-            } else if (t != null && nav.sinRuta != null && !mirando) {
+            } else if (t != null && nav.sinRuta != null && !mirando && !ocupado) {
                 AvisoMapa(nav.sinRuta.orEmpty())
             }
             nav.sugerencia?.let { s ->
@@ -265,6 +266,7 @@ fun MapaScreen(
             nav.avisoRuta?.let { AvisoMapa(it) }
             nav.vozEnOtro?.let { AvisoConBoton(it, nav.textoVozAca) { motor.traerVoz() } }
             if (bajando > 0) AvisoMapa(stringResource(R.string.nav_bajando))
+            if (ocupado) AvisoMapa(stringResource(R.string.nav_calculando))
             convoy?.takeIf { it.enSala && it.tarjetas.isNotEmpty() }?.let { co ->
                 TarjetasConvoy(co) { id ->
                     tarjetaAbierta = id

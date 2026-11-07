@@ -560,6 +560,43 @@ def test_despues_de_reiniciar_el_reporte_toma_el_part_si_fue_el_ultimo_armado(tm
     assert map_builder.failed_build_log(None, ahora) is None
 
 
+def test_un_armado_cancelado_no_deja_gigas_en_el_disco(tmp_path, monkeypatch):
+    """Lo intermedio pesa GB y el proximo armado empieza de cero. Queda el
+    build.log, que dice que este armado no fallo (failed_build_log)."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(map_builder, "ensure_builder", lambda version, progress: str(tmp_path / "armador"))
+
+    def correr(cmd, log_path, cancel, env):
+        part = os.path.dirname(log_path)
+        with open(os.path.join(part, "parser", "usa-cities.json"), "w", encoding="utf-8") as f:
+            f.write("[]")
+        with open(os.path.join(part, "route-graph-local_ats.json"), "w", encoding="utf-8") as f:
+            f.write("{}")
+        raise map_builder.BuildCancelled()
+
+    monkeypatch.setattr(map_builder, "_correr", correr)
+    with pytest.raises(map_builder.BuildCancelled):
+        map_builder.build_map("ats", str(tmp_path / "juego"), [str(tmp_path / "mod.scs")], "1.5.37")
+    carpetas = os.listdir(map_builder.maps_dir())
+    assert len(carpetas) == 1 and carpetas[0].endswith(".part")
+    assert sorted(os.listdir(os.path.join(map_builder.maps_dir(), carpetas[0]))) == ["build.log", "mods.txt"]
+
+
+def test_un_armado_que_falla_guarda_su_log(tmp_path, monkeypatch):
+    """Es lo que suma "Report a problem" (failed_build_log)."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(map_builder, "ensure_builder", lambda version, progress: str(tmp_path / "armador"))
+
+    def correr(cmd, log_path, cancel, env):
+        raise RuntimeError("parser.mjs failed (exit 1)")
+
+    monkeypatch.setattr(map_builder, "_correr", correr)
+    with pytest.raises(RuntimeError):
+        map_builder.build_map("ats", str(tmp_path / "juego"), [str(tmp_path / "mod.scs")], "1.5.37")
+    carpeta = os.path.join(map_builder.maps_dir(), os.listdir(map_builder.maps_dir())[0])
+    assert os.path.isfile(os.path.join(carpeta, "build.log"))
+
+
 def test_un_armado_cancelado_no_va_al_reporte_despues_de_reiniciar(tmp_path, monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     ahora = 1_800_000_000

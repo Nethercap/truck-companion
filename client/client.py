@@ -18,6 +18,7 @@ import ctypes
 import glob
 import json
 import logging
+import math
 import os
 import re
 import sys
@@ -714,12 +715,30 @@ def reloj_del_juego(raw: dict):
     return reloj + offset
 
 
+def sin_no_finitos(valor):
+    """El valor con NaN e infinito cambiados por None, tambien adentro de
+    dicts y listas. json.dumps los escribe como NaN e Infinity, que no son
+    JSON: el JSON.parse de la web tiraba el dato entero, en cada tick, y el
+    tablero se quedaba en "In the menu" con el juego andando (Discord 07-11,
+    warrensiks: el mapa no cargaba nunca en el celular ni en la tablet). Los
+    floats salen crudos del juego, y un camion de mod puede mandar un consumo
+    o un alcance asi. La web desde el 07-11 tambien los acepta (parseWsJson),
+    pero la app nativa y otros lectores no."""
+    if isinstance(valor, float):
+        return valor if math.isfinite(valor) else None
+    if isinstance(valor, dict):
+        return {k: sin_no_finitos(v) for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [sin_no_finitos(v) for v in valor]
+    return valor
+
+
 def build_payload(raw: dict) -> dict:
     speed_kmh = (raw.get("speed") or 0) * 3.6
     # el SDK devuelve speedLimit en m/s igual que speed, hay que convertirlo
     # tambien - antes se mandaba crudo y quedaba ~3.6x mas bajo de lo real.
     speed_limit_kmh = (raw.get("speedLimit") or 0) * 3.6
-    return {
+    return sin_no_finitos({
         "ts": time.time(),
         "clientVersion": CLIENT_VERSION,
         "paused": raw.get("paused"),
@@ -870,7 +889,7 @@ def build_payload(raw: dict) -> dict:
             "jobCancelled": raw.get("jobCancelled"),
             "jobCancelledPenalty": raw.get("jobCancelledPenalty"),
         },
-    }
+    })
 
 
 # Al momento exacto en que el SDK pulsa jobDelivered/jobCancelled, los campos
@@ -990,6 +1009,11 @@ def payload_has_event(payload: dict) -> bool:
 # conoce ({"type": "offmap", "game": "ats"}), y la bandeja ofrece armar el
 # mapa en la PC (map_builder.py).
 on_offmap = None
+# Lo define la bandeja: el destino del trabajo no esta en el mapa que conoce la
+# web ({"type": "offmap_place", "game": "ets2", "place": "Kherson"}). El largo
+# se corta aca: el nombre termina en un aviso de la bandeja.
+on_offmap_place = None
+OFFMAP_PLACE_MAX = 60
 # Lo define la bandeja: el giro, lo que falta y la llegada que calcula la web,
 # como texto ya traducido, para el overlay en el juego (overlay.py). La web lo
 # manda solo si client_status dice que el overlay esta prendido.
@@ -1028,6 +1052,10 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
         elif msg_type == "offmap":
             if on_offmap and payload.get("game") in ("ats", "ets2"):
                 on_offmap(payload["game"])
+        elif msg_type == "offmap_place":
+            place = payload.get("place")
+            if on_offmap_place and payload.get("game") in ("ats", "ets2") and isinstance(place, str) and place.strip():
+                on_offmap_place(payload["game"], place.strip()[:OFFMAP_PLACE_MAX])
         elif msg_type == "viewers":
             if on_viewers and isinstance(payload.get("count"), int):
                 on_viewers(payload["count"])

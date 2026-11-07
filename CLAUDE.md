@@ -96,6 +96,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   truckermudgeon tienen los mismos, vienen del generador; sacar los sueltos
   dejaba la calle cortada antes de la rotonda. Desde el zoom 12 la ruta es
   mas fina que la calle y va encima, como un carril marcado.
+- Destino del trabajo fuera del mapa elegido (`offMapJobPlace`, reporte del 07-11: Kherson
+  con ProMods, RusMap, ROEX y European Grand Utopia). `resolveModVariant` sigue eligiendo
+  el de Grand Utopia, para no dejar sin mapa al que maneja en las islas (y no cambia el
+  golden de la app nativa). Pero si otro mapa publicado para esos mods
+  (`alternateModVariants`) tiene el destino y al camion adentro (`variantForJobPlace`), la
+  web cambia a ese hasta que se recargue (`jobMap`). Si no hay, y juega con mods y un
+  cliente con armador (`canOfferMapBuild`), el resumen de la ruta lleva a Setup y manda
+  `offmap_place`: el cliente lo ofrece con el lugar en el texto. Los limites de `mapBounds`
+  no sirven para detectar esto: las 222 ciudades propias de RusMap y ROEX caen dentro de
+  los del mapa de Grand Utopia. Los textos dicen "si lo agrega uno de tus mods": tambien
+  puede ser un evento (Brackenreach), y ahi armar el mapa no ayuda.
 - Un mapa armado en la PC ("Build my map") cuyas ciudades caen sobre todo
   fuera de la tierra real (Explorando a America en ATS, 18-10) va con el
   fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5
@@ -964,6 +975,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (CI). Con `--guion` graba la corrida con un reloj falso y `MotorGuionTest` (androidTest,
   emulador, no en CI; pasos en el README) la repite en QuickJS y compara paso a paso: otro
   motor, otra libm y sin Intl. Correrlo al tocar `motor/` o al subir QuickJS.
+- Sin JIT el mismo codigo corre muchas veces mas lento que en el navegador (primer tester de la
+  beta, 06-11: una ruta de 2.400 km son segundos de QuickJS en una PC rapida, y mientras tanto no
+  hay giros ni busqueda). Nada caro en cada dato: lo que se repite va con `createBusyGate` o
+  `createOffRouteRetry` (`pure.js`). Lo que mide `pc_falsa.py` es la ruta demo (670 km) sin
+  overlay: los dos esconden esto.
 - Los mapas piden Referer: la app manda el de trucksim-dash.com. Nunca el secreto
   `TRUCKDASH_MAPS_KEY`, que en una APK quedaria a la vista.
 - Lo portado de la web tiene un golden que sale de correr la web
@@ -1049,3 +1065,15 @@ Revisar cada cambio contra esta lista:
 9. **Varias pestanas escriben el mismo localStorage.** Escribir solo lo que
    cambio esta pestana (`settingsChangedKeys`), nunca todo lo que tiene en
    memoria.
+10. **Lo que el juego manda tal cual.** Un float puede ser NaN o infinito (un
+    camion de mod) y un texto de 64 bytes o mas llega sin el 0 y cortado
+    (`strncpy` del plugin). Con el primero el `json.dumps` del cliente escribia
+    NaN/Infinity, el `JSON.parse` de la web tiraba cada dato y el tablero
+    quedaba en "In the menu" con el juego andando; con el segundo
+    `truck_telemetry` levantaba en cada lectura y el cliente no mandaba nada
+    (Discord 07-11, warrensiks: su log tiene `ValueError: subsection not found`
+    379 veces en 19 minutos, un texto de primer nivel del bloque, no de un
+    remolque; arreglarlo pide version del cliente). El cliente los manda como null
+    (`sin_no_finitos`) y lee los textos sin romperse (`telemetry_compat`), y la
+    web acepta NaN/Infinity de clientes viejos (`parseWsJson`): todo socket que
+    lea telemetria o algo armado con ella usa `parseWsJson`, no `JSON.parse`.

@@ -167,7 +167,7 @@ function connect(code) {
   const socket = new WebSocket(url);
   socket.onmessage = (event) => {
     let data;
-    try { data = JSON.parse(event.data); } catch (e) { return; }
+    try { data = parseWsJson(event.data); } catch (e) { return; } // NaN o Infinity del cliente: null (pure.js)
     if (data.type === 'nav_hud') { nav = data; navEn = Date.now(); render(); return; }
     if (data.type) return; // session_state, client_status, convoy...: aca solo la telemetria y el giro
     update(data);

@@ -3234,6 +3234,66 @@ test('routeDismissed: una ruta de waypoints borrada tambien se puede traer (Brac
   ]);
 });
 
+test('alternateModVariants: otros mapas publicados para Grand Utopia con RusMap o ROEX (07-11)', () => {
+  const { alternateModVariants } = require('./pure.js');
+  const publicadas = { ets2_promods_rusmap_roex: '1', ets2_promods_roex: '1', ets2_promods_rusmap: '1' };
+  const todos = { eu_grand_utopia: true, grand_utopia: true, promods: true, rusmap: true, roextended: true };
+  assert.deepEqual(alternateModVariants('ets2', todos, publicadas), ['ets2_promods_rusmap_roex', 'ets2_promods_roex', 'ets2_promods_rusmap']);
+  assert.deepEqual(alternateModVariants('ets2', { ...todos, rusmap: false }, publicadas), ['ets2_promods_roex']);
+  assert.deepEqual(alternateModVariants('ets2', { ...todos, roextended: false }, publicadas), ['ets2_promods_rusmap']);
+  // Sin publicar no se ofrece
+  assert.deepEqual(alternateModVariants('ets2', todos, { ets2_promods_rusmap: '1' }), ['ets2_promods_rusmap']);
+  // Sin Grand Utopia, resolveModVariant ya elige el que trae todo
+  assert.deepEqual(alternateModVariants('ets2', { ...todos, eu_grand_utopia: false }, publicadas), []);
+  assert.deepEqual(alternateModVariants('ets2', { eu_grand_utopia: true, promods: true }, publicadas), []);
+  assert.deepEqual(alternateModVariants('ats', todos, publicadas), []);
+  assert.deepEqual(alternateModVariants('ets2', null, publicadas), []);
+});
+
+test('variantForJobPlace: el primer mapa con el destino y con el camion adentro', () => {
+  const { variantForJobPlace } = require('./pure.js');
+  const eugu = { variant: 'eugu', cities: [
+    { Token: 'bucuresti', Name: 'Bucharest', X: 60000, Y: 30000 },
+    { Token: 'assamaka', Name: 'Assamaka', X: -218000, Y: -5000 },
+  ] };
+  const roex = { variant: 'roex', cities: [
+    { Token: 'bucuresti', Name: 'Bucharest', X: 60000, Y: 30000 },
+    { Token: 'kerson', Name: 'Херсон', X: 84000, Y: 15000 },
+  ] };
+  const enBucarest = { x: 60000, z: 30000 };
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'kerson', name: 'x', ...enBucarest }), 'roex');
+  // Sin id, o con un id que no esta, por el nombre que manda el juego
+  assert.equal(variantForJobPlace([eugu, roex], { name: 'Херсон', ...enBucarest }), 'roex');
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'otro', name: 'Assamaka', ...enBucarest }), 'eugu');
+  // Con varios, el primero
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'bucuresti', ...enBucarest }), 'eugu');
+  assert.equal(variantForJobPlace([roex, eugu], { id: 'bucuresti', ...enBucarest }), 'roex');
+  // En ninguno: el evento de Halloween
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'brackenreach', name: 'Brackenreach', ...enBucarest }), null);
+  // Desde las islas no sirve un mapa que no las tiene
+  assert.equal(variantForJobPlace([roex], { id: 'kerson', x: -218000, z: -5000 }), null);
+  // Sin posicion todavia, alcanza con el destino
+  assert.equal(variantForJobPlace([roex], { id: 'kerson' }), 'roex');
+  // Un mapa que no se pudo bajar no cuenta
+  assert.equal(variantForJobPlace([{ variant: 'x', cities: null }, roex], { id: 'kerson', ...enBucarest }), 'roex');
+  assert.equal(variantForJobPlace([], { id: 'kerson' }), null);
+});
+
+test('canOfferMapBuild: con mods, con cliente con armador y sin mapa armado', () => {
+  const { canOfferMapBuild } = require('./pure.js');
+  const si = { modsAuto: true, clientConnected: true, spectator: false, demo: false, hasLocalMap: false, clientHasBuilder: true, modNames: ['RusMap'] };
+  assert.equal(canOfferMapBuild(si), true);
+  assert.equal(canOfferMapBuild({ ...si, modsAuto: false }), false);
+  assert.equal(canOfferMapBuild({ ...si, clientConnected: false }), false);
+  assert.equal(canOfferMapBuild({ ...si, spectator: true }), false);
+  assert.equal(canOfferMapBuild({ ...si, demo: true }), false);
+  assert.equal(canOfferMapBuild({ ...si, hasLocalMap: true }), false);
+  assert.equal(canOfferMapBuild({ ...si, clientHasBuilder: false }), false);
+  assert.equal(canOfferMapBuild({ ...si, modNames: [] }), false);
+  assert.equal(canOfferMapBuild({ ...si, modNames: null }), false);
+  assert.equal(canOfferMapBuild(), false);
+});
+
 test('offMapJobPlace: trabajo a un lugar que no esta en el mapa (Brackenreach, 15-10)', () => {
   const { offMapJobPlace } = require('./pure.js');
   const evento = { game: 'ats', citySrc: 'Dallas', cityDst: 'Brackenreach', companyDst: 'Castle Brackenhelm',
@@ -4844,6 +4904,32 @@ test('positionAtOrigin: el camion en 0,0 exacto es un dato sin posicion (Cheyenn
   assert.equal(positionAtOrigin(undefined), false);
 });
 
+test('parseWsJson: NaN e Infinity del json.dumps del cliente son null, no un dato perdido (Discord 07-11)', () => {
+  const { parseWsJson } = require('./pure.js');
+  // Lo que manda el cliente con un float del juego que no es un numero
+  const texto = '{"speedKmh": 52.3, "fuelRangeKm": Infinity, "fuelAvgConsumption": NaN, "x": -Infinity, '
+    + '"position": {"x": 10.5, "z": -3}, "lista": [NaN, 1, Infinity]}';
+  assert.throws(() => JSON.parse(texto));
+  const d = parseWsJson(texto);
+  assert.equal(d.speedKmh, 52.3);
+  assert.equal(d.fuelRangeKm, null);
+  assert.equal(d.fuelAvgConsumption, null);
+  assert.equal(d.x, null);
+  assert.deepEqual(d.position, { x: 10.5, z: -3 });
+  assert.deepEqual(d.lista, [null, 1, null]);
+  // Adentro de un texto no se toca, tampoco con comillas escapadas
+  const nombres = parseWsJson('{"truckName": "NaN Infinity \\"NaN\\"", "cargo": "a\\\\", "v": NaN}');
+  assert.equal(nombres.truckName, 'NaN Infinity "NaN"');
+  assert.equal(nombres.cargo, 'a\\');
+  assert.equal(nombres.v, null);
+  // El JSON valido sale igual que con JSON.parse
+  assert.deepEqual(parseWsJson('{"type": "client_status", "status": "live", "n": 1e3}'), { type: 'client_status', status: 'live', n: 1000 });
+  // Otro error sigue siendo un error
+  assert.throws(() => parseWsJson('{"a": '), SyntaxError);
+  assert.throws(() => parseWsJson('{"a": NaN'), SyntaxError);
+  assert.throws(() => parseWsJson('{"a": nan}'), SyntaxError);
+});
+
 test('recalcOnRoute: sin desviarse, la ruta nueva sigue con lo recorrido y el rumbo (Tyler -> Lufkin, ATS)', () => {
   const { recalcOnRoute } = require('./pure.js');
   // Lo recorrido: 100 m al norte con los nodos de la esquina; la ruta vieja
@@ -5938,6 +6024,49 @@ test('createNearStopPick: la de menos camino sin alejarse primero, de a una busq
   r = correr([], () => null);
   assert.equal(r.best, null);
   assert.equal(r.busquedas, 0);
+});
+
+test('createBusyGate: lo que tardo mucho espera varias veces eso, y lo rapido no espera', () => {
+  const { createBusyGate } = require('./pure.js');
+  const g = createBusyGate(4);
+  assert.equal(g.ready(1000), true); // nunca corrio
+  g.ran(1000, 3000);
+  assert.equal(g.ready(1000), false);
+  assert.equal(g.ready(12999), false);
+  assert.equal(g.ready(13000), true);
+  // Una busqueda de 30 ms en una PC: el dato siguiente (250 ms) ya puede
+  g.ran(20000, 30);
+  assert.equal(g.ready(20250), true);
+  // Con el reloj atrasado no queda trabada hasta que se ponga al dia
+  g.ran(50000, 3000);
+  assert.equal(g.ready(40000), true);
+  // Sin medir (el reloj falso de los guiones): nada espera
+  g.ran(60000, 0);
+  assert.equal(g.ready(60000), true);
+  g.ran(61000, NaN);
+  assert.equal(g.ready(61000), true);
+});
+
+test('createOffRouteRetry: un desvio se recalcula en el momento, lejos del grafo no en cada dato', () => {
+  const { createOffRouteRetry } = require('./pure.js');
+  const r = createOffRouteRetry({ moveM: 200, factor: 4 });
+  // Un desvio de verdad: sin nada anotado, en el momento
+  assert.equal(r.due(0, 0, 1000), true);
+  r.computed(0, 0, 1000, 100);
+  // La ruta nueva paso cerca: el proximo desvio tambien va en el momento
+  r.onRoute();
+  assert.equal(r.due(10, 0, 1250), true);
+  // La ruta nueva no paso cerca: parado no se busca de nuevo, nunca
+  r.computed(10, 0, 1250, 100);
+  assert.equal(r.due(10, 0, 1500), false);
+  assert.equal(r.due(10, 0, 999999), false);
+  // Andando, recien a los 200 m
+  assert.equal(r.due(209, 0, 9000), false);
+  assert.equal(r.due(210, 0, 9000), true);
+  // Sin JIT, una ruta de 20 s: aunque ya se haya movido, espera 80 s
+  r.computed(210, 0, 100000, 20000);
+  assert.equal(r.due(1000, 0, 179999), false);
+  assert.equal(r.due(1000, 0, 180000), true);
 });
 
 test('createNearStops: sigue al camion por el camino y dice cuando volver a elegir', () => {

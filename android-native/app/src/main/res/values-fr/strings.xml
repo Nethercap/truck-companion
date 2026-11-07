@@ -117,6 +117,7 @@
     <string name="perfil_rapida">Le plus rapide</string>
     <string name="perfil_corta">Le plus court</string>
     <string name="nav_bajando">Téléchargement du réseau routier pour les itinéraires…</string>
+    <string name="nav_calculando">Calcul de l\'itinéraire…</string>
     <string name="nav_llegada">Arrivée</string>
     <string name="nav_voz_prender">Activer le guidage vocal</string>
     <string name="nav_voz_apagar">Désactiver le guidage vocal</string>

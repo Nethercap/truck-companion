@@ -74,6 +74,13 @@ depends on fails the build. All of it runs on its own thread with a big stack, s
 route never touches the interface. On the emulator: about 10 to 25 ms per telemetry
 message, a few seconds for the first route of a map, and about 60 MB of memory.
 
+Without a JIT the same code runs many times slower than in a browser, and what costs nothing
+there can take over here: a route across the whole map is seconds of QuickJS on a fast PC, and
+everything waits behind it, also the search. So nothing expensive may run on every telemetry
+message. `createBusyGate` and `createOffRouteRetry` in `pure.js` space out what repeats, and
+the map shows "Calculating the route" while the engine is stuck on one thing. Measure long
+routes (Ketchum to Peoria is 2,400 km), not only the demo route, which is 670 km.
+
 **The catch:** the code that writes to the page runs against a fake DOM, and that never
 fails. Something new the web shows on the page does not appear in the app until
 `navegacion()` in `conduccion.js` returns it and the interface draws it. New buttons are
@@ -142,7 +149,7 @@ Windows client and announce it on Discord. And it can't become "latest", because
 download button points at `releases/latest/download/TruckDash-windows.zip`.
 
 ```bash
-gh release create android-0.2.0 --target claude/app-nativa --prerelease --latest=false --title "Truck Dash Beta 0.2.0" --notes-file BETA.md app/build/beta/*.apk
+gh release create android-0.2.1 --target main --prerelease --latest=false --title "Truck Dash Beta 0.2.1" --notes-file BETA.md app/build/beta/*.apk
 ```
 
 ## Testing
