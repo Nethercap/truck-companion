@@ -320,6 +320,35 @@ def test_correr_pasa_la_salida_del_armador_por_el_filtro(tmp_path):
     ]
 
 
+@pytest.mark.skipif(not shutil.which("node"), reason="sin node en esta maquina")
+@pytest.mark.parametrize("programa, error", [
+    ("'x'.repeat(2 ** 29);", "RangeError: Invalid string length"),
+    ("import { constants } from 'node:buffer';\nBuffer.alloc(constants.MAX_STRING_LENGTH + 1).toString();",
+     "ERR_STRING_TOO_LONG"),
+])
+def test_un_tope_de_v8_no_se_muestra_como_un_error_comun(tmp_path, programa, error):
+    """Con node de verdad. Mas memoria no lo arregla: Setup tiene que decirlo y no
+    solo "parser.mjs failed"."""
+    script = tmp_path / "parser.mjs"
+    script.write_text(programa, encoding="utf-8")
+    log = tmp_path / "build.log"
+    with pytest.raises(RuntimeError, match="parser.mjs: this map is too big") as exc:
+        map_builder._correr([shutil.which("node"), str(script)], str(log), threading.Event(), dict(os.environ))
+    assert "fewer map mods" in str(exc.value) and str(log) in str(exc.value)
+    assert error in log.read_text(encoding="utf-8")
+
+
+def test_el_tope_de_un_map_tambien_cuenta(tmp_path):
+    cmd = _programa(tmp_path, "import sys\nprint('RangeError: Map maximum size exceeded')\nsys.exit(1)\n")
+    with pytest.raises(RuntimeError, match="too big"):
+        map_builder._correr(cmd, str(tmp_path / "build.log"), threading.Event(), dict(os.environ))
+
+
+def test_el_texto_del_tope_en_un_paso_que_termina_bien_no_es_un_error(tmp_path):
+    cmd = _programa(tmp_path, "print('Invalid string length')\n")
+    map_builder._correr(cmd, str(tmp_path / "build.log"), threading.Event(), dict(os.environ))
+
+
 def test_cancelar_corta_el_paso_aunque_no_escriba_nada(tmp_path):
     cmd = _programa(tmp_path, "import sys, time\nprint('arranco', flush=True)\ntime.sleep(60)\n")
     log = tmp_path / "build.log"

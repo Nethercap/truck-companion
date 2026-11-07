@@ -308,6 +308,10 @@ _EXCEPCION_RE = re.compile(r"[✖×] \[ \{ (.*)")
 _SALTEA_RE = re.compile(r"[⚠‼] skipping (.*)")
 _AVISO_RE = re.compile(r"[⚠‼] ")
 _ERROR_RE = re.compile(r"[✖×] ")
+# Lo que dice node al chocar con un tope fijo de V8, que no depende de la memoria:
+# un string de 512 MB ("Invalid string length" al armarlo, ERR_STRING_TOO_LONG al
+# leerlo de un archivo) o 16,7 millones de entradas en un Map o un Set.
+_TOPE_DE_V8_RE = re.compile(r"Invalid string length|ERR_STRING_TOO_LONG|(?:Map|Set) maximum size exceeded")
 _PILA_RE = re.compile(r"\s+at \S")
 # Lo que dice node al quedarse sin memoria, con el heap al limite ("FATAL ERROR:
 # Reached heap limit Allocation failed - JavaScript heap out of memory") o porque
@@ -537,6 +541,9 @@ def _correr(cmd: list, log_path: str, cancel: threading.Event, env: dict):
         detalle = f"(exit {proc.returncode}), see {log_path}"
         if filtro.sin_memoria:
             raise BuildOutOfMemory(f"{os.path.basename(cmd[1])} ran out of memory {detalle}")
+        if any(_TOPE_DE_V8_RE.search(linea) for linea in _final_del_archivo(log_path, BUILD_LOG_LINEAS)):
+            raise RuntimeError(f"{os.path.basename(cmd[1])}: this map is too big for the map builder, and more "
+                               f"memory won't help. Try a profile with fewer map mods {detalle}")
         raise RuntimeError(f"{os.path.basename(cmd[1])} failed {detalle}")
 
 

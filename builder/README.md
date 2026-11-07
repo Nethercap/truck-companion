@@ -44,6 +44,9 @@ as a separate program.
   companies and weigh stations are kept.
 - Vector tiles (`.pmtiles`) written in TypeScript instead of tippecanoe,
   with the same layers and zoom filter as the maps on our servers.
+- The parser's JSON files and the generator's GeoJSON are written and read in
+  pieces, so they can pass the 512 MB of a string in node. The files stay the
+  same, byte for byte.
 - Flags of prefab navigation curves, map projection fixes for standalone
   maps, and schema fixes for some mods.
 - The `@include` lists in `def/` (cities, companies, cargo...) are read with
