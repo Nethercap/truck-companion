@@ -741,6 +741,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 
 ## Reportes de navegacion (25-10)
 
+- El reporte abierto se rehace cada segundo con la telemetria (`refreshNavReport`,
+  `navReportRefreshDue`), salvo mandandolo o con su texto seleccionado, y se cierra solo
+  al salir bien. Se armaba solo al abrir: dejado abierto seguia con los datos de entonces,
+  y eso se mandaba (07-11, ShadE: tomo el trabajo y veia el reporte de antes). A pantalla
+  completa no estan el link ni los ajustes: ahi hay un boton sobre el mapa
+  (`navReportFsBtn`), que no sale fuera de ese modo ni en `?cab=1`.
 - Ajustes > "Report a navigation problem" (`navReportModal`; `navReportBody`,
   `navReportCredentials` y `navReportOutcome` en pure.js) manda lo que la
   persona elige (`NAV_REPORT_KINDS`) y escribe, mas el turn report entero,

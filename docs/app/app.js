@@ -7292,9 +7292,9 @@ document.getElementById('turnReportBtn').addEventListener('click', () => copyTur
 // Reportar un problema de navegacion (25-10): en vez de pegar el turn report
 // en Discord, se manda al servicio de cuentas con lo que la persona elige y
 // escribe, y queda numerado para arreglarlo con los demas (navReportBody en
-// pure.js). El reporte se arma al abrir: lo que se ve en "What gets sent" es
-// lo que se manda. Si no sale (sin internet, la API todavia sin la ruta), se
-// ofrece copiarlo, como antes.
+// pure.js). El reporte se arma al abrir y se rehace mientras esta abierto: lo que
+// se ve en "What gets sent" es lo que se manda. Si no sale (sin internet, la API
+// todavia sin la ruta), se ofrece copiarlo, como antes.
 let navReportText = '';
 // Sin avisos de giro y sin nada escrito, el primer toque de "Send report"
 // pide confirmar (navReportLooksEmpty); el segundo lo manda igual.
@@ -7302,14 +7302,36 @@ let navReportHasTurns = false;
 let navReportConfirmed = false;
 function setNavReportStatus(text) { document.getElementById('navReportStatus').textContent = text || ''; }
 
+function fillNavReport() {
+  navReportText = buildTurnReport();
+  navReportHasTurns = turnLog.list().length > 0;
+  document.getElementById('navReportOnlyNav').hidden = navReportHasTurns;
+  const preview = document.getElementById('navReportPreview');
+  if (preview.textContent !== navReportText) preview.textContent = navReportText;
+}
+
+// Con cada dato de la telemetria, para que el reporte abierto siga al dia
+// (navReportRefreshDue, pure.js).
+let navReportFilledAt = 0;
+function refreshNavReport() {
+  const preview = document.getElementById('navReportPreview');
+  const sel = window.getSelection ? window.getSelection() : null;
+  if (!navReportRefreshDue({
+    open: document.getElementById('navReportModal').style.display !== 'none',
+    sending: document.getElementById('navReportSendBtn').disabled,
+    selecting: !!sel && !sel.isCollapsed && preview.contains(sel.anchorNode),
+    nowMs: Date.now(), lastMs: navReportFilledAt,
+  })) return;
+  navReportFilledAt = Date.now();
+  fillNavReport();
+}
+
 // Se abre desde Ajustes y desde el link de arriba del mapa (navReportLink).
 function openNavReport() {
   document.getElementById('settingsModal').style.display = 'none';
-  navReportText = buildTurnReport();
-  navReportHasTurns = turnLog.list().length > 0;
+  fillNavReport();
+  navReportFilledAt = Date.now();
   navReportConfirmed = false;
-  document.getElementById('navReportOnlyNav').hidden = navReportHasTurns;
-  document.getElementById('navReportPreview').textContent = navReportText;
   document.querySelectorAll('input[name="navReportKind"]').forEach(r => { r.checked = false; });
   document.getElementById('navReportText').value = '';
   document.getElementById('navReportSendBtn').disabled = false;
@@ -7320,6 +7342,8 @@ function openNavReport() {
 }
 document.getElementById('navReportBtn').addEventListener('click', openNavReport);
 document.getElementById('navReportLink').addEventListener('click', openNavReport);
+// A pantalla completa no estan ni el link ni los ajustes (ShadE, 07-11)
+document.getElementById('navReportFsBtn').addEventListener('click', openNavReport);
 
 document.getElementById('navReportSendBtn').addEventListener('click', async () => {
   if (conn.demo) { setNavReportStatus(t('navReportDemo')); return; }
@@ -7354,9 +7378,11 @@ document.getElementById('navReportSendBtn').addEventListener('click', async () =
     // Para avisar cuando se arregle (checkNavReports)
     const ahora = Date.now();
     lsSet(NAV_REPORTS_KEY, JSON.stringify(navReportsAdd(navReportsParse(lsGet(NAV_REPORTS_KEY), ahora), fin, ahora)));
-    setNavReportStatus(t('navReportSent', fin.id));
+    // Se cierra solo: quedaba abierto con lo que se mando y el boton apagado
+    document.getElementById('navReportModal').style.display = 'none';
+    btn.disabled = false;
     showToast(t('navReportSent', fin.id), 'success', 4000);
-    return; // el boton queda apagado: ya se mando
+    return;
   }
   btn.disabled = false;
   setNavReportStatus(t(fin.state === 'tooMany' ? 'navReportTooMany' : 'navReportFailed'));
@@ -8243,6 +8269,7 @@ function handleTelemetry(data) {
   updateGameGpsGuess(data);
   updateGameGpsGuessPanel(data);
   updateRouteSummary(data);
+  refreshNavReport();
   checkMissingCompanies(data);
   checkUpdateBanner(data.clientVersion);
   if (typeof convoyOnTelemetry === 'function') convoyOnTelemetry(data); // Convoy: variante de mapa, ruta, seguir al lider

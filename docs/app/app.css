@@ -365,6 +365,8 @@
     display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;
   }
   #topRightControls .mapBtn { position: static; }
+  /* El link de reportar esta arriba del mapa, y a pantalla completa no se ve */
+  body:not(.fsMode) #navReportFsBtn { display: none; }
   #topRightBtns { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
 
   /* Botones movibles: mientras se acomodan, el grupo entero agarra el puntero
