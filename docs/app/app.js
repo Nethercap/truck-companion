@@ -7296,16 +7296,24 @@ document.getElementById('turnReportBtn').addEventListener('click', () => copyTur
 // se ve en "What gets sent" es lo que se manda. Si no sale (sin internet, la API
 // todavia sin la ruta), se ofrece copiarlo, como antes.
 let navReportText = '';
-// Sin avisos de giro y sin nada escrito, el primer toque de "Send report"
-// pide confirmar (navReportLooksEmpty); el segundo lo manda igual.
-let navReportHasTurns = false;
-let navReportConfirmed = false;
+// Sin avisos de giro o sin ruta no se manda: la ventana lleva a Discord
+// (navReportCanSend, pure.js), y se ve de nuevo el formulario si aparecen
+// mientras esta abierta.
+let navReportSendable = false;
+let navReportCopyOffered = false; // no salio: se ofrece copiarlo
 function setNavReportStatus(text) { document.getElementById('navReportStatus').textContent = text || ''; }
 
 function fillNavReport() {
   navReportText = buildTurnReport();
-  navReportHasTurns = turnLog.list().length > 0;
-  document.getElementById('navReportOnlyNav').hidden = navReportHasTurns;
+  navReportSendable = navReportCanSend({
+    hasTurns: turnLog.list().length > 0,
+    hasRoute: !!(currentRouteWorldPoints && currentRouteWorldPoints.length),
+  });
+  document.getElementById('navReportForm').hidden = !navReportSendable;
+  document.getElementById('navReportSendBtn').hidden = !navReportSendable;
+  document.getElementById('navReportToDiscord').hidden = navReportSendable;
+  document.getElementById('navReportDiscord').hidden = navReportSendable;
+  document.getElementById('navReportCopyBtn').hidden = navReportSendable && !navReportCopyOffered;
   const preview = document.getElementById('navReportPreview');
   if (preview.textContent !== navReportText) preview.textContent = navReportText;
 }
@@ -7329,14 +7337,12 @@ function refreshNavReport() {
 // Se abre desde Ajustes y desde el link de arriba del mapa (navReportLink).
 function openNavReport() {
   document.getElementById('settingsModal').style.display = 'none';
+  navReportCopyOffered = false;
   fillNavReport();
   navReportFilledAt = Date.now();
-  navReportConfirmed = false;
   document.querySelectorAll('input[name="navReportKind"]').forEach(r => { r.checked = false; });
   document.getElementById('navReportText').value = '';
   document.getElementById('navReportSendBtn').disabled = false;
-  document.getElementById('navReportSendBtn').textContent = t('navReportSend');
-  document.getElementById('navReportCopyBtn').hidden = true;
   setNavReportStatus(conn.demo ? t('navReportDemo') : '');
   document.getElementById('navReportModal').style.display = 'flex';
 }
@@ -7347,6 +7353,7 @@ document.getElementById('navReportFsBtn').addEventListener('click', openNavRepor
 
 document.getElementById('navReportSendBtn').addEventListener('click', async () => {
   if (conn.demo) { setNavReportStatus(t('navReportDemo')); return; }
+  if (!navReportSendable) return;
   const kind = document.querySelector('input[name="navReportKind"]:checked')?.value || null;
   const pedido = navReportBody({
     kind, description: document.getElementById('navReportText').value, report: navReportText,
@@ -7355,13 +7362,6 @@ document.getElementById('navReportSendBtn').addEventListener('click', async () =
   });
   if (pedido.error) { setNavReportStatus(t('navReportNeedKind')); return; }
   const btn = document.getElementById('navReportSendBtn');
-  if (!navReportConfirmed && navReportLooksEmpty({ hasTurns: navReportHasTurns, description: pedido.body.description })) {
-    navReportConfirmed = true;
-    btn.textContent = t('navReportSendAnyway');
-    setNavReportStatus(t('navReportLooksEmpty'));
-    return;
-  }
-  btn.textContent = t('navReportSend');
   btn.disabled = true;
   setNavReportStatus(t('navReportSending'));
   let status = 0, body = null;
@@ -7386,7 +7386,8 @@ document.getElementById('navReportSendBtn').addEventListener('click', async () =
   }
   btn.disabled = false;
   setNavReportStatus(t(fin.state === 'tooMany' ? 'navReportTooMany' : 'navReportFailed'));
-  document.getElementById('navReportCopyBtn').hidden = fin.state === 'tooMany';
+  navReportCopyOffered = fin.state !== 'tooMany';
+  document.getElementById('navReportCopyBtn').hidden = !navReportCopyOffered;
 });
 
 document.getElementById('navReportCopyBtn').addEventListener('click', () => copyTurnReport(navReportText));
