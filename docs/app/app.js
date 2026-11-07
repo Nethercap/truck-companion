@@ -7767,6 +7767,54 @@ function checkUpdateBanner(connectedVersion) {
   banner.style.display = 'flex';
 }
 
+// Una version nueva de la web con la pestana abierta (webUpdateAction, pure.js). No
+// recarga sola: cortaria la voz y lo que se este mirando. Va sobre el mapa y no en
+// #updateBanner porque ese no se ve a pantalla completa, y un pedido cada 30 min
+// (sw.js pesa 2 KB). En LAN el sw.js no esta en la copia del cliente, y la publicada
+// se pide al sitio, como los POIs: CORS abierto y sin red no pasa nada.
+const WEB_UPDATE_FIRST_MS = 60 * 1000;
+const WEB_UPDATE_EVERY_MS = 30 * 60 * 1000;
+const WEB_UPDATE_BACK_MS = 5 * 60 * 1000; // al volver a la pestana, si paso esto
+const WEB_SITE_SW = 'https://trucksim-dash.com/app/sw.js';
+const WEB_UPDATE_TEXT = { reload: 'webUpdateText', restart_client: 'webUpdateRestartClient' };
+let webUpdateAt = 0;
+let webUpdateShown = null; // lo que se esta mostrando: accion y version
+let webUpdateClosed = null; // lo que se cerro: no vuelve hasta que haya otra cosa
+async function fetchWebVersion(url) {
+  try {
+    const res = await fetch(url, { cache: 'no-cache' });
+    return res.ok ? webVersionIn(await res.text()) : null;
+  } catch (e) { return null; }
+}
+async function checkWebUpdate() {
+  webUpdateAt = Date.now();
+  const lan = !!new URLSearchParams(location.search).get('local');
+  const served = await fetchWebVersion(lan ? 'index.html' : 'sw.js');
+  const site = lan ? await fetchWebVersion(WEB_SITE_SW) : null;
+  const action = webUpdateAction({ current: webVersion(), served, site });
+  showWebUpdate(action, action === 'reload' ? served : site);
+}
+function showWebUpdate(action, version) {
+  const pill = document.getElementById('webUpdate');
+  webUpdateShown = action ? `${action}:${version}` : null;
+  if (!action || webUpdateClosed === webUpdateShown) { pill.hidden = true; return; }
+  const text = document.getElementById('webUpdateMsg');
+  text.setAttribute('data-i18n', WEB_UPDATE_TEXT[action]); // applyTranslations, al cambiar de idioma
+  text.textContent = t(WEB_UPDATE_TEXT[action]);
+  document.getElementById('webUpdateReload').hidden = action !== 'reload';
+  pill.hidden = false;
+}
+document.getElementById('webUpdateReload').addEventListener('click', () => location.reload());
+document.getElementById('webUpdateClose').addEventListener('click', () => {
+  webUpdateClosed = webUpdateShown;
+  document.getElementById('webUpdate').hidden = true;
+});
+setTimeout(checkWebUpdate, WEB_UPDATE_FIRST_MS);
+setInterval(checkWebUpdate, WEB_UPDATE_EVERY_MS);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && webUpdateAt && Date.now() - webUpdateAt > WEB_UPDATE_BACK_MS) checkWebUpdate();
+});
+
 // Botonera de comandos: un solo bloque de markup (#commandsPanel) que se
 // reubica segun el layout - en horizontal vive en el drawer fijo debajo del
 // mapa, en vertical se muda dentro del swipe del panel de info como 2da

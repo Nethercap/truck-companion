@@ -5301,6 +5301,46 @@ test('routeSharedFrac: que parte de una ruta va por las aristas de otra, en metr
   assert.equal(routeSharedFrac([], [1], edgeM), 1);
 });
 
+test('webVersionIn: la version de la web en sw.js y en index.html', () => {
+  const { webVersionIn } = require('./pure.js');
+  const fs = require('fs'), path = require('path');
+  // Los archivos de verdad: si cambia el formato del token, esto avisa
+  const leer = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
+  const enSw = webVersionIn(leer('sw.js'));
+  assert.match(enSw, /^\d{8}[a-z]*$/);
+  assert.equal(webVersionIn(leer('index.html')), enSw);
+  assert.equal(webVersionIn("'./app.js?v=20261106c',"), '20261106c');
+  // No lo confunde con otro archivo, y sin token no hay version
+  assert.equal(webVersionIn("'./pure.js?v=20261106c',"), null);
+  assert.equal(webVersionIn('<html></html>'), null);
+  assert.equal(webVersionIn(null), null);
+});
+
+test('webUpdateAction: avisar solo de una version posterior, y en LAN decir que recargar no alcanza (reporte #29)', () => {
+  const { webVersionNewer, webUpdateAction } = require('./pure.js');
+  assert.equal(webVersionNewer('20261105b', '20261106a'), true);
+  assert.equal(webVersionNewer('20261106a', '20261106b'), true);
+  assert.equal(webVersionNewer('20261106z', '20261106aa'), true);
+  // La misma, o una copia mas vieja del CDN: no
+  assert.equal(webVersionNewer('20261106b', '20261106b'), false);
+  assert.equal(webVersionNewer('20261106b', '20261106a'), false);
+  assert.equal(webVersionNewer('20261107a', '20261106z'), false);
+  // Sin dato, o una pagina que no sabe su version (webVersion da 'unknown')
+  assert.equal(webVersionNewer('unknown', '20261106a'), false);
+  assert.equal(webVersionNewer('20261106a', null), false);
+  // Por internet: la que sirve el sitio
+  assert.equal(webUpdateAction({ current: '20261105b', served: '20261106c' }), 'reload');
+  assert.equal(webUpdateAction({ current: '20261106c', served: '20261106c' }), null);
+  assert.equal(webUpdateAction({ current: '20261106c', served: null }), null);
+  // En LAN con la copia vieja: reiniciar el cliente
+  assert.equal(webUpdateAction({ current: '20261105b', served: '20261105b', site: '20261106c' }), 'restart_client');
+  assert.equal(webUpdateAction({ current: '20261105b', served: null, site: '20261106c' }), 'restart_client');
+  // La copia ya es nueva (el cliente se reinicio) y esta pagina no: recargar
+  assert.equal(webUpdateAction({ current: '20261105b', served: '20261106c', site: '20261106c' }), 'reload');
+  // Sin internet en la LAN
+  assert.equal(webUpdateAction({ current: '20261106c', served: '20261106c', site: null }), null);
+});
+
 test('followGameRoute: la ruta como la del juego solo con la empresa del trabajo, sin waypoints y con la mas rapida', () => {
   const { followGameRoute } = require('./pure.js');
   assert.equal(followGameRoute({ kind: 'dest' }, 0, 'fastest'), true);
