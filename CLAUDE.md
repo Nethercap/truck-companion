@@ -15,6 +15,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   conexion en su propio thread y los tests se cuelgan a veces en CI.
 - Todo cambio en `docs/` sube `CACHE_NAME` en `docs/app/sw.js` y el `?v=`
   de `docs/{app,account,dash,overlay}/index.html` y del APP_SHELL (mismo token en todos).
+- El `?v=` tiene que seguir siendo fecha y letra (`20261106c`): con el, una pestana
+  abierta se entera de que hay web nueva (`checkWebUpdate`, `webUpdateAction`, cada 30
+  min). Lee el de `app.js` en `sw.js`, y en LAN el de `index.html` de la copia del
+  cliente y el `sw.js` del sitio: la copia se baja solo al arrancar el cliente, asi
+  que ahi dice que lo reinicies. Antes una pestana seguia horas en la version con que
+  se abrio (reporte #29, 07-11, ShadE). No recarga sola, y no sale en `?cab=1`.
 - La logica de decision va en `docs/app/pure.js` con su test, no suelta en
   app.js: la mayoria de los bugs del 10-10 estaban en app.js, donde no hay tests.
 - Cambios de cliente: anotarlos en CHANGELOG.md (seccion de la proxima

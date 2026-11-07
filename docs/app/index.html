@@ -15,10 +15,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-5.24.0.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261106c" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261106c" />
-<link rel="stylesheet" href="../dash/trucks.css?v=20261106c" />
-<link rel="stylesheet" href="app.css?v=20261106c" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261106d" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261106d" />
+<link rel="stylesheet" href="../dash/trucks.css?v=20261106d" />
+<link rel="stylesheet" href="app.css?v=20261106d" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -501,6 +501,11 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
         <button id="stopSuggestGo" class="stopSuggestGo"></button>
         <button id="stopSuggestClose" class="panelCloseX" data-i18n-title="close" title="Close">×</button>
       </div>
+      <div id="webUpdate" class="stopSuggest webUpdate" role="status" hidden>
+        <span id="webUpdateMsg"></span>
+        <button id="webUpdateReload" class="stopSuggestGo" data-i18n="webUpdateReload">Reload</button>
+        <button id="webUpdateClose" class="panelCloseX" data-i18n-title="close" title="Close">×</button>
+      </div>
       <div id="bottomRightHud" class="bottomRightHud">
         <div id="miniHudExtra" class="miniHudExtra"></div>
         <div id="compassBtn" class="mapBtn compassIndicator" role="img" data-i18n-title="compassTitle" title="North" style="display:none"><svg id="compassNeedle" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><text x="12" y="6.4" text-anchor="middle" font-size="6.5" font-weight="800" font-family="system-ui, sans-serif" fill="#ef4444">N</text><path d="M12 7.6 L14.9 14.6 L9.1 14.6 Z" fill="#ef4444"/><path d="M12 21.6 L14.9 14.6 L9.1 14.6 Z" fill="currentColor" opacity="0.6"/></svg></div>
@@ -814,15 +819,15 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 <script src="vendor/maplibre-gl-5.24.0.js"></script>
 <script src="vendor/pmtiles-4.5.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261106c"></script>
-<script src="pure.js?v=20261106c"></script>
-<script src="i18n.js?v=20261106c"></script>
-<script src="i18n_en_es.js?v=20261106c"></script>
-<script src="../dash/dash.js?v=20261106c"></script>
-<script src="../dash/classic.js?v=20261106c"></script>
-<script src="../dash/trucks.js?v=20261106c"></script>
-<script src="app.js?v=20261106c"></script>
-<script src="convoy.js?v=20261106c"></script>
-<script src="livemap.js?v=20261106c"></script>
+<script src="variants.js?v=20261106d"></script>
+<script src="pure.js?v=20261106d"></script>
+<script src="i18n.js?v=20261106d"></script>
+<script src="i18n_en_es.js?v=20261106d"></script>
+<script src="../dash/dash.js?v=20261106d"></script>
+<script src="../dash/classic.js?v=20261106d"></script>
+<script src="../dash/trucks.js?v=20261106d"></script>
+<script src="app.js?v=20261106d"></script>
+<script src="convoy.js?v=20261106d"></script>
+<script src="livemap.js?v=20261106d"></script>
 </body>
 </html>
