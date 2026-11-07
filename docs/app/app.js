@@ -2498,7 +2498,6 @@ const MAX_WAYPOINTS = 9;
 let waypoints = []; // [{ pos: [x,z], lngLat: [lng,lat], inGame: bool, label: string|null, marker }]
 let waypointMode = false; // true mientras se espera el proximo click en el mapa para ubicar un waypoint
 let pendingWaypoint = null; // { pos, lngLat, label } mientras se muestra el modal de confirmacion
-let lastKnownAvgSpeedKmh = null; // ultimo promedio de velocidad real calculado por computeRealEtaSeconds, reusado para el ETA con waypoint
 
 function sumPathDistanceMeters(points) {
   if (!points || points.length < 2) return 0;
@@ -2926,9 +2925,7 @@ function updateWaypointRoute(data) {
     gameKm: Number.isFinite(data.routeDistanceKm) ? data.routeDistanceKm : null,
     gameEtaSeconds: data.routeTimeSeconds,
     realEtaSeconds: routeSummaryEtaSeconds,
-    avgSpeedKmh: lastKnownAvgSpeedKmh,
-    // Sin push: measuredTimeScale ya lo alimenta una vez por tick.
-    timeScale: gameTimeScale.value() ?? distanceScale(),
+    own: ownRouteTime(),
   });
   // Los tramos solo si la ruta es la de los waypoints de ahora: recien
   // cambiados (currentRouteTarget en null) son los de antes, corridos.
@@ -3849,9 +3846,18 @@ function routeEdgesOf(points) {
   }
   return out;
 }
+function edgeSecondsOf(e) {
+  return routeGraph.edgeS[e] + (routeGraph.edgeT ? routeGraph.edgeT[e] / 10 : 0);
+}
 function routeSecondsOf(points) {
-  const { edgeS, edgeT } = routeGraph;
-  return routeEdgesOf(points).reduce((s, e) => s + edgeS[e] + (edgeT ? edgeT[e] / 10 : 0), 0);
+  return routeEdgesOf(points).reduce((s, e) => s + edgeSecondsOf(e), 0);
+}
+// Lo que falta de la ruta dibujada, por los tiempos del grafo (routeTimeAhead).
+function ownRouteTime() {
+  return routeTimeAhead(currentRouteWorldPoints, (a, b) => {
+    const d = routeGraph ? routeGraph.dirEdge(a, b) : -1;
+    return d === -1 ? null : edgeSecondsOf(routeGraph.adjEdge[d]);
+  });
 }
 
 // La ruta mas rapida, o una casi igual que va por donde el GPS del juego
@@ -4423,7 +4429,7 @@ function updateRouteSummary(data) {
     : Math.max(0, Math.min(100, (1 - remainingKm / routeProgressState.total) * 100));
   // Por nuestra ruta, lo mismo que la fila "via waypoint" del ETA real.
   const seconds = manual
-    ? waypointEta({ viaKm: remainingKm, gameKm, realEtaSeconds: routeSummaryEtaSeconds, avgSpeedKmh: lastKnownAvgSpeedKmh }).realSeconds
+    ? waypointEta({ viaKm: remainingKm, gameKm, realEtaSeconds: routeSummaryEtaSeconds, own: ownRouteTime() }).realSeconds
     : (remainingKm === 0 ? 0 : routeSummaryEtaSeconds);
   routeSummaryNumbers = { remainingKm, seconds }; // para el overlay de OBS (sendNavHud)
   // Ruta a la carga (remolque propio sin cargar): sin decirlo, "llegaste" en
@@ -6762,17 +6768,12 @@ function measuredTimeScale(data) {
 }
 
 // ETA real = ETA del juego pasado a tiempo real (base) corregido por el ritmo
-// medido a medida que hay datos (createPaceEta en pure.js). El ritmo tambien
-// lo usan el ETA "(with waypoint)" y el resumen con waypoints propios.
+// medido a medida que hay datos (createPaceEta en pure.js).
 function computeRealEtaSeconds(data) {
   if (!data.routeDistanceKm || data.ts == null) return null;
   const scale = measuredTimeScale(data);
   const prior = data.routeTimeSeconds != null && data.routeTimeSeconds > 0 ? data.routeTimeSeconds / scale : null;
   paceEta.push(data.cityDst, data.ts, data.routeDistanceKm);
-  // Se queda el ultimo bueno: despues de borrar la ruta el ritmo vuelve a
-  // medirse de cero, y el ETA con waypoint no tiene por que quedar en blanco.
-  const ritmo = paceEta.avgSpeedKmh();
-  if (ritmo != null) lastKnownAvgSpeedKmh = ritmo;
   return paceEta.estimate(prior, data.ts);
 }
 
