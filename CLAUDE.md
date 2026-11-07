@@ -989,25 +989,25 @@ Revisar cada cambio contra esta lista:
    el remolque una vez en ESE trabajo (`createTrailerPickupWatch`, 05-11,
    guardado en `truckdash_trailer_hooked`): soltado despues, el remolque esta
    donde se dejo y el SDK no da su posicion, asi que sigue a la entrega.
-   Eso pide que el trabajo este en la telemetria, y el 06-11 (ETS2 1.62, Bilbao)
-   no estaba: trabajo recien tomado, GPS del juego al remolque a 4,0 km, reporte
-   sin "Route:". Atlas esta en los POIs y a 4,02 km por nuestra ruta: no es el
-   mapa. Sin confirmar si el SDK no lo manda hasta enganchar (ETCARS documenta
-   eso; el video del 10-10 lo tenia antes de enganchar) o si lo perdio, por
-   ejemplo al soltar un remolque propio (foro de SCS). Lo dira la linea `Job:`
-   del turn report y `Trabajo:` del log (`log_job_change`, cliente siguiente).
+   Eso pide que el trabajo este en la telemetria, y al elegirlo en el freight
+   market todavia no esta: el SDK lo manda recien al elegirlo otra vez en la
+   empresa, antes de enganchar (reporte #30 y el siguiente, 07-11, ShadE, en
+   Nuremberg: con el GPS a 6,5 km `Job: none`, y en la empresa `from sellplan@nurnberg,
+   trailer off, going to the trailer`). Un solo viaje medido, en ETS2. El trecho hasta
+   la empresa la web solo sabe los km.
    Mientras, `gameGpsCandidates` ofrece en el panel las empresas a esa distancia
    (un toque, sin rutear solo: un destino a mano tambien coincide a veces).
    Se ven tambien con el modo navegacion apagado, parado y solo si hay empresas
    (`gameGpsGuessPanelShown`): la navegacion arranca apagada y en la vista normal
-   del mapa la lista se calculaba sin mostrarse (Discord 06-11, ShadE). Desde una
-   empresa, en 25 viajes por tramo y midiendo con nuestra propia distancia, ofrece
-   la correcta en 97 de 100 hasta 100 km en ETS2 (98 en ATS), 18 de 25 de 100 a
-   200 (15) y 13 de 25 de 200 a 300 (5); de mas lejos, nunca.
-   ShadE dice ademas que la primera seleccion solo apunta el GPS a la empresa y que
-   alli hay que elegir el trabajo otra vez para que salga la bandera del remolque.
-   Explicaria los dos datos de arriba (el trabajo arrancaria en ese segundo paso),
-   pero falta confirmarlo: un turn report en cada momento, mirando la linea `Job:`.
+   del mapa la lista se calculaba sin mostrarse (Discord 06-11, ShadE). La
+   tolerancia es de 0,75 km o 1,5 % (`GAME_GPS_GUESS_TOL_KM`): con 0,15 km, en
+   Nuremberg nuestra ruta daba 7,04 km, el juego 6,5 y no salia nada. Nuestra ruta
+   termina en el nodo de la playa y el GPS antes (al llegar, 0,3 km contra 0,0). Con
+   ese error (juego de 0 a 0,6 km mas corto y +-0,5 %, 40 viajes por tramo desde una
+   empresa) ofrece la correcta en 39 de 40 hasta 50 km en ETS2 (hasta 25 km en ATS, 33
+   a 39), 35 de 50 a 100 (37), 27 de 100 a 200 (18) y 20 de 200 a 300 (10); de mas
+   lejos, nunca. Mostrar siempre las 3 mas parecidas subiria los dos ultimos a 40 y 35
+   (39 y 33), pero el modelo de error es optimista de lejos: sin datos reales, no.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el
    usuario escriba las tildes (`foldText`).

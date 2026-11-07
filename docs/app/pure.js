@@ -4585,10 +4585,18 @@ function noRouteReason({ hasTarget, hasRoute, gameRouteKm, routing }) {
 const GAME_GPS_GUESS_MAX_KM = 300;
 const GAME_GPS_GUESS_MAX = 3;
 const GAME_GPS_GUESS_SLOW_KMH = 5;
+// Lo que puede diferir nuestra ruta de la del juego yendo a la misma empresa. El GPS
+// sale del camion y termina en la empresa, y la nuestra sale del nodo mas cercano y
+// termina en el de la playa: en Nuremberg (reportes #30 y siguiente, ShadE, a SellPlan)
+// 7,04 km contra 6,5, y al llegar el juego en 0,0 y la nuestra en 0,3. A 1:3 son 180 m.
+// Con 0,15 km esa lista quedaba vacia: con ese error, de 2 a 25 km encontraba 21 de 80 en
+// ETS2 y 26 de 80 en ATS; con 0,75 km, 78 y 72 (40 viajes por tramo, juego de 0 a 0,6 km
+// mas corto y +-0,5 %). Con 1 km ya sobran: mas listas de mas de 3, que no se ofrecen.
+const GAME_GPS_GUESS_TOL_KM = 0.75;
 
 // Si una ruta de routeKm puede ser la del GPS del juego, que da gameKm.
 function gameGpsKmMatches(routeKm, gameKm) {
-  return Math.abs(routeKm - gameKm) <= Math.max(0.15, gameKm * 0.015);
+  return Math.abs(routeKm - gameKm) <= Math.max(GAME_GPS_GUESS_TOL_KM, gameKm * 0.015);
 }
 
 // Las empresas a las que vale calcular la ruta: la recta, en km del juego
@@ -4596,7 +4604,7 @@ function gameGpsKmMatches(routeKm, gameKm) {
 // verdad (7 de 595, una ruta por adentro de una ciudad y la recta por afuera).
 function gameGpsCandidates(companies, gameKm, straightKm) {
   if (!Array.isArray(companies) || !(gameKm > 0) || gameKm > GAME_GPS_GUESS_MAX_KM) return [];
-  const tope = gameKm * 1.05 + 0.2;
+  const tope = gameKm * 1.05 + GAME_GPS_GUESS_TOL_KM;
   return companies.filter(c => straightKm(c) <= tope);
 }
 
