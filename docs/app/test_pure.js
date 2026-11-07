@@ -5342,6 +5342,19 @@ test('routeSharedFrac: que parte de una ruta va por las aristas de otra, en metr
   assert.equal(routeSharedFrac([], [1], edgeM), 1);
 });
 
+test('navReportRefreshDue: el reporte abierto sigue al dia, salvo mandandolo o copiandolo (ShadE, 07-11)', () => {
+  const { navReportRefreshDue, NAV_REPORT_REFRESH_MS } = require('./pure.js');
+  const base = { open: true, sending: false, selecting: false, nowMs: 10000, lastMs: 10000 - NAV_REPORT_REFRESH_MS };
+  assert.equal(navReportRefreshDue(base), true);
+  // No en cada dato
+  assert.equal(navReportRefreshDue({ ...base, lastMs: 9500 }), false);
+  // Cerrado no se arma
+  assert.equal(navReportRefreshDue({ ...base, open: false }), false);
+  // Mandandolo no cambia lo que salio, y seleccionando no se pierde la seleccion
+  assert.equal(navReportRefreshDue({ ...base, sending: true }), false);
+  assert.equal(navReportRefreshDue({ ...base, selecting: true }), false);
+});
+
 test('webVersionIn: la version de la web en sw.js y en index.html', () => {
   const { webVersionIn } = require('./pure.js');
   const fs = require('fs'), path = require('path');
