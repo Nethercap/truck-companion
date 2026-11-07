@@ -11,6 +11,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+// Sin CR: en una copia de Windows con autocrlf no se encontraban las marcas de los archivos.
+const leerTexto = (ruta) => fs.readFileSync(ruta, 'utf8').replace(/\r\n/g, '\n');
 
 const RAIZ = path.resolve(__dirname, '..', '..');
 const APP = path.join(RAIZ, 'docs', 'app');
@@ -216,11 +218,11 @@ function nombresUsados(texto) {
 }
 
 function armar() {
-  const puente = fs.readFileSync(path.join(MOTOR, 'puente.js'), 'utf8');
-  const conduccion = fs.readFileSync(path.join(MOTOR, 'conduccion.js'), 'utf8');
-  const app = fs.readFileSync(path.join(APP, 'app.js'), 'utf8');
-  const pure = fs.readFileSync(path.join(APP, 'pure.js'), 'utf8');
-  const convoy = fs.readFileSync(path.join(APP, 'convoy.js'), 'utf8');
+  const puente = leerTexto(path.join(MOTOR, 'puente.js'));
+  const conduccion = leerTexto(path.join(MOTOR, 'conduccion.js'));
+  const app = leerTexto(path.join(APP, 'app.js'));
+  const pure = leerTexto(path.join(APP, 'pure.js'));
+  const convoy = leerTexto(path.join(APP, 'convoy.js'));
 
   // Lo que puente.js y conduccion.js declaran o dejan afuera a proposito.
   const afuera = new Set(JSON.parse(/\/\/ QUEDA_AFUERA: (\[[\s\S]*?\])\n/.exec(puente)[1].replace(/\n\/\/ ?/g, ' ')));
@@ -259,7 +261,7 @@ function armar() {
   // Una declaracion con varios nombres entra entera; si uno de ellos esta afuera, conduccion lo pisa.
   const elegidas = decl.filter((d) => incluidas.has(d));
 
-  const leer = (rel) => fs.readFileSync(path.join(APP, rel), 'utf8');
+  const leer = (rel) => leerTexto(path.join(APP, rel));
   const texto = [
     '// GENERADO por android-native/tools/armar_motor.js. No editar: sale de docs/app/ y android-native/motor/.',
     puente,

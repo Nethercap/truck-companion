@@ -5940,6 +5940,49 @@ test('createNearStopPick: la de menos camino sin alejarse primero, de a una busq
   assert.equal(r.busquedas, 0);
 });
 
+test('createBusyGate: lo que tardo mucho espera varias veces eso, y lo rapido no espera', () => {
+  const { createBusyGate } = require('./pure.js');
+  const g = createBusyGate(4);
+  assert.equal(g.ready(1000), true); // nunca corrio
+  g.ran(1000, 3000);
+  assert.equal(g.ready(1000), false);
+  assert.equal(g.ready(12999), false);
+  assert.equal(g.ready(13000), true);
+  // Una busqueda de 30 ms en una PC: el dato siguiente (250 ms) ya puede
+  g.ran(20000, 30);
+  assert.equal(g.ready(20250), true);
+  // Con el reloj atrasado no queda trabada hasta que se ponga al dia
+  g.ran(50000, 3000);
+  assert.equal(g.ready(40000), true);
+  // Sin medir (el reloj falso de los guiones): nada espera
+  g.ran(60000, 0);
+  assert.equal(g.ready(60000), true);
+  g.ran(61000, NaN);
+  assert.equal(g.ready(61000), true);
+});
+
+test('createOffRouteRetry: un desvio se recalcula en el momento, lejos del grafo no en cada dato', () => {
+  const { createOffRouteRetry } = require('./pure.js');
+  const r = createOffRouteRetry({ moveM: 200, factor: 4 });
+  // Un desvio de verdad: sin nada anotado, en el momento
+  assert.equal(r.due(0, 0, 1000), true);
+  r.computed(0, 0, 1000, 100);
+  // La ruta nueva paso cerca: el proximo desvio tambien va en el momento
+  r.onRoute();
+  assert.equal(r.due(10, 0, 1250), true);
+  // La ruta nueva no paso cerca: parado no se busca de nuevo, nunca
+  r.computed(10, 0, 1250, 100);
+  assert.equal(r.due(10, 0, 1500), false);
+  assert.equal(r.due(10, 0, 999999), false);
+  // Andando, recien a los 200 m
+  assert.equal(r.due(209, 0, 9000), false);
+  assert.equal(r.due(210, 0, 9000), true);
+  // Sin JIT, una ruta de 20 s: aunque ya se haya movido, espera 80 s
+  r.computed(210, 0, 100000, 20000);
+  assert.equal(r.due(1000, 0, 179999), false);
+  assert.equal(r.due(1000, 0, 180000), true);
+});
+
 test('createNearStops: sigue al camion por el camino y dice cuando volver a elegir', () => {
   const { createNearStops } = require('./pure.js');
   const largo = (p) => p.slice(1).reduce((m, q, i) => m + Math.hypot(q[0] - p[i][0], q[1] - p[i][1]), 0);

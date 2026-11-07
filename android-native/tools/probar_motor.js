@@ -981,6 +981,39 @@ const ESCENARIOS = {
     }
   },
 
+  // Lejos de toda calle (un camino de un mod de mapa, un deposito enorme) ninguna ruta pasa cerca
+  // del camion. No se calcula otra igual en cada dato: sin JIT eran segundos por dato, sin parar,
+  // y la app no hacia ni giros ni busqueda (primer tester de la beta, 06-11).
+  async fueraDelGrafo() {
+    const m = await conRuta();
+    m.j(`var rutasCalculadas = 0; var recalcOnRouteWeb = recalcOnRoute;
+      recalcOnRoute = function (o) { rutasCalculadas++; return recalcOnRouteWeb(o); };`);
+    const lejos = m.j(`(function () {
+      var n = routeGraph.nodes;
+      for (var d = 500; d <= 30000; d += 250) {
+        var x = ${INICIO[0]} + d, z = ${INICIO[1]} - d;
+        var i = nearestNodeIndex(x, z, 'real');
+        if (Math.hypot(n[2 * i] - x, n[2 * i + 1] - z) > 450) return [x, z];
+      }
+      return null;
+    })()`);
+    if (!chequear(lejos, 'no hay ningun lugar lejos de las calles')) return;
+    const [x, z] = lejos;
+    const paso = (dx, kmh = 30) => m.paso('telemetria', [dato(m, TRABAJO_DEMO, x + dx, z, 90, kmh)], 250);
+    for (let i = 0; i < 20; i++) await paso(i);
+    chequear(m.j('rutasCalculadas') === 1, `calcula en cada dato estando lejos: ${m.j('rutasCalculadas')} rutas en 20 datos`);
+    chequear(m.nav().hayRuta, 'lejos de las calles se queda sin ruta');
+    // Andando un buen trecho, si: puede haber llegado a otra calle.
+    await paso(400);
+    chequear(m.j('rutasCalculadas') === 2, `no recalcula al moverse: ${m.j('rutasCalculadas')} rutas`);
+    // Y un desvio comun sigue siendo en el momento, cada vez.
+    await m.paso('telemetria', [dato(m, TRABAJO_DEMO, INICIO[0], INICIO[1], RUMBO_INICIO, 0)], 250);
+    const antes = m.j('rutasCalculadas');
+    chequear(antes === 3, `volviendo a una calle no recalcula: ${antes} rutas`);
+    await m.paso('telemetria', [dato(m, TRABAJO_DEMO, INICIO[0], INICIO[1], RUMBO_INICIO, 0)], 250);
+    chequear(m.j('rutasCalculadas') === antes, 'sobre la ruta sigue recalculando');
+  },
+
   async compartirLaRuta() {
     const m = await conRuta();
     await m.paso('conexion', [true, false]);

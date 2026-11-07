@@ -51,7 +51,12 @@ data class SugerenciaNav(val tipo: String, val texto: String, val boton: String)
 data class EncontradoNav(val indice: Int, val nombre: String, val detalle: String, val distancia: String, val atras: Boolean)
 
 @Immutable
-data class BusquedaNav(val aviso: String?, val lista: List<EncontradoNav>)
+data class BusquedaNav(
+    val aviso: String?,
+    val lista: List<EncontradoNav>,
+    /** Los lugares todavia estan bajando: hay que volver a preguntar. */
+    val cargando: Boolean = false,
+)
 
 @Immutable
 data class EstadoNav(
@@ -236,6 +241,7 @@ internal fun parsearBusqueda(texto: String): BusquedaNav {
                 r.logico("atras") ?: false,
             )
         } ?: emptyList(),
+        d.logico("cargando") ?: false,
     )
 }
 

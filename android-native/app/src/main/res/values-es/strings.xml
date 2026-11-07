@@ -117,6 +117,7 @@
     <string name="perfil_rapida">Más rápida</string>
     <string name="perfil_corta">Más corta</string>
     <string name="nav_bajando">Bajando la red de rutas…</string>
+    <string name="nav_calculando">Calculando la ruta…</string>
     <string name="nav_llegada">Llegada</string>
     <string name="nav_voz_prender">Prender la voz</string>
     <string name="nav_voz_apagar">Apagar la voz</string>
