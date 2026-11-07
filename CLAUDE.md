@@ -921,6 +921,16 @@ Revisar cada cambio contra esta lista:
    del turn report y `Trabajo:` del log (`log_job_change`, cliente siguiente).
    Mientras, `gameGpsCandidates` ofrece en el panel las empresas a esa distancia
    (un toque, sin rutear solo: un destino a mano tambien coincide a veces).
+   Se ven tambien con el modo navegacion apagado, parado y solo si hay empresas
+   (`gameGpsGuessPanelShown`): la navegacion arranca apagada y en la vista normal
+   del mapa la lista se calculaba sin mostrarse (Discord 06-11, ShadE). Desde una
+   empresa, en 25 viajes por tramo y midiendo con nuestra propia distancia, ofrece
+   la correcta en 97 de 100 hasta 100 km en ETS2 (98 en ATS), 18 de 25 de 100 a
+   200 (15) y 13 de 25 de 200 a 300 (5); de mas lejos, nunca.
+   ShadE dice ademas que la primera seleccion solo apunta el GPS a la empresa y que
+   alli hay que elegir el trabajo otra vez para que salga la bandera del remolque.
+   Explicaria los dos datos de arriba (el trabajo arrancaria en ese segundo paso),
+   pero falta confirmarlo: un turn report en cada momento, mirando la linea `Job:`.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el
    usuario escriba las tildes (`foldText`).
