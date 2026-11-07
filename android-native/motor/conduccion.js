@@ -160,6 +160,11 @@ function lineaParaMapa(f) {
 // Lo que se recorta es lo que queda atras del camion, tapado por el rastro: alcanza con cada
 // tanto. Una ruta nueva va en el momento.
 var RUTA_CADA_MS = 5000;
+// Y hasta que se manda no hace falta armarla: con 2.400 km de ruta, proyectar cada punto
+// era lo que mas pesaba de cada dato sin JIT.
+routeRedrawMs = RUTA_CADA_MS;
+// Cada ciudad contra 400 puntos de la ruta, sin JIT, se notaba: y cambia cada varios minutos.
+nextCityEveryMs = 15000;
 var rutaEnviadaEn = 0;
 var rutaEnviadaDe = null;
 
@@ -882,7 +887,8 @@ var motor = {
     if (!pois) {
       const v = poiVariantNow();
       if (v && !poisLoading) loadPois(v);
-      return JSON.stringify({ aviso: poisError ? t('poiLoadFailed') : t('poiLoading'), lista: [] });
+      // cargando: la web rehace la lista cuando llegan (loadPois); aca Kotlin vuelve a preguntar.
+      return JSON.stringify({ aviso: poisError ? t('poiLoadFailed') : t('poiLoading'), lista: [], cargando: !!poisLoading });
     }
     if (!pos) return JSON.stringify({ aviso: t('poiNoPosition'), lista: [] });
     const q = String(texto || '').trim();

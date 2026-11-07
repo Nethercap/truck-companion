@@ -117,6 +117,7 @@
     <string name="perfil_rapida">Быстрый</string>
     <string name="perfil_corta">Короткий</string>
     <string name="nav_bajando">Загрузка дорожной сети для маршрутов…</string>
+    <string name="nav_calculando">Расчёт маршрута…</string>
     <string name="nav_llegada">Прибытие</string>
     <string name="nav_voz_prender">Включить голосовые подсказки</string>
     <string name="nav_voz_apagar">Выключить голосовые подсказки</string>

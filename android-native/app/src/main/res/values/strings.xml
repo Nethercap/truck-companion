@@ -123,6 +123,7 @@
     <string name="perfil_rapida">Fastest</string>
     <string name="perfil_corta">Shortest</string>
     <string name="nav_bajando">Downloading the road network for routes…</string>
+    <string name="nav_calculando">Calculating the route…</string>
     <string name="nav_llegada">Arrival</string>
     <string name="nav_voz_prender">Turn on voice guidance</string>
     <string name="nav_voz_apagar">Turn off voice guidance</string>

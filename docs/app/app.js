@@ -2478,6 +2478,8 @@ const OFF_ROUTE_THRESHOLD_M = 200; // si te alejas mas que esto de la ruta calcu
 // datos seguidos, para no recalcular por uno suelto.
 const OFF_BRANCH_TICKS = 2;
 let offBranchTicks = 0;
+// Lejos de toda calle, no otra ruta igual en cada dato (createOffRouteRetry, pure.js)
+const offRouteRetry = createOffRouteRetry();
 function tookOtherBranch(data) {
   const rama = routeGraph && currentRouteWorldPoints
     ? offRouteBranch(routeGraph, routeBehind, currentRouteWorldPoints, data.position.x, data.position.z, routeStartHeading(data))
@@ -3395,7 +3397,9 @@ for (const [id, code] of [['poiNearestFuelBtn', 'g'], ['poiNearestRestBtn', 'p']
 // Distancia minima (aprox) del punto (x,z) a la polilinea de la ruta actual,
 // en unidades del juego. Alcanza con chequear contra cada segmento entre
 // vertices consecutivos (la ruta ya viene con buena densidad de puntos).
-function distanceToRouteMeters(x, z) {
+// alcanza: para preguntar solo si esta a menos de eso. La ruta arranca en el camion y con
+// el primer tramo cerca ya se sabe: recorrerla entera pesaba en cada dato sin JIT.
+function distanceToRouteMeters(x, z, alcanza = 0) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2) return Infinity;
   let best = Infinity;
   for (let i = 0; i < currentRouteWorldPoints.length - 1; i++) {
@@ -3408,6 +3412,7 @@ function distanceToRouteMeters(x, z) {
     const px = ax + t * dx, pz = az + t * dz;
     const dist = Math.hypot(x - px, z - pz);
     if (dist < best) best = dist;
+    if (best <= alcanza) return best;
   }
   return best;
 }
@@ -4574,13 +4579,18 @@ function updateDestinationMarker(data) {
   if (target.kind !== 'waypoint') legs.push([target.x, target.z]);
   const routeKey = `${target.key}|${legs.map(p => `${p[0]},${p[1]}`).join(';')}`;
   const destChanged = routeKey !== currentRouteTarget;
+  const lejos = !destChanged
+    && data.position?.x != null
+    && distanceToRouteMeters(data.position.x, data.position.z, OFF_ROUTE_THRESHOLD_M) > OFF_ROUTE_THRESHOLD_M;
+  if (!lejos) offRouteRetry.onRoute();
   const offRoute = !destChanged
     && data.position?.x != null
-    && (distanceToRouteMeters(data.position.x, data.position.z) > OFF_ROUTE_THRESHOLD_M || tookOtherBranch(data));
-  const recheck = !destChanged && !offRoute && data.position?.x != null && !!routeGraph
+    && (lejos ? offRouteRetry.due(data.position.x, data.position.z, Date.now()) : tookOtherBranch(data));
+  const recheck = !destChanged && !lejos && !offRoute && data.position?.x != null && !!routeGraph
     && routeGameRecheck(routeKey, target, data);
 
   if ((destChanged || offRoute || recheck) && data.position?.x != null && routeGraph) {
+    const calculoDesde = Date.now();
     currentRouteTarget = routeKey;
     offBranchTicks = 0;
     // Una comparacion mas con el GPS del juego, salvo despues de esta.
@@ -4649,6 +4659,8 @@ function updateDestinationMarker(data) {
     if (!complete) console.warn('Ruta incompleta: algun tramo no se pudo calcular por el grafo');
     if (typeof convoyOnRouteChanged === 'function') convoyOnRouteChanged(); // Convoy: los demas ven mi ruta
     sendLiveRoute(false); // mapa en vivo: a lo sumo cada LIVE_ROUTE_RESEND_MS
+    const calculoHasta = Date.now();
+    offRouteRetry.computed(data.position.x, data.position.z, calculoHasta, calculoHasta - calculoDesde);
   }
 }
 
@@ -5853,11 +5865,16 @@ const NAV_HUD_SRC = Math.random().toString(36).slice(2, 10);
 // en uno por minuto. Solo con el overlay del cliente, el de OBS no la muestra.
 const nearStops = createNearStops();
 let nearStopsPick = null; // lo que se esta eligiendo: uno por vez
+const nearStopGate = createBusyGate(); // una busqueda de varios segundos no va en cada dato
 let nearStopsFor = null;  // cada variante y vehiculo tienen sus paradas
 
 function nearStopPickStep() {
   const { kind, pos, rumbo, pick, routeKey } = nearStopsPick;
-  if (!pick.step((st) => stopRoad(pos, rumbo, st))) return;
+  const desde = Date.now();
+  const termino = pick.step((st) => stopRoad(pos, rumbo, st));
+  const hasta = Date.now();
+  nearStopGate.ran(hasta, hasta - desde);
+  if (!termino) return;
   nearStopsPick = null;
   const best = pick.best();
   const path = best ? [[pos.x, pos.z], ...best.path, [best.st.x, best.st.z]] : null;
@@ -5892,7 +5909,7 @@ function nearStopsHud() {
         nearStopsPick = { kind, pos, rumbo: routeStartHeading(lastData), pick, routeKey: currentRouteFull };
       }
     }
-    if (nearStopsPick) nearStopPickStep();
+    if (nearStopsPick && nearStopGate.ready(Date.now())) nearStopPickStep();
     const near = [];
     for (const kind of kinds) {
       const p = nearStops.left(kind);
@@ -6216,9 +6233,10 @@ function navTargetZoom(turn) {
 // atraviesa). Se recalcula cada pocos segundos, no por tick.
 let nextCityName = null;
 let nextCityComputedAt = 0;
+let nextCityEveryMs = 4000; // cada ciudad contra toda la ruta: la app nativa lo espacia (conduccion.js)
 function updateNextCity(x, z) {
   const now = performance.now();
-  if (now - nextCityComputedAt < 4000) return;
+  if (now - nextCityComputedAt < nextCityEveryMs) return;
   nextCityComputedAt = now;
   const found = nextCityAlongRoute(currentRouteWorldPoints, citiesAll, [x, z]);
   if (found !== nextCityName) {
@@ -6242,6 +6260,7 @@ const TRIM_WINDOW_M = 400;
 // en tiles, y a 4 Hz eso era un cuarto del CPU de la pestana. En un segundo
 // el camion avanza menos de 30 m, que quedan debajo de la flecha y la estela.
 const ROUTE_REDRAW_MS = 1000;
+let routeRedrawMs = ROUTE_REDRAW_MS; // sin JIT es lo que mas pesa: la app nativa lo sube (conduccion.js)
 let routeDrawnAt = 0;
 function trimRouteBehindTruck(x, z) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 2 || !map.getSource('route')) return;
@@ -6255,7 +6274,7 @@ function trimRouteBehindTruck(x, z) {
   // atras y las indicaciones piden dar la vuelta. Ahi se recalcula desde
   // donde esta (una sola vez: la ruta nueva arranca en el camion).
   if (bestDist > OFF_ROUTE_THRESHOLD_M) {
-    if (distanceToRouteMeters(x, z) <= OFF_ROUTE_THRESHOLD_M) currentRouteTarget = null;
+    if (distanceToRouteMeters(x, z, OFF_ROUTE_THRESHOLD_M) <= OFF_ROUTE_THRESHOLD_M) currentRouteTarget = null;
     return;
   }
   // Los nodos que quedan atras se guardan aparte (ROUTE_BEHIND_MAX): findUpcomingTurn
@@ -6270,7 +6289,7 @@ function trimRouteBehindTruck(x, z) {
   const nextPt = currentRouteWorldPoints[bestIdx + 1];
   currentRouteWorldPoints = [[bestPoint[0], bestPoint[1], 0, 0, null, nextPt && nextPt[5] != null ? nextPt[5] : 0, nextPt ? nextPt[6] : undefined], ...currentRouteWorldPoints.slice(bestIdx + 1)];
   const now = performance.now();
-  if (now - routeDrawnAt < ROUTE_REDRAW_MS) return;
+  if (now - routeDrawnAt < routeRedrawMs) return;
   routeDrawnAt = now;
   const parts = splitRouteForDrawing(currentRouteWorldPoints);
   setRouteData(parts.land);

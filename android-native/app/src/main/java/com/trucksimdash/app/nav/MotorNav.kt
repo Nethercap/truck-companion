@@ -3,6 +3,7 @@ package com.trucksimdash.app.nav
 import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.edit
 import com.trucksimdash.app.BuildConfig
@@ -27,10 +28,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
@@ -45,10 +49,20 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+
+// Los textos del buscador, de la web: en los ocho idiomas, y sin una segunda copia.
+internal val CLAVES_BUSCADOR = listOf(
+    "poiNearestFuel", "poiNearestRest", "poiSearchPlaceholder", "poiCatFuel", "poiCatRest",
+    "poiCatService", "poiCatGarage", "poiCatDealer", "poiCatWeigh", "navReportOpen",
+)
+
+private const val OCUPADO_TRAS_MS = 4000L
+private const val OCUPADO_SIGUE_MS = 1000L
 
 /**
  * El ruteo y las indicaciones de la web corriendo adentro de la app, en QuickJS. Este es el
@@ -127,10 +141,37 @@ class MotorNav(
     private val sockets = HashMap<Int, WebSocket>()
     private val datoPendiente = AtomicReference<String?>(null)
 
+    @Volatile
+    private var trabajandoDesdeMs = 0L
+
+    /**
+     * Lleva un rato en una sola cosa: una ruta larga en un telefono lento son decenas de
+     * segundos sin JIT, y todo lo que se le pida espera atras. Mejor decirlo que parecer roto.
+     */
+    val ocupado: StateFlow<Boolean> = flow {
+        var ultimoLargo = 0L
+        while (true) {
+            val ahora = SystemClock.uptimeMillis()
+            val desde = trabajandoDesdeMs
+            if (desde != 0L && ahora - desde >= OCUPADO_TRAS_MS) ultimoLargo = ahora
+            emit(ultimoLargo != 0L && ahora - ultimoLargo < OCUPADO_SIGUE_MS)
+            delay(500)
+        }
+    }.stateIn(alcance, SharingStarted.WhileSubscribed(), false)
+
+    private inline fun midiendo(bloque: () -> Unit) {
+        trabajandoDesdeMs = SystemClock.uptimeMillis()
+        try {
+            bloque()
+        } finally {
+            trabajandoDesdeMs = 0L
+        }
+    }
+
     private fun enMotor(bloque: () -> Unit) {
         hilo.execute {
             try {
-                bloque()
+                midiendo(bloque)
             } catch (e: Throwable) {
                 // Sin ruta el tablero sigue andando: nunca se cae la app por esto.
                 Log.e(TAG, "error en el motor", e)
@@ -170,6 +211,7 @@ class MotorNav(
             }
             llamar("iniciar", config.toString())
             (llamarDirecto("trazosCarriles") as? String)?.let { _trazos.value = parsearTrazos(it) }
+            leerTextos(CLAVES_BUSCADOR)
             iniciado = true
             Log.i(TAG, "motor listo en ${System.currentTimeMillis() - t0} ms")
             drenar()
@@ -387,18 +429,23 @@ class MotorNav(
         return listo.await()
     }
 
-    /** Textos en el idioma del telefono, de los ocho de la web. */
+    private val textosLeidos = ConcurrentHashMap<String, String>()
+
+    private fun leerTextos(claves: List<String>): Map<String, String> {
+        val o = (llamarDirecto("textos", org.json.JSONArray(claves).toString()) as? String)?.let { JSONObject(it) }
+        val leidos = o?.keys()?.asSequence()?.associateWith { o.getString(it) } ?: emptyMap()
+        textosLeidos.putAll(leidos)
+        return leidos
+    }
+
+    /**
+     * Textos en el idioma del telefono, de los ocho de la web. Una vez leidos no se le piden mas
+     * al motor: con una ruta calculandose, el buscador se abria sin un solo texto.
+     */
     suspend fun textos(claves: List<String>): Map<String, String> {
+        if (claves.all(textosLeidos::containsKey)) return claves.associateWith { textosLeidos.getValue(it) }
         val listo = CompletableDeferred<Map<String, String>>()
-        enMotor {
-            val r = if (asegurarIniciado()) {
-                llamarDirecto("textos", org.json.JSONArray(claves).toString()) as? String
-            } else {
-                null
-            }
-            val o = r?.let { JSONObject(it) }
-            listo.complete(o?.keys()?.asSequence()?.associateWith { o.getString(it) } ?: emptyMap())
-        }
+        enMotor { listo.complete(if (asegurarIniciado()) leerTextos(claves) else emptyMap()) }
         return listo.await()
     }
 
@@ -520,7 +567,7 @@ class MotorNav(
 
     private fun enMotorDirecto(bloque: () -> Unit) {
         try {
-            bloque()
+            midiendo(bloque)
         } catch (e: Throwable) {
             Log.e(TAG, "error en un timer del motor", e)
         }

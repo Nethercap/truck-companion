@@ -975,6 +975,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (CI). Con `--guion` graba la corrida con un reloj falso y `MotorGuionTest` (androidTest,
   emulador, no en CI; pasos en el README) la repite en QuickJS y compara paso a paso: otro
   motor, otra libm y sin Intl. Correrlo al tocar `motor/` o al subir QuickJS.
+- Sin JIT el mismo codigo corre muchas veces mas lento que en el navegador (primer tester de la
+  beta, 06-11: una ruta de 2.400 km son segundos de QuickJS en una PC rapida, y mientras tanto no
+  hay giros ni busqueda). Nada caro en cada dato: lo que se repite va con `createBusyGate` o
+  `createOffRouteRetry` (`pure.js`). Lo que mide `pc_falsa.py` es la ruta demo (670 km) sin
+  overlay: los dos esconden esto.
 - Los mapas piden Referer: la app manda el de trucksim-dash.com. Nunca el secreto
   `TRUCKDASH_MAPS_KEY`, que en una APK quedaria a la vista.
 - Lo portado de la web tiene un golden que sale de correr la web

@@ -117,6 +117,7 @@
     <string name="perfil_rapida">Najszybsza</string>
     <string name="perfil_corta">Najkrótsza</string>
     <string name="nav_bajando">Pobieranie sieci dróg do wyznaczania tras…</string>
+    <string name="nav_calculando">Wyznaczanie trasy…</string>
     <string name="nav_llegada">Przyjazd</string>
     <string name="nav_voz_prender">Włącz nawigację głosową</string>
     <string name="nav_voz_apagar">Wyłącz nawigację głosową</string>
