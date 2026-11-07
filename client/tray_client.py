@@ -151,7 +151,7 @@ class AppState:
         self.cloud_viewers = None  # tableros conectados por el relay (None: no se sabe todavia)
         self.last_known_mods: dict = {}  # ultimos mods de mapa no-None por juego
         self.offmap_notified: set = set()
-        self.map_build: dict | None = None  # {'game', 'step', 'error', 'running', 'started'}
+        self.map_build: dict | None = None  # {'game', 'step', 'error', 'out_of_memory', 'running', 'started'}
         self.map_build_cancel = threading.Event()
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
@@ -1169,7 +1169,9 @@ class SetupWindow:
                 continue
             filas += 1
             if build.get("game") == game and build.get("step") == "error":
-                self.label(self.local_map_body, T("local_map_error", err=build.get("error")), fg=RED,
+                texto = (T("local_map_out_of_memory") if build.get("out_of_memory")
+                         else T("local_map_error", err=build.get("error")))
+                self.label(self.local_map_body, texto, fg=RED,
                            wraplength=520).pack(anchor="w", pady=(4, 0))
             elif build.get("game") == game and build.get("step") == "cancelled":
                 self.label(self.local_map_body, T("local_map_cancelled"), fg=MUTED).pack(anchor="w", pady=(4, 0))
@@ -1997,7 +1999,10 @@ def start_map_build(game: str) -> bool:
             state.map_build = {"game": game, "step": "cancelled", "error": None, "running": False}
         except Exception as exc:
             logging.exception("Map build failed")
+            map_builder.limpiar_armados_fallidos(game)
             state.map_build = {"game": game, "step": "error", "error": str(exc), "running": False,
+                               # MemoryError: el paso del grafo corre en este proceso, no en node
+                               "out_of_memory": isinstance(exc, (map_builder.BuildOutOfMemory, MemoryError)),
                                "started": inicio}
 
     threading.Thread(target=vigilar_hilo(correr, "map build"), daemon=True).start()

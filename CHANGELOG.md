@@ -8,6 +8,11 @@ updates on its own and is not versioned here.
 
 - The log now records each change in the job the game reports (job or none, the trailer, and whether
   the in-game GPS has a route), to help with reports about routes that don't appear.
+- Build my map: the map builder can use more memory on PCs with more than 12 GB of RAM, up to 24 GB
+  and always leaving 4 GB for the system. Before it was 8 GB on every PC, and a profile with many map
+  mods could run out of it. If it still runs out, Setup now says so and what to try, instead of
+  "parser.mjs failed". `build.log` records the PC's memory and the limit used, and a build that fails
+  no longer leaves gigabytes of temporary files on the disk.
 
 ## 1.5.37 (2026-11-06)
 
