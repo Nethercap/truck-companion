@@ -5365,16 +5365,17 @@ test('pickRouteLikeGame: en un viaje largo, otro corredor aunque el largo este a
   const { pickRouteLikeGame, routeGameAgreement, routeGameMayDiffer } = require('./pure.js');
   // La app por Burgos y Leon, 871,2 km. El juego por la costa, 843,6 km. Los
   // numeros son los de la ruta real: la de 845,2 km sigue por Burgos y entra
-  // al destino por otro lado; coincide mejor que la costa, pero no es.
+  // al destino por otro lado; coincide mejor que la costa, pero no es. La
+  // ultima es la costa otra vez (dropRouteDetours, reporte #33).
   const rutas = [
     { km: 871.2, seconds: 2319, shared: 1 },
     { km: 834.7, seconds: 2356, shared: 0.203 },
     { km: 845.2, seconds: 2374, shared: 0.899 },
-    { km: 836.9, seconds: 2353, shared: 0.203 },
+    { km: 834.7, seconds: 2356, shared: 0.203 },
   ];
   assert.equal(routeGameAgreement(871.2, 843.6), 'near');
   assert.equal(routeGameMayDiffer('near'), true);
-  assert.equal(pickRouteLikeGame(rutas, 843.6), 3);
+  assert.equal(pickRouteLikeGame(rutas, 843.6), 1);
   // Coincide con el juego, pero es la misma con una vuelta distinta: queda la nuestra
   assert.equal(pickRouteLikeGame([rutas[0], rutas[2]], 843.6), 0);
   // Sin saber cuanto comparte, tampoco
@@ -5504,6 +5505,27 @@ test('dropRouteDetours: la alternativa no se baja de la autopista para volver a 
   // Termina en el mismo nodo que la anterior: vale como volver
   assert.deepEqual(dropRouteDetours([0, 1, 5, 6, 3], [0, 1, 2, 3], edge), [0, 1, 2, 3]);
   assert.equal(dropRouteDetours(null, ruta, edge), null);
+});
+
+test('dropRouteDetours: un desvio que ahorra poco tampoco es otro camino (reporte #33, N-121-A al norte de Pamplona)', () => {
+  const { dropRouteDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_DETOUR_MAX_M } = require('./pure.js');
+  // La calle 2+1: de 1 a 2, 1.234 m y 83,8 s. Por la rampa y el camino viejo
+  // de un carril, 1-3-2: 1.355 m y 80,7 s. Son los numeros del grafo.
+  const con = (seg) => (a, b) => ({ '0-1': { m: 100, cost: 4 }, '1-2': { m: 1234, cost: 83.8 }, '2-4': { m: 100, cost: 4 },
+    '1-3': { m: 300, cost: 12 }, '3-2': { m: 1055, cost: seg } })[`${a}-${b}`] || null;
+  const calle = [0, 1, 2, 4], viejo = [0, 1, 3, 2, 4];
+  assert.deepEqual(dropRouteDetours(viejo, calle, con(68.7)), calle);
+  // Justo en el limite tambien; con mas ahorro, y si no se admite ahorro, queda
+  assert.deepEqual(dropRouteDetours(viejo, calle, con(83.8 - 12 - ROUTE_RAMP_DETOUR_MAX_S)), calle);
+  assert.equal(dropRouteDetours(viejo, calle, con(83.8 - 12 - ROUTE_RAMP_DETOUR_MAX_S - 1)), viejo);
+  assert.equal(dropRouteDetours(viejo, calle, con(68.7), ROUTE_DETOUR_MAX_M, 0), viejo);
+  // Lo largo sigue siendo otro camino, ahorre lo que ahorre
+  assert.equal(dropRouteDetours(viejo, calle, con(68.7), 1000), viejo);
+  // Por otra de las rutas ya encontradas, lo encarecido era el desvio: queda.
+  // Si cuesta mas que ref se saca igual, y por otra que no lo toca, tambien.
+  assert.equal(dropRouteDetours(viejo, calle, con(68.7), ROUTE_DETOUR_MAX_M, ROUTE_RAMP_DETOUR_MAX_S, [[9, 1, 3, 2, 8]]), viejo);
+  assert.deepEqual(dropRouteDetours(viejo, calle, con(90), ROUTE_DETOUR_MAX_M, ROUTE_RAMP_DETOUR_MAX_S, [[9, 1, 3, 2, 8]]), calle);
+  assert.deepEqual(dropRouteDetours(viejo, calle, con(68.7), ROUTE_DETOUR_MAX_M, ROUTE_RAMP_DETOUR_MAX_S, [[9, 8]]), calle);
 });
 
 test('offRouteBranch: el camion siguio por la colectora en vez de subir a la rampa (reporte #7, Amarillo, 27-10)', () => {

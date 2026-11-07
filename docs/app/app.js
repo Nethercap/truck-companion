@@ -4114,7 +4114,9 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
       const e = adjEdge[d];
       return { m: edgeM[e], cost: routeEdgeCost(edgeT ? edgeS[e] + edgeT[e] / 10 : edgeS[e], edgeM[e], byTime) };
     };
-    for (const r of previas) path = dropRouteDetours(path, r.filter(p => p[4] != null).map(p => p[4]), arista);
+    const listas = previas.map(r => r.filter(p => p[4] != null).map(p => p[4]));
+    const maxSave = routeEdgeCost(ROUTE_RAMP_DETOUR_MAX_S, 0, byTime);
+    for (const ref of listas) path = dropRouteDetours(path, ref, arista, ROUTE_DETOUR_MAX_M, maxSave, listas.filter(l => l !== ref));
   }
   // Cada punto: [x, y, ferry, junction]. ferry = 1 si el tramo que LLEGA a
   // el es un ferry/tren (dibujado punteado, sin anunciar giros en el mar);
