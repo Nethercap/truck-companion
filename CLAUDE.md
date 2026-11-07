@@ -366,8 +366,8 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   se buscan igual, pero solo gana la que comparte hasta la mitad de sus
   metros con la nuestra (`nearShared`, `routeSharedFrac`): otro corredor
   entero (reporte #28, 06-11, Pamplona -> A Coruna: la app por Burgos y Leon,
-  871 km; el GPS por la costa, 844, y la costa medida da 837, 0,8 % de error,
-  el unico dato real hasta ahora). Por el largo solo ganaba otra que sigue por
+  871 km; el GPS por la costa, 844, y la costa medida da 835, 1,1 % de error;
+  ya pasando Pamplona, en el reporte #33, 775,5 contra 777,4, 0,2 %). Por el largo solo ganaba otra que sigue por
   Burgos y entra a A Coruna por otro lado, 845 km. 300 rutas largas por
   variante (ETS2, ATS, ProMods, Coast to Coast, semilla 7, 650 a 740 km de
   mediana): con la escala errada hasta 2 % no cambia ninguna; con 2,5 %, 1 de
@@ -379,7 +379,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`dropRouteDetours`, `ROUTE_DETOUR_MAX_M`): con la autopista encarecida
   se bajaba por la salida y volvia a subir, o pasaba por el area de
   descanso, y ese largo de mas la hacia coincidir con el juego (I-15,
-  salida 385, camino a Ogden, Discord 20-10).
+  salida 385, camino a Ogden, Discord 20-10). Tampoco si el desvio ahorra
+  hasta 10 s (`ROUTE_RAMP_DETOUR_MAX_S`): `dropRampDetours` deja la ruta en la
+  calle, pero con la calle encarecida ya no, y la alternativa se iba por la
+  rampa y el camino viejo (reporte #33, 07-11, N-121-A: 3 s menos en el grafo
+  y 2,3 km mas por la calle de un carril, y ganaba por coincidir mejor). Salvo
+  que el desvio vaya por otra ruta ya encontrada. 300 rutas por variante: otro
+  corredor se sigue encontrando igual (344 antes, 343 despues) y la elegida
+  cambia en 84 de 18.000 pruebas, 17 tramos, dibujados, de hasta 2,3 km.
 - La distancia a la parada mas cercana en el overlay del juego ("near" en
   `nav_hud`, item `near_stops` del cliente, para jugar por Moonlight o con una
   sola pantalla) no usa `pickFuelStop`: lo que elige el boton cambia seguido
