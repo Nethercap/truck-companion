@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Truck Dash</string>
+
+    <string name="sec_panel">Dash</string>
+    <string name="sec_mapa">Map</string>
+    <string name="sec_en_vivo">Live</string>
+    <string name="sec_stats">Stats</string>
+
+    <!-- Conexion -->
+    <string name="conectar_titulo">Connect to your PC</string>
+    <string name="conectar_ayuda">Open Truck Dash on the PC where you play. The app reads the game through it.</string>
+    <string name="modo_codigo">Pairing code</string>
+    <string name="modo_lan">Local network</string>
+    <string name="codigo_pc">Code</string>
+    <string name="codigo_ayuda">It\'s in the tray icon of Truck Dash on your PC.</string>
+    <string name="codigo_invalido">That code doesn\'t exist or expired. Check it on your PC.</string>
+    <string name="ip_pc">PC address</string>
+    <string name="lan_ayuda">Same Wi-Fi as the PC. Truck Dash shows this address in its setup window.</string>
+    <string name="conectar">Connect</string>
+    <string name="desconectar">Disconnect</string>
+    <string name="ver_mapa_sin_juego">Just watch the live map, no game needed</string>
+    <string name="conectando">Connecting…</string>
+    <string name="reconectando">Reconnecting…</string>
+    <string name="esperando_pc">Waiting for your PC</string>
+    <string name="esperando_juego">Waiting for the game</string>
+    <string name="ayuda_conectando">If it takes too long, check your connection.</string>
+    <string name="ayuda_esperando_pc">Open Truck Dash on your PC. This connects by itself once it\'s running.</string>
+    <string name="ayuda_esperando_juego">Truck Dash is running. Start ETS2 or ATS and drive.</string>
+    <string name="estado_en_vivo">Connected, game running.</string>
+    <string name="sin_conexion">No connection</string>
+    <string name="cargando">Loading…</string>
+
+    <!-- Tablero -->
+    <string name="desc_velocimetro">Speed: %1$d %2$s</string>
+    <string name="limite_ee_uu">SPEED\nLIMIT</string>
+    <string name="rpm">RPM</string>
+    <string name="marcha">Gear</string>
+    <string name="crucero">Cruise control</string>
+    <string name="encendido">on</string>
+    <string name="giro_izquierda">Left blinker</string>
+    <string name="giro_derecha">Right blinker</string>
+    <string name="bajas">Low beams</string>
+    <string name="altas">High beams</string>
+    <string name="balizas">Hazards</string>
+    <string name="baliza">Beacon</string>
+    <string name="freno_mano">Parking brake</string>
+    <string name="motor">Engine</string>
+    <string name="alerta_aire">Air pressure</string>
+    <string name="alerta_aceite">Oil pressure</string>
+    <string name="alerta_agua">Water temperature</string>
+    <string name="alerta_bateria">Battery</string>
+    <string name="alerta_combustible">Low fuel</string>
+    <string name="alerta_adblue">Low AdBlue</string>
+    <string name="combustible">Fuel</string>
+    <string name="ruta_gps">Route</string>
+    <string name="tiempo_juego">Game time left</string>
+    <string name="descanso">Rest in</string>
+    <string name="consumo">Consumption</string>
+    <string name="trabajo">Current job</string>
+    <string name="hacia">to</string>
+    <string name="carga">Cargo</string>
+    <string name="pago">Pay</string>
+    <string name="plazo">Deadline</string>
+    <string name="dano_carga">Damage</string>
+    <string name="camion">Truck</string>
+    <string name="pieza_motor">Engine</string>
+    <string name="pieza_transmision">Transmission</string>
+    <string name="pieza_cabina">Cabin</string>
+    <string name="pieza_chasis">Chassis</string>
+    <string name="pieza_ruedas">Wheels</string>
+    <string name="pieza_remolque">Trailer</string>
+    <string name="pausado">Paused</string>
+    <string name="en_vivo">Live</string>
+    <string-array name="dias_semana">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+
+    <!-- Comandos -->
+    <string name="comandos">Commands</string>
+    <string name="cmd_balizas">Hazards</string>
+    <string name="cmd_baliza">Beacon</string>
+    <string name="cmd_freno">Handbrake</string>
+    <string name="cmd_motor">Engine</string>
+    <string name="cmd_remolque">Trailer</string>
+    <string name="cmd_camara">Camera</string>
+    <string name="cmd_crucero">Cruise</string>
+    <string name="cmd_luces">Lights</string>
+    <string name="cmd_altas">High beams</string>
+    <string name="cmd_pantalla">Screen</string>
+    <string name="cmd_eje">Lift axle</string>
+    <string name="cmd_limpia">Wipers</string>
+    <string name="cmd_sin_tecla">This command has no key assigned on the PC</string>
+    <string name="cmd_sin_ventana">Couldn\'t find the game window on the PC</string>
+    <string name="cmd_tecla_mala">The PC client doesn\'t accept that key</string>
+    <string name="cmd_fallo">Command failed: %1$s</string>
+    <string name="aviso_multa">Fined %1$s</string>
+
+    <!-- Mapa -->
+    <string name="mapa_sin_camion">No truck yet</string>
+    <string name="mapa_sin_camion_ayuda">Connect to your PC to see your truck on the map.</string>
+    <string name="mapa_recentrar">Follow my truck</string>
+    <string name="mapa_con_rumbo">Rotate the map with the truck</string>
+    <string name="mapa_norte_arriba">Keep north up</string>
+
+    <string name="nav_buscar">Stops and destinations</string>
+    <string name="nav_paradas">Your stops</string>
+    <string name="nav_quitar_parada">Remove this stop</string>
+    <string name="nav_quitar_todas">Remove all</string>
+    <string name="nav_punto_ruta">Point on the route</string>
+    <string name="nav_ocultar_ruta">Hide the route</string>
+    <string name="nav_mostrar_ruta">Show the route again</string>
+    <string name="nav_atras">behind you</string>
+    <string name="nav_ayuda_mapa">Tip: long-press the map to route through that point.</string>
+    <string name="cerrar">Close</string>
+    <string name="ajustes_perfil">Route</string>
+    <string name="perfil_rapida">Fastest</string>
+    <string name="perfil_corta">Shortest</string>
+    <string name="nav_bajando">Downloading the road network for routes…</string>
+    <string name="nav_llegada">Arrival</string>
+    <string name="nav_voz_prender">Turn on voice guidance</string>
+    <string name="nav_voz_apagar">Turn off voice guidance</string>
+    <string name="ajustes_voz">Voice guidance</string>
+    <string name="ajustes_voz_ayuda">The directions are spoken on this phone. Only one device of your session talks at a time.</string>
+
+    <!-- En vivo -->
+    <string name="vivo_titulo">Live map</string>
+    <string name="vivo_nadie">Nobody yet</string>
+    <string name="vivo_anonimo">Driver</string>
+    <string name="vivo_lleno">This map is full of spectators</string>
+    <string name="vivo_desconocido">Unknown map</string>
+    <string name="vivo_siguiendo">Following %1$s</string>
+    <string name="vivo_ver_lista">Show drivers</string>
+    <string name="vivo_ocultar_lista">Hide drivers</string>
+    <string name="vivo_fuera">Outside this map</string>
+    <string name="vivo_dejar_seguir">Stop following</string>
+    <plurals name="vivo_conductores">
+        <item quantity="one">%1$d driver</item>
+        <item quantity="other">%1$d drivers</item>
+    </plurals>
+    <plurals name="vivo_conductores_total">
+        <item quantity="one">%1$d driver sharing right now</item>
+        <item quantity="other">%1$d drivers sharing right now</item>
+    </plurals>
+    <string name="volver">Back</string>
+
+    <!-- Stats -->
+    <string name="stats_titulo">Your stats</string>
+    <string name="stats_vincular_ayuda">Link your Truck Dash account to see your trips, totals and achievements here.</string>
+    <string name="stats_vincular">Link my account</string>
+    <string name="stats_sin_contrasena">You approve it on the website. The app never sees your password.</string>
+    <string name="stats_vinculo_vencido">That link expired. Try again.</string>
+    <string name="stats_aprobar">Approve it in your browser</string>
+    <string name="stats_aprobar_ayuda">Check that the page shows this same code, then approve it. This screen continues by itself.</string>
+    <string name="stats_abrir_otra_vez">Open the page again</string>
+    <string name="cancelar">Cancel</string>
+    <string name="actualizar">Refresh</string>
+    <string name="stats_sin_red">Couldn\'t update. Showing what was already loaded.</string>
+    <string name="stats_sin_viajes">No trips yet</string>
+    <string name="stats_sin_viajes_ayuda">Trips are saved by Truck Dash on your PC once it\'s linked to this same account.</string>
+    <string name="stats_manejado">Total driven</string>
+    <string name="stats_entregados">Delivered</string>
+    <string name="stats_a_tiempo">On time</string>
+    <string name="stats_sin_terminar">Unfinished</string>
+    <string name="stats_horas_reales">Hours played</string>
+    <string name="stats_km_trabajos">On jobs</string>
+    <string name="stats_paises">Regions</string>
+    <plurals name="stats_modeados">
+        <item quantity="one">%1$d trip with a modded economy isn\'t counted in the money.</item>
+        <item quantity="other">%1$d trips with a modded economy aren\'t counted in the money.</item>
+    </plurals>
+    <string name="stats_actividad">Driving per day</string>
+    <plurals name="stats_ultimos_dias">
+        <item quantity="one">Last %1$d day</item>
+        <item quantity="other">Last %1$d days</item>
+    </plurals>
+    <plurals name="stats_entregas_dia">
+        <item quantity="one">%1$d delivery</item>
+        <item quantity="other">%1$d deliveries</item>
+    </plurals>
+    <string name="stats_plata">Money</string>
+    <string name="stats_ingresos">Earned</string>
+    <string name="stats_peajes">Tolls</string>
+    <string name="stats_multas">Fines</string>
+    <string name="stats_ferries">Ferries</string>
+    <string name="stats_penalidades">Cancellations</string>
+    <string name="stats_records">Personal records</string>
+    <string name="stats_mas_largo">Longest job</string>
+    <string name="stats_mejor_pago">Best pay</string>
+    <string name="stats_mejor_promedio">Best average speed</string>
+    <string name="stats_mas_pesado">Heaviest load</string>
+    <string name="stats_mas_eficiente">Lowest consumption</string>
+    <string name="stats_vel_max">Top speed</string>
+    <string name="stats_vel_media">Average speed</string>
+    <string name="stats_lo_que_mas">Most used</string>
+    <string name="stats_top_camiones">Trucks</string>
+    <string name="stats_top_cargas">Cargo</string>
+    <string name="stats_top_empresas">Companies</string>
+    <string name="stats_top_ciudades">Cities</string>
+    <string name="stats_consumo_camion">Consumption by truck</string>
+    <string name="stats_logros">Achievements</string>
+    <string name="stats_logros_cuenta">%1$d of %2$d</string>
+    <string name="stats_conseguido">Unlocked</string>
+    <string name="stats_bloqueado">Locked</string>
+    <string name="ver_todos">See all</string>
+    <string name="ver_menos">See less</string>
+    <plurals name="stats_bitacora">
+        <item quantity="one">Logbook · %1$d trip</item>
+        <item quantity="other">Logbook · %1$d trips</item>
+    </plurals>
+    <string name="stats_mas_viajes">Load more</string>
+    <string name="stats_modeado">modded</string>
+    <string name="viaje_entregado">Delivered</string>
+    <string name="viaje_tarde">Late</string>
+    <string name="viaje_en_curso">In progress</string>
+    <string name="viaje_cancelado">Cancelled</string>
+    <string name="viaje_sin_terminar">Unfinished</string>
+    <string name="stats_abrir_cuenta">Open my account on the web</string>
+    <string name="stats_olvidar">Unlink this phone</string>
+    <string name="stats_olvidar_ayuda">This erases the link from the phone. To revoke it for good, remove the device from your account page.</string>
+
+    <!-- Logros: textos de docs/account/account.js -->
+    <string name="logro_primera_t">First delivery</string>
+    <string name="logro_primera_d">Deliver your first job.</string>
+    <string name="logro_entregas_t">%1$s deliveries</string>
+    <string name="logro_entregas_d">Deliver %1$s jobs.</string>
+    <string name="logro_km_t">%1$s on the road</string>
+    <string name="logro_km_d">Drive %1$s, with or without a job.</string>
+    <string name="logro_largo_t">Long haul</string>
+    <string name="logro_ultra_t">Across the continent</string>
+    <string name="logro_largo_d">Deliver a job of %1$s or more.</string>
+    <string name="logro_paises_t">%1$d countries</string>
+    <string name="logro_paises_d">Drive through %1$d countries in ETS2.</string>
+    <string name="logro_estados_t">%1$d states</string>
+    <string name="logro_estados_d">Drive through %1$d states in ATS.</string>
+    <string name="logro_racha_t">Always on time</string>
+    <string name="logro_racha_d">%1$d deliveries on time in a row.</string>
+    <string name="logro_limpio_t">Clean record</string>
+    <string name="logro_limpio_d">%1$d deliveries in a row without a fine.</string>
+    <string name="logro_impecable_t">Not a scratch</string>
+    <string name="logro_impecable_d">Deliver a job of %1$s or more with no damage.</string>
+    <string name="logro_pesado_t">Heavy hauler</string>
+    <string name="logro_pesado_d">Deliver a load of %1$s or more.</string>
+    <string name="logro_ferry_t">Sea legs</string>
+    <string name="logro_ferry_d">Take a ferry or a train during a job.</string>
+    <string name="logro_pago_t">Big payday</string>
+    <string name="logro_pago_d">Earn %1$s in a single delivery.</string>
+    <string name="logro_ambos_t">Both sides of the ocean</string>
+    <string name="logro_ambos_d">Deliver in ETS2 and in ATS.</string>
+    <string name="logro_auto_t">Car delivery</string>
+    <string name="logro_auto_d">Deliver a car job.</string>
+
+    <!-- Ajustes -->
+    <string name="ajustes">Settings</string>
+    <string name="ajustes_conexion">Connection</string>
+    <string name="ajustes_compartir_titulo">Live map</string>
+    <string name="ajustes_compartir">Share my position</string>
+    <string name="ajustes_compartir_ayuda">Others see your truck on the public live map, and you see theirs. It applies to your whole session, on every device.</string>
+    <string name="ajustes_compartir_sin_conexion">Connect to your PC to change this.</string>
+    <string name="ajustes_apodo">Nickname</string>
+    <string name="ajustes_apodo_ayuda">The only name others see on the live map. Optional.</string>
+    <string name="ajustes_ver_otros">Show other drivers on my map</string>
+    <string name="ajustes_ver_otros_ayuda">Drivers sharing their position and nearby TruckersMP players.</string>
+    <string name="ajustes_unidades">Units</string>
+    <string name="unidades_auto">Auto</string>
+    <string name="unidades_km">km</string>
+    <string name="unidades_mi">mi</string>
+    <string name="unidades_ayuda">Auto uses miles in ATS and kilometers in ETS2.</string>
+    <string name="ajustes_pantalla">Keep the screen on</string>
+    <string name="ajustes_pantalla_ayuda">Only while the game is running.</string>
+    <string name="ajustes_mapa">Map</string>
+    <string name="ajustes_mapa_ayuda">The map is chosen from the mods Truck Dash detects on your PC. Pick one only if it gets it wrong.</string>
+    <string name="mapa_auto">Detect automatically</string>
+    <string name="ajustes_pruebas">Testing (debug build only)</string>
+    <string name="ajustes_acerca">About</string>
+    <string name="ajustes_version">Truck Dash %1$s</string>
+    <string name="ajustes_creditos">Map rendering by MapLibre Native. Map data generated with truckermudgeon/maps from the game files.</string>
+    <string name="ajustes_privacidad">Privacy policy</string>
+    <string name="convoy">Convoy</string>
+    <string name="boton_agregar">Add</string>
+    <string name="boton_tecla_ayuda">Written like ctrl+shift+f5. Letters, digits, f1 to f24, num0 to num9, space, enter, tab, esc, the arrows (up, down, left, right), pageup, pagedown and punctuation.</string>
+    <string name="boton_tecla">Key</string>
+    <string name="stats_mapa">Driven map</string>
+    <string name="stats_ano">Year in review</string>
+    <string name="stats_ano_titulo">Your %1$d</string>
+    <string name="stats_todo">All</string>
+    <string name="stats_mapa_vacio">No trips on this map yet.</string>
+    <string name="stats_mapa_resumen">%1$d trips · %2$d cities</string>
+    <string name="stats_horas">Hours at the wheel</string>
+    <string name="stats_entregas">Deliveries</string>
+    <string name="stats_dias">Days driven</string>
+    <string name="stats_racha">Longest streak (days)</string>
+    <string name="stats_mejor_dia">Best day</string>
+    <string name="stats_primer_viaje">First trip</string>
+    <string name="stats_logros_ano">Achievements</string>
+    <string name="stats_por_mes">Distance per month</string>
+    <string name="viaje_marcar_cancelado">Mark as cancelled</string>
+    <string name="viaje_marcar_sin_terminar">Mark as unfinished</string>
+    <string name="viaje_nota">Note</string>
+    <string name="viaje_guardar_nota">Save note</string>
+    <string name="viaje_borrar">Remove this trip</string>
+    <string name="viaje_borrar_seguro">Tap again to remove it</string>
+    <string name="seguir_titulo">Following</string>
+    <string name="seguir_novedades">News</string>
+    <string name="seguir_siguiendo">Following</string>
+    <string name="seguir_seguidores">Followers</string>
+    <string name="seguir_sin_novedades">Nothing new from the drivers you follow.</string>
+    <string name="seguir_nombre">Username</string>
+    <string name="seguir_pedir">Follow</string>
+    <string name="seguir_no_existe">There\'s no driver with that name.</string>
+    <string name="seguir_pedido_hecho">Request sent.</string>
+    <string name="seguir_dejar">Unfollow</string>
+    <string name="seguir_esperando">Waiting for them to accept</string>
+    <string name="seguir_cancelar">Cancel</string>
+    <string name="seguir_pedidos">Want to follow you</string>
+    <string name="seguir_aceptar">Accept</string>
+    <string name="seguir_rechazar">Reject</string>
+    <string name="seguir_bloquear">Block</string>
+    <string name="seguir_bloqueados">Blocked</string>
+    <string name="seguir_desbloquear">Unblock</string>
+    <string name="seguir_sin_seguidores">Nobody follows you yet.</string>
+    <string name="seguir_manejando">Driving right now</string>
+    <string name="seguir_privado">You\'ll see their stats once they accept you.</string>
+    <string name="seguir_ultimos">Latest deliveries</string>
+    <string name="novedad_entrego">%1$s delivered a job</string>
+    <string name="novedad_cancelo">%1$s cancelled a job</string>
+    <string name="novedad_empezo">%1$s started a job</string>
+    <string name="novedad_logro">%1$s unlocked an achievement</string>
+    <string name="sin_internet_titulo">Maps without internet</string>
+    <string name="sin_internet_ayuda">Download a map with its road network to see it and get directions with no internet on the phone. You still need to reach your PC, on the local network.</string>
+    <string name="sin_internet_bajar">Download</string>
+    <string name="sin_internet_listo">Downloaded · %1$d MB</string>
+    <string name="sin_internet_borrar">Delete</string>
+    <string name="sin_internet_error">It didn\'t download. Check your connection and try again.</string>
+    <string name="convoy_mirar">Watch a convoy</string>
+    <string name="ajustes_segundo_plano">Keep navigating in the background</string>
+    <string name="ajustes_segundo_plano_ayuda">The voice, the in-game overlay and your route keep going when you switch to another app, like Moonlight. It shows a notification and uses more battery.</string>
+    <string name="ajustes_flotante">Floating window when leaving the app</string>
+    <string name="ajustes_flotante_ayuda">If you leave the app while driving, a small window with the map and the next turn stays on top of the other app.</string>
+    <string name="servicio_canal">Navigation</string>
+    <string name="servicio_activo">Still navigating in the background</string>
+    <string name="mapa_local">built on the PC</string>
+    <string name="compartir">Share</string>
+    <string name="stats_buscar_conductor">Look up a driver</string>
+    <string name="fallo_titulo">Truck Dash closed unexpectedly</string>
+    <string name="fallo_texto">You can share a report with whoever gave you this beta. It has the error, the app\'s recent log and your phone model, not your account or your codes.</string>
+    <string name="fallo_seguir">Continue</string>
+</resources>

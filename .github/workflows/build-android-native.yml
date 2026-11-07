@@ -1,0 +1,88 @@
+name: Build Android nativa
+
+# La app nativa (android-native/): tests y APK de debug para instalar a mano. Tambien
+# corre si cambia lo que esta portado de la web o lo que manda el cliente: los dos
+# --check comparan contra ese codigo y avisan que hay que portar el cambio a Kotlin. El
+# motor de navegacion es el codigo de la web, armado al compilar: probar_motor lo maneja.
+# No firma ni publica: la app de Play sigue siendo la TWA de android/.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android-native/**"
+      - ".github/workflows/build-android-native.yml"
+      - "docs/app/app.js"
+      - "docs/app/pure.js"
+      - "docs/app/livemap.js"
+      - "docs/app/convoy.js"
+      - "docs/app/i18n.js"
+      - "docs/app/i18n_en_es.js"
+      - "docs/app/variants.js"
+      - "docs/app/vendor/proj4-*.js"
+      - "docs/data/map-manifest.json"
+      - "client/client.py"
+  pull_request:
+    branches: [main]
+    paths:
+      - "android-native/**"
+      - ".github/workflows/build-android-native.yml"
+      - "docs/app/app.js"
+      - "docs/app/pure.js"
+      - "docs/app/livemap.js"
+      - "docs/app/convoy.js"
+      - "docs/app/i18n.js"
+      - "docs/app/i18n_en_es.js"
+      - "docs/app/variants.js"
+      - "docs/app/vendor/proj4-*.js"
+      - "docs/data/map-manifest.json"
+      - "client/client.py"
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Lo portado de la web sigue igual
+        run: node android-native/tools/generar_golden.js --check
+      - name: El motor de navegacion sigue manejando
+        env:
+          TRUCKDASH_MAPS_KEY: ${{ secrets.TRUCKDASH_MAPS_KEY }}
+        run: node android-native/tools/probar_motor.js
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Lo mismo que el job client-linux de tests.yml: client.py importa la ventana.
+      - run: sudo apt-get update && sudo apt-get install -y python3-tk libxtst6 libxss1 xvfb
+      - run: pip install -r client/requirements.txt
+      - name: El mensaje del cliente sigue igual
+        run: xvfb-run -a python android-native/tools/generar_telemetria.py --check
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Tests y APK
+        working-directory: android-native
+        env:
+          TD_VERSION_CODE: ${{ github.run_number }}
+          TD_VERSION_NAME: 0.1.${{ github.run_number }}
+        run: bash gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TruckDash-nativa-${{ github.run_number }}
+          path: |
+            android-native/app/build/outputs/apk/debug/*.apk
+            android-native/app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: warn

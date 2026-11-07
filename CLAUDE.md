@@ -893,6 +893,77 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   tiene algo para ocultar. Para que algo abra dentro de la app, mismo
   origen y sin `target="_blank"` cuando `html.twa`.
 
+## App nativa de Android (05-11)
+
+- `android-native/` es la app nativa (Kotlin, Compose, MapLibre Native): interfaz
+  propia, sin WebView. La TWA de `android/` sigue siendo la de Play hasta que esta la
+  alcance; conviven en el telefono porque el `applicationId` es otro. Lo que tiene y lo
+  que falta esta en `android-native/README.md`.
+- Habla con el relay como un dispositivo mas de la sesion (`/ws/live/<codigo>`, sin
+  Origin) o directo por LAN (27766), y con la API de cuentas por `/auth/device` y
+  Bearer, sin pedir contrasena: valen la lista de supuestos de abajo y las reglas de
+  compartir (`explicit`, `compartirElegido` null como `liveShareChoice`). Manda lo que una
+  pestana lider: `nav_hud` con overlay, `live_route` compartiendo, plan, ajustes de ruta y
+  voz (lider es por navegador, ver `requestLeadership`: otro dispositivo no le saca nada).
+  Por LAN abre la conexion solo de plan (`connectLanPlan`) como la web. Los viajes de la
+  cuenta los guarda el cliente de la PC; la app guarda su historial local, como la web.
+- Con una sesion abierta corre `ServicioManejo` (foreground, `connectedDevice`: dataSync se
+  corta a las 6 horas), o Android congela la app con otra adelante y se queda sin voz, overlay
+  ni ruta en el mapa en vivo (quien juega por Moonlight en el mismo telefono). Lo prende y lo
+  apaga `Contenedor`, solo con la app adelante porque Android no deja desde atras. Sale solo
+  a los 10 min sin juego (supuesto 8). Apagado en Ajustes, se corta al minuto como antes.
+  La ventana flotante es el PiP de Android: `MainActivity`, `flotante` de `MapaScreen`.
+- Lo de apariencia del mapa (`AparienciaMapa`) lo guarda la web como todos sus ajustes y Kotlin
+  lo lee de `truckdash_settings` sin esperar al motor: liviano tiene que estar antes de que
+  nazca el mapa. `liteMode` vale al volver a abrir, como en la web al recargar.
+- Mapas armados en la PC: solo por LAN (`probarMapasLocales`), con `raiz` en `VarianteMapa` y en
+  `ponerVariante`. No se ofrecen para bajar ni en el mapa en vivo (`esLocal`).
+- La navegacion es el codigo de la web corriendo en QuickJS, no una copia en Kotlin:
+  `tools/armar_motor.js` arma al compilar `motor/puente.js` (un navegador de mentira), proj4,
+  `variants.js`, `pure.js`, i18n, las declaraciones de `app.js` que hacen falta (por clausura
+  desde `RAICES` de `motor/conduccion.js`), `convoy.js` entero y `conduccion.js`, la API que
+  llama `nav/MotorNav.kt`. Una regla nueva de la web entra sola; una raiz renombrada hace fallar la
+  compilacion. Lo que no se ve al compilar: el DOM de mentira nunca falla. Lo que la web
+  muestra escribiendo en la pagina (un aviso nuevo, como la voz en otro dispositivo) o
+  escucha de un boton no existe en la app hasta sumarlo a `navegacion()` y a `motor` en
+  `conduccion.js` y dibujarlo: revisar eso al tocar esa parte de la web. Lo que va en
+  `QUEDA_AFUERA` de `puente.js` (el mapa, el HUD, las voces de la pagina) no llega a QuickJS.
+  Los ajustes de navegacion los guarda la web (`saveSettings` corre en el motor): Kotlin no
+  tiene copia, porque el perfil y los DLC los cambia tambien otro dispositivo. `urlsDeMapa`
+  (mapas sin internet) tiene que dar lo que el mapa pide de verdad: `probar_motor` lo compara.
+- Los textos de `values*/strings.xml` van en los 8 idiomas (`TraduccionesTest`: mismos
+  nombres, mismos `%1$d`, y las formas de plural de polaco y ruso). Un texto nuevo va
+  traducido en el mismo cambio, o sale de la web con `motor.textos` si ya existe alla.
+- `tools/probar_motor.js` maneja el motor en Node con datos de R2, un escenario por funcion
+  (CI). Con `--guion` graba la corrida con un reloj falso y `MotorGuionTest` (androidTest,
+  emulador, no en CI; pasos en el README) la repite en QuickJS y compara paso a paso: otro
+  motor, otra libm y sin Intl. Correrlo al tocar `motor/` o al subir QuickJS.
+- Los mapas piden Referer: la app manda el de trucksim-dash.com. Nunca el secreto
+  `TRUCKDASH_MAPS_KEY`, que en una APK quedaria a la vista.
+- Lo portado de la web tiene un golden que sale de correr la web
+  (`android-native/tools/generar_golden.js`: proyecciones, `resolveModVariant`,
+  `roadLineWidth`, `liveMapColor`, `BASEMAP_VERSION`, `COMPANY_ICONS_REV`) y lo que manda
+  el cliente otro (`generar_telemetria.py`, con `build_payload`). CI corre los dos con
+  `--check` si cambian `app.js`, `pure.js`, `livemap.js` o `client/client.py`: si falla,
+  regenerar y portar el cambio a Kotlin en el mismo PR. El estilo del mapa
+  (`EstiloMapa.kt`, de `buildVecLayers`) no tiene golden: al tocar capas, mirar los dos.
+- Las variantes salen de `docs/data/map-manifest.json`: la app lo baja al abrir y trae
+  una copia de cuando se compilo. Publicar un mapa no pide una version nueva de la app.
+- Una ruta nativa nueva se prueba con `android-native/tools/pc_falsa.py` (camion por la
+  ruta demo con `build_payload` real, por LAN o contra un relay local) en el emulador.
+  Con `--entrega S` manda un peaje, una multa y la entrega, y con `--mapa-local` sirve
+  `/localmap/` con Range como el cliente. Sin probar todavia: un telefono de verdad, el juego
+  de verdad, una cuenta de verdad y oir la voz.
+- Beta sin Play (`tools/armar_beta.ps1`, `BETA.md`, pasos en el README): clave propia y fuera del
+  repo, version a mano en `app/build.gradle.kts`. Una release de GitHub va con tag que no empiece
+  con `v` (compila el cliente y lo anuncia en Discord) y `--prerelease --latest=false` (el boton de
+  descarga de la web es `releases/latest/download/TruckDash-windows.zip`).
+- `core/Fallos.kt` guarda un cierre de Kotlin y lee de Android los nativos y los ANR. Con uno sin
+  contar, `TruckDashApp` no arranca nada hasta pasar el aviso (`AvisoDeFallo`): un cierre del
+  arranque tambien se puede contar. El informe lo manda la persona, no hay servidor. Promete no
+  llevar la cuenta ni los codigos: lo nuevo que se anote con `Log` tiene que seguir cumpliendolo
+  (`TextoFallo.limpiar` saca los de las URL, `legible` la memoria de una traza nativa).
+
 ## Supuestos que ya rompieron cosas (10-10-2026)
 
 Revisar cada cambio contra esta lista:
