@@ -1745,3 +1745,22 @@ def test_log_job_change_solo_cuando_cambia(monkeypatch, caplog):
         "Trabajo: freight_market, ts_atlas@bilbao -> acc@santander, carga si, remolque no, GPS del juego 4.0 km",
         "Trabajo: freight_market, ts_atlas@bilbao -> acc@santander, carga si, remolque si, GPS del juego 4.0 km",
     ]
+
+
+def test_el_destino_fuera_del_mapa_llega_a_la_bandeja(monkeypatch):
+    """La web manda el nombre del lugar: lo que no sirva no llega al aviso."""
+    import asyncio
+    import json
+    vistos = []
+    monkeypatch.setattr(client, "on_offmap_place", lambda game, place: vistos.append((game, place)))
+
+    def mandar(**campos):
+        asyncio.run(client.handle_control_message(json.dumps({"type": "offmap_place", **campos}), {}, None))
+
+    mandar(game="ets2", place=" Kherson ")
+    mandar(game="ats", place="x" * 500)
+    mandar(game="otro", place="Kherson")
+    mandar(game="ets2", place="   ")
+    mandar(game="ets2", place=5)
+    mandar(game="ets2")
+    assert vistos == [("ets2", "Kherson"), ("ats", "x" * client.OFFMAP_PLACE_MAX)]

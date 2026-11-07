@@ -148,11 +148,13 @@ class AppState:
         self.mounted_mods: dict | None = None
         self.local_maps: dict = {}
         self.offmap_games: set = set()
+        self.offmap_places: dict = {}  # juego -> destino de un trabajo que no esta en el mapa de la web
         self.cloud_viewers = None  # tableros conectados por el relay (None: no se sabe todavia)
         self.last_known_mods: dict = {}  # ultimos mods de mapa no-None por juego
         self.offmap_notified: set = set()
         self.map_build: dict | None = None  # {'game', 'step', 'error', 'out_of_memory', 'running', 'started'}
         self.map_build_cancel = threading.Event()
+        self.map_build_thread: threading.Thread | None = None
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.vehicle = None  # "Marca Modelo" mientras esta en vivo, para el log
@@ -1127,6 +1129,7 @@ class SetupWindow:
     def _local_map_signature(self):
         build = state.map_build or {}
         return (tuple(sorted((g, m.get("fingerprint")) for g, m in state.local_maps.items())),
+                tuple(sorted(state.offmap_places.items())), tuple(sorted(state.offmap_games)),
                 tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
                 tuple(g for g in ("ats", "ets2") if can_build_map(g)),
                 build.get("game"), build.get("step"), build.get("error"), build.get("running"))
@@ -1153,7 +1156,7 @@ class SetupWindow:
                                                   date=str(man.get("built", ""))[:10]),
                            fg=GREEN, wraplength=520).pack(anchor="w", pady=2)
             elif needs_map_build(game):
-                self.label(self.local_map_body, T("local_map_needed", game=nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
+                self.label(self.local_map_body, local_map_needed_text(game, nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
                 self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
                 self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g),
                             primary=True).pack(anchor="w")
@@ -1175,6 +1178,9 @@ class SetupWindow:
                            wraplength=520).pack(anchor="w", pady=(4, 0))
             elif build.get("game") == game and build.get("step") == "cancelled":
                 self.label(self.local_map_body, T("local_map_cancelled"), fg=MUTED).pack(anchor="w", pady=(4, 0))
+            elif build.get("game") == game and build.get("step") == "game_opened":
+                self.label(self.local_map_body, T("local_map_game_opened"), fg=ORANGE,
+                           wraplength=520).pack(anchor="w", pady=(4, 0))
         if filas:
             if not self.local_map_frame.winfo_ismapped():
                 self.local_map_frame.pack(fill="x", after=self.games_frame)
@@ -1441,6 +1447,7 @@ def apagar(icono=None) -> None:
     # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
     # que el proceso murio.
     state.discord.close()
+    parar_armado_al_salir()
     icono = icono if icono is not None else state.icon
     win_integration.stop_and_exit(icono.stop if icono is not None else None)
 
@@ -1898,6 +1905,7 @@ def refresh_map_mods(force: bool = False) -> bool:
             if valor is not None and valor != state.last_known_mods.get(game):
                 if game in state.last_known_mods:
                     state.offmap_games.discard(game)
+                    state.offmap_places.pop(game, None)
                 state.last_known_mods[game] = valor
         # Para etiquetar la sesion y el viaje de la cuenta con los mods. Con
         # el None de mientras carga el juego se mantienen los ultimos: la
@@ -1955,9 +1963,33 @@ def can_build_map(game: str) -> bool:
 
 
 def needs_map_build(game: str) -> bool:
-    """Ademas la web vio el camion fuera del mapa: Setup lo ofrece primero,
-    con el aviso de la bandeja."""
-    return game in state.offmap_games and can_build_map(game)
+    """Ademas la web vio el camion, o el destino del trabajo, fuera del mapa:
+    Setup lo ofrece primero, con el aviso de la bandeja."""
+    return (game in state.offmap_games or game in state.offmap_places) and can_build_map(game)
+
+
+def local_map_needed_text(game: str, nombre: str) -> str:
+    """Con el camion adentro del mapa, "salio del mapa" no seria cierto."""
+    place = state.offmap_places.get(game)
+    if place and game not in state.offmap_games:
+        return T("local_map_needed_place", game=nombre, place=place)
+    return T("local_map_needed", game=nombre)
+
+
+def on_offmap_place(game: str, place: str):
+    """La web avisa que el destino del trabajo no esta en ningun mapa que le
+    sirva a esos mods. Puede ser un evento y no un mod (Brackenreach): los
+    textos dicen "si lo agrega uno de tus mods"."""
+    if state.offmap_places.get(game) == place:
+        return
+    state.offmap_places[game] = place
+    logging.info("Dashboard reports the job destination %s off the known %s map", place, game)
+    if needs_map_build(game) and game not in state.offmap_notified and state.icon:
+        state.offmap_notified.add(game)
+        try:
+            state.icon.notify(T("notify_local_map_place", place=place), "Truck Dash")
+        except Exception as exc:
+            logging.info("No se pudo mostrar el aviso del mapa: %s", exc)
 
 
 def on_offmap(game: str):
@@ -1974,6 +2006,43 @@ def on_offmap(game: str):
             logging.info("No se pudo mostrar el aviso del mapa: %s", exc)
 
 
+def frenar_armado_si_se_abre_el_juego(juego_abierto: threading.Event, termino: threading.Event):
+    """El boton mira si el juego esta abierto solo al apretarlo, y el armado
+    tarda minutos: si despues se abria el juego, el armador seguia con sus
+    ~7 GB de memoria y el juego andando al lado. Se corta como con Cancelar."""
+    while not termino.wait(map_builder.GAME_WATCH_SECONDS):
+        if map_builder.game_running():
+            juego_abierto.set()  # antes que cancelar: correr() lo mira al cortarse
+            state.map_build_cancel.set()
+            return
+
+
+def avisar_armado_frenado():
+    """Por la bandeja: con el juego abriendose, Setup no esta a la vista."""
+    if not state.icon:
+        return
+    try:
+        state.icon.notify(T("local_map_game_opened"), "Truck Dash")
+    except Exception as exc:
+        logging.info("No se pudo mostrar el aviso del armado: %s", exc)
+
+
+# Menos que los 5 s en que stop_and_exit fuerza la salida
+ARMADO_ESPERA_AL_SALIR_S = 3.0
+
+
+def parar_armado_al_salir():
+    """El armador es otro proceso: sin esto seguia solo despues de salir del
+    cliente, sin nadie que lo frenara si se abria el juego. El hilo del armado
+    lo corta en medio segundo; no se espera mas que ARMADO_ESPERA_AL_SALIR_S
+    (un paso del grafo corre en este proceso y no se corta a mitad)."""
+    hilo = state.map_build_thread
+    if hilo is None or not hilo.is_alive():
+        return
+    state.map_build_cancel.set()
+    hilo.join(ARMADO_ESPERA_AL_SALIR_S)
+
+
 def start_map_build(game: str) -> bool:
     """Arma el mapa en un hilo. False si ya hay uno en curso."""
     if state.map_build and state.map_build.get("running"):
@@ -1984,6 +2053,8 @@ def start_map_build(game: str) -> bool:
     state.map_build_cancel.clear()
     inicio = time.time()
     state.map_build = {"game": game, "step": "download", "error": None, "running": True, "started": inicio}
+    juego_abierto = threading.Event()
+    termino = threading.Event()
 
     def paso(nombre):
         state.map_build["step"] = nombre
@@ -1995,8 +2066,13 @@ def start_map_build(game: str) -> bool:
             refresh_local_maps()
             state.map_build = {"game": game, "step": "done", "error": None, "running": False}
         except map_builder.BuildCancelled:
-            logging.info("Map build cancelled")
-            state.map_build = {"game": game, "step": "cancelled", "error": None, "running": False}
+            if juego_abierto.is_set():
+                logging.info("Map build stopped: the game was opened")
+                state.map_build = {"game": game, "step": "game_opened", "error": None, "running": False}
+                avisar_armado_frenado()
+            else:
+                logging.info("Map build cancelled")
+                state.map_build = {"game": game, "step": "cancelled", "error": None, "running": False}
         except Exception as exc:
             logging.exception("Map build failed")
             map_builder.limpiar_armados_fallidos(game)
@@ -2004,8 +2080,13 @@ def start_map_build(game: str) -> bool:
                                # MemoryError: el paso del grafo corre en este proceso, no en node
                                "out_of_memory": isinstance(exc, (map_builder.BuildOutOfMemory, MemoryError)),
                                "started": inicio}
+        finally:
+            termino.set()
 
-    threading.Thread(target=vigilar_hilo(correr, "map build"), daemon=True).start()
+    state.map_build_thread = threading.Thread(target=vigilar_hilo(correr, "map build"), daemon=True)
+    state.map_build_thread.start()
+    threading.Thread(target=vigilar_hilo(lambda: frenar_armado_si_se_abre_el_juego(juego_abierto, termino),
+                                         "map build game watch"), daemon=True).start()
     return True
 
 
@@ -2400,6 +2481,7 @@ def main():
 
     local_server.on_show_setup = open_setup_window
     client_lib.on_offmap = on_offmap
+    client_lib.on_offmap_place = on_offmap_place
     client_lib.on_nav_hud = state.overlay_data.navegacion
     client_lib.on_viewers = lambda n: setattr(state, "cloud_viewers", n)
     ajustes_overlay = win_integration.overlay_settings()

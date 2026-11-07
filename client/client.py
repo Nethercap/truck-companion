@@ -990,6 +990,11 @@ def payload_has_event(payload: dict) -> bool:
 # conoce ({"type": "offmap", "game": "ats"}), y la bandeja ofrece armar el
 # mapa en la PC (map_builder.py).
 on_offmap = None
+# Lo define la bandeja: el destino del trabajo no esta en el mapa que conoce la
+# web ({"type": "offmap_place", "game": "ets2", "place": "Kherson"}). El largo
+# se corta aca: el nombre termina en un aviso de la bandeja.
+on_offmap_place = None
+OFFMAP_PLACE_MAX = 60
 # Lo define la bandeja: el giro, lo que falta y la llegada que calcula la web,
 # como texto ya traducido, para el overlay en el juego (overlay.py). La web lo
 # manda solo si client_status dice que el overlay esta prendido.
@@ -1028,6 +1033,10 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
         elif msg_type == "offmap":
             if on_offmap and payload.get("game") in ("ats", "ets2"):
                 on_offmap(payload["game"])
+        elif msg_type == "offmap_place":
+            place = payload.get("place")
+            if on_offmap_place and payload.get("game") in ("ats", "ets2") and isinstance(place, str) and place.strip():
+                on_offmap_place(payload["game"], place.strip()[:OFFMAP_PLACE_MAX])
         elif msg_type == "viewers":
             if on_viewers and isinstance(payload.get("count"), int):
                 on_viewers(payload["count"])

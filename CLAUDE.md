@@ -96,6 +96,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   truckermudgeon tienen los mismos, vienen del generador; sacar los sueltos
   dejaba la calle cortada antes de la rotonda. Desde el zoom 12 la ruta es
   mas fina que la calle y va encima, como un carril marcado.
+- Destino del trabajo fuera del mapa elegido (`offMapJobPlace`, reporte del 07-11: Kherson
+  con ProMods, RusMap, ROEX y European Grand Utopia). `resolveModVariant` sigue eligiendo
+  el de Grand Utopia, para no dejar sin mapa al que maneja en las islas (y no cambia el
+  golden de la app nativa). Pero si otro mapa publicado para esos mods
+  (`alternateModVariants`) tiene el destino y al camion adentro (`variantForJobPlace`), la
+  web cambia a ese hasta que se recargue (`jobMap`). Si no hay, y juega con mods y un
+  cliente con armador (`canOfferMapBuild`), el resumen de la ruta lleva a Setup y manda
+  `offmap_place`: el cliente lo ofrece con el lugar en el texto. Los limites de `mapBounds`
+  no sirven para detectar esto: las 222 ciudades propias de RusMap y ROEX caen dentro de
+  los del mapa de Grand Utopia. Los textos dicen "si lo agrega uno de tus mods": tambien
+  puede ser un evento (Brackenreach), y ahi armar el mapa no ayuda.
 - Un mapa armado en la PC ("Build my map") cuyas ciudades caen sobre todo
   fuera de la tierra real (Explorando a America en ATS, 18-10) va con el
   fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5
