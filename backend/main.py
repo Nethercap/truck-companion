@@ -2275,6 +2275,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
                     continue
                 # "offmap": la web vio el camion fuera del mapa que conoce; el
                 # cliente ofrece armar el mapa en la PC (map_builder.py).
+                # "offmap_place": lo mismo con el destino del trabajo.
                 # "nav_hud": el giro y lo que falta para el overlay en el
                 # juego; texto corto, se descarta si viene grande.
                 if msg_type == "nav_hud" and len(data) > NAV_HUD_MAX_BYTES:
@@ -2286,7 +2287,7 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         outbox = session.viewer_outboxes.get(obs)
                         if outbox is not None and obs is not websocket:
                             outbox.push_control(data)
-                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "nav_hud"):
+                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "offmap_place", "nav_hud"):
                     if session.client_ws is not None:
                         await session.client_ws.send_text(data)
                 elif msg_type == "set_live_share":
