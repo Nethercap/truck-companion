@@ -6,6 +6,8 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Build my map: when the dashboard can't find your job's destination on the map, Setup and the tray
+  now offer to build it and name the place, even if your truck is still inside the map.
 - Build my map: if you open the game while the map is being built, the build now stops and tells
   you, instead of competing with the game for up to 7 GB of memory. Quitting Truck Dash stops it
   too, and a cancelled build no longer leaves gigabytes of temporary files on the disk.

@@ -1240,11 +1240,13 @@ const GAME_MAPS = Object.fromEntries(Object.entries(VARIANT_META).map(([name, me
 // prueba antes y se sigue con el de R2).
 let localMaps = {};          // juego -> datos del cliente, solo los que se pudieron leer
 let localMapsSig = null;
+let clientReportsLocalMaps = false; // un cliente que manda localMaps tiene el armador
 function localMapRoot(game, port) {
   const base = conn.local ? '' : (port ? `http://127.0.0.1:${port}` : null);
   return base === null ? null : `${base}/localmap/${game}`;
 }
 async function applyLocalMaps(maps, port) {
+  clientReportsLocalMaps = maps !== undefined;
   const sig = JSON.stringify([maps || null, port || null, conn.local]);
   if (sig === localMapsSig) return;
   localMapsSig = sig;
@@ -4355,7 +4357,10 @@ function renderRouteSummary(view) {
   panel.classList.toggle('dismissed', !!(view && view.dismissed));
   panel.classList.toggle('offmap', !!(view && view.offMap));
   document.getElementById('mapPanel').classList.toggle('hasRouteSummary', !!view);
-  if (view && view.offMap) document.getElementById('routeOffMapText').textContent = t('routeOffMap').replace('{name}', view.offMap);
+  if (view && view.offMap) {
+    document.getElementById('routeOffMapText').textContent =
+      t(view.build ? 'routeOffMapBuild' : 'routeOffMap').replace('{name}', view.offMap);
+  }
   keepPanelsClearOfRouteSummary();
   if (!view || view.dismissed || view.offMap) return;
   const bar = document.getElementById('routeProgressBar');
@@ -4393,7 +4398,9 @@ function updateRouteSummary(data) {
     const raw = resolveRawRouteTarget(data);
     const oculta = routeDismissed(dismissedRouteIdentity, data, raw, dismissedStopList().length);
     const fuera = oculta ? null : offMapJobPlace(data, raw, jobPlacesReady());
-    renderRouteSummary(oculta ? { dismissed: true } : fuera ? { offMap: fuera } : null);
+    if (fuera) checkJobPlace(data, fuera);
+    renderRouteSummary(oculta ? { dismissed: true }
+      : fuera ? { offMap: fuera, build: !jobPlaceChecking && offerMapBuild(data.game) } : null);
     return;
   }
   // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
@@ -6439,7 +6446,62 @@ function offMapCheckReady(game) {
 // Mapa de la version del juego elegida en Ajustes, sobre el de los mods
 // (gameVersionVariant: solo cambia el mapa base).
 function resolveEffectiveGame(game) {
-  return gameVersionVariant(resolveModVariant(game), { ats: atsVersion, ets2: ets2Version }, MAP_DATA_VERSION);
+  return gameVersionVariant(jobMapVariant(game, resolveModVariant(game)), { ats: atsVersion, ets2: ets2Version }, MAP_DATA_VERSION);
+}
+
+// Destino del trabajo fuera del mapa elegido (offMapJobPlace). Con mods que no
+// tienen un mapa comun, puede estar en otro de los publicados
+// (alternateModVariants): se cambia a ese y la ruta sale sola. Si no, lo unico
+// que lo trae es armar el mapa en la PC, si el destino es de un mod: con un
+// evento (Brackenreach) no alcanza, por eso el texto dice "si".
+let jobMap = null; // { game, primary, variant }: vale mientras resolveModVariant siga dando primary
+let jobPlaceChecked = null; // `${mapa}|${destino}` ya mirado
+let jobPlaceChecking = false;
+
+function jobMapVariant(game, variant) {
+  return modsAuto && jobMap && jobMap.game === game && jobMap.primary === variant ? jobMap.variant : variant;
+}
+
+function offerMapBuild(game) {
+  return canOfferMapBuild({
+    modsAuto, clientConnected: conn.clientConnected, spectator: conn.spectator, demo: conn.demo,
+    hasLocalMap: !!localMaps[game], clientHasBuilder: clientReportsLocalMaps,
+    modNames: detectedModNames && detectedModNames[game],
+  });
+}
+
+async function otherVariantWithJobPlace(data, game) {
+  if (!modsAuto || localMaps[game]) return null;
+  const alternativas = alternateModVariants(game, detectedMods && detectedMods[game], MAP_DATA_VERSION);
+  if (!alternativas.length) return null;
+  const nombres = [resolveModVariant(game), ...alternativas].filter((v) => v !== currentGame && GAME_MAPS[v]);
+  const candidates = await Promise.all(nombres.map(async (variant) => {
+    try {
+      const res = await fetch(`${GAME_MAPS[variant].assetsDir}/Cities.json?v=${MAP_DATA_VERSION[variant] || ''}`);
+      return { variant, cities: res.ok ? await res.json() : null };
+    } catch (err) {
+      return { variant, cities: null };
+    }
+  }));
+  return variantForJobPlace(candidates, { id: data.cityDstId, name: data.cityDst, x: lastWorldPos && lastWorldPos.x, z: lastWorldPos && lastWorldPos.z });
+}
+
+async function checkJobPlace(data, place) {
+  const game = data.game;
+  if (!game || conn.demo || conn.spectator || !offMapCheckReady(game)) return;
+  const key = `${currentGame}|${data.cityDstId || place}`;
+  if (key === jobPlaceChecked) return;
+  jobPlaceChecked = key;
+  jobPlaceChecking = true;
+  const variant = await otherVariantWithJobPlace(data, game);
+  jobPlaceChecking = false;
+  if (key !== jobPlaceChecked) return; // ya cambio el destino o el mapa
+  if (variant) {
+    jobMap = { game, primary: resolveModVariant(game), variant }; // updateMap lo carga en el proximo dato
+    showToast(t('jobMapSwitched').replace('{map}', GAME_MAPS[variant].label).replace('{name}', place), 'info', 10000);
+  } else if (offerMapBuild(game) && ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'offmap_place', game, place }));
+  }
 }
 
 function resolveModVariant(game) {
@@ -6592,8 +6654,13 @@ function updateMap(position, game, gameHeadingDeg) {
     }
   }
   lastWorldPos = { x: position.x, z: position.z };
-  if (!conn.demo && !conn.spectator && mapBounds && offMapWarnedFor !== currentGame
-      && offMapCheckReady(lastData && lastData.game) && !insideMapBounds(mapBounds, position.x, position.z)) {
+  const fueraDelMapa = !conn.demo && !conn.spectator && mapBounds && offMapWarnedFor !== currentGame
+    && offMapCheckReady(lastData && lastData.game) && !insideMapBounds(mapBounds, position.x, position.z);
+  if (fueraDelMapa && jobMap) {
+    // Salio del mapa que se eligio por un trabajo (de ROEX hacia las islas):
+    // primero el de los mods, y ahi se vera si tambien esta afuera.
+    jobMap = null;
+  } else if (fueraDelMapa) {
     offMapWarnedFor = currentGame;
     const label = (typeof GAME_MAPS !== 'undefined' && GAME_MAPS[currentGame] && GAME_MAPS[currentGame].label) || currentGame;
     showToast(t('offMapNotice').replace('{map}', label), 'info', 20000);

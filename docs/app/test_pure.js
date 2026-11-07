@@ -3234,6 +3234,66 @@ test('routeDismissed: una ruta de waypoints borrada tambien se puede traer (Brac
   ]);
 });
 
+test('alternateModVariants: otros mapas publicados para Grand Utopia con RusMap o ROEX (07-11)', () => {
+  const { alternateModVariants } = require('./pure.js');
+  const publicadas = { ets2_promods_rusmap_roex: '1', ets2_promods_roex: '1', ets2_promods_rusmap: '1' };
+  const todos = { eu_grand_utopia: true, grand_utopia: true, promods: true, rusmap: true, roextended: true };
+  assert.deepEqual(alternateModVariants('ets2', todos, publicadas), ['ets2_promods_rusmap_roex', 'ets2_promods_roex', 'ets2_promods_rusmap']);
+  assert.deepEqual(alternateModVariants('ets2', { ...todos, rusmap: false }, publicadas), ['ets2_promods_roex']);
+  assert.deepEqual(alternateModVariants('ets2', { ...todos, roextended: false }, publicadas), ['ets2_promods_rusmap']);
+  // Sin publicar no se ofrece
+  assert.deepEqual(alternateModVariants('ets2', todos, { ets2_promods_rusmap: '1' }), ['ets2_promods_rusmap']);
+  // Sin Grand Utopia, resolveModVariant ya elige el que trae todo
+  assert.deepEqual(alternateModVariants('ets2', { ...todos, eu_grand_utopia: false }, publicadas), []);
+  assert.deepEqual(alternateModVariants('ets2', { eu_grand_utopia: true, promods: true }, publicadas), []);
+  assert.deepEqual(alternateModVariants('ats', todos, publicadas), []);
+  assert.deepEqual(alternateModVariants('ets2', null, publicadas), []);
+});
+
+test('variantForJobPlace: el primer mapa con el destino y con el camion adentro', () => {
+  const { variantForJobPlace } = require('./pure.js');
+  const eugu = { variant: 'eugu', cities: [
+    { Token: 'bucuresti', Name: 'Bucharest', X: 60000, Y: 30000 },
+    { Token: 'assamaka', Name: 'Assamaka', X: -218000, Y: -5000 },
+  ] };
+  const roex = { variant: 'roex', cities: [
+    { Token: 'bucuresti', Name: 'Bucharest', X: 60000, Y: 30000 },
+    { Token: 'kerson', Name: 'Херсон', X: 84000, Y: 15000 },
+  ] };
+  const enBucarest = { x: 60000, z: 30000 };
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'kerson', name: 'x', ...enBucarest }), 'roex');
+  // Sin id, o con un id que no esta, por el nombre que manda el juego
+  assert.equal(variantForJobPlace([eugu, roex], { name: 'Херсон', ...enBucarest }), 'roex');
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'otro', name: 'Assamaka', ...enBucarest }), 'eugu');
+  // Con varios, el primero
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'bucuresti', ...enBucarest }), 'eugu');
+  assert.equal(variantForJobPlace([roex, eugu], { id: 'bucuresti', ...enBucarest }), 'roex');
+  // En ninguno: el evento de Halloween
+  assert.equal(variantForJobPlace([eugu, roex], { id: 'brackenreach', name: 'Brackenreach', ...enBucarest }), null);
+  // Desde las islas no sirve un mapa que no las tiene
+  assert.equal(variantForJobPlace([roex], { id: 'kerson', x: -218000, z: -5000 }), null);
+  // Sin posicion todavia, alcanza con el destino
+  assert.equal(variantForJobPlace([roex], { id: 'kerson' }), 'roex');
+  // Un mapa que no se pudo bajar no cuenta
+  assert.equal(variantForJobPlace([{ variant: 'x', cities: null }, roex], { id: 'kerson', ...enBucarest }), 'roex');
+  assert.equal(variantForJobPlace([], { id: 'kerson' }), null);
+});
+
+test('canOfferMapBuild: con mods, con cliente con armador y sin mapa armado', () => {
+  const { canOfferMapBuild } = require('./pure.js');
+  const si = { modsAuto: true, clientConnected: true, spectator: false, demo: false, hasLocalMap: false, clientHasBuilder: true, modNames: ['RusMap'] };
+  assert.equal(canOfferMapBuild(si), true);
+  assert.equal(canOfferMapBuild({ ...si, modsAuto: false }), false);
+  assert.equal(canOfferMapBuild({ ...si, clientConnected: false }), false);
+  assert.equal(canOfferMapBuild({ ...si, spectator: true }), false);
+  assert.equal(canOfferMapBuild({ ...si, demo: true }), false);
+  assert.equal(canOfferMapBuild({ ...si, hasLocalMap: true }), false);
+  assert.equal(canOfferMapBuild({ ...si, clientHasBuilder: false }), false);
+  assert.equal(canOfferMapBuild({ ...si, modNames: [] }), false);
+  assert.equal(canOfferMapBuild({ ...si, modNames: null }), false);
+  assert.equal(canOfferMapBuild(), false);
+});
+
 test('offMapJobPlace: trabajo a un lugar que no esta en el mapa (Brackenreach, 15-10)', () => {
   const { offMapJobPlace } = require('./pure.js');
   const evento = { game: 'ats', citySrc: 'Dallas', cityDst: 'Brackenreach', companyDst: 'Castle Brackenhelm',

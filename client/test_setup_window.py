@@ -16,6 +16,7 @@ import types
 
 import pytest
 
+import client as client_lib
 import i18n
 import plugin_installer
 import tray_client
@@ -910,6 +911,50 @@ def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch
     textos = _textos(v.local_map_body)
     assert tray_client.T("local_map_build") not in textos
     assert any("12" in t for t in textos)
+
+
+def test_el_destino_fuera_del_mapa_ofrece_armarlo(ventana, monkeypatch, tmp_path):
+    """Con el camion adentro del mapa la web solo ve que falta el destino
+    (Kherson con el mapa de Grand Utopia, 07-11): el aviso de la bandeja y Setup
+    lo dicen con el lugar, no con "tu camion salio del mapa"."""
+    v, _ = ventana
+    bin_dir = _install(tmp_path, "ETS2", "ets2")
+    tray_client.state.installs = [plugin_installer.describe_install("ets2", bin_dir)]
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ets2": [str(tmp_path / "mod.scs")], "ats": None})
+    monkeypatch.setattr(tray_client.state, "local_maps", {})
+    monkeypatch.setattr(tray_client.state, "offmap_games", set())
+    monkeypatch.setattr(tray_client.state, "offmap_places", {})
+    monkeypatch.setattr(tray_client.state, "offmap_notified", set())
+    monkeypatch.setattr(tray_client.state, "map_build", None)
+    avisos = []
+    monkeypatch.setattr(tray_client.state, "icon",
+                        types.SimpleNamespace(notify=lambda texto, titulo: avisos.append(texto)))
+    nombre = tray_client.GAME_LABELS["ets2"]
+
+    tray_client.on_offmap_place("ets2", "Kherson")
+    tray_client.on_offmap_place("ets2", "Kherson")  # el mismo destino no avisa de nuevo
+    assert avisos == [tray_client.T("notify_local_map_place", place="Kherson")]
+    assert tray_client.needs_map_build("ets2")
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_needed_place", game=nombre, place="Kherson") in textos
+    assert tray_client.T("local_map_build") in textos
+
+    # Si ademas el camion salio del mapa, eso es lo que hay que decir
+    tray_client.state.offmap_games.add("ets2")
+    v.render_local_map()
+    v.root.update()
+    assert tray_client.T("local_map_needed", game=nombre) in _textos(v.local_map_body)
+
+
+def test_el_destino_fuera_del_mapa_en_todas_las_lenguas():
+    for lang, textos in i18n._STRINGS.items():
+        assert "{place}" in textos["local_map_needed_place"] and "{game}" in textos["local_map_needed_place"], lang
+        aviso = textos["notify_local_map_place"]
+        assert "{place}" in aviso, lang
+        # Lo que entra en un globo de la bandeja de Windows, con el lugar mas largo
+        assert len(aviso.format(place="x" * client_lib.OFFMAP_PLACE_MAX)) < 256, lang
 
 
 def _armado_que_falla(monkeypatch, tmp_path, armar):
