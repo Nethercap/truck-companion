@@ -11,9 +11,12 @@ Necesitan una pantalla: se saltean solos donde no la hay (CI en Linux).
 
 import gc
 import os
+import threading
+import types
 
 import pytest
 
+import i18n
 import plugin_installer
 import tray_client
 
@@ -235,6 +238,109 @@ def test_apagar_cierra_discord_y_el_icono(monkeypatch):
     monkeypatch.setattr(tray_client.state, "icon", None)
     tray_client.apagar()
     assert llamadas == ["discord", ("salir", False)]
+
+
+def _armado_de_prueba(monkeypatch, armar, juego_abierto=False):
+    """start_map_build con un armado de mentira y el juego abierto o no.
+    Devuelve los avisos que salieron por la bandeja."""
+    avisos = []
+    monkeypatch.setattr(tray_client.state, "map_build", None)
+    monkeypatch.setattr(tray_client.state, "map_build_cancel", threading.Event())
+    monkeypatch.setattr(tray_client.state, "map_build_thread", None)
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": ["mod.scs"], "ets2": None})
+    monkeypatch.setattr(tray_client.state, "icon",
+                        types.SimpleNamespace(notify=lambda texto, titulo: avisos.append(texto), stop=lambda: None))
+    monkeypatch.setattr(tray_client, "game_dir_for", lambda game: "juego")
+    monkeypatch.setattr(tray_client, "refresh_local_maps", lambda: False)
+    monkeypatch.setattr(tray_client.map_builder, "GAME_WATCH_SECONDS", 0.01)
+    monkeypatch.setattr(tray_client.map_builder, "game_running", lambda: juego_abierto)
+    monkeypatch.setattr(tray_client.map_builder, "build_map", armar)
+    return avisos
+
+
+def _armar_hasta_que_lo_corten(*args, cancel, **kwargs):
+    assert cancel.wait(10)
+    raise tray_client.map_builder.BuildCancelled()
+
+
+def test_el_armado_se_frena_y_avisa_si_se_abre_el_juego(monkeypatch):
+    """El boton mira si el juego esta abierto solo al apretarlo: si se abria
+    despues, el armador seguia con sus ~7 GB de memoria y el juego andando."""
+    avisos = _armado_de_prueba(monkeypatch, _armar_hasta_que_lo_corten, juego_abierto=True)
+    assert tray_client.start_map_build("ats")
+    tray_client.state.map_build_thread.join(10)
+    assert tray_client.state.map_build["step"] == "game_opened"
+    assert tray_client.state.map_build["running"] is False
+    assert avisos == [tray_client.T("local_map_game_opened")]
+
+
+def test_cancelar_a_mano_no_dice_que_se_abrio_el_juego(monkeypatch):
+    avisos = _armado_de_prueba(monkeypatch, _armar_hasta_que_lo_corten)
+    assert tray_client.start_map_build("ats")
+    tray_client.state.map_build_cancel.set()
+    tray_client.state.map_build_thread.join(10)
+    assert tray_client.state.map_build["step"] == "cancelled"
+    assert avisos == []
+
+
+def test_sin_juego_el_armado_no_se_corta(monkeypatch):
+    mirados = threading.Event()
+    corte = []
+
+    def armar(*args, cancel, **kwargs):
+        # Espera a que la vigilancia haya mirado al menos una vez
+        assert mirados.wait(10)
+        corte.append(cancel.is_set())
+
+    avisos = _armado_de_prueba(monkeypatch, armar)
+
+    def mirar():
+        mirados.set()
+        return False
+
+    monkeypatch.setattr(tray_client.map_builder, "game_running", mirar)
+    assert tray_client.start_map_build("ats")
+    tray_client.state.map_build_thread.join(10)
+    assert corte == [False]
+    assert tray_client.state.map_build["step"] == "done"
+    assert avisos == []
+
+
+def test_salir_frena_el_armado(monkeypatch):
+    """El armador es otro proceso: al salir del cliente seguia solo, y ya no
+    quedaba nadie que lo frenara si se abria el juego."""
+    _armado_de_prueba(monkeypatch, _armar_hasta_que_lo_corten)
+    monkeypatch.setattr(tray_client.state.discord, "close", lambda: None)
+    monkeypatch.setattr(tray_client.win_integration, "stop_and_exit", lambda cb=None: None)
+    assert tray_client.start_map_build("ats")
+    tray_client.apagar()
+    assert tray_client.state.map_build_cancel.is_set()
+    assert not tray_client.state.map_build_thread.is_alive()
+    assert tray_client.state.map_build["step"] == "cancelled"
+
+
+def test_setup_dice_que_el_armado_se_freno_y_deja_armarlo_de_nuevo(ventana, monkeypatch, tmp_path):
+    v, _ = ventana
+    bin_dir = _install(tmp_path, "ATS", "ats")
+    tray_client.state.installs = [plugin_installer.describe_install("ats", bin_dir)]
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": [str(tmp_path / "mod.scs")], "ets2": None})
+    monkeypatch.setattr(tray_client.state, "local_maps", {})
+    monkeypatch.setattr(tray_client.state, "offmap_games", set())
+    monkeypatch.setattr(tray_client.state, "map_build",
+                        {"game": "ats", "step": "game_opened", "error": None, "running": False})
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_game_opened") in textos
+    assert tray_client.T("local_map_build") in textos
+
+
+def test_el_aviso_del_armado_frenado_esta_en_todas_las_lenguas():
+    for lang, textos in i18n._STRINGS.items():
+        aviso = textos.get("local_map_game_opened")
+        assert aviso, lang
+        # Lo que entra en un globo de la bandeja de Windows
+        assert len(aviso) < 256, lang
 
 
 def test_salir_de_la_bandeja_esconde_el_overlay_y_cierra(monkeypatch):

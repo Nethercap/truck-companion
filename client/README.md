@@ -150,9 +150,11 @@ client, and Setup offers **Build my map**: it builds the map from your game
 and your active mods, on your PC. If you play with mods it is also in Setup
 without that, for a map mod whose roads the dashboard is missing (one we don't
 have, or a newer version than ours). Close the game first: it usually takes
-about five minutes and 7 GB of memory, more with many map mods. If it runs out
-of memory, Setup says so: close other programs, or try a profile with fewer map
-mods. The first time it downloads the map builder (about 40 MB) from this same
+about five minutes and 7 GB of memory, more with many map mods. If you open the
+game before it finishes, the build stops and tells you: close the game and start
+it again. If it runs out of memory, Setup says so: close other programs, or try
+a profile with fewer map mods. The first time it downloads the map builder
+(about 40 MB) from this same
 release and checks its SHA-256.
 
 The map is saved in `%LOCALAPPDATA%\TruckDash\maps\` and used while the same

@@ -153,6 +153,7 @@ class AppState:
         self.offmap_notified: set = set()
         self.map_build: dict | None = None  # {'game', 'step', 'error', 'out_of_memory', 'running', 'started'}
         self.map_build_cancel = threading.Event()
+        self.map_build_thread: threading.Thread | None = None
         self.cloud = "connecting"  # estado de la conexion al backend (ver CLOUD_TEXT)
         self.game = None
         self.vehicle = None  # "Marca Modelo" mientras esta en vivo, para el log
@@ -1175,6 +1176,9 @@ class SetupWindow:
                            wraplength=520).pack(anchor="w", pady=(4, 0))
             elif build.get("game") == game and build.get("step") == "cancelled":
                 self.label(self.local_map_body, T("local_map_cancelled"), fg=MUTED).pack(anchor="w", pady=(4, 0))
+            elif build.get("game") == game and build.get("step") == "game_opened":
+                self.label(self.local_map_body, T("local_map_game_opened"), fg=ORANGE,
+                           wraplength=520).pack(anchor="w", pady=(4, 0))
         if filas:
             if not self.local_map_frame.winfo_ismapped():
                 self.local_map_frame.pack(fill="x", after=self.games_frame)
@@ -1441,6 +1445,7 @@ def apagar(icono=None) -> None:
     # Sin esto Discord deja colgado el "jugando a Truck Dash" hasta que nota
     # que el proceso murio.
     state.discord.close()
+    parar_armado_al_salir()
     icono = icono if icono is not None else state.icon
     win_integration.stop_and_exit(icono.stop if icono is not None else None)
 
@@ -1974,6 +1979,43 @@ def on_offmap(game: str):
             logging.info("No se pudo mostrar el aviso del mapa: %s", exc)
 
 
+def frenar_armado_si_se_abre_el_juego(juego_abierto: threading.Event, termino: threading.Event):
+    """El boton mira si el juego esta abierto solo al apretarlo, y el armado
+    tarda minutos: si despues se abria el juego, el armador seguia con sus
+    ~7 GB de memoria y el juego andando al lado. Se corta como con Cancelar."""
+    while not termino.wait(map_builder.GAME_WATCH_SECONDS):
+        if map_builder.game_running():
+            juego_abierto.set()  # antes que cancelar: correr() lo mira al cortarse
+            state.map_build_cancel.set()
+            return
+
+
+def avisar_armado_frenado():
+    """Por la bandeja: con el juego abriendose, Setup no esta a la vista."""
+    if not state.icon:
+        return
+    try:
+        state.icon.notify(T("local_map_game_opened"), "Truck Dash")
+    except Exception as exc:
+        logging.info("No se pudo mostrar el aviso del armado: %s", exc)
+
+
+# Menos que los 5 s en que stop_and_exit fuerza la salida
+ARMADO_ESPERA_AL_SALIR_S = 3.0
+
+
+def parar_armado_al_salir():
+    """El armador es otro proceso: sin esto seguia solo despues de salir del
+    cliente, sin nadie que lo frenara si se abria el juego. El hilo del armado
+    lo corta en medio segundo; no se espera mas que ARMADO_ESPERA_AL_SALIR_S
+    (un paso del grafo corre en este proceso y no se corta a mitad)."""
+    hilo = state.map_build_thread
+    if hilo is None or not hilo.is_alive():
+        return
+    state.map_build_cancel.set()
+    hilo.join(ARMADO_ESPERA_AL_SALIR_S)
+
+
 def start_map_build(game: str) -> bool:
     """Arma el mapa en un hilo. False si ya hay uno en curso."""
     if state.map_build and state.map_build.get("running"):
@@ -1984,6 +2026,8 @@ def start_map_build(game: str) -> bool:
     state.map_build_cancel.clear()
     inicio = time.time()
     state.map_build = {"game": game, "step": "download", "error": None, "running": True, "started": inicio}
+    juego_abierto = threading.Event()
+    termino = threading.Event()
 
     def paso(nombre):
         state.map_build["step"] = nombre
@@ -1995,8 +2039,13 @@ def start_map_build(game: str) -> bool:
             refresh_local_maps()
             state.map_build = {"game": game, "step": "done", "error": None, "running": False}
         except map_builder.BuildCancelled:
-            logging.info("Map build cancelled")
-            state.map_build = {"game": game, "step": "cancelled", "error": None, "running": False}
+            if juego_abierto.is_set():
+                logging.info("Map build stopped: the game was opened")
+                state.map_build = {"game": game, "step": "game_opened", "error": None, "running": False}
+                avisar_armado_frenado()
+            else:
+                logging.info("Map build cancelled")
+                state.map_build = {"game": game, "step": "cancelled", "error": None, "running": False}
         except Exception as exc:
             logging.exception("Map build failed")
             map_builder.limpiar_armados_fallidos(game)
@@ -2004,8 +2053,13 @@ def start_map_build(game: str) -> bool:
                                # MemoryError: el paso del grafo corre en este proceso, no en node
                                "out_of_memory": isinstance(exc, (map_builder.BuildOutOfMemory, MemoryError)),
                                "started": inicio}
+        finally:
+            termino.set()
 
-    threading.Thread(target=vigilar_hilo(correr, "map build"), daemon=True).start()
+    state.map_build_thread = threading.Thread(target=vigilar_hilo(correr, "map build"), daemon=True)
+    state.map_build_thread.start()
+    threading.Thread(target=vigilar_hilo(lambda: frenar_armado_si_se_abre_el_juego(juego_abierto, termino),
+                                         "map build game watch"), daemon=True).start()
     return True
 
 

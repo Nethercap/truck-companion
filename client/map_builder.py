@@ -15,7 +15,8 @@ los nombres de archivo que la web espera de una variante ("local_ats",
 huella coincide con los mods activos ahora: cambiar de mods lo deja de lado.
 
 Pide el juego cerrado (el parser llega a ~6-7 GB de memoria) y corre con
-prioridad baja.
+prioridad baja. Si el juego se abre a mitad de camino, el cliente lo corta
+(start_map_build, en tray_client).
 """
 
 import hashlib
@@ -46,6 +47,8 @@ NODE_MEMORY_MAX_MB = 24576
 # armado comun (el parser llega a ~7 GB con mapas grandes). Un perfil con muchos
 # mods de mapa pide mas, pero no hay como saber cuanto antes de armarlo.
 MIN_FREE_GB = 7.0
+# Cada cuanto se mira, durante el armado, si se abrio el juego (es un tasklist).
+GAME_WATCH_SECONDS = 5.0
 BUILDER_ZIP = "TruckDash-MapBuilder-{version}.zip"
 RELEASE_URL = "https://github.com/Nethercap/truck-companion/releases/download/v{version}/{name}"
 
@@ -639,30 +642,34 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
     env["TM_NO_UK_HACK"] = "0"
     bin_ = os.path.join(builder, "bin")
 
-    progress("parser")
-    lista = write_mod_list(mod_paths, os.path.join(tmp, "mods.txt"), log_path)
-    _correr([node, os.path.join(bin_, "parser.mjs"), game_dir, "@" + lista, os.path.join(tmp, "parser")],
-            log_path, cancel, env)
-    progress("generator")
-    _correr([node, os.path.join(bin_, "generator.mjs"), "map", "-m", prefijo, "-i", os.path.join(tmp, "parser"),
-             "-o", os.path.join(tmp, "vec"), "-t", "geojson"], log_path, cancel, env)
-    progress("tiles")
-    _correr([node, os.path.join(bin_, "tiles.mjs"), os.path.join(tmp, "vec", f"{LAYER[game]}.geojson"), LAYER[game],
-             os.path.join(tmp, "vector", f"{variante}.pmtiles")], log_path, cancel, env)
+    try:
+        progress("parser")
+        lista = write_mod_list(mod_paths, os.path.join(tmp, "mods.txt"), log_path)
+        _correr([node, os.path.join(bin_, "parser.mjs"), game_dir, "@" + lista, os.path.join(tmp, "parser")],
+                log_path, cancel, env)
+        progress("generator")
+        _correr([node, os.path.join(bin_, "generator.mjs"), "map", "-m", prefijo, "-i", os.path.join(tmp, "parser"),
+                 "-o", os.path.join(tmp, "vec"), "-t", "geojson"], log_path, cancel, env)
+        progress("tiles")
+        _correr([node, os.path.join(bin_, "tiles.mjs"), os.path.join(tmp, "vec", f"{LAYER[game]}.geojson"), LAYER[game],
+                 os.path.join(tmp, "vector", f"{variante}.pmtiles")], log_path, cancel, env)
 
-    progress("graph")
-    parser_dir = os.path.join(tmp, "parser")
-    salida = os.path.join(tmp, variante)
-    grafo_json = os.path.join(tmp, f"route-graph-{variante}.json")
-    build_route_graph.main(["", parser_dir, prefijo, grafo_json])
-    # -lanes.bin, -times.bin y -prefabs.bin: las flechas de carril, las
-    # decimas de segundo y de que prefab es cada arista, por aristas de este v3
-    for sufijo in (".bin", "-v3.bin", "-lanes.bin", "-times.bin", "-prefabs.bin"):
-        os.replace(grafo_json[:-5] + sufijo, os.path.join(salida, f"route-graph-{variante}{sufijo}"))
-    if cancel.is_set():
-        with open(log_path, "a", encoding="utf-8") as log:
-            log.write(f"{LOG_CANCELADO}\n")
-        raise BuildCancelled()
+        progress("graph")
+        parser_dir = os.path.join(tmp, "parser")
+        salida = os.path.join(tmp, variante)
+        grafo_json = os.path.join(tmp, f"route-graph-{variante}.json")
+        build_route_graph.main(["", parser_dir, prefijo, grafo_json])
+        # -lanes.bin, -times.bin y -prefabs.bin: las flechas de carril, las
+        # decimas de segundo y de que prefab es cada arista, por aristas de este v3
+        for sufijo in (".bin", "-v3.bin", "-lanes.bin", "-times.bin", "-prefabs.bin"):
+            os.replace(grafo_json[:-5] + sufijo, os.path.join(salida, f"route-graph-{variante}{sufijo}"))
+        if cancel.is_set():
+            with open(log_path, "a", encoding="utf-8") as log:
+                log.write(f"{LOG_CANCELADO}\n")
+            raise BuildCancelled()
+    except BuildCancelled:
+        _dejar_solo_el_log(tmp)
+        raise
     build_cities_json.main(["", os.path.join(parser_dir, f"{prefijo}-cities.json"), os.path.join(salida, "Cities.json")])
     extract_road_names.main(["", os.path.join(parser_dir, f"{prefijo}-signs.json"), os.path.join(salida, "road-names.json")])
     pois = mapbuild_pois.build(parser_dir, prefijo)
