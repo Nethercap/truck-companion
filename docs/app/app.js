@@ -8406,7 +8406,7 @@ function connectWs(backend, code, options = {}) {
     // codigo desconocido cierra sin mandar nada). Ver el 4404 mas abajo.
     conn.everValid = true;
     rememberedTries = 0;
-    const data = JSON.parse(event.data);
+    const data = parseWsJson(event.data); // NaN o Infinity del cliente: null, no el dato perdido
     if (data.type) flushPendingTelemetry(); // los mensajes de control se procesan en orden con la telemetria que llego antes
     if (data.type === 'keybinds') { handleKeybindsMessage(data); return; } // no es telemetria
     if (data.type === 'live_players') { updateLivePlayers(data.players || []); return; } // no es telemetria

@@ -76,12 +76,47 @@ def _open_named(nombre):
     return _map
 
 
+def _leer_texto_tolerante(self, buffer, offset=0):
+    """BytesStruct.unpack_from de truck_telemetry, sin romperse con un texto.
+
+    El plugin copia cada texto con strncpy a 64 bytes: uno de 64 o mas queda
+    sin el 0 del final, cortado donde caiga, tambien a mitad de una letra con
+    tilde. El paquete busca el 0 con index() y decodifica estricto, asi que
+    levantaba ValueError o UnicodeDecodeError, get_data() fallaba en cada
+    vuelta y el cliente no mandaba nada mientras el juego tuviera ese texto
+    (el nombre de un camion o de un remolque de mod): el tablero quedaba en
+    "In the menu". Aca se corta en el 0 si lo hay y lo que no se puede leer
+    se saltea."""
+    valor = self._BytesStruct__struct.unpack_from(buffer, offset)[0]
+    if not self._BytesStruct__adjust:
+        return valor
+    fin = valor.find(b"\x00")
+    return (valor if fin < 0 else valor[:fin]).decode("utf-8", "ignore")
+
+
+def _textos_tolerantes():
+    """Pone _leer_texto_tolerante en el paquete (una vez). Si otra version del
+    paquete no tiene esa clase, queda como estaba."""
+    from truck_telemetry.telemetry_version import unpack
+    clase = getattr(unpack, "BytesStruct", None)
+    if clase is None or getattr(clase, "_tolerante", False):
+        return
+    try:
+        prueba = clase(4, True)
+        prueba._BytesStruct__struct, prueba._BytesStruct__adjust  # noqa: B018
+    except (AttributeError, TypeError):
+        return
+    clase.unpack_from = _leer_texto_tolerante
+    clase._tolerante = True
+
+
 def init():
     """Abre el bloque publicado por el plugin. Levanta excepcion si no esta:
     el juego no arranco, o el plugin no quedo instalado."""
     global _buf, _version
     from truck_telemetry.telemetry_version import v1_10, v1_12
 
+    _textos_tolerantes()
     _buf = _open_buffer()
     for version in (v1_10, v1_12):
         if version.is_same_version(_buf):

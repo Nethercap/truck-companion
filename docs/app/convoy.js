@@ -639,7 +639,7 @@ function convoyStartSpectator(code, backend) {
   convoy.spectatorWs = socket;
   socket.onopen = () => { conn.socket = 'open'; conn.everOpen = true; renderConnectionUi(); };
   socket.onmessage = (ev) => {
-    const data = JSON.parse(ev.data);
+    const data = parseWsJson(ev.data); // el resumen del relay sale de la telemetria (pure.js)
     if (data.type === 'convoy_state') {
       if (data.ended) { convoy.ended = true; showToast(t('convoyEnded'), 'info', 6000); }
       convoy.code = data.code; convoy.you = null; convoy.creatorId = data.creatorId || null;

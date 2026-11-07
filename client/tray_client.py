@@ -2259,7 +2259,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 ultimo_tmp = now_send
                 jugadores = lector_tmp.leer()
                 if jugadores is not None:
-                    payload["tmpPlayers"] = jugadores
+                    payload["tmpPlayers"] = client_lib.sin_no_finitos(jugadores)
                     con_tmp = True
             text = json.dumps(payload)
             if (now_send - last_cloud_send >= client_lib.CLOUD_SEND_INTERVAL_SECONDS
