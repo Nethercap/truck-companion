@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.38 (2026-11-07)
 
 - The dashboard no longer stays on "In the menu" while you drive with some trucks or trailers. If
   the game reported a number that isn't one (a mod truck can report an endless fuel range), the
