@@ -180,14 +180,23 @@ heuristic/ML engines look for. Everything the client does is in this repo,
 the build runs on GitHub's runners (not on anyone's PC) and each release
 publishes the SHA-256 of the file.
 
-What we do about it: the executable now carries proper version metadata and
-is no longer UPX-compressed (both are known heuristic triggers), and a code
-signing certificate through [SignPath](https://signpath.org/) for open
-source projects is in progress — a signed build is what actually removes
-these warnings for good.
+What we do about it: the executable carries proper version metadata and is
+not UPX-compressed (both are known heuristic triggers). Releases after 1.5.38
+are also built with a PyInstaller bootloader compiled on GitHub's runner,
+instead of the stock one that every PyInstaller program shares, and with exact,
+hash-checked dependencies. A code signing certificate through
+[SignPath](https://signpath.org/) for open source projects is in progress — a
+signed build is what actually removes these warnings for good.
 
-The one detection we have seen reported is `Behavior:Win32/Persistence.A!ml`
-from Microsoft Defender. That one is not about the file at all: it fires when
+Microsoft Defender flagged 1.5.37 as `Trojan:Script/Sabsik.EN.A!ml` while it
+was being downloaded. The `!ml` means a machine-learning guess, not a known
+virus: each release is a new file Microsoft has never seen, and a brand-new,
+unsigned, self-unpacking executable is what that model flags until the file is
+reported or enough people run it. To check yours, compare it with the SHA-256
+in the release notes (in PowerShell: `Get-FileHash .\TruckDash-windows.zip`).
+
+The other one is `Behavior:Win32/Persistence.A!ml`, also from Microsoft
+Defender. That one is not about the file at all: it fires when
 the program is run **from inside the zip** (so it lives in a temporary folder)
 and the user turns on "start with Windows", because a program in a temp folder
 writing itself into the `Run` key is a classic persistence pattern. Extract the

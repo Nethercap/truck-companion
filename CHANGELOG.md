@@ -4,6 +4,13 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Windows: TruckDash.exe is now built with a PyInstaller bootloader compiled on GitHub's runner,
+  instead of the stock one that every PyInstaller program shares, and with exact dependency versions
+  checked by hash. It should get fewer antivirus false positives: Microsoft Defender flagged 1.5.37
+  as `Trojan:Script/Sabsik.EN.A!ml` while it was being downloaded. The program itself doesn't change.
+
 ## 1.5.38 (2026-11-07)
 
 - The dashboard no longer stays on "In the menu" while you drive with some trucks or trailers. If

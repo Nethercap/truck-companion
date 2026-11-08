@@ -114,6 +114,26 @@ Actions desde el código fuente del tag y lista el SHA-256 de los archivos
 para que verifiques lo que bajaste — o corrélo desde el código fuente (más
 abajo).
 
+### El antivirus marca TruckDash.exe (falso positivo)
+
+Algunos antivirus lo marcan por cómo está empaquetado, no por lo que hace: es
+un ejecutable de PyInstaller sin firma que se descomprime solo al arrancar, que
+es justo lo que buscan los motores por heurística o machine learning. Microsoft
+Defender marcó la 1.5.37 como `Trojan:Script/Sabsik.EN.A!ml` al bajarla: el
+`!ml` quiere decir que es una sospecha del modelo, no un virus conocido. Cada
+release es un archivo nuevo que Microsoft nunca vio, y lo marca hasta que se lo
+reporta o lo corre suficiente gente.
+
+Para verificar el tuyo, comparalo con el SHA-256 de la release (en PowerShell:
+`Get-FileHash .\TruckDash-windows.zip`). Si coincide, podés agregar una
+excepción, correr el cliente desde el código fuente (más abajo) o reportarlo a
+tu antivirus ([Microsoft](https://www.microsoft.com/en-us/wdsi/filesubmission)),
+que también ayuda a los demás. Las releases después de la 1.5.38 se arman con
+un bootloader de PyInstaller compilado en GitHub en vez del que comparten todos
+los programas de PyInstaller, y con las dependencias fijadas por hash. La firma
+digital por [SignPath](https://signpath.org/) está en trámite; con ella se van
+estos avisos.
+
 ### Instalación manual del plugin
 
 Si preferís copiar el plugin vos mismo: bajalo de
