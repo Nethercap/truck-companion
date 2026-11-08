@@ -851,6 +851,30 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`test_tmp_players.py` compara el .hpp con el lector).
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
+- El .exe como carpeta (`onedir` de PyInstaller, 08-11): en espera, lo decide el
+  maintainer. Saca la autoextraccion a `%TEMP%`, otra senal de los antivirus, pero
+  la deteccion de la 1.5.37 fue al bajar el archivo, y no arregla SmartScreen (la
+  firma con SignPath arregla las dos cosas). Antes de hacerlo, medir: el zip con
+  bootloader propio (PR #195, artefacto de la corrida 42482395488 de "Build
+  client") contra el de la 1.5.38 en VirusTotal, y si sigue marcado, una rama de
+  prueba que compile la carpeta como artefacto, sin release. Solo si baja mucho, la
+  migracion, que es grande:
+  1. `stage_update` saca del zip solo `TruckDash.exe`, sin `_internal\`: un
+     cliente de antes que se actualice a una carpeta se cierra y no vuelve a
+     abrir. Hay que publicar los dos zips un tiempo (el de siempre para los
+     viejos, el de carpeta para la web) y que `/version` mande otro campo para
+     los nuevos. El relay hoy no cuenta versiones de cliente: sin eso no se sabe
+     cuando sacar el zip viejo.
+  2. Un actualizador de carpeta: los DLL de `_internal\` quedan tomados mientras
+     corre. Preparar la nueva al lado, cambiarla al cerrar y volver atras si falla
+     a la mitad (hoy es una sola copia).
+  3. Abierto desde el zip: 7-Zip y WinRAR sacan solo el .exe y falla con "Failed to
+     load Python DLL" (hoy anda con un aviso); el Explorador pregunta "Extraer
+     todo". Hace falta detectarlo y explicarlo.
+  4. Quien tiene el .exe en el Escritorio o en Descargas pasa a tener una carpeta
+     `_internal` al lado, y mover solo el .exe lo rompe.
+  5. El manifiesto de winget (`RelativeFilePath: TruckDash.exe`), los 46 links a
+     `TruckDash-windows.zip` de la web y el README, y los tests del actualizador.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para
   apagarlas. Si se agrega, el texto va en todos los idiomas de la app.
 - La guia no menciona las flechas sin aviso; su frase de los carriles sigue
