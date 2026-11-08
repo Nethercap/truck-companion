@@ -26,6 +26,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - Cambios de cliente: anotarlos en CHANGELOG.md (seccion de la proxima
   version) y no publicar release sin que lo pida el maintainer. Web y relay
   salen apenas pasa CI.
+- El .exe se arma con `client/requirements-build.txt` (versiones exactas con
+  hash, `--require-hashes`), no con `requirements.txt`: al tocar ese, regenerar
+  el otro con el comando de su encabezado (`test_requirements_build.py` falla
+  si no). El bootloader de PyInstaller se compila en el runner (`--no-binary
+  pyinstaller` con `PYINSTALLER_COMPILE_BOOTLOADER=1`) y
+  `tools/bootloader_propio.py` falla si vuelve el de la rueda: el precompilado
+  es el que marcan los antivirus (issue #2, Sabsik en la 1.5.37, 08-11).
 - La guia (`docs/guide/`) tiene su propio `?v=` en `docs/guide/index.html`:
   subirlo al tocar `text.js`, `text_extra.js` o `guide.css`. Las 8 lenguas
   llevan las mismas secciones (`test_guide.js`).

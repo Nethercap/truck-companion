@@ -103,7 +103,21 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: pip install -r client/requirements.txt
+        # requirements-build.txt: las versiones exactas, con el hash de cada
+        # archivo (un paquete cambiado en PyPI corta el build en vez de entrar
+        # al .exe). PyInstaller se instala desde el codigo fuente y compila su
+        # bootloader aca, con el Visual Studio del runner: el de la rueda de
+        # PyPI es el mismo en miles de programas, malware incluido, y los
+        # antivirus por machine learning lo marcan (issue #2; Defender marco la
+        # 1.5.37 como Trojan:Script/Sabsik.EN.A!ml al bajarla). Si no compila,
+        # pip falla: no vuelve en silencio al precompilado.
+        env:
+          PYINSTALLER_COMPILE_BOOTLOADER: '1'
+        run: pip install --require-hashes --no-binary pyinstaller -r client/requirements-build.txt
+      - name: Check the bootloader was compiled here
+        # Si alguien cambia la linea de arriba y vuelve la rueda, el .exe sale
+        # igual; esto lo compara con el de la rueda oficial y falla.
+        run: python tools/bootloader_propio.py
       - name: Run client tests
         run: |
           pip install pytest
@@ -295,7 +309,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-tk libxtst6 libxss1 xvfb
       - name: Install dependencies
-        run: pip install -r client/requirements.txt
+        # Las mismas versiones con hash que el .exe. El bootloader sigue
+        # siendo el de la rueda: el que marcan los antivirus es el de Windows.
+        run: pip install --require-hashes -r client/requirements-build.txt
       - name: Run client tests
         run: |
           pip install pytest
