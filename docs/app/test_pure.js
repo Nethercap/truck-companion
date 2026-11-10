@@ -5348,6 +5348,24 @@ test('turnReportText: mapa, versiones, el camion y los avisos, para pegar en Dis
   assert.ok(turnReportText({ game: 'ats', map: 'ats', web: 'x', client: null, truck: null, now: 1, items: [], formatTime: hora,
     routeKm: { app: 12, game: null } }).includes('Route left: app 12.0 km, game GPS ?'));
   assert.ok(!vacio.includes('Route left'));
+  // la velocidad y el limite del juego, despues del camion (reporte #36)
+  const conVel = turnReportText({ game: 'ets2', map: 'ets2_tmp', web: 'x', client: '1.5.38', truck: [1, 2], now: 1, items: [],
+    formatTime: hora, speed: { kmh: 47.6, limitKmh: 0 } });
+  assert.equal(conVel.split('\n')[4], 'Speed: 48 km/h, game speed limit none');
+  assert.ok(!vacio.includes('Speed:'));
+  // diez avisos largos con la velocidad siguen entrando en Discord
+  const largoVel = turnReportText({ game: 'ats', map: 'ats_c2c_promods', web: '20261017f', client: '1.5.32', truck: [-123456, -98765],
+    heading: 359, now: 1792000000000, items: log.list(), formatTime: () => '23:59', speed: { kmh: 104.4, limitKmh: 104.6 } });
+  assert.ok(largoVel.includes('Speed: 104 km/h, game speed limit 105 km/h'));
+  assert.ok(largoVel.length < 2000, `${largoVel.length} caracteres`);
+});
+
+test('turnReportSpeedLine: el limite en 0 es sin limite, sin velocidad no va', () => {
+  const { turnReportSpeedLine } = require('./pure.js');
+  assert.equal(turnReportSpeedLine({ kmh: 80, limitKmh: 80 }), 'Speed: 80 km/h, game speed limit 80 km/h');
+  assert.equal(turnReportSpeedLine({ kmh: 0, limitKmh: null }), 'Speed: 0 km/h, game speed limit none');
+  assert.equal(turnReportSpeedLine({ kmh: null, limitKmh: 50 }), null);
+  assert.equal(turnReportSpeedLine(null), null);
 });
 
 test('pickRouteLikeGame: casi empatadas, la que coincide con el GPS del juego (I-80 en Salt Lake City, Discord 19-10)', () => {
