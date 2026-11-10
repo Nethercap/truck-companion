@@ -10,6 +10,10 @@ updates on its own and is not versioned here.
   instead of the stock one that every PyInstaller program shares, and with exact dependency versions
   checked by hash. It should get fewer antivirus false positives: Microsoft Defender flagged 1.5.37
   as `Trojan:Script/Sabsik.EN.A!ml` while it was being downloaded. The program itself doesn't change.
+- Build my map: going straight through a roundabout that the game builds as one piece, the route is
+  now drawn around the right side of it in both directions; before, one of the two directions was
+  drawn the wrong way round. A few of these roundabouts are now also announced as roundabouts. This
+  applies to maps built from this version on: a map you already built keeps working as it did.
 
 ## 1.5.38 (2026-11-07)
 

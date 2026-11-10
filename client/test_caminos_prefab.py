@@ -136,3 +136,42 @@ def test_el_largo_es_el_de_nodo_a_nodo(tmp_path):
     assert flags & 2 == 0
     assert largo == 40.0
     assert segundos == 3.6
+
+
+def test_cruce_de_rotonda_cada_sentido_por_su_lado(tmp_path):
+    # El cruce derecho de una rotonda de un solo prefab (reporte #38, Vaxjo):
+    # de A a B por el norte del anillo y de B a A por el sur, los dos de 84 m.
+    # Con el mismo largo quedaban en una arista de doble mano con el dibujo
+    # del norte, y de B a A la ruta daba la vuelta al reves.
+    nodos = {"n1": (0, 0), "A": (100, 0), "B": (180, 0), "n4": (280, 0)}
+    calles = [("n1", "A", True), ("B", "n4", True)]
+    desc = {
+        "token": "rotonda",
+        "nodes": [{"x": 100, "y": 0, "rotation": 0}, {"x": 180, "y": 0, "rotation": math.pi}],
+        "navCurves": [curva(102, -2, 140, -20, -0.4), curva(140, -20, 178, -2, 0.4),
+                      curva(178, 2, 140, 20, math.pi - 0.4), curva(140, 20, 102, 2, math.pi + 0.4)],
+        "navNodes": [fisico(0, (1, [0, 1])), fisico(1, (0, [2, 3]))],
+    }
+    prefab = {"uid": "p1", "token": "rotonda", "nodeUids": ["A", "B"], "originNodeIndex": 0, "x": 140, "y": 0}
+    aristas = armar(tmp_path, nodos, calles, [prefab], [desc])
+    A, B = (100, 0), (180, 0)
+    assert aristas[(A, B)][1] & 2 and aristas[(B, A)][1] & 2
+    g = json.loads((tmp_path / "g.json").read_text(encoding="utf-8"))
+    xy = [tuple(n) for n in g["nodes"]]
+    puntos = {(xy[e[0]], xy[e[1]]): e[5] for e in g["edges"] if len(e) > 5}
+    assert min(y for _x, y in puntos[(A, B)]) < -15
+    assert max(y for _x, y in puntos[(B, A)]) > 15
+
+
+def test_por_otro_lado_solo_si_los_caminos_se_apartan():
+    from mapbuild.build_route_graph import por_otro_lado
+    a, b = (0, 0), (80, 0)
+    # los dos por el norte (una calle que dobla): juntos
+    assert not por_otro_lado(a, b, [(40, -20)], [(42, -18)])
+    # cada uno por su lado del anillo: separados
+    assert por_otro_lado(a, b, [(40, -20)], [(40, 20)])
+    # recto a la ida, una curva de 6 m a la vuelta: juntos
+    assert not por_otro_lado(a, b, None, [(40, 6)])
+    # separados 12 m pero del mismo costado (el carril de giro de una T con
+    # isleta, Wroclaw): juntos, o el giro se anunciaba como "keep"
+    assert not por_otro_lado(a, b, [(40, -20)], [(40, -8)])
