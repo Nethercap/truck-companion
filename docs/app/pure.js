@@ -4342,6 +4342,12 @@ const DLC_GUARDS = {
     16: ['wbalkans'], 17: ['wbalkans', 'east'], 18: ['wbalkans', 'balt'], 19: ['feldbinder'],
     20: ['greece'], 21: ['greece', 'east'], 22: ['greece', 'wbalkans'], 23: ['nordic'],
     24: ['nordic', 'balt'], 25: ['nordic', 'north'],
+    // La terminal del ferry de Alesund (ferry_47001 y sus siete calles: lo
+    // unico con este numero). En 1.62.1 no tenia lineas y desde 1.62.2 solo
+    // va a Seydisfjordur, en Islandia: bloqueada, la ruta de Alesund a
+    // Islandia daba la vuelta por Hirtshals. Va siempre: sin el DLC no lleva
+    // a ningun lado. Islandia misma viene en sus sectores con guard 0.
+    27: [],
   },
 };
 // Los que se pueden destildar, en orden de salida. Nevada y Arizona vienen
