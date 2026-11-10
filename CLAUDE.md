@@ -114,6 +114,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   no sirven para detectar esto: las 222 ciudades propias de RusMap y ROEX caen dentro de
   los del mapa de Grand Utopia. Los textos dicen "si lo agrega uno de tus mods": tambien
   puede ser un evento (Brackenreach), y ahi armar el mapa no ayuda.
+- El mapa base real (`basemap/*.geojson` en R2, `build_basemap.py` del
+  taller) dibuja Islandia donde la pone la proyeccion de la web, no donde esta:
+  el hack de UK (escala 0,75 alrededor de Calais) la corre unos 3 grados al
+  sur y 7 al este, y el taller mueve la costa real hasta ahi (10-11). La de
+  ProMods (con sus Feroe) esta en otro lugar del juego: las variantes con el
+  mod `promods` usan `europe-promods` (`basemapForVariant` en pure.js,
+  `fondoDelMapa` en la app nativa, con golden). Un archivo nuevo o cambiado va
+  a R2 antes de subir `BASEMAP_VERSION` (y `VERSION_MAPA_BASE` en Kotlin).
 - Un mapa armado en la PC ("Build my map") cuyas ciudades caen sobre todo
   fuera de la tierra real (Explorando a America en ATS, 18-10) va con el
   fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5

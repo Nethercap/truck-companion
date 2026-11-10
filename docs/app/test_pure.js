@@ -5839,6 +5839,28 @@ test('citiesOnLand y basemapFitsCities: un mapa armado en el mar no pinta el mar
   assert.deepEqual(citiesOnLand([[NaN, 1], null], tierra), { share: 1, off: 0, total: 0 });
 });
 
+test('basemapForVariant: las variantes con ProMods llevan su Islandia (10-11)', () => {
+  const { basemapForVariant, BASEMAP_PROMODS } = require('./pure.js');
+  const fs = require('fs');
+  const vm = require('vm');
+  const ctx = vm.createContext({});
+  vm.runInContext(fs.readFileSync(require('path').join(__dirname, 'variants.js'), 'utf8') + ';this.V = VARIANT_META;', ctx);
+  const base = { ats: 'usa', ets2: 'europe', gu: null };
+  const elegido = Object.fromEntries(Object.entries(ctx.V).map(([id, m]) => [id, basemapForVariant(base[m.projection], m.mods)]));
+  // la Islandia del DLC de SCS va en el de siempre; ProMods la tiene en otro
+  // lugar del juego (y con mas mods encima, la misma)
+  assert.equal(elegido.ets2, 'europe');
+  assert.equal(elegido.ets2_promods, BASEMAP_PROMODS);
+  assert.equal(elegido.ets2_promods_rusmap_roex, BASEMAP_PROMODS);
+  assert.equal(elegido.ets2_promods_eugu, BASEMAP_PROMODS);
+  assert.equal(elegido.ets2_eugu, 'europe');
+  // ProMods Canada es de ATS: su fondo no tiene Islandia
+  assert.equal(elegido.ats_promods, 'usa');
+  assert.equal(elegido.ets2_gu, null);
+  assert.equal(basemapForVariant('europe', undefined), 'europe');
+  assert.equal(basemapForVariant(undefined, ['promods']), null);
+});
+
 test('roadLineWidth: el ancho de siempre de lejos y el de la calle del juego de cerca', () => {
   const { roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE } = require('./pure.js');
   const base = [5, 0.5, 12, 1.5, 17, 5]; // road-local
