@@ -34,6 +34,21 @@ def load_json(path):
 # de paso arranca a 13,5 m del nodo, y con 12 m el derecho de esos cruces se
 # perdia (Bakersfield, Gargamosch 10-10). 20 m cubre 4 carriles de 4,5 m.
 PREFAB_END_TOLERANCE_M = 20.0
+# Los dos sentidos de un par de nodos de un prefab van en una sola arista de
+# doble mano si miden lo mismo, salvo que vayan por caminos que se apartan mas
+# que esto: el cruce derecho de una rotonda de un solo prefab va por un costado
+# del anillo a la ida y por el otro a la vuelta. Juntos, un sentido se dibujaba
+# por el lado contrario y a veces la rotonda no se reconocia (reporte #38, 10-11,
+# ets2_tmp, Vaxjo: "le trace me fait prendre a gauche du giratoire"). Dos
+# carriles de una calle que cruza el prefab quedan juntos: align_to_nodes los
+# lleva a los dos al eje. Y tienen que ir por costados opuestos de la recta
+# entre los nodos, cada uno a mas de PREFAB_OTRO_LADO_COSTADO_M: separados
+# del mismo lado son el carril de giro de una T con isleta, que como arista
+# propia empieza paralelo a la calle y se anunciaba "keep left" donde el juego
+# dice "turn left" (Wroclaw). En ets2_tmp asi quedan las 1.637 parejas de
+# rotonda y 36 de otros prefabs, casi todas peajes con una cabina por mano.
+PREFAB_OTRO_LADO_M = 8.0
+PREFAB_OTRO_LADO_COSTADO_M = 4.0
 # Rulos de calle (lazos de trebol, horquillas): un tramo que gira mas de 90
 # grados y es LAZO_LARGO_FACTOR veces mas largo que la recta entre sus nodos
 # lleva un punto de dibujo cada LAZO_PASO_M, hasta LAZO_PASOS_MAX (13-10).
@@ -460,6 +475,40 @@ def align_to_nodes(points, start, end):
 def largo_de(points):
     """Largo de una polilinea."""
     return sum(math.dist(p, q) for p, q in zip(points, points[1:]))
+
+
+def _dist_a_polilinea(p, linea):
+    """Distancia de un punto a una polilinea."""
+    px, py = p
+    mejor = math.inf
+    for (ax, ay), (bx, by) in zip(linea, linea[1:]):
+        dx, dy = bx - ax, by - ay
+        den = dx * dx + dy * dy
+        t = 0.0 if den == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / den))
+        mejor = min(mejor, math.hypot(px - ax - t * dx, py - ay - t * dy))
+    return mejor
+
+
+def por_otro_lado(pa, pb, ida, vuelta, tol=PREFAB_OTRO_LADO_M, lado=PREFAB_OTRO_LADO_COSTADO_M):
+    """True si el paso a -> b (puntos `ida`) y el b -> a (puntos `vuelta`, en
+    su sentido) se apartan mas de `tol` m en algun punto y van por costados
+    opuestos de la recta entre los nodos, cada uno a mas de `lado` m de ella.
+    Sin puntos el paso es la recta entre los nodos."""
+    linea_ida = [pa] + list(ida or []) + [pb]
+    linea_vuelta = [pa] + list(reversed(vuelta or [])) + [pb]
+    if not (any(_dist_a_polilinea(p, linea_vuelta) > tol for p in linea_ida[1:-1])
+            or any(_dist_a_polilinea(p, linea_ida) > tol for p in linea_vuelta[1:-1])):
+        return False
+    (ax, ay), (bx, by) = pa, pb
+    dx, dy = bx - ax, by - ay
+    largo = math.hypot(dx, dy) or 1.0
+
+    def costados(puntos):
+        return [((px - ax) * dy - (py - ay) * dx) / largo for px, py in puntos]
+
+    c_ida, c_vuelta = costados(linea_ida[1:-1]), costados(linea_vuelta[1:-1])
+    return ((max(c_ida, default=0) > lado and min(c_vuelta, default=0) < -lado)
+            or (min(c_ida, default=0) < -lado and max(c_vuelta, default=0) > lado))
 
 
 def prefab_mid_points(points, start, end, tol=2.5, min_bulge=4.0):
@@ -1023,6 +1072,8 @@ def main(argv=None):
     sin_curvas_por = {}
     tokens_sin_curvas = Counter()
     n_contramano = 0
+    n_otro_lado = 0
+    tokens_otro_lado = Counter()
     collect_prefab_node_shifts()
     for pi, p in enumerate(prefabs):
         uids = [u for u in p.get("nodeUids", []) if u in uid_to_index]
@@ -1119,7 +1170,13 @@ def main(argv=None):
             vuelta = directed.get((key[1], key[0]))
             if ida and vuelta:
                 (l1, m1), (l2, m2) = ida, vuelta
-                if not ENFORCE_TURNS or abs(l1 - l2) <= max(5.0, 0.1 * min(l1, l2)):
+                mismo_largo = abs(l1 - l2) <= max(5.0, 0.1 * min(l1, l2))
+                otro_lado = (ENFORCE_TURNS and mismo_largo
+                             and por_otro_lado(node_list[key[0]], node_list[key[1]], m1, m2))
+                if otro_lado:
+                    n_otro_lado += 1
+                    tokens_otro_lado[p.get("token")] += 1
+                if not ENFORCE_TURNS or (mismo_largo and not otro_lado):
                     # Una calle que atraviesa el prefab: los dos sentidos son
                     # el mismo camino. Una sola arista de doble sentido.
                     if l1 <= l2:
@@ -1197,6 +1254,11 @@ def main(argv=None):
     print(f"Aristas de prefab con geometria real (navCurves): {n_prefab_geom}"
           + (f", de un solo sentido: {n_one_way}" if ENFORCE_TURNS else "")
           + (f", giros inexistentes borrados: {n_dropped}" if n_dropped else ""))
+    if n_otro_lado:
+        # Pares con los dos sentidos del mismo largo por caminos distintos
+        # (PREFAB_OTRO_LADO_M): cada uno quedo como arista de un solo sentido.
+        print(f"Pares de prefab con cada sentido por otro lado: {n_otro_lado}; "
+              + ", ".join(f"{token} x{n}" for token, n in tokens_otro_lado.most_common(15)))
     if sin_curvas_por:
         # Para ver por que les faltan: los tokens se buscan en las descripciones.
         print("Prefabs sin navCurves (todos contra todos): "
