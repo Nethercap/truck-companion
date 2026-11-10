@@ -1,4 +1,4 @@
-{"variants":{"ats":{"graph":"895946a6b345fb10","routes":[
+{"variants":{"ats":{"graph":"0de8cc4ee06c50d0","routes":[
 {"from":"St. Louis","to":"Rolla","man":[["fork","right",25421,2190],["fork","left",23804,2117],["fork","left",22730,2353],["fork","right",19439,5265],["turn","left",19134,5385]]},
 {"from":"Helena","to":"Butte","man":[["turn","right",-62333,-49691],["turn","right",-62259,-49698],["fork","right",-63676,-45093],["turn","right",-66318,-45989],["turn","left",-66394,-45889],["fork","left",-65477,-45704]]},
 {"from":"Pendleton","to":"Kennewick","man":[["fork","right",-90681,-49989],["turn","left",-90519,-49663],["turn","right",-90169,-49743],["fork","right",-91049,-50162],["fork","left",-90789,-52238],["fork","right",-90932,-52923]]},
@@ -23,7 +23,7 @@
 {"from":"Fort Collins","to":"Steamboat Springs","man":[["turn","right",-39448,-9957],["fork","right",-43920,-8383],["turn","right",-46890,-11632]]},
 {"from":"McAllen","to":"Laredo","man":[["fork","left",-12695,71147],["fork","right",-17835,65603]]},
 {"from":"Fort Collins","to":"Scottsbluff","man":[["turn","left",-39158,-11562],["fork","left",-38105,-11169],["fork","left",-36577,-14486],["fork","left",-36575,-15245],["fork","left",-36558,-15566],["fork","right",-36805,-20004]]},
-{"from":"Steamboat Springs","to":"Rangely","man":[["turn","right",-46890,-11632],["turn","left",-55189,-11115]]}]},"ets2":{"graph":"57f86df332c88068","routes":[
+{"from":"Steamboat Springs","to":"Rangely","man":[["turn","right",-46890,-11632],["turn","left",-55189,-11115]]}]},"ets2":{"graph":"bc09b4184acb8243","routes":[
 {"from":"Alta","to":"Honningsvåg","man":[["fork","left",36154,-116729],["turn","left",36364,-117015]]},
 {"from":"Călărași","to":"Brașov","man":[["fork","right",62399,31100],["turn","right",60157,31262],["turn","right",56157,28710],["fork","right",56313,28739],["turn","left",57862,25132],["turn","left",58270,23862]]},
 {"from":"Istanbul","to":"Varna","man":[["fork","left",72672,46477],["fork","left",71956,47170],["fork","left",66773,46018],["turn","right",65749,45318],["turn","left",65865,45249],["fork","left",65828,44756],["fork","right",64864,43747],["turn","right",64318,41038],["turn","left",68838,40227],["roundabout","left",69176,40107,1],["turn","left",69992,39358],["turn","right",69461,36463],["turn","left",69679,35961],["fork","right",69465,35787]]},
@@ -34,7 +34,7 @@
 {"from":"Bitola","to":"Larissa","man":[["turn","right",44917,51615],["roundabout","left",45084,52452,1],["fork","left",45825,54448],["turn","right",49421,60917]]},
 {"from":"Stuttgart","to":"Munich","man":[["fork","right",-6264,10652],["fork","left",-6304,10719],["turn","right",-6347,11039],["fork","left",-6267,11022],["fork","left",-5025,11405],["fork","left",-3997,11455],["fork","left",-2047,12296],["fork","left",1728,13256],["fork","right",2437,13386]]},
 {"from":"Odense","to":"Kiel","man":[["turn","left",1235,-26141],["turn","right",1603,-26206],["fork","left",-1703,-27795],["fork","left",-2150,-22505],["fork","right",-1305,-20307],["turn","right",-1337,-19903],["fork","left",-1271,-19936],["fork","left",70,-21126],["turn","right",527,-21693],["turn","left",776,-21631]]},
-{"from":"Frederikshavn","to":"Hirtshals","man":[["fork","right",2480,-38054],["turn","right",2574,-37890],["turn","right",1305,-37030],["turn","right",1056,-37221],["turn","left",1272,-38676]]},
+{"from":"Frederikshavn","to":"Hirtshals","man":[["fork","right",2480,-38054],["turn","right",2574,-37890],["turn","right",1305,-37030],["roundabout","left",1185,-37177,1],["turn","right",1056,-37221],["turn","left",1272,-38676]]},
 {"from":"Kaliningrad","to":"Liepāja","man":[["turn","left",34042,-22605],["turn","left",34461,-21945],["fork","right",35878,-23182],["turn","left",37122,-22919],["turn","right",38521,-25685],["turn","right",38930,-25533],["roundabout","left",41250,-28154,2],["fork","right",37987,-28888],["roundabout","right",37609,-28985,1],["fork","left",36660,-30752],["fork","right",36228,-32371],["turn","right",35953,-33332],["turn","left",36089,-33667],["fork","left",35831,-33869]]},
 {"from":"Paldiski","to":"Valmiera","man":[["turn","right",42744,-49976],["fork","right",43487,-49693],["fork","left",43815,-48717],["roundabout","left",44359,-45974,2],["turn","left",44254,-45643],["turn","left",45037,-44952],["turn","left",45171,-44594],["turn","right",47171,-40778],["fork","left",47205,-40862],["fork","left",47622,-40984]]},
 {"from":"Zenica","to":"Podgorica","man":[["fork","left",28560,36283],["turn","right",28990,35737],["roundabout","right",29024,35161,1],["fork","left",29705,37717],["turn","left",28452,41551],["turn","right",33295,42951]]},
