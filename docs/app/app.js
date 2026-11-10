@@ -7362,6 +7362,7 @@ function buildTurnReport() {
     client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
     now: Date.now(), items: turnLog.list(), job: turnReportJobLine(lastData),
+    speed: lastData ? { kmh: lastData.speedKmh, limitKmh: lastData.speedLimitKmh } : null,
     routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
     route: {
       profile: routeProfile,
