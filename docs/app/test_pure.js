@@ -1280,7 +1280,8 @@ test('DLC: lo que no esta en la tabla o no se publico no se usa nunca', () => {
   const ets2 = dlcBlockedGuards('ets2', []);
   assert.equal(ets2[13], 1);           // Heart of Russia
   assert.equal(ets2[14], 1);
-  assert.equal(ets2[27], 1);           // Alesund: no esta en la tabla
+  assert.equal(ets2[26], 1);           // no esta en la tabla
+  assert.equal(ets2[27], 0);           // el ferry de Alesund a Islandia (1.62.2)
   assert.equal(ets2[23], 0);           // Nordic Horizons
   assert.equal(dlcBlockedGuards('ets2', ['nordic', 'north'])[25], 1);
 });
