@@ -28,6 +28,8 @@ data class VarianteMapa(
     /** Armado con "Build my map": se lee de la PC por la red de la casa (/localmap/<juego>). */
     val raiz: String? = null,
     val logosPropios: Boolean = false,
+    /** Los `mods` del manifest: con ProMods el mapa base es otro (fondoDelMapa). */
+    val mods: List<String> = emptyList(),
 ) {
     val esLocal: Boolean get() = raiz != null
     val urlDeDescarga: String get() = "${raiz ?: Red.MAPAS}/vector/$id.pmtiles?v=$version"
@@ -39,18 +41,25 @@ data class VarianteMapa(
      * nada que ver con la tierra de verdad (basemapFitsCities en la web lo mide): va liso.
      */
     val mapaBase: String?
-        get() = if (esLocal) null else BASE_POR_PROYECCION[proyeccion]?.let { "${Red.MAPAS}/basemap/$it.geojson?v=$VERSION_MAPA_BASE" }
+        get() = if (esLocal) null else fondoDelMapa(proyeccion, mods)?.let { "${Red.MAPAS}/basemap/$it.geojson?v=$VERSION_MAPA_BASE" }
+}
 
-    private companion object {
-        // BASEMAP_BY_PROJECTION en app.js.
-        val BASE_POR_PROYECCION = mapOf("ats" to "usa", "ets2" to "europe")
-    }
+// BASEMAP_BY_PROJECTION en app.js.
+private val BASE_POR_PROYECCION = mapOf("ats" to "usa", "ets2" to "europe")
+
+/**
+ * basemapForVariant en pure.js: el de la proyeccion, salvo ETS2 con ProMods, que tiene su
+ * Islandia (y sus Feroe) en otro lugar del juego que la del DLC de SCS y su propio archivo.
+ */
+internal fun fondoDelMapa(proyeccion: String, mods: List<String>): String? {
+    val base = BASE_POR_PROYECCION[proyeccion]
+    return if (base == "europe" && "promods" in mods) "europe-promods" else base
 }
 
 // Copias de constantes de app.js, con un test que las compara contra la web
 // (ReferenciaWebTest). Se suben junto con las de la web, despues de subir el archivo
 // a R2: Cloudflare guarda lo que reciba con ese numero, aunque sea un 404.
-internal const val VERSION_MAPA_BASE = "20261025" // BASEMAP_VERSION
+internal const val VERSION_MAPA_BASE = "20261110" // BASEMAP_VERSION
 internal const val REV_LOGOS_EMPRESA = "1" // COMPANY_ICONS_REV
 
 /**
@@ -151,6 +160,7 @@ class CatalogoMapas(val variantes: Map<String, VarianteMapa>) {
                     version = version,
                     anteriorDe = v.texto("previousVersionOf"),
                     centro = if (origen != null && origen.size == 2) LngLat(origen[0], origen[1]) else LngLat(0.0, 20.0),
+                    mods = v.lista("mods")?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty(),
                 )
             }
             return if (lista.isEmpty()) null else CatalogoMapas(lista.toMap())

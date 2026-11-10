@@ -231,4 +231,10 @@
 {"id":"Zz9","color":"#8fd3ff"},
 {"id":"x7Kp2mQ","color":"#2ad3a4"},
 {"id":"0","color":"#ffa8e8"},
-{"id":"sesion-larga-de-prueba","color":"#c5e17a"}],"constantes":{"BASEMAP_VERSION":"20261025","COMPANY_ICONS_REV":"1"}}
+{"id":"sesion-larga-de-prueba","color":"#c5e17a"}],"constantes":{"BASEMAP_VERSION":"20261110","COMPANY_ICONS_REV":"1"},"fondos":[{"proyeccion":"ats","mods":[],"fondo":"usa"},
+{"proyeccion":"ats","mods":["promods_canada"],"fondo":"usa"},
+{"proyeccion":"ets2","mods":[],"fondo":"europe"},
+{"proyeccion":"ets2","mods":["promods","promods_me"],"fondo":"europe-promods"},
+{"proyeccion":"ets2","mods":["rusmap","roextended"],"fondo":"europe"},
+{"proyeccion":"ets2","mods":["grand_utopia","eu_grand_utopia"],"fondo":"europe"},
+{"proyeccion":"gu","mods":["grand_utopia"],"fondo":null}]}

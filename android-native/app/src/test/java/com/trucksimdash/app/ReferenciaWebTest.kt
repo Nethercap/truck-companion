@@ -9,6 +9,7 @@ import com.trucksimdash.app.mapa.VERSION_MAPA_BASE
 import com.trucksimdash.app.mapa.VarianteMapa
 import com.trucksimdash.app.mapa.anchoDeCalle
 import com.trucksimdash.app.mapa.colorDeConductor
+import com.trucksimdash.app.mapa.fondoDelMapa
 import com.trucksimdash.app.mapa.rumboDeGrillaAGeo
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -133,6 +134,18 @@ class ReferenciaWebTest {
         val c = golden.getValue("constantes").jsonObject
         assertEquals(c.getValue("BASEMAP_VERSION").jsonPrimitive.content, VERSION_MAPA_BASE)
         assertEquals(c.getValue("COMPANY_ICONS_REV").jsonPrimitive.content, REV_LOGOS_EMPRESA)
+    }
+
+    @Test
+    fun `cada variante lleva el mismo mapa base que en la web`() {
+        val filas = golden.getValue("fondos").jsonArray
+        assert(filas.any { it.jsonObject["fondo"]?.jsonPrimitive?.content == "europe-promods" })
+        for (fila in filas) {
+            val f = fila.jsonObject
+            val mods = f.getValue("mods").jsonArray.map { it.jsonPrimitive.content }
+            val esperado = f.getValue("fondo").let { if (it is JsonNull) null else it.jsonPrimitive.content }
+            assertEquals("$mods", esperado, fondoDelMapa(f.getValue("proyeccion").jsonPrimitive.content, mods))
+        }
     }
 
     @Test

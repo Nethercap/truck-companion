@@ -1205,8 +1205,10 @@ const PROJECTIONS = {
 // El de ATS llega a Alaska y al Yukon desde 20261025 (issue #132: los mods de
 // Alaska quedaban en el mar). Un numero nuevo va despues de subir el archivo a
 // R2: Cloudflare guarda lo que reciba con ese ?v=, aunque sea el viejo.
+// Desde 20261110 Islandia esta donde la dibuja la web, y las variantes con
+// ProMods tienen el suyo, europe-promods (basemapForVariant en pure.js).
 const BASEMAP_BY_PROJECTION = { ats: 'usa', ets2: 'europe', gu: null };
-const BASEMAP_VERSION = '20261025';
+const BASEMAP_VERSION = '20261110';
 const BASE_LAYER_IDS = ['base-land', 'base-urban', 'base-lake', 'base-river'];
 // Con el mapa base apagado el fondo es el gris de siempre; con el prendido el
 // fondo pasa a ser el mar y la tierra se pinta con ese mismo gris, asi lo
@@ -1229,7 +1231,7 @@ const GAME_MAPS = Object.fromEntries(Object.entries(VARIANT_META).map(([name, me
   toLngLat: PROJECTIONS[meta.projection].toLngLat,
   fromLngLat: PROJECTIONS[meta.projection].fromLngLat,
   origin: meta.origin,
-  basemap: BASEMAP_BY_PROJECTION[meta.projection],
+  basemap: basemapForVariant(BASEMAP_BY_PROJECTION[meta.projection], meta.mods),
 }]));
 
 // Mapas armados en la PC del cliente ("Build my map", client/map_builder.py).

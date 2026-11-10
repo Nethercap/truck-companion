@@ -143,7 +143,15 @@ const constante = (nombre) => {
 };
 const constantes = { BASEMAP_VERSION: constante('BASEMAP_VERSION'), COMPANY_ICONS_REV: constante('COMPANY_ICONS_REV') };
 
-const golden = { proyeccion, variantes, sinOpcionales: SIN_OPCIONALES, todas: TODAS, anchos, colores, constantes };
+// basemapForVariant con la tabla de app.js: que mapa base lleva cada proyeccion
+// con unos mods fijos (no los del manifest, que cambian al publicar).
+const ctxFondo = vm.createContext({});
+const BASES = vm.runInContext(`${lineaConst('BASEMAP_BY_PROJECTION')}; BASEMAP_BY_PROJECTION`, ctxFondo);
+const fondos = [['ats', []], ['ats', ['promods_canada']], ['ets2', []], ['ets2', ['promods', 'promods_me']],
+  ['ets2', ['rusmap', 'roextended']], ['ets2', ['grand_utopia', 'eu_grand_utopia']], ['gu', ['grand_utopia']]]
+  .map(([proyeccion, mods]) => ({ proyeccion, mods, fondo: pure.basemapForVariant(BASES[proyeccion], mods) }));
+
+const golden = { proyeccion, variantes, sinOpcionales: SIN_OPCIONALES, todas: TODAS, anchos, colores, constantes, fondos };
 const texto = JSON.stringify(golden, null, 0).replace(/\},\{/g, '},\n{') + '\n';
 
 if (process.argv.includes('--check')) {
