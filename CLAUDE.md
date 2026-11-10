@@ -45,7 +45,7 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `-prefabs.bin` (de que prefab es cada arista, `decodePrefabsBin`, desde el
   22-10; los de antes no lo tienen). Si se regenera el grafo, se regeneran y
   suben los cinco juntos (`rebuild_graphs_only.py` del taller) y se sube
-  `ROUTE_GRAPH_V3_REV` en `app.js` (6 desde el 22-10, con `ROUTE_PREFABS_REV`
+  `ROUTE_GRAPH_V3_REV` en `app.js` (7 desde el 10-11, con `ROUTE_PREFABS_REV`
   en 1): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
   la vuelta de Kiel (ver el ruteo). Los prefabs sin navCurves que lista el
   log del constructor (unidos todos contra todos, sin contramano) son
@@ -880,7 +880,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
     parecen de verdad; no se midio contra el GPS del juego.
   - Rotondas compactas de un solo prefab en ETS2: 11 de 29 sin reconocer (las
     curvas internas quedaron de doble mano en el grafo). Lo robusto es que el
-    constructor marque los prefabs de rotonda por su nombre.
+    constructor marque los prefabs de rotonda por su nombre. Desde el 10-11
+    (`ROUTE_GRAPH_V3_REV` 7, reporte #38, Vaxjo) el cruce derecho va con un
+    sentido por cada lado del anillo (`PREFAB_OTRO_LADO_M` del constructor):
+    antes uno de los dos se dibujaba de contramano. Eso no cambio cuantas se
+    reconocen (`--rotondas`: 18 de 47 casos de prefab sin aviso en ETS2, 31 de
+    69 en ProMods): la curva simplificada del cruce derecho da 76 grados de
+    vuelta de mas y la de la tercera salida 88, y la regla del prefab compacto
+    pide 90 en dos curvas.
   - Nombres (ATS, 63 mal de 447): sobre todo empates entre un cartel cerca
     del giro y otro mas adelante; que gane el de adelante da +8/-2 contra los
     escudos de despues y +2/-4 con los de las dos manos, sin regla segura.

@@ -3424,7 +3424,9 @@ function distanceToRouteMeters(x, z, alcanza = 0) {
 // 5 = 10-10: el derecho de los cruces de calles anchas (el lazo de Bakersfield).
 // 6 = 22-10: sin caminos por un tercer nodo del prefab (la vuelta de Kiel),
 // largos de nodo a nodo y el -prefabs.bin.
-const ROUTE_GRAPH_V3_REV = 6;
+// 7 = 10-11: el cruce derecho de una rotonda de un solo prefab, cada sentido
+// por su lado del anillo (PREFAB_OTRO_LADO_M del constructor, reporte #38).
+const ROUTE_GRAPH_V3_REV = 7;
 
 // Flechas de carril (decodeLanesBin en pure.js): archivo aparte y chico
 // (~90 KB en ATS), que se baja despues del grafo y solo sirve con ESE grafo
