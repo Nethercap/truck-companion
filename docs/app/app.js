@@ -3876,15 +3876,48 @@ function ownRouteTime() {
 // cuanto falta: con 3 s de diferencia, la app mandaba por la I-84 y el GPS
 // del juego por la I-80 (Salt Lake City, Discord 19-10). Las alternativas
 // (routeAlternatives) se buscan solo si el largo no coincide con el juego.
-// Devuelve { leg, switched }.
+// Si ninguna coincide y la nuestra va por ferry, la de por tierra
+// (routeLikeGameByFerry). Devuelve { leg, switched }.
 function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
-  if (!leg || !routeGameMayDiffer(routeGameAgreement(gameKmOf(leg, leg), gameKm))) return { leg, switched: false };
-  const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas, tramo), routeEdgesOf);
-  const base = routeEdgesOf(leg);
-  const k = pickRouteLikeGame(rutas.map(r => ({
-    km: gameKmOf(r, r), seconds: routeSecondsOf(r), shared: routeSharedFrac(routeEdgesOf(r), base, routeGraph.edgeM),
-  })), gameKm);
-  return { leg: rutas[k], switched: k > 0 };
+  if (!leg) return { leg, switched: false };
+  const km = gameKmOf(leg, leg);
+  if (routeGameMayDiffer(routeGameAgreement(km, gameKm))) {
+    const rutas = routeAlternatives(leg, (penal, previas) => findRoute(from, to, rumbo, penal, previas, tramo), routeEdgesOf);
+    const base = routeEdgesOf(leg);
+    const k = pickRouteLikeGame(rutas.map(r => ({
+      km: gameKmOf(r, r), seconds: routeSecondsOf(r), shared: routeSharedFrac(routeEdgesOf(r), base, routeGraph.edgeM),
+    })), gameKm);
+    if (k > 0) return { leg: rutas[k], switched: true };
+  }
+  return routeLikeGameByFerry(leg, km, from, to, rumbo, gameKm, tramo);
+}
+
+// Las aristas de ferry o tren del grafo cargado.
+let routeFerryEdgesOf = { graph: null, edges: null };
+function routeFerryEdges() {
+  if (routeFerryEdgesOf.graph !== routeGraph) {
+    const edges = new Set();
+    for (let e = 0; e < routeGraph.edgeF.length; e++) if (routeGraph.edgeF[e] & 1) edges.add(e);
+    routeFerryEdgesOf = { graph: routeGraph, edges };
+  }
+  return routeFerryEdgesOf.edges;
+}
+
+// Nuestra ruta va por ferry y la del GPS del juego es bastante mas larga: la
+// misma con los ferrys encarecidos hasta que coincide con el juego
+// (routeGameFerryShorter y routeFerrySearch en pure.js; reporte #37, Hamburgo
+// -> Helsinki por los balticos y no por Suecia). km: el de leg.
+function routeLikeGameByFerry(leg, km, from, to, rumbo, gameKm, tramo) {
+  if (!routeGameFerryShorter(km, routeFerryLegs(leg, distanceScale()), gameKm)) return { leg, switched: false };
+  const ferrys = routeFerryEdges();
+  const ferryS = (r) => routeEdgesOf(r).reduce((s, e) => s + (ferrys.has(e) ? edgeSecondsOf(e) : 0), 0);
+  const hallada = routeFerrySearch((f) => {
+    const penal = new Map();
+    for (const e of ferrys) penal.set(e, f);
+    const r = findRoute(from, to, rumbo, penal, null, tramo);
+    return r ? { route: r, km: gameKmOf(r, r), ferryS: ferryS(r) } : null;
+  }, gameKm, ferryS(leg));
+  return hallada ? { leg: hallada.result.route, switched: true } : { leg, switched: false };
 }
 
 // Si se busca la ruta como la del GPS del juego (followGameRoute, pure.js).
@@ -3896,14 +3929,18 @@ function gameRouteComparable(target) {
 // nueva, y la comparacion de routeLikeGame se hizo con el dato viejo. Si
 // unos datos despues todavia no coincide y una alternativa si, se recalcula
 // una vez. Despues de elegir una alternativa no: volveria a la mas rapida.
+// Tambien si la nuestra va por ferry y la del juego es mucho mas larga
+// (routeLikeGameByFerry).
 const ROUTE_GAME_RECHECK_TICKS = 3;
 let routeGameCheck = { key: null, left: 0, ticks: 0 };
 function routeGameRecheck(routeKey, target, data) {
   const c = routeGameCheck;
   if (c.key !== routeKey || c.left <= 0 || !currentRouteWorldPoints || !gameRouteComparable(target)) return false;
-  const acuerdo = routeGameAgreement(gameKmOf(currentRouteWorldPoints), data.routeDistanceKm);
+  const km = gameKmOf(currentRouteWorldPoints);
+  const acuerdo = routeGameAgreement(km, data.routeDistanceKm);
   if (acuerdo === 'agree') { c.left = 0; return false; }
-  c.ticks = routeGameMayDiffer(acuerdo) ? c.ticks + 1 : 0;
+  const porFerry = routeGameFerryShorter(km, routeFerryLegs(currentRouteWorldPoints, distanceScale()), data.routeDistanceKm);
+  c.ticks = routeGameMayDiffer(acuerdo) || porFerry ? c.ticks + 1 : 0;
   if (c.ticks < ROUTE_GAME_RECHECK_TICKS) return false;
   c.left = 0;
   const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data);

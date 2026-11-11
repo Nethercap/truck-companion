@@ -5448,6 +5448,70 @@ test('routeSharedFrac: que parte de una ruta va por las aristas de otra, en metr
   assert.equal(routeSharedFrac([], [1], edgeM), 1);
 });
 
+test('routeFerryLegs: cada cruce en ferry (tramos seguidos marcados), en km del juego', () => {
+  const { routeFerryLegs } = require('./pure.js');
+  const pts = [[0, 0, 0], [1000, 0, 0], [1000, 3000, 1], [1000, 4000, 1], [2000, 4000, 0], [2000, 5000, 1]];
+  assert.deepEqual(routeFerryLegs(pts, 19), [76, 19]);
+  assert.deepEqual(routeFerryLegs(pts.slice(0, 5), 19), [76]);
+  assert.deepEqual(routeFerryLegs(pts.map(p => [p[0], p[1], 0]), 19), []);
+  assert.deepEqual(routeFerryLegs(null, 19), []);
+});
+
+test('routeGameFerryShorter: la nuestra va por ferry y la del juego es mucho mas larga (reporte #37, Hamburgo -> Helsinki)', () => {
+  const { routeGameFerryShorter, routeGameAgreement } = require('./pure.js');
+  // La app por Puttgarden, Suecia y Kapellskar -> Naantali: 1.299,1 km, con
+  // 11 y 164 en ferry. El GPS del juego por los balticos: 1.673,9. Con 22 %
+  // la comparacion de siempre no busca nada.
+  assert.equal(routeGameAgreement(1299.1, 1673.9), 'unknown');
+  assert.equal(routeGameFerryShorter(1299.1, [11, 164], 1673.9), true);
+  // Sin ferry en la nuestra, nunca
+  assert.equal(routeGameFerryShorter(1299.1, [], 1673.9), false);
+  assert.equal(routeGameFerryShorter(1299.1, null, 1673.9), false);
+  // La diferencia la explica como cuente el juego los ferrys (sus datos dan
+  // hasta 60 % mas que nuestra recta, o el triple en uno corto): igual que el
+  // juego. Berlin -> Copenhague por Rostock -> Gedser, 22 km en el grafo y 65
+  // en los datos del juego.
+  assert.equal(routeGameFerryShorter(1000, [200], 1090), false);
+  assert.equal(routeGameFerryShorter(1000, [200], 1150), false);
+  assert.equal(routeGameFerryShorter(450, [22], 493), false);
+  assert.equal(routeGameFerryShorter(1000, [20], 1150), true);
+  // Nuestra ruta mas larga que la del juego, o el juego apuntando a otra cosa
+  assert.equal(routeGameFerryShorter(1300, [175], 1200), false);
+  assert.equal(routeGameFerryShorter(1000, [175], 1700), false);
+  assert.equal(routeGameFerryShorter(20, [5], 30), false);
+  assert.equal(routeGameFerryShorter(1299.1, [175], null), false);
+});
+
+test('routeFerrySearch: encarece los ferrys hasta que la ruta coincide con el juego (reporte #37)', () => {
+  const { routeFerrySearch } = require('./pure.js');
+  // Lo medido con el grafo de ProMods: hasta x3 por el mar, x4 por Tallin y
+  // de x6 por San Petersburgo.
+  const mar = { km: 1299.1, ferryS: 1100 }, tallin = { km: 1700.2, ferryS: 300 }, rusia = { km: 2439, ferryS: 0 };
+  const probados = [];
+  const ruta = (corte1, corte2) => (f) => { probados.push(Math.round(f * 100) / 100); return f < corte1 ? mar : f < corte2 ? tallin : rusia; };
+  assert.deepEqual(routeFerrySearch(ruta(4, 6), 1673.9, 1100), { result: tallin, factor: 4 });
+  assert.deepEqual(probados, [2, 4]);
+  // Si x4 ya da la vuelta por Rusia, parte al medio el tramo de x2 a x4
+  probados.length = 0;
+  assert.deepEqual(routeFerrySearch(ruta(2.5, 3), 1673.9, 1100), { result: tallin, factor: Math.sqrt(8) });
+  assert.deepEqual(probados, [2, 4, 2.83]);
+  // A lo sumo dos veces: si la ventana es mas angosta, queda la nuestra
+  probados.length = 0;
+  assert.equal(routeFerrySearch(ruta(2.1, 2.2), 1673.9, 1100), null);
+  assert.deepEqual(probados, [2, 4, 2.83, 2.38]);
+  // Siempre por el mar (una isla sin otro camino): queda la nuestra
+  probados.length = 0;
+  assert.equal(routeFerrySearch(ruta(100, 200), 1673.9, 1100), null);
+  assert.deepEqual(probados, [2, 4, 8]);
+  // Coincide pero no va menos por ferry: es otra cosa, no se cambia
+  assert.equal(routeFerrySearch(() => ({ km: 1680, ferryS: 1100 }), 1673.9, 1100), null);
+  // A mas de 3 % del juego, no
+  assert.equal(routeFerrySearch(() => ({ km: 1730, ferryS: 300 }), 1673.9, 1100), null);
+  assert.deepEqual(routeFerrySearch(() => ({ km: 1720, ferryS: 300 }), 1673.9, 1100).factor, 2);
+  // Sin ruta, nada
+  assert.equal(routeFerrySearch(() => null, 1673.9, 1100), null);
+});
+
 test('navReportRefreshDue: el reporte abierto sigue al dia, salvo mandandolo o copiandolo (ShadE, 07-11)', () => {
   const { navReportRefreshDue, NAV_REPORT_REFRESH_MS } = require('./pure.js');
   const base = { open: true, sending: false, selecting: false, nowMs: 10000, lastMs: 10000 - NAV_REPORT_REFRESH_MS };

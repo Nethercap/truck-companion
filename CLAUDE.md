@@ -413,6 +413,21 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   que el desvio vaya por otra ruta ya encontrada. 300 rutas por variante: otro
   corredor se sigue encontrando igual (344 antes, 343 despues) y la elegida
   cambia en 84 de 18.000 pruebas, 17 tramos, dibujados, de hasta 2,3 km.
+  Si ninguna coincide, nuestra ruta va por ferry y la del juego es mas larga
+  aun contando cada cruce 60 % de mas y al menos 60 km (`routeGameFerryShorter`),
+  se buscan con todos los ferrys x2, x4 y x8 mas caros, partiendo al medio dos
+  veces entre la ultima corta y la que se paso, y gana la primera a menos de
+  3 % del juego que va menos por ferry (`routeFerrySearch`,
+  `routeLikeGameByFerry`; tambien en `routeGameRecheck`), sin tope de lentitud.
+  Reporte #37 (10-11, ProMods, Hamburgo -> Helsinki): la app por Puttgarden,
+  Suecia y Kapellskar -> Naantali, 1.299 km; el GPS 1.674 por Polonia, los
+  balticos y el ferry de Tallin (x4, 1.700 medido; x6 rodea por San
+  Petersburgo). Al juego un ferry le cuesta mas que a nosotros (recta x1,2 a
+  40 km/h en el constructor) y no se sabe cuanto: esto no cambia el costo,
+  sigue al GPS cuando lo dice. El margen por cruce es porque el grafo tiene
+  cada ferry en linea recta y los datos del juego un largo propio (Rostock ->
+  Gedser 65 km contra 22); si el GPS cuenta ese, en 600 rutas con ferry de
+  ETS2 y ProMods (semilla 7) no cambia ninguna (`sim_ferry.js` del reporte).
 - La distancia a la parada mas cercana en el overlay del juego ("near" en
   `nav_hud`, item `near_stops` del cliente, para jugar por Moonlight o con una
   sola pantalla) no usa `pickFuelStop`: lo que elige el boton cambia seguido
