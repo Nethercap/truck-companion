@@ -4073,7 +4073,19 @@ function turnReportSpeedLine(speed) {
   return `Speed: ${Math.round(speed.kmh)} km/h, game speed limit ${limite}`;
 }
 
-function turnReportText({ game, map, web, client, truck, heading, now, items, formatTime, routeKm = null, route = null, job = null, speed = null }) {
+// El grafo de rutas cuando no esta listo, con el error de la ultima vez que no
+// bajo: el log del cliente no ve la ruta, y "Couldn't load the road network"
+// en la beta (11-11) no decia si era la red, un 404 o la memoria del
+// telefono. graph: { state, failures, error }. Listo o sin dato, nada.
+const TURN_REPORT_GRAPH_ERROR_MAX = 100;
+function turnReportGraphLine(graph) {
+  if (!graph || !graph.state || graph.state === 'ready') return null;
+  const veces = graph.failures > 1 ? ` ${graph.failures} times` : '';
+  const error = graph.error ? ` (${String(graph.error).slice(0, TURN_REPORT_GRAPH_ERROR_MAX)})` : '';
+  return `Road network: ${graph.state}${graph.state === 'failed' ? veces : ''}${error}`;
+}
+
+function turnReportText({ game, map, web, client, truck, heading, now, items, formatTime, routeKm = null, route = null, job = null, speed = null, graph = null }) {
   const r = (v) => Math.round(v);
   const que = (it) => (it.kind === 'roundabout'
     ? `roundabout exit ${it.exit != null ? it.exit : '?'}`
@@ -4085,7 +4097,9 @@ function turnReportText({ game, map, web, client, truck, heading, now, items, fo
       : `Truck now: no position (${formatTime(now)})`];
   const linea = turnReportSpeedLine(speed);
   if (linea) lineas.push(linea);
-  if (routeKm && (Number.isFinite(routeKm.app) || Number.isFinite(routeKm.game))) {
+  const grafo = turnReportGraphLine(graph);
+  if (grafo) lineas.push(grafo);
+  if (routeKm &&(Number.isFinite(routeKm.app) || Number.isFinite(routeKm.game))) {
     const km = (v) => (Number.isFinite(v) ? `${v.toFixed(1)} km` : '?');
     lineas.push(`Route left: app ${km(routeKm.app)}, game GPS ${km(routeKm.game)}`);
   }
@@ -4735,6 +4749,24 @@ function noRouteReason({ hasTarget, hasRoute, gameRouteKm, routing }) {
   if (hasRoute) return null;
   if (hasTarget) return NO_ROUTE_BY_ROUTING[routing] || null;
   return Number.isFinite(gameRouteKm) && gameRouteKm > 0 ? 'game_gps' : 'none';
+}
+
+// El grafo que no bajo (sin senal, un corte de la red de la casa o del R2):
+// loadRouteGraph lo prueba otra vez a los 3, 10 y 30 s, y despues quedaba
+// 'failed' hasta recargar. La app nativa no recarga nunca (el motor vive lo
+// que la app, y con el servicio de manejo son dias), y una pestana de la PC
+// tampoco: un tester de la beta 0.2.1 (Discord, 11-11, ATS) quedo con
+// "Couldn't load the road network" sin forma de salir, con la conexion de su
+// casa cortandose (el log del cliente: el relay se corto a las 08:45 y el
+// juego arranco a las 08:49). Con destino se vuelve a pedir cada vez mas
+// espaciado; sin destino nadie lo necesita y no se baja nada. failures:
+// cuantas veces seguidas termino en 'failed' (1 la primera); failedAt: cuando
+// fue la ultima.
+const ROUTE_GRAPH_LATE_RETRY_S = [60, 120, 300];
+function routeGraphRetryDue({ state, failures, failedAt, now }) {
+  if (state !== 'failed' || !(failures > 0) || !Number.isFinite(failedAt) || !Number.isFinite(now)) return false;
+  const s = ROUTE_GRAPH_LATE_RETRY_S[Math.min(failures, ROUTE_GRAPH_LATE_RETRY_S.length) - 1];
+  return now - failedAt >= s * 1000;
 }
 
 // Una ruta en el GPS del juego y ningun trabajo en la telemetria: pasa con un
@@ -7223,5 +7255,5 @@ function webUpdateAction({ current, served = null, site = null }) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { createBusyGate, BUSY_GATE_FACTOR, createOffRouteRetry, OFF_ROUTE_RETRY_M, alternateModVariants, variantForJobPlace, canOfferMapBuild, navReportRefreshDue, NAV_REPORT_REFRESH_MS, webVersionIn, webVersionNewer, webUpdateAction, gameGpsKmMatches, gameGpsCandidates, gameGpsGuessList, gameGpsGuessStep, gameGpsGuessPanelShown, GAME_GPS_GUESS_MAX_KM, GAME_GPS_GUESS_MAX, turnReportJobLine, nearStopCandidates, createNearStopPick, createNearStops, roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, basemapForVariant, BASEMAP_PROMODS, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, createTrailerPickupWatch, trailerPickupJobKey, TRAILER_PICKUP_MARKET_RE, offMapJobPlace, hasJobDestination, jobPanelFields, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, routeGameMayDiffer, routeSharedFrac, pickRouteLikeGame, ROUTE_GAME_FERRY, routeFerryLegs, routeGameFerryShorter, routeFerrySearch, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, turnReportText, turnReportSpeedLine, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportLooksEmpty, navReportCanSend, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, routeTimeAhead, ROUTE_TIME_DEFAULT_KMH, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, truckDashLamps, truckGaugeScales, MAP_DASH_MODES, MAP_DASH_STYLES, mapDashSetting, mapDashHosts, mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, DLC_GUARDS, DLC_LIST, dlcGameOf, GAME_VERSION_VARIANTS, gameVersionSetting, gameVersionVariant, sharedMapVariant, gameVersionTag, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, parseWsJson, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
-    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText };
+    createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText, routeGraphRetryDue, ROUTE_GRAPH_LATE_RETRY_S, turnReportGraphLine };
 }
