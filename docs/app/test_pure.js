@@ -2607,6 +2607,23 @@ test('mapDashSetting y mapDashHosts: el tablero en la vista del mapa, con el map
   assert.deepEqual(mapDashHosts({ mode: 'side' }), [{ id: 'mapDashStage', mapHole: 'right' }]);
 });
 
+test('mapDashLimitOnMap: el cartel de la maxima en el mapa con el europeo y el americano', () => {
+  const { mapDashLimitOnMap } = require('./pure.js');
+  // El europeo lo tiene en la pantalla que tapa el mapa y el americano no
+  // tiene: va en el mapa, con el mapa al medio o a un costado.
+  for (const mode of ['middle', 'left', 'right']) {
+    assert.equal(mapDashLimitOnMap({ mode, style: 'euro' }), true, mode);
+    assert.equal(mapDashLimitOnMap({ mode, style: 'american' }), true, mode);
+    // El digital lo lleva adentro del aro de la velocidad.
+    assert.equal(mapDashLimitOnMap({ mode, style: 'digital' }), false, mode);
+  }
+  // Sin tablero en el mapa, el mini-HUD de siempre.
+  assert.equal(mapDashLimitOnMap({ mode: 'off', style: 'euro' }), false);
+  assert.equal(mapDashLimitOnMap(undefined), false);
+  // Un estilo que no se conoce es el europeo.
+  assert.equal(mapDashLimitOnMap({ mode: 'middle', style: 'pink' }), true);
+});
+
 test('mapHoleCompact: botones chicos con el mapa en un hueco chico', () => {
   const { mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H } = require('./pure.js');
   // Telefono acostado (el mapa a un costado, unos 290 x 280) y parado (el

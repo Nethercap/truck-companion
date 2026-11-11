@@ -1217,6 +1217,21 @@ body.mapInDash .stopSuggest { top: 5.8rem; }
    repetia lo mismo y en el hueco se montaba sobre Mapa / Pantalla. Va
    despues de los de "Mover los botones" para ganarles tambien ahi. */
 body.mapInDash #miniHud { display: none !important; }
+/* Menos el cartel de la maxima con el europeo y el americano
+   (mapDashLimitOnMap en pure.js): el del europeo esta en la pantalla que
+   tapa el mapa y el americano no tiene. Solo el cartel, sin la caja, con la
+   regla de siempre del mini-HUD (panel oculto), y sin maxima nada, salvo
+   mientras se acomodan los botones (si no, no habria que agarrar). */
+body.mapDashLimitOnMap:not(.spectator) .layout.panelHidden #miniHud,
+body.mapDashLimitOnMap:not(.spectator) .layout.commandsPageActive #miniHud {
+  display: flex !important; padding: 0; background: none; box-shadow: none;
+}
+body.mapDashLimitOnMap #miniHud .miniHudTop > :not(.limitSign) { display: none !important; }
+body.mapDashLimitOnMap #miniHud .limitSign {
+  width: 46px; height: 46px; font-size: 1.05rem; border-width: 4px; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+}
+body.mapDashSmall.mapDashLimitOnMap #miniHud .limitSign { width: 36px; height: 36px; font-size: 0.85rem; border-width: 3px; }
+body.mapDashLimitOnMap:not(.editLayout) #miniHud .limitSign.empty { display: none; }
 /* Hueco chico (mapDashSmall, mapHoleCompact en pure.js: el telefono, o una
    ventana angosta): los botones de 32 px, mas juntos y pegados al borde, y
    la columna de la izquierda sigue en otra si no entra. El giro va entre
