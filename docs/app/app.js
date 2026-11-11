@@ -2460,6 +2460,10 @@ let routeGraph = null; // typed arrays + CSR, ver buildRouteGraph()
 // u 'off' (modo liviano sin ruteo, espectador). Con destino y sin grafo, el
 // panel de indicaciones dice cual (noRouteReason).
 let routeGraphState = 'loading';
+// Las veces seguidas que el grafo termino en 'failed', cuando fue la ultima y
+// con que error: para volver a pedirlo con destino (routeGraphRetryDue) y para
+// el turn report. Vuelve a cero al cargarlo o al cambiar de mapa.
+let routeGraphFail = { failures: 0, at: 0, error: null };
 // La ruta actual pasa por un DLC destildado porque no hay otro camino.
 let routeUsesUncheckedDlc = false;
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
@@ -3499,12 +3503,15 @@ async function loadRoutePrefabs(base, v, game, decoded, graph, local) {
 
 // Si el grafo no baja (el telefono perdio la senal un momento, un corte del
 // R2), se prueba otra vez a los 3, 10 y 30 s: antes quedaba sin ruta hasta
-// recargar, sin decir nada.
+// recargar, sin decir nada. Despues, con destino, cada vez mas espaciado
+// (routeGraphRetryDue, desde updateDestinationMarker): una sola vez cada una,
+// con intento = ROUTE_GRAPH_RETRY_S.length.
 const ROUTE_GRAPH_RETRY_S = [3, 10, 30];
 async function loadRouteGraph(mapInfo, intento = 0) {
   routeGraph = null;
   routeLanes = null;
   routeGraphState = 'loading';
+  if (intento === 0) routeGraphFail = { failures: 0, at: 0, error: null };
   // Baja por detras del mapa (ver loadGameMap): si mientras tanto se cambio
   // de variante, el grafo que llega tarde no pisa el de la nueva.
   const game = currentGame;
@@ -3539,6 +3546,7 @@ async function loadRouteGraph(mapInfo, intento = 0) {
     if (currentGame === game) {
       routeGraph = g;
       routeGraphState = 'ready';
+      routeGraphFail = { failures: 0, at: 0, error: null };
       // Solo con el v3: el archivo de carriles va por sus aristas
       if (decoded.shiftA) {
         loadRouteLanes(base, v, game, decoded, g);
@@ -3558,6 +3566,7 @@ async function loadRouteGraph(mapInfo, intento = 0) {
       return;
     }
     routeGraphState = 'failed';
+    routeGraphFail = { failures: routeGraphFail.failures + 1, at: Date.now(), error: (err && err.message) || String(err) };
   }
 }
 
@@ -4579,6 +4588,10 @@ function updateDestinationMarker(data) {
   }
   // Con destino, sin grafo no hay ruta: el panel dice por que.
   noRouteNow = noRouteReason({ hasTarget: true, hasRoute: !!routeGraph, routing: routeGraphState });
+  // Y el que no bajo se vuelve a pedir: sin esto quedaba asi hasta recargar.
+  if (GAME_MAPS[currentGame] && routeGraphRetryDue({ state: routeGraphState, failures: routeGraphFail.failures, failedAt: routeGraphFail.at, now: Date.now() })) {
+    loadRouteGraph(GAME_MAPS[currentGame], ROUTE_GRAPH_RETRY_S.length);
+  }
   const destLngLat = toLngLat(target.x, target.z);
   if (target.kind === 'waypoint') {
     // El ultimo waypoint ya tiene su propio marcador - no duplicar bandera.
@@ -7402,6 +7415,7 @@ function buildTurnReport() {
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
     now: Date.now(), items: turnLog.list(), job: turnReportJobLine(lastData),
     speed: lastData ? { kmh: lastData.speedKmh, limitKmh: lastData.speedLimitKmh } : null,
+    graph: { state: routeGraphState, failures: routeGraphFail.failures, error: routeGraphFail.error },
     routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
     route: {
       profile: routeProfile,

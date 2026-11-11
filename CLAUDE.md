@@ -1017,6 +1017,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   hay giros ni busqueda). Nada caro en cada dato: lo que se repite va con `createBusyGate` o
   `createOffRouteRetry` (`pure.js`). Lo que mide `pc_falsa.py` es la ruta demo (670 km) sin
   overlay: los dos esconden esto.
+- El motor vive lo que la app (dias, con `ServicioManejo`) y nunca recarga: un estado que en la
+  web se arreglaba recargando ahi queda para siempre. El grafo que no baja tras los reintentos
+  de `loadRouteGraph` (3, 10 y 30 s) se vuelve a pedir con destino a 1, 2 y cada 5 min
+  (`routeGraphRetryDue`; beta 0.2.1, Discord 11-11: "Couldn't load the road network" con la red
+  de la casa cortandose), y el turn report dice `Road network: failed N times (error)`: el log
+  del cliente no ve la ruta.
 - Los mapas piden Referer: la app manda el de trucksim-dash.com. Nunca el secreto
   `TRUCKDASH_MAPS_KEY`, que en una APK quedaria a la vista.
 - Lo portado de la web tiene un golden que sale de correr la web

@@ -3350,6 +3350,51 @@ test('noRouteReason: sin trabajo, la ruta del GPS del juego se explica en vez de
   assert.equal(noRouteReason({ hasTarget: true, hasRoute: true, routing: 'failed' }), null);
 });
 
+test('routeGraphRetryDue: el grafo que no bajo se vuelve a pedir, cada vez mas espaciado (beta 0.2.1, 11-11)', () => {
+  const { routeGraphRetryDue, ROUTE_GRAPH_LATE_RETRY_S } = require('./pure.js');
+  const t0 = 1_000_000;
+  const al = (failures, s) => routeGraphRetryDue({ state: 'failed', failures, failedAt: t0, now: t0 + s * 1000 });
+  // la primera vez, al minuto; despues 2 y 5 minutos, y de ahi cada 5
+  assert.deepEqual(ROUTE_GRAPH_LATE_RETRY_S, [60, 120, 300]);
+  assert.equal(al(1, 59), false);
+  assert.equal(al(1, 60), true);
+  assert.equal(al(2, 119), false);
+  assert.equal(al(2, 120), true);
+  assert.equal(al(3, 299), false);
+  assert.equal(al(3, 300), true);
+  assert.equal(al(9, 299), false);
+  assert.equal(al(9, 300), true);
+  // bajando, listo o apagado (liviano sin ruteo, espectador): nada
+  for (const state of ['loading', 'ready', 'off']) {
+    assert.equal(routeGraphRetryDue({ state, failures: 1, failedAt: t0, now: t0 + 3600e3 }), false, state);
+  }
+  // sin un fallo anotado no hay de cuando contar
+  assert.equal(routeGraphRetryDue({ state: 'failed', failures: 0, failedAt: t0, now: t0 + 3600e3 }), false);
+  assert.equal(routeGraphRetryDue({ state: 'failed', failures: 1, failedAt: NaN, now: t0 + 3600e3 }), false);
+  assert.equal(routeGraphRetryDue({ state: 'failed', failures: 1, failedAt: t0, now: undefined }), false);
+});
+
+test('turnReportGraphLine: el grafo que no esta listo va al turn report con su error', () => {
+  const { turnReportGraphLine, turnReportText } = require('./pure.js');
+  assert.equal(turnReportGraphLine({ state: 'failed', failures: 1, error: 'sin red' }), 'Road network: failed (sin red)');
+  assert.equal(turnReportGraphLine({ state: 'failed', failures: 3, error: 'HTTP 404' }), 'Road network: failed 3 times (HTTP 404)');
+  // reintentando: el error de la vez anterior sigue sirviendo
+  assert.equal(turnReportGraphLine({ state: 'loading', failures: 2, error: 'HTTP 0' }), 'Road network: loading (HTTP 0)');
+  assert.equal(turnReportGraphLine({ state: 'loading', failures: 0, error: null }), 'Road network: loading');
+  assert.equal(turnReportGraphLine({ state: 'off', failures: 0, error: null }), 'Road network: off');
+  assert.equal(turnReportGraphLine({ state: 'ready', failures: 0, error: null }), null);
+  assert.equal(turnReportGraphLine(null), null);
+  // un error largo no se come el mensaje de Discord
+  assert.ok(turnReportGraphLine({ state: 'failed', failures: 1, error: 'x'.repeat(5000) }).length < 140);
+  const hora = (ms) => `h${ms}`;
+  const txt = turnReportText({ game: 'ats', map: 'ats', web: 'x', client: '1.5.38', truck: [-30078, -14738], now: 1, items: [],
+    formatTime: hora, speed: { kmh: 0, limitKmh: 0 }, graph: { state: 'failed', failures: 4, error: 'sin red' } });
+  assert.equal(txt.split('\n')[5], 'Road network: failed 4 times (sin red)');
+  const listo = turnReportText({ game: 'ats', map: 'ats', web: 'x', client: null, truck: null, now: 1, items: [], formatTime: hora,
+    graph: { state: 'ready', failures: 0, error: null } });
+  assert.ok(!listo.includes('Road network'));
+});
+
 test('gameRouteDistanceText: entero lejos, un decimal cerca, en millas con imperial', () => {
   const { gameRouteDistanceText } = require('./pure.js');
   assert.equal(gameRouteDistanceText(312.4, false, 'en'), '312 km');
