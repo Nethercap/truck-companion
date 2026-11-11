@@ -701,6 +701,15 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
     const rMarcha = texto(rpm.extra, 0, 8, 'tdBig');
     const rTxt = texto(rpm.extra, 0, 38, 'tdUnitD');
     const rRet = texto(rpm.extra, 0, 60, 'tdRet');
+    // Combustible y AdBlue abajo del aro de la velocidad, agua y aire abajo
+    // del de las rpm: en el cuarto que el aro deja libre, como los segmentos
+    // del europeo. Las barras de la columna quedan debajo del mapa con el
+    // tablero en la vista del mapa, y no se veian sin pasar a Pantalla
+    // (Discord, 11-11).
+    const vNafta = segmentos(vel.extra, -52, 92, 46, 8, 'fuelLow', 1, true);
+    const vAdblue = segmentos(vel.extra, 6, 92, 46, 8, 'adblueLow', 1, true);
+    const rAgua = segmentos(rpm.extra, -52, 92, 46, 8, 'waterTemp', 1, false);
+    const rAire = segmentos(rpm.extra, 6, 92, 46, 8, 'airPressure', 3, true);
     const info = tiraTestigos(TD_LAMPS_INFO);
     const avisos = tiraTestigos(TD_LAMPS_WARN);
 
@@ -795,6 +804,10 @@ function createTruckDash({ root, money, imperial, lang, hour12, layout, embedded
         txt(rMarcha, L.marcha);
         txt(rTxt, num(L.rpm) + ' rpm');
         txt(rRet, L.retarder ? 'RET ' + L.retarder : null);
+        vNafta.poner(L.fuelFrac, L.lamps.fuelLow);
+        vAdblue.poner(L.adFrac, L.lamps.adblueLow);
+        rAgua.poner(d.waterTemperature != null ? (d.waterTemperature - 40) / 80 : null, L.lamps.waterTemp);
+        rAire.poner(d.airPressure != null ? d.airPressure / 150 : null, L.lamps.airPressure);
         info.poner(L.lamps);
         avisos.poner(L.lamps);
 

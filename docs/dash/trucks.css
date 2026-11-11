@@ -124,6 +124,11 @@
 .tdUnitD { fill: #8fa0b5; font-size: 14px; text-anchor: middle; }
 .tdCc { fill: #35e35b; font-size: 17px; font-weight: 700; text-anchor: middle; }
 .tdRet { fill: #ffb21f; font-size: 15px; font-weight: 700; text-anchor: middle; }
+/* Los segmentos abajo de los aros, con el azul de la pantalla. */
+.tdRingDial .tdSegOff { fill: #141b25; }
+.tdRingDial .tdSegOn { fill: #3cc4ff; }
+.tdRingDial .tdSegOn.tdSegBad { fill: #ff5a3c; }
+.tdRingDial .tdSegIco { color: #8fa0b5; }
 .tdCard { fill: rgba(16, 26, 40, 0.78); stroke: #1e2a3a; stroke-width: 1.5; }
 .tdTxt.tdAccent { fill: #5fd0ff; }
 .tdBarTrack { fill: #1a2330; }

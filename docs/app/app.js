@@ -4991,7 +4991,11 @@ function placeMiniHud() {
   // Si el usuario lo puso en otro lado, es suyo: no se lo movemos al girar la
   // pantalla ni al arrancar.
   if (hud && hud.classList.contains('moved')) return;
-  const target = portraitMq.matches ? document.getElementById('bottomRightHud') : document.getElementById('topRightControls');
+  // Con el tablero en el mapa y solo el cartel (mapDashLimitOnMap), arriba
+  // siempre: abajo caia sobre el nombre del mapa, y el giro va entre las dos
+  // columnas de botones, sin tocarlo.
+  const abajo = portraitMq.matches && !document.body.classList.contains('mapDashLimitOnMap');
+  const target = abajo ? document.getElementById('bottomRightHud') : document.getElementById('topRightControls');
   if (hud && hud.parentElement !== target) target.insertBefore(hud, target.firstChild);
   placeMiniHudExtra();
 }
@@ -7067,9 +7071,12 @@ function updateHud(data) {
       limitEl.textContent = Math.round(limitDisplay);
       const over = data.speedKmh > limit + 3;
       limitEl.classList.toggle('over', over);
+      limitEl.classList.remove('empty');
     } else {
       limitEl.textContent = '--';
       limitEl.classList.remove('over');
+      // Con el tablero en el mapa, sin maxima no queda nada (app.css).
+      limitEl.classList.add('empty');
     }
   }
 
@@ -8847,6 +8854,9 @@ function applyMapDash() {
   escenario.hidden = !lugar;
   escenario.dataset.style = mapDash.style;
   document.body.classList.toggle('mapInDash', !!lugar);
+  // Del mini-HUD queda el cartel de la maxima (mapDashLimitOnMap, app.css).
+  document.body.classList.toggle('mapDashLimitOnMap', !!lugar && mapDashLimitOnMap(mapDash));
+  placeMiniHud();
   if (!lugar) {
     // El mapa vuelve a su lugar en la fila.
     const panel = document.getElementById('mapPanel');
