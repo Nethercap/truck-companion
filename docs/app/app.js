@@ -7455,10 +7455,37 @@ async function copyText(text) {
 // cruce en el simulador. Lo copia el boton de Ajustes y lo lleva el reporte
 // de navegacion. El destino, sin tocar el estado de la ruta borrada a mano
 // (resolveRouteTarget la da por terminada si cambio el viaje).
+// Por que ese mapa y esos DLC, para el turn report (turnReportMapLines y
+// turnReportDlcLine en pure.js; reportes #41 y #43, 12-11).
+function turnReportMapChoice(game) {
+  if (game !== 'ats' && game !== 'ets2') return null;
+  const manual = game === 'ats' ? atsMod : ets2Mod;
+  const version = game === 'ats' ? atsVersion : ets2Version;
+  return {
+    auto: modsAuto, local: !!localMaps[game],
+    detected: detectedMods && detectedMods[game] ? detectedMods[game] : null,
+    manual: manual && manual !== 'none' ? manual : null,
+    version: version && version !== 'latest' ? version : null,
+    jobMap: jobMap && jobMap.game === game ? jobMap.variant : null,
+    names: detectedModNames && Array.isArray(detectedModNames[game]) ? detectedModNames[game] : null,
+  };
+}
+function turnReportDlc() {
+  if (!currentGame) return null;
+  const table = dlcGameOf(currentGame);
+  const lista = DLC_LIST[table] || [];
+  const tiene = detectedDlcs && Array.isArray(detectedDlcs[table]) ? detectedDlcs[table] : null;
+  return {
+    table, auto: dlcAuto, total: lista.length, off: dlcOffFor(table), unchecked: routeUsesUncheckedDlc,
+    detected: tiene ? lista.filter((d) => tiene.includes(d[0])).length : null,
+  };
+}
+
 function buildTurnReport() {
   const pos = lastData && lastData.position;
   const target = lastData ? resolveRawRouteTarget(lastData) : null;
   return turnReportText({
+    mapChoice: turnReportMapChoice(lastData && lastData.game), dlc: turnReportDlc(),
     game: lastData && lastData.game, map: currentGame, web: webVersion(),
     client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
