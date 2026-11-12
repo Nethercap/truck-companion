@@ -18,6 +18,9 @@ updates on its own and is not versioned here.
   found none in your last session and which file it reads them from (`game.log.txt`, which the game
   writes when you load your profile), instead of showing nothing. A new **Re-read mods** button reads
   that file again right away, instead of waiting up to 10 seconds.
+- Build my map: with an older game version (seen with ETS2 1.53), Setup found none of your mods and
+  never offered to build the map, even with map mods active: those versions write the mods to the
+  game's log in another way. They are now read too.
 
 ## 1.5.38 (2026-11-07)
 

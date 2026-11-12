@@ -30,6 +30,39 @@ def test_rutas_de_los_mods_en_el_orden_en_que_el_juego_los_monta():
                      os.path.normpath("C:/Users/x/Documents/American Truck Simulator/mod/Eastern_Canada.scs")]
 
 
+# Asi escribe los mods ETS2 1.53 (Discord 12-11, jalihaag): "mounted." pelado, y
+# el mod_package_manager en la linea siguiente. Recortado de su game.log.txt.
+LOG_153 = """00:00:14.955 : [fs] device C:/Program Files (x86)/Steam/steamapps/common/Euro Truck Simulator 2/dlc_balt.scs mounted.
+00:00:18.258 : [mods] Active 3 mods (local: 2, workshop: 1)
+00:00:18.258 : [mods] Active local mod realpoland_map (name: Real Poland 1:1 - MAP, version: 0.02, author: x)
+00:00:18.258 : [mods] Active local mod RPM - Map (name: RPM - Map, version: 1.2, author: RPM-Modding)
+00:00:18.259 : [mods] Active workshop mod ID 3434968486 (name: Brighter Nights, version: 1.0, author: x)
+00:00:18.701 : [hashfs] realpoland_map.scs: Created, 75 entries
+00:00:18.701 : [fs] device C:/Users/x/Documents/Euro Truck Simulator 2/mod/realpoland_map.scs mounted.
+00:00:18.701 : [mod_package_manager] Mod "Real Poland 1:1 - MAP" has been mounted. (package_name: realpoland_map, version: 0.02, source: User mods)
+00:00:18.900 : [zipfs] RPM - Map.scs: Created, 4200 entries
+00:00:18.901 : [fs] device C:/Users/x/Documents/Euro Truck Simulator 2/mod/RPM - Map.scs mounted.
+00:00:18.901 : [mod_package_manager] Mod "RPM - Map" has been mounted. (package_name: RPM - Map, version: 1.2, source: User mods)
+00:00:19.436 : [fs] device C:/Program Files (x86)/Steam/steamapps/workshop/content/227300/3434968486/universal mounted.
+00:00:19.436 : [mod_package_manager] Mod "Brighter Nights" has been mounted. (package_name: mod_workshop_package.00000000CC8A6E06, version: 1.0, source: Steam Workshop)
+00:00:25.000 : [fs] device C:/Program Files (x86)/Steam/steamapps/common/Euro Truck Simulator 2/dlc_feldbinder.scs mounted.
+00:00:25.001 : [core] Loading profile
+"""
+
+
+def test_los_mods_de_un_juego_viejo_tambien_se_encuentran():
+    """Sin esto Setup no ofrecia Build my map con ETS2 1.53: no habia ninguna
+    linea "mounted to mod pool" y daba cero mods. Lo montado que no es un mod
+    (un DLC, aun despues de la lista) sigue sin contar."""
+    assert map_builder.mounted_mod_paths(LOG_153) == [
+        os.path.normpath("C:/Users/x/Documents/Euro Truck Simulator 2/mod/realpoland_map.scs"),
+        os.path.normpath("C:/Users/x/Documents/Euro Truck Simulator 2/mod/RPM - Map.scs"),
+        os.path.normpath("C:/Program Files (x86)/Steam/steamapps/workshop/content/227300/3434968486/universal"),
+    ]
+    # Con los finales de linea de Windows tal cual (si alguien lo lee en binario).
+    assert map_builder.mounted_mod_paths(LOG_153.replace("\n", "\r\n")) == map_builder.mounted_mod_paths(LOG_153)
+
+
 def test_los_dlc_montados_antes_de_la_lista_de_mods_no_cuentan():
     assert not any("dlc_wa" in r for r in map_builder.mounted_mod_paths(LOG))
 
