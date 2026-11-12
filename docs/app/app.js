@@ -1194,7 +1194,7 @@ const PROJECTIONS = {
   gu: { toLngLat: guToLngLat, fromLngLat: guFromLngLat },
 };
 
-// Mapa base real: costa, lagos, rios y zonas urbanas debajo de las rutas.
+// Mapa base real: costa, lagos, rios, zonas urbanas y limites debajo de las rutas.
 // El juego no trae nada de eso - sus mapArea son motas pegadas a las rutas,
 // no hay costa ni agua -, pero la proyeccion de arriba manda las coordenadas
 // del juego a lng/lat de verdad, asi que la geografia real cae justo donde
@@ -1207,9 +1207,21 @@ const PROJECTIONS = {
 // R2: Cloudflare guarda lo que reciba con ese ?v=, aunque sea el viejo.
 // Desde 20261110 Islandia esta donde la dibuja la web, y las variantes con
 // ProMods tienen el suyo, europe-promods (basemapForVariant en pure.js).
+// Desde 20261112 trae los limites de paises y de estados (base-border,
+// base-state; Discord 12-11: "estaba mirando el estado equivocado").
 const BASEMAP_BY_PROJECTION = { ats: 'usa', ets2: 'europe', gu: null };
-const BASEMAP_VERSION = '20261110';
-const BASE_LAYER_IDS = ['base-land', 'base-urban', 'base-lake', 'base-river'];
+const BASEMAP_VERSION = '20261112';
+const BASE_LAYER_IDS = ['base-land', 'base-urban', 'base-lake', 'base-river', 'base-state', 'base-border'];
+// Los limites son los reales (Natural Earth) y el mapa del juego no calza
+// justo: en ATS 13 de 289 ciudades quedan del otro lado de un limite (Yuma
+// 18 km adentro de California, Reno 12, St. Louis 3 en Illinois) y en ETS2 17
+// de 388 (Ginebra en Francia, Luxemburgo en Belgica). Sirven para ubicarse de
+// lejos y se apagan al acercarse, antes de que se note de que lado queda una
+// ciudad del borde. Los nombres de los estados (country-label) llegan hasta
+// el mismo zoom.
+const BORDER_FADE_FROM_ZOOM = 7;
+const BORDER_FADE_TO_ZOOM = 8.5;
+const BORDER_COLOR = '#ab9fd8';
 // Con el mapa base apagado el fondo es el gris de siempre; con el prendido el
 // fondo pasa a ser el mar y la tierra se pinta con ese mismo gris, asi lo
 // unico que cambia es que aparece el agua.
@@ -1542,7 +1554,11 @@ function buildVecLayers(sourceLayer) {
 }
 
 // Se dibujan en este orden y todas van debajo de las capas del juego.
-function buildBaseLayers() {
+// flat: el mapa base no calza con el del juego (measureLocalBasemap); los
+// limites tampoco, y no se muestran.
+function buildBaseLayers(flat = false) {
+  const borderOpacity = ['interpolate', ['linear'], ['zoom'], BORDER_FADE_FROM_ZOOM, 0.9, BORDER_FADE_TO_ZOOM, 0];
+  const borderLayout = { 'line-join': 'round', visibility: flat ? 'none' : 'visible' };
   return [
     { id: 'base-land', type: 'fill', source: 'base', filter: ['==', ['get', 'k'], 'land'],
       paint: { 'fill-color': MAP_BG_FLAT } },
@@ -1552,6 +1568,16 @@ function buildBaseLayers() {
       paint: { 'fill-color': MAP_BG_WATER } },
     { id: 'base-river', type: 'line', source: 'base', filter: ['==', ['get', 'k'], 'river'],
       paint: { 'line-color': '#1e3350', 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 0.4, 10, 2] } },
+    // Estados y provincias (solo ATS): punteados, para no confundirlos con
+    // una calle. Los paises, de linea entera y un poco mas anchos.
+    { id: 'base-state', type: 'line', source: 'base', maxzoom: BORDER_FADE_TO_ZOOM, filter: ['==', ['get', 'k'], 'state'],
+      layout: borderLayout,
+      paint: { 'line-color': BORDER_COLOR, 'line-opacity': borderOpacity, 'line-dasharray': [4, 2.5],
+               'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1, 8, 1.6] } },
+    { id: 'base-border', type: 'line', source: 'base', maxzoom: BORDER_FADE_TO_ZOOM, filter: ['==', ['get', 'k'], 'border'],
+      layout: borderLayout,
+      paint: { 'line-color': BORDER_COLOR, 'line-opacity': borderOpacity,
+               'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.3, 8, 2.2] } },
   ];
 }
 
@@ -1600,7 +1626,7 @@ function applyBaseMap() {
   // quede debajo de todo; si las capas del juego todavia no estan, antes del
   // trail, que es el ancla que usa el resto.
   const before = map.getLayer('mapArea') ? 'mapArea' : 'trail-line';
-  for (const layer of buildBaseLayers()) {
+  for (const layer of buildBaseLayers(!!basemapFlatFor[key])) {
     try { map.addLayer(layer, before); } catch (err) { console.error('No se pudo agregar la capa', layer.id, err); }
   }
 }
