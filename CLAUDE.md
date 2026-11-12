@@ -815,6 +815,24 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - El turn report lleva la linea "Route:" (perfil, destino y waypoints,
   `route` de `turnReportText`): sin ella, reproducir el de Tonopah era
   adivinar la empresa hasta que la ruta pasara por los avisos.
+- Cada aviso lleva lo que faltaba por la app y por el GPS del juego cuando
+  aparecio (`(left: app ..., game ...)`, `km` de `createTurnLog`), y al final
+  van los ultimos 5 recalculos ("Route changes", `createRouteChangeLog`): hora,
+  motivo (`routeChangeReason`: ruta nueva, destino o waypoints, desvio, otra
+  rama, `routeGameRecheck`, ajustes de ruta, DLC detectados, decimas o
+  `-prefabs.bin` que llegan tarde, salto, el camion sobre la ruta mas
+  adelante; quien pone `currentRouteTarget` en null deja el suyo en
+  `routeForcedReason`), donde estaba el camion, km de la app antes y despues,
+  km del juego y si `routeLikeGame` la cambio por la que coincide con el GPS
+  (con los km de la mas rapida). Seguidos y por lo mismo a menos de 2 min van
+  en uno ("3 times"): lejos de toda calle se recalcula cada 200 m. Los
+  recalculos se anotan aunque no se este guiando; los avisos no. Reporte #39
+  (11-11, ATS, Los Angeles): la ruta paso de la I-10 a la I-8 entre dos avisos
+  y solo se sabia el km del juego del final. En la app con la posicion de las
+  09:28 y el GPS en 1.155 km, la app elige la alternativa por San Diego (1.155,4
+  contra 1.096,4 de la mas rapida) y da el mismo "keep left" en -101771, 15447
+  que el reporte. Todo junto entra en los 6.000 caracteres de la API
+  (`REPORTE_MAX`); para Discord (2.000) solo sin los recalculos.
 - Se leen y resuelven en `docs/admin.html` (seccion "Navigation reports",
   GET y PATCH /admin/nav-reports con X-Admin-Key) y se arreglan de a tandas:
   con 10 abiertos o los viernes. "Copy open reports" los junta en un texto.
@@ -997,7 +1015,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `variants.js`, `pure.js`, i18n, las declaraciones de `app.js` que hacen falta (por clausura
   desde `RAICES` de `motor/conduccion.js`), `convoy.js` entero y `conduccion.js`, la API que
   llama `nav/MotorNav.kt`. Una regla nueva de la web entra sola; una raiz renombrada hace fallar la
-  compilacion. Lo que no se ve al compilar: el DOM de mentira nunca falla. Lo que la web
+  compilacion. La clausura sale de los nombres que usa cada declaracion (`nombresUsados`): lo que
+  va despues de un punto es una propiedad, salvo los tres de `...f()` (hasta el 11-11 tambien
+  esos, y `routeLikeGameByFerry` quedo afuera: `probar_motor` fallo en cada ruta). Un nombre que
+  falta revienta recien manejando. Lo que no se ve al compilar: el DOM de mentira nunca falla. Lo que la web
   muestra escribiendo en la pagina (un aviso nuevo, como la voz en otro dispositivo) o
   escucha de un boton no existe en la app hasta sumarlo a `navegacion()` y a `motor` en
   `conduccion.js` y dibujarlo: revisar eso al tocar esa parte de la web. Lo que va en
