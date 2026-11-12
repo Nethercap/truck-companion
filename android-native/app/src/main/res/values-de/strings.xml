@@ -123,6 +123,8 @@
     <string name="nav_voz_apagar">Sprachansagen ausschalten</string>
     <string name="ajustes_voz">Sprachansagen</string>
     <string name="ajustes_voz_ayuda">Die Ansagen kommen von diesem Handy. Nur ein Gerät deiner Sitzung spricht gleichzeitig.</string>
+    <string name="ajustes_volumen_voz">Lautstärke der Ansagen: %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Nur die Ansagen werden leiser: Handy, Spiel und Musik behalten ihre Lautstärke.</string>
 
     <string name="vivo_titulo">Live-Karte</string>
     <string name="vivo_nadie">Noch niemand</string>
@@ -334,6 +336,7 @@
     <string name="ajustes_flotante_ayuda">Wenn du die App während der Fahrt verlässt, bleibt ein kleines Fenster mit der Karte und der nächsten Abbiegung über der anderen App.</string>
     <string name="servicio_canal">Navigation</string>
     <string name="servicio_activo">Navigiert im Hintergrund weiter</string>
+    <string name="aviso_limite">Tempolimit %1$d</string>
     <string name="mapa_local">auf dem PC gebaut</string>
     <string name="compartir">Teilen</string>
     <string name="stats_buscar_conductor">Fahrer suchen</string>

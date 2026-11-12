@@ -122,7 +122,7 @@ class MotorNav(
         // Un stack grande: QuickJS se apoya en el del hilo que lo corre.
         Thread(null, r, "motor-nav", 32L * 1024 * 1024)
     }
-    private val voz = Voz(contexto) { id -> enMotor { llamar("audioTermino", id) } }
+    private val voz = Voz(contexto, { prefs.ajustes.value.volumenVoz }) { id -> enMotor { llamar("audioTermino", id) } }
     private val almacen = contexto.getSharedPreferences("truckdash_motor", Context.MODE_PRIVATE)
 
     private val _apariencia = MutableStateFlow(aparienciaGuardada(almacen.getString("truckdash_settings", null)))

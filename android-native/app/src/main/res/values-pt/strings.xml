@@ -123,6 +123,8 @@
     <string name="nav_voz_apagar">Desativar a orientação por voz</string>
     <string name="ajustes_voz">Orientação por voz</string>
     <string name="ajustes_voz_ayuda">As indicações são faladas neste celular. Só um aparelho da sua sessão fala por vez.</string>
+    <string name="ajustes_volumen_voz">Volume da voz: %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Só as indicações ficam mais baixas: o celular, o jogo e sua música continuam no mesmo volume.</string>
 
     <string name="vivo_titulo">Mapa ao vivo</string>
     <string name="vivo_nadie">Ninguém ainda</string>
@@ -340,6 +342,7 @@
     <string name="ajustes_flotante_ayuda">Se você sair do app dirigindo, fica uma janelinha com o mapa e a próxima curva por cima do outro app.</string>
     <string name="servicio_canal">Navegação</string>
     <string name="servicio_activo">Navegando em segundo plano</string>
+    <string name="aviso_limite">Limite %1$d</string>
     <string name="mapa_local">montado no PC</string>
     <string name="compartir">Compartilhar</string>
     <string name="stats_buscar_conductor">Procurar um motorista</string>

@@ -123,6 +123,8 @@
     <string name="nav_voz_apagar">Sesli yönlendirmeyi kapat</string>
     <string name="ajustes_voz">Sesli yönlendirme</string>
     <string name="ajustes_voz_ayuda">Yönlendirmeler bu telefonda seslendirilir. Oturumundaki cihazlardan aynı anda yalnızca biri konuşur.</string>
+    <string name="ajustes_volumen_voz">Yönlendirme sesi: %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Yalnızca yönlendirmeler kısılır: telefonun, oyunun ve müziğin sesi aynı kalır.</string>
 
     <string name="vivo_titulo">Canlı harita</string>
     <string name="vivo_nadie">Henüz kimse yok</string>
@@ -334,6 +336,7 @@
     <string name="ajustes_flotante_ayuda">Sürerken uygulamadan çıkarsan, diğer uygulamanın üstünde harita ve sonraki dönüşle küçük bir pencere kalır.</string>
     <string name="servicio_canal">Navigasyon</string>
     <string name="servicio_activo">Arka planda gezinmeye devam ediyor</string>
+    <string name="aviso_limite">Sınır %1$d</string>
     <string name="mapa_local">bilgisayarda oluşturuldu</string>
     <string name="compartir">Paylaş</string>
     <string name="stats_buscar_conductor">Sürücü ara</string>

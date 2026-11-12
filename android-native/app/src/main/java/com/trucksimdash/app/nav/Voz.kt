@@ -6,6 +6,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Base64
@@ -16,8 +17,11 @@ import java.util.Locale
  * Lo que suena. Que decir y cuando lo decide la web (speakVoice, voiceGuide); aca llegan
  * los clips de sus paquetes o, en una voz del sistema, el texto para TextToSpeech. Baja el
  * volumen de lo demas (el juego por Moonlight, la musica) mientras habla.
+ *
+ * `volumen` es el de Ajustes: baja solo la voz, sin tocar el del telefono, que tambien es el
+ * del juego por Moonlight y el de la musica (pedido de Discord, 12-11).
  */
-class Voz(contexto: Context, private val alTerminar: (Int) -> Unit) {
+class Voz(contexto: Context, private val volumen: () -> Float, private val alTerminar: (Int) -> Unit) {
     private val app = contexto.applicationContext
     private val audio = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val atributos = AudioAttributes.Builder()
@@ -83,6 +87,8 @@ class Voz(contexto: Context, private val alTerminar: (Int) -> Unit) {
                     true
                 }
                 prepare()
+                val a = amplitudVoz(volumen())
+                setVolume(a, a)
                 start()
             }
         }.onFailure {
@@ -134,6 +140,16 @@ class Voz(contexto: Context, private val alTerminar: (Int) -> Unit) {
         val t = tts ?: return alTerminar(id)
         if (idioma != null) t.language = Locale.forLanguageTag(idioma)
         pedirFoco()
-        t.speak(frase, TextToSpeech.QUEUE_FLUSH, null, id.toString())
+        val parametros = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, amplitudVoz(volumen())) }
+        t.speak(frase, TextToSpeech.QUEUE_FLUSH, parametros, id.toString())
     }
+}
+
+/**
+ * Del deslizador a lo que se le pasa al reproductor, que es lineal: al cuadrado, para que la
+ * mitad del recorrido se oiga como la mitad y no casi igual que al maximo.
+ */
+internal fun amplitudVoz(volumen: Float): Float {
+    val v = volumen.coerceIn(0f, 1f)
+    return v * v
 }

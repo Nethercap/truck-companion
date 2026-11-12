@@ -123,6 +123,8 @@
     <string name="nav_voz_apagar">Apagar la voz</string>
     <string name="ajustes_voz">Indicaciones por voz</string>
     <string name="ajustes_voz_ayuda">Las indicaciones se dicen en este teléfono. Habla un solo dispositivo de tu sesión a la vez.</string>
+    <string name="ajustes_volumen_voz">Volumen de la voz: %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Solo bajan las indicaciones: el teléfono, el juego y tu música quedan como están.</string>
 
     <string name="vivo_titulo">Mapa en vivo</string>
     <string name="vivo_nadie">Nadie todavía</string>
@@ -336,6 +338,7 @@
     <string name="ajustes_flotante_ayuda">Si salís de la app mientras manejás, queda una ventanita con el mapa y el próximo giro arriba de la otra app.</string>
     <string name="servicio_canal">Navegación</string>
     <string name="servicio_activo">Sigue navegando en segundo plano</string>
+    <string name="aviso_limite">Límite %1$d</string>
     <string name="mapa_local">armado en la PC</string>
     <string name="compartir">Compartir</string>
     <string name="stats_buscar_conductor">Buscar un conductor</string>
