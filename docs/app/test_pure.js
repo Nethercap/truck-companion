@@ -4369,6 +4369,30 @@ test('overlay de OBS: que se muestra segun el link', () => {
   assert.ok(!obsOverlayItems(null, null, false).includes('gear'));
 });
 
+test('navHudHeadingRoad: la ruta y los puntos cardinales para el overlay del juego (Discord 12-11)', () => {
+  const { navHudHeadingRoad, NAV_HUD_ROAD_MAX } = require('./pure.js');
+  assert.deepEqual(navHudHeadingRoad('I-80', 'N,NE,E,SE,S,SW,W,NW'),
+    { road: 'I-80', headingNames: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] });
+  // Sin cartel cerca (o ETS2, sin numeros de ruta) va vacio
+  assert.equal(navHudHeadingRoad(null, 'N,NE,E,SE,S,SW,W,NW').road, '');
+  assert.equal(navHudHeadingRoad('  US-6  ', '').road, 'US-6');
+  assert.equal(navHudHeadingRoad('x'.repeat(40), '').road.length, NAV_HUD_ROAD_MAX);
+  // Una traduccion que no da 8 puntos cortos: null y el cliente usa los suyos
+  assert.equal(navHudHeadingRoad('I-80', 'N,E,S,W').headingNames, null);
+  assert.equal(navHudHeadingRoad('I-80', 'N,NE,E,SE,S,SW,W,Noroeste').headingNames, null);
+  assert.equal(navHudHeadingRoad('I-80', undefined).headingNames, null);
+  // Los 8 idiomas de la app traen los 8 puntos
+  const fs = require('fs');
+  const vm = require('vm');
+  const ctx = vm.createContext({});
+  for (const f of ['i18n_en_es.js', 'i18n.js']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, f), 'utf8'), ctx);
+  const textos = vm.runInContext('({ ...TRANSLATIONS, ...TRANSLATIONS_EXTRA })', ctx);
+  assert.deepEqual(Object.keys(textos).sort(), ['de', 'en', 'es', 'fr', 'pl', 'pt', 'ru', 'tr']);
+  for (const [lang, t] of Object.entries(textos)) {
+    assert.ok(navHudHeadingRoad('', t.overlayCompassPoints).headingNames, lang);
+  }
+});
+
 test('formatGear: la marcha igual que en el overlay del juego', () => {
   const { formatGear } = require('./pure.js');
   // los mismos casos que formato_marcha en client/test_overlay.py

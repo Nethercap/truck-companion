@@ -127,7 +127,7 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
     monkeypatch.setattr(win_integration, "overlay_supported", lambda: True)
     monkeypatch.setattr(win_integration, "load_settings", lambda: {})
     assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": 100,
-                                                  "opacity": 90, "items": overlay.ITEMS,
+                                                  "opacity": 90, "items": overlay.ITEMS_POR_DEFECTO,
                                                   "hotkey": "ctrl+shift+o", "pos": None}
     # El tamano de antes era una letra: se pasa a su por ciento.
     monkeypatch.setattr(win_integration, "load_settings",
@@ -161,7 +161,7 @@ def test_textos_en_los_ocho_idiomas():
     claves = ["overlay_option", "overlay_position", "overlay_size", "overlay_opacity", "menu_overlay",
               "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show",
               "overlay_hotkey", "hotkey_none", "sec_overlay", "overlay_hint", "pos_custom",
-              "overlay_move", "overlay_move_done", "overlay_move_hint"]
+              "overlay_move", "overlay_move_done", "overlay_move_hint", "overlay_compass"]
     claves += [f"pos_{c}" for c in overlay.CORNERS]
     claves += [f"item_{k}" for k in overlay.ITEMS]
     for lang, textos in i18n._STRINGS.items():
@@ -506,3 +506,62 @@ def test_paradas_cercanas_se_limpian():
 def test_el_ejemplo_del_modo_mover_trae_las_paradas_cercanas():
     assert len(overlay.ejemplo(overlay.ITEMS, ("F", "R", "J"))["near_stops"]) == 2
     assert overlay.ejemplo(("speed",), ("F", "R", "J"))["near_stops"] is None
+
+
+# Rumbo y numero de ruta (Discord, 12-11)
+
+# Sobre el meridiano central de ATS la grilla del juego apunta al norte real
+EN_IOWA = {"x": 7245, "z": -14697}
+
+
+def test_rumbo_sin_tablero_y_ruta_del_tablero():
+    t = tele(game="ats", heading=316.0, position=EN_IOWA)
+    items = overlay.ITEMS
+    d = overlay.contenido(t, 100.0, None, 0.0, 100.5, items=items)
+    # El rumbo sale de la telemetria aunque no haya tablero; la ruta no
+    assert d["heading"] == "NW" and d["road"] == ""
+    n = nav(road="I-80", headingNames=["N", "NE", "E", "SE", "S", "SO", "O", "NO"])
+    d = overlay.contenido(t, 100.0, n, 100.0, 100.5, items=items)
+    assert d["heading"] == "NO" and d["road"] == "I-80"
+    # El tablero se callo: la ruta se va (puede ser vieja), el rumbo queda y
+    # con los nombres del tablero
+    d = overlay.contenido(t, 119.5, n, 100.0, 120.0, items=items)
+    assert d["heading"] == "NO" and d["road"] == ""
+    # Sin tablero nunca, los del idioma del cliente
+    d = overlay.contenido(t, 100.0, None, 0.0, 100.5, items=items, rumbos="K,KD,D,GD,G,GB,B,KB")
+    assert d["heading"] == "KB"
+
+
+def test_rumbo_y_ruta_solo_si_se_eligen_y_apagados_por_defecto():
+    t = tele(game="ats", heading=90.0, position=EN_IOWA)
+    n = nav(road="I-80")
+    d = overlay.contenido(t, 100.0, n, 100.0, 100.5, items=overlay.ITEMS_POR_DEFECTO)
+    assert d["heading"] == "" and d["road"] == ""
+    assert "heading" not in overlay.ITEMS_POR_DEFECTO and "road" not in overlay.ITEMS_POR_DEFECTO
+    assert set(overlay.ITEMS_POR_DEFECTO) | {"heading", "road"} == set(overlay.ITEMS)
+    # Solo el rumbo elegido alcanza para que se vea el overlay
+    d = overlay.contenido(t, 100.0, None, 0.0, 100.5, items=("heading",))
+    assert d is not None and d["heading"] == "E" and not d["speed"]
+    # Sin rumbo en la telemetria (cliente sin rotationX) y nada mas: no se ve
+    assert overlay.contenido(tele(game="ats", heading=None, position=EN_IOWA), 100.0, None, 0.0, 100.5,
+                             items=("heading",)) is None
+
+
+def test_ruta_y_puntos_del_tablero_se_limpian():
+    n = overlay.limpiar_nav({"road": "  I-80 Bus extra largo de mas  ", "headingNames": ["N"] * 7})
+    assert n["road"] == "I-80 Bus extra l" and n["headingNames"] is None
+    assert overlay.limpiar_nav({"road": 80, "headingNames": "N,NE,E,SE,S,SW,W,NW"})["road"] == ""
+    assert overlay.limpiar_nav({"headingNames": ["N", "", "E", "SE", "S", "SW", "W", "NW"]})["headingNames"] is None
+    assert overlay.limpiar_nav({"headingNames": ["N", 1, "E", "SE", "S", "SW", "W", "NW"]})["headingNames"] is None
+    assert overlay.limpiar_nav({})["road"] == "" and overlay.limpiar_nav({})["headingNames"] is None
+    # Un texto que no son 8 puntos (otra traduccion rota): los de siempre
+    t = tele(game="ats", heading=180.0, position=EN_IOWA)
+    assert overlay.contenido(t, 100.0, None, 0.0, 100.5, items=("heading",), rumbos="S,N")["heading"] == "S"
+
+
+def test_el_ejemplo_del_modo_mover_trae_rumbo_y_ruta_si_se_eligen():
+    d = overlay.ejemplo(("speed", "heading", "road"), ("F", "R", "J"))
+    assert d["heading"] and d["road"]
+    d = overlay.ejemplo(("speed",), ("F", "R", "J"))
+    assert d["heading"] == "" and d["road"] == ""
+

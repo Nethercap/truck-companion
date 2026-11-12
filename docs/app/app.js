@@ -6048,6 +6048,9 @@ function sendNavHud() {
     remainingLabel: t('routeRemainingLabel'),
     arrivalLabel: t('overlayArrivalReal'),
     gameArrivalLabel: t('overlayArrivalGame'),
+    // El overlay del juego: la ruta por la que se va y los puntos cardinales
+    // en el idioma del tablero (navHudHeadingRoad en pure.js)
+    ...navHudHeadingRoad(currentRoadLabel, t('overlayCompassPoints')),
     imperial: !!useImperial,
     // El formato de hora de Ajustes: el overlay del juego calcula la
     // llegada del juego y el de OBS las dos, y tienen que salir como aca.
