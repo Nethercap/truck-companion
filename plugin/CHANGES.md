@@ -38,6 +38,27 @@ plugin does not know, so they never reached the shared memory. Seen in
   `is_cargo_loaded`, and in a quick job the configuration arrives once, with
   the cargo already on board. Not yet checked with a freight market car job.
 
+## Bus jobs (ETS2 1.62.3, Coaches)
+
+The Coaches DLC (12-11-2026) brought the first real bus jobs. They use the
+`bus_job` configuration, but they end with `bus_job.completed` (with
+`passenger.satisfaction` next to `revenue`), not `bus_job.delivered`, so
+the delivery never reached the shared memory. `completed` now counts as
+`delivered`; `bus_job.cancelled` already worked. The names come from the
+game executable (the published SDK does not have them), and
+`tools/probar_plugin_linux.py` plays a bus job against the plugin.
+
+Also from the executable, sent with `bus_job` and not stored yet:
+`bus.stages.count`, `bus.stages.current`, `source_stop.*` and
+`destination_stop.*` (`id`, `name`, `type`, planned and actual departure
+and arrival times, passengers getting on and off). Next to `bus_job.market`
+the executable has `company_job` and `tourist_job` (likely its values, with
+`quick_job`); not seen in a game yet. Until they are stored, every
+non-empty `bus_job` configuration and every `bus_job.*` event goes to
+`game.log.txt` with its values, as a message (`log_configs` /
+`log_events`, now logged as messages instead of errors), so a log from a
+real coach job shows what the game sends at each stop.
+
 Not mapped (no field for them in the revision 12 layout): the car job
 attributes `customer.prio.cargo`, `customer.prio.time`,
 `customer.prio.vehicle`, and `vehicle.damage` on delivery. The plugin still
