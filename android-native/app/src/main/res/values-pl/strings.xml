@@ -111,7 +111,7 @@
     <string name="nav_ocultar_ruta">Ukryj trasę</string>
     <string name="nav_mostrar_ruta">Pokaż trasę ponownie</string>
     <string name="nav_atras">za Tobą</string>
-    <string name="nav_ayuda_mapa">Wskazówka: przytrzymaj mapę, aby poprowadzić trasę przez ten punkt.</string>
+    <string name="nav_ayuda_mapa">Wskazówka: przytrzymaj mapę, aby poprowadzić trasę przez ten punkt, a dotknij numerowanego przystanku, aby go usunąć.</string>
     <string name="cerrar">Zamknij</string>
     <string name="ajustes_perfil">Trasa</string>
     <string name="perfil_rapida">Najszybsza</string>

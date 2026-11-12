@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.SystemClock
 import android.util.DisplayMetrics
@@ -37,6 +38,7 @@ import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.Layer
+import org.maplibre.geojson.Point
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.hypot
@@ -78,6 +80,12 @@ class ControlMapa(
 
     /** Mantener apretado sobre el mapa: ahi va un waypoint. */
     var alMantenerApretado: ((LngLat) -> Unit)? = null
+
+    /**
+     * Tocar una parada numerada: cual (desde 0) y donde quedo en la pantalla, en pixeles. Sin esto
+     * la unica salida era la hoja del buscador, y habia quien no la encontraba (Discord, 12-11).
+     */
+    var alTocarWaypoint: ((indice: Int, enPantalla: PointF) -> Unit)? = null
 
     var seguir: Boolean = true
         set(valor) {
@@ -135,6 +143,12 @@ class ControlMapa(
         mapa.addOnMapLongClickListener { punto ->
             val accion = alMantenerApretado ?: return@addOnMapLongClickListener false
             accion(LngLat(punto.longitude, punto.latitude))
+            true
+        }
+        mapa.addOnMapClickListener { punto ->
+            val accion = alTocarWaypoint ?: return@addOnMapClickListener false
+            val parada = waypointTocado(mapa.projection.toScreenLocation(punto)) ?: return@addOnMapClickListener false
+            accion(parada.n - 1, PointF(parada.x, parada.y))
             true
         }
         // Los logos de empresa son unos 500 y en una ciudad se ven diez: se bajan
@@ -325,6 +339,20 @@ class ControlMapa(
 
     fun ponerWaypoints(lista: List<LngLat>) {
         estilo?.getSourceAs<GeoJsonSource>(CapasMapa.FUENTE_WAYPOINTS)?.setGeoJson(geojsonWaypoints(lista))
+    }
+
+    /** El circulo es de 11 dp: se acepta el toque un poco afuera, que manejando no se apunta fino. */
+    private fun waypointTocado(toque: PointF): ParadaEnPantalla? {
+        if (estilo == null) return null
+        val radio = RADIO_TOQUE_WAYPOINT_DP * mapView.resources.displayMetrics.density
+        val caja = RectF(toque.x - radio, toque.y - radio, toque.x + radio, toque.y + radio)
+        val cerca = mapa.queryRenderedFeatures(caja, CapasMapa.CAPA_WAYPOINTS).mapNotNull { f ->
+            val n = f.getStringProperty("n")?.toIntOrNull() ?: return@mapNotNull null
+            val p = f.geometry() as? Point ?: return@mapNotNull null
+            val enPantalla = mapa.projection.toScreenLocation(LatLng(p.latitude(), p.longitude()))
+            ParadaEnPantalla(n, enPantalla.x, enPantalla.y)
+        }
+        return paradaMasCercana(toque.x, toque.y, radio, cerca)
     }
 
     /** Lo que la web le pone al mapa ademas de la ruta. Los escudos se dibujan una sola vez. */
@@ -548,6 +576,9 @@ class ControlMapa(
         const val ZOOM_SEGUIR_MIN = 7.0
         const val PASO_LAT_ANCHOS = 2.0
         const val MS_ENTRE_AVISOS_CAMARA = 200L
+
+        /** El circulo mide 11 dp de radio, y un dedo unos 10 mm: 24 dp alrededor del centro. */
+        const val RADIO_TOQUE_WAYPOINT_DP = 24f
     }
 }
 

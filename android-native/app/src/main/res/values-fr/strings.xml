@@ -111,7 +111,7 @@
     <string name="nav_ocultar_ruta">Masquer l\'itinéraire</string>
     <string name="nav_mostrar_ruta">Afficher à nouveau l\'itinéraire</string>
     <string name="nav_atras">derrière toi</string>
-    <string name="nav_ayuda_mapa">Astuce : appuie longuement sur la carte pour passer par ce point.</string>
+    <string name="nav_ayuda_mapa">Astuce : appuie longuement sur la carte pour passer par ce point, et touche une étape numérotée pour la retirer.</string>
     <string name="cerrar">Fermer</string>
     <string name="ajustes_perfil">Itinéraire</string>
     <string name="perfil_rapida">Le plus rapide</string>

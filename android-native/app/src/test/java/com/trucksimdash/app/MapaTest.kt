@@ -9,6 +9,7 @@ import com.trucksimdash.app.mapa.CatalogoMapas
 import com.trucksimdash.app.mapa.LineaRuta
 import com.trucksimdash.app.mapa.LngLat
 import com.trucksimdash.app.mapa.MarcaJugador
+import com.trucksimdash.app.mapa.ParadaEnPantalla
 import com.trucksimdash.app.mapa.VarianteMapa
 import com.trucksimdash.app.mapa.cajaDesdeCiudades
 import com.trucksimdash.app.mapa.diferenciaAngular
@@ -17,6 +18,8 @@ import com.trucksimdash.app.mapa.geojsonJugadores
 import com.trucksimdash.app.mapa.geojsonLinea
 import com.trucksimdash.app.mapa.geojsonPunto
 import com.trucksimdash.app.mapa.geojsonRutas
+import com.trucksimdash.app.mapa.geojsonWaypoints
+import com.trucksimdash.app.mapa.paradaMasCercana
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -195,5 +198,30 @@ class MapaTest {
         assertEquals(20.0, diferenciaAngular(10.0, 350.0), 1e-9)
         assertEquals(-20.0, diferenciaAngular(350.0, 10.0), 1e-9)
         assertEquals(0.0, diferenciaAngular(90.0, 90.0), 1e-9)
+    }
+
+    @Test
+    fun `tocar entre dos paradas juntas elige la mas cercana al dedo`() {
+        // La 2 y la 3 de la captura de Discord (12-11), a unos 60 px una de otra.
+        val paradas = listOf(ParadaEnPantalla(3, 420f, 660f), ParadaEnPantalla(2, 395f, 717f))
+        assertEquals(2, paradaMasCercana(398f, 705f, 60f, paradas)?.n)
+        assertEquals(3, paradaMasCercana(415f, 670f, 60f, paradas)?.n)
+        // El orden en que las da el mapa no cambia nada.
+        assertEquals(2, paradaMasCercana(398f, 705f, 60f, paradas.reversed())?.n)
+    }
+
+    @Test
+    fun `un toque lejos de toda parada no es de ninguna`() {
+        val paradas = listOf(ParadaEnPantalla(1, 100f, 100f))
+        assertNull(paradaMasCercana(100f, 161f, 60f, paradas))
+        assertEquals(1, paradaMasCercana(100f, 159f, 60f, paradas)?.n)
+        assertNull(paradaMasCercana(100f, 100f, 60f, emptyList()))
+    }
+
+    @Test
+    fun `cada parada lleva su numero, el que se toca para sacarla`() {
+        val geo = JsonLaxo.parseToJsonElement(geojsonWaypoints(listOf(LngLat(1.0, 2.0), LngLat(3.0, 4.0)))).jsonObject
+        val numeros = geo["features"]!!.jsonArray.map { it.jsonObject["properties"]!!.jsonObject["n"]!!.jsonPrimitive.content }
+        assertEquals(listOf("1", "2"), numeros)
     }
 }

@@ -111,7 +111,7 @@
     <string name="nav_ocultar_ruta">Route ausblenden</string>
     <string name="nav_mostrar_ruta">Route wieder anzeigen</string>
     <string name="nav_atras">hinter dir</string>
-    <string name="nav_ayuda_mapa">Tipp: Halte die Karte gedrückt, um die Route über diesen Punkt zu führen.</string>
+    <string name="nav_ayuda_mapa">Tipp: Halte die Karte gedrückt, um die Route über diesen Punkt zu führen, und tippe auf einen nummerierten Stopp, um ihn zu entfernen.</string>
     <string name="cerrar">Schließen</string>
     <string name="ajustes_perfil">Route</string>
     <string name="perfil_rapida">Schnellste</string>
