@@ -56,7 +56,12 @@ PREFIX = {"ats": "usa", "ets2": "europe"}
 LAYER = {"ats": "ats", "ets2": "ets2"}
 
 _MODS_HEADER_RE = re.compile(r"\[mods\] Active (\d+) mods")
-_MOUNT_RE = re.compile(r"\[fs\] device (?P<path>.+?) mounted to mod pool\.")
+# Los juegos de hoy escriben "mounted to mod pool." (y "to base pool." los DLC).
+# Los de antes (visto en ETS2 1.53.3, Discord 12-11: con 97 mods activos, entre
+# ellos varios mapas, Setup no ofrecia armar nada) escriben "mounted." para todo,
+# y en la linea siguiente el mod_package_manager dice que lo montado es un mod.
+_MOUNT_RE = re.compile(r"\[fs\] device (?P<path>.+?) mounted"
+                       r"(?: to mod pool\.|\.\r?\n[^\n]*\[mod_package_manager\] Mod )")
 
 
 # ---------------------------------------------------------------- mods activos
