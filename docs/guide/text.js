@@ -24,6 +24,7 @@ GUIDE_TEXT.en = {
     devices: 'Several devices at once',
     convoy: 'Convoy (beta)',
     client: 'The client on your PC',
+    mapbuild: 'Build my map: map mods we don\'t have',
     overlay: 'The in-game overlay',
     account: 'Your account (optional)',
   },
@@ -33,6 +34,7 @@ GUIDE_TEXT.en = {
     phone: 'Navigation mode on a phone.',
     dash: 'The dashboard, full screen.',
     overlay: 'The overlay over ETS2: next turn, speed and limit, distance left, and arrival in real time and on the game clock.',
+    mapbuild: 'Your map mods, in Setup & status.',
   },
   b: {
     start: `
@@ -76,7 +78,7 @@ GUIDE_TEXT.en = {
 <ul>
 <li>The <b>blue line</b> behind the truck is where you have driven.</li>
 <li>With <b>Share my position</b> on, you see other Truck Dash drivers on your map and you appear on the public <a href="/live/">live map</a> as an anonymous driver, with your route drawn unless you untick <b>Also show my route on the live map</b>. You can turn it off in Settings.</li>
-<li><b>Map mods</b> have their own maps: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, ATS Expansion, Reforma, RusMap, Roextended, Grand Utopia and TruckersMP. The app detects them from the game, or you pick one with the puzzle button.</li>
+<li><b>Map mods</b> have their own maps: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, ATS Expansion, Reforma, RusMap, Roextended, Grand Utopia and TruckersMP. The app detects them from the game, or you pick one with the puzzle button. Not on the list? See <a href="#mapbuild">Build my map</a>.</li>
 <li><b>DLCs</b> (in Settings): uncheck the map DLCs you do not own and routes avoid their roads. If there is no way around one, the route uses it anyway and says so. With the client 1.5.28 or newer they are read from your game on their own.</li>
 </ul>
 <p>Every map button can be moved and resized: long-press one on a phone, or use <b>Move the buttons</b> in Settings.</p>`,
@@ -169,6 +171,23 @@ GUIDE_TEXT.en = {
 <li><b>Show log file</b> and <b>Report a problem</b>.</li>
 </ul>
 <div class="tip"><p>Something not working? Ask in our <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> and attach the log file: most problems are solved in a couple of messages.</p></div>`,
+    mapbuild: `
+<p>For a map mod that is not on our servers (one we don't have, a newer version than ours, or a combination we don't publish), the client can build the map on your PC, from your game and your active mods. The app then routes and guides you on it like on any other map.</p>
+<h3>Step by step</h3>
+<ol>
+<li>Play once with the mods you want: Truck Dash reads which ones are active from the game's log, so the mods of your last session are the ones it builds. Then <b>close the game</b>: building the map needs the memory the game uses.</li>
+<li>Right-click the tray icon, next to the clock, and open <b>Setup &amp; status</b>.</li>
+<li>In <b>Your map mods</b>, click <b>Build my map</b>. If the app saw your truck, or your job's destination, off the map, this section already says so, and the client tells you from the tray too.</li>
+<li>Wait while Setup shows each step (downloading the map builder, reading the game and your mods, drawing the map...). It usually takes about 5 minutes and 7 GB of memory, more with many map mods; the first time it also downloads the map builder (about 40 MB). <b>Cancel</b> stops it.</li>
+<li>When it finishes, the section says <i>Map built on this PC</i>, with how many cities it has. Open the game and the app: with <b>Map mods</b> on <b>Automatic</b> (the puzzle button) the app uses that map on its own.</li>
+</ol>
+<h3>Where you see it</h3>
+<ul>
+<li>On that PC, and on any phone or tablet on your Wi-Fi in same Wi-Fi mode (see <a href="#start">Getting started</a>).</li>
+<li>A phone connected with the pairing code from somewhere else keeps the map from our servers.</li>
+<li>It is used while the same mods are active. If you change your map mods, Setup offers to build it again.</li>
+</ul>
+<div class="tip"><p>Did it stop? Opening the game in the middle stops the build: close the game and click <b>Build my map</b> again. If it runs out of memory, close other programs or try a profile with fewer map mods. For anything else, <b>Report a problem</b> in the tray menu brings the end of the map builder's log.</p></div>`,
     overlay: `
 <p>A small panel the client draws over the game, so you see the essentials without looking away from the road. Windows only (not under Linux with Proton), with the game in a window or in borderless fullscreen.</p>
 <ul>
@@ -258,6 +277,7 @@ GUIDE_TEXT.es = {
     devices: 'Varios dispositivos a la vez',
     convoy: 'Convoy (beta)',
     client: 'El cliente de la PC',
+    mapbuild: 'Armar mi mapa: mods de mapa que no tenemos',
     overlay: 'El overlay en el juego',
     account: 'Tu cuenta (opcional)',
   },
@@ -267,6 +287,7 @@ GUIDE_TEXT.es = {
     phone: 'Modo navegación en un celular.',
     dash: 'El tablero, a pantalla completa.',
     overlay: 'El overlay sobre ETS2: próximo giro, velocidad y límite, lo que falta, y la llegada en hora real y en el reloj del juego.',
+    mapbuild: 'Tus mods de mapa, en Configuración y estado.',
   },
   b: {
     start: `
@@ -310,7 +331,7 @@ GUIDE_TEXT.es = {
 <ul>
 <li>La <b>línea azul</b> detrás del camión es por donde anduviste.</li>
 <li>Con <b>Compartir mi posición</b> prendido ves a otros conductores de Truck Dash en tu mapa y aparecés en el <a href="/live/">mapa en vivo</a> público como un conductor anónimo, con tu ruta dibujada salvo que destildes <b>Mostrar también mi ruta en el mapa en vivo</b>. Se apaga en Configuración.</li>
-<li>Los <b>mods de mapa</b> tienen su propio mapa: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, ATS Expansion, Reforma, RusMap, Roextended, Grand Utopia y TruckersMP. La app los detecta desde el juego, o elegís uno con el botón del rompecabezas.</li>
+<li>Los <b>mods de mapa</b> tienen su propio mapa: ProMods, Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, ATS Expansion, Reforma, RusMap, Roextended, Grand Utopia y TruckersMP. La app los detecta desde el juego, o elegís uno con el botón del rompecabezas. ¿No está en la lista? Mirá <a href="#mapbuild">Armar mi mapa</a>.</li>
 <li><b>DLC</b> (en Ajustes): destildá los DLC de mapa que no tenés y las rutas evitan sus caminos. Si no hay forma de rodear uno, la ruta lo usa igual y te avisa. Con el cliente 1.5.28 o más nuevo se leen solos de tu juego.</li>
 </ul>
 <p>Todos los botones del mapa se pueden mover y agrandar: dejá apretado uno en el celular, o usá <b>Mover los botones</b> en Configuración.</p>`,
@@ -403,6 +424,23 @@ GUIDE_TEXT.es = {
 <li><b>Ver archivo de log</b> y <b>Reportar un problema</b>.</li>
 </ul>
 <div class="tip"><p>¿Algo no anda? Preguntá en nuestro <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> y adjuntá el archivo de log: la mayoría de los problemas se resuelven en un par de mensajes.</p></div>`,
+    mapbuild: `
+<p>Para un mod de mapa que no está en nuestros servidores (uno que no tenemos, una versión más nueva que la nuestra o una combinación que no publicamos), el cliente puede armar el mapa en tu PC, con tu juego y tus mods activos. Después la app te rutea y te guía en ese mapa como en cualquier otro.</p>
+<h3>Paso a paso</h3>
+<ol>
+<li>Jugá una vez con los mods que querés: Truck Dash lee cuáles están activos del log del juego, así que arma los de tu última partida. Después <b>cerrá el juego</b>: armar el mapa necesita la memoria que usa el juego.</li>
+<li>Clic derecho en el ícono de la bandeja, al lado del reloj, y abrí <b>Configuración y estado</b>.</li>
+<li>En <b>Tus mods de mapa</b>, tocá <b>Armar mi mapa</b>. Si la app vio tu camión, o el destino de tu trabajo, fuera del mapa, esta sección ya lo dice, y el cliente también te avisa desde la bandeja.</li>
+<li>Esperá mientras Configuración muestra cada paso (bajando el armador de mapas, leyendo el juego y tus mods, dibujando el mapa...). Suele tardar unos 5 minutos y usar unos 7 GB de memoria, más con muchos mods de mapa; la primera vez también baja el armador de mapas (unos 40 MB). <b>Cancelar</b> lo frena.</li>
+<li>Cuando termina, la sección dice <i>Mapa armado en esta PC</i>, con cuántas ciudades tiene. Abrí el juego y la app: con <b>Mods de mapa</b> en <b>Automático</b> (el botón del rompecabezas), la app usa ese mapa sola.</li>
+</ol>
+<h3>Dónde se ve</h3>
+<ul>
+<li>En esa PC, y en cualquier celular o tablet de tu WiFi con el modo para la misma WiFi (ver <a href="#start">Primeros pasos</a>).</li>
+<li>Un celular conectado con el código de pairing desde otro lado sigue con el mapa de nuestros servidores.</li>
+<li>Se usa mientras estén activos los mismos mods. Si cambiás tus mods de mapa, Configuración ofrece armarlo de nuevo.</li>
+</ul>
+<div class="tip"><p>¿Se frenó? Abrir el juego en el medio frena el armado: cerrá el juego y tocá <b>Armar mi mapa</b> otra vez. Si se queda sin memoria, cerrá otros programas o probá con un perfil con menos mods de mapa. Para cualquier otra cosa, <b>Reportar un problema</b> en el menú de la bandeja lleva el final del log del armador.</p></div>`,
     overlay: `
 <p>Un recuadro que el cliente dibuja sobre el juego, para ver lo importante sin sacar la vista de la ruta. Solo en Windows (no en Linux con Proton), con el juego en ventana o en pantalla completa sin bordes.</p>
 <ul>
