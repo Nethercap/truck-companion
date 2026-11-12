@@ -123,6 +123,8 @@
     <string name="nav_voz_apagar">Désactiver le guidage vocal</string>
     <string name="ajustes_voz">Guidage vocal</string>
     <string name="ajustes_voz_ayuda">Les indications sont dites sur ce téléphone. Un seul appareil de ta session parle à la fois.</string>
+    <string name="ajustes_volumen_voz">Volume du guidage : %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Seules les indications baissent : le téléphone, le jeu et ta musique gardent leur volume.</string>
 
     <string name="vivo_titulo">Carte en direct</string>
     <string name="vivo_nadie">Personne pour l\'instant</string>
@@ -340,6 +342,7 @@
     <string name="ajustes_flotante_ayuda">Si vous quittez l\'appli en conduisant, une petite fenêtre avec la carte et la prochaine direction reste au-dessus de l\'autre appli.</string>
     <string name="servicio_canal">Navigation</string>
     <string name="servicio_activo">Navigation en arrière-plan</string>
+    <string name="aviso_limite">Limite %1$d</string>
     <string name="mapa_local">construite sur le PC</string>
     <string name="compartir">Partager</string>
     <string name="stats_buscar_conductor">Chercher un conducteur</string>

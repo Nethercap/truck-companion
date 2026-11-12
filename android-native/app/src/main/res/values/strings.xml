@@ -129,6 +129,8 @@
     <string name="nav_voz_apagar">Turn off voice guidance</string>
     <string name="ajustes_voz">Voice guidance</string>
     <string name="ajustes_voz_ayuda">The directions are spoken on this phone. Only one device of your session talks at a time.</string>
+    <string name="ajustes_volumen_voz">Voice volume: %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Only the directions get quieter: the phone, the game and your music keep their volume.</string>
 
     <!-- En vivo -->
     <string name="vivo_titulo">Live map</string>
@@ -346,6 +348,7 @@
     <string name="ajustes_flotante_ayuda">If you leave the app while driving, a small window with the map and the next turn stays on top of the other app.</string>
     <string name="servicio_canal">Navigation</string>
     <string name="servicio_activo">Still navigating in the background</string>
+    <string name="aviso_limite">Limit %1$d</string>
     <string name="mapa_local">built on the PC</string>
     <string name="compartir">Share</string>
     <string name="stats_buscar_conductor">Look up a driver</string>

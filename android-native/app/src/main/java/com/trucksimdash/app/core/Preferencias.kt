@@ -67,6 +67,9 @@ sealed interface Destino {
     data class Lan(val host: String) : Destino
 }
 
+/** Mas bajo la voz no se oye con el juego de fondo: para callarla esta el interruptor. */
+const val VOLUMEN_VOZ_MIN = 0.1f
+
 data class Ajustes(
     val unidades: Unidades = Unidades.Auto,
     val pantallaEncendida: Boolean = true,
@@ -74,6 +77,8 @@ data class Ajustes(
     val mostrarTmp: Boolean = true,
     val apodo: String = "",
     val voz: Boolean = false,
+    /** Cuanto suena la voz, de VOLUMEN_VOZ_MIN a 1: solo ella, el telefono queda igual. */
+    val volumenVoz: Float = 1f,
     val botones: List<BotonPropio> = emptyList(),
     /** Seguir con otra app adelante, con su notificacion (ServicioManejo). */
     val segundoPlano: Boolean = true,
@@ -96,6 +101,7 @@ class Preferencias(contexto: Context) {
             mostrarTmp = sp.getBoolean("mostrarTmp", true),
             apodo = sp.getString("apodo", "") ?: "",
             voz = sp.getBoolean("voz", false),
+            volumenVoz = sp.getFloat("volumenVoz", 1f).coerceIn(VOLUMEN_VOZ_MIN, 1f),
             botones = leerBotones(sp.getString("botones", null)),
             segundoPlano = sp.getBoolean("segundoPlano", true),
             flotanteAlSalir = sp.getBoolean("flotanteAlSalir", false),
@@ -154,6 +160,12 @@ class Preferencias(contexto: Context) {
     fun ponerVoz(valor: Boolean) {
         sp.edit { putBoolean("voz", valor) }
         _ajustes.value = _ajustes.value.copy(voz = valor)
+    }
+
+    fun ponerVolumenVoz(valor: Float) {
+        val v = valor.coerceIn(VOLUMEN_VOZ_MIN, 1f)
+        sp.edit { putFloat("volumenVoz", v) }
+        _ajustes.value = _ajustes.value.copy(volumenVoz = v)
     }
 
     /** A donde se conecto la ultima vez: al abrir, se vuelve solo. */

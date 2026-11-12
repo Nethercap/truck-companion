@@ -123,6 +123,8 @@
     <string name="nav_voz_apagar">Выключить голосовые подсказки</string>
     <string name="ajustes_voz">Голосовые подсказки</string>
     <string name="ajustes_voz_ayuda">Подсказки звучат на этом телефоне. В вашей сессии говорит только одно устройство.</string>
+    <string name="ajustes_volumen_voz">Громкость подсказок: %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Тише становятся только подсказки: громкость телефона, игры и музыки не меняется.</string>
 
     <string name="vivo_titulo">Онлайн-карта</string>
     <string name="vivo_nadie">Пока никого</string>
@@ -346,6 +348,7 @@
     <string name="ajustes_flotante_ayuda">Если выйти из приложения во время езды, поверх другого приложения останется маленькое окно с картой и следующим поворотом.</string>
     <string name="servicio_canal">Навигация</string>
     <string name="servicio_activo">Навигация работает в фоне</string>
+    <string name="aviso_limite">Ограничение %1$d</string>
     <string name="mapa_local">собрана на ПК</string>
     <string name="compartir">Поделиться</string>
     <string name="stats_buscar_conductor">Найти водителя</string>

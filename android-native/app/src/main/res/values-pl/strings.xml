@@ -123,6 +123,8 @@
     <string name="nav_voz_apagar">Wyłącz nawigację głosową</string>
     <string name="ajustes_voz">Nawigacja głosowa</string>
     <string name="ajustes_voz_ayuda">Wskazówki są czytane na tym telefonie. W jednej sesji mówi tylko jedno urządzenie naraz.</string>
+    <string name="ajustes_volumen_voz">Głośność wskazówek: %1$s</string>
+    <string name="ajustes_volumen_voz_ayuda">Ciszej będą tylko wskazówki: telefon, gra i muzyka zachowują swoją głośność.</string>
 
     <string name="vivo_titulo">Mapa na żywo</string>
     <string name="vivo_nadie">Na razie nikogo</string>
@@ -346,6 +348,7 @@
     <string name="ajustes_flotante_ayuda">Gdy wyjdziesz z aplikacji w trakcie jazdy, nad drugą aplikacją zostanie małe okno z mapą i następnym skrętem.</string>
     <string name="servicio_canal">Nawigacja</string>
     <string name="servicio_activo">Nawigacja działa w tle</string>
+    <string name="aviso_limite">Limit %1$d</string>
     <string name="mapa_local">zbudowana na PC</string>
     <string name="compartir">Udostępnij</string>
     <string name="stats_buscar_conductor">Znajdź kierowcę</string>

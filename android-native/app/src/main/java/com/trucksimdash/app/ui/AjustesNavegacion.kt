@@ -47,12 +47,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import java.text.NumberFormat
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.trucksimdash.app.R
 import com.trucksimdash.app.core.Ajustes
 import com.trucksimdash.app.core.Destino
 import com.trucksimdash.app.core.Preferencias
 import com.trucksimdash.app.core.Red
+import com.trucksimdash.app.core.VOLUMEN_VOZ_MIN
 import com.trucksimdash.app.nav.AjustesNav
 import com.trucksimdash.app.nav.MotorNav
 import com.trucksimdash.app.nav.OpcionNav
@@ -81,6 +84,19 @@ private fun TarjetaVoz(ajustes: Ajustes, prefs: Preferencias, motor: MotorNav, n
                 OutlinedButton(onClick = { motor.probarVoz() }) { Text(nav.t("settingsVoiceTest")) }
             }
         }
+        Spacer(Modifier.height(10.dp))
+        val porciento = NumberFormat.getPercentInstance()
+        Deslizador(
+            stringResource(R.string.ajustes_volumen_voz, porciento.format(ajustes.volumenVoz)),
+            porciento.format(VOLUMEN_VOZ_MIN), porciento.format(1), nav.t("navZoomDefault"),
+            ajustes.volumenVoz.toDouble(), VOLUMEN_VOZ_MIN.toDouble()..1.0, 0.05, 1.0,
+        ) {
+            prefs.ponerVolumenVoz(it.toFloat())
+            // Para oir como queda: la frase del boton Probar.
+            if (nav.voces.isNotEmpty()) motor.probarVoz()
+        }
+        Text(stringResource(R.string.ajustes_volumen_voz_ayuda), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+        Spacer(Modifier.height(10.dp))
         Selector(nav.t("settingsVoiceTiming"), nav.momentos, nav.momento) { motor.momentoVoz(it) }
         Spacer(Modifier.height(6.dp))
         Text(nav.t("settingsVoiceHint"), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
@@ -167,7 +183,8 @@ private fun Deslizador(
     alCambiar: (Double) -> Unit,
 ) {
     var arrastrando by remember { mutableStateOf<Float?>(null) }
-    val pasos = ((rango.endInclusive - rango.start) / paso).toInt() - 1
+    // Redondeado: 0,9 / 0,05 da 17,999... en coma flotante, y truncado quedaba un paso de menos.
+    val pasos = ((rango.endInclusive - rango.start) / paso).roundToInt() - 1
     Text(titulo.trimEnd(':'), style = MaterialTheme.typography.labelMedium, color = Paleta.TextoSuave)
     Slider(
         value = arrastrando ?: valor.toFloat(),
