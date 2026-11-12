@@ -1291,6 +1291,9 @@ test('DLC: juego de la variante y ajustes guardados limpios', () => {
   assert.equal(dlcGameOf('ats_c2c_promods'), 'ats');
   assert.equal(dlcGameOf('ets2_promods_eugu'), 'ets2');
   assert.equal(dlcGameOf(null), 'ets2');
+  // El mapa armado en la PC es del juego que dice despues de 'local_'
+  assert.equal(dlcGameOf('local_ats'), 'ats');
+  assert.equal(dlcGameOf('local_ets2'), 'ets2');
   assert.deepEqual(normalizeDlcOff({ ats: ['co', 'co', 'xx', 'nv'], ets2: 'iberia' }), { ats: ['co'], ets2: [] });
   assert.deepEqual(normalizeDlcOff(undefined), { ats: [], ets2: [] });
 });
