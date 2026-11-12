@@ -9,7 +9,8 @@ codigo de salida del hijo):
   velocidad y posicion, y despues la lectura con el lector del cliente
   (client/telemetry_compat.py) y con el check-telemetry.py del paquete de
   prueba (plugin/linux/): los dos tienen que ver lo mismo que se mando.
-  Despues scs_telemetry_shutdown (sdkActive apagado) y dlclose, que vuelve a
+  Despues un trabajo de bus de punta a punta (`_trabajo_de_bus`), y
+  scs_telemetry_shutdown (sdkActive apagado) y dlclose, que vuelve a
   llamar a shutdown desde el destructor.
 - "sin-init": dlopen y dlclose, como cuando init falla y el juego suelta el
   plugin (en macOS eso se caia).
@@ -38,8 +39,17 @@ TELEMETRY_1_01 = (1 << 16) | 1
 ATS_SDK_1_05 = (1 << 16) | 5
 EVENTO_FRAME_START = 1
 EVENTO_STARTED = 4
+EVENTO_CONFIGURACION = 5
+EVENTO_GAMEPLAY = 6
+TIPO_S32 = 2
+TIPO_U32 = 3
+TIPO_U64 = 4
 TIPO_FLOAT = 5
 TIPO_DPLACEMENT = 11
+TIPO_STRING = 12
+TIPO_S64 = 13
+FORMATOS = {TIPO_S32: "i", TIPO_U32: "I", TIPO_U64: "Q", TIPO_FLOAT: "f", TIPO_S64: "q"}
+SIN_INDICE = 0xFFFFFFFF  # SCS_U32_NIL
 CANAL_VELOCIDAD = b"truck.speed"
 CANAL_POSICION = b"truck.world.placement"
 
@@ -47,6 +57,36 @@ CANAL_POSICION = b"truck.world.placement"
 class Valor(ctypes.Structure):  # scs_value_t: tipo, relleno y la union (48 bytes)
     _fields_ = [("tipo", ctypes.c_uint32), ("_relleno", ctypes.c_uint32),
                 ("datos", ctypes.c_ubyte * 40)]
+
+
+class ValorConNombre(ctypes.Structure):  # scs_named_value_t (64 bytes en 64 bits)
+    _fields_ = [("nombre", ctypes.c_char_p), ("indice", ctypes.c_uint32),
+                ("_relleno", ctypes.c_uint32), ("valor", Valor)]
+
+
+class ConAtributos(ctypes.Structure):
+    # scs_telemetry_configuration_t y scs_telemetry_gameplay_event_t: un id y
+    # los atributos, terminados en uno sin nombre.
+    _fields_ = [("id", ctypes.c_char_p), ("atributos", ctypes.POINTER(ValorConNombre))]
+
+
+def con_atributos(ident: bytes, atributos: list):
+    """El id y los atributos [(nombre, tipo, valor)] como los arma el juego.
+    Devuelve la estructura y lo que tiene que seguir vivo mientras se usa
+    (los textos)."""
+    lista = (ValorConNombre * (len(atributos) + 1))()
+    textos = []
+    for item, (nombre, tipo, valor) in zip(lista, atributos):
+        item.nombre = nombre
+        item.indice = SIN_INDICE
+        item.valor.tipo = tipo
+        if tipo == TIPO_STRING:
+            texto = ctypes.create_string_buffer(valor)
+            textos.append(texto)
+            struct.pack_into("<Q", item.valor.datos, 0, ctypes.addressof(texto))
+        else:
+            struct.pack_into("<" + FORMATOS[tipo], item.valor.datos, 0, valor)
+    return ConAtributos(ident, lista), (lista, textos)
 
 
 class Cuadro(ctypes.Structure):  # scs_telemetry_frame_start_t
@@ -124,6 +164,45 @@ def _comparar(que, leido, esperado):
             raise SystemExit(f"{que}: {clave} = {leido[clave]!r}, se mando {valor!r}")
 
 
+def _trabajo_de_bus(juego: JuegoFalso, leer) -> None:
+    """Un trabajo de bus del DLC Coaches (ETS2 1.62.3, 12-11-2026): la
+    configuracion `bus_job` y, al terminar, el evento `bus_job.completed`, no
+    `.delivered`. Los nombres salen de eurotrucks2.exe (el SDK publicado no
+    los trae): los eventos de bus son `bus_job.completed` y
+    `bus_job.cancelled`, con `passenger.satisfaction` al lado de `revenue`.
+    Con solo `.delivered` la entrega no le llegaba a nadie: ni el resumen del
+    tablero ni el viaje de la cuenta. Los atributos propios del bus
+    (`bus.stages.count`, `destination_stop.name`) el bloque no los guarda
+    todavia; tienen que pasar sin romper lo demas."""
+    antes = leer()["jobDelivered"]
+    config, vivos = con_atributos(b"bus_job", [
+        (b"bus_job.market", TIPO_STRING, b"company_job"),
+        (b"source.city", TIPO_STRING, b"Graz"),
+        (b"destination.city", TIPO_STRING, b"Wien"),
+        (b"income", TIPO_U64, 1830),
+        (b"bus.stages.count", TIPO_U32, 3),
+        (b"destination_stop.name", TIPO_STRING, b"Wien Hbf"),
+    ])
+    juego.evento(EVENTO_CONFIGURACION, config)
+    _comparar("bus_job", leer(), {"onJob": True, "citySrc": "Graz", "cityDst": "Wien",
+                                  "jobMarket": "company_job", "jobIncome": 1830,
+                                  "isCargoLoaded": True})
+    fin, vivos = con_atributos(b"bus_job.completed", [
+        (b"revenue", TIPO_S64, 1830),
+        (b"earned.xp", TIPO_S32, 412),
+        (b"passenger.satisfaction", TIPO_FLOAT, 0.875),
+    ])
+    juego.evento(EVENTO_GAMEPLAY, fin)
+    _comparar("bus_job.completed", leer(), {"jobDelivered": not antes, "onJob": False,
+                                            "jobDeliveredRevenue": 1830,
+                                            "jobDeliveredEarnedXp": 412})
+    # Despues el juego manda la configuracion vacia: el trabajo ya termino y
+    # no tiene que volver a abrirse.
+    vacia, vivos = con_atributos(b"bus_job", [])
+    juego.evento(EVENTO_CONFIGURACION, vacia)
+    _comparar("bus_job vacio", leer(), {"onJob": False, "jobDelivered": not antes})
+
+
 def _pasada_init(so: str) -> None:
     import telemetry_compat
 
@@ -169,6 +248,8 @@ def _pasada_init(so: str) -> None:
                 raise SystemExit(f"check-telemetry.py: {nombre} = {leido[nombre]!r}, "
                                  f"el cliente lee {datos[nombre]!r}")
         _comparar("check-telemetry.py", leido, esperado)
+
+        _trabajo_de_bus(juego, telemetry_compat.get_data)
 
         lib.scs_telemetry_shutdown()
         if check.leer()["sdkActive"]:

@@ -361,7 +361,9 @@ scs_timestamp_t rendertimestamp;
 // Job configurations. ATS 1.61 added drivable cars and, with them, the
 // `car_job` and `bus_job` configurations (and their `.delivered` /
 // `.cancelled` gameplay events). They carry the same attributes as `job`, so
-// they are stored in the same fields.
+// they are stored in the same fields. Bus jobs (the Coaches DLC, ETS2
+// 1.62.3) also send their own stop and stage attributes, not stored yet, and
+// end with `bus_job.completed` instead of `.delivered`.
 static const char* const job_config_ids[] = {SCS_TELEMETRY_CONFIG_job,
                                              "car_job", "bus_job"};
 
@@ -377,7 +379,7 @@ static bool is_job_config(const char* id) {
   return false;
 }
 
-// `job.delivered`, `car_job.delivered`, `bus_job.delivered`, and so on.
+// `job.delivered`, `car_job.delivered`, `bus_job.completed`, and so on.
 static bool is_job_event(const char* id, const char* event) {
   for (auto job_id : job_config_ids) {
     const auto len = strlen(job_id);
@@ -574,7 +576,11 @@ SCSAPI_VOID telemetry_gameplay(const scs_event_t event,
     telem_ptr->special_b.onJob = false;
     telem_ptr->special_b.jobFinished ^= true;
     job_owner[0] = '\0';
-  } else if (is_job_event(info->id, "delivered")) {
+  } else if (is_job_event(info->id, "delivered") ||
+             is_job_event(info->id, "completed")) {
+    // Coaches (ETS2 1.62.3) ends bus jobs with `bus_job.completed`, not
+    // `.delivered`: the same attributes (revenue, earned.xp...) plus
+    // `passenger.satisfaction`.
     type = delivered;
     telem_ptr->special_b.jobDelivered ^= true;
     telem_ptr->gameplay_ui.jobFinishedTime = telem_ptr->common_ui.time_abs;
