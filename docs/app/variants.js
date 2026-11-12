@@ -1,18 +1,18 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-11-10.
+// Fuente: manifest del 2026-11-12.
 const MAP_DATA_VERSION = {
   "ats": "20261103",
   "ats_161": "20261103",
-  "ats_c2c": "20261101",
-  "ats_promods": "20261101",
-  "ats_c2c_promods": "20261101",
-  "ats_canada": "20261022",
-  "ats_c2c_canada": "20261101",
+  "ats_c2c": "20261112",
+  "ats_promods": "20261112",
+  "ats_c2c_promods": "20261112",
+  "ats_canada": "20261112",
+  "ats_c2c_canada": "20261112",
   "ats_expansion": "20261101",
-  "ats_c2c_expansion": "20261101",
-  "ats_reforma": "20261022",
-  "ats_reforma_c2c_promods": "20261101",
+  "ats_c2c_expansion": "20261112",
+  "ats_reforma": "20261112",
+  "ats_reforma_c2c_promods": "20261112",
   "ets2": "20261110",
   "ets2_161": "20261105",
   "ets2_promods": "20261022",
@@ -64,7 +64,7 @@ const VARIANT_META = {
     "mods": [
       "c2c"
     ],
-    "gameVersion": "1.61.3.18"
+    "gameVersion": "1.62.2.0"
   },
   "ats_promods": {
     "label": "American Truck Simulator + ProMods Canada",
@@ -78,7 +78,7 @@ const VARIANT_META = {
     "mods": [
       "promods_canada"
     ],
-    "gameVersion": "1.61.3.18"
+    "gameVersion": "1.62.2.0"
   },
   "ats_c2c_promods": {
     "label": "American Truck Simulator + Coast to Coast + ProMods Canada",
@@ -93,7 +93,7 @@ const VARIANT_META = {
       "c2c",
       "promods_canada"
     ],
-    "gameVersion": "1.61.3.18"
+    "gameVersion": "1.62.2.0"
   },
   "ats_canada": {
     "label": "American Truck Simulator + Western/Eastern Canada",
@@ -108,7 +108,7 @@ const VARIANT_META = {
       "western_canada",
       "eastern_canada"
     ],
-    "gameVersion": "1.61.2.0"
+    "gameVersion": "1.62.2.0"
   },
   "ats_c2c_canada": {
     "label": "American Truck Simulator + Coast to Coast + Western/Eastern Canada",
@@ -125,7 +125,7 @@ const VARIANT_META = {
       "eastern_canada",
       "cnx_canada_c2c"
     ],
-    "gameVersion": "1.61.3.18"
+    "gameVersion": "1.62.2.0"
   },
   "ats_expansion": {
     "label": "American Truck Simulator + ATS Expansion",
@@ -154,7 +154,7 @@ const VARIANT_META = {
       "c2c",
       "ats_expansion"
     ],
-    "gameVersion": "1.61.3.18"
+    "gameVersion": "1.62.2.0"
   },
   "ats_reforma": {
     "label": "American Truck Simulator + Reforma",
@@ -170,7 +170,7 @@ const VARIANT_META = {
       "reforma_mega_resources",
       "reforma_sierra_nevada"
     ],
-    "gameVersion": "1.61.2.0"
+    "gameVersion": "1.62.2.0"
   },
   "ats_reforma_c2c_promods": {
     "label": "American Truck Simulator + Coast to Coast + ProMods Canada + Reforma",
@@ -189,7 +189,7 @@ const VARIANT_META = {
       "reforma_sierra_nevada",
       "reforma_othermaps_patch"
     ],
-    "gameVersion": "1.61.3.18"
+    "gameVersion": "1.62.2.0"
   },
   "ets2": {
     "label": "Euro Truck Simulator 2",
