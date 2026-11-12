@@ -4,6 +4,14 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- In-game overlay: two new things it can show, both off until you tick them in Setup. **Heading**
+  (N, NE, E...) comes from the game itself, so it works without the dashboard open, and is true
+  north like the map, not the game's grid. **Road number** (I-80, US-6) is the road you are on, as
+  the dashboard reads it from the signs around you: like the next turn, it needs the dashboard open,
+  and only ATS has it because ETS2 signs don't carry route numbers.
+
 ## 1.5.39 (2026-11-12)
 
 - Coaches (ETS2): finishing a bus job now counts as a delivery. The game ends bus jobs with an event

@@ -264,7 +264,8 @@ def overlay_supported() -> bool:
 def overlay_settings() -> dict:
     """{'enabled', 'corner', 'pos', 'size', 'opacity', 'items', 'hotkey'} del
     overlay en el juego. Apagado por defecto: es una ventana encima del juego
-    y la tiene que pedir uno. Sin 'items' guardado se muestra todo. El tamano
+    y la tiene que pedir uno. Sin 'items' guardado se muestra todo, salvo lo
+    agregado despues (overlay.ITEMS_POR_DEFECTO). El tamano
     y la opacidad van en por ciento; el tamano de antes era una letra."""
     import overlay
     s = load_settings()
@@ -283,7 +284,7 @@ def overlay_settings() -> dict:
         "size": overlay.tamano_valido(s.get("overlay_size")),
         "opacity": overlay.opacidad_valida(s.get("overlay_opacity")),
         "items": (tuple(i for i in overlay.ITEMS if i in items) if isinstance(items, list)
-                  else overlay.ITEMS),
+                  else overlay.ITEMS_POR_DEFECTO),
         "hotkey": hotkey if hotkey in overlay.HOTKEYS else overlay.DEFAULT_HOTKEY,
     }
 

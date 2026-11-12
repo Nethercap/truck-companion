@@ -177,10 +177,11 @@ class AppState:
         self.overlay_data = overlay.OverlayData()
         # Las mismas claves que win_integration.overlay_settings().
         self.overlay_layout = {"corner": overlay.DEFAULT_CORNER, "size": overlay.DEFAULT_SIZE,
-                               "items": overlay.ITEMS, "pos": None, "opacity": overlay.DEFAULT_OPACITY}
+                               "items": overlay.ITEMS_POR_DEFECTO, "pos": None, "opacity": overlay.DEFAULT_OPACITY}
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
-                                                T("overlay_arrival_game"), self.aviso_giro()))
+                                                T("overlay_arrival_game"), self.aviso_giro(),
+                                                T("overlay_compass")))
         # Arrastrado en el modo Mover: queda en esa posicion; estirado desde
         # la esquina o con la rueda, con ese tamano.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))

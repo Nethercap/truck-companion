@@ -28,6 +28,8 @@ import logging
 import threading
 import time
 
+from rumbo import PUNTOS, punto_cardinal
+
 KM_TO_MI = 0.621371
 
 CORNERS = ("top_left", "top_center", "top_right", "bottom_left", "bottom_right")
@@ -51,8 +53,17 @@ DEFAULT_OPACITY = 90  # antes fija en 88; de a SIZE_STEP como el deslizador
 # velocidad con el limite, la del control de crucero (solo si esta puesto),
 # la marcha, lo que falta, la hora de llegada real (la de tu reloj, la
 # calcula la web) y la del reloj del juego (la que importa contra el plazo).
-ITEMS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival", "stops", "near_stops")
-DATOS = ("turn", "speed", "cruise", "gear", "remaining", "arrival", "game_arrival")
+# El rumbo (N, NE...) y el numero de la ruta (I-80) se pidieron en Discord
+# (12-11): el rumbo sale de la telemetria (rumbo.py, sin tablero), la ruta la
+# manda el tablero (currentRoadLabel de app.js; solo ATS, los carteles de
+# ETS2 no traen el numero). Vienen apagados, para no cambiar el overlay de
+# nadie.
+ITEMS = ("turn", "speed", "cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival",
+         "stops", "near_stops")
+DATOS = ("turn", "speed", "cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival")
+ITEMS_NUEVOS_APAGADOS = ("heading", "road")
+# Sin lista guardada (nunca se toco una casilla) se ve todo menos esos.
+ITEMS_POR_DEFECTO = tuple(i for i in ITEMS if i not in ITEMS_NUEVOS_APAGADOS)
 # La barra de la ruta ("stops", idea del usuario del 09-10): de aca al
 # destino, con el tramo donde conviene cargar combustible y el tramo donde
 # conviene dormir, solo con colores. Cada tramo es el ultimo cuarto antes de
@@ -157,6 +168,18 @@ def carriles(rec):
             for k, bits in enumerate(rec["arrows"][:rec["count"]])]
 
 
+def nombres_rumbo(valor):
+    """Los 8 puntos cardinales en el idioma del tablero (headingNames de
+    nav_hud, de N en sentido horario) o del cliente ("N,NE,E,..."), o None si
+    no son 8 textos cortos."""
+    if isinstance(valor, str):
+        valor = valor.split(",")
+    if not isinstance(valor, (list, tuple)) or len(valor) != len(PUNTOS):
+        return None
+    nombres = [_texto(v, 4) for v in valor]
+    return nombres if all(nombres) else None
+
+
 def paradas_cercanas(lista):
     """La parada mas cercana de cada tipo como llega en nav_hud, o None: el
     tablero manda textos, ya en su idioma y su unidad. Sin distancia no hay
@@ -177,6 +200,10 @@ def limpiar_nav(msg: dict) -> dict:
         "near": paradas_cercanas(msg.get("near")),
         "turn": _texto(msg.get("turn")),
         "next": _texto(msg.get("next")),
+        # La ruta por la que se va (I-80) y los puntos cardinales en el idioma
+        # del tablero: tableros de antes no los mandan
+        "road": _texto(msg.get("road"), 16),
+        "headingNames": nombres_rumbo(msg.get("headingNames")),
         "remaining": _texto(msg.get("remaining"), 24),
         "arrival": _texto(msg.get("arrival"), 24),
         # Lo que falta como numero (el de OBS): para la barra de paradas
@@ -305,7 +332,7 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
               ahora: float, imperial_default: bool | None = None,
               etiqueta_falta: str = "Remaining", etiqueta_llega: str = "Arrival (real)",
               etiqueta_juego: str = "Arrival (game)", items=ITEMS,
-              aviso_giro: str = "") -> dict | None:
+              aviso_giro: str = "", rumbos=None) -> dict | None:
     """Lo que hay que dibujar, o None si el overlay no tiene que verse.
 
     tele es el payload que va al tablero (el mismo dict); nav lo ultimo que
@@ -341,6 +368,10 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
             falta = formato_distancia(km, imperial)
 
     ver_giro, ver_vel = "turn" in items, "speed" in items
+    # El rumbo no depende del tablero; sus nombres si (el idioma del giro),
+    # aunque ya no mande, como las etiquetas de abajo.
+    punto = punto_cardinal(tele) if "heading" in items else None
+    nombres = (nav and nav.get("headingNames")) or nombres_rumbo(rumbos) or PUNTOS
     # Con ruta en el juego y el giro elegido pero sin tablero que lo mande,
     # se dice de donde sale en vez de dejar el lugar vacio sin explicacion.
     con_ruta = (tele.get("routeDistanceKm") or 0) > 0
@@ -356,6 +387,9 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         "over": ver_vel and bool(limite) and velocidad > limite + 2,
         "cruise": crucero,
         "gear": formato_marcha(tele.get("gear")) if "gear" in items else "",
+        "heading": nombres[punto] if punto is not None else "",
+        # Como el giro: la calcula el tablero mirando los carteles cercanos
+        "road": nav.get("road", "") if nav_ok and "road" in items else "",
         "remaining": falta if "remaining" in items else "",
         "arrival": llega if "arrival" in items else "",
         # El formato vale aunque el tablero ya no mande: es una preferencia
@@ -418,7 +452,8 @@ def ejemplo(items, etiquetas) -> dict:
     verdad, para saber donde queda."""
     falta, llega, llega_juego = etiquetas
     d = {"turn": "\u21b1 400 m", "next": "", "speed": "72", "unit": "km/h", "limit": "80", "over": False,
-         "cruise": "80", "gear": "8", "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59",
+         "cruise": "80", "gear": "8", "heading": "NW", "road": "I-80",
+         "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59",
          "remainingLabel": falta, "arrivalLabel": llega, "gameArrivalLabel": llega_juego,
          "lanes": carriles({"count": 3, "mask": 0b110, "turn": CARRIL_BITS["right"],
                             "arrows": [CARRIL_BITS["straight"], CARRIL_BITS["straight"] | CARRIL_BITS["right"],
@@ -432,7 +467,7 @@ def ejemplo(items, etiquetas) -> dict:
         d["lanes"] = None
     if "speed" not in items:
         d["speed"] = d["limit"] = ""
-    for k in ("cruise", "gear", "remaining", "arrival", "game_arrival"):
+    for k in ("cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival"):
         if k not in items:
             d[k] = ""
     if not any(d[k] for k in DATOS):
@@ -788,7 +823,8 @@ class _Ventana:
             self.alfa = alfa
         datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
                           etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items,
-                          aviso_giro=resto[0] if resto else "")
+                          aviso_giro=resto[0] if resto else "",
+                          rumbos=resto[1] if len(resto) > 1 else None)
         rect = _rect_de(juego) if juego else None
         if mover:
             # Sin juego abierto se acomoda sobre la pantalla principal.
@@ -855,6 +891,8 @@ class _Ventana:
             izquierda += hueco + icono + round(4 * k) + mide(d["cruise"], fuente(17, True))
         if d["gear"]:
             izquierda += hueco + ancho_marcha
+        if d["heading"] or d["road"]:
+            izquierda += hueco + self._ancho_rumbo(d, k, fuente, mide)
         derecha_total = sum(max(mide(v, fuente(19, True)), mide(e, fuente(11))) + sep for v, e in columnas)
         ancho = max(round(420 * k), 2 * pad + izquierda + round(8 * k) + derecha_total)
         lanes = d.get("lanes") or []
@@ -886,7 +924,7 @@ class _Ventana:
                               font=fuente(14), width=ancho - 2 * pad)
             y = c.bbox(t)[3] + round(8 * k)
 
-        if not (d["speed"] or d["cruise"] or d["gear"] or columnas):
+        if not (d["speed"] or d["cruise"] or d["gear"] or d["heading"] or d["road"] or columnas):
             y = self._fila_cercanas(cercanas, y - round(8 * k), pad, sep, k, fuente)
             alto = self._barra_paradas(d.get("stops"), y, ancho, pad, k) + pad
             self._marco_mover(ancho, alto, k)
@@ -925,6 +963,14 @@ class _Ventana:
                                outline=MUTED, width=max(1, round(2 * k)))
             c.create_text(x + ancho_marcha // 2, medio, text=d["gear"], fill=FG, font=fuente(20, True))
             x += ancho_marcha
+        if d["heading"] or d["road"]:
+            x += hueco if x > pad else 0
+            if d["heading"]:
+                t = c.create_text(x, medio, text=d["heading"], fill=FG, anchor="w", font=fuente(20, True))
+                x = c.bbox(t)[2] + (round(6 * k) if d["road"] else 0)
+            if d["road"]:
+                t = c.create_text(x, medio + round(1 * k), text=d["road"], fill=MUTED, anchor="w", font=fuente(16, True))
+                x = c.bbox(t)[2]
 
         derecha = ancho - pad
         for valor, etiqueta in columnas:
@@ -936,6 +982,14 @@ class _Ventana:
         self._marco_mover(ancho, alto, k)
         c.configure(width=ancho, height=alto)
         return ancho, alto
+
+    @staticmethod
+    def _ancho_rumbo(d: dict, k: float, fuente, mide) -> int:
+        """Lo que ocupa el rumbo con la ruta al lado, igual que en dibujar."""
+        ancho = mide(d["heading"], fuente(20, True)) if d["heading"] else 0
+        if d["road"]:
+            ancho += (round(6 * k) if d["heading"] else 0) + mide(d["road"], fuente(16, True))
+        return ancho
 
     def _fila_cercanas(self, cercanas, y: int, pad: int, sep: int, k: float, fuente) -> int:
         """La parada mas cercana de cada tipo: un punto del color de la barra
