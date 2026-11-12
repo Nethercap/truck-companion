@@ -299,6 +299,7 @@
       colPay: "Pay",
       tripDetails: 'Details',
       tripPlanned: 'Planned',
+      tripGameDistance: 'In game',
       tripTruck: 'Truck',
       tripAvgSpeed: 'Avg speed',
       tripGameTime: 'Game time',
@@ -695,6 +696,7 @@
       colPay: "Pago",
       tripDetails: 'Detalle',
       tripPlanned: 'Planeado',
+      tripGameDistance: 'En el juego',
       tripTruck: 'Camion',
       tripAvgSpeed: 'Promedio',
       tripGameTime: 'Tiempo de juego',
@@ -2244,7 +2246,11 @@
 
     const dibujo = dibujarRecorrido(d.route || []);
     if (dibujo) {
-      caja.appendChild(conNombres(dibujo, [d.city_src, d.city_dst]));
+      // El destino solo en la punta de un viaje entregado: en uno en curso,
+      // cancelado o sin terminar la punta es donde quedo el camion, y con
+      // "Keflavik" ahi 2 km dentro de Holmavik parecian el viaje entero
+      // (Discord 12-11, linuxmeow).
+      caja.appendChild(conNombres(dibujo, [d.city_src, d.status === 'delivered' ? d.city_dst : null]));
       const tope = topeDeVelocidad(cortarSaltos(d.route || []));
       if (tope) caja.appendChild(leyendaDeVelocidad(tope));
       // Solo se aclara si hay hueco: en un viaje entero no hay nada que
@@ -2266,6 +2272,10 @@
     sumar(caja, renglon([
       d.truck_name || d.truck_brand ? t(d.job_kind === 'car' ? 'tripVehicle' : 'tripTruck') + ' ' + [d.truck_brand, d.truck_name].filter(Boolean).join(' ') : null,
       d.distance_planned_km ? t('tripPlanned') + ' ' + distancia(d.distance_planned_km) : null,
+      // La de la columna de la tabla. Sin ella, el detalle daba planeado y
+      // rastreado (315 y 320) y la tabla un tercero (322) sin decir de donde
+      // salia (Discord 12-11).
+      d.distance_game_km ? t('tripGameDistance') + ' ' + distancia(d.distance_game_km) : null,
       d.distance_tracked_km ? t('tripTracked', distancia(d.distance_tracked_km)) : null
     ]));
     // Los tiempos en horas de juego, como los muestra el juego. El total
