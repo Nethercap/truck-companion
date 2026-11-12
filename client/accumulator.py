@@ -510,6 +510,12 @@ class Acumulador:
         if previo is not None:
             paso = math.hypot(punto[0] - previo[0], punto[1] - previo[1])
             if not corte and paso < PASO_RECORRIDO_M:
+                # Quieto (o casi) con el cliente leyendo: no hay silencio que
+                # marcar, asi que el reloj del corte se renueva. Sin esto, con
+                # el camion parado salia un segmento de un punto cada 30 s y a
+                # los 100 minutos la API rechazaba el viaje entero, cierre
+                # incluido (10-11, Falun -> Riga: 6 horas parado, 156 rechazos).
+                v["ultimo_punto_ts"] = ahora
                 return
             if paso > SALTO_MAXIMO_M:
                 # Un teletransporte: no se dibuja como manejado. Si el punto

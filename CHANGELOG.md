@@ -21,6 +21,11 @@ updates on its own and is not versioned here.
 - Build my map: with an older game version (seen with ETS2 1.53), Setup found none of your mods and
   never offered to build the map, even with map mods active: those versions write the mods to the
   game's log in another way. They are now read too.
+- Accounts: a job left open while the truck stood still for more than about an hour and a half
+  stopped saving. Every 30 seconds parked added an empty piece to the trip's route, the account
+  server refused the route once it had more than 200 pieces, and from then on the rest of the trip
+  and its delivery were lost. Standing still now adds nothing. The server has also been fixed to keep
+  a trip whose route is too long, so older versions don't lose trips this way anymore.
 
 ## 1.5.38 (2026-11-07)
 

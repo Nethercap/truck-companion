@@ -269,6 +269,30 @@ def test_un_silencio_largo_parte_el_recorrido_en_dos_segmentos():
     assert all(len(s) >= 2 for s in recorrido)
 
 
+def test_el_camion_quieto_no_abre_segmentos():
+    """10-11, Falun -> Riga: parado 6 horas con el viaje abierto, salia un
+    segmento de un punto cada 30 s; a los 100 minutos la API (tope de 200)
+    rechazaba cada checkpoint y el cierre. Parado con el cliente leyendo no
+    hay silencio: el recorrido sigue en un solo segmento."""
+    acc = accumulator.Acumulador()
+    t = 1.0
+    for i in range(10):
+        acc.tick(payload(600 + i, odometerKm=1 + i * 0.1, speedKmh=60,
+                         position={"x": i * 100.0, "z": 0.0}), TRABAJO, t)
+        t += 1
+    for i in range(6 * 3600):  # seis horas quieto, un dato por segundo
+        acc.tick(payload(700 + i * 0.3, odometerKm=2.0, speedKmh=0,
+                         position={"x": 900.0, "z": 0.0}), TRABAJO, t)
+        t += 1
+    for i in range(10):
+        acc.tick(payload(9000 + i, odometerKm=2.0 + i * 0.1, speedKmh=60,
+                         position={"x": 1000.0 + i * 100, "z": 0.0}), TRABAJO, t)
+        t += 1
+    recorrido = acc.viaje()["route"]
+    assert len(recorrido) == 1
+    assert recorrido[0][0][:2] == [0.0, 0.0] and recorrido[0][-1][:2] == [1900.0, 0.0]
+
+
 def test_el_recorrido_se_simplifica_pero_conserva_las_puntas():
     acc = accumulator.Acumulador()
     for i in range(1500):
