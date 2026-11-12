@@ -4512,9 +4512,14 @@ const DLC_LIST = {
 };
 const DLC_ALWAYS = { ats: ['nv', 'az'], ets2: [] };
 
-// 'ats' o 'ets2' a partir de la variante del mapa ('ets2_promods', 'ats_c2c').
+// 'ats' o 'ets2' a partir de la variante del mapa ('ets2_promods', 'ats_c2c',
+// y 'local_ats' / 'local_ets2', el mapa armado en la PC). Sin mirar el
+// 'local_', un mapa armado de ATS contaba como ETS2: las rutas usaban los DLC
+// de ETS2 de la persona y la tabla de ETS2, y con todo comprado daban la
+// vuelta por Canada con "This route goes through a DLC you unchecked"
+// (Discord, 11-11, Culiacan -> Tampa con Reforma y Coast to Coast).
 function dlcGameOf(variant) {
-  return String(variant || '').startsWith('ats') ? 'ats' : 'ets2';
+  return String(variant || '').replace(/^local_/, '').startsWith('ats') ? 'ats' : 'ets2';
 }
 
 // Version del juego del mapa base (ATS 03-11-2026, ETS2 05-11-2026): `ats` y

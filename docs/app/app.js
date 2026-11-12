@@ -2993,7 +2993,9 @@ const POI_BASE = new URLSearchParams(location.search).get('local') ? 'https://tr
 // se muestra con la misma escala para que sea coherente con el juego. Los
 // umbrales de logica (giro cerca, waypoint alcanzado) siguen en metros crudos.
 function distanceScale() {
-  return (currentGame || '').startsWith('ets2') ? 19 : 20;
+  // dlcGameOf mira tambien el mapa armado en la PC ('local_ets2'): con
+  // startsWith('ets2') ese iba a 1:20.
+  return currentGame && dlcGameOf(currentGame) === 'ets2' ? 19 : 20;
 }
 
 // La escala de la ruta no vale en las ciudades: ahi el juego va a 1:3
@@ -3235,7 +3237,7 @@ function poiCityLabels() {
     const a = centro[tok];
     return a ? [a[0] / a[2], a[1] / a[2]] : null;
   };
-  const tokenRegions = String(poiVariantNow() || '').startsWith('ats');
+  const tokenRegions = !!poiVariantNow() && dlcGameOf(poiVariantNow()) === 'ats';
   poiCityLabelsCache = cityChoiceLabels(poiCityNames(), { countries: pois.countries, coords, tokenRegions, near: (c) => t('poiCityNear', c) });
   poiCityLabelsKey = key;
   return poiCityLabelsCache;
