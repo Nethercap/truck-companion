@@ -23,19 +23,19 @@ from mapbuild.pois import FACILITY_CODES  # noqa: E402,F401  (lo importa check_m
 
 # variante de mapa en la web -> (carpeta del parser, prefijo)
 VARIANTS = {
-    "ats": ("parser-output-ats", "usa"),  # ATS 1.62.1.1
+    "ats": ("parser-output-ats", "usa"),  # ATS 1.62.1.1 (1.62.2.0 da el mismo mapa)
     # ATS 1.61.2.0, el mapa de antes de la 1.62: no se vuelve a parsear (en
     # el taller no hay parser-output-ats_161), queda el json publicado
     "ats_161": ("parser-output-ats_161", "usa"),
-    "ats_c2c": ("parser-output-ats_c2c", "usa"),  # Coast to Coast 2.24.61.2
-    "ats_promods": ("parser-output-ats_promods", "usa"),  # ProMods Canada 1.70
-    "ats_c2c_promods": ("parser-output-ats_c2c_promods", "usa"),  # C2C 2.24.61.2 + ProMods Canada 1.70
-    "ats_reforma": ("parser-output-ats_reforma", "usa"),  # Reforma 3.0.1.161 + Mega Resources + Sierra Nevada 1.19
-    "ats_reforma_c2c_promods": ("parser-output-ats_reforma_c2c_promods", "usa"),  # Reforma 3.0.1 + C2C + ProMods Canada + OtherMaps Patch 40
-    "ats_canada": ("parser-output-ats_canada", "usa"),  # Western Canada Expansion 1.7.3 + Eastern 1.2.1
-    "ats_c2c_canada": ("parser-output-ats_c2c_canada", "usa"),  # C2C 2.24.61.2 + Western/Eastern Canada + sus conectores C2C
+    "ats_c2c": ("parser-output-ats_c2c", "usa"),  # Coast to Coast 2.24.62.1 (ATS 1.62.2)
+    "ats_promods": ("parser-output-ats_promods", "usa"),  # ProMods Canada 1.71
+    "ats_c2c_promods": ("parser-output-ats_c2c_promods", "usa"),  # C2C 2.24.62.1 + ProMods Canada 1.71
+    "ats_reforma": ("parser-output-ats_reforma", "usa"),  # Reforma 3.0.4.162 + Mega Resources + Sierra Nevada 1.21
+    "ats_reforma_c2c_promods": ("parser-output-ats_reforma_c2c_promods", "usa"),  # Reforma 3.0.4 + C2C + ProMods Canada + OtherMaps Patch 42
+    "ats_canada": ("parser-output-ats_canada", "usa"),  # Western Canada Expansion 1.7.4 + Eastern 1.2.2
+    "ats_c2c_canada": ("parser-output-ats_c2c_canada", "usa"),  # C2C 2.24.62.1 + Western/Eastern Canada + sus conectores C2C (1.7.3/1.2.1)
     "ats_expansion": ("parser-output-ats_expansion", "usa"),  # ATS Expansion 23.0 (Sineptorro)
-    "ats_c2c_expansion": ("parser-output-ats_c2c_expansion", "usa"),  # C2C 2.24.61.2 + ATS Expansion 23.0 (este arriba)
+    "ats_c2c_expansion": ("parser-output-ats_c2c_expansion", "usa"),  # C2C 2.24.62.1 + ATS Expansion 23.0 (este arriba)
     "ets2": ("parser-output-ets2", "europe"),  # ETS2 1.62.2.1 (con Islandia)
     # ETS2 1.61.1.0, para quien volvio a la 1.61 en Steam
     "ets2_161": ("parser-output-ets2_161", "europe"),
