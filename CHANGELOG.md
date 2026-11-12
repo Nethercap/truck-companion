@@ -9,7 +9,9 @@ updates on its own and is not versioned here.
 - Coaches (ETS2): finishing a bus job now counts as a delivery. The game ends bus jobs with an event
   of its own, which the telemetry plugin didn't know: the dashboard showed no delivery summary and the
   trip stayed open in your account. The client updates the plugin in the game folder by itself the
-  next time it starts with the game closed.
+  next time it starts with the game closed. The plugin also writes the details of each bus job (stops,
+  times, passengers) to the game's `game.log.txt`, to help us add more coach support: if you drive
+  coaches, sending us that file after a job helps.
 - Windows: TruckDash.exe is now built with a PyInstaller bootloader compiled on GitHub's runner,
   instead of the stock one that every PyInstaller program shares, and with exact dependency versions
   checked by hash. It should get fewer antivirus false positives: Microsoft Defender flagged 1.5.37

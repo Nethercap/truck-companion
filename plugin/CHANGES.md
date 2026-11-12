@@ -53,7 +53,11 @@ Also from the executable, sent with `bus_job` and not stored yet:
 `destination_stop.*` (`id`, `name`, `type`, planned and actual departure
 and arrival times, passengers getting on and off). Next to `bus_job.market`
 the executable has `company_job` and `tourist_job` (likely its values, with
-`quick_job`); not seen in a game yet.
+`quick_job`); not seen in a game yet. Until they are stored, every
+non-empty `bus_job` configuration and every `bus_job.*` event goes to
+`game.log.txt` with its values, as a message (`log_configs` /
+`log_events`, now logged as messages instead of errors), so a log from a
+real coach job shows what the game sends at each stop.
 
 Not mapped (no field for them in the revision 12 layout): the car job
 attributes `customer.prio.cargo`, `customer.prio.time`,

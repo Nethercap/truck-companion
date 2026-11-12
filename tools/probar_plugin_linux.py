@@ -50,6 +50,7 @@ TIPO_STRING = 12
 TIPO_S64 = 13
 FORMATOS = {TIPO_S32: "i", TIPO_U32: "I", TIPO_U64: "Q", TIPO_FLOAT: "f", TIPO_S64: "q"}
 SIN_INDICE = 0xFFFFFFFF  # SCS_U32_NIL
+LOG_MENSAJE = 0  # SCS_LOG_TYPE_message
 CANAL_VELOCIDAD = b"truck.speed"
 CANAL_POSICION = b"truck.world.placement"
 
@@ -120,8 +121,9 @@ class JuegoFalso:
     def __init__(self):
         self.eventos = {}
         self.canales = {}
+        self.log = []  # (tipo, texto) de lo que el plugin escribe en game.log.txt
         self.params = Params(b"American Truck Simulator", b"ats", ATS_SDK_1_05,
-                             LOG(lambda tipo, texto: None),
+                             LOG(lambda tipo, texto: self.log.append((tipo, texto.decode()))),
                              REG_EVENTO(self._evento), UNREG_EVENTO(lambda *a: 0),
                              REG_CANAL(self._canal), UNREG_CANAL(lambda *a: 0))
 
@@ -201,6 +203,18 @@ def _trabajo_de_bus(juego: JuegoFalso, leer) -> None:
     vacia, vivos = con_atributos(b"bus_job", [])
     juego.evento(EVENTO_CONFIGURACION, vacia)
     _comparar("bus_job vacio", leer(), {"onJob": False, "jobDelivered": not antes})
+
+    # Los valores del trabajo de bus van a game.log.txt como mensaje (no como
+    # error), para ver en un log de verdad que manda el juego en cada parada.
+    # La configuracion vacia no se anota.
+    mensajes = [texto for tipo, texto in juego.log if tipo == LOG_MENSAJE]
+    for esperado in ("Configuration: bus_job", " destination_stop.name string = Wien Hbf",
+                     " bus.stages.count u32 = 3", "^Gameplayevents: bus_job.completed",
+                     " passenger.satisfaction float = 0.875000"):
+        if esperado not in mensajes:
+            raise SystemExit(f"game.log.txt: falta {esperado!r}")
+    if mensajes.count("Configuration: bus_job") != 1:
+        raise SystemExit("game.log.txt: la configuracion bus_job vacia tambien se anoto")
 
 
 def _pasada_init(so: str) -> None:
