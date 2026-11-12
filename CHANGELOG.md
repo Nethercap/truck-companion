@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.39 (2026-11-12)
 
 - Coaches (ETS2): finishing a bus job now counts as a delivery. The game ends bus jobs with an event
   of its own, which the telemetry plugin didn't know: the dashboard showed no delivery summary and the
