@@ -3415,6 +3415,48 @@ test('turnReportGraphLine: el grafo que no esta listo va al turn report con su e
   assert.ok(!listo.includes('Road network'));
 });
 
+test('turnReportMapLines y turnReportDlcLine: por que ese mapa y que DLC se evitan (#41, #43)', () => {
+  const { turnReportMapLines, turnReportDlcLine, turnReportText, TURN_REPORT_MODS_CHARS } = require('./pure.js');
+  // Automatico con la lista del cliente: los mods de mapa que encendieron la variante.
+  assert.deepEqual(turnReportMapLines({ auto: true, detected: { promods: true, rusmap: true, c2c: false }, names: null }),
+    ['Map choice: auto, detected promods, rusmap']);
+  assert.deepEqual(turnReportMapLines({ auto: true, detected: { promods: false } }), ['Map choice: auto, detected no map mods']);
+  // El armado en la PC gana sobre lo detectado.
+  assert.deepEqual(turnReportMapLines({ auto: true, local: true, detected: { reforma: true } }), ['Map choice: auto, map built on this PC']);
+  // Sin la lista del cliente manda Ajustes aunque este en automatico.
+  assert.deepEqual(turnReportMapLines({ auto: true, detected: null, manual: 'promods' }),
+    ['Map choice: auto, no mod list from the client (falls back to promods)']);
+  assert.deepEqual(turnReportMapLines({ auto: false, manual: null, version: '1.61', jobMap: 'ets2_promods' }),
+    ['Map choice: manual, base; game version 1.61; switched to ets2_promods for this job']);
+  assert.deepEqual(turnReportMapLines(null), []);
+  // Los nombres que parecen de mapa van primero, y la lista larga se corta con "+N more".
+  const muchos = [...Array.from({ length: 60 }, (_, k) => `Truck skin pack number ${k}`), 'ProMods Europe', 'Coast to Coast'];
+  const [, mods] = turnReportMapLines({ auto: true, detected: { promods: true }, names: muchos });
+  assert.ok(mods.startsWith('Active mods (62): ProMods Europe, Coast to Coast, Truck skin pack number 0'), mods);
+  assert.match(mods, /\(\+\d+ more\)$/);
+  assert.ok(mods.length < TURN_REPORT_MODS_CHARS + 40, mods.length);
+  assert.deepEqual(turnReportMapLines({ auto: true, detected: {}, names: [] }), ['Map choice: auto, detected no map mods', 'Active mods: none']);
+
+  // El #41: la tabla de ETS2 sobre un mapa de ATS se ve en "ets2 list".
+  assert.equal(turnReportDlcLine({ table: 'ets2', auto: true, detected: 5, total: 12, off: ['blke', 'iberia'], unchecked: false }),
+    'DLC: auto, ets2 list, 5 of 12 detected, avoiding blke, iberia');
+  assert.equal(turnReportDlcLine({ table: 'ats', auto: true, detected: null, total: 22, off: [], unchecked: false }),
+    'DLC: auto, ats list, none from the client yet, avoiding none');
+  assert.equal(turnReportDlcLine({ table: 'ats', auto: false, detected: null, total: 22, off: ['nm'], unchecked: true }),
+    'DLC: manual, ats list, avoiding nm; route uses an unchecked DLC');
+  assert.equal(turnReportDlcLine(null), null);
+
+  // En el reporte: el mapa abajo de "Map:", los DLC despues de "Route:"; sin los datos, como antes.
+  const hora = (ms) => `h${ms}`;
+  const base = { game: 'ats', map: 'local_ats', web: 'x', client: '1.5.39', truck: [1, 2], now: 1, items: [], formatTime: hora,
+    route: { profile: 'fastest', to: { kind: 'dest', x: 68228, z: 57696 }, via: [] } };
+  const lineas = turnReportText({ ...base, mapChoice: { auto: true, local: true }, dlc: { table: 'ats', auto: true, detected: 20, total: 22, off: ['ia'] } }).split('\n');
+  assert.equal(lineas[3], 'Map choice: auto, map built on this PC');
+  assert.equal(lineas[lineas.indexOf('Route: fastest, to dest at 68228, 57696') + 1], 'DLC: auto, ats list, 20 of 22 detected, avoiding ia');
+  const viejo = turnReportText(base);
+  assert.ok(!viejo.includes('Map choice') && !viejo.includes('DLC:'));
+});
+
 test('gameRouteDistanceText: entero lejos, un decimal cerca, en millas con imperial', () => {
   const { gameRouteDistanceText } = require('./pure.js');
   assert.equal(gameRouteDistanceText(312.4, false, 'en'), '312 km');
