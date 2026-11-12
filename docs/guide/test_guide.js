@@ -70,7 +70,7 @@ test('el HTML de los textos esta balanceado', () => {
 
 test('las capturas de cada idioma estan', () => {
   for (const lang of LANGS) {
-    for (const img of ['map', 'phone', 'dash']) {
+    for (const img of ['map', 'phone', 'dash', 'mapbuild']) {
       assert.ok(fs.existsSync(path.join(dir, 'img', lang, img + '.webp')), `img/${lang}/${img}.webp`);
     }
   }

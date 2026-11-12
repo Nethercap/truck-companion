@@ -30,6 +30,7 @@
     { id: 'devices' },
     { id: 'convoy' },
     { id: 'client' },
+    { id: 'mapbuild', fig: 'mapbuild' },
     { id: 'overlay', fig: 'overlay' },
     { id: 'account' },
   ];
