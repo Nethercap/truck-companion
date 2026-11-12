@@ -111,7 +111,7 @@
     <string name="nav_ocultar_ruta">Ocultar a rota</string>
     <string name="nav_mostrar_ruta">Mostrar a rota de novo</string>
     <string name="nav_atras">atrás de você</string>
-    <string name="nav_ayuda_mapa">Dica: mantenha o mapa pressionado para traçar a rota por esse ponto.</string>
+    <string name="nav_ayuda_mapa">Dica: mantenha o mapa pressionado para traçar a rota por esse ponto e toque em uma parada numerada para removê-la.</string>
     <string name="cerrar">Fechar</string>
     <string name="ajustes_perfil">Rota</string>
     <string name="perfil_rapida">Mais rápida</string>

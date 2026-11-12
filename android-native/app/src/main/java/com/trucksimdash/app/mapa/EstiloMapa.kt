@@ -2,6 +2,7 @@ package com.trucksimdash.app.mapa
 
 import com.trucksimdash.app.nav.AparienciaMapa
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.math.hypot
 
 // El estilo del mapa, port de buildVecLayers y buildBaseLayers de app.js: los
 // mismos tiles, los mismos colores y los mismos filtros. Es texto JSON y no
@@ -22,6 +23,9 @@ internal object CapasMapa {
     const val FUENTE_RUTA_FERRY = "route-ferry"
     const val FUENTE_DESTINO = "destino"
     const val FUENTE_WAYPOINTS = "waypoints"
+
+    /** El circulo de cada parada: el que se toca para quitarla. */
+    const val CAPA_WAYPOINTS = "wp-circulo"
     const val FUENTE_RUTA_CONVOY = "convoy-route"
     const val FUENTE_RECORRIDO = "viajes"
     const val FUENTE_CIUDADES_RECORRIDO = "ciudades"
@@ -206,7 +210,7 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double, a: AparienciaMapa = Ap
         {"id":"destino-sym","type":"symbol","source":"${CapasMapa.FUENTE_DESTINO}",
          "layout":{"icon-image":["get","imagen"],"icon-anchor":"bottom-left","icon-allow-overlap":true,"icon-ignore-placement":true},
          "paint":{"icon-opacity":["case",["==",["get","aproximado"],1],0.55,1]}},
-        {"id":"wp-circulo","type":"circle","source":"${CapasMapa.FUENTE_WAYPOINTS}",
+        {"id":"${CapasMapa.CAPA_WAYPOINTS}","type":"circle","source":"${CapasMapa.FUENTE_WAYPOINTS}",
          "paint":{"circle-radius":11,"circle-color":"#3b9eff","circle-stroke-color":"#0d0f12","circle-stroke-width":2}},
         {"id":"wp-numero","type":"symbol","source":"${CapasMapa.FUENTE_WAYPOINTS}",
          "layout":{"text-field":["get","n"],"text-size":12,"text-allow-overlap":true,"text-ignore-placement":true},
@@ -266,6 +270,20 @@ internal fun geojsonWaypoints(lista: List<LngLat>): String = buildString {
     }
     append("]}")
 }
+
+/** Una parada dibujada: su numero (desde 1) y donde quedo en la pantalla. */
+internal data class ParadaEnPantalla(val n: Int, val x: Float, val y: Float)
+
+/**
+ * La parada que se toco: la mas cercana al dedo, si queda a `radio` o menos. Dos paradas
+ * juntas caen las dos en la caja del toque, y la primera que da el mapa no es la apuntada.
+ */
+internal fun paradaMasCercana(x: Float, y: Float, radio: Float, paradas: List<ParadaEnPantalla>): ParadaEnPantalla? =
+    paradas
+        .map { it to hypot((it.x - x).toDouble(), (it.y - y).toDouble()) }
+        .filter { it.second <= radio }
+        .minByOrNull { it.second }
+        ?.first
 
 internal fun geojsonDestino(lng: Double, lat: Double, aBuscarCarga: Boolean, aproximado: Boolean): String = buildString {
     append("""{"type":"Feature","properties":{"imagen":""")

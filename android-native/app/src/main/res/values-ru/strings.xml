@@ -111,7 +111,7 @@
     <string name="nav_ocultar_ruta">Скрыть маршрут</string>
     <string name="nav_mostrar_ruta">Показать маршрут снова</string>
     <string name="nav_atras">позади</string>
-    <string name="nav_ayuda_mapa">Совет: нажмите и удерживайте точку на карте, чтобы проложить маршрут через неё.</string>
+    <string name="nav_ayuda_mapa">Совет: нажмите и удерживайте точку на карте, чтобы проложить маршрут через неё, а нажмите на пронумерованную остановку, чтобы убрать её.</string>
     <string name="cerrar">Закрыть</string>
     <string name="ajustes_perfil">Маршрут</string>
     <string name="perfil_rapida">Быстрый</string>

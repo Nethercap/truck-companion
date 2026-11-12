@@ -117,7 +117,7 @@
     <string name="nav_ocultar_ruta">Hide the route</string>
     <string name="nav_mostrar_ruta">Show the route again</string>
     <string name="nav_atras">behind you</string>
-    <string name="nav_ayuda_mapa">Tip: long-press the map to route through that point.</string>
+    <string name="nav_ayuda_mapa">Tip: long-press the map to route through that point, and tap a numbered stop to remove it.</string>
     <string name="cerrar">Close</string>
     <string name="ajustes_perfil">Route</string>
     <string name="perfil_rapida">Fastest</string>

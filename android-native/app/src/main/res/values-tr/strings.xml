@@ -111,7 +111,7 @@
     <string name="nav_ocultar_ruta">Rotayı gizle</string>
     <string name="nav_mostrar_ruta">Rotayı yeniden göster</string>
     <string name="nav_atras">geride</string>
-    <string name="nav_ayuda_mapa">İpucu: o noktadan rota çizmek için haritaya uzun bas.</string>
+    <string name="nav_ayuda_mapa">İpucu: o noktadan rota çizmek için haritaya uzun bas, numaralı bir durağı kaldırmak için ona dokun.</string>
     <string name="cerrar">Kapat</string>
     <string name="ajustes_perfil">Rota</string>
     <string name="perfil_rapida">En hızlı</string>

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +48,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,6 +65,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -88,11 +91,13 @@ import com.trucksimdash.app.nav.MarcaConvoy
 import com.trucksimdash.app.nav.MotorNav
 import com.trucksimdash.app.nav.ResumenNav
 import com.trucksimdash.app.nav.SugerenciaNav
+import com.trucksimdash.app.nav.WaypointNav
 import com.trucksimdash.app.telemetria.EstadoSesion
 import com.trucksimdash.app.telemetria.Telemetria
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.roundToInt
 
 /** El mapa propio: el camion en vivo, por donde paso y quien anda cerca. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -181,6 +186,18 @@ fun MapaScreen(
     LaunchedEffect(control, versionEstilo, rutaConvoy) { control?.ponerRutaConvoy(rutaConvoy) }
     LaunchedEffect(control, versionEstilo, nav.waypoints) {
         control?.ponerWaypoints(nav.waypoints.map { LngLat(it.lng, it.lat) })
+    }
+    // Tocar una parada numerada abre un menu ahi para sacarla: se guarda la parada y no su
+    // numero, que cambia si mientras tanto se alcanza la de antes.
+    var paradaTocada by remember { mutableStateOf<ParadaTocada?>(null) }
+    val waypointsAlDia by rememberUpdatedState(nav.waypoints)
+    LaunchedEffect(control, mirando, flotante) {
+        control?.alTocarWaypoint = if (mirando || flotante) null else { i, donde ->
+            waypointsAlDia.getOrNull(i)?.let { paradaTocada = ParadaTocada(it, donde.x, donde.y) }
+        }
+    }
+    LaunchedEffect(nav.waypoints, mirando) {
+        paradaTocada?.let { if (mirando || it.parada !in nav.waypoints) paradaTocada = null }
     }
 
     LaunchedEffect(control, versionEstilo, t?.x, t?.z, t?.rumbo) {
@@ -355,6 +372,19 @@ fun MapaScreen(
             HojaDestinos(nav, motor, alReportar) { hojaAbierta = false }
         }
 
+        paradaTocada?.let { p ->
+            MenuParada(
+                p,
+                numero = nav.waypoints.indexOf(p.parada) + 1,
+                alQuitar = {
+                    val i = nav.waypoints.indexOf(p.parada)
+                    if (i >= 0) motor.sacarWaypoint(i)
+                    paradaTocada = null
+                },
+                alCerrar = { paradaTocada = null },
+            )
+        }
+
         convoy?.let { co ->
             co.tarjetas.firstOrNull { it.id == tarjetaAbierta }?.let { tarjeta ->
                 DetalleConvoy(co, tarjeta, motor) { tarjetaAbierta = null }
@@ -392,6 +422,34 @@ fun MapaScreen(
                     c.irA(LngLat(m.lng, m.lat))
                 }
             }
+        }
+    }
+}
+
+/** Una parada tocada en el mapa y donde quedo su circulo en la pantalla, en pixeles. */
+private data class ParadaTocada(val parada: WaypointNav, val x: Float, val y: Float)
+
+/**
+ * El menu de una parada tocada, pegado a su circulo. Pide un toque mas en vez de sacarla
+ * de una (la web la saca al tocarla): moviendo el mapa manejando, un toque se escapa.
+ */
+@Composable
+private fun BoxScope.MenuParada(p: ParadaTocada, numero: Int, alQuitar: () -> Unit, alCerrar: () -> Unit) {
+    Box(Modifier.align(Alignment.TopStart).offset { IntOffset(p.x.roundToInt(), p.y.roundToInt()) }.size(1.dp)) {
+        DropdownMenu(expanded = true, onDismissRequest = alCerrar) {
+            Text(
+                "$numero. ${p.parada.etiqueta ?: stringResource(R.string.nav_punto_ruta)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Paleta.TextoSuave,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 260.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.nav_quitar_parada)) },
+                leadingIcon = { Icon(Icons.Filled.Close, null) },
+                onClick = alQuitar,
+            )
         }
     }
 }
