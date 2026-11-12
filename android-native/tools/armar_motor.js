@@ -199,7 +199,9 @@ function nombresDeclarados(cuerpo) {
 }
 
 // Los nombres que usa un pedazo de codigo. Lo que viene despues de un punto es una
-// propiedad y no cuenta. Una `clave:` de objeto si: no se distingue de un ternario sin
+// propiedad y no cuenta, salvo los tres puntos de `...f()` o `[...lista]`: con ellos
+// routeLikeGameByFerry quedo afuera del motor y probar_motor revento en cada ruta
+// (11-11). Una `clave:` de objeto si: no se distingue de un ternario sin
 // parsear, y de mas solo suma una declaracion, en cambio de menos revienta manejando.
 // Los comentarios y las cadenas se sacan antes.
 function nombresUsados(texto) {
@@ -209,10 +211,10 @@ function nombresUsados(texto) {
     .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
     .replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
   const usados = new Set();
-  const re = /(\.\s*)?([A-Za-z_$][A-Za-z0-9_$]*)/g;
+  const re = /(\.\.\.\s*|\.\s*)?([A-Za-z_$][A-Za-z0-9_$]*)/g;
   let m;
   while ((m = re.exec(limpio))) {
-    if (!m[1]) usados.add(m[2]);
+    if (!m[1] || m[1].startsWith('...')) usados.add(m[2]);
   }
   return usados;
 }

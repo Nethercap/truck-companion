@@ -5360,7 +5360,7 @@ test('createTurnLog: los ultimos avisos, cada uno una vez, el mas nuevo primero 
   const l = log.list();
   assert.equal(l.length, 2);
   assert.deepEqual(l[0], { id: 'fork|left|2,-45601', t: 1002, kind: 'fork', direction: 'left', exit: null,
-    node: [2, -45601], truck: [-48, -45701], text: 'Turn right in 2 ft' });
+    node: [2, -45601], truck: [-48, -45701], text: 'Turn right in 2 ft', km: null });
   assert.equal(l[1].kind, 'turn');
   // el mismo cruce despues de un "derecho" en el medio tampoco se repite
   assert.equal(log.push(giro(1), datos(1)), false);
@@ -5420,6 +5420,138 @@ test('turnReportText: mapa, versiones, el camion y los avisos, para pegar en Dis
     heading: 359, now: 1792000000000, items: log.list(), formatTime: () => '23:59', speed: { kmh: 104.4, limitKmh: 104.6 } });
   assert.ok(largoVel.includes('Speed: 104 km/h, game speed limit 105 km/h'));
   assert.ok(largoVel.length < 2000, `${largoVel.length} caracteres`);
+});
+
+test('createTurnLog: cada aviso con lo que faltaba por la app y por el GPS del juego (reporte #39, 11-11)', () => {
+  const { createTurnLog } = require('./pure.js');
+  const log = createTurnLog();
+  const giro = (x) => ({ kind: 'fork', direction: 'left', node: [x, 17000] });
+  log.push(giro(1), () => ({ t: 1, truck: [0, 0], text: 'Keep left', km: { app: 1097.94, game: 1150.26 } }));
+  log.push(giro(2), () => ({ t: 2, truck: [0, 0], text: 'Keep left', km: { app: 12.04, game: null } }));
+  log.push(giro(3), () => ({ t: 3, truck: [0, 0], text: 'Keep left', km: { app: null, game: NaN } }));
+  log.push(giro(4), () => ({ t: 4, truck: [0, 0], text: 'Keep left' }));
+  const l = log.list();
+  assert.equal(l[0].km, null); // sin km (como antes)
+  assert.equal(l[1].km, null); // ninguno de los dos se sabe
+  assert.deepEqual(l[2].km, { app: 12, game: null });
+  assert.deepEqual(l[3].km, { app: 1097.9, game: 1150.3 });
+});
+
+test('createRouteChangeLog: los ultimos recalculos con su motivo, juntando los seguidos por lo mismo (reporte #39)', () => {
+  const { createRouteChangeLog, ROUTE_CHANGES_MAX, ROUTE_CHANGE_MERGE_MS } = require('./pure.js');
+  const log = createRouteChangeLog();
+  const MIN = 60000;
+  assert.equal(log.push({ t: 0, reason: 'new', truck: [-101478.4, 17607.6], before: null, after: 1128.64, game: 1128.6 }), true);
+  assert.deepEqual(log.list()[0], { t: 0, reason: 'new', truck: [-101478, 17608], before: null, after: 1128.6, game: 1128.6,
+    pick: null, fastest: null, complete: true, count: 1, tLast: 0 });
+  // cambiada para seguir al GPS del juego: con lo que media la mas rapida
+  log.push({ t: MIN, reason: 'game_check', truck: [1, 2], before: 1120.2, after: 1150.14, game: 1150.3, pick: 'game', fastest: 1120.04 });
+  assert.equal(log.list()[0].pick, 'game');
+  assert.equal(log.list()[0].fastest, 1120);
+  // fastest sin pick no va; un pick que no se conoce tampoco
+  log.push({ t: 2 * MIN, reason: 'destination', before: 5, after: 6, game: 7, pick: 'otra', fastest: 9 });
+  assert.equal(log.list()[0].pick, null);
+  assert.equal(log.list()[0].fastest, null);
+  assert.equal(log.list()[0].truck, null);
+  // lejos de toda calle se recalcula cada 200 m: seguidos y por lo mismo se juntan,
+  // con el antes del primero y el despues del ultimo
+  log.push({ t: 3 * MIN, reason: 'off_route', truck: [10, 20], before: 300, after: 301, game: 290 });
+  assert.equal(log.push({ t: 4 * MIN, reason: 'off_route', truck: [30, 40], before: 301, after: 302.5, game: 289, complete: false }), false);
+  log.push({ t: 4 * MIN + ROUTE_CHANGE_MERGE_MS, reason: 'off_route', truck: [50, 60], before: 302.5, after: 303, game: 288 });
+  let l = log.list();
+  assert.equal(l.length, 4);
+  assert.deepEqual(l[0], { t: 3 * MIN, reason: 'off_route', truck: [10, 20], before: 300, after: 303, game: 288,
+    pick: null, fastest: null, complete: true, count: 3, tLast: 4 * MIN + ROUTE_CHANGE_MERGE_MS });
+  // pasado el tiempo, otro motivo o otra eleccion, uno nuevo
+  log.push({ t: 6 * MIN + ROUTE_CHANGE_MERGE_MS + 1, reason: 'off_route', before: 1, after: 2, game: 3 });
+  log.push({ t: 7 * MIN + ROUTE_CHANGE_MERGE_MS, reason: 'off_route', before: 1, after: 2, game: 3, pick: 'game', fastest: 1 });
+  log.push({ t: 7 * MIN + ROUTE_CHANGE_MERGE_MS, reason: 'other_branch', before: 1, after: 2, game: 3 });
+  l = log.list();
+  assert.equal(l.length, ROUTE_CHANGES_MAX);
+  assert.deepEqual(l.map(c => [c.reason, c.count]), [['other_branch', 1], ['off_route', 1], ['off_route', 1], ['off_route', 3], ['destination', 1]]);
+  // un motivo que no se conoce es un recalculo a secas
+  log.push({ t: 8 * MIN + ROUTE_CHANGE_MERGE_MS, reason: 'cualquiera', before: 1, after: 2, game: 3 });
+  assert.equal(log.list()[0].reason, 'refresh');
+  // list devuelve copias
+  log.list()[0].count = 99;
+  assert.equal(log.list()[0].count, 1);
+});
+
+test('routeChangeReason: por que se recalculo la ruta (reporte #39)', () => {
+  const { routeChangeReason } = require('./pure.js');
+  const base = { prevKey: 'dest:a@b|1,2', prevTarget: 'dest:a@b', key: 'dest:a@b|1,2', target: 'dest:a@b', forced: null, offRoute: false, far: false, recheck: false };
+  assert.equal(routeChangeReason({ ...base, offRoute: true, far: true }), 'off_route');
+  assert.equal(routeChangeReason({ ...base, offRoute: true }), 'other_branch');
+  assert.equal(routeChangeReason({ ...base, recheck: true }), 'game_check');
+  assert.equal(routeChangeReason({ ...base, prevKey: null, prevTarget: null }), 'new');
+  assert.equal(routeChangeReason({ ...base, key: 'dest:c@d|3,4', target: 'dest:c@d' }), 'destination');
+  assert.equal(routeChangeReason({ ...base, key: 'dest:a@b|9,9;1,2' }), 'waypoints');
+  // la misma ruta invalidada: lo que dijo quien la invalido
+  assert.equal(routeChangeReason({ ...base, forced: 'road_data' }), 'road_data');
+  assert.equal(routeChangeReason({ ...base, forced: 'route_settings' }), 'route_settings');
+  assert.equal(routeChangeReason({ ...base, forced: 'cualquiera' }), 'refresh');
+  assert.equal(routeChangeReason(base), 'refresh');
+  // un cambio de destino le gana al motivo forzado (un salto al tomar el trabajo)
+  assert.equal(routeChangeReason({ ...base, key: 'dest:c@d|3,4', target: 'dest:c@d', forced: 'jump' }), 'destination');
+});
+
+test('turnReportText: km por aviso y los cambios de ruta; sin ellos, como antes (reporte #39)', () => {
+  const { turnReportText, createRouteChangeLog, createTurnLog, TURN_LOG_MAX, ROUTE_CHANGES_MAX } = require('./pure.js');
+  const hora = (ms) => `h${ms}`;
+  const base = { game: 'ats', map: 'ats', web: '20261111c', client: '1.5.38', truck: [-101478, 17607], heading: 160, now: 100,
+    formatTime: hora, routeKm: { app: 1097.9, game: 1128.6 } };
+  const viejos = [{ t: 20, kind: 'fork', direction: 'left', exit: null, node: [-101771, 15447], truck: [-101500, 16000], text: 'Keep left onto I-10' }];
+  const antes = turnReportText({ ...base, items: viejos });
+  // una pestana vieja o la app nativa sin el motor nuevo: sin km ni cambios, igual
+  assert.equal(turnReportText({ ...base, items: viejos.map(it => ({ ...it, km: null })), changes: [] }), antes);
+  assert.ok(!antes.includes('Route changes'));
+  assert.ok(antes.includes('"Keep left onto I-10"\n'));
+  // con los km de cuando aparecio el aviso
+  const conKm = turnReportText({ ...base, items: [{ ...viejos[0], km: { app: 1101.24, game: 1150 } }] });
+  assert.ok(conKm.includes('1. h20 keep left at -101771, 15447, truck at -101500, 16000 "Keep left onto I-10" (left: app 1101.2 km, game 1150.0 km)'), conKm);
+  assert.ok(turnReportText({ ...base, items: [{ ...viejos[0], km: { app: 3.5, game: null } }] }).includes('(left: app 3.5 km, game ?)'));
+  // los cambios de ruta, el mas nuevo primero, despues de los avisos
+  const log = createRouteChangeLog();
+  log.push({ t: 10, reason: 'new', truck: [-99000, 18000], before: null, after: 1180.04, game: 1181 });
+  log.push({ t: 15, reason: 'off_route', truck: [-100000, 17900], before: 1150, after: 1149, game: 1150 });
+  log.push({ t: 16, reason: 'off_route', truck: [-100100, 17900], before: 1149, after: 1148.5, game: 1149 });
+  log.push({ t: 30, reason: 'game_check', truck: [-101478.2, 17607], before: 1128.64, after: 1150.1, game: 1150.3, pick: 'game', fastest: 1128.6 });
+  log.push({ t: 40, reason: 'road_data', truck: [1, 2], before: 50, after: null, game: 49, complete: false });
+  log.push({ t: 50, reason: 'off_route', truck: [1, 2], before: 50, after: 2000, game: 49, pick: 'game_ferry', fastest: 1500 });
+  const txt = turnReportText({ ...base, items: viejos, changes: log.list() });
+  const lineas = txt.split('\n');
+  const i = lineas.indexOf('Route changes, newest first:');
+  assert.ok(i > lineas.indexOf('Last turn warnings, newest first:'));
+  assert.deepEqual(lineas.slice(i + 1, -1), [
+    '1. h50 off route, truck at 1, 2: app 50.0 -> 2000.0 km, game 49.0 km, matched the game GPS with fewer ferries (fastest 1500.0 km)',
+    '2. h40 road data arrived, truck at 1, 2: app 50.0 -> no route (incomplete), game 49.0 km',
+    '3. h30 game GPS check, truck at -101478, 17607: app 1128.6 -> 1150.1 km, game 1150.3 km, matched the game GPS (fastest 1128.6 km)',
+    '4. h15 off route (2 times, last h16), truck at -100000, 17900: app 1150.0 -> 1148.5 km, game 1149.0 km',
+    '5. h10 new route, truck at -99000, 18000: app ? -> 1180.0 km, game 1181.0 km',
+  ]);
+  assert.equal(lineas[lineas.length - 1], '```');
+  // los cambios van aunque no haya avisos (sin modo navegacion no se anota ninguno)
+  const sinAvisos = turnReportText({ ...base, items: [], changes: log.list() });
+  assert.ok(sinAvisos.includes('No turn warnings shown yet') && sinAvisos.includes('Route changes, newest first:'));
+  // lo mas largo entra en lo que acepta la API (REPORTE_MAX de reportes.py, 6000), con
+  // diez avisos largos y cinco cambios con todo; sin los cambios, en Discord (2000)
+  const avisos = createTurnLog();
+  for (let k = 0; k < TURN_LOG_MAX; k++) {
+    avisos.push({ kind: 'fork', direction: 'left', node: [-123456 - k, -98765] },
+      () => ({ t: 1792000000000, truck: [-123456, -98765], text: 'Keep left in 1.5 mi onto I-5 N toward Portland', km: { app: 12345.6, game: 12345.6 } }));
+  }
+  const cambios = createRouteChangeLog();
+  for (let k = 0; k < ROUTE_CHANGES_MAX + 2; k++) {
+    cambios.push({ t: k * 1e9, reason: k % 2 ? 'road_data' : 'route_ahead', truck: [-123456, -98765], before: 12345.6, after: 12345.6,
+      game: 12345.6, pick: 'game_ferry', fastest: 12345.6 });
+    cambios.push({ t: k * 1e9 + 1, reason: k % 2 ? 'road_data' : 'route_ahead', truck: [-123456, -98765], before: 12345.6, after: 12345.6,
+      game: 12345.6, pick: 'game_ferry', fastest: 12345.6 });
+  }
+  const largo = { ...base, map: 'ats_c2c_promods', truck: [-123456, -98765], now: 1792000000000, items: avisos.list(), formatTime: () => '23:59',
+    speed: { kmh: 104.4, limitKmh: 104.6 }, routeKm: { app: 12345.6, game: 12345.6 } };
+  const todo = turnReportText({ ...largo, changes: cambios.list() });
+  assert.ok(todo.length < 6000, `${todo.length} caracteres`);
+  assert.ok(turnReportText(largo).length < 2000, `${turnReportText(largo).length} caracteres`);
 });
 
 test('turnReportSpeedLine: el limite en 0 es sin limite, sin velocidad no va', () => {

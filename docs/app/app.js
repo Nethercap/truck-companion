@@ -209,7 +209,7 @@ function dlcOffFor(game) {
 function applyDetectedDlcs(valor) {
   if (valor === undefined || JSON.stringify(valor) === JSON.stringify(detectedDlcs)) return;
   detectedDlcs = valor;
-  if (dlcAuto) invalidateRoute();
+  if (dlcAuto) invalidateRoute('dlc');
   if (document.getElementById('dlcModal').style.display === 'flex') renderDlcLists();
 }
 // Guia por voz (Ajustes): apagada por defecto, y una voz elegida por idioma
@@ -517,7 +517,7 @@ document.querySelectorAll('input[name="routeProfile"]').forEach(radio => {
     routeProfile = e.target.value;
     saveSettings();
     routePrefsChanged(); // a los demas dispositivos de la sesion
-    invalidateRoute(); // recalcula con el perfil nuevo en el proximo tick
+    invalidateRoute('route_settings'); // recalcula con el perfil nuevo en el proximo tick
   });
 });
 
@@ -1035,7 +1035,7 @@ function renderDlcLists() {
         dlcOff = normalizeDlcOff({ ...dlcOff, [game]: [...off] });
         saveSettings();
         routePrefsChanged();
-        invalidateRoute();
+        invalidateRoute('route_settings');
       });
       label.appendChild(input);
       label.appendChild(document.createTextNode(' ' + nombre));
@@ -1059,7 +1059,7 @@ document.querySelectorAll('input[name="dlcAuto"]').forEach(radio => {
     dlcAuto = auto;
     saveSettings();
     routePrefsChanged();
-    invalidateRoute();
+    invalidateRoute('route_settings');
     renderDlcLists();
   });
 });
@@ -2467,6 +2467,14 @@ let routeGraphFail = { failures: 0, at: 0, error: null };
 // La ruta actual pasa por un DLC destildado porque no hay otro camino.
 let routeUsesUncheckedDlc = false;
 let currentRouteTarget = null; // cityDst actual, para saber cuando recalcular
+// Para el turn report (createRouteChangeLog, routeChangeReason en pure.js): por que
+// se recalcula. routeForcedReason lo deja quien pone currentRouteTarget en null
+// (invalidateRoute, el grafo que termino de llegar, un salto); lastRouteKeys, la
+// clave de la ultima ruta calculada y la de su destino, para saber si cambio el
+// destino o los waypoints (null al cambiar de mapa o conectar otra vez).
+let routeForcedReason = null;
+let lastRouteKeys = null;
+const routeChangeLog = createRouteChangeLog();
 // Sin destino en la app: por que (noRouteReason) y los km de la ruta del GPS
 // del juego, para decirlo en vez de "No destination set". Los pone
 // updateDestinationMarker en cada dato.
@@ -2555,8 +2563,11 @@ function renumberWaypointMarkers() {
   });
 }
 
-function invalidateRoute() {
+// reason: el motivo para el turn report (ROUTE_CHANGE_REASONS); sin el, el que
+// estaba, y si cambiaron los waypoints lo dice la clave de la ruta.
+function invalidateRoute(reason = null) {
   currentRouteTarget = null; // fuerza recalculo de la ruta en el proximo tick
+  routeForcedReason = reason || routeForcedReason;
   paceEta.reset();
 }
 
@@ -2736,7 +2747,7 @@ function applyRoutePrefs(msg) {
   document.getElementById('setRouteFastest').checked = routeProfile !== 'shortest';
   document.getElementById('setRouteShortest').checked = routeProfile === 'shortest';
   if (document.getElementById('dlcModal').style.display === 'flex') renderDlcLists();
-  invalidateRoute();
+  invalidateRoute('route_settings');
   showToast(t('routePrefsSyncedToast'), 'success', 3000);
 }
 // Un plan del relay: la respuesta a un cambio de aca (se guarda su rev) o el
@@ -3475,7 +3486,7 @@ async function loadRouteTimes(base, v, game, decoded, graph) {
     // La ruta calculada antes de que llegaran se rehace con ellas (como con
     // el -prefabs.bin): si no, dos dispositivos con los mismos waypoints
     // mostraban caminos distintos segun cuando abrieron el mapa
-    if (data && currentGame === game && routeGraph === graph) { graph.edgeT = data; currentRouteTarget = null; }
+    if (data && currentGame === game && routeGraph === graph) { graph.edgeT = data; currentRouteTarget = null; routeForcedReason = 'road_data'; }
   } catch (e) { /* sin decimas: los segundos enteros */ }
 }
 
@@ -3497,7 +3508,7 @@ async function loadRoutePrefabs(base, v, game, decoded, graph, local) {
     if (!res.ok) return;
     const data = decodePrefabsBin(await res.arrayBuffer(), decoded.n, decoded.ne);
     // La ruta calculada sin el (vueltas de Kiel, tocos) se rehace con el
-    if (data && currentGame === game && routeGraph === graph) { graph.edgePrefab = data; currentRouteTarget = null; }
+    if (data && currentGame === game && routeGraph === graph) { graph.edgePrefab = data; currentRouteTarget = null; routeForcedReason = 'road_data'; }
   } catch (e) { /* sin el archivo: uTurnPairs, como antes */ }
 }
 
@@ -3886,7 +3897,8 @@ function ownRouteTime() {
 // del juego por la I-80 (Salt Lake City, Discord 19-10). Las alternativas
 // (routeAlternatives) se buscan solo si el largo no coincide con el juego.
 // Si ninguna coincide y la nuestra va por ferry, la de por tierra
-// (routeLikeGameByFerry). Devuelve { leg, switched }.
+// (routeLikeGameByFerry). Devuelve { leg, switched, by, km }: by, 'alternative' o
+// 'ferry' si cambio, y km, los de la mas rapida (para el turn report).
 function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
   if (!leg) return { leg, switched: false };
   const km = gameKmOf(leg, leg);
@@ -3896,9 +3908,9 @@ function routeLikeGame(leg, from, to, rumbo, gameKm, tramo = null) {
     const k = pickRouteLikeGame(rutas.map(r => ({
       km: gameKmOf(r, r), seconds: routeSecondsOf(r), shared: routeSharedFrac(routeEdgesOf(r), base, routeGraph.edgeM),
     })), gameKm);
-    if (k > 0) return { leg: rutas[k], switched: true };
+    if (k > 0) return { leg: rutas[k], switched: true, by: 'alternative', km };
   }
-  return routeLikeGameByFerry(leg, km, from, to, rumbo, gameKm, tramo);
+  return { ...routeLikeGameByFerry(leg, km, from, to, rumbo, gameKm, tramo), km };
 }
 
 // Las aristas de ferry o tren del grafo cargado.
@@ -3926,7 +3938,7 @@ function routeLikeGameByFerry(leg, km, from, to, rumbo, gameKm, tramo) {
     const r = findRoute(from, to, rumbo, penal, null, tramo);
     return r ? { route: r, km: gameKmOf(r, r), ferryS: ferryS(r) } : null;
   }, gameKm, ferryS(leg));
-  return hallada ? { leg: hallada.result.route, switched: true } : { leg, switched: false };
+  return hallada ? { leg: hallada.result.route, switched: true, by: 'ferry' } : { leg, switched: false };
 }
 
 // Si se busca la ruta como la del GPS del juego (followGameRoute, pure.js).
@@ -4580,6 +4592,7 @@ function updateDestinationMarker(data) {
     if (map.getSource('route-ferry')) map.getSource('route-ferry').setData(emptyLineString());
     currentRouteTarget = null;
     currentRouteWorldPoints = null;
+    routeForcedReason = null;
     // Con la ruta borrada por el usuario hay destino igual (el crudo): ahi
     // no se explica nada.
     noRouteNow = noRouteReason({ hasTarget: !!resolveRawRouteTarget(data), hasRoute: false, gameRouteKm: data.routeDistanceKm });
@@ -4645,6 +4658,18 @@ function updateDestinationMarker(data) {
 
   if ((destChanged || offRoute || recheck) && data.position?.x != null && routeGraph) {
     const calculoDesde = Date.now();
+    // Para el turn report: por que, y cuanto faltaba por la ruta de antes. Solo con
+    // waypoints el destino es el ultimo, y su clave, la de todos: es un cambio de
+    // waypoints.
+    const destinoClave = target.kind === 'waypoint' ? 'waypoints' : target.key;
+    const motivo = routeChangeReason({
+      prevKey: lastRouteKeys && lastRouteKeys.key, prevTarget: lastRouteKeys && lastRouteKeys.target,
+      key: routeKey, target: destinoClave, forced: routeForcedReason, offRoute, far: lejos, recheck,
+    });
+    const kmAntes = currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null;
+    let eleccion = null;
+    routeForcedReason = null;
+    lastRouteKeys = { key: routeKey, target: destinoClave };
     currentRouteTarget = routeKey;
     offBranchTicks = 0;
     // Una comparacion mas con el GPS del juego, salvo despues de esta.
@@ -4680,7 +4705,10 @@ function updateDestinationMarker(data) {
       if (leg && legs.length === 1 && gameRouteComparable(target)) {
         const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx), empresa: empresa(legIdx) });
         leg = elegida.leg;
-        if (elegida.switched) routeGameCheck.left = 0;
+        if (elegida.switched) {
+          routeGameCheck.left = 0;
+          eleccion = { pick: elegida.by === 'ferry' ? 'game_ferry' : 'game', fastest: elegida.km };
+        }
       }
       if (leg) {
         if (leg.usesUncheckedDlc) routeUsesUncheckedDlc = true;
@@ -4696,6 +4724,11 @@ function updateDestinationMarker(data) {
     if (!routePoints.length) routePoints = null;
     currentRouteWorldPoints = routePoints;
     currentRouteFull = routePoints;
+    routeChangeLog.push({
+      t: calculoDesde, reason: motivo, truck: [data.position.x, data.position.z],
+      before: kmAntes, after: routePoints ? gameKmOf(routePoints) : null, game: data.routeDistanceKm,
+      pick: eleccion && eleccion.pick, fastest: eleccion && eleccion.fastest, complete,
+    });
     if (map.getSource('route')) {
       if (routePoints) {
         const parts = splitRouteForDrawing(routePoints);
@@ -4751,6 +4784,7 @@ async function loadGameMap(game) {
   }
   loadPois(game); // no bloquea: la busqueda muestra "cargando" hasta que llegue
   currentRouteTarget = null;
+  lastRouteKeys = null;
   currentRouteWorldPoints = null;
   trailWorld.length = 0;
   lastDisplayedLngLat = null;
@@ -6332,7 +6366,7 @@ function trimRouteBehindTruck(x, z) {
   // atras y las indicaciones piden dar la vuelta. Ahi se recalcula desde
   // donde esta (una sola vez: la ruta nueva arranca en el camion).
   if (bestDist > OFF_ROUTE_THRESHOLD_M) {
-    if (distanceToRouteMeters(x, z, OFF_ROUTE_THRESHOLD_M) <= OFF_ROUTE_THRESHOLD_M) currentRouteTarget = null;
+    if (distanceToRouteMeters(x, z, OFF_ROUTE_THRESHOLD_M) <= OFF_ROUTE_THRESHOLD_M) { currentRouteTarget = null; routeForcedReason = 'route_ahead'; }
     return;
   }
   // Los nodos que quedan atras se guardan aparte (ROUTE_BEHIND_MAX): findUpcomingTurn
@@ -6697,6 +6731,7 @@ function updateMap(position, game, gameHeadingDeg) {
       trailWorldRaw = null;
       headingRef = null;
       currentRouteTarget = null;
+      routeForcedReason = 'jump';
       currentRouteWorldPoints = null;
     } else if (Number.isFinite(gameHeadingDeg)) {
       // El juego lo dice: no hay cuerda ni base minima ni espera a moverse.
@@ -6789,7 +6824,12 @@ function updateMap(position, game, gameHeadingDeg) {
   // donde no sirven todos los carriles: abajo de "Continue straight", sin voz.
   navQuietLanes = guiando || obsOverlayOn
     ? stabilizeManeuver(navQuietLanesState, giroAhora || turn ? null : findQuietLanes(), NAV_TURN_DEBOUNCE_TICKS) : null;
-  if (turn) turnLog.push(turn, () => ({ t: Date.now(), truck: [position.x, position.z], text: (navTurnParts(turn) || {}).text }));
+  if (turn) {
+    turnLog.push(turn, () => ({
+      t: Date.now(), truck: [position.x, position.z], text: (navTurnParts(turn) || {}).text,
+      km: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
+    }));
+  }
   if (guiando) voiceManeuverTick(turn);
   if (pipWin) pipTurnHtml = navPanelHtml(turn);
   if (clientOverlayOn || obsOverlayOn) overlayTurnParts = navTurnParts(turn);
@@ -7420,7 +7460,7 @@ function buildTurnReport() {
     game: lastData && lastData.game, map: currentGame, web: webVersion(),
     client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
-    now: Date.now(), items: turnLog.list(), job: turnReportJobLine(lastData),
+    now: Date.now(), items: turnLog.list(), changes: routeChangeLog.list(), job: turnReportJobLine(lastData),
     speed: lastData ? { kmh: lastData.speedKmh, limitKmh: lastData.speedLimitKmh } : null,
     graph: { state: routeGraphState, failures: routeGraphFail.failures, error: routeGraphFail.error },
     routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
@@ -8564,6 +8604,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   lastWorldPos = null;
   lastDisplayedLngLat = null;
   currentRouteTarget = null;
+  lastRouteKeys = null;
   currentRouteWorldPoints = null;
   if (map && map.getSource('trail')) map.getSource('trail').setData(emptyLineString());
   setRouteData(emptyLineString());

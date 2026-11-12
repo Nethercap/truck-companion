@@ -912,6 +912,9 @@ const ESCENARIOS = {
     const f = JSON.parse(m.motor.abrirReporte());
     chequear(f.hayAvisos && /Route:/.test(f.reporte), `reporte vacio: ${f.reporte.slice(0, 200)}`);
     chequear(f.reporte.includes('android-test'), `no dice que app lo manda: ${f.reporte.slice(0, 200)}`);
+    // Los km de cada aviso y los recalculos, como en la web (reporte #39, 11-11).
+    chequear(/ \(left: app [\d.]+ km, game [\d.?]+/.test(f.reporte), `avisos sin km: ${f.reporte.slice(0, 600)}`);
+    chequear(/Route changes, newest first:\n1\. .*, truck at -?\d+, -?\d+: app /.test(f.reporte), `sin cambios de ruta: ${f.reporte.slice(-400)}`);
     chequear(f.tipos.length === 6 && f.tipos.every((x) => x.label && !x.label.startsWith('navReport')), `tipos: ${JSON.stringify(f.tipos)}`);
     for (const [k, v] of Object.entries(f.textos)) chequear(v && v !== k, `sin texto para ${k}`);
 
