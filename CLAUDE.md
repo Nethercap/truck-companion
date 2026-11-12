@@ -72,6 +72,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   con su Deploy, la PC), o check_avisos falla con 403. La URL r2.dev del
   bucket esta apagada (saltearia la regla); el CORS del bucket queda en `*`
   porque el modo LAN pide desde direcciones que cambian en cada casa.
+- El pais de cada viaje en la cuenta sale de `app/data/city_regions.json` de
+  truckdash-loginapp (`build_city_regions.py` del taller, todas las variantes
+  juntas): un mapa con ciudades nuevas va con la tabla regenerada. Sin eso, la
+  Islandia de ETS2 1.62.2 sumaba las Feroe de ProMods (Discord, 11-11): la tabla
+  tenia solo la de ProMods, en otro lugar del mapa con los mismos tokens. Una
+  ciudad en dos lugares va dos veces (`MISMO_LUGAR`).
 - Un archivo de mapa nuevo es opcional en la web: sin el, la app hace lo
   de antes (sin flechas de carril, por ejemplo), nunca deja de rutear.
 - Los mods con firma `AEM!` (ZIP con las cabeceras cambiadas: Project Russia,
