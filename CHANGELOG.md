@@ -14,6 +14,10 @@ updates on its own and is not versioned here.
   now drawn around the right side of it in both directions; before, one of the two directions was
   drawn the wrong way round. A few of these roundabouts are now also announced as roundabouts. This
   applies to maps built from this version on: a map you already built keeps working as it did.
+- Build my map: Setup now always shows "Your map mods" for each game it found. Without mods it says it
+  found none in your last session and which file it reads them from (`game.log.txt`, which the game
+  writes when you load your profile), instead of showing nothing. A new **Re-read mods** button reads
+  that file again right away, instead of waiting up to 10 seconds.
 
 ## 1.5.38 (2026-11-07)
 

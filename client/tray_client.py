@@ -656,8 +656,9 @@ class SetupWindow:
         self.label(self.games_frame, T("plugin_note", v=plugin_installer.PLUGIN_DLL_VERSION), fg=MUTED, wraplength=520).pack(anchor="w", pady=(6, 0))
 
         # --- Mapa armado en la PC ---
-        # Solo aparece si hace falta (la web vio el camion fuera del mapa con
-        # mods activos), si ya hay un mapa armado o si se esta armando.
+        # Con cada juego instalado, aunque no haya mods: sin ellos dice donde
+        # los busco y deja volver a leerlos (Discord 12-11: un usuario con el
+        # juego instalado no veia la seccion y no habia forma de saber por que).
         self.local_map_frame = self.section(T("sec_local_map"))
         self.local_map_body = tk.Frame(self.local_map_frame, bg=BG)
         self.local_map_body.pack(fill="x", pady=(4, 0))
@@ -1132,7 +1133,8 @@ class SetupWindow:
                 tuple(sorted(state.offmap_places.items())), tuple(sorted(state.offmap_games)),
                 tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
                 tuple(g for g in ("ats", "ets2") if can_build_map(g)),
-                build.get("game"), build.get("step"), build.get("error"), build.get("running"))
+                build.get("game"), build.get("step"), build.get("error"), build.get("running"),
+                tuple(local_map_row(g) for g in ("ats", "ets2")))
 
     def render_local_map(self):
         sig = self._local_map_signature()
@@ -1168,6 +1170,13 @@ class SetupWindow:
                            wraplength=520).pack(anchor="w", pady=(2, 0))
                 self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
                 self.button(self.local_map_body, T("local_map_build"), lambda g=game: self.build_my_map(g)).pack(anchor="w")
+            elif local_map_row(game) == "no_game_dir":
+                self.label(self.local_map_body, T("local_map_no_game_dir", game=nombre), fg=ORANGE,
+                           wraplength=520).pack(anchor="w", pady=2)
+            elif local_map_row(game) in ("no_mods", "no_log"):
+                self.label(self.local_map_body,
+                           T(f"local_map_{local_map_row(game)}", game=nombre, path=game_log_path(game)),
+                           fg=MUTED, wraplength=520).pack(anchor="w", pady=2)
             else:
                 continue
             filas += 1
@@ -1181,11 +1190,26 @@ class SetupWindow:
             elif build.get("game") == game and build.get("step") == "game_opened":
                 self.label(self.local_map_body, T("local_map_game_opened"), fg=ORANGE,
                            wraplength=520).pack(anchor="w", pady=(4, 0))
+        if filas and not build.get("running"):
+            # Los mods se releen solos cada 10 s; esto es para no esperar y
+            # para ver que se leyo (sin cambios, la seccion queda igual).
+            self.button(self.local_map_body, T("local_map_reread"), self.reread_mods).pack(anchor="w", pady=(8, 0))
         if filas:
             if not self.local_map_frame.winfo_ismapped():
                 self.local_map_frame.pack(fill="x", after=self.games_frame)
         else:
             self.local_map_frame.pack_forget()
+
+    def reread_mods(self):
+        try:
+            refresh_map_mods(force=True)
+        except Exception:
+            logging.exception("Re-reading the mods failed")
+        logging.info("Mods re-read from Setup: %s", {g: len(r) if r is not None else None
+                                                      for g, r in (state.mounted_mods or {}).items()})
+        self._local_map_sig = None
+        self.render_local_map()
+        self.flash_local_map(T("local_map_reread_done", time=time.strftime("%H:%M:%S")), MUTED)
 
     def build_my_map(self, game):
         if map_builder.game_running():
@@ -1960,6 +1984,25 @@ def can_build_map(game: str) -> bool:
     mapa armado para esos mods. Setup ofrece armarlo a mano."""
     return (game not in state.local_maps and bool((state.mounted_mods or {}).get(game))
             and game_dir_for(game) is not None)
+
+
+def game_log_path(game: str) -> str:
+    """El game.log.txt de donde salen los mods de ese juego."""
+    return client_lib.game_log_paths().get(game, "")
+
+
+def local_map_row(game: str) -> str | None:
+    """Lo que dice Setup de un juego que no tiene mapa armado ni se puede armar:
+    'no_game_dir' (hay mods y no se sabe donde esta el juego), 'no_log' (el juego
+    esta y su game.log.txt no), 'no_mods' (esta el log y no hay mods, o el juego
+    se cerro sin cargar un perfil) o None (no se muestra: ni juego ni mods)."""
+    if game in state.local_maps or can_build_map(game):
+        return None
+    if (state.mounted_mods or {}).get(game):
+        return "no_game_dir"
+    if game_dir_for(game) is None:
+        return None
+    return "no_mods" if os.path.isfile(game_log_path(game)) else "no_log"
 
 
 def needs_map_build(game: str) -> bool:

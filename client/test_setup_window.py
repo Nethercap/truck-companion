@@ -858,12 +858,24 @@ def _textos(widget):
     return out
 
 
+def _logs(monkeypatch, tmp_path, **existen):
+    """Los game.log.txt van a tmp_path; los juegos en `existen` lo tienen."""
+    rutas = {g: str(tmp_path / f"{g}-game.log.txt") for g in ("ats", "ets2")}
+    for g, si in existen.items():
+        if si:
+            open(rutas[g], "w").close()
+    monkeypatch.setattr(tray_client.client_lib, "game_log_paths", lambda: dict(rutas))
+    return rutas
+
+
 def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch, tmp_path):
-    """Sin mods no hay seccion. Con mods se puede armar a mano, sin esperar
-    a que la web vea el camion fuera del mapa (la opcion "desaparecia" si el
-    tablero no lo veia, o al reiniciar el cliente); con ese aviso se ofrece
-    primero. Con el juego abierto el boton no arranca nada."""
+    """Sin mods la seccion dice que no los encontro (ver el test de abajo). Con
+    mods se puede armar a mano, sin esperar a que la web vea el camion fuera
+    del mapa (la opcion "desaparecia" si el tablero no lo veia, o al reiniciar
+    el cliente); con ese aviso se ofrece primero. Con el juego abierto el boton
+    no arranca nada."""
     v, _ = ventana
+    _logs(monkeypatch, tmp_path, ats=True)
     bin_dir = _install(tmp_path, "ATS", "ats")
     tray_client.state.installs = [plugin_installer.describe_install("ats", bin_dir)]
     monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": [], "ets2": None})
@@ -872,7 +884,8 @@ def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch
     monkeypatch.setattr(tray_client.state, "map_build", None)
     v.render_local_map()
     v.root.update()
-    assert not v.local_map_frame.winfo_ismapped()
+    assert v.local_map_frame.winfo_ismapped()
+    assert tray_client.T("local_map_build") not in _textos(v.local_map_body)
 
     tray_client.state.mounted_mods = {"ats": [str(tmp_path / "mod.scs")], "ets2": None}
     v.render_local_map()
@@ -911,6 +924,82 @@ def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch
     textos = _textos(v.local_map_body)
     assert tray_client.T("local_map_build") not in textos
     assert any("12" in t for t in textos)
+
+
+def test_sin_mods_dice_donde_los_busco_y_se_pueden_releer(ventana, monkeypatch, tmp_path):
+    """Discord 12-11 (jalihaag, 1.5.38): con ETS2 instalado y sin mods en el log
+    la seccion no salia, y no habia como saber por que ni como hacer que el
+    cliente volviera a leerlos. Sin juego ni mods sigue sin salir."""
+    v, _ = ventana
+    rutas = _logs(monkeypatch, tmp_path, ets2=True)
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ets2": [], "ats": None})
+    monkeypatch.setattr(tray_client.state, "local_maps", {})
+    monkeypatch.setattr(tray_client.state, "offmap_games", set())
+    monkeypatch.setattr(tray_client.state, "offmap_places", {})
+    monkeypatch.setattr(tray_client.state, "map_build", None)
+    nombre = tray_client.GAME_LABELS["ets2"]
+
+    tray_client.state.installs = []
+    v.render_local_map()
+    v.root.update()
+    assert not v.local_map_frame.winfo_ismapped()
+
+    bin_dir = _install(tmp_path, "ETS2", "ets2", exe="eurotrucks2.exe")
+    tray_client.state.installs = [plugin_installer.describe_install("ets2", bin_dir)]
+    v.render_local_map()
+    v.root.update()
+    assert v.local_map_frame.winfo_ismapped()
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_no_mods", game=nombre, path=rutas["ets2"]) in textos
+    assert tray_client.T("local_map_reread") in textos
+    assert tray_client.T("local_map_build") not in textos
+    # El de ATS no: no esta instalado ni tiene mods.
+    assert not any(tray_client.GAME_LABELS["ats"] in t for t in textos)
+
+    # Sin el game.log.txt lo dice distinto: puede estar en otra carpeta.
+    os.remove(rutas["ets2"])
+    tray_client.state.mounted_mods = {"ets2": None, "ats": None}
+    v.render_local_map()
+    v.root.update()
+    assert tray_client.T("local_map_no_log", game=nombre, path=rutas["ets2"]) in _textos(v.local_map_body)
+
+    # Volver a leer: va al log en el momento (sin los 10 s) y, con mods, ofrece armar.
+    leidas = []
+    def releer(force=False):
+        leidas.append(force)
+        tray_client.state.mounted_mods = {"ets2": [str(tmp_path / "mod.scs")], "ats": None}
+        return True
+    monkeypatch.setattr(tray_client, "refresh_map_mods", releer)
+    v.reread_mods()
+    v.root.update()
+    assert leidas == [True]
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_build") in textos
+    assert any(t.startswith(tray_client.T("local_map_reread_done", time="")[:6]) for t in textos)
+
+    # Con mods y sin saber donde esta el juego: que lo agregue.
+    tray_client.state.installs = []
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert tray_client.T("local_map_no_game_dir", game=nombre) in textos
+    assert tray_client.T("local_map_build") not in textos
+
+    # Armando, no se ofrece releer (el armado ya tomo sus mods).
+    tray_client.state.installs = [plugin_installer.describe_install("ets2", bin_dir)]
+    tray_client.state.map_build = {"game": "ets2", "step": "parser", "error": None, "running": True}
+    v.render_local_map()
+    v.root.update()
+    assert tray_client.T("local_map_reread") not in _textos(v.local_map_body)
+
+
+def test_los_avisos_sin_mods_estan_en_todas_las_lenguas():
+    for lang, textos in i18n._STRINGS.items():
+        for clave in ("local_map_no_mods", "local_map_no_log"):
+            assert "{game}" in textos[clave] and "{path}" in textos[clave], (lang, clave)
+            # El texto nombra el boton tal como se ve.
+            assert textos["local_map_reread"] in textos[clave], (lang, clave)
+        assert "{time}" in textos["local_map_reread_done"], lang
 
 
 def test_el_destino_fuera_del_mapa_ofrece_armarlo(ventana, monkeypatch, tmp_path):
