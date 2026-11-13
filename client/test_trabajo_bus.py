@@ -259,3 +259,72 @@ def test_la_cuenta_sigue_el_mismo_viaje_toda_la_linea():
     cierres = [a for a in acciones if a["tipo"] == "trip_close"]
     assert len(cierres) == 1 and cierres[0]["datos"]["status"] == "delivered"
     assert cierres[0]["datos"]["city_dst"] == "Oulu"
+
+
+def test_los_miradores_salen_por_uid_o_por_la_clave_del_nombre(tmp_path):
+    """mapbuild/pois.viewpoints: el id del album -> lugar del cutscene. Por el
+    uid; si un mod rehizo el sector (otro uid), por la clave del nombre en la
+    accion del cutscene. Solo en ETS2."""
+    import json as _json
+    from mapbuild import pois
+
+    cutscenes = [
+        {"uid": "5e3e4694e4990000", "x": 43560.36, "y": -73397.83, "actionStringParams": [
+            "create", "viewpoint", 'ui_value 0.0 "ui" "@@poc_cut_viitasaari@@"']},
+        {"uid": "aaaa000000000001", "x": 100.4, "y": 200.6, "actionStringParams": [
+            'ui_value 0.0 "ui" "@@de_cut_hannover@@"']},
+    ]
+    (tmp_path / "europe-cutscenes.json").write_text(_json.dumps(cutscenes), encoding="utf-8")
+    tabla = {
+        "pocviitasaar": {"key": "@@poc_cut_viitasaari@@", "uids": ["5e3e4694e4990000"]},
+        "dehannover": {"key": "@@de_cut_hannover@@", "uids": ["ffff000000000000"]},
+        "isgeyser": {"key": "@@is_cut_geyser@@", "uids": ["bbbb000000000000"]},
+    }
+    etiquetas = {(43560, -73398): "Viitasaari"}
+    assert pois.viewpoints(str(tmp_path), "europe", etiquetas, tabla) == {
+        "dehannover": [100, 201, "dehannover"],
+        "pocviitasaar": [43560, -73398, "Viitasaari"],
+    }
+    assert pois.viewpoints(str(tmp_path), "usa", etiquetas, tabla) == {}
+    assert pois.viewpoints(str(tmp_path / "nada"), "europe", etiquetas, tabla) == {}
+
+
+def test_la_tabla_de_miradores_sale_del_album_del_juego():
+    """tools/build_viewpoints_ets2.py lee def/photo_album/viewpoints.sui."""
+    import importlib.util
+    ruta = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "tools", "build_viewpoints_ets2.py")
+    spec = importlib.util.spec_from_file_location("build_viewpoints_ets2", ruta)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    sui = """SiiNunit
+{
+photo_album_group : album.viewpoints
+{
+	items[]: album.viewpoints.pocviitasaar
+}
+photo_album_item : album.viewpoints.pocviitasaar
+{
+	name: "@@poc_cut_viitasaari@@"
+	desc: "@@poc_cut_viitasaari_desc@@"
+	dlc_id: eut2_nordic
+	objects_uid[]: 0x5E3E4694E4990000
+}
+photo_album_item : album.viewpoints.corto
+{
+	name: "@@corto@@"
+	objects_uid[]: 0x1
+}
+}"""
+    assert modulo.leer(sui) == {
+        "pocviitasaar": {"key": "@@poc_cut_viitasaari@@", "uids": ["5e3e4694e4990000"]},
+        "corto": {"key": "@@corto@@", "uids": ["0000000000000001"]},
+    }
+    # La tabla que viaja con el cliente tiene los 137 de ETS2 1.62.3.
+    tabla = pois_tabla()
+    assert len(tabla) >= 137 and tabla["pocviitasaar"]["uids"] == ["5e3e4694e4990000"]
+
+
+def pois_tabla():
+    from mapbuild import pois
+    return pois.load_viewpoint_table()

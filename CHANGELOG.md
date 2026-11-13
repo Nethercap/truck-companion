@@ -14,8 +14,9 @@ updates on its own and is not versioned here.
 - Coaches (ETS2): bus jobs now reach your account and the dashboard. The game sends a bus job as a
   list of stops instead of a destination city, and the telemetry plugin now keeps that list (each
   stop's name, timetable and passengers). Your account saves the trip from the first stop to the
-  last, and while the next stop is in a city the dashboard routes to that city, with the stop's
-  timetable as the deadline. Viewpoint stops of tourist jobs are not on the map yet. The client puts
+  last. The dashboard routes to the next stop and shows its scheduled arrival in game time and the
+  passengers on board: a viewpoint stop of a tourist job is routed to exactly, and a stop in a city
+  goes to the city centre for now, because bus stations aren't in our map data yet. The client puts
   the new plugin in the game folder when it sees the game closed, so restart the game once after
   updating.
 

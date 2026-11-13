@@ -4365,6 +4365,10 @@ function resolveRouteTarget(data) {
 }
 
 function resolveRawRouteTarget(data) {
+  // Trabajo de bus (DLC Coaches): a la proxima parada, un mirador por su id
+  // en los POIs o el centro de su ciudad (busRouteTarget en pure.js).
+  const parada = busRouteTarget(data, pois && poisVariant === currentGame ? pois.viewpoints : null, findCity);
+  if (parada) return parada;
   // Trabajo tomado pero carga todavia no enganchada: hay que ir a buscarla.
   // Empresa exacta si esta en los POIs; si no, el centro de la ciudad de
   // ORIGEN (antes caia al destino, que es justo a donde no hay que ir aun).
@@ -4475,9 +4479,23 @@ function renderRouteSummary(view) {
     parada.hidden = !wp;
     if (wp) document.getElementById('routeStopName').textContent = t('routeNextStop').replace('{name}', wp.label || `${t('waypoint')} 1`);
   }
+  // La proxima parada de un trabajo de bus, con la hora del horario en el
+  // reloj del juego (en rojo si ya paso sin llegar).
+  const bus = document.getElementById('routeBusStop');
+  if (bus) {
+    const p = view.busStop;
+    bus.hidden = !p;
+    if (p) {
+      document.getElementById('routeBusStopName').textContent = t('busNextStop', p.n, p.total, p.name);
+      const hora = document.getElementById('routeBusStopDue');
+      hora.textContent = p.due ? t('busDue', p.due) : '';
+      hora.classList.toggle('late', !!p.late);
+    }
+  }
   const aviso = document.getElementById('routeApprox');
   if (aviso) {
-    const textos = [view.pickup || null, view.approx ? t('destApprox') : null, view.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
+    const aprox = view.approx ? t(view.approxBus ? 'busStationApprox' : 'destApprox') : null;
+    const textos = [view.pickup || null, aprox, view.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
     aviso.hidden = !textos.length;
     if (textos.length) aviso.textContent = textos.join(' ');
   }
@@ -4511,7 +4529,9 @@ function updateRouteSummary(data) {
   // remolque en el deposito de origen. Usandolo, el tablero decia que
   // faltaban metros y anunciaba la llegada con la ruta a Charleston dibujada
   // ("says I'm at the location when clearly I'm not", Discord 10-10).
-  const manual = waypoints.some(wp => !wp.inGame) || target.kind === 'waypoint'
+  // Con un trabajo de bus el GPS del juego cuenta hasta el final de la linea
+  // y la ruta va a la proxima parada: lo que falta es el de nuestra ruta.
+  const manual = waypoints.some(wp => !wp.inGame) || target.kind === 'waypoint' || !!target.bus
     || useOwnRemaining(gameKm, ownKm);
   const remainingKm = manual ? ownKm : gameKm;
   const key = routeIdentity(data) + target.key;
@@ -4554,6 +4574,8 @@ function updateRouteSummary(data) {
   renderRouteSummary({
     pickup,
     approx: !!target.approx,
+    approxBus: target.market === 'bus',
+    busStop: busNextStopLine(busJobOf(data), data.gameTimeMinutes, hour12()),
     dlc: routeUsesUncheckedDlc,
     percent,
     remaining: remainingKm == null ? '--'
@@ -4653,7 +4675,9 @@ function updateDestinationMarker(data) {
       // Se agrega de que mercado salio el trabajo cuando el cliente lo manda:
       // es justo el dato que explica por que el juego no informo la empresa,
       // y asi el proximo reporte ya viene con la respuesta adentro.
-      if (target.approx) {
+      if (target.approx && target.market === 'bus') {
+        el.title = t('busStationApprox');
+      } else if (target.approx) {
         el.title = t('destApproxHint') + (target.market ? ` (${target.market})` : '');
       }
       destMarker = new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat(destLngLat).addTo(map);
@@ -4724,8 +4748,11 @@ function updateDestinationMarker(data) {
       // una empresa o la empresa del trabajo se entra (entrar); a la del
       // trabajo, por un nodo que no toque una via rapida (empresa).
       const pasa = (i) => i < waypoints.length && waypointPassesBy(waypoints[i]);
-      const empresa = (i) => i >= waypoints.length && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx;
-      const entra = (i) => (i < waypoints.length ? !pasa(i) : empresa(i));
+      const empresa = (i) => i >= waypoints.length && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && !target.bus;
+      // A un mirador de un trabajo de bus se entra como a una parada propia:
+      // es un estacionamiento al costado de la ruta, no el patio de una empresa.
+      const mirador = (i) => i >= waypoints.length && !!target.bus && !target.approx;
+      const entra = (i) => (i < waypoints.length ? !pasa(i) : empresa(i) || mirador(i));
       const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
       let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), siguiente });
       llegada = leg ? leg.llegada || null : null;
@@ -7166,7 +7193,10 @@ function updateHud(data) {
     document.getElementById('odometer').textContent =
       Math.round(odo).toLocaleString(currentLang) + (useImperial ? ' mi' : ' km');
   }
-  if (viaje.cargo) {
+  if (viaje.passengers != null) {
+    // Trabajo de bus: en vez de la carga, los que van a bordo.
+    document.getElementById('cargo').textContent = t('busPassengers', viaje.passengers);
+  } else if (viaje.cargo) {
     const cargoWeightText = viaje.cargoMassKg ? ` (${formatCargoMass(viaje.cargoMassKg, currentLang, useImperial)})` : '';
     document.getElementById('cargo').textContent = `${viaje.cargo}${cargoWeightText}`;
   } else {

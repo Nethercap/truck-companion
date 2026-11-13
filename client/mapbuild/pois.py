@@ -19,6 +19,10 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
                                               # en las ciudades repetidas
     "atlas":      [[x, z, "t", "Name"], ...],   # solo ATS: t tourist board,
                                               # o point of interest (Road Trip)
+    "viewpoints": {"id": [x, z, "Name"], ...},  # solo ETS2: los miradores por
+                                              # el id del album del juego, el
+                                              # de las paradas de un trabajo
+                                              # de turismo (DLC Coaches)
     "areas":      [[x, z, ancho, alto], ...]  # areas de ciudad (esquina de
                                               # arriba a la izquierda): adentro
                                               # el juego va a escala 1:3
@@ -49,6 +53,13 @@ FACILITY_CODES = {
 # para que el mapa armado en la PC tambien tenga los nombres.
 ATLAS_NAMES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "atlas-names-ats.json")
 ATLAS_KEY = re.compile(r"(tb|poi)_[a-z]{2}\d+(_\d+)?")
+
+# Miradores de ETS2: id del album del juego -> uid del cutscene y clave del
+# nombre (tools/build_viewpoints_ets2.py, desde def.scs). Un trabajo de
+# turismo del DLC Coaches manda sus paradas en miradores con ese id
+# ("pocviitasaar"), sin posicion. Viaja con el cliente como el de arriba.
+VIEWPOINTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "viewpoints-ets2.json")
+VIEWPOINT_NAME_KEY = re.compile(r"@@\w+@@")
 
 # Surtidores solo para auto (ATS 1.61): los techos de surtidores para auto
 # (prefab/gas/us_gas_<marca>_car_<N>rows...) tienen surtidor desde el Road
@@ -140,6 +151,44 @@ def atlas_items(parser_dir, prefix, names=None):
     return out
 
 
+def load_viewpoint_table():
+    try:
+        return _cargar(VIEWPOINTS_PATH)
+    except OSError:
+        return {}
+
+
+def viewpoints(parser_dir, prefix, labels=None, table=None):
+    """{id: [x, z, "Nombre"]}: los miradores del album del juego que estan en
+    este mapa, por el id con que el juego manda una parada de bus. El
+    cutscene se busca por su uid y, si no esta (un mod rehizo el sector: 42 de
+    137 en ProMods), por la clave del nombre en su accion (ui_value). El
+    nombre es el del POI en ese lugar (labels: {(x, z): nombre}); la web
+    muestra el que manda el juego, en el idioma de quien juega."""
+    if prefix != "europe":
+        return {}
+    path = os.path.join(parser_dir, f"{prefix}-cutscenes.json")
+    if not os.path.exists(path):
+        return {}
+    table = load_viewpoint_table() if table is None else table
+    labels = labels or {}
+    por_uid, por_clave = {}, {}
+    for c in _cargar(path):
+        if c.get("uid"):
+            por_uid[c["uid"]] = c
+        for param in c.get("actionStringParams") or []:
+            for clave in VIEWPOINT_NAME_KEY.findall(param):
+                por_clave.setdefault(clave, c)
+    out = {}
+    for ident, item in sorted(table.items()):
+        c = next((por_uid[u] for u in item.get("uids") or [] if u in por_uid), None) \
+            or por_clave.get(item.get("key"))
+        if c:
+            x, z = round(c["x"]), round(c["y"])
+            out[ident] = [x, z, labels.get((x, z)) or ident]
+    return out
+
+
 def build(parser_dir, prefix, work_points=None, atlas_names=None):
     """El dict de POIs, o None si esa carpeta no tiene salida del parser.
 
@@ -220,6 +269,11 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
     atlas = atlas_items(parser_dir, prefix, atlas_names)
     if atlas:
         out["atlas"] = atlas
+    miradores = viewpoints(parser_dir, prefix, {
+        (round(p["x"]), round(p["y"])): p["label"]
+        for p in del_parser if p.get("type") == "viewpoint" and p.get("label")})
+    if miradores:
+        out["viewpoints"] = miradores
     if areas:
         out["areas"] = areas
     fill_missing_cities(out)
