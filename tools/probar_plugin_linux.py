@@ -167,12 +167,11 @@ def _comparar(que, leido, esperado):
             raise SystemExit(f"{que}: {clave} = {leido[clave]!r}, se mando {valor!r}")
 
 
-def _config_de_bus(salida_real: int = 0, actual: int = 0, llegada_real: int = 0) -> list:
-    """La configuracion `bus_job` de un game.log.txt de verdad (12-11-2026,
+def _config_de_bus(actual: int = 0, salidas=(0, 0), llegadas=(0, 0)) -> list:
+    """La configuracion `bus_job` del game.log.txt de un usuario (12-11-2026,
     turismo Oulu -> mirador de Viitasaari -> Oulu, en el orden en que la
-    mando el juego), con lo que cambia al avanzar: la salida real de la
-    primera etapa (llego en la segunda configuracion, despues del embarque),
-    y la etapa en curso y la llegada real, que todavia nadie vio cambiar."""
+    mando el juego). Cambia de una a otra la etapa en curso y las salidas y
+    llegadas reales de cada etapa (salidas[i], llegadas[i]; 0 = todavia no)."""
     etapas = [
         (b"city", b"oulu", b"Oulu", b"viewpoints", b"pocviitasaar", b"Viitasaari",
          256620, 256880, 25, 0),
@@ -196,11 +195,11 @@ def _config_de_bus(salida_real: int = 0, actual: int = 0, llegada_real: int = 0)
             (b"destination_stop.name", TIPO_STRING, dn, i),
             (b"source_stop.departure_time.planned", TIPO_U32, sale, i),
         ]
-        if i == 0 and salida_real:
-            atributos.append((b"source_stop.departure_time.actual", TIPO_U32, salida_real, i))
+        if salidas[i]:
+            atributos.append((b"source_stop.departure_time.actual", TIPO_U32, salidas[i], i))
         atributos.append((b"destination_stop.arrival_time.planned", TIPO_U32, llega, i))
-        if i == 0 and llegada_real:
-            atributos.append((b"destination_stop.arrival_time.actual", TIPO_U32, llegada_real, i))
+        if llegadas[i]:
+            atributos.append((b"destination_stop.arrival_time.actual", TIPO_U32, llegadas[i], i))
         atributos += [
             (b"source_stop.entering_passengers.planned", TIPO_U32, suben, i),
             (b"destination_stop.leaving_passengers.planned", TIPO_U32, bajan, i),
@@ -246,32 +245,52 @@ def _trabajo_de_bus(juego: JuegoFalso, leer) -> None:
     if paradas != {"stage": 0, "stages": 2, "updates": 1, "stops": esperadas}:
         raise SystemExit(f"trabajo_bus.del_raw: {paradas!r}")
 
-    # Despues del embarque el juego manda todo otra vez con la salida real; y
-    # al llegar al mirador, se supone, la etapa 1 y la llegada real. La zona se
-    # rehace entera cada vez.
-    config, vivos = con_atributos(b"bus_job", _config_de_bus(salida_real=256620))
+    # Lo que mando el juego despues, segun el game.log.txt del trabajo
+    # terminado (12-11): la configuracion entera otra vez en cada cambio, y la
+    # zona se rehace cada vez.
+    # - Al empezar el embarque, la salida real de la primera etapa.
+    config, vivos = con_atributos(b"bus_job", _config_de_bus(salidas=(256620, 0)))
     juego.evento(EVENTO_CONFIGURACION, config)
     bus = leer()["bus"]
     _comparar("salida real", bus["stages"][0]["source"], {"departureActual": 256620})
-    config, vivos = con_atributos(b"bus_job", _config_de_bus(256620, actual=1, llegada_real=256871))
+    # - Al llegar al mirador: la etapa 1, la llegada real (antes de hora) y ya
+    #   la salida real de la etapa siguiente (el juego adelanta el reloj
+    #   durante la parada).
+    config, vivos = con_atributos(b"bus_job", _config_de_bus(1, (256620, 257000), (256852, 0)))
     juego.evento(EVENTO_CONFIGURACION, config)
     datos = leer()
     paradas = trabajo_bus.del_raw(datos)
     if (datos["bus"]["updates"] != 3 or paradas["stage"] != 1
-            or paradas["stops"][1].get("arrivalActual") != 256871
+            or paradas["stops"][1].get("arrivalActual") != 256852
+            or paradas["stops"][1].get("departureActual") != 257000
             or trabajo_bus.proxima_parada(paradas)["name"] != "Oulu"):
         raise SystemExit(f"etapa 1: {paradas!r}")
+    # - Al llegar a Oulu, la ultima: la etapa sigue en 1 y llega la llegada real.
+    config, vivos = con_atributos(b"bus_job", _config_de_bus(1, (256620, 257000), (256852, 257190)))
+    juego.evento(EVENTO_CONFIGURACION, config)
+    datos = leer()
+    paradas = trabajo_bus.del_raw(datos)
+    if (datos["bus"]["updates"] != 4 or paradas["stage"] != 1 or not datos["onJob"]
+            or paradas["stops"][2].get("arrivalActual") != 257190):
+        raise SystemExit(f"llegada a Oulu: {paradas!r}")
 
+    # Y 37 s despues (la escena de la parada) el evento, con los atributos de
+    # ese log: revenue (s64, el log decia "unknown"), earned.xp,
+    # passenger.satisfaction, distance.km y delivery.time.
     fin, vivos = con_atributos(b"bus_job.completed", [
-        (b"revenue", TIPO_S64, 1830),
-        (b"earned.xp", TIPO_S32, 412),
-        (b"passenger.satisfaction", TIPO_FLOAT, 0.875),
+        (b"revenue", TIPO_S64, 6718),
+        (b"earned.xp", TIPO_S32, 639),
+        (b"passenger.satisfaction", TIPO_FLOAT, 0.994682),
+        (b"distance.km", TIPO_FLOAT, 410.0),
+        (b"delivery.time", TIPO_U32, 570),
     ])
     juego.evento(EVENTO_GAMEPLAY, fin)
     datos = leer()
     _comparar("bus_job.completed", datos, {"jobDelivered": not antes, "onJob": False,
-                                           "jobDeliveredRevenue": 1830,
-                                           "jobDeliveredEarnedXp": 412, "bus": None})
+                                           "jobDeliveredRevenue": 6718,
+                                           "jobDeliveredEarnedXp": 639,
+                                           "jobDeliveredDistanceKm": 410.0,
+                                           "jobDeliveredDeliveryTime": 570, "bus": None})
     # Despues el juego manda la configuracion vacia: el trabajo ya termino y
     # no tiene que volver a abrirse.
     vacia, vivos = con_atributos(b"bus_job", [])
@@ -292,10 +311,11 @@ def _trabajo_de_bus(juego: JuegoFalso, leer) -> None:
     mensajes = [texto for tipo, texto in juego.log if tipo == LOG_MENSAJE]
     for esperado in ("Configuration: bus_job", " source_stop.id[1] string = pocviitasaar",
                      " bus.stages.count u32 = 2", "^Gameplayevents: bus_job.completed",
-                     " passenger.satisfaction float = 0.875000"):
+                     " passenger.satisfaction float = 0.994682", " revenue s64 = 6718",
+                     " destination_stop.arrival_time.actual[1] u32 = 257190"):
         if esperado not in mensajes:
             raise SystemExit(f"game.log.txt: falta {esperado!r}")
-    if mensajes.count("Configuration: bus_job") != 4:
+    if mensajes.count("Configuration: bus_job") != 5:
         raise SystemExit("game.log.txt: la configuracion bus_job vacia tambien se anoto")
     # id 5 es configType job (el evento de entrega tiene los suyos sin guardar,
     # como passenger.satisfaction, y esos no son de esto).

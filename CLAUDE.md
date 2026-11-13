@@ -924,8 +924,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   del juego (`followGameRoute`): va por todas las paradas hasta el final. Lo
   que falta es el de nuestra ruta, y abajo del resumen la parada con su
   horario (`busNextStopLine`). La app nativa todavia no lo dibuja.
-  Sin ver todavia: que cambia al llegar a una parada y al terminar; el plugin
-  sigue anotando cada `bus_job` en game.log.txt, ahora con el indice.
+  Visto en el juego (log de un usuario, 12-11, turismo de punta a punta): la
+  configuracion vuelve al embarcar y en cada llegada (`current` sube en la
+  parada del medio y queda en la ultima etapa al llegar al final), y unos 40 s
+  despues `bus_job.completed` con revenue, distance.km y delivery.time. Sin
+  ver todavia: una linea (`company_job`); el plugin sigue anotando cada
+  `bus_job` en game.log.txt, con el indice y los s64.
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para
