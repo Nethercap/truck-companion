@@ -48,23 +48,45 @@ the delivery never reached the shared memory. `completed` now counts as
 game executable (the published SDK does not have them), and
 `tools/probar_plugin_linux.py` plays a bus job against the plugin.
 
-Also from the executable, sent with `bus_job` and not stored yet:
-`bus.stages.count`, `bus.stages.current`, `source_stop.*` and
-`destination_stop.*` (`id`, `name`, `type`, planned and actual departure
-and arrival times, passengers getting on and off). Next to `bus_job.market`
-the executable has `company_job` and `tourist_job` (likely its values, with
-`quick_job`); not seen in a game yet. Until they are stored, every
-non-empty `bus_job` configuration and every `bus_job.*` event goes to
-`game.log.txt` with its values, as a message (`log_configs` /
-`log_events`, now logged as messages instead of errors), so a log from a
-real coach job shows what the game sends at each stop.
+A bus job has no source or destination city: it has stops. Its own
+attributes, as a user's `game.log.txt` showed them (12-11-2026, a tourist
+job Oulu -> Viitasaari viewpoint -> Oulu): `bus.stages.count`,
+`bus.stages.current` (from 0) and, as indexed attributes with one index per
+stage, `source_stop.*` and `destination_stop.*`: `type` (`city`, where the
+id is the city token, or `viewpoints`, where it is the viewpoint's
+`album.viewpoints.<id>`), `id`, `name`, `departure_time.planned/actual`,
+`arrival_time.planned/actual` (absolute game minutes; the actual ones come
+when they happen), `entering_passengers.planned` and
+`leaving_passengers.planned`. `bus_job.market` is `company_job` (bus lines)
+or `tourist_job`. The game sends the whole configuration again whenever
+something changes (it came back with the actual departure time after the
+boarding scene).
+
+They go to a zone of their own at the end of the block, offset 21600
+(`bus` in `scsTelemetryMap_t`): `revision` (`BUS_ZONE_REVISION`, 1),
+`stageCount`, `stageCurrent`, `updates` (one more per `bus_job`
+configuration) and up to 16 stages, each with both ends (`scsBusStop_t`:
+type, id, name and the eight numbers, `*.actual` passengers included in case
+the game sends them). The zone is cleared and filled again with every
+non-empty `bus_job` configuration, cleared by any other non-empty job
+configuration, and cleared when the job ends. `client/telemetry_compat.py`
+reads it with the same offsets.
+
+Every non-empty `bus_job` configuration and every `bus_job.*` event still
+goes to `game.log.txt` with its values, as a message (`log_configs` /
+`log_events`), now with the index of each indexed attribute
+(`source_stop.id[1]`): what changes on arrival at a stop and at the end of
+the job has not been seen yet.
 
 Not mapped (no field for them in the revision 12 layout): the car job
 attributes `customer.prio.cargo`, `customer.prio.time`,
 `customer.prio.vehicle`, and `vehicle.damage` on delivery. The plugin still
 logs them as "attribute not handled".
 
-The shared memory layout is unchanged (revision 12).
+The shared memory layout keeps revision 12: what upstream defines is
+unchanged, and its readers never look past offset 21600, where upstream's
+layout ends (its comment says 21619, but 10 trailers of 1560 bytes from
+6000 end at 21599).
 
 ## macOS
 

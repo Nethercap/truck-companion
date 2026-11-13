@@ -11,6 +11,13 @@ updates on its own and is not versioned here.
   north like the map, not the game's grid. **Road number** (I-80, US-6) is the road you are on, as
   the dashboard reads it from the signs around you: like the next turn, it needs the dashboard open,
   and only ATS has it because ETS2 signs don't carry route numbers.
+- Coaches (ETS2): bus jobs now reach your account and the dashboard. The game sends a bus job as a
+  list of stops instead of a destination city, and the telemetry plugin now keeps that list (each
+  stop's name, timetable and passengers). Your account saves the trip from the first stop to the
+  last, and while the next stop is in a city the dashboard routes to that city, with the stop's
+  timetable as the deadline. Viewpoint stops of tourist jobs are not on the map yet. The client puts
+  the new plugin in the game folder when it sees the game closed, so restart the game once after
+  updating.
 
 ## 1.5.39 (2026-11-12)
 

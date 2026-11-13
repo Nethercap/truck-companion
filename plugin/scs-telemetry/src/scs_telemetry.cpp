@@ -15,6 +15,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdarg>
+#include <cstddef>
+#include <cstdio>
+#include <cstring>
 #include <string>
 // SDK
 #include "amtrucks/scssdk_ats.h"
@@ -159,10 +162,17 @@ bool check_max_version(unsigned const int max_ets2,
 // the log window
 void log_configs(const scs_telemetry_configuration_t* info) {
   log_line(SCS_LOG_TYPE_message, "Configuration: %s", info->id);
-  for (auto current = info->attributes; current->name; ++current) {
-    if (current->index != SCS_U32_NIL) {
-      // log_line(SCS_LOG_TYPE_message, "[%u]", static_cast<unsigned>(current->index));
+  for (auto attribute = info->attributes; attribute->name; ++attribute) {
+    // Indexed attributes (one per stage in a bus job) go with their index,
+    // "source_stop.id[1]": without it two stages read as one repeated.
+    char indexed[128];
+    scs_named_value_t named = *attribute;
+    if (attribute->index != SCS_U32_NIL) {
+      snprintf(indexed, sizeof indexed, "%s[%u]", attribute->name,
+               static_cast<unsigned>(attribute->index));
+      named.name = indexed;
     }
+    const auto current = &named;
     switch (current->value.type) {
       case SCS_VALUE_TYPE_INVALID: {
         log_line(SCS_LOG_TYPE_message, " %s none", current->name);
@@ -424,6 +434,100 @@ void set_job_values_zero() {
   memset(telem_ptr->config_s.jobMarket, 0, 32);
 }
 
+// Truck Dash: the stages of a bus job, in the bus zone of the block. The
+// `bus_job` configuration brings `bus.stages.count`, `bus.stages.current`
+// and, one index per stage, `source_stop.*` and `destination_stop.*` (seen in
+// the game.log.txt of a tourist job, 12-11-2026: Oulu -> Viitasaari viewpoint
+// -> Oulu). The whole configuration comes again whenever something changes
+// (the departure time once the passengers got on), so the zone is cleared
+// and filled again each time, and cleared when the job ends.
+void clear_bus_values() {
+  telem_ptr->bus.stageCount = 0;
+  telem_ptr->bus.stageCurrent = 0;
+  memset(telem_ptr->bus.stage, 0, sizeof telem_ptr->bus.stage);
+}
+
+static bool value_as_u32(const scs_value_t& value, unsigned int* out) {
+  switch (value.type) {
+    case SCS_VALUE_TYPE_u32:
+      *out = value.value_u32.value;
+      return true;
+    case SCS_VALUE_TYPE_s32:
+      *out = static_cast<unsigned int>(value.value_s32.value);
+      return true;
+    case SCS_VALUE_TYPE_u64:
+      *out = static_cast<unsigned int>(value.value_u64.value);
+      return true;
+    default:
+      return false;
+  }
+}
+
+static void copy_bus_text(char* to, const scs_value_t& value) {
+  if (value.type != SCS_VALUE_TYPE_string || !value.value_string.value) return;
+  strncpy(to, value.value_string.value, stringsize - 1);
+  to[stringsize - 1] = '\0';
+}
+
+static const struct {
+  const char* field;
+  size_t offset;
+} bus_stop_numbers[] = {
+    {"arrival_time.planned", offsetof(scsBusStop_t, arrivalPlanned)},
+    {"arrival_time.actual", offsetof(scsBusStop_t, arrivalActual)},
+    {"departure_time.planned", offsetof(scsBusStop_t, departurePlanned)},
+    {"departure_time.actual", offsetof(scsBusStop_t, departureActual)},
+    {"entering_passengers.planned", offsetof(scsBusStop_t, enteringPlanned)},
+    {"entering_passengers.actual", offsetof(scsBusStop_t, enteringActual)},
+    {"leaving_passengers.planned", offsetof(scsBusStop_t, leavingPlanned)},
+    {"leaving_passengers.actual", offsetof(scsBusStop_t, leavingActual)},
+};
+
+// Whether the attribute is one of the bus job's own (and then it is stored).
+// The rest of the `bus_job` attributes (income, planned_distance.km,
+// bus_job.market) are the job's, and go where those of `job` go.
+static bool handle_bus_attribute(const scs_named_value_t* current) {
+  const char* name = current->name;
+  unsigned int number = 0;
+  if (strcmp(name, "bus.stages.count") == 0) {
+    if (value_as_u32(current->value, &number)) telem_ptr->bus.stageCount = number;
+    return true;
+  }
+  if (strcmp(name, "bus.stages.current") == 0) {
+    if (value_as_u32(current->value, &number)) telem_ptr->bus.stageCurrent = number;
+    return true;
+  }
+  const bool source = strncmp(name, "source_stop.", 12) == 0;
+  const bool destination = strncmp(name, "destination_stop.", 17) == 0;
+  if (!source && !destination) return false;
+  const char* field = name + (source ? 12 : 17);
+  const auto index = current->index == SCS_U32_NIL ? 0 : current->index;
+  if (index >= BUS_STAGES_MAX) return true;  // no room: known, not stored
+  auto& stage = telem_ptr->bus.stage[index];
+  scsBusStop_t* stop = source ? &stage.source : &stage.destination;
+  if (strcmp(field, "type") == 0) {
+    copy_bus_text(stop->type, current->value);
+    return true;
+  }
+  if (strcmp(field, "id") == 0) {
+    copy_bus_text(stop->id, current->value);
+    return true;
+  }
+  if (strcmp(field, "name") == 0) {
+    copy_bus_text(stop->name, current->value);
+    return true;
+  }
+  for (const auto& entry : bus_stop_numbers) {
+    if (strcmp(field, entry.field) == 0) {
+      if (value_as_u32(current->value, &number)) {
+        *reinterpret_cast<unsigned int*>(reinterpret_cast<char*>(stop) + entry.offset) = number;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 // Function: set_trailer_values_zero
 // set every trailer value 0/empty string
 void set_trailer_values_zero(unsigned int trailer_id = 0) {
@@ -581,6 +685,7 @@ SCSAPI_VOID telemetry_gameplay(const scs_event_t event,
     telem_ptr->special_b.onJob = false;
     telem_ptr->special_b.jobFinished ^= true;
     job_owner[0] = '\0';
+    clear_bus_values();
   } else if (is_job_event(info->id, "delivered") ||
              is_job_event(info->id, "completed")) {
     // Coaches (ETS2 1.62.3) ends bus jobs with `bus_job.completed`, not
@@ -592,6 +697,7 @@ SCSAPI_VOID telemetry_gameplay(const scs_event_t event,
     telem_ptr->special_b.onJob = false;
     telem_ptr->special_b.jobFinished ^= true;
     job_owner[0] = '\0';
+    clear_bus_values();
   } else if (strcmp(info->id, SCS_TELEMETRY_GAMEPLAY_EVENT_player_fined) == 0) {
     type = fined;
     telem_ptr->special_b.fined ^= true;
@@ -662,6 +768,9 @@ SCSAPI_VOID telemetry_configuration(const scs_event_t event,
       // is_cargo_loaded: the cargo travels with the vehicle from the start.
       telem_ptr->config_b.isCargoLoaded =
           strcmp(info->id, SCS_TELEMETRY_CONFIG_job) != 0;
+      // Also the stages of a bus job: a truck or car job wipes them, and a
+      // bus job fills them again below.
+      clear_bus_values();
     }
   } else {
     // check if it is trailer with backwards compatibility
@@ -697,12 +806,16 @@ SCSAPI_VOID telemetry_configuration(const scs_event_t event,
 
   // uncomment to log every config, should work but with function not tested ^^`
   // log_configs(info);
-  // Bus jobs (Coaches, ETS2 1.62.3) are new and their stop and stage
-  // attributes are not stored yet: write them with their values to
-  // game.log.txt, so a log from a real coach job shows what the game sends
-  // at each stop. Only non-empty ones; the game sends them on change.
-  if (strcmp(info->id, "bus_job") == 0 && info->attributes->name) {
+  // Bus jobs (Coaches, ETS2 1.62.3) are new: their configuration also goes
+  // to game.log.txt with its values (and the index of each stage), so a log
+  // from a real coach job shows what the game sends at each stop. The first
+  // one seen (12-11-2026) stopped at the boarding scene: what changes on
+  // arrival and at the end of the job is still unseen. Only non-empty ones;
+  // the game sends them on change.
+  const bool bus_config = strcmp(info->id, "bus_job") == 0;
+  if (bus_config && info->attributes->name) {
     log_configs(info);
+    ++telem_ptr->bus.updates;
   }
 
   // attribute is a pointer array that is never null so ... i have no clue how
@@ -711,6 +824,10 @@ SCSAPI_VOID telemetry_configuration(const scs_event_t event,
   auto is_empty = true;
 
   for (auto current = info->attributes; current->name; ++current) {
+    if (bus_config && handle_bus_attribute(current)) {
+      is_empty = false;
+      continue;
+    }
     if (!handleCfg(current, type, trailer_id)) {
       // actually only for testing/debug purpose, so should there be a message
       // in game with that line there is missed something
@@ -726,6 +843,7 @@ SCSAPI_VOID telemetry_configuration(const scs_event_t event,
         telem_ptr->special_b.onJob = false;
         telem_ptr->special_b.jobFinished ^= true;
         job_owner[0] = '\0';
+        clear_bus_values();
       }
     } else {
       if (!telem_ptr->special_b.onJob) {
@@ -908,6 +1026,7 @@ SCSAPI_RESULT scs_telemetry_init(
   telem_ptr->time = 0;
   // Get SCS Game Version and Set Plugin Version
   telem_ptr->scs_values.telemetry_plugin_revision = PLUGIN_REVID;
+  telem_ptr->bus.revision = BUS_ZONE_REVISION;
   telem_ptr->scs_values.version_major =
       SCS_GET_MAJOR_VERSION(version_params->common.game_version);
   telem_ptr->scs_values.version_minor =
