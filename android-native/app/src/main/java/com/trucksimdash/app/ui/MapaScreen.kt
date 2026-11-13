@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowColumn
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -314,8 +316,10 @@ fun MapaScreen(
 
         // De costado no entran uno arriba del otro: con el convoy pisaban el panel del giro.
         val pantalla = LocalConfiguration.current
+        // Lo que ocupan los botones, con su margen: el panel de abajo termina antes (MiniHud).
+        var anchoBotones by remember { mutableIntStateOf(0) }
         FlowColumn(
-            Modifier.align(Alignment.BottomEnd).padding(12.dp).alpha(opacidadBotones),
+            Modifier.align(Alignment.BottomEnd).onSizeChanged { anchoBotones = it.width }.padding(12.dp).alpha(opacidadBotones),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             maxItemsInEachColumn = if (pantalla.screenWidthDp > pantalla.screenHeightDp) 4 else 8,
@@ -392,7 +396,15 @@ fun MapaScreen(
         }
 
         if (t != null) {
-            MiniHud(t, usaMillas(ajustes.unidades, t.juego), nav.resumen, nav.miniHud, Modifier.align(Alignment.BottomStart).padding(12.dp))
+            // Sin tapar los botones: un panel ancho quedaba encima y no se los podia tocar.
+            val margenBotones = with(LocalDensity.current) { anchoBotones.toDp() }.coerceAtLeast(12.dp)
+            MiniHud(
+                t,
+                usaMillas(ajustes.unidades, t.juego),
+                nav.resumen,
+                nav.miniHud,
+                Modifier.align(Alignment.BottomStart).padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = margenBotones),
+            )
         } else if (!mirando) {
             Surface(
                 shape = MaterialTheme.shapes.large,
@@ -625,7 +637,13 @@ private fun BotonMapa(
     ) { Icon(icono, descripcion) }
 }
 
-/** Lo minimo para no tener que cambiar de pantalla mientras se maneja. */
+/**
+ * Lo minimo para no tener que cambiar de pantalla mientras se maneja. Lo que no entra en un
+ * renglon baja al siguiente: en un Row el ultimo dato se quedaba con el ancho que sobraba y se
+ * partia letra por letra. Con la senal de limite, en un telefono de 20:9 con la pantalla
+ * agrandada, "Ankunft" quedaba en una columna de una letra que tapaba medio mapa (12-11).
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MiniHud(t: Telemetria, millas: Boolean, resumen: ResumenNav?, extra: List<String>, modifier: Modifier = Modifier) {
     Surface(
@@ -635,47 +653,55 @@ private fun MiniHud(t: Telemetria, millas: Boolean, resumen: ResumenNav?, extra:
         border = BorderStroke(1.dp, Paleta.Borde),
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    velocidadEnUnidad(t.velocidadKmh, millas).toString(),
-                    fontSize = 32.sp,
-                    lineHeight = 34.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (t.excedido) Paleta.Rojo else Paleta.Texto,
-                    style = NumerosTabulares,
-                )
-                Text(unidadVelocidad(millas), style = MaterialTheme.typography.labelSmall, color = Paleta.TextoSuave)
-            }
-            if (t.limiteKmh > 0) {
-                Spacer(Modifier.width(10.dp))
-                SenalLimite(velocidadEnUnidad(t.limiteKmh, millas), t.juego, chica = true)
-            }
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text(stringResource(R.string.marcha), style = MaterialTheme.typography.labelSmall, color = Paleta.TextoSuave)
-                Text(marcha(t.marcha), style = MaterialTheme.typography.titleMedium.merge(NumerosTabulares))
-            }
-            // Lo que falta sale de nuestra ruta si la hay; si no, del GPS del juego.
-            val falta = resumen?.falta ?: t.rutaKm.takeIf { it > 0 }?.let { distancia(it, millas) }
-            if (falta != null) {
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(stringResource(R.string.ruta_gps), style = MaterialTheme.typography.labelSmall, color = Paleta.TextoSuave)
-                    Text(falta, style = MaterialTheme.typography.titleMedium.merge(NumerosTabulares))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                // La velocidad y su limite van juntos aunque el resto baje.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            velocidadEnUnidad(t.velocidadKmh, millas).toString(),
+                            fontSize = 32.sp,
+                            lineHeight = 34.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (t.excedido) Paleta.Rojo else Paleta.Texto,
+                            style = NumerosTabulares,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                        Text(
+                            unidadVelocidad(millas),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Paleta.TextoSuave,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                    if (t.limiteKmh > 0) {
+                        Spacer(Modifier.width(10.dp))
+                        SenalLimite(velocidadEnUnidad(t.limiteKmh, millas), t.juego, chica = true)
+                    }
                 }
+                DatoHud(stringResource(R.string.marcha), marcha(t.marcha))
+                // Lo que falta sale de nuestra ruta si la hay; si no, del GPS del juego.
+                val falta = resumen?.falta ?: t.rutaKm.takeIf { it > 0 }?.let { distancia(it, millas) }
+                if (falta != null) DatoHud(stringResource(R.string.ruta_gps), falta)
+                resumen?.llegada?.let { DatoHud(stringResource(R.string.nav_llegada), it) }
             }
-            resumen?.llegada?.let {
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(stringResource(R.string.nav_llegada), style = MaterialTheme.typography.labelSmall, color = Paleta.TextoSuave)
-                    Text(it, style = MaterialTheme.typography.titleMedium.merge(NumerosTabulares))
-                }
-            }
+            // Lo que se eligio en Ajustes.
+            extra.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = Paleta.TextoSuave) }
         }
-        // Lo que se eligio en Ajustes.
-        extra.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = Paleta.TextoSuave) }
-        }
+    }
+}
+
+/** Un dato del MiniHud: titulo chico arriba, valor abajo, cada uno en un renglon. */
+@Composable
+private fun DatoHud(titulo: String, valor: String) {
+    Column {
+        Text(titulo, style = MaterialTheme.typography.labelSmall, color = Paleta.TextoSuave, maxLines = 1, softWrap = false)
+        Text(valor, style = MaterialTheme.typography.titleMedium.merge(NumerosTabulares), maxLines = 1, softWrap = false)
     }
 }
 

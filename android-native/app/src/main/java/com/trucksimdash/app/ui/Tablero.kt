@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trucksimdash.app.R
@@ -147,9 +150,21 @@ fun Velocimetro(t: Telemetria, millas: Boolean, modifier: Modifier = Modifier, c
     }
 }
 
-/** Como se ve en la ruta: redondo en Europa, rectangular en Estados Unidos. */
+/**
+ * Como se ve en la ruta: redondo en Europa, rectangular en Estados Unidos. Es un dibujo de
+ * tamano fijo, asi que su texto no crece con la letra del sistema: con la letra agrandada,
+ * "105" no entraba y se partia en "10" y "5" (12-11).
+ */
 @Composable
 fun SenalLimite(limite: Int, juego: String?, modifier: Modifier = Modifier, chica: Boolean = false) {
+    val densidad = LocalDensity.current
+    CompositionLocalProvider(LocalDensity provides Density(densidad.density, fontScale = 1f)) {
+        DibujoLimite(limite, juego, modifier, chica)
+    }
+}
+
+@Composable
+private fun DibujoLimite(limite: Int, juego: String?, modifier: Modifier, chica: Boolean) {
     val tamano = if (chica) 44.dp else 58.dp
     if (juego == "ats") {
         Column(
