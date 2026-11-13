@@ -7,12 +7,16 @@ destino, como las manda el juego (`source_stop.*`, `destination_stop.*`). Aca
 se pasan a una lista de paradas en orden, que es lo que sirve para mostrar:
 la parada k es el destino de la etapa k-1 y el origen de la etapa k.
 
-Lo visto en el primer game.log.txt de un trabajo de bus (12-11-2026, turismo
-Oulu -> mirador de Viitasaari -> Oulu): dos etapas, `bus.stages.current` en 0,
-el tipo de parada "city" (el id es la ciudad) o "viewpoints" (el id es el del
-album de miradores, `album.viewpoints.<id>`), horarios planificados en minutos
-de juego absolutos y los reales recien cuando pasan. Que cambia al llegar a
-una parada y al terminar todavia no se vio.
+Lo visto en el game.log.txt de un trabajo de bus de punta a punta (12-11-2026,
+turismo Oulu -> mirador de Viitasaari -> Oulu): dos etapas, el tipo de parada
+"city" (el id es la ciudad) o "viewpoints" (el id es el del album de
+miradores, `album.viewpoints.<id>`), horarios planificados en minutos de juego
+absolutos y los reales recien cuando pasan. El juego manda la configuracion
+entera de nuevo en cada cambio: al empezar el embarque (la salida real), al
+llegar al mirador (`bus.stages.current` pasa a 1, con la llegada real y ya la
+salida real de la etapa siguiente: el reloj se adelanta en la parada) y al
+llegar a la ultima (la etapa queda en 1 y llega la llegada real). Unos 40 s
+despues, `bus_job.completed`. Ningun evento en las paradas del medio.
 """
 
 # (campo de la parada que arma esto, campo de la etapa del plugin, de que lado

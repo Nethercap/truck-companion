@@ -254,11 +254,15 @@ def test_la_cuenta_sigue_el_mismo_viaje_toda_la_linea():
     fin = dict(etapa_2, onJob=False, bus=None)
     payload = client.build_payload(fin)
     payload["event"]["jobDelivered"] = True
+    # Lo que trajo el bus_job.completed del log real (12-11).
     payload["event"]["jobDeliveredRevenue"] = 6718
+    payload["event"]["jobDeliveredDistanceKm"] = 410.0
     acciones = acc.tick(payload, fin, 1002.0)
     cierres = [a for a in acciones if a["tipo"] == "trip_close"]
     assert len(cierres) == 1 and cierres[0]["datos"]["status"] == "delivered"
     assert cierres[0]["datos"]["city_dst"] == "Oulu"
+    assert cierres[0]["datos"]["distance_game_km"] == 410.0
+    assert cierres[0]["datos"]["deadline_game_time"] == 257250
 
 
 def test_los_miradores_salen_por_uid_o_por_la_clave_del_nombre(tmp_path):

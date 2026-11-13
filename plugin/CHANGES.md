@@ -72,11 +72,21 @@ non-empty `bus_job` configuration, cleared by any other non-empty job
 configuration, and cleared when the job ends. `client/telemetry_compat.py`
 reads it with the same offsets.
 
+The same user's log of the whole job showed the rest: the configuration
+comes again when boarding starts (the actual departure), on arrival at the
+viewpoint (`bus.stages.current` goes to 1, with the actual arrival and
+already the actual departure of the next stage: the clock jumps ahead during
+the stop) and on arrival at the last stop (the stage stays at 1, with the
+actual arrival). About 40 seconds later comes `bus_job.completed`, with
+`revenue` (s64), `earned.xp`, `passenger.satisfaction`, `distance.km` and
+`delivery.time`. There is no event at the stops in between.
+
 Every non-empty `bus_job` configuration and every `bus_job.*` event still
 goes to `game.log.txt` with its values, as a message (`log_configs` /
 `log_events`), now with the index of each indexed attribute
-(`source_stop.id[1]`): what changes on arrival at a stop and at the end of
-the job has not been seen yet.
+(`source_stop.id[1]`) and with s64 values, which read "unknown" before
+(the revenue of `bus_job.completed`). Bus lines (`company_job`) have not been
+seen yet.
 
 Not mapped (no field for them in the revision 12 layout): the car job
 attributes `customer.prio.cargo`, `customer.prio.time`,

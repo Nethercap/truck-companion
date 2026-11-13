@@ -198,6 +198,13 @@ void log_configs(const scs_telemetry_configuration_t* info) {
                  current->value.value_u64.value);
         break;
       }
+      case SCS_VALUE_TYPE_s64: {
+        // The revenue of bus_job.completed: it read "revenue unknown"
+        // in the first coach log (12-11-2026).
+        log_line(SCS_LOG_TYPE_message, " %s s64 = %" SCS_PF_S64, current->name,
+                 current->value.value_s64.value);
+        break;
+      }
       case SCS_VALUE_TYPE_float: {
         log_line(SCS_LOG_TYPE_message, " %s float = %f", current->name,
                  current->value.value_float.value);
@@ -293,6 +300,13 @@ void log_events(const scs_telemetry_gameplay_event_t* info) {
       case SCS_VALUE_TYPE_u64: {
         log_line(SCS_LOG_TYPE_message, " %s u64 = %" SCS_PF_U64, current->name,
                  current->value.value_u64.value);
+        break;
+      }
+      case SCS_VALUE_TYPE_s64: {
+        // The revenue of bus_job.completed: it read "revenue unknown"
+        // in the first coach log (12-11-2026).
+        log_line(SCS_LOG_TYPE_message, " %s s64 = %" SCS_PF_S64, current->name,
+                 current->value.value_s64.value);
         break;
       }
       case SCS_VALUE_TYPE_float: {
@@ -808,10 +822,10 @@ SCSAPI_VOID telemetry_configuration(const scs_event_t event,
   // log_configs(info);
   // Bus jobs (Coaches, ETS2 1.62.3) are new: their configuration also goes
   // to game.log.txt with its values (and the index of each stage), so a log
-  // from a real coach job shows what the game sends at each stop. The first
-  // one seen (12-11-2026) stopped at the boarding scene: what changes on
-  // arrival and at the end of the job is still unseen. Only non-empty ones;
-  // the game sends them on change.
+  // from a real coach job shows what the game sends at each stop. A tourist
+  // job has been seen from start to end (12-11-2026); bus lines
+  // (company_job) not yet. Only non-empty ones; the game sends them on
+  // change (boarding, each arrival).
   const bool bus_config = strcmp(info->id, "bus_job") == 0;
   if (bus_config && info->attributes->name) {
     log_configs(info);
