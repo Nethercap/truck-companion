@@ -6188,6 +6188,35 @@ test('basemapForVariant: las variantes con ProMods llevan su Islandia (10-11)', 
   assert.equal(basemapForVariant(undefined, ['promods']), null);
 });
 
+test('mapa base: BASE_LAYER_IDS tiene cada capa y los limites se apagan al acercarse (Discord 12-11)', () => {
+  // applyBaseMap saca las capas por BASE_LAYER_IDS antes de volver a
+  // ponerlas: una que falte en la lista queda y addLayer falla al tocar el
+  // ajuste o cambiar de juego.
+  const fs = require('fs');
+  const vm = require('vm');
+  const app = fs.readFileSync(require('path').join(__dirname, 'app.js'), 'utf8');
+  const constante = (nombre) => app.match(new RegExp(`^const ${nombre} = .*;$`, 'm'))[0];
+  const fn = app.match(/^function buildBaseLayers\([^)]*\) \{[\s\S]*?\n\}/m)[0];
+  const ctx = vm.createContext({});
+  vm.runInContext(['BASE_LAYER_IDS', 'MAP_BG_FLAT', 'MAP_BG_WATER', 'BORDER_FADE_FROM_ZOOM', 'BORDER_FADE_TO_ZOOM', 'BORDER_COLOR']
+    .map(constante).join('\n') + '\n' + fn + '\nthis.ids = BASE_LAYER_IDS; this.capas = buildBaseLayers(false); this.lisas = buildBaseLayers(true);'
+    + '\nthis.desde = BORDER_FADE_FROM_ZOOM; this.hasta = BORDER_FADE_TO_ZOOM;', ctx);
+  // Por JSON: los arrays del contexto de vm son de otro realm
+  const { ids, capas, lisas } = JSON.parse(JSON.stringify({ ids: ctx.ids, capas: ctx.capas, lisas: ctx.lisas }));
+  assert.deepEqual(ids, capas.map(c => c.id));
+  for (const id of ['base-state', 'base-border']) {
+    const capa = capas.find(c => c.id === id);
+    assert.ok(capa, id);
+    assert.equal(capa.maxzoom, ctx.hasta);
+    assert.deepEqual(capa.paint['line-opacity'], ['interpolate', ['linear'], ['zoom'], ctx.desde, 0.9, ctx.hasta, 0]);
+    assert.equal(capa.layout.visibility, 'visible');
+    // con el fondo liso (un mapa armado que cae en el mar) tampoco calzan
+    assert.equal(lisas.find(c => c.id === id).layout.visibility, 'none');
+  }
+  assert.equal(capas.find(c => c.id === 'base-state').filter[2], 'state');
+  assert.equal(capas.find(c => c.id === 'base-border').filter[2], 'border');
+});
+
 test('roadLineWidth: el ancho de siempre de lejos y el de la calle del juego de cerca', () => {
   const { roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE } = require('./pure.js');
   const base = [5, 0.5, 12, 1.5, 17, 5]; // road-local

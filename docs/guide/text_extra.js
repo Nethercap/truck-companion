@@ -123,7 +123,7 @@ GUIDE_TEXT.de = {
 <li><b>Mini-HUD</b>: was angezeigt wird, wenn das Infopanel ausgeblendet ist.</li>
 <li><b>Andere Fahrer in der Nähe</b>: deine Position teilen, oder die Markierungen der anderen ausblenden. Wenn du auf TruckersMP spielst, erscheinen die Spieler um dich herum mit Namen und Fahrtrichtung auf der Karte (auch die kannst du ausblenden).</li>
 <li><b>Kartenschaltflächen</b>: dunkler Stil passend zur Karte, beim Fahren ausblenden (sie kommen bei Berührung zurück), und <b>Schaltflächen verschieben</b>: jeden Knopf oder jedes Panel ziehen, an der Ecke die Größe ändern, mit Raster und Zurücksetzen.</li>
-<li><b>Echte Basiskarte</b>: Küsten, Seen, Flüsse und bebaute Flächen unter den Straßen (etwa 1 MB mehr).</li>
+<li><b>Echte Basiskarte</b>: Küsten, Seen, Flüsse, bebaute Flächen und Grenzen unter den Straßen (etwa 1 MB mehr). Die Grenzen sind die echten und blenden sich beim Heranzoomen aus: aus der Nähe kann ein Ort an einer Grenze ein wenig auf der falschen Seite liegen.</li>
 <li><b>Sparmodus</b> für alte Handys und Tablets: leichtere Darstellung und auf Wunsch ganz ohne Routenberechnung, um am meisten Speicher zu sparen.</li>
 <li><b>Routenpräferenz</b>: schnellste oder kürzeste.</li>
 <li><b>Pausenhinweis</b>: wie lange vor der fälligen Pause (in Spielzeit) die Stimme und die Abkürzung zum nächsten Rastplatz kommen, 1 bis 3 Stunden.</li>
@@ -375,7 +375,7 @@ GUIDE_TEXT.fr = {
 <li><b>Mini-HUD</b> : quoi afficher quand le panneau d'infos est masqué.</li>
 <li><b>Autres conducteurs à proximité</b> : partager ta position, ou masquer les marqueurs des autres. Quand tu joues sur TruckersMP, les joueurs autour de toi apparaissent sur la carte avec leur nom et leur direction (tu peux aussi les masquer).</li>
 <li><b>Boutons de la carte</b> : style sombre assorti à la carte, les estomper pendant la conduite (ils reviennent au toucher), et <b>Déplacer les boutons</b> : fais glisser n'importe quel bouton ou panneau, et son coin pour le redimensionner, avec une grille et un Réinitialiser.</li>
-<li><b>Vrai fond de carte</b> : côtes, lacs, rivières et zones bâties sous les routes (environ 1 Mo de plus).</li>
+<li><b>Vrai fond de carte</b> : côtes, lacs, rivières, zones bâties et frontières sous les routes (environ 1 Mo de plus). Les frontières sont les vraies et s'effacent quand on zoome : de près, une ville sur une frontière peut se trouver un peu du mauvais côté.</li>
 <li><b>Mode léger</b> pour les vieux téléphones et tablettes : rendu allégé et, si besoin, sans calcul d'itinéraire pour économiser le plus de mémoire.</li>
 <li><b>Préférence d'itinéraire</b> : le plus rapide ou le plus court.</li>
 <li><b>Alerte de repos</b> : combien de temps avant la pause obligatoire (en temps de jeu) arrivent la voix et le raccourci vers l'aire de repos la plus proche, de 1 à 3 heures.</li>
@@ -627,7 +627,7 @@ GUIDE_TEXT.pt = {
 <li><b>Mini-HUD</b>: o que mostrar quando o painel de informações está oculto.</li>
 <li><b>Outros motoristas por perto</b>: compartilhar sua posição, ou esconder os marcadores dos outros. Quando você joga no TruckersMP, os jogadores ao seu redor aparecem no mapa com o nome e a direção (também dá para escondê-los).</li>
 <li><b>Botões do mapa</b>: estilo escuro para combinar com o mapa, esmaecer ao dirigir (voltam ao tocar), e <b>Mover os botões</b>: arraste qualquer botão ou painel, e o canto para redimensionar, com grade e um Restaurar.</li>
-<li><b>Mapa base real</b>: litoral, lagos, rios e áreas urbanas embaixo das estradas (cerca de 1 MB a mais).</li>
+<li><b>Mapa base real</b>: litoral, lagos, rios, áreas urbanas e divisas embaixo das estradas (cerca de 1 MB a mais). As divisas são as reais e somem ao aproximar: de perto, uma cidade na divisa pode ficar um pouco do lado errado.</li>
 <li><b>Modo leve</b> para celulares e tablets antigos: desenho mais leve e, se quiser, sem cálculo de rota, para economizar o máximo de memória.</li>
 <li><b>Preferência de rota</b>: a mais rápida ou a mais curta.</li>
 <li><b>Aviso de descanso</b>: quanto tempo antes da hora de descansar (em tempo de jogo) aparecem a voz e o atalho para a área de descanso mais próxima, de 1 a 3 horas.</li>
@@ -879,7 +879,7 @@ GUIDE_TEXT.pl = {
 <li><b>Mini-HUD</b>: co pokazywać, gdy panel informacji jest ukryty.</li>
 <li><b>Inni kierowcy w pobliżu</b>: udostępniaj swoją pozycję albo ukryj znaczniki innych. Gdy grasz na TruckersMP, gracze wokół ciebie pojawiają się na mapie z nazwą i kierunkiem jazdy (ich też możesz ukryć).</li>
 <li><b>Przyciski mapy</b>: ciemny styl pasujący do mapy, przygaszanie podczas jazdy (wracają po dotknięciu) i <b>Przesuń przyciski</b>: przeciągnij dowolny przycisk lub panel, a jego róg, by zmienić rozmiar, z siatką i przyciskiem Przywróć.</li>
-<li><b>Prawdziwa mapa bazowa</b>: wybrzeża, jeziora, rzeki i tereny zabudowane pod drogami (około 1 MB więcej).</li>
+<li><b>Prawdziwa mapa bazowa</b>: wybrzeża, jeziora, rzeki, tereny zabudowane i granice pod drogami (około 1 MB więcej). Granice są prawdziwe i znikają przy przybliżaniu: z bliska miasto przy granicy może leżeć trochę po złej stronie.</li>
 <li><b>Tryb lekki</b> dla starych telefonów i tabletów: lżejsze rysowanie i opcjonalnie bez wyznaczania trasy, by oszczędzić najwięcej pamięci.</li>
 <li><b>Preferencja trasy</b>: najszybsza lub najkrótsza.</li>
 <li><b>Przypomnienie o odpoczynku</b>: jak długo przed wymaganym odpoczynkiem (w czasie gry) odzywa się głos i pojawia się skrót do najbliższego parkingu, od 1 do 3 godzin.</li>
@@ -1131,7 +1131,7 @@ GUIDE_TEXT.tr = {
 <li><b>Mini-HUD</b>: bilgi paneli gizliyken ne gösterileceği.</li>
 <li><b>Yakındaki diğer sürücüler</b>: konumunu paylaş ya da diğerlerinin işaretlerini gizle. TruckersMP'de oynarken etrafındaki oyuncular adları ve gittikleri yönle haritada görünür (onları da gizleyebilirsin).</li>
 <li><b>Harita düğmeleri</b>: haritaya uyan koyu stil, sürerken soluklaştırma (dokununca geri gelir) ve <b>Düğmeleri taşı</b>: herhangi bir düğmeyi veya paneli sürükle, köşesinden boyutunu değiştir; ızgara ve Sıfırla ile.</li>
-<li><b>Gerçek altlık harita</b>: yolların altında kıyı şeridi, göller, nehirler ve yerleşim alanları (yaklaşık 1 MB daha).</li>
+<li><b>Gerçek altlık harita</b>: yolların altında kıyı şeridi, göller, nehirler, yerleşim alanları ve sınırlar (yaklaşık 1 MB daha). Sınırlar gerçek sınırlardır ve yakınlaştırınca kaybolur: yakından bakınca sınırdaki bir şehir biraz yanlış tarafta görünebilir.</li>
 <li><b>Hafif mod</b> eski telefonlar ve tabletler için: daha hafif çizim ve istersen hiç rota hesaplamadan, en fazla belleği korumak için.</li>
 <li><b>Rota tercihi</b>: en hızlı veya en kısa.</li>
 <li><b>Mola uyarısı</b>: mola zamanından ne kadar önce (oyun saatiyle) sesin ve en yakın dinlenme alanına giden kısayolun geleceği, 1 ile 3 saat arası.</li>
@@ -1383,7 +1383,7 @@ GUIDE_TEXT.ru = {
 <li><b>Мини-HUD</b>: что показывать, когда панель информации скрыта.</li>
 <li><b>Другие водители рядом</b>: делиться своей позицией или скрыть метки других. Если вы играете в TruckersMP, игроки рядом с вами появляются на карте с именем и направлением движения (их тоже можно скрыть).</li>
 <li><b>Кнопки на карте</b>: тёмный стиль под цвет карты, приглушение во время езды (возвращаются при касании) и <b>Переместить кнопки</b>: перетащите любую кнопку или панель, а за угол измените размер; есть сетка и сброс.</li>
-<li><b>Настоящая подложка</b>: береговая линия, озёра, реки и застройка под дорогами (примерно на 1 МБ больше).</li>
+<li><b>Настоящая подложка</b>: береговая линия, озёра, реки, застройка и границы под дорогами (примерно на 1 МБ больше). Границы настоящие и исчезают при приближении: вблизи город на границе может оказаться немного не с той стороны.</li>
 <li><b>Лёгкий режим</b> для старых телефонов и планшетов: упрощённая отрисовка и, при желании, без расчёта маршрута, чтобы сэкономить больше всего памяти.</li>
 <li><b>Предпочтение маршрута</b>: самый быстрый или самый короткий.</li>
 <li><b>Напоминание об отдыхе</b>: за сколько до обязательного отдыха (по игровому времени) звучит голос и появляется ярлык к ближайшей зоне отдыха, от 1 до 3 часов.</li>

@@ -113,6 +113,14 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double, a: AparienciaMapa = Ap
         {"id":"base-lake","type":"fill","source":"base","filter":["==",["get","k"],"lake"],"paint":{"fill-color":"$FONDO_AGUA"}},
         {"id":"base-river","type":"line","source":"base","filter":["==",["get","k"],"river"],
          "paint":{"line-color":"#1e3350","line-width":["interpolate",["linear"],["zoom"],4,0.4,10,2]}},
+        {"id":"base-state","type":"line","source":"base","maxzoom":8.5,"filter":["==",["get","k"],"state"],
+         "layout":{"line-join":"round"},
+         "paint":{"line-color":"#ab9fd8","line-opacity":["interpolate",["linear"],["zoom"],7,0.9,8.5,0],
+                  "line-dasharray":[4,2.5],"line-width":["interpolate",["linear"],["zoom"],3,1,8,1.6]}},
+        {"id":"base-border","type":"line","source":"base","maxzoom":8.5,"filter":["==",["get","k"],"border"],
+         "layout":{"line-join":"round"},
+         "paint":{"line-color":"#ab9fd8","line-opacity":["interpolate",["linear"],["zoom"],7,0.9,8.5,0],
+                  "line-width":["interpolate",["linear"],["zoom"],3,1.3,8,2.2]}},
         """
     } else {
         ""

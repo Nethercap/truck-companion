@@ -160,6 +160,21 @@ class MapaTest {
     }
 
     @Test
+    fun `con mapa base van los limites, como en la web`() {
+        // base-state y base-border de buildBaseLayers (app.js): el usa.geojson
+        // de VERSION_MAPA_BASE 20261112 los trae, y se apagan al acercarse.
+        val estilo = JsonLaxo.parseToJsonElement(estiloDe(atsVainilla, 45.0)).jsonObject
+        val capas = estilo.getValue("layers").jsonArray.map { it.jsonObject }
+        val ids = capas.map { it.getValue("id").jsonPrimitive.content }
+        assertEquals(listOf("base-land", "base-urban", "base-lake", "base-river", "base-state", "base-border"),
+            ids.filter { it.startsWith("base-") })
+        for (id in listOf("base-state", "base-border")) {
+            val capa = capas.first { it.getValue("id").jsonPrimitive.content == id }
+            assertEquals(8.5, capa.getValue("maxzoom").jsonPrimitive.content.toDouble(), 0.0)
+        }
+    }
+
+    @Test
     fun `el geojson que va a las fuentes es valido, con nombres raros incluidos`() {
         val raro = "Nombre \"con\" comillas \\ y ñ"
         JsonLaxo.parseToJsonElement(geojsonPunto(LngLat(1.5, -2.5), 90.0))

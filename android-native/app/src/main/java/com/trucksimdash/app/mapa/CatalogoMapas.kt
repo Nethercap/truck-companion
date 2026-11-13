@@ -59,7 +59,7 @@ internal fun fondoDelMapa(proyeccion: String, mods: List<String>): String? {
 // Copias de constantes de app.js, con un test que las compara contra la web
 // (ReferenciaWebTest). Se suben junto con las de la web, despues de subir el archivo
 // a R2: Cloudflare guarda lo que reciba con ese numero, aunque sea un 404.
-internal const val VERSION_MAPA_BASE = "20261110" // BASEMAP_VERSION
+internal const val VERSION_MAPA_BASE = "20261112" // BASEMAP_VERSION
 internal const val REV_LOGOS_EMPRESA = "1" // COMPANY_ICONS_REV
 
 /**

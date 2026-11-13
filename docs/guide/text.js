@@ -127,7 +127,7 @@ GUIDE_TEXT.en = {
 <li><b>Mini-HUD</b>: what to show when the info panel is hidden.</li>
 <li><b>Other players nearby</b>: share your position, or hide other drivers' markers. When you play on TruckersMP, the players around you show up on the map with their name and where they're heading (you can hide them too).</li>
 <li><b>Map buttons</b>: dark style to match the map, fade them while driving (they come back on touch), and <b>Move the buttons</b>: drag any button or panel, drag its corner to resize it, with a grid and a Reset.</li>
-<li><b>Real base map</b>: coastline, lakes, rivers and built-up areas under the roads (about 1 MB more).</li>
+<li><b>Real base map</b>: coastline, lakes, rivers, built-up areas and borders under the roads (about 1 MB more). The borders are the real ones and fade out as you zoom in: up close a town on a border can sit a little on the wrong side.</li>
 <li><b>Lite mode</b> for old phones and tablets: lighter rendering, and optionally no routing at all to save the most memory.</li>
 <li><b>Route preference</b>: fastest or shortest.</li>
 <li><b>Rest warning</b>: how long before a rest is due (in game time) the voice and the shortcut to the nearest rest area come up, from 1 to 3 hours.</li>
@@ -380,7 +380,7 @@ GUIDE_TEXT.es = {
 <li><b>Mini-HUD</b>: qué mostrar cuando el panel de info está oculto.</li>
 <li><b>Otros jugadores cerca</b>: compartir tu posición, u ocultar los marcadores de los demás. Si jugás en TruckersMP, los jugadores que tenés alrededor aparecen en el mapa con su nombre y hacia dónde van (también los podés ocultar).</li>
 <li><b>Botones del mapa</b>: estilo oscuro para que combinen con el mapa, atenuarlos al manejar (vuelven al tocar la pantalla), y <b>Mover los botones</b>: arrastrá cualquier botón o panel, y su esquina para cambiarle el tamaño, con grilla y un Restablecer.</li>
-<li><b>Mapa base real</b>: costa, lagos, ríos y zonas urbanas debajo de las rutas (alrededor de 1 MB más).</li>
+<li><b>Mapa base real</b>: costa, lagos, ríos, zonas urbanas y límites debajo de las rutas (alrededor de 1 MB más). Los límites son los reales y se apagan al acercarse: de cerca, un pueblo sobre un límite puede quedar un poco del otro lado.</li>
 <li><b>Modo liviano</b> para celulares y tablets viejos: dibujo más liviano y, si hace falta, sin cálculo de ruta, para ahorrar la mayor cantidad de memoria.</li>
 <li><b>Preferencia de ruta</b>: la más rápida o la más corta.</li>
 <li><b>Aviso de descanso</b>: cuánto antes de que toque descansar (en tiempo del juego) avisan la voz y el atajo al área de descanso más cercana, de 1 a 3 horas.</li>

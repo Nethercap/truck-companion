@@ -128,6 +128,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   mod `promods` usan `europe-promods` (`basemapForVariant` en pure.js,
   `fondoDelMapa` en la app nativa, con golden). Un archivo nuevo o cambiado va
   a R2 antes de subir `BASEMAP_VERSION` (y `VERSION_MAPA_BASE` en Kotlin).
+  Desde 20261112 trae los limites de paises y de estados de EE. UU., Canada y
+  Mexico (`k` "border" y "state", capas `base-border` y `base-state`, tambien
+  en `EstiloMapa.kt`; Discord 12-11). Son los reales y el mapa del juego no
+  calza justo: 13 de 289 ciudades de ATS y 17 de 388 de ETS2 quedan del otro
+  lado (Yuma 18 km, Reno 12, Ginebra, Luxemburgo), y una spline sobre 334
+  ciudades solo cambiaba cuales; por eso se apagan entre el zoom 7 y el 8,5.
 - Un mapa armado en la PC ("Build my map") cuyas ciudades caen sobre todo
   fuera de la tierra real (Explorando a America en ATS, 18-10) va con el
   fondo liso y sin mar: se mide una vez al cargarlo (`citiesOnLand`, con 0,5
