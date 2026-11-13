@@ -4366,8 +4366,11 @@ function resolveRouteTarget(data) {
 
 function resolveRawRouteTarget(data) {
   // Trabajo de bus (DLC Coaches): a la proxima parada, un mirador por su id
-  // en los POIs o el centro de su ciudad (busRouteTarget en pure.js).
-  const parada = busRouteTarget(data, pois && poisVariant === currentGame ? pois.viewpoints : null, findCity);
+  // en los POIs, la terminal de su ciudad o, sin terminal, el centro de la
+  // ciudad (busRouteTarget en pure.js).
+  const susPois = pois && poisVariant === currentGame ? pois : null;
+  const parada = busRouteTarget(data, susPois ? susPois.viewpoints : null, findCity,
+    susPois ? { lines: susPois.busStations, tourist: susPois.busTouristStops } : null);
   if (parada) return parada;
   // Trabajo tomado pero carga todavia no enganchada: hay que ir a buscarla.
   // Empresa exacta si esta en los POIs; si no, el centro de la ciudad de
@@ -4748,10 +4751,11 @@ function updateDestinationMarker(data) {
       // una empresa o la empresa del trabajo se entra (entrar); a la del
       // trabajo, por un nodo que no toque una via rapida (empresa).
       const pasa = (i) => i < waypoints.length && waypointPassesBy(waypoints[i]);
-      const empresa = (i) => i >= waypoints.length && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && !target.bus;
+      // La terminal de bus de una ciudad es un patio como el de una empresa.
+      const empresa = (i) => i >= waypoints.length && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && (!target.bus || !!target.terminal);
       // A un mirador de un trabajo de bus se entra como a una parada propia:
       // es un estacionamiento al costado de la ruta, no el patio de una empresa.
-      const mirador = (i) => i >= waypoints.length && !!target.bus && !target.approx;
+      const mirador = (i) => i >= waypoints.length && !!target.bus && !target.approx && !target.terminal;
       const entra = (i) => (i < waypoints.length ? !pasa(i) : empresa(i) || mirador(i));
       const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
       let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), siguiente });

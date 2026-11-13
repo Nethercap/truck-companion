@@ -5088,19 +5088,34 @@ function busJobOf(data) {
 }
 
 // Donde queda una parada en el mapa: un mirador por su id en los POIs
-// (viewpoints: { id: [x, z, nombre] }), exacto; una ciudad por la ciudad,
-// en el centro (approx): las terminales de bus de Coaches no estan en los
-// datos del parser. Un mirador que el mapa no tiene (Islandia en las
-// variantes de antes de la 1.62, lugares que ProMods rehizo) no se busca por
-// nombre entre las ciudades: "Viitasaari" podria ser una ciudad de un mod en
-// otro lado. findCity(id, nombre): la de app.js ({ X, Y }).
-function busStopPlace(stop, viewpoints, findCity) {
+// (viewpoints: { id: [x, z, nombre] }), exacto; una ciudad por su terminal de
+// bus, exacta (terminal). stations: { lines, tourist }, busStations y
+// busTouristStops de los POIs ({ ciudad: [x, z] }, del objeto BusStop del mapa
+// que el juego ata a esa ciudad): una linea va a la terminal y un viaje de
+// turismo (tourist) al punto de subida de turismo si la ciudad tiene uno
+// aparte; si falta el que toca, el otro. Sin ninguno en los datos (mapas
+// publicados antes, ciudades de mods), al centro (approx). Un mirador que el
+// mapa no tiene (Islandia en las variantes de antes de la 1.62, lugares que
+// ProMods rehizo) no se busca por nombre entre las ciudades: "Viitasaari"
+// podria ser una ciudad de un mod en otro lado. findCity(id, nombre): la de
+// app.js ({ X, Y }).
+function busStopPlace(stop, viewpoints, findCity, stations, tourist = false) {
   if (!stop) return null;
   const mirador = viewpoints && stop.id ? viewpoints[stop.id] : null;
   if (Array.isArray(mirador) && Number.isFinite(mirador[0]) && Number.isFinite(mirador[1])) {
     return { x: mirador[0], z: mirador[1], approx: false };
   }
-  if (stop.type === 'viewpoints' || typeof findCity !== 'function') return null;
+  if (stop.type === 'viewpoints') return null;
+  const deLaCiudad = (tabla) => (tabla && typeof tabla === 'object' && stop.id
+    && Object.prototype.hasOwnProperty.call(tabla, stop.id) ? tabla[stop.id] : null);
+  const tablas = stations ? (tourist ? [stations.tourist, stations.lines] : [stations.lines, stations.tourist]) : [];
+  for (const tabla of tablas) {
+    const t = deLaCiudad(tabla);
+    if (Array.isArray(t) && Number.isFinite(t[0]) && Number.isFinite(t[1])) {
+      return { x: t[0], z: t[1], approx: false, terminal: true };
+    }
+  }
+  if (typeof findCity !== 'function') return null;
   const ciudad = findCity(stop.id || null, stop.name || null);
   return ciudad && Number.isFinite(ciudad.X) && Number.isFinite(ciudad.Y) ? { x: ciudad.X, z: ciudad.Y, approx: true } : null;
 }
@@ -5108,14 +5123,17 @@ function busStopPlace(stop, viewpoints, findCity) {
 // El destino de la ruta con un trabajo de bus: la proxima parada (no la
 // ultima). La clave cambia en cada parada, asi la ruta, la barra y el aviso
 // de llegada vuelven a empezar. null si no hay bus o la parada no se ubica
-// (sin otro destino, la app no rutea: el GPS del juego va igual).
-function busRouteTarget(data, viewpoints, findCity) {
+// (sin otro destino, la app no rutea: el GPS del juego va igual). terminal:
+// la parada es la terminal de una ciudad, y a ella se entra como al patio de
+// una empresa (yardNodes), no como al estacionamiento de un mirador.
+function busRouteTarget(data, viewpoints, findCity, stations) {
   const bus = busJobOf(data);
   if (!bus) return null;
-  const lugar = busStopPlace(bus.next, viewpoints, findCity);
+  const lugar = busStopPlace(bus.next, viewpoints, findCity, stations, data.jobMarket === 'tourist_job');
   if (!lugar) return null;
   const target = { x: lugar.x, z: lugar.z, kind: 'dest', bus: true,
     key: `bus:${bus.nextIndex}:${bus.next.id || bus.next.name || ''}` };
+  if (lugar.terminal) target.terminal = true;
   if (lugar.approx) { target.approx = true; target.market = 'bus'; }
   return target;
 }

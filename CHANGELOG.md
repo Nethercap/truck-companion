@@ -4,6 +4,13 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Coaches (ETS2), Build my map: maps built on your PC now include the bus stations, so a bus stop
+  in a city routes to the station instead of the city centre (the maps on our site already have
+  them). An ETS2 map built with an earlier version is offered for rebuilding once; ATS maps are
+  not affected.
+
 ## 1.5.40 (2026-11-13)
 
 - In-game overlay: two new things it can show, both off until you tick them in Setup. **Heading**

@@ -97,10 +97,33 @@ def test_un_mapa_a_medias_no_cuenta(tmp_path, monkeypatch):
     carpeta = tmp_path / "TruckDash" / "maps" / "ats-abc"
     carpeta.mkdir(parents=True)
     assert map_builder.built_map("ats", "abc") is None
-    (carpeta / "manifest.json").write_text(json.dumps({"format": map_builder.MAP_FORMAT, "fingerprint": "abc"}))
+    (carpeta / "manifest.json").write_text(json.dumps({"format": map_builder.map_format("ats"), "fingerprint": "abc"}))
     assert map_builder.built_map("ats", "abc")["dir"] == str(carpeta)
-    (carpeta / "manifest.json").write_text(json.dumps({"format": map_builder.MAP_FORMAT - 1, "fingerprint": "abc"}))
+    (carpeta / "manifest.json").write_text(json.dumps({"format": map_builder.map_format("ats") - 1, "fingerprint": "abc"}))
     assert map_builder.built_map("ats", "abc") is None
+
+
+def test_el_formato_va_por_juego(tmp_path, monkeypatch):
+    """Las terminales de bus (3) son solo de ETS2: un mapa de ATS armado con
+    el formato 2 sigue sirviendo, y su huella es la de antes; uno de ETS2 con
+    el 2 se vuelve a armar."""
+    import hashlib
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert map_builder.map_format("ats") == 2
+    assert map_builder.map_format("ets2") == 3
+    juego = tmp_path / "juego"
+    juego.mkdir()
+    (juego / "version.scs").write_bytes(b"v")
+    h = hashlib.sha1()
+    h.update(b"2|ats|")
+    h.update(map_builder._huella_de(str(juego / "version.scs")).encode())
+    assert map_builder.fingerprint("ats", str(juego), []) == h.hexdigest()[:12]
+    for game in ("ats", "ets2"):
+        carpeta = tmp_path / "TruckDash" / "maps" / f"{game}-abc"
+        carpeta.mkdir(parents=True)
+        (carpeta / "manifest.json").write_text(json.dumps({"format": 2, "fingerprint": "abc"}))
+    assert map_builder.built_map("ats", "abc") is not None
+    assert map_builder.built_map("ets2", "abc") is None
 
 
 def test_los_mods_van_al_parser_en_una_lista_y_no_separados_por_coma(tmp_path, monkeypatch):

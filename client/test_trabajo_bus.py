@@ -293,6 +293,46 @@ def test_los_miradores_salen_por_uid_o_por_la_clave_del_nombre(tmp_path):
     assert pois.viewpoints(str(tmp_path / "nada"), "europe", etiquetas, tabla) == {}
 
 
+def test_las_terminales_de_bus_salen_de_los_busstop_del_mapa(tmp_path):
+    """mapbuild/pois.bus_stations: el BusStop del mapa da la ciudad y el
+    lugar. Uno con la escena de turismo al lado (tag "tj") va aparte; uno sin
+    ciudad no va (ningun trabajo lo nombra); dos del mismo tipo en una ciudad,
+    el de uid menor. Valores de ETS2 1.62.3."""
+    import json as _json
+    from mapbuild import pois
+
+    busstops = [
+        # Tallinn: terminal de prefab, sin escena en el mapa
+        {"uid": "b2", "x": 44519.4, "y": -50561.2, "cityToken": "tallinn", "prefabUid": "1"},
+        # Joensuu: parada armada con escena de linea y otra de turismo
+        {"uid": "c1", "x": 55088.0, "y": -71260.0, "cityToken": "joensuu", "prefabUid": "2"},
+        {"uid": "c2", "x": 57167.0, "y": -69782.0, "cityToken": "joensuu", "prefabUid": "3"},
+        # Valmiera: dos de linea a 30 m
+        {"uid": "d2", "x": 47771.0, "y": -40898.0, "cityToken": "valmiera", "prefabUid": "4"},
+        {"uid": "d1", "x": 47776.0, "y": -40872.0, "cityToken": "valmiera", "prefabUid": "5"},
+        # turismo sin ciudad, y una fila rota
+        {"uid": "e1", "x": 1.0, "y": 2.0, "cityToken": "", "prefabUid": "6"},
+        {"uid": "e2", "x": None, "y": 2.0, "cityToken": "riga", "prefabUid": "7"},
+    ]
+    cutscenes = [
+        {"uid": "s1", "x": 55070.0, "y": -71250.0, "tags": ["bus_stop", "load"]},
+        {"uid": "s2", "x": 57150.0, "y": -69770.0, "tags": ["bus_stop", "load", "tj"]},
+        {"uid": "s3", "x": 3.0, "y": 2.0, "tags": ["bus_stop", "load", "tj"]},
+        {"uid": "s4", "x": 47770.0, "y": -40880.0, "tags": ["bus_stop", "load"]},
+        # una escena de turismo a 100 m no hace de turismo a una terminal
+        {"uid": "s5", "x": 44519.0, "y": -50461.0, "tags": ["bus_stop", "load", "tj"]},
+        {"uid": "s6", "x": 0.0, "y": 0.0, "tags": ["game_intro", "tallinn"]},
+    ]
+    (tmp_path / "europe-busStops.json").write_text(_json.dumps(busstops), encoding="utf-8")
+    (tmp_path / "europe-cutscenes.json").write_text(_json.dumps(cutscenes), encoding="utf-8")
+    lineas, turismo = pois.bus_stations(str(tmp_path), "europe")
+    assert lineas == {"tallinn": [44519, -50561], "joensuu": [55088, -71260], "valmiera": [47776, -40872]}
+    assert turismo == {"joensuu": [57167, -69782]}
+    # ATS y una salida del parser sin el parche (mapas armados antes): nada
+    assert pois.bus_stations(str(tmp_path), "usa") == ({}, {})
+    assert pois.bus_stations(str(tmp_path / "nada"), "europe") == ({}, {})
+
+
 def test_la_tabla_de_miradores_sale_del_album_del_juego():
     """tools/build_viewpoints_ets2.py lee def/photo_album/viewpoints.sui."""
     import importlib.util

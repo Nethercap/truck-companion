@@ -23,6 +23,12 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
                                               # el id del album del juego, el
                                               # de las paradas de un trabajo
                                               # de turismo (DLC Coaches)
+    "busStations": {"city_token": [x, z], ...},  # solo ETS2: la terminal de
+                                              # las lineas de bus de cada
+                                              # ciudad (DLC Coaches)
+    "busTouristStops": {"city_token": [x, z], ...},  # y donde suben los de
+                                              # un viaje de turismo, si la
+                                              # ciudad tiene uno aparte
     "areas":      [[x, z, ancho, alto], ...]  # areas de ciudad (esquina de
                                               # arriba a la izquierda): adentro
                                               # el juego va a escala 1:3
@@ -189,6 +195,53 @@ def viewpoints(parser_dir, prefix, labels=None, table=None):
     return out
 
 
+# Una parada de bus armada a mano en el mapa (sin prefab de terminal) tiene al
+# lado la escena donde suben los pasajeros: un cutscene con el tag "bus_stop"
+# a 15-25 m del BusStop. Las terminales de prefab no tienen ninguno a menos
+# de 100 m (la escena va adentro del prefab).
+BUS_STOP_SCENE_M = 60
+
+
+def bus_stations(parser_dir, prefix):
+    """(lineas, turismo): {ciudad: [x, z]} con la terminal de bus de cada
+    ciudad y, aparte, el punto de subida de los viajes de turismo.
+
+    Salen de los BusStop del mapa (<prefijo>-busStops.json, que escribe el
+    parser con el parche de truckdash): el juego ata cada uno a su ciudad, y
+    un trabajo de bus manda sus paradas de ciudad con ese token ("tallinn").
+    En ETS2 1.62.3 son 322: 114 terminales de prefab, 110 paradas armadas con
+    escenas (las dos son de lineas; ninguna ciudad tiene de las dos) y 98 de
+    turismo, cuya escena lleva ademas el tag "tj" (41 sin ciudad, que ningun
+    trabajo nombra). Que los de turismo salen del "tj" es una deduccion: sus
+    escenas son las bus_t_*, y en Oulu, sin "tj", un viaje de turismo arranco
+    en la terminal. La posicion es la del BusStop: en Tallinn, a 13 m de donde
+    el juego pone el bus al tomar una linea (game.log, 13-11). Dos de un mismo
+    tipo en una ciudad (Valmiera, Lulea) estan a 30 m: queda el de uid menor."""
+    path = os.path.join(parser_dir, f"{prefix}-busStops.json")
+    if prefix != "europe" or not os.path.exists(path):
+        return {}, {}
+    escenas = []
+    try:
+        for c in _cargar(os.path.join(parser_dir, f"{prefix}-cutscenes.json")):
+            if "bus_stop" in (c.get("tags") or []):
+                escenas.append((c["x"], c["y"], "tj" in c["tags"]))
+    except OSError:
+        pass
+    lineas, turismo = {}, {}
+    for b in sorted(_cargar(path), key=lambda b: str(b.get("uid"))):
+        ciudad = b.get("cityToken")
+        try:
+            x, z = float(b["x"]), float(b["y"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not ciudad or not (math.isfinite(x) and math.isfinite(z)):
+            continue
+        cerca = min(escenas, key=lambda e: (e[0] - x) ** 2 + (e[1] - z) ** 2, default=None)
+        es_turismo = bool(cerca and cerca[2] and math.hypot(cerca[0] - x, cerca[1] - z) < BUS_STOP_SCENE_M)
+        (turismo if es_turismo else lineas).setdefault(ciudad, [round(x), round(z)])
+    return lineas, turismo
+
+
 def build(parser_dir, prefix, work_points=None, atlas_names=None):
     """El dict de POIs, o None si esa carpeta no tiene salida del parser.
 
@@ -274,6 +327,11 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
         for p in del_parser if p.get("type") == "viewpoint" and p.get("label")})
     if miradores:
         out["viewpoints"] = miradores
+    lineas, turismo = bus_stations(parser_dir, prefix)
+    if lineas:
+        out["busStations"] = lineas
+    if turismo:
+        out["busTouristStops"] = turismo
     if areas:
         out["areas"] = areas
     fill_missing_cities(out)
