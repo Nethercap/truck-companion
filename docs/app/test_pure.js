@@ -3471,8 +3471,9 @@ test('jobPanelFields: el panel no sigue con el trabajo cancelado (16-10)', () =>
   const trabajo = { game: 'ats', citySrc: 'Reno', cityDst: 'Sacramento', cargo: 'Bulldozer', cargoMassKg: 16200,
     jobIncome: 61158, jobDeadlineSeconds: 7200, onJob: true };
   const enCurso = { citySrc: 'Reno', cityDst: 'Sacramento', cargo: 'Bulldozer', cargoMassKg: 16200,
-    income: 61158, deadlineSeconds: 7200 };
-  const nada = { citySrc: null, cityDst: null, cargo: null, cargoMassKg: null, income: null, deadlineSeconds: null };
+    income: 61158, deadlineSeconds: 7200, passengers: null };
+  const nada = { citySrc: null, cityDst: null, cargo: null, cargoMassKg: null, income: null, deadlineSeconds: null,
+    passengers: null };
   assert.deepEqual(jobPanelFields(trabajo), enCurso);
   // terminado sin evento: los campos quedan, el panel no los muestra
   assert.deepEqual(jobPanelFields({ ...trabajo, onJob: false }), nada);
@@ -6729,4 +6730,96 @@ test('turnReportJobLine: dice si la web tenia el trabajo, para separar el SDK de
   const base = { game: 'ets2', map: 'ets2', web: 'x', client: '1.5.37', truck: [1, 2], now: 1, items: [], formatTime: () => 'h' };
   assert.ok(turnReportText({ ...base, job: 'Job: none, trailer off, cargo not loaded' }).includes('\nJob: none, trailer off, cargo not loaded\n'));
   assert.ok(!turnReportText(base).includes('Job:'));
+});
+
+// Trabajo de bus del DLC Coaches como lo manda el cliente (client/trabajo_bus.py),
+// el del primer game.log.txt visto (12-11): turismo Oulu -> mirador de
+// Viitasaari -> Oulu.
+const BUS_DE_TURISMO = {
+  stage: 0, stages: 2, updates: 1,
+  stops: [
+    { type: 'city', id: 'oulu', name: 'Oulu', departurePlanned: 256620, boardingPlanned: 25 },
+    { type: 'viewpoints', id: 'pocviitasaar', name: 'Viitasaari', arrivalPlanned: 256880, departurePlanned: 257000 },
+    { type: 'city', id: 'oulu', name: 'Oulu', arrivalPlanned: 257250, alightingPlanned: 25 },
+  ],
+};
+const MIRADORES = { pocviitasaar: [43560, -73398, 'Viitasaari'] };
+const ciudadesBus = (id, nombre) => ({ oulu: { X: 40223, Y: -83629 }, viitasaari_mod: { X: 1, Y: 2 } })[id]
+  || (nombre === 'Viitasaari' ? { X: 1, Y: 2 } : null);
+
+test('busJobOf: la proxima parada del trabajo de bus, y nada sin bus o con un cliente viejo', () => {
+  const { busJobOf } = require('./pure.js');
+  const bus = busJobOf({ onJob: true, bus: BUS_DE_TURISMO });
+  assert.equal(bus.stage, 0);
+  assert.equal(bus.stages, 2);
+  assert.equal(bus.nextIndex, 1);
+  assert.equal(bus.next.id, 'pocviitasaar');
+  // una etapa de mas (el juego al terminar) no se sale de la lista
+  assert.equal(busJobOf({ onJob: true, bus: { ...BUS_DE_TURISMO, stage: 5 } }).next.name, 'Oulu');
+  assert.equal(busJobOf({ onJob: false, bus: BUS_DE_TURISMO }), null);
+  assert.equal(busJobOf({ onJob: true }), null);
+  assert.equal(busJobOf({ onJob: true, bus: { stage: 0, stops: [BUS_DE_TURISMO.stops[0]] } }), null);
+  assert.equal(busJobOf(null), null);
+});
+
+test('busStopPlace: el mirador exacto por el id del album; la ciudad al centro; un mirador que falta no se busca entre las ciudades', () => {
+  const { busStopPlace } = require('./pure.js');
+  const [oulu, viitasaari] = BUS_DE_TURISMO.stops;
+  assert.deepEqual(busStopPlace(viitasaari, MIRADORES, ciudadesBus), { x: 43560, z: -73398, approx: false });
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, ciudadesBus), { x: 40223, z: -83629, approx: true });
+  // ProMods sin ese mirador: no a la "Viitasaari" que encuentre por nombre
+  assert.equal(busStopPlace(viitasaari, {}, ciudadesBus), null);
+  assert.equal(busStopPlace(viitasaari, undefined, ciudadesBus), null);
+  assert.equal(busStopPlace({ type: 'city', id: 'nada', name: 'Nada' }, MIRADORES, ciudadesBus), null);
+  assert.equal(busStopPlace(null, MIRADORES, ciudadesBus), null);
+});
+
+test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada', () => {
+  const { busRouteTarget, followGameRoute } = require('./pure.js');
+  const a = busRouteTarget({ onJob: true, bus: BUS_DE_TURISMO }, MIRADORES, ciudadesBus);
+  assert.deepEqual(a, { x: 43560, z: -73398, kind: 'dest', bus: true, key: 'bus:1:pocviitasaar' });
+  const b = busRouteTarget({ onJob: true, bus: { ...BUS_DE_TURISMO, stage: 1 } }, MIRADORES, ciudadesBus);
+  assert.deepEqual(b, { x: 40223, z: -83629, kind: 'dest', bus: true, key: 'bus:2:oulu', approx: true, market: 'bus' });
+  assert.equal(busRouteTarget({ onJob: true, bus: BUS_DE_TURISMO }, {}, ciudadesBus), null);
+  assert.equal(busRouteTarget({ onJob: true, cityDst: 'Oulu' }, MIRADORES, ciudadesBus), null);
+  // el GPS del juego va por todas las paradas hasta el final: no se lo sigue
+  assert.equal(followGameRoute(a, 0, 'fastest'), false);
+  assert.equal(followGameRoute({ ...a, bus: false }, 0, 'fastest'), true);
+});
+
+test('busPassengersOnBoard: los que subieron menos los que bajaron, los reales si los hay', () => {
+  const { busJobOf, busPassengersOnBoard } = require('./pure.js');
+  const bus = (cambios) => busJobOf({ onJob: true, bus: { ...BUS_DE_TURISMO, ...cambios } });
+  assert.equal(busPassengersOnBoard(bus({})), 25);
+  assert.equal(busPassengersOnBoard(bus({ stage: 1 })), 25);
+  const linea = { stage: 1, stops: [
+    { id: 'a', boardingPlanned: 30, boardingActual: 28 },
+    { id: 'b', alightingPlanned: 10, boardingPlanned: 5 },
+    { id: 'c', alightingPlanned: 23 },
+  ] };
+  assert.equal(busPassengersOnBoard(bus(linea)), 28 - 10 + 5);
+  assert.equal(busPassengersOnBoard(bus({ stops: [{ id: 'a' }, { id: 'b' }] })), null);
+});
+
+test('busNextStopLine: numero, nombre del juego, hora planificada en el reloj del juego y si se paso', () => {
+  const { busJobOf, busNextStopLine } = require('./pure.js');
+  const bus = busJobOf({ onJob: true, bus: BUS_DE_TURISMO });
+  // 256880 minutos: dia 178, 09:20
+  assert.deepEqual(busNextStopLine(bus, 256600), { n: 1, total: 2, name: 'Viitasaari', due: '09:20', late: false });
+  assert.equal(busNextStopLine(bus, 256600, true).due, '9:20 AM');
+  assert.equal(busNextStopLine(bus, 256900).late, true);
+  const llego = busJobOf({ onJob: true, bus: { ...BUS_DE_TURISMO, stops: [BUS_DE_TURISMO.stops[0],
+    { ...BUS_DE_TURISMO.stops[1], arrivalActual: 256890 }, BUS_DE_TURISMO.stops[2]] } });
+  assert.equal(busNextStopLine(llego, 256900).late, false);
+  const sinHorario = busJobOf({ onJob: true, bus: { stage: 0, stops: [{ id: 'a' }, { id: 'b' }] } });
+  assert.deepEqual(busNextStopLine(sinHorario, 1), { n: 1, total: 1, name: 'b', due: null, late: false });
+  assert.equal(busNextStopLine(null, 1), null);
+});
+
+test('jobPanelFields: con un trabajo de bus, primera y proxima parada y los pasajeros', () => {
+  const { jobPanelFields } = require('./pure.js');
+  const datos = { onJob: true, cityDst: null, citySrc: 'Oulu', cargo: null, jobIncome: 6718,
+    jobDeadlineSeconds: 16800, bus: BUS_DE_TURISMO };
+  assert.deepEqual(jobPanelFields(datos), { citySrc: 'Oulu', cityDst: 'Viitasaari', cargo: null, cargoMassKg: null,
+    income: 6718, deadlineSeconds: 16800, passengers: 25 });
 });

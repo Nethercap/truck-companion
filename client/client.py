@@ -27,6 +27,7 @@ import time
 IS_WINDOWS = sys.platform == "win32"
 import keys_compat
 import telemetry_compat
+import trabajo_bus
 import window_compat
 import websockets
 from urllib.request import Request
@@ -734,6 +735,41 @@ def sin_no_finitos(valor):
 
 
 def build_payload(raw: dict) -> dict:
+    payload = _payload_basico(raw)
+    bus = trabajo_bus.del_raw(raw)
+    if bus:
+        con_trabajo_de_bus(payload, raw, bus)
+    return payload
+
+
+def con_trabajo_de_bus(payload: dict, raw: dict, bus: dict) -> None:
+    """Un trabajo de bus (DLC Coaches) va con sus paradas en `bus` (ver
+    trabajo_bus.del_raw), y la clave solo existe entonces: la tabla viaja en
+    cada dato al relay, y sin bus el payload queda como siempre.
+
+    El juego no manda ciudades de origen y destino para un bus, y los campos
+    del trabajo de siempre se llenan con lo que sirve a quien todavia no
+    conoce `bus`: el origen es la primera parada, y el destino la proxima,
+    solo si es una ciudad (la web rutea al centro, como con un destino sin
+    empresa). Un mirador no: la web tomaria su nombre por una ciudad que no
+    esta en el mapa y lo diria. El plazo es la llegada planificada a la
+    proxima parada, el horario de la linea."""
+    payload["bus"] = bus
+    if payload.get("cityDst") or payload.get("cityDstId"):
+        return
+    primera, proxima = bus["stops"][0], trabajo_bus.proxima_parada(bus)
+    payload["citySrc"] = primera.get("name") or None
+    if trabajo_bus.es_ciudad(primera):
+        payload["citySrcId"] = primera["id"]
+    if trabajo_bus.es_ciudad(proxima):
+        payload["cityDst"] = proxima.get("name") or proxima["id"]
+        payload["cityDstId"] = proxima["id"]
+    llegada, ahora = proxima.get("arrivalPlanned"), raw.get("time_abs")
+    if not raw.get("time_abs_delivery") and llegada and ahora is not None:
+        payload["jobDeadlineSeconds"] = (llegada - ahora) * 60
+
+
+def _payload_basico(raw: dict) -> dict:
     speed_kmh = (raw.get("speed") or 0) * 3.6
     # el SDK devuelve speedLimit en m/s igual que speed, hay que convertirlo
     # tambien - antes se mandaba crudo y quedaba ~3.6x mas bajo de lo real.
@@ -917,11 +953,18 @@ def log_job_change(raw: dict):
     origen = f"{raw.get('compSrcId') or raw.get('compSrc') or '?'}@{raw.get('citySrcId') or raw.get('citySrc') or '?'}"
     destino = f"{raw.get('compDstId') or raw.get('compDst') or '?'}@{raw.get('cityDstId') or raw.get('cityDst') or '?'}"
     en_viaje = bool(raw.get("onJob"))
-    clave = (en_viaje, raw.get("jobMarket") or None, origen, destino, bool(raw.get("isCargoLoaded")), remolque, gps_m > 0)
+    # Un trabajo de bus no trae origen ni destino ("?@? -> ?@?" en el log del
+    # 12-11): van sus paradas y la etapa. Con `updates` sale una linea cada vez
+    # que el juego manda la configuracion otra vez, y asi el log dice que
+    # cambia al llegar a una parada, que todavia no se vio.
+    bus = trabajo_bus.del_raw(raw)
+    recorrido = f"bus {trabajo_bus.descripcion(bus)}" if bus else f"{origen} -> {destino}"
+    cambios = bus["updates"] if bus else None
+    clave = (en_viaje, raw.get("jobMarket") or None, recorrido, cambios, bool(raw.get("isCargoLoaded")), remolque, gps_m > 0)
     if clave == _last_job_log:
         return
     _last_job_log = clave
-    viaje = f"{raw.get('jobMarket') or '?'}, {origen} -> {destino}" if en_viaje else "ninguno"
+    viaje = f"{raw.get('jobMarket') or '?'}, {recorrido}" if en_viaje else "ninguno"
     logging.info("Trabajo: %s, carga %s, remolque %s, GPS del juego %.1f km", viaje,
                  "si" if raw.get("isCargoLoaded") else "no", "si" if remolque else "no", gps_m / 1000)
 
@@ -929,10 +972,13 @@ def log_job_change(raw: dict):
 def update_job_snapshot(raw: dict):
     global _last_job_snapshot
     log_job_change(raw)
-    if raw.get("onJob") and raw.get("cityDst"):
+    # De un bus, la primera y la ultima parada: el aviso de entrega dice de
+    # donde a donde fue el trabajo entero, no la ultima etapa.
+    bus = trabajo_bus.del_raw(raw)
+    if raw.get("onJob") and (raw.get("cityDst") or bus):
         _last_job_snapshot = {
-            "citySrc": raw.get("citySrc") or None,
-            "cityDst": raw.get("cityDst") or None,
+            "citySrc": (bus["stops"][0].get("name") if bus else raw.get("citySrc")) or None,
+            "cityDst": (bus["stops"][-1].get("name") if bus else raw.get("cityDst")) or None,
             "truckBrand": raw.get("truckBrand") or None,
             "truckName": raw.get("truckName") or None,
             "cargo": raw.get("cargo") or None,

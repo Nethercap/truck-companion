@@ -72,14 +72,15 @@ class ConAtributos(ctypes.Structure):
 
 
 def con_atributos(ident: bytes, atributos: list):
-    """El id y los atributos [(nombre, tipo, valor)] como los arma el juego.
-    Devuelve la estructura y lo que tiene que seguir vivo mientras se usa
-    (los textos)."""
+    """El id y los atributos [(nombre, tipo, valor)] como los arma el juego,
+    o (nombre, tipo, valor, indice) para uno con indice (las etapas de un
+    trabajo de bus). Devuelve la estructura y lo que tiene que seguir vivo
+    mientras se usa (los textos)."""
     lista = (ValorConNombre * (len(atributos) + 1))()
     textos = []
-    for item, (nombre, tipo, valor) in zip(lista, atributos):
+    for item, (nombre, tipo, valor, *indice) in zip(lista, atributos):
         item.nombre = nombre
-        item.indice = SIN_INDICE
+        item.indice = indice[0] if indice else SIN_INDICE
         item.valor.tipo = tipo
         if tipo == TIPO_STRING:
             texto = ctypes.create_string_buffer(valor)
@@ -166,55 +167,141 @@ def _comparar(que, leido, esperado):
             raise SystemExit(f"{que}: {clave} = {leido[clave]!r}, se mando {valor!r}")
 
 
+def _config_de_bus(salida_real: int = 0, actual: int = 0, llegada_real: int = 0) -> list:
+    """La configuracion `bus_job` de un game.log.txt de verdad (12-11-2026,
+    turismo Oulu -> mirador de Viitasaari -> Oulu, en el orden en que la
+    mando el juego), con lo que cambia al avanzar: la salida real de la
+    primera etapa (llego en la segunda configuracion, despues del embarque),
+    y la etapa en curso y la llegada real, que todavia nadie vio cambiar."""
+    etapas = [
+        (b"city", b"oulu", b"Oulu", b"viewpoints", b"pocviitasaar", b"Viitasaari",
+         256620, 256880, 25, 0),
+        (b"viewpoints", b"pocviitasaar", b"Viitasaari", b"city", b"oulu", b"Oulu",
+         257000, 257250, 0, 25),
+    ]
+    atributos = [
+        (b"bus.stages.count", TIPO_U32, 2),
+        (b"bus.stages.current", TIPO_U32, actual),
+        (b"income", TIPO_U64, 6718),
+        (b"planned_distance.km", TIPO_U32, 396),
+        (b"bus_job.market", TIPO_STRING, b"tourist_job"),
+    ]
+    for i, (st, si, sn, dt, di, dn, sale, llega, suben, bajan) in enumerate(etapas):
+        atributos += [
+            (b"source_stop.type", TIPO_STRING, st, i),
+            (b"source_stop.id", TIPO_STRING, si, i),
+            (b"source_stop.name", TIPO_STRING, sn, i),
+            (b"destination_stop.type", TIPO_STRING, dt, i),
+            (b"destination_stop.id", TIPO_STRING, di, i),
+            (b"destination_stop.name", TIPO_STRING, dn, i),
+            (b"source_stop.departure_time.planned", TIPO_U32, sale, i),
+        ]
+        if i == 0 and salida_real:
+            atributos.append((b"source_stop.departure_time.actual", TIPO_U32, salida_real, i))
+        atributos.append((b"destination_stop.arrival_time.planned", TIPO_U32, llega, i))
+        if i == 0 and llegada_real:
+            atributos.append((b"destination_stop.arrival_time.actual", TIPO_U32, llegada_real, i))
+        atributos += [
+            (b"source_stop.entering_passengers.planned", TIPO_U32, suben, i),
+            (b"destination_stop.leaving_passengers.planned", TIPO_U32, bajan, i),
+        ]
+    return atributos
+
+
 def _trabajo_de_bus(juego: JuegoFalso, leer) -> None:
     """Un trabajo de bus del DLC Coaches (ETS2 1.62.3, 12-11-2026): la
-    configuracion `bus_job` y, al terminar, el evento `bus_job.completed`, no
-    `.delivered`. Los nombres salen de eurotrucks2.exe (el SDK publicado no
-    los trae): los eventos de bus son `bus_job.completed` y
-    `bus_job.cancelled`, con `passenger.satisfaction` al lado de `revenue`.
-    Con solo `.delivered` la entrega no le llegaba a nadie: ni el resumen del
-    tablero ni el viaje de la cuenta. Los atributos propios del bus
-    (`bus.stages.count`, `destination_stop.name`) el bloque no los guarda
-    todavia; tienen que pasar sin romper lo demas."""
+    configuracion `bus_job` con sus etapas y, al terminar, el evento
+    `bus_job.completed`, no `.delivered` (los nombres de los eventos salen de
+    eurotrucks2.exe; con solo `.delivered` la entrega no le llegaba a nadie).
+    Las etapas van a la zona de bus del bloque, que el cliente lee en
+    raw["bus"] y trabajo_bus pasa a paradas; ninguna sale en game.log.txt
+    como "attribute not handled"."""
+    import trabajo_bus
+
     antes = leer()["jobDelivered"]
-    config, vivos = con_atributos(b"bus_job", [
-        (b"bus_job.market", TIPO_STRING, b"company_job"),
-        (b"source.city", TIPO_STRING, b"Graz"),
-        (b"destination.city", TIPO_STRING, b"Wien"),
-        (b"income", TIPO_U64, 1830),
-        (b"bus.stages.count", TIPO_U32, 3),
-        (b"destination_stop.name", TIPO_STRING, b"Wien Hbf"),
-    ])
+    config, vivos = con_atributos(b"bus_job", _config_de_bus())
     juego.evento(EVENTO_CONFIGURACION, config)
-    _comparar("bus_job", leer(), {"onJob": True, "citySrc": "Graz", "cityDst": "Wien",
-                                  "jobMarket": "company_job", "jobIncome": 1830,
-                                  "isCargoLoaded": True})
+    datos = leer()
+    _comparar("bus_job", datos, {"onJob": True, "jobMarket": "tourist_job", "jobIncome": 6718,
+                                 "plannedDistanceKm": 396, "isCargoLoaded": True,
+                                 "cityDst": "", "citySrc": ""})
+    bus = datos["bus"]
+    if not bus or bus["stageCount"] != 2 or bus["stageCurrent"] != 0 or bus["updates"] != 1:
+        raise SystemExit(f"zona de bus: {bus!r}")
+    _comparar("etapa 0, origen", bus["stages"][0]["source"],
+              {"type": "city", "id": "oulu", "name": "Oulu", "departurePlanned": 256620,
+               "departureActual": 0, "enteringPlanned": 25})
+    _comparar("etapa 1, destino", bus["stages"][1]["destination"],
+              {"type": "city", "id": "oulu", "name": "Oulu", "arrivalPlanned": 257250,
+               "leavingPlanned": 25})
+    paradas = trabajo_bus.del_raw(datos)
+    esperadas = [
+        {"type": "city", "id": "oulu", "name": "Oulu", "departurePlanned": 256620,
+         "boardingPlanned": 25},
+        {"type": "viewpoints", "id": "pocviitasaar", "name": "Viitasaari",
+         "arrivalPlanned": 256880, "departurePlanned": 257000},
+        {"type": "city", "id": "oulu", "name": "Oulu", "arrivalPlanned": 257250,
+         "alightingPlanned": 25},
+    ]
+    if paradas != {"stage": 0, "stages": 2, "updates": 1, "stops": esperadas}:
+        raise SystemExit(f"trabajo_bus.del_raw: {paradas!r}")
+
+    # Despues del embarque el juego manda todo otra vez con la salida real; y
+    # al llegar al mirador, se supone, la etapa 1 y la llegada real. La zona se
+    # rehace entera cada vez.
+    config, vivos = con_atributos(b"bus_job", _config_de_bus(salida_real=256620))
+    juego.evento(EVENTO_CONFIGURACION, config)
+    bus = leer()["bus"]
+    _comparar("salida real", bus["stages"][0]["source"], {"departureActual": 256620})
+    config, vivos = con_atributos(b"bus_job", _config_de_bus(256620, actual=1, llegada_real=256871))
+    juego.evento(EVENTO_CONFIGURACION, config)
+    datos = leer()
+    paradas = trabajo_bus.del_raw(datos)
+    if (datos["bus"]["updates"] != 3 or paradas["stage"] != 1
+            or paradas["stops"][1].get("arrivalActual") != 256871
+            or trabajo_bus.proxima_parada(paradas)["name"] != "Oulu"):
+        raise SystemExit(f"etapa 1: {paradas!r}")
+
     fin, vivos = con_atributos(b"bus_job.completed", [
         (b"revenue", TIPO_S64, 1830),
         (b"earned.xp", TIPO_S32, 412),
         (b"passenger.satisfaction", TIPO_FLOAT, 0.875),
     ])
     juego.evento(EVENTO_GAMEPLAY, fin)
-    _comparar("bus_job.completed", leer(), {"jobDelivered": not antes, "onJob": False,
-                                            "jobDeliveredRevenue": 1830,
-                                            "jobDeliveredEarnedXp": 412})
+    datos = leer()
+    _comparar("bus_job.completed", datos, {"jobDelivered": not antes, "onJob": False,
+                                           "jobDeliveredRevenue": 1830,
+                                           "jobDeliveredEarnedXp": 412, "bus": None})
     # Despues el juego manda la configuracion vacia: el trabajo ya termino y
     # no tiene que volver a abrirse.
     vacia, vivos = con_atributos(b"bus_job", [])
     juego.evento(EVENTO_CONFIGURACION, vacia)
-    _comparar("bus_job vacio", leer(), {"onJob": False, "jobDelivered": not antes})
+    _comparar("bus_job vacio", leer(), {"onJob": False, "jobDelivered": not antes, "bus": None})
+
+    # Un trabajo de camion despues no trae etapas viejas.
+    config, vivos = con_atributos(b"bus_job", _config_de_bus())
+    juego.evento(EVENTO_CONFIGURACION, config)
+    camion, vivos2 = con_atributos(b"job", [(b"cargo", TIPO_STRING, b"Chemicals"),
+                                            (b"destination.city", TIPO_STRING, b"Wien")])
+    juego.evento(EVENTO_CONFIGURACION, camion)
+    _comparar("job despues de bus_job", leer(), {"cityDst": "Wien", "bus": None})
 
     # Los valores del trabajo de bus van a game.log.txt como mensaje (no como
-    # error), para ver en un log de verdad que manda el juego en cada parada.
-    # La configuracion vacia no se anota.
+    # error), con el indice de cada etapa, para ver en un log de verdad que
+    # manda el juego en cada parada. La configuracion vacia no se anota.
     mensajes = [texto for tipo, texto in juego.log if tipo == LOG_MENSAJE]
-    for esperado in ("Configuration: bus_job", " destination_stop.name string = Wien Hbf",
-                     " bus.stages.count u32 = 3", "^Gameplayevents: bus_job.completed",
+    for esperado in ("Configuration: bus_job", " source_stop.id[1] string = pocviitasaar",
+                     " bus.stages.count u32 = 2", "^Gameplayevents: bus_job.completed",
                      " passenger.satisfaction float = 0.875000"):
         if esperado not in mensajes:
             raise SystemExit(f"game.log.txt: falta {esperado!r}")
-    if mensajes.count("Configuration: bus_job") != 1:
+    if mensajes.count("Configuration: bus_job") != 4:
         raise SystemExit("game.log.txt: la configuracion bus_job vacia tambien se anoto")
+    # id 5 es configType job (el evento de entrega tiene los suyos sin guardar,
+    # como passenger.satisfaction, y esos no son de esto).
+    sueltos = [texto for _, texto in juego.log if "attribute not handled id: 5" in texto]
+    if sueltos:
+        raise SystemExit(f"game.log.txt: {sueltos[0]!r}")
 
 
 def _pasada_init(so: str) -> None:

@@ -48,6 +48,8 @@ datas = [('assets/icon.png', 'assets')]  # icono de la bandeja (logo real)
 # Nombres del Atlas para el mapa armado en la PC (mapbuild/pois.py los lee
 # al lado del modulo).
 datas.append(('mapbuild/atlas-names-ats.json', 'mapbuild'))
+# Los miradores de ETS2, para las paradas de los trabajos de turismo (Coaches).
+datas.append(('mapbuild/viewpoints-ets2.json', 'mapbuild'))
 if IS_WINDOWS:
     datas.insert(0, ('vendor/truckdash-telemetry.dll', 'vendor'))
 

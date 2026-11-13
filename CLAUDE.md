@@ -902,6 +902,30 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `tools/probar_plugin.py` lo prueba con un TMP falso. Si cambia la
   disposicion del bloque, cambia en los dos lados y sube la revision
   (`test_tmp_players.py` compara el .hpp con el lector).
+- Trabajos de bus (DLC Coaches, ETS2 1.62.3; 13-11): el juego no manda
+  ciudades sino paradas, una etapa por indice (`source_stop.*`,
+  `destination_stop.*`, tipo `city` o `viewpoints`). El plugin las guarda en
+  una zona propia al final del bloque (offset 21600, `bus` de
+  `scsTelemetryMap_t`, `BUS_ZONE_REVISION`), y el bloque sigue en la revision
+  12. `telemetry_compat.leer_bus` la deja en `raw["bus"]` y
+  `trabajo_bus.del_raw` la pasa a paradas: `payload["bus"]` (la clave existe
+  solo con un trabajo de bus), el viaje de la cuenta de la primera parada a
+  la ultima y `cityDst` con la proxima solo si es una ciudad (un mirador la
+  web lo tomaria por una ciudad fuera del mapa). Si cambia la disposicion, en
+  los dos lados y sube la revision (`test_trabajo_bus.py` compara el .hpp
+  con el lector; `probar_plugin_linux.py` juega el trabajo del log real).
+  En la web la ruta va a la proxima parada (`busRouteTarget`, antes que el
+  destino de siempre en `resolveRawRouteTarget`): un mirador exacto por su id
+  en `viewpoints` de `pois-<variante>.json` (`client/mapbuild/pois.py`, con la
+  tabla `viewpoints-ets2.json` de `tools/build_viewpoints_ets2.py`: album de
+  miradores de def.scs -> uid del cutscene, o la clave del nombre si un mod
+  rehizo el sector), y una ciudad al centro con `busStationApprox` (las
+  terminales de Coaches no estan en el parser). No se sigue la ruta del GPS
+  del juego (`followGameRoute`): va por todas las paradas hasta el final. Lo
+  que falta es el de nuestra ruta, y abajo del resumen la parada con su
+  horario (`busNextStopLine`). La app nativa todavia no lo dibuja.
+  Sin ver todavia: que cambia al llegar a una parada y al terminar; el plugin
+  sigue anotando cada `bus_job` en game.log.txt, ahora con el indice.
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para

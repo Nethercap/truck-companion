@@ -21,6 +21,8 @@
 #define SDK_ENABLE_LOGGING
 #endif
 
+#include <cstddef>
+
 #include "scssdk.h"
 // Truck Dash: its own block, not upstream's "Local\\SCSTelemetry". This DLL
 // is installed next to whatever scs-telemetry.dll the game already has
@@ -50,6 +52,12 @@
   // macro: SUBSTANCE_SIZE
   // The maximum number of substances that are saved to the memory
 #define SUBSTANCE_SIZE 25
+
+// Truck Dash: bus jobs (Coaches, ETS2 1.62.3). The game allows up to 10
+// stops per route (stops_per_route_max in def/bus_economy_data.sii), so 9
+// stages; mods can raise it, hence the room for 16.
+#define BUS_ZONE_REVISION 1
+#define BUS_STAGES_MAX 16
 
 bool check_min_version(unsigned const int min_ets2, unsigned const int min_ats);
 bool check_max_version(unsigned const int min_ets2, unsigned const int min_ats);
@@ -148,6 +156,32 @@ typedef struct scsTrailer_s { // Size: 1560
 	}con_s;
 	//----- END OF 6TH ZONE AT OFFSET 1559 -----//
 }scsTrailer_t;
+
+/**
+ * \brief Truck Dash: one end of a bus job stage, `source_stop.*` or
+ * `destination_stop.*` of the `bus_job` configuration (an indexed attribute,
+ * one index per stage). Times are absolute game minutes, like
+ * `common_ui.time_abs`; 0 while the game has not sent them (the actual ones
+ * come once it happens). Size 224.
+ */
+typedef struct {
+	char type[stringsize];  // "city" or "viewpoints" in the first coach jobs seen
+	char id[stringsize];    // city token, or the viewpoint (album.viewpoints.<id>)
+	char name[stringsize];
+	unsigned int arrivalPlanned;
+	unsigned int arrivalActual;
+	unsigned int departurePlanned;
+	unsigned int departureActual;
+	unsigned int enteringPlanned;  // passengers getting on
+	unsigned int enteringActual;
+	unsigned int leavingPlanned;   // passengers getting off
+	unsigned int leavingActual;
+}scsBusStop_t;
+
+typedef struct {
+	scsBusStop_t source;
+	scsBusStop_t destination;
+}scsBusStage_t;
 
 /**
    *  \brief Telemetry object
@@ -560,7 +594,28 @@ typedef struct scsTelemetryMap_s
 		scsTrailer_t trailer[10];
 	}trailer;
 
-	//----- END OF 14TH ZONE AT OFFSET 21619 -----//
+	//----- END OF 14TH ZONE AT OFFSET 21599 -----//
+	// (upstream says 21619, but 10 trailers of 1560 from 6000 end at 21599)
+
+	//----- START OF 15TH ZONE AT OFFSET 21600 -----//
+	// Truck Dash: the stages of a bus job (Coaches, ETS2 1.62.3). Upstream's
+	// layout ends before it and readers of revision 12 never look here, so the
+	// block keeps that revision; `revision` says whether a plugin wrote this
+	// zone (0: an older Truck Dash plugin). client/telemetry_compat.py reads
+	// it with the same offsets: change both at once and bump
+	// BUS_ZONE_REVISION.
+	struct {
+		unsigned int revision;      // BUS_ZONE_REVISION
+		unsigned int stageCount;    // bus.stages.count; 0 without a bus job
+		unsigned int stageCurrent;  // bus.stages.current, from 0
+		unsigned int updates;       // +1 with every bus_job configuration
+		scsBusStage_t stage[BUS_STAGES_MAX];
+	}bus;
+	//----- END OF 15TH ZONE AT OFFSET 28783 -----//
 } scsTelemetryMap_t;
+
+static_assert(sizeof(scsBusStage_t) == 448, "scsBusStage_t layout");
+static_assert(offsetof(scsTelemetryMap_t, bus) == 21600, "bus zone offset");
+static_assert(sizeof(scsTelemetryMap_t) <= SCS_PLUGIN_MMF_SIZE, "the map fits the block");
 
 #endif

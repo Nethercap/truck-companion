@@ -12,6 +12,8 @@ deadline). Con eso mas el cargamento y las dos ciudades, dos trabajos
 distintos no se confunden y el mismo se reconoce despues de apagar la PC.
 """
 
+import trabajo_bus
+
 # Lo que identifica al trabajo. Nada de lo que cambia mientras manejas: si
 # entrara, por ejemplo, la distancia restante, cada lectura pareceria un
 # trabajo nuevo.
@@ -32,7 +34,12 @@ def hay_trabajo(raw: dict) -> bool:
     el resto, y abrir un viaje con todo en blanco crearia una huella basura
     que despues no coincide con nada.
     """
-    return bool(raw.get("onJob")) and bool(raw.get("cityDstId") or raw.get("cityDst"))
+    if not raw.get("onJob"):
+        return False
+    # Un trabajo de bus (DLC Coaches) no trae ciudades de origen ni destino:
+    # trae paradas, en la zona de bus del plugin (trabajo_bus). Sin esto no se
+    # abria el viaje de ninguno (log del 12-11).
+    return bool(raw.get("cityDstId") or raw.get("cityDst") or trabajo_bus.del_raw(raw))
 
 
 def datos_del_trabajo(raw: dict) -> dict | None:
@@ -40,6 +47,9 @@ def datos_del_trabajo(raw: dict) -> dict | None:
     if not hay_trabajo(raw):
         return None
     nombre_juego = juego(raw)
+    bus = trabajo_bus.del_raw(raw)
+    if bus:
+        return _datos_del_trabajo_de_bus(raw, bus, nombre_juego)
     return {
         "game": nombre_juego,
         # --- huella ---
@@ -58,6 +68,38 @@ def datos_del_trabajo(raw: dict) -> dict | None:
         "revenue": _numero(raw.get("jobIncome")),
         "currency": MONEDA[nombre_juego],
         "distance_planned_km": _numero(raw.get("plannedDistanceKm")),
+    }
+
+
+def _datos_del_trabajo_de_bus(raw: dict, bus: dict, nombre_juego: str) -> dict:
+    """Lo mismo para un trabajo de bus: de la primera parada a la ultima, con
+    la llegada planificada a la ultima como plazo. La huella no puede llevar
+    la parada siguiente (cambia en cada etapa y partiria el viaje en dos), y
+    sin el plazo la huella de dos lineas iguales tomadas en dias distintos
+    seria la misma salvo por la hora de inicio. Sin carga: el pasaje no tiene
+    nombre ni peso. `job_kind` lo ignora la API de hoy (lista blanca de
+    campos) hasta que sepa de buses; para ella un viaje sin carga es de
+    camion."""
+    primera, ultima = bus["stops"][0], bus["stops"][-1]
+    return {
+        "game": nombre_juego,
+        # --- huella ---
+        "job_started_game_time": _entero(raw.get("jobStartingTime")),
+        "deadline_game_time": _entero(ultima.get("arrivalPlanned")),
+        "cargo_id": None,
+        "city_src_id": primera.get("id") or None,
+        "city_dst_id": ultima.get("id") or None,
+        # --- del trabajo, para mostrarlo ---
+        "city_src": primera.get("name") or None,
+        "city_dst": ultima.get("name") or None,
+        "company_src": None,
+        "company_dst": None,
+        "cargo": None,
+        "cargo_mass": None,
+        "revenue": _numero(raw.get("jobIncome")),
+        "currency": MONEDA[nombre_juego],
+        "distance_planned_km": _numero(raw.get("plannedDistanceKm")),
+        "job_kind": "bus",
     }
 
 

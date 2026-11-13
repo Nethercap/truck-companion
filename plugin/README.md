@@ -34,8 +34,10 @@ the `car_job` and `bus_job` configurations and their `car_job.delivered` /
 so a job taken with a car never reached the shared memory: no destination,
 no income, no delivery.
 
-This fork maps them onto the same fields as a truck job. The shared memory
-layout does not change (still revision 12): only the block name does. See `CHANGES.md` for the exact list.
+This fork maps them onto the same fields as a truck job. The stops of a bus
+job (Coaches, ETS2 1.62.3) go to a zone added after the end of upstream's
+layout, so the shared memory keeps revision 12 for every reader of it; the
+block name is the other change. See `CHANGES.md` for the exact list.
 
 ## Building
 

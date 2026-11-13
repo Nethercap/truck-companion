@@ -27,6 +27,7 @@ Uso identico al de truck_telemetry:
 
 import mmap
 import os
+import struct
 import sys
 
 IS_WINDOWS = sys.platform == "win32"
@@ -37,6 +38,19 @@ LINUX_PATH = "/dev/shm/SCSTelemetry"
 WINDOWS_NAMES = ("Local\\TruckDashTelemetry", WINDOWS_NAME)
 LINUX_PATHS = ("/dev/shm/TruckDashTelemetry", LINUX_PATH)
 BLOCK_SIZE = 32 * 1024  # SCS_PLUGIN_MMF_SIZE
+
+# La zona de bus del plugin de Truck Dash (`bus` de scsTelemetryMap_t en
+# plugin/scs-telemetry/inc/scs-telemetry-common.hpp): las etapas de un
+# trabajo de bus del DLC Coaches. Va despues de todo lo que lee truck_telemetry,
+# asi que el bloque sigue siendo de la revision 12. Mismas posiciones que el
+# .hpp: si cambia uno, cambia el otro y sube BUS_ZONE_REVISION.
+BUS_OFFSET = 21600
+BUS_ZONE_REVISION = 1
+BUS_STAGES_MAX = 16
+_BUS_CABEZA = struct.Struct("<4I")  # revision, stageCount, stageCurrent, updates
+_BUS_PARADA = struct.Struct("<64s64s64s8I")  # scsBusStop_t, 224 bytes
+_BUS_CAMPOS = ("arrivalPlanned", "arrivalActual", "departurePlanned", "departureActual",
+               "enteringPlanned", "enteringActual", "leavingPlanned", "leavingActual")
 
 _mem = None      # SharedMemory en Windows
 _map = None      # mmap en Linux
@@ -128,7 +142,49 @@ def init():
 
 
 def get_data():
-    return _version.parse_data(_buf)
+    datos = _version.parse_data(_buf)
+    # Las etapas de un trabajo de bus, solo del bloque de nuestro plugin (el
+    # de RenCloud no tiene la zona). Si algo sale mal aca no se pierde el
+    # dato: es lo unico que el resto no necesita.
+    try:
+        datos["bus"] = leer_bus(_buf) if _abierto in (WINDOWS_NAMES[0], LINUX_PATHS[0]) else None
+    except (struct.error, ValueError, TypeError):
+        datos["bus"] = None
+    return datos
+
+
+def _texto(crudo: bytes) -> str:
+    fin = crudo.find(b"\x00")
+    return (crudo if fin < 0 else crudo[:fin]).decode("utf-8", "ignore")
+
+
+def leer_bus(buf) -> dict | None:
+    """La zona de bus del bloque, o None si no hay trabajo de bus o la escribio
+    un plugin sin ella (revision 0: los de Truck Dash hasta la 1.5.39).
+
+        {"stageCount": 2, "stageCurrent": 0, "updates": 3,
+         "stages": [{"source": {"type": "city", "id": "oulu", "name": "Oulu",
+                                "departurePlanned": 256620, ...},
+                     "destination": {...}}, ...]}
+
+    Los numeros van tal cual (0 = el juego no lo mando); trabajo_bus.del_raw
+    los pasa a paradas."""
+    revision, cantidad, actual, cambios = _BUS_CABEZA.unpack_from(buf, BUS_OFFSET)
+    if revision != BUS_ZONE_REVISION or cantidad == 0:
+        return None
+    etapas = []
+    base = BUS_OFFSET + _BUS_CABEZA.size
+    for i in range(min(cantidad, BUS_STAGES_MAX)):
+        etapa = {}
+        for j, lado in enumerate(("source", "destination")):
+            valores = _BUS_PARADA.unpack_from(buf, base + (2 * i + j) * _BUS_PARADA.size)
+            parada = {"type": _texto(valores[0]), "id": _texto(valores[1]),
+                      "name": _texto(valores[2])}
+            parada.update(zip(_BUS_CAMPOS, valores[3:]))
+            etapa[lado] = parada
+        etapas.append(etapa)
+    return {"stageCount": cantidad, "stageCurrent": actual, "updates": cambios,
+            "stages": etapas}
 
 
 def get_version_number():
