@@ -339,7 +339,9 @@ function avisoDeVersion() {
 function avisoDeRuta(r) {
   if (!r) return null;
   if (r.offMap) return t('routeOffMap').replace('{name}', r.offMap.name || r.offMap);
-  const textos = [r.pickup || null, r.approx ? t('destApprox') : null, r.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
+  // approxKey: el bus sin terminal, la empresa que el mapa no tiene o la que el juego
+  // no dijo (approxNoticeKey en pure.js).
+  const textos = [r.pickup || null, r.approxKey ? t(r.approxKey) : null, r.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
   return textos.length ? textos.join(' ') : null;
 }
 
