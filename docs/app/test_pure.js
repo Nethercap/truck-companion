@@ -6793,6 +6793,10 @@ const BUS_DE_TURISMO = {
   ],
 };
 const MIRADORES = { pocviitasaar: [43560, -73398, 'Viitasaari'] };
+// Las terminales de ETS2 1.62.3 (BusStop del mapa): la de Oulu, a 11 m de
+// donde arranco el trabajo del log real; Joensuu tiene ademas un punto de
+// turismo aparte.
+const TERMINALES = { lines: { oulu: [41338, -82372], joensuu: [55088, -71260] }, tourist: { joensuu: [57167, -69782], lulea: [33366, -85131] } };
 const ciudadesBus = (id, nombre) => ({ oulu: { X: 40223, Y: -83629 }, viitasaari_mod: { X: 1, Y: 2 } })[id]
   || (nombre === 'Viitasaari' ? { X: 1, Y: 2 } : null);
 
@@ -6823,6 +6827,34 @@ test('busStopPlace: el mirador exacto por el id del album; la ciudad al centro; 
   assert.equal(busStopPlace(null, MIRADORES, ciudadesBus), null);
 });
 
+test('busStopPlace: una ciudad con terminal en los POIs va a la terminal; sin terminal, al centro como antes', () => {
+  const { busStopPlace } = require('./pure.js');
+  const [oulu, viitasaari] = BUS_DE_TURISMO.stops;
+  const enOulu = { x: 41338, z: -82372, approx: false, terminal: true };
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, ciudadesBus, TERMINALES), enOulu);
+  // sin findCity tambien: la terminal no necesita la lista de ciudades
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, null, TERMINALES), enOulu);
+  // turismo en una ciudad sin punto de turismo aparte: la terminal (Oulu, log real)
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, ciudadesBus, TERMINALES, true), enOulu);
+  // con punto de turismo aparte: la linea a la terminal, el turismo a su punto
+  const joensuu = { type: 'city', id: 'joensuu', name: 'Joensuu' };
+  assert.deepEqual(busStopPlace(joensuu, {}, null, TERMINALES), { x: 55088, z: -71260, approx: false, terminal: true });
+  assert.deepEqual(busStopPlace(joensuu, {}, null, TERMINALES, true), { x: 57167, z: -69782, approx: false, terminal: true });
+  // una ciudad con solo punto de turismo: ese, tambien para una linea
+  assert.deepEqual(busStopPlace({ type: 'city', id: 'lulea' }, {}, null, TERMINALES), { x: 33366, z: -85131, approx: false, terminal: true });
+  // el mirador sigue por su id, aunque haya terminales
+  assert.deepEqual(busStopPlace(viitasaari, MIRADORES, ciudadesBus, TERMINALES), { x: 43560, z: -73398, approx: false });
+  // una ciudad sin terminal (o POIs viejos, o una fila rota) cae al centro
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, ciudadesBus, { lines: { tampere: [1, 2] } }), { x: 40223, z: -83629, approx: true });
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, ciudadesBus, { lines: undefined, tourist: undefined }), { x: 40223, z: -83629, approx: true });
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, ciudadesBus, undefined), { x: 40223, z: -83629, approx: true });
+  assert.deepEqual(busStopPlace(oulu, MIRADORES, ciudadesBus, { lines: { oulu: [null, 3] } }), { x: 40223, z: -83629, approx: true });
+  // un id que es el nombre de algo del objeto no es una terminal
+  assert.equal(busStopPlace({ type: 'city', id: 'constructor' }, {}, null, TERMINALES), null);
+  // un mirador que el mapa no tiene no se busca entre las terminales
+  assert.equal(busStopPlace({ type: 'viewpoints', id: 'oulu' }, {}, ciudadesBus, TERMINALES), null);
+});
+
 test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada', () => {
   const { busRouteTarget, followGameRoute } = require('./pure.js');
   const a = busRouteTarget({ onJob: true, bus: BUS_DE_TURISMO }, MIRADORES, ciudadesBus);
@@ -6831,6 +6863,14 @@ test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada',
   assert.deepEqual(b, { x: 40223, z: -83629, kind: 'dest', bus: true, key: 'bus:2:oulu', approx: true, market: 'bus' });
   assert.equal(busRouteTarget({ onJob: true, bus: BUS_DE_TURISMO }, {}, ciudadesBus), null);
   assert.equal(busRouteTarget({ onJob: true, cityDst: 'Oulu' }, MIRADORES, ciudadesBus), null);
+  // con la terminal de Oulu en los POIs: exacta, sin el aviso del centro
+  const t = busRouteTarget({ onJob: true, bus: { ...BUS_DE_TURISMO, stage: 1 } }, MIRADORES, ciudadesBus, TERMINALES);
+  assert.deepEqual(t, { x: 41338, z: -82372, kind: 'dest', bus: true, key: 'bus:2:oulu', terminal: true });
+  assert.equal(followGameRoute(t, 0, 'fastest'), false);
+  // el mercado del trabajo elige entre la terminal y el punto de turismo
+  const aJoensuu = { stage: 0, stops: [BUS_DE_TURISMO.stops[0], { type: 'city', id: 'joensuu', name: 'Joensuu' }] };
+  assert.equal(busRouteTarget({ onJob: true, jobMarket: 'company_job', bus: aJoensuu }, {}, null, TERMINALES).x, 55088);
+  assert.equal(busRouteTarget({ onJob: true, jobMarket: 'tourist_job', bus: aJoensuu }, {}, null, TERMINALES).x, 57167);
   // el GPS del juego va por todas las paradas hasta el final: no se lo sigue
   assert.equal(followGameRoute(a, 0, 'fastest'), false);
   assert.equal(followGameRoute({ ...a, bus: false }, 0, 'fastest'), true);

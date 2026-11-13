@@ -949,17 +949,33 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   en `viewpoints` de `pois-<variante>.json` (`client/mapbuild/pois.py`, con la
   tabla `viewpoints-ets2.json` de `tools/build_viewpoints_ets2.py`: album de
   miradores de def.scs -> uid del cutscene, o la clave del nombre si un mod
-  rehizo el sector), y una ciudad al centro con `busStationApprox` (las
-  terminales de Coaches no estan en el parser). No se sigue la ruta del GPS
+  rehizo el sector), y una ciudad a su terminal (`busStations`, y
+  `busTouristStops` para un viaje de turismo si la ciudad tiene un punto
+  aparte; se entra como al patio de una empresa, `target.terminal`). Las
+  terminales salen del objeto BusStop del mapa, que el juego ata a su ciudad:
+  el parser lo leia y lo tiraba, y el parche de truckdash lo escribe en
+  `<mapa>-busStops.json` (parche 0006 de `tm-maps-patches` del taller, y en
+  `builder/truckdash.patch` para "Build my map", con `map_format("ets2")` en
+  3). En ETS2 1.62.3 son 223 ciudades con terminal y 56 con punto de turismo;
+  el de Tallinn queda a 13 m de donde el juego pone el bus al tomar la linea.
+  Una ciudad sin terminal en los datos (las variantes armadas sobre la 1.61,
+  ProMods) sigue al centro con `busStationApprox`. Un parse de antes del
+  13-11 no tiene `europe-busStops.json`, y sin el `build_pois.py` deja la
+  variante sin terminales (el de `ets2` se copio de la 1.62.3, cuyo parse es
+  igual byte a byte al de la 1.62.2.1 publicada). No se sigue la ruta del GPS
   del juego (`followGameRoute`): va por todas las paradas hasta el final. Lo
   que falta es el de nuestra ruta, y abajo del resumen la parada con su
   horario (`busNextStopLine`). La app nativa todavia no lo dibuja.
   Visto en el juego (log de un usuario, 12-11, turismo de punta a punta): la
   configuracion vuelve al embarcar y en cada llegada (`current` sube en la
   parada del medio y queda en la ultima etapa al llegar al final), y unos 40 s
-  despues `bus_job.completed` con revenue, distance.km y delivery.time. Sin
-  ver todavia: una linea (`company_job`); el plugin sigue anotando cada
-  `bus_job` en game.log.txt, con el indice y los s64.
+  despues `bus_job.completed` con revenue, distance.km y delivery.time. Las
+  lineas (`company_job`, log del 13-11: Oulu -> Joensuu, Joensuu -> Lahti ->
+  Helsinki -> Tallinn) avanzan de etapa igual. Del GPS del juego al salir de
+  cada terminal contra nuestra ruta entre terminales: Oulu -> Joensuu 320,3
+  contra 324,3 km (al centro, 298,4); Joensuu -> Tallinn 662,3 contra 664,9
+  (647,5). El plugin sigue anotando cada `bus_job` en game.log.txt, con el
+  indice y los s64.
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para

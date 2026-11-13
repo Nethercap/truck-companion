@@ -74,6 +74,15 @@ def check_file(path, fix=False):
         if len(fila) != 4 or not all(_num(v) for v in fila) or fila[2] <= 0 or fila[3] <= 0:
             errores.append(f"area rara: {fila}")
             break
+    # Opcional (desde el 13-11, ETS2): terminales de bus por ciudad, {token: [x, z]}.
+    for clave in ("busStations", "busTouristStops"):
+        tabla = d.get(clave)
+        if tabla is None:
+            continue
+        if not isinstance(tabla, dict) or not all(
+                isinstance(k, str) and k and isinstance(v, list) and len(v) == 2 and all(_num(c) for c in v)
+                for k, v in tabla.items()):
+            errores.append(f"'{clave}' raro: tiene que ser {{ciudad: [x, z]}}")
     if fix:
         if mapbuild_pois.fill_missing_cities(d):
             mapbuild_pois.write(d, path)

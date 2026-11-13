@@ -973,10 +973,18 @@ index 4094551..a1234c4 100644
 +  return value && /^@@.+@@$/.test(value) ? value : fallback;
 +}
 diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
-index b65d4c8..ca9207b 100644
+index b65d4c8..b2e3978 100644
 --- a/packages/clis/parser/game-files/map-files-parser.ts
 +++ b/packages/clis/parser/game-files/map-files-parser.ts
-@@ -54,7 +54,18 @@ import {
+@@ -11,6 +11,7 @@ import {
+ } from '@truckermudgeon/map/constants';
+ import { toMapPosition } from '@truckermudgeon/map/prefabs';
+ import type {
++  BusStopItem,
+   Building,
+   City,
+   CityArea,
+@@ -54,7 +55,18 @@ import {
  
  export function parseMapFiles(
    scsFilePaths: string[],
@@ -996,7 +1004,7 @@ index b65d4c8..ca9207b 100644
  ):
    | {
        data: 'all';
-@@ -94,6 +105,9 @@ export function parseMapFiles(
+@@ -94,6 +106,9 @@ export function parseMapFiles(
        logger.log('adding', scsSource);
        return new ScsArchive(p, scsSource);
      });
@@ -1006,7 +1014,7 @@ index b65d4c8..ca9207b 100644
    const entries = new CombinedEntries(archives);
    try {
      const version = parseVersionSii(entries);
-@@ -122,7 +136,7 @@ export function parseMapFiles(
+@@ -122,7 +137,7 @@ export function parseMapFiles(
        };
      }
  
@@ -1015,7 +1023,7 @@ index b65d4c8..ca9207b 100644
      return {
        ...baseResult,
        data: 'all',
-@@ -148,26 +162,106 @@ function parseVersionSii(entries: Entries) {
+@@ -148,26 +163,106 @@ function parseVersionSii(entries: Entries) {
    return { application, version };
  }
  
@@ -1133,7 +1141,7 @@ index b65d4c8..ca9207b 100644
    const bar = new cliProgress.SingleBar(
      {
        format: `[{bar}] | {filename} | {value} of {total}`,
-@@ -194,8 +288,27 @@ function parseSectorFiles(entries: Entries): {
+@@ -194,8 +289,27 @@ function parseSectorFiles(entries: Entries): {
        throw new Error(`couldn't parse ${sectorX} or ${sectorY}`);
      }
      const sector = putIfAbsent(sectorKey, { items: [], nodes: [] }, sectors);
@@ -1163,7 +1171,7 @@ index b65d4c8..ca9207b 100644
      sector.items = sector.items.concat(
        parsedSector.items.map(item =>
          withDlcGuard(item, map, baseFile.scsSource),
-@@ -284,25 +397,46 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
+@@ -284,25 +398,46 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
        l10nStrings,
      );
      for (const f of localeSubdir.files) {
@@ -1218,7 +1226,7 @@ index b65d4c8..ca9207b 100644
        for (let i = 0; i < key.length; i++) {
          localeMap.set(key[i], val[i]);
        }
-@@ -404,12 +538,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+@@ -404,12 +539,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
      // .dds pixel data. Assume that the concrete instance of the FileEntry for
      // the .tobj file is an ScsArchiveTobjFile, whose .read() returns a complete
      // header-ful .dds file.
@@ -1256,7 +1264,26 @@ index b65d4c8..ca9207b 100644
    // verify that mapX pngs are square
    const size = mapPngs[0].width;
    assert(mapPngs.every(p => p.width === p.height && p.width === size));
-@@ -611,288 +766,317 @@ function postProcess(
+@@ -462,6 +618,7 @@ function postProcess(
+   const prefabsByUid = new Map<bigint, Prefab>();
+   const mapAreas: MapArea[] = [];
+   const cutscenes: Cutscene[] = [];
++  const busStops: BusStopItem[] = [];
+   const triggers: Trigger[] = [];
+   const signs: Sign[] = [];
+   const ferryItems = new Map<string, FerryItem>();
+@@ -544,6 +701,10 @@ function postProcess(
+         poifulItems.push(item);
+         cutscenes.push(item);
+         break;
++      case ItemType.BusStop:
++        checkReference(item.nodeUid, nodesByUid, 'nodeUid', item);
++        busStops.push(item);
++        break;
+       case ItemType.Trigger:
+         checkReference(item.nodeUids, nodesByUid, 'nodeUids', item);
+         item.nodeUids.forEach(uid => referencedNodeUids.add(uid));
+@@ -611,288 +772,317 @@ function postProcess(
      nodeUid: bigint;
    }[] = [];
    for (const item of poifulItems) {
@@ -1822,7 +1849,15 @@ index b65d4c8..ca9207b 100644
      }
    }
  
-@@ -1156,12 +1340,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
+@@ -1110,6 +1300,7 @@ function postProcess(
+       signs,
+       trajectories,
+       cutscenes,
++      busStops,
+       countries: valuesWithTokens(defData.countries).map(withLocalizedName),
+       cities: valuesWithTokens(cities).map(withLocalizedName),
+       companyDefs: valuesWithTokens(defData.companies),
+@@ -1156,12 +1347,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
      if (o.nameLocalized && !l10n.has(o.nameLocalized.replaceAll('@', ''))) {
        logger.warn('no localized name for', o.nameLocalized, `(${o.name})`);
      }
@@ -2565,10 +2600,18 @@ index 73a4a8f..36ad9ab 100644
    readonly type = 'directory';
    readonly subdirectories: readonly string[];
 diff --git a/packages/clis/parser/game-files/sector-parser.ts b/packages/clis/parser/game-files/sector-parser.ts
-index 3f1cd15..671815b 100644
+index 3f1cd15..b53089a 100644
 --- a/packages/clis/parser/game-files/sector-parser.ts
 +++ b/packages/clis/parser/game-files/sector-parser.ts
-@@ -78,6 +78,40 @@ const vegetationSpheres = new r.Array(
+@@ -8,6 +8,7 @@ import {
+ } from '@truckermudgeon/map/constants';
+ import type {
+   BaseItem,
++  BusStopItem,
+   Building,
+   CityArea,
+   CompanyItem,
+@@ -78,6 +79,40 @@ const vegetationSpheres = new r.Array(
    r.uint32le,
  );
  
@@ -2609,7 +2652,7 @@ index 3f1cd15..671815b 100644
  const SimpleItemStruct = {
    header: {
      // Note: care must be taken to _not_ reuse header keys
-@@ -365,39 +399,7 @@ const SimpleItemStruct = {
+@@ -365,39 +400,7 @@ const SimpleItemStruct = {
            }),
            r.uint32le,
          ),
@@ -2650,7 +2693,7 @@ index 3f1cd15..671815b 100644
          //debugStruct,
        }),
        (parent: { overrideTemplate: string }) => parent.overrideTemplate != '',
-@@ -599,6 +601,106 @@ const Sector = new r.Struct({
+@@ -599,6 +602,106 @@ const Sector = new r.Struct({
    visibleAreaChildUids: new r.Array(uint64le, r.uint32le),
  });
  
@@ -2757,7 +2800,7 @@ index 3f1cd15..671815b 100644
  const versionWarnings = new Set<number>();
  
  export function parseSector(
-@@ -606,7 +708,7 @@ export function parseSector(
+@@ -606,7 +709,7 @@ export function parseSector(
    ignoreNodeUids: ReadonlySet<bigint>,
  ) {
    const version = buffer.readUint32LE();
@@ -2766,7 +2809,7 @@ index 3f1cd15..671815b 100644
      if (!versionWarnings.has(version)) {
        logger.warn('unknown .base file version', version);
        logger.warn('errors may come up, and parse results may be inaccurate.');
-@@ -615,7 +717,7 @@ export function parseSector(
+@@ -615,7 +718,7 @@ export function parseSector(
    }
  
    const str = new r.DecodeStream(buffer);
@@ -2775,7 +2818,32 @@ index 3f1cd15..671815b 100644
    if (str.pos !== buffer.length) {
      logger.error(
        'not enough bytes read; expected / actual',
-@@ -873,17 +975,21 @@ function toBuilding(
+@@ -644,6 +747,8 @@ export function parseSector(
+             return toCompany(ri);
+           case ItemType.Cutscene:
+             return toCutscene(ri);
++          case ItemType.BusStop:
++            return toBusStop(ri);
+           case ItemType.Trigger:
+             return toTrigger(ri);
+           case ItemType.Sign:
+@@ -820,6 +925,15 @@ function toCutscene(rawItem: SectorItem<ItemType.Cutscene>): Cutscene {
+   };
+ }
+ 
++function toBusStop(rawItem: SectorItem<ItemType.BusStop>): BusStopItem {
++  return {
++    ...toBaseItem(rawItem),
++    cityToken: rawItem.cityName,
++    prefabUid: rawItem.prefabUid,
++    nodeUid: rawItem.nodeUid,
++  };
++}
++
+ function toTrigger(rawItem: SectorItem<ItemType.Trigger>): Trigger {
+   const actionsMap = new Map(
+     rawItem.actions.map(a => [a.action, a.override ? a.override.params : []]),
+@@ -873,17 +987,21 @@ function toBuilding(
  }
  
  function toCurve(rawItem: SectorItem<ItemType.Curve>): Curve | undefined {
@@ -5060,10 +5128,18 @@ index d2dc5d5..f4aaf38 100644
    };
  }
 diff --git a/packages/libs/io/mapped-data.ts b/packages/libs/io/mapped-data.ts
-index e5fce40..ca352cd 100644
+index e5fce40..3a90c36 100644
 --- a/packages/libs/io/mapped-data.ts
 +++ b/packages/libs/io/mapped-data.ts
-@@ -38,6 +38,7 @@ import type {
+@@ -14,6 +14,7 @@ import type {
+   CompanyItem,
+   Country,
+   Curve,
++  BusStopItem,
+   Cutscene,
+   Ferry,
+   MapArea,
+@@ -38,6 +39,7 @@ import type {
  } from '@truckermudgeon/map/types';
  import path from 'path';
  import process from 'process';
@@ -5071,7 +5147,28 @@ index e5fce40..ca352cd 100644
  import type { FileSource } from './file-source';
  import { fromDir, fromZip } from './file-source';
  import { logger } from './logger';
-@@ -621,10 +622,7 @@ function readArrayFile<T>(
+@@ -56,6 +58,7 @@ interface MapDataKeyFields {
+   companyDefs: PickKey<'companyDefs', 'token'>;
+   countries: PickKey<'countries', 'token'>;
+   cutscenes: PickKey<'cutscenes', 'uid'>;
++  busStops: PickKey<'busStops', 'uid'>;
+   dividers: PickKey<'dividers', 'uid'>;
+   elevation: PickKey<'elevation', never>;
+   ferries: PickKey<'ferries', 'token'>;
+@@ -461,6 +464,12 @@ export function readMapData<
+           referencedNodeUids.add(cutscene.nodeUid);
+         });
+         break;
++      case 'busStops':
++        mapData.busStops = mapify(
++          readArrayFile<BusStopItem>(source, toJsonFilePath(key)),
++          b => b.uid,
++        );
++        break;
+       case 'routes':
+         mapData.routes = mapify(
+           readArrayFile<WithToken<Route>>(source, toJsonFilePath(key)),
+@@ -621,10 +630,7 @@ function readArrayFile<T>(
      basename.endsWith('nodes')
        ? undefined
        : bigintReviver;
@@ -5171,6 +5268,44 @@ index d3eff1b..70f9a03 100644
  
    if (isUk) {
      x = x / ukScaleFactor - calais[0] / 2;
+diff --git a/packages/libs/map/types.ts b/packages/libs/map/types.ts
+index 43e9a36..55e63a7 100644
+--- a/packages/libs/map/types.ts
++++ b/packages/libs/map/types.ts
+@@ -424,6 +424,17 @@ export type Cutscene = BaseItem &
+     actionStringParams: readonly string[];
+   }>;
+ 
++// Terminal de bus de una ciudad: el juego la ata a la ciudad por cityToken.
++// prefabUid es el prefab de la terminal (0 si la terminal esta armada a
++// mano en el mapa, con cutscenes).
++export type BusStopItem = BaseItem &
++  Readonly<{
++    type: ItemType.BusStop;
++    cityToken: string;
++    prefabUid: bigint;
++    nodeUid: bigint;
++  }>;
++
+ export type Sign = BaseItem &
+   Readonly<{
+     type: ItemType.Sign;
+@@ -467,6 +478,7 @@ export type Item =
+   | FerryItem
+   | CompanyItem
+   | Cutscene
++  | BusStopItem
+   | Trigger
+   | Sign
+   | Model
+@@ -630,6 +642,7 @@ export interface MapData extends DefData {
+   triggers: Trigger[];
+   signs: Sign[];
+   cutscenes: Cutscene[];
++  busStops: BusStopItem[];
+   cities: City[];
+ }
+ 
 diff --git a/packages/clis/parser/game-files/tests/scs-archive-v1.test.ts b/packages/clis/parser/game-files/tests/scs-archive-v1.test.ts
 new file mode 100644
 index 0000000..ad1a987

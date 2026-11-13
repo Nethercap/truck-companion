@@ -34,8 +34,16 @@ import zipfile
 import red
 
 # Sube cuando cambia lo que se arma (formato, archivos): un mapa armado con
-# otro formato no se usa y se ofrece armarlo de nuevo.
-MAP_FORMAT = 2  # 2: el armador lee los sectores de formatos viejos, antes se perdian
+# otro formato no se usa y se ofrece armarlo de nuevo. Va por juego, para no
+# pedir que se rearme un mapa al que no le cambia nada (el de ATS sigue en 2:
+# su huella no cambia).
+# 2: el armador lee los sectores de formatos viejos, antes se perdian.
+# 3 (ETS2): las terminales de bus del DLC Coaches (BusStop) en los POIs.
+MAP_FORMATS = {"ats": 2, "ets2": 3}
+
+
+def map_format(game: str) -> int:
+    return MAP_FORMATS.get(game, 2)
 NODE_MEMORY_MB = 8192
 # El limite de node sale de la RAM de la PC (node_memory_mb): lo de arriba como
 # piso, NODE_RESERVA_GB para el sistema y un tope. Lo publicado se arma con 12 GB,
@@ -112,7 +120,7 @@ def fingerprint(game: str, game_dir: str, mod_paths: list) -> str:
     """Huella de juego + version + mods (en orden). Doce hex alcanzan para
     distinguir las combinaciones de una misma PC."""
     h = hashlib.sha1()
-    h.update(f"{MAP_FORMAT}|{game}|".encode())
+    h.update(f"{map_format(game)}|{game}|".encode())
     h.update(_huella_de(os.path.join(game_dir, "version.scs")).encode())
     for ruta in mod_paths:
         h.update(f"|{ruta.lower()}={_huella_de(ruta)}".encode())
@@ -144,7 +152,7 @@ def built_map(game: str, fp: str) -> dict | None:
             man = json.load(f)
     except (OSError, ValueError):
         return None
-    if man.get("format") != MAP_FORMAT or man.get("fingerprint") != fp:
+    if man.get("format") != map_format(game) or man.get("fingerprint") != fp:
         return None
     man["dir"] = os.path.dirname(path)
     return man
@@ -700,7 +708,7 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
         if os.path.exists(sobra):
             os.remove(sobra)
     manifest = {
-        "format": MAP_FORMAT, "game": game, "variant": variante, "fingerprint": fp,
+        "format": map_format(game), "game": game, "variant": variante, "fingerprint": fp,
         "built": time.strftime("%Y-%m-%dT%H:%M:%S"), "seconds": round(time.time() - t0),
         "cities": ciudades, "mods": mod_names or [os.path.basename(p) for p in mod_paths],
         # Sin el campo (mapas armados antes de la 1.5.32), la web usa los de R2.
