@@ -149,7 +149,7 @@ Windows client and announce it on Discord. And it can't become "latest", because
 download button points at `releases/latest/download/TruckDash-windows.zip`.
 
 ```bash
-gh release create android-0.2.2 --target main --prerelease --latest=false --title "Truck Dash Beta 0.2.2" --notes-file BETA.md app/build/beta/*.apk
+gh release create android-0.2.3 --target main --prerelease --latest=false --title "Truck Dash Beta 0.2.3" --notes-file BETA.md app/build/beta/*.apk
 ```
 
 ## Testing

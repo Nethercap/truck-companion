@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- El modo LAN habla con el cliente de la PC por ws://<ip>:27766 y las IP de
      cada casa no se pueden listar aca, asi que hay que permitir texto plano.
-     Lo demas (relay, mapas, API) va siempre por https/wss, escrito en Red.kt. -->
+     Lo demas (relay, mapas, API) va siempre por https/wss, escrito en Red.kt.
+
+     ISRG Root X1 va aparte porque Android 7.0 (API 24, con el que vienen el Moto G5 y
+     otros que nunca se actualizaron) no la tiene: llego en la 7.1.1. El relay de Railway y
+     trucksim-dash.com (GitHub Pages) son de Let's Encrypt y terminan en ella (13-11: YE2 y
+     YR2, por Root YE / Root YR); sin esto, en esos telefonos no conectaba con el codigo.
+     Los mapas y la API (Google Trust Services) terminan en GlobalSign, que si tienen. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true" />
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+        </trust-anchors>
+    </base-config>
 </network-security-config>

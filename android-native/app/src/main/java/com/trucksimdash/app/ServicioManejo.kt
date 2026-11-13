@@ -1,7 +1,5 @@
 package com.trucksimdash.app
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
@@ -10,7 +8,9 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.trucksimdash.app.core.unidadVelocidad
@@ -44,8 +44,12 @@ class ServicioManejo : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CANAL, getString(R.string.servicio_canal), NotificationManager.IMPORTANCE_LOW),
+        // Con Compat: NotificationChannel es de Android 8, y en el 7 (minSdk) reventaba la app
+        // apenas se conectaba, que es cuando arranca el servicio.
+        NotificationManagerCompat.from(this).createNotificationChannel(
+            NotificationChannelCompat.Builder(CANAL, NotificationManagerCompat.IMPORTANCE_LOW)
+                .setName(getString(R.string.servicio_canal))
+                .build(),
         )
         // Con la pantalla apagada y solo la voz, el motor tiene que seguir corriendo.
         despierto = getSystemService(PowerManager::class.java)

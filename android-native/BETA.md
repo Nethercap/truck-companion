@@ -9,7 +9,9 @@ You need Android 7 or newer, and Truck Dash on the PC where you play, the same a
 ## Install
 
 1. Download `TruckDash-Beta-<version>-arm64-v8a.apk`, the right one for almost any phone. If
-   Android says it isn't compatible, use the `universal` one, which is much bigger.
+   Android says the app wasn't installed or isn't compatible, use the `armeabi-v7a` one: some
+   older phones run 32-bit Android (the Moto G5, for example). The `universal` one works on
+   all of them, but it's much bigger.
 2. Open the file. Android asks you to allow installing from your browser, and Play Protect may
    warn you about an unknown app, because it doesn't come from Google Play.
 3. To update, install the new version over this one. There's no need to uninstall.
