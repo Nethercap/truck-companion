@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.40 (2026-11-13)
 
 - In-game overlay: two new things it can show, both off until you tick them in Setup. **Heading**
   (N, NE, E...) comes from the game itself, so it works without the dashboard open, and is true
