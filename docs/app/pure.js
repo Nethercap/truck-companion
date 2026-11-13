@@ -1854,7 +1854,15 @@ function detectManeuver(ctx) {
           return [...tocos].some(n => deLaCruz(n) && lejos(n) > lejos(sale)
             && Math.abs(normDeg(bearingBetween(pts[i], nodeAt(n)) - inBearing)) < straightLegDeg);
         };
-        if (new Set(deads.map(([, , n]) => n)).size >= 2 && (esquinaEnEscuadra() || enfrente())) quiet = false;
+        // Los dos brazos muertos tienen que salir del mismo nodo, como en una
+        // cruz (los brazos de un prefab se unen todos entre si). En una curva
+        // de la ruta 60 de Islandia (ETS2, -69695,-106536, reporte #47,
+        // 13-11) eran dos bahias de sobrepaso, cada una de dos nodos de la
+        // ruta a 40 m de la otra, y la curva se anunciaba "turn left".
+        const muertosPorNodo = new Map();
+        for (const [, idx, n] of deads) muertosPorNodo.set(idx, (muertosPorNodo.get(idx) || new Set()).add(n));
+        const cruz = [...muertosPorNodo.values()].some(s => s.size >= 2);
+        if (cruz && (esquinaEnEscuadra() || enfrente())) quiet = false;
       }
       // Salvo que la otra salida arranque pareja con la ruta: es una
       // bifurcacion en una curva (el rulo de un trebol que se abre en dos
@@ -2013,13 +2021,20 @@ function detectManeuver(ctx) {
   // abren a la derecha, la menos abierta es la de la izquierda. La entrada a
   // una rotonda queda como estaba (se entra a la derecha para doblar a la
   // izquierda, y lo que sirve es hacia donde se sale).
+  // Se mira a legM, a parallelForkM y a mitad de camino: una salida de
+  // autopista se abre de a poco. En Wells (ATS, -79883,-20728, reporte #44,
+  // 13-11) la rampa a la US-93 sale a la derecha de la I-80 y a los 190 m
+  // dobla a la izquierda por arriba de la autopista, todo en un prefab: a
+  // los 60 m iba 7 grados a la derecha de la I-80 (no llegaba a los 8), a los
+  // 100 m 11 y a los 155 m 13, y a los 250 m ya estaba a la izquierda. Se
+  // decia "keep left" dos veces antes de una salida a la derecha.
   let laterTurn = false;
-  const nearSep = normDeg(sampleAt(legM) - bestAlt);
-  if (Math.abs(nearSep) >= forkMinSep && Math.sign(nearSep) !== Math.sign(normDeg(routeDelta - bestAlt)) && !entersRing()) {
+  const ladoLejos = Math.sign(normDeg(routeDelta - bestAlt));
+  const separadas = [legM, parallelForkM, (legM + forkLegM) / 2].filter(d => d < forkLegM).map(sampleAt)
+    .filter(s => Math.abs(normDeg(s - bestAlt)) >= forkMinSep && Math.sign(normDeg(s - bestAlt)) !== ladoLejos);
+  if (separadas.length && !entersRing()) {
     laterTurn = true;
-    routeDelta = [legM, (legM + forkLegM) / 2].map(sampleAt)
-      .filter(s => Math.sign(normDeg(s - bestAlt)) === Math.sign(nearSep))
-      .reduce((a, s) => (Math.abs(normDeg(s - bestAlt)) > Math.abs(normDeg(a - bestAlt)) ? s : a));
+    routeDelta = separadas.reduce((a, s) => (Math.abs(normDeg(s - bestAlt)) > Math.abs(normDeg(a - bestAlt)) ? s : a));
   }
   if (Math.abs(normDeg(routeDelta - bestAlt)) < forkMinSep) return laterTurn ? null : (parallelFork() || farFork());
   if (Math.abs(bestAlt) > Math.abs(routeDelta) + forkAltSlack) return laterTurn ? null : farFork();
@@ -2908,7 +2923,11 @@ function roadShieldPoints(names, cellM) {
 // y 4 con un texto sin traducir ("@@fp_de_diesel@@"), y en 300 rutas 18
 // avisos decian "toward traffic_rule.limit_80" (Balcanes, Grecia).
 const signLabelOk = (label) => typeof label === 'string' && !/^traffic_rule\.|^@@.*@@$/.test(label.trim());
+// Los espacios de mas se sacan: en el de ETS2 hay 4.656 con espacios al
+// principio, al final o repetidos, y el aviso decia "Links abbiegen Richtung
+//     Dalasysla" (reporte #47, 13-11).
 function groupSignsByPoint(signs) {
+  if (Array.isArray(signs)) for (const s of signs) if (s && typeof s.label === 'string') s.label = s.label.replace(/\s+/g, ' ').trim();
   if (Array.isArray(signs) && !signs.every((s) => signLabelOk(s.label))) signs = signs.filter((s) => signLabelOk(s.label));
   const porPunto = new Map();
   for (const s of signs || []) {
@@ -6413,7 +6432,13 @@ function pickRouteLikeGame(candidates, gameKm, o = ROUTE_GAME_MATCH) {
 // contra 22: con la mitad de mas, Berlin -> Copenhague por ahi parecia otra
 // ruta) y uno solo por encima de las dos cotas (Ambarli -> Mersin rodea
 // Turquia: 1.565 contra 678). maxFrac: el juego hasta 60 % mas.
-const ROUTE_GAME_FERRY = { minKm: 40, shorterFrac: 0.05, shorterKm: 5, ferryCountFrac: 0.6, ferryCountKm: 60, maxFrac: 0.6, matchFrac: 0.03, factors: [2, 4, 8], halvings: 2 };
+// matchFrac es el error de nuestra escala que acepta routeGameAgreement (4 %).
+// Con 3 %, de Patreksfjordur a Reykjavik (ETS2, Islandia, reporte #46, 13-11)
+// la app seguia por el ferry de Brjanslaekur a Stykkisholmur (388 km) y el
+// GPS por tierra (501,7): por tierra da 519,0 medido, 3,4 % mas. Ya en ese
+// camino la app decia 240,2 y el juego 232,4: el final en Reykjavik mide
+// 7,7 km mas que el del juego.
+const ROUTE_GAME_FERRY = { minKm: 40, shorterFrac: 0.05, shorterKm: 5, ferryCountFrac: 0.6, ferryCountKm: 60, maxFrac: 0.6, matchFrac: 0.04, factors: [2, 4, 8], halvings: 2 };
 
 // Los cruces en ferry o tren de una ruta (tramos seguidos con p[2] === 1: el
 // tramo que llega al punto), cada uno en km del juego con outside de escala.
@@ -7069,15 +7094,21 @@ const WAYPOINT_ARC_TIE_M = 10;
 const STOP_SLOW_KMH = 75;
 const STOP_SLOW_NODE_M = 150;
 const edgeKmh = (g, e) => g.edgeM[e] / Math.max(0.1, g.edgeS[e] + (g.edgeT ? g.edgeT[e] / 10 : 0)) * 3.6;
+// Los dos se guardan en el grafo con las decimas con que se calcularon
+// (edgeKmh las usa): las decimas (edgeT) llegan despues del grafo, y con el
+// trabajo ya tomado la primera ruta se calcula antes. Guardado sin ellas,
+// quedaba asi toda la sesion: 22.568 nodos de patio de mas o de menos en ATS,
+// y la ruta a Rail Export de Casper terminaba en otro nodo y daba una vuelta
+// de 6 km (reportes #44 y #45, 13-11: 802,6 km contra 796,3 desde Pocatello).
 function slowNodes(g, maxKmh = STOP_SLOW_KMH) {
-  if (g._slowNodes && g._slowNodes.kmh === maxKmh) return g._slowNodes.nodos;
+  if (g._slowNodes && g._slowNodes.kmh === maxKmh && g._slowNodes.t === g.edgeT) return g._slowNodes.nodos;
   const nodos = new Uint8Array(g.n);
   for (let i = 0; i < g.n; i++) {
     for (let k = g.csr[i]; k < g.csr[i + 1]; k++) {
       if (edgeKmh(g, g.adjEdge[k]) < maxKmh) { nodos[i] = 1; break; }
     }
   }
-  g._slowNodes = { kmh: maxKmh, nodos };
+  g._slowNodes = { kmh: maxKmh, t: g.edgeT, nodos };
   return nodos;
 }
 // Los nodos lentos casi igual de cerca de una parada que el elegido (endIdx,
@@ -7115,14 +7146,14 @@ function stopEndNodes(g, x, z, endIdx, lentos, tieM = STOP_SLOW_TIE_M, nodeOk = 
 // servicio de las estaciones van a 90 km/h, y con esta regla cambiaban 196
 // de 2.074 estaciones, algunas a la de la otra mano (1,4 km mas de ruta).
 function yardNodes(g, maxKmh = STOP_SLOW_KMH) {
-  if (g._yardNodes && g._yardNodes.kmh === maxKmh) return g._yardNodes.nodos;
+  if (g._yardNodes && g._yardNodes.kmh === maxKmh && g._yardNodes.t === g.edgeT) return g._yardNodes.nodos;
   const nodos = new Uint8Array(g.n).fill(1);
   for (let i = 0; i < g.n; i++) {
     for (let k = g.csr[i]; k < g.csr[i + 1]; k++) {
       if (edgeKmh(g, g.adjEdge[k]) >= maxKmh) { nodos[i] = 0; nodos[g.adjTo[k]] = 0; }
     }
   }
-  g._yardNodes = { kmh: maxKmh, nodos };
+  g._yardNodes = { kmh: maxKmh, t: g.edgeT, nodos };
   return nodos;
 }
 

@@ -333,6 +333,17 @@ test('maneuver: salida corta a la derecha que enseguida dobla a la izquierda -> 
   assert.deepEqual([detectManeuver(izq).kind, detectManeuver(izq).direction], ['fork', 'left']);
 });
 
+test('maneuver: salida que se abre de a poco a la derecha y dobla a la izquierda por arriba de la autopista -> keep right (Wells, reporte #44)', () => {
+  // La autopista sigue derecho (nodo 6, a 330 m). La rampa va 6,7 grados a la
+  // derecha a los 60 m (no llega a los 8), 8,8 a los 100 y 13 a los 155, y
+  // despues dobla al oeste: a los 250 m queda 12,6 grados a la izquierda.
+  const ruta = (s) => [[0, -300], [0, 0], [10 * s, 85], [35 * s, 150], [-40 * s, 200], [-300 * s, 230]];
+  const ctx = scenario({ route: ruta(1), extraNodes: [[0, 330], [0, 800]], edges: [[1, 6], [6, 7]] });
+  assert.deepEqual([detectManeuver(ctx).kind, detectManeuver(ctx).direction], ['fork', 'right']);
+  const izq = scenario({ route: ruta(-1), extraNodes: [[0, 330], [0, 800]], edges: [[1, 6], [6, 7]] });
+  assert.deepEqual([detectManeuver(izq).kind, detectManeuver(izq).direction], ['fork', 'left']);
+});
+
 test('maneuver: giro de 90 grados sigue siendo turn', () => {
   // con la calle que sigue derecho como otra opcion
   const ctx = scenario({ route: [[0, -300], [0, 0], [300, 0], [600, 0]], extraNodes: [[0, 300]], edges: [[1, 4]] });
@@ -433,6 +444,20 @@ test('maneuver: la esquina en escuadra de una cruz con dos brazos muertos se anu
   // con la calle doblando otra vez enseguida (zigzag, sierra): callada
   const zigzag = [[0, -300], [0, 0], [60, 0], [100, -40], [100, -300]];
   assert.equal(detectManeuver(cruz(zigzag)).quiet, true);
+});
+
+test('maneuver: una curva en escuadra con dos bahias de sobrepaso no es una cruz (ruta 60 de Islandia, reporte #47)', () => {
+  // La calle llega del sur y dobla al este entre los nodos 1 y 4, todos del
+  // mismo grupo de cruce. Una bahia (7) une el 1 con el 2 y otra (8) el 3 con
+  // el 4: dos "brazos muertos", pero cada uno de su par de nodos.
+  const route = [[0, -300], [0, 0], [0, 20], [20, 40], [40, 40], [300, 40], [600, 40]];
+  const bahias = (a, b) => scenario({ route, extraNodes: [[-8, 10], [30, 50]],
+    edges: [[a[0], 7], [7, a[0]], [7, a[1]], [a[1], 7], [b[0], 8], [8, b[0]], [8, b[1]], [b[1], 8]] });
+  const grupo = (ctx) => { for (let k = 1; k <= 4; k++) ctx.pts[k][3] = 1; ctx.iEnd = 4; return ctx; };
+  const m = detectManeuver(grupo(bahias([1, 2], [3, 4])));
+  assert.deepEqual([m.kind, m.direction, m.quiet], ['turn', 'right', true]);
+  // Los dos colgados del mismo nodo (la cruz de Rockford): se anuncia
+  assert.equal(detectManeuver(grupo(bahias([1, 2], [1, 2]))).quiet, false);
 });
 
 test('maneuver: la cruz con el brazo de enfrente oculto se anuncia aunque la calle se enderece enseguida (Bakersfield, reporte del 26-10)', () => {
@@ -3811,6 +3836,10 @@ test('groupSignsByPoint: los escudos de un mismo cartel quedan juntos', () => {
   const ets2 = groupSignsByPoint([{ x: 1, y: 2, label: 'traffic_rule.limit_80', kind: 'city' }, { x: 3, y: 2, label: '@@fp_de_diesel@@', kind: 'city' },
     { x: 5, y: 2, label: 'Beograd', kind: 'city' }, { x: 7, y: 2, label: 'c.nuclear', kind: 'city' }]);
   assert.deepEqual(ets2.map((s) => s.label), ['Beograd', 'c.nuclear']);
+  // Sin espacios de mas ("Richtung     Dalasysla", reporte #47)
+  const espacios = groupSignsByPoint([{ x: 1, y: 2, label: '    Dalasýsla', kind: 'city' }, { x: 3, y: 2, label: 'Hella  ', kind: 'city' },
+    { x: 5, y: 2, label: 'Vík   í Mýrdal', kind: 'city' }]);
+  assert.deepEqual(espacios.map((s) => s.label), ['Dalasýsla', 'Hella', 'Vík í Mýrdal']);
 });
 
 test('nombre del giro: el portico con dos escudos de una bifurcacion ("Keep left onto I-94" por la I-90 en Chicago, Discord 20-10)', () => {
@@ -5234,6 +5263,22 @@ test('yardNodes: a la empresa del trabajo no se llega por un nodo de la autopist
   assert.deepEqual([...yardNodes(g, 95)], [1, 1, 1, 1, 1, 1, 1]);
 });
 
+test('yardNodes y slowNodes se rehacen cuando llegan las decimas despues del grafo (reportes #44 y #45, Casper)', () => {
+  const { slowNodes, yardNodes } = require('./pure.js');
+  // Calle 0 - 1 de 100 m en 4 s enteros (90 km/h): sin decimas es rapida. Con
+  // ellas (+1,5 s, ~65 km/h) es lenta. La primera ruta se calcula antes de que
+  // lleguen (la app las pide despues del grafo) y quedaba guardada sin ellas.
+  const { g } = grafoDePrueba([[0, 0], [100, 0]], [{ a: 0, b: 1 }]);
+  g.edgeM = Float32Array.from([100]);
+  g.edgeS = Uint16Array.from([4]);
+  assert.deepEqual([...yardNodes(g)], [0, 0]);
+  assert.deepEqual([...slowNodes(g)], [0, 0]);
+  g.edgeT = Uint8Array.from([15]);
+  assert.deepEqual([...yardNodes(g)], [1, 1]);
+  assert.deepEqual([...slowNodes(g)], [1, 1]);
+  assert.equal(yardNodes(g), yardNodes(g)); // con las mismas decimas, una vez
+});
+
 test('waypointArcs y findArcRoute con endArcs: un waypoint sobre la autovia pasa por su calzada, no por el nodo mas cercano', () => {
   const { waypointArcs, findArcRoute, waypointPassesBy, WAYPOINT_ARC_M } = require('./pure.js');
   // Autovia de dos calzadas de una mano, 20 m entre si: la de ida (0 -> 1 ->
@@ -5769,9 +5814,13 @@ test('routeFerrySearch: encarece los ferrys hasta que la ruta coincide con el ju
   assert.deepEqual(probados, [2, 4, 8]);
   // Coincide pero no va menos por ferry: es otra cosa, no se cambia
   assert.equal(routeFerrySearch(() => ({ km: 1680, ferryS: 1100 }), 1673.9, 1100), null);
-  // A mas de 3 % del juego, no
-  assert.equal(routeFerrySearch(() => ({ km: 1730, ferryS: 300 }), 1673.9, 1100), null);
+  // A mas de 4 % del juego, no
+  assert.equal(routeFerrySearch(() => ({ km: 1745, ferryS: 300 }), 1673.9, 1100), null);
   assert.deepEqual(routeFerrySearch(() => ({ km: 1720, ferryS: 300 }), 1673.9, 1100).factor, 2);
+  // Islandia (reporte #46): por tierra 519,0 medido contra 501,7 del GPS
+  // (3,4 %), y por el ferry 388; hasta x2 sigue por el mar
+  const islandia = (f) => (f <= 2 ? { km: 388.1, ferryS: 363 } : { km: 519.0, ferryS: 0 });
+  assert.equal(routeFerrySearch(islandia, 501.7, 363).factor, 4);
   // Sin ruta, nada
   assert.equal(routeFerrySearch(() => null, 1673.9, 1100), null);
 });

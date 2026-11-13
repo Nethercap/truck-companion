@@ -366,6 +366,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   o al nodo de al lado). Las paradas no: en ETS2 las calles de servicio de las
   estaciones van a 90 y 196 de 2.074 se iban a otro nodo, a veces el de la
   estacion de la otra mano.
+  `yardNodes` y `slowNodes` se guardan en el grafo con las decimas con que se
+  calcularon (`edgeT`, que llegan despues): con el trabajo tomado al abrir, la
+  primera ruta se calcula sin ellas y quedaba asi toda la sesion (22.568 nodos
+  de patio distintos en ATS; la ruta a Rail Export de Casper daba 6 km de
+  vuelta, reportes #44 y #45, 13-11). El arnes carga las decimas antes de
+  rutear y no lo veia: solo la app de verdad (Playwright) dio los 802,6 km.
   A una parada se entra por otro nodo lento hasta `STOP_SLOW_TIE_M` (40 m)
   mas lejos que el mas cercano (`stopEndNodes`) si ahorra mas de
   `STOP_SIDE_SWITCH_M` (1 km): el icono de un area de descanso puede caer
@@ -429,8 +435,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   aun contando cada cruce 60 % de mas y al menos 60 km (`routeGameFerryShorter`),
   se buscan con todos los ferrys x2, x4 y x8 mas caros, partiendo al medio dos
   veces entre la ultima corta y la que se paso, y gana la primera a menos de
-  3 % del juego que va menos por ferry (`routeFerrySearch`,
+  4 % del juego que va menos por ferry (`routeFerrySearch`,
   `routeLikeGameByFerry`; tambien en `routeGameRecheck`), sin tope de lentitud.
+  El 4 % es el error de escala de `routeGameAgreement`: con 3 %, de
+  Patreksfjordur a Reykjavik (reporte #46, 13-11, Islandia) la app seguia por
+  el ferry de Brjanslaekur (388 km) y el GPS por tierra (501,7, medido 519,0).
+  Con `sim_ferry.js` y los largos del juego no cambia ninguna de 600 rutas;
+  contando cada cruce 0,8 o 1,2 veces de mas (modelos extremos) cambian 10 mas
+  de unas 380 que disparan.
   Reporte #37 (10-11, ProMods, Hamburgo -> Helsinki): la app por Puttgarden,
   Suecia y Kapellskar -> Naantali, 1.299 km; el GPS 1.674 por Polonia, los
   balticos y el ferry de Tallin (x4, 1.700 medido; x6 rodea por San
@@ -526,7 +538,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   Tampoco la esquina en escuadra (60 a 120 grados entre tramos rectos) de
   una cruz con dos brazos muertos: la calle se termina y hay que doblar
   (salida 115 de Rockford, Discord 18-10, Gargamosch). Con un brazo muerto o
-  con la calle curvandose (sierras, zigzags), callada.
+  con la calle curvandose (sierras, zigzags), callada. Los dos brazos tienen
+  que salir del mismo nodo, como en la cruz (los brazos de un prefab se unen
+  todos entre si): cada prefab en T con el brazo oculto, y cada bahia de
+  sobrepaso, cuelga de dos nodos seguidos de la ruta, y una curva con dos de
+  esas se anunciaba ("turn left" en la ruta 60 de Islandia, reporte #47,
+  13-11). En 1.200 rutas (ATS, ETS2, Coast to Coast, ProMods, semilla 7) se
+  van los avisos de 30 lugares, dibujados: curvas sin otra calle, con tocos o
+  bahias al costado (Kaliningrad en check_avisos). Uno solo tapaba otro:
+  saliendo del patio de Springfield IL la ruta dobla 18 grados con una calle
+  a la derecha y ahora se dice ese "keep left" (`turnAfterFork` ya no tiene
+  el giro de la esquina).
   Salvo que el brazo de enfrente sea un toco (`prefabStubs`, en `ctx.stubs`):
   desde el nodo de entrada sigue derecho (20 grados), se une a otro toco del
   mismo nodo y queda mas lejos que el brazo por donde sale la ruta, y la
@@ -630,6 +652,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   derecho pero no la sirven todos los carriles, se avisa igual, sin nombre
   (`through`): "Keep left onto US-395" salia del cartel de la salida que
   viene, 1 km antes, y esa salida es a la derecha.
+- En la bifurcacion por angulo el lado es donde la ruta se separa de la otra
+  salida (`laterTurn`), mirando a 60, 100 y 155 m: una salida de autopista se
+  abre de a poco. En Wells (ATS, -79883,-20728, reporte #44, 13-11) la rampa a
+  la US-93 sale a la derecha de la I-80 y a los 190 m dobla a la izquierda por
+  arriba de la autopista, todo en un prefab: a 60 m iba 7 grados a la derecha
+  (no llegaba a los 8) y a 250 m ya a la izquierda; se decia "keep left". En
+  1.200 rutas no cambia ningun otro aviso.
 - La bifurcacion lejana (`farFork`, a 500 m) no cuenta una rama que se separo
   para un lado y lejos queda del otro: cruzo la ruta por un puente y el lado
   es donde se separan (US-63 en Columbia, 16-10). Ademas de los 8 grados a
@@ -719,7 +748,8 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   contra 3 o mas muestras sin cartel de la salida da 11 mejores, 47 peores.
   Los carteles de ETS2 con la clave del juego (`traffic_rule.limit_80`, 399
   de velocidad) o un texto sin traducir (`@@fp_de_diesel@@`) no son nombres:
-  `groupSignsByPoint` los saca al cargar (18 de 2124 avisos en 300 rutas).
+  `groupSignsByPoint` los saca al cargar (18 de 2124 avisos en 300 rutas), y
+  les saca los espacios de mas (4.656 en ETS2: "Richtung     Dalasysla").
   Cada muestra vota con el cartel mas cercano que pasa `exitSignTest` (no
   con el mas cercano a secas: si era de la otra mano tapaba al bueno y el
   aviso salia sin nombre), un cartel vota una vez aunque lo encuentren dos
