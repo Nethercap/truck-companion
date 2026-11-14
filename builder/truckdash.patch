@@ -1888,12 +1888,12 @@ index 10fdc04..46f7831 100644
 -const Prefab = new r.Struct({
 -  version: r.uint32le,
 +// Versiones soportadas. Las secciones se leen por los punteros (offsets) del
-+// header, asi que entre la 23, 24 y 25 solo cambia el tamano de dos registros:
-+//   - semaphores: la 25 agrega 4 uint32 al final (unknown2)
-+//   - spawn points: la 24 agrega un uint32 de flags
-+// (layout tomado de sk-zk/TruckLib.Models, Semaphore/SpawnPoint.Deserialize).
-+// Mods viejos (RusMap jazzycat = 24, Grand Utopia custom_company = 23) los usan.
-+const PPD_VERSIONS = [23, 24, 25] as const;
++// header, asi que entre la 22 y la 25 solo cambia el tamano de tres registros:
++//   - nav nodes: la 22 trae 4 conexiones por nodo (las de la doc de SCS), la 23 8
++//   - semaphores: la 25 agrega 4 uint32 al final; spawn points: la 24 un uint32 de flags
++// (TruckLib.Models para semaphores y spawn points; la 22, medida en 639 .ppd de mods).
++// Mods viejos: Mapa BR Brasil = 22, RusMap jazzycat = 24, Grand Utopia custom_company = 23.
++const PPD_VERSIONS = [22, 23, 24, 25] as const;
  
 -  numNodes: r.uint32le,
 -  numNavCurves: r.uint32le,
@@ -2294,8 +2294,8 @@ index 10fdc04..46f7831 100644
 +              curveIndicesCount: r.uint8,
 +              curveIndices: new r.Array(r.uint16le, 8),
 +            }),
-+            8,
-+          ), // note: this 8 differs from docs at http://modding.scssoft.com/wiki/Games/ETS2/Modding_guides/1.30#Prefabs, which says it's 4.
++            version >= 23 ? 8 : 4,
++          ), // 8 desde la v23; la doc de SCS (1.30) dice 4, que es como viene la v22.
 +        }),
 +        'numNavNodes',
 +      ),

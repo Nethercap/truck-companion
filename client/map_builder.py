@@ -38,7 +38,11 @@ import red
 # pedir que se rearme un mapa al que no le cambia nada (el de ATS sigue en 2:
 # su huella no cambia).
 # 2: el armador lee los sectores de formatos viejos, antes se perdian.
-# 3 (ETS2): las terminales de bus del DLC Coaches (BusStop) en los POIs.
+# 3 (ETS2): las terminales de bus del DLC Coaches (BusStop) en los POIs, y los
+# prefabs .ppd de la version 22 (mods viejos: Mapa BR Brasil 6.2 perdia unos 1.600,
+# entre ellos puentes y cruces). Los dos despues de la 1.5.40, con el mismo numero.
+# ATS sigue en 2: de la 22 solo se vio un .ppd de Reforma, y un mapa de ATS armado
+# antes se rearma igual cuando cambian sus mods.
 MAP_FORMATS = {"ats": 2, "ets2": 3}
 
 

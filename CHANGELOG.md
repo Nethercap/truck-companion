@@ -10,6 +10,10 @@ updates on its own and is not versioned here.
   in a city routes to the station instead of the city centre (the maps on our site already have
   them). An ETS2 map built with an earlier version is offered for rebuilding once; ATS maps are
   not affected.
+- Build my map: older map mods built with version 22 prefabs (Mapa BR Brasil, for one) no longer
+  lose those pieces. The map builder skipped them, so bridges, junctions, gas stations and freight
+  yards of those mods were missing from the map (about 1,600 of them in Mapa BR Brasil 6.2). The
+  same one-time rebuild of ETS2 maps covers it.
 
 ## 1.5.40 (2026-11-13)
 
