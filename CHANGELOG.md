@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.42 (2026-11-14)
 
 - Build my map: companies from map mods whose icons point to their image from the game's root
   folder (Mapa BR Brasil 6.2 does this for all 75 of its companies) are no longer left out of the
