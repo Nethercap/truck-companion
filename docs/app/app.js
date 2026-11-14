@@ -5897,11 +5897,12 @@ const turnAnnouncer = createTurnAnnouncer();
 // Los ultimos avisos mostrados, para "Copy turn report" (createTurnLog)
 const turnLog = createTurnLog();
 
-// Las empresas y las terminales de bus que quedan a la distancia del GPS del
-// juego cuando la app no tiene a donde ir (gameGpsCandidates en pure.js, un
-// toque = destino). Las terminales, por los trabajos de linea y de turismo del
-// DLC Coaches: se eligen en el mapa del juego y se toman en la terminal, y hasta
-// ahi la telemetria no trae trabajo (Discord 14-11). list: { x, z, label } para
+// Las empresas, las terminales de bus y los lugares del Atlas que quedan a la
+// distancia del GPS del juego cuando la app no tiene a donde ir (gameGpsPlaces y
+// gameGpsCandidates en pure.js, un toque = destino). Las terminales, por los
+// trabajos de linea y de turismo del DLC Coaches: se eligen en el mapa del juego y
+// se toman en la terminal, y hasta ahi la telemetria no trae trabajo (Discord
+// 14-11). Los del Atlas, porque el Road Trip los agrega al GPS del juego. list: { x, z, label } para
 // el panel. run: la busqueda en curso, que se corta sola si otra la reemplaza.
 // Son decenas de rutas: de a poco, para no trabar el mapa.
 let gameGpsGuess = { km: null, list: [], run: 0 };
@@ -5925,10 +5926,8 @@ function searchGameGpsGuess(data) {
   const from = [data.position.x, data.position.z];
   const rumbo = routeStartHeading(data);
   const recta = (l) => { const p = [from, [l.x, l.z]]; return gameKmOf(p, p); };
-  const ciudad = (tok) => (pois.cities && pois.cities[tok]) || tok;
-  // A la terminal se entra como al patio de una empresa (busRouteTarget).
-  const lugares = pois.companies.map(c => ({ x: c[0], z: c[1], name: c[3], city: c[4] }))
-    .concat(busStopList(pois).map(b => ({ x: b.x, z: b.z, name: t(b.tourist ? 'poiCatBusTourist' : 'poiCatBusStation'), city: b.city, group: 'bus' })));
+  const lugares = gameGpsPlaces(pois, { busStation: t('poiCatBusStation'), busTourist: t('poiCatBusTourist'),
+    atlasTouristBoard: t('atlasTouristBoard'), atlasPoi: t('atlasPoi') });
   const candidatas = gameGpsCandidates(lugares, km, recta);
   const halladas = [];
   let i = 0;
@@ -5937,14 +5936,12 @@ function searchGameGpsGuess(data) {
     const inicio = performance.now();
     while (i < candidatas.length && performance.now() - inicio < 8) {
       const lugar = candidatas[i++];
-      const r = findRoute(from, [lugar.x, lugar.z], rumbo, null, null, { entrar: true, empresa: true });
+      const r = findRoute(from, [lugar.x, lugar.z], rumbo, null, null, { entrar: true, empresa: lugar.yard });
       if (r && r.length) halladas.push({ ...lugar, km: gameKmOf(r, r) });
     }
     if (i < candidatas.length) { setTimeout(seguir, 0); return; }
-    gameGpsGuess.list = gameGpsGuessList(halladas, km).map((l) => {
-      const c = ciudad(l.city);
-      return { x: l.x, z: l.z, label: c ? `${l.name} (${c})` : l.name };
-    });
+    gameGpsGuess.list = gameGpsGuessList(halladas, km).map((l) => (
+      { x: l.x, z: l.z, label: l.sub ? `${l.name} (${l.sub})` : l.name }));
   };
   setTimeout(seguir, 0);
 }
