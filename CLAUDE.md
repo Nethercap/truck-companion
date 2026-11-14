@@ -1224,6 +1224,17 @@ Revisar cada cambio contra esta lista:
    a 39), 35 de 50 a 100 (37), 27 de 100 a 200 (18) y 20 de 200 a 300 (10); de mas
    lejos, nunca. Mostrar siempre las 3 mas parecidas subiria los dos ultimos a 40 y 35
    (39 y 33), pero el modelo de error es optimista de lejos: sin datos reales, no.
+   Tambien ofrece las terminales de bus y los lugares del Atlas del Road Trip de ATS
+   (`gameGpsPlaces`, cada tipo con su propio tope de 3). El Road Trip agrega esos
+   lugares al GPS del juego (Reddit 14-11), y a un lugar del Atlas se entra como a una
+   parada. Con un camion en Jefferson City y el GPS a 83 km del cartel de Bagnell
+   Dam (Playwright), sale ese solo.
+   TruckSim GPS (su servidor 2.0.0) lee el destino y los waypoints del GPS del juego,
+   y el trabajo elegido, de una partida guardada: su plugin registra un dispositivo
+   de input del SDK (`scs_input_init`) que aprieta "quicksave" cuando lo pide el
+   servidor, y el servidor descifra el `game.sii` mas nuevo y lee
+   `economy.stored_gps_ahead_waypoints` (`nav_node_position`) y `player.selected_job`
+   (`job_info`). Pisa el quicksave del jugador. Aca no se hizo: queda por decidir.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el
    usuario escriba las tildes (`foldText`).

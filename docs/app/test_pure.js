@@ -6984,6 +6984,31 @@ test('gameGpsGuessList: la terminal de un trabajo de bus elegido en el mapa, con
   assert.deepEqual(gameGpsGuessList([empresas[0], ...terminales], 12).map(f => f.company), ['a']);
 });
 
+test('gameGpsPlaces: empresas, terminales y lugares del Atlas para el GPS del juego sin trabajo (Reddit 14-11)', () => {
+  const { gameGpsPlaces, gameGpsGuessList } = require('./pure.js');
+  const pois = {
+    companies: [[10, 20, 'bnr', 'BNR', 'palmas'], [null, 3, 'roto', 'Roto', 'x']],
+    cities: { palmas: 'Palmas', joensuu: 'Joensuu' },
+    busStations: { joensuu: [55088, -71260] },
+    atlas: [[-1000, 500, 't', 'Welcome to Utah'], [-900, 600, 'p', 'Arches'], ['x', 1, 't', 'Roto']],
+  };
+  const textos = { busStation: 'Bus station', busTourist: 'Tourist bus stop', atlasTouristBoard: 'Tourist Board', atlasPoi: 'Point of Interest' };
+  assert.deepEqual(gameGpsPlaces(pois, textos), [
+    { x: 10, z: 20, name: 'BNR', sub: 'Palmas', group: 'company', yard: true },
+    { x: 55088, z: -71260, name: 'Bus station', sub: 'Joensuu', group: 'bus', yard: true },
+    // a un lugar del Atlas se entra como a una parada, no como al patio de una empresa
+    { x: -1000, z: 500, name: 'Welcome to Utah', sub: 'Tourist Board', group: 'atlas', yard: false },
+    { x: -900, z: 600, name: 'Arches', sub: 'Point of Interest', group: 'atlas', yard: false },
+  ]);
+  // POIs sin Atlas (ETS2) o sin nada
+  assert.equal(gameGpsPlaces({ companies: [] }, textos).length, 0);
+  assert.deepEqual(gameGpsPlaces(null, textos), []);
+  // el Atlas en su grupo: con cuatro empresas a la misma distancia, el cartel sigue saliendo
+  const halladas = ['a', 'b', 'c', 'd'].map(name => ({ name, group: 'company', km: 30 }))
+    .concat([{ name: 'Welcome to Utah', group: 'atlas', km: 30.2 }]);
+  assert.deepEqual(gameGpsGuessList(halladas, 30).map(f => f.name), ['Welcome to Utah']);
+});
+
 test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada', () => {
   const { busRouteTarget, followGameRoute } = require('./pure.js');
   const a = busRouteTarget({ onJob: true, bus: BUS_DE_TURISMO }, MIRADORES, ciudadesBus);
