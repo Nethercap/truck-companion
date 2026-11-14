@@ -1068,6 +1068,13 @@
 .deliveryCardCargo { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.3rem; }
 .deliveryCard .row:last-child { border-bottom: none; }
 .deliveryCardPay span:last-child { font-weight: 700; color: #4caf50; }
+/* Las paradas de un bus: una por renglon, con la hora del juego y lo tarde. */
+.deliveryCardStops { margin-top: 0.4rem; font-size: 0.82rem; }
+.deliveryCardStopsTitle { color: var(--muted); font-size: 0.78rem; margin-bottom: 0.15rem; }
+.deliveryCardStops ol { margin: 0; padding-left: 1.2rem; max-height: 9.5rem; overflow-y: auto; }
+.deliveryCardStops li { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.08rem 0; }
+.deliveryCardStops li::marker { color: var(--muted); }
+.deliveryCardStops .late { color: var(--danger); }
 
 /* La X de arriba de un modal largo (buscar lugares): el boton Cerrar queda
    abajo de la lista y en una tablet no se encontraba ("how do I get out of

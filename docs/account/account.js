@@ -89,11 +89,24 @@
       statsModded: (n) => n + ' with a modded economy, left out of the money.',
       statsOnlyTrips: "Only driving with a job counts here. Distance driven, at the top, also has driving without one.",
       jobKindCar: "car",
+      jobKindBus: "bus",
       filterKind: "Type",
       filterTruck: "Truck",
       filterCar: "Car",
       tripVehicle: "Vehicle",
+      tripBus: "Bus",
+      tripStops: (n) => 'Stops (' + n + ')',
+      stopDeparted: (h) => 'departed ' + h,
+      stopDeparts: (h) => 'departs ' + h,
+      stopArrived: (h) => 'arrived ' + h,
+      stopDue: (h) => 'due ' + h,
+      stopLate: (d) => d + ' late',
+      stopBoarding: (n) => n + ' boarded',
+      stopAlighting: (n) => n + ' got off',
       statsCarJobs: "Car jobs",
+      statsBusJobs: "Bus jobs",
+      statsPassengers: "Passengers",
+      statsStopsMade: "Stops made",
       achCar_t: "Car delivery",
       achCar_d: "Deliver a car job.",
       linkPendingTitle: "Link Truck Dash on this PC?",
@@ -172,7 +185,12 @@
       topStates: "Most visited states",
       topTrucks: "Most used trucks",
       topCars: "Most used cars",
+      topBuses: "Most used buses",
+      topLines: "Most driven lines",
+      topStops: "Most visited stops",
+      recMostPassengers: "Most passengers",
       fuelByCarTitle: "Fuel by car",
+      fuelByBusTitle: "Fuel by bus",
       statsAvgFuel: "Avg consumption",
       drivingStarted: (r) => 'started ' + r,
       statsNet: "Net before fuel",
@@ -182,6 +200,7 @@
       filterSearchPh: "City, cargo, truck",
       statsTabTrucks: "Trucks",
       statsTabCars: "Cars",
+      statsTabBuses: "Buses",
       topCargo: "Most hauled cargo",
       topCompanies: "Most worked companies",
       topCities: "Most visited cities",
@@ -486,11 +505,24 @@
       statsModded: (n) => n + ' con economia modeada, afuera de la plata.',
       statsOnlyTrips: "Aca solo cuenta lo manejado con un trabajo. La distancia manejada de arriba suma tambien lo manejado sin trabajo.",
       jobKindCar: "auto",
+      jobKindBus: "bus",
       filterKind: "Tipo",
       filterTruck: "Camion",
       filterCar: "Auto",
       tripVehicle: "Vehiculo",
+      tripBus: "Bus",
+      tripStops: (n) => 'Paradas (' + n + ')',
+      stopDeparted: (h) => 'salio ' + h,
+      stopDeparts: (h) => 'sale ' + h,
+      stopArrived: (h) => 'llego ' + h,
+      stopDue: (h) => 'prevista ' + h,
+      stopLate: (d) => d + ' tarde',
+      stopBoarding: (n) => 'subieron ' + n,
+      stopAlighting: (n) => 'bajaron ' + n,
       statsCarJobs: "Trabajos con auto",
+      statsBusJobs: "Trabajos con bus",
+      statsPassengers: "Pasajeros",
+      statsStopsMade: "Paradas hechas",
       achCar_t: "Entrega en auto",
       achCar_d: "Entrega un trabajo con auto.",
       linkPendingTitle: "Vincular Truck Dash en esta PC?",
@@ -569,7 +601,12 @@
       topStates: "Estados mas visitados",
       topTrucks: "Camiones mas usados",
       topCars: "Autos mas usados",
+      topBuses: "Buses mas usados",
+      topLines: "Lineas mas hechas",
+      topStops: "Paradas mas visitadas",
+      recMostPassengers: "Mas pasajeros",
       fuelByCarTitle: "Consumo por auto",
+      fuelByBusTitle: "Consumo por bus",
       statsAvgFuel: "Consumo promedio",
       drivingStarted: (r) => 'empezó ' + r,
       statsNet: "Neto sin combustible",
@@ -579,6 +616,7 @@
       filterSearchPh: "Ciudad, carga, camión",
       statsTabTrucks: "Camiones",
       statsTabCars: "Autos",
+      statsTabBuses: "Buses",
       topCargo: "Cargas mas llevadas",
       topCompanies: "Empresas mas trabajadas",
       topCities: "Ciudades mas visitadas",
@@ -1731,6 +1769,7 @@
       cifra(numero(s.trips), t('statsTrips')),
       cifra(numero(s.delivered), t('statsDelivered')),
       s.car_jobs ? cifra(numero(s.car_jobs), t('statsCarJobs')) : null,
+      s.bus_jobs ? cifra(numero(s.bus_jobs), t('statsBusJobs')) : null,
       s.on_time ? cifra(numero(s.on_time), t('statsOnTime')) : null,
       s.late ? cifra(numero(s.late), t('statsLate')) : null,
       s.unfinished ? cifra(numero(s.unfinished), t('statsUnfinished')) : null,
@@ -1773,18 +1812,23 @@
       listaTop(t('topRoutes'), top.city_pairs, (r) => r.from + ' \u2192 ' + r.to)
     ].filter(Boolean);
 
-    // Con trabajos con auto (ATS), camiones y autos en dos solapas: otro
-    // vehiculo, otras cargas y otros numeros.
-    if (s.cars && s.cars.trips) {
+    // Con trabajos con auto (ATS) o con bus (Coaches, ETS2), cada vehiculo en
+    // su solapa: otras cargas (o pasajeros) y otros numeros.
+    const vehiculos = [['trucks', t('statsTabTrucks')]];
+    if (s.cars && s.cars.trips) vehiculos.push(['cars', t('statsTabCars')]);
+    if (s.buses && s.buses.trips) vehiculos.push(['buses', t('statsTabBuses')]);
+    if (vehiculos.length > 1) {
       // Con solapas, lo general va arriba (de a dos) y lo de cada vehiculo
       // en su solapa.
       sumar(caja, grillaTops(generales, 'dos'));
-      const vista = leerPref(PREF_VEHICULO) === 'cars' ? 'cars' : 'trucks';
-      caja.appendChild(pestanas([['trucks', t('statsTabTrucks')], ['cars', t('statsTabCars')]], vista, (v) => {
+      const pedida = leerPref(PREF_VEHICULO);
+      const vista = vehiculos.some(([v]) => v === pedida) ? pedida : 'trucks';
+      caja.appendChild(pestanas(vehiculos, vista, (v) => {
         guardarPref(PREF_VEHICULO, v);
         pintarResumen();
       }, 'chicas'));
-      caja.appendChild(vista === 'cars' ? bloqueAutos(s.cars) : parteCamion(s));
+      caja.appendChild(vista === 'cars' ? bloqueAutos(s.cars)
+        : vista === 'buses' ? bloqueBuses(s.buses) : parteCamion(s));
     } else {
       caja.appendChild(parteCamion(s, generales));
     }
@@ -1940,6 +1984,52 @@
       r.best_avg_speed ? [t('recBestAvg'), velocidad(r.best_avg_speed.value), r.best_avg_speed] : null
     ]));
     sumar(bloques, listaConsumo(t('fuelByCarTitle'), c.fuel_by_vehicle));
+    if (bloques.children.length) caja.appendChild(bloques);
+    return caja;
+  }
+
+  // Los trabajos de bus (DLC Coaches, ETS2), como los autos: sin carga, con
+  // pasajeros, paradas y lineas. Lo arma la API ("buses" de /trips/stats).
+  function bloqueBuses(b) {
+    const caja = document.createElement('div');
+    caja.className = 'autos';
+    const cifras = document.createElement('div');
+    cifras.className = 'cifras';
+    [
+      cifra(numero(b.trips), t('statsTrips')),
+      cifra(numero(b.delivered), t('statsDelivered')),
+      b.on_time ? cifra(numero(b.on_time), t('statsOnTime')) : null,
+      b.passengers ? cifra(numero(b.passengers), t('statsPassengers')) : null,
+      b.stops ? cifra(numero(b.stops), t('statsStopsMade')) : null,
+      cifra(distancia(b.distance_km), t('statsDistance')),
+      cifra(duracion(b.real_hours), t('statsWheel')),
+      b.fuel_used ? cifra(volumen(b.fuel_used), t('tripFuel')) : null,
+      b.l_per_100km ? cifra(consumo(b.l_per_100km), t('statsAvgFuel')) : null
+    ].filter(Boolean).forEach((x) => cifras.appendChild(x));
+    caja.appendChild(cifras);
+
+    sumar(caja, tablaPlata(b.money));
+
+    const top = b.top || {};
+    const tops = document.createElement('div');
+    tops.className = 'tops';
+    [
+      listaTop(t('topBuses'), top.vehicles, (x) => x.name),
+      listaTop(t('topLines'), top.lines, (x) => x.name),
+      listaTop(t('topStops'), top.stops, (x) => x.name)
+    ].filter(Boolean).forEach((l) => tops.appendChild(l));
+    if (tops.children.length) caja.appendChild(tops);
+
+    const r = b.records || {};
+    const bloques = document.createElement('div');
+    bloques.className = 'tops dos';
+    sumar(bloques, listaRecords([
+      r.best_pay ? [t('recBestPay'), plata(r.best_pay.value, r.best_pay.currency), r.best_pay] : null,
+      r.most_passengers ? [t('recMostPassengers'), numero(r.most_passengers.value), r.most_passengers] : null,
+      r.longest ? [t('statsLongest'), distancia(r.longest.value), r.longest] : null,
+      r.best_avg_speed ? [t('recBestAvg'), velocidad(r.best_avg_speed.value), r.best_avg_speed] : null
+    ]));
+    sumar(bloques, listaConsumo(t('fuelByBusTitle'), b.fuel_by_vehicle));
     if (bloques.children.length) caja.appendChild(bloques);
     return caja;
   }
@@ -2270,7 +2360,7 @@
     const empresas = [d.company_src, d.company_dst].filter(Boolean).join(' \u2192 ');
     if (empresas) sumar(caja, renglon([empresas]));
     sumar(caja, renglon([
-      d.truck_name || d.truck_brand ? t(d.job_kind === 'car' ? 'tripVehicle' : 'tripTruck') + ' ' + [d.truck_brand, d.truck_name].filter(Boolean).join(' ') : null,
+      d.truck_name || d.truck_brand ? t(etiquetaDeVehiculo(d)) + ' ' + [d.truck_brand, d.truck_name].filter(Boolean).join(' ') : null,
       d.distance_planned_km ? t('tripPlanned') + ' ' + distancia(d.distance_planned_km) : null,
       // La de la columna de la tabla. Sin ella, el detalle daba planeado y
       // rastreado (315 y 320) y la tabla un tercero (322) sin decir de donde
@@ -2295,7 +2385,70 @@
       d.avg_speed ? t('tripAvgSpeed') + ' ' + velocidad(d.avg_speed) : null,
       d.max_speed ? t('statsTopSpeed') + ' ' + velocidad(d.max_speed) : null
     ]));
+    sumar(caja, listaDeParadas(d.bus_stops));
     if ((d.countries || []).length) caja.appendChild(listaDePaises(d.countries));
+    return caja;
+  }
+
+  // "Camion", "Vehiculo" (un auto de ATS) o "Bus" delante del modelo.
+  function etiquetaDeVehiculo(v) {
+    return v.job_kind === 'bus' ? 'tripBus' : v.job_kind === 'car' ? 'tripVehicle' : 'tripTruck';
+  }
+
+  // Hora del juego (minutos absolutos, el 0 es un lunes a las 00:00) como
+  // "mié 08:37": el dia ayuda en una linea que pasa la medianoche. El nombre
+  // del dia sale de Intl, como en la app (el 1-1-2024 fue lunes).
+  function horaDelJuego(minutos) {
+    if (!Number.isFinite(minutos) || minutos <= 0) return null;
+    const m = Math.floor(minutos);
+    let dia = '';
+    try {
+      dia = new Date(Date.UTC(2024, 0, 1 + Math.floor(m / 1440) % 7))
+        .toLocaleDateString(idioma, { weekday: 'short', timeZone: 'UTC' });
+    } catch (e) { /* sin Intl, solo la hora */ }
+    const h = Math.floor((m % 1440) / 60), mm = m % 60;
+    return (dia ? dia + ' ' : '') + String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+  }
+
+  // Las etapas de un trabajo de bus: cada parada con la salida (la primera) o
+  // la llegada, real si el juego la mando y si no la planificada, lo tarde que
+  // llego y los pasajeros que subieron y bajaron. Lo guarda la API (bus_stops)
+  // desde que el cliente las manda.
+  function listaDeParadas(paradas) {
+    if (!Array.isArray(paradas) || paradas.length < 2) return null;
+    const caja = document.createElement('div');
+    caja.className = 'paradas';
+    const titulo = document.createElement('h4');
+    titulo.textContent = t('tripStops', numero(paradas.length));
+    caja.appendChild(titulo);
+    const lista = document.createElement('ol');
+    paradas.forEach((p, k) => {
+      const fila = document.createElement('li');
+      const nombre = document.createElement('span');
+      nombre.className = 'parada-nombre';
+      nombre.textContent = p.name || p.id || '?';
+      fila.appendChild(nombre);
+      const planificada = k === 0 ? p.departurePlanned : p.arrivalPlanned;
+      const real = k === 0 ? p.departureActual : p.arrivalActual;
+      const hora = horaDelJuego(real || planificada);
+      const datos = [];
+      // "salio 08:37" / "llego 08:37" con la hora real; sin ella, la del plan
+      // ("sale" / "prevista"): un viaje sin terminar no llego a las ultimas.
+      if (hora) {
+        datos.push(t(k === 0 ? (real ? 'stopDeparted' : 'stopDeparts') : (real ? 'stopArrived' : 'stopDue'), hora));
+      }
+      if (real && planificada && real > planificada) datos.push(t('stopLate', duracion((real - planificada) / 60)));
+      const suben = p.boardingActual || p.boardingPlanned;
+      const bajan = p.alightingActual || p.alightingPlanned;
+      if (suben) datos.push(t('stopBoarding', numero(suben)));
+      if (bajan) datos.push(t('stopAlighting', numero(bajan)));
+      const detalle = document.createElement('span');
+      detalle.className = 'parada-datos' + (real && planificada && real > planificada ? ' tarde' : '');
+      detalle.textContent = datos.join(' · ');
+      fila.appendChild(detalle);
+      lista.appendChild(fila);
+    });
+    caja.appendChild(lista);
     return caja;
   }
 
@@ -2478,14 +2631,17 @@
       'distance_game_km', 'distance_tracked_km', 'game_hours', 'total_game_hours', 'total_game_hours_approx',
       'sleep_hours', 'real_hours', 'revenue', 'currency', 'modded', 'fuel_used', 'tolls',
       'fines', 'ferries', 'cancel_penalty', 'damage_delta', 'on_time', 'truck_brand', 'truck_name',
-      'countries', 'note', 'trimmed'];
+      'countries', 'note', 'trimmed', 'bus_stops'];
     const celdaCsv = (valor) => {
       if (valor == null) return '';
       const texto = Array.isArray(valor) ? valor.join(' ') : String(valor);
       return /[",\n\r;]/.test(texto) ? '"' + texto.replace(/"/g, '""') + '"' : texto;
     };
+    // Las paradas de un bus, por nombre y en orden ("Brussels > Duisburg > ...").
+    const valorCsv = (v, c) => (c === 'bus_stops' && Array.isArray(v[c])
+      ? v[c].map((p) => p.name || p.id || '?').join(' > ') : v[c]);
     const lineas = [columnas.join(',')].concat(
-      todos.map((v) => columnas.map((c) => celdaCsv(v[c])).join(',')));
+      todos.map((v) => columnas.map((c) => celdaCsv(valorCsv(v, c))).join(',')));
     // La marca BOM es para que Excel lea los acentos como UTF-8.
     const blob = new Blob(['\ufeff' + lineas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -3708,10 +3864,11 @@
       ruta.appendChild(chip);
       // Trabajo con auto (ATS 1.61): lo deduce la API, porque llega sin peso
       // de carga. Se marca para que no parezca un viaje de camion raro.
-      if (v.job_kind === 'car') {
+      // Un bus (Coaches) lo dice el cliente, igual con su chip.
+      if (v.job_kind === 'car' || v.job_kind === 'bus') {
         const auto = document.createElement('span');
         auto.className = 'juego-chip auto';
-        auto.textContent = t('jobKindCar');
+        auto.textContent = t(v.job_kind === 'bus' ? 'jobKindBus' : 'jobKindCar');
         ruta.appendChild(auto);
       }
       // Las ciudades no se parten ("Las / Vegas"): las etiquetas bajan.
@@ -4067,7 +4224,7 @@
     const datos = [
       [t('colDistance'), distanciaEnTabla(v) || '-'],
       [t('tripCargo'), v.cargo || '-'],
-      [t(v.job_kind === 'car' ? 'tripVehicle' : 'tripTruck'), [v.truck_brand, v.truck_name].filter(Boolean).join(' ') || '-'],
+      [t(etiquetaDeVehiculo(v)), [v.truck_brand, v.truck_name].filter(Boolean).join(' ') || '-'],
       [t('colTime'), v.real_hours ? duracion(v.real_hours) : '-'],
       [t('colPay'), sinCobrar || v.modded || !v.revenue ? '-' : plata(v.revenue, v.currency)],
       [t('tripStatus'), estado ? estado.textContent.charAt(0).toUpperCase() + estado.textContent.slice(1) : '-'],

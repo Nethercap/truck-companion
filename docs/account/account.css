@@ -276,6 +276,16 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
   unicode-range: U+1F1E6-1F1FF;
   font-display: swap;
 }
+/* Las etapas de un trabajo de bus en el detalle (listaDeParadas). */
+.paradas { margin-top: 0.7rem; }
+.paradas h4 { margin: 0 0 0.3rem; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.paradas ol { margin: 0; padding-left: 1.4rem; font-size: 0.88rem; }
+.paradas li { padding: 0.18rem 0; border-bottom: 1px solid var(--line); }
+.paradas li:last-child { border-bottom: none; }
+.paradas li::marker { color: var(--muted); }
+.paradas .parada-nombre { font-weight: 600; margin-right: 0.5rem; }
+.paradas .parada-datos { color: var(--muted); }
+.paradas .parada-datos.tarde { color: var(--warn); }
 .paises { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin-top: 0.7rem; }
 .paises .etq { font-size: 0.85rem; color: var(--muted); margin-right: 0.15rem; }
 .paises .bandera { font-size: 1.3rem; line-height: 1.15; cursor: default; }

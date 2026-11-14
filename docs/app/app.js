@@ -7300,6 +7300,7 @@ function updateHud(data) {
     alertsRow.style.display = 'none';
   }
 
+  busJobMemory.push(data);
   updateSessionEvents(data.event || {}, data.game, data.onJob);
 }
 
@@ -7352,17 +7353,21 @@ function resetJobCosts() { jobCosts.fines = 0; jobCosts.tolls = 0; }
 // no 5 s como el toast de antes, que se perdia mientras uno estacionaba.
 const DELIVERY_CARD_MS = 90000;
 let deliveryCardTimer = null;
+// Las paradas del ultimo trabajo de bus: en el dato de la entrega ya no estan
+// (createBusJobMemory, pure.js).
+const busJobMemory = createBusJobMemory();
 function closeDeliveryCard() {
   clearTimeout(deliveryCardTimer);
   document.getElementById('deliveryCard')?.remove();
 }
-function showDeliveryCard(event, costs, game) {
-  const summary = deliverySummary(event, costs);
+function showDeliveryCard(event, costs, game, bus = null) {
+  const summary = deliverySummary(event, costs, bus);
   if (!summary) return;
   closeDeliveryCard();
   const value = ([, kind, v]) => {
     if (kind === 'money') return escapeHtml(moneyLine(v, game));
     if (kind === 'xp') return `+${formatInt(v, currentLang)} XP`;
+    if (kind === 'count') return formatInt(v, currentLang);
     if (kind === 'km') return `${formatInt(useImperial ? v * 0.621371 : v, currentLang)} ${useImperial ? 'mi' : 'km'}`;
     if (kind === 'minutes') return escapeHtml(formatGameMinutes(v, t('hourShort'), t('minShort')));
     if (kind === 'percent') return `${v < 10 && v > 0 ? formatDec(v, currentLang) : Math.round(v)}\u00a0%`;
@@ -7376,12 +7381,26 @@ function showDeliveryCard(event, costs, game) {
     + `<button type="button" class="deliveryCardClose" aria-label="${escapeHtml(t('close'))}" title="${escapeHtml(t('close'))}">×</button></div>`
     + (summary.route ? `<div class="deliveryCardRoute">${escapeHtml(summary.route)}</div>` : '')
     + (summary.cargo ? `<div class="deliveryCardCargo">${escapeHtml(summary.cargo)}</div>` : '')
-    + summary.rows.map((r, k) => `<div class="row${k === 0 ? ' deliveryCardPay' : ''}"><span class="label">${escapeHtml(t(r[0]))}</span><span>${value(r)}</span></div>`).join('');
+    + summary.rows.map((r, k) => `<div class="row${k === 0 ? ' deliveryCardPay' : ''}"><span class="label">${escapeHtml(t(r[0]))}</span><span>${value(r)}</span></div>`).join('')
+    + deliveryStopsHtml(summary.stops);
   el.querySelector('.deliveryCardClose').addEventListener('click', closeDeliveryCard);
   document.body.appendChild(el);
   deliveryCardTimer = setTimeout(closeDeliveryCard, DELIVERY_CARD_MS);
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDeliveryCard(); });
+
+// Las paradas de un bus en la tarjeta de entrega: cada una con la hora del
+// juego de su salida (la primera) o su llegada, y cuanto tarde llego.
+function deliveryStopsHtml(stops) {
+  if (!stops || stops.length < 2) return '';
+  const filas = stops.map((s) => {
+    const reloj = gameClockFromMinutes(s.time);
+    const hora = reloj ? formatClockHM(reloj.hours, reloj.minutes, hour12()) : '';
+    const tarde = s.late ? ` <span class="late">${escapeHtml(t('deliveredStopLate', formatInt(s.late, currentLang)))}</span>` : '';
+    return `<li><span class="label">${escapeHtml(s.name)}</span><span>${escapeHtml(hora)}${tarde}</span></li>`;
+  }).join('');
+  return `<div class="deliveryCardStops"><div class="deliveryCardStopsTitle">${escapeHtml(t('deliveredStops'))}</div><ol>${filas}</ol></div>`;
+}
 
 function updateSessionEvents(event, game, onJob) {
   if (onJob && lastOnJob === false) resetJobCosts();
@@ -7403,12 +7422,13 @@ function updateSessionEvents(event, game, onJob) {
   if (event.ferry && !previousEventState.ferry) { sessionTotals.tolls += 0; sessionTotals.ferryTrainCount++; }
   if (event.train && !previousEventState.train) sessionTotals.ferryTrainCount++;
   if (event.jobDelivered && !previousEventState.jobDelivered) {
-    showDeliveryCard(event, jobCosts, game || lastData?.game);
+    showDeliveryCard(event, jobCosts, game || lastData?.game, busJobMemory.take());
     if (isLeaderTab) recordTrip(event); // una sola pestana por navegador la graba
     resetJobCosts();
   }
   if (event.jobCancelled && !previousEventState.jobCancelled) {
     showToast(t('jobCancelledToast'), 'danger');
+    busJobMemory.take();
     resetJobCosts();
   }
   previousEventState.tollgate = !!event.tollgate;
