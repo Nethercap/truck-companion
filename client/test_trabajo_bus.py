@@ -265,6 +265,27 @@ def test_la_cuenta_sigue_el_mismo_viaje_toda_la_linea():
     assert cierres[0]["datos"]["deadline_game_time"] == 257250
 
 
+def test_el_viaje_de_la_cuenta_lleva_las_paradas_y_sus_llegadas():
+    """La cuenta muestra cada etapa: el viaje abre con las paradas planificadas
+    y, como la huella no cambia de etapa en etapa, las llegadas reales llegan
+    con el checkpoint y el cierre (las del juego al llegar al mirador)."""
+    acc = Acumulador(id_sesion="s")
+    acciones = acc.tick(client.build_payload(raw_de_bus()), raw_de_bus(), 1000.0)
+    abierto = next(a for a in acciones if a["tipo"] == "trip_open")["datos"]
+    assert abierto["bus_stops"] == PARADAS
+    etapas = [ETAPAS[0][:3] + ({"arrivalPlanned": 256880, "arrivalActual": 256871},), ETAPAS[1]]
+    etapa_2 = raw_de_bus(bus=telemetry_compat.leer_bus(bloque(etapas, actual=1, cambios=3)))
+    acc.tick(client.build_payload(etapa_2), etapa_2, 1001.0)
+    assert acc.viaje()["bus_stops"][1]["arrivalActual"] == 256871
+    fin = dict(etapa_2, onJob=False, bus=None)
+    payload = client.build_payload(fin)
+    payload["event"]["jobDelivered"] = True
+    cierre = next(a for a in acc.tick(payload, fin, 1002.0) if a["tipo"] == "trip_close")["datos"]
+    assert [p["id"] for p in cierre["bus_stops"]] == ["oulu", "pocviitasaar", "oulu"]
+    assert cierre["bus_stops"][1]["arrivalActual"] == 256871
+    assert cierre["job_kind"] == "bus"
+
+
 def test_los_miradores_salen_por_uid_o_por_la_clave_del_nombre(tmp_path):
     """mapbuild/pois.viewpoints: el id del album -> lugar del cutscene. Por el
     uid; si un mod rehizo el sector (otro uid), por la clave del nombre en la

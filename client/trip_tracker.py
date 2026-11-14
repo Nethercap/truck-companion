@@ -77,9 +77,11 @@ def _datos_del_trabajo_de_bus(raw: dict, bus: dict, nombre_juego: str) -> dict:
     la parada siguiente (cambia en cada etapa y partiria el viaje en dos), y
     sin el plazo la huella de dos lineas iguales tomadas en dias distintos
     seria la misma salvo por la hora de inicio. Sin carga: el pasaje no tiene
-    nombre ni peso. `job_kind` lo ignora la API de hoy (lista blanca de
-    campos) hasta que sepa de buses; para ella un viaje sin carga es de
-    camion."""
+    nombre ni peso. Van las paradas con sus horarios y pasajeros
+    (`bus_stops`, las de trabajo_bus.del_raw), para que la cuenta muestre
+    cada etapa; no entran en la huella, porque las llegadas reales cambian en
+    cada parada. La API las guarda con `job_kind` desde su migracion 0024; una
+    de antes las tira y toma el viaje por uno de camion."""
     primera, ultima = bus["stops"][0], bus["stops"][-1]
     return {
         "game": nombre_juego,
@@ -100,6 +102,7 @@ def _datos_del_trabajo_de_bus(raw: dict, bus: dict, nombre_juego: str) -> dict:
         "currency": MONEDA[nombre_juego],
         "distance_planned_km": _numero(raw.get("plannedDistanceKm")),
         "job_kind": "bus",
+        "bus_stops": [dict(p) for p in bus["stops"]],
     }
 
 

@@ -1886,6 +1886,39 @@ test('deliverySummary: un cliente viejo sin xp ni dano muestra igual el pago', (
   assert.equal(deliverySummary(null), null);
 });
 
+test('deliverySummary: un bus lleva sus paradas con la hora y lo tarde, y los pasajeros', () => {
+  const { deliverySummary, createBusJobMemory } = require('./pure.js');
+  // La linea del game.log del 13-11: Brussels -> Duisburg -> Dortmund -> Kassel,
+  // con las llegadas reales de Duisburg y Dortmund (esta, 5 minutos tarde).
+  const datos = { onJob: true, cityDst: 'Kassel', cityDstId: 'kassel', bus: { stage: 2, stops: [
+    { id: 'brussel', name: 'Brussels', departurePlanned: 355575, departureActual: 355575, boardingPlanned: 34 },
+    { id: 'duisburg', name: 'Duisburg', arrivalPlanned: 355775, arrivalActual: 355757, boardingPlanned: 47 },
+    { id: 'dortmund', name: 'Dortmund', arrivalPlanned: 355845, arrivalActual: 355850, boardingPlanned: 50 },
+    { id: 'kassel', name: 'Kassel', arrivalPlanned: 356040 }] } };
+  const memoria = createBusJobMemory();
+  memoria.push(datos);
+  // La entrega: el plugin ya borro la tabla de paradas.
+  memoria.push({ onJob: false, event: { jobDelivered: true } });
+  const bus = memoria.take();
+  const s = deliverySummary({ jobDeliveredRevenue: 6420, jobCargoDamage: 0, jobSrc: 'Brussels', jobDst: 'Kassel' }, {}, bus);
+  assert.deepEqual(s.rows.map(r => r[0]), ['deliveredPay', 'deliveredPassengers']);
+  assert.equal(s.rows[1][2], 131);
+  assert.deepEqual(s.stops, [
+    { name: 'Brussels', kind: 'departure', time: 355575, late: 0 },
+    { name: 'Duisburg', kind: 'arrival', time: 355757, late: 0 },
+    { name: 'Dortmund', kind: 'arrival', time: 355850, late: 5 },
+    { name: 'Kassel', kind: 'arrival', time: 356040, late: 0 }]);
+  // Se toma una vez: la proxima entrega no lleva estas paradas.
+  assert.equal(memoria.take(), null);
+  // Un trabajo de camion despues de un bus la olvida.
+  memoria.push(datos);
+  memoria.push({ onJob: true, cityDst: 'Praga', cityDstId: 'praga' });
+  assert.equal(memoria.take(), null);
+  // Sin bus, la tarjeta de siempre (con el dano de la carga).
+  assert.equal(deliverySummary({ jobCargoDamage: 0 }).stops, null);
+  assert.ok(deliverySummary({ jobCargoDamage: 0 }).rows.some(r => r[0] === 'cargoDamage'));
+});
+
 test('truckSizeSetting: de 1 a 3 en pasos de 0.25, lo raro vuelve al tamano normal', () => {
   const { truckSizeSetting } = require('./pure.js');
   assert.equal(truckSizeSetting(undefined), 1);

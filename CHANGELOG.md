@@ -14,6 +14,10 @@ updates on its own and is not versioned here.
   lose those pieces. The map builder skipped them, so bridges, junctions, gas stations and freight
   yards of those mods were missing from the map (about 1,600 of them in Mapa BR Brasil 6.2). The
   same one-time rebuild of ETS2 maps covers it.
+- Coaches (ETS2), your account: a bus job now reaches your account with all its stops, each with
+  its scheduled and actual times and the passengers who got on and off. Your stats show bus jobs
+  apart from truck jobs, with their passengers and lines, and the trip shows every stage. Bus jobs
+  saved with 1.5.40 still count as truck jobs.
 
 ## 1.5.40 (2026-11-13)
 

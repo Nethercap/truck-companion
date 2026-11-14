@@ -459,6 +459,12 @@ class Acumulador:
                     self._viaje = None
             elif mismo:
                 v.pop("suelto_desde", None)
+                # Un bus llega a cada parada con la hora real (y el juego
+                # manda la tabla de nuevo): el viaje lleva las paradas de la
+                # ultima lectura, y el checkpoint y el cierre salen con ellas.
+                # El resto de los datos del trabajo no cambia en el camino.
+                if actual.get("bus_stops"):
+                    v["datos"]["bus_stops"] = actual["bus_stops"]
             else:
                 acciones.append({"tipo": "trip_checkpoint", "datos": self.viaje()})
                 self._viaje = None
