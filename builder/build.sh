@@ -46,13 +46,16 @@ empaquetar() {
 }
 # Lo que es nuestro y se puede probar sin el juego: unir-calles.ts (tiles.ts
 # lo usa para juntar las calles que se tocan punta con punta), zip-entries.ts
-# (lee los .scs que son ZIP, tambien los de firmas cambiadas), arreglo-json.ts y
+# (lee los .scs que son ZIP, tambien los de firmas cambiadas), ruta-textura.ts
+# (la textura de un icono .mat, tambien desde la raiz), arreglo-json.ts y
 # leer-geojson.ts (leen y escriben de a pedazos, con archivos de mas de 512 MB).
 echo "== pruebas"
 (cd "$WORK/maps" && node --experimental-strip-types --no-warnings --test \
   packages/clis/truckdash-builder/unir-calles.prueba.ts)
 (cd "$WORK/maps" && node --experimental-transform-types --no-warnings --test \
   packages/clis/parser/game-files/zip-entries.prueba.ts)
+(cd "$WORK/maps" && node --experimental-strip-types --no-warnings --test \
+  packages/clis/parser/game-files/ruta-textura.prueba.ts)
 (cd "$WORK/maps" && NODE_OPTIONS=--max-old-space-size=4096 npx --no-install tsx --test \
   packages/libs/io/arreglo-json.prueba.ts packages/clis/truckdash-builder/leer-geojson.prueba.ts)
 

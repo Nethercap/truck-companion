@@ -104,13 +104,13 @@ def test_un_mapa_a_medias_no_cuenta(tmp_path, monkeypatch):
 
 
 def test_el_formato_va_por_juego(tmp_path, monkeypatch):
-    """Las terminales de bus (3) son solo de ETS2: un mapa de ATS armado con
-    el formato 2 sigue sirviendo, y su huella es la de antes; uno de ETS2 con
-    el 2 se vuelve a armar."""
+    """Las terminales de bus (3) y los iconos con la textura desde la raiz (4)
+    son solo de ETS2: un mapa de ATS armado con el formato 2 sigue sirviendo, y
+    su huella es la de antes; uno de ETS2 con el 2 o el 3 se vuelve a armar."""
     import hashlib
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert map_builder.map_format("ats") == 2
-    assert map_builder.map_format("ets2") == 3
+    assert map_builder.map_format("ets2") == 4
     juego = tmp_path / "juego"
     juego.mkdir()
     (juego / "version.scs").write_bytes(b"v")

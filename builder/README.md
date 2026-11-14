@@ -55,6 +55,11 @@ as a separate program.
 - A translation file from a mod (`locale/*/local_module.*.sii`) that can't
   be read is skipped with a warning naming the mod, instead of stopping the
   build. One with German quotes („...“) instead of `"` did.
+- An icon's image path in its `.mat` is read the way the game reads it: from
+  the game's root when it starts with `/`, otherwise from the `.mat`'s folder.
+  An icon whose image can't be found still counts, without the image. A
+  company with no icon is left out of the map, and Mapa BR Brasil 6.2 lost
+  all 75 of its companies that way.
 
 ## Building it
 

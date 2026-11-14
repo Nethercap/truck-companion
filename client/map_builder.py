@@ -43,7 +43,11 @@ import red
 # entre ellos puentes y cruces). Los dos despues de la 1.5.40, con el mismo numero.
 # ATS sigue en 2: de la 22 solo se vio un .ppd de Reforma, y un mapa de ATS armado
 # antes se rearma igual cuando cambian sus mods.
-MAP_FORMATS = {"ats": 2, "ets2": 3}
+# 4 (ETS2): la textura de un icono .mat desde la raiz ("/material/..."): Mapa BR
+# Brasil 6.2 perdia asi sus 75 empresas, todas las de destino (Discord 14-11). ATS
+# sigue en 2: ningun mod de ATS visto escribe asi sus iconos, y con otro numero su
+# mapa armado dejaria de usarse hasta rearmarlo.
+MAP_FORMATS = {"ats": 2, "ets2": 4}
 
 
 def map_format(game: str) -> int:
