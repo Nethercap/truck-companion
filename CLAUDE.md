@@ -984,6 +984,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   del juego (`followGameRoute`): va por todas las paradas hasta el final. Lo
   que falta es el de nuestra ruta, y abajo del resumen la parada con su
   horario (`busNextStopLine`). La app nativa todavia no lo dibuja.
+  Un trabajo de linea o de turismo se elige en el mapa del juego y se toma en
+  la terminal (Discord 14-11, 1.5.41; el rapido te lleva ahi y anda): hasta
+  ahi el GPS del juego va a la terminal y la telemetria no trae trabajo (la
+  configuracion llega al embarcar). Las terminales entran en lo que ofrece el
+  panel con los km del GPS (`gameGpsGuessList`, grupo `bus` con su propio tope
+  de 3: con las empresas de alrededor pasaban de 3 y no salia ninguna). Con un
+  camion en Tartu y el GPS a la terminal de Tallinn (159,6 km, Playwright)
+  ofrece la terminal y AeroBaltica. Tambien van en el mapa (capa `bus-stop`, de
+  `busStopList`, con iconos dibujados en un canvas, `addBusStopImages`: uno en
+  R2 habria que subirlo antes, por los 404 guardados) y en el buscador (chip
+  `b`, oculto si la variante no tiene terminales). La app nativa no tiene
+  ninguna de las tres.
   Visto en el juego (log de un usuario, 12-11, turismo de punta a punta): la
   configuracion vuelve al embarcar y en cada llegada (`current` sube en la
   parada del medio y queda en la ultima etapa al llegar al final), y unos 40 s

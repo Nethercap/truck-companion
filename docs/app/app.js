@@ -1427,7 +1427,7 @@ function setRouteData(data) {
 // Capas del estilo que dependen del juego actual (fuente vectorial 'vec') -
 // se remueven y se vuelven a crear al cambiar de juego, ya que MapLibre no
 // permite cambiarle la url a un source ya existente.
-const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'ferry-poi', 'road-shield', 'exit-label', 'country-label', 'city-label'];
+const VEC_LAYER_IDS = ['mapArea', 'prefab', 'ferry-line', 'road-local', 'road-divided', 'road-freeway', 'company', 'poi','car-parking', 'fuel', 'atlas', 'bus-stop', 'ferry-poi', 'road-shield', 'exit-label', 'country-label', 'city-label'];
 
 // Ancho de las calles: el de siempre de lejos y el del juego de cerca
 // (roadLineWidth en pure.js). En pixeles depende de la latitud, asi que se
@@ -1525,6 +1525,14 @@ function buildVecLayers(sourceLayer) {
                 'text-field': ['step', ['zoom'], '', 9, ['match', ['get', 'k'], 't', ['get', 'name'], ''], 11, ['get', 'name']],
                 'text-size': 11, 'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true },
       paint: { 'text-color': '#ffd166', 'text-halo-color': '#000', 'text-halo-width': 1 } },
+    // Terminales de bus (DLC Coaches, ETS2; Discord 14-11): no estan en los
+    // tiles, salen de pois-<variante>.json (busStopList, setAtlasData). Hay una
+    // o dos por ciudad, asi que desde lejos como los demas POIs. Los iconos se
+    // dibujan aca (addBusStopImages): uno nuevo en R2 pediria subirlo antes.
+    { id: 'bus-stop', type: 'symbol', source: 'bus-stops', minzoom: liteMode ? 9 : 7,
+      layout: { 'icon-image': ['match', ['get', 'k'], 't', 'bus_tourist_stop', 'bus_station'],
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.65, 11, 0.85],
+                'icon-allow-overlap': true, 'icon-ignore-placement': true } },
     // minzoom 7 y no menos: el filtro de tippecanoe (tiles_light_filter.json)
     // solo guarda ciudades, paises, carreteras y las LINEAS de ferry por
     // debajo de z7; los puertos son type=poi y ahi se podan. Si algun dia se
@@ -2180,6 +2188,7 @@ function ensureMapInitialized() {
     map.addSource('atlas', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('car-parking', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('fuel', { type: 'geojson', data: atlasGeoJson(null) });
+    map.addSource('bus-stops', { type: 'geojson', data: atlasGeoJson(null) });
     map.addSource('road-shields', { type: 'geojson', data: atlasGeoJson(null) });
     map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#3b9eff', 'line-width': 3, 'line-opacity': 0.7 } });
     // La ruta crece con el zoom como las calles, pero siempre un poco mas
@@ -2255,6 +2264,7 @@ const ATLAS_ICONS = ['atlas_tourist_board', 'atlas_poi', 'car_parking'];
 const POI_ICON_BASE = `${REMOTE_MAP_BASE}/vector/icons`;
 
 async function loadPoiIcons() {
+  addBusStopImages();
   for (const name of POI_ICONS.concat(FERRY_ICONS, ATLAS_ICONS)) {
     if (map.hasImage(name)) continue;
     try {
@@ -2262,6 +2272,53 @@ async function loadPoiIcons() {
       map.addImage(name, res.data);
     } catch (err) {
       console.error('No se pudo cargar el icono de POI', name, err);
+    }
+  }
+}
+
+// Iconos de las terminales de bus (capa 'bus-stop'): el frente de un bus en
+// blanco sobre un cuadrado azul con borde blanco, como el del mapa del juego, y
+// el de turismo en verde. Dibujados en un canvas (como los escudos de ruta): el
+// parser no saca el del juego y en R2 no hay ninguno.
+function addBusStopImages() {
+  for (const [nombre, fondo] of [['bus_station', '#2f6fd6'], ['bus_tourist_stop', '#16a07a']]) {
+    if (map.hasImage(nombre)) continue;
+    try {
+      const S = 40; // pixeles de la imagen (pixelRatio 2): 20 px en pantalla
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const g = c.getContext('2d');
+      const caja = (x, y, w, h, r) => {
+        g.beginPath();
+        g.moveTo(x + r, y);
+        g.arcTo(x + w, y, x + w, y + h, r);
+        g.arcTo(x + w, y + h, x, y + h, r);
+        g.arcTo(x, y + h, x, y, r);
+        g.arcTo(x, y, x + w, y, r);
+        g.closePath();
+      };
+      g.fillStyle = '#ffffff';
+      caja(1, 1, S - 2, S - 2, 7);
+      g.fill();
+      g.fillStyle = fondo;
+      caja(4, 4, S - 8, S - 8, 5);
+      g.fill();
+      // la carroceria, el parabrisas y las ruedas
+      g.fillStyle = '#ffffff';
+      caja(11, 9, 18, 20, 3);
+      g.fill();
+      g.fillRect(12, 29, 4, 3);
+      g.fillRect(24, 29, 4, 3);
+      g.fillStyle = fondo;
+      caja(13, 12, 14, 8, 1.5);
+      g.fill();
+      g.beginPath();
+      g.arc(15, 25, 1.6, 0, Math.PI * 2);
+      g.arc(25, 25, 1.6, 0, Math.PI * 2);
+      g.fill();
+      map.addImage(nombre, g.getImageData(0, 0, S, S), { pixelRatio: 2 });
+    } catch (err) {
+      console.error('No se pudo dibujar el icono de la terminal de bus', nombre, err);
     }
   }
 }
@@ -3046,8 +3103,8 @@ function gameKmOf(points, full = currentRouteFull) {
   return points ? gameScale().routeMeters(full, points) / 1000 : null;
 }
 
-const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', c: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh', a: 'poiCatAtlas' };
-const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', c: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️', a: '🧭' };
+const POI_CODES = { g: 'poiCatFuel', p: 'poiCatRest', c: 'poiCatRest', s: 'poiCatService', r: 'poiCatGarage', d: 'poiCatDealer', w: 'poiCatWeigh', a: 'poiCatAtlas', b: 'poiCatBus' };
+const POI_ICONS_TEXT = { g: '⛽', p: '🅿️', c: '🅿️', s: '🔧', r: '🏠', d: '🚛', w: '⚖️', a: '🧭', b: '🚌' };
 let pois = null; // { facilities: [[x,z,code]], companies: [[x,z,token,label,city]], cities: {token: name} }
 let poisVariant = null;
 let poisLoading = null; // promesa en curso, para no disparar dos fetch del mismo archivo
@@ -3097,6 +3154,8 @@ function setAtlasData() {
   src.setData(atlasGeoJson(vale ? pois.atlas : null));
   const autos = map.getSource('car-parking');
   if (autos) autos.setData(atlasGeoJson(vale ? pois.facilities.filter(f => f[2] === 'c') : null));
+  const buses = map.getSource('bus-stops');
+  if (buses) buses.setData(atlasGeoJson(vale ? busStopList(pois).map(b => [b.x, b.z, b.tourist ? 't' : 'l', b.city]) : null));
   applyFuelSource();
 }
 
@@ -3144,6 +3203,15 @@ function nearestFacilities(code, x, z, limit) {
     // points of interest juntos, del mas cercano al mas lejano.
     for (const [ax, az, kind, name] of pois.atlas || []) {
       out.push({ x: ax, z: az, code, kind, name, dist: Math.hypot(ax - x, az - z) });
+    }
+    out.sort((a, b) => a.dist - b.dist);
+    return out.slice(0, limit);
+  }
+  if (code === 'b') {
+    // Terminales de bus (DLC Coaches, ETS2): las de linea y las de turismo,
+    // cada una con su ciudad (busStopList en pure.js).
+    for (const b of busStopList(pois)) {
+      out.push({ x: b.x, z: b.z, code, tourist: b.tourist, city: b.city, dist: Math.hypot(b.x - x, b.z - z) });
     }
     out.sort((a, b) => a.dist - b.dist);
     return out.slice(0, limit);
@@ -3295,9 +3363,7 @@ function renderPoiResults() {
   } else {
     // En auto, "Area de descanso" son los estacionamientos para auto, y en
     // camion el combustible es sin los surtidores de auto (nearestFacilities).
-    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => r.code === 'a'
-      ? { ...r, sub: [t(r.kind === 't' ? 'atlasTouristBoard' : 'atlasPoi'), nearestCityName(r.x, r.z)].filter(Boolean).join(' · ') }
-      : { ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' });
+    results = nearestFacilities(poiCategory, pos.x, pos.z, 15).map(r => poiFacilityRow(r));
   }
   if (!results.length) { list.innerHTML = `<div class="poiEmpty">${t('poiNoResults')}</div>`; return; }
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3328,13 +3394,23 @@ function renderPoiResults() {
   }));
 }
 
-// El chip del Atlas solo existe en ATS (y en las variantes cuyo mapa lo trae).
+// Nombre y linea de abajo de un lugar de la categoria elegida (nearestFacilities).
+// La terminal de bus sabe su ciudad: la de la tabla, no la mas cercana.
+function poiFacilityRow(r) {
+  if (r.code === 'a') return { ...r, sub: [t(r.kind === 't' ? 'atlasTouristBoard' : 'atlasPoi'), nearestCityName(r.x, r.z)].filter(Boolean).join(' · ') };
+  if (r.code === 'b') return { ...r, name: t(r.tourist ? 'poiCatBusTourist' : 'poiCatBusStation'), sub: cityLabel(r.city) };
+  return { ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' };
+}
+
+// El chip del Atlas solo existe en ATS (y en las variantes cuyo mapa lo trae), y
+// el de las terminales de bus en las de ETS2 que las traen (busStopList).
 function updateAtlasChip() {
-  const chip = document.querySelector('.poiChip[data-code="a"]');
-  if (!chip) return;
-  const hay = !!(pois && pois.atlas && pois.atlas.length);
-  chip.hidden = !hay;
-  if (!hay && poiCategory === 'a') {
+  const hay = { a: !!(pois && pois.atlas && pois.atlas.length), b: busStopList(pois).length > 0 };
+  for (const code of Object.keys(hay)) {
+    const chip = document.querySelector(`.poiChip[data-code="${code}"]`);
+    if (chip) chip.hidden = !hay[code];
+  }
+  if (Object.prototype.hasOwnProperty.call(hay, poiCategory) && !hay[poiCategory]) {
     poiCategory = 'g';
     document.querySelectorAll('.poiChip').forEach(c => c.classList.toggle('active', c.dataset.code === 'g'));
   }
@@ -5821,10 +5897,13 @@ const turnAnnouncer = createTurnAnnouncer();
 // Los ultimos avisos mostrados, para "Copy turn report" (createTurnLog)
 const turnLog = createTurnLog();
 
-// Las empresas que quedan a la distancia del GPS del juego cuando la app no
-// tiene a donde ir (gameGpsCandidates en pure.js, un toque = destino). list:
-// { x, z, label } para el panel. run: la busqueda en curso, que se corta sola si
-// otra la reemplaza. Son decenas de rutas: de a poco, para no trabar el mapa.
+// Las empresas y las terminales de bus que quedan a la distancia del GPS del
+// juego cuando la app no tiene a donde ir (gameGpsCandidates en pure.js, un
+// toque = destino). Las terminales, por los trabajos de linea y de turismo del
+// DLC Coaches: se eligen en el mapa del juego y se toman en la terminal, y hasta
+// ahi la telemetria no trae trabajo (Discord 14-11). list: { x, z, label } para
+// el panel. run: la busqueda en curso, que se corta sola si otra la reemplaza.
+// Son decenas de rutas: de a poco, para no trabar el mapa.
 let gameGpsGuess = { km: null, list: [], run: 0 };
 function clearGameGpsGuess() {
   gameGpsGuess = { km: null, list: [], run: gameGpsGuess.run + 1 };
@@ -5845,22 +5924,26 @@ function searchGameGpsGuess(data) {
   gameGpsGuess = { km, list: gameGpsGuess.list, run };
   const from = [data.position.x, data.position.z];
   const rumbo = routeStartHeading(data);
-  const recta = (c) => { const p = [from, [c[0], c[1]]]; return gameKmOf(p, p); };
-  const candidatas = gameGpsCandidates(pois.companies, km, recta);
+  const recta = (l) => { const p = [from, [l.x, l.z]]; return gameKmOf(p, p); };
+  const ciudad = (tok) => (pois.cities && pois.cities[tok]) || tok;
+  // A la terminal se entra como al patio de una empresa (busRouteTarget).
+  const lugares = pois.companies.map(c => ({ x: c[0], z: c[1], name: c[3], city: c[4] }))
+    .concat(busStopList(pois).map(b => ({ x: b.x, z: b.z, name: t(b.tourist ? 'poiCatBusTourist' : 'poiCatBusStation'), city: b.city, group: 'bus' })));
+  const candidatas = gameGpsCandidates(lugares, km, recta);
   const halladas = [];
   let i = 0;
   const seguir = () => {
     if (run !== gameGpsGuess.run) return;
     const inicio = performance.now();
     while (i < candidatas.length && performance.now() - inicio < 8) {
-      const company = candidatas[i++];
-      const r = findRoute(from, [company[0], company[1]], rumbo, null, null, { entrar: true, empresa: true });
-      if (r && r.length) halladas.push({ company, km: gameKmOf(r, r) });
+      const lugar = candidatas[i++];
+      const r = findRoute(from, [lugar.x, lugar.z], rumbo, null, null, { entrar: true, empresa: true });
+      if (r && r.length) halladas.push({ ...lugar, km: gameKmOf(r, r) });
     }
     if (i < candidatas.length) { setTimeout(seguir, 0); return; }
-    gameGpsGuess.list = gameGpsGuessList(halladas, km).map(({ company: c }) => {
-      const ciudad = (pois.cities && pois.cities[c[4]]) || c[4];
-      return { x: c[0], z: c[1], label: ciudad ? `${c[3]} (${ciudad})` : c[3] };
+    gameGpsGuess.list = gameGpsGuessList(halladas, km).map((l) => {
+      const c = ciudad(l.city);
+      return { x: l.x, z: l.z, label: c ? `${l.name} (${c})` : l.name };
     });
   };
   setTimeout(seguir, 0);
