@@ -3104,12 +3104,6 @@ function poiVariantNow() {
   return currentGame || (lastData ? resolveEffectiveGame(lastData.game) : null);
 }
 
-// Distancia maxima entre una empresa y el centro de la ciudad a la que
-// pertenece. Medido sobre los datos del parser: en ETS2 vainilla la mas
-// alejada esta a 8,6 km y el percentil 99 es 5 km, asi que 15 km ya es
-// seguro otra ciudad.
-const COMPANY_CITY_MAX_M = 15000;
-
 function companyPoiAt(hit) {
   return hit ? { x: hit[0], z: hit[1], token: hit[2], label: hit[3], city: hit[4] } : null;
 }
@@ -3130,28 +3124,16 @@ function findCompanyPoiByName(name, cityToken) {
     c => c[4] === cityToken && (c[3] || '').trim().toLowerCase() === buscado));
 }
 
+// Sin ciudad no hay con que desempatar: se toma la primera y listo. Con
+// ciudad, "la primera con ese token" es una trampa: el 97% de las empresas de
+// ETS2 tienen su marca en varias ciudades, asi que esa linea podia mandar la
+// bandera a la sucursal de otra ciudad, hasta 200 km lejos, sin decir nada. Si
+// la ciudad no la tiene, null, y el llamador cae al centro de la ciudad
+// correcta, que es un error mucho mas chico y mucho menos confuso
+// (companyForJob en pure.js, reporte #49).
 function findCompanyPoi(token, cityToken) {
   if (!pois || !token) return null;
-  const exacta = pois.companies.find(c => c[2] === token && c[4] === cityToken);
-  if (exacta) return companyPoiAt(exacta);
-  // Sin ciudad no hay con que desempatar: se toma la primera y listo.
-  if (!cityToken) return companyPoiAt(pois.companies.find(c => c[2] === token));
-  // Con ciudad, "la primera con ese token" es una trampa: el 97% de las
-  // empresas de ETS2 tienen su marca en varias ciudades, asi que esa linea
-  // podia mandar la bandera a la sucursal de otra ciudad, hasta 200 km lejos,
-  // sin decir nada. Se busca la mas cercana al destino y, si no hay ninguna
-  // plausible, se devuelve null para que el llamador caiga al centro de la
-  // ciudad correcta, que es un error mucho mas chico y mucho menos confuso.
-  const city = findCity(cityToken, null);
-  if (!city) return null;
-  let mejor = null;
-  let mejorDist = Infinity;
-  for (const c of pois.companies) {
-    if (c[2] !== token) continue;
-    const d = Math.hypot(c[0] - city.X, c[1] - city.Y);
-    if (d < mejorDist) { mejorDist = d; mejor = c; }
-  }
-  return mejorDist <= COMPANY_CITY_MAX_M ? companyPoiAt(mejor) : null;
+  return companyPoiAt(companyForJob(pois.companies, token, cityToken));
 }
 
 function nearestFacilities(code, x, z, limit) {
@@ -4387,7 +4369,9 @@ function resolveRawRouteTarget(data) {
     const srcCity = findCity(data.citySrcId, data.citySrc);
     // approx: esto es el centro del pueblo, no el lugar de carga. Se marca
     // para poder decirlo en pantalla en vez de fingir precision.
-    if (srcCity) return { x: srcCity.X, z: srcCity.Y, kind: 'pickup', key: `pickupcity:${data.citySrc}`, approx: true };
+    // unknownCompany: el juego dijo la empresa y el mapa no la tiene (approxNoticeKey).
+    if (srcCity) return { x: srcCity.X, z: srcCity.Y, kind: 'pickup', key: `pickupcity:${data.citySrc}`, approx: true,
+                          unknownCompany: !!(data.companySrcId || data.companySrc) };
   }
   // Sin trabajo no hay destino, aunque cityDst siga (hasJobDestination).
   if (hasJobDestination(data)) {
@@ -4396,7 +4380,8 @@ function resolveRawRouteTarget(data) {
     if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${company.token}@${company.city}` };
     const city = findCity(data.cityDstId, data.cityDst);
     if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}`,
-                       approx: true, market: data.specialJob ? 'special_transport' : (data.jobMarket || null) };
+                       approx: true, market: data.specialJob ? 'special_transport' : (data.jobMarket || null),
+                       unknownCompany: !!(data.companyDstId || data.companyDst) };
   }
   if (waypoints.length) {
     const last = waypoints[waypoints.length - 1];
@@ -4497,7 +4482,7 @@ function renderRouteSummary(view) {
   }
   const aviso = document.getElementById('routeApprox');
   if (aviso) {
-    const aprox = view.approx ? t(view.approxBus ? 'busStationApprox' : 'destApprox') : null;
+    const aprox = view.approxKey ? t(view.approxKey) : null;
     const textos = [view.pickup || null, aprox, view.dlc ? t('dlcRouteNotice') : null].filter(Boolean);
     aviso.hidden = !textos.length;
     if (textos.length) aviso.textContent = textos.join(' ');
@@ -4577,7 +4562,7 @@ function updateRouteSummary(data) {
   renderRouteSummary({
     pickup,
     approx: !!target.approx,
-    approxBus: target.market === 'bus',
+    approxKey: approxNoticeKey(target),
     busStop: busNextStopLine(busJobOf(data), data.gameTimeMinutes, hour12()),
     dlc: routeUsesUncheckedDlc,
     percent,
@@ -4678,10 +4663,11 @@ function updateDestinationMarker(data) {
       // Se agrega de que mercado salio el trabajo cuando el cliente lo manda:
       // es justo el dato que explica por que el juego no informo la empresa,
       // y asi el proximo reporte ya viene con la respuesta adentro.
-      if (target.approx && target.market === 'bus') {
-        el.title = t('busStationApprox');
-      } else if (target.approx) {
+      const avisoAprox = approxNoticeKey(target);
+      if (avisoAprox === 'destApprox') {
         el.title = t('destApproxHint') + (target.market ? ` (${target.market})` : '');
+      } else if (avisoAprox) {
+        el.title = t(avisoAprox);
       }
       destMarker = new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat(destLngLat).addTo(map);
       destMarker._kind = target.kind;
@@ -7553,6 +7539,7 @@ function buildTurnReport() {
     client: conn.clientStatus?.clientVersion || lastData?.clientVersion || null,
     truck: pos && pos.x != null ? [pos.x, pos.z] : null, heading: lastData && lastData.heading,
     now: Date.now(), items: turnLog.list(), changes: routeChangeLog.list(), job: turnReportJobLine(lastData),
+    bus: turnReportBusLine(lastData),
     speed: lastData ? { kmh: lastData.speedKmh, limitKmh: lastData.speedLimitKmh } : null,
     graph: { state: routeGraphState, failures: routeGraphFail.failures, error: routeGraphFail.error },
     routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },

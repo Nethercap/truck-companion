@@ -6781,6 +6781,70 @@ test('turnReportJobLine: dice si la web tenia el trabajo, para separar el SDK de
   assert.ok(!turnReportText(base).includes('Job:'));
 });
 
+test('companyForJob: la sucursal de la ciudad de al lado no es la del trabajo (reporte #49, 13-11)', () => {
+  const { companyForJob } = require('./pure.js');
+  // Lo de ATS: Gallup sin NAMIQ en el mapa, el de Farmington a 7,5 km de Gallup
+  // y a 512 m de Farmington.
+  const empresas = [
+    [-55599, 8905, 'nmq_min_str', 'NAMIQ', 'farmington'],
+    [-38472, 10745, 'nmq_min_str', 'NAMIQ', 'raton'],
+    [-57973, 15724, 'aml_rail_wrk', 'Amarillo Rail', 'gallup'],
+  ];
+  // exacta y sin ciudad, como antes
+  assert.equal(companyForJob(empresas, 'nmq_min_str', 'farmington'), empresas[0]);
+  assert.equal(companyForJob(empresas, 'nmq_min_str', 'raton'), empresas[1]);
+  assert.equal(companyForJob(empresas, 'nmq_min_str', null), empresas[0]);
+  // la del reporte: antes daba la de Farmington (7,5 km < 15 km), y una de otra
+  // ciudad pegada a la pedida tampoco (medido, casi siempre pierde con el centro)
+  assert.equal(companyForJob(empresas, 'nmq_min_str', 'gallup'), null);
+  const pegada = [-58000, 15500, 'nmq_min_str', 'NAMIQ', 'farmington'];
+  assert.equal(companyForJob([...empresas, pegada], 'nmq_min_str', 'gallup'), null);
+  // token que no esta, sin datos
+  assert.equal(companyForJob(empresas, 'xyz', 'gallup'), null);
+  assert.equal(companyForJob(null, 'nmq_min_str', 'gallup'), null);
+  assert.equal(companyForJob(empresas, '', 'gallup'), null);
+});
+
+test('approxNoticeKey: el cartel del centro de la ciudad dice por que (reporte #49)', () => {
+  const { approxNoticeKey } = require('./pure.js');
+  assert.equal(approxNoticeKey(null), null);
+  assert.equal(approxNoticeKey({ approx: false, unknownCompany: true }), null);
+  assert.equal(approxNoticeKey({ approx: true, market: 'external_contracts' }), 'destApprox');
+  assert.equal(approxNoticeKey({ approx: true, market: 'quick_job', unknownCompany: true }), 'destApproxUnknown');
+  assert.equal(approxNoticeKey({ approx: true, market: 'bus', unknownCompany: true }), 'busStationApprox');
+});
+
+test('turnReportBusLine: la tabla de paradas del cliente en el turn report (reporte #48, 13-11)', () => {
+  const { turnReportBusLine, turnReportText, TURN_REPORT_BUS_CHARS } = require('./pure.js');
+  const linea = {
+    onJob: true, jobMarket: 'company_job',
+    bus: { stage: 1, stages: 3, updates: 5, stops: [
+      { type: 'city', id: 'oslo', name: 'Oslo', departureActual: 1000 },
+      { type: 'city', id: 'linkoping', name: 'Linköping', arrivalActual: 1300, departureActual: 1310 },
+      { type: 'city', id: 'liepaja', name: 'Liepāja', arrivalPlanned: 1900 },
+      { type: 'city', id: 'kaunas', name: 'Kaunas' },
+    ] },
+  };
+  assert.equal(turnReportBusLine(linea), 'Bus: stage 2 of 3, 5 updates: oslo -> linkoping (arrived) -> [liepaja] -> kaunas');
+  // un mirador va con su tipo, y una etapa fuera de la tabla dice cual mando el cliente
+  const turismo = { onJob: true, bus: { stage: 4, updates: 1, stops: [{ type: 'city', id: 'oulu' }, { type: 'viewpoints', id: 'fi_viitasaari' }, { type: 'city', id: 'oulu' }] } };
+  assert.equal(turnReportBusLine(turismo), 'Bus: stage 2 of 2 (client sent 4), 1 updates: oulu -> viewpoints:fi_viitasaari -> [oulu]');
+  // sin bus o sin trabajo, nada
+  assert.equal(turnReportBusLine({ onJob: true }), null);
+  assert.equal(turnReportBusLine({ ...linea, onJob: false }), null);
+  assert.equal(turnReportBusLine(null), null);
+  // una linea larga se corta
+  const larga = { onJob: true, bus: { stage: 0, stops: Array.from({ length: 17 }, (_, k) => ({ type: 'city', id: `ciudad_con_un_nombre_largo_${k}` })) } };
+  const cortada = turnReportBusLine(larga);
+  assert.equal(cortada.length, TURN_REPORT_BUS_CHARS);
+  assert.ok(cortada.endsWith('...'));
+  // va despues de la linea del trabajo
+  const base = { game: 'ets2', map: 'ets2', web: 'x', client: '1.5.40', truck: [1, 2], now: 1, items: [], formatTime: () => 'h' };
+  const txt = turnReportText({ ...base, job: 'Job: market company_job', bus: turnReportBusLine(linea) });
+  assert.ok(txt.includes('\nJob: market company_job\nBus: stage 2 of 3, 5 updates: '));
+  assert.ok(!turnReportText(base).includes('Bus:'));
+});
+
 // Trabajo de bus del DLC Coaches como lo manda el cliente (client/trabajo_bus.py),
 // el del primer game.log.txt visto (12-11): turismo Oulu -> mirador de
 // Viitasaari -> Oulu.

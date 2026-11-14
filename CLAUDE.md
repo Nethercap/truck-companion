@@ -857,6 +857,24 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - El turn report lleva la linea "Route:" (perfil, destino y waypoints,
   `route` de `turnReportText`): sin ella, reproducir el de Tonopah era
   adivinar la empresa hasta que la ruta pasara por los avisos.
+  Con un trabajo de bus, "Bus:" (`turnReportBusLine`): la etapa que manda el
+  cliente, cuantas configuraciones llegaron y las paradas, "(arrived)" las que
+  tienen la llegada real y entre corchetes a la que va la ruta. El #48 (13-11,
+  app nativa 0.2.2, linea de Oslo a Liepaja) iba a Jonkoping mientras el bus
+  paraba en Linkoping y despues a Liepaja, con el GPS del juego (788,6 km desde
+  Linkoping, bajando hacia el noreste) que no cierra con Liepaja sola (503,6 + 22
+  del ferry del juego): sin la tabla no se supo que decia el cliente.
+- La empresa del trabajo se busca exacta por token y ciudad (`companyForJob`):
+  si el mapa no la tiene, el centro de la ciudad, aproximado y con
+  `destApproxUnknown` ("esa empresa no esta en nuestro mapa", `approxNoticeKey`),
+  no "el juego no dijo la empresa". Antes se tomaba la de la misma marca mas
+  cercana hasta 15 km, que siempre era la de otra ciudad: en el #49 (13-11, ATS
+  1.61, Kayenta -> NAMIQ de Gallup, que ningun mapa nuestro tiene) la ruta iba al
+  NAMIQ de Farmington como destino exacto, 144 km contra 263 del GPS; al centro
+  de Gallup, 248. Sacando cada empresa de los POIs, iba a otra ciudad en 70 % de
+  los casos, mediana 140 a 180 km de la real; el centro, 21 a 25 km. Ahora esos
+  trabajos tambien salen como `missing_company` (antes la otra los daba por
+  conocidos).
 - Cada aviso lleva lo que faltaba por la app y por el GPS del juego cuando
   aparecio (`(left: app ..., game ...)`, `km` de `createTurnLog`), y al final
   van los ultimos 5 recalculos ("Route changes", `createRouteChangeLog`): hora,
