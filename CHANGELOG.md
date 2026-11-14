@@ -4,6 +4,14 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Build my map: companies from map mods whose icons point to their image from the game's root
+  folder (Mapa BR Brasil 6.2 does this for all 75 of its companies) are no longer left out of the
+  map. A job to one of them went to the city centre with "we don't have this business on our map".
+  A company whose icon image can't be found at all now stays on the map too, without its logo. ETS2
+  maps built with an earlier version are offered for rebuilding once; ATS maps are not affected.
+
 ## 1.5.41 (2026-11-14)
 
 - Coaches (ETS2), Build my map: maps built on your PC now include the bus stations, so a bus stop

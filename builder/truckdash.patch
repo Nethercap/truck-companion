@@ -973,7 +973,7 @@ index 4094551..a1234c4 100644
 +  return value && /^@@.+@@$/.test(value) ? value : fallback;
 +}
 diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
-index b65d4c8..b2e3978 100644
+index b65d4c8..443765d 100644
 --- a/packages/clis/parser/game-files/map-files-parser.ts
 +++ b/packages/clis/parser/game-files/map-files-parser.ts
 @@ -11,6 +11,7 @@ import {
@@ -984,7 +984,15 @@ index b65d4c8..b2e3978 100644
    Building,
    City,
    CityArea,
-@@ -54,7 +55,18 @@ import {
+@@ -43,6 +44,7 @@ import { CombinedEntries } from './combined-entries';
+ import { convertSiiToJson } from './convert-sii-to-json';
+ import { parseDds } from './dds-parser';
+ import { parseDefFiles } from './def-parser';
++import { rutaDeTextura } from './ruta-textura';
+ import type { Entries } from './scs-archive';
+ import { ScsArchive } from './scs-archive';
+ import { parseSector } from './sector-parser';
+@@ -54,7 +56,18 @@ import {
  
  export function parseMapFiles(
    scsFilePaths: string[],
@@ -1004,7 +1012,7 @@ index b65d4c8..b2e3978 100644
  ):
    | {
        data: 'all';
-@@ -94,6 +106,9 @@ export function parseMapFiles(
+@@ -94,6 +107,9 @@ export function parseMapFiles(
        logger.log('adding', scsSource);
        return new ScsArchive(p, scsSource);
      });
@@ -1014,7 +1022,7 @@ index b65d4c8..b2e3978 100644
    const entries = new CombinedEntries(archives);
    try {
      const version = parseVersionSii(entries);
-@@ -122,7 +137,7 @@ export function parseMapFiles(
+@@ -122,7 +138,7 @@ export function parseMapFiles(
        };
      }
  
@@ -1023,7 +1031,7 @@ index b65d4c8..b2e3978 100644
      return {
        ...baseResult,
        data: 'all',
-@@ -148,26 +163,106 @@ function parseVersionSii(entries: Entries) {
+@@ -148,26 +164,106 @@ function parseVersionSii(entries: Entries) {
    return { application, version };
  }
  
@@ -1141,7 +1149,7 @@ index b65d4c8..b2e3978 100644
    const bar = new cliProgress.SingleBar(
      {
        format: `[{bar}] | {filename} | {value} of {total}`,
-@@ -194,8 +289,27 @@ function parseSectorFiles(entries: Entries): {
+@@ -194,8 +290,27 @@ function parseSectorFiles(entries: Entries): {
        throw new Error(`couldn't parse ${sectorX} or ${sectorY}`);
      }
      const sector = putIfAbsent(sectorKey, { items: [], nodes: [] }, sectors);
@@ -1171,7 +1179,7 @@ index b65d4c8..b2e3978 100644
      sector.items = sector.items.concat(
        parsedSector.items.map(item =>
          withDlcGuard(item, map, baseFile.scsSource),
-@@ -284,25 +398,46 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
+@@ -284,25 +399,46 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
        l10nStrings,
      );
      for (const f of localeSubdir.files) {
@@ -1226,7 +1234,32 @@ index b65d4c8..b2e3978 100644
        for (let i = 0; i < key.length; i++) {
          localeMap.set(key[i], val[i]);
        }
-@@ -404,12 +539,33 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+@@ -347,12 +483,12 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+         const rfx = assertExists(
+           json.effect['ui.rfx'] ?? json.effect['ui.sdf.rfx'],
+         );
+-        tobjPaths.set(key, `${dir}/${rfx.texture.texture.source}`);
++        tobjPaths.set(key, rutaDeTextura(dir, rfx.texture.texture.source));
+         if (json.effect['ui.sdf.rfx']) {
+           sdfAuxData.set(key, json.effect['ui.sdf.rfx'].aux);
+         }
+       } else if (json.material) {
+-        tobjPaths.set(key, `${dir}/${json.material.ui.texture}`);
++        tobjPaths.set(key, rutaDeTextura(dir, json.material.ui.texture));
+       } else {
+         logger.warn(`unknown format for ${dir}/${f}`);
+       }
+@@ -397,19 +533,43 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+   for (const [key, tobjPath] of tobjPaths) {
+     const tobj = entries.files.get(tobjPath);
+     if (!tobj) {
++      // Como un icono que no se puede dibujar (abajo): el .mat existe y su
++      // empresa o su cartel siguen contando, sin imagen.
+       logger.warn('could not find', tobjPath);
++      pngs.set(key, Buffer.alloc(0));
+       continue;
+     }
+     // A .tobj file in a HashFs v2 archive is actually a file with header-less
      // .dds pixel data. Assume that the concrete instance of the FileEntry for
      // the .tobj file is an ScsArchiveTobjFile, whose .read() returns a complete
      // header-ful .dds file.
@@ -1264,7 +1297,7 @@ index b65d4c8..b2e3978 100644
    // verify that mapX pngs are square
    const size = mapPngs[0].width;
    assert(mapPngs.every(p => p.width === p.height && p.width === size));
-@@ -462,6 +618,7 @@ function postProcess(
+@@ -462,6 +622,7 @@ function postProcess(
    const prefabsByUid = new Map<bigint, Prefab>();
    const mapAreas: MapArea[] = [];
    const cutscenes: Cutscene[] = [];
@@ -1272,7 +1305,7 @@ index b65d4c8..b2e3978 100644
    const triggers: Trigger[] = [];
    const signs: Sign[] = [];
    const ferryItems = new Map<string, FerryItem>();
-@@ -544,6 +701,10 @@ function postProcess(
+@@ -544,6 +705,10 @@ function postProcess(
          poifulItems.push(item);
          cutscenes.push(item);
          break;
@@ -1283,7 +1316,7 @@ index b65d4c8..b2e3978 100644
        case ItemType.Trigger:
          checkReference(item.nodeUids, nodesByUid, 'nodeUids', item);
          item.nodeUids.forEach(uid => referencedNodeUids.add(uid));
-@@ -611,288 +772,317 @@ function postProcess(
+@@ -611,288 +776,317 @@ function postProcess(
      nodeUid: bigint;
    }[] = [];
    for (const item of poifulItems) {
@@ -1849,7 +1882,7 @@ index b65d4c8..b2e3978 100644
      }
    }
  
-@@ -1110,6 +1300,7 @@ function postProcess(
+@@ -1110,6 +1304,7 @@ function postProcess(
        signs,
        trajectories,
        cutscenes,
@@ -1857,7 +1890,7 @@ index b65d4c8..b2e3978 100644
        countries: valuesWithTokens(defData.countries).map(withLocalizedName),
        cities: valuesWithTokens(cities).map(withLocalizedName),
        companyDefs: valuesWithTokens(defData.companies),
-@@ -1156,12 +1347,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
+@@ -1156,12 +1351,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
      if (o.nameLocalized && !l10n.has(o.nameLocalized.replaceAll('@', ''))) {
        logger.warn('no localized name for', o.nameLocalized, `(${o.name})`);
      }
@@ -5480,3 +5513,52 @@ new file mode 100644
 +  assert.deepEqual(entries.directories.get('')?.subdirectories, ['def', 'map']);
 +  zip.dispose();
 +});
+diff --git a/packages/clis/parser/game-files/ruta-textura.prueba.ts b/packages/clis/parser/game-files/ruta-textura.prueba.ts
+new file mode 100644
+index 0000000..b0c525b
+--- /dev/null
++++ b/packages/clis/parser/game-files/ruta-textura.prueba.ts
+@@ -0,0 +1,23 @@
++// Pruebas de ruta-textura.ts. node --experimental-strip-types --test
++
++import assert from 'node:assert/strict';
++import { test } from 'node:test';
++import { rutaDeTextura } from './ruta-textura.ts';
++
++test('relativa a la carpeta del .mat, como las del juego', () => {
++  assert.equal(rutaDeTextura('material/ui/company/small', 'acm.tobj'), 'material/ui/company/small/acm.tobj');
++  assert.equal(rutaDeTextura('material/ui/map/road', 'road_a_a1.tobj'), 'material/ui/map/road/road_a_a1.tobj');
++});
++
++test('desde la raiz si empieza con "/" (Mapa BR Brasil 6.2, Discord 14-11)', () => {
++  assert.equal(
++    rutaDeTextura('material/ui/company/small', '/material/ui/company/small/bnr.tobj'),
++    'material/ui/company/small/bnr.tobj',
++  );
++  assert.equal(rutaDeTextura('material/ui/company/small', '//material/ui/x.tobj'), 'material/ui/x.tobj');
++});
++
++test('con ".." o "./" en el medio', () => {
++  assert.equal(rutaDeTextura('material/ui/company/small', '../big/acm.tobj'), 'material/ui/company/big/acm.tobj');
++  assert.equal(rutaDeTextura('material/ui/company/small', './acm.tobj'), 'material/ui/company/small/acm.tobj');
++});
+diff --git a/packages/clis/parser/game-files/ruta-textura.ts b/packages/clis/parser/game-files/ruta-textura.ts
+new file mode 100644
+index 0000000..e945643
+--- /dev/null
++++ b/packages/clis/parser/game-files/ruta-textura.ts
+@@ -0,0 +1,14 @@
++// La textura de un icono .mat, como la busca el juego: relativa a la carpeta
++// del .mat, o desde la raiz del juego si empieza con "/". Mapa BR Brasil 6.2
++// escribe asi las de sus 77 empresas ("/material/ui/company/small/bnr.tobj"),
++// y pegada a la carpeta quedaba "material/ui/company/small//material/...", que
++// no existe: sin icono la empresa no cuenta (icons.has(token)) y se caia del
++// mapa con "unknown company token" (Discord 14-11, 75 empresas, entre ellas
++// todas las de destino de sus trabajos).
++
++import path from 'node:path';
++
++export function rutaDeTextura(dir: string, source: string): string {
++  const ruta = source.startsWith('/') ? source : `${dir}/${source}`;
++  return path.posix.normalize(ruta).replace(/^\/+/, '');
++}
