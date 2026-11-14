@@ -6952,6 +6952,38 @@ test('busStopPlace: una ciudad con terminal en los POIs va a la terminal; sin te
   assert.equal(busStopPlace({ type: 'viewpoints', id: 'oulu' }, {}, ciudadesBus, TERMINALES), null);
 });
 
+test('busStopList: las terminales de linea y las de turismo de los POIs, para el mapa y el buscador', () => {
+  const { busStopList } = require('./pure.js');
+  const pois = { busStations: TERMINALES.lines, busTouristStops: TERMINALES.tourist };
+  assert.deepEqual(busStopList(pois), [
+    { x: 41338, z: -82372, city: 'oulu', tourist: false },
+    { x: 55088, z: -71260, city: 'joensuu', tourist: false },
+    { x: 57167, z: -69782, city: 'joensuu', tourist: true },
+    { x: 33366, z: -85131, city: 'lulea', tourist: true },
+  ]);
+  // POIs de antes de la 1.62.3 (o de ATS): ninguna
+  assert.deepEqual(busStopList({ companies: [] }), []);
+  assert.deepEqual(busStopList(null), []);
+  // una fila rota no va
+  assert.deepEqual(busStopList({ busStations: { oulu: [null, 3], tampere: 'x', pori: [1, 2] }, busTouristStops: 7 }),
+    [{ x: 1, z: 2, city: 'pori', tourist: false }]);
+});
+
+test('gameGpsGuessList: la terminal de un trabajo de bus elegido en el mapa, con empresas a la misma distancia (Discord 14-11)', () => {
+  const { gameGpsGuessList } = require('./pure.js');
+  // Un trabajo de linea o de turismo se elige en el mapa y se toma en la terminal:
+  // hasta ahi, sin trabajo en la telemetria y el GPS del juego a 12 km.
+  const empresas = [['a', 12.1], ['b', 12.3], ['c', 11.8], ['d', 12.4], ['lejos', 20]].map(([company, km]) => ({ company, km }));
+  const terminal = { group: 'bus', city: 'tallinn', km: 12.2 };
+  // cuatro empresas no dicen nada, pero la terminal sigue saliendo
+  assert.deepEqual(gameGpsGuessList([...empresas, terminal], 12), [terminal]);
+  // con tres, todas, la mas parecida primero
+  assert.deepEqual(gameGpsGuessList([...empresas.slice(0, 3), terminal], 12).map(f => f.company || f.city), ['a', 'c', 'tallinn', 'b']);
+  // y mas de tres terminales tampoco
+  const terminales = [12, 12.1, 12.2, 11.9].map((km, i) => ({ group: 'bus', city: `t${i}`, km }));
+  assert.deepEqual(gameGpsGuessList([empresas[0], ...terminales], 12).map(f => f.company), ['a']);
+});
+
 test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada', () => {
   const { busRouteTarget, followGameRoute } = require('./pure.js');
   const a = busRouteTarget({ onJob: true, bus: BUS_DE_TURISMO }, MIRADORES, ciudadesBus);
