@@ -45,6 +45,7 @@ import discord_presence
 import local_server
 import map_builder
 import overlay
+import partida_gps
 import account
 import account_sync
 import plugin_installer
@@ -172,6 +173,10 @@ class AppState:
         self.lan_en_la_red = True
         # Rich Presence de Discord: se prende desde Ajustes, apagado por defecto.
         self.discord = discord_presence.DiscordPresence()
+        # El GPS del juego leido de la partida guardada (partida_gps.py), del
+        # juego en vivo, o None. Solo con el ajuste prendido (read_saves):
+        # vigilar_partidas lo llena y el dato a la web lo lleva en gameGps.
+        self.gps_partida: dict | None = None
         # Overlay en el juego (overlay.py): apagado por defecto. La ventana
         # lee la esquina y el tamano de aca, sin ir al disco en cada cuadro.
         self.overlay_data = overlay.OverlayData()
@@ -418,6 +423,71 @@ def open_account_menu_item(icon=None, item=None):
         abrir_navegador(URL_CUENTA)
     else:
         open_setup_window()
+
+
+def leer_partidas_prendido() -> bool:
+    return win_integration.load_settings().get(partida_gps.CLAVE_AJUSTE) is True
+
+
+def vigilar_partidas(cada_s: float = 3.0) -> None:
+    """Hilo propio: con el ajuste prendido y el juego en vivo, mira la
+    partida mas nueva y la relee cuando cambia (partida_gps.Vigia). Solo lee.
+    Descifrar y recorrer una partida grande lleva hasta un segundo: aca, y no
+    en el bucle de la telemetria."""
+    vigia = partida_gps.Vigia(client_lib.documents_folder())
+    while True:
+        try:
+            if leer_partidas_prendido() and state.status == "live" and state.game:
+                state.gps_partida = vigia.mirar(state.game, time.time())
+            else:
+                state.gps_partida = None
+        except Exception:
+            logging.exception("Fallo leyendo la partida guardada")
+        time.sleep(cada_s)
+
+
+def guardar_leer_partidas(valor: bool) -> None:
+    settings = win_integration.load_settings()
+    settings[partida_gps.CLAVE_AJUSTE] = bool(valor)
+    win_integration.save_settings(settings)
+    if not valor:
+        state.gps_partida = None
+    logging.info("Leer la partida guardada para el GPS: %s", "si" if valor else "no")
+
+
+def preguntar_leer_partidas() -> None:
+    """El aviso de la primera vez (Discord 15-11): leer la partida para
+    seguir el GPS del juego, si o no. Espera a que se pueda mostrar
+    (partida_gps.hay_que_preguntar). Cerrarlo sin contestar no guarda nada y
+    vuelve a preguntar en el proximo arranque. Despues se cambia en Setup."""
+    while True:
+        settings = win_integration.load_settings()
+        if partida_gps.CLAVE_AJUSTE in settings:
+            return
+        if partida_gps.hay_que_preguntar(settings, _setup_window_open, state.autostart_mode, state.vio_el_juego):
+            break
+        time.sleep(5)
+    root = tk.Tk()
+    root.title(T("read_saves_title"))
+    root.attributes("-topmost", True)
+    root.resizable(False, False)
+    root.configure(bg=BG)
+    tk.Label(root, text=T("read_saves_title"), bg=BG, fg=FG, font=("Segoe UI", 12, "bold"),
+             padx=16).pack(anchor="w", pady=(14, 4))
+    tk.Label(root, text=T("read_saves_question"), bg=BG, fg=FG, wraplength=460, justify="left",
+             padx=16).pack(anchor="w", pady=(0, 10))
+    botones = tk.Frame(root, bg=BG, padx=16, pady=12)
+    botones.pack(fill="x")
+
+    def contestar(valor):
+        guardar_leer_partidas(valor)
+        root.destroy()
+
+    tk.Button(botones, text=T("read_saves_yes"), command=lambda: contestar(True), bg=BLUE, fg="white",
+              relief="flat", padx=14, pady=4).pack(side="right")
+    tk.Button(botones, text=T("read_saves_no"), command=lambda: contestar(False), relief="flat",
+              padx=14, pady=4).pack(side="right", padx=8)
+    root.mainloop()
 
 
 def anunciar_cuentas(icon) -> bool:
@@ -702,6 +772,14 @@ class SetupWindow:
         dchk.pack(anchor="w", pady=(2, 0))
         if not discord_presence.APPLICATION_ID:
             dchk.configure(state="disabled")
+
+        # Leer la partida guardada para seguir el GPS del juego (partida_gps.py):
+        # se pregunta la primera vez (preguntar_leer_partidas) y se cambia aca.
+        self.saves_var = tk.BooleanVar(value=leer_partidas_prendido())
+        schk = tk.Checkbutton(options, text=T("read_saves_option"), variable=self.saves_var,
+                              command=self.toggle_read_saves, bg=BG, fg=FG, selectcolor="#262b33",
+                              activebackground=BG, activeforeground=FG, wraplength=520, justify="left")
+        schk.pack(anchor="w", pady=(2, 0))
 
         # Bajo Proton el cliente retiene el wineserver del prefijo y Steam
         # sigue viendo el juego como "Running". Por eso viene activado ahi y
@@ -1242,6 +1320,9 @@ class SetupWindow:
         settings["discord_presence"] = enabled
         win_integration.save_settings(settings)
         state.discord.set_enabled(enabled)
+
+    def toggle_read_saves(self):
+        guardar_leer_partidas(bool(self.saves_var.get()))
 
     def toggle_autostart(self):
         if self.autostart_var.get() and win_integration.in_temp_location():
@@ -2305,6 +2386,9 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 if jugadores is not None:
                     payload["tmpPlayers"] = client_lib.sin_no_finitos(jugadores)
                     con_tmp = True
+            gps_partida = partida_gps.para_el_payload(state.gps_partida, game)
+            if gps_partida:
+                payload["gameGps"] = gps_partida
             text = json.dumps(payload)
             if (now_send - last_cloud_send >= client_lib.CLOUD_SEND_INTERVAL_SECONDS
                     or client_lib.payload_has_event(payload) or con_tmp):
@@ -2543,6 +2627,12 @@ def main():
     # Antes de arrancar el hilo: first_run_done se guarda mas abajo.
     state.lan_en_la_red = local_server.lan_al_arrancar(win_integration.load_settings())
     start_asyncio_thread(args.backend, args.code)
+    threading.Thread(target=vigilar_partidas, daemon=True).start()
+    # Unos segundos despues, para no salir encima del arranque. Daemon: puede
+    # quedarse esperando el juego, y no tiene que trabar la salida.
+    aviso = threading.Timer(10, preguntar_leer_partidas)
+    aviso.daemon = True
+    aviso.start()
 
     settings = win_integration.load_settings()
     if not settings.get("first_run_done") and not args.autostart:
