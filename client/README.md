@@ -20,12 +20,17 @@ Euro Truck Simulator 2 and American Truck Simulator.
   find where the game is installed.
 - On request, it presses keys in the game window when you tap a button in
   the dashboard's button box, using the bindings from your own `controls.sii`.
+- Only if you allow it (it asks once, and Setup has a checkbox to change it),
+  it reads your latest save in the game's profile folders to see where the
+  in-game GPS is going: the telemetry only says how far the route is. It never
+  writes to the save.
 
 **It does not**:
 - Read, modify, or access any files on your computer other than the game's
   telemetry shared memory, the game's `controls.sii` (read-only, for the
-  button box), the plugin file it installs on request, and its own settings
-  and log next to the `.exe`.
+  button box), your latest save (read-only, only if you allowed it), the
+  plugin file it installs on request, and its own settings and log next to
+  the `.exe`.
 - Require administrator privileges.
 - Collect or store any personal information. Telemetry is relayed live and
   is not saved anywhere server-side beyond the current session.

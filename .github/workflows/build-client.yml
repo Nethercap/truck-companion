@@ -186,7 +186,7 @@ jobs:
 
           ``TruckDash-MapBuilder-*.zip`` is optional: the client downloads it by itself, only if you use "Build my map" for map mods that are not on our servers. It is GPL-3.0 (built from truckermudgeon/maps with our patch; source in [builder/](https://github.com/${{ github.repository }}/tree/main/builder)).
 
-          Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". Some antivirus engines flag the file for the same reason (an unsigned one-file PyInstaller executable that unpacks itself at startup) — it is a false positive; the source and this build log are public, and a code signing certificate for open source projects is in progress. The client is open source, needs no admin rights and only reads the game's telemetry.
+          Windows SmartScreen may warn about an unrecognized app because the executable is not code-signed: click "More info" → "Run anyway". Some antivirus engines flag the file for the same reason (an unsigned one-file PyInstaller executable that unpacks itself at startup) — it is a false positive; the source and this build log are public, and a code signing certificate for open source projects is in progress. The client is open source, needs no admin rights and never writes to the game or your saves.
           "@
           Set-Content -Path release-notes.md -Value $notas -Encoding utf8
           Get-Content release-notes.md
