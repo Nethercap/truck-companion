@@ -4423,6 +4423,20 @@ function resolveRouteTarget(data) {
 }
 
 function resolveRawRouteTarget(data) {
+  const delTrabajo = jobRouteTargetOf(data);
+  if (delTrabajo) return delTrabajo;
+  // Sin trabajo, a donde va el GPS del juego segun la partida guardada
+  // (updateGameGpsSave), con los waypoints de la app antes.
+  if (gameGpsSave.target) return gameGpsSave.target;
+  if (waypoints.length) {
+    const last = waypoints[waypoints.length - 1];
+    return { x: last.pos[0], z: last.pos[1], kind: 'waypoint', key: waypointRouteKey(waypoints) };
+  }
+  return null;
+}
+
+// El destino que sale del trabajo de la telemetria (bus, remolque o entrega), o null.
+function jobRouteTargetOf(data) {
   // Trabajo de bus (DLC Coaches): a la proxima parada, un mirador por su id
   // en los POIs, la terminal de su ciudad o, sin terminal, el centro de la
   // ciudad (busRouteTarget en pure.js).
@@ -4458,10 +4472,6 @@ function resolveRawRouteTarget(data) {
     if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}`,
                        approx: true, market: data.specialJob ? 'special_transport' : (data.jobMarket || null),
                        unknownCompany: !!(data.companyDstId || data.companyDst) };
-  }
-  if (waypoints.length) {
-    const last = waypoints[waypoints.length - 1];
-    return { x: last.pos[0], z: last.pos[1], kind: 'waypoint', key: waypointRouteKey(waypoints) };
   }
   return null;
 }
@@ -4760,6 +4770,9 @@ function updateDestinationMarker(data) {
   // comparar contra. routeKey incluye los waypoints para que un cambio
   // (poner/sacar/alcanzar uno) tambien dispare el recalculo.
   const legs = waypoints.map(wp => wp.pos);
+  // Los waypoints del GPS del juego antes de su destino (gameGpsSave): por ahi se pasa.
+  const via = Array.isArray(target.via) ? target.via : [];
+  legs.push(...via);
   if (target.kind !== 'waypoint') legs.push([target.x, target.z]);
   const routeKey = `${target.key}|${legs.map(p => `${p[0]},${p[1]}`).join(';')}`;
   const destChanged = routeKey !== currentRouteTarget;
@@ -4812,13 +4825,17 @@ function updateDestinationMarker(data) {
       // (solo los puestos tocando el mapa: waypointPassesBy). A una parada,
       // una empresa o la empresa del trabajo se entra (entrar); a la del
       // trabajo, por un nodo que no toque una via rapida (empresa).
-      const pasa = (i) => i < waypoints.length && waypointPassesBy(waypoints[i]);
-      // La terminal de bus de una ciudad es un patio como el de una empresa.
-      const empresa = (i) => i >= waypoints.length && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && (!target.bus || !!target.terminal);
+      // Los del GPS del juego (via) son nodos de la calle: se pasa por ellos.
+      const nAntes = waypoints.length + via.length;
+      const pasa = (i) => (i < waypoints.length ? waypointPassesBy(waypoints[i]) : i < nAntes);
+      // La terminal de bus de una ciudad es un patio como el de una empresa. Al
+      // destino del GPS del juego no: es el nodo de la calle donde termina.
+      const empresa = (i) => i >= nAntes && (target.kind === 'dest' || target.kind === 'pickup') && !target.approx && (!target.bus || !!target.terminal)
+        && !(target.gameGps && target.kind === 'dest');
       // A un mirador de un trabajo de bus se entra como a una parada propia:
       // es un estacionamiento al costado de la ruta, no el patio de una empresa.
-      const mirador = (i) => i >= waypoints.length && !!target.bus && !target.approx && !target.terminal;
-      const entra = (i) => (i < waypoints.length ? !pasa(i) : empresa(i) || mirador(i));
+      const mirador = (i) => i >= nAntes && !!target.bus && !target.approx && !target.terminal;
+      const entra = (i) => (i < nAntes ? !pasa(i) : empresa(i) || mirador(i));
       const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
       let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), siguiente });
       llegada = leg ? leg.llegada || null : null;
@@ -5906,6 +5923,87 @@ const turnLog = createTurnLog();
 // el panel. run: la busqueda en curso, que se corta sola si otra la reemplaza.
 // Son decenas de rutas: de a poco, para no trabar el mapa.
 let gameGpsGuess = { km: null, list: [], run: 0 };
+
+// A donde va el GPS del juego segun la partida guardada (gameGps del cliente,
+// partida_gps.py; Discord 15-11). Con cada partida nueva se calculan los
+// candidatos (gameGpsSaveCandidates) y queda el que coincide con los km del GPS
+// (gameGpsSavePick): target, el destino que devuelve resolveRawRouteTarget sin
+// trabajo. savedAt: la ultima partida buscada (no se vuelve a buscar en la misma);
+// km y pos: el dato anterior, para ver si el GPS cambio despues (gameGpsSaveStale).
+let gameGpsSave = { savedAt: null, target: null, run: 0, km: null, pos: null };
+function updateGameGpsSave(data) {
+  const gg = data.gameGps && typeof data.gameGps === 'object' ? data.gameGps : null;
+  const km = Number(data.routeDistanceKm) || 0;
+  const pos = data.position && data.position.x != null ? [data.position.x, data.position.z] : null;
+  const prev = gameGpsSave;
+  gameGpsSave = { ...prev, km, pos };
+  // Con trabajo manda la telemetria; sin GPS en el juego, no hay a donde ir.
+  if (!gg || !(km > 0) || jobRouteTargetOf(data)) {
+    if (prev.target) { gameGpsSave.target = null; routeForcedReason = 'game_gps_save'; }
+    return;
+  }
+  const salto = prev.pos && pos ? Math.hypot(pos[0] - prev.pos[0], pos[1] - prev.pos[1]) : 0;
+  if (prev.target && gameGpsSaveStale(prev.km, km, salto)) {
+    // Un destino nuevo en el juego: hasta la proxima partida, lo de siempre.
+    gameGpsSave.target = null;
+    routeForcedReason = 'game_gps_save';
+    return;
+  }
+  if (gg.savedAt === prev.savedAt || !routeGraph || !pois || poisVariant !== currentGame || !pos) return;
+  gameGpsSave.savedAt = gg.savedAt;
+  searchGameGpsSave(gg, pos, routeStartHeading(data), km);
+}
+function searchGameGpsSave(gg, from, rumbo, km) {
+  const run = gameGpsSave.run + 1;
+  gameGpsSave.run = run;
+  const pickupOf = (job) => findCompanyPoi(job.srcCompany, job.srcCity);
+  const candidatas = gameGpsSaveCandidates(gg, pickupOf);
+  const halladas = [];
+  let i = 0;
+  const seguir = () => {
+    if (run !== gameGpsSave.run) return;
+    const inicio = performance.now();
+    do {
+      const c = candidatas[i++];
+      if (!c) break;
+      // Cada tramo como lo calcula la ruta: por los waypoints se pasa, al
+      // remolque se entra como al patio de una empresa.
+      const puntos = c.via.concat([[c.x, c.z]]);
+      let desde = from, total = [], llegada = null, ok = true;
+      for (let k = 0; k < puntos.length && ok; k++) {
+        const fin = k === puntos.length - 1;
+        const leg = findRoute(desde, puntos[k], k === 0 ? rumbo : null, null, null,
+          { desde: llegada, pasar: !fin, entrar: fin && c.kind === 'pickup', empresa: fin && c.kind === 'pickup' });
+        if (!leg || !leg.length) { ok = false; break; }
+        llegada = leg.llegada || null;
+        total = total.length ? total.concat(leg.slice(1)) : leg;
+        desde = puntos[k];
+      }
+      if (ok) halladas.push({ ...c, km: gameKmOf(total, total) });
+    } while (i < candidatas.length && performance.now() - inicio < 8);
+    if (i < candidatas.length) { setTimeout(seguir, 0); return; }
+    const elegida = gameGpsSavePick(halladas, km);
+    const antes = gameGpsSave.target;
+    gameGpsSave.target = elegida
+      ? { x: elegida.x, z: elegida.z, kind: elegida.kind, via: elegida.via, key: elegida.key, gameGps: true }
+      : null;
+    if (elegida && (!antes || antes.key !== elegida.key)) showToast(t('gameGpsSaveToast'), 'success', 4000);
+    if (elegida || antes) routeForcedReason = 'game_gps_save';
+  };
+  setTimeout(seguir, 0);
+}
+
+// Los waypoints del GPS del juego se van sacando al pasarlos, como los de la app
+// (waypointReached); recien sin los de la app el primero del juego es el primer tramo.
+function checkGameGpsViaReached(x, z) {
+  const tg = gameGpsSave.target;
+  if (!tg || !tg.via || !tg.via.length || waypoints.length) return;
+  const route = currentRouteTarget ? currentRouteWorldPoints : null;
+  const speedKmh = lastData && Number.isFinite(lastData.speedKmh) ? Math.abs(lastData.speedKmh) : null;
+  if (waypointReached(x, z, tg.via[0], route, { tapM: WAYPOINT_REACHED_M, speedKmh })) {
+    gameGpsSave.target = { ...tg, via: tg.via.slice(1) };
+  }
+}
 function clearGameGpsGuess() {
   gameGpsGuess = { km: null, list: [], run: gameGpsGuess.run + 1 };
 }
@@ -6912,6 +7010,7 @@ function updateMap(position, game, gameHeadingDeg) {
     }
   }
   checkWaypointReached(position.x, position.z);
+  checkGameGpsViaReached(position.x, position.z);
   updateCurrentRoad(position.x, position.z);
   updateNextCity(position.x, position.z);
 
@@ -7645,8 +7744,9 @@ function buildTurnReport() {
     routeKm: { app: currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null, game: lastData ? lastData.routeDistanceKm : null },
     route: {
       profile: routeProfile,
-      to: target && target.kind !== 'waypoint' ? { kind: target.kind, x: target.x, z: target.z, approx: !!target.approx } : null,
-      via: waypoints.map(wp => wp.pos),
+      to: target && target.kind !== 'waypoint' ? { kind: target.kind, x: target.x, z: target.z, approx: !!target.approx, gameGps: !!target.gameGps } : null,
+      // Los del GPS del juego (gameGpsSave) despues de los de la app, como en la ruta.
+      via: waypoints.map(wp => wp.pos).concat(target && Array.isArray(target.via) ? target.via : []),
     },
     formatTime: (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
   });
@@ -8636,6 +8736,7 @@ function handleTelemetry(data) {
   if (dashPanel) dashPanel.update(data);
   if (mapDashPanel) mapDashPanel.update(data);
   updateMap(data.position || {}, data.game, data.heading);
+  updateGameGpsSave(data);
   updateDestinationMarker(data);
   updateGameGpsGuess(data);
   updateGameGpsGuessPanel(data);

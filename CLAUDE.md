@@ -1234,7 +1234,29 @@ Revisar cada cambio contra esta lista:
    de input del SDK (`scs_input_init`) que aprieta "quicksave" cuando lo pide el
    servidor, y el servidor descifra el `game.sii` mas nuevo y lee
    `economy.stored_gps_ahead_waypoints` (`nav_node_position`) y `player.selected_job`
-   (`job_info`). Pisa el quicksave del jugador. Aca no se hizo: queda por decidir.
+   (`job_info`). Pisa el quicksave del jugador. En Discord (15-11) eligieron solo
+   leer, preguntando la primera vez: `client/partida_gps.py` lee la partida mas
+   nueva de los perfiles (`profiles` y `steam_profiles`, sin los `.bak`), la
+   descifra (ScsC: AES-256-CBC con la clave publica y zlib; bcrypt en Windows,
+   libcrypto en Linux y un AES propio de respaldo, probado con los vectores del
+   NIST) y la recorre en BSII o en texto sin decodificar lo que no sirve (25 MB en
+   0,26 s). Nunca escribe. `nav_node_position` va en punto fijo (/256). El ajuste es
+   `read_saves` en los ajustes del cliente: sin la clave, el aviso de la primera vez
+   (`preguntar_leer_partidas`, despues de cerrar Setup y, arrancado con Windows,
+   con el juego abierto); la casilla de Setup lo cambia. Va en el dato como
+   `gameGps` ({ savedAt, waypoints: [[x, z]], job, jobActive }, opcional). En la
+   web, sin trabajo en la telemetria, cada partida nueva da candidatos
+   (`gameGpsSaveCandidates`: una cola de waypoints por cada uno que pudo quedar
+   atras, y la empresa de origen del trabajo elegido) y gana el que coincide con
+   los km del GPS (`gameGpsSavePick`, 1 km o 5 %): una partida vieja no coincide.
+   Si los km saltan sin que salte el camion (`gameGpsSaveStale`: un destino nuevo
+   en el juego), se suelta hasta la proxima partida. Los waypoints del juego van
+   en `target.via` (por donde se pasa) y se sacan al pasarlos
+   (`checkGameGpsViaReached`). En Playwright (ATS, Jefferson City): un pin, el GPS
+   cambiado, un waypoint en el medio, uno ya pasado (317 km con el contra 83 del
+   GPS), el trabajo elegido (al remolque) y con trabajo en la telemetria (manda
+   el trabajo). Sin probar con el juego ni con una partida de verdad. La app nativa
+   no lo usa: `conduccion.js` no llama a `updateGameGpsSave`.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el
    usuario escriba las tildes (`foldText`).

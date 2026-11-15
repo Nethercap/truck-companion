@@ -3513,6 +3513,9 @@ test('turnReportMapLines y turnReportDlcLine: por que ese mapa y que DLC se evit
   assert.equal(lineas[lineas.indexOf('Route: fastest, to dest at 68228, 57696') + 1], 'DLC: auto, ats list, 20 of 22 detected, avoiding ia');
   const viejo = turnReportText(base);
   assert.ok(!viejo.includes('Map choice') && !viejo.includes('DLC:'));
+  // el destino leido de la partida guardada (gameGpsSave) se distingue del de un trabajo
+  const delGps = turnReportText({ ...base, route: { profile: 'fastest', to: { kind: 'dest', x: 1, z: 2, gameGps: true }, via: [[5, 6]] } });
+  assert.ok(delGps.includes('to dest (in-game GPS, from the save) at 1, 2'));
 });
 
 test('gameRouteDistanceText: entero lejos, un decimal cerca, en millas con imperial', () => {
@@ -7007,6 +7010,53 @@ test('gameGpsPlaces: empresas, terminales y lugares del Atlas para el GPS del ju
   const halladas = ['a', 'b', 'c', 'd'].map(name => ({ name, group: 'company', km: 30 }))
     .concat([{ name: 'Welcome to Utah', group: 'atlas', km: 30.2 }]);
   assert.deepEqual(gameGpsGuessList(halladas, 30).map(f => f.name), ['Welcome to Utah']);
+});
+
+test('gameGpsSaveCandidates: una cola de waypoints por cada uno ya pasado, y el remolque del trabajo elegido (Discord 15-11)', () => {
+  const { gameGpsSaveCandidates } = require('./pure.js');
+  const gg = { savedAt: 1700000000, waypoints: [[10, 20], [30, 40], [50, 60]], job: null, jobActive: false };
+  const c = gameGpsSaveCandidates(gg, null);
+  assert.equal(c.length, 3);
+  assert.deepEqual(c[0], { x: 50, z: 60, via: [[10, 20], [30, 40]], kind: 'dest', skipped: 0, key: 'gamegps:1700000000:50,60', gameGps: true });
+  assert.deepEqual(c[2].via, []);
+  assert.equal(c[2].skipped, 2);
+  // el mismo destino con menos paradas: la misma clave (la barra de progreso no vuelve a empezar)
+  assert.equal(c[1].key, c[0].key);
+  // el trabajo elegido: a la empresa de origen, si los POIs la tienen
+  const job = { srcCompany: 'tradeaux', srcCity: 'berlin', dstCompany: 'posped', dstCity: 'praha', market: 'freight_market' };
+  const empresas = (j) => (j.srcCompany === 'tradeaux' ? { x: 1, z: 2, token: 'tradeaux', city: 'berlin' } : null);
+  const conTrabajo = gameGpsSaveCandidates({ savedAt: 5, waypoints: [], job }, empresas);
+  assert.deepEqual(conTrabajo, [{ x: 1, z: 2, via: [], kind: 'pickup', skipped: 0, key: 'gamegps:5:pickup:tradeaux@berlin', gameGps: true }]);
+  assert.deepEqual(gameGpsSaveCandidates({ savedAt: 5, waypoints: [], job: { ...job, srcCompany: 'otra' } }, empresas), []);
+  // un cliente viejo (sin gameGps), o datos rotos
+  assert.deepEqual(gameGpsSaveCandidates(undefined, empresas), []);
+  assert.deepEqual(gameGpsSaveCandidates({ waypoints: [[1, 2]] }, empresas), []);
+  assert.equal(gameGpsSaveCandidates({ savedAt: 1, waypoints: [[1, 'x'], [3, 4]] }, null).length, 1);
+});
+
+test('gameGpsSavePick: gana el que coincide con los km del GPS, y la partida vieja no', () => {
+  const { gameGpsSavePick, gameGpsSaveMatches, gameGpsSaveStale } = require('./pure.js');
+  // camion pasado del primer waypoint por 2 km: con el, 4 km de mas (ir y volver); sin el, lo del GPS
+  const pasado = [{ skipped: 0, km: 104.2 }, { skipped: 1, km: 100.3 }, { skipped: 2, km: 61 }];
+  assert.equal(gameGpsSavePick(pasado, 100).skipped, 1);
+  // todavia antes del primero: con el
+  assert.equal(gameGpsSavePick([{ skipped: 0, km: 100.4 }, { skipped: 1, km: 92 }], 100).skipped, 0);
+  // el GPS ya va a otro lado: nada
+  assert.equal(gameGpsSavePick([{ skipped: 0, km: 40 }], 100), null);
+  assert.equal(gameGpsSavePick([{ skipped: 0, km: null }], 100), null);
+  assert.equal(gameGpsSavePick([], 100), null);
+  // margen: 1 km de cerca, 5 % de lejos
+  assert.equal(gameGpsSaveMatches(3.9, 3), true);
+  assert.equal(gameGpsSaveMatches(4.1, 3), false);
+  assert.equal(gameGpsSaveMatches(209, 200), true);
+  assert.equal(gameGpsSaveMatches(211, 200), false);
+  assert.equal(gameGpsSaveMatches(10, 0), false);
+  // el GPS cambio: los km saltan sin que salte el camion
+  assert.equal(gameGpsSaveStale(100, 99.98, 25), false); // andando
+  assert.equal(gameGpsSaveStale(100, 140, 0), true); // destino mas lejos
+  assert.equal(gameGpsSaveStale(100, 20, 0), true); // o mas cerca
+  assert.equal(gameGpsSaveStale(100, 40, 30000), false); // un ferry
+  assert.equal(gameGpsSaveStale(0, 40, 0), false);
 });
 
 test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada', () => {
