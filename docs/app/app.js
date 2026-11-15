@@ -6171,6 +6171,8 @@ function sendNavHud() {
     remainingLabel: t('routeRemainingLabel'),
     arrivalLabel: t('overlayArrivalReal'),
     gameArrivalLabel: t('overlayArrivalGame'),
+    // La de la hora de la PC (el cliente la muestra tambien sin tablero)
+    clockLabel: t('overlayClock'),
     // El overlay del juego: la ruta por la que se va y los puntos cardinales
     // en el idioma del tablero (navHudHeadingRoad en pure.js)
     ...navHudHeadingRoad(currentRoadLabel, t('overlayCompassPoints')),

@@ -4,6 +4,12 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- In-game overlay: it can show the real time, from your PC's clock (Setup, Show, **Clock (real)**;
+  off until you tick it). It works without the dashboard open, and follows the 12 or 24 hour format
+  chosen in the dashboard's Settings, like the arrival times.
+
 ## 1.5.42 (2026-11-14)
 
 - Build my map: companies from map mods whose icons point to their image from the game's root

@@ -161,7 +161,7 @@ def test_textos_en_los_ocho_idiomas():
     claves = ["overlay_option", "overlay_position", "overlay_size", "overlay_opacity", "menu_overlay",
               "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show",
               "overlay_hotkey", "hotkey_none", "sec_overlay", "overlay_hint", "pos_custom",
-              "overlay_move", "overlay_move_done", "overlay_move_hint", "overlay_compass"]
+              "overlay_move", "overlay_move_done", "overlay_move_hint", "overlay_compass", "overlay_clock"]
     claves += [f"pos_{c}" for c in overlay.CORNERS]
     claves += [f"item_{k}" for k in overlay.ITEMS]
     for lang, textos in i18n._STRINGS.items():
@@ -538,7 +538,7 @@ def test_rumbo_y_ruta_solo_si_se_eligen_y_apagados_por_defecto():
     d = overlay.contenido(t, 100.0, n, 100.0, 100.5, items=overlay.ITEMS_POR_DEFECTO)
     assert d["heading"] == "" and d["road"] == ""
     assert "heading" not in overlay.ITEMS_POR_DEFECTO and "road" not in overlay.ITEMS_POR_DEFECTO
-    assert set(overlay.ITEMS_POR_DEFECTO) | {"heading", "road"} == set(overlay.ITEMS)
+    assert set(overlay.ITEMS_POR_DEFECTO) | {"heading", "road", "clock"} == set(overlay.ITEMS)
     # Solo el rumbo elegido alcanza para que se vea el overlay
     d = overlay.contenido(t, 100.0, None, 0.0, 100.5, items=("heading",))
     assert d is not None and d["heading"] == "E" and not d["speed"]
@@ -565,3 +565,50 @@ def test_el_ejemplo_del_modo_mover_trae_rumbo_y_ruta_si_se_eligen():
     d = overlay.ejemplo(("speed",), ("F", "R", "J"))
     assert d["heading"] == "" and d["road"] == ""
 
+
+# La hora real (Discord, 15-11)
+
+def _local(h, m):
+    """Un instante de hoy a esa hora, en la zona horaria de la maquina."""
+    import time
+    return time.mktime((2026, 11, 15, h, m, 30, 0, 0, -1))
+
+
+def test_hora_real_sin_tablero_y_en_el_formato_del_tablero():
+    ahora = _local(21, 5)
+    d = overlay.contenido(tele(), ahora, None, 0.0, ahora, items=("clock",), etiqueta_hora="Hora")
+    # Sin tablero: 24 h y la etiqueta del idioma del cliente
+    assert d is not None and (d["clock"], d["clockLabel"]) == ("21:05", "Hora")
+    assert not d["speed"] and not d["remaining"]
+    n = nav(clock12=True, clockLabel="Time")
+    d = overlay.contenido(tele(), ahora, n, ahora, ahora, items=("clock",), etiqueta_hora="Hora")
+    assert (d["clock"], d["clockLabel"]) == ("9:05 PM", "Time")
+    # El tablero se callo: la hora sigue, con su formato y su etiqueta
+    d = overlay.contenido(tele(), ahora, n, ahora - 60, ahora, items=("clock",))
+    assert (d["clock"], d["clockLabel"]) == ("9:05 PM", "Time")
+    medianoche = _local(0, 30)
+    assert overlay.contenido(tele(), medianoche, None, 0.0, medianoche, items=("clock",))["clock"] == "00:30"
+    assert overlay.contenido(tele(), medianoche, n, medianoche, medianoche, items=("clock",))["clock"] == "12:30 AM"
+    assert overlay.hora_real(_local(12, 0), True) == "12:00 PM"
+
+
+def test_hora_real_solo_si_se_elige_y_apagada_por_defecto():
+    ahora = _local(8, 41)
+    assert "clock" not in overlay.ITEMS_POR_DEFECTO and "clock" in overlay.DATOS
+    d = overlay.contenido(tele(), ahora, nav(), ahora, ahora, items=overlay.ITEMS_POR_DEFECTO)
+    assert d["clock"] == ""
+    assert overlay.contenido(tele(), ahora, None, 0.0, ahora, items=overlay.ITEMS)["clock"] == "08:41"
+    # En pausa (menu) el overlay se esconde aunque la hora este elegida
+    assert overlay.contenido(tele(paused=True), ahora, None, 0.0, ahora, items=("clock",)) is None
+
+
+def test_etiqueta_de_la_hora_del_tablero_y_ejemplo():
+    assert overlay.limpiar_nav({"clockLabel": "  Uhrzeit  "})["clockLabel"] == "Uhrzeit"
+    assert overlay.limpiar_nav({"clockLabel": 5})["clockLabel"] == ""
+    # Un tablero de antes no la manda: la del cliente
+    d = overlay.contenido(tele(), 100.0, nav(), 100.0, 100.5, items=("clock",), etiqueta_hora="Godzina")
+    assert d["clockLabel"] == "Godzina"
+    # Modo Mover sin juego: el ejemplo la trae solo si esta elegida
+    assert overlay.ejemplo(("clock",), ("F", "R", "J", "Hora"))["clockLabel"] == "Hora"
+    assert overlay.ejemplo(("clock",), ("F", "R", "J"))["clock"]
+    assert overlay.ejemplo(overlay.ITEMS_POR_DEFECTO, ("F", "R", "J"))["clock"] == ""

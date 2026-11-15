@@ -57,11 +57,13 @@ DEFAULT_OPACITY = 90  # antes fija en 88; de a SIZE_STEP como el deslizador
 # (12-11): el rumbo sale de la telemetria (rumbo.py, sin tablero), la ruta la
 # manda el tablero (currentRoadLabel de app.js; solo ATS, los carteles de
 # ETS2 no traen el numero). Vienen apagados, para no cambiar el overlay de
-# nadie.
+# nadie. La hora de la PC ("clock", pedida en Discord el 15-11) tambien;
+# sale sin tablero, con el formato de 12 o 24 h si lo eligio el tablero, como
+# la llegada del juego.
 ITEMS = ("turn", "speed", "cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival",
-         "stops", "near_stops")
-DATOS = ("turn", "speed", "cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival")
-ITEMS_NUEVOS_APAGADOS = ("heading", "road")
+         "clock", "stops", "near_stops")
+DATOS = ("turn", "speed", "cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival", "clock")
+ITEMS_NUEVOS_APAGADOS = ("heading", "road", "clock")
 # Sin lista guardada (nunca se toco una casilla) se ve todo menos esos.
 ITEMS_POR_DEFECTO = tuple(i for i in ITEMS if i not in ITEMS_NUEVOS_APAGADOS)
 # La barra de la ruta ("stops", idea del usuario del 09-10): de aca al
@@ -211,6 +213,8 @@ def limpiar_nav(msg: dict) -> dict:
         "remainingLabel": _texto(msg.get("remainingLabel"), 24),
         "arrivalLabel": _texto(msg.get("arrivalLabel"), 32),
         "gameArrivalLabel": _texto(msg.get("gameArrivalLabel"), 32),
+        # La de la hora real: tableros de antes no la mandan
+        "clockLabel": _texto(msg.get("clockLabel"), 32),
         "imperial": msg.get("imperial") if isinstance(msg.get("imperial"), bool) else None,
         # 12 o 24 h, el de Ajustes del tablero: la llegada del juego la arma
         # el cliente y tiene que salir igual que la real, que llega hecha
@@ -328,11 +332,18 @@ def llegada_en_juego(tele: dict, doce: bool = False) -> str:
     return formato_hora(hora // 60, hora % 60, doce) + (f" +{dias}d" if dias > 0 else "")
 
 
+def hora_real(ahora: float, doce: bool = False) -> str:
+    """La hora de esta PC ("21:05" o "9:05 PM"): la del reloj de Windows,
+    con su zona horaria."""
+    t = time.localtime(ahora)
+    return formato_hora(t.tm_hour, t.tm_min, doce)
+
+
 def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float,
               ahora: float, imperial_default: bool | None = None,
               etiqueta_falta: str = "Remaining", etiqueta_llega: str = "Arrival (real)",
               etiqueta_juego: str = "Arrival (game)", items=ITEMS,
-              aviso_giro: str = "", rumbos=None) -> dict | None:
+              aviso_giro: str = "", rumbos=None, etiqueta_hora: str = "Time") -> dict | None:
     """Lo que hay que dibujar, o None si el overlay no tiene que verse.
 
     tele es el payload que va al tablero (el mismo dict); nav lo ultimo que
@@ -395,6 +406,8 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         # El formato vale aunque el tablero ya no mande: es una preferencia
         "game_arrival": llegada_en_juego(tele, bool(nav and nav.get("clock12")))
         if "game_arrival" in items else "",
+        # La hora real no depende del tablero; su formato si, como la de arriba
+        "clock": hora_real(ahora, bool(nav and nav.get("clock12"))) if "clock" in items else "",
         # Lo que falta: el del tablero si manda (su ruta tiene los waypoints),
         # si no el del GPS del juego
         "stops": barra_paradas(tele, nav["remainingKm"] if nav_ok and nav.get("remainingKm") else tele.get("routeDistanceKm"))
@@ -408,6 +421,7 @@ def contenido(tele: dict | None, tele_ts: float, nav: dict | None, nav_ts: float
         "remainingLabel": (nav and nav.get("remainingLabel")) or etiqueta_falta,
         "arrivalLabel": (nav and nav.get("arrivalLabel")) or etiqueta_llega,
         "gameArrivalLabel": (nav and nav.get("gameArrivalLabel")) or etiqueta_juego,
+        "clockLabel": (nav and nav.get("clockLabel")) or etiqueta_hora,
     }
     # Nada para mostrar (todo destildado, o solo el giro y no hay ruta): no
     # se deja un recuadro vacio arriba del juego.
@@ -449,12 +463,14 @@ def relativa_de(rect, x: int, y: int) -> tuple[float, float]:
 
 def ejemplo(items, etiquetas) -> dict:
     """Lo que se ve en el modo Mover si no hay datos del juego: el tamano de
-    verdad, para saber donde queda."""
-    falta, llega, llega_juego = etiquetas
+    verdad, para saber donde queda. etiquetas: (falta, llegada real,
+    llegada del juego[, hora])."""
+    falta, llega, llega_juego, *resto = etiquetas
     d = {"turn": "\u21b1 400 m", "next": "", "speed": "72", "unit": "km/h", "limit": "80", "over": False,
          "cruise": "80", "gear": "8", "heading": "NW", "road": "I-80",
-         "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59",
+         "remaining": "123 km", "arrival": "14:32", "game_arrival": "21:59", "clock": "13:05",
          "remainingLabel": falta, "arrivalLabel": llega, "gameArrivalLabel": llega_juego,
+         "clockLabel": resto[0] if resto else "Time",
          "lanes": carriles({"count": 3, "mask": 0b110, "turn": CARRIL_BITS["right"],
                             "arrows": [CARRIL_BITS["straight"], CARRIL_BITS["straight"] | CARRIL_BITS["right"],
                                        CARRIL_BITS["right"]]})}
@@ -467,7 +483,7 @@ def ejemplo(items, etiquetas) -> dict:
         d["lanes"] = None
     if "speed" not in items:
         d["speed"] = d["limit"] = ""
-    for k in ("cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival"):
+    for k in ("cruise", "gear", "heading", "road", "remaining", "arrival", "game_arrival", "clock"):
         if k not in items:
             d[k] = ""
     if not any(d[k] for k in DATOS):
@@ -578,7 +594,9 @@ class Overlay:
         self.data = data
         # () -> {"corner", "size", "items", "pos", "opacity"}, como overlay_settings()
         self.ajustes = ajustes
-        self.etiquetas = etiquetas  # () -> (falta, llegada real, llegada del juego, aviso del giro), idioma del cliente
+        # () -> (falta, llegada real, llegada del juego, aviso del giro, puntos
+        # cardinales, hora), en el idioma del cliente
+        self.etiquetas = etiquetas
         self._activo = False
         self._hilo = None
         # Modo Mover (boton de Setup): el overlay se ve aunque el juego no
@@ -821,15 +839,16 @@ class _Ventana:
             # LAYERED los clics ya no pasan al juego.
             self.u.SetLayeredWindowAttributes(self.hwnd, 0, alfa, LWA_ALPHA)
             self.alfa = alfa
+        hora = resto[2] if len(resto) > 2 else "Time"
         datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
                           etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items,
                           aviso_giro=resto[0] if resto else "",
-                          rumbos=resto[1] if len(resto) > 1 else None)
+                          rumbos=resto[1] if len(resto) > 1 else None, etiqueta_hora=hora)
         rect = _rect_de(juego) if juego else None
         if mover:
             # Sin juego abierto se acomoda sobre la pantalla principal.
             rect = rect or self._pantalla()
-            datos = datos or ejemplo(items, (falta, llega, llega_juego))
+            datos = datos or ejemplo(items, (falta, llega, llega_juego, hora))
         if datos is None or rect is None:
             self.esconder()
             return
@@ -876,9 +895,11 @@ class _Ventana:
         hueco = round(12 * k)
         icono = round(17 * k)          # el reloj del crucero
         caja = round(36 * k)           # alto del recuadro de la marcha
-        # De derecha a izquierda: llegada del juego, llegada real, lo que falta.
-        columnas = [(d[v], d[e]) for v, e in (("game_arrival", "gameArrivalLabel"), ("arrival", "arrivalLabel"),
-                                               ("remaining", "remainingLabel")) if d[v]]
+        # De derecha a izquierda: la hora, llegada del juego, llegada real, lo
+        # que falta.
+        columnas = [(d[v], d[e]) for v, e in (("clock", "clockLabel"), ("game_arrival", "gameArrivalLabel"),
+                                               ("arrival", "arrivalLabel"), ("remaining", "remainingLabel"))
+                    if d.get(v)]
         ancho_marcha = max(caja, mide(d["gear"], fuente(20, True)) + round(14 * k)) if d["gear"] else 0
         # El ancho sale de lo que hay que mostrar: con todo prendido no entra
         # en el minimo y los numeros se pisaban con la velocidad.

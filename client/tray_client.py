@@ -181,7 +181,7 @@ class AppState:
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
                                                 T("overlay_arrival_game"), self.aviso_giro(),
-                                                T("overlay_compass")))
+                                                T("overlay_compass"), T("overlay_clock")))
         # Arrastrado en el modo Mover: queda en esa posicion; estirado desde
         # la esquina o con la rueda, con ese tamano.
         self.overlay.al_mover = lambda fx, fy: set_overlay_layout(corner=overlay.CUSTOM, pos=(fx, fy))
