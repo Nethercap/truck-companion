@@ -576,7 +576,7 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
     </div>
     <div class="note">
       <strong data-i18n="smartscreenTitle">Windows says "unrecognized app"?</strong>
-      <span data-i18n="smartscreenBody">That's SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn't need admin rights and only reads the game's telemetry. Every release page lists the file's SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.</span>
+      <span data-i18n="smartscreenBody">That's SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn't need admin rights and never writes to the game or your saves. Every release page lists the file's SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.</span>
       <a href="https://github.com/Nethercap/truck-companion/tree/main/client#building-it-yourself" target="_blank" rel="noopener" data-i18n="sourceOptionLink">Run from source →</a>
     </div>
   </section>
@@ -807,7 +807,7 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
     <div class="trustGrid">
       <div class="trustCard">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span data-i18n="trust1Title">Read-only, no admin</span></h3>
-        <p data-i18n="trust1Body">The client only reads the game's official telemetry SDK. It never touches your saves, profiles or any other file, and it never asks for administrator rights.</p>
+        <p data-i18n="trust1Body">The client reads the game's official telemetry SDK and, only if you allow it, your latest save to follow the in-game GPS. It never writes to your saves, profiles or any other file, and it never asks for administrator rights.</p>
       </div>
       <div class="trustCard">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg><span data-i18n="trust2Title">100% open source</span></h3>
@@ -875,10 +875,10 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
     <h2 data-i18n="faqTitle">Frequently asked questions</h2>
     <div class="faq" id="faqList">
       <details><summary data-i18n="faqQ1">Is it really free? What's the catch?</summary><p data-i18n="faqA1">No catch. No account needed, no ads, no routing limits, no Pro tier. Everything is open source. <span data-donate>If you want to support it, you can <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">buy me a tea on Tecito</a>: it's optional and doesn't unlock anything.</span></p></details>
-      <details><summary data-i18n="faqQ2">Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?</summary><p data-i18n="faqA2">Yes. SmartScreen shows that warning for any new program that isn't code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game's telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive: the source and the build log are public. If yours blocks it, you can add an exclusion or run the client from source.</p></details>
+      <details><summary data-i18n="faqQ2">Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?</summary><p data-i18n="faqA2">Yes. SmartScreen shows that warning for any new program that isn't code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and never writes to the game or your saves. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive: the source and the build log are public. If yours blocks it, you can add an exclusion or run the client from source.</p></details>
       <details><summary data-i18n="faqQ3">Does my phone need to be on the same Wi-Fi as my PC?</summary><p data-i18n="faqA3">No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type.</p></details>
       <details><summary data-i18n="faqQ4">Does it work with ProMods, Coast to Coast or other map mods?</summary><p data-i18n="faqA4">Yes: ProMods (with RusMap and Roextended), Grand Utopia, European Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, ATS Expansion and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.</p></details>
-      <details><summary data-i18n="faqQ5">Does it modify the game, my saves or my achievements?</summary><p data-i18n="faqA5">No. It reads data through SCS Software's official Telemetry SDK, which is a supported, read-only feature of both games. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.</p></details>
+      <details><summary data-i18n="faqQ5">Does it modify the game, my saves or my achievements?</summary><p data-i18n="faqA5">No. It reads data through SCS Software's official Telemetry SDK, which is a supported, read-only feature of both games. If you allow it, it also reads your latest save to follow the in-game GPS. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.</p></details>
       <details><summary data-i18n="faqQ6">What do I need?</summary><p data-i18n="faqA6">A Windows PC running Euro Truck Simulator 2 or American Truck Simulator, and any device with a modern browser for the dashboard: your phone, a tablet, or a second monitor. You can add the dashboard to your home screen so it opens like an app.</p></details>
       <details><summary data-i18n="faqQ7">The dashboard says "waiting for telemetry". What now?</summary><p data-i18n="faqA7">Three things to check: the telemetry plugin is installed (the client can do it for you from the tray menu), the game is open and you're actually in the truck (not in a menu), and the tray icon shows "connected". The tray menu has a "Show log file" option that says exactly what it detected.</p></details>
       <details><summary data-i18n="faqQ8">Can I use it with a steering wheel, controller or on a second monitor?</summary><p data-i18n="faqA8">Yes — Truck Dash doesn't care how you drive. Open the dashboard in a browser on a second monitor for a big GPS view, or on a phone mounted on your desk. The button box works from any of them.</p></details>
@@ -1006,7 +1006,7 @@ const TRANSLATIONS = {
     gsStep3Body: 'Open the game. Your browser opens the dashboard already connected. On your phone, go to <code>trucksim-dash.com/app</code> and type the 8-letter code from the tray icon — your phone doesn\'t even need to be on the same Wi-Fi.',
     gsStep3Link: 'Open the dashboard →',
     smartscreenTitle: 'Windows says "unrecognized app"?',
-    smartscreenBody: 'That\'s SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn\'t need admin rights and only reads the game\'s telemetry. Every release page lists the file\'s SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.',
+    smartscreenBody: 'That\'s SmartScreen warning about any new, unsigned program — click "More info" → "Run anyway". The client is open source, doesn\'t need admin rights and never writes to the game or your saves. Every release page lists the file\'s SHA-256 so you can verify what you downloaded, and you can always run it straight from the source code instead.',
     sourceOptionLink: 'Run from source →',
     featuresTitle: 'Everything a truck GPS should do. <span class="accent">And then some.</span>',
     featGroupNav: 'Navigate',
@@ -1091,7 +1091,7 @@ const TRANSLATIONS = {
     compareNote: '"Paid apps" describes the common free-with-Pro model in this category as of late 2026; check each app for its current terms.',
     trustTitle: 'Safe, transparent, <span class="accent">yours</span>',
     trust1Title: 'Read-only, no admin',
-    trust1Body: 'The client only reads the game\'s official telemetry SDK. It never touches your saves, profiles or any other file, and it never asks for administrator rights.',
+    trust1Body: 'The client reads the game\'s official telemetry SDK and, only if you allow it, your latest save to follow the in-game GPS. It never writes to your saves, profiles or any other file, and it never asks for administrator rights.',
     trust2Title: '100% open source',
     trust2Body: 'Client, backend and web app live in one public repository. Read the code, build it yourself, or verify a release\'s SHA-256 before running it.',
     trust3Title: 'No account needed, no tracking cookies',
@@ -1107,13 +1107,13 @@ const TRANSLATIONS = {
     faqQ1: 'Is it really free? What\'s the catch?',
     faqA1: 'No catch. No account needed, no ads, no routing limits, no Pro tier. Everything is open source. <span data-donate>If you want to support it, you can <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">buy me a tea on Tecito</a>: it\'s optional and doesn\'t unlock anything.</span>',
     faqQ2: 'Windows or my antivirus says the file is "unrecognized" or dangerous. Is it safe?',
-    faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and only reads the game\'s telemetry. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive: the source and the build log are public. If yours blocks it, you can add an exclusion or run the client from source.',
+    faqA2: 'Yes. SmartScreen shows that warning for any new program that isn\'t code-signed (signing certificates cost money). Click "More info" → "Run anyway". The client is open source, needs no admin rights, and never writes to the game or your saves. Each release lists the SHA-256 of the file so you can verify it, and you can run it from source with Python instead. Some antivirus engines flag it for the same reason (an unsigned, self-unpacking executable): it is a false positive: the source and the build log are public. If yours blocks it, you can add an exclusion or run the client from source.',
     faqQ3: 'Does my phone need to be on the same Wi-Fi as my PC?',
     faqA3: 'No. Truck Dash pairs your PC and your phone with an 8-letter code through a small relay server, so your phone can be on mobile data, on a different network, or you can even watch from somewhere else. Nothing to configure, no IP addresses to type. If you ARE on the same Wi-Fi, the client also offers a direct LAN mode (scan a QR code in its Setup window) with the lowest latency, no code and no internet needed.',
     faqQ4: 'Does it work with ProMods, Coast to Coast or other map mods?',
     faqA4: 'Yes: ProMods (with RusMap and Roextended), Grand Utopia, European Grand Utopia and TruckersMP for ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, ATS Expansion and Reforma for ATS — in any of the usual combinations. The client detects what your profile runs and the app switches by itself. Want another one? Ask on Discord.',
     faqQ5: 'Does it modify the game, my saves or my achievements?',
-    faqA5: 'No. It reads data through SCS Software\'s official Telemetry SDK, which is a supported, read-only feature of both games. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.',
+    faqA5: 'No. It reads data through SCS Software\'s official Telemetry SDK, which is a supported, read-only feature of both games. If you allow it, it also reads your latest save to follow the in-game GPS. Nothing is written to the game, your profile or your saves, and achievements are unaffected. It also works alongside TruckersMP.',
     faqQ6: 'What do I need?',
     faqA6: 'A Windows PC running Euro Truck Simulator 2 or American Truck Simulator, and any device with a modern browser for the dashboard: your phone, a tablet, or a second monitor. You can add the dashboard to your home screen so it opens like an app.',
     faqQ7: 'The dashboard says "waiting for telemetry". What now?',
@@ -1227,7 +1227,7 @@ const TRANSLATIONS = {
     gsStep3Body: 'Abrí el juego. Tu navegador abre el tablero ya conectado. Desde el celular, entrá a <code>trucksim-dash.com/app</code> y escribí el código de 8 letras del ícono de la bandeja — ni siquiera hace falta que esté en la misma WiFi.',
     gsStep3Link: 'Abrir el tablero →',
     smartscreenTitle: '¿Windows dice "aplicación no reconocida"?',
-    smartscreenBody: 'Es SmartScreen avisando sobre cualquier programa nuevo sin firmar — tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que verifiques lo que bajaste, y siempre podés correrlo directo desde el código fuente.',
+    smartscreenBody: 'Es SmartScreen avisando sobre cualquier programa nuevo sin firmar — tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y nunca escribe en el juego ni en tus partidas. Cada release lista el SHA-256 del archivo para que verifiques lo que bajaste, y siempre podés correrlo directo desde el código fuente.',
     sourceOptionLink: 'Correr desde el código fuente →',
     featuresTitle: 'Todo lo que un GPS de camión tiene que hacer. <span class="accent">Y bastante más.</span>',
     featGroupNav: 'Navegar',
@@ -1312,7 +1312,7 @@ const TRANSLATIONS = {
     compareNote: '"Apps pagas" describe el modelo habitual gratis-con-Pro de esta categoría a fines de 2026; revisá cada app para sus condiciones actuales.',
     trustTitle: 'Seguro, transparente, <span class="accent">tuyo</span>',
     trust1Title: 'Solo lectura, sin administrador',
-    trust1Body: 'El cliente solo lee el SDK oficial de telemetría del juego. Nunca toca tus partidas, perfiles ni ningún otro archivo, y nunca pide permisos de administrador.',
+    trust1Body: 'El cliente lee el SDK oficial de telemetría del juego y, solo si lo permitís, tu última partida guardada para seguir el GPS del juego. Nunca escribe en tus partidas, perfiles ni ningún otro archivo, y nunca pide permisos de administrador.',
     trust2Title: '100% código abierto',
     trust2Body: 'Cliente, backend y web viven en un solo repositorio público. Leé el código, compilalo vos mismo, o verificá el SHA-256 de un release antes de correrlo.',
     trust3Title: 'Sin cuenta obligatoria, sin cookies de rastreo',
@@ -1328,13 +1328,13 @@ const TRANSLATIONS = {
     faqQ1: '¿Es realmente gratis? ¿Cuál es la trampa?',
     faqA1: 'No hay trampa. Sin cuenta obligatoria, sin publicidad, sin límite de rutas, sin plan Pro. Todo es código abierto. <span data-donate>Si querés apoyarlo, podés <a href="https://tecito.app/truckdash" target="_blank" rel="noopener">invitarme un tecito</a>: es opcional y no desbloquea nada.</span>',
     faqQ2: 'Windows o mi antivirus dicen que el archivo es "no reconocido" o peligroso. ¿Es seguro?',
-    faqA2: 'Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y solo lee la telemetría del juego. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python. Algunos antivirus lo marcan por lo mismo (un ejecutable sin firma que se descomprime solo): es un falso positivo: el código y el log de compilación son públicos. Si el tuyo lo bloquea, podés agregar una excepción o correr el cliente desde el código fuente.',
+    faqA2: 'Sí. SmartScreen muestra ese aviso para cualquier programa nuevo sin firma digital (los certificados de firma cuestan dinero). Tocá "Más información" → "Ejecutar de todas formas". El cliente es código abierto, no necesita permisos de administrador y nunca escribe en el juego ni en tus partidas. Cada release lista el SHA-256 del archivo para que lo verifiques, y podés correrlo desde el código fuente con Python. Algunos antivirus lo marcan por lo mismo (un ejecutable sin firma que se descomprime solo): es un falso positivo: el código y el log de compilación son públicos. Si el tuyo lo bloquea, podés agregar una excepción o correr el cliente desde el código fuente.',
     faqQ3: '¿Mi celular tiene que estar en la misma WiFi que la PC?',
     faqA3: 'No. Truck Dash empareja tu PC y tu celular con un código de 8 letras a través de un pequeño servidor relay, así que el celular puede estar con datos móviles, en otra red, o incluso podés mirar desde otro lado. Nada que configurar, sin direcciones IP que tipear. Si SÍ estás en la misma WiFi, el cliente también ofrece un modo LAN directo (escaneás un QR en su ventana de Setup) con la menor latencia, sin código y sin necesitar internet.',
     faqQ4: '¿Funciona con ProMods, Coast to Coast u otros mods de mapa?',
     faqA4: 'Sí: ProMods (con RusMap y Roextended), Grand Utopia, European Grand Utopia y TruckersMP para ETS2; Coast to Coast, ProMods Canada, Western/Eastern Canada Expansion, ATS Expansion y Reforma para ATS — en las combinaciones habituales. El cliente detecta lo que usa tu perfil y la app cambia sola. ¿Querés otro? Pedilo en Discord.',
     faqQ5: '¿Modifica el juego, mis partidas o mis logros?',
-    faqA5: 'No. Lee los datos a través del SDK de telemetría oficial de SCS Software, que es una función soportada y de solo lectura de ambos juegos. No se escribe nada en el juego, tu perfil ni tus partidas, y los logros no se ven afectados. También funciona junto con TruckersMP.',
+    faqA5: 'No. Lee los datos a través del SDK de telemetría oficial de SCS Software, que es una función soportada y de solo lectura de ambos juegos. Si lo permitís, también lee tu última partida guardada para seguir el GPS del juego. No se escribe nada en el juego, tu perfil ni tus partidas, y los logros no se ven afectados. También funciona junto con TruckersMP.',
     faqQ6: '¿Qué necesito?',
     faqA6: 'Una PC con Windows corriendo Euro Truck Simulator 2 o American Truck Simulator, y cualquier dispositivo con un navegador moderno para el tablero: tu celular, una tablet o un segundo monitor. Podés agregar el tablero a la pantalla de inicio para que abra como una app.',
     faqQ7: 'El tablero dice "esperando telemetría". ¿Y ahora?',
