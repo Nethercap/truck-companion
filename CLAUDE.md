@@ -1252,11 +1252,19 @@ Revisar cada cambio contra esta lista:
    Si los km saltan sin que salte el camion (`gameGpsSaveStale`: un destino nuevo
    en el juego), se suelta hasta la proxima partida. Los waypoints del juego van
    en `target.via` (por donde se pasa) y se sacan al pasarlos
-   (`checkGameGpsViaReached`). En Playwright (ATS, Jefferson City): un pin, el GPS
-   cambiado, un waypoint en el medio, uno ya pasado (317 km con el contra 83 del
-   GPS), el trabajo elegido (al remolque) y con trabajo en la telemetria (manda
-   el trabajo). Sin probar con el juego ni con una partida de verdad. La app nativa
-   no lo usa: `conduccion.js` no llama a `updateGameGpsSave`.
+   (`checkGameGpsViaReached`). Con trabajo en la telemetria manda el trabajo, pero
+   los waypoints puestos a mano en el GPS del juego van como paradas antes de la
+   entrega o del remolque (`gameGpsSaveJobCandidates`, `gameGpsSave.jobVia`) si con
+   ellos la ruta coincide con los km del GPS; uno a menos de 300 m del destino es
+   el destino mismo. Con paradas, `gameRouteComparable` no busca alternativas: irian
+   derecho al destino. Se busca de nuevo con cada partida nueva y al cambiar el
+   destino del trabajo (`evalKey`). En Playwright (ATS, Jefferson City): un pin, el
+   GPS cambiado, un waypoint en el medio, uno ya pasado (317 km con el contra 83 del
+   GPS), el trabajo elegido (al remolque), con trabajo y sin waypoints (manda el
+   trabajo), con trabajo y un waypoint a mano (263 km contra 76,5 directo: dos
+   tramos) y uno que el GPS ya no cuenta (directo). Sin probar con el juego ni con
+   una partida de verdad. La app nativa no lo usa: `conduccion.js` no llama a
+   `updateGameGpsSave`.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el
    usuario escriba las tildes (`foldText`).

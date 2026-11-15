@@ -7034,6 +7034,24 @@ test('gameGpsSaveCandidates: una cola de waypoints por cada uno ya pasado, y el 
   assert.equal(gameGpsSaveCandidates({ savedAt: 1, waypoints: [[1, 'x'], [3, 4]] }, null).length, 1);
 });
 
+test('gameGpsSaveJobCandidates: con trabajo, los waypoints de la partida como paradas antes de la entrega', () => {
+  const { gameGpsSaveJobCandidates, gameGpsSavePick } = require('./pure.js');
+  const entrega = { x: 1000, z: 1000 };
+  // una estacion de servicio en el camino: con ella, o ya pasada (ninguna parada)
+  const c = gameGpsSaveJobCandidates({ savedAt: 9, waypoints: [[100, 100]] }, entrega);
+  assert.deepEqual(c, [{ via: [[100, 100]], skipped: 0 }, { via: [], skipped: 1 }]);
+  // el ultimo waypoint pegado a la entrega es la entrega misma
+  const conDestino = gameGpsSaveJobCandidates({ savedAt: 9, waypoints: [[100, 100], [1100, 1050]] }, entrega);
+  assert.deepEqual(conDestino.map(x => x.via), [[[100, 100]], []]);
+  // sin waypoints en la partida (o sin partida, o sin destino), nada que agregar
+  assert.deepEqual(gameGpsSaveJobCandidates({ savedAt: 9, waypoints: [] }, entrega), []);
+  assert.deepEqual(gameGpsSaveJobCandidates(null, entrega), []);
+  assert.deepEqual(gameGpsSaveJobCandidates({ savedAt: 9, waypoints: [[1, 2]] }, null), []);
+  // gana lo que coincide con el GPS: con la parada si el GPS la cuenta, sin ella si no
+  assert.deepEqual(gameGpsSavePick([{ ...c[0], km: 212 }, { ...c[1], km: 200 }], 211.5).via, [[100, 100]]);
+  assert.deepEqual(gameGpsSavePick([{ ...c[0], km: 212 }, { ...c[1], km: 200 }], 200.2).via, []);
+});
+
 test('gameGpsSavePick: gana el que coincide con los km del GPS, y la partida vieja no', () => {
   const { gameGpsSavePick, gameGpsSaveMatches, gameGpsSaveStale } = require('./pure.js');
   // camion pasado del primer waypoint por 2 km: con el, 4 km de mas (ir y volver); sin el, lo del GPS
