@@ -4,15 +4,15 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.43 (2026-11-15)
 
-- Follow the in-game GPS: Truck Dash can now take you where your in-game GPS is going when you
-  have no job yet: a pin you placed on the game map, an Atlas stop in Road Trip, or the trailer of
-  the job you just picked in the Freight Market. The game's telemetry only says how far the route
-  is, so Truck Dash reads your latest save to see where it goes. It only reads it and never
-  changes or writes your saves; it updates whenever the game saves (an autosave, or F5 if you want
-  it right away). The first time, Truck Dash asks whether you want it, and you can turn it on or
-  off any time in Setup.
+- Follow the in-game GPS: Truck Dash can now take you where your in-game GPS is going: a pin you
+  placed on the game map, an Atlas stop in Road Trip, or the trailer of the job you just picked in
+  the Freight Market. With a job, waypoints you add in the game's GPS (a fuel stop on the way)
+  become stops on your route. The game's telemetry only says how far the route is, so Truck Dash
+  reads your latest save to see where it goes. It only reads it and never changes or writes your
+  saves; it updates whenever the game saves (an autosave, or F5 if you want it right away). The
+  first time, Truck Dash asks whether you want it, and you can turn it on or off any time in Setup.
 
 ## 1.5.42 (2026-11-14)
 
