@@ -197,3 +197,31 @@ pass plain C types, and memory from TruckersMP goes back through its own
 `Free`. `tools/probar_plugin.py` reads the import table and fails on any
 Visual C++ runtime DLL; the Actions runner has the redistributable, so
 loading the DLL there would not show it.
+
+## In-game overlay (TruckersMP)
+
+The Truck Dash overlay is a window of the client over the game, so clips
+and recordings that only capture the game leave it out. Under TruckersMP
+the plugin can draw it inside the game instead
+(`src/truckersmp_overlay.cpp`, `inc/truckersmp_overlay.hpp`):
+
+- The client draws the overlay as an RGBA image and writes it in the
+  `Local\TruckDashOverlay` block, with a seqlock, its position and a
+  heartbeat. A stale heartbeat (2 s) or `visible == 0` draws nothing.
+- On the TruckersMP client's post-render event (its SDK gives plugins this
+  event for overlays, and the D3D11 device with `GetDeviceHandle`) the
+  plugin uploads the image to a texture when it changes and draws one quad
+  on the render target bound at that moment, blended with its alpha and
+  keeping the frame's alpha. On an sRGB or float target it decodes the
+  image to linear light first. It saves and restores every pipeline state
+  it touches.
+- The two shaders are compiled once with `D3DCompile` from the
+  `d3dcompiler_47.dll` in System32 (loaded only from there), so the build
+  needs no `fxc`.
+- Every frame it writes `pluginTick`, the target's size and a status
+  (ready, OpenGL, no device, no shaders, no render target): the client keeps
+  its window unless that says ready.
+- Nothing is hooked: single player never runs this, and the game's own
+  rendering is untouched. `tools/probar_plugin.py` checks the pixels with a
+  WARP device.
+

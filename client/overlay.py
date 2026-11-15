@@ -22,12 +22,20 @@ otra ventana o con el juego en pausa (menu) se esconde. Funciona con el juego
 en ventana o en pantalla completa sin bordes, que es lo que usan ETS2 y ATS
 desde la 1.50; en pantalla completa exclusiva Windows no deja dibujar encima.
 Solo Windows (bajo Wine/Proton no se ofrece).
+
+Con "Dibujar adentro del juego" (Setup, apagado por defecto) y el juego abierto
+con TruckersMP, el mismo dibujo va como imagen al plugin, que lo pega en cada
+cuadro del juego (overlay_imagen.py, overlay_juego.py): asi sale en los clips
+y en lo que graba solo la imagen del juego, como el de Trucky (Discord, 15-11).
+Mientras el plugin no diga que puede (sin TruckersMP, en OpenGL), y en el modo
+Mover, sigue la ventana.
 """
 
 import logging
 import threading
 import time
 
+import overlay_juego
 from rumbo import PUNTOS, punto_cardinal
 
 KM_TO_MI = 0.621371
@@ -535,6 +543,253 @@ class OverlayData:
             return self.tele, self.tele_ts, self.nav, self.nav_ts
 
 
+# --- Dibujo ------------------------------------------------------------------
+# El overlay se dibuja sobre un lienzo: el canvas de la ventana (LienzoTk) o
+# una imagen de Pillow que el plugin pega adentro del juego
+# (overlay_imagen.LienzoPil, opcion "Dibujar adentro del juego"). Las medidas
+# y el orden estan una sola vez, aca.
+#
+# Un lienzo tiene: limpiar(), tamano(ancho, alto), mide(texto, fuente),
+# texto(x, y, texto, color, fuente, ancla, ancho) -> bbox, ovalo, linea,
+# rectangulo y poligono. La fuente es (pixeles, negrita), siempre Segoe UI; el
+# ancla y el bbox del texto son los de Tk (el alto de la linea, no la tinta).
+
+
+class LienzoTk:
+    """El canvas de Tk de la ventana del overlay."""
+
+    def __init__(self, canvas, root):
+        self.c = canvas
+        self.root = root
+
+    @staticmethod
+    def _fuente(fuente):
+        px, negrita = fuente
+        return ("Segoe UI", -px, "bold" if negrita else "normal")
+
+    def limpiar(self) -> None:
+        self.c.delete("all")
+
+    def tamano(self, ancho: int, alto: int) -> None:
+        self.c.configure(width=ancho, height=alto)
+
+    def mide(self, texto: str, fuente) -> int:
+        from tkinter import font as tkfont
+        return tkfont.Font(root=self.root, font=self._fuente(fuente)).measure(texto)
+
+    def texto(self, x, y, texto, color, fuente, ancla="center", ancho=None):
+        extra = {"width": ancho} if ancho else {}
+        t = self.c.create_text(x, y, text=texto, fill=color, anchor=ancla, font=self._fuente(fuente), **extra)
+        return self.c.bbox(t)
+
+    def ovalo(self, x0, y0, x1, y1, relleno="", borde="", grueso=1) -> None:
+        self.c.create_oval(x0, y0, x1, y1, fill=relleno, outline=borde, width=grueso)
+
+    def linea(self, puntos, color, grueso, redondo=True) -> None:
+        """puntos: x0, y0, x1, y1... seguidos. Redondo: puntas y esquinas
+        redondeadas; si no, puntas cortadas al ras."""
+        self.c.create_line(*puntos, fill=color, width=grueso, capstyle="round" if redondo else "butt",
+                           joinstyle="round")
+
+    def rectangulo(self, x0, y0, x1, y1, relleno="", borde="", grueso=1, rayas=None) -> None:
+        extra = {"dash": rayas} if rayas else {}
+        self.c.create_rectangle(x0, y0, x1, y1, fill=relleno, outline=borde, width=grueso, **extra)
+
+    def poligono(self, puntos, relleno, suave=False) -> None:
+        self.c.create_polygon(puntos, fill=relleno, outline="", smooth=suave)
+
+
+def dibujar_overlay(lz, d: dict, k: float, clics: bool = False, parpadeo: bool = False) -> tuple[int, int]:
+    """Dibuja el contenido d (de contenido() o ejemplo()) a escala k y
+    devuelve el tamano (ancho, alto). clics: modo Mover (el borde para
+    agarrarlo); parpadeo: el medio segundo en que el limite se ve mas claro."""
+    lz.limpiar()
+    fuente = lambda px, negrita=False: (max(8, round(px * k)), negrita)
+    mide = lz.mide
+    pad = round(14 * k)
+    sep = round(16 * k)
+    fila = round(46 * k)
+    hueco = round(12 * k)
+    icono = round(17 * k)          # el reloj del crucero
+    caja = round(36 * k)           # alto del recuadro de la marcha
+    # De derecha a izquierda: la hora, llegada del juego, llegada real, lo
+    # que falta.
+    columnas = [(d[v], d[e]) for v, e in (("clock", "clockLabel"), ("game_arrival", "gameArrivalLabel"),
+                                           ("arrival", "arrivalLabel"), ("remaining", "remainingLabel"))
+                if d.get(v)]
+    ancho_marcha = max(caja, mide(d["gear"], fuente(20, True)) + round(14 * k)) if d["gear"] else 0
+    # El ancho sale de lo que hay que mostrar: con todo prendido no entra
+    # en el minimo y los numeros se pisaban con la velocidad.
+    izquierda = 0
+    if d["limit"]:
+        izquierda += fila + hueco
+    if d["speed"]:
+        izquierda += mide(d["speed"], fuente(34, True)) + round(4 * k) + mide(d["unit"], fuente(13))
+    if d["cruise"]:
+        izquierda += hueco + icono + round(4 * k) + mide(d["cruise"], fuente(17, True))
+    if d["gear"]:
+        izquierda += hueco + ancho_marcha
+    if d["heading"] or d["road"]:
+        izquierda += hueco + _ancho_rumbo(d, k, fuente, mide)
+    derecha_total = sum(max(mide(v, fuente(19, True)), mide(e, fuente(11))) + sep for v, e in columnas)
+    ancho = max(round(420 * k), 2 * pad + izquierda + round(8 * k) + derecha_total)
+    lanes = d.get("lanes") or []
+    carril_w, carril_h, carril_sep = round(30 * k), round(36 * k), round(4 * k)
+    if lanes:
+        ancho = max(ancho, 2 * pad + len(lanes) * (carril_w + carril_sep) - carril_sep)
+    cercanas = d.get("near_stops") or []
+    if cercanas:
+        ancho = max(ancho, 2 * pad + sep * (len(cercanas) - 1) + sum(
+            round(16 * k) + (mide(p["label"], fuente(13)) + round(6 * k) if p["label"] else 0)
+            + mide(p["dist"], fuente(17, True)) for p in cercanas))
+    y = pad
+    if d["turn"]:
+        y = lz.texto(pad, y, d["turn"], FG, fuente(24, True), "nw", ancho - 2 * pad)[3] + round(2 * k)
+        if lanes:
+            y += round(3 * k)
+            for i, carril in enumerate(lanes):
+                _carril(lz, pad + i * (carril_w + carril_sep), y, carril_w, carril_h, carril, k)
+            y += carril_h + round(4 * k)
+        if d["next"]:
+            y = lz.texto(pad, y, d["next"], MUTED, fuente(14), "nw", ancho - 2 * pad)[3]
+        y += round(8 * k)
+    elif d.get("hint"):
+        y = lz.texto(pad, y, d["hint"], MUTED, fuente(14), "nw", ancho - 2 * pad)[3] + round(8 * k)
+
+    if not (d["speed"] or d["cruise"] or d["gear"] or d["heading"] or d["road"] or columnas):
+        y = _fila_cercanas(lz, cercanas, y - round(8 * k), pad, sep, k, fuente)
+        alto = _barra_paradas(lz, d.get("stops"), y, ancho, pad, k) + pad
+        _marco_mover(lz, ancho, alto, k, clics)
+        lz.tamano(ancho, alto)
+        return ancho, alto
+    medio = y + fila // 2
+    x = pad
+    if d["limit"]:
+        r = fila // 2
+        borde = max(3, round(5 * k))
+        anillo = RED if not (d["over"] and parpadeo) else "#ff8a80"
+        lz.ovalo(x, medio - r, x + 2 * r, medio + r, relleno="#ffffff", borde=anillo, grueso=borde)
+        lz.texto(x + r, medio, d["limit"], "#111111", fuente(17 if len(d["limit"]) < 3 else 14, True))
+        x += 2 * r + hueco
+    if d["speed"]:
+        x = lz.texto(x, medio, d["speed"], RED if d["over"] else FG, fuente(34, True), "w")[2] + round(4 * k)
+        x = lz.texto(x, medio + round(6 * k), d["unit"], MUTED, fuente(13), "w")[2]
+    if d["cruise"]:
+        # Como en el overlay de OBS: un relojito y la velocidad fijada, en verde.
+        x += hueco if x > pad else 0
+        r = icono // 2
+        grueso = max(2, round(2.4 * k))
+        lz.ovalo(x, medio - r, x + 2 * r, medio + r, borde=CRUISE, grueso=grueso)
+        lz.linea((x + r, medio, x + r + round(r * 0.6), medio - round(r * 0.6)), CRUISE, grueso)
+        x = lz.texto(x + 2 * r + round(4 * k), medio, d["cruise"], CRUISE, fuente(17, True), "w")[2]
+    if d["gear"]:
+        x += hueco if x > pad else 0
+        lz.rectangulo(x, medio - caja // 2, x + ancho_marcha, medio + caja // 2,
+                      borde=MUTED, grueso=max(1, round(2 * k)))
+        lz.texto(x + ancho_marcha // 2, medio, d["gear"], FG, fuente(20, True))
+        x += ancho_marcha
+    if d["heading"] or d["road"]:
+        x += hueco if x > pad else 0
+        if d["heading"]:
+            x = lz.texto(x, medio, d["heading"], FG, fuente(20, True), "w")[2] + (round(6 * k) if d["road"] else 0)
+        if d["road"]:
+            x = lz.texto(x, medio + round(1 * k), d["road"], MUTED, fuente(16, True), "w")[2]
+
+    derecha = ancho - pad
+    for valor, etiqueta in columnas:
+        a = lz.texto(derecha, medio - round(2 * k), valor, FG, fuente(19, True), "se")
+        b = lz.texto(derecha, medio + round(1 * k), etiqueta, MUTED, fuente(11), "ne")
+        derecha = min(a[0], b[0]) - sep
+    y = _fila_cercanas(lz, cercanas, y + fila, pad, sep, k, fuente)
+    alto = _barra_paradas(lz, d.get("stops"), y, ancho, pad, k) + pad
+    _marco_mover(lz, ancho, alto, k, clics)
+    lz.tamano(ancho, alto)
+    return ancho, alto
+
+
+def _ancho_rumbo(d: dict, k: float, fuente, mide) -> int:
+    """Lo que ocupa el rumbo con la ruta al lado, igual que en dibujar_overlay."""
+    ancho = mide(d["heading"], fuente(20, True)) if d["heading"] else 0
+    if d["road"]:
+        ancho += (round(6 * k) if d["heading"] else 0) + mide(d["road"], fuente(16, True))
+    return ancho
+
+
+def _fila_cercanas(lz, cercanas, y: int, pad: int, sep: int, k: float, fuente) -> int:
+    """La parada mas cercana de cada tipo: un punto del color de la barra
+    de la ruta, el nombre y lo que falta. Devuelve donde termina."""
+    if not cercanas:
+        return y
+    y += round(8 * k)
+    medio = y + round(11 * k)
+    r = round(5 * k)
+    x = pad
+    for p in cercanas:
+        color = BARRA_COMBUSTIBLE if p["kind"] == "g" else BARRA_DESCANSO
+        lz.ovalo(x, medio - r, x + 2 * r, medio + r, relleno=color)
+        x += 2 * r + round(6 * k)
+        if p["label"]:
+            x = lz.texto(x, medio, p["label"], MUTED, fuente(13), "w")[2] + round(6 * k)
+        x = lz.texto(x, medio, p["dist"], FG, fuente(17, True), "w")[2] + sep
+    return y + round(22 * k)
+
+
+def _barra_paradas(lz, barra, y: int, ancho: int, pad: int, k: float) -> int:
+    """La barra de la ruta debajo de todo: de aca (izquierda) al destino,
+    arriba el tramo para cargar combustible y abajo el de dormir. Devuelve
+    donde termina."""
+    if not barra:
+        return y
+    y += round(8 * k)
+    alto_b = max(8, round(12 * k))
+    x0, x1 = pad, ancho - pad
+    lz.rectangulo(x0, y, x1, y + alto_b, relleno=BARRA_FONDO)
+    mitad = alto_b // 2
+    for clave, color, arriba in (("fuel", BARRA_COMBUSTIBLE, True), ("rest", BARRA_DESCANSO, False)):
+        tramo = barra.get(clave)
+        if tramo:
+            a, b = x0 + tramo[0] * (x1 - x0), x0 + tramo[1] * (x1 - x0)
+            ya = y if arriba else y + mitad
+            lz.rectangulo(a, ya, max(a + 2, b), ya + (mitad if arriba else alto_b - mitad), relleno=color)
+    return y + alto_b
+
+
+def _carril(lz, x: int, y: int, w: int, h: int, carril: dict, k: float) -> None:
+    """Un carril como en el tablero (lanesHtml): caja azul si sirve, la
+    flecha del giro en blanco y las demas apagadas."""
+    r = max(2, round(4 * k))
+    fondo = CARRIL_ON if carril["on"] else CARRIL_OFF
+    # Caja con las puntas redondeadas: Tk no tiene, va como poligono suave
+    puntos = [x + r, y, x + w - r, y, x + w, y, x + w, y + r, x + w, y + h - r, x + w, y + h,
+              x + w - r, y + h, x + r, y + h, x, y + h, x, y + h - r, x, y + r, x, y]
+    lz.poligono(puntos, fondo, suave=True)
+    # El dibujo de 24 x 30 adentro, con el margen de la caja del tablero
+    esc = (w - 6 * k) / 24
+    ox, oy = x + 3 * k, y + (h - 30 * esc) / 2
+    pt = lambda p: (ox + p[0] * esc, oy + p[1] * esc)
+    grueso = max(1.5, 2.6 * esc)
+    color = (lambda dd: "#ffffff" if dd == carril["giro"] else CARRIL_OTRA) if carril["on"] else (lambda dd: CARRIL_APAGADO)
+    lz.linea((*pt((12, 28)), *pt((12, 17))), "#ffffff" if carril["on"] else CARRIL_APAGADO, grueso)
+    # La del giro al final, para que quede arriba de las otras
+    for dd in sorted(carril["dirs"], key=lambda dd: dd == carril["giro"]):
+        trazo, cabeza = CARRIL_FORMAS[dd]
+        lz.linea([v for p in trazo for v in pt(p)], color(dd), grueso)
+        lz.poligono([v for p in cabeza for v in pt(p)], color(dd))
+
+
+def _marco_mover(lz, ancho: int, alto: int, k: float, clics: bool) -> None:
+    """Modo Mover: un borde para que se vea que se puede agarrar, y la
+    esquina de abajo a la derecha, que estira."""
+    if not clics:
+        return
+    grueso = max(2, round(2 * k))
+    lz.rectangulo(1, 1, ancho - 2, alto - 2, borde="#4a90d9", grueso=grueso, rayas=(6, 4))
+    lado = max(14, round(GRIP * k))
+    for i in (1, 2, 3):
+        d = round(lado * i / 3)
+        lz.linea((ancho - 3 - d, alto - 3, ancho - 3, alto - 3 - d), "#4a90d9", grueso, redondo=False)
+
+
 # --- Win32 -------------------------------------------------------------------
 GWL_EXSTYLE = -20
 WS_EX_TOPMOST = 0x00000008
@@ -592,7 +847,7 @@ class Overlay:
 
     def __init__(self, data: OverlayData, ajustes, etiquetas):
         self.data = data
-        # () -> {"corner", "size", "items", "pos", "opacity"}, como overlay_settings()
+        # () -> {"corner", "size", "items", "pos", "opacity", "in_game"}, como overlay_settings()
         self.ajustes = ajustes
         # () -> (falta, llegada real, llegada del juego, aviso del giro, puntos
         # cardinales, hora), en el idioma del cliente
@@ -607,6 +862,11 @@ class Overlay:
         self.mover = False
         self.al_mover = None
         self.al_redimensionar = None
+        # Adentro del juego: el bloque con el plugin (se abre recien con la
+        # opcion prendida) y lo que pasa, para Setup: "off", "drawing", "too_big"
+        # o el estado del plugin (overlay_juego.ESTADOS, "revision").
+        self.bloque = overlay_juego.Bloque()
+        self.estado_juego = "off"
 
     @property
     def enabled(self) -> bool:
@@ -617,6 +877,13 @@ class Overlay:
         if prender != self._activo:
             logging.info("Overlay en el juego %s", "prendido" if prender else "apagado")
         self._activo = prender
+        if not prender and self.bloque.visible:
+            # Ya, sin esperar al proximo cuadro: al salir del cliente el
+            # proceso termina antes (el plugin lo sacaria recien a los 2 s).
+            try:
+                self.bloque.ocultar(overlay_juego.ahora_ms())
+            except Exception:
+                pass
         if prender and (self._hilo is None or not self._hilo.is_alive()):
             self._hilo = threading.Thread(target=self._correr, name="overlay", daemon=True)
             self._hilo.start()
@@ -697,6 +964,8 @@ class _Ventana:
         self.escala = 1.0       # la del ultimo cuadro (para medir la esquina)
         self.alfa = None        # la opacidad puesta en la ventana, 0-255
         self.rect = None        # el rectangulo del juego del ultimo cuadro
+        self.dibujado_juego = None  # (contenido, escala, parpadeo, opacidad) de la imagen del plugin
+        self.imagen_juego = None
         self.juego_mover = (0.0, None)  # (cuando se busco, hwnd) en modo Mover
         self.canvas.bind("<ButtonPress-1>", self._agarrar)
         self.canvas.bind("<B1-Motion>", self._arrastrar)
@@ -814,11 +1083,77 @@ class _Ventana:
         m = ctypes.windll.user32.GetSystemMetrics
         return (0, 0, m(0), m(1))
 
+    def _datos(self, aj):
+        """contenido() con lo de ahora y las etiquetas del cliente, y esas
+        etiquetas (para el ejemplo del modo Mover)."""
+        tele, tele_ts, nav, nav_ts = self.ov.data.foto()
+        falta, llega, llega_juego, *resto = self.ov.etiquetas()
+        hora = resto[2] if len(resto) > 2 else "Time"
+        datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
+                          etiqueta_llega=llega, etiqueta_juego=llega_juego, items=aj["items"],
+                          aviso_giro=resto[0] if resto else "",
+                          rumbos=resto[1] if len(resto) > 1 else None, etiqueta_hora=hora)
+        return datos, (falta, llega, llega_juego, hora)
+
+    def _en_juego(self, aj, mover: bool) -> bool:
+        """Con "Dibujar adentro del juego": la imagen al plugin. True si este
+        cuadro va adentro del juego (la ventana se esconde), False si va en
+        la ventana: la opcion apagada, el overlay apagado, el modo Mover (se
+        arrastra la ventana), el plugin que no dibuja o una imagen que no entra."""
+        ov, bloque = self.ov, self.ov.bloque
+        estado = "off"
+        listo = False
+        if aj.get("in_game") and ov.enabled and not mover:
+            ahora = overlay_juego.ahora_ms()
+            plugin = bloque.plugin(ahora)
+            estado = "drawing" if plugin["listo"] else plugin["estado"]
+            if plugin["listo"]:
+                listo = self._publicar(aj, plugin["cuadro"], ahora)
+                if not listo:
+                    estado = "too_big"
+        if not listo and bloque.visible:
+            bloque.ocultar(overlay_juego.ahora_ms())
+        if estado != ov.estado_juego:
+            logging.info("Overlay: %s", "adentro del juego" if estado == "drawing" else f"en la ventana ({estado})")
+            ov.estado_juego = estado
+        return listo
+
+    def _publicar(self, aj, cuadro, ahora) -> bool:
+        """La imagen del overlay para un cuadro de (ancho, alto), ubicada y
+        escalada como la ventana contra la del juego. False si no entra en el
+        bloque (vuelve la ventana)."""
+        import overlay_imagen
+
+        datos, _ = self._datos(aj)
+        if datos is None:
+            # En pausa o sin nada para mostrar: tampoco adentro del juego
+            if self.ov.bloque.visible:
+                self.ov.bloque.ocultar(ahora)
+            return True
+        ancho_j, alto_j = cuadro
+        escala = max(0.6, alto_j / 1080) * aj["size"] / 100
+        parpadeo = datos["over"] and int(time.monotonic() * 2) % 2 == 0
+        opacidad = opacidad_valida(aj.get("opacity"))
+        clave = (datos, escala, parpadeo, opacidad)
+        if clave != self.dibujado_juego:
+            self.imagen_juego = overlay_imagen.imagen_overlay(datos, escala, opacidad, parpadeo,
+                                                              cabe=overlay_juego.entra)
+            self.dibujado_juego = clave
+        img = self.imagen_juego
+        if img is None:
+            return False
+        x, y = posicion((0, 0, ancho_j, alto_j), img.width, img.height, aj["corner"], round(24 * escala), aj["pos"])
+        return self.ov.bloque.publicar(img, x, y, ahora)
+
     def _tick(self):
         import window_compat
 
         mover = self.ov.mover and self.ov.enabled
         self._modo_clics(mover)
+        aj = self.ov.ajustes()
+        if self._en_juego(aj, mover):
+            self.esconder()
+            return
         if mover:
             juego = self._juego_para_mover()
         else:
@@ -826,9 +1161,6 @@ class _Ventana:
             if not juego:
                 self.esconder()
                 return
-        tele, tele_ts, nav, nav_ts = self.ov.data.foto()
-        falta, llega, llega_juego, *resto = self.ov.etiquetas()
-        aj = self.ov.ajustes()
         esquina, items, relativa = aj["corner"], aj["items"], aj["pos"]
         tamano = self.tamano_vivo if self.tamano_vivo is not None else aj["size"]
         self.tamano = tamano
@@ -839,16 +1171,12 @@ class _Ventana:
             # LAYERED los clics ya no pasan al juego.
             self.u.SetLayeredWindowAttributes(self.hwnd, 0, alfa, LWA_ALPHA)
             self.alfa = alfa
-        hora = resto[2] if len(resto) > 2 else "Time"
-        datos = contenido(tele, tele_ts, nav, nav_ts, time.time(), etiqueta_falta=falta,
-                          etiqueta_llega=llega, etiqueta_juego=llega_juego, items=items,
-                          aviso_giro=resto[0] if resto else "",
-                          rumbos=resto[1] if len(resto) > 1 else None, etiqueta_hora=hora)
+        datos, etiquetas = self._datos(aj)
         rect = _rect_de(juego) if juego else None
         if mover:
             # Sin juego abierto se acomoda sobre la pantalla principal.
             rect = rect or self._pantalla()
-            datos = datos or ejemplo(items, (falta, llega, llega_juego, hora))
+            datos = datos or ejemplo(items, etiquetas)
         if datos is None or rect is None:
             self.esconder()
             return
@@ -883,213 +1211,7 @@ class _Ventana:
                                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
 
     def dibujar(self, d: dict, k: float) -> tuple[int, int]:
-        from tkinter import font as tkfont
-
-        c = self.canvas
-        c.delete("all")
-        fuente = lambda px, negrita=False: ("Segoe UI", -max(8, round(px * k)), "bold" if negrita else "normal")
-        mide = lambda texto, f: tkfont.Font(root=self.root, font=f).measure(texto)
-        pad = round(14 * k)
-        sep = round(16 * k)
-        fila = round(46 * k)
-        hueco = round(12 * k)
-        icono = round(17 * k)          # el reloj del crucero
-        caja = round(36 * k)           # alto del recuadro de la marcha
-        # De derecha a izquierda: la hora, llegada del juego, llegada real, lo
-        # que falta.
-        columnas = [(d[v], d[e]) for v, e in (("clock", "clockLabel"), ("game_arrival", "gameArrivalLabel"),
-                                               ("arrival", "arrivalLabel"), ("remaining", "remainingLabel"))
-                    if d.get(v)]
-        ancho_marcha = max(caja, mide(d["gear"], fuente(20, True)) + round(14 * k)) if d["gear"] else 0
-        # El ancho sale de lo que hay que mostrar: con todo prendido no entra
-        # en el minimo y los numeros se pisaban con la velocidad.
-        izquierda = 0
-        if d["limit"]:
-            izquierda += fila + hueco
-        if d["speed"]:
-            izquierda += mide(d["speed"], fuente(34, True)) + round(4 * k) + mide(d["unit"], fuente(13))
-        if d["cruise"]:
-            izquierda += hueco + icono + round(4 * k) + mide(d["cruise"], fuente(17, True))
-        if d["gear"]:
-            izquierda += hueco + ancho_marcha
-        if d["heading"] or d["road"]:
-            izquierda += hueco + self._ancho_rumbo(d, k, fuente, mide)
-        derecha_total = sum(max(mide(v, fuente(19, True)), mide(e, fuente(11))) + sep for v, e in columnas)
-        ancho = max(round(420 * k), 2 * pad + izquierda + round(8 * k) + derecha_total)
-        lanes = d.get("lanes") or []
-        carril_w, carril_h, carril_sep = round(30 * k), round(36 * k), round(4 * k)
-        if lanes:
-            ancho = max(ancho, 2 * pad + len(lanes) * (carril_w + carril_sep) - carril_sep)
-        cercanas = d.get("near_stops") or []
-        if cercanas:
-            ancho = max(ancho, 2 * pad + sep * (len(cercanas) - 1) + sum(
-                round(16 * k) + (mide(p["label"], fuente(13)) + round(6 * k) if p["label"] else 0)
-                + mide(p["dist"], fuente(17, True)) for p in cercanas))
-        y = pad
-        if d["turn"]:
-            t = c.create_text(pad, y, text=d["turn"], fill=FG, anchor="nw",
-                              font=fuente(24, True), width=ancho - 2 * pad)
-            y = c.bbox(t)[3] + round(2 * k)
-            if lanes:
-                y += round(3 * k)
-                for i, carril in enumerate(lanes):
-                    self._carril(pad + i * (carril_w + carril_sep), y, carril_w, carril_h, carril, k)
-                y += carril_h + round(4 * k)
-            if d["next"]:
-                t = c.create_text(pad, y, text=d["next"], fill=MUTED, anchor="nw",
-                                  font=fuente(14), width=ancho - 2 * pad)
-                y = c.bbox(t)[3]
-            y += round(8 * k)
-        elif d.get("hint"):
-            t = c.create_text(pad, y, text=d["hint"], fill=MUTED, anchor="nw",
-                              font=fuente(14), width=ancho - 2 * pad)
-            y = c.bbox(t)[3] + round(8 * k)
-
-        if not (d["speed"] or d["cruise"] or d["gear"] or d["heading"] or d["road"] or columnas):
-            y = self._fila_cercanas(cercanas, y - round(8 * k), pad, sep, k, fuente)
-            alto = self._barra_paradas(d.get("stops"), y, ancho, pad, k) + pad
-            self._marco_mover(ancho, alto, k)
-            c.configure(width=ancho, height=alto)
-            return ancho, alto
-        medio = y + fila // 2
-        x = pad
-        if d["limit"]:
-            r = fila // 2
-            borde = max(3, round(5 * k))
-            anillo = RED if not (d["over"] and self.parpadeo) else "#ff8a80"
-            c.create_oval(x, medio - r, x + 2 * r, medio + r, fill="#ffffff", outline=anillo, width=borde)
-            c.create_text(x + r, medio, text=d["limit"], fill="#111111",
-                          font=fuente(17 if len(d["limit"]) < 3 else 14, True))
-            x += 2 * r + hueco
-        if d["speed"]:
-            v = c.create_text(x, medio, text=d["speed"], fill=RED if d["over"] else FG, anchor="w",
-                              font=fuente(34, True))
-            x = c.bbox(v)[2] + round(4 * k)
-            u = c.create_text(x, medio + round(6 * k), text=d["unit"], fill=MUTED, anchor="w", font=fuente(13))
-            x = c.bbox(u)[2]
-        if d["cruise"]:
-            # Como en el overlay de OBS: un relojito y la velocidad fijada, en verde.
-            x += hueco if x > pad else 0
-            r = icono // 2
-            grueso = max(2, round(2.4 * k))
-            c.create_oval(x, medio - r, x + 2 * r, medio + r, outline=CRUISE, width=grueso)
-            c.create_line(x + r, medio, x + r + round(r * 0.6), medio - round(r * 0.6),
-                          fill=CRUISE, width=grueso, capstyle="round")
-            t = c.create_text(x + 2 * r + round(4 * k), medio, text=d["cruise"], fill=CRUISE, anchor="w",
-                              font=fuente(17, True))
-            x = c.bbox(t)[2]
-        if d["gear"]:
-            x += hueco if x > pad else 0
-            c.create_rectangle(x, medio - caja // 2, x + ancho_marcha, medio + caja // 2,
-                               outline=MUTED, width=max(1, round(2 * k)))
-            c.create_text(x + ancho_marcha // 2, medio, text=d["gear"], fill=FG, font=fuente(20, True))
-            x += ancho_marcha
-        if d["heading"] or d["road"]:
-            x += hueco if x > pad else 0
-            if d["heading"]:
-                t = c.create_text(x, medio, text=d["heading"], fill=FG, anchor="w", font=fuente(20, True))
-                x = c.bbox(t)[2] + (round(6 * k) if d["road"] else 0)
-            if d["road"]:
-                t = c.create_text(x, medio + round(1 * k), text=d["road"], fill=MUTED, anchor="w", font=fuente(16, True))
-                x = c.bbox(t)[2]
-
-        derecha = ancho - pad
-        for valor, etiqueta in columnas:
-            a = c.create_text(derecha, medio - round(2 * k), text=valor, fill=FG, anchor="se", font=fuente(19, True))
-            b = c.create_text(derecha, medio + round(1 * k), text=etiqueta, fill=MUTED, anchor="ne", font=fuente(11))
-            derecha = min(c.bbox(a)[0], c.bbox(b)[0]) - sep
-        y = self._fila_cercanas(cercanas, y + fila, pad, sep, k, fuente)
-        alto = self._barra_paradas(d.get("stops"), y, ancho, pad, k) + pad
-        self._marco_mover(ancho, alto, k)
-        c.configure(width=ancho, height=alto)
-        return ancho, alto
-
-    @staticmethod
-    def _ancho_rumbo(d: dict, k: float, fuente, mide) -> int:
-        """Lo que ocupa el rumbo con la ruta al lado, igual que en dibujar."""
-        ancho = mide(d["heading"], fuente(20, True)) if d["heading"] else 0
-        if d["road"]:
-            ancho += (round(6 * k) if d["heading"] else 0) + mide(d["road"], fuente(16, True))
-        return ancho
-
-    def _fila_cercanas(self, cercanas, y: int, pad: int, sep: int, k: float, fuente) -> int:
-        """La parada mas cercana de cada tipo: un punto del color de la barra
-        de la ruta, el nombre y lo que falta. Devuelve donde termina."""
-        if not cercanas:
-            return y
-        c = self.canvas
-        y += round(8 * k)
-        medio = y + round(11 * k)
-        r = round(5 * k)
-        x = pad
-        for p in cercanas:
-            color = BARRA_COMBUSTIBLE if p["kind"] == "g" else BARRA_DESCANSO
-            c.create_oval(x, medio - r, x + 2 * r, medio + r, fill=color, outline="")
-            x += 2 * r + round(6 * k)
-            if p["label"]:
-                t = c.create_text(x, medio, text=p["label"], fill=MUTED, anchor="w", font=fuente(13))
-                x = c.bbox(t)[2] + round(6 * k)
-            t = c.create_text(x, medio, text=p["dist"], fill=FG, anchor="w", font=fuente(17, True))
-            x = c.bbox(t)[2] + sep
-        return y + round(22 * k)
-
-    def _barra_paradas(self, barra, y: int, ancho: int, pad: int, k: float) -> int:
-        """La barra de la ruta debajo de todo: de aca (izquierda) al destino,
-        arriba el tramo para cargar combustible y abajo el de dormir. Devuelve
-        donde termina."""
-        if not barra:
-            return y
-        c = self.canvas
-        y += round(8 * k)
-        alto_b = max(8, round(12 * k))
-        x0, x1 = pad, ancho - pad
-        c.create_rectangle(x0, y, x1, y + alto_b, fill=BARRA_FONDO, outline="")
-        mitad = alto_b // 2
-        for clave, color, arriba in (("fuel", BARRA_COMBUSTIBLE, True), ("rest", BARRA_DESCANSO, False)):
-            tramo = barra.get(clave)
-            if tramo:
-                a, b = x0 + tramo[0] * (x1 - x0), x0 + tramo[1] * (x1 - x0)
-                ya = y if arriba else y + mitad
-                c.create_rectangle(a, ya, max(a + 2, b), ya + (mitad if arriba else alto_b - mitad), fill=color, outline="")
-        return y + alto_b
-
-    def _carril(self, x: int, y: int, w: int, h: int, carril: dict, k: float) -> None:
-        """Un carril como en el tablero (lanesHtml): caja azul si sirve, la
-        flecha del giro en blanco y las demas apagadas."""
-        c = self.canvas
-        r = max(2, round(4 * k))
-        fondo = CARRIL_ON if carril["on"] else CARRIL_OFF
-        # Caja con las puntas redondeadas: Tk no tiene, va como poligono suave
-        puntos = [x + r, y, x + w - r, y, x + w, y, x + w, y + r, x + w, y + h - r, x + w, y + h,
-                  x + w - r, y + h, x + r, y + h, x, y + h, x, y + h - r, x, y + r, x, y]
-        c.create_polygon(puntos, fill=fondo, outline="", smooth=True)
-        # El dibujo de 24 x 30 adentro, con el margen de la caja del tablero
-        esc = (w - 6 * k) / 24
-        ox, oy = x + 3 * k, y + (h - 30 * esc) / 2
-        pt = lambda p: (ox + p[0] * esc, oy + p[1] * esc)
-        grueso = max(1.5, 2.6 * esc)
-        color = (lambda dd: "#ffffff" if dd == carril["giro"] else CARRIL_OTRA) if carril["on"] else (lambda dd: CARRIL_APAGADO)
-        c.create_line(*pt((12, 28)), *pt((12, 17)), fill="#ffffff" if carril["on"] else CARRIL_APAGADO,
-                      width=grueso, capstyle="round")
-        # La del giro al final, para que quede arriba de las otras
-        for dd in sorted(carril["dirs"], key=lambda dd: dd == carril["giro"]):
-            trazo, cabeza = CARRIL_FORMAS[dd]
-            c.create_line(*[v for p in trazo for v in pt(p)], fill=color(dd), width=grueso,
-                          capstyle="round", joinstyle="round")
-            c.create_polygon(*[v for p in cabeza for v in pt(p)], fill=color(dd), outline="")
-
-    def _marco_mover(self, ancho: int, alto: int, k: float) -> None:
-        """Modo Mover: un borde para que se vea que se puede agarrar, y la
-        esquina de abajo a la derecha, que estira."""
-        if not self.clics:
-            return
-        c = self.canvas
-        grueso = max(2, round(2 * k))
-        c.create_rectangle(1, 1, ancho - 2, alto - 2, outline="#4a90d9", width=grueso, dash=(6, 4))
-        lado = max(14, round(GRIP * k))
-        for i in (1, 2, 3):
-            d = round(lado * i / 3)
-            c.create_line(ancho - 3 - d, alto - 3, ancho - 3, alto - 3 - d, fill="#4a90d9", width=grueso)
+        return dibujar_overlay(LienzoTk(self.canvas, self.root), d, k, clics=self.clics, parpadeo=self.parpadeo)
 
 
 # --- Tecla rapida ------------------------------------------------------------

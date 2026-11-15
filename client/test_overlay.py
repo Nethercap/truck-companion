@@ -128,14 +128,19 @@ def test_ajustes_por_defecto_y_validados(monkeypatch):
     monkeypatch.setattr(win_integration, "load_settings", lambda: {})
     assert win_integration.overlay_settings() == {"enabled": False, "corner": "top_center", "size": 100,
                                                   "opacity": 90, "items": overlay.ITEMS_POR_DEFECTO,
-                                                  "hotkey": "ctrl+shift+o", "pos": None}
+                                                  "hotkey": "ctrl+shift+o", "pos": None, "in_game": False}
     # El tamano de antes era una letra: se pasa a su por ciento.
     monkeypatch.setattr(win_integration, "load_settings",
                         lambda: {"overlay": True, "overlay_corner": "middle", "overlay_size": "l",
                                  "overlay_items": ["arrival", "inventado", "speed"], "overlay_hotkey": ""})
     assert win_integration.overlay_settings() == {"enabled": True, "corner": "top_center", "size": 130,
                                                   "opacity": 90, "items": ("speed", "arrival"),
-                                                  "hotkey": "", "pos": None}
+                                                  "hotkey": "", "pos": None, "in_game": False}
+    # Adentro del juego: solo si se eligio (un valor raro no lo prende)
+    monkeypatch.setattr(win_integration, "load_settings", lambda: {"overlay_in_game": True})
+    assert win_integration.overlay_settings()["in_game"] is True
+    monkeypatch.setattr(win_integration, "load_settings", lambda: {"overlay_in_game": "si"})
+    assert win_integration.overlay_settings()["in_game"] is False
     monkeypatch.setattr(win_integration, "load_settings",
                         lambda: {"overlay_size": 155, "overlay_opacity": 45})
     ajustes = win_integration.overlay_settings()
@@ -161,7 +166,9 @@ def test_textos_en_los_ocho_idiomas():
     claves = ["overlay_option", "overlay_position", "overlay_size", "overlay_opacity", "menu_overlay",
               "overlay_remaining", "overlay_arrival", "overlay_arrival_game", "overlay_show",
               "overlay_hotkey", "hotkey_none", "sec_overlay", "overlay_hint", "pos_custom",
-              "overlay_move", "overlay_move_done", "overlay_move_hint", "overlay_compass", "overlay_clock"]
+              "overlay_move", "overlay_move_done", "overlay_move_hint", "overlay_compass", "overlay_clock",
+              "overlay_in_game", "overlay_in_game_hint", "overlay_in_game_on", "overlay_in_game_wait",
+              "overlay_in_game_gl", "overlay_in_game_big", "overlay_in_game_fail"]
     claves += [f"pos_{c}" for c in overlay.CORNERS]
     claves += [f"item_{k}" for k in overlay.ITEMS]
     for lang, textos in i18n._STRINGS.items():
@@ -612,3 +619,123 @@ def test_etiqueta_de_la_hora_del_tablero_y_ejemplo():
     assert overlay.ejemplo(("clock",), ("F", "R", "J", "Hora"))["clockLabel"] == "Hora"
     assert overlay.ejemplo(("clock",), ("F", "R", "J"))["clock"]
     assert overlay.ejemplo(overlay.ITEMS_POR_DEFECTO, ("F", "R", "J"))["clock"] == ""
+
+
+# Adentro del juego (Discord, 15-11): la imagen al plugin si dice que puede,
+# si no la ventana. La ventana de Win32 no se prueba; esto es lo que decide.
+
+class _Ov:
+    """Lo que _Ventana usa del Overlay, sin hilo ni ventana."""
+
+    def __init__(self, buf, **ajustes):
+        import overlay_juego
+        self.bloque = overlay_juego.Bloque(abrir=lambda: buf)
+        self.data = overlay.OverlayData()
+        self.enabled = True
+        self.mover = False
+        self.estado_juego = "off"
+        self.aj = {"corner": "top_right", "size": 100, "items": ("speed",), "pos": None, "opacity": 90,
+                   "in_game": True}
+        self.aj.update(ajustes)
+        self.ajustes = lambda: self.aj
+        self.etiquetas = lambda: ("Remaining", "Arrival", "Arrival (game)", "", None, "Time")
+
+
+def _ventana(ov):
+    v = overlay._Ventana.__new__(overlay._Ventana)
+    v.ov = ov
+    v.dibujado_juego = None
+    v.imagen_juego = None
+    return v
+
+
+def _juego(monkeypatch, cuadro=(2560, 1440), estado=1, ahora=1_000_000):
+    import overlay_juego as oj
+    buf = bytearray(oj.TAMANO)
+    oj.PLUGIN.pack_into(buf, oj.PLUGIN_EN, ahora - 10, cuadro[0], cuadro[1], estado, oj.REVISION)
+    monkeypatch.setattr(oj, "ahora_ms", lambda: ahora)
+    return buf
+
+
+def _leido(buf):
+    import overlay_juego as oj
+    _rev, sec, visible, x, y, w, h, _, tick = oj.CLIENTE.unpack_from(buf, 0)
+    return {"sec": sec, "visible": visible, "pos": (x, y), "tam": (w, h), "tick": tick}
+
+
+def test_adentro_del_juego_con_el_plugin_listo(monkeypatch):
+    buf = _juego(monkeypatch)
+    ov = _Ov(buf)
+    ov.data.telemetria(tele())
+    v = _ventana(ov)
+    assert v._en_juego(ov.aj, False) is True  # la ventana se esconde
+    assert ov.estado_juego == "drawing"
+    leido = _leido(buf)
+    # Escalada contra el cuadro del juego (1440 de alto: 1,33) y arriba a la
+    # derecha, con el margen de la ventana
+    ancho, alto = leido["tam"]
+    escala = 1440 / 1080
+    assert leido["visible"] == 1 and leido["tick"] == 1_000_000
+    assert ancho == round(420 * escala) and leido["pos"] == (2560 - round(24 * escala) - ancho, round(24 * escala))
+    # Otro cuadro igual: no se rehace la imagen ni se vuelve a copiar
+    imagen = v.imagen_juego
+    assert v._en_juego(ov.aj, False) is True
+    assert v.imagen_juego is imagen and _leido(buf)["sec"] == leido["sec"]
+
+
+def test_sin_plugin_que_dibuje_sigue_la_ventana(monkeypatch):
+    # Sin TruckersMP (el plugin nunca escribio)
+    import overlay_juego as oj
+    buf = bytearray(oj.TAMANO)
+    monkeypatch.setattr(oj, "ahora_ms", lambda: 1_000_000)
+    ov = _Ov(buf)
+    ov.data.telemetria(tele())
+    assert _ventana(ov)._en_juego(ov.aj, False) is False
+    assert ov.estado_juego == "none" and _leido(buf)["visible"] == 0
+    # El juego en OpenGL: late pero no puede
+    buf = _juego(monkeypatch, estado=2)
+    ov = _Ov(buf)
+    ov.data.telemetria(tele())
+    assert _ventana(ov)._en_juego(ov.aj, False) is False
+    assert ov.estado_juego == "not_dx11"
+
+
+def test_la_opcion_apagada_no_abre_el_bloque(monkeypatch):
+    buf = _juego(monkeypatch)
+    ov = _Ov(buf, in_game=False)
+    ov.data.telemetria(tele())
+    assert _ventana(ov)._en_juego(ov.aj, False) is False
+    assert ov.estado_juego == "off" and ov.bloque.buf is None
+
+
+def test_mover_apagar_o_pausa_lo_sacan_del_juego(monkeypatch):
+    buf = _juego(monkeypatch)
+    ov = _Ov(buf)
+    ov.data.telemetria(tele())
+    v = _ventana(ov)
+    assert v._en_juego(ov.aj, False) and _leido(buf)["visible"] == 1
+    # Modo Mover: se arrastra la ventana, adentro del juego no queda otra
+    assert v._en_juego(ov.aj, True) is False
+    assert _leido(buf)["visible"] == 0 and ov.estado_juego == "off"
+    assert v._en_juego(ov.aj, False) and _leido(buf)["visible"] == 1
+    # En pausa: ni adentro ni en la ventana (True: la ventana se esconde)
+    ov.data.telemetria(tele(paused=True))
+    assert v._en_juego(ov.aj, False) is True and _leido(buf)["visible"] == 0
+    ov.data.telemetria(tele())
+    assert v._en_juego(ov.aj, False) and _leido(buf)["visible"] == 1
+    # La tecla rapida lo apaga: se saca ya, sin esperar al proximo cuadro
+    ov.enabled = False
+    real = overlay.Overlay(ov.data, ov.ajustes, ov.etiquetas)
+    real.bloque, real._activo = ov.bloque, True
+    real.set_enabled(False)
+    assert _leido(buf)["visible"] == 0
+    assert v._en_juego(ov.aj, False) is False
+
+
+def test_si_no_entra_vuelve_la_ventana(monkeypatch):
+    # Un cuadro enorme al 200 %: la imagen pasa el maximo del bloque
+    buf = _juego(monkeypatch, cuadro=(30000, 20000))
+    ov = _Ov(buf, size=200, items=overlay.ITEMS)
+    ov.data.telemetria(tele())
+    assert _ventana(ov)._en_juego(ov.aj, False) is False
+    assert ov.estado_juego == "too_big" and _leido(buf)["visible"] == 0

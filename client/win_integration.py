@@ -262,11 +262,12 @@ def overlay_supported() -> bool:
 
 
 def overlay_settings() -> dict:
-    """{'enabled', 'corner', 'pos', 'size', 'opacity', 'items', 'hotkey'} del
-    overlay en el juego. Apagado por defecto: es una ventana encima del juego
-    y la tiene que pedir uno. Sin 'items' guardado se muestra todo, salvo lo
-    agregado despues (overlay.ITEMS_POR_DEFECTO). El tamano
-    y la opacidad van en por ciento; el tamano de antes era una letra."""
+    """{'enabled', 'corner', 'pos', 'size', 'opacity', 'items', 'hotkey',
+    'in_game'} del overlay en el juego. Apagado por defecto: es una ventana
+    encima del juego y la tiene que pedir uno. Sin 'items' guardado se muestra
+    todo, salvo lo agregado despues (overlay.ITEMS_POR_DEFECTO). El tamano
+    y la opacidad van en por ciento; el tamano de antes era una letra.
+    'in_game': dibujarlo adentro del juego (overlay_juego.py), apagado."""
     import overlay
     s = load_settings()
     corner = s.get("overlay_corner")
@@ -286,13 +287,14 @@ def overlay_settings() -> dict:
         "items": (tuple(i for i in overlay.ITEMS if i in items) if isinstance(items, list)
                   else overlay.ITEMS_POR_DEFECTO),
         "hotkey": hotkey if hotkey in overlay.HOTKEYS else overlay.DEFAULT_HOTKEY,
+        "in_game": s.get("overlay_in_game") is True,
     }
 
 
 def save_overlay_settings(**cambios) -> None:
     claves = {"enabled": "overlay", "corner": "overlay_corner", "size": "overlay_size",
               "items": "overlay_items", "hotkey": "overlay_hotkey", "pos": "overlay_pos",
-              "opacity": "overlay_opacity"}
+              "opacity": "overlay_opacity", "in_game": "overlay_in_game"}
     settings = load_settings()
     for k, v in cambios.items():
         settings[claves[k]] = list(v) if k in ("items", "pos") and v is not None else v

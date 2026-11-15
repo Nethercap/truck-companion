@@ -950,6 +950,32 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `tools/probar_plugin.py` lo prueba con un TMP falso. Si cambia la
   disposicion del bloque, cambia en los dos lados y sube la revision
   (`test_tmp_players.py` compara el .hpp con el lector).
+- Overlay adentro del juego (15-11, Discord: el de Trucky sale en los clips y
+  el nuestro no). El de Trucky va por Overwolf, que se mete en el juego; el
+  nuestro es una ventana encima, y lo que graba solo la imagen del juego
+  (Steam, Xbox Game Bar, la Captura de juego de OBS) no la ve. Con "Dibujar
+  adentro del juego" (Setup, `overlay_in_game`, apagado) el cliente arma la
+  misma imagen con Pillow (`overlay_imagen.py`, `LienzoPil`) y la escribe en
+  `Local\TruckDashOverlay` (`overlay_juego.py`, `truckersmp_overlay.hpp`,
+  revision 1). El plugin la pega en el evento de despues de dibujar de
+  TruckersMP (`truckersmp_overlay.cpp`: `OnPostRender` con el ID3D11Device de
+  `GetDeviceHandle`, los shaders con el `d3dcompiler_47.dll` de System32, y
+  deja el pipeline como estaba). El dibujo es uno solo (`dibujar_overlay`,
+  con `LienzoTk` para la ventana: sale pixel a pixel como antes). Sin
+  TruckersMP no hay donde: no se engancha el `Present` del juego (el
+  maintainer eligio el 15-11 empezar sin eso, por los antivirus del issue #2 y
+  los otros overlays), y sigue la ventana. El plugin escribe en cada cuadro
+  `pluginTick` y un estado; el cliente sigue con la ventana mientras no diga
+  READY (OpenGL, sin dispositivo, sin render target), en el modo Mover y si la
+  imagen no entra (4096 x 2048), y Setup dice por que. Las formas se dibujan a
+  3x y se guardan (`FORMAS_GUARDADAS`): cambiando solo la velocidad son 4 a 9
+  ms por imagen (30 ms la primera a 1440p). `tools/probar_plugin.py` (pasada
+  `tmp-overlay`) lo prueba con un dispositivo WARP y lee los pixeles del
+  render target (tambien sRGB y OpenGL); con la DLL de mingw bajo Wine 9 pasa.
+  Sin probar todavia con el TruckersMP de verdad: que lo atado en
+  `OnPostRender` sea el back buffer lo dice el SDK ("Overlay drawing belongs
+  here"), no una prueba. Si cambia el bloque, en los dos lados y sube la
+  revision (`test_overlay_juego.py` compara el .hpp con el escritor).
 - Trabajos de bus (DLC Coaches, ETS2 1.62.3; 13-11): el juego no manda
   ciudades sino paradas, una etapa por indice (`source_stop.*`,
   `destination_stop.*`, tipo `city` o `viewpoints`). El plugin las guarda en

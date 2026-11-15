@@ -17,6 +17,13 @@ Cuatro pasadas, cada una en un proceso aparte:
 - "tmp-rechazado": un TMP sin la parte de jugadores. truckersmp_init tiene
   que decir que no, sin dejar listeners, y TMP suelta la DLL sin llamar a
   truckersmp_shutdown.
+- "tmp-overlay": el overlay adentro del juego (truckersmp_overlay.cpp) con un
+  dispositivo D3D11 de verdad (WARP, el de software de Windows) que el TMP
+  falso da como el suyo. El cliente escribe una imagen en el bloque
+  (client/overlay_juego.py), se dispara el evento de despues de dibujar con un
+  render target atado, y se leen sus pixeles: la imagen en su lugar, mezclada
+  con su alfa, nada afuera, y el estado del pipeline como estaba. Tambien en
+  un render target sRGB, con OpenGL (no dibuja y lo dice) y oculto.
 
 La DLL del 30-09 se caia en las dos primeras: la segunda llamada a shutdown
 escribia en el bloque ya desmapeado, y sin init en un puntero nulo.
@@ -43,7 +50,7 @@ import subprocess
 import sys
 import time
 
-PASADAS = ("init", "sin-init", "tmp", "tmp-rechazado")
+PASADAS = ("init", "sin-init", "tmp", "tmp-rechazado", "tmp-overlay")
 # Las DLLs del Visual C++ Redistributable, que Windows no trae. El CRT
 # universal (ucrtbase, api-ms-win-crt-*) y msvcrt.dll si vienen con Windows.
 RUNTIME_VISUAL_CPP = re.compile(r"^(vcruntime|msvcp|msvcr|concrt|vccorlib|vcomp)\d", re.IGNORECASE)
@@ -139,6 +146,7 @@ EVT_DISCONNECTED = 0xA9E12170E5CA1702
 EVT_STREAM_IN = 0x095C1192F5DA21CD
 EVT_STREAM_OUT = 0x702C3C15A6DFF3EE
 EVT_PRE_RENDER = 0x62B8AFF307976B31
+EVT_POST_RENDER = 0xE4C430A67C63B3BE
 
 # Cuaterniones (w, x, y, z): mirando al norte (-Z, el frente del vehiculo) y
 # girado 90 grados sobre Y, al oeste.
@@ -192,8 +200,12 @@ class TmpFalso:
 
     LOCAL = 100
 
-    def __init__(self, jugadores: dict, con_jugadores: bool = True):
+    def __init__(self, jugadores: dict, con_jugadores: bool = True, dispositivo=None):
         self.jugadores = jugadores
+        # El render: el ID3D11Device que da GetDeviceHandle (None: no da
+        # nada, como hasta ahora) y el renderer (1 DirectX 11, 0 OpenGL).
+        self.dispositivo = dispositivo
+        self.renderer = 1
         self.cargados = []  # lo que devuelve GetAllPlayers
         self.conectado = True
         self.oyentes = []  # (evento, funcion, contexto)
@@ -213,7 +225,7 @@ class TmpFalso:
                             self._cb(_LOG, self._log), nada, nada),
             API_NETWORK: tabla(self._cb(_SALIDA, self._conectado), nada,
                                self._cb(_SALIDA, lambda c, o: self._escribir(o, ctypes.c_uint64, 2))),
-            API_RENDER: tabla(nada, nada),
+            API_RENDER: tabla(self._cb(_SALIDA, self._renderer), self._cb(_SALIDA, self._dispositivo)),
             API_VEHICLE: tabla(nada, self._cb(_SALIDA_DE, self._ubicacion),
                                self._cb(_SALIDA_DE, self._velocidad), nada, nada),
         }
@@ -275,6 +287,12 @@ class TmpFalso:
         t = _Texto.from_address(texto)
         self.logs.append((nivel, ctypes.string_at(t.ptr, t.size).decode("utf-8", "replace")))
         return 0
+
+    def _renderer(self, ctx, salida):
+        return self.dispositivo is not None and self._escribir(salida, ctypes.c_int32, self.renderer)
+
+    def _dispositivo(self, ctx, salida):
+        return self.dispositivo is not None and self._escribir(salida, ctypes.c_uint64, self.dispositivo)
 
     def _conectado(self, ctx, salida):
         return self._escribir(salida, ctypes.c_bool, self.conectado)
@@ -413,6 +431,13 @@ def _pasada_tmp(dll: str, h, con_jugadores: bool) -> None:
     cuadro()
     if leer("sin Ana") != [lukasz]:
         fallar(f"sin Ana: {leer('sin Ana')}")
+    # El overlay adentro del juego, sin dispositivo de TMP: no dibuja y lo dice
+    import overlay_juego
+    bloque = overlay_juego.Bloque()
+    tmp.disparar(EVT_POST_RENDER)
+    if bloque.plugin(overlay_juego.ahora_ms())["estado"] != "no_device":
+        fallar(f"sin dispositivo el overlay dice {bloque.plugin(overlay_juego.ahora_ms())}")
+    bloque.cerrar()
     tmp.conectado = False
     tmp.disparar(EVT_DISCONNECTED)
     if leer("desconectado") != []:
@@ -430,10 +455,250 @@ def _pasada_tmp(dll: str, h, con_jugadores: bool) -> None:
         fallar("errores del TMP falso")
 
 
+# ------------------------------------------------------- overlay en D3D11
+
+# Lugares en la tabla de cada interfaz (d3d11.h): los de IUnknown (0-2) y,
+# en el contexto, los de ID3D11DeviceChild (3-6), van antes.
+D3D_DEVICE_CREATE_TEXTURE2D = 5
+D3D_DEVICE_CREATE_RTV = 9
+CTX_MAP, CTX_UNMAP = 14, 15
+CTX_IA_SET_TOPOLOGY = 24
+CTX_OM_SET_RENDER_TARGETS = 33
+CTX_RS_SET_VIEWPORTS = 44
+CTX_COPY_RESOURCE = 47
+CTX_CLEAR_RTV = 50
+CTX_IA_GET_TOPOLOGY = 83
+CTX_OM_GET_RENDER_TARGETS = 89
+CTX_RS_GET_VIEWPORTS = 95
+R8G8B8A8_UNORM, R8G8B8A8_UNORM_SRGB = 28, 29
+DRIVER_WARP, DRIVER_HARDWARE = 5, 1
+
+
+class _DescTextura(ctypes.Structure):  # D3D11_TEXTURE2D_DESC
+    _fields_ = [(n, ctypes.c_uint32) for n in ("Width", "Height", "MipLevels", "ArraySize", "Format",
+                                               "SampleCount", "SampleQuality", "Usage", "BindFlags",
+                                               "CPUAccessFlags", "MiscFlags")]
+
+
+class _Viewport(ctypes.Structure):  # D3D11_VIEWPORT
+    _fields_ = [(n, ctypes.c_float) for n in ("x", "y", "w", "h", "zmin", "zmax")]
+
+
+class _Mapeado(ctypes.Structure):  # D3D11_MAPPED_SUBRESOURCE
+    _fields_ = [("pData", ctypes.c_void_p), ("RowPitch", ctypes.c_uint32), ("DepthPitch", ctypes.c_uint32)]
+
+
+def _metodo(objeto, lugar, *argtypes, restype=ctypes.c_long):
+    """El metodo de ese lugar de la tabla de una interfaz COM, ya atado."""
+    tabla = ctypes.cast(objeto, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    funcion = ctypes.WINFUNCTYPE(restype, ctypes.c_void_p, *argtypes)(tabla[lugar])
+    return lambda *a: funcion(objeto, *a)
+
+
+def _soltar(objeto) -> None:
+    if objeto:
+        _metodo(objeto, 2, restype=ctypes.c_ulong)()
+
+
+class _D3D:
+    """Un dispositivo D3D11 (WARP, o el de la placa si no hay: bajo Wine) con
+    un render target de ancho x alto atado en el contexto inmediato."""
+
+    def __init__(self, ancho: int, alto: int, formato: int = R8G8B8A8_UNORM):
+        d3d11 = ctypes.WinDLL("d3d11")
+        crear = d3d11.D3D11CreateDevice
+        crear.restype = ctypes.c_long
+        crear.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p,
+                          ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p),
+                          ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_void_p)]
+        self.dispositivo, self.contexto = ctypes.c_void_p(), ctypes.c_void_p()
+        nivel = ctypes.c_int()
+        for driver in (DRIVER_WARP, DRIVER_HARDWARE):
+            if crear(None, driver, None, 0, None, 0, 7, ctypes.byref(self.dispositivo), ctypes.byref(nivel),
+                     ctypes.byref(self.contexto)) >= 0:
+                break
+        else:
+            raise SystemExit("no hay dispositivo D3D11")
+        self.ancho, self.alto = ancho, alto
+        self.textura = self._textura(formato, usage=0, bind=0x20)  # DEFAULT, RENDER_TARGET
+        self.copia = self._textura(formato, usage=3, bind=0, cpu=0x20000)  # STAGING, CPU_ACCESS_READ
+        self.rtv = ctypes.c_void_p()
+        hr = _metodo(self.dispositivo.value, D3D_DEVICE_CREATE_RTV, ctypes.c_void_p, ctypes.c_void_p,
+                     ctypes.POINTER(ctypes.c_void_p))(self.textura, None, ctypes.byref(self.rtv))
+        if hr < 0:
+            raise SystemExit(f"CreateRenderTargetView: {hr & 0xFFFFFFFF:#x}")
+        c = self.contexto.value
+        self._om_set = _metodo(c, CTX_OM_SET_RENDER_TARGETS, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p),
+                               ctypes.c_void_p, restype=None)
+        self._om_get = _metodo(c, CTX_OM_GET_RENDER_TARGETS, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p),
+                               ctypes.c_void_p, restype=None)
+        self._limpiar = _metodo(c, CTX_CLEAR_RTV, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), restype=None)
+        self._vp_set = _metodo(c, CTX_RS_SET_VIEWPORTS, ctypes.c_uint, ctypes.POINTER(_Viewport), restype=None)
+        self._vp_get = _metodo(c, CTX_RS_GET_VIEWPORTS, ctypes.POINTER(ctypes.c_uint), ctypes.POINTER(_Viewport),
+                               restype=None)
+        self._topo_set = _metodo(c, CTX_IA_SET_TOPOLOGY, ctypes.c_int, restype=None)
+        self._topo_get = _metodo(c, CTX_IA_GET_TOPOLOGY, ctypes.POINTER(ctypes.c_int), restype=None)
+        self._copiar = _metodo(c, CTX_COPY_RESOURCE, ctypes.c_void_p, ctypes.c_void_p, restype=None)
+        self._map = _metodo(c, CTX_MAP, ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_uint,
+                            ctypes.POINTER(_Mapeado))
+        self._unmap = _metodo(c, CTX_UNMAP, ctypes.c_void_p, ctypes.c_uint, restype=None)
+
+    def _textura(self, formato, usage, bind, cpu=0):
+        desc = _DescTextura(self.ancho, self.alto, 1, 1, formato, 1, 0, usage, bind, cpu, 0)
+        t = ctypes.c_void_p()
+        hr = _metodo(self.dispositivo.value, D3D_DEVICE_CREATE_TEXTURE2D, ctypes.POINTER(_DescTextura),
+                     ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))(ctypes.byref(desc), None, ctypes.byref(t))
+        if hr < 0:
+            raise SystemExit(f"CreateTexture2D: {hr & 0xFFFFFFFF:#x}")
+        return t.value
+
+    def preparar(self, color):
+        """Limpia el render target a color (RGBA 0-1) y lo deja atado, con un
+        viewport y una topologia que el plugin tiene que devolver como estaban."""
+        self._limpiar(self.rtv, (ctypes.c_float * 4)(*color))
+        self._om_set(1, ctypes.byref(self.rtv), None)
+        self._vp_set(1, ctypes.byref(_Viewport(3, 4, 50, 60, 0, 1)))
+        self._topo_set(4)  # TRIANGLELIST
+
+    def estado(self):
+        """(render target atado, viewport, topologia), para ver que quedo igual."""
+        rtv = ctypes.c_void_p()
+        self._om_get(1, ctypes.byref(rtv), None)
+        atado = rtv.value == self.rtv.value
+        _soltar(rtv.value)
+        n, vp = ctypes.c_uint(1), _Viewport()
+        self._vp_get(ctypes.byref(n), ctypes.byref(vp))
+        topo = ctypes.c_int()
+        self._topo_get(ctypes.byref(topo))
+        return atado, (n.value, vp.x, vp.y, vp.w, vp.h), topo.value
+
+    def pixeles(self) -> dict:
+        """{(x, y): (r, g, b, a)} de todo el render target."""
+        self._copiar(self.copia, self.textura)
+        m = _Mapeado()
+        hr = self._map(self.copia, 0, 1, 0, ctypes.byref(m))  # MAP_READ
+        if hr < 0:
+            raise SystemExit(f"Map: {hr & 0xFFFFFFFF:#x}")
+        datos = ctypes.string_at(m.pData, m.RowPitch * self.alto)
+        fila = m.RowPitch
+        self._unmap(self.copia, 0)
+        return lambda x, y: tuple(datos[y * fila + x * 4:y * fila + x * 4 + 4])
+
+    def cerrar(self):
+        for o in (self.rtv.value, self.copia, self.textura, self.contexto.value, self.dispositivo.value):
+            _soltar(o)
+
+
+class _Imagen:
+    """Lo que overlay_juego.Bloque.publicar usa de una imagen de Pillow, sin
+    Pillow (Build plugin no instala el cliente)."""
+
+    def __init__(self, ancho, alto, pixel):
+        self.width, self.height, self.size = ancho, alto, (ancho, alto)
+        self._datos = b"".join(bytes(pixel(x, y)) for y in range(alto) for x in range(ancho))
+
+    def tobytes(self, *_):
+        return self._datos
+
+
+def _cerca(a, b, tolerancia=3) -> bool:
+    return all(abs(x - y) <= tolerancia for x, y in zip(a, b))
+
+
+def _pasada_overlay(dll: str, h) -> None:
+    sys.path.insert(0, os.path.join(RAIZ, "client"))
+    import overlay_juego
+
+    lib = ctypes.CDLL(dll, handle=h)
+    lib.truckersmp_init.restype = ctypes.c_bool
+    lib.truckersmp_init.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    lib.truckersmp_shutdown.restype = None
+    d3d = _D3D(320, 180)
+    tmp = TmpFalso(_jugadores(), dispositivo=d3d.dispositivo.value)
+    tmp.renderer = 0  # empieza en OpenGL
+
+    def fallar(motivo):
+        raise SystemExit(f"{motivo} (logs: {tmp.logs}, errores: {tmp.errores})")
+
+    if not lib.truckersmp_init(ctypes.byref(tmp.host), ctypes.byref(_Desc(ctypes.sizeof(_Desc)))):
+        fallar("truckersmp_init dijo que no")
+    bloque = overlay_juego.Bloque()
+    verde = (0.0, 128 / 255, 0.0, 1.0)
+
+    def cuadro():
+        tmp.disparar(EVT_POST_RENDER)
+        return bloque.plugin(overlay_juego.ahora_ms())
+
+    # En OpenGL no dibuja, y lo dice
+    if cuadro() != {"listo": False, "estado": "not_dx11", "cuadro": None}:
+        fallar(f"en OpenGL el plugin dice {cuadro()}")
+    tmp.renderer = 1
+    d3d.preparar(verde)
+    antes = d3d.estado()
+    # Sin imagen todavia: listo, con el tamano del render target
+    if cuadro() != {"listo": True, "estado": "ready", "cuadro": (320, 180)}:
+        fallar(f"con DirectX 11 el plugin dice {cuadro()}")
+    # Mitad izquierda rojo opaco, derecha azul al 50 %; arriba a la izquierda
+    # un pixel gris opaco
+    img = _Imagen(40, 20, lambda x, y: (128, 128, 128, 255) if (x, y) == (0, 0)
+                  else (255, 0, 0, 255) if x < 20 else (0, 0, 255, 128))
+    bloque.publicar(img, 100, 50, overlay_juego.ahora_ms())
+    d3d.preparar(verde)
+    cuadro()
+    px = d3d.pixeles()
+    esperado = {(110, 60): (255, 0, 0, 255), (130, 60): (0, 64, 128, 255), (139, 69): (0, 64, 128, 255),
+                (100, 50): (128, 128, 128, 255), (99, 50): (0, 128, 0, 255), (140, 60): (0, 128, 0, 255),
+                (110, 70): (0, 128, 0, 255), (110, 49): (0, 128, 0, 255), (5, 5): (0, 128, 0, 255)}
+    malos = {p: px(*p) for p, c in esperado.items() if not _cerca(px(*p), c)}
+    if malos:
+        fallar(f"pixeles distintos: {malos}")
+    if d3d.estado() != antes:
+        fallar(f"el pipeline no quedo como estaba: {antes} -> {d3d.estado()}")
+    # Movida: se dibuja en el lugar nuevo con la misma imagen
+    bloque.publicar(img, 0, 0, overlay_juego.ahora_ms())
+    d3d.preparar(verde)
+    cuadro()
+    px = d3d.pixeles()
+    if not _cerca(px(10, 10), (255, 0, 0, 255)) or not _cerca(px(110, 60), (0, 128, 0, 255)):
+        fallar(f"movida: {px(10, 10)} y {px(110, 60)}")
+    # Oculta: nada
+    bloque.ocultar(overlay_juego.ahora_ms())
+    d3d.preparar(verde)
+    cuadro()
+    if not _cerca(d3d.pixeles()(10, 10), (0, 128, 0, 255)):
+        fallar("oculta se dibujo igual")
+    lib.truckersmp_shutdown()
+    if bloque.plugin(overlay_juego.ahora_ms())["estado"] != "none":
+        fallar("despues de truckersmp_shutdown el bloque sigue diciendo que dibuja")
+    if tmp.oyentes:
+        fallar(f"quedaron {len(tmp.oyentes)} listeners despues de truckersmp_shutdown")
+    d3d.cerrar()
+
+    # En un render target sRGB el gris sale gris: el plugin lo pasa a luz
+    # lineal y la placa lo vuelve a codificar (sin eso, 188).
+    d3d = _D3D(64, 32, R8G8B8A8_UNORM_SRGB)
+    tmp = TmpFalso(_jugadores(), dispositivo=d3d.dispositivo.value)
+    if not lib.truckersmp_init(ctypes.byref(tmp.host), ctypes.byref(_Desc(ctypes.sizeof(_Desc)))):
+        fallar("truckersmp_init dijo que no (sRGB)")
+    gris = _Imagen(8, 8, lambda x, y: (128, 128, 128, 255))
+    bloque.publicar(gris, 4, 4, overlay_juego.ahora_ms())
+    d3d.preparar((0.0, 0.0, 0.0, 1.0))
+    cuadro()
+    if not _cerca(d3d.pixeles()(6, 6), (128, 128, 128, 255)):
+        fallar(f"en sRGB el gris salio {d3d.pixeles()(6, 6)}")
+    lib.truckersmp_shutdown()
+    bloque.cerrar()
+    d3d.cerrar()
+    if tmp.vivos or tmp.errores:
+        fallar("cosas sin liberar o errores del TMP falso")
+
+
 def _hijo(pasada: str, dll: str) -> None:
     k32, h = _cargar(dll)
     if pasada in ("init", "sin-init"):
         _pasada_scs(dll, h, pasada == "init")
+    elif pasada == "tmp-overlay":
+        _pasada_overlay(dll, h)
     else:
         _pasada_tmp(dll, h, pasada == "tmp")
     k32.FreeLibrary(h)

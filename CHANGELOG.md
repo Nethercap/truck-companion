@@ -6,6 +6,14 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- In-game overlay: with TruckersMP it can now be drawn inside the game itself, so it shows in clips
+  and in recordings that only capture the game (Steam's game recording, Xbox Game Bar, OBS's Game
+  Capture), like Trucky's does. Tick **Draw it inside the game** in Setup; it is off until you do.
+  The TruckersMP client lets plugins draw on the game's picture and the Truck Dash plugin now does;
+  single player has no such way, so there the overlay stays a window over the game. It also stays in
+  its window while it can't be drawn inside (the game on OpenGL, or a plugin from before this
+  version) and while you move it, and Setup says why. The client updates the plugin in the game
+  folder while the game is closed: restart the game once after updating.
 - In-game overlay: it can show the real time, from your PC's clock (Setup, Show, **Clock (real)**;
   off until you tick it). It works without the dashboard open, and follows the 12 or 24 hour format
   chosen in the dashboard's Settings, like the arrival times.

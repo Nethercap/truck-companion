@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "sharedmemory.hpp"
+#include "truckersmp_overlay.hpp"
 #include "truckersmp_players.hpp"
 
 namespace {
@@ -130,6 +131,9 @@ void DropSession() {
 
 void Release() {
   DropSession();
+  // The in-game overlay (truckersmp_overlay.cpp): its post-render listener
+  // went with the session.
+  TruckDashOverlayStop();
   g_streamed.clear();
   if (g_mem != nullptr) {
     // Empty right away: the reader may keep the block alive after this.
@@ -150,8 +154,9 @@ TMP_EXPORT bool TMP_API truckersmp_init(const TruckersMP_Host* host, TruckersMP_
   info.m_author = "Truck Dash";
   info.m_version = "1.12.1-truckdash.5";  // PLUGIN_DLL_VERSION in client/plugin_installer.py
   info.m_description =
-      "Shows the TruckersMP players around you on the map of the Truck Dash app. "
-      "It only hands them to the Truck Dash client on this PC.";
+      "Shows the TruckersMP players around you on the map of the Truck Dash app, "
+      "and can draw the Truck Dash overlay inside the game. It only talks to the "
+      "Truck Dash client on this PC.";
   FillPluginDesc(desc, info);
 
   g_session = Session::Create(host).release();
@@ -193,6 +198,11 @@ TMP_EXPORT bool TMP_API truckersmp_init(const TruckersMP_Host* host, TruckersMP_
     Refresh();
   });
   Refresh();
+  // The in-game overlay, drawn on the post-render event. Without its block
+  // the players still work and the client keeps its overlay window.
+  if (!TruckDashOverlayStart(g_session)) {
+    g_session->Core().LogMessage(LogLevel::Warning, "Truck Dash: no in-game overlay (could not open its shared memory)");
+  }
   return true;
 }
 

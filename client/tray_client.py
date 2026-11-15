@@ -177,7 +177,8 @@ class AppState:
         self.overlay_data = overlay.OverlayData()
         # Las mismas claves que win_integration.overlay_settings().
         self.overlay_layout = {"corner": overlay.DEFAULT_CORNER, "size": overlay.DEFAULT_SIZE,
-                               "items": overlay.ITEMS_POR_DEFECTO, "pos": None, "opacity": overlay.DEFAULT_OPACITY}
+                               "items": overlay.ITEMS_POR_DEFECTO, "pos": None, "opacity": overlay.DEFAULT_OPACITY,
+                               "in_game": False}
         self.overlay = overlay.Overlay(self.overlay_data, lambda: self.overlay_layout,
                                        lambda: (T("overlay_remaining"), T("overlay_arrival"),
                                                 T("overlay_arrival_game"), self.aviso_giro(),
@@ -1078,6 +1079,29 @@ class SetupWindow:
             tk.Checkbutton(casillas, text=T(f"item_{clave}"), variable=var, command=self.change_overlay_items,
                            bg=BG, fg=FG, selectcolor="#262b33", activebackground=BG,
                            activeforeground=FG).grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 6))
+        # Adentro del juego (overlay_juego.py): sale en los clips. Solo con
+        # TruckersMP; sin el, o si no se puede, sigue la ventana y lo dice.
+        self.overlay_in_game_var = tk.BooleanVar(value=bool(layout.get("in_game")))
+        tk.Checkbutton(sec, text=T("overlay_in_game"), variable=self.overlay_in_game_var,
+                       command=lambda: set_overlay_layout(in_game=self.overlay_in_game_var.get()),
+                       bg=BG, fg=FG, selectcolor="#262b33", activebackground=BG,
+                       activeforeground=FG).pack(anchor="w", pady=(8, 0))
+        self.overlay_in_game_label = self.label(sec, "", fg=MUTED, wraplength=540, justify="left")
+        self.overlay_in_game_label.pack(anchor="w")
+        self.render_overlay_in_game()
+
+    def render_overlay_in_game(self):
+        """Lo que pasa con "Dibujar adentro del juego": apagado, dibujando, o
+        en la ventana y por que (lo que dice el plugin en el bloque)."""
+        estado = state.overlay.estado_juego
+        if not state.overlay_layout.get("in_game") or estado == "off":
+            texto, color = T("overlay_in_game_hint"), MUTED
+        else:
+            clave = {"drawing": "overlay_in_game_on", "not_dx11": "overlay_in_game_gl",
+                     "too_big": "overlay_in_game_big", "none": "overlay_in_game_wait"}.get(estado, "overlay_in_game_fail")
+            texto, color = T(clave), (GREEN if estado == "drawing" else MUTED)
+        if self.overlay_in_game_label.cget("text") != texto:
+            self.overlay_in_game_label.configure(text=texto, fg=color)
 
     def toggle_overlay_move(self):
         mover = not state.overlay.mover
@@ -1407,6 +1431,7 @@ class SetupWindow:
             # Estirado en el modo Mover (esquina o rueda): el deslizador lo sigue.
             if self.overlay_size_var.get() != state.overlay_layout["size"]:
                 self.overlay_size_var.set(state.overlay_layout["size"])
+            self.render_overlay_in_game()
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         # La deteccion de la red Publica llega despues (PowerShell, en un hilo).
@@ -2529,7 +2554,7 @@ def main():
     client_lib.on_nav_hud = state.overlay_data.navegacion
     client_lib.on_viewers = lambda n: setattr(state, "cloud_viewers", n)
     ajustes_overlay = win_integration.overlay_settings()
-    state.overlay_layout = {k: ajustes_overlay[k] for k in ("corner", "size", "items", "pos", "opacity")}
+    state.overlay_layout = {k: ajustes_overlay[k] for k in ("corner", "size", "items", "pos", "opacity", "in_game")}
     if ajustes_overlay["enabled"]:
         state.overlay.set_enabled(True)
     if win_integration.overlay_supported():
