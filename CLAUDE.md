@@ -1200,6 +1200,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`routeGraphRetryDue`; beta 0.2.1, Discord 11-11: "Couldn't load the road network" con la red
   de la casa cortandose), y el turn report dice `Road network: failed N times (error)`: el log
   del cliente no ve la ruta.
+- MapLibre va en la variante `android-sdk-opengl`: desde la 13, `android-sdk` es la de Vulkan sola
+  (su manifiesto lo pide obligatorio) y Vulkan es opcional en Android 7. Una tablet con Android 7
+  andaba en todo menos el mapa (beta 0.2.3, 16-11). Al subir la version, la misma variante. En
+  Android 10 o antes `Fallos.kt` no ve los cierres nativos (el mapa, QuickJS) ni los ANR: sin
+  informe, hace falta `adb logcat`.
 - Los mapas piden Referer: la app manda el de trucksim-dash.com. Nunca el secreto
   `TRUCKDASH_MAPS_KEY`, que en una APK quedaria a la vista.
 - Lo portado de la web tiene un golden que sale de correr la web

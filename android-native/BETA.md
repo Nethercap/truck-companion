@@ -29,7 +29,9 @@ You need Android 7 or newer, and Truck Dash on the PC where you play, the same a
 
 - **The app closed by itself:** the next time you open it, it offers a report. Tap Share and send
   the file to whoever gave you this beta. It has the error, the app's recent log and your phone
-  model, not your account or your codes.
+  model, not your account or your codes. On Android 10 or older some crashes (in the map, for
+  example) don't leave a report: then tell us what you were doing when it closed, your phone or
+  tablet model and its Android version.
 - **A wrong turn or a bad route:** Settings > Report a navigation problem.
 - **Anything else:** tell us what happened, your phone model and the app version, which is at the
   bottom of Settings.
