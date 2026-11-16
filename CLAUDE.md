@@ -366,6 +366,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   o al nodo de al lado). Las paradas no: en ETS2 las calles de servicio de las
   estaciones van a 90 y 196 de 2.074 se iban a otro nodo, a veces el de la
   estacion de la otra mano.
+  Y el nodo final sale de la entrada del patio, no de los muelles: el icono de
+  la empresa (CompanyPos), que los POIs llevan como 6.o y 7.o elemento cuando
+  el punto guardado es el centro de los muelles (`client/mapbuild/pois.py`;
+  `companyRouteEnd` y `routeEndPoint` en pure.js, `tramo.puerta` en
+  `findRouteWith`, `entry` del destino). La bandera sigue en los muelles. Al
+  NBFC de Calais (ETS2, reporte #52, 15-11) el nodo mas cercano a los muelles
+  era el de la calle de LkwLog, la de al lado: la ruta daba 0,1 km con el GPS
+  del juego en 1,1; desde el icono, 1,08. El prefab de muchas empresas de
+  ETS2 queda aislado en el grafo (la calle que entra es oculta) y el icono
+  esta a pocos metros del brazo que lleva ahi. Cambia el final de 60 empresas
+  de ETS2 y 97 de ATS a mas de 150 m de camino (dibujadas: casi siempre el
+  nuevo queda en los nodos del prefab de la empresa); en 300 rutas por
+  variante cambia el final en 55 a 70 %, mediana 0,15 km menos. A mas de
+  `COMPANY_ENTRY_MAX_M` (300 m) de los muelles el icono no se usa: dos
+  empresas iguales en una ciudad (bm_con_pln de Escobedo, Reforma). Los mapas
+  armados en la PC no tienen muelles y su punto ya es el icono.
   `yardNodes` y `slowNodes` se guardan en el grafo con las decimas con que se
   calcularon (`edgeT`, que llegan despues): con el trabajo tomado al abrir, la
   primera ruta se calcula sin ellas y quedaba asi toda la sesion (22.568 nodos

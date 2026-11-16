@@ -8,7 +8,8 @@ sale de un bug real:
   - toda empresa tiene nombre de ciudad en "cities": Gulfport, Meridian y
     otras de C2C, Rusia y ProMods no estaban, y buscar la ciudad no daba
     nada ("can't find the city I'm going to", Discord 10-10);
-  - forma de cada fila (coordenadas numericas, codigos que la web conoce);
+  - forma de cada fila (coordenadas numericas, codigos que la web conoce; una
+    empresa con 5 elementos, o 7 con su icono);
   - "countries" (opcional), el estado de cada ciudad: {token: country_token};
   - "areas" (opcional), las cajas de ciudad: [x, z, ancho, alto] con lados > 0.
 
@@ -54,7 +55,9 @@ def check_file(path, fix=False):
             errores.append(f"facility rara: {fila}")
             break
     for fila in d["companies"]:
-        if len(fila) != 5 or not (_num(fila[0]) and _num(fila[1])) or not fila[2] or not isinstance(fila[3], str):
+        # 5 elementos, o 7 con el icono (la entrada del patio, companyRouteEnd)
+        if len(fila) not in (5, 7) or not (_num(fila[0]) and _num(fila[1])) or not fila[2] or not isinstance(fila[3], str) \
+                or (len(fila) == 7 and not (_num(fila[5]) and _num(fila[6]))):
             errores.append(f"empresa rara: {fila}")
             break
     for fila in d.get("atlas") or []:
