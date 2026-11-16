@@ -7162,6 +7162,67 @@ test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada',
   assert.equal(followGameRoute({ ...a, bus: false }, 0, 'fastest'), true);
 });
 
+test('busStopArcs: la parada armada sobre una calle termina en esa calle, no en la calzada contraria ni en otra calle (16-11)', () => {
+  const { busStopArcs, busStopRoadPoint, findArcRoute, BUS_STOP_ARC_M } = require('./pure.js');
+  // Como la terminal de Stuttgart (ETS2, -5230,9775): una calle de una mano al
+  // oeste (0 -> 1, z = 0) con la parada al norte, la calzada de vuelta al este
+  // 20 m al sur (2 -> 3) con los retornos en las puntas (1 -> 2, 3 -> 0), y una
+  // calle de doble mano 30 m al norte (4 - 5).
+  const nodos = [[1000, 0], [0, 0], [0, 20], [1000, 20], [400, -30], [600, -30]];
+  const aristas = [
+    { a: 0, b: 1, uno: true }, { a: 2, b: 3, uno: true }, { a: 4, b: 5 },
+    { a: 1, b: 2, uno: true }, { a: 3, b: 0, uno: true },
+  ];
+  const { g, opts } = grafoDePrueba(nodos, aristas);
+  const aristasDe = (arcos) => arcos.map(c => g.adjEdge[c.arc]).sort();
+  // Desde el punto de su calle (pois.py, [x, z, xc, zc]): solo esa calle, en su sentido
+  const enLaCalle = busStopArcs(g, 500, 0);
+  assert.deepEqual(aristasDe(enLaCalle), [0]);
+  assert.ok(Math.abs(enLaCalle[0].f - 0.5) < 1e-6);
+  // Desde el cartel, 12 m al norte: la arista mas cercana sigue siendo la suya,
+  // y la calzada contraria (32 m) no entra aunque quede a menos de BUS_STOP_ARC_M
+  assert.deepEqual(aristasDe(busStopArcs(g, 500, -12)), [0]);
+  // Un cartel entre dos calles (la de turismo de Atenas): mas cerca de la otra.
+  // Por eso la ruta sale del punto de su calle y no del cartel.
+  assert.deepEqual(aristasDe(busStopArcs(g, 500, -22)), [2, 2]);
+  // Una calle de doble mano: los dos sentidos (la mano de la parada no se pide)
+  assert.equal(busStopArcs(g, 500, -30).length, 2);
+  // Lejos de toda calle: ninguna, y la ruta va al patio como antes
+  assert.deepEqual(busStopArcs(g, 500, -30 - BUS_STOP_ARC_M - 5), []);
+  // La ruta desde la calzada de vuelta da la vuelta en la punta y pasa por la parada por su calle
+  const ruta = findArcRoute(g, 2, -1, { ...opts(0), endArcs: new Map(enLaCalle.map(c => [c.arc, c.f])) });
+  assert.deepEqual([...ruta], [2, 3, 0, 1]);
+  assert.equal(g.adjEdge[ruta.endArc], 0);
+  assert.ok(Math.abs(ruta.cost - (1000 + 20 + 500)) < 1e-6);
+  // El punto de la calle en tramo.parada: [x, z] o nada
+  assert.deepEqual(busStopRoadPoint([1, 2]), [1, 2]);
+  assert.deepEqual(busStopRoadPoint([1, 2, 3]), [1, 2]);
+  for (const malo of [undefined, null, [], [1], [1, 'a'], [NaN, 1], 'x']) assert.equal(busStopRoadPoint(malo), null);
+});
+
+test('busStopPlace y busRouteTarget: una parada armada sobre una calle lleva el punto de su calle (road); una terminal de prefab no', () => {
+  const { busStopPlace, busRouteTarget, busStopList, gameGpsPlaces } = require('./pure.js');
+  const conCalle = { lines: { stuttgart: [-5230, 9775, -5225, 9789], oulu: [41338, -82372] }, tourist: { stuttgart: [-4989, 9744], rota: [1, 2, 3, 'x'] } };
+  const stuttgart = { type: 'city', id: 'stuttgart', name: 'Stuttgart' };
+  assert.deepEqual(busStopPlace(stuttgart, {}, null, conCalle),
+    { x: -5230, z: 9775, approx: false, terminal: true, road: [-5225, 9789] });
+  // la de turismo de Stuttgart esta sobre un prefab de calle: sin road, al patio
+  assert.deepEqual(busStopPlace(stuttgart, {}, null, conCalle, true), { x: -4989, z: 9744, approx: false, terminal: true });
+  // un punto de la calle roto no va (POIs de antes: dos numeros solos)
+  assert.deepEqual(busStopPlace({ type: 'city', id: 'rota' }, {}, null, conCalle, true), { x: 1, z: 2, approx: false, terminal: true });
+  const aStuttgart = { stage: 0, stops: [BUS_DE_TURISMO.stops[0], stuttgart] };
+  assert.deepEqual(busRouteTarget({ onJob: true, jobMarket: 'company_job', bus: aStuttgart }, {}, null, conCalle),
+    { x: -5230, z: 9775, kind: 'dest', bus: true, key: 'bus:1:stuttgart', terminal: true, road: [-5225, 9789] });
+  assert.equal(busRouteTarget({ onJob: true, jobMarket: 'tourist_job', bus: aStuttgart }, {}, null, conCalle).road, undefined);
+  // en la lista del mapa y en lo que puede ser el GPS del juego, con el punto de su calle
+  const pois = { busStations: conCalle.lines, busTouristStops: { stuttgart: [-4989, 9744] }, cities: { stuttgart: 'Stuttgart' } };
+  assert.deepEqual(busStopList(pois)[0], { x: -5230, z: 9775, city: 'stuttgart', tourist: false, road: [-5225, 9789] });
+  assert.deepEqual(busStopList(pois)[2], { x: -4989, z: 9744, city: 'stuttgart', tourist: true });
+  const lugares = gameGpsPlaces(pois, { busStation: 'Bus station', busTourist: 'Tourist bus stop' });
+  assert.deepEqual(lugares[0], { x: -5230, z: 9775, name: 'Bus station', sub: 'Stuttgart', group: 'bus', yard: true, road: [-5225, 9789] });
+  assert.equal('road' in lugares[2], false);
+});
+
 test('busPassengersOnBoard: los que subieron menos los que bajaron, los reales si los hay', () => {
   const { busJobOf, busPassengersOnBoard } = require('./pure.js');
   const bus = (cambios) => busJobOf({ onJob: true, bus: { ...BUS_DE_TURISMO, ...cambios } });

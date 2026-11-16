@@ -4108,8 +4108,15 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
     endIdx = nearestNodeIndex(finXY[0], finXY[1], false, componentId[startIdx], nodeOk);
     if (endIdx === -1) return null;
   }
-  const metas = tramo && tramo.pasar
-    ? waypointArcs(routeGraph, endXY[0], endXY[1], { edgeOk: arcoOk }).filter(c => componentId[c.to] === componentId[startIdx]) : [];
+  // tramo.parada: [x, z] de la calle al lado de una parada de bus armada sobre
+  // ella (busStopPlace, pure.js): se pasa por ahi, por esa calle
+  // (busStopArcs), como por un waypoint. Sin calle a mano, se entra como
+  // siempre (tramo.entrar y tramo.empresa, que la llamada manda igual): ese
+  // nodo queda tambien si no hay camino por la calle.
+  const parada = tramo && !tramo.pasar ? busStopRoadPoint(tramo.parada) : null;
+  const metas = tramo && (tramo.pasar || parada)
+    ? (parada ? busStopArcs(routeGraph, parada[0], parada[1], { edgeOk: arcoOk }) : waypointArcs(routeGraph, endXY[0], endXY[1], { edgeOk: arcoOk }))
+      .filter(c => componentId[c.to] === componentId[startIdx]) : [];
   // Un lugar al que se entra (estacion, area de descanso, empresa) pegado a
   // una via rapida: el nodo de la autopista dejaba la ruta pasando de largo.
   // El de una calle o un prefab mas cercano, si no queda mucho mas lejos
@@ -4849,13 +4856,16 @@ function updateDestinationMarker(data) {
       // es un estacionamiento al costado de la ruta, no el patio de una empresa.
       const mirador = (i) => i >= nAntes && !!target.bus && !target.approx && !target.terminal;
       const entra = (i) => (i < nAntes ? !pasa(i) : empresa(i) || mirador(i));
+      // Una terminal armada sobre una calle (target.road, busStopPlace): pasando
+      // por esa calle al lado del cartel; si no hay calle a mano, al patio.
+      const parada = (i) => (empresa(i) && target.bus && target.road ? target.road : null);
       const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
       const puerta = empresa(legIdx) ? target.entry || null : null;
-      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), puerta, siguiente });
+      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), puerta, parada: parada(legIdx), siguiente });
       llegada = leg ? leg.llegada || null : null;
       // Casi empatada con otra, la que va por donde el GPS del juego.
       if (leg && legs.length === 1 && gameRouteComparable(target)) {
-        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx), empresa: empresa(legIdx), puerta });
+        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx), empresa: empresa(legIdx), puerta, parada: parada(legIdx) });
         leg = elegida.leg;
         if (elegida.switched) {
           routeGameCheck.left = 0;
@@ -6072,7 +6082,7 @@ function searchGameGpsGuess(data) {
     const inicio = performance.now();
     while (i < candidatas.length && performance.now() - inicio < 8) {
       const lugar = candidatas[i++];
-      const r = findRoute(from, [lugar.x, lugar.z], rumbo, null, null, { entrar: true, empresa: lugar.yard, puerta: lugar.entry || null });
+      const r = findRoute(from, [lugar.x, lugar.z], rumbo, null, null, { entrar: true, empresa: lugar.yard, puerta: lugar.entry || null, parada: lugar.road || null });
       if (r && r.length) halladas.push({ ...lugar, km: gameKmOf(r, r) });
     }
     if (i < candidatas.length) { setTimeout(seguir, 0); return; }

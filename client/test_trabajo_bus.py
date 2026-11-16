@@ -354,6 +354,66 @@ def test_las_terminales_de_bus_salen_de_los_busstop_del_mapa(tmp_path):
     assert pois.bus_stations(str(tmp_path / "nada"), "europe") == ({}, {})
 
 
+def test_una_parada_sobre_una_calle_lleva_el_punto_de_su_calle(tmp_path):
+    """mapbuild/pois.bus_stop_roads: el BusStop atado a un road (prefabUid es
+    el uid de un road) lleva el punto de esa calle al lado del cartel, sobre la
+    curva del road (Hermite con la rotacion de los nodos), no sobre la recta
+    entre sus nodos. La web termina la ruta pasando por ahi: por el nodo de
+    patio, la de Stuttgart terminaba en el retorno 103 m mas alla (16-11).
+    Los nodos van como los escribe el parser (con sangria y la rotacion en
+    cuaternion adentro), y se leen sin cargar el archivo entero."""
+    import json as _json
+    from mapbuild import pois
+
+    busstops = [
+        # Stuttgart (ETS2 1.62.3): sobre una calle de una mano al oeste
+        {"uid": "6319e8245f1f0000", "x": -5230.125, "y": 9775.32421875, "cityToken": "stuttgart",
+         "prefabUid": "49cdd6b4464f1c6c", "nodeUid": "6319e8243d9f0003"},
+        # una calle en curva, de (0, 0) al este hasta (100, 100) al sur
+        {"uid": "c1", "x": 80.0, "y": 20.0, "cityToken": "curva", "prefabUid": "r2"},
+        # una calle oculta, un prefab (terminal) y un road sin un nodo: sin punto
+        {"uid": "c2", "x": 500.0, "y": 0.0, "cityToken": "oculta", "prefabUid": "r3"},
+        {"uid": "c3", "x": 44519.4, "y": -50561.2, "cityToken": "tallinn", "prefabUid": "p1"},
+        {"uid": "c4", "x": 0.0, "y": 0.0, "cityToken": "sin_nodo", "prefabUid": "r4"},
+    ]
+    roads = [
+        {"uid": "49cdd6b4464f1c6c", "type": 3, "roadLookToken": "ger9",
+         "startNodeUid": "49cdd6b44bcf58d6", "endNodeUid": "49cdd6b4548f5884", "length": 115.976},
+        {"uid": "r2", "startNodeUid": "n1", "endNodeUid": "n2", "length": 160},
+        {"uid": "r3", "startNodeUid": "n1", "endNodeUid": "n2", "hidden": True},
+        {"uid": "r4", "startNodeUid": "n1", "endNodeUid": "falta"},
+        {"uid": "r5", "startNodeUid": "n9", "endNodeUid": "n9"},
+    ]
+    nodos = [
+        {"uid": "49cdd6b44bcf58d6", "x": -5111.32421875, "y": 9767.11328125, "z": 300.0,
+         "rotation": 2.9642248102741267, "rotationQuat": [0.1, 0, 0.99, 0], "forwardItemUid": "0"},
+        {"uid": "49cdd6b4548f5884", "x": -5225.08984375, "y": 9789.13671875, "z": 300.0,
+         "rotation": 2.9267066298183453, "rotationQuat": [0.1, 0, 0.99, 0], "forwardItemUid": "0"},
+        {"uid": "n1", "x": 0.0, "y": 0.0, "rotation": 0.0, "rotationQuat": [1, 0, 0, 0]},
+        {"uid": "n2", "x": 100.0, "y": 100.0, "rotation": 1.5707963267948966, "rotationQuat": [0.7, 0, 0.7, 0]},
+        {"uid": "n9", "x": 1.0, "y": 1.0, "rotation": None},
+    ]
+    (tmp_path / "europe-busStops.json").write_text(_json.dumps(busstops), encoding="utf-8")
+    (tmp_path / "europe-roads.json").write_text(_json.dumps(roads, indent=2), encoding="utf-8")
+    (tmp_path / "europe-nodes.json").write_text(_json.dumps(nodos, indent=2), encoding="utf-8")
+    calles = pois.bus_stop_roads(str(tmp_path), "europe", busstops)
+    # Stuttgart: la punta oeste de su calle (el cartel queda pasado esa punta)
+    assert calles["6319e8245f1f0000"] == [-5225, 9789]
+    # sobre la curva (su punto del medio, 67,7 / 32,3), no sobre la recta (50, 50)
+    assert calles["c1"] == [68, 32]
+    assert set(calles) == {"6319e8245f1f0000", "c1"}
+    # en la tabla de la web va despues del cartel; la terminal de prefab, sola
+    lineas, turismo = pois.bus_stations(str(tmp_path), "europe")
+    assert lineas["stuttgart"] == [-5230, 9775, -5225, 9789]
+    assert lineas["tallinn"] == [44519, -50561]
+    assert lineas["oculta"] == [500, 0]
+    assert turismo == {}
+    # sin roads ni nodes (una salida del parser vieja): sin puntos, y la tabla de antes
+    (tmp_path / "europe-roads.json").unlink()
+    assert pois.bus_stop_roads(str(tmp_path), "europe", busstops) == {}
+    assert pois.bus_stations(str(tmp_path), "europe")[0]["stuttgart"] == [-5230, 9775]
+
+
 def test_la_tabla_de_miradores_sale_del_album_del_juego():
     """tools/build_viewpoints_ets2.py lee def/photo_album/viewpoints.sui."""
     import importlib.util
