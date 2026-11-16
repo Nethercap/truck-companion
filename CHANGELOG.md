@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.44 (2026-11-16)
 
 - Coaches (ETS2), Build my map: a bus stop built on a street (most of them outside the big
   stations) now records the point of its street next to the sign, and the route ends there,
