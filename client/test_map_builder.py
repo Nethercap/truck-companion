@@ -840,6 +840,26 @@ def test_pois_sin_el_surtidor_de_los_garajes(tmp_path):
     assert sorted(datos["facilities"]) == sorted([[100, 100, "r"], [5000, 100, "r"], [250, 100, "g"]])
 
 
+def test_pois_empresa_con_el_icono_aparte(tmp_path):
+    """Con el centro de los muelles (company-points del taller), el icono va
+    como 6.o y 7.o elemento: es la entrada del patio y ahi termina la ruta del
+    trabajo (reporte #52, NBFC de Calais). Sin muelles, la fila de siempre."""
+    import json
+    from mapbuild import pois
+    (tmp_path / "europe-pois.json").write_text(json.dumps([
+        {"x": -30243.2, "y": -4910.6, "type": "company", "icon": "nbfc", "label": "NBFC", "cityToken": "calais"},
+        {"x": -30086.9, "y": -4880.2, "type": "company", "icon": "lkwlog", "label": "LkwLog GmbH", "cityToken": "calais"},
+        {"x": -29899.3, "y": -4903.5, "type": "company", "icon": "stokes", "label": "Stokes", "cityToken": "calais"},
+    ]))
+    puntos = {"nbfc|calais": [-30161, -4884], "stokes|calais": [-29899, -4904]}
+    datos = pois.build(str(tmp_path), "europe", puntos)
+    assert datos["companies"] == [
+        [-30161, -4884, "nbfc", "NBFC", "calais", -30243, -4911],
+        [-30087, -4880, "lkwlog", "LkwLog GmbH", "calais"],
+        [-29899, -4904, "stokes", "Stokes", "calais"],
+    ]
+
+
 def test_pois_guarda_el_estado_de_cada_ciudad(tmp_path):
     """Tres Jackson en ATS + C2C: sin el estado, en el buscador de la web no
     se sabia cual era cual (Discord 11-10)."""

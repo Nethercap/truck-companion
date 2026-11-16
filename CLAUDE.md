@@ -366,6 +366,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   o al nodo de al lado). Las paradas no: en ETS2 las calles de servicio de las
   estaciones van a 90 y 196 de 2.074 se iban a otro nodo, a veces el de la
   estacion de la otra mano.
+  Y el nodo final sale de la entrada del patio, no de los muelles: el icono de
+  la empresa (CompanyPos), que los POIs llevan como 6.o y 7.o elemento cuando
+  el punto guardado es el centro de los muelles (`client/mapbuild/pois.py`;
+  `companyRouteEnd` y `routeEndPoint` en pure.js, `tramo.puerta` en
+  `findRouteWith`, `entry` del destino). La bandera sigue en los muelles. Al
+  NBFC de Calais (ETS2, reporte #52, 15-11) el nodo mas cercano a los muelles
+  era el de la calle de LkwLog, la de al lado: la ruta daba 0,1 km con el GPS
+  del juego en 1,1; desde el icono, 1,08. El prefab de muchas empresas de
+  ETS2 queda aislado en el grafo (la calle que entra es oculta) y el icono
+  esta a pocos metros del brazo que lleva ahi. Cambia el final de 60 empresas
+  de ETS2 y 97 de ATS a mas de 150 m de camino (dibujadas: casi siempre el
+  nuevo queda en los nodos del prefab de la empresa); en 300 rutas por
+  variante cambia el final en 55 a 70 %, mediana 0,15 km menos. A mas de
+  `COMPANY_ENTRY_MAX_M` (300 m) de los muelles el icono no se usa: dos
+  empresas iguales en una ciudad (bm_con_pln de Escobedo, Reforma). Los mapas
+  armados en la PC no tienen muelles y su punto ya es el icono.
   `yardNodes` y `slowNodes` se guardan en el grafo con las decimas con que se
   calcularon (`edgeT`, que llegan despues): con el trabajo tomado al abrir, la
   primera ruta se calcula sin ellas y quedaba asi toda la sesion (22.568 nodos
@@ -645,6 +661,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   grafo cambian 34 lugares de ATS y 168 de ETS2, casi todos salidas de una
   autopista que dobla donde no se decia nada; 2 y 11 pasan de "keep left" a
   "keep right" en el mismo nodo, ramas que se cruzan como la de San Antonio.
+  Con los carriles partidos de un lado (`porCarriles` y `lado`), la rampa
+  puede ir pegada a la calzada mas de los 100 m: ahi los 10 m se miran tambien
+  a 250 y a 500 m (`forkLegM`, `forkFarLegM`). La salida a la izquierda de
+  -50174,-13949 (ETS2, Reino Unido, reporte #50, 14-11) da la vuelta por un
+  rulo y va a 1,8 m a los 100 m, a 4,7 a los 200 y a 10 a los 250: no se decia
+  nada. En 300 rutas por variante (semilla 7) suma un aviso en ProMods
+  (Grimsby -> Manchester, la misma salida con rulo, dibujado); check_avisos igual.
   En la bifurcacion por angulo, lo mismo cuando la rama de la ruta no tiene
   flechas (sirven todos los carriles) y la otra sale a un costado: la
   autopista que dobla 8 a 10 grados en una salida comun daba "keep left"

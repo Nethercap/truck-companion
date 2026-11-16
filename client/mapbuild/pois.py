@@ -12,7 +12,10 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
                                               # r garage, d dealer, w weigh station,
                                               # c estacionamiento para auto (ATS),
                                               # f surtidores solo para auto (ATS)
-    "companies":  [[x, z, "token", "Label", "city_token"], ...],
+    "companies":  [[x, z, "token", "Label", "city_token"(, ix, iz)], ...],
+                                              # x, z: centro de los muelles;
+                                              # ix, iz: el icono (la entrada),
+                                              # solo si es otro punto
     "cities":     {"city_token": "City Name", ...},
     "countries":  {"city_token": "country_token", ...},  # estado/pais del juego
                                               # ("wyoming"): la web lo muestra
@@ -287,10 +290,19 @@ def build(parser_dir, prefix, work_points=None, atlas_names=None):
             # lugares de trailer), que es adonde el juego te manda de verdad.
             # El icono se equivoca por 53 m de mediana y hasta 214 m; el
             # centro, por 29 m, y gana en el 99% de las empresas.
+            # El icono (CompanyPos) va aparte, 6.o y 7.o elemento, si no es el
+            # mismo punto: esta en la entrada del patio y es donde termina la
+            # ruta del trabajo (companyRouteEnd en pure.js). El nodo mas cercano
+            # a los muelles podia ser el de la calle de la empresa de al lado:
+            # NBFC de Calais (reporte #52, 15-11) terminaba en la puerta de
+            # LkwLog, a 0,1 km con el GPS del juego en 1,1.
             ciudad = p.get("cityToken") or ""
             punto = work_points.get(f'{p["icon"]}|{ciudad}')
             px, pz = (punto[0], punto[1]) if punto else (x, z)
-            companies.append([px, pz, p["icon"], p.get("label") or p["icon"], ciudad])
+            fila = [px, pz, p["icon"], p.get("label") or p["icon"], ciudad]
+            if (px, pz) != (x, z):
+                fila += [x, z]
+            companies.append(fila)
     cities = {}
     # El estado de cada ciudad: hay tres Jackson en ATS + C2C, y en el
     # buscador no se sabia cual era cual (Discord, 11-10).

@@ -1983,7 +1983,7 @@ function detectManeuver(ctx) {
       const otra = walkPointAt(idx, n, parallelForkM - (cum[k] - cum[i]));
       if (!otra) continue;
       const otraDelta = normDeg(bearingBetween(pts[i], otra) - inBearing);
-      if (Math.hypot(otra[0] - ruta[0], otra[1] - ruta[1]) < parallelForkSepM) continue;
+      const juntas = Math.hypot(otra[0] - ruta[0], otra[1] - ruta[1]) < parallelForkSepM;
       let direction = rutaDelta > otraDelta ? 'right' : 'left';
       let sig = null;
       for (let j = k + 1; j < pts.length && sig == null; j++) sig = pts[j][4];
@@ -1995,6 +1995,19 @@ function detectManeuver(ctx) {
       const lado = mascaras ? ladoDeCarriles(mr, ma) : null;
       const porCarriles = tr != null && ta != null && (ta & B.straight) && !(tr & B.straight)
         && !(mascaras && (!lado || carriles(mr) > carriles(ma)));
+      // Con los carriles partidos de un lado (porCarriles y lado), la rampa
+      // puede ir pegada a la calzada mas de parallelForkM: los carriles de la
+      // izquierda que se van por una salida a la izquierda de Reino Unido que
+      // da la vuelta por un rulo (ETS2, -50174,-13949, reporte #50, 14-11) van
+      // a 1,8 m a los 100 m, a 4,7 a los 200 y a 10 a los 250, y no se decia
+      // nada. Ahi la separacion se mira tambien a forkLegM y a forkFarLegM.
+      const seSeparan = () => [forkLegM, forkFarLegM].some((d) => {
+        if (cum[i] + d > cum[cum.length - 1]) return false;
+        const o = walkPointAt(idx, n, d - (cum[k] - cum[i]));
+        const r = pointAt(cum[i] + d);
+        return o && Math.hypot(o[0] - r[0], o[1] - r[1]) >= parallelForkSepM;
+      });
+      if (juntas && !(porCarriles && lado && seSeparan())) continue;
       if (!porCarriles && Math.abs(otraDelta) >= Math.abs(rutaDelta)) continue;
       if (tr != null || ta != null) {
         if (tr == null || (tr & B.straight) || !(tr & (B.left | B.slightLeft | B.right | B.slightRight))) continue;
@@ -2921,8 +2934,11 @@ function roadShieldPoints(names, cellM) {
 // la lista, sin las que no son un nombre: en el road-names.json de ETS2 hay
 // 399 carteles de velocidad con la clave del juego ("traffic_rule.limit_40")
 // y 4 con un texto sin traducir ("@@fp_de_diesel@@"), y en 300 rutas 18
-// avisos decian "toward traffic_rule.limit_80" (Balcanes, Grecia).
-const signLabelOk = (label) => typeof label === 'string' && !/^traffic_rule\.|^@@.*@@$/.test(label.trim());
+// avisos decian "toward traffic_rule.limit_80" (Balcanes, Grecia). Tampoco el
+// relleno de las plantillas de carteles, solo equis ("XXXXXXX", "xxx": 45 en el
+// de ETS2, 30 en ProMods, al lado del nombre de verdad en el mismo cartel): en el
+// reporte #51 (14-11, Nuremberg) salia "Gira a la izquierda hacia XXXXXXX".
+const signLabelOk = (label) => typeof label === 'string' && !/^traffic_rule\.|^@@.*@@$|^x{2,}$/i.test(label.trim());
 // Los espacios de mas se sacan: en el de ETS2 hay 4.656 con espacios al
 // principio, al final o repetidos, y el aviso decia "Links abbiegen Richtung
 //     Dalasysla" (reporte #47, 13-11).
@@ -4981,6 +4997,35 @@ function companyForJob(companies, token, cityToken) {
   return companies.find(c => c[2] === token && c[4] === cityToken) || null;
 }
 
+// Donde termina la ruta a una empresa de los POIs: su icono (CompanyPos, 6.o y
+// 7.o elemento de la fila), que esta en la entrada del patio, y no el centro de
+// los muelles ([x, z], adonde va la bandera). El nodo mas cercano a los muelles
+// podia ser el de la calle de otra empresa: la de NBFC de Calais (ETS2, reporte
+// #52, 15-11) terminaba en la puerta de LkwLog, con 0,1 km por la app y 1,1 por
+// el GPS del juego; desde el icono, 1,08 (y 1,35 contra 1,3 un poco antes). En
+// los nodos del prefab de la empresa queda casi siempre el final por el icono, y
+// el de los muelles en la calle de al lado: 60 empresas de ETS2 y 97 de ATS
+// terminan asi a mas de 150 m de camino de donde terminaban (dibujadas). Si el
+// icono queda a mas de COMPANY_ENTRY_MAX_M de los muelles (dos empresas iguales
+// en la misma ciudad: bm_con_pln de Escobedo en Reforma, a 1,6 km), el punto de
+// siempre. Sin icono aparte (mapas armados en la PC: ahi [x, z] ya es el icono),
+// tambien. Devuelve [x, z] o null.
+const COMPANY_ENTRY_MAX_M = 300;
+function companyRouteEnd(row) {
+  if (!Array.isArray(row) || !Number.isFinite(row[0]) || !Number.isFinite(row[1])) return null;
+  const ix = row[5], iz = row[6];
+  if (Number.isFinite(ix) && Number.isFinite(iz) && Math.hypot(ix - row[0], iz - row[1]) <= COMPANY_ENTRY_MAX_M) return [ix, iz];
+  return [row[0], row[1]];
+}
+
+// El punto desde el que findRouteWith elige el nodo donde termina la ruta: a la
+// empresa del trabajo (tramo.empresa), su entrada si se conoce (tramo.puerta,
+// companyRouteEnd); si no, el destino de siempre.
+function routeEndPoint(endXY, tramo) {
+  const p = tramo && tramo.empresa ? tramo.puerta : null;
+  return Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]) ? p : endXY;
+}
+
 // Por que no hay indicaciones. Sin trabajo ni waypoints la app no tiene a
 // donde rutear aunque el GPS del juego tenga una ruta puesta: el SDK da lo
 // que falta (routeDistanceKm) pero no donde termina. Solo decia "No
@@ -5089,7 +5134,7 @@ function gameGpsPlaces(p, labels = {}) {
   const vale = (v) => Array.isArray(v) && Number.isFinite(v[0]) && Number.isFinite(v[1]);
   const out = [];
   for (const c of Array.isArray(p.companies) ? p.companies : []) {
-    if (vale(c)) out.push({ x: c[0], z: c[1], name: c[3] || c[2] || '', sub: ciudad(c[4]), group: 'company', yard: true });
+    if (vale(c)) out.push({ x: c[0], z: c[1], name: c[3] || c[2] || '', sub: ciudad(c[4]), group: 'company', yard: true, entry: companyRouteEnd(c) });
   }
   for (const b of busStopList(p)) {
     out.push({ x: b.x, z: b.z, name: (b.tourist ? labels.busTourist : labels.busStation) || '', sub: ciudad(b.city), group: 'bus', yard: true });
@@ -5126,7 +5171,7 @@ function gameGpsSaveCandidates(gameGps, pickupOf) {
   const pickup = job && typeof job === 'object' && job.srcCompany && typeof pickupOf === 'function' ? pickupOf(job) : null;
   if (pickup && Number.isFinite(pickup.x) && Number.isFinite(pickup.z)) {
     out.push({ x: pickup.x, z: pickup.z, via: [], kind: 'pickup', skipped: 0,
-      key: `gamegps:${gameGps.savedAt}:pickup:${pickup.token}@${pickup.city}`, gameGps: true });
+      key: `gamegps:${gameGps.savedAt}:pickup:${pickup.token}@${pickup.city}`, gameGps: true, ...(pickup.entry ? { entry: pickup.entry } : {}) });
   }
   return out;
 }
@@ -7832,6 +7877,6 @@ function webUpdateAction({ current, served = null, site = null }) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createBusyGate, BUSY_GATE_FACTOR, createOffRouteRetry, OFF_ROUTE_RETRY_M, alternateModVariants, variantForJobPlace, canOfferMapBuild, navReportRefreshDue, NAV_REPORT_REFRESH_MS, webVersionIn, webVersionNewer, webUpdateAction, gameGpsKmMatches, gameGpsCandidates, gameGpsGuessList, gameGpsPlaces, gameGpsSaveCandidates, gameGpsSaveJobCandidates, GAME_GPS_SAVE_SAME_M, gameGpsSaveMatches, gameGpsSavePick, gameGpsSaveStale, GAME_GPS_SAVE_TOL_KM, GAME_GPS_SAVE_TOL_FRAC, gameGpsGuessStep, gameGpsGuessPanelShown, GAME_GPS_GUESS_MAX_KM, GAME_GPS_GUESS_MAX, turnReportJobLine, turnReportBusLine, TURN_REPORT_BUS_CHARS, companyForJob, approxNoticeKey, turnReportMapLines, turnReportDlcLine, TURN_REPORT_MODS_CHARS, nearStopCandidates, createNearStopPick, createNearStops, roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, basemapForVariant, BASEMAP_PROMODS, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, createTrailerPickupWatch, trailerPickupJobKey, TRAILER_PICKUP_MARKET_RE, offMapJobPlace, hasJobDestination, jobPanelFields, busJobOf, busStopPlace, busStopList, busRouteTarget, busPassengersOnBoard, busNextStopLine, createBusJobMemory, busDeliveryStops, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, routeGameMayDiffer, routeSharedFrac, pickRouteLikeGame, ROUTE_GAME_FERRY, routeFerryLegs, routeGameFerryShorter, routeFerrySearch, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, navHudHeadingRoad, NAV_HUD_ROAD_MAX, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, createRouteChangeLog, ROUTE_CHANGES_MAX, ROUTE_CHANGE_MERGE_MS, ROUTE_CHANGE_REASONS, routeChangeReason, turnReportText, turnReportSpeedLine, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportLooksEmpty, navReportCanSend, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, routeTimeAhead, ROUTE_TIME_DEFAULT_KMH, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, truckDashLamps, truckGaugeScales, MAP_DASH_MODES, MAP_DASH_STYLES, mapDashSetting, mapDashHosts, mapDashLimitOnMap, mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, DLC_GUARDS, DLC_LIST, dlcGameOf, GAME_VERSION_VARIANTS, gameVersionSetting, gameVersionVariant, sharedMapVariant, gameVersionTag, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, parseWsJson, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
+  module.exports = { createBusyGate, BUSY_GATE_FACTOR, createOffRouteRetry, OFF_ROUTE_RETRY_M, alternateModVariants, variantForJobPlace, canOfferMapBuild, navReportRefreshDue, NAV_REPORT_REFRESH_MS, webVersionIn, webVersionNewer, webUpdateAction, gameGpsKmMatches, gameGpsCandidates, gameGpsGuessList, gameGpsPlaces, gameGpsSaveCandidates, gameGpsSaveJobCandidates, GAME_GPS_SAVE_SAME_M, gameGpsSaveMatches, gameGpsSavePick, gameGpsSaveStale, GAME_GPS_SAVE_TOL_KM, GAME_GPS_SAVE_TOL_FRAC, gameGpsGuessStep, gameGpsGuessPanelShown, GAME_GPS_GUESS_MAX_KM, GAME_GPS_GUESS_MAX, turnReportJobLine, turnReportBusLine, TURN_REPORT_BUS_CHARS, companyForJob, companyRouteEnd, COMPANY_ENTRY_MAX_M, routeEndPoint, approxNoticeKey, turnReportMapLines, turnReportDlcLine, TURN_REPORT_MODS_CHARS, nearStopCandidates, createNearStopPick, createNearStops, roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, basemapForVariant, BASEMAP_PROMODS, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, createTrailerPickupWatch, trailerPickupJobKey, TRAILER_PICKUP_MARKET_RE, offMapJobPlace, hasJobDestination, jobPanelFields, busJobOf, busStopPlace, busStopList, busRouteTarget, busPassengersOnBoard, busNextStopLine, createBusJobMemory, busDeliveryStops, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, routeGameMayDiffer, routeSharedFrac, pickRouteLikeGame, ROUTE_GAME_FERRY, routeFerryLegs, routeGameFerryShorter, routeFerrySearch, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, navHudHeadingRoad, NAV_HUD_ROAD_MAX, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, createRouteChangeLog, ROUTE_CHANGES_MAX, ROUTE_CHANGE_MERGE_MS, ROUTE_CHANGE_REASONS, routeChangeReason, turnReportText, turnReportSpeedLine, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportLooksEmpty, navReportCanSend, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, routeTimeAhead, ROUTE_TIME_DEFAULT_KMH, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, truckDashLamps, truckGaugeScales, MAP_DASH_MODES, MAP_DASH_STYLES, mapDashSetting, mapDashHosts, mapDashLimitOnMap, mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, DLC_GUARDS, DLC_LIST, dlcGameOf, GAME_VERSION_VARIANTS, gameVersionSetting, gameVersionVariant, sharedMapVariant, gameVersionTag, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, parseWsJson, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText, routeGraphRetryDue, ROUTE_GRAPH_LATE_RETRY_S, turnReportGraphLine };
 }

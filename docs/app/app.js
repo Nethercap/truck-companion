@@ -3163,8 +3163,9 @@ function poiVariantNow() {
   return currentGame || (lastData ? resolveEffectiveGame(lastData.game) : null);
 }
 
+// entry: donde termina la ruta (la entrada del patio, companyRouteEnd en pure.js).
 function companyPoiAt(hit) {
-  return hit ? { x: hit[0], z: hit[1], token: hit[2], label: hit[3], city: hit[4] } : null;
+  return hit ? { x: hit[0], z: hit[1], token: hit[2], label: hit[3], city: hit[4], entry: companyRouteEnd(hit) } : null;
 }
 
 // El SDK no siempre manda el ID de la empresa de destino: en los contratos
@@ -4055,7 +4056,7 @@ function routeGameRecheck(routeKey, target, data) {
   if (c.ticks < ROUTE_GAME_RECHECK_TICKS) return false;
   c.left = 0;
   const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data);
-  const tramo = { entrar: true, empresa: true }; // gameRouteComparable: la empresa del trabajo
+  const tramo = { entrar: true, empresa: true, puerta: target.entry || null }; // gameRouteComparable: la empresa del trabajo
   return routeLikeGame(findRoute(from, [target.x, target.z], rumbo, null, null, tramo), from, [target.x, target.z], rumbo, data.routeDistanceKm, tramo).switched;
 }
 
@@ -4098,10 +4099,13 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   let arranque = tramo && tramo.desde ? tramo.desde
     : startHeading != null ? startArcForHeading(routeGraph, startXY[0], startXY[1], startHeading, { edgeOk: arcoOk }) : null;
   let startIdx = arranque ? arranque.to : nearestNodeIndex(startXY[0], startXY[1], 'real', -1, nodeOk);
-  let endIdx = nearestNodeIndex(endXY[0], endXY[1], 'real', -1, nodeOk);
+  // A la empresa del trabajo, el nodo final sale de su entrada (tramo.puerta,
+  // routeEndPoint en pure.js), no del centro de los muelles (reporte #52).
+  const finXY = routeEndPoint(endXY, tramo);
+  let endIdx = nearestNodeIndex(finXY[0], finXY[1], 'real', -1, nodeOk);
   if (startIdx === -1 || endIdx === -1) return null;
   if (componentId[startIdx] !== componentId[endIdx]) {
-    endIdx = nearestNodeIndex(endXY[0], endXY[1], false, componentId[startIdx], nodeOk);
+    endIdx = nearestNodeIndex(finXY[0], finXY[1], false, componentId[startIdx], nodeOk);
     if (endIdx === -1) return null;
   }
   const metas = tramo && tramo.pasar
@@ -4119,8 +4123,8 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
   if (tramo && tramo.entrar) {
     const lentos = tramo.empresa ? yardNodes(routeGraph) : slowNodes(routeGraph);
     if (!lentos[endIdx]) {
-      const j = nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, lentos);
-      const dist = (i) => Math.hypot(nodes[2 * i] - endXY[0], nodes[2 * i + 1] - endXY[1]);
+      const j = nearestNodeIndex(finXY[0], finXY[1], false, componentId[endIdx], nodeOk, lentos);
+      const dist = (i) => Math.hypot(nodes[2 * i] - finXY[0], nodes[2 * i + 1] - finXY[1]);
       if (j !== -1 && dist(j) <= dist(endIdx) + STOP_SLOW_NODE_M) endIdx = j;
     }
     if (!tramo.empresa && !metas.length && lentos[endIdx]) {
@@ -4236,7 +4240,7 @@ function findRouteWith(startXY, endXY, filtro, startHeading = null, penal = null
     // Mejor una ruta que empieza o termina unos metros mas alla que una recta.
     const alcance = routeReachability(routeGraph);
     const s2 = alcance.reachesMain[startIdx] ? startIdx : nearestNodeIndex(startXY[0], startXY[1], false, componentId[startIdx], nodeOk, alcance.reachesMain);
-    const e2 = alcance.reachFromMain[endIdx] ? endIdx : nearestNodeIndex(endXY[0], endXY[1], false, componentId[endIdx], nodeOk, alcance.reachFromMain);
+    const e2 = alcance.reachFromMain[endIdx] ? endIdx : nearestNodeIndex(finXY[0], finXY[1], false, componentId[endIdx], nodeOk, alcance.reachFromMain);
     if (s2 !== -1 && e2 !== -1 && (s2 !== startIdx || e2 !== endIdx)) {
       if (s2 !== startIdx) { arranque = null; startIdx = s2; }
       if (finales) finales.clear();
@@ -4464,7 +4468,7 @@ function jobRouteTargetOf(data) {
   if (data.onJob && (data.isCargoLoaded === false || data.trailerPickup)) {
     const pickup = (data.companySrcId ? findCompanyPoi(data.companySrcId, data.citySrcId) : null)
       || findCompanyPoiByName(data.companySrc, data.citySrcId);
-    if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${pickup.token}@${pickup.city}` };
+    if (pickup) return { x: pickup.x, z: pickup.z, kind: 'pickup', key: `pickup:${pickup.token}@${pickup.city}`, entry: pickup.entry };
     const srcCity = findCity(data.citySrcId, data.citySrc);
     // approx: esto es el centro del pueblo, no el lugar de carga. Se marca
     // para poder decirlo en pantalla en vez de fingir precision.
@@ -4476,7 +4480,7 @@ function jobRouteTargetOf(data) {
   if (hasJobDestination(data)) {
     const company = (data.companyDstId ? findCompanyPoi(data.companyDstId, data.cityDstId) : null)
       || findCompanyPoiByName(data.companyDst, data.cityDstId);
-    if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${company.token}@${company.city}` };
+    if (company) return { x: company.x, z: company.z, kind: 'dest', key: `dest:${company.token}@${company.city}`, entry: company.entry };
     const city = findCity(data.cityDstId, data.cityDst);
     if (city) return { x: city.X, z: city.Y, kind: 'dest', key: `city:${data.cityDstId || data.cityDst}`,
                        approx: true, market: data.specialJob ? 'special_transport' : (data.jobMarket || null),
@@ -4846,11 +4850,12 @@ function updateDestinationMarker(data) {
       const mirador = (i) => i >= nAntes && !!target.bus && !target.approx && !target.terminal;
       const entra = (i) => (i < nAntes ? !pasa(i) : empresa(i) || mirador(i));
       const siguiente = legIdx + 1 < legs.length ? { xy: legs[legIdx + 1], pasar: pasa(legIdx + 1) } : null;
-      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), siguiente });
+      const puerta = empresa(legIdx) ? target.entry || null : null;
+      let leg = findRoute(from, to, rumbo, null, null, { desde: llegada, pasar: pasa(legIdx), entrar: entra(legIdx), empresa: empresa(legIdx), puerta, siguiente });
       llegada = leg ? leg.llegada || null : null;
       // Casi empatada con otra, la que va por donde el GPS del juego.
       if (leg && legs.length === 1 && gameRouteComparable(target)) {
-        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx), empresa: empresa(legIdx) });
+        const elegida = routeLikeGame(leg, from, to, rumbo, data.routeDistanceKm, { entrar: entra(legIdx), empresa: empresa(legIdx), puerta });
         leg = elegida.leg;
         if (elegida.switched) {
           routeGameCheck.left = 0;
@@ -5978,7 +5983,7 @@ function searchGameGpsSave(gg, from, rumbo, km, job) {
   // patio: al ultimo punto se entra como al patio de una empresa (el remolque, o
   // la entrega si no es el centro de la ciudad); a un nodo del GPS del juego no.
   const candidatas = job
-    ? gameGpsSaveJobCandidates(gg, job).map(c => ({ ...c, x: job.x, z: job.z, patio: !job.approx }))
+    ? gameGpsSaveJobCandidates(gg, job).map(c => ({ ...c, x: job.x, z: job.z, entry: job.entry || null, patio: !job.approx }))
     : gameGpsSaveCandidates(gg, (j) => findCompanyPoi(j.srcCompany, j.srcCity)).map(c => ({ ...c, patio: c.kind === 'pickup' }));
   const halladas = [];
   let i = 0;
@@ -5993,7 +5998,7 @@ function searchGameGpsSave(gg, from, rumbo, km, job) {
     }
     const antes = gameGpsSave.target;
     gameGpsSave.target = elegida
-      ? { x: elegida.x, z: elegida.z, kind: elegida.kind, via: elegida.via, key: elegida.key, gameGps: true }
+      ? { x: elegida.x, z: elegida.z, kind: elegida.kind, via: elegida.via, key: elegida.key, gameGps: true, entry: elegida.entry || null }
       : null;
     if (elegida && (!antes || antes.key !== elegida.key)) showToast(t('gameGpsSaveToast'), 'success', 4000);
     if (elegida || antes) routeForcedReason = 'game_gps_save';
@@ -6009,7 +6014,7 @@ function searchGameGpsSave(gg, from, rumbo, km, job) {
       for (let k = 0; k < puntos.length; k++) {
         const fin = k === puntos.length - 1;
         const leg = findRoute(desde, puntos[k], k === 0 ? rumbo : null, null, null,
-          { desde: llegada, pasar: !fin, entrar: fin && c.patio, empresa: fin && c.patio });
+          { desde: llegada, pasar: !fin, entrar: fin && c.patio, empresa: fin && c.patio, puerta: fin && c.patio ? c.entry || null : null });
         if (!leg || !leg.length) { ok = false; break; }
         llegada = leg.llegada || null;
         total = total.length ? total.concat(leg.slice(1)) : leg;
@@ -6067,7 +6072,7 @@ function searchGameGpsGuess(data) {
     const inicio = performance.now();
     while (i < candidatas.length && performance.now() - inicio < 8) {
       const lugar = candidatas[i++];
-      const r = findRoute(from, [lugar.x, lugar.z], rumbo, null, null, { entrar: true, empresa: lugar.yard });
+      const r = findRoute(from, [lugar.x, lugar.z], rumbo, null, null, { entrar: true, empresa: lugar.yard, puerta: lugar.entry || null });
       if (r && r.length) halladas.push({ ...lugar, km: gameKmOf(r, r) });
     }
     if (i < candidatas.length) { setTimeout(seguir, 0); return; }

@@ -3140,6 +3140,32 @@ test('maneuver: bifurcacion pareja donde la ruta es la mas recta por angulo pero
   assert.deepEqual([l.kind, l.direction, l.parallel], ['fork', 'left', true]);
 });
 
+test('maneuver: salida pegada a la calzada que se va en un rulo, con los carriles partidos -> keep left (Reino Unido, reporte #50, 14-11)', () => {
+  // ETS2, -50174,-13949: los dos carriles de la izquierda de tres se van por
+  // una salida a la izquierda que da la vuelta por un rulo y cruza por arriba
+  // (flecha "right" del juego); a los 100 m van a 2 m de la calzada, a los
+  // 250 a 12 y despues el rulo vuelve. No se decia nada.
+  const ruta = [[0, -300], [0, 0], [-2, 100], [-5, 200], [-12, 250], [-30, 300], [-60, 320], [-90, 300], [-95, 260], [-70, 240], [30, 260], [300, 300]];
+  const geo = { route: ruta, extraNodes: [[0, 490]], edges: [[1, 12]] };
+  const flechas = (r, o) => (a, b) => (a === 1 && b === 2 ? r : a === 1 && b === 12 ? o : null);
+  const B = { left: 1, straight: 4, right: 16 };
+  // sin carriles no hay como saber que es una salida: nada, como antes
+  assert.equal(detectManeuver(scenario(geo)), null);
+  const m = detectManeuver({ ...scenario(geo), laneTurn: flechas(B.right, B.straight), laneMask: flechas(3, 6) });
+  assert.deepEqual([m.kind, m.direction, m.parallel], ['fork', 'left', true]);
+  // carriles mezclados, o la ruta se lleva mas carriles (es la autopista): nada
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(B.right, B.straight), laneMask: flechas(5, 2) }), null);
+  assert.equal(detectManeuver({ ...scenario(geo), laneTurn: flechas(B.right, B.straight), laneMask: flechas(3, 4) }), null);
+  // espejado (mano derecha): keep right
+  const espejo = (p) => [-p[0], p[1]];
+  const der = detectManeuver({ ...scenario({ ...geo, route: ruta.map(espejo), extraNodes: geo.extraNodes.map(espejo) }), laneTurn: flechas(B.left, B.straight), laneMask: flechas(6, 3) });
+  assert.deepEqual([der.kind, der.direction], ['fork', 'right']);
+  // pegadas hasta los 500 m (no se separan): nada
+  const pegadas = { route: [[0, -300], [0, 0], [-2, 100], [-4, 250], [-6, 500], [-8, 700]], extraNodes: [[0, 900]], edges: [[1, 6]] };
+  const f6 = (r, o) => (a, b) => (a === 1 && b === 2 ? r : a === 1 && b === 6 ? o : null);
+  assert.equal(detectManeuver({ ...scenario(pegadas), laneTurn: f6(B.right, B.straight), laneMask: f6(3, 6) }), null);
+});
+
 test('maneuver: la autopista dobla en una salida y los carriles del juego dicen que sigue derecho -> nada, o keep sin nombre (I-90, 23-10)', () => {
   const B = { slightLeft: 2, straight: 4, slightRight: 8 };
   // la ruta (la autopista) dobla 10 grados a la izquierda y la salida se va
@@ -3872,6 +3898,11 @@ test('groupSignsByPoint: los escudos de un mismo cartel quedan juntos', () => {
   const ets2 = groupSignsByPoint([{ x: 1, y: 2, label: 'traffic_rule.limit_80', kind: 'city' }, { x: 3, y: 2, label: '@@fp_de_diesel@@', kind: 'city' },
     { x: 5, y: 2, label: 'Beograd', kind: 'city' }, { x: 7, y: 2, label: 'c.nuclear', kind: 'city' }]);
   assert.deepEqual(ets2.map((s) => s.label), ['Beograd', 'c.nuclear']);
+  // El relleno de las plantillas no es un nombre ("hacia XXXXXXX" en Nuremberg, reporte #51)
+  const relleno = groupSignsByPoint([{ x: 1, y: 2, label: 'XXXXXXX', kind: 'city' }, { x: 1, y: 2, label: 'Nürnberg', kind: 'city' },
+    { x: 3, y: 2, label: ' xxx ', kind: 'city' }, { x: 5, y: 2, label: 'Xanten', kind: 'city' }, { x: 7, y: 2, label: 'Exx', kind: 'city' }]);
+  assert.deepEqual(relleno.map((s) => s.label), ['Nürnberg', 'Xanten', 'Exx']);
+  assert.equal(relleno[0].labels, undefined);
   // Sin espacios de mas ("Richtung     Dalasysla", reporte #47)
   const espacios = groupSignsByPoint([{ x: 1, y: 2, label: '    Dalasýsla', kind: 'city' }, { x: 3, y: 2, label: 'Hella  ', kind: 'city' },
     { x: 5, y: 2, label: 'Vík   í Mýrdal', kind: 'city' }]);
@@ -6841,6 +6872,39 @@ test('companyForJob: la sucursal de la ciudad de al lado no es la del trabajo (r
   assert.equal(companyForJob(empresas, '', 'gallup'), null);
 });
 
+test('companyRouteEnd y routeEndPoint: la ruta a la empresa termina en su entrada (reporte #52, 15-11)', () => {
+  const { companyRouteEnd, routeEndPoint, COMPANY_ENTRY_MAX_M, gameGpsPlaces, gameGpsSaveCandidates } = require('./pure.js');
+  // NBFC de Calais (ETS2): los muelles quedan a 61 m de la puerta de LkwLog y el
+  // icono a 14 m de la calle que entra a NBFC
+  const nbfc = [-30161, -4884, 'nbfc', 'NBFC', 'calais', -30243, -4911];
+  assert.deepEqual(companyRouteEnd(nbfc), [-30243, -4911]);
+  // sin icono aparte (mapa armado en la PC: x, z ya es el icono)
+  assert.deepEqual(companyRouteEnd([-30055, -4910, 'lkwlog', 'LkwLog GmbH', 'calais']), [-30055, -4910]);
+  // dos empresas iguales en la misma ciudad: el icono de una y los muelles de la
+  // otra (bm_con_pln de Escobedo, 1,6 km), el punto de siempre
+  const lejos = [0, 0, 'bm_con_pln', 'X', 'escobedo', COMPANY_ENTRY_MAX_M + 1, 0];
+  assert.deepEqual(companyRouteEnd(lejos), [0, 0]);
+  assert.deepEqual(companyRouteEnd([0, 0, 'a', 'A', 'c', COMPANY_ENTRY_MAX_M, 0]), [COMPANY_ENTRY_MAX_M, 0]);
+  assert.deepEqual(companyRouteEnd([0, 0, 'a', 'A', 'c', null, 5]), [0, 0]);
+  assert.equal(companyRouteEnd(null), null);
+  assert.equal(companyRouteEnd(['x', 0]), null);
+  // routeEndPoint: solo a la empresa del trabajo
+  const dest = [-30161, -4884];
+  assert.deepEqual(routeEndPoint(dest, { entrar: true, empresa: true, puerta: [-30243, -4911] }), [-30243, -4911]);
+  assert.equal(routeEndPoint(dest, { entrar: true, empresa: false, puerta: [-30243, -4911] }), dest);
+  assert.equal(routeEndPoint(dest, { entrar: true, empresa: true, puerta: null }), dest);
+  assert.equal(routeEndPoint(dest, { entrar: true, empresa: true }), dest);
+  assert.equal(routeEndPoint(dest, { empresa: true, puerta: [NaN, 1] }), dest);
+  assert.equal(routeEndPoint(dest, null), dest);
+  // las empresas que ofrece el panel con los km del GPS y la de la partida guardada
+  const lugares = gameGpsPlaces({ companies: [nbfc], cities: { calais: 'Calais' } });
+  assert.deepEqual(lugares[0].entry, [-30243, -4911]);
+  assert.equal(lugares[0].x, -30161);
+  const cand = gameGpsSaveCandidates({ savedAt: 5, waypoints: [], job: { srcCompany: 'nbfc', srcCity: 'calais' } },
+    () => ({ x: -30161, z: -4884, token: 'nbfc', city: 'calais', entry: [-30243, -4911] }));
+  assert.deepEqual(cand[0].entry, [-30243, -4911]);
+});
+
 test('approxNoticeKey: el cartel del centro de la ciudad dice por que (reporte #49)', () => {
   const { approxNoticeKey } = require('./pure.js');
   assert.equal(approxNoticeKey(null), null);
@@ -6997,7 +7061,7 @@ test('gameGpsPlaces: empresas, terminales y lugares del Atlas para el GPS del ju
   };
   const textos = { busStation: 'Bus station', busTourist: 'Tourist bus stop', atlasTouristBoard: 'Tourist Board', atlasPoi: 'Point of Interest' };
   assert.deepEqual(gameGpsPlaces(pois, textos), [
-    { x: 10, z: 20, name: 'BNR', sub: 'Palmas', group: 'company', yard: true },
+    { x: 10, z: 20, name: 'BNR', sub: 'Palmas', group: 'company', yard: true, entry: [10, 20] },
     { x: 55088, z: -71260, name: 'Bus station', sub: 'Joensuu', group: 'bus', yard: true },
     // a un lugar del Atlas se entra como a una parada, no como al patio de una empresa
     { x: -1000, z: 500, name: 'Welcome to Utah', sub: 'Tourist Board', group: 'atlas', yard: false },
