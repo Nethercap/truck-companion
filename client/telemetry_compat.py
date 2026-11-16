@@ -19,6 +19,8 @@ nombres a proposito: el nuestro se instala AL LADO del scs-telemetry.dll de
 otras apps (Trucky lo trae y protesta si alguien se lo cambia), y los dos
 plugins corren a la vez. Se prefiere el nuestro, que trae los trabajos con
 auto de ATS 1.61; si no esta, el de siempre, que sirve para todo lo demas.
+Entre los dos gana el que tiene el plugin andando (sdkActive): un bloque
+puede quedar despues de cerrarse el juego (ver _open_buffer).
 
 Uso identico al de truck_telemetry:
     telemetry_compat.init()
@@ -60,20 +62,86 @@ _version = None
 _abierto = None  # nombre del bloque que se abrio
 
 
+def _nombres():
+    return WINDOWS_NAMES if IS_WINDOWS else LINUX_PATHS
+
+
+def _activo(buf) -> bool:
+    """sdkActive, el primer byte del bloque. El plugin lo pone en true al
+    arrancar y en false solo en scs_telemetry_shutdown, al salir el juego."""
+    return len(buf) > 0 and buf[0] != 0
+
+
 def _open_buffer():
-    """Devuelve algo indexable con el contenido del primer bloque que
-    exista. Si no hay ninguno, levanta la excepcion del ultimo."""
+    """Devuelve algo indexable con el contenido del primer bloque que exista
+    y tenga el plugin andando (sdkActive). Si ninguno lo tiene, el primero que
+    exista: el que llama ve sdkActive en false. Si no hay ninguno, levanta la
+    excepcion del ultimo.
+
+    Un bloque con el plugin apagado puede seguir ahi: en Windows mientras otra
+    app que lee la telemetria lo tenga abierto (The Dispatcher, RideAlong), y
+    en Linux siempre, porque el plugin no borra el archivo de /dev/shm. Si ese
+    es el nuestro, se lee el otro que si anda."""
     global _abierto
     error = None
-    for nombre in (WINDOWS_NAMES if IS_WINDOWS else LINUX_PATHS):
+    primero = None
+    for nombre in _nombres():
         try:
             buf = _open_named(nombre)
         except OSError as exc:
             error = exc
             continue
-        _abierto = nombre
-        return buf
-    raise error
+        if _activo(buf):
+            _abierto = nombre
+            return buf
+        deinit()
+        primero = primero or nombre
+    if primero is None:
+        raise error
+    buf = _open_named(primero)
+    _abierto = primero
+    return buf
+
+
+def _espiar(nombre) -> bool:
+    """Si el bloque `nombre` existe y tiene el plugin andando, sin tocar el
+    que se esta leyendo. En Linux con mmap a mano, como _open_named."""
+    if IS_WINDOWS:
+        from multiprocessing.shared_memory import SharedMemory
+        try:
+            mem = SharedMemory(name=nombre, create=False)
+        except OSError:
+            return False
+        try:
+            return _activo(mem.buf)
+        finally:
+            mem.close()
+    try:
+        fd = os.open(nombre, os.O_RDONLY)
+    except OSError:
+        return False
+    try:
+        with mmap.mmap(fd, BLOCK_SIZE, mmap.MAP_SHARED, mmap.PROT_READ) as m:
+            return _activo(m)
+    except (OSError, ValueError):
+        return False
+    finally:
+        os.close(fd)
+
+
+def mejor_bloque_activo():
+    """El nombre de un bloque preferido antes que el abierto que ya tiene el
+    plugin andando, o None. Al arrancar el juego cada plugin crea su bloque
+    cuando lo carga el juego: si justo se abrio el de RenCloud y el nuestro
+    todavia no estaba, se quedaba leyendo ese toda la sesion (log del 16-11),
+    sin la zona de bus ni los trabajos con auto."""
+    nombres = _nombres()
+    if _abierto not in nombres:
+        return None
+    for nombre in nombres[:nombres.index(_abierto)]:
+        if _espiar(nombre):
+            return nombre
+    return None
 
 
 def _open_named(nombre):

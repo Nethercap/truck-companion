@@ -624,7 +624,7 @@ def test_telemetry_compat_prefiere_el_bloque_de_truck_dash(monkeypatch):
         if nombre not in existen:
             raise FileNotFoundError(nombre)
         abiertos.append(nombre)
-        return b""
+        return b"\x01"  # sdkActive: los dos plugins andando
 
     monkeypatch.setattr(telemetry_compat, "_open_named", abrir)
     nombres = telemetry_compat.WINDOWS_NAMES if telemetry_compat.IS_WINDOWS else telemetry_compat.LINUX_PATHS

@@ -547,8 +547,9 @@ def test_no_se_cierra_si_la_opcion_esta_apagada():
 
 def test_no_se_cierra_mientras_la_memoria_compartida_esta():
     """Es el bug reportado. Mientras el plugin siga publicando, el juego
-    esta abierto, aunque sdkActive este en falso por estar en un menu o en
-    una estacion de servicio, y aunque no se encuentre la ventana."""
+    esta abierto, aunque no haya cuadros (una carga) y aunque no se encuentre
+    la ventana. sdkActive en falso no es un menu: lo pone solo el plugin al
+    apagarse, y eso si cuenta como juego ido (bloque_sin_juego)."""
     assert tray_client.debe_cerrarse(True, True, None, 10_000) is False
 
 

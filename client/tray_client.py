@@ -1856,6 +1856,40 @@ def actualizar_plugins_viejos(ahora: float | None = None) -> None:
 
 GAME_LOADING_GRACE_S = 90
 FROZEN_FRAME_SECONDS = 10
+MEJOR_BLOQUE_CADA_S = 2
+
+# Por que un bloque que abre no tiene juego (bloque_sin_juego), o que no abrio.
+SIN_MEMORIA = "sin memoria"
+SIN_JUEGO_APAGADO = "plugin apagado"
+SIN_JUEGO_CONGELADO = "mismo cuadro que al cerrarse"
+
+
+def bloque_sin_juego(raw: dict, render_muerto) -> str | None:
+    """Si el bloque recien abierto es de un juego que ya no esta, y por que.
+
+    La memoria compartida dura mientras alguien la tenga abierta: el juego se
+    cierra y el bloque queda si otra app que lee la telemetria lo tiene
+    (The Dispatcher, RideAlong, ATS Voice Dispatch), y en Linux siempre, porque
+    el plugin no borra el archivo. init() andaba, el cliente decia "esperando
+    el camion", a los 5 s sin ventana cerraba y volvia a abrir: cada 5 s un
+    client_status distinto al relay y por LAN, durante horas (log del 16-11,
+    unas 1.000 vueltas con The Dispatcher abierto).
+
+    - El plugin apagado (sdkActive en false: lo pone solo
+      scs_telemetry_shutdown, al salir el juego): el juego se fue.
+    - El mismo cuadro (renderTime) con que se dio el juego por ido y sin la
+      ventana: el juego se colgo o se cayo sin apagar el plugin. Los dos
+      plugins reciben el mismo renderTime del juego, asi que vale tambien para
+      el otro bloque. Con la ventana, se lee como siempre (congelado mientras
+      carga)."""
+    if not raw.get("sdkActive"):
+        return SIN_JUEGO_APAGADO
+    render = raw.get("renderTime")
+    if render_muerto and render == render_muerto and not client_lib.find_game_window():
+        return SIN_JUEGO_CONGELADO
+    return None
+
+
 _juego_visto_desde = None
 
 
@@ -2298,30 +2332,54 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
 
     sin_memoria_desde = None
     ultimo_render, render_cambio_en, avisado_congelado = None, time.time(), False
+    # El ultimo cuadro cuando se dio el juego por ido (renderTime), y por que
+    # se esta esperando: ver bloque_sin_juego.
+    render_muerto = None
+    sin_juego_antes = None
+    mejor_bloque_mirado = 0.0
 
     while True:
         if not telemetry_ready:
             try:
                 telemetry_compat.init()
-                client_lib.reset_event_state()
-                telemetry_ready = True
-                logging.info("Telemetry opened: %s", telemetry_compat.opened_block())
             except Exception:
+                sin_juego = SIN_MEMORIA
+            else:
+                try:
+                    sin_juego = bloque_sin_juego(telemetry_compat.get_data(), render_muerto)
+                except Exception:
+                    sin_juego = None  # lo resuelve la lectura de siempre, mas abajo
+                if sin_juego:
+                    telemetry_compat.deinit()
+            if sin_juego:
+                if sin_juego != sin_juego_antes and sin_juego != SIN_MEMORIA:
+                    logging.info("Telemetria: el bloque sigue abierto pero el juego no esta (%s): "
+                                 "se espera el juego", sin_juego)
+                sin_juego_antes = sin_juego
+                # Sin memoria o con el plugin apagado, el juego se fue de
+                # verdad. Con el ultimo cuadro congelado puede ser una carga
+                # larga bajo gamescope (sin ventana): ni se actualiza el
+                # plugin ni cuenta para el cierre automatico.
+                se_fue = sin_juego != SIN_JUEGO_CONGELADO
                 new_status = telemetry_status_when_unavailable()
                 if new_status != state.status:
                     logging.info("Telemetry unavailable: %s", new_status)
                 state.set_status(new_status)
                 # Con el juego cerrado: al arrancar sin juego y cada vez que
                 # se cierra (la memoria compartida se va y se cae aca).
-                if new_status == "waiting_game":
+                if new_status == "waiting_game" and se_fue:
                     actualizar_plugins_viejos()
                 await publish_status()
 
                 # El juego se fue de verdad: cuando se cierra, el plugin
-                # desmapea la memoria compartida y init() deja de funcionar.
-                # Mientras init() ande, el juego esta ahi aunque estemos en un
-                # menu y aunque la ventana no se encuentre.
-                if sin_memoria_desde is None:
+                # desmapea la memoria compartida y init() deja de funcionar,
+                # o, si otra app la tiene abierta, queda con sdkActive en
+                # falso. Mientras init() ande con el plugin prendido, el juego
+                # esta ahi aunque estemos en un menu y aunque la ventana no se
+                # encuentre.
+                if not se_fue:
+                    sin_memoria_desde = None
+                elif sin_memoria_desde is None:
                     sin_memoria_desde = time.time()
                 if debe_cerrarse(state.vio_el_juego,
                                  win_integration.quit_on_game_close_enabled(),
@@ -2333,13 +2391,30 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                     return
                 await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
                 continue
+            client_lib.reset_event_state()
+            telemetry_ready = True
+            render_muerto = sin_juego_antes = None
+            logging.info("Telemetry opened: %s", telemetry_compat.opened_block())
             sin_memoria_desde = None
             state.vio_el_juego = True
+
+        # Si se esta leyendo el bloque de otro plugin y aparecio el nuestro
+        # andando, se cambia (cada tanto: abrirlo cuesta poco pero no es gratis).
+        if time.time() - mejor_bloque_mirado >= MEJOR_BLOQUE_CADA_S:
+            mejor_bloque_mirado = time.time()
+            mejor = telemetry_compat.mejor_bloque_activo()
+            if mejor:
+                logging.info("Telemetria: aparecio %s con el plugin andando, se deja %s",
+                             mejor, telemetry_compat.opened_block())
+                telemetry_compat.deinit()
+                telemetry_ready = False
+                continue
 
         try:
             raw = telemetry_compat.get_data()
         except Exception:
             logging.exception("get_data() failed, re-initializing telemetry")
+            telemetry_compat.deinit()
             telemetry_ready = False
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
             continue
@@ -2406,6 +2481,10 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
                 telemetry_compat.deinit()
                 telemetry_ready = False
                 inactive_since = None
+                # Si otra app tiene abierto el bloque, init() vuelve a andar:
+                # con este cuadro se sabe que sigue siendo el del juego que se
+                # fue (bloque_sin_juego).
+                render_muerto = render or None
                 state.set_status("waiting_game")
                 state.discord.update(None)
                 # Se cerro el juego: la sesion de manejo termino. El viaje

@@ -4,6 +4,18 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- With another telemetry app still open after you close the game (The Dispatcher, RideAlong, ATS
+  Voice Dispatch), Truck Dash no longer flips between "waiting for the truck" and "waiting for the
+  game" every 5 seconds. Each flip went to every phone, tablet and browser showing the dashboard,
+  for as long as the other app stayed open. The same happened on Linux after every game session.
+  If you use "Close Truck Dash when the game closes", it now also works with those apps open.
+- If you also have another telemetry plugin installed (Trucky and other apps bring one), Truck Dash
+  sometimes read that plugin's data for the whole session, when it loaded first as the game started.
+  It now switches to its own plugin as soon as that one starts, so bus job stops (ETS2) and car
+  jobs (ATS) are no longer missed in those sessions.
+
 ## 1.5.44 (2026-11-16)
 
 - Coaches (ETS2), Build my map: a bus stop built on a street (most of them outside the big
