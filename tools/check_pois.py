@@ -78,14 +78,17 @@ def check_file(path, fix=False):
             errores.append(f"area rara: {fila}")
             break
     # Opcional (desde el 13-11, ETS2): terminales de bus por ciudad, {token: [x, z]}.
+    # Desde el 16-11 una parada armada sobre una calle lleva tambien el punto de
+    # esa calle ([x, z, xc, zc], pois.bus_stop_roads), a menos de 100 m del cartel.
     for clave in ("busStations", "busTouristStops"):
         tabla = d.get(clave)
         if tabla is None:
             continue
         if not isinstance(tabla, dict) or not all(
-                isinstance(k, str) and k and isinstance(v, list) and len(v) == 2 and all(_num(c) for c in v)
+                isinstance(k, str) and k and isinstance(v, list) and len(v) in (2, 4) and all(_num(c) for c in v)
+                and (len(v) == 2 or math.hypot(v[2] - v[0], v[3] - v[1]) <= 100)
                 for k, v in tabla.items()):
-            errores.append(f"'{clave}' raro: tiene que ser {{ciudad: [x, z]}}")
+            errores.append(f"'{clave}' raro: tiene que ser {{ciudad: [x, z]}} o [x, z, xc, zc] con la calle cerca")
     if fix:
         if mapbuild_pois.fill_missing_cities(d):
             mapbuild_pois.write(d, path)

@@ -999,6 +999,23 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `builder/truckdash.patch` para "Build my map", con `map_format("ets2")` en
   3). En ETS2 1.62.3 son 223 ciudades con terminal y 56 con punto de turismo;
   el de Tallinn queda a 13 m de donde el juego pone el bus al tomar la linea.
+  Una parada armada sobre una calle (el BusStop apunta a un road: 149 de las 279
+  de ETS2) lleva en la fila el punto de esa calle al lado del cartel ([x, z, xc,
+  zc], `bus_stop_roads` de pois.py: la curva del road, leyendo solo sus nodos del
+  `-nodes.json`), y la ruta termina pasando por ahi (`target.road`, `tramo.parada`,
+  `busStopArcs`: la arista mas cercana a ese punto, en los dos sentidos). Por el
+  nodo de patio (`yardNodes` saltea toda calle de 75 km/h o mas) la de Stuttgart
+  terminaba en el retorno 103 m mas alla, del otro lado de su calle de una mano, y
+  la de Zaragoza en una T a 121 m (Barcelona -> Zaragoza 291,9 -> 266,2 km, app de
+  verdad). Desde el cartel la arista mas cercana era la de su calle en 151 de 181
+  (la de turismo de Atenas queda entre dos calles); desde el punto, en 180. Pedir
+  la mano de la parada (la calzada mas cercana sola) alejaba la de Duisburg a
+  Kassel del GPS del juego (167,2 km: 173,4 -> 175,8) y mandaba a darse vuelta 5 km
+  mas alla en Ginebra: no se pide. Las terminales de prefab siguen al patio (desde
+  el cartel la arista mas cercana es una calle de afuera). Con el punto, rutas mas
+  largas donde la calle de la parada solo se alcanza dando la vuelta: Strasbourg ->
+  Stuttgart 184 -> 217,9 km (calle de una mano que muere en un retorno), Leipzig ->
+  Dresden 106,6 -> 127,8 (el cruce de al lado no dobla hacia la parada).
   Una ciudad sin terminal en los datos (las variantes armadas sobre la 1.61,
   ProMods) sigue al centro con `busStationApprox`. Un parse de antes del
   13-11 no tiene `europe-busStops.json`, y sin el `build_pois.py` deja la

@@ -28,7 +28,10 @@ Formato compacto (coordenadas de juego, redondeadas al metro):
                                               # de turismo (DLC Coaches)
     "busStations": {"city_token": [x, z], ...},  # solo ETS2: la terminal de
                                               # las lineas de bus de cada
-                                              # ciudad (DLC Coaches)
+                                              # ciudad (DLC Coaches); una
+                                              # parada armada sobre una calle
+                                              # va [x, z, xc, zc], con el
+                                              # punto de su calle al lado
     "busTouristStops": {"city_token": [x, z], ...},  # y donde suben los de
                                               # un viaje de turismo, si la
                                               # ciudad tiene uno aparte
@@ -205,6 +208,103 @@ def viewpoints(parser_dir, prefix, labels=None, table=None):
 BUS_STOP_SCENE_M = 60
 
 
+def _objetos_por_uid(path, uids):
+    """{uid: objeto} de los objetos de una lista grande del parser (nodes,
+    roads: objetos sin otros objetos adentro) cuyo uid esta en uids, sin
+    cargarla entera: europe-nodes.json pesa 267 MB y json.load lo vuelve
+    varios GB. Se busca cada "uid" en el texto y se lee solo su objeto (de la
+    llave de antes a la de despues). {} si falta el archivo."""
+    out = {}
+    if not uids:
+        return out
+    try:
+        with open(path, "rb") as f:
+            texto = f.read()
+    except OSError:
+        return out
+    for m in re.finditer(rb'"uid"\s*:\s*"([^"]+)"', texto):
+        uid = m.group(1).decode("utf-8", "replace")
+        if uid not in uids or uid in out:
+            continue
+        a, b = texto.rfind(b"{", 0, m.start()), texto.find(b"}", m.end())
+        try:
+            out[uid] = json.loads(texto[a:b + 1])
+        except ValueError:
+            continue
+        if len(out) == len(uids):
+            break
+    return out
+
+
+def _punto_de_la_calle(x, z, na, nb, pasos=24):
+    """El punto de un road mas cerca de (x, z). El road es la curva Hermite
+    entre sus dos nodos con la rotacion de cada uno como tangente, la misma
+    que dibujan el juego y build_route_graph (hermite_mid_points)."""
+    (x0, z0, ra), (x1, z1, rb) = na, nb
+    dist = math.hypot(x1 - x0, z1 - z0)
+    m0 = (math.cos(ra) * dist, math.sin(ra) * dist)
+    m1 = (math.cos(rb) * dist, math.sin(rb) * dist)
+    linea = []
+    for i in range(pasos + 1):
+        t = i / pasos
+        t2, t3 = t * t, t * t * t
+        h00, h10, h01, h11 = 2 * t3 - 3 * t2 + 1, t3 - 2 * t2 + t, -2 * t3 + 3 * t2, t3 - t2
+        linea.append((x0 * h00 + m0[0] * h10 + x1 * h01 + m1[0] * h11,
+                      z0 * h00 + m0[1] * h10 + z1 * h01 + m1[1] * h11))
+    mejor, mejor_d = linea[0], math.inf
+    for (ax, az), (bx, bz) in zip(linea, linea[1:]):
+        dx, dz = bx - ax, bz - az
+        largo2 = dx * dx + dz * dz
+        t = max(0.0, min(1.0, ((x - ax) * dx + (z - az) * dz) / largo2)) if largo2 else 0.0
+        px, pz = ax + t * dx, az + t * dz
+        d = math.hypot(x - px, z - pz)
+        if d < mejor_d:
+            mejor, mejor_d = (px, pz), d
+    return mejor
+
+
+def bus_stop_roads(parser_dir, prefix, paradas):
+    """{uid del BusStop: [x, z]} con el punto de su calle al lado del cartel,
+    para los BusStop atados a un road visible (prefabUid es el uid de un road:
+    188 de 322 en ETS2 1.62.3, las paradas armadas sobre una calle). El bus
+    para en esa calle, y la web termina la ruta pasando por ahi
+    (busStopArcs): por el nodo de patio mas cercano, la de Stuttgart
+    terminaba en el retorno de 103 m mas alla, del otro lado de la calle, y la
+    de Zaragoza en una T a 121 m. La arista del grafo mas cercana al cartel
+    era la de su calle en 151 de 181 paradas (la de turismo de Atenas queda
+    entre dos calles, a 22 m de la otra y a 48 de la suya); la mas cercana a
+    este punto, en 180. Las de un prefab (una terminal, una rotonda) no van:
+    a esas se entra como al patio de una empresa."""
+    uids = {str(b.get("prefabUid")) for b in paradas if b.get("prefabUid")}
+    roads = {u: r for u, r in _objetos_por_uid(os.path.join(parser_dir, f"{prefix}-roads.json"), uids).items()
+             if not r.get("hidden") and r.get("startNodeUid") and r.get("endNodeUid")}
+    nodos = _objetos_por_uid(os.path.join(parser_dir, f"{prefix}-nodes.json"),
+                             {r[k] for r in roads.values() for k in ("startNodeUid", "endNodeUid")})
+
+    def nodo(uid):
+        n = nodos.get(uid)
+        try:
+            v = (float(n["x"]), float(n["y"]), float(n["rotation"]))
+        except (TypeError, KeyError, ValueError):
+            return None
+        return v if all(math.isfinite(c) for c in v) else None
+
+    out = {}
+    for b in paradas:
+        r = roads.get(str(b.get("prefabUid")))
+        if not r:
+            continue
+        na, nb = nodo(r["startNodeUid"]), nodo(r["endNodeUid"])
+        try:
+            x, z = float(b["x"]), float(b["y"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if na and nb and math.isfinite(x) and math.isfinite(z):
+            px, pz = _punto_de_la_calle(x, z, na, nb)
+            out[str(b.get("uid"))] = [round(px), round(pz)]
+    return out
+
+
 def bus_stations(parser_dir, prefix):
     """(lineas, turismo): {ciudad: [x, z]} con la terminal de bus de cada
     ciudad y, aparte, el punto de subida de los viajes de turismo.
@@ -219,7 +319,9 @@ def bus_stations(parser_dir, prefix):
     escenas son las bus_t_*, y en Oulu, sin "tj", un viaje de turismo arranco
     en la terminal. La posicion es la del BusStop: en Tallinn, a 13 m de donde
     el juego pone el bus al tomar una linea (game.log, 13-11). Dos de un mismo
-    tipo en una ciudad (Valmiera, Lulea) estan a 30 m: queda el de uid menor."""
+    tipo en una ciudad (Valmiera, Lulea) estan a 30 m: queda el de uid menor.
+    Las paradas armadas sobre una calle llevan el punto de esa calle al lado
+    del cartel ([x, z, xc, zc], bus_stop_roads)."""
     path = os.path.join(parser_dir, f"{prefix}-busStops.json")
     if prefix != "europe" or not os.path.exists(path):
         return {}, {}
@@ -231,7 +333,9 @@ def bus_stations(parser_dir, prefix):
     except OSError:
         pass
     lineas, turismo = {}, {}
-    for b in sorted(_cargar(path), key=lambda b: str(b.get("uid"))):
+    paradas = _cargar(path)
+    calles = bus_stop_roads(parser_dir, prefix, paradas)
+    for b in sorted(paradas, key=lambda b: str(b.get("uid"))):
         ciudad = b.get("cityToken")
         try:
             x, z = float(b["x"]), float(b["y"])
@@ -241,7 +345,8 @@ def bus_stations(parser_dir, prefix):
             continue
         cerca = min(escenas, key=lambda e: (e[0] - x) ** 2 + (e[1] - z) ** 2, default=None)
         es_turismo = bool(cerca and cerca[2] and math.hypot(cerca[0] - x, cerca[1] - z) < BUS_STOP_SCENE_M)
-        (turismo if es_turismo else lineas).setdefault(ciudad, [round(x), round(z)])
+        calle = calles.get(str(b.get("uid")))
+        (turismo if es_turismo else lineas).setdefault(ciudad, [round(x), round(z)] + (calle or []))
     return lineas, turismo
 
 
