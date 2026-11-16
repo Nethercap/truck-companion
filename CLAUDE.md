@@ -661,6 +661,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   grafo cambian 34 lugares de ATS y 168 de ETS2, casi todos salidas de una
   autopista que dobla donde no se decia nada; 2 y 11 pasan de "keep left" a
   "keep right" en el mismo nodo, ramas que se cruzan como la de San Antonio.
+  Con los carriles partidos de un lado (`porCarriles` y `lado`), la rampa
+  puede ir pegada a la calzada mas de los 100 m: ahi los 10 m se miran tambien
+  a 250 y a 500 m (`forkLegM`, `forkFarLegM`). La salida a la izquierda de
+  -50174,-13949 (ETS2, Reino Unido, reporte #50, 14-11) da la vuelta por un
+  rulo y va a 1,8 m a los 100 m, a 4,7 a los 200 y a 10 a los 250: no se decia
+  nada. En 300 rutas por variante (semilla 7) suma un aviso en ProMods
+  (Grimsby -> Manchester, la misma salida con rulo, dibujado); check_avisos igual.
   En la bifurcacion por angulo, lo mismo cuando la rama de la ruta no tiene
   flechas (sirven todos los carriles) y la otra sale a un costado: la
   autopista que dobla 8 a 10 grados en una salida comun daba "keep left"

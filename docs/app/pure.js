@@ -1983,7 +1983,7 @@ function detectManeuver(ctx) {
       const otra = walkPointAt(idx, n, parallelForkM - (cum[k] - cum[i]));
       if (!otra) continue;
       const otraDelta = normDeg(bearingBetween(pts[i], otra) - inBearing);
-      if (Math.hypot(otra[0] - ruta[0], otra[1] - ruta[1]) < parallelForkSepM) continue;
+      const juntas = Math.hypot(otra[0] - ruta[0], otra[1] - ruta[1]) < parallelForkSepM;
       let direction = rutaDelta > otraDelta ? 'right' : 'left';
       let sig = null;
       for (let j = k + 1; j < pts.length && sig == null; j++) sig = pts[j][4];
@@ -1995,6 +1995,19 @@ function detectManeuver(ctx) {
       const lado = mascaras ? ladoDeCarriles(mr, ma) : null;
       const porCarriles = tr != null && ta != null && (ta & B.straight) && !(tr & B.straight)
         && !(mascaras && (!lado || carriles(mr) > carriles(ma)));
+      // Con los carriles partidos de un lado (porCarriles y lado), la rampa
+      // puede ir pegada a la calzada mas de parallelForkM: los carriles de la
+      // izquierda que se van por una salida a la izquierda de Reino Unido que
+      // da la vuelta por un rulo (ETS2, -50174,-13949, reporte #50, 14-11) van
+      // a 1,8 m a los 100 m, a 4,7 a los 200 y a 10 a los 250, y no se decia
+      // nada. Ahi la separacion se mira tambien a forkLegM y a forkFarLegM.
+      const seSeparan = () => [forkLegM, forkFarLegM].some((d) => {
+        if (cum[i] + d > cum[cum.length - 1]) return false;
+        const o = walkPointAt(idx, n, d - (cum[k] - cum[i]));
+        const r = pointAt(cum[i] + d);
+        return o && Math.hypot(o[0] - r[0], o[1] - r[1]) >= parallelForkSepM;
+      });
+      if (juntas && !(porCarriles && lado && seSeparan())) continue;
       if (!porCarriles && Math.abs(otraDelta) >= Math.abs(rutaDelta)) continue;
       if (tr != null || ta != null) {
         if (tr == null || (tr & B.straight) || !(tr & (B.left | B.slightLeft | B.right | B.slightRight))) continue;
