@@ -973,7 +973,7 @@ index 4094551..a1234c4 100644
 +  return value && /^@@.+@@$/.test(value) ? value : fallback;
 +}
 diff --git a/packages/clis/parser/game-files/map-files-parser.ts b/packages/clis/parser/game-files/map-files-parser.ts
-index b65d4c8..443765d 100644
+index b65d4c8..3cca82a 100644
 --- a/packages/clis/parser/game-files/map-files-parser.ts
 +++ b/packages/clis/parser/game-files/map-files-parser.ts
 @@ -11,6 +11,7 @@ import {
@@ -984,15 +984,19 @@ index b65d4c8..443765d 100644
    Building,
    City,
    CityArea,
-@@ -43,6 +44,7 @@ import { CombinedEntries } from './combined-entries';
+@@ -43,9 +44,11 @@ import { CombinedEntries } from './combined-entries';
  import { convertSiiToJson } from './convert-sii-to-json';
  import { parseDds } from './dds-parser';
  import { parseDefFiles } from './def-parser';
-+import { rutaDeTextura } from './ruta-textura';
++import { rutaDeTextura, texturaDelMaterial } from './ruta-textura';
  import type { Entries } from './scs-archive';
  import { ScsArchive } from './scs-archive';
  import { parseSector } from './sector-parser';
-@@ -54,7 +56,18 @@ import {
++import type { IconMat } from './sii-schemas';
+ import {
+   IconMatSchema,
+   LocalizationSiiSchema,
+@@ -54,7 +57,18 @@ import {
  
  export function parseMapFiles(
    scsFilePaths: string[],
@@ -1012,7 +1016,7 @@ index b65d4c8..443765d 100644
  ):
    | {
        data: 'all';
-@@ -94,6 +107,9 @@ export function parseMapFiles(
+@@ -94,6 +108,9 @@ export function parseMapFiles(
        logger.log('adding', scsSource);
        return new ScsArchive(p, scsSource);
      });
@@ -1022,7 +1026,7 @@ index b65d4c8..443765d 100644
    const entries = new CombinedEntries(archives);
    try {
      const version = parseVersionSii(entries);
-@@ -122,7 +138,7 @@ export function parseMapFiles(
+@@ -122,7 +139,7 @@ export function parseMapFiles(
        };
      }
  
@@ -1031,7 +1035,7 @@ index b65d4c8..443765d 100644
      return {
        ...baseResult,
        data: 'all',
-@@ -148,26 +164,106 @@ function parseVersionSii(entries: Entries) {
+@@ -148,26 +165,106 @@ function parseVersionSii(entries: Entries) {
    return { application, version };
  }
  
@@ -1149,7 +1153,7 @@ index b65d4c8..443765d 100644
    const bar = new cliProgress.SingleBar(
      {
        format: `[{bar}] | {filename} | {value} of {total}`,
-@@ -194,8 +290,27 @@ function parseSectorFiles(entries: Entries): {
+@@ -194,8 +291,27 @@ function parseSectorFiles(entries: Entries): {
        throw new Error(`couldn't parse ${sectorX} or ${sectorY}`);
      }
      const sector = putIfAbsent(sectorKey, { items: [], nodes: [] }, sectors);
@@ -1179,7 +1183,7 @@ index b65d4c8..443765d 100644
      sector.items = sector.items.concat(
        parsedSector.items.map(item =>
          withDlcGuard(item, map, baseFile.scsSource),
-@@ -284,25 +399,46 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
+@@ -284,25 +400,46 @@ function parseLocaleFiles(entries: Entries): Map<string, Map<string, string>> {
        l10nStrings,
      );
      for (const f of localeSubdir.files) {
@@ -1234,22 +1238,77 @@ index b65d4c8..443765d 100644
        for (let i = 0; i < key.length; i++) {
          localeMap.set(key[i], val[i]);
        }
-@@ -347,12 +483,12 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
-         const rfx = assertExists(
-           json.effect['ui.rfx'] ?? json.effect['ui.sdf.rfx'],
-         );
+@@ -321,6 +458,8 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+   const dotMatSuffix = /\.mat$/g;
+   const tobjPaths = new Map<string, string>();
+   const sdfAuxData = new Map<string, number[][]>();
++  // Iconos con un .mat que no se pudo leer: cuentan igual, sin imagen (abajo).
++  const sinImagen = new Set<string>();
+   const readTobjPathsFromMatFiles = (
+     dir: string,
+     filenameFilter: (filename: string) => boolean = f => f.endsWith('.mat'),
+@@ -332,27 +471,51 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+       if (!filenameFilter(f)) {
+         continue;
+       }
+-      const json = convertSiiToJson(`${dir}/${f}`, entries, IconMatSchema);
+-      if (Object.keys(json).length === 0) {
+-        continue;
+-      }
+       let key = f.replaceAll(deleteRegex, '');
+       if (/^map[0-3]$/.exec(key)) {
+         // prefix `map{0,1,2,3}` keys with usa-/europe-, so that parsing into
+         // the same output directory doesn't lead to clobbering.
+         key = `${map}-${key}`;
+       }
++      // Un .mat de un mod que no se puede leer (o que no pasa el schema) se
++      // saltea con su nombre en el log, y el icono sigue contando sin imagen,
++      // como uno cuya textura no aparece: antes cortaba todo el armado, despues
++      // de los sectores (road_rtc_kazflag.mat, build.log del 16-11).
++      let json: IconMat;
++      try {
++        json = convertSiiToJson(`${dir}/${f}`, entries, IconMatSchema);
++      } catch (err) {
++        logger.warn(
++          'skipping icon',
++          `${dir}/${f}`,
++          '- failed to parse/validate, keeping it without its image:',
++          err instanceof Error && err.message ? err.message : '(see above)',
++        );
++        sinImagen.add(key);
++        continue;
++      }
++      if (Object.keys(json).length === 0) {
++        continue;
++      }
+ 
+       if (json.effect) {
+-        const rfx = assertExists(
+-          json.effect['ui.rfx'] ?? json.effect['ui.sdf.rfx'],
+-        );
 -        tobjPaths.set(key, `${dir}/${rfx.texture.texture.source}`);
++        const rfx = json.effect['ui.rfx'] ?? json.effect['ui.sdf.rfx'];
++        if (!rfx) {
++          logger.warn(
++            `unknown effect for ${dir}/${f}, keeping it without its image`,
++          );
++          sinImagen.add(key);
++          continue;
++        }
 +        tobjPaths.set(key, rutaDeTextura(dir, rfx.texture.texture.source));
          if (json.effect['ui.sdf.rfx']) {
            sdfAuxData.set(key, json.effect['ui.sdf.rfx'].aux);
          }
        } else if (json.material) {
 -        tobjPaths.set(key, `${dir}/${json.material.ui.texture}`);
-+        tobjPaths.set(key, rutaDeTextura(dir, json.material.ui.texture));
++        tobjPaths.set(
++          key,
++          rutaDeTextura(dir, texturaDelMaterial(json.material.ui.texture)),
++        );
        } else {
          logger.warn(`unknown format for ${dir}/${f}`);
        }
-@@ -397,19 +533,43 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
+@@ -397,19 +560,48 @@ function parseIconMatFiles(map: 'usa' | 'europe', entries: Entries) {
    for (const [key, tobjPath] of tobjPaths) {
      const tobj = entries.files.get(tobjPath);
      if (!tobj) {
@@ -1279,6 +1338,11 @@ index b65d4c8..443765d 100644
 +      // imagen; quien escribe los .png los saltea.
 +      pngs.set(key, Buffer.alloc(0));
 +    }
++  }
++  for (const key of sinImagen) {
++    if (!pngs.has(key)) {
++      pngs.set(key, Buffer.alloc(0));
++    }
    }
  
 -  const mapPngs = [0, 1, 2, 3].map(i =>
@@ -1297,7 +1361,7 @@ index b65d4c8..443765d 100644
    // verify that mapX pngs are square
    const size = mapPngs[0].width;
    assert(mapPngs.every(p => p.width === p.height && p.width === size));
-@@ -462,6 +622,7 @@ function postProcess(
+@@ -462,6 +654,7 @@ function postProcess(
    const prefabsByUid = new Map<bigint, Prefab>();
    const mapAreas: MapArea[] = [];
    const cutscenes: Cutscene[] = [];
@@ -1305,7 +1369,7 @@ index b65d4c8..443765d 100644
    const triggers: Trigger[] = [];
    const signs: Sign[] = [];
    const ferryItems = new Map<string, FerryItem>();
-@@ -544,6 +705,10 @@ function postProcess(
+@@ -544,6 +737,10 @@ function postProcess(
          poifulItems.push(item);
          cutscenes.push(item);
          break;
@@ -1316,7 +1380,7 @@ index b65d4c8..443765d 100644
        case ItemType.Trigger:
          checkReference(item.nodeUids, nodesByUid, 'nodeUids', item);
          item.nodeUids.forEach(uid => referencedNodeUids.add(uid));
-@@ -611,288 +776,317 @@ function postProcess(
+@@ -611,288 +808,317 @@ function postProcess(
      nodeUid: bigint;
    }[] = [];
    for (const item of poifulItems) {
@@ -1882,7 +1946,7 @@ index b65d4c8..443765d 100644
      }
    }
  
-@@ -1110,6 +1304,7 @@ function postProcess(
+@@ -1110,6 +1336,7 @@ function postProcess(
        signs,
        trajectories,
        cutscenes,
@@ -1890,7 +1954,7 @@ index b65d4c8..443765d 100644
        countries: valuesWithTokens(defData.countries).map(withLocalizedName),
        cities: valuesWithTokens(cities).map(withLocalizedName),
        companyDefs: valuesWithTokens(defData.companies),
-@@ -1156,12 +1351,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
+@@ -1156,12 +1383,16 @@ function createWithLocalizedName(l10n: Map<string, string>) {
      if (o.nameLocalized && !l10n.has(o.nameLocalized.replaceAll('@', ''))) {
        logger.warn('no localized name for', o.nameLocalized, `(${o.name})`);
      }
@@ -3089,7 +3153,7 @@ index 0000000..f54d9b7
 +  });
 +});
 diff --git a/packages/clis/parser/game-files/sii-schemas.ts b/packages/clis/parser/game-files/sii-schemas.ts
-index b8accdc..8bec80f 100644
+index b8accdc..5bf2438 100644
 --- a/packages/clis/parser/game-files/sii-schemas.ts
 +++ b/packages/clis/parser/game-files/sii-schemas.ts
 @@ -115,8 +115,12 @@ const numberTriple = fixedLengthArray(number, 3);
@@ -3223,7 +3287,30 @@ index b8accdc..8bec80f 100644
          achievementName: string,
        }),
      ),
-@@ -480,10 +484,10 @@ export interface FerrySii {
+@@ -413,7 +417,10 @@ export interface IconMat {
+     'ui.rfx'?: IconMatRfx;
+     'ui.sdf.rfx'?: IconMatSdfRfx;
+   };
+-  material?: { ui: { texture: string } };
++  // Un texto, o una lista si el .mat la escribe con `texture[]:` (el escudo
++  // road_rtc_kazflag.mat de los mods RTC, build.log del 16-11): texturaDelMaterial
++  // (ruta-textura.ts) toma la primera.
++  material?: { ui: { texture: string | string[] } };
+ }
+ // Break up the above into separate interfaces to workaround some typing issues.
+ interface IconMatRfx {
+@@ -441,7 +448,9 @@ export const IconMatSchema: JSONSchemaType<IconMat> = object(
+         [],
+       ),
+     ),
+-    material: nullable(object({ ui: object({ texture: string }) })),
++    material: nullable(
++      object({ ui: object({ texture: { anyOf: [string, stringArray] } }) }),
++    ),
+   },
+   [],
+ );
+@@ -480,10 +489,10 @@ export interface FerrySii {
  }
  export const FerrySiiSchema: JSONSchemaType<FerrySii> = object({
    ferryData: patternRecord(
@@ -3236,7 +3323,7 @@ index b8accdc..8bec80f 100644
      },
      ['ferryName'],
    ),
-@@ -493,7 +497,7 @@ export interface CompanySii {
+@@ -493,7 +502,7 @@ export interface CompanySii {
    companyPermanent: Record<string, { name: string }>;
  }
  export const CompanySiiSchema: JSONSchemaType<CompanySii> = object({
@@ -3245,7 +3332,7 @@ index b8accdc..8bec80f 100644
      name: string,
    }),
  });
-@@ -524,7 +528,7 @@ export const CountrySiiSchema: JSONSchemaType<CountrySii> = object(
+@@ -524,7 +533,7 @@ export const CountrySiiSchema: JSONSchemaType<CountrySii> = object(
    {
      countryData: nullable(
        patternRecord(
@@ -3254,7 +3341,7 @@ index b8accdc..8bec80f 100644
          {
            name: string,
            nameLocalized: localeToken,
-@@ -558,7 +562,13 @@ export interface CitySii {
+@@ -558,7 +567,13 @@ export interface CitySii {
      string,
      {
        cityName: string;
@@ -3269,7 +3356,7 @@ index b8accdc..8bec80f 100644
        country: string;
        population?: number;
      }
-@@ -568,14 +578,14 @@ export const CitySiiSchema: JSONSchemaType<CitySii> = object(
+@@ -568,14 +583,14 @@ export const CitySiiSchema: JSONSchemaType<CitySii> = object(
    {
      cityData: nullable(
        patternRecord(
@@ -3287,7 +3374,7 @@ index b8accdc..8bec80f 100644
        ),
      ),
    },
-@@ -601,7 +611,7 @@ export const MileageTargetsSiiSchema: JSONSchemaType<MileageTargetsSii> =
+@@ -601,7 +616,7 @@ export const MileageTargetsSiiSchema: JSONSchemaType<MileageTargetsSii> =
    object(
      {
        mileageTarget: patternRecord(
@@ -3296,7 +3383,7 @@ index b8accdc..8bec80f 100644
          {
            editorName: string,
            defaultName: string,
-@@ -648,7 +658,7 @@ export interface ViewpointsSii {
+@@ -648,7 +663,7 @@ export interface ViewpointsSii {
  }
  export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
    photoAlbumItem: patternRecord(
@@ -3305,7 +3392,7 @@ index b8accdc..8bec80f 100644
      {
        name: localeToken,
        dlcId: token,
-@@ -656,7 +666,7 @@ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
+@@ -656,7 +671,7 @@ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
      },
    ),
    photoAlbumGroup: patternRecord(
@@ -3314,7 +3401,7 @@ index b8accdc..8bec80f 100644
      {
        name: localeToken,
        items: stringArray,
-@@ -679,7 +689,7 @@ interface FerryConnectionSii {
+@@ -679,7 +694,7 @@ interface FerryConnectionSii {
  export const FerryConnectionSiiSchema: JSONSchemaType<FerryConnectionSii> =
    object({
      ferryConnection: patternRecord(
@@ -3323,7 +3410,7 @@ index b8accdc..8bec80f 100644
        {
          price: number,
          time: number,
-@@ -705,7 +715,7 @@ export const PrefabSiiSchema: JSONSchemaType<PrefabSii> = object(
+@@ -705,7 +720,7 @@ export const PrefabSiiSchema: JSONSchemaType<PrefabSii> = object(
    {
      prefabModel: nullable(
        patternRecord(
@@ -3332,7 +3419,7 @@ index b8accdc..8bec80f 100644
          {
            prefabDesc: string,
            modelDesc: string,
-@@ -725,7 +735,7 @@ export const ModelSiiSchema: JSONSchemaType<ModelSii> = object(
+@@ -725,7 +740,7 @@ export const ModelSiiSchema: JSONSchemaType<ModelSii> = object(
    {
      modelDef: nullable(
        patternRecord(
@@ -3341,7 +3428,7 @@ index b8accdc..8bec80f 100644
          {
            modelDesc: nullable(string),
            vegetationModel: nullable(string),
-@@ -761,7 +771,7 @@ export const RoadLookSiiSchema: JSONSchemaType<RoadLookSii> = object(
+@@ -761,7 +776,7 @@ export const RoadLookSiiSchema: JSONSchemaType<RoadLookSii> = object(
    {
      roadLook: nullable(
        patternRecord(
@@ -3350,7 +3437,7 @@ index b8accdc..8bec80f 100644
          {
            name: string,
            lanesLeft: nullable(stringArray),
-@@ -830,7 +840,13 @@ export interface CityCompanySii {
+@@ -830,7 +845,13 @@ export interface CityCompanySii {
    companyDef: Record<string, { city: string }>;
  }
  export const CityCompanySiiSchema: JSONSchemaType<CityCompanySii> = object({
@@ -3365,7 +3452,7 @@ index b8accdc..8bec80f 100644
      city: token,
    }),
  });
-@@ -839,9 +855,9 @@ export interface CargoDefSii {
+@@ -839,9 +860,9 @@ export interface CargoDefSii {
    cargoDef: Record<string, { cargo: string }>;
  }
  export const CargoDefSiiSchema: JSONSchemaType<CargoDefSii> = object({
@@ -3377,7 +3464,7 @@ index b8accdc..8bec80f 100644
    }),
  });
  
-@@ -864,7 +880,7 @@ export interface CargoDataSii {
+@@ -864,7 +885,7 @@ export interface CargoDataSii {
  }
  export const CargoDataSiiSchema: JSONSchemaType<CargoDataSii> = object({
    cargoData: patternRecord(
@@ -3386,7 +3473,7 @@ index b8accdc..8bec80f 100644
      {
        name: string, // should be `localeToken`, but Valentines cargo :(
        volume: number,
-@@ -895,9 +911,12 @@ export const SignSiiSchema: JSONSchemaType<SignSii> = object(
+@@ -895,9 +916,12 @@ export const SignSiiSchema: JSONSchemaType<SignSii> = object(
    {
      signModel: nullable(
        patternRecord(
@@ -5515,15 +5602,15 @@ new file mode 100644
 +});
 diff --git a/packages/clis/parser/game-files/ruta-textura.prueba.ts b/packages/clis/parser/game-files/ruta-textura.prueba.ts
 new file mode 100644
-index 0000000..b0c525b
+index 0000000..e6af895
 --- /dev/null
 +++ b/packages/clis/parser/game-files/ruta-textura.prueba.ts
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,32 @@
 +// Pruebas de ruta-textura.ts. node --experimental-strip-types --test
 +
 +import assert from 'node:assert/strict';
 +import { test } from 'node:test';
-+import { rutaDeTextura } from './ruta-textura.ts';
++import { rutaDeTextura, texturaDelMaterial } from './ruta-textura.ts';
 +
 +test('relativa a la carpeta del .mat, como las del juego', () => {
 +  assert.equal(rutaDeTextura('material/ui/company/small', 'acm.tobj'), 'material/ui/company/small/acm.tobj');
@@ -5542,12 +5629,21 @@ index 0000000..b0c525b
 +  assert.equal(rutaDeTextura('material/ui/company/small', '../big/acm.tobj'), 'material/ui/company/big/acm.tobj');
 +  assert.equal(rutaDeTextura('material/ui/company/small', './acm.tobj'), 'material/ui/company/small/acm.tobj');
 +});
++
++test('la textura de un material ui, tambien escrita como lista (RTC, build.log del 16-11)', () => {
++  assert.equal(texturaDelMaterial('road_a_a1.tobj'), 'road_a_a1.tobj');
++  assert.equal(texturaDelMaterial(['road_rtc_kazflag.tobj']), 'road_rtc_kazflag.tobj');
++  assert.equal(
++    rutaDeTextura('material/ui/map/road', texturaDelMaterial(['road_rtc_kazflag.tobj'])),
++    'material/ui/map/road/road_rtc_kazflag.tobj',
++  );
++});
 diff --git a/packages/clis/parser/game-files/ruta-textura.ts b/packages/clis/parser/game-files/ruta-textura.ts
 new file mode 100644
-index 0000000..e945643
+index 0000000..b3e11d1
 --- /dev/null
 +++ b/packages/clis/parser/game-files/ruta-textura.ts
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,23 @@
 +// La textura de un icono .mat, como la busca el juego: relativa a la carpeta
 +// del .mat, o desde la raiz del juego si empieza con "/". Mapa BR Brasil 6.2
 +// escribe asi las de sus 77 empresas ("/material/ui/company/small/bnr.tobj"),
@@ -5561,4 +5657,13 @@ index 0000000..e945643
 +export function rutaDeTextura(dir: string, source: string): string {
 +  const ruta = source.startsWith('/') ? source : `${dir}/${source}`;
 +  return path.posix.normalize(ruta).replace(/^\/+/, '');
++}
++
++// La textura de un material "ui" de los viejos (`material : "ui" { texture: ... }`).
++// Un .mat puede escribirla como lista (`texture[]: "x.tobj"`): el escudo de ruta
++// road_rtc_kazflag.mat de los mods RTC lo hace, y con el texto solo se cortaba
++// todo el armado en "parsing icon .mat files" (build.log del 16-11, 185 mods). Un icono
++// de la interfaz lleva una textura: va la primera.
++export function texturaDelMaterial(texture: string | string[]): string {
++  return Array.isArray(texture) ? texture[0] : texture;
 +}

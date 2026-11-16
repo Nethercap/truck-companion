@@ -60,6 +60,11 @@ as a separate program.
   An icon whose image can't be found still counts, without the image. A
   company with no icon is left out of the map, and Mapa BR Brasil 6.2 lost
   all 75 of its companies that way.
+- An icon `.mat` that gives its image as a list (`texture[]:`, the road shield
+  `road_rtc_kazflag.mat` of the RTC mods) takes the first one. An icon `.mat`
+  that can't be read at all is skipped with a warning naming it, and its icon
+  still counts without the image, instead of stopping the build after all the
+  sectors were parsed.
 
 ## Building it
 
