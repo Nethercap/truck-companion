@@ -1,6 +1,6 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-11-12.
+// Fuente: manifest del 2026-11-16.
 const MAP_DATA_VERSION = {
   "ats": "20261103",
   "ats_161": "20261103",
@@ -22,7 +22,7 @@ const MAP_DATA_VERSION = {
   "ets2_gu": "20261022",
   "ets2_eugu": "20261022",
   "ets2_promods_eugu": "20261022",
-  "ets2_tmp": "20261022"
+  "ets2_tmp": "20261116"
 };
 
 // Metadatos por variante: etiqueta, juego, que proyeccion usa, que valor
@@ -350,7 +350,7 @@ const VARIANT_META = {
     "mods": [
       "truckersmp"
     ],
-    "gameVersion": "1.61.1"
+    "gameVersion": "1.62.3.2"
   }
 };
 
