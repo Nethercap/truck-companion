@@ -11,6 +11,10 @@ updates on its own and is not versioned here.
   driving past the stop on that street. Before, a stop beside a fast road could end at a
   turnaround or a side street up to 160 m away, sometimes after a long loop. Maps built with an
   earlier version keep routing as before until they are rebuilt.
+- Build my map: the RTC map mods no longer stop the build after the whole map was read ("error
+  validating material/ui/map/road/road_rtc_kazflag.mat" in the build log): their road shield icon
+  lists its image in a way the builder didn't expect. Any other icon file the builder can't read
+  is now skipped with a warning, keeping the icon without its image, instead of stopping the build.
 
 ## 1.5.43 (2026-11-15)
 
