@@ -31,7 +31,7 @@
 <header><img src="/assets/logo.svg" alt="" /> <a href="/" style="color:var(--text)">Truck Dash</a></header>
 <main>
   <h1>Privacy policy</h1>
-  <p class="updated">Last updated: 15 November 2026</p>
+  <p class="updated">Last updated: 17 November 2026</p>
 
   <p>Truck Dash is a free, open-source companion for Euro Truck Simulator 2 and American Truck Simulator. It is designed to handle as little data as possible. This page explains exactly what it reads, sends and stores.</p>
   <p><strong>An account is optional.</strong> Without one, everything works as it always has and nothing about you is stored on our servers. If you do create one, the section below says exactly what it holds.</p>
@@ -57,6 +57,7 @@
   <h2>What is stored</h2>
   <ul>
     <li><strong>Aggregate counters</strong>: total number of sessions started and jobs delivered (numbers only).</li>
+    <li><strong>Drivers in the last 24 hours</strong>: to count how many different PCs had the game open with Truck Dash, the relay keeps a statistical sketch for each hour (a HyperLogLog). Your pairing code goes through a one-way keyed hash and can at most raise one of its 4,096 small numbers; neither the code nor a list of PCs is stored, and the sketch cannot be turned back into codes or PCs. It only estimates how many there were. Hourly sketches are deleted after 24 hours; for each day, only the total is kept.</li>
     <li><strong>Latest delivered jobs</strong> for the community feed and the Discord bot: origin city, destination city, cargo, truck model, pay and distance of the last few deliveries. No identifier links a job to a person.</li>
     <li><strong>In your own browser</strong> (localStorage): your preferences (units, language, settings), whether you've seen the tour, and, if enabled, a local trip history. This never leaves your device.</li>
   </ul>

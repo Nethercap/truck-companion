@@ -996,6 +996,7 @@ const TRANSLATIONS = {
     badgeOpenSource: 'Open source',
     heroDiscord: 'Join our Discord',
     driversOnlineText: '{n} drivers online right now',
+    driversDayText: '{n} drivers in the last 24 hours',
     jobsDeliveredText: '{n} jobs delivered with Truck Dash',
     gsTitle: 'Up and running in <span class="accent">two minutes</span>',
     gsIntro: 'No installer, no sign-up, no admin rights. Three steps, once.',
@@ -1222,6 +1223,7 @@ const TRANSLATIONS = {
     badgeOpenSource: 'Código abierto',
     heroDiscord: 'Unite a nuestro Discord',
     driversOnlineText: '{n} camioneros conectados ahora',
+    driversDayText: '{n} camioneros en las últimas 24 horas',
     jobsDeliveredText: '{n} trabajos entregados con Truck Dash',
     gsTitle: 'Listo en <span class="accent">dos minutos</span>',
     gsIntro: 'Sin instalador, sin registrarte, sin permisos de administrador. Tres pasos, una sola vez.',
@@ -1414,11 +1416,14 @@ function buildFaqJsonLd() {
   document.getElementById('faqJsonLd').textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: items });
 }
 
-// Contador: conectados ahora (PCs con el cliente andando, /health del relay)
-// y trabajos entregados. Antes decia "N drivers have tracked their jobs" con
-// total_sessions, que suma una por sesion del relay: el mismo camionero que
-// juega 30 dias contaba 30 veces (auditoria del 12-10).
+// Contador: conductores de las ultimas 24 horas (PCs distintas con el juego
+// abierto, drivers_24h de /health; null hasta que el relay tenga un dia entero
+// contado), o si no los conectados ahora, y trabajos entregados. Antes decia
+// "N drivers have tracked their jobs" con total_sessions, que suma una por
+// sesion del relay: el mismo camionero que juega 30 dias contaba 30 veces
+// (auditoria del 12-10).
 let lastOnline = null;
+let lastDrivers24h = null;
 let lastJobsDelivered = null;
 
 // Con el idioma de la pagina: con toLocaleString() pelado, una PC en
@@ -1428,7 +1433,8 @@ function fmtCount(n) { return n.toLocaleString(currentLang); }
 function renderDriverCounter() {
   const el = document.getElementById('driverCounter');
   const parts = [];
-  if (lastOnline) parts.push(t('driversOnlineText').replace('{n}', `<strong>${fmtCount(lastOnline)}</strong>`));
+  if (lastDrivers24h) parts.push(t('driversDayText').replace('{n}', `<strong>${fmtCount(lastDrivers24h)}</strong>`));
+  else if (lastOnline) parts.push(t('driversOnlineText').replace('{n}', `<strong>${fmtCount(lastOnline)}</strong>`));
   if (lastJobsDelivered) parts.push(t('jobsDeliveredText').replace('{n}', `<strong>${fmtCount(lastJobsDelivered)}</strong>`));
   el.innerHTML = parts.join(' · ');
   el.hidden = !parts.length;
@@ -1517,6 +1523,7 @@ function fetchOnline() {
   fetch(HEALTH_URL).then(r => r.ok ? r.json() : null).then(data => {
     if (!data || typeof data.connected_clients !== 'number') return;
     lastOnline = data.connected_clients;
+    lastDrivers24h = typeof data.drivers_24h === 'number' ? data.drivers_24h : null;
     renderDriverCounter();
   }).catch(() => {});
 }

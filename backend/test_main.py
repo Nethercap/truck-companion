@@ -1866,3 +1866,95 @@ def test_dos_listas_sin_sincronizar_quedan_la_del_primero_en_los_dos(client, mai
         b.send_text(main.json.dumps({"type": "route_plan_hello", "device": "bbbbbbbb", "plans": {"ats": {"list": PLAN[:1], "rev": 0}}}))
         msg = _hasta_tipo(b, main, "route_plan")
         assert msg["rev"] == 1 and len(msg["list"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Conductores de las ultimas 24 h (HyperLogLog por hora, record_driver_seen)
+
+# Un dia UTC cualquiera a las 10:00, para los tests con hora fija.
+DIA_FIJO = 20409
+DIEZ_UTC = DIA_FIJO * 86400 + 10 * 3600
+
+
+def test_el_sketch_cuenta_casi_exacto_y_no_repite(main):
+    import random
+    rnd = random.Random(7)
+    regs = bytearray(main.DRIVERS_HLL_M)
+    hashes = [rnd.getrandbits(64) for _ in range(3000)]
+    for h in hashes:
+        main.hll_add(regs, h)
+    for h in hashes[:500]:  # la misma PC otra vez no suma
+        assert main.hll_add(regs, h) is False
+    assert abs(main.hll_count(regs) - 3000) <= 60
+    pocos = bytearray(main.DRIVERS_HLL_M)
+    for i in range(10):
+        main.hll_add(pocos, main.driver_hash(f"PC{i:06d}"))
+    assert main.hll_count(pocos) == 10
+    assert main.hll_count(bytearray(main.DRIVERS_HLL_M)) == 0
+
+
+def test_la_telemetria_cuenta_la_pc_y_el_client_status_solo_no(client, main):
+    jugando = client.post("/pair/new").json()["code"]
+    en_el_menu = client.post("/pair/new").json()["code"]
+    tick = main.json.dumps({"position": {"x": 1, "z": 2}, "event": {"jobDelivered": False}})
+    with client.websocket_connect(f"/ws/client/{jugando}") as ws, \
+            client.websocket_connect(f"/ws/client/{en_el_menu}") as menu:
+        menu.send_text(main.json.dumps({"type": "client_status", "status": "waiting_game"}))
+        for _ in range(5):
+            ws.send_text(tick)
+        import time as _time
+        _time.sleep(0.2)
+    assert main.drivers_counts(main.time.time())["last_24h"] == 1
+    # Recien desplegado no se publica: el numero de 24 h se quedaria corto
+    assert client.get("/health").json()["drivers_24h"] is None
+    main._drivers_since = main.time.time() - 25 * 3600
+    main._drivers_cache.clear()
+    assert client.get("/health").json()["drivers_24h"] == 1
+
+
+def test_la_ventana_es_de_24_horas_y_cada_dia_guarda_su_total(main):
+    a, b = main.Session("AAAAAAAA"), main.Session("BBBBBBBB")
+    main.record_driver_seen(a, DIEZ_UTC)
+    main.record_driver_seen(b, DIEZ_UTC + 3600)
+    main.record_driver_seen(a, DIEZ_UTC + 3700)  # otra hora, la misma PC
+    conteos = main.drivers_counts(DIEZ_UTC + 2 * 3600)
+    assert conteos["last_24h"] == 2 and conteos["today"] == 2
+    # Al dia siguiente a las 9:30 las dos siguen en la ventana; hoy, ninguna
+    conteos = main.drivers_counts(DIEZ_UTC + 23 * 3600 + 1800)
+    assert conteos["last_24h"] == 2 and conteos["today"] == 0
+    assert main._drivers_days == {main._dia_utc(DIA_FIJO): 2}
+    # A las 10:30 del dia siguiente la hora de las 10 de ayer salio de la
+    # ventana, pero en la de las 11 estan las dos (b y la segunda de a)
+    assert main.drivers_counts(DIEZ_UTC + 24 * 3600 + 1800)["last_24h"] == 2
+    assert main.drivers_counts(DIEZ_UTC + 25 * 3600 + 1800)["last_24h"] == 0
+    assert all(h > (DIEZ_UTC + 25 * 3600) // 3600 - 24 for h in main._drivers_hours)
+    assert main._drivers_days == {main._dia_utc(DIA_FIJO): 2}
+
+
+def test_lo_guardado_vuelve_sin_codigos_y_sin_contar_dos_veces(main):
+    # Codigos que no pueden aparecer por casualidad en el base64 de los registros
+    a, b, c = main.Session("KQ7ZX2PM"), main.Session("WJ4RT9HN"), main.Session("CX3VB8LD")
+    main.record_driver_seen(a, DIEZ_UTC)
+    main.record_driver_seen(b, DIEZ_UTC)
+    guardado = main.drivers_snapshot()
+    for codigo in ("KQ7ZX2PM", "WJ4RT9HN", str(a.driver_hash), format(a.driver_hash, "x")):
+        assert codigo not in guardado
+    # Un redeploy: la memoria vacia, llega c antes de leer R2, y despues a otra vez
+    main._drivers_hours.clear()
+    main._drivers_days.clear()
+    main._drivers_since = None
+    main.record_driver_seen(c, DIEZ_UTC + 60)
+    main.apply_drivers_snapshot(main.json.loads(guardado))
+    main.record_driver_seen(main.Session("KQ7ZX2PM"), DIEZ_UTC + 120)
+    assert main.drivers_counts(DIEZ_UTC + 180)["last_24h"] == 3
+    assert main._drivers_since == DIEZ_UTC
+    # Basura en el archivo no rompe nada
+    main.apply_drivers_snapshot({"v": 1, "hours": {"x": "!!", "5": "AAAA"}, "days": {"d": "no"}, "since": True})
+    main.apply_drivers_snapshot(["no", "es", "un", "dict"])
+
+
+def test_admin_stats_trae_los_conductores(client, main):
+    main.record_driver_seen(main.Session("AAAAAAAA"), main.time.time())
+    body = client.get("/admin/stats", headers={"X-Admin-Key": "test-admin-key"}).json()
+    assert body["drivers"]["last_24h"] == 1 and body["drivers"]["today"] == 1
+    assert body["drivers"]["full_window"] is False and isinstance(body["drivers"]["daily"], dict)
