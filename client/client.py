@@ -198,6 +198,19 @@ def parse_active_mods(log_text: str) -> list | None:
     return mods
 
 
+def es_de_promods(mod: dict) -> bool:
+    """Un paquete de ProMods o un conector suyo: el archivo empieza con
+    "promods" o "cnx-pm" (promods-eu-map-v284, cnx-pm-eu-v284-v104) o el
+    nombre con "ProMods" (los manifest dicen "ProMods Map Package", "ProMods
+    Canada Definition Package"...). No un mod que solo lo nombra: con "Real
+    life currency exchange ratio - ProMods version" la web cargaba el mapa de
+    ProMods a quien jugaba sin el (reportes #56 y #58, 16-11: Valencia fuera
+    de la ruta cada 200 m, y la Islandia de ProMods en vez de la del juego)."""
+    archivo = str(mod.get("file") or "").strip().lower()
+    nombre = str(mod.get("name") or "").strip().lower()
+    return archivo.startswith(("promods", "cnx-pm")) or nombre.startswith("promods")
+
+
 def detect_map_mods(mods: list) -> dict:
     """{promods, promods_canada, c2c} a partir de nombres/archivos de mods.
     ProMods Europa y sus addons (ME, Maghreb, TGS) cuentan como 'promods';
@@ -205,7 +218,7 @@ def detect_map_mods(mods: list) -> dict:
     flags = {"promods": False, "promods_canada": False, "c2c": False, "rusmap": False, "reforma": False, "roextended": False, "grand_utopia": False, "eu_grand_utopia": False, "canada_expansion": False, "ats_expansion": False, "truckersmp": False}
     for mod in mods:
         text = f"{mod.get('file', '')} {mod.get('name', '')}".lower()
-        if "promods" in text or "pm-" in text or "cnx-pm" in text:
+        if es_de_promods(mod):
             if "canada" in text or "promods-ats" in text or "pm-ats" in text:
                 flags["promods_canada"] = True
             else:

@@ -227,16 +227,41 @@ def clean_map_dlcs(valor) -> Optional[dict]:
 
 MAP_MOD_FLAG_RE = re.compile(r"^[a-z0-9_]{1,32}$")
 MAP_MOD_FLAGS_MAX = 32
+# Tope de nombres que manda el cliente (ACTIVE_MOD_NAMES_MAX de client.py):
+# una lista de ese largo puede estar cortada y no prueba que falte ProMods.
+ACTIVE_MOD_NAMES_MAX = 150
 
 
-def clean_map_mods(valor) -> Optional[dict]:
+def sin_promods_falso(flags: dict, nombres) -> dict:
+    """Hasta la 1.5.44 el cliente marcaba ProMods con cualquier mod que lo
+    nombrara ("Real life currency exchange ratio - ProMods version",
+    reportes #56 y #58, 16-11) y la web cargaba el mapa de ProMods a quien
+    jugaba sin el. Con la lista de nombres (los paquetes de verdad empiezan
+    con "ProMods": "ProMods Map Package", "ProMods Canada Map Package"), se
+    apaga la bandera si ninguno lo es. Solo apaga: el cliente tambien mira
+    los archivos, que no llegan. Lo mismo hace la web (correctProModsFlags
+    en pure.js) con el client_status en vivo; esto es para la pestana que
+    abre despues, que solo ve lo guardado aca."""
+    if not isinstance(nombres, list) or len(nombres) >= ACTIVE_MOD_NAMES_MAX:
+        return flags
+    de_pm = [n.strip().lower() for n in nombres if isinstance(n, str) and n.strip().lower().startswith("promods")]
+    salida = dict(flags)
+    if salida.get("promods") and not any("canada" not in n for n in de_pm):
+        salida["promods"] = False
+    if salida.get("promods_canada") and not any("canada" in n for n in de_pm):
+        salida["promods_canada"] = False
+    return salida
+
+
+def clean_map_mods(valor, nombres=None) -> Optional[dict]:
     """Los mods de mapa que el cliente detecto, por juego ({'ats': {'c2c':
     True, ...} o None, 'ets2': ...}). Se guardan con el estado de la sesion
     como los DLC: el cliente solo reenvia client_status cuando algo cambia,
     asi que una pestana que abria o recargaba despues cargaba el mapa base
     y el que jugaba con Coast to Coast veia "ciudad no encontrada"
     (auditoria del 10-10). Solo banderas cortas y booleanas, nunca nombres
-    de mods."""
+    de mods: los de `nombres` (el activeMods del cliente) solo sirven para
+    corregir la bandera de ProMods (sin_promods_falso) y no se guardan."""
     if not isinstance(valor, dict):
         return None
     limpio = {}
@@ -245,6 +270,8 @@ def clean_map_mods(valor) -> Optional[dict]:
         if isinstance(flags, dict):
             limpio[game] = {k: bool(v) for k, v in list(flags.items())[:MAP_MOD_FLAGS_MAX]
                             if isinstance(k, str) and MAP_MOD_FLAG_RE.fullmatch(k)}
+            if isinstance(nombres, dict):
+                limpio[game] = sin_promods_falso(limpio[game], nombres.get(game))
         else:
             limpio[game] = None
     return limpio
@@ -2110,7 +2137,7 @@ async def ws_client(websocket: WebSocket, code: str):
                     session.last_client_status = {"status": payload.get("status"), "game": payload.get("game"), "clientVersion": payload.get("clientVersion"),
                                                   "detail": detail[:400] if isinstance(detail, str) and detail else None,
                                                   "mapDlcs": clean_map_dlcs(payload.get("mapDlcs")),
-                                                  "mapMods": clean_map_mods(payload.get("mapMods")),
+                                                  "mapMods": clean_map_mods(payload.get("mapMods"), payload.get("activeMods")),
                                                   "localMaps": clean_local_maps(payload.get("localMaps")),
                                                   "localMapPort": clean_port(payload.get("localMapPort")),
                                                   "overlay": payload.get("overlay") is True}

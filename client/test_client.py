@@ -401,6 +401,25 @@ def test_detect_map_mods_flags():
     assert client.detect_map_mods([]) == NO_MODS
 
 
+def test_detect_map_mods_un_mod_que_nombra_promods_no_es_promods():
+    """Reportes #56 y #58 (16-11): "Real life currency exchange ratio -
+    ProMods version" sin ProMods cargaba el mapa de ProMods; el camion andaba
+    por calles del juego base (Valencia, la Islandia de la 1.62)."""
+    otros = [
+        {"file": "real_life_currency_promods", "name": "Real life currency exchange ratio - ProMods version"},
+        {"file": "645553604", "name": "YARA - Yet Another Route Advisor"},
+        {"file": "trafico_pm-compatible", "name": "Traffic Density"},
+        {"file": "currency_canada_promods", "name": "Currency for ProMods Canada"},
+    ]
+    assert client.detect_map_mods(otros) == NO_MODS
+    # los paquetes de verdad, por el nombre del manifest o por el archivo
+    assert client.detect_map_mods(otros + [{"file": "promods-eu-map-v284", "name": "ProMods Map Package"}])["promods"]
+    assert client.detect_map_mods(otros + [{"file": "123456", "name": "ProMods Definition Package"}])["promods"]
+    assert client.detect_map_mods([{"file": "promods-eu-def-v284", "name": ""}])["promods"]
+    pmc = client.detect_map_mods(otros + [{"file": "promods-ats-map-v171", "name": "ProMods Canada Map Package"}])
+    assert pmc["promods_canada"] and not pmc["promods"]
+
+
 def test_detect_map_mods_rusmap_with_promods():
     mods = [{"file": "promods-eu-map-v284.scs", "name": "ProMods Europe"}, {"file": "RusMap_Map.scs", "name": "RusMap 2.61"}, {"file": "cnx-pm-v284-rm-v261.scs", "name": "ProMods 2.84 - RusMap 2.61 Connector"}]
     assert client.detect_map_mods(mods) == {**NO_MODS, "promods": True, "rusmap": True}

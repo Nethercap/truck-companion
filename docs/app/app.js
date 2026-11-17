@@ -6810,7 +6810,7 @@ function animateTruckTo(fromLngLat, toPos, fromHeading, toHeading) {
 // (usuario de C2C + Canada, 10-10).
 function applyClientMapMods(st) {
   if (st.activeMods !== undefined) detectedModNames = st.activeMods;
-  const mapMods = st.mapMods === undefined ? undefined : holdDetectedMods(detectedMods, st.mapMods);
+  const mapMods = st.mapMods === undefined ? undefined : holdDetectedMods(detectedMods, correctProModsFlags(st.mapMods, st.activeMods));
   if (mapMods !== undefined && JSON.stringify(mapMods) !== JSON.stringify(detectedMods)) {
     detectedMods = mapMods;
     if (modsAuto && lastData && currentGame && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null; // recarga con la variante detectada

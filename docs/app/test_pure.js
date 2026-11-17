@@ -1852,6 +1852,32 @@ test('voiceManeuverKey: rotonda hasta la octava salida, despues hacia que lado',
   assert.equal(voiceManeuverKey({ kind: 'fork', direction: 'right' }), 'keep_right');
 });
 
+test('correctProModsFlags: un mod que nombra ProMods no carga el mapa de ProMods (reportes #56 y #58)', () => {
+  const { correctProModsFlags, ACTIVE_MOD_NAMES_MAX } = require('./pure.js');
+  const flags = { ets2: { promods: true, rusmap: false }, ats: { promods_canada: true, c2c: true } };
+  // #58: 66 mods, el unico "de mapa" era este; el camion iba por las calles del juego base
+  const falso = { ets2: ['Real life currency exchange ratio - ProMods version', 'YARA - Yet Another Route Advisor'],
+    ats: ['Coast to Coast v2.24.62.1', 'Currency for ProMods Canada'] };
+  const corregido = correctProModsFlags(flags, falso);
+  assert.deepEqual(corregido, { ets2: { promods: false, rusmap: false }, ats: { promods_canada: false, c2c: true } });
+  assert.deepEqual(flags.ets2, { promods: true, rusmap: false }, 'no toca lo que recibe');
+  // los paquetes de verdad (como los nombra el manifest, o el archivo sin manifest)
+  const real = { ets2: ['ProMods Map Package', 'ProMods Definition Package'], ats: ['promods-ats-map-v171', 'ProMods Canada Definition Package'] };
+  assert.equal(correctProModsFlags(flags, real), flags);
+  // ProMods Canada no cuenta como ProMods Europa
+  assert.deepEqual(correctProModsFlags({ ets2: { promods: true } }, { ets2: ['ProMods Canada Map Package'] }), { ets2: { promods: false } });
+  // sin nombres (pestana que abre despues: el relay no los guarda), con null o con
+  // la lista en el tope (puede estar cortada), queda lo del cliente
+  assert.equal(correctProModsFlags(flags, undefined), flags);
+  assert.equal(correctProModsFlags(flags, { ets2: null, ats: null }), flags);
+  const tope = Array.from({ length: ACTIVE_MOD_NAMES_MAX }, (_, i) => `mod ${i}`);
+  assert.equal(correctProModsFlags(flags, { ets2: tope, ats: tope }), flags);
+  // nunca prende, y pasa de largo lo que no es un objeto
+  assert.deepEqual(correctProModsFlags({ ets2: { promods: false } }, { ets2: ['ProMods Map Package'] }), { ets2: { promods: false } });
+  assert.equal(correctProModsFlags(null, falso), null);
+  assert.deepEqual(correctProModsFlags({ ets2: null, ats: null }, falso), { ets2: null, ats: null });
+});
+
 test('holdDetectedMods: el hueco sin lista de mods al rearrancar el juego no tira la variante', () => {
   const { holdDetectedMods } = require('./pure.js');
   const c2c = { c2c: true, promods_canada: false, canada_expansion: true };
