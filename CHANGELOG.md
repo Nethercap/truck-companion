@@ -4,6 +4,15 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- ProMods is detected only from its own packages (files starting with "promods" or "cnx-pm",
+  names starting with "ProMods"). A mod that only mentions it, such as "Real life currency
+  exchange ratio - ProMods version", made the dashboard load the ProMods map for players who
+  don't have it: the route went off the road every few hundred meters around Valencia, and a
+  bus in Iceland showed up on the other side of the island. The relay and the web already
+  correct this for older clients when the list of mod names reaches them.
+
 ## 1.5.44 (2026-11-16)
 
 - Coaches (ETS2), Build my map: a bus stop built on a street (most of them outside the big

@@ -1438,6 +1438,45 @@ def test_mods_de_mapa_del_cliente_saneados(main):
     assert main.clean_map_mods("c2c") is None
 
 
+def test_mods_de_mapa_promods_falso_por_los_nombres(main):
+    """Reportes #56 y #58 (16-11): el cliente hasta la 1.5.44 marcaba ProMods
+    con "Real life currency exchange ratio - ProMods version". Con los
+    nombres se apaga; sin ellos, o con la lista posiblemente cortada, queda."""
+    flags = {"ets2": {"promods": True, "rusmap": False}, "ats": {"promods_canada": True, "c2c": True}}
+    falso = {"ets2": ["Real life currency exchange ratio - ProMods version", "YARA - Yet Another Route Advisor"],
+             "ats": ["Coast to Coast v2.24.62.1", "Currency for ProMods Canada"]}
+    assert main.clean_map_mods(flags, falso) == {
+        "ets2": {"promods": False, "rusmap": False}, "ats": {"promods_canada": False, "c2c": True}}
+    real = {"ets2": ["ProMods Map Package", "ProMods Definition Package"],
+            "ats": ["ProMods Canada Map Package", "Coast to Coast v2.24.62.1"]}
+    assert main.clean_map_mods(flags, real) == {
+        "ets2": {"promods": True, "rusmap": False}, "ats": {"promods_canada": True, "c2c": True}}
+    # ProMods Canada no es ProMods Europa, ni al reves
+    assert main.clean_map_mods({"ets2": {"promods": True}}, {"ets2": ["ProMods Canada Map Package"]})["ets2"] == {"promods": False}
+    assert main.clean_map_mods(flags, None) == main.clean_map_mods(flags)
+    assert main.clean_map_mods(flags, {"ets2": None, "ats": "x"}) == main.clean_map_mods(flags)
+    cortada = {"ets2": [f"mod {i}" for i in range(main.ACTIVE_MOD_NAMES_MAX)]}
+    assert main.clean_map_mods(flags, cortada)["ets2"]["promods"] is True
+    # nunca prende
+    assert main.clean_map_mods({"ets2": {"promods": False}}, {"ets2": ["ProMods Map Package"]})["ets2"] == {"promods": False}
+
+
+def test_pestana_que_abre_despues_no_ve_promods_falso(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as local_client:
+        local_client.send_text(main.json.dumps({
+            "type": "client_status", "status": "live", "game": "ets2", "clientVersion": "1.5.43",
+            "mapMods": {"ets2": {"promods": True}, "ats": None},
+            "activeMods": {"ets2": ["Real life currency exchange ratio - ProMods version"], "ats": None},
+        }))
+        import time as _time
+        _time.sleep(0.1)
+        with client.websocket_connect(f"/ws/live/{code}") as viewer:
+            guardado = main.json.loads(viewer.receive_text())["client_status"]
+            assert guardado["mapMods"] == {"ets2": {"promods": False}, "ats": None}
+            assert "activeMods" not in guardado
+
+
 def test_viewer_que_entra_despues_recibe_los_mods_de_mapa(client, main):
     """El cliente solo reenvia client_status cuando algo cambia: una pestana
     que abre o recarga despues tiene que recibir los mods de mapa en el
