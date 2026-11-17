@@ -60,6 +60,7 @@ badgeNoLimits: 'Без лимитов на маршруты и без рекла
 badgeOpenSource: 'Открытый код',
 heroDiscord: 'Присоединяйтесь к Discord',
 driversOnlineText: 'Водителей онлайн сейчас: {n}',
+driversDayText: 'Водителей за последние 24 часа: {n}',
 jobsDeliveredText: 'Заказов доставлено с Truck Dash: {n}',
 gsTitle: 'Готово за <span class="accent">две минуты</span>',
 gsIntro: 'Без установщика, без регистрации, без прав администратора. Три шага, один раз.',

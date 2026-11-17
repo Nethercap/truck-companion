@@ -147,10 +147,17 @@
     <div class="body">
       <div class="cards">
         <div class="card"><div class="label">Active sessions (live)</div><div class="value" id="cardActiveSessions">-</div></div>
+        <div class="card"><div class="label">Drivers, last 24 h</div><div class="value" id="cardDrivers24h">-</div><div class="sub" id="cardDrivers24hSub"></div></div>
         <div class="card"><div class="label">Total sessions</div><div class="value" id="cardSessions">-</div></div>
         <div class="card"><div class="label">Jobs delivered</div><div class="value" id="cardJobs">-</div></div>
         <div class="card"><div class="label">Total revenue</div><div class="value" id="cardRevenue">-</div></div>
       </div>
+      <h3>Drivers per day (distinct PCs with the game open, UTC)</h3>
+      <div class="tableWrap"><table>
+        <thead><tr><th>Date</th><th>Drivers</th></tr></thead>
+        <tbody id="dailyDriversBody"></tbody>
+      </table></div>
+      <div class="pager" data-for="dailyDriversBody"></div>
       <h3>Sessions per day</h3>
       <div class="tableWrap"><table>
         <thead><tr><th>Date</th><th>Sessions</th></tr></thead>
@@ -333,6 +340,14 @@ function filasDiarias(obj) {
 }
 function pintarRelay(data) {
   $('cardActiveSessions').textContent = fmt(data.active_sessions);
+  // PCs distintas con el juego abierto (HyperLogLog del relay, ~1,6 % de error).
+  // Hasta tener un dia entero contado, el de 24 h se queda corto.
+  const dr = data.drivers || {};
+  $('cardDrivers24h').textContent = dr.last_24h == null ? '-' : fmt(dr.last_24h);
+  $('cardDrivers24hSub').textContent = dr.full_window
+    ? `today (UTC): ${fmt(dr.today)}`
+    : (dr.since ? `counting since ${new Date(dr.since * 1000).toLocaleString()}, not a full day yet` : 'not counted yet');
+  paginar('dailyDriversBody', filasDiarias(dr.daily), 'No full day yet', 2);
   $('cardSessions').textContent = fmt(data.total_sessions);
   $('cardJobs').textContent = fmt(data.jobs_delivered);
   $('cardRevenue').textContent = `$${Math.round(data.total_revenue || 0).toLocaleString()}`;

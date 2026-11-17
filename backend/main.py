@@ -11,6 +11,9 @@ mientras dure la sesion del proceso. No se persiste nada en DB todavia.
 """
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import math
@@ -196,6 +199,213 @@ def _save_stats():
         )
     except Exception:
         logging.exception("Failed to persist session stats to R2")
+
+
+# ---------------------------------------------------------------------------
+# Conductores de las ultimas 24 h: cuantas PCs distintas mandaron telemetria
+# (el cliente la manda solo con el juego abierto: sdkActive y frames que
+# avanzan, ver tray_client). Para tener un numero comparable con los
+# "conductores en 24 h" de otras apps (17-11); hasta aca solo habia
+# conectados en el momento y sesiones por dia.
+# La PC se reconoce por su codigo de pairing (el cliente lo guarda entre
+# arranques), pero no se guarda el codigo ni una lista de PCs: cada hora UTC
+# tiene un HyperLogLog (4096 registros de un byte) y cada PC sube a lo sumo un
+# registro. Del sketch sale cuantas hubo (error ~1,6 %, casi exacto con pocos
+# miles por el linear counting), pero no se puede sacar ni reconocer a
+# ninguna. Va a R2 al lado de las stats, y ese prefijo se lee desde afuera
+# (maps.trucksim-dash.com/stats/... con el Referer del sitio): por eso un
+# sketch y no hashes con su hora. Un codigo rotado a mano cuenta como otra PC.
+DRIVERS_KEY = "stats/drivers-hll.json"
+DRIVERS_HLL_P = 12
+DRIVERS_HLL_M = 1 << DRIVERS_HLL_P
+DRIVERS_WINDOW_HOURS = 24
+DRIVERS_DAYS_KEPT = 400
+DRIVERS_SAVE_INTERVAL_SECONDS = 300
+DRIVERS_COUNT_CACHE_SECONDS = 60
+_DRIVERS_HASH_KEY = ("truckdash-drivers:" + (ADMIN_KEY or "")).encode("utf-8")
+_HLL_POTENCIAS = [2.0 ** -r for r in range(66)]
+
+_drivers_hours: dict[int, bytearray] = {}  # hora UTC (epoch // 3600) -> registros
+_drivers_days: dict[str, int] = {}  # "YYYY-MM-DD" -> PCs distintas ese dia UTC
+_drivers_since: Optional[float] = None  # desde cuando se cuenta
+_drivers_dirty = False
+_drivers_cache: dict = {}
+
+
+def driver_hash(code: str) -> int:
+    """64 bits del HMAC del codigo: el mismo numero para la misma PC, y sin la
+    clave no se puede ir del codigo al numero."""
+    return int.from_bytes(hmac.new(_DRIVERS_HASH_KEY, code.encode("utf-8"), hashlib.sha256).digest()[:8], "big")
+
+
+def hll_add(regs: bytearray, h: int) -> bool:
+    """Suma un hash de 64 bits al sketch; True si cambio algun registro."""
+    idx = h >> (64 - DRIVERS_HLL_P)
+    resto = h & ((1 << (64 - DRIVERS_HLL_P)) - 1)
+    rango = (64 - DRIVERS_HLL_P) - resto.bit_length() + 1
+    if rango > regs[idx]:
+        regs[idx] = rango
+        return True
+    return False
+
+
+def hll_merge(sketches) -> bytearray:
+    out = bytearray(DRIVERS_HLL_M)
+    for regs in sketches:
+        out = bytearray(map(max, out, regs))
+    return out
+
+
+def hll_count(regs) -> int:
+    m = len(regs)
+    alpha = 0.7213 / (1 + 1.079 / m)
+    estimado = alpha * m * m / sum(_HLL_POTENCIAS[r] for r in regs)
+    ceros = regs.count(0)
+    if estimado <= 2.5 * m and ceros:
+        estimado = m * math.log(m / ceros)
+    return int(round(estimado))
+
+
+def _dia_utc(dia: int) -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime(dia * 86400))
+
+
+def drivers_roll(now: float):
+    """Cierra los dias UTC terminados (su total va a _drivers_days) y despues
+    borra las horas que salieron de la ventana. En ese orden: una hora de un
+    dia sin cerrar nunca se borra antes de sumarla."""
+    global _drivers_dirty
+    hora = int(now // 3600)
+    hoy = hora // 24
+    for dia in sorted({h // 24 for h in _drivers_hours if h // 24 < hoy}):
+        clave = _dia_utc(dia)
+        if clave not in _drivers_days:
+            _drivers_days[clave] = hll_count(hll_merge(r for h, r in _drivers_hours.items() if h // 24 == dia))
+            _drivers_dirty = True
+    for h in [h for h in _drivers_hours if h <= hora - DRIVERS_WINDOW_HOURS]:
+        del _drivers_hours[h]
+        _drivers_dirty = True
+    for clave in sorted(_drivers_days)[:-DRIVERS_DAYS_KEPT]:
+        del _drivers_days[clave]
+
+
+def record_driver_seen(session: "Session", now: float):
+    """Una vez por hora UTC y por sesion (el sketch no cuenta dos veces la
+    misma PC, pero asi no se calcula nada en cada dato)."""
+    global _drivers_dirty, _drivers_since
+    hora = int(now // 3600)
+    if session.driver_hour == hora:
+        return
+    session.driver_hour = hora
+    if _drivers_since is None:
+        _drivers_since = now
+        _drivers_dirty = True
+    regs = _drivers_hours.get(hora)
+    if regs is None:
+        regs = _drivers_hours[hora] = bytearray(DRIVERS_HLL_M)
+    if hll_add(regs, session.driver_hash):
+        _drivers_dirty = True
+        _drivers_cache.clear()
+
+
+def drivers_counts(now: float) -> dict:
+    """PCs distintas en las ultimas 24 horas (la hora en curso y las 23
+    anteriores) y en el dia UTC de hoy. full_window: ya se conto un dia
+    entero; antes, el numero de 24 h se queda corto."""
+    minuto = int(now // DRIVERS_COUNT_CACHE_SECONDS)
+    if _drivers_cache.get("minuto") == minuto:
+        return _drivers_cache["conteos"]
+    drivers_roll(now)
+    hora = int(now // 3600)
+    ventana = [r for h, r in _drivers_hours.items() if h > hora - DRIVERS_WINDOW_HOURS]
+    hoy = [r for h, r in _drivers_hours.items() if h // 24 == hora // 24]
+    conteos = {
+        "last_24h": hll_count(hll_merge(ventana)),
+        "today": hll_count(hll_merge(hoy)),
+        "full_window": _drivers_since is not None and now - _drivers_since >= DRIVERS_WINDOW_HOURS * 3600,
+    }
+    _drivers_cache.clear()
+    _drivers_cache.update({"minuto": minuto, "conteos": conteos})
+    return conteos
+
+
+def drivers_snapshot() -> str:
+    return json.dumps({
+        "v": 1,
+        "since": _drivers_since,
+        "hours": {str(h): base64.b64encode(bytes(r)).decode("ascii") for h, r in _drivers_hours.items()},
+        "days": _drivers_days,
+    })
+
+
+def apply_drivers_snapshot(data) -> None:
+    """Junta lo guardado con lo que haya en memoria (maximo por registro)."""
+    global _drivers_since
+    if not isinstance(data, dict) or data.get("v") != 1:
+        return
+    horas = data.get("hours")
+    for h, b64 in (horas.items() if isinstance(horas, dict) else []):
+        try:
+            hora = int(h)
+            regs = bytearray(base64.b64decode(b64))
+        except Exception:
+            continue
+        if len(regs) != DRIVERS_HLL_M:
+            continue
+        actual = _drivers_hours.get(hora)
+        _drivers_hours[hora] = hll_merge([actual, regs]) if actual is not None else regs
+    dias = data.get("days")
+    for clave, n in (dias.items() if isinstance(dias, dict) else []):
+        if isinstance(clave, str) and isinstance(n, int) and not isinstance(n, bool):
+            _drivers_days.setdefault(clave, n)
+    since = data.get("since")
+    if isinstance(since, (int, float)) and not isinstance(since, bool) and (_drivers_since is None or since < _drivers_since):
+        _drivers_since = float(since)
+    _drivers_cache.clear()
+
+
+def load_drivers():
+    client = _r2_client()
+    if client is None:
+        return
+    try:
+        obj = client.get_object(Bucket=R2_STATS_BUCKET, Key=DRIVERS_KEY)
+        data = json.loads(obj["Body"].read())
+    except Exception:
+        logging.info("Sin conteo de conductores en R2 todavia (o R2 no responde): arranca de cero")
+        return
+    apply_drivers_snapshot(data)
+
+
+def _put_drivers(body: str) -> bool:
+    client = _r2_client()
+    if client is None:
+        return True
+    try:
+        client.put_object(Bucket=R2_STATS_BUCKET, Key=DRIVERS_KEY, Body=body.encode("utf-8"), ContentType="application/json")
+        return True
+    except Exception:
+        logging.exception("No se pudo guardar el conteo de conductores en R2")
+        return False
+
+
+async def save_drivers():
+    global _drivers_dirty
+    drivers_roll(time.time())
+    if not _drivers_dirty:
+        return
+    _drivers_dirty = False
+    if not await asyncio.to_thread(_put_drivers, drivers_snapshot()):
+        _drivers_dirty = True
+
+
+async def drivers_save_loop():
+    while True:
+        await asyncio.sleep(DRIVERS_SAVE_INTERVAL_SECONDS)
+        try:
+            await save_drivers()
+        except Exception:
+            logging.exception("Fallo el guardado periodico del conteo de conductores")
 
 
 # Mapas que no conocemos: la web reporta cuando el camion queda fuera de la
@@ -811,6 +1021,10 @@ class Session:
         # mensaje con un type que no conocen.
         self.plan_viewers: dict = {}
         self.last_seen = time.time()
+        # Conductores de las ultimas 24 h (record_driver_seen): el hash del
+        # codigo, calculado una vez, y la ultima hora UTC en que se sumo.
+        self.driver_hash = driver_hash(code)
+        self.driver_hour: Optional[int] = None
 
 
 sessions: dict[str, Session] = {}
@@ -1214,11 +1428,21 @@ def tmp_events(response: Response, game: Optional[str] = None):
 
 @app.on_event("startup")
 async def start_background_tasks():
+    # Antes de atender a nadie: lo que llegue despues se suma a lo guardado.
+    await asyncio.to_thread(load_drivers)
+    asyncio.create_task(drivers_save_loop())
     asyncio.create_task(broadcast_live_positions_loop())
     asyncio.create_task(convoy_tick_loop())
     # Se precarga para que el primero que abra el mapa en vivo no espere el
     # ida y vuelta a la API de TruckersMP.
     asyncio.create_task(asyncio.to_thread(_refresh_tmp_events_blocking))
+
+
+@app.on_event("shutdown")
+async def save_drivers_on_shutdown():
+    # Railway manda SIGTERM en cada deploy: sin esto se perdian hasta 5
+    # minutos de conductores (los que cerraron el juego en ese rato).
+    await save_drivers()
 
 
 CODE_ALPHABET = string.ascii_uppercase + string.digits
@@ -1969,6 +2193,7 @@ def create_pairing_code(request: Request):
 
 @app.get("/health")
 def health():
+    conductores = drivers_counts(time.time())
     return {
         "status": "ok",
         "active_sessions": len(sessions),
@@ -1977,6 +2202,11 @@ def health():
         # local realmente corriendo y mandando telemetria en este momento -
         # lo que la web muestra como "X jugadores activos ahora".
         "connected_clients": sum(1 for s in sessions.values() if s.client_ws is not None),
+        # PCs distintas con el juego abierto en las ultimas 24 horas (ver
+        # record_driver_seen). null hasta tener un dia entero contado: recien
+        # desplegado daria un numero corto. La landing usa connected_clients
+        # mientras tanto.
+        "drivers_24h": conductores["last_24h"] if conductores["full_window"] else None,
         # Railway setea esta env var sola con el commit deployado - sirve para
         # confirmar desde afuera que un push realmente se reflejo en produccion.
         "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")[:7],
@@ -2038,7 +2268,11 @@ def stats_admin(x_admin_key: Optional[str] = Header(default=None)):
         raise HTTPException(status_code=403)
     # active_sessions es en vivo (cuenta sessions en memoria de este proceso,
     # como /health) - no se persiste en R2 como el resto de las stats.
-    return {**_load_stats(), "active_sessions": len(sessions)}
+    conductores = drivers_counts(time.time())
+    return {**_load_stats(), "active_sessions": len(sessions),
+            "drivers": {"last_24h": conductores["last_24h"], "today": conductores["today"],
+                        "full_window": conductores["full_window"], "since": _drivers_since,
+                        "daily": dict(_drivers_days)}}
 
 
 # Permite sembrar una base real conocida manualmente (ej. gente que probo el
@@ -2160,6 +2394,9 @@ async def ws_client(websocket: WebSocket, code: str):
                 event = payload.get("event") or {}
                 job_delivered = bool(event.get("jobDelivered"))
                 now = time.time()
+                # Un dato de telemetria es el juego abierto: cuenta para los
+                # conductores de las ultimas 24 h (el client_status solo no).
+                record_driver_seen(session, now)
                 # Se guarda siempre (barato, solo en memoria) - el filtro de
                 # privacidad pasa por share_position/map_variant a la hora de
                 # armar el broadcast, no aca.
