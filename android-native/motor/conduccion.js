@@ -748,7 +748,7 @@ var motor = {
     lastData = data;
     // Lo de updateHud que le importa a la ruta: la llegada en tiempo real.
     routeSummaryEtaSeconds = computeRealEtaSeconds(data);
-    updateMap(data.position || {}, data.game, data.heading);
+    updateMap(data.position || {}, data.game, data.heading, data);
     updateDestinationMarker(data);
     updateRouteSummary(data);
     checkMissingCompanies(data);

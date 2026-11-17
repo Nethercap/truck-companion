@@ -5062,7 +5062,6 @@ function scheduleMapFollow() {
   if (map && (map.isMoving() || map.isZooming() || map.isRotating())) return;
   mapFollowTimer = setTimeout(resumeMapFollow, MAP_FOLLOW_DELAY_MS);
 }
-const TRAIL_JUMP_THRESHOLD_M = 500; // si salta mas que esto entre updates, es un teleport (job asignado, garage, etc.), no un tramo manejado
 
 // Modo navegacion: mapa heading-up (rota con el camion, como un GPS real) en
 // vez de norte-arriba, con zoom dinamico (se acerca en curvas, se aleja en
@@ -7027,7 +7026,9 @@ function describeDetectedMods(game) {
   return names.length ? t('modsDetected').replace('{mods}', names.join(' + ')) : t('modsDetectedNone');
 }
 
-function updateMap(position, game, gameHeadingDeg) {
+// sample: el dato de telemetria entero (ts, speedKmh, paused, event), para saber si
+// el camion salto o anduvo (truckJumped). Sin el, cualquier dato a mas de 500 m.
+function updateMap(position, game, gameHeadingDeg, sample = null) {
   if (position.x == null || position.z == null) return;
   loadGameMap(resolveEffectiveGame(game));
   // loadGameMap es async: entre que setea toLngLat y crea el marcador del
@@ -7042,16 +7043,27 @@ function updateMap(position, game, gameHeadingDeg) {
   // hasta el nuevo, con la misma rampa que usa la camara para su bearing.
   const headingAtTickStart = lastHeadingDeg;
   let justJumped = false;
+  // Lo que hace falta del dato para ver si el camion salto hasta el proximo.
+  const here = {
+    x: position.x, z: position.z,
+    ts: sample && Number(sample.ts) > 0 ? Number(sample.ts) : Date.now() / 1000,
+    speedKmh: sample ? sample.speedKmh : null,
+    paused: !!(sample && sample.paused),
+    event: sample && sample.event ? sample.event : null,
+  };
 
   if (prevWorldPos) {
     const dx = position.x - prevWorldPos.x;
     const dz = position.z - prevWorldPos.z;
     const movedM = Math.hypot(dx, dz);
-    if (movedM > TRAIL_JUMP_THRESHOLD_M) {
+    if (truckJumped(prevWorldPos, here)) {
       // Un salto grande (teletransporte al asignar trabajo, garage, etc.)
       // deja la ruta ya calculada desalineada del camion. Se fuerza un
       // recalculo la proxima vez que llegue el destino, igual que un GPS
-      // recalcula cuando te salis del camino.
+      // recalcula cuando te salis del camino. Un hueco de datos que explica
+      // la velocidad (pestana en segundo plano) no: la ruta se recorta sola
+      // hasta el camion (projectAheadOnRoute agranda la ventana con lo que
+      // anduvo) y lo recorrido y los avisos siguen.
       justJumped = true;
       trailWorld.length = 0;
       trailWorldRaw = null;
@@ -7091,7 +7103,7 @@ function updateMap(position, game, gameHeadingDeg) {
       lastHeadingDeg = angleDeg;
     }
   }
-  lastWorldPos = { x: position.x, z: position.z };
+  lastWorldPos = here;
   const fueraDelMapa = !conn.demo && !conn.spectator && mapBounds && offMapWarnedFor !== currentGame
     && offMapCheckReady(lastData && lastData.game) && !insideMapBounds(mapBounds, position.x, position.z);
   if (fueraDelMapa && jobMap) {
@@ -8835,7 +8847,7 @@ function handleTelemetry(data) {
   if (tmpNext !== tmpPlayers) { tmpPlayers = tmpNext; renderTmpPlayers(); }
   if (dashPanel) dashPanel.update(data);
   if (mapDashPanel) mapDashPanel.update(data);
-  updateMap(data.position || {}, data.game, data.heading);
+  updateMap(data.position || {}, data.game, data.heading, data);
   updateGameGpsSave(data);
   updateDestinationMarker(data);
   updateGameGpsGuess(data);
