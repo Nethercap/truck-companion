@@ -7219,6 +7219,11 @@ test('gameGpsSavePick: gana el que coincide con los km del GPS, y la partida vie
   assert.equal(gameGpsSaveStale(100, 20, 0), true); // o mas cerca
   assert.equal(gameGpsSaveStale(100, 40, 30000), false); // un ferry
   assert.equal(gameGpsSaveStale(0, 40, 0), false);
+  // Datos de a rafagas (pestana en segundo plano): lo que anduvo el camion, a 1:20, no es otro GPS
+  assert.equal(gameGpsSaveStale(100, 90, 504), false); // 15 s a 121 km/h: 504 m de mundo, 10 km del GPS
+  assert.equal(gameGpsSaveStale(20, 19.33, 33.6), false); // un dato por segundo, cerca del final
+  assert.equal(gameGpsSaveStale(20, 30, 33.6), true); // andando, el GPS a otro lado
+  assert.equal(gameGpsSaveStale(100, 140, 34), true);
 });
 
 test('createGameGpsViaCheck: un waypoint del juego que el GPS ya no cuenta se prueba sacar una vez (reporte #57)', () => {
