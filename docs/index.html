@@ -775,7 +775,7 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
   </section>
   <section id="compare">
     <h2 data-i18n="compareTitle">What paid GPS apps charge for, <span class="accent">free here</span></h2>
-    <p class="sectionIntro" data-i18n="compareIntro">Most truck-sim GPS apps give you a limited free tier and put routing limits, waypoints and ad removal behind a subscription. Truck Dash has no tiers.</p>
+    <p class="sectionIntro" data-i18n="compareIntro">Most truck-sim GPS apps give you a limited free tier and put routing limits, extra stops, voices and ad removal behind a subscription. Truck Dash has no tiers.</p>
     <div class="compareWrap scrollHintWrap">
       <table class="compare">
         <thead>
@@ -790,11 +790,15 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
           <tr><td data-i18n="cmpMap">Live map &amp; turn-by-turn</td><td class="td yes">✓</td><td class="meh" data-i18n="cmpLimited">Daily limit</td><td class="yes">✓</td></tr>
           <tr><td data-i18n="cmpRouting">Unlimited routing</td><td class="td yes">✓</td><td class="no">✗</td><td class="yes">✓</td></tr>
           <tr><td data-i18n="cmpWaypoints">Multi-stop waypoints</td><td class="td yes">✓</td><td class="no">✗</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmpVoices">All navigation voices</td><td class="td yes">✓</td><td class="meh" data-i18n="cmpOneVoice">One voice</td><td class="yes">✓</td></tr>
           <tr><td data-i18n="cmpAds">No ads</td><td class="td yes">✓</td><td class="no">✗</td><td class="yes">✓</td></tr>
-          <tr><td data-i18n="cmpWifi">Phone on mobile data (not only same Wi-Fi)</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpOverlay">In-game overlay and OBS overlay</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpLogbook">Trip logbook and stats</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
           <tr><td data-i18n="cmpButtons">Truck button box from your phone</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
           <tr><td data-i18n="cmpLive">See other drivers live</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
-          <tr><td data-i18n="cmpOpenSource">Open source</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpMods">Unlisted map mods, <a href="/guide/#mapbuild">mapped on your PC</a></td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpLinux">Linux (through Proton)</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
+          <tr><td data-i18n="cmpOpenSource">Fully open source, app included</td><td class="td yes">✓</td><td class="no">✗</td><td class="no">✗</td></tr>
           <tr><td data-i18n="cmpPrice">Price</td><td class="td price" data-i18n="cmpPriceTd">Free, forever</td><td data-i18n="cmpPriceFree">Free (limited)</td><td class="price" data-i18n="cmpPricePro">≈ $5/month or $50/year</td></tr>
         </tbody>
       </table>
@@ -1072,7 +1076,7 @@ const TRANSLATIONS = {
     slideButtons: 'Button box: tap on your phone, the client presses the real key in the game.',
     slideOverview: 'Zoomed out: the whole route, driven trail in blue, road network in orange.',
     compareTitle: 'What paid GPS apps charge for, <span class="accent">free here</span>',
-    compareIntro: 'Most truck-sim GPS apps give you a limited free tier and put routing limits, waypoints and ad removal behind a subscription. Truck Dash has no tiers.',
+    compareIntro: 'Most truck-sim GPS apps give you a limited free tier and put routing limits, extra stops, voices and ad removal behind a subscription. Truck Dash has no tiers.',
     compareColFree: 'Paid apps – free tier',
     compareColPro: 'Paid apps – Pro',
     cmpMap: 'Live map &amp; turn-by-turn',
@@ -1080,10 +1084,15 @@ const TRANSLATIONS = {
     cmpRouting: 'Unlimited routing',
     cmpWaypoints: 'Multi-stop waypoints',
     cmpAds: 'No ads',
-    cmpWifi: 'Phone on mobile data (not only same Wi-Fi)',
+    cmpVoices: 'All navigation voices',
+    cmpOneVoice: 'One voice',
+    cmpOverlay: 'In-game overlay and OBS overlay',
+    cmpLogbook: 'Trip logbook and stats',
+    cmpMods: 'Unlisted map mods, <a href="/guide/#mapbuild">mapped on your PC</a>',
+    cmpLinux: 'Linux (through Proton)',
     cmpButtons: 'Truck button box from your phone',
     cmpLive: 'See other drivers live',
-    cmpOpenSource: 'Open source',
+    cmpOpenSource: 'Fully open source, app included',
     cmpPrice: 'Price',
     cmpPriceTd: 'Free, forever',
     cmpPriceFree: 'Free (limited)',
@@ -1293,7 +1302,7 @@ const TRANSLATIONS = {
     slideButtons: 'Botonera: tocás en el celular, el cliente aprieta la tecla real en el juego.',
     slideOverview: 'Alejado: toda la ruta, el recorrido hecho en azul, la red de rutas en naranja.',
     compareTitle: 'Lo que las apps de GPS pagas cobran, <span class="accent">acá es gratis</span>',
-    compareIntro: 'La mayoría de las apps de GPS para simuladores de camiones dan un plan gratis limitado y ponen los límites de ruteo, los waypoints y sacar la publicidad detrás de una suscripción. Truck Dash no tiene planes.',
+    compareIntro: 'La mayoría de las apps de GPS para simuladores de camiones dan un plan gratis limitado y ponen los límites de ruteo, los waypoints, las voces y sacar la publicidad detrás de una suscripción. Truck Dash no tiene planes.',
     compareColFree: 'Apps pagas – plan gratis',
     compareColPro: 'Apps pagas – Pro',
     cmpMap: 'Mapa en vivo e indicaciones de giro',
@@ -1301,10 +1310,15 @@ const TRANSLATIONS = {
     cmpRouting: 'Ruteo ilimitado',
     cmpWaypoints: 'Waypoints múltiples',
     cmpAds: 'Sin publicidad',
-    cmpWifi: 'Celular con datos móviles (no solo misma WiFi)',
+    cmpVoices: 'Todas las voces de navegación',
+    cmpOneVoice: 'Una voz',
+    cmpOverlay: 'Overlay en el juego y para OBS',
+    cmpLogbook: 'Registro de viajes y estadísticas',
+    cmpMods: 'Mods de mapa fuera de la lista, <a href="/guide/#mapbuild">armados en tu PC</a>',
+    cmpLinux: 'Linux (con Proton)',
     cmpButtons: 'Botonera del camión desde el celular',
     cmpLive: 'Ver otros camioneros en vivo',
-    cmpOpenSource: 'Código abierto',
+    cmpOpenSource: 'Código abierto completo, app incluida',
     cmpPrice: 'Precio',
     cmpPriceTd: 'Gratis, para siempre',
     cmpPriceFree: 'Gratis (limitado)',
