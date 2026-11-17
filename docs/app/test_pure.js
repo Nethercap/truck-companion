@@ -5159,6 +5159,60 @@ test('positionAtOrigin: el camion en 0,0 exacto es un dato sin posicion (Cheyenn
   assert.equal(positionAtOrigin(undefined), false);
 });
 
+test('truckJumped: un hueco de datos que explica la velocidad no es un salto (reporte #57, 16-11)', () => {
+  const { truckJumped, TRUCK_JUMP_MIN_M, TRUCK_JUMP_MAX_GAP_S } = require('./pure.js');
+  // El camion por una autopista de ATS hacia el este; dato(m, s, km/h): m metros y s segundos despues
+  const t0 = 1763300000;
+  const antes = { x: -30000, z: 12000, ts: t0, speedKmh: 121, paused: false, event: {} };
+  const dato = (m, s, kmh, extra = {}) => ({ x: antes.x + m, z: antes.z, ts: t0 + s, speedKmh: kmh, paused: false, event: {}, ...extra });
+  // Pestana en segundo plano a 121 km/h: 15 s son 504 m (antes, "truck jumped"), 25 s 840 m, 60 s 2 km
+  assert.equal(truckJumped(antes, dato(504, 15, 121)), false);
+  assert.equal(truckJumped(antes, dato(840, 25, 120)), false);
+  assert.equal(truckJumped(antes, dato(2017, 60, 121)), false);
+  // #57: 5,1 km de mundo en 3 minutos a unos 120 km/h
+  assert.equal(truckJumped(antes, dato(5100, 180, 119)), false);
+  // Acelerando desde parado en el hueco: vale la velocidad de despues
+  assert.equal(truckJumped({ ...antes, speedKmh: 0 }, dato(650, 40, 100)), false);
+  // Marcha atras: la velocidad negativa tambien anda
+  assert.equal(truckJumped({ ...antes, speedKmh: -20 }, dato(520, 60, -20)), false);
+  // El borde: a 72 km/h (20 m/s) en 20 s explica hasta 20 * 20 * 1,5 + 200 = 800 m
+  assert.equal(truckJumped({ ...antes, speedKmh: 72 }, dato(799, 20, 72)), false);
+  assert.equal(truckJumped({ ...antes, speedKmh: 72 }, dato(801, 20, 72)), true);
+  // Hasta TRUCK_JUMP_MIN_M nunca es salto, ni parado
+  assert.equal(truckJumped({ ...antes, speedKmh: 0 }, dato(TRUCK_JUMP_MIN_M, 0.25, 0)), false);
+  assert.equal(truckJumped({ ...antes, speedKmh: 0 }, dato(TRUCK_JUMP_MIN_M + 1, 0.25, 0)), true);
+
+  // Siguen siendo salto. Trabajo rapido con los datos al dia: el menu en pausa (con
+  // la velocidad de antes de la pausa) y despues la empresa, parado, a 40 km
+  const enElMenu = { ...antes, speedKmh: 90, paused: true };
+  assert.equal(truckJumped(enElMenu, dato(40000, 0.25, 0)), true);
+  // Aunque el menu haya durado un minuto y la empresa quede a 2 km: pausado no anda
+  // (con los 90 km/h de antes de la pausa explicaria 2.450 m)
+  assert.equal(truckJumped(enElMenu, dato(2000, 60, 0)), true);
+  // Parado antes y despues (servicio, garaje), 30 s de carga
+  assert.equal(truckJumped({ ...antes, speedKmh: 0 }, dato(12000, 30, 0)), true);
+  // En segundo plano: manejando a 90 y un minuto despues la empresa, a 25 km
+  assert.equal(truckJumped({ ...antes, speedKmh: 90 }, dato(25000, 60, 0)), true);
+  // Ferry o tren: el pulso del evento, en el dato del salto o en el anterior, aunque la velocidad alcance
+  assert.equal(truckJumped({ ...antes, speedKmh: 60 }, dato(800, 30, 60, { event: { ferry: true } })), true);
+  assert.equal(truckJumped({ ...antes, speedKmh: 60, event: { train: true } }, dato(800, 30, 60)), true);
+  assert.equal(truckJumped({ ...antes, speedKmh: 60 }, dato(800, 30, 60, { event: { ferry: false, train: false } })), false);
+  // Un dato en 0,0 (handleTelemetry ya lo saca, ver positionAtOrigin), sin ts, o con el reloj para atras
+  // (a 600 m del origen, que 15 s a 121 km/h explicarian)
+  const cercaDel00 = { ...antes, x: 600, z: 0 };
+  assert.equal(truckJumped(cercaDel00, { ...dato(0, 15, 121), x: 0, z: 0 }), true);
+  assert.equal(truckJumped({ ...cercaDel00, x: 0, z: 0 }, { ...dato(0, 15, 121), x: 600, z: 0 }), true);
+  assert.equal(truckJumped(cercaDel00, { ...dato(0, 15, 121), x: 0, z: 1 }), false);
+  assert.equal(truckJumped(antes, dato(504, 15, 121, { ts: undefined })), true);
+  assert.equal(truckJumped({ ...antes, ts: null }, dato(504, 15, 121)), true);
+  assert.equal(truckJumped(antes, dato(504, -1, 121)), true);
+  // Un hueco de mas de TRUCK_JUMP_MAX_GAP_S (el juego cerrado y vuelto a abrir): como antes
+  assert.equal(truckJumped(antes, dato(2000, TRUCK_JUMP_MAX_GAP_S + 1, 121)), true);
+  assert.equal(truckJumped(antes, dato(2000, TRUCK_JUMP_MAX_GAP_S, 121)), false);
+  // Sin dato anterior no hay salto
+  assert.equal(truckJumped(null, dato(9999, 1, 0)), false);
+});
+
 test('parseWsJson: NaN e Infinity del json.dumps del cliente son null, no un dato perdido (Discord 07-11)', () => {
   const { parseWsJson } = require('./pure.js');
   // Lo que manda el cliente con un float del juego que no es un numero
