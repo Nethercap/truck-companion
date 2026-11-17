@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.45 (2026-11-17)
 
 - ProMods is detected only from its own packages (files starting with "promods" or "cnx-pm",
   names starting with "ProMods"). A mod that only mentions it, such as "Real life currency
