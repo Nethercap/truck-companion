@@ -7167,6 +7167,59 @@ test('gameGpsSavePick: gana el que coincide con los km del GPS, y la partida vie
   assert.equal(gameGpsSaveStale(0, 40, 0), false);
 });
 
+test('createGameGpsViaCheck: un waypoint del juego que el GPS ya no cuenta se prueba sacar una vez (reporte #57)', () => {
+  const { createGameGpsViaCheck, gameGpsViaTails, gameGpsSavePick, GAME_GPS_VIA_RECHECK_MS } = require('./pure.js');
+  const chk = createGameGpsViaCheck();
+  chk.reset('k1');
+  // con el waypoint coincide (2.754 contra 2.807 del juego, dentro del 5 %): nada
+  for (let t = 0; t < 20000; t += 1000) assert.equal(chk.push('k1', 2754.1, 2807, t), false);
+  // paso de largo por la estacion: 2.875 contra 2.708. Espera a que el GPS del
+  // juego tenga su ruta nueva (si el waypoint sigue ahi, sus km suben)
+  const veces = [];
+  for (let t = 30000; t < 45000; t += 1000) veces.push(chk.push('k1', 2875.1, 2708.4, t));
+  const primera = veces.indexOf(true);
+  assert.ok(primera >= 2, 'no en el primer dato');
+  assert.ok(primera * 1000 >= GAME_GPS_VIA_RECHECK_MS, 'despues de unos segundos');
+  assert.equal(veces.filter(Boolean).length, 1, 'una sola vez por ruta');
+  // si el juego vuelve a coincidir antes, se empieza a contar de nuevo
+  chk.reset('k2');
+  assert.equal(chk.push('k2', 2875.1, 2708.4, 0), false);
+  assert.equal(chk.push('k2', 2875.1, 2708.4, 1000), false);
+  assert.equal(chk.push('k2', 2875.1, 2870, 2000), false); // el GPS del juego tambien volvio a buscarlo
+  for (let t = 3000; t < 7000; t += 1000) assert.equal(chk.push('k2', 2875.1, 2708.4, t), false);
+  assert.equal(chk.push('k2', 2875.1, 2708.4, 9000), true);
+  // otra ruta (otra clave), sin GPS del juego, sin clave: nada
+  chk.reset('k3');
+  for (let t = 0; t < 20000; t += 1000) {
+    assert.equal(chk.push('otra', 2875.1, 2708.4, t), false);
+    assert.equal(chk.push('k3', 2875.1, 0, t), false);
+  }
+  chk.reset(null);
+  for (let t = 0; t < 20000; t += 1000) assert.equal(chk.push(null, 2875.1, 2708.4, t), false);
+  // la ruta se mide solo cuando toca (cada segundo), no en cada dato
+  chk.reset('k4');
+  let medidas = 0;
+  for (let t = 0; t < 3000; t += 250) chk.push('k4', () => { medidas += 1; return 2754; }, 2807, t);
+  assert.equal(medidas, 3);
+  // las colas sin los primeros, y la que coincide: sin la estacion, 2.498 contra 2.575
+  assert.deepEqual(gameGpsViaTails([[33704, 46531]]), [{ via: [], skipped: 1 }]);
+  assert.deepEqual(gameGpsViaTails([[1, 2], [3, 4]]).map(c => c.via), [[[3, 4]], []]);
+  assert.deepEqual(gameGpsViaTails(null), []);
+  assert.deepEqual(gameGpsSavePick([{ via: [], skipped: 1, km: 2497.8 }], 2574.5).via, []);
+  // si sin ellos tampoco coincide, quedan como estaban (gameGpsViaRecheck no toca nada)
+  assert.equal(gameGpsSavePick([{ via: [], skipped: 1, km: 2000 }], 2574.5), null);
+});
+
+test('routeChangeReason: sacar un waypoint del juego que ya no cuenta se dice aparte (reporte #57)', () => {
+  const { routeChangeReason, ROUTE_CHANGE_REASONS } = require('./pure.js');
+  const base = { prevKey: 'dest:a@b|33704,46531;1,2', prevTarget: 'dest:a@b', key: 'dest:a@b|1,2', target: 'dest:a@b', forced: null, offRoute: false, far: false, recheck: false };
+  assert.equal(routeChangeReason(base), 'waypoints');
+  assert.equal(routeChangeReason({ ...base, forced: 'game_gps_via' }), 'game_gps_via');
+  assert.ok(ROUTE_CHANGE_REASONS.game_gps_via);
+  // un cambio de destino le sigue ganando
+  assert.equal(routeChangeReason({ ...base, target: 'dest:c@d', forced: 'game_gps_via' }), 'destination');
+});
+
 test('busRouteTarget: la ruta va a la proxima parada, con una clave por parada', () => {
   const { busRouteTarget, followGameRoute } = require('./pure.js');
   const a = busRouteTarget({ onJob: true, bus: BUS_DE_TURISMO }, MIRADORES, ciudadesBus);

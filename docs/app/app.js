@@ -4805,6 +4805,9 @@ function updateDestinationMarker(data) {
     && (lejos ? offRouteRetry.due(data.position.x, data.position.z, Date.now()) : tookOtherBranch(data));
   const recheck = !destChanged && !lejos && !offRoute && data.position?.x != null && !!routeGraph
     && routeGameRecheck(routeKey, target, data);
+  // Los waypoints del GPS del juego que el juego dejo de contar: se sacan y la
+  // ruta se recalcula en otro dato (reporte #57).
+  if (!destChanged && !offRoute && !recheck) gameGpsViaRecheck(routeKey, target, data);
 
   if ((destChanged || offRoute || recheck) && data.position?.x != null && routeGraph) {
     const calculoDesde = Date.now();
@@ -4824,6 +4827,8 @@ function updateDestinationMarker(data) {
     offBranchTicks = 0;
     // Una comparacion mas con el GPS del juego, salvo despues de esta.
     routeGameCheck = { key: routeKey, left: recheck ? 0 : 1, ticks: 0 };
+    // Y con waypoints del GPS del juego, si siguen coincidiendo con sus km (reporte #57).
+    gameGpsViaCheck.reset(via.length ? routeKey : null);
     navManeuverState.shown = null; navManeuverState.shownKey = null; navManeuverState.candidate = undefined; navManeuverState.candidateTicks = 0;
     navQuietLanesState.shown = null; navQuietLanesState.shownKey = null; navQuietLanesState.candidate = undefined; navQuietLanesState.candidateTicks = 0;
     navQuietLanes = null;
@@ -6018,19 +6023,8 @@ function searchGameGpsSave(gg, from, rumbo, km, job) {
     const inicio = performance.now();
     while (i < candidatas.length) {
       const c = candidatas[i++];
-      // Cada tramo como lo calcula la ruta: por los waypoints se pasa.
-      const puntos = c.via.concat([[c.x, c.z]]);
-      let desde = from, total = [], llegada = null, ok = true;
-      for (let k = 0; k < puntos.length; k++) {
-        const fin = k === puntos.length - 1;
-        const leg = findRoute(desde, puntos[k], k === 0 ? rumbo : null, null, null,
-          { desde: llegada, pasar: !fin, entrar: fin && c.patio, empresa: fin && c.patio, puerta: fin && c.patio ? c.entry || null : null });
-        if (!leg || !leg.length) { ok = false; break; }
-        llegada = leg.llegada || null;
-        total = total.length ? total.concat(leg.slice(1)) : leg;
-        desde = puntos[k];
-      }
-      if (ok) halladas.push({ ...c, km: gameKmOf(total, total) });
+      const km = gameGpsCandidateKm(c, from, rumbo);
+      if (km != null) halladas.push({ ...c, km });
       if (performance.now() - inicio >= 8) break;
     }
     if (i < candidatas.length) { setTimeout(seguir, 0); return; }
@@ -6038,12 +6032,70 @@ function searchGameGpsSave(gg, from, rumbo, km, job) {
   };
   setTimeout(seguir, 0);
 }
+// Los km del juego de un candidato ({ via, x, z, patio, entry }) desde el camion, o
+// null sin camino. Cada tramo como lo calcula la ruta: por los waypoints se pasa.
+function gameGpsCandidateKm(c, from, rumbo) {
+  const puntos = c.via.concat([[c.x, c.z]]);
+  let desde = from, total = [], llegada = null;
+  for (let k = 0; k < puntos.length; k++) {
+    const fin = k === puntos.length - 1;
+    const leg = findRoute(desde, puntos[k], k === 0 ? rumbo : null, null, null,
+      { desde: llegada, pasar: !fin, entrar: fin && c.patio, empresa: fin && c.patio, puerta: fin && c.patio ? c.entry || null : null });
+    if (!leg || !leg.length) return null;
+    llegada = leg.llegada || null;
+    total = total.length ? total.concat(leg.slice(1)) : leg;
+    desde = puntos[k];
+  }
+  return gameKmOf(total, total);
+}
+
+// De quien son los waypoints del juego de la ruta de ahora: 'target' (sin
+// trabajo, el destino de la partida) o 'jobVia' (con trabajo), o null.
+function gameGpsViaOwner() {
+  return gameGpsSave.target && gameGpsSave.target.via && gameGpsSave.target.via.length ? 'target'
+    : gameGpsSave.jobVia && gameGpsSave.jobVia.via.length ? 'jobVia' : null;
+}
+
+// Los waypoints del juego que el GPS del juego dejo de contar (createGameGpsViaCheck
+// en pure.js, reporte #57): si la ruta con ellos ya no coincide con sus km, se
+// prueba sin los primeros y queda la que coincide. De a poco, como la busqueda
+// de la partida: son rutas enteras. Si mientras tanto cambian, no se toca nada.
+const gameGpsViaCheck = createGameGpsViaCheck();
+let gameGpsViaRun = 0;
+function gameGpsViaRecheck(routeKey, target, data) {
+  const con = gameGpsViaOwner();
+  if (!con || waypoints.length || !target || !Array.isArray(target.via) || !target.via.length) return;
+  if (!currentRouteWorldPoints || !routeGraph || data.position?.x == null) return;
+  if (!gameGpsViaCheck.push(routeKey, () => gameKmOf(currentRouteWorldPoints), data.routeDistanceKm, Date.now())) return;
+  const viaAntes = JSON.stringify(gameGpsSave[con].via);
+  const patio = con === 'jobVia' ? !target.approx : target.kind === 'pickup';
+  const candidatas = gameGpsViaTails(gameGpsSave[con].via).map(c => ({ ...c, x: target.x, z: target.z, patio, entry: target.entry || null }));
+  const from = [data.position.x, data.position.z], rumbo = routeStartHeading(data), km = data.routeDistanceKm;
+  const run = ++gameGpsViaRun;
+  const halladas = [];
+  let i = 0;
+  const seguir = () => {
+    if (run !== gameGpsViaRun || !gameGpsSave[con] || JSON.stringify(gameGpsSave[con].via) !== viaAntes) return;
+    const inicio = performance.now();
+    while (i < candidatas.length) {
+      const c = candidatas[i++];
+      const k = gameGpsCandidateKm(c, from, rumbo);
+      if (k != null) halladas.push({ ...c, km: k });
+      if (performance.now() - inicio >= 8) break;
+    }
+    if (i < candidatas.length) { setTimeout(seguir, 0); return; }
+    const elegida = gameGpsSavePick(halladas, km);
+    if (!elegida) return;
+    gameGpsSave[con] = { ...gameGpsSave[con], via: elegida.via };
+    routeForcedReason = 'game_gps_via';
+  };
+  setTimeout(seguir, 0);
+}
 
 // Los waypoints del GPS del juego se van sacando al pasarlos, como los de la app
 // (waypointReached); recien sin los de la app el primero del juego es el primer tramo.
 function checkGameGpsViaReached(x, z) {
-  const con = gameGpsSave.target && gameGpsSave.target.via && gameGpsSave.target.via.length ? 'target'
-    : gameGpsSave.jobVia && gameGpsSave.jobVia.via.length ? 'jobVia' : null;
+  const con = gameGpsViaOwner();
   if (!con || waypoints.length) return;
   const via = gameGpsSave[con].via;
   const route = currentRouteTarget ? currentRouteWorldPoints : null;
