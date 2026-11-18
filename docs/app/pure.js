@@ -2183,8 +2183,25 @@ function junctionManeuver(ctx, gapM, spanM, skip, curveSpanM = 60) {
 // mas (T e Y anchas donde hay que elegir, otra cruz con el brazo de enfrente
 // muerto en Sandpoint, la esquina de una con dos en Missoula); ninguno de
 // antes se pierde ni se mueve.
+// La otra mitad puede estar hasta mismaCruzM (160 m) por la curva: el vecino
+// comun ya dice que es el mismo prefab. Con 80 m quedaba afuera la cruz con
+// semaforos al este de Billings (ATS, -47829,-43712, reporte #59, 18-11), un
+// us_cross_angled de 2-1-2 carriles: 104 m de curva del brazo oeste al norte,
+// mitades de 3 y 23 grados que juntas doblan 48 a la izquierda, con los brazos
+// este y sur ocultos. La app decia "Continue straight" y el GPS del juego
+// "turn left". En 1.200 rutas (300 de ATS, ETS2, Coast to Coast y ProMods,
+// semilla 7) suma 14 avisos, ninguno se pierde ni se mueve, y con 250 m da lo
+// mismo; dibujados: la misma cruz en Peoria (los dos sentidos) y en Fort
+// Collins, T e Y anchas donde hay que elegir (Modesto, Munchen, Bitola,
+// Katowice a 147 m, Ostroleka), cruces en X (Carson City, Huntsville) y dos
+// rotondas compactas sin reconocer (Poznan, "turn right" en la 1.a salida;
+// Liege, "turn left" en la 3.a con las otras dos sin calle). Dudoso uno: la
+// T de calles iguales de Calarasi -> Pleven (ProMods, 58191,37428), donde la
+// ruta sigue por la barra y la calle se curva 41 grados entre antes y despues,
+// con el palo de la T doblando mas para el mismo lado; es lo que la regla ya
+// dice en una T chica (como Madaba).
 // r: { iEnd, m } de junctionManeuver.
-function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 80, contraMaxDeg = 20) {
+function mismaCruz(ctx, r, gapM, spanM, skip, mismaCruzM = 160, contraMaxDeg = 20) {
   const { pts, cum, adjacency } = ctx;
   if (!adjacency || (r.m && (r.m.kind !== 'turn' || !r.m.quiet))) return r;
   let j = r.iEnd + 1;
