@@ -2941,6 +2941,43 @@ test('junctionManeuver: una cruz ancha que dobla en dos mitades bajo el umbral s
   assert.equal(r.m, null);
 });
 
+test('junctionManeuver: una cruz de 2-1-2 carriles, de 104 m por la curva, con los brazos de enfrente ocultos se avisa (reporte #59, Billings)', () => {
+  // La cruz con semaforos al este de Billings (ATS, -47829,-43712; el norte es
+  // +y), prefab us_cross_angled_2-1-2_country_x_2-1-2_country_mirrored_tmpl:
+  // la ruta llega al noreste por la US-87, entra por el brazo oeste (3) y sale
+  // al norte (4) por una curva de 104 m. Los brazos este (8) y sur (9) llevan a
+  // calles ocultas: solo se unen a los otros brazos. Cada mitad dobla menos de
+  // 35 grados (3 y 23) y, a mas de 80 m una de otra, no se median juntas: la
+  // app decia "Continue straight" y el GPS del juego "turn left" (18-11).
+  const pts = [[-84, -239, 0, 0, 0], [-81, -209, 0, 0, 1], [-69, -89, 0, 0, 2], [-66, -75, 0, 0, null], [-61, -61, 0, 0, null],
+    [-54, -48, 0, 0, null], [-45, -36, 0, 0, null], [-35, -25, 0, 0, null], [-24, -15, 0, 0, null], [-12, -7, 0, 0, null], [0, 0, 0, 1, 3],
+    [36, 26, 0, 0, null], [51, 49, 0, 0, null], [61.4, 78.7, 0, 1, 4], [63, 123, 0, 0, 5], [72, 218, 0, 0, 6], [80, 500, 0, 0, 7]];
+  // El brazo este queda a 119,8 m de la entrada: no llega a escapeM (120) y no
+  // es otra salida, como en el grafo.
+  const nodes = [[-84, -239], [-81, -209], [-69, -89], [0, 0], [61.4, 78.7], [63, 123], [72, 218], [80, 500], [108.7, 50.4], [47.3, -28.3]];
+  const cruz = (aristas) => {
+    const adjacency = new Map();
+    const add = (a, b) => { if (!adjacency.has(a)) adjacency.set(a, []); adjacency.get(a).push([b]); };
+    for (const [a, b] of aristas) { add(a, b); add(b, a); }
+    const { cum, pointAt } = routeMetrics(pts);
+    return { pts, cum, pointAt, bearingBetween: planarBearing, nodes, adjacency, stubs: { 8: 1, 9: 1 } };
+  };
+  const calle = [[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [6, 7]];
+  const ctx = cruz([...calle, [3, 4], [3, 8], [3, 9], [4, 8], [4, 9], [8, 9]]);
+  assert.equal(junctionClusterEnd(pts, ctx.cum, 10, 50, 100, undefined, 60), 10);
+  assert.ok(ctx.cum[13] - ctx.cum[10] > 100);
+  assert.equal(detectManeuver({ ...ctx, i: 10, iEnd: 10 }), null);
+  assert.equal(detectManeuver({ ...ctx, i: 13, iEnd: 13 }), null);
+  const { iEnd, m } = junctionManeuver({ ...ctx, i: 10, iEnd: 10 }, 50, 100, undefined, 60);
+  assert.equal(iEnd, 13);
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.at], ['turn', 'left', false, 10]);
+  // Sin un vecino comun son dos prefabs unidos por una calle: nada
+  const dos = cruz([...calle, [3, 4], [3, 8], [3, 9], [8, 9]]);
+  const r = junctionManeuver({ ...dos, i: 10, iEnd: 10 }, 50, 100, undefined, 60);
+  assert.equal(r.iEnd, 10);
+  assert.equal(r.m, null);
+});
+
 test('junctionManeuver: la segunda vuelta de una S, con la cruz pegada a la T de antes, se avisa (Wenatchee -> Everett, 21-10)', () => {
   // Wenatchee -> Everett (ATS, -98451,-65259; el norte es +y): la ruta dobla a
   // la derecha en una T (1 -> 2) y 38 m despues entra a una cruz por el sur

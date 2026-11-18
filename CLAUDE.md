@@ -590,7 +590,7 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   esos 60 m (la cruz de Modesto con dos brazos muertos, 21-10); un tramo sin
   puntos de curva de 50 m o mas sigue cortando: son dos prefabs.
   Si el grupo arranca en otro prefab pegado y asi pasa los 60 m, la mitad
-  que sigue (a menos de 80 m) se mide con la primera cuando se calla, dobla
+  que sigue (a menos de 160 m) se mide con la primera cuando se calla, dobla
   para el mismo lado (o la primera no dobla), sus nodos comparten un vecino
   (los otros brazos se unen a los dos: es el mismo prefab) y la curva entre
   las dos dobla para un solo lado (no la 2.a salida de una rotonda chica sin
@@ -609,6 +609,20 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   to Coast y ProMods: 11 lugares mas, ninguno perdido ni movido (T e Y
   anchas; en Madaba, ProMods, "turn right" con otra salida a +70 del mismo
   lado, como pasa con un grupo solo).
+  Hasta el 18-11 la otra mitad tenia que estar a menos de 80 m: la cruz con
+  semaforos al este de Billings (ATS, -47829,-43712, reporte #59), un
+  `us_cross_angled` de 2-1-2 carriles, tiene 104 m de curva del brazo oeste
+  al norte, dobla 48 grados en mitades de 3 y 23 y tiene ocultos los brazos
+  este y sur: "Continue straight" donde el GPS del juego dice "turn left".
+  Con 160 m (`mismaCruzM`), en 1.200 rutas (300 de ATS, ETS2, Coast to Coast
+  y ProMods, semilla 7) suman 14 avisos, ninguno perdido ni movido, y con
+  250 m da lo mismo. Dibujados: la misma cruz en Peoria y Fort Collins (este
+  tambien en check_avisos), T e Y anchas (Modesto, Munchen, Bitola, Katowice
+  a 147 m, Ostroleka), cruces en X (Carson City, Huntsville) y dos rotondas
+  compactas sin reconocer (Poznan, Liege). Dudoso uno: la T de calles
+  iguales de Calarasi -> Pleven (ProMods, 58191,37428), la ruta por la barra
+  y la calle curvandose 41 grados entre antes y despues, con el palo de la T
+  doblando mas para el mismo lado ("turn left", como Madaba).
   Las segundas vueltas de una S que siguen calladas (Salt Lake -> Twin Falls,
   Timisoara) no tienen otra calle en el grafo: el brazo este de la T de Salt
   Lake (n84167) solo se une a la ruta y la calle oeste de la de Timisoara no
