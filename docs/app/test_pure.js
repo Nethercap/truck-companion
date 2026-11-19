@@ -4993,6 +4993,40 @@ test('vista de cabina: el link lleva lo que hace falta para conectarse sola', ()
   assert.equal(new URL(cabViewUrl('https://trucksim-dash.com/app/#x', '')).hash, '');
 });
 
+test('codigo recordado: /app sin ?code= se conecta con el ultimo que el relay acepto', () => {
+  const { normalPairingCode, pairingCodeToSave, savedPairingCode, PAIRING_CODE_KEY } = require('./pure.js');
+  const RELAY = 'wss://truck-companion-production.up.railway.app';
+  assert.equal(PAIRING_CODE_KEY, 'truckdash_pairing_code');
+  // Como lo genera el relay: 8 de A-Z y 0-9 (los viejos con I, O, 0 y 1 siguen valiendo)
+  assert.equal(normalPairingCode(' abcd2345 '), 'ABCD2345');
+  assert.equal(normalPairingCode('IO01ABCD'), 'IO01ABCD');
+  for (const raw of ['DEMO', '', 'ABCD234', 'ABCD23456', 'ABCD-234', null, 12345678]) assert.equal(normalPairingCode(raw), null, String(raw));
+
+  // Se guarda con el relay; lo mismo otra vez no se escribe
+  const saved = pairingCodeToSave('abcd2345', RELAY);
+  assert.deepEqual(JSON.parse(saved), { code: 'ABCD2345', backend: RELAY });
+  assert.equal(pairingCodeToSave('ABCD2345', RELAY, saved), null);
+  assert.notEqual(pairingCodeToSave('WXYZ6789', RELAY, saved), null);   // otro codigo pisa al anterior
+  // La demo y un codigo sin relay no se guardan
+  assert.equal(pairingCodeToSave('DEMO', RELAY), null);
+  assert.equal(pairingCodeToSave('ABCD2345', ''), null);
+
+  // Abrir /app pelado (o la app instalada, que abre ./index.html): el guardado
+  assert.equal(savedPairingCode('', saved, RELAY), 'ABCD2345');
+  assert.equal(savedPairingCode('?cab=1&lang=es', saved, RELAY), 'ABCD2345');
+  // Un codigo en la URL manda, y demo, LAN, mapa en vivo y convoy entran sin codigo
+  for (const search of ['?code=WXYZ6789', '?demo=1', '?local=1', '?live=ats', '?convoy=ABCDEF']) {
+    assert.equal(savedPairingCode(search, saved, RELAY), null, search);
+  }
+  // El de otro relay no se prueba contra este (?backend= de prueba)
+  assert.equal(savedPairingCode('', saved, 'ws://localhost:8000'), null);
+  assert.equal(savedPairingCode('?backend=ws%3A%2F%2Flocalhost%3A8000', pairingCodeToSave('ABCD2345', 'ws://localhost:8000'), 'ws://localhost:8000'), 'ABCD2345');
+  // Nada guardado, localStorage que no anda (lsGet da null) o basura: sin codigo
+  for (const bad of [null, '', 'ABCD2345', '{', '[]', '"x"', JSON.stringify({ code: 'DEMO', backend: RELAY }), JSON.stringify({ code: 'ABCD2345' })]) {
+    assert.equal(savedPairingCode('', bad, RELAY), null, String(bad));
+  }
+});
+
 test('vista de cabina: la flecha grande sale de la maniobra', () => {
   const { turnIconShape, turnIconHtml, LANE_PATHS } = require('./pure.js');
   assert.deepEqual(turnIconShape('straight'), { shape: 'straight' });

@@ -8184,9 +8184,11 @@ document.getElementById('recenterBtn').addEventListener('click', () => {
 
 let reconnectTimer = null;
 const RECONNECT_DELAY_MS = 3000;
-// El codigo llego en la URL (el cliente abre el navegador asi, y en el celular
-// ese link se guarda como marcador) y no lo tipeo alguien a mano.
-let codeFromLink = false;
+// El codigo que llego en la URL (el cliente abre el navegador asi, y en el celular
+// ese link se guarda como marcador) o que estaba guardado en este dispositivo
+// (savedPairingCode), no tipeado a mano. Solo ese espera al cliente: uno escrito
+// despues, aunque sea en la misma pestana, avisa enseguida si esta mal.
+let rememberedCode = null;
 // Reintentos de un codigo guardado que el backend nunca conocio: despues de un
 // minuto se asume que el codigo ya no existe (lo rotaron) en vez de esperar
 // para siempre a un cliente que no va a venir.
@@ -8295,6 +8297,10 @@ function renderConnectionUi() {
 
 document.getElementById('changeCodeBtn').addEventListener('click', () => {
   if (conn.demo) { location.href = location.pathname; return; }
+  // La salida a mano del codigo recordado: el proximo que acepte el relay lo reemplaza,
+  // y sin ninguno /app vuelve a abrir pidiendolo.
+  if (!conn.local) { try { localStorage.removeItem(PAIRING_CODE_KEY); } catch (e) { /* nada */ } }
+  rememberedCode = null;
   clearTimeout(reconnectTimer);
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
   conn.socket = 'idle'; conn.clientConnected = null; conn.clientStatus = null; conn.hasTelemetry = false; conn.invalidCode = false; conn.everOpen = false; conn.everValid = false; conn.waitingClient = false;
@@ -8899,6 +8905,11 @@ function connectWs(backend, code, options = {}) {
     hideReconnectBanner();
     // Un mensaje del backend = el codigo existia de verdad (el rechazo por
     // codigo desconocido cierra sin mandar nada). Ver el 4404 mas abajo.
+    if (!conn.everValid && !conn.local && !conn.demo) {
+      // Se recuerda para la proxima vez que se abra /app sin ?code= (savedPairingCode)
+      const guardar = pairingCodeToSave(code, backend, lsGet(PAIRING_CODE_KEY));
+      if (guardar) lsSet(PAIRING_CODE_KEY, guardar);
+    }
     conn.everValid = true;
     rememberedTries = 0;
     const data = parseWsJson(event.data); // NaN o Infinity del cliente: null, no el dato perdido
@@ -9007,7 +9018,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
     url.searchParams.set('code', code);
     try { history.replaceState(null, '', url); } catch (e) { /* nada */ }
   }
-  connectWs(backend, code, { remembered: codeFromLink });
+  connectWs(backend, code, { remembered: code === rememberedCode });
 });
 
 // Tour rapido de onboarding - se muestra solo la primera vez (localStorage),
@@ -9257,7 +9268,17 @@ initCab();
   }
   if (code) {
     document.getElementById('code').value = code.toUpperCase();
-    codeFromLink = true;   // ver connectWs: se espera al cliente en vez de "codigo invalido"
+    rememberedCode = code.toUpperCase();   // ver connectWs: se espera al cliente en vez de "codigo invalido"
+    document.getElementById('connectBtn').click();
+    return;
+  }
+  // Sin codigo en la URL: el ultimo que el relay acepto en este dispositivo (abrir
+  // /app pelado, o la app instalada, que abre ./index.html). Con la PC apagada espera
+  // al cliente igual que un link guardado.
+  const saved = savedPairingCode(location.search, lsGet(PAIRING_CODE_KEY), document.getElementById('backendUrl').value);
+  if (saved) {
+    document.getElementById('code').value = saved;
+    rememberedCode = saved;
     document.getElementById('connectBtn').click();
   }
 })();

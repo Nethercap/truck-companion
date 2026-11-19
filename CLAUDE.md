@@ -167,6 +167,14 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   nunca lo cambio (`liveShareChoice` null: saveSettings guarda solo lo que
   cambia) no le manda nada al relay al conectar: ni lo prende ni apaga lo
   que eligio otro dispositivo. Ya no hay aviso de "apareces en el mapa".
+- `/app` recuerda el ultimo codigo que el relay acepto en ese dispositivo
+  (`PAIRING_CODE_KEY`, con el relay: `pairingCodeToSave`) y se conecta con el
+  al abrir sin `?code=` (`savedPairingCode`; Discord 19-11, Niekie813: el celular
+  y la app instalada, que abre `./index.html`, lo pedian cada vez). El cliente usa
+  el mismo codigo en cada arranque. Espera al cliente como un link guardado
+  (`rememberedCode`: solo ese codigo, uno escrito despues avisa enseguida si esta
+  mal), y el lapiz (`changeCodeBtn`) lo olvida. La cuenta no sirve para esto: el
+  relay no sabe de cuentas.
 - Plan de ruta y voz por sesion (Discord 22-10, Gargamosch: los waypoints en
   la tablet, la navegacion en el celular y la voz en la PC). El relay guarda
   los waypoints de cada variante (`Session.route_plans`, con `rev` = su hora
