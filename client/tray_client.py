@@ -353,6 +353,15 @@ FG = "#f2f3f5"
 MUTED = "#9aa4b2"
 PAUSA_APROBACION = 3  # segundos entre consultas al vincular
 
+
+def texto_sin_api(motivo: str) -> str:
+    """El aviso de que no se llega al servicio de cuentas, con el por que
+    abajo ('HTTP 403, Cloudflare 1010', 'timed out'...). El motivo va sin
+    traducir: es para quien lo lee en una captura (Discord 20-11, Aerista)."""
+    texto = T("account_unreachable")
+    return f"{texto}\n({motivo})" if motivo else texto
+
+
 # Cuanto tiene que estar ausente la memoria compartida para dar el juego por
 # cerrado. Es holgado a proposito: el costo de equivocarse para arriba es
 # esperar un minuto de mas antes de soltar el prefijo de Proton, y el de
@@ -998,17 +1007,29 @@ class SetupWindow:
         self.account_label.configure(text=T("account_checking"))
 
         def consultar():
-            usuario = account.quien_soy(token, win_integration.load_settings())
+            estado, usuario, motivo = account.quien_soy(token, win_integration.load_settings())
             def pintar():
-                if usuario:
-                    nombre = usuario.get("username") or T("account_no_name")
+                if estado == account.VINCULADO:
+                    nombre = (usuario or {}).get("username") or T("account_no_name")
                     self.account_label.configure(text=T("account_linked", name=nombre))
                     self.account_button.configure(text=T("account_unlink"), state="normal")
+                elif estado == account.REVOCADO:
+                    # La API dijo que el token no es de nadie (la sesion se
+                    # cerro desde la web): no sirve guardarlo. Se saca y queda
+                    # el boton de vincular, en vez de hacer desvincular y
+                    # vincular a mano. Solo si sigue siendo el mismo: pudo
+                    # vincularse otra vez mientras se preguntaba.
+                    settings = win_integration.load_settings()
+                    if account.token_guardado(settings) == token:
+                        settings.pop(account.CLAVE_TOKEN, None)
+                        win_integration.save_settings(settings)
+                    self._mostrar_pitch(True)
+                    self.account_label.configure(text=T("account_revoked"))
+                    self.account_button.configure(text=T("account_link"), state="normal")
                 else:
-                    # Puede ser que el token ya no valga o que no haya
-                    # internet. No se borra nada: borrarlo por un corte de
-                    # wifi obligaria a vincular de nuevo cada vez.
-                    self.account_label.configure(text=T("account_unreachable"))
+                    # Sin respuesta: no se sabe nada del token y no se borra
+                    # (un corte de wifi obligaria a vincular de nuevo).
+                    self.account_label.configure(text=texto_sin_api(motivo))
                     self.account_button.configure(text=T("account_unlink"), state="normal")
             self.en_ventana(pintar)
 
@@ -1032,11 +1053,11 @@ class SetupWindow:
 
         def pedir():
             import socket
-            pedido = account.pedir_codigo(socket.gethostname() or "Truck Dash",
-                                          win_integration.load_settings())
+            pedido, motivo = account.pedir_codigo(socket.gethostname() or "Truck Dash",
+                                                  win_integration.load_settings())
             if not pedido:
                 self.en_ventana(lambda: (
-                    self.account_label.configure(text=T("account_unreachable")),
+                    self.account_label.configure(text=texto_sin_api(motivo)),
                     self.account_button.configure(state="normal")))
                 return
 

@@ -4,6 +4,15 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Accounts: when this PC's link is closed from the website (signing out everywhere, a new password,
+  or closing it from the list of sessions), Setup now says so and offers to link again. Before, it
+  said "Can't reach the account service right now", and getting out of it took Unlink and then Link.
+- Accounts: when Setup really can't reach the account service, it now shows why under the message
+  (an HTTP error, a Cloudflare block, no DNS, a certificate that doesn't validate, a timeout), and
+  the log says the same. Before, nothing showed what went wrong.
+
 ## 1.5.45 (2026-11-17)
 
 - ProMods is detected only from its own packages (files starting with "promods" or "cnx-pm",

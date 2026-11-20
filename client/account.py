@@ -13,6 +13,7 @@ la web ya logueada, y recien ahi retira el token.
 
 import json
 import logging
+import re
 import urllib.error
 import urllib.request
 
@@ -45,6 +46,24 @@ def _pedir(url: str, cuerpo: dict | None = None, token: str | None = None,
            metodo: str | None = None) -> tuple[int, dict]:
     """Devuelve (codigo, datos). Nunca levanta: un fallo de red es
     (0, {}) y el que llama decide si reintenta."""
+    codigo, datos, _ = _pedir_con_motivo(url, cuerpo, token, metodo)
+    return codigo, datos
+
+
+# Cuanto del motivo se muestra en la ventana y en el log.
+MOTIVO_MAX = 120
+
+
+def _pedir_con_motivo(url: str, cuerpo: dict | None = None, token: str | None = None,
+                      metodo: str | None = None) -> tuple[int, dict, str]:
+    """Como _pedir, mas por que fallo ("" si anduvo).
+
+    Sin el motivo, un 403 de Cloudflare, un DNS que no resuelve, un
+    certificado que no valida y un timeout decian todos "no se puede
+    contactar al servicio de cuentas", y el log no decia nada: no habia
+    como saber cual era (Discord 20-11, Aerista: el tablero andaba y la
+    cuenta no, en ninguno de los dos pasos).
+    """
     datos = json.dumps(cuerpo or {}).encode() if cuerpo is not None else None
     cabeceras = {"Content-Type": "application/json"}
     if token:
@@ -53,27 +72,83 @@ def _pedir(url: str, cuerpo: dict | None = None, token: str | None = None,
                                  method=metodo or ("POST" if datos is not None else "GET"))
     try:
         with red.abrir(req, timeout=TIMEOUT) as r:
-            return r.status, json.loads(r.read().decode("utf-8") or "{}")
+            codigo = r.status
+            texto = r.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         try:
-            return e.code, json.loads(e.read().decode("utf-8") or "{}")
+            texto = e.read().decode("utf-8", "replace")
         except Exception:
-            return e.code, {}
-    except Exception as exc:  # red caida, DNS, timeout
-        logging.debug(f"La API de cuentas no respondio ({exc})")
-        return 0, {}
+            texto = ""
+        try:
+            respuesta = json.loads(texto or "{}")
+        except ValueError:
+            respuesta = None
+        return (e.code, respuesta if isinstance(respuesta, dict) else {},
+                _motivo_http(e.code, texto, respuesta))
+    except Exception as exc:  # red caida, DNS, timeout, certificado
+        motivo = _motivo_red(exc)
+        logging.debug(f"La API de cuentas no respondio ({motivo})")
+        return 0, {}, motivo
+    try:
+        respuesta = json.loads(texto or "{}")
+    except ValueError:
+        respuesta = None
+    if not isinstance(respuesta, dict):
+        # Un 200 que no es nuestro JSON lo dio otro: el portal de un wifi
+        # publico, un proxy o un filtro. Para quien llama es como sin red.
+        return 0, {}, f"HTTP {codigo}, {_resumen_texto(texto) or 'empty'}"
+    return codigo, respuesta, ""
+
+
+def _motivo_http(codigo: int, texto: str, respuesta) -> str:
+    """'HTTP 403, Cloudflare 1010', 'HTTP 500', 'HTTP 400: pedido_vencido'."""
+    if isinstance(respuesta, dict) and isinstance(respuesta.get("error"), str):
+        return _cortar(f"HTTP {codigo}: {respuesta['error']}")
+    # Las paginas de error de Cloudflare: "error code: 1010" en texto, o un
+    # HTML con "Error 1015" en el titulo.
+    cf = re.search(r"error(?: code)?:?\s*(1\d{3})\b", texto or "", re.I)
+    if cf:
+        return f"HTTP {codigo}, Cloudflare {cf.group(1)}"
+    resumen = _resumen_texto(texto)
+    return _cortar(f"HTTP {codigo}" + (f", {resumen}" if resumen else ""))
+
+
+def _motivo_red(exc: Exception) -> str:
+    """Lo que dijo la red, sin el nombre de la excepcion si ya se entiende:
+    'timed out', '[Errno 11001] getaddrinfo failed', '[SSL: ...]'."""
+    razon = getattr(exc, "reason", None) or exc
+    texto = str(razon).strip() or type(razon).__name__
+    return _cortar(texto)
+
+
+def _resumen_texto(texto: str) -> str:
+    """Una pista de que es una respuesta que no es JSON: el titulo de una
+    pagina o el comienzo del texto."""
+    texto = (texto or "").strip()
+    titulo = re.search(r"<title[^>]*>(.*?)</title>", texto, re.I | re.S)
+    if titulo:
+        texto = titulo.group(1)
+    elif texto.startswith("<"):
+        return "HTML"
+    return _cortar(" ".join(texto.split()))
+
+
+def _cortar(texto: str) -> str:
+    return texto if len(texto) <= MOTIVO_MAX else texto[:MOTIVO_MAX - 3] + "..."
 
 
 # ---------------------------------------------------------------- vincular
 
-def pedir_codigo(nombre_equipo: str, settings: dict | None = None) -> dict | None:
-    """Arranca la vinculacion. Devuelve {'code', 'secret', 'expires_in',
-    'url'} o None si no se pudo."""
-    codigo, datos = _pedir(base_api(settings) + "/auth/device/start",
-                           {"device_name": nombre_equipo})
+def pedir_codigo(nombre_equipo: str, settings: dict | None = None) -> tuple[dict | None, str]:
+    """Arranca la vinculacion. Devuelve ({'code', 'secret', 'expires_in',
+    'url'}, "") o (None, motivo) si no se pudo."""
+    url = base_api(settings) + "/auth/device/start"
+    codigo, datos, motivo = _pedir_con_motivo(url, {"device_name": nombre_equipo})
     if codigo != 200 or "secret" not in datos:
-        return None
-    return datos
+        motivo = motivo or f"HTTP {codigo}, no secret"
+        logging.warning("Account: couldn't get a link code from %s (%s)", url, motivo)
+        return None, motivo
+    return datos, ""
 
 
 def consultar_codigo(secret: str, settings: dict | None = None) -> tuple[str, str | None]:
@@ -100,23 +175,31 @@ def token_guardado(settings: dict) -> str | None:
     return valor or None
 
 
-def quien_soy(token: str, settings: dict | None = None) -> dict | None:
-    """El usuario de ese token, o None.
+# Lo que puede contestar quien_soy.
+VINCULADO = "vinculado"
+REVOCADO = "revocado"        # el servidor dijo que ese token ya no vale
+SIN_RESPUESTA = "sin_respuesta"
 
-    None puede ser "el token ya no vale" o "no hay internet", y para la
-    ventana no es lo mismo, asi que se distingue con esta_vencido().
+
+def quien_soy(token: str, settings: dict | None = None) -> tuple[str, dict | None, str]:
+    """De quien es ese token: (estado, usuario, motivo).
+
+    - (VINCULADO, usuario, "")
+    - (REVOCADO, None, ""): la API contesto y el token no es de nadie. Asi
+      contesta /auth/me (200 con usuario null, no 401) a un token de una
+      sesion cerrada desde la web, o de antes de cambiar la contrasena. Hasta
+      el 20-11 la ventana lo mostraba como "no se puede contactar".
+    - (SIN_RESPUESTA, None, motivo): no hubo respuesta que sirva (sin red, un
+      403 de Cloudflare, un 500). No dice nada del token: borrarlo por un
+      corte de wifi obligaria a vincular de nuevo cada vez.
     """
-    codigo, datos = _pedir(base_api(settings) + "/auth/me", token=token)
-    if codigo != 200:
-        return None
-    return datos.get("usuario")
-
-
-def esta_vencido(token: str, settings: dict | None = None) -> bool:
-    """True solo si el servidor DIJO que no vale.
-
-    Un corte de internet no es una sesion cerrada: borrar el token porque no
-    hubo respuesta obligaria a vincular de nuevo cada vez que se cae el wifi.
-    """
-    codigo, _ = _pedir(base_api(settings) + "/auth/me", token=token)
-    return codigo == 401
+    url = base_api(settings) + "/auth/me"
+    codigo, datos, motivo = _pedir_con_motivo(url, token=token)
+    if codigo == 200 and datos.get("usuario"):
+        return VINCULADO, datos["usuario"], ""
+    if codigo == 401 or (codigo == 200 and "usuario" in datos and datos["usuario"] is None):
+        logging.warning("Account: the API says this PC's link is no longer valid")
+        return REVOCADO, None, ""
+    motivo = motivo or f"HTTP {codigo}"
+    logging.warning("Account: couldn't check the link with %s (%s)", url, motivo)
+    return SIN_RESPUESTA, None, motivo

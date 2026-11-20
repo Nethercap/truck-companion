@@ -396,9 +396,9 @@ def test_vincular_muestra_el_codigo_y_lo_guarda_cuando_lo_aprueban(ventana, monk
     copiar a la web."""
     v, guardados = ventana
     monkeypatch.setattr(tray_client.account, "pedir_codigo",
-                        lambda nombre, s=None: {"code": "ACDE-3456", "secret": "s3cr3t",
-                                                "expires_in": 600,
-                                                "url": "https://trucksim-dash.com/account/"})
+                        lambda nombre, s=None: ({"code": "ACDE-3456", "secret": "s3cr3t",
+                                                 "expires_in": 600,
+                                                 "url": "https://trucksim-dash.com/account/"}, ""))
     # Que no abra el navegador de verdad en medio de la prueba.
     monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda *a, **k: True)
     monkeypatch.setattr(tray_client.account, "consultar_codigo",
@@ -413,8 +413,8 @@ def test_vincular_muestra_el_codigo_y_lo_guarda_cuando_lo_aprueban(ventana, monk
 def test_el_codigo_de_cuenta_se_puede_copiar_mientras_se_ve(ventana, monkeypatch):
     v, guardados = ventana
     monkeypatch.setattr(tray_client.account, "pedir_codigo",
-                        lambda nombre, s=None: {"code": "ACDE-3456", "secret": "s",
-                                                "expires_in": 600, "url": "http://x/"})
+                        lambda nombre, s=None: ({"code": "ACDE-3456", "secret": "s",
+                                                 "expires_in": 600, "url": "http://x/"}, ""))
     monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda *a, **k: True)
     respuestas = [("pendiente", None)] * 40 + [("listo", "tok")]
     monkeypatch.setattr(tray_client.account, "consultar_codigo",
@@ -436,8 +436,8 @@ def test_un_corte_de_internet_no_cancela_la_espera(ventana, monkeypatch):
     cuando la persona esta yendo al navegador."""
     v, guardados = ventana
     monkeypatch.setattr(tray_client.account, "pedir_codigo",
-                        lambda nombre, s=None: {"code": "ACDE-3456", "secret": "s",
-                                                "expires_in": 600, "url": "http://x/"})
+                        lambda nombre, s=None: ({"code": "ACDE-3456", "secret": "s",
+                                                 "expires_in": 600, "url": "http://x/"}, ""))
     monkeypatch.setattr(tray_client.win_integration, "open_in_browser", lambda *a, **k: True)
 
     respuestas = [("sin_red", None), ("pendiente", None), ("listo", "tok")]
@@ -452,7 +452,7 @@ def test_con_cuenta_muestra_el_nombre_y_ofrece_desvincular(ventana, monkeypatch)
     v, guardados = ventana
     guardados["account_token"] = "tok"
     monkeypatch.setattr(tray_client.account, "quien_soy",
-                        lambda token, s=None: {"username": "Netherman"})
+                        lambda token, s=None: ("vinculado", {"username": "Netherman"}, ""))
     v.refresh_account()
     _esperar(v, lambda: "Netherman" in v.account_label.cget("text"))
     assert v.account_button.cget("text") == tray_client.T("account_unlink")
@@ -503,17 +503,64 @@ def test_si_la_api_no_responde_no_se_borra_el_token(ventana, monkeypatch):
     vincular de nuevo cada vez que se cae el wifi."""
     v, guardados = ventana
     guardados["account_token"] = "tok"
-    monkeypatch.setattr(tray_client.account, "quien_soy", lambda token, s=None: None)
+    monkeypatch.setattr(tray_client.account, "quien_soy",
+                        lambda token, s=None: ("sin_respuesta", None, "timed out"))
     v.refresh_account()
-    _esperar(v, lambda: v.account_label.cget("text") == tray_client.T("account_unreachable"))
+    _esperar(v, lambda: v.account_label.cget("text").startswith(tray_client.T("account_unreachable")))
     assert guardados["account_token"] == "tok"
+    # Con el por que abajo, para que una captura de pantalla lo diga.
+    assert v.account_label.cget("text").endswith("(timed out)")
+    assert v.account_button.cget("text") == tray_client.T("account_unlink")
+
+
+def test_un_token_que_la_api_no_reconoce_se_saca_y_ofrece_vincular(ventana, monkeypatch):
+    """La sesion se cerro desde la web: /auth/me contesta 200 con usuario
+    null. Antes decia "no se puede contactar" y habia que desvincular y
+    vincular a mano para salir (Discord 20-11, Aerista)."""
+    v, guardados = ventana
+    guardados["account_token"] = "tok"
+    monkeypatch.setattr(tray_client.account, "quien_soy",
+                        lambda token, s=None: ("revocado", None, ""))
+    v.refresh_account()
+    _esperar(v, lambda: v.account_label.cget("text") == tray_client.T("account_revoked"))
+    assert "account_token" not in guardados
+    assert v.account_button.cget("text") == tray_client.T("account_link")
+    assert v.account_pitch.winfo_manager()
+
+
+def test_si_se_vinculo_otra_vez_mientras_preguntaba_no_se_borra_el_nuevo(ventana, monkeypatch):
+    v, guardados = ventana
+    guardados["account_token"] = "viejo"
+
+    def quien_soy(token, s=None):
+        guardados["account_token"] = "nuevo"  # lo aprobo otra ventana
+        return ("revocado", None, "")
+    monkeypatch.setattr(tray_client.account, "quien_soy", quien_soy)
+    v.refresh_account()
+    _esperar(v, lambda: v.account_label.cget("text") == tray_client.T("account_revoked"))
+    assert guardados["account_token"] == "nuevo"
+
+
+def test_si_no_se_puede_pedir_el_codigo_dice_por_que(ventana, monkeypatch):
+    v, guardados = ventana
+    monkeypatch.setattr(tray_client.account, "pedir_codigo",
+                        lambda nombre, s=None: (None, "HTTP 403, Cloudflare 1010"))
+    v.link_account()
+    _esperar(v, lambda: "Cloudflare 1010" in v.account_label.cget("text"))
+    assert v.account_label.cget("text").startswith(tray_client.T("account_unreachable"))
+    assert str(v.account_button.cget("state")) == "normal"
+
+
+def test_el_aviso_de_vinculo_cerrado_esta_en_todas_las_lenguas():
+    for lang, textos in i18n._STRINGS.items():
+        assert textos.get("account_revoked"), lang
 
 
 def test_desvincular_saca_el_token_de_esta_pc(ventana, monkeypatch):
     v, guardados = ventana
     guardados["account_token"] = "tok"
     monkeypatch.setattr(tray_client.account, "quien_soy",
-                        lambda token, s=None: {"username": "Netherman"})
+                        lambda token, s=None: ("vinculado", {"username": "Netherman"}, ""))
     v.link_account()  # con token guardado, el boton desvincula
     assert "account_token" not in guardados
 
