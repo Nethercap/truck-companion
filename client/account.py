@@ -11,11 +11,14 @@ cuenta y que eso signifique algo. Pide un codigo, la persona lo aprueba desde
 la web ya logueada, y recien ahi retira el token.
 """
 
+import ipaddress
 import json
 import logging
 import re
+import socket
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 
 import red
 
@@ -55,7 +58,7 @@ MOTIVO_MAX = 120
 
 
 def _pedir_con_motivo(url: str, cuerpo: dict | None = None, token: str | None = None,
-                      metodo: str | None = None) -> tuple[int, dict, str]:
+                      metodo: str | None = None, mirar_dns: bool = False) -> tuple[int, dict, str]:
     """Como _pedir, mas por que fallo ("" si anduvo).
 
     Sin el motivo, un 403 de Cloudflare, un DNS que no resuelve, un
@@ -63,6 +66,10 @@ def _pedir_con_motivo(url: str, cuerpo: dict | None = None, token: str | None = 
     contactar al servicio de cuentas", y el log no decia nada: no habia
     como saber cual era (Discord 20-11, Aerista: el tablero andaba y la
     cuenta no, en ninguno de los dos pasos).
+
+    mirar_dns: en un fallo de red, ver tambien a que resuelve el nombre
+    (_resuelve_a_local). Solo desde la ventana: la cola de viajes reintenta
+    cada minuto sin internet y no muestra el motivo.
     """
     datos = json.dumps(cuerpo or {}).encode() if cuerpo is not None else None
     cabeceras = {"Content-Type": "application/json"}
@@ -86,7 +93,7 @@ def _pedir_con_motivo(url: str, cuerpo: dict | None = None, token: str | None = 
         return (e.code, respuesta if isinstance(respuesta, dict) else {},
                 _motivo_http(e.code, texto, respuesta))
     except Exception as exc:  # red caida, DNS, timeout, certificado
-        motivo = _motivo_red(exc)
+        motivo = _motivo_red(exc, url if mirar_dns else "")
         logging.debug(f"La API de cuentas no respondio ({motivo})")
         return 0, {}, motivo
     try:
@@ -113,12 +120,50 @@ def _motivo_http(codigo: int, texto: str, respuesta) -> str:
     return _cortar(f"HTTP {codigo}" + (f", {resumen}" if resumen else ""))
 
 
-def _motivo_red(exc: Exception) -> str:
+def _motivo_red(exc: Exception, url: str = "") -> str:
     """Lo que dijo la red, sin el nombre de la excepcion si ya se entiende:
-    'timed out', '[Errno 11001] getaddrinfo failed', '[SSL: ...]'."""
+    'timed out', '[Errno 11001] getaddrinfo failed', '[SSL: ...]'.
+
+    Si el nombre de la API da una direccion local, eso va primero: es un
+    filtro de DNS (el del router, un Pi-hole, un antivirus) que la bloquea,
+    y lo de la red ("connection refused") no lo dice. El router eero de
+    Aerista contestaba api.trucksim-dash.com con su propia 192.168.4.1
+    (Discord 21-11), y con una VPN andaba.
+    """
     razon = getattr(exc, "reason", None) or exc
     texto = str(razon).strip() or type(razon).__name__
+    local = _resuelve_a_local(url)
+    if local:
+        texto = f"{urlsplit(url).hostname} resolves to {local}, a local address: a DNS filter? {texto}"
     return _cortar(texto)
+
+
+def _resuelve_a_local(url: str) -> str | None:
+    """La direccion local (privada, loopback, 0.0.0.0) a la que resuelve el
+    nombre de url, si resuelve solo a esas; None si no, o si url ya es una
+    IP o localhost (un servidor de prueba). Solo se mira despues de un fallo."""
+    host = urlsplit(url).hostname if url else None
+    if not host or host == "localhost":
+        return None
+    try:
+        ipaddress.ip_address(host)
+        return None  # ya es una direccion, no hay DNS de por medio
+    except ValueError:
+        pass
+    try:
+        ips = {info[4][0] for info in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
+        locales = [ip for ip in ips if _es_local(ip)]
+    except Exception:
+        return None
+    return sorted(locales)[0] if locales and len(locales) == len(ips) else None
+
+
+def _es_local(ip: str) -> bool:
+    try:
+        d = ipaddress.ip_address(ip.split("%")[0])
+    except ValueError:
+        return False
+    return d.is_private or d.is_loopback or d.is_unspecified or d.is_link_local
 
 
 def _resumen_texto(texto: str) -> str:
@@ -143,7 +188,8 @@ def pedir_codigo(nombre_equipo: str, settings: dict | None = None) -> tuple[dict
     """Arranca la vinculacion. Devuelve ({'code', 'secret', 'expires_in',
     'url'}, "") o (None, motivo) si no se pudo."""
     url = base_api(settings) + "/auth/device/start"
-    codigo, datos, motivo = _pedir_con_motivo(url, {"device_name": nombre_equipo})
+    codigo, datos, motivo = _pedir_con_motivo(url, {"device_name": nombre_equipo},
+                                              mirar_dns=True)
     if codigo != 200 or "secret" not in datos:
         motivo = motivo or f"HTTP {codigo}, no secret"
         logging.warning("Account: couldn't get a link code from %s (%s)", url, motivo)
@@ -194,7 +240,7 @@ def quien_soy(token: str, settings: dict | None = None) -> tuple[str, dict | Non
       corte de wifi obligaria a vincular de nuevo cada vez.
     """
     url = base_api(settings) + "/auth/me"
-    codigo, datos, motivo = _pedir_con_motivo(url, token=token)
+    codigo, datos, motivo = _pedir_con_motivo(url, token=token, mirar_dns=True)
     if codigo == 200 and datos.get("usuario"):
         return VINCULADO, datos["usuario"], ""
     if codigo == 401 or (codigo == 200 and "usuario" in datos and datos["usuario"] is None):

@@ -11,7 +11,9 @@ updates on its own and is not versioned here.
   said "Can't reach the account service right now", and getting out of it took Unlink and then Link.
 - Accounts: when Setup really can't reach the account service, it now shows why under the message
   (an HTTP error, a Cloudflare block, no DNS, a certificate that doesn't validate, a timeout), and
-  the log says the same. Before, nothing showed what went wrong.
+  the log says the same. Before, nothing showed what went wrong. If the name of the account service
+  points to an address inside your own network, it says so: that is a DNS filter blocking it, like
+  the security filter of some routers.
 
 ## 1.5.45 (2026-11-17)
 

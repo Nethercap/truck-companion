@@ -113,6 +113,36 @@ def test_sin_servidor_dice_lo_que_dijo_la_red(monkeypatch):
     assert account._pedir(account.base_api() + "/auth/me") == (0, {})
 
 
+def test_si_el_dns_da_una_direccion_local_lo_dice(monkeypatch):
+    """Un filtro de DNS contesta con su propia direccion (el eero de Aerista,
+    192.168.4.1) o con 0.0.0.0, y la conexion se rechaza."""
+    def abrir(pedido, timeout):
+        raise urllib.error.URLError(ConnectionRefusedError(10061, "refused"))
+    monkeypatch.setattr(account.red, "abrir", abrir)
+    respuestas = {"api.trucksim-dash.com": ["192.168.4.1"]}
+    consultas = []
+
+    def getaddrinfo(host, *a, **k):
+        consultas.append(host)
+        return [(2, 1, 6, "", (ip, 443)) for ip in respuestas[host]]
+    monkeypatch.setattr(account.socket, "getaddrinfo", getaddrinfo)
+    _, _, motivo = account.quien_soy("tok")
+    assert motivo.startswith("api.trucksim-dash.com resolves to 192.168.4.1, a local address")
+    assert "refused" in motivo
+    # Con una direccion publica, solo lo de la red.
+    respuestas["api.trucksim-dash.com"] = ["104.21.83.223", "172.67.182.97"]
+    assert "resolves to" not in account.quien_soy("tok")[2]
+    respuestas["api.trucksim-dash.com"] = ["0.0.0.0", "::"]
+    assert "resolves to " in account.quien_soy("tok")[2]
+    # La cola de viajes (_pedir) no pregunta al DNS: reintenta sin internet.
+    consultas.clear()
+    assert account._pedir("https://api.trucksim-dash.com/trips/open", {}) == (0, {})
+    assert consultas == []
+    # Un servidor de prueba en la PC no es un filtro.
+    assert account._resuelve_a_local("http://127.0.0.1:8000/auth/me") is None
+    assert account._resuelve_a_local("http://localhost:8000/auth/me") is None
+
+
 def test_el_motivo_no_pasa_del_largo_maximo():
     largo = account._motivo_http(502, "x" * 500, None)
     assert len(largo) == account.MOTIVO_MAX and largo.endswith("...")
