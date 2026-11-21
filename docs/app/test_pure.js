@@ -1624,6 +1624,17 @@ test('voiceSpeaksHere: con un dispositivo elegido habla solo ese; sin eleccion o
   assert.equal(voiceSpeaksHere(true, false, true, celular, 'celular1'), false);
 });
 
+test('voiceElsewhere: el aviso de Ajustes sale si la voz la tiene otro, este prendida o no aca', () => {
+  const { voiceElsewhere } = require('./pure.js');
+  const tablet = { device: 'tabletchica', kind: 'tablet' };
+  assert.equal(voiceElsewhere(true, tablet, 'tabletgrande'), true);
+  // La tiene este dispositivo, nadie, o no se sabe (LAN con un cliente viejo)
+  assert.equal(voiceElsewhere(true, tablet, 'tabletchica'), false);
+  assert.equal(voiceElsewhere(true, null, 'tabletgrande'), false);
+  assert.equal(voiceElsewhere(true, { device: null }, 'tabletgrande'), false);
+  assert.equal(voiceElsewhere(false, tablet, 'tabletgrande'), false);
+});
+
 // ---- rotondas
 // Grafo dirigido chico: nodos [x, y] (y = norte) y aristas [a, b, dosManos].
 function grafoChico(nodos, aristas) {

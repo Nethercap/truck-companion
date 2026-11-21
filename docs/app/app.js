@@ -764,10 +764,18 @@ document.getElementById('setVoice').addEventListener('change', (e) => {
   if (voiceOn) { claimVoice(); unlockVoice().catch(() => {}); speakVoice('soon_turn_right'); } else releaseVoice();
   renderVoiceDeviceHint();
 });
+// El aviso sale tambien con la voz apagada aca (voiceElsewhere): "Speak here"
+// la prende y la trae, lo mismo que poner el tilde.
 document.getElementById('voiceSpeakHereBtn').addEventListener('click', () => {
+  if (!voiceOn) {
+    voiceOn = true;
+    document.getElementById('setVoice').checked = true;
+    saveSettings();
+  }
   claimVoice();
   unlockVoice().catch(() => {});
   speakVoice('soon_turn_right');
+  renderVoiceDeviceHint();
 });
 document.getElementById('setVoiceName').addEventListener('change', (e) => {
   voiceByLang[currentLang] = e.target.value;
@@ -6581,10 +6589,12 @@ function applyVoiceDevice(msg) {
   if (voiceOn && otro && antes && antes.device === DEVICE_ID) showToast(t('voiceMovedToast').replace('{device}', deviceLabel(voiceDevice)), '', 5000);
   renderVoiceDeviceHint();
 }
+// En Ajustes, aunque la voz este apagada aca: con el tilde sin poner en la
+// tablet nueva no habia ningun "Speak here" que tocar (Discord 21-11).
 function renderVoiceDeviceHint() {
   const hint = document.getElementById('voiceOtherDeviceHint');
   if (!hint) return;
-  const otro = voiceOn && planCapable() && voiceDevice && voiceDevice.device !== DEVICE_ID;
+  const otro = voiceElsewhere(planCapable(), voiceDevice, DEVICE_ID);
   hint.hidden = !otro;
   if (otro) document.getElementById('voiceOtherDeviceText').textContent = t('voiceOtherDevice').replace('{device}', deviceLabel(voiceDevice));
 }
