@@ -8402,7 +8402,10 @@ const WEB_UPDATE_FIRST_MS = 60 * 1000;
 const WEB_UPDATE_EVERY_MS = 30 * 60 * 1000;
 const WEB_UPDATE_BACK_MS = 5 * 60 * 1000; // al volver a la pestana, si paso esto
 const WEB_SITE_SW = 'https://trucksim-dash.com/app/sw.js';
-const WEB_UPDATE_TEXT = { reload: 'webUpdateText', restart_client: 'webUpdateRestartClient' };
+const WEB_UPDATE_TEXT = { reload: 'webUpdateText', restart_client: 'webUpdateRestartClient', client_cant_download: 'webUpdateClientCantDownload' };
+// En LAN, lo que dice el cliente de su copia ({ error, version }, webCopy del
+// session_state): no la pudo bajar (Discord 21-11). null si se pudo, o con un cliente viejo.
+let lanWebCopy = null;
 let webUpdateAt = 0;
 let webUpdateShown = null; // lo que se esta mostrando: accion y version
 let webUpdateClosed = null; // lo que se cerro: no vuelve hasta que haya otra cosa
@@ -8417,8 +8420,14 @@ async function checkWebUpdate() {
   const lan = !!new URLSearchParams(location.search).get('local');
   const served = await fetchWebVersion(lan ? 'index.html' : 'sw.js');
   const site = lan ? await fetchWebVersion(WEB_SITE_SW) : null;
-  const action = webUpdateAction({ current: webVersion(), served, site });
+  const action = webUpdateAction({ current: webVersion(), served, site, copyError: lan && !!lanWebCopy });
   showWebUpdate(action, action === 'reload' ? served : site);
+}
+// El sitio con el codigo de la sesion: desde la copia LAN vieja, la version de hoy sin
+// escribir la direccion (la tablet de Discord 21-11 la escribio mal).
+function webSiteUrl() {
+  const code = normalPairingCode(lanPlanRelay && lanPlanRelay.code);
+  return 'https://trucksim-dash.com/app/' + (code ? '?code=' + code : '');
 }
 function showWebUpdate(action, version) {
   const pill = document.getElementById('webUpdate');
@@ -8428,9 +8437,11 @@ function showWebUpdate(action, version) {
   text.setAttribute('data-i18n', WEB_UPDATE_TEXT[action]); // applyTranslations, al cambiar de idioma
   text.textContent = t(WEB_UPDATE_TEXT[action]);
   document.getElementById('webUpdateReload').hidden = action !== 'reload';
+  document.getElementById('webUpdateSite').hidden = action !== 'client_cant_download';
   pill.hidden = false;
 }
 document.getElementById('webUpdateReload').addEventListener('click', () => location.reload());
+document.getElementById('webUpdateSite').addEventListener('click', () => { location.href = webSiteUrl(); });
 document.getElementById('webUpdateClose').addEventListener('click', () => {
   webUpdateClosed = webUpdateShown;
   document.getElementById('webUpdate').hidden = true;
@@ -8943,6 +8954,11 @@ function connectWs(backend, code, options = {}) {
         // El relay y el codigo de la sesion: plan de ruta, voz y ajustes compartidos
         connectLanPlan(data.planRelay);
         renderLiveShareControls();
+        // La copia que sirve el cliente no se pudo actualizar (webUpdateAction)
+        const copia = data.webCopy && typeof data.webCopy === 'object' ? data.webCopy : null;
+        const cambioCopia = !copia !== !lanWebCopy;
+        lanWebCopy = copia;
+        if (cambioCopia) checkWebUpdate();
       }
       setClientOverlay(data.client_status && data.client_status.overlay);
       setObsOverlay(data.obs_overlay); // un relay viejo no lo manda: apagado

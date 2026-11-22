@@ -1794,6 +1794,14 @@ def test_web_cache_sin_copia_no_anota_copia_vieja(monkeypatch, tmp_path):
     assert local_server.copia_vieja is None
 
 
+def test_el_aviso_de_la_copia_vieja_esta_en_todas_las_lenguas():
+    import i18n
+    for lang, textos in i18n._STRINGS.items():
+        aviso = textos.get("lan_copy_old")
+        assert aviso and "{err}" in aviso and "{date}" in aviso, lang
+        assert "trucksim-dash.com/app" in aviso, lang  # lo que se puede hacer mientras
+
+
 def test_error_corto_de_la_copia():
     import urllib.error
     import local_server

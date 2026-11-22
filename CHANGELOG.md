@@ -4,6 +4,15 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- LAN mode: when this PC can't download the latest dashboard page from trucksim-dash.com, Setup
+  now says so in the "Same Wi-Fi" section, with the reason and the date of the copy that phones
+  and tablets keep getting. Before, the copy silently stayed old: since November 16 a player's
+  PC got "SSL: WRONG_VERSION_NUMBER" on every download (something on the PC or the network was
+  blocking the site), and his tablet kept the dashboard from that day. The dashboard page on the
+  LAN address says it too, instead of "restart the Truck Dash client", which didn't help.
+
 ## 1.5.45 (2026-11-17)
 
 - ProMods is detected only from its own packages (files starting with "promods" or "cnx-pm",
