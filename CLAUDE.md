@@ -191,7 +191,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `-prefabs.bin`: calculada antes de que llegaran, dos dispositivos con los
   mismos waypoints mostraban caminos distintos. Prender la voz en un
   dispositivo la trae a ese (`set_voice_device`, `voiceSpeaksHere`) y los
-  demas dicen donde esta, con "Decirlas aca"; apagarla la suelta, y si su
+  demas dicen donde esta, con "Decirlas aca" (en Ajustes, `voiceElsewhere`: tambien con
+  la voz apagada ahi, y el boton la prende; Discord 21-11, una tablet nueva sin el tilde
+  no tenia nada que tocar); apagarla la suelta, y si su
   dispositivo no vuelve en `VOICE_DEVICE_GRACE_S` (20 s) queda libre. Los
   ajustes que cambian la ruta (mas rapida o mas corta, DLC automatico o
   apagados: `route_prefs`, `routePrefsOf`, `syncAction`) van igual que el

@@ -183,18 +183,24 @@ def main():
             celular.evaluate("removeWaypoint(0)")
             chequear("sacarlo en el celular lo saca en la tablet", esperar(tablet, "() => waypoints.length === 0"))
 
-            # 3) La voz: prenderla en el celular la trae ahi y calla la tablet
-            for pg in (tablet, celular):
-                pg.evaluate("voiceOn = true")
+            # 3) La voz: prenderla en el celular la trae ahi y calla la tablet.
+            # La tablet con la voz apagada (Discord 21-11: la tablet nueva no
+            # tenia el tilde y no habia ningun "Speak here" que tocar).
+            tablet.evaluate("voiceOn = false; document.getElementById('setVoice').checked = false")
+            celular.evaluate("voiceOn = true")
             celular.evaluate("claimVoice()")
             chequear("la tablet sabe que la voz esta en el celular",
                      esperar(tablet, f"() => voiceDevice && voiceDevice.device === '{ids[1]}'"))
             chequear("habla solo el celular", tablet.evaluate("voiceHere()") is False and celular.evaluate("voiceHere()") is True)
-            tablet.evaluate("renderVoiceDeviceHint()")
             texto = tablet.evaluate("document.getElementById('voiceOtherDeviceHint').hidden ? '' : document.getElementById('voiceOtherDeviceText').textContent")
-            chequear("la tablet dice donde esta la voz", "Chrome" in texto or "·" in texto, texto)
+            chequear("la tablet dice donde esta la voz, con la voz apagada ahi", "Chrome" in texto or "·" in texto, texto)
             tablet.evaluate("document.getElementById('voiceSpeakHereBtn').click()")
             chequear("'Speak here' en la tablet la trae", esperar(celular, f"() => voiceDevice && voiceDevice.device === '{ids[0]}'"))
+            chequear("y la prende en la tablet",
+                     tablet.evaluate("voiceOn && document.getElementById('setVoice').checked && voiceHere()") is True)
+            chequear("el aviso se va de la tablet y sale en el celular",
+                     esperar(tablet, "() => document.getElementById('voiceOtherDeviceHint').hidden")
+                     and esperar(celular, "() => !document.getElementById('voiceOtherDeviceHint').hidden"))
 
             # 4) Por LAN: el plan, la voz y los ajustes de ruta cruzan con los del codigo
             lan = pestana_lan(b, base, errores)
