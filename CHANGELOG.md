@@ -4,6 +4,16 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Build my map: map mods packed with protection against extraction tools are no longer skipped
+  with "incorrect header check" in the build log. Their packer adds junk entries that the game
+  never reads, and one such entry made the builder drop the whole mod: Beyond by Terramaps lost
+  all four of its files this way (the Caribbean islands, among others), and so did some fix mods
+  of the map combos. A folder listing stored without its folder mark (another trick of these
+  packers) is also read now. Maps built with an earlier version stay as they were: rebuild yours
+  from Setup to get the missing parts.
+
 ## 1.5.45 (2026-11-17)
 
 - ProMods is detected only from its own packages (files starting with "promods" or "cnx-pm",

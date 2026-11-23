@@ -28,6 +28,13 @@ as a separate program.
   its end (some protected mods) is read up to its stated size, as the game
   does, and a mod that still can't be read is skipped with its name in the
   log instead of stopping the build.
+- Mods packed with protection against extraction tools are read as the game
+  reads them. Their junk entries (marked as zlib over data that isn't, with
+  metadata types or compressions that don't exist), which the game never
+  opens, are skipped one by one instead of dropping the whole mod with
+  "incorrect header check" (Beyond by Terramaps, all four files). A folder
+  listing stored as a plain file, without the folder mark, is read as a
+  folder when it has the exact shape of a listing.
 - Map sectors in older formats are read with the layout of their version
   (898 to 906, the game versions before 1.59; from 880 on, if they have no
   items). Mods keep the format of the game they were made with. A sector that

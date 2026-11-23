@@ -2472,10 +2472,16 @@ index 10fdc04..46f7831 100644
      }),
      navNodes: rawPrefab.navNodes.map(rn => {
 diff --git a/packages/clis/parser/game-files/scs-archive.ts b/packages/clis/parser/game-files/scs-archive.ts
-index 73a4a8f..36ad9ab 100644
+index 73a4a8f..3424ee9 100644
 --- a/packages/clis/parser/game-files/scs-archive.ts
 +++ b/packages/clis/parser/game-files/scs-archive.ts
-@@ -6,18 +6,33 @@ import type { BaseOf } from 'restructure';
+@@ -1,23 +1,38 @@
+ import { assert, assertExists } from '@truckermudgeon/base/assert';
+-import { Preconditions, UnreachableError } from '@truckermudgeon/base/precon';
++import { Preconditions } from '@truckermudgeon/base/precon';
+ import fs from 'fs';
+ import { createRequire } from 'module';
+ import type { BaseOf } from 'restructure';
  import * as r from 'restructure';
  import zlib from 'zlib';
  import { logger } from '../logger';
@@ -2544,7 +2550,53 @@ index 73a4a8f..36ad9ab 100644
  
      const entryHeaders = new r.Array(
        EntryHeader,
-@@ -222,6 +244,69 @@ export class ScsArchive {
+@@ -205,23 +227,117 @@ export class ScsArchive {
+     );
+     const metadataMap = this.createMetadataMap(entryHeaders);
+ 
++    // Los mods "protegidos" traen entradas basura para trabar a las
++    // herramientas: con la marca de zlib sobre datos que no lo son, con un
++    // offset fuera del archivo o con metadatos que no existen (lo mismo que
++    // saltea el SCS Extractor de sk-zk, IdentifyJunkEntries). El juego no
++    // las lee nunca: busca cada archivo por el hash de su ruta, y ninguna
++    // ruta da el de una basura. Aca cada listado se lee al abrir, y una sola
++    // basura con la marca de directorio dejaba afuera el mod entero con
++    // "incorrect header check" (Beyond de Terramaps, sus cuatro .scs, en un
++    // build.log de ATS del 23-11). Como en v1, se saltea solo esa entrada.
+     const directories: DirectoryEntry[] = [];
+     const files: FileEntry[] = [];
++    let unreadable = 0;
+     for (const header of entryHeaders) {
+-      const entry = createEntry(this.fd, header, this.scsSource, metadataMap);
++      let entry: DirectoryEntry | FileEntry;
++      try {
++        entry = createEntry(this.fd, header, this.scsSource, metadataMap);
++      } catch {
++        unreadable++;
++        continue;
++      }
+       if (entry.type === 'directory') {
+         directories.push(entry);
+       } else {
+         files.push(entry);
+       }
+     }
++    if (unreadable) {
++      logger.warn(
++        `${this.path}: ${unreadable} entries could not be read (junk entries of a protected mod?), skipped.`,
++      );
++    }
++    const fileStore = createStore(files);
+     this.entries = {
+-      directories: createStore(directories),
+-      files: createStore(files),
++      directories: withUnflaggedListings(
++        createStore(directories),
++        fileStore,
++        directoryListingV2,
++      ),
++      files: fileStore,
+     };
      return this.entries;
    }
  
@@ -2605,16 +2657,153 @@ index 73a4a8f..36ad9ab 100644
 +      );
 +    }
 +    const hash = salt ? (key: string) => city64(`${salt}${key}`) : city64;
++    const fileStore = createStore(files, hash);
 +    return {
-+      directories: createStore(directories, hash),
-+      files: createStore(files, hash),
++      directories: withUnflaggedListings(
++        createStore(directories, hash),
++        fileStore,
++        directoryListingV1,
++      ),
++      files: fileStore,
 +    };
 +  }
 +
    private createMetadataMap(
      entryHeaders: BaseOf<typeof EntryHeader>[],
    ): Map<number, MetadataEntry> {
-@@ -313,10 +398,13 @@ export class ScsArchive {
+@@ -234,56 +350,13 @@ export class ScsArchive {
+     });
+     const skippedMetaTypes = new Set();
+     for (const header of entryHeaders) {
+-      for (let i = 0; i < header.metadataCount; i++) {
+-        const metadataHeaderByteOffset = 4 * (header.metadataIndex + i);
+-        const metadataHeader = MetadataEntryHeader.fromBuffer(
+-          metadataTable.subarray(
+-            metadataHeaderByteOffset,
+-            metadataHeaderByteOffset + MetadataEntryHeader.size(),
+-          ),
+-        );
+-        const type = metadataHeader.type as MetadataType;
+-        switch (type) {
+-          case MetadataType.IMG:
+-          case MetadataType.SAMPLE:
+-          case MetadataType.PLAIN:
+-          case MetadataType.DIRECTORY:
+-          case MetadataType.MIP_TAIL:
+-          case MetadataType.PMA_INFO:
+-          case MetadataType.PMG_INFO: {
+-            let descriptor;
+-            if (type === MetadataType.IMG) {
+-              descriptor = ImageMeta;
+-            } else if (type === MetadataType.SAMPLE) {
+-              descriptor = SampleMeta;
+-            } else if (type === MetadataType.PMA_INFO) {
+-              descriptor = PmaInfoMeta;
+-            } else if (type === MetadataType.PMG_INFO) {
+-              descriptor = PmgInfoMeta;
+-            } else {
+-              descriptor = PlainMeta;
+-            }
+-            const metadataEntryByteOffset = 4 * metadataHeader.index;
+-            metadataMap.set(header.metadataIndex + i, {
+-              version: metadataHeader.type,
+-              ...descriptor.fromBuffer(
+-                metadataTable.subarray(
+-                  metadataEntryByteOffset,
+-                  metadataEntryByteOffset + descriptor.size(),
+-                ),
+-              ),
+-            });
+-            break;
+-          }
+-          case MetadataType.MIP_0:
+-          case MetadataType.MIP_1:
+-          case MetadataType.MIP_PROXY:
+-          case MetadataType.INLINE_DIRECTORY:
+-            skippedMetaTypes.add(metadataHeader.type);
+-            break;
+-          default:
+-            throw new UnreachableError(type);
+-        }
++      // Los metadatos de una entrada basura pueden no tener sentido (un tipo
++      // o una compresion que no existen, un indice fuera de la tabla): sin
++      // ellos, createEntry no la arma y parseEntries la saltea.
++      try {
++        this.addMetadata(header, metadataTable, metadataMap, skippedMetaTypes);
++      } catch {
++        // la entrada queda sin metadatos
+       }
+     }
+     if (skippedMetaTypes.size) {
+@@ -293,6 +366,67 @@ export class ScsArchive {
+     return metadataMap;
+   }
+ 
++  private addMetadata(
++    header: BaseOf<typeof EntryHeader>,
++    metadataTable: Buffer,
++    metadataMap: Map<number, MetadataEntry>,
++    skippedMetaTypes: Set<unknown>,
++  ) {
++    for (let i = 0; i < header.metadataCount; i++) {
++      const metadataHeaderByteOffset = 4 * (header.metadataIndex + i);
++      const metadataHeader = MetadataEntryHeader.fromBuffer(
++        metadataTable.subarray(
++          metadataHeaderByteOffset,
++          metadataHeaderByteOffset + MetadataEntryHeader.size(),
++        ),
++      );
++      const type = metadataHeader.type as MetadataType;
++      switch (type) {
++        case MetadataType.IMG:
++        case MetadataType.SAMPLE:
++        case MetadataType.PLAIN:
++        case MetadataType.DIRECTORY:
++        case MetadataType.MIP_TAIL:
++        case MetadataType.PMA_INFO:
++        case MetadataType.PMG_INFO: {
++          let descriptor;
++          if (type === MetadataType.IMG) {
++            descriptor = ImageMeta;
++          } else if (type === MetadataType.SAMPLE) {
++            descriptor = SampleMeta;
++          } else if (type === MetadataType.PMA_INFO) {
++            descriptor = PmaInfoMeta;
++          } else if (type === MetadataType.PMG_INFO) {
++            descriptor = PmgInfoMeta;
++          } else {
++            descriptor = PlainMeta;
++          }
++          const metadataEntryByteOffset = 4 * metadataHeader.index;
++          metadataMap.set(header.metadataIndex + i, {
++            version: metadataHeader.type,
++            ...descriptor.fromBuffer(
++              metadataTable.subarray(
++                metadataEntryByteOffset,
++                metadataEntryByteOffset + descriptor.size(),
++              ),
++            ),
++          });
++          break;
++        }
++        case MetadataType.MIP_0:
++        case MetadataType.MIP_1:
++        case MetadataType.MIP_PROXY:
++        case MetadataType.INLINE_DIRECTORY:
++          skippedMetaTypes.add(metadataHeader.type);
++          break;
++        default:
++          // Un tipo que no existe: basura de un mod protegido. TruckLib la
++          // deja en UnimplementedEntries y sigue; antes esto cortaba.
++          throw new Error(`unknown metadata type ${type as number}`);
++      }
++    }
++  }
++
+   private readData({
+     offset,
+     compressedSize,
+@@ -313,13 +447,122 @@ export class ScsArchive {
    }
  }
  
@@ -2627,10 +2816,119 @@ index 73a4a8f..36ad9ab 100644
    return {
 -    get: (key: string) => map.get(city64(key)),
 +    get: (key: string) => map.get(hash(key)),
++    hash,
++    byHash: (h: bigint) => map.get(h),
    };
  }
  
-@@ -471,7 +559,7 @@ abstract class ScsArchiveEntry {
++type HashStore<V extends { hash: bigint }> = ReturnType<typeof createStore<V>>;
++
++interface Listing {
++  subdirectories: string[];
++  files: string[];
++}
++
++// Otro truco de los mods protegidos: el listado de una carpeta guardado sin
++// la marca de directorio, como un archivo mas (el SCS Extractor de sk-zk le
++// pone la marca al recorrer, "Some dir entries don't have the directory flag
++// set"). Sin esto, la carpeta no existia para el parser: sin map/usa no hay
++// sectores del mod, y sin def no hay ciudades. Si no aparece como directorio,
++// se lee el archivo con esa ruta como listado, solo si tiene la forma exacta
++// de uno (el parser pide carpetas, nunca la ruta de un archivo de verdad).
++function withUnflaggedListings(
++  directories: HashStore<DirectoryEntry>,
++  files: HashStore<FileEntry>,
++  parse: (data: Buffer) => Listing | undefined,
++): Store<DirectoryEntry> {
++  const unflagged = new Map<bigint, DirectoryEntry | undefined>();
++  return {
++    get: (key: string) => {
++      // El hash una sola vez: el parser pide cada carpeta a cada .scs (unos
++      // 80 con los DLC), y casi siempre no esta.
++      const h = directories.hash(key);
++      const dir = directories.byHash(h);
++      if (dir) return dir;
++      if (unflagged.has(h)) return unflagged.get(h);
++      const file = files.byHash(h);
++      let listing: Listing | undefined;
++      try {
++        listing = file ? parse(file.read()) : undefined;
++      } catch {
++        listing = undefined;
++      }
++      const entry: DirectoryEntry | undefined =
++        file && listing
++          ? {
++              type: 'directory',
++              hash: file.hash,
++              scsSource: file.scsSource,
++              ...listing,
++            }
++          : undefined;
++      unflagged.set(h, entry);
++      return entry;
++    },
++  };
++}
++
++// El listado de HashFS v2: cuantos nombres (uint32), el largo de cada uno
++// (un byte) y los nombres, los subdirectorios con "/" adelante. Solo si los
++// largos cierran justo con el tamano y ningun nombre esta vacio: un archivo
++// cualquiera no pasa por un listado.
++export function directoryListingV2(data: Buffer): Listing | undefined {
++  if (data.length < 4) return undefined;
++  const count = data.readUInt32LE(0);
++  if (4 + count > data.length) return undefined;
++  let total = 4 + count;
++  for (let i = 0; i < count; i++) {
++    if (data[4 + i] === 0) return undefined;
++    total += data[4 + i];
++  }
++  if (total !== data.length) return undefined;
++  const subdirectories: string[] = [];
++  const files: string[] = [];
++  let p = 4 + count;
++  for (let i = 0; i < count; i++) {
++    const name = data.toString('utf8', p, p + data[4 + i]);
++    p += data[4 + i];
++    if (name.startsWith('/')) {
++      subdirectories.push(name.substring(1));
++    } else {
++      files.push(name);
++    }
++  }
++  return { subdirectories, files };
++}
++
++// El listado de HashFS v1: texto, un nombre por linea, los subdirectorios
++// con "*" adelante. Uno con bytes de control o que no es UTF-8 no es un
++// listado.
++export function directoryListingV1(data: Buffer): Listing | undefined {
++  let text: string;
++  try {
++    text = new TextDecoder('utf-8', { fatal: true }).decode(data);
++  } catch {
++    return undefined;
++  }
++  if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(text)) return undefined;
++  const subdirectories: string[] = [];
++  const files: string[] = [];
++  for (const line of text.split('\n')) {
++    const name = line.replace(/\r$/, '');
++    if (!name) continue;
++    if (name.startsWith('*')) {
++      subdirectories.push(name.substring(1));
++    } else {
++      files.push(name);
++    }
++  }
++  return { subdirectories, files };
++}
++
+ interface EntryMetadata {
+   hash: bigint;
+   offset: bigint;
+@@ -471,7 +714,7 @@ abstract class ScsArchiveEntry {
        case Compression.NONE:
          return rawData;
        case Compression.ZLIB:
@@ -2639,7 +2937,7 @@ index 73a4a8f..36ad9ab 100644
        case Compression.GDEFLATE: {
          const tileStreamHeader = TileStreamHeader.decode(
            new r.DecodeStream(rawData),
-@@ -618,11 +706,56 @@ class ScsArchiveTobjFile extends ScsArchiveFile {
+@@ -618,11 +861,56 @@ class ScsArchiveTobjFile extends ScsArchiveFile {
    }
  }
  
@@ -5513,6 +5811,189 @@ index 0000000..ad1a987
 +    expect(entries.directories.get('map')).toBeUndefined();
 +    expect(entries.files.get('def/city.sii')?.read()).toEqual(ciudad);
 +    scs.dispose();
++  });
++});
+diff --git a/packages/clis/parser/game-files/tests/scs-archive-v2.test.ts b/packages/clis/parser/game-files/tests/scs-archive-v2.test.ts
+new file mode 100644
+index 0000000..e0fe14d
+--- /dev/null
++++ b/packages/clis/parser/game-files/tests/scs-archive-v2.test.ts
+@@ -0,0 +1,177 @@
++import fs from 'fs';
++import os from 'os';
++import path from 'path';
++import zlib from 'zlib';
++import { city64 } from '../cityhash';
++import {
++  directoryListingV1,
++  directoryListingV2,
++  ScsArchive,
++} from '../scs-archive';
++
++// Tipos de metadatos de HashFS v2 (MetadataType en scs-archive.ts).
++const PLAIN = 0x80;
++const DIRECTORY = 0x81;
++// Compresion de PlainMeta: los 4 bits altos del tamano comprimido.
++const NONE = 0;
++const ZLIB = 1;
++
++interface Entrada {
++  // la ruta, o el hash ya hecho (una basura no tiene ruta)
++  ruta: string | bigint;
++  directorio: boolean;
++  tipo: number;
++  compresion: number;
++  // los datos a escribir, o el indice de otra entrada cuyo offset se repite
++  datos: Buffer | number;
++  tamano: number;
++}
++
++// El listado de v2: cuantos nombres, el largo de cada uno y los nombres, los
++// subdirectorios con "/" adelante.
++function listado(nombres: string[]): Buffer {
++  const textos = nombres.map(n => Buffer.from(n, 'utf8'));
++  const cabeza = Buffer.alloc(4 + textos.length);
++  cabeza.writeUInt32LE(textos.length, 0);
++  textos.forEach((t, i) => (cabeza[4 + i] = t.length));
++  return Buffer.concat([cabeza, ...textos]);
++}
++
++// Un HashFS v2 como lo lee ScsArchive: cabecera de 53 bytes, los datos
++// alineados a 16, la tabla de entradas (16 bytes por entrada) y la de
++// metadatos (un encabezado de 4 bytes y un PlainMeta de 16 por entrada),
++// las dos con zlib.
++function hashfsV2(entradas: Entrada[]): string {
++  const partes: Buffer[] = [Buffer.alloc(64)];
++  let offset = 64;
++  const offsets: number[] = [];
++  for (const e of entradas) {
++    if (typeof e.datos === 'number') {
++      offsets.push(offsets[e.datos]);
++      continue;
++    }
++    offsets.push(offset);
++    const relleno = (16 - (e.datos.length % 16)) % 16;
++    partes.push(e.datos, Buffer.alloc(relleno));
++    offset += e.datos.length + relleno;
++  }
++
++  const tabla = Buffer.alloc(entradas.length * 16);
++  const metadatos = Buffer.alloc(entradas.length * 20);
++  entradas.forEach((e, i) => {
++    const hash = typeof e.ruta === 'bigint' ? e.ruta : city64(e.ruta);
++    const datos = typeof e.datos === 'number' ? entradas[e.datos].datos : e.datos;
++    const comprimido = (datos as Buffer).length;
++    tabla.writeBigUInt64LE(hash, i * 16);
++    tabla.writeUInt32LE(i * 5, i * 16 + 8); // indice de metadatos (de a 4 bytes)
++    tabla.writeUInt16LE(1, i * 16 + 12);
++    tabla[i * 16 + 14] = e.directorio ? 1 : 0;
++    const m = i * 20;
++    metadatos.writeUIntLE(i * 5 + 1, m, 3); // el PlainMeta va justo despues
++    metadatos[m + 3] = e.tipo;
++    metadatos.writeUInt32LE(((e.compresion & 0xf) << 28) | comprimido, m + 4);
++    metadatos.writeUInt32LE(e.tamano, m + 8);
++    metadatos.writeUInt32LE(offsets[i] / 16, m + 16);
++  });
++  const tablaZ = zlib.deflateSync(tabla);
++  const metadatosZ = zlib.deflateSync(metadatos);
++  partes.push(tablaZ, metadatosZ);
++
++  const cabecera = partes[0];
++  cabecera.write('SCS#', 0, 'latin1');
++  cabecera.writeUInt16LE(2, 4);
++  cabecera.writeUInt16LE(0, 6);
++  cabecera.write('CITY', 8, 'latin1');
++  cabecera.writeUInt32LE(entradas.length, 12);
++  cabecera.writeUInt32LE(tablaZ.length, 16);
++  cabecera.writeUInt32LE(metadatos.length, 20);
++  cabecera.writeUInt32LE(metadatosZ.length, 24);
++  cabecera.writeBigUInt64LE(BigInt(offset), 28);
++  cabecera.writeBigUInt64LE(BigInt(offset + tablaZ.length), 36);
++  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hashfs-v2-')), 'mod.scs');
++  fs.writeFileSync(archivo, Buffer.concat(partes));
++  return archivo;
++}
++
++describe('ScsArchive HashFS v2 protegido', () => {
++  const raiz = listado(['/def', '/map']);
++  const def = listado(['city.sii']);
++  const map = listado(['/usa', 'usa.mbd']);
++  const usa = listado(['sec+0000+0000.base']);
++  const ciudad = Buffer.from('SiiNunit\n{\n}\n', 'utf8');
++  const sector = Buffer.from('sector de mentira', 'latin1');
++
++  function protegido(): string {
++    return hashfsV2([
++      { ruta: '', directorio: true, tipo: DIRECTORY, compresion: ZLIB, datos: zlib.deflateSync(raiz), tamano: raiz.length },
++      { ruta: 'def', directorio: true, tipo: DIRECTORY, compresion: NONE, datos: def, tamano: def.length },
++      // el listado de map sin la marca de directorio, como un archivo mas
++      { ruta: 'map', directorio: false, tipo: PLAIN, compresion: ZLIB, datos: zlib.deflateSync(map), tamano: map.length },
++      { ruta: 'map/usa', directorio: true, tipo: DIRECTORY, compresion: NONE, datos: usa, tamano: usa.length },
++      { ruta: 'def/city.sii', directorio: false, tipo: PLAIN, compresion: NONE, datos: ciudad, tamano: ciudad.length },
++      { ruta: 'map/usa/sec+0000+0000.base', directorio: false, tipo: PLAIN, compresion: NONE, datos: sector, tamano: sector.length },
++      // basura: un "directorio" con la marca de zlib sobre los datos sin
++      // comprimir de def/city.sii (el mismo offset). Antes dejaba afuera el
++      // mod entero con "incorrect header check" (Beyond, 23-11).
++      { ruta: 0x1234_5678_9abc_def0n, directorio: true, tipo: DIRECTORY, compresion: ZLIB, datos: 4, tamano: 4096 },
++      // basura: un tipo de metadatos y una compresion que no existen
++      { ruta: 0x0fed_cba9_8765_4321n, directorio: false, tipo: 0x55, compresion: NONE, datos: 5, tamano: 10 },
++      { ruta: 0x1111_2222_3333_4444n, directorio: true, tipo: DIRECTORY, compresion: 7, datos: 5, tamano: 10 },
++    ]);
++  }
++
++  it('saltea las entradas basura y lee lo demas', () => {
++    const scs = new ScsArchive(protegido(), 'mod.scs');
++    expect(scs.isValid()).toBe(true);
++    const entries = scs.parseEntries();
++    expect(entries.directories.get('')?.subdirectories).toEqual(['def', 'map']);
++    expect(entries.directories.get('def')?.files).toEqual(['city.sii']);
++    expect(entries.directories.get('map/usa')?.files).toEqual(['sec+0000+0000.base']);
++    expect(entries.files.get('def/city.sii')?.read()).toEqual(ciudad);
++    expect(entries.files.get('map/usa/sec+0000+0000.base')?.read()).toEqual(sector);
++    scs.dispose();
++  });
++
++  it('lee como carpeta un listado guardado sin la marca de directorio', () => {
++    const scs = new ScsArchive(protegido(), 'mod.scs');
++    const entries = scs.parseEntries();
++    const mapDir = entries.directories.get('map');
++    expect(mapDir?.subdirectories).toEqual(['usa']);
++    expect(mapDir?.files).toEqual(['usa.mbd']);
++    expect(mapDir?.scsSource).toBe('mod.scs');
++    // un archivo de verdad no pasa por un listado
++    expect(entries.directories.get('def/city.sii')).toBeUndefined();
++    expect(entries.directories.get('no/existe')).toBeUndefined();
++    scs.dispose();
++  });
++});
++
++describe('directoryListingV2', () => {
++  it('lee un listado', () => {
++    expect(directoryListingV2(listado(['/def', 'manifest.sii']))).toEqual({
++      subdirectories: ['def'],
++      files: ['manifest.sii'],
++    });
++  });
++
++  it('no toma por listado lo que no cierra justo', () => {
++    expect(directoryListingV2(Buffer.from('SiiNunit\n{\n}\n', 'utf8'))).toBeUndefined();
++    expect(directoryListingV2(Buffer.concat([listado(['a']), Buffer.from('x')]))).toBeUndefined();
++    expect(directoryListingV2(Buffer.from([1, 0, 0, 0, 0]))).toBeUndefined();
++    expect(directoryListingV2(Buffer.alloc(2))).toBeUndefined();
++  });
++});
++
++describe('directoryListingV1', () => {
++  it('lee un listado de texto', () => {
++    expect(directoryListingV1(Buffer.from('*def\r\nmanifest.sii\n', 'utf8'))).toEqual({
++      subdirectories: ['def'],
++      files: ['manifest.sii'],
++    });
++  });
++
++  it('no toma por listado algo binario', () => {
++    expect(directoryListingV1(Buffer.from([0x53, 0x00, 0x01, 0x02]))).toBeUndefined();
++    expect(directoryListingV1(Buffer.from([0xff, 0xfe, 0x41]))).toBeUndefined();
 +  });
 +});
 diff --git a/packages/clis/parser/game-files/zip-entries.prueba.ts b/packages/clis/parser/game-files/zip-entries.prueba.ts
