@@ -222,3 +222,19 @@ def test_por_otro_camino_solo_lejos():
     assert not por_otro_camino((0, 0), (80, 0), [(40, -20)], [(40, -8)])
     # sin puntos es la recta entre los nodos
     assert not por_otro_camino(a, b, None, None)
+
+
+def test_separar_sentidos_dice_por_que():
+    from mapbuild.build_route_graph import separar_sentidos
+    a, b = (0, 0), (80, 0)
+    # una calle que atraviesa el prefab: juntos
+    assert separar_sentidos(a, b, (80, None), (81, None)) is None
+    # el lazo contra la rampa al reves (Budapest): miden distinto
+    assert separar_sentidos(a, b, (450, None), (800, [(40, -200)])) == "largo"
+    # el cruce derecho de una rotonda (reporte #38)
+    assert separar_sentidos(a, b, (84, [(40, -20)]), (84, [(40, 20)])) == "otro_lado"
+    # la izquierda y el rulo del trebol de Ostrava (reporte #60)
+    assert separar_sentidos((300, 0), (0, 200), (488, [(20, 0), (0, 20)]),
+                            (530, [(200, -40), (140, -80), (60, -60), (20, 60)])) == "otro_camino"
+    # el carril de giro de Wroclaw: juntos
+    assert separar_sentidos(a, b, (84, [(40, -20)]), (84, [(40, -8)])) is None

@@ -531,6 +531,26 @@ def por_otro_camino(pa, pb, ida, vuelta, tol=PREFAB_OTRO_CAMINO_M):
             or any(_dist_a_polilinea(p, linea_ida) > tol for p in linea_vuelta[1:-1]))
 
 
+def separar_sentidos(pa, pb, ida, vuelta):
+    """Por que el paso a -> b (`ida`) y el b -> a (`vuelta`) de un prefab van
+    en dos aristas de un solo sentido, o None si son la misma calle y van en
+    una de doble mano. Cada uno es (largo, puntos), puntos en su sentido.
+    "largo": miden distinto (en un trebol, doblar a la izquierda por el lazo
+    contra recorrer al reves la rampa de la derecha, Budapest 06-10);
+    "otro_lado": cada uno por un costado de la recta (el cruce derecho de una
+    rotonda, reporte #38); "otro_camino": del mismo costado pero lejos (la
+    izquierda y el rulo del trebol de Ostrava, reporte #60). Tambien la usa
+    diag_prefab_pares.py del taller."""
+    (l1, m1), (l2, m2) = ida, vuelta
+    if abs(l1 - l2) > max(5.0, 0.1 * min(l1, l2)):
+        return "largo"
+    if por_otro_lado(pa, pb, m1, m2):
+        return "otro_lado"
+    if por_otro_camino(pa, pb, m1, m2):
+        return "otro_camino"
+    return None
+
+
 def prefab_mid_points(points, start, end, tol=2.5, min_bulge=4.0):
     """Saca los extremos (ya son los nodos), simplifica, y descarta la
     geometria si la curva no se aparta de la recta: un cruce comun no necesita
@@ -1192,20 +1212,14 @@ def main(argv=None):
             vuelta = directed.get((key[1], key[0]))
             if ida and vuelta:
                 (l1, m1), (l2, m2) = ida, vuelta
-                mismo_largo = abs(l1 - l2) <= max(5.0, 0.1 * min(l1, l2))
-                otro_lado = (ENFORCE_TURNS and mismo_largo
-                             and por_otro_lado(node_list[key[0]], node_list[key[1]], m1, m2))
-                if otro_lado:
+                razon = separar_sentidos(node_list[key[0]], node_list[key[1]], ida, vuelta) if ENFORCE_TURNS else None
+                if razon == "otro_lado":
                     n_otro_lado += 1
                     tokens_otro_lado[p.get("token")] += 1
-                # Del mismo costado pero lejos: la izquierda y el rulo de un
-                # trebol (PREFAB_OTRO_CAMINO_M, reporte #60).
-                otro_camino = (ENFORCE_TURNS and mismo_largo and not otro_lado
-                               and por_otro_camino(node_list[key[0]], node_list[key[1]], m1, m2))
-                if otro_camino:
+                elif razon == "otro_camino":
                     n_otro_camino += 1
                     tokens_otro_camino[p.get("token")] += 1
-                if not ENFORCE_TURNS or (mismo_largo and not otro_lado and not otro_camino):
+                if not razon:
                     # Una calle que atraviesa el prefab: los dos sentidos son
                     # el mismo camino. Una sola arista de doble sentido.
                     if l1 <= l2:
