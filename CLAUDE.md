@@ -1074,6 +1074,22 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   contra 324,3 km (al centro, 298,4); Joensuu -> Tallinn 662,3 contra 664,9
   (647,5). El plugin sigue anotando cada `bus_job` en game.log.txt, con el
   indice y los s64.
+- Reporte #60 (21-11, ETS2, Ostrava -> Brno): el constructor juntaba en una
+  arista de doble mano los dos sentidos de un par de nodos de prefab del mismo
+  largo y del mismo costado de la recta aunque fueran por caminos distintos: en
+  el trebol del D1 (27618,5276) de la calle del este a Brno se dobla a la
+  izquierda (lo dicen los carriles del ramal al norte: "right", y el carril
+  izquierdo solo dobla a la izquierda) y de vuelta se sale por el rulo, los dos
+  de unos 700 m. La ruta a Brno se dibujaba por el rulo, a la derecha, sin aviso
+  en la bifurcacion (los dos ramales salen derechos, a 8 m a los 100 m), y el
+  camion tomo el ramal al norte (recalculo a 356 km). Desde el 23-11 van
+  separados a mas de `PREFAB_OTRO_CAMINO_M` (40 m; el carril de giro de
+  Wroclaw va a 12). En el grafo publicado del 10-11 son 43 aristas de prefab de
+  doble mano largas y con rulo en ETS2 (casi todas del mismo trebol, tambien la
+  llegada a Brno) y ninguna en ATS. La web no cambia: falta regenerar los
+  grafos de R2 (los cinco archivos y `ROUTE_GRAPH_V3_REV` a 8, como con el #38)
+  y medir como siempre; el log del constructor dice cuantos pares separa y de
+  que prefabs ("por otro camino"). Hasta entonces el #60 sigue pasando.
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para

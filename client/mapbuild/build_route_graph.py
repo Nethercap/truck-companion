@@ -49,6 +49,16 @@ PREFAB_END_TOLERANCE_M = 20.0
 # rotonda y 36 de otros prefabs, casi todas peajes con una cabina por mano.
 PREFAB_OTRO_LADO_M = 8.0
 PREFAB_OTRO_LADO_COSTADO_M = 4.0
+# Del mismo costado, dos caminos a mas de esto uno del otro tampoco son la
+# misma calle: en el trebol del D1 en Ostrava (reporte #60, 21-11, ETS2) de la
+# calle del este a la autopista hacia Brno se dobla a la izquierda y de vuelta
+# se sale por el rulo, los dos de unos 700 m y al norte de la recta entre los
+# nodos. Juntos, la ruta a Brno se dibujaba por el rulo (a la derecha y de
+# contramano) y no se avisaba la bifurcacion con la rampa al norte: el camion
+# tomo esa. En el grafo publicado del 10-11 hay 43 aristas de prefab de doble
+# mano asi (largas y con un rulo) en ETS2, casi todas del mismo trebol, y
+# ninguna en ATS. El carril de giro de Wroclaw va a 12 m.
+PREFAB_OTRO_CAMINO_M = 40.0
 # Rulos de calle (lazos de trebol, horquillas): un tramo que gira mas de 90
 # grados y es LAZO_LARGO_FACTOR veces mas largo que la recta entre sus nodos
 # lleva un punto de dibujo cada LAZO_PASO_M, hasta LAZO_PASOS_MAX (13-10).
@@ -509,6 +519,36 @@ def por_otro_lado(pa, pb, ida, vuelta, tol=PREFAB_OTRO_LADO_M, lado=PREFAB_OTRO_
     c_ida, c_vuelta = costados(linea_ida[1:-1]), costados(linea_vuelta[1:-1])
     return ((max(c_ida, default=0) > lado and min(c_vuelta, default=0) < -lado)
             or (min(c_ida, default=0) < -lado and max(c_vuelta, default=0) > lado))
+
+
+def por_otro_camino(pa, pb, ida, vuelta, tol=PREFAB_OTRO_CAMINO_M):
+    """True si algun punto del paso a -> b (`ida`) queda a mas de `tol` m del
+    b -> a (`vuelta`, en su sentido) o al reves, de cualquier costado: son dos
+    rampas distintas, no una calle que atraviesa el prefab."""
+    linea_ida = [pa] + list(ida or []) + [pb]
+    linea_vuelta = [pa] + list(reversed(vuelta or [])) + [pb]
+    return (any(_dist_a_polilinea(p, linea_vuelta) > tol for p in linea_ida[1:-1])
+            or any(_dist_a_polilinea(p, linea_ida) > tol for p in linea_vuelta[1:-1]))
+
+
+def separar_sentidos(pa, pb, ida, vuelta):
+    """Por que el paso a -> b (`ida`) y el b -> a (`vuelta`) de un prefab van
+    en dos aristas de un solo sentido, o None si son la misma calle y van en
+    una de doble mano. Cada uno es (largo, puntos), puntos en su sentido.
+    "largo": miden distinto (en un trebol, doblar a la izquierda por el lazo
+    contra recorrer al reves la rampa de la derecha, Budapest 06-10);
+    "otro_lado": cada uno por un costado de la recta (el cruce derecho de una
+    rotonda, reporte #38); "otro_camino": del mismo costado pero lejos (la
+    izquierda y el rulo del trebol de Ostrava, reporte #60). Tambien la usa
+    diag_prefab_pares.py del taller."""
+    (l1, m1), (l2, m2) = ida, vuelta
+    if abs(l1 - l2) > max(5.0, 0.1 * min(l1, l2)):
+        return "largo"
+    if por_otro_lado(pa, pb, m1, m2):
+        return "otro_lado"
+    if por_otro_camino(pa, pb, m1, m2):
+        return "otro_camino"
+    return None
 
 
 def prefab_mid_points(points, start, end, tol=2.5, min_bulge=4.0):
@@ -1074,6 +1114,8 @@ def main(argv=None):
     n_contramano = 0
     n_otro_lado = 0
     tokens_otro_lado = Counter()
+    n_otro_camino = 0
+    tokens_otro_camino = Counter()
     collect_prefab_node_shifts()
     for pi, p in enumerate(prefabs):
         uids = [u for u in p.get("nodeUids", []) if u in uid_to_index]
@@ -1170,13 +1212,14 @@ def main(argv=None):
             vuelta = directed.get((key[1], key[0]))
             if ida and vuelta:
                 (l1, m1), (l2, m2) = ida, vuelta
-                mismo_largo = abs(l1 - l2) <= max(5.0, 0.1 * min(l1, l2))
-                otro_lado = (ENFORCE_TURNS and mismo_largo
-                             and por_otro_lado(node_list[key[0]], node_list[key[1]], m1, m2))
-                if otro_lado:
+                razon = separar_sentidos(node_list[key[0]], node_list[key[1]], ida, vuelta) if ENFORCE_TURNS else None
+                if razon == "otro_lado":
                     n_otro_lado += 1
                     tokens_otro_lado[p.get("token")] += 1
-                if not ENFORCE_TURNS or (mismo_largo and not otro_lado):
+                elif razon == "otro_camino":
+                    n_otro_camino += 1
+                    tokens_otro_camino[p.get("token")] += 1
+                if not razon:
                     # Una calle que atraviesa el prefab: los dos sentidos son
                     # el mismo camino. Una sola arista de doble sentido.
                     if l1 <= l2:
@@ -1259,6 +1302,12 @@ def main(argv=None):
         # (PREFAB_OTRO_LADO_M): cada uno quedo como arista de un solo sentido.
         print(f"Pares de prefab con cada sentido por otro lado: {n_otro_lado}; "
               + ", ".join(f"{token} x{n}" for token, n in tokens_otro_lado.most_common(15)))
+    if n_otro_camino:
+        # Del mismo costado pero a mas de PREFAB_OTRO_CAMINO_M (la izquierda y
+        # el rulo de un trebol): tambien una arista por sentido.
+        print(f"Pares de prefab con cada sentido por otro camino (a mas de {PREFAB_OTRO_CAMINO_M:g} m): "
+              f"{n_otro_camino}; "
+              + ", ".join(f"{token} x{n}" for token, n in tokens_otro_camino.most_common(15)))
     if sin_curvas_por:
         # Para ver por que les faltan: los tokens se buscan en las descripciones.
         print("Prefabs sin navCurves (todos contra todos): "

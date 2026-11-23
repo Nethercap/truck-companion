@@ -175,3 +175,66 @@ def test_por_otro_lado_solo_si_los_caminos_se_apartan():
     # separados 12 m pero del mismo costado (el carril de giro de una T con
     # isleta, Wroclaw): juntos, o el giro se anunciaba como "keep"
     assert not por_otro_lado(a, b, [(40, -20)], [(40, -8)])
+
+
+def recta(x0, y0, x1, y1):
+    """Una navCurve recta de (x0, y0) a (x1, y1)."""
+    rot = math.atan2(y1 - y0, x1 - x0)
+    return curva(x0, y0, x1, y1, rot)
+
+
+def test_trebol_cada_sentido_por_su_camino(tmp_path):
+    # El trebol del D1 en Ostrava (reporte #60, 21-11): de la calle del este
+    # (E) a la autopista hacia Brno (S) se dobla a la izquierda, y de S a E se
+    # vuelve por el rulo. Los dos miden casi lo mismo y van del mismo costado
+    # de la recta entre los nodos: quedaban en una arista de doble mano con el
+    # dibujo del rulo, la ruta a Brno se dibujaba por el rulo (a la derecha,
+    # de contramano) y no se avisaba la bifurcacion con la rampa al norte.
+    nodos = {"n1": (400, 0), "E": (300, 0), "S": (0, 200), "n4": (0, 300)}
+    calles = [("n1", "E", True), ("S", "n4", True)]
+    ida = [recta(300, 0, 20, 0), recta(20, 0, 0, 20), recta(0, 20, 0, 200)]
+    rulo = [recta(0, 200, 20, 60), recta(20, 60, 60, -60), recta(60, -60, 140, -80),
+            recta(140, -80, 200, -40), recta(200, -40, 300, 0)]
+    desc = {
+        "token": "trebol",
+        "nodes": [{"x": 300, "y": 0, "rotation": 0}, {"x": 0, "y": 200, "rotation": 0}],
+        "navCurves": ida + rulo,
+        "navNodes": [fisico(0, (1, [0, 1, 2])), fisico(1, (0, [3, 4, 5, 6, 7]))],
+    }
+    prefab = {"uid": "p1", "token": "trebol", "nodeUids": ["E", "S"], "originNodeIndex": 0, "x": 150, "y": 50}
+    aristas = armar(tmp_path, nodos, calles, [prefab], [desc])
+    E, S = (300, 0), (0, 200)
+    assert aristas[(E, S)][1] & 2 and aristas[(S, E)][1] & 2
+    g = json.loads((tmp_path / "g.json").read_text(encoding="utf-8"))
+    xy = [tuple(n) for n in g["nodes"]]
+    puntos = {(xy[e[0]], xy[e[1]]): e[5] for e in g["edges"] if len(e) > 5}
+    # cada uno con su dibujo: la ida no sube al norte, la vuelta si
+    assert min(y for _x, y in puntos[(E, S)]) > -5
+    assert min(y for _x, y in puntos[(S, E)]) < -50
+
+
+def test_por_otro_camino_solo_lejos():
+    from mapbuild.build_route_graph import por_otro_camino
+    a, b = (300, 0), (0, 200)
+    # la izquierda y el rulo del trebol: a mas de 60 m
+    assert por_otro_camino(a, b, [(20, 0), (0, 20)], [(200, -40), (140, -80), (60, -60), (20, 60)])
+    # el carril de giro de una T con isleta (Wroclaw), a 12 m: juntos
+    assert not por_otro_camino((0, 0), (80, 0), [(40, -20)], [(40, -8)])
+    # sin puntos es la recta entre los nodos
+    assert not por_otro_camino(a, b, None, None)
+
+
+def test_separar_sentidos_dice_por_que():
+    from mapbuild.build_route_graph import separar_sentidos
+    a, b = (0, 0), (80, 0)
+    # una calle que atraviesa el prefab: juntos
+    assert separar_sentidos(a, b, (80, None), (81, None)) is None
+    # el lazo contra la rampa al reves (Budapest): miden distinto
+    assert separar_sentidos(a, b, (450, None), (800, [(40, -200)])) == "largo"
+    # el cruce derecho de una rotonda (reporte #38)
+    assert separar_sentidos(a, b, (84, [(40, -20)]), (84, [(40, 20)])) == "otro_lado"
+    # la izquierda y el rulo del trebol de Ostrava (reporte #60)
+    assert separar_sentidos((300, 0), (0, 200), (488, [(20, 0), (0, 20)]),
+                            (530, [(200, -40), (140, -80), (60, -60), (20, 60)])) == "otro_camino"
+    # el carril de giro de Wroclaw: juntos
+    assert separar_sentidos(a, b, (84, [(40, -20)]), (84, [(40, -8)])) is None

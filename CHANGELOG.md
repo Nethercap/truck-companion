@@ -4,6 +4,15 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Build my map: at some motorway interchanges, turning left onto the motorway and coming back
+  from it by the loop were stored as one two-way road, drawn as the loop. On the D1 at Ostrava
+  (ETS2) the route to Brno was drawn along the loop, to the right and the wrong way, and the
+  fork with the ramp to the north wasn't announced, so the truck took the ramp to the north.
+  Each direction now keeps its own path. Maps built with an earlier version keep routing as
+  before until they are rebuilt.
+
 ## 1.5.46 (2026-11-23)
 
 - LAN mode: when this PC can't download the latest dashboard page from trucksim-dash.com, Setup
