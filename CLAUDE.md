@@ -21,6 +21,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   cliente y el `sw.js` del sitio: la copia se baja solo al arrancar el cliente, asi
   que ahi dice que lo reinicies. Antes una pestana seguia horas en la version con que
   se abrio (reporte #29, 07-11, ShadE). No recarga sola, y no sale en `?cab=1`.
+  Si el cliente no pudo bajar la copia (`copia_vieja` de `local_server.py`, `webCopy` en
+  el session_state LAN), no dice "reinicia" sino que la PC no la puede bajar, con un boton
+  al sitio con el codigo, y Setup lo dice con el error (`lan_copy_old`): una PC no llegaba
+  a trucksim-dash.com desde el 16-11 y su tablet siguio con esa copia (Discord 21-11).
 - La logica de decision va en `docs/app/pure.js` con su test, no suelta en
   app.js: la mayoria de los bugs del 10-10 estaban en app.js, donde no hay tests.
 - Cambios de cliente: anotarlos en CHANGELOG.md (seccion de la proxima

@@ -1731,6 +1731,86 @@ def test_web_cache_pisa_los_archivos_en_solo_lectura(monkeypatch, tmp_path, capl
         os.chmod(del_mod, stat.S_IREAD | stat.S_IWRITE)
 
 
+def test_web_cache_que_no_se_puede_bajar_lo_dice(monkeypatch, tmp_path, caplog):
+    """Discord 21-11: desde el 16-11 cada descarga de trucksim-dash.com le fallaba
+    (SSL: WRONG_VERSION_NUMBER) y la tablet siguio con la web de ese dia sin que nada
+    lo dijera. Queda anotado para Setup y para el session_state LAN."""
+    import asyncio
+    import io
+    import json
+    import logging
+    import urllib.error
+    import local_server
+    monkeypatch.setattr(local_server, "cache_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(local_server, "WEB_FILES", ["app/index.html", "app/app.js", "app/vendor/x-1.0.js"])
+    (tmp_path / "app" / "vendor").mkdir(parents=True)
+    (tmp_path / "app" / "index.html").write_bytes(b'<script src="app.js?v=20261116b"></script>')
+    (tmp_path / "app" / "vendor" / "x-1.0.js").write_bytes(b"lib")
+
+    def sin_tls(url, timeout):
+        raise urllib.error.URLError("[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010)")
+    monkeypatch.setattr(local_server.red, "abrir", sin_tls)
+    monkeypatch.setattr(local_server, "copia_vieja", None)
+    with caplog.at_level(logging.INFO):
+        assert local_server.refresh_web_cache() is True  # sirve la copia de antes
+    assert local_server.copia_vieja == {"version": "20261116b", "fecha": "2026-11-16",
+                                        "error": "[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010)"}
+    resumen = [r.getMessage() for r in caplog.records if "no se actualizo" in r.getMessage()]
+    assert resumen == ["La copia de la web para el modo LAN no se actualizo: fallaron 2 archivos "
+                       "([SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010)); "
+                       "los tableros por LAN siguen con la del 2026-11-16"]
+
+    async def estado():
+        ws = _FakeWs([])
+        await local_server.LocalServer({}, en_la_red=False)._handle_viewer(ws)
+        return json.loads(ws.sent[0])
+    assert asyncio.run(estado())["webCopy"] == {
+        "error": "[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010)", "version": "20261116b"}
+
+    # Vuelve la red: la pagina pide index.html al abrir y el aviso se va
+    monkeypatch.setattr(local_server.red, "abrir",
+                        lambda url, timeout: io.BytesIO(b'<script src="app.js?v=20261121a"></script>'))
+    assert local_server._refresh_file("app/index.html", str(tmp_path / "app" / "index.html"))
+    assert local_server.copia_vieja is None
+    assert "webCopy" not in asyncio.run(estado())
+    # Y si se vuelve a cortar, otra vez (con la copia nueva)
+    monkeypatch.setattr(local_server.red, "abrir", sin_tls)
+    assert not local_server._refresh_file("app/index.html", str(tmp_path / "app" / "index.html"))
+    assert local_server.copia_vieja["version"] == "20261121a"
+
+
+def test_web_cache_sin_copia_no_anota_copia_vieja(monkeypatch, tmp_path):
+    """Sin ninguna copia, el modo LAN no esta disponible y Setup ya lo dice
+    (lan_no_web): no hay "copia del dia tal" que avisar."""
+    import local_server
+    monkeypatch.setattr(local_server, "cache_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(local_server, "WEB_FILES", ["app/index.html"])
+
+    def sin_red(url, timeout):
+        raise OSError("sin red")
+    monkeypatch.setattr(local_server.red, "abrir", sin_red)
+    monkeypatch.setattr(local_server, "copia_vieja", {"error": "de antes"})
+    assert local_server.refresh_web_cache() is False
+    assert local_server.copia_vieja is None
+
+
+def test_el_aviso_de_la_copia_vieja_esta_en_todas_las_lenguas():
+    import i18n
+    for lang, textos in i18n._STRINGS.items():
+        aviso = textos.get("lan_copy_old")
+        assert aviso and "{err}" in aviso and "{date}" in aviso, lang
+        assert "trucksim-dash.com/app" in aviso, lang  # lo que se puede hacer mientras
+
+
+def test_error_corto_de_la_copia():
+    import urllib.error
+    import local_server
+    assert local_server._error_corto(urllib.error.URLError("timed out")) == "timed out"
+    assert local_server._error_corto(OSError("x" * 200)).endswith("...")
+    assert len(local_server._error_corto(OSError("x" * 200))) == 120
+    assert local_server._error_corto(TimeoutError()) == "TimeoutError"
+
+
 def test_estado_de_smart_app_control():
     import win_integration
     assert [win_integration.estado_sac(v) for v in (0, 1, 2, 7, None)] == ["off", "on", "evaluation", None, None]

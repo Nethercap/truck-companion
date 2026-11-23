@@ -709,6 +709,9 @@ class SetupWindow:
                    justify="left").pack(anchor="w")
         self.button(self.lan_public_frame, T("lan_network_settings"),
                     abrir_ajustes_de_red).pack(anchor="w", pady=(4, 0))
+        # La copia de la web que se sirve no se pudo actualizar (local_server.copia_vieja,
+        # Discord 21-11): el celular la abre igual, pero vieja, y sin esto nada lo decia.
+        self.lan_copy_label = self.label(lan_frame, "", fg=ORANGE, wraplength=520, justify="left")
         self.open_here_btn = self.button(lan_btns, T("open_here"), self.open_lan_here)
         self.open_here_btn.pack(side="left", padx=6)
         # Y para volver atras: el celular deja de llegar y Windows no pregunta mas.
@@ -1373,6 +1376,12 @@ class SetupWindow:
             self.lan_public_frame.pack(anchor="w", pady=(6, 0), fill="x")
         else:
             self.lan_public_frame.pack_forget()
+        vieja = local_server.copia_vieja
+        if vieja and not cerrado and srv and srv.web_ready:
+            self.lan_copy_label.configure(text=T("lan_copy_old", err=vieja["error"], date=vieja["fecha"]))
+            self.lan_copy_label.pack(anchor="w", pady=(6, 0), fill="x")
+        else:
+            self.lan_copy_label.pack_forget()
         if cerrado:
             # Si ni siquiera pudo escuchar en esta PC (puerto tomado, issue #4),
             # eso es lo que hay que decir, no "apagado".
@@ -1491,8 +1500,11 @@ class SetupWindow:
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         # La deteccion de la red Publica llega despues (PowerShell, en un hilo).
+        # La copia vieja tambien: se anota al arrancar y al pedir la pagina.
+        vieja = local_server.copia_vieja
         clave_lan = (lan_url, win_integration.red_publica(), state.lan_en_la_red,
-                     state.local.error if state.local else None)
+                     state.local.error if state.local else None,
+                     (vieja["error"], vieja["fecha"]) if vieja else None)
         if getattr(self, "_last_lan_url", "?") != clave_lan:
             self._last_lan_url = clave_lan
             self.render_lan()

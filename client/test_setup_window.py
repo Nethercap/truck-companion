@@ -1214,6 +1214,34 @@ def test_modo_lan_apagado_hasta_prenderlo_y_queda_guardado(ventana, monkeypatch)
     assert not v.lan_off_btn.winfo_manager() and not v.copy_lan_btn.winfo_manager()
 
 
+def test_modo_lan_con_la_copia_vieja_lo_dice(ventana, monkeypatch):
+    """Discord 21-11: la PC no podia bajar la web desde el 16-11 y el celular
+    seguia con esa copia sin que nada lo dijera. Con el modo LAN prendido,
+    Setup dice por que y de cuando es la copia; se va cuando vuelve la red."""
+    import i18n
+    import local_server
+    v, _ = ventana
+    monkeypatch.setattr(tray_client.state, "local", _LanFalso())
+    monkeypatch.setattr(tray_client.state, "lan_en_la_red", True)
+    vieja = {"error": "[SSL: WRONG_VERSION_NUMBER] wrong version number", "version": "20261116b",
+             "fecha": "2026-11-16"}
+    monkeypatch.setattr(local_server, "copia_vieja", vieja)
+    v.render_lan()
+    assert v.lan_copy_label.winfo_manager() == "pack"
+    assert v.lan_copy_label.cget("text") == i18n.T("lan_copy_old", err=vieja["error"], date="2026-11-16")
+    # Apagado no hace falta: ningun celular la esta abriendo
+    monkeypatch.setattr(tray_client.state, "lan_en_la_red", False)
+    v.render_lan()
+    assert not v.lan_copy_label.winfo_manager()
+    # Vuelve la red (refresh_status lo nota solo, sin otro cambio)
+    monkeypatch.setattr(tray_client.state, "lan_en_la_red", True)
+    v.render_lan()
+    assert v.lan_copy_label.winfo_manager() == "pack"
+    monkeypatch.setattr(local_server, "copia_vieja", None)
+    v.refresh_status()
+    assert not v.lan_copy_label.winfo_manager()
+
+
 def test_modo_lan_apagado_con_el_puerto_tomado_lo_dice(ventana, monkeypatch):
     """Issue #4: si ni en esta PC pudo escuchar, Setup dice el puerto ocupado
     y no solo "apagado"."""
