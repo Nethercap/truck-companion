@@ -23,7 +23,7 @@
 {"from":"Fort Collins","to":"Steamboat Springs","man":[["turn","right",-39448,-9957],["fork","right",-43920,-8383],["turn","right",-46890,-11632]]},
 {"from":"McAllen","to":"Laredo","man":[["fork","left",-12695,71147],["fork","right",-17835,65603]]},
 {"from":"Fort Collins","to":"Scottsbluff","man":[["turn","left",-39158,-11562],["turn","left",-39081,-11342],["fork","left",-38105,-11169],["fork","left",-36577,-14486],["fork","left",-36575,-15245],["fork","left",-36558,-15566],["fork","right",-36805,-20004]]},
-{"from":"Steamboat Springs","to":"Rangely","man":[["turn","right",-46890,-11632],["turn","left",-55189,-11115]]}]},"ets2":{"graph":"bc09b4184acb8243","routes":[
+{"from":"Steamboat Springs","to":"Rangely","man":[["turn","right",-46890,-11632],["turn","left",-55189,-11115]]}]},"ets2":{"graph":"06372a6ff6c17bf9","routes":[
 {"from":"Alta","to":"Honningsvåg","man":[["fork","left",36154,-116729],["turn","left",36364,-117015]]},
 {"from":"Călărași","to":"Brașov","man":[["fork","right",62399,31100],["turn","right",60157,31262],["turn","right",56157,28710],["fork","right",56313,28739],["turn","left",57862,25132],["turn","left",58270,23862]]},
 {"from":"Istanbul","to":"Varna","man":[["fork","left",72672,46477],["fork","left",71956,47170],["fork","left",66773,46018],["turn","right",65749,45318],["turn","left",65865,45249],["fork","left",65828,44756],["fork","right",64864,43747],["turn","right",64318,41038],["turn","left",68838,40227],["roundabout","left",69176,40107,1],["turn","left",69992,39358],["turn","right",69461,36463],["turn","left",69679,35961],["fork","right",69465,35787]]},

@@ -3538,7 +3538,10 @@ function distanceToRouteMeters(x, z, alcanza = 0) {
 // largos de nodo a nodo y el -prefabs.bin.
 // 7 = 10-11: el cruce derecho de una rotonda de un solo prefab, cada sentido
 // por su lado del anillo (PREFAB_OTRO_LADO_M del constructor, reporte #38).
-const ROUTE_GRAPH_V3_REV = 7;
+// 8 = 24-11: la izquierda y el rulo de un trebol, cada sentido por su camino
+// (PREFAB_OTRO_CAMINO_M del constructor, reporte #60, Ostrava). Cambian las 9
+// variantes de ETS2 con esos treboles (41 pares en ets2); ATS y ets2_gu no.
+const ROUTE_GRAPH_V3_REV = 8;
 
 // Flechas de carril (decodeLanesBin en pure.js): archivo aparte y chico
 // (~90 KB en ATS), que se baja despues del grafo y solo sirve con ESE grafo
