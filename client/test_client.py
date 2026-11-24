@@ -1635,6 +1635,18 @@ def test_lan_la_bandeja_lo_prende_y_main_decide_antes_de_guardar_first_run(monke
     assert decide < fuente.index("start_asyncio_thread(") < fuente.index('settings["first_run_done"] = True')
 
 
+def test_las_partidas_se_buscan_en_documentos_y_en_steam(monkeypatch, tmp_path):
+    """El cableado: sin la carpeta de Steam, con un perfil de Steam Cloud no
+    se lee ninguna partida (hasta la 1.5.46 era asi)."""
+    import inspect
+    import tray_client
+    monkeypatch.setattr(tray_client.client_lib, "documents_folder", lambda: str(tmp_path / "Documentos"))
+    monkeypatch.setattr(tray_client.plugin_installer, "steam_roots", lambda: [str(tmp_path / "Steam")])
+    vigia = tray_client.vigia_de_partidas()
+    assert vigia.documentos == str(tmp_path / "Documentos") and vigia.raices_steam == [str(tmp_path / "Steam")]
+    assert "vigia_de_partidas()" in inspect.getsource(tray_client.vigilar_partidas)
+
+
 def _cuerpo_del_issue(url):
     import urllib.parse
     return urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)["body"][0]

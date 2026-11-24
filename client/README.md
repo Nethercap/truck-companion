@@ -21,9 +21,10 @@ Euro Truck Simulator 2 and American Truck Simulator.
 - On request, it presses keys in the game window when you tap a button in
   the dashboard's button box, using the bindings from your own `controls.sii`.
 - Only if you allow it (it asks once, and Setup has a checkbox to change it),
-  it reads your latest save in the game's profile folders to see where the
-  in-game GPS is going: the telemetry only says how far the route is. It never
-  writes to the save.
+  it reads your latest save in the game's profile folders (in Steam's
+  `userdata` folder for Steam Cloud profiles) to see where the in-game GPS is
+  going: the telemetry only says how far the route is. It never writes to the
+  save.
 
 **It does not**:
 - Read, modify, or access any files on your computer other than the game's

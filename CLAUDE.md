@@ -1331,7 +1331,9 @@ Revisar cada cambio contra esta lista:
    `economy.stored_gps_ahead_waypoints` (`nav_node_position`) y `player.selected_job`
    (`job_info`). Pisa el quicksave del jugador. En Discord (15-11) eligieron solo
    leer, preguntando la primera vez: `client/partida_gps.py` lee la partida mas
-   nueva de los perfiles (`profiles` y `steam_profiles`, sin los `.bak`), la
+   nueva de los perfiles (los locales en Documentos, y los de Steam Cloud en
+   `userdata/<cuenta>/<juego>/remote/profiles` de la carpeta de Steam,
+   `steam_roots` de plugin_installer), la
    descifra (ScsC: AES-256-CBC con la clave publica y zlib; bcrypt en Windows,
    libcrypto en Linux y un AES propio de respaldo, probado con los vectores del
    NIST) y la recorre en BSII o en texto sin decodificar lo que no sirve (25 MB en
@@ -1357,8 +1359,12 @@ Revisar cada cambio contra esta lista:
    GPS cambiado, un waypoint en el medio, uno ya pasado (317 km con el contra 83 del
    GPS), el trabajo elegido (al remolque), con trabajo y sin waypoints (manda el
    trabajo), con trabajo y un waypoint a mano (263 km contra 76,5 directo: dos
-   tramos) y uno que el GPS ya no cuenta (directo). Sin probar con el juego ni con
-   una partida de verdad. La app nativa no lo usa: `conduccion.js` no llama a
+   tramos) y uno que el GPS ya no cuenta (directo). Hasta la 1.5.46 los perfiles de
+   Steam Cloud se buscaban en `Documentos/<juego>/steam_profiles`, donde quedan solo
+   los controles y la configuracion (las copias `.bak` de un update si traen
+   partidas, y confundian): no se leia ninguna y no quedaba rastro (24-11). Con las
+   partidas de verdad de la PC del maintainer (ETS2 y ATS) ahora se leen; sin probar
+   con el juego andando. La app nativa no lo usa: `conduccion.js` no llama a
    `updateGameGpsSave`.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el

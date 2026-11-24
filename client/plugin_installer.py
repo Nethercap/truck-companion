@@ -98,13 +98,14 @@ def unix_a_wine(ruta: str) -> str:
     return ruta
 
 
-def linux_steam_roots(env=None, existe=os.path.isdir) -> list[str]:
+def linux_steam_roots(env=None, existe=os.path.isdir, como_se_ve=unix_a_wine) -> list[str]:
     """Bajo Proton, el Steam de Linux visto desde Wine. El del registro es uno
     de mentira dentro del prefijo, sin juegos: sin esto la instalacion solo
     aparecia con el juego ya abierto (issue #7, Nobara). Proton pasa la
     carpeta de Steam y la del prefijo (STEAM_COMPAT_CLIENT_INSTALL_PATH,
     STEAM_COMPAT_DATA_PATH, que vive en <biblioteca>/steamapps/compatdata/<id>)
-    y el HOME de Linux; en Windows ninguna existe como carpeta."""
+    y el HOME de Linux; en Windows ninguna existe como carpeta. En Linux
+    nativo las mismas carpetas van tal cual (`como_se_ve`)."""
     env = os.environ if env is None else env
     candidatas = []
     if env.get("STEAM_COMPAT_CLIENT_INSTALL_PATH", "").startswith("/"):
@@ -118,9 +119,21 @@ def linux_steam_roots(env=None, existe=os.path.isdir) -> list[str]:
             candidatas.append(home.rstrip("/") + "/" + sub)
     raices = []
     for c in candidatas:
-        ruta = unix_a_wine(c)
+        ruta = como_se_ve(c)
         if ruta not in raices and existe(ruta):
             raices.append(ruta)
+    return raices
+
+
+def steam_roots(windows=os.name == "nt") -> list[str]:
+    """Las carpetas donde esta instalado Steam (no las bibliotecas), donde
+    viven las partidas de Steam Cloud (userdata, ver partida_gps): la del
+    registro, la de Linux vista desde Wine bajo Proton, o la de Linux."""
+    linux = linux_steam_roots() if windows else linux_steam_roots(como_se_ve=str)
+    raices = []
+    for raiz in [find_steam_path()] + linux:
+        if raiz and raiz not in raices:
+            raices.append(raiz)
     return raices
 
 

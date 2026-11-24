@@ -294,6 +294,55 @@ def test_la_partida_mas_nueva_de_cualquier_perfil(tmp_path):
     assert pg.partida_mas_nueva("ats", str(tmp_path)) is None
 
 
+def _guardar_en_steam(raiz, cuenta, app, perfil, slot, contenido, fecha, carpeta="profiles"):
+    destino = raiz / "userdata" / cuenta / app / "remote" / carpeta / perfil / "save" / slot
+    destino.mkdir(parents=True, exist_ok=True)
+    ruta = destino / "game.sii"
+    ruta.write_bytes(contenido)
+    os.utime(ruta, (fecha, fecha))
+    return str(ruta)
+
+
+def test_la_partida_de_un_perfil_de_steam_cloud(tmp_path):
+    """Con Steam Cloud, Documentos/steam_profiles tiene solo los controles y la
+    configuracion: las partidas estan en la carpeta de Steam. Como en una PC de
+    verdad (24-11), con la copia de un update en Documentos y la otra cuenta."""
+    docs, steam = tmp_path / "Documentos", tmp_path / "Steam [x86]"
+    local = docs / "Euro Truck Simulator 2" / "steam_profiles" / "41424344"
+    local.mkdir(parents=True)
+    (local / "controls.sii").write_bytes(b"x")
+    _guardar(docs, "steam_profiles(1.62.3.3s).bak/41424344", "autosave", b"x", 9000)
+    _guardar_en_steam(steam, "111", "227300", "41424344", "autosave", b"x", 1000)
+    nueva = _guardar_en_steam(steam, "111", "227300", "41424344", "quicksave", b"x", 2000)
+    _guardar_en_steam(steam, "222", "227300", "45464748", "autosave", b"x", 1500)
+    _guardar_en_steam(steam, "111", "227300", "41424344", "autosave", b"x", 9500, carpeta="profiles(1.61).bak")
+    ats = _guardar_en_steam(steam, "111", "270880", "41424344", "autosave", b"x", 3000)
+    assert pg.partida_mas_nueva("ets2", str(docs), [str(steam)]) == (nueva, 2000)
+    assert pg.partida_mas_nueva("ats", str(docs), [str(steam)]) == (ats, 3000)
+    # sin saber donde esta Steam, ninguna: es lo que pasaba
+    assert pg.partida_mas_nueva("ets2", str(docs)) is None
+    # un perfil local mas nuevo le gana al de Steam Cloud, y al reves
+    local_nueva = _guardar(docs, "profiles/4C4F43", "autosave", b"x", 2500)
+    assert pg.partida_mas_nueva("ets2", str(docs), [str(steam)]) == (local_nueva, 2500)
+
+
+def test_el_vigia_lee_la_de_steam_cloud(tmp_path):
+    _guardar_en_steam(tmp_path / "Steam", "111", "227300", "41424344", "autosave", _partida_cifrada(TEXTO.encode()), 1000)
+    vigia = pg.Vigia(str(tmp_path / "Documentos"), [str(tmp_path / "Steam")])
+    gps = vigia.mirar("ets2", 1002)
+    assert gps["waypoints"][0] == [2560.0, -1280.0] and gps["savedAt"] == 1000 and gps["game"] == "ets2"
+
+
+def test_sin_partidas_queda_en_el_log_una_vez_por_juego(tmp_path, caplog):
+    vigia = pg.Vigia(str(tmp_path), [])
+    with caplog.at_level("INFO"):
+        for _ in range(3):
+            assert vigia.mirar("ets2", 1000) is None
+        assert vigia.mirar("ats", 1000) is None
+    lineas = [r.getMessage() for r in caplog.records if "Ninguna partida" in r.getMessage()]
+    assert len(lineas) == 2 and "ets2" in lineas[0] and "ats" in lineas[1]
+
+
 def test_el_vigia_espera_que_termine_de_escribir_y_relee_al_cambiar(tmp_path):
     ruta = _guardar(tmp_path, "profiles/41424344", "autosave", _partida_cifrada(TEXTO.encode()), 1000)
     vigia = pg.Vigia(str(tmp_path))
