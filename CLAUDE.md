@@ -1221,7 +1221,10 @@ Salieron de comparar con los pedidos y resenas de TruckSim GPS.
   mismo tramo que la lista del panel, `waypointLegEtas`). Sin trabajo y con una sola, no:
   arriba dice lo mismo.
 - Ferry y tren: `ferryAhead` es lo que se muestra cuando `findUpcomingTurn` no encontro
-  giro antes (por eso `check_avisos` y el simulador no cambian). El nombre sale de los
+  giro antes, y los giros se buscan solo en el tramo por tierra (`landAround`): el nodo
+  del muelle se media con la salida sobre el mar, y ese "turn right" falso tapaba el
+  ferry en 42 de 138 cruces de ETS2 y 73 de 266 de ProMods (con el corte, en ninguno).
+  El nombre sale de los
   puertos del mismo `.pmtiles` del mapa (`loadFerryPort`: el tile de z10 de donde llega,
   leido con `mvtPoints`, porque MapLibre solo da los tiles a la vista), sin archivo nuevo
   en R2. La ciudad mas cercana no sirve: en 45 de 137 cruces de ETS2 no es el puerto. La

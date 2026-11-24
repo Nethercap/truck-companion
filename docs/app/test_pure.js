@@ -7668,6 +7668,23 @@ test('ferryAhead: el proximo cruce por la ruta, con el nodo donde llega', () => 
   assert.deepEqual(nav4.ferryAhead(pts, Infinity).node, [5000, 0]);
 });
 
+test('landAround: los giros se buscan en el tramo por tierra donde esta el camion', () => {
+  const pts = [[0, 0, 0], [100, 0, 0], [300, 0, 0], [5000, 0, 1], [5100, 0, 0], [5200, 0, 0], [9000, 0, 1], [9100, 0, 0]];
+  assert.deepEqual(nav4.landAround(pts), { pts: pts.slice(0, 3), here: 0 });
+  assert.deepEqual(nav4.landAround(pts, 1), { pts: pts.slice(0, 3), here: 1 });
+  // En el muelle, o pasado su nodo (el camion va sobre la linea del ferry): nada que girar
+  assert.deepEqual(nav4.landAround(pts, 2).pts, []);
+  assert.deepEqual(nav4.landAround([[0, 0, 0], [300, 0, 0], [320, 4, 0], [5000, 0, 1], [5100, 0, 0]], 2).pts, []);
+  // Recien bajado: lo de atras es mar, la entrada se mide desde donde llego
+  assert.deepEqual(nav4.landAround(pts, 3), { pts: pts.slice(3, 6), here: 0 });
+  assert.deepEqual(nav4.landAround(pts, 4), { pts: pts.slice(3, 6), here: 1 });
+  assert.deepEqual(nav4.landAround(pts, 7), { pts: pts.slice(6), here: 1 });     // pasado el segundo
+  // Sin mar, la misma lista (no se copia en cada dato)
+  const tierra = pts.slice(0, 3);
+  assert.equal(nav4.landAround(tierra, 1).pts, tierra);
+  assert.equal(nav4.landAround(tierra, 1).here, 1);
+});
+
 // Un tile MVT escrito a mano: capas con puntos (y una linea) y propiedades.
 function tileMvt(capas) {
   const varint = (n) => { const o = []; do { let b = n % 128; n = Math.floor(n / 128); if (n) b += 128; o.push(b); } while (n); return o; };

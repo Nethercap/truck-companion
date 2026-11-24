@@ -5313,8 +5313,10 @@ function updateCompass() {
 // de la ruta por el que llega (check_avisos y el simulador no lo pasan).
 function findUpcomingTurn(heading) {
   if (!currentRouteWorldPoints || currentRouteWorldPoints.length < 3 || !toLngLat) return null;
-  const pts = routeBehind.length ? routeBehind.concat(currentRouteWorldPoints) : currentRouteWorldPoints;
-  const here = routeBehind.length; // indice de la posicion actual dentro de pts
+  // here: indice de la posicion actual dentro de pts. Solo el tramo por tierra: lo
+  // que hay del otro lado de un ferry o tren se anuncia alla (landAround).
+  const { pts, here } = landAround(routeBehind.length ? routeBehind.concat(currentRouteWorldPoints) : currentRouteWorldPoints, routeBehind.length);
+  if (pts.length < 3) return null;
   const { cum, pointAt } = routeMetrics(pts);
   // Rumbo geografico entre dos puntos de mundo.
   const bearingBetween = (p, q) => {
@@ -5360,7 +5362,6 @@ function findUpcomingTurn(heading) {
     ? detectRoundabout({ pts, cum, i, iEnd, adjacency: graph.adjacency, nodeAt: graph.nodeXY, edgeLine, bearingBetween }) : null;
   for (let i = 1; i < pts.length - 1; i++) {
     if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
-    if (pts[i][2] === 1) break; // tramo de ferry/tren: lo que hay del otro lado se anuncia alla
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
     let iEnd = junctionClusterEnd(pts, cum, i, NAV_JUNCTION_CLUSTER_GAP_M, NAV_JUNCTION_CLUSTER_SPAN_M, here);
     // Rotonda: se anuncia la salida ("tomar la segunda salida") en la entrada
