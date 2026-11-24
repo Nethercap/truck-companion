@@ -120,7 +120,7 @@ GUIDE_TEXT.en = {
 <h3>On a second screen</h3>
 <p>Open <a href="/dash/">trucksim-dash.com/dash</a> on another device (a tablet, an old phone, a second monitor) and type the same pairing code. The GPS and the dashboard can run at the same time. Settings has a <b>Copy the panel link</b> button.</p>`,
     buttons: `
-<p>The gamepad button on the map opens a row of truck controls. Tap one and the client on your PC presses the key in the game for you.</p>`,
+<p>The gamepad button on the map opens a row of truck controls. Tap one and the client on your PC does it in the game for you.</p>`,
     settings: `
 <p>The gear button opens Settings:</p>
 <ul>
@@ -225,7 +225,7 @@ GUIDE_TEXT.en = {
     buttons: `
 <p>A button turns <b>blue</b> when that thing is on in your truck (engine running, lights on, trailer attached, cruise control set), so the row doubles as a status panel.</p>
 <h3>Your keys</h3>
-<p>The buttons come with preset keys. If you changed the controls in the game, match them in Settings, <b>Remap keys</b>. Leave a key empty to turn that button off.</p>
+<p>There are no keys to set up: the buttons reach the game directly, even for an action with no key assigned. <b>Remap keys</b>, in Settings, is only for when they can't (a client before 1.5.47, or a plugin that hasn't been updated yet): then they go as key presses, with the keys you have in the game.</p>
 <h3>Custom buttons</h3>
 <p><b>Add button</b> makes up to 3 of your own: give it a label and press the key (Ctrl, Shift and Alt combinations work, as well as F1 to F24 and the numpad). Then bind the same key to anything in the game's controls: differential lock, retarder, horn, the radio, whatever you like.</p>
 <div class="tip"><p>On a phone held upright the button box is one more page of the info panel: swipe to it. The client has to be running with the game open; in the demo the buttons do nothing.</p></div>`,
@@ -374,7 +374,7 @@ GUIDE_TEXT.es = {
 <h3>En una segunda pantalla</h3>
 <p>Abrí <a href="/dash/">trucksim-dash.com/dash</a> en otro dispositivo (una tablet, un celular viejo, un segundo monitor) y escribí el mismo código. El GPS y el tablero pueden andar a la vez. En Configuración está el botón <b>Copiar el link del panel</b>.</p>`,
     buttons: `
-<p>El botón del joystick en el mapa abre una fila de controles del camión. Tocás uno y el cliente de la PC aprieta la tecla en el juego por vos.</p>`,
+<p>El botón del joystick en el mapa abre una fila de controles del camión. Tocás uno y el cliente de la PC lo hace en el juego por vos.</p>`,
     settings: `
 <p>El engranaje abre la Configuración:</p>
 <ul>
@@ -479,7 +479,7 @@ GUIDE_TEXT.es = {
     buttons: `
 <p>Un botón se pone <b>azul</b> cuando eso está prendido en tu camión (motor en marcha, luces, remolque enganchado, control de crucero puesto), así que la fila también sirve de panel de estado.</p>
 <h3>Tus teclas</h3>
-<p>Los botones vienen con teclas ya puestas. Si cambiaste los controles en el juego, igualalos en Configuración, <b>Remapear teclas</b>. Dejá una tecla vacía para apagar ese botón.</p>
+<p>No hay teclas que configurar: los botones le llegan al juego directo, aunque la acción no tenga tecla asignada. <b>Remapear teclas</b>, en Configuración, es solo para cuando no pueden (un cliente anterior a la 1.5.47, o el plugin sin actualizar todavía): ahí van como teclas, con las que tenés en el juego.</p>
 <h3>Botones propios</h3>
 <p><b>Agregar botón</b> crea hasta 3 tuyos: poné un nombre y apretá la tecla (andan las combinaciones con Ctrl, Shift y Alt, de F1 a F24 y el teclado numérico). Después asigná esa misma tecla a lo que quieras en los controles del juego: bloqueo del diferencial, retardador, bocina, la radio, lo que se te ocurra.</p>
 <div class="tip"><p>En un celular vertical la botonera es una página más del panel de info: deslizá hasta ella. El cliente tiene que estar abierto con el juego andando; en la demo los botones no hacen nada.</p></div>`,

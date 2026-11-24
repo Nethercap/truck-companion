@@ -15,10 +15,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-5.24.0.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261124i" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261124i" />
-<link rel="stylesheet" href="../dash/trucks.css?v=20261124i" />
-<link rel="stylesheet" href="app.css?v=20261124i" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261124j" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261124j" />
+<link rel="stylesheet" href="../dash/trucks.css?v=20261124j" />
+<link rel="stylesheet" href="app.css?v=20261124j" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -795,7 +795,7 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
   <div id="customBtnModal" class="settingsOverlay" style="display:none;">
     <div class="settingsPanel">
       <h3 data-i18n="customBtnModalTitle">Custom button</h3>
-      <p class="waypointModalExplain" data-i18n="customBtnExplain">The client presses this key in the game, exactly like the built-in buttons. Bind the same key to something in the game's controls.</p>
+      <p class="waypointModalExplain" data-i18n="customBtnExplain">The client presses this key in the game. Bind the same key to something in the game's controls.</p>
       <div class="keybindRow"><span data-i18n="customBtnLabel">Label</span><input type="text" id="customBtnTitle" maxlength="14" style="width:140px" /></div>
       <div class="keybindRow" style="margin-top:0.5rem"><span data-i18n="customBtnKey">Key</span><input type="text" id="customBtnKey" maxlength="24" style="width:140px" data-i18n-placeholder="customBtnKeyPlaceholder" placeholder="Press a key…" /></div>
       <p class="waypointModalExplain" data-i18n="customBtnKeyHint">Click the field and press the key (Ctrl / Shift / Alt combos work). Letters, digits, F1–F24, numpad and the usual punctuation.</p>
@@ -810,7 +810,7 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
   <div id="keybindsModal" class="settingsOverlay" style="display:none;">
     <div class="settingsPanel">
       <h3 data-i18n="keybindsModalTitle">Remap keys</h3>
-      <p class="waypointModalExplain" data-i18n="keybindsModalExplain">Keys must match your in-game control settings. Leave a field empty to leave that command unassigned.</p>
+      <p class="waypointModalExplain" data-i18n="keybindsModalExplain">The buttons reach the game without keys; these are only used when they can't (a client before 1.5.47, or a plugin not updated yet). Then keys must match your in-game control settings. Leave a field empty to leave that command unassigned.</p>
       <div id="keybindsList"></div>
       <div class="waypointModalButtons">
         <button id="keybindsSaveBtn" data-i18n="save">Save</button>
@@ -832,15 +832,15 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 <script src="vendor/maplibre-gl-5.24.0.js"></script>
 <script src="vendor/pmtiles-4.5.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261124i"></script>
-<script src="pure.js?v=20261124i"></script>
-<script src="i18n.js?v=20261124i"></script>
-<script src="i18n_en_es.js?v=20261124i"></script>
-<script src="../dash/dash.js?v=20261124i"></script>
-<script src="../dash/classic.js?v=20261124i"></script>
-<script src="../dash/trucks.js?v=20261124i"></script>
-<script src="app.js?v=20261124i"></script>
-<script src="convoy.js?v=20261124i"></script>
-<script src="livemap.js?v=20261124i"></script>
+<script src="variants.js?v=20261124j"></script>
+<script src="pure.js?v=20261124j"></script>
+<script src="i18n.js?v=20261124j"></script>
+<script src="i18n_en_es.js?v=20261124j"></script>
+<script src="../dash/dash.js?v=20261124j"></script>
+<script src="../dash/classic.js?v=20261124j"></script>
+<script src="../dash/trucks.js?v=20261124j"></script>
+<script src="app.js?v=20261124j"></script>
+<script src="convoy.js?v=20261124j"></script>
+<script src="livemap.js?v=20261124j"></script>
 </body>
 </html>
