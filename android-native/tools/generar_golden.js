@@ -151,8 +151,10 @@ const constantes = { BASEMAP_VERSION: constante('BASEMAP_VERSION'), COMPANY_ICON
 const ctxFondo = vm.createContext({});
 const BASES = vm.runInContext(`${lineaConst('BASEMAP_BY_PROJECTION')}; BASEMAP_BY_PROJECTION`, ctxFondo);
 const fondos = [['ats', []], ['ats', ['promods_canada']], ['ets2', []], ['ets2', ['promods', 'promods_me']],
+  ['ets2', ['promods', 'promods_me'], 'europe-promods285'],
   ['ets2', ['rusmap', 'roextended']], ['ets2', ['grand_utopia', 'eu_grand_utopia']], ['gu', ['grand_utopia']]]
-  .map(([proyeccion, mods]) => ({ proyeccion, mods, fondo: pure.basemapForVariant(BASES[proyeccion], mods) }));
+  .map(([proyeccion, mods, propio]) => ({ proyeccion, mods, ...(propio ? { propio } : {}),
+    fondo: pure.basemapForVariant(BASES[proyeccion], mods, propio) }));
 
 const golden = { proyeccion, variantes, sinOpcionales: SIN_OPCIONALES, todas: TODAS, anchos, colores, constantes, fondos };
 const texto = JSON.stringify(golden, null, 0).replace(/\},\{/g, '},\n{') + '\n';

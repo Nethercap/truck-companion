@@ -245,6 +245,7 @@
 {"proyeccion":"ats","mods":["promods_canada"],"fondo":"usa"},
 {"proyeccion":"ets2","mods":[],"fondo":"europe"},
 {"proyeccion":"ets2","mods":["promods","promods_me"],"fondo":"europe-promods"},
+{"proyeccion":"ets2","mods":["promods","promods_me"],"propio":"europe-promods285","fondo":"europe-promods285"},
 {"proyeccion":"ets2","mods":["rusmap","roextended"],"fondo":"europe"},
 {"proyeccion":"ets2","mods":["grand_utopia","eu_grand_utopia"],"fondo":"europe"},
 {"proyeccion":"gu","mods":["grand_utopia"],"fondo":null}]}

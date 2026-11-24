@@ -1260,7 +1260,7 @@ const GAME_MAPS = Object.fromEntries(Object.entries(VARIANT_META).map(([name, me
   toLngLat: PROJECTIONS[meta.projection].toLngLat,
   fromLngLat: PROJECTIONS[meta.projection].fromLngLat,
   origin: meta.origin,
-  basemap: basemapForVariant(BASEMAP_BY_PROJECTION[meta.projection], meta.mods),
+  basemap: basemapForVariant(BASEMAP_BY_PROJECTION[meta.projection], meta.mods, meta.basemap),
 }]));
 
 // Mapas armados en la PC del cliente ("Build my map", client/map_builder.py).

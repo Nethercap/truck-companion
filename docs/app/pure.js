@@ -4256,8 +4256,12 @@ function basemapFitsCities(r, { minShare = BASEMAP_MIN_LAND_SHARE, minCities = 2
 // (build_basemap.py) mueve la costa real a donde la web dibuja la Islandia del
 // juego. La de ProMods (con sus Feroe) esta en otro lugar del juego que la del
 // DLC de SCS, asi que va en otro archivo (10-11-2026).
+// Una variante puede nombrar su propio fondo en el manifest (meta.basemap): la
+// 2.85 de ProMods usa la Islandia del DLC y conserva sus Feroe, y las que
+// siguen en la 2.84 (RusMap, Roextended, EUGU) llevan el de antes (24-11).
 const BASEMAP_PROMODS = 'europe-promods';
-function basemapForVariant(base, mods) {
+function basemapForVariant(base, mods, own) {
+  if (base === 'europe' && typeof own === 'string' && own) return own;
   if (base === 'europe' && Array.isArray(mods) && mods.includes('promods')) return BASEMAP_PROMODS;
   return base || null;
 }

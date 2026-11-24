@@ -1,6 +1,6 @@
 {
   "_comment": "Fuente de verdad de los datos de mapa publicados. Se edita a mano al publicar una variante (ver mod-integration-pipeline/README.md en D:/ets2-companion). tools/check_map_mods.py lo lee, consulta las versiones upstream donde se puede y escribe map-mods-status.json; admin.html muestra ambos.",
-  "updated": "2026-11-16",
+  "updated": "2026-11-24",
   "r2Base": "https://maps.trucksim-dash.com",
   "variants": {
     "ats": {
@@ -162,9 +162,9 @@
     "ats_expansion": {
       "label": "ATS + ATS Expansion",
       "game": "ats",
-      "gameVersion": "1.61.3.18",
-      "built": "2026-11-01",
-      "mapDataVersion": "20261101",
+      "gameVersion": "1.62.2.0",
+      "built": "2026-11-24",
+      "mapDataVersion": "20261124",
       "mods": [
         "ats_expansion"
       ],
@@ -185,8 +185,8 @@
       "label": "ATS + Coast to Coast + ATS Expansion",
       "game": "ats",
       "gameVersion": "1.62.2.0",
-      "built": "2026-11-12",
-      "mapDataVersion": "20261112",
+      "built": "2026-11-24",
+      "mapDataVersion": "20261124",
       "mods": [
         "c2c",
         "ats_expansion"
@@ -299,9 +299,9 @@
     "ets2_promods": {
       "label": "ETS2 + ProMods Europe (+ Middle East, The Maghreb, The Great Steppe)",
       "game": "ets2",
-      "gameVersion": "1.61.1",
-      "built": "2026-09-29",
-      "mapDataVersion": "20261022",
+      "gameVersion": "1.62.3.2",
+      "built": "2026-11-24",
+      "mapDataVersion": "20261124",
       "mods": [
         "promods",
         "promods_me",
@@ -319,7 +319,8 @@
       "origin": [
         15,
         50
-      ]
+      ],
+      "basemap": "europe-promods285"
     },
     "ets2_promods_rusmap": {
       "label": "ETS2 + ProMods + RusMap (connector 2.84/2.61)",
@@ -522,18 +523,19 @@
     "promods": {
       "name": "ProMods Europe",
       "game": "ets2",
-      "version": "2.84",
+      "version": "2.85",
       "homepage": "https://www.promods.net/setup.php",
       "check": {
         "url": "https://truckymods.io/euro-truck-simulator-2/map-patches/promods-rusmap-connector-626771",
         "pattern": "ProMods (\\d+\\.\\d+) - RusMap",
         "note": "leido de la pagina del conector ProMods-RusMap en TruckyMods (promods.net bloquea scripts)"
-      }
+      },
+      "checkNote": "ets2_promods en 2.85; las combinaciones con RusMap, Roextended y EUGU siguen en 2.84 (faltan sus conectores)"
     },
     "promods_me": {
       "name": "ProMods Middle East",
       "game": "ets2",
-      "version": "2.84",
+      "version": "2.85",
       "homepage": "https://www.promods.net/setup.php",
       "check": null,
       "checkNote": "va con la version de ProMods Europe"
@@ -541,7 +543,7 @@
     "promods_maghreb": {
       "name": "ProMods The Maghreb",
       "game": "ets2",
-      "version": "1.04",
+      "version": "1.05",
       "homepage": "https://www.promods.net/setup.php",
       "check": null,
       "checkNote": "promods.net bloquea scripts (403): verificar a mano"
@@ -549,7 +551,7 @@
     "promods_tgs": {
       "name": "ProMods The Great Steppe",
       "game": "ets2",
-      "version": "1.70",
+      "version": "1.71",
       "homepage": "https://www.promods.net/setup.php",
       "check": null,
       "checkNote": "promods.net bloquea scripts (403): verificar a mano"
@@ -686,10 +688,10 @@
       "name": "ATS Expansion",
       "author": "Sineptorro, Driver47",
       "game": "ats",
-      "version": "23.0",
+      "version": "24.0",
       "homepage": "https://forum.scssoft.com/viewtopic.php?t=312717",
       "check": null,
-      "checkNote": "hilo del foro de SCS (t=312717): verificar a mano. Con C2C va arriba (C2C abajo de todo): gana en los 10 sectores que tocan los dos"
+      "checkNote": "hilo del foro de SCS (t=312717): verificar a mano. 24.0: para ATS 1.62, pide el DLC de South Dakota. Con C2C va arriba (C2C abajo de todo): gana en los 10 sectores que tocan los dos"
     }
   }
 }
