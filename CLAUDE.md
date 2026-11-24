@@ -1001,6 +1001,24 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `tools/probar_plugin.py` lo prueba con un TMP falso. Si cambia la
   disposicion del bloque, cambia en los dos lados y sube la revision
   (`test_tmp_players.py` compara el .hpp con el lector).
+- Botones por el SDK de entrada (24-11): el plugin registra un dispositivo
+  semantical con los 13 mixes de la botonera (`truckdash_input.cpp`) y el cliente
+  pide cada toque en `Local\TruckDashInput` (`entrada_sdk.py`, revision 1; bloque
+  aparte porque el SDK no dice si va primero `scs_input_init` o
+  `scs_telemetry_init`, y telemetria borra el suyo al abrirlo). Las teclas quedan
+  de respaldo y los custom siguen siendo teclas. Declarar una entrada es para el
+  juego tenerla asignada aunque no mande nada: con todos los mixes declarados el
+  limpiaparabrisas no se apaga mas con su tecla (foro SCS t=328756, `wipersback`),
+  asi que solo los que usa un boton, y nunca `quicksave`. Sin foco el juego no
+  pide entrada (issue 642 de ETS2LA): con el juego atras se lo trae al frente como
+  antes y se espera. `first_in_frame` puede seguir prendido en las llamadas
+  repetidas de un cuadro: no usarlo. Un pedido de mas de 300 ms no se aprieta
+  nunca y el cliente espera mas que eso antes de usar la tecla, o el boton se
+  apretaria dos veces. Si el juego lo toma y la telemetria no cambia (balizas,
+  luces o freno de mano, `EFECTO`) dos veces, esa partida sigue con teclas:
+  TruckersMP puede bloquearlo. `truckdash-no-input.txt` al lado de la DLL lo apaga.
+  Si cambia la disposicion o la lista, en los dos lados (`test_entrada_sdk.py`
+  compara; `tools/probar_entrada.py` prueba el plugin con un juego falso).
 - Trabajos de bus (DLC Coaches, ETS2 1.62.3; 13-11): el juego no manda
   ciudades sino paradas, una etapa por indice (`source_stop.*`,
   `destination_stop.*`, tipo `city` o `viewpoints`). El plugin las guarda en

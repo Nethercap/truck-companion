@@ -25,6 +25,7 @@ import sys
 import time
 
 IS_WINDOWS = sys.platform == "win32"
+import entrada_sdk
 import keys_compat
 import telemetry_compat
 import trabajo_bus
@@ -95,6 +96,7 @@ else:
 # Nombre de nuestra accion -> nombre interno que usa SCS en controls.sii
 # (linea "mix <nombre_scs> `...`"). Se saco leyendo un controls.sii real -
 # no esta documentado oficialmente, puede variar entre versiones del juego.
+# Con ese mismo nombre lo aprieta el plugin (BOTONES de entrada_sdk.py).
 ACTION_TO_SCS_ACTION = {
     "toggle_hazards": "flasher4way",
     "toggle_beacon": "beacon",
@@ -609,10 +611,25 @@ def send_custom_key(spec) -> str:
         return str(exc)
 
 
+# Los botones por el SDK de entrada del juego (entrada_sdk.py), que no necesita
+# tecla ni foco. Las teclas quedan de respaldo.
+botones_sdk = entrada_sdk.Botones()
+
+
+def traer_juego_al_frente() -> bool:
+    hwnd = find_game_window()
+    if not hwnd:
+        return False
+    bring_window_to_foreground(hwnd)
+    return True
+
+
 def send_game_command(action: str, keybinds: dict) -> str:
     """Devuelve un codigo de resultado ("ok", "no_key", "no_window", o el
     texto de la excepcion) - la web lo usa para avisar cuando algo no
     funciono, en vez de fallar en silencio sin que nadie se de cuenta."""
+    if botones_sdk.apretar(ACTION_TO_SCS_ACTION.get(action), traer_juego_al_frente):
+        return "ok"
     key = keybinds.get(action)
     if not key:
         logging.info(f"Comando '{action}' no tiene tecla asignada en keybinds.json, se ignora.")
