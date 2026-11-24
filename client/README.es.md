@@ -19,14 +19,22 @@ gratuito para Euro Truck Simulator 2 y American Truck Simulator.
 - A pedido (ventana de Setup), copia el plugin del SDK de telemetría de SCS
   en la carpeta `bin\win_x64\plugins\` del juego, y lee la lista de
   bibliotecas de Steam para encontrar dónde está instalado el juego.
-- A pedido, aprieta teclas en la ventana del juego cuando tocás un botón en
-  la botonera del tablero, usando las asignaciones de tu propio `controls.sii`.
+- Cuando tocás un botón en la botonera del tablero, le pide al plugin que lo
+  apriete por el **SDK de entrada oficial de SCS** (el plugin solo puede
+  apretar los 13 botones de la botonera). Si el plugin o el juego no toman
+  esa entrada, y en los botones propios, aprieta teclas en la ventana del
+  juego, con las asignaciones de tu propio `controls.sii`.
+- Solo si lo permitís (pregunta una vez, y en Setup hay una casilla para
+  cambiarlo), lee tu última partida guardada en las carpetas de perfil del
+  juego (en la carpeta `userdata` de Steam con perfiles de Steam Cloud)
+  para ver a dónde va el GPS del juego: la telemetría solo dice cuánto
+  falta. Nunca escribe en la partida.
 
 **No hace lo siguiente**:
 - No lee, modifica ni accede a ningún archivo de tu computadora aparte de
   la memoria compartida de telemetría del juego, el `controls.sii` del juego
-  (solo lectura, para la botonera), el archivo del plugin que instala a
-  pedido, y sus propios settings y log al lado del `.exe`.
+  (solo lectura, para la botonera), tu última partida (solo lectura, y solo
+  si lo permitiste), el archivo del plugin que instala a pedido, y sus propios settings y log al lado del `.exe`.
 - No requiere permisos de administrador.
 - No recolecta ni guarda información personal. La telemetría se reenvía en
   vivo y no queda guardada del lado del servidor más allá de la sesión

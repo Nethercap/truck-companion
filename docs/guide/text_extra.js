@@ -116,7 +116,7 @@ GUIDE_TEXT.de = {
 <h3>Auf einem zweiten Bildschirm</h3>
 <p>Öffne <a href="/dash/">trucksim-dash.com/dash</a> auf einem anderen Gerät (Tablet, altes Handy, zweiter Monitor) und gib denselben Pairing-Code ein. Navi und Armaturenbrett können gleichzeitig laufen. In den Einstellungen gibt es den Knopf <b>Link zum Armaturenbrett kopieren</b>.</p>`,
     buttons: `
-<p>Der Gamepad-Knopf auf der Karte öffnet eine Reihe von Lkw-Befehlen. Tippe auf einen und der Client auf deinem PC drückt die Taste im Spiel für dich.</p>`,
+<p>Der Gamepad-Knopf auf der Karte öffnet eine Reihe von Lkw-Befehlen. Tippe auf einen und der Client auf deinem PC macht es im Spiel für dich.</p>`,
     settings: `
 <p>Das Zahnrad öffnet die Einstellungen:</p>
 <ul>
@@ -221,7 +221,7 @@ GUIDE_TEXT.de = {
     buttons: `
 <p>Ein Knopf wird <b>blau</b>, wenn das im Lkw an ist (Motor läuft, Licht an, Anhänger angekuppelt, Tempomat gesetzt), so dient die Reihe auch als Statusanzeige.</p>
 <h3>Deine Tasten</h3>
-<p>Die Knöpfe haben voreingestellte Tasten. Wenn du die Steuerung im Spiel geändert hast, gleiche sie in den Einstellungen an, <b>Tasten belegen</b>. Lass eine Taste leer, um den Knopf abzuschalten.</p>
+<p>Es gibt keine Tasten einzurichten: Die Knöpfe erreichen das Spiel direkt, auch wenn für die Aktion keine Taste belegt ist. <b>Tasten belegen</b> in den Einstellungen ist nur für den Fall, dass das nicht geht (ein Client vor 1.5.47 oder ein noch nicht aktualisiertes Plugin): Dann gehen sie als Tastendruck, mit den Tasten, die du im Spiel hast.</p>
 <h3>Eigene Knöpfe</h3>
 <p><b>Button hinzufügen</b> legt bis zu 3 eigene an: Gib eine Beschriftung ein und drücke die Taste (Kombinationen mit Strg, Umschalt und Alt gehen, ebenso F1 bis F24 und der Ziffernblock). Belege dann dieselbe Taste in der Steuerung des Spiels mit was du willst: Differenzialsperre, Retarder, Hupe, das Radio.</p>
 <div class="tip"><p>Auf dem Handy im Hochformat ist das Tastenfeld eine weitere Seite des Infopanels: einfach hinwischen. Der Client muss laufen und das Spiel offen sein; in der Demo tun die Knöpfe nichts.</p></div>`,
@@ -369,7 +369,7 @@ GUIDE_TEXT.fr = {
 <h3>Sur un second écran</h3>
 <p>Ouvre <a href="/dash/">trucksim-dash.com/dash</a> sur un autre appareil (tablette, vieux téléphone, second écran) et tape le même code d'appairage. Le GPS et le tableau de bord peuvent tourner en même temps. Les Paramètres ont un bouton <b>Copier le lien du tableau de bord</b>.</p>`,
     buttons: `
-<p>Le bouton manette sur la carte ouvre une rangée de commandes du camion. Touche-en une et le client sur ton PC appuie sur la touche dans le jeu à ta place.</p>`,
+<p>Le bouton manette sur la carte ouvre une rangée de commandes du camion. Touche-en une et le client sur ton PC le fait dans le jeu à ta place.</p>`,
     settings: `
 <p>L'engrenage ouvre les Paramètres :</p>
 <ul>
@@ -474,7 +474,7 @@ GUIDE_TEXT.fr = {
     buttons: `
 <p>Un bouton devient <b>bleu</b> quand la fonction est active sur ton camion (moteur allumé, phares, remorque attelée, régulateur enclenché) : la rangée sert aussi de tableau d'état.</p>
 <h3>Tes touches</h3>
-<p>Les boutons ont des touches par défaut. Si tu as changé les commandes dans le jeu, fais pareil dans les Paramètres, <b>Réassigner les touches</b>. Laisse une touche vide pour désactiver ce bouton.</p>
+<p>Il n'y a pas de touches à configurer : les boutons arrivent directement au jeu, même si l'action n'a pas de touche assignée. <b>Réassigner les touches</b>, dans les Paramètres, ne sert que quand ce n'est pas possible (un client d'avant la 1.5.47, ou le plugin pas encore à jour) : ils partent alors comme des touches, avec celles que tu as dans le jeu.</p>
 <h3>Boutons perso</h3>
 <p><b>Ajouter un bouton</b> en crée jusqu'à 3 : donne-lui un nom et appuie sur la touche (les combinaisons avec Ctrl, Maj et Alt marchent, ainsi que F1 à F24 et le pavé numérique). Assigne ensuite cette même touche à ce que tu veux dans les commandes du jeu : blocage du différentiel, ralentisseur, klaxon, la radio.</p>
 <div class="tip"><p>Sur un téléphone tenu droit, la boîte à boutons est une page de plus du panneau d'infos : fais glisser jusqu'à elle. Le client doit tourner avec le jeu ouvert ; dans la démo, les boutons ne font rien.</p></div>`,
@@ -622,7 +622,7 @@ GUIDE_TEXT.pt = {
 <h3>Numa segunda tela</h3>
 <p>Abra <a href="/dash/">trucksim-dash.com/dash</a> em outro aparelho (tablet, celular antigo, segundo monitor) e digite o mesmo código de pareamento. O GPS e o painel podem rodar ao mesmo tempo. Nas Configurações há o botão <b>Copiar o link do painel</b>.</p>`,
     buttons: `
-<p>O botão de controle no mapa abre uma fileira de comandos do caminhão. Toque num e o cliente no seu PC aperta a tecla no jogo por você.</p>`,
+<p>O botão de controle no mapa abre uma fileira de comandos do caminhão. Toque num e o cliente no seu PC faz isso no jogo por você.</p>`,
     settings: `
 <p>A engrenagem abre as Configurações:</p>
 <ul>
@@ -727,7 +727,7 @@ GUIDE_TEXT.pt = {
     buttons: `
 <p>Um botão fica <b>azul</b> quando aquilo está ligado no seu caminhão (motor funcionando, faróis acesos, reboque engatado, piloto automático ativo), então a fileira também serve de painel de status.</p>
 <h3>Suas teclas</h3>
-<p>Os botões vêm com teclas padrão. Se você mudou os controles no jogo, ajuste igual nas Configurações, <b>Remapear teclas</b>. Deixe uma tecla vazia para desativar o botão.</p>
+<p>Não há teclas para configurar: os botões chegam direto ao jogo, mesmo que a ação não tenha tecla. <b>Remapear teclas</b>, nas Configurações, é só para quando não dá (um cliente anterior ao 1.5.47, ou o plugin ainda não atualizado): aí eles vão como teclas, com as que você tem no jogo.</p>
 <h3>Botões personalizados</h3>
 <p><b>Adicionar botão</b> cria até 3 seus: dê um nome e aperte a tecla (combinações com Ctrl, Shift e Alt funcionam, assim como F1 a F24 e o teclado numérico). Depois associe a mesma tecla ao que quiser nos controles do jogo: bloqueio do diferencial, retarder, buzina, o rádio.</p>
 <div class="tip"><p>No celular em pé, a botoeira é mais uma página do painel de informações: deslize até ela. O cliente precisa estar rodando com o jogo aberto; na demo os botões não fazem nada.</p></div>`,
@@ -875,7 +875,7 @@ GUIDE_TEXT.pl = {
 <h3>Na drugim ekranie</h3>
 <p>Otwórz <a href="/dash/">trucksim-dash.com/dash</a> na innym urządzeniu (tablet, stary telefon, drugi monitor) i wpisz ten sam kod parowania. GPS i deska rozdzielcza mogą działać jednocześnie. W Ustawieniach jest przycisk <b>Skopiuj link do deski rozdzielczej</b>.</p>`,
     buttons: `
-<p>Przycisk z padem na mapie otwiera rząd poleceń ciężarówki. Dotknij jednego, a klient na komputerze naciśnie klawisz w grze za ciebie.</p>`,
+<p>Przycisk z padem na mapie otwiera rząd poleceń ciężarówki. Dotknij jednego, a klient na komputerze zrobi to w grze za ciebie.</p>`,
     settings: `
 <p>Zębatka otwiera Ustawienia:</p>
 <ul>
@@ -980,7 +980,7 @@ GUIDE_TEXT.pl = {
     buttons: `
 <p>Przycisk robi się <b>niebieski</b>, gdy dana rzecz jest włączona w ciężarówce (silnik pracuje, światła włączone, naczepa podpięta, tempomat ustawiony), więc rząd przycisków służy też jako panel stanu.</p>
 <h3>Twoje klawisze</h3>
-<p>Przyciski mają domyślne klawisze. Jeśli zmieniłeś sterowanie w grze, ustaw to samo w Ustawieniach, <b>Zmień klawisze</b>. Zostaw pole puste, by wyłączyć przycisk.</p>
+<p>Nie ma klawiszy do ustawiania: przyciski trafiają prosto do gry, nawet gdy czynność nie ma przypisanego klawisza. <b>Zmień klawisze</b> w Ustawieniach jest tylko na wypadek, gdy to niemożliwe (klient starszy niż 1.5.47 albo jeszcze nie zaktualizowana wtyczka): wtedy idą jako naciśnięcia klawiszy, tych, które masz w grze.</p>
 <h3>Własne przyciski</h3>
 <p><b>Dodaj przycisk</b> tworzy do 3 własnych: nadaj nazwę i naciśnij klawisz (działają kombinacje z Ctrl, Shift i Alt, a także F1 do F24 i klawiatura numeryczna). Potem przypisz ten sam klawisz do czegokolwiek w sterowaniu gry: blokady mechanizmu różnicowego, retardera, klaksonu, radia.</p>
 <div class="tip"><p>Na telefonie trzymanym pionowo przyciski ciężarówki są kolejną stroną panelu informacji: przesuń do niej. Klient musi działać przy otwartej grze; w demo przyciski nic nie robią.</p></div>`,
@@ -1128,7 +1128,7 @@ GUIDE_TEXT.tr = {
 <h3>İkinci ekranda</h3>
 <p>Başka bir cihazda (tablet, eski bir telefon, ikinci monitör) <a href="/dash/">trucksim-dash.com/dash</a> adresini aç ve aynı eşleştirme kodunu yaz. GPS ve gösterge paneli aynı anda çalışabilir. Ayarlar'da <b>Panel bağlantısını kopyala</b> düğmesi var.</p>`,
     buttons: `
-<p>Haritadaki oyun kolu düğmesi bir sıra kamyon komutu açar. Birine dokun, bilgisayarındaki istemci oyunda tuşa senin yerine basar.</p>`,
+<p>Haritadaki oyun kolu düğmesi bir sıra kamyon komutu açar. Birine dokun, bilgisayarındaki istemci bunu oyunda senin yerine yapar.</p>`,
     settings: `
 <p>Dişli düğmesi Ayarlar'ı açar:</p>
 <ul>
@@ -1233,7 +1233,7 @@ GUIDE_TEXT.tr = {
     buttons: `
 <p>Bir düğme, o şey kamyonunda açıkken <b>maviye</b> döner (motor çalışıyor, farlar açık, dorse bağlı, hız sabitleyici ayarlı); yani sıra aynı zamanda bir durum paneli.</p>
 <h3>Tuşların</h3>
-<p>Düğmeler hazır tuşlarla gelir. Oyunda kontrolleri değiştirdiysen Ayarlar'da <b>Tuş ata</b> ile aynısını yap. Bir düğmeyi kapatmak için tuşunu boş bırak.</p>
+<p>Ayarlanacak tuş yok: düğmeler, eyleme tuş atanmamış olsa bile doğrudan oyuna ulaşır. Ayarlar'daki <b>Tuş ata</b> yalnızca bu mümkün olmadığında işe yarar (1.5.47'den eski bir istemci ya da henüz güncellenmemiş eklenti): o zaman oyundaki tuşlarınla tuş basışı olarak gider.</p>
 <h3>Özel düğmeler</h3>
 <p><b>Düğme ekle</b> ile kendine ait en fazla 3 düğme oluştur: bir ad ver ve tuşa bas (Ctrl, Shift ve Alt kombinasyonları, F1-F24 ve sayısal tuş takımı çalışır). Sonra aynı tuşu oyunun kontrollerinde istediğin şeye ata: diferansiyel kilidi, retarder, korna, radyo.</p>
 <div class="tip"><p>Telefon dikken düğme kutusu bilgi panelinin bir sayfasıdır: ona kaydır. İstemci, oyun açıkken çalışıyor olmalı; demoda düğmeler bir şey yapmaz.</p></div>`,
@@ -1381,7 +1381,7 @@ GUIDE_TEXT.ru = {
 <h3>На втором экране</h3>
 <p>Откройте <a href="/dash/">trucksim-dash.com/dash</a> на другом устройстве (планшет, старый телефон, второй монитор) и введите тот же код сопряжения. GPS и панель приборов могут работать одновременно. В настройках есть кнопка <b>Скопировать ссылку на панель</b>.</p>`,
     buttons: `
-<p>Кнопка с геймпадом на карте открывает ряд команд грузовика. Нажмите одну, и клиент на ПК нажмёт нужную клавишу в игре за вас.</p>`,
+<p>Кнопка с геймпадом на карте открывает ряд команд грузовика. Нажмите одну, и клиент на ПК сделает это в игре за вас.</p>`,
     settings: `
 <p>Шестерёнка открывает настройки:</p>
 <ul>
@@ -1486,7 +1486,7 @@ GUIDE_TEXT.ru = {
     buttons: `
 <p>Кнопка становится <b>синей</b>, когда эта функция включена в грузовике (двигатель работает, фары включены, прицеп сцеплен, круиз-контроль установлен), так что ряд кнопок служит и панелью состояния.</p>
 <h3>Ваши клавиши</h3>
-<p>У кнопок есть клавиши по умолчанию. Если вы меняли управление в игре, сделайте то же в настройках, <b>Назначить клавиши</b>. Оставьте поле пустым, чтобы отключить кнопку.</p>
+<p>Клавиши настраивать не нужно: кнопки попадают в игру напрямую, даже если у действия нет клавиши. <b>Назначить клавиши</b> в настройках нужно только когда так нельзя (клиент до версии 1.5.47 или ещё не обновлённый плагин): тогда они идут как нажатия клавиш, тех, что у вас в игре.</p>
 <h3>Свои кнопки</h3>
 <p><b>Добавить кнопку</b> создаёт до 3 своих: задайте подпись и нажмите клавишу (работают сочетания с Ctrl, Shift и Alt, а также F1–F24 и цифровой блок). Затем назначьте ту же клавишу на что угодно в управлении игры: блокировку дифференциала, ретардер, гудок, радио.</p>
 <div class="tip"><p>На телефоне в вертикальном положении кнопки грузовика — ещё одна страница панели информации: пролистайте до неё. Клиент должен работать при открытой игре; в демо кнопки ничего не делают.</p></div>`,

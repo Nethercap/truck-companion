@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.47 (2026-11-24)
 
 - Build my map: mods packed in parts are now read: a "base" folder, plus "dlc_" folders for the
   DLCs you own, the way the game loads them. The builder only looked at the top of the mod, so

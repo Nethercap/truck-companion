@@ -39,7 +39,7 @@
   <h2>What the local client reads</h2>
   <ul>
     <li><strong>Game telemetry</strong> through SCS Software's official Telemetry SDK (a shared-memory segment the game exposes when the plugin is installed): position, speed, fuel, cargo, job, truck wear and similar in-game values.</li>
-    <li><strong>Your in-game key bindings</strong> (<code>controls.sii</code> in the game's profile folder), read-only, so the button box presses the same keys you configured in the game.</li>
+    <li><strong>Your in-game key bindings</strong> (<code>controls.sii</code> in the game's profile folder), read-only, so the button box can press the keys you configured in the game when it can't go through the game's input SDK.</li>
     <li><strong>Where the game is installed</strong> (via Steam's library list), only to offer installing the telemetry plugin for you.</li>
     <li><strong>The game's log</strong> (<code>game.log.txt</code> in your Documents folder), read-only, to see which map mods are active so the dashboard loads the right map.</li>
     <li><strong>Which map DLCs you have</strong>: the names of the <code>dlc_*.scs</code> files in the game folder (not their contents), so routes avoid the DLCs you don't own.</li>
