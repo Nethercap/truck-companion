@@ -6105,6 +6105,14 @@ test('webUpdateAction: avisar solo de una version posterior, y en LAN decir que 
   assert.equal(webUpdateAction({ current: '20261105b', served: '20261106c', site: '20261106c' }), 'reload');
   // Sin internet en la LAN
   assert.equal(webUpdateAction({ current: '20261106c', served: '20261106c', site: null }), null);
+  // El cliente no pudo bajar la copia (Discord 21-11): reiniciarlo no la trae
+  assert.equal(webUpdateAction({ current: '20261116b', served: '20261116b', site: '20261121a', copyError: true }), 'client_cant_download');
+  // Y la tablet tampoco llega al sitio: no se sabe, la copia puede ser vieja
+  assert.equal(webUpdateAction({ current: '20261116b', served: '20261116b', site: null, copyError: true }), 'client_cant_download');
+  // El sitio contesta y no hay nada nuevo: la copia es la de hoy aunque no se haya podido bajar
+  assert.equal(webUpdateAction({ current: '20261121a', served: '20261121a', site: '20261121a', copyError: true }), null);
+  // Recargar sigue primero: la copia se pudo bajar despues
+  assert.equal(webUpdateAction({ current: '20261116b', served: '20261121a', site: '20261121a', copyError: true }), 'reload');
 });
 
 test('followGameRoute: la ruta como la del juego solo con la empresa del trabajo, sin waypoints y con la mas rapida', () => {

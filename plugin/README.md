@@ -26,6 +26,10 @@ the app. It is built with the TruckersMP Client SDK v1.1.0
 `bee3b9e`, MIT License, header-only) in `truckersmp_sdk/`. Without
 TruckersMP that code never runs.
 
+It also takes the presses of the dashboard's buttons, through the SCS input
+API (`src/truckdash_input.cpp`): the client asks for them in
+`Local\TruckDashInput` and the plugin can press only those 13 buttons.
+
 ## Why a fork
 
 ATS 1.61 added drivable cars and, with them, two new job types in the SDK:

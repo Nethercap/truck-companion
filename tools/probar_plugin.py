@@ -2,7 +2,7 @@
 
 Uso: python tools/probar_plugin.py <ruta a la DLL>
 
-Cuatro pasadas, cada una en un proceso aparte:
+Seis pasadas, cada una en un proceso aparte:
 - "init": scs_telemetry_init, scs_telemetry_shutdown y FreeLibrary, que es lo
   que hace el juego al abrir y al cerrar. Al soltar la DLL, DllMain vuelve a
   llamar a scs_telemetry_shutdown.
@@ -17,6 +17,10 @@ Cuatro pasadas, cada una en un proceso aparte:
 - "tmp-rechazado": un TMP sin la parte de jugadores. truckersmp_init tiene
   que decir que no, sin dejar listeners, y TMP suelta la DLL sin llamar a
   truckersmp_shutdown.
+- "entrada": los botones por el SDK de entrada (truckdash_input.cpp), con un
+  juego de mentira y los pedidos del cliente (probar_entrada.py).
+- "entrada-apagada": con truckdash-no-input.txt al lado de la DLL no registra
+  nada en el juego.
 
 La DLL del 30-09 se caia en las dos primeras: la segunda llamada a shutdown
 escribia en el bloque ya desmapeado, y sin init en un puntero nulo.
@@ -43,7 +47,7 @@ import subprocess
 import sys
 import time
 
-PASADAS = ("init", "sin-init", "tmp", "tmp-rechazado")
+PASADAS = ("init", "sin-init", "tmp", "tmp-rechazado", "entrada", "entrada-apagada")
 # Las DLLs del Visual C++ Redistributable, que Windows no trae. El CRT
 # universal (ucrtbase, api-ms-win-crt-*) y msvcrt.dll si vienen con Windows.
 RUNTIME_VISUAL_CPP = re.compile(r"^(vcruntime|msvcp|msvcr|concrt|vccorlib|vcomp)\d", re.IGNORECASE)
@@ -430,10 +434,27 @@ def _pasada_tmp(dll: str, h, con_jugadores: bool) -> None:
         fallar("errores del TMP falso")
 
 
+def _pasada_entrada_apagada(dll: str) -> None:
+    import probar_entrada
+
+    def cargar(copia):
+        k32, h = _cargar(copia)
+        return ctypes.CDLL(copia, handle=h), lambda: k32.FreeLibrary(h)
+
+    probar_entrada.probar_apagado(cargar, dll)
+
+
 def _hijo(pasada: str, dll: str) -> None:
+    sys.path.insert(0, os.path.join(RAIZ, "tools"))
+    if pasada == "entrada-apagada":
+        _pasada_entrada_apagada(dll)
+        return
     k32, h = _cargar(dll)
     if pasada in ("init", "sin-init"):
         _pasada_scs(dll, h, pasada == "init")
+    elif pasada == "entrada":
+        import probar_entrada
+        probar_entrada.probar(ctypes.CDLL(dll, handle=h))
     else:
         _pasada_tmp(dll, h, pasada == "tmp")
     k32.FreeLibrary(h)

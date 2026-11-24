@@ -190,12 +190,56 @@ def lan_ip() -> str | None:
         return None
 
 
+# La copia de la web que sirve el modo LAN, cuando no se pudo actualizar (Discord 21-11,
+# Lightningroc771): desde el 16-11 cada descarga de trucksim-dash.com le daba
+# "SSL: WRONG_VERSION_NUMBER" (algo en su PC o su red contesta sin TLS solo para ese
+# sitio: los mapas y el relay andaban), y la tablet siguio con la web de ese dia sin que
+# nada lo dijera. En LAN la web decia "reinicia el cliente", y reiniciar no servia.
+# None si la ultima vez se pudo bajar app/index.html (o si no hay copia: eso ya lo dice
+# lan_no_web). Si no, {"error": por que, "version": el ?v= de la copia, "fecha": de la
+# copia}: va a Setup (lan_copy_old) y al session_state LAN (webCopy).
+copia_vieja: dict | None = None
+
+# El ?v= de app.js en index.html, como webVersionIn de pure.js.
+_VERSION_WEB = re.compile(rb"app\.js\?v=(\d{8}[a-z]*)")
+
+
+def _error_corto(exc) -> str:
+    """Lo que dice el error sin el envoltorio de urllib, para Setup y la web."""
+    motivo = getattr(exc, "reason", None)
+    texto = str(motivo if motivo is not None else exc) or exc.__class__.__name__
+    return texto if len(texto) <= 120 else texto[:117] + "..."
+
+
+def _datos_de_la_copia(target: str) -> dict | None:
+    """Version y fecha de la copia de app/index.html, o None si no hay copia."""
+    index = os.path.join(target, "app", "index.html")
+    try:
+        with open(index, "rb") as f:
+            m = _VERSION_WEB.search(f.read())
+        version = m.group(1).decode() if m else None
+        fecha = (f"{version[:4]}-{version[4:6]}-{version[6:8]}" if version
+                 else time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(index))))
+        return {"version": version, "fecha": fecha}
+    except OSError:
+        return None
+
+
+def _anotar_copia(target: str, error) -> None:
+    """Despues de intentar bajar app/index.html: error None si se pudo."""
+    global copia_vieja
+    datos = _datos_de_la_copia(target) if error is not None else None
+    copia_vieja = dict(datos, error=_error_corto(error)) if datos else None
+
+
 def refresh_web_cache() -> bool:
     """Baja la ultima version del web app a la cache local. Devuelve True si
     hay una copia servible (nueva o anterior)."""
     target = cache_dir()
     ok = 0
     solo_lectura = []
+    fallaron = []
+    error_index = None
     for rel in WEB_FILES:
         local = os.path.join(target, rel.replace("/", os.sep))
         os.makedirs(os.path.dirname(local), exist_ok=True)
@@ -220,10 +264,20 @@ def refresh_web_cache() -> bool:
             ok += 1
         except Exception as exc:
             logging.warning("No se pudo bajar %s para el modo LAN: %s", rel, exc)
+            fallaron.append(rel)
+            if rel == "app/index.html":
+                error_index = exc
     if solo_lectura:
         logging.warning("Web cache: estaban en solo lectura y se pisaron igual: %s", ", ".join(solo_lectura))
     if ok:
         logging.info("Web cache actualizada (%d/%d archivos)", ok, len(WEB_FILES))
+    _anotar_copia(target, error_index)
+    if copia_vieja:
+        # Los que ya estaban (vendor/, las voces) cuentan en "actualizada": este dice
+        # cuantos se intentaron bajar y no se pudo, y con que copia se queda.
+        logging.warning("La copia de la web para el modo LAN no se actualizo: fallaron %d archivos (%s); "
+                        "los tableros por LAN siguen con la del %s", len(fallaron), copia_vieja["error"],
+                        copia_vieja["fecha"])
     return os.path.exists(os.path.join(target, "app", "index.html"))
 
 
@@ -406,8 +460,12 @@ def _refresh_file(rel: str, local_path: str) -> bool:
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         with open(local_path, "wb") as f:
             f.write(data)
+        if rel == "app/index.html":
+            _anotar_copia(cache_dir(), None)  # volvio la red: la copia ya es la de ahora
         return True
-    except Exception:
+    except Exception as exc:
+        if rel == "app/index.html":
+            _anotar_copia(cache_dir(), exc)
         return False
 
 
@@ -623,6 +681,11 @@ class LocalServer:
             relay = self.plan_relay() if self.plan_relay is not None else None
             if relay:
                 estado["planRelay"] = relay
+            # La copia que esta viendo no se pudo actualizar: la pagina lo dice
+            # (webUpdateAction de pure.js) en vez de "reinicia el cliente".
+            vieja = copia_vieja
+            if vieja:
+                estado["webCopy"] = {"error": vieja["error"], "version": vieja["version"]}
             await ws.send(json.dumps(estado))
             if self.last_status_message:
                 await ws.send(self.last_status_message)

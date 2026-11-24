@@ -6,13 +6,34 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
-- Build my map: map mods packed with protection against extraction tools are no longer skipped
-  with "incorrect header check" in the build log. Their packer adds junk entries that the game
-  never reads, and one such entry made the builder drop the whole mod: Beyond by Terramaps lost
-  all four of its files this way (the Caribbean islands, among others), and so did some fix mods
-  of the map combos. A folder listing stored without its folder mark (another trick of these
-  packers) is also read now. Maps built with an earlier version stay as they were: rebuild yours
-  from Setup to get the missing parts.
+- Follow the in-game GPS: saves of Steam Cloud profiles are now found. The game keeps them in Steam's
+  own folder, not in Documents, and Truck Dash only looked in Documents: with this turned on it
+  never found a save and did nothing, without saying so. It still only reads the newest save, and
+  the log now says when there is none to read.
+- Build my map: at some motorway interchanges, turning left onto the motorway and coming back
+  from it by the loop were stored as one two-way road, drawn as the loop. On the D1 at Ostrava
+  (ETS2) the route to Brno was drawn along the loop, to the right and the wrong way, and the
+  fork with the ramp to the north wasn't announced, so the truck took the ramp to the north.
+  Each direction now keeps its own path. Maps built with an earlier version keep routing as
+  before until they are rebuilt.
+- The truck buttons (hazards, lights, wipers, engine, parking brake and the rest of the button
+  box) now reach the game through SCS's official input SDK, in the Truck Dash plugin, instead of
+  key presses. They work without a key assigned in the game and whatever your keyboard layout
+  is, and with the game in front Truck Dash no longer touches the window focus. With the game in
+  the background it brings the game to the front first, as before. If the plugin isn't updated
+  yet (it updates itself with the game closed) or the game isn't taking SDK input, the buttons
+  keep using the keys. Custom buttons are still key presses, and the plugin can press only these
+  13 buttons.
+
+## 1.5.46 (2026-11-23)
+
+- LAN mode: when this PC can't download the latest dashboard page from trucksim-dash.com, Setup
+  now says so in the "Same Wi-Fi" section, with the reason and the date of the copy that phones
+  and tablets on your Wi-Fi keep getting. Before, that copy silently stayed old: since November
+  16 a player's PC got "SSL: WRONG_VERSION_NUMBER" on every download (something on the PC or the
+  network was blocking the site), and their tablet kept the dashboard from that day.
+- The dashboard page on the LAN address says it too, with a button that opens trucksim-dash.com
+  with your pairing code, instead of "restart the Truck Dash client", which didn't help.
 
 ## 1.5.45 (2026-11-17)
 

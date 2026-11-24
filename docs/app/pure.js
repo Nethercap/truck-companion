@@ -8067,8 +8067,14 @@ function webVersionNewer(a, b) {
 // publicada, solo en LAN. 'reload' si recargar la trae. 'restart_client' si esta
 // publicada pero la copia LAN sigue vieja: el cliente la baja recien al arrancar
 // (refresh_web_cache), y ahi recargar no alcanza. null si no hay nada nuevo.
-function webUpdateAction({ current, served = null, site = null }) {
+// copyError: el cliente dice que no pudo bajar la copia (webCopy del session_state LAN,
+// local_server.copia_vieja; Discord 21-11: su PC no llegaba a trucksim-dash.com desde el
+// 16-11 y la tablet siguio con esa copia). Ahi reiniciar no la trae: 'client_cant_download'.
+// Tambien sin saber la publicada (la tablet tampoco llega al sitio): la copia puede ser
+// vieja. Si el sitio contesta y no hay nada nuevo, nada.
+function webUpdateAction({ current, served = null, site = null, copyError = false }) {
   if (webVersionNewer(current, served)) return 'reload';
+  if (copyError && (site === null || webVersionNewer(current, site))) return 'client_cant_download';
   return webVersionNewer(current, site) ? 'restart_client' : null;
 }
 

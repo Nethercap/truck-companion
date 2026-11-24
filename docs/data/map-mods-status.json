@@ -1,11 +1,11 @@
 {
-  "checkedAt": "2026-11-16T19:40:24Z",
+  "checkedAt": "2026-11-23T21:29:55Z",
   "mods": {
     "c2c": {
       "ours": "2.24.62.1",
       "upstream": null,
       "status": "unknown",
-      "error": "TimeoutError: The read operation timed out",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=202317"
     },
     "promods_canada": {
@@ -54,7 +54,7 @@
       "ours": "3.0.4.162",
       "upstream": null,
       "status": "unknown",
-      "error": "TimeoutError: The read operation timed out",
+      "error": "HTTPError: HTTP Error 429: Too Many Requests",
       "source": "https://forum.scssoft.com/viewtopic.php?t=316081"
     },
     "roextended": {
@@ -101,15 +101,15 @@
     },
     "grand_utopia": {
       "ours": "1.20d",
-      "upstream": "1.20d",
-      "status": "ok",
+      "upstream": "1.21",
+      "status": "outdated",
       "error": null,
       "source": "https://truckymods.io/euro-truck-simulator-2/maps/grand-utopia-map"
     },
     "eu_grand_utopia": {
       "ours": "1.12",
-      "upstream": "1.12",
-      "status": "ok",
+      "upstream": "1.13",
+      "status": "outdated",
       "error": null,
       "source": "https://truckymods.io/euro-truck-simulator-2/maps/european-grand-utopia"
     },

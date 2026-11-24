@@ -104,6 +104,10 @@ def test_bundled_dll_publica_en_su_propio_bloque():
         datos = f.read()
     assert "Local\\TruckDashTelemetry".encode("utf-16-le") in datos
     assert "Local\\SCSTelemetry".encode("utf-16-le") not in datos
+    # Los botones por el SDK de entrada (truckdash_input.cpp): sin esta DLL el
+    # cliente sigue con las teclas y nadie se entera de que no llego.
+    assert "Local\\TruckDashInput".encode("utf-16-le") in datos
+    assert b"scs_input_init" in datos
 
 
 def test_bundled_dll_no_pide_el_runtime_de_visual_cpp():
@@ -684,6 +688,28 @@ def test_bajo_proton_se_busca_el_steam_de_linux():
     assert len(raices) == len(set(raices))
     # Solo las que existen
     assert plugin_installer.linux_steam_roots(env, existe=lambda r: r.endswith("SteamLibrary")) == [r"Z:\run\media\tw\G\SteamLibrary"]
+
+
+def test_las_carpetas_de_steam_de_esta_pc(monkeypatch):
+    """Donde viven las partidas de Steam Cloud: la del registro y, bajo Proton,
+    la de Linux vista desde Wine; en Linux nativo, la de Linux tal cual."""
+    for clave in ("STEAM_COMPAT_CLIENT_INSTALL_PATH", "STEAM_COMPAT_DATA_PATH"):
+        monkeypatch.delenv(clave, raising=False)
+    monkeypatch.setenv("HOME", "/home/tw")
+    monkeypatch.setattr(plugin_installer, "find_steam_path", lambda: r"C:\Program Files (x86)\Steam")
+    original = plugin_installer.linux_steam_roots
+    monkeypatch.setattr(plugin_installer, "linux_steam_roots",
+                        lambda **k: original(existe=lambda r: r.endswith("share/Steam") or r.endswith(r"share\Steam"), **k)[:1])
+    assert plugin_installer.steam_roots(windows=True) == [r"C:\Program Files (x86)\Steam", r"Z:\home\tw\.local\share\Steam"]
+    monkeypatch.setattr(plugin_installer, "find_steam_path", lambda: None)
+    assert plugin_installer.steam_roots(windows=False) == ["/home/tw/.local/share/Steam"]
+    # sin Steam, nada
+    monkeypatch.setattr(plugin_installer, "linux_steam_roots", lambda **k: [])
+    assert plugin_installer.steam_roots(windows=True) == []
+    # la misma carpeta por dos caminos, una vez
+    monkeypatch.setattr(plugin_installer, "find_steam_path", lambda: r"Z:\s")
+    monkeypatch.setattr(plugin_installer, "linux_steam_roots", lambda **k: [r"Z:\s"])
+    assert plugin_installer.steam_roots(windows=True) == [r"Z:\s"]
 
 
 def test_en_windows_no_se_suman_rutas_de_linux():

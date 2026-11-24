@@ -21,6 +21,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   cliente y el `sw.js` del sitio: la copia se baja solo al arrancar el cliente, asi
   que ahi dice que lo reinicies. Antes una pestana seguia horas en la version con que
   se abrio (reporte #29, 07-11, ShadE). No recarga sola, y no sale en `?cab=1`.
+  Si el cliente no pudo bajar la copia (`copia_vieja` de `local_server.py`, `webCopy` en
+  el session_state LAN), no dice "reinicia" sino que la PC no la puede bajar, con un boton
+  al sitio con el codigo, y Setup lo dice con el error (`lan_copy_old`): una PC no llegaba
+  a trucksim-dash.com desde el 16-11 y su tablet siguio con esa copia (Discord 21-11).
 - La logica de decision va en `docs/app/pure.js` con su test, no suelta en
   app.js: la mayoria de los bugs del 10-10 estaban en app.js, donde no hay tests.
 - Cambios de cliente: anotarlos en CHANGELOG.md (seccion de la proxima
@@ -45,8 +49,8 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `-prefabs.bin` (de que prefab es cada arista, `decodePrefabsBin`, desde el
   22-10; los de antes no lo tienen). Si se regenera el grafo, se regeneran y
   suben los cinco juntos (`rebuild_graphs_only.py` del taller) y se sube
-  `ROUTE_GRAPH_V3_REV` en `app.js` (7 desde el 10-11, con `ROUTE_PREFABS_REV`
-  en 1): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
+  `ROUTE_GRAPH_V3_REV` en `app.js` (8 desde el 24-11, con `ROUTE_PREFABS_REV`
+  en 1), no `mapDataVersion` (haria bajar de nuevo los tiles): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
   la vuelta de Kiel (ver el ruteo). Los prefabs sin navCurves que lista el
   log del constructor (unidos todos contra todos, sin contramano) son
   patios, estaciones y talleres de dos nodos, y 15 `cross_temp` de ProMods.
@@ -997,6 +1001,24 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `tools/probar_plugin.py` lo prueba con un TMP falso. Si cambia la
   disposicion del bloque, cambia en los dos lados y sube la revision
   (`test_tmp_players.py` compara el .hpp con el lector).
+- Botones por el SDK de entrada (24-11): el plugin registra un dispositivo
+  semantical con los 13 mixes de la botonera (`truckdash_input.cpp`) y el cliente
+  pide cada toque en `Local\TruckDashInput` (`entrada_sdk.py`, revision 1; bloque
+  aparte porque el SDK no dice si va primero `scs_input_init` o
+  `scs_telemetry_init`, y telemetria borra el suyo al abrirlo). Las teclas quedan
+  de respaldo y los custom siguen siendo teclas. Declarar una entrada es para el
+  juego tenerla asignada aunque no mande nada: con todos los mixes declarados el
+  limpiaparabrisas no se apaga mas con su tecla (foro SCS t=328756, `wipersback`),
+  asi que solo los que usa un boton, y nunca `quicksave`. Sin foco el juego no
+  pide entrada (issue 642 de ETS2LA): con el juego atras se lo trae al frente como
+  antes y se espera. `first_in_frame` puede seguir prendido en las llamadas
+  repetidas de un cuadro: no usarlo. Un pedido de mas de 300 ms no se aprieta
+  nunca y el cliente espera mas que eso antes de usar la tecla, o el boton se
+  apretaria dos veces. Si el juego lo toma y la telemetria no cambia (balizas,
+  luces o freno de mano, `EFECTO`) dos veces, esa partida sigue con teclas:
+  TruckersMP puede bloquearlo. `truckdash-no-input.txt` al lado de la DLL lo apaga.
+  Si cambia la disposicion o la lista, en los dos lados (`test_entrada_sdk.py`
+  compara; `tools/probar_entrada.py` prueba el plugin con un juego falso).
 - Trabajos de bus (DLC Coaches, ETS2 1.62.3; 13-11): el juego no manda
   ciudades sino paradas, una etapa por indice (`source_stop.*`,
   `destination_stop.*`, tipo `city` o `viewpoints`). El plugin las guarda en
@@ -1070,6 +1092,33 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   contra 324,3 km (al centro, 298,4); Joensuu -> Tallinn 662,3 contra 664,9
   (647,5). El plugin sigue anotando cada `bus_job` en game.log.txt, con el
   indice y los s64.
+- Reporte #60 (21-11, ETS2, Ostrava -> Brno): el constructor juntaba en una
+  arista de doble mano los dos sentidos de un par de nodos de prefab del mismo
+  largo y del mismo costado de la recta aunque fueran por caminos distintos. En
+  el trebol del D1 (27618,5276, prefab 178) de la calle del este a Brno se
+  sigue derecho por arriba de la autopista y se baja por un rulo del otro lado
+  (729 m; los carriles le dan "left") y de vuelta se sale por otro rulo, del
+  lado de la calle (695 m). Quedaba una arista con el dibujo del de 695: la ruta
+  a Brno se dibujaba a la derecha por ese rulo, que sale junto con el ramal al
+  norte, y el camion tomo el ramal (recalculo a 356 km). Desde el 23-11 van
+  separados a mas de `PREFAB_OTRO_CAMINO_M` (40 m; el carril de giro de
+  Wroclaw va a 12; `separar_sentidos`, y `diag_prefab_pares.py` del taller dice
+  que hace con cada par). Los grafos de R2 van asi desde el 24-11
+  (`ROUTE_GRAPH_V3_REV` 8): 41 pares en ets2, ets2_161, ets2_eugu y ets2_tmp,
+  31 con ProMods, 43 con ROEX, 60 con RusMap y 70 con los dos (prefabs 134,
+  166, 178, 225, 226, 244 y `arak17`/`arak19` de ROEX); ATS y ets2_gu quedaron
+  iguales byte a byte en el ruteo. Cruzando cada par de ets2 en los dos
+  sentidos (82 rutas cortas) cambian 31 avisos: 28 bifurcaciones pasan al otro
+  lado, todas al que dicen los carriles del juego (antes todas al contrario,
+  por el dibujo del otro sentido); 2 se callan, donde la ruta va 400 a 600 m
+  por la misma calzada que otra rama y se separa adentro del prefab, sin nodo
+  donde avisar; y 1 ruta de prueba va por otro lado (el sentido largo dejo de
+  costar lo del corto). En Ostrava no se avisa la bifurcacion: la ruta va por
+  todos los carriles y el ramal al norte tiene flecha a la derecha, y para
+  `parallelFork` eso es una salida y la ruta sigue; ahora se dibuja derecho.
+  El simulador (120 rutas, semilla 7) da igual; con 200 rutas de Polonia,
+  Hungria, Chequia, Eslovaquia y Reino Unido, los mismos avisos en ets2 y 3
+  menos en ProMods, sin sospechosos nuevos; check_avisos, igual.
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para
@@ -1300,7 +1349,9 @@ Revisar cada cambio contra esta lista:
    `economy.stored_gps_ahead_waypoints` (`nav_node_position`) y `player.selected_job`
    (`job_info`). Pisa el quicksave del jugador. En Discord (15-11) eligieron solo
    leer, preguntando la primera vez: `client/partida_gps.py` lee la partida mas
-   nueva de los perfiles (`profiles` y `steam_profiles`, sin los `.bak`), la
+   nueva de los perfiles (los locales en Documentos, y los de Steam Cloud en
+   `userdata/<cuenta>/<juego>/remote/profiles` de la carpeta de Steam,
+   `steam_roots` de plugin_installer), la
    descifra (ScsC: AES-256-CBC con la clave publica y zlib; bcrypt en Windows,
    libcrypto en Linux y un AES propio de respaldo, probado con los vectores del
    NIST) y la recorre en BSII o en texto sin decodificar lo que no sirve (25 MB en
@@ -1326,8 +1377,12 @@ Revisar cada cambio contra esta lista:
    GPS cambiado, un waypoint en el medio, uno ya pasado (317 km con el contra 83 del
    GPS), el trabajo elegido (al remolque), con trabajo y sin waypoints (manda el
    trabajo), con trabajo y un waypoint a mano (263 km contra 76,5 directo: dos
-   tramos) y uno que el GPS ya no cuenta (directo). Sin probar con el juego ni con
-   una partida de verdad. La app nativa no lo usa: `conduccion.js` no llama a
+   tramos) y uno que el GPS ya no cuenta (directo). Hasta la 1.5.46 los perfiles de
+   Steam Cloud se buscaban en `Documentos/<juego>/steam_profiles`, donde quedan solo
+   los controles y la configuracion (las copias `.bak` de un update si traen
+   partidas, y confundian): no se leia ninguna y no quedaba rastro (24-11). Con las
+   partidas de verdad de la PC del maintainer (ETS2 y ATS) ahora se leen; sin probar
+   con el juego andando. La app nativa no lo usa: `conduccion.js` no llama a
    `updateGameGpsSave`.
 4. **Datos de mapa incompletos.** Mods y DLC traen ciudades que el parser no
    lista; la web no debe depender de que un token tenga nombre ni de que el

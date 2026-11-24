@@ -36,6 +36,9 @@ import zlib
 
 CARPETAS_DEL_JUEGO = {"ets2": "Euro Truck Simulator 2", "ats": "American Truck Simulator"}
 
+# El numero de cada juego en Steam: su carpeta dentro de userdata/<cuenta>.
+APPS_DE_STEAM = {"ets2": "227300", "ats": "270880"}
+
 # La clave de las partidas cifradas: es publica (la usan SII_Decrypt, los
 # editores de partidas y TruckSim GPS) y la misma en ETS2 y ATS.
 CLAVE_SII = bytes([
@@ -66,24 +69,31 @@ class PartidaIlegible(Exception):
 # ------------------------------------------------------------------ donde estan
 
 
-def carpetas_de_perfiles(game: str, documentos: str) -> list:
-    """Las carpetas de perfil de ese juego: las locales (profiles) y las de
-    Steam Cloud (steam_profiles). Las copias que deja una actualizacion del
-    juego ("steam_profiles(1.61.x).bak") no son perfiles en uso."""
+def carpetas_de_perfiles(game: str, documentos: str, raices_steam=()) -> list:
+    """Las carpetas de perfil de ese juego. Las locales, en Documentos
+    (profiles). Las de Steam Cloud, en la carpeta de Steam
+    (userdata/<cuenta>/<juego>/remote/profiles): en Documentos/steam_profiles
+    esos perfiles dejan solo los controles y la configuracion de esta PC. Hasta
+    la 1.5.46 se miraba ahi y con Steam Cloud no se leia ninguna partida
+    (24-11); lo que confundio fueron las copias que deja una actualizacion del
+    juego ("steam_profiles(1.61.x).bak"), que si traen partidas pero no son
+    perfiles en uso."""
     base = os.path.join(documentos, CARPETAS_DEL_JUEGO[game])
     carpetas = []
     for tipo in ("steam_profiles", "profiles"):
-        carpetas.extend(glob.glob(os.path.join(base, tipo, "*")))
+        carpetas.extend(glob.glob(os.path.join(glob.escape(base), tipo, "*")))
+    for raiz in raices_steam:
+        carpetas.extend(glob.glob(os.path.join(glob.escape(raiz), "userdata", "*", APPS_DE_STEAM[game], "remote", "profiles", "*")))
     return [c for c in carpetas if os.path.isdir(c) and ".bak" not in c.lower()]
 
 
-def partida_mas_nueva(game: str, documentos: str):
+def partida_mas_nueva(game: str, documentos: str, raices_steam=()):
     """(ruta, fecha) del game.sii escrito mas recientemente en cualquier perfil
     de ese juego, o None. El que se esta jugando es el que guarda: el mas nuevo
     es de ese perfil (autoguardado, guardado rapido o uno a mano)."""
     mejor = None
-    for perfil in carpetas_de_perfiles(game, documentos):
-        for ruta in glob.glob(os.path.join(perfil, "save", "*", "game.sii")):
+    for perfil in carpetas_de_perfiles(game, documentos, raices_steam):
+        for ruta in glob.glob(os.path.join(glob.escape(perfil), "save", "*", "game.sii")):
             try:
                 fecha = os.path.getmtime(ruta)
             except OSError:
@@ -638,17 +648,24 @@ class Vigia:
 
     QUIETA_S = 1.5
 
-    def __init__(self, documentos: str):
+    def __init__(self, documentos: str, raices_steam=()):
         self.documentos = documentos
+        self.raices_steam = list(raices_steam)
         self.ultimo = None      # lo ultimo leido (dict de leer_gps) o None
         self._visto = None      # (game, ruta, fecha) ya procesado
+        self._sin_partidas = set()  # juegos sin ninguna: se anota una vez
 
     def mirar(self, game: str, ahora: float) -> dict | None:
         """Lo leido para ese juego (puede ser de antes), o None."""
         if game not in CARPETAS_DEL_JUEGO:
             return None
-        nueva = partida_mas_nueva(game, self.documentos)
+        nueva = partida_mas_nueva(game, self.documentos, self.raices_steam)
         if nueva is None:
+            # Sin esto, buscar en el lugar equivocado no dejaba rastro.
+            if game not in self._sin_partidas:
+                self._sin_partidas.add(game)
+                logging.info("Ninguna partida de %s para leer (en %s y %d carpetas de Steam)", game,
+                             os.path.join(self.documentos, CARPETAS_DEL_JUEGO[game]), len(self.raices_steam))
             return None
         ruta, fecha = nueva
         clave = (game, ruta, fecha)

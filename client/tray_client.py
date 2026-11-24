@@ -429,12 +429,18 @@ def leer_partidas_prendido() -> bool:
     return win_integration.load_settings().get(partida_gps.CLAVE_AJUSTE) is True
 
 
+def vigia_de_partidas() -> partida_gps.Vigia:
+    """Con los dos lugares donde el juego guarda: Documentos y, los perfiles
+    de Steam Cloud, la carpeta de Steam."""
+    return partida_gps.Vigia(client_lib.documents_folder(), plugin_installer.steam_roots())
+
+
 def vigilar_partidas(cada_s: float = 3.0) -> None:
     """Hilo propio: con el ajuste prendido y el juego en vivo, mira la
     partida mas nueva y la relee cuando cambia (partida_gps.Vigia). Solo lee.
     Descifrar y recorrer una partida grande lleva hasta un segundo: aca, y no
     en el bucle de la telemetria."""
-    vigia = partida_gps.Vigia(client_lib.documents_folder())
+    vigia = vigia_de_partidas()
     while True:
         try:
             if leer_partidas_prendido() and state.status == "live" and state.game:
@@ -709,6 +715,9 @@ class SetupWindow:
                    justify="left").pack(anchor="w")
         self.button(self.lan_public_frame, T("lan_network_settings"),
                     abrir_ajustes_de_red).pack(anchor="w", pady=(4, 0))
+        # La copia de la web que se sirve no se pudo actualizar (local_server.copia_vieja,
+        # Discord 21-11): el celular la abre igual, pero vieja, y sin esto nada lo decia.
+        self.lan_copy_label = self.label(lan_frame, "", fg=ORANGE, wraplength=520, justify="left")
         self.open_here_btn = self.button(lan_btns, T("open_here"), self.open_lan_here)
         self.open_here_btn.pack(side="left", padx=6)
         # Y para volver atras: el celular deja de llegar y Windows no pregunta mas.
@@ -1373,6 +1382,12 @@ class SetupWindow:
             self.lan_public_frame.pack(anchor="w", pady=(6, 0), fill="x")
         else:
             self.lan_public_frame.pack_forget()
+        vieja = local_server.copia_vieja
+        if vieja and not cerrado and srv and srv.web_ready:
+            self.lan_copy_label.configure(text=T("lan_copy_old", err=vieja["error"], date=vieja["fecha"]))
+            self.lan_copy_label.pack(anchor="w", pady=(6, 0), fill="x")
+        else:
+            self.lan_copy_label.pack_forget()
         if cerrado:
             # Si ni siquiera pudo escuchar en esta PC (puerto tomado, issue #4),
             # eso es lo que hay que decir, no "apagado".
@@ -1491,8 +1506,11 @@ class SetupWindow:
         self.render_local_map()
         lan_url = state.local.url if (state.local and state.local.web_ready and not state.local.error) else None
         # La deteccion de la red Publica llega despues (PowerShell, en un hilo).
+        # La copia vieja tambien: se anota al arrancar y al pedir la pagina.
+        vieja = local_server.copia_vieja
         clave_lan = (lan_url, win_integration.red_publica(), state.lan_en_la_red,
-                     state.local.error if state.local else None)
+                     state.local.error if state.local else None,
+                     (vieja["error"], vieja["fecha"]) if vieja else None)
         if getattr(self, "_last_lan_url", "?") != clave_lan:
             self._last_lan_url = clave_lan
             self.render_lan()

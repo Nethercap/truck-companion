@@ -180,6 +180,43 @@ streaming in and out, pre-render, a disconnect and `truckersmp_shutdown`,
 reading the block with the client's reader; and a client without the
 players API, which init has to refuse cleanly.
 
+## Buttons through the input SDK
+
+New, not in upstream: `scs_input_init` and `scs_input_shutdown`, the two
+exports of the SCS input API (`src/truckdash_input.cpp`). The plugin registers
+a semantical device ("truckdash") with the 13 buttons of the dashboard, and
+the client asks for each press in a block of its own, `Local\TruckDashInput`
+(`inc/truckdash_input.hpp`, revision 1). Outside Windows it is a file, like
+the telemetry block: `/dev/shm/TruckDashInput` or `/tmp/TruckDashInput`.
+
+- A block of its own because the SDK doesn't say which of the two APIs is
+  initialized first, and telemetry clears its block when it opens it. The
+  telemetry block and its layout do not change.
+- Nothing is sent without a request. A press is one `true` event, at least
+  80 ms and three frames down, and one `false` event; a single frame can get
+  lost. Two presses in a row have the button up for a couple of frames.
+- A request older than 300 ms is never pressed. The client waits longer than
+  that before it falls back to a keystroke, so the two never add up.
+- If the game stops taking input in the middle of a press (it lost the
+  focus), the button is released in the first frame after it comes back.
+- The repeated calls of one frame can come with `first_in_frame` still set
+  (seen by TruckTel), so the code doesn't use that flag: a frame ends when the
+  callback returns `not_found`.
+- Only the 13 mixes that have a button. The game takes a declared input as a
+  bound one even if it never sends anything: with a plugin that declares
+  every mix, the wipers stay at full speed and their key no longer turns them
+  off (forum.scssoft.com, t=328756; `wipersback` is declared there). It can't
+  press a save either: `quicksave` is not on the list.
+- `scs_input_init` always answers ok, even if the game rejects the device or
+  there is no shared memory: the telemetry of the same DLL has to go on.
+- With an empty `truckdash-no-input.txt` next to the DLL (Windows) the device
+  isn't registered and the client uses keystrokes. It is for whoever has
+  trouble with it, for example if it disturbs a controller that plays through
+  Steam Input, which is also a semantical device (not checked).
+
+`tools/probar_entrada.py` tests it with a fake game and the client's own
+`entrada_sdk.py`, from `probar_plugin.py` and `probar_plugin_linux.py`.
+
 ## C++ runtime inside the DLL
 
 The Release builds link the C++ runtime statically (`/MT`, `MultiThreaded`

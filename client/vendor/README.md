@@ -7,7 +7,8 @@
   memory block (`Local\TruckDashTelemetry`); the source and the list of
   changes are in `plugin/` at the root of this repository. It is built with
   the TruckersMP Client SDK (MIT License, `plugin/truckersmp_sdk/LICENSE`)
-  to publish the TruckersMP players nearby when TruckersMP loads it.
+  to publish the TruckersMP players nearby when TruckersMP loads it. It also
+  presses the buttons of the dashboard through the SCS input API.
 
   The Truck Dash client bundles this file so it can install it into the
   game's `bin\win_x64\plugins\` folder for the user with one click. It goes

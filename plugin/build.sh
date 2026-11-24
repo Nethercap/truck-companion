@@ -49,8 +49,8 @@ else
   sha="$(sha256sum "$lib" | cut -d' ' -f1)"
 fi
 
-# El juego busca estas dos funciones por nombre (sin decorar: extern "C").
-for funcion in scs_telemetry_init scs_telemetry_shutdown; do
+# El juego busca estas funciones por nombre (sin decorar: extern "C").
+for funcion in scs_telemetry_init scs_telemetry_shutdown scs_input_init scs_input_shutdown; do
   if ! grep -qE "[ _]${funcion}\$" <<<"$exportados"; then
     echo "$lib no exporta $funcion" >&2
     exit 1

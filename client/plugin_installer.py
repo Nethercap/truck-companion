@@ -34,12 +34,12 @@ PLUGIN_DLL_NAME = "truckdash-telemetry.dll"
 # si esta, para saber que el juego ya publica telemetria (en "SCSTelemetry",
 # que el cliente tambien lee).
 OTHER_DLL_NAME = "scs-telemetry.dll"
-# Fork de RenCloud 1.12.1 con los trabajos con auto de ATS 1.61 y los
-# jugadores de TruckersMP (plugin/). La DLL y su hash los escribe el workflow
+# Fork de RenCloud 1.12.1 con los trabajos con auto de ATS 1.61, los jugadores
+# de TruckersMP y los botones (plugin/). La DLL y su hash los escribe el workflow
 # "Build plugin" (tools/pin_plugin.py). La version tambien va en
 # truckersmp_init (plugin/scs-telemetry/src/truckersmp_players.cpp).
-PLUGIN_DLL_VERSION = "1.12.1-truckdash.5"
-PLUGIN_DLL_SHA256 = "431c29fad12a451192afa501f6a402e2784dbc2f490548bc6731b61ed218319a"
+PLUGIN_DLL_VERSION = "1.12.1-truckdash.6"
+PLUGIN_DLL_SHA256 = "76f7d98def87e5d3b35b947e36cb7e77253a2e8f069bc7e8316dd783832b3e08"
 # El mismo plugin para macOS, universal (Intel y Apple Silicon): la .dylib y
 # su hash tambien los escribe "Build plugin" (plataforma macos, con
 # plugin/build.sh). Vacio hasta la primera compilacion; el cliente todavia no
@@ -98,13 +98,14 @@ def unix_a_wine(ruta: str) -> str:
     return ruta
 
 
-def linux_steam_roots(env=None, existe=os.path.isdir) -> list[str]:
+def linux_steam_roots(env=None, existe=os.path.isdir, como_se_ve=unix_a_wine) -> list[str]:
     """Bajo Proton, el Steam de Linux visto desde Wine. El del registro es uno
     de mentira dentro del prefijo, sin juegos: sin esto la instalacion solo
     aparecia con el juego ya abierto (issue #7, Nobara). Proton pasa la
     carpeta de Steam y la del prefijo (STEAM_COMPAT_CLIENT_INSTALL_PATH,
     STEAM_COMPAT_DATA_PATH, que vive en <biblioteca>/steamapps/compatdata/<id>)
-    y el HOME de Linux; en Windows ninguna existe como carpeta."""
+    y el HOME de Linux; en Windows ninguna existe como carpeta. En Linux
+    nativo las mismas carpetas van tal cual (`como_se_ve`)."""
     env = os.environ if env is None else env
     candidatas = []
     if env.get("STEAM_COMPAT_CLIENT_INSTALL_PATH", "").startswith("/"):
@@ -118,9 +119,21 @@ def linux_steam_roots(env=None, existe=os.path.isdir) -> list[str]:
             candidatas.append(home.rstrip("/") + "/" + sub)
     raices = []
     for c in candidatas:
-        ruta = unix_a_wine(c)
+        ruta = como_se_ve(c)
         if ruta not in raices and existe(ruta):
             raices.append(ruta)
+    return raices
+
+
+def steam_roots(windows=os.name == "nt") -> list[str]:
+    """Las carpetas donde esta instalado Steam (no las bibliotecas), donde
+    viven las partidas de Steam Cloud (userdata, ver partida_gps): la del
+    registro, la de Linux vista desde Wine bajo Proton, o la de Linux."""
+    linux = linux_steam_roots() if windows else linux_steam_roots(como_se_ve=str)
+    raices = []
+    for raiz in [find_steam_path()] + linux:
+        if raiz and raiz not in raices:
+            raices.append(raiz)
     return raices
 
 
