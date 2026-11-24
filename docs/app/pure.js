@@ -4275,7 +4275,7 @@ function basemapForVariant(base, mods) {
 // velocidad real. Parado o casi (un semaforo antes de doblar) se toma una
 // velocidad minima: si no, el aviso no llegaria nunca.
 // El aviso del punto sale con el primero de dos limites: segundos a la
-// velocidad actual o, en giros y rotondas, metros (ver VOICE_TIMINGS). Si
+// velocidad actual o, en giros, rotondas y ferrys, metros (ver VOICE_TIMINGS). Si
 // antes del giro queda otra calle hacia el mismo lado (turn.decoyMeters, ver
 // sideExitToward), se espera a pasarla.
 // arrival(key, kind, remainingKm, totalKm): una vez por destino; solo si la
@@ -4380,7 +4380,11 @@ function parseWsJson(text) {
 // (como los ordinales de la pantalla; las de sexta a octava, desde los
 // paquetes v4 del 15-10); mas alla se dice hacia que lado sale.
 const VOICE_ROUNDABOUT_MAX_EXIT = 8;
+// Ferry o tren (frases desde los paquetes v5 del 24-11): turn.train lo pone
+// voiceManeuverTick (app.js) con el puerto, que puede no haber llegado. Sin
+// saberlo, null: en Calais salen los dos, y decir el otro es peor que callarse.
 function voiceManeuverKey(turn) {
+  if (turn.kind === 'ferry') return typeof turn.train === 'boolean' ? (turn.train ? 'take_train' : 'take_ferry') : null;
   if (turn.kind === 'roundabout' && turn.exit >= 1 && turn.exit <= VOICE_ROUNDABOUT_MAX_EXIT) return `roundabout_${turn.exit}`;
   return `${turn.kind === 'fork' ? 'keep' : 'turn'}_${turn.direction === 'left' ? 'left' : 'right'}`;
 }
@@ -4794,8 +4798,8 @@ function navReportOutcome(status, body) {
 // era siempre a 6 s: a 80 km/h, 130 m antes, y frenando para doblar se
 // llegaba 10 s despues; en una rotonda se decia "primera salida" lejos de
 // la entrada (Discord, 11-10). Los metros (del mundo, los que recorre el
-// camion) son solo para giros y rotondas, donde se frena; una salida de
-// autopista se toma a velocidad y necesita los segundos.
+// camion) son solo para giros, rotondas y ferrys, donde se frena; una salida
+// de autopista se toma a velocidad y necesita los segundos.
 const VOICE_TIMINGS = {
   early: { nowSec: 6, nowMaxM: Infinity }, // el de antes
   normal: { nowSec: 5, nowMaxM: 70 },
@@ -4844,16 +4848,15 @@ function createVoiceGuide(opts = {}) {
   return {
     maneuver(turn, speedKmh) {
       if (!turn || !turn.node || !Number.isFinite(turn.distanceMeters)) return null;
-      // Un ferry no tiene frase grabada en ningun paquete de voz (24-11): sin esto
-      // se decia "turn right". El panel lo muestra con el nombre del puerto.
-      if (turn.kind === 'ferry') return null;
+      const action = voiceManeuverKey(turn);
+      // Un cruce sin el puerto: no se da por dicho, sale si el dato llega a tiempo
+      if (!action) return null;
       const id = turnIdentity(turn);
       const current = dichos.get(id) || dichos.set(id, { soon: false, now: false });
       const speedMs = Math.max(minSpeedMs, (Number(speedKmh) || 0) / 3.6);
       const seconds = turn.distanceMeters / speedMs;
-      const action = voiceManeuverKey(turn);
       const nowSec = timing.nowSec;
-      const capped = turn.kind === 'turn' || turn.kind === 'roundabout';
+      const capped = turn.kind === 'turn' || turn.kind === 'roundabout' || turn.kind === 'ferry';
       const due = seconds <= nowSec && (!capped || turn.distanceMeters <= timing.nowMaxM);
       if (!current.now && due && !(turn.decoyMeters > 0)) {
         current.now = current.soon = true;
@@ -4895,7 +4898,7 @@ function createVoiceGuide(opts = {}) {
 // llegada, avisos del camion). En espera queda una sola: la mas urgente, o
 // si empatan, la ultima.
 function voiceIsUrgent(key) {
-  return /^(turn|keep|roundabout)_/.test(String(key));
+  return /^(turn|keep|roundabout|take)_/.test(String(key));
 }
 function voiceQueueAction(playingKey, newKey) {
   if (!playingKey) return 'play';

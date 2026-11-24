@@ -35,6 +35,17 @@ VOICE_DIR = os.path.join(ROOT, "docs", "app", "voice")
 SILENCIO_INICIAL_S = 0.15
 KBPS = 48
 
+# Como se le escribe a Piper una palabra que lee mal, por idioma de las frases. En
+# frances lee "ferry" a la inglesa, con una erre que la voz no conoce (espeak: fɛɹi);
+# "ferri" suena como se dice. En voices.json queda bien escrita.
+PRONUNCIACION = {"fr": {"ferry": "ferri"}}
+
+
+def texto_para_piper(texto: str, frases: str) -> str:
+    for palabra, como in PRONUNCIACION.get(frases, {}).items():
+        texto = texto.replace(palabra, como)
+    return texto
+
 
 def sintetizar(voz, texto: str) -> tuple[bytes, int]:
     """PCM de 16 bits mono y su frecuencia de muestreo."""
@@ -90,7 +101,7 @@ def main():
             if clave in viejos:
                 clips[clave] = viejos[clave]
                 continue
-            pcm, frecuencia = sintetizar(voz, texto)
+            pcm, frecuencia = sintetizar(voz, texto_para_piper(texto, v["phrases"]))
             clips[clave] = "data:audio/mpeg;base64," + base64.b64encode(a_mp3(pcm, frecuencia)).decode()
         salida = os.path.join(VOICE_DIR, v["file"])
         with open(salida, "w", encoding="utf-8", newline="\n") as f:

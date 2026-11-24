@@ -6672,7 +6672,9 @@ function fillVoiceSelect() {
 
 function voiceManeuverTick(turn) {
   if (!voiceOn) return;
-  const key = voiceGuide.maneuver(turn, Math.abs(Number(lastData && lastData.speedKmh) || 0));
+  // Un cruce es ferry o tren segun su puerto, que se baja aparte (ferryPortAt)
+  const puerto = turn && turn.kind === 'ferry' ? ferryPortAt(turn.node[0], turn.node[1]) : null;
+  const key = voiceGuide.maneuver(puerto ? { ...turn, train: puerto.train } : turn, Math.abs(Number(lastData && lastData.speedKmh) || 0));
   if (key && voiceHere()) speakVoice(key);
 }
 

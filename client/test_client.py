@@ -2018,6 +2018,21 @@ def test_lan_sirve_los_glifos_que_pide_la_app():
         assert os.path.exists(os.path.join(raiz, "docs", *rel.split("/"))), rel
 
 
+def test_lan_sirve_los_paquetes_de_voz_del_catalogo():
+    # El catalogo dice que paquete pide cada voz: sin el en WEB_FILES, en LAN sin
+    # internet la guia queda muda. Los de antes no, que se bajarian para nada.
+    import json
+    import local_server
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(raiz, "docs", "app", "voice", "voices.json"), encoding="utf-8") as f:
+        pide = {f"app/voice/{v['file']}" for v in json.load(f)["voices"] if not v.get("system")}
+    sirve = {rel for rel in local_server.WEB_FILES if rel.startswith("app/voice/")}
+    assert sirve == pide | {"app/voice/voices.json"}
+    for rel in pide:
+        assert os.path.exists(os.path.join(raiz, "docs", *rel.split("/"))), rel
+
+
 def test_log_job_change_solo_cuando_cambia(monkeypatch, caplog):
     """El log dice que manda el SDK al tomar el trabajo y al enganchar (06-11)."""
     import logging

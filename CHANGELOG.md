@@ -43,6 +43,8 @@ updates on its own and is not versioned here.
   Dash's default key, which can belong to something else (Beacon opened the infotainment for a
   player who has the beacon only on the wheel), and the key is now the one of the game that is
   open, not the one of whichever game's controls changed last.
+- LAN mode: the new voice packs, which also say when to take a ferry or a train, are downloaded
+  ahead with the rest of the page, so the voice works on your Wi-Fi without internet too.
 
 ## 1.5.46 (2026-11-23)
 
