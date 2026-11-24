@@ -429,12 +429,18 @@ def leer_partidas_prendido() -> bool:
     return win_integration.load_settings().get(partida_gps.CLAVE_AJUSTE) is True
 
 
+def vigia_de_partidas() -> partida_gps.Vigia:
+    """Con los dos lugares donde el juego guarda: Documentos y, los perfiles
+    de Steam Cloud, la carpeta de Steam."""
+    return partida_gps.Vigia(client_lib.documents_folder(), plugin_installer.steam_roots())
+
+
 def vigilar_partidas(cada_s: float = 3.0) -> None:
     """Hilo propio: con el ajuste prendido y el juego en vivo, mira la
     partida mas nueva y la relee cuando cambia (partida_gps.Vigia). Solo lee.
     Descifrar y recorrer una partida grande lleva hasta un segundo: aca, y no
     en el bucle de la telemetria."""
-    vigia = partida_gps.Vigia(client_lib.documents_folder())
+    vigia = vigia_de_partidas()
     while True:
         try:
             if leer_partidas_prendido() and state.status == "live" and state.game:

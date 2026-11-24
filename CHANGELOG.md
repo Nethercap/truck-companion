@@ -6,6 +6,10 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Follow the in-game GPS: saves of Steam Cloud profiles are now found. The game keeps them in Steam's
+  own folder, not in Documents, and Truck Dash only looked in Documents: with this turned on it
+  never found a save and did nothing, without saying so. It still only reads the newest save, and
+  the log now says when there is none to read.
 - Build my map: at some motorway interchanges, turning left onto the motorway and coming back
   from it by the loop were stored as one two-way road, drawn as the loop. On the D1 at Ostrava
   (ETS2) the route to Brno was drawn along the loop, to the right and the wrong way, and the
