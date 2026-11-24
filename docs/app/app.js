@@ -1349,8 +1349,7 @@ function ets2FromLngLat(lng, lat) { return ets2FromLngLatImpl(lng, lat, true); }
 function guToLngLat(x, z) { return ets2ToLngLatImpl(x, z, false); }
 function guFromLngLat(lng, lat) { return ets2FromLngLatImpl(lng, lat, false); }
 function ets2ToLngLatImpl(x, z, ukHack) {
-  const sx = Math.floor(x / 4000);
-  const sz = Math.floor(z / 4000);
+  const isUk = ukHack && ets2InGb(x, z);
   x -= ETS2_DEF.offset[0];
   z -= ETS2_DEF.offset[1];
   // El contenido de UK esta autorado a una escala un poco mas grande, y todo
@@ -1359,7 +1358,6 @@ function ets2ToLngLatImpl(x, z, ukHack) {
   // desde los archivos del juego.
   const ukScale = 0.75;
   const calaisX = -31100, calaisZ = -5500;
-  const isUk = ukHack && sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
   if (isUk) {
     x = (x + calaisX / 2) * ukScale;
     z = (z + calaisZ / 2) * ukScale;
@@ -1367,11 +1365,9 @@ function ets2ToLngLatImpl(x, z, ukHack) {
   const lcc = [x * ETS2_DEF.factor[1] * LENGTH_OF_DEGREE, z * ETS2_DEF.factor[0] * LENGTH_OF_DEGREE];
   return ets2Proj4.inverse(lcc);
 }
-// Inversa de ets2ToLngLat. El hack de UK hace esto no trivial de invertir en
-// un solo paso (si el punto es UK depende del sector x,z ANTES de aplicarle
-// la escala de UK, que es justo lo que estamos por calcular) - se resuelve
-// en dos pasadas: primero se asume que no es UK, se ve a que sector cae, y
-// si ese sector resulta ser UK se rehace la cuenta aplicando la escala.
+// Inversa de ets2ToLngLat. Si el punto es UK depende del sector x,z ANTES de
+// aplicarle la escala, que es justo lo que se esta por calcular: se hacen las
+// dos cuentas y se elige (ets2PickSide).
 function ets2FromLngLatImpl(lng, lat, ukHack) {
   const [lccX, lccY] = ets2Proj4.forward([lng, lat]);
   const ukScale = 0.75;
@@ -1389,11 +1385,8 @@ function ets2FromLngLatImpl(lng, lat, ukHack) {
     return [x, z];
   };
 
-  const [x0, z0] = tryConvert(false);
-  const sx = Math.floor(x0 / 4000);
-  const sz = Math.floor(z0 / 4000);
-  const isUk = ukHack && sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2);
-  return isUk ? tryConvert(true) : [x0, z0];
+  const cont = tryConvert(false);
+  return ukHack ? ets2PickSide(cont, tryConvert(true)) : cont;
 }
 
 let map = null; // instancia de MapLibre

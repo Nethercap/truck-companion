@@ -7734,6 +7734,60 @@ test('worldNear: las coordenadas de juego de un punto cercano, sin la proyeccion
   assert.ok(Math.abs(x + 32302) < 0.01 && Math.abs(z + 7000) < 0.01, `${x},${z}`);
 });
 
+// Las proyecciones de ETS2 de app.js, con el proj4 de la web.
+function ets2Projection() {
+  const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  const desde = app.indexOf('const EARTH_RADIUS_M'), hasta = app.indexOf('let map = null;');
+  assert.ok(desde > 0 && hasta > desde, 'las proyecciones de app.js');
+  const ctx = vm.createContext({ proj4: require('./vendor/proj4-2.15.0.js'), ets2InGb: nav4.ets2InGb, ets2PickSide: nav4.ets2PickSide });
+  return vm.runInContext(app.slice(desde, hasta) + `;({ ida: ets2ToLngLat, vuelta: ets2FromLngLat, guIda: guToLngLat, guVuelta: guFromLngLat })`, ctx);
+}
+
+test('ets2InGb: arriba a la izquierda del sector de Calais', () => {
+  for (const [x, z] of [[-32502, -7179], [-33772, -8554], [-36082, -7001], [-32001, -4001], [-28001, -8001]]) assert.equal(nav4.ets2InGb(x, z), true, `${x},${z}`);
+  for (const [x, z] of [[-31141, -5506], [-31866, -5788], [-31999, -7999], [-27999, -8001], [-32001, -3999], [0, 0]]) assert.equal(nav4.ets2InGb(x, z), false, `${x},${z}`);
+});
+
+test('ETS2: ida y vuelta da el mismo punto a los dos lados del borde de Gran Bretana', () => {
+  const { ida, vuelta, guIda, guVuelta } = ets2Projection();
+  const lugares = [
+    ['puerto de Dover', -32502, -7179], ['Dover', -33772, -8554], ['puerto de Folkestone', -36082, -7001],
+    ['la calle mas al sur del puerto de Dover', -32276, -7384], ['la calle al norte de Dover', -32654, -8723],
+    ['Calais', -31141, -5506], ['Calais de ProMods', -31866, -5788], ['su puerto', -31678, -5770], ['su calle mas al sur', -31600, -5599],
+    ['el tunel de ProMods', -32637, -4092], ['su punta francesa', -32498, -3998], ['Coquelles', -32149, -1764],
+    ['Shetland', -29500, -19000], ['Londres', -39000, -11000], ['Lille', -26840, -2930], ['origen', 0, 0],
+    // a un metro del borde, lejos de la franja
+    ['borde este, GB', -28001, -13000], ['borde este, mar', -27999, -13000], ['borde sur, GB', -36000, -4001], ['borde sur, Francia', -36000, -3999],
+  ];
+  for (const [nombre, x, z] of lugares) {
+    const [a, b] = vuelta(...ida(x, z));
+    assert.ok(Math.hypot(a - x, b - z) < 0.01, `${nombre}: ${x},${z} vuelve como ${a},${b}`);
+    const [c, d] = guVuelta(...guIda(x, z));              // Grand Utopia va sin la escala
+    assert.ok(Math.hypot(c - x, d - z) < 0.01, `${nombre} en gu: ${c},${d}`);
+  }
+});
+
+test('ETS2: cerca del borde solo se corre el lado que no se elige de la franja que se pisa', () => {
+  // Achicada, GB cae en parte encima del sector de Calais: dos lugares del juego en el
+  // mismo punto del mapa, y la vuelta solo puede dar uno.
+  const { ida, vuelta } = ets2Projection();
+  let corridos = 0;
+  for (let x = -35950; x < -24000; x += 100) {
+    for (let z = -11950; z < 0; z += 100) {
+      const [a, b] = vuelta(...ida(x, z));
+      if (Math.hypot(a - x, b - z) < 0.01) continue;
+      corridos++;
+      const gb = nav4.ets2InGb(x, z), zMapa = gb ? (z - 6900) * 0.75 + 4150 : z;
+      assert.notEqual(nav4.ets2InGb(a, b), gb, `${x},${z} vuelve del otro lado`);
+      assert.equal(gb, zMapa > -6100 && zMapa < -4900, `${x},${z} (z del mapa ${zMapa})`);
+      const [[lng, lat], [lng2, lat2]] = [ida(x, z), ida(a, b)];
+      assert.ok(Math.abs(lng - lng2) < 1e-6 && Math.abs(lat - lat2) < 1e-6, `${x},${z}: otro lugar del mapa`);
+    }
+  }
+  assert.ok(corridos > 0 && corridos < 600, `${corridos} corridos`);   // con el continente siempre, 891
+});
+
 test('pickFerryPort y ferryPortName: el puerto de ese nodo, y su nombre', () => {
   const puertos = [{ x: 0, z: 0, raw: 'Priwall' }, { x: 118, z: 0, raw: 'Travemünde' }, { x: 5000, z: 0, raw: 'Lejos' }];
   assert.equal(nav4.pickFerryPort(puertos, 20, 5).raw, 'Priwall');

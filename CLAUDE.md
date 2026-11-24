@@ -139,6 +139,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   no sirven para detectar esto: las 222 ciudades propias de RusMap y ROEX caen dentro de
   los del mapa de Grand Utopia. Los textos dicen "si lo agrega uno de tus mods": tambien
   puede ser un evento (Brackenreach), y ahi armar el mapa no ayuda.
+- La vuelta del mapa al juego en ETS2 (`ets2FromLngLatImpl`, tocar el mapa para un waypoint)
+  no es unica junto a Gran Bretana: achicada a 0,75, se mete 502 m al este y 975 m al sur
+  encima del sector de Calais, y en esa franja dos lugares del juego se dibujan en el mismo
+  punto. Probar las dos lecturas y quedarse con la que vuelve al mismo punto no alcanza (las
+  dos vuelven): decide `ets2PickSide` por lo que hay de cada lado en los nueve mapas, Dover o
+  el Calais de ProMods, que esta en la franja (24-11; antes ganaba siempre el continente y el
+  puerto de Dover se corria 993 m). En la app nativa, `elegirLado` de `Proyeccion.kt`.
 - El mapa base real (`basemap/*.geojson` en R2, `build_basemap.py` del
   taller) dibuja Islandia donde la pone la proyeccion de la web, no donde esta:
   el hack de UK (escala 0,75 alrededor de Calais) la corre unos 3 grados al
@@ -1220,8 +1227,8 @@ Salieron de comparar con los pedidos y resenas de TruckSim GPS.
   en R2. La ciudad mas cercana no sirve: en 45 de 137 cruces de ETS2 no es el puerto. La
   mitad de los de ProMods traen la clave sin traducir (`ferryPortName`). Medido con la
   app: 138 de 138 en ETS2, 10 de 10 en ATS, 263 de 266 en ProMods y ninguno mal. Las
-  coordenadas del puerto van con `worldNear`, no con `fromLngLat`, que en el puerto de
-  Dover se corre 993 m. La voz se calla: ningun paquete tiene la frase (pide regenerarlos
+  coordenadas del puerto van con `worldNear`, no con `fromLngLat`, que junto al borde de
+  Gran Bretana tiene que elegir un lado. La voz se calla: ningun paquete tiene la frase (pide regenerarlos
   con `tools/build_voice_packs.py`).
 - Aviso de F5 (`createGpsSaveHint`, renglon del resumen): solo con `gameGps`. Nunca
   aprieta nada. Un salto de los km del juego parado o recien salido de la pausa es un
