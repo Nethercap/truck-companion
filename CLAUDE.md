@@ -1197,6 +1197,43 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   o correr nada; los forks y ports, con su propio nombre, relay y mapas
   (README y terminos). Registrar la marca quedo como sugerencia.
 
+## Zoom automatico, proxima parada, ferry y aviso de F5 (24-11)
+
+Salieron de comparar con los pedidos y resenas de TruckSim GPS.
+
+- Zoom automatico (`navZoomAuto`, Ajustes, apagado por defecto): un corrimiento sobre
+  `navZoom` (`createNavAutoZoom`), que a 90 km/h es 0 y a la mitad de velocidad un nivel
+  mas cerca; en una caja de ciudad la velocidad cuenta hasta 60. No mira el giro: acercar
+  al doblar daba saltos en los cruces y se saco. Velocidad promediada, meta con banda y
+  espera, parado no cambia y a lo sumo 0,15 niveles por segundo; con
+  `prefers-reduced-motion`, un corte (`map.jumpTo` antes de `followCameraTo`, que lo
+  animaria). Medido en la app (88, 28 y 88 km/h): 0,026 niveles por dato.
+- `navPaddingTop`: con el resumen alto el camion sube lo justo (en un celular acostado
+  la flecha quedaba debajo).
+- La proxima parada propia del resumen lleva km y hora de llegada (`nextStopText`, del
+  mismo tramo que la lista del panel, `waypointLegEtas`). Sin trabajo y con una sola, no:
+  arriba dice lo mismo.
+- Ferry y tren: `ferryAhead` es lo que se muestra cuando `findUpcomingTurn` no encontro
+  giro antes (por eso `check_avisos` y el simulador no cambian). El nombre sale de los
+  puertos del mismo `.pmtiles` del mapa (`loadFerryPort`: el tile de z10 de donde llega,
+  leido con `mvtPoints`, porque MapLibre solo da los tiles a la vista), sin archivo nuevo
+  en R2. La ciudad mas cercana no sirve: en 45 de 137 cruces de ETS2 no es el puerto. La
+  mitad de los de ProMods traen la clave sin traducir (`ferryPortName`). Medido con la
+  app: 138 de 138 en ETS2, 10 de 10 en ATS, 263 de 266 en ProMods y ninguno mal. Las
+  coordenadas del puerto van con `worldNear`, no con `fromLngLat`, que en el puerto de
+  Dover se corre 993 m. La voz se calla: ningun paquete tiene la frase (pide regenerarlos
+  con `tools/build_voice_packs.py`).
+- Aviso de F5 (`createGpsSaveHint`, renglon del resumen): solo con `gameGps`. Nunca
+  aprieta nada. Un salto de los km del juego parado o recien salido de la pausa es un
+  destino puesto a mano y alcanza con poco; andando puede ser un desvio o un area de
+  descanso (a 1:20 volver por la otra salida son 20 km) y pide 10 km y 10 %, sin haber
+  estado a mas de 30 m de la linea en un minuto. Compara contra nuestra ruta de antes y
+  despues, no contra un largo fijo: si subieron juntas no avisa. Se va solo (partida
+  nueva, sin ruta, salto del camion, parada propia, 10 min) y con la X. Con el resumen
+  minimizado o en el hueco chico del tablero va como toast. Sin probar en el juego.
+- La app nativa muestra "Take the ferry" sin el puerto (el motor no lee tiles) y sin
+  icono propio, y no tiene el ajuste del zoom, la hora de la proxima parada ni el aviso.
+
 ## Modales, overlay de OBS y accesibilidad (13-10)
 
 - Un modal nuevo de la app es un `.settingsOverlay` con su `h3` y un boton

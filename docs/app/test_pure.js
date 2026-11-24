@@ -7499,3 +7499,457 @@ test('jobPanelFields: con un trabajo de bus, primera y proxima parada y los pasa
   assert.deepEqual(jobPanelFields(datos), { citySrc: 'Oulu', cityDst: 'Viitasaari', cargo: null, cargoMassKg: null,
     income: 6718, deadlineSeconds: 16800, passengers: 25 });
 });
+
+// ------------------------------------------------ zoom, parada, ferry y F5 (24-11)
+const nav4 = require('./pure.js');
+
+test('navAutoZoomOffset: a 90 el zoom elegido, a la mitad un nivel mas cerca, y en ciudad nunca como en la autopista', () => {
+  const { navAutoZoomOffset: off } = nav4;
+  assert.equal(off(90, false), 0);
+  assert.ok(Math.abs(off(45, false) - 1) < 1e-9);
+  assert.ok(off(120, false) < -0.3, 'a 120 se aleja');
+  assert.equal(off(0, false), 2);                        // parado: lo mas cerca, acotado
+  assert.equal(off(10, false), off(0, false));
+  assert.equal(off(200, false), off(130, false));        // y no se aleja sin tope
+  assert.equal(off(-45, false), off(45, false));         // marcha atras
+  assert.ok(off(90, true) > 0.5, 'en ciudad, mas cerca aunque se vaya rapido');
+  assert.equal(off(90, true), off(60, true));
+  assert.equal(off(30, true), off(30, false));           // despacio da lo mismo donde sea
+  assert.equal(off(NaN, false), 2);                      // sin dato, como parado
+});
+
+// Un viaje de prueba: velocidades por segundo, a 4 datos por segundo.
+function manejarZoom(z, kmhs, { inCity = false, reduced = false, t0 = 0 } = {}) {
+  const out = [];
+  kmhs.forEach((v, s) => {
+    for (let k = 0; k < 4; k++) out.push(z.push({ speedKmh: v, inCity, now: t0 + (s * 4 + k) * 250, reduced }));
+  });
+  return out;
+}
+const repetir = (v, n) => new Array(n).fill(v);
+
+test('createNavAutoZoom: se desliza despacio, sin saltos de un dato al otro', () => {
+  const z = nav4.createNavAutoZoom();
+  manejarZoom(z, repetir(90, 5));
+  assert.equal(z.offset(), 0);
+  // De la autopista a 30 por hora: baja en varios segundos, nunca de golpe
+  const bajada = manejarZoom(z, repetir(30, 60), { t0: 5000 });
+  for (let i = 1; i < bajada.length; i++) {
+    assert.ok(Math.abs(bajada[i] - bajada[i - 1]) <= nav4.NAV_AUTO_ZOOM.maxPerS * 0.25 + 1e-9, `salto en ${i}`);
+  }
+  assert.ok(bajada[7] < 0.1, 'a los 2 s todavia no se nota');
+  const fin = bajada[bajada.length - 1];
+  assert.ok(fin > 1.1 && fin <= nav4.navAutoZoomOffset(30, false), String(fin));
+  // Una caja de ciudad cambia la meta mas de un nivel de golpe: igual de a poco
+  const c = nav4.createNavAutoZoom();
+  manejarZoom(c, repetir(130, 5));
+  const entrada = manejarZoom(c, repetir(130, 40), { t0: 5000, inCity: true });
+  for (let i = 1; i < entrada.length; i++) {
+    assert.ok(entrada[i] - entrada[i - 1] <= nav4.NAV_AUTO_ZOOM.maxPerS * 0.25 + 1e-9, `salto en ${i}`);
+  }
+  assert.ok(Math.abs(entrada[entrada.length - 1] - nav4.navAutoZoomOffset(130, true)) < 0.02);
+});
+
+test('createNavAutoZoom: la meta cambia recien despues de holdS segundos pidiendolo', () => {
+  const o = { ...nav4.NAV_AUTO_ZOOM, speedS: 1e-6 }; // sin promediar: se ve solo la espera
+  const z = nav4.createNavAutoZoom(o);
+  manejarZoom(z, repetir(90, 5));
+  manejarZoom(z, [40], { t0: 5000 });                    // un segundo
+  assert.equal(z.offset(), 0);
+  manejarZoom(z, repetir(90, 20), { t0: 6000 });
+  assert.equal(z.offset(), 0);
+  manejarZoom(z, repetir(40, 4), { t0: 26000 });
+  assert.ok(z.offset() > 0.1);
+});
+
+test('createNavAutoZoom: los cambios chicos y los cortos no mueven nada (histeresis)', () => {
+  const z = nav4.createNavAutoZoom();
+  manejarZoom(z, repetir(85, 5));
+  const base = z.offset();
+  // Subiendo y bajando 8 km/h alrededor: el mismo zoom, cuadro a cuadro
+  const vaiven = manejarZoom(z, Array.from({ length: 60 }, (_, s) => 85 + 8 * Math.sin(s / 2)), { t0: 5000 });
+  assert.ok(vaiven.every(v => v === base), 'con la velocidad casi igual no se mueve');
+  // Un frenazo de 3 segundos tampoco
+  const frenazo = manejarZoom(z, [...repetir(40, 3), ...repetir(85, 20)], { t0: 65000 });
+  assert.ok(Math.max(...frenazo) - base < 0.1, String(Math.max(...frenazo) - base));
+});
+
+test('createNavAutoZoom: parado no cambia, en pausa tampoco, y despues de un hueco largo arranca de una', () => {
+  const z = nav4.createNavAutoZoom();
+  manejarZoom(z, repetir(90, 5));
+  // Parado en un semaforo un minuto: la meta no cambia por estar en 0
+  const semaforo = manejarZoom(z, repetir(0, 60), { t0: 5000 });
+  assert.equal(semaforo[semaforo.length - 1], 0);
+  // Y en ciudad, parado: tampoco
+  assert.equal(manejarZoom(z, repetir(0, 20), { t0: 65000, inCity: true }).pop(), 0);
+  // En pausa el reloj corre y no pasa nada
+  const z2 = nav4.createNavAutoZoom();
+  manejarZoom(z2, repetir(90, 5));
+  for (let i = 0; i < 80; i++) z2.push({ speedKmh: 30, inCity: true, now: 5000 + i * 250, paused: true });
+  assert.equal(z2.offset(), 0);
+  // Pestana dormida un minuto: lo que toca, de una (la camara tambien salta)
+  z2.push({ speedKmh: 45, inCity: false, now: 90000 });
+  assert.ok(Math.abs(z2.offset() - 1) < 1e-9);
+  // Un dato sin velocidad no rompe
+  assert.equal(z2.push({ speedKmh: undefined, inCity: false, now: 90250 }), z2.offset());
+  // reset: el proximo dato arranca de una
+  z2.reset();
+  z2.push({ speedKmh: 90, inCity: false, now: 90500 });
+  assert.equal(z2.offset(), 0);
+});
+
+test('createNavAutoZoom: con prefers-reduced-motion corta en vez de deslizarse, y mucho menos seguido', () => {
+  const z = nav4.createNavAutoZoom();
+  manejarZoom(z, repetir(90, 5), { reduced: true });
+  const bajada = manejarZoom(z, repetir(25, 60), { t0: 5000, reduced: true });
+  const distintos = new Set(bajada);
+  assert.ok(distintos.size >= 2 && distintos.size <= 3, `${distintos.size} zooms distintos`);
+  for (let i = 1; i < bajada.length; i++) {
+    const paso = Math.abs(bajada[i] - bajada[i - 1]);
+    assert.ok(paso === 0 || paso >= 0.5, `se desliza (${paso})`);
+  }
+  // De 85 a 60 sin el ajuste se movia; con el, no llega a la diferencia que pide
+  const z2 = nav4.createNavAutoZoom();
+  manejarZoom(z2, repetir(85, 5), { reduced: true });
+  const antes = z2.offset();
+  assert.equal(manejarZoom(z2, repetir(60, 40), { t0: 5000, reduced: true }).pop(), antes);
+  const z3 = nav4.createNavAutoZoom();
+  manejarZoom(z3, repetir(85, 5));
+  assert.ok(manejarZoom(z3, repetir(60, 40), { t0: 5000 }).pop() > antes + 0.3);
+});
+
+test('navPaddingTop: el camion abajo, pero nunca debajo del resumen de la ruta', () => {
+  const { navPaddingTop: top, NAV_TRUCK_CLEAR_PX: margen } = nav4;
+  const y = (h, s) => (h + top(h, s)) / 2; // donde queda el camion
+  assert.equal(top(543, 0), 244);                        // sin resumen, al 72 %
+  assert.equal(top(543, 55), 244);                       // en escritorio, con el resumen, igual
+  // Celular acostado: 300 px de mapa y el resumen con un renglon de mas
+  assert.ok(y(300, 79) <= 300 - 79 - margen, String(y(300, 79)));
+  assert.ok(y(300, 79) > 150, 'y no mas arriba de lo que hace falta');
+  assert.equal(top(150, 120), 0);                        // sin lugar: en el medio
+  assert.equal(top(300, null), 135);
+  assert.equal(top(100, 0), 45);                           // sin resumen no hay nada que esquivar
+});
+
+test('navAutoZoomOf: dentro de lo que se puede elegir en Ajustes', () => {
+  assert.equal(nav4.navAutoZoomOf(10, 1.25), 11.25);
+  assert.equal(nav4.navAutoZoomOf(12.5, 2), nav4.NAV_ZOOM_MAX);
+  assert.equal(nav4.navAutoZoomOf(8, -0.5), nav4.NAV_ZOOM_MIN);
+  assert.equal(nav4.navAutoZoomOf(10, NaN), 10);
+});
+
+test('nextStopText: distancia y hora de llegada de la proxima parada, en las unidades y el formato elegidos', () => {
+  const now = new Date(2026, 10, 24, 14, 30).getTime();
+  const leg = { km: 100, realSeconds: 45 * 60, gameSeconds: 999 };
+  assert.equal(nav4.nextStopText(leg, { imperial: false, lang: 'en', hour12: false, now }), '100.0 km · 15:15');
+  assert.equal(nav4.nextStopText(leg, { imperial: true, lang: 'en', hour12: true, now }), '62.1 mi · 3:15 PM');
+  assert.equal(nav4.nextStopText(leg, { imperial: false, lang: 'es', hour12: false, now }), '100,0 km · 15:15');
+  // Pasada la medianoche, la hora de manana
+  assert.equal(nav4.nextStopText({ km: 900, realSeconds: 10 * 3600 }, { imperial: false, lang: 'en', hour12: false, now }), '900.0 km · 00:30');
+  // Sin tiempo, la distancia sola; sin tramo (ruta recien cambiada), nada
+  assert.equal(nav4.nextStopText({ km: 12.34, realSeconds: null }, { imperial: false, lang: 'en', hour12: false, now }), '12.3 km');
+  assert.equal(nav4.nextStopText(null, { imperial: false, lang: 'en', hour12: false, now }), '');
+  assert.equal(nav4.nextStopText({ km: NaN }, { imperial: false, lang: 'en', hour12: false, now }), '');
+  // Si es el final de la ruta, arriba ya dice lo mismo
+  assert.equal(nav4.nextStopText(leg, { imperial: false, lang: 'en', hour12: false, now, last: true }), '');
+});
+
+test('ferryAhead: el proximo cruce por la ruta, con el nodo donde llega', () => {
+  const pts = [[0, 0, 0], [100, 0, 0], [300, 0, 0], [5000, 0, 1], [5100, 0, 0], [9000, 0, 1]];
+  const f = nav4.ferryAhead(pts, 800);
+  assert.deepEqual(f, { kind: 'ferry', direction: null, distanceMeters: 300, node: [5000, 0] });
+  assert.equal(nav4.ferryAhead(pts, 250), null);         // mas lejos de lo que se mira
+  // Ya en el muelle: el camion es el primer punto y el tramo siguiente es el barco
+  assert.deepEqual(nav4.ferryAhead([[290, 3, 0], [5000, 0, 1]], 800), { kind: 'ferry', direction: null, distanceMeters: 0, node: [5000, 0] });
+  // Dos cruces seguidos (A -> B -> C): en A se elige el de B
+  assert.deepEqual(nav4.ferryAhead([[0, 0, 0], [50, 0, 0], [4000, 0, 1], [8000, 0, 1]], 800).node, [4000, 0]);
+  assert.equal(nav4.ferryAhead([[0, 0, 0], [100, 0, 0]], 800), null);
+  assert.equal(nav4.ferryAhead(null, 800), null);
+  assert.deepEqual(nav4.ferryAhead(pts, Infinity).node, [5000, 0]);
+});
+
+// Un tile MVT escrito a mano: capas con puntos (y una linea) y propiedades.
+function tileMvt(capas) {
+  const varint = (n) => { const o = []; do { let b = n % 128; n = Math.floor(n / 128); if (n) b += 128; o.push(b); } while (n); return o; };
+  const campo = (num, bytes) => [...varint(num * 8 + 2), ...varint(bytes.length), ...bytes];
+  const entero = (num, v) => [...varint(num * 8), ...varint(v)];
+  const texto = (s) => [...Buffer.from(s, 'utf8')];
+  const zz = (n) => (n < 0 ? -2 * n - 1 : 2 * n);
+  return Uint8Array.from(capas.flatMap(({ name, extent, features }) => {
+    const claves = [], valores = [];
+    const idx = (lista, v) => { if (!lista.includes(v)) lista.push(v); return lista.indexOf(v); };
+    const figuras = features.map(({ x, y, props, line, geoAntes }) => {
+      const tags = Object.entries(props).flatMap(([k, v]) => [idx(claves, k), idx(valores, v)]);
+      const geo = line ? [9, zz(x), zz(y), 10, zz(5), zz(5)] : [9, zz(x), zz(y)];
+      const tipo = entero(3, line ? 2 : 1), geometria = campo(4, geo.flatMap(varint));
+      return campo(2, [...campo(2, tags.flatMap(varint)), ...(geoAntes ? [...geometria, ...tipo] : [...tipo, ...geometria])]);
+    });
+    const valor = (v) => (typeof v === 'string' ? campo(1, texto(v)) : typeof v === 'boolean' ? entero(7, v ? 1 : 0) : [...varint(3 * 8 + 1), 0, 0, 0, 0, 0, 0, 12, 64]); // un double
+    return campo(3, [...entero(15, 2), ...campo(1, texto(name)), ...figuras.flat(), ...claves.flatMap(k => campo(3, texto(k))),
+      ...valores.flatMap(v => campo(4, valor(v))), ...(extent ? entero(5, extent) : [])]);
+  }));
+}
+
+test('mvtPoints: los puntos de una capa de un tile, con sus propiedades de texto', () => {
+  const tile = tileMvt([
+    { name: 'otra', features: [{ x: 1, y: 1, props: { poiName: 'No' } }] },
+    { name: 'ets2', extent: 8192, features: [
+      { x: 10, y: 20, props: { type: 'road' }, line: true },
+      { x: 11, y: 21, props: { type: 'road' }, line: true, geoAntes: true }, // el orden de los campos es libre
+      { x: 300, y: -15, props: { type: 'poi', poiType: 'ferry', poiName: 'Travemünde', secret: false, dlcGuard: 3.5 } },
+      { x: 4000, y: 4001, props: { type: 'poi', poiType: 'train', poiName: 'Folkestone' } },
+    ] },
+    { name: 'tercera', features: [{ x: 2, y: 2, props: {} }] },
+  ]);
+  const pts = nav4.mvtPoints(tile, 'ets2');
+  assert.equal(pts.length, 2);                            // la linea no
+  assert.deepEqual([pts[0].x, pts[0].y, pts[0].extent], [300, -15, 8192]);
+  assert.equal(pts[0].props.poiName, 'Travemünde');
+  assert.equal(pts[0].props.secret, null);                // lo que no es texto no hace falta
+  assert.deepEqual([pts[1].x, pts[1].y, pts[1].props.poiType], [4000, 4001, 'train']);
+  assert.equal(nav4.mvtPoints(tile, 'otra')[0].extent, 4096); // el de siempre, sin decirlo
+  assert.deepEqual(nav4.mvtPoints(tile, 'nada'), []);
+  assert.deepEqual(nav4.mvtPoints(new Uint8Array(0), 'ets2'), []);
+  assert.deepEqual(nav4.mvtPoints(tile.buffer, 'ets2').length, 2); // un ArrayBuffer tambien
+  assert.throws(() => nav4.mvtPoints(tile.slice(0, tile.length - 40), 'ets2')); // cortado: se sabe
+});
+
+test('tilesCovering y tilePointLngLat: ida y vuelta por el mismo tile', () => {
+  const [lng, lat] = [10.8, 54.02];
+  const tiles = nav4.tilesCovering([[lng, lat]], 10);
+  assert.equal(tiles.length, 1);
+  const [tx, ty] = tiles[0];
+  assert.deepEqual([tx, ty], [542, 328]);                 // el de Travemunde
+  const [oLng, oLat] = nav4.tilePointLngLat(10, tx, ty, 0, 0, 4096);
+  const [fLng, fLat] = nav4.tilePointLngLat(10, tx, ty, 4096, 4096, 4096);
+  assert.ok(oLng <= lng && lng <= fLng && fLat <= lat && lat <= oLat);
+  // Un rectangulo que cruza el borde pide los cuatro
+  assert.equal(nav4.tilesCovering([[oLng - 0.01, oLat + 0.01], [oLng + 0.01, oLat - 0.01]], 10).length, 4);
+});
+
+test('worldNear: las coordenadas de juego de un punto cercano, sin la proyeccion inversa', () => {
+  // Una proyeccion girada y con otra escala en cada eje
+  const proj = (x, z) => [10 + x * 0.0002 + z * 0.00003, 50 - z * 0.0001 + x * 0.00001];
+  const [x, z] = nav4.worldNear(-32502, -7179, proj(-32302, -7000), proj);
+  assert.ok(Math.abs(x + 32302) < 0.01 && Math.abs(z + 7000) < 0.01, `${x},${z}`);
+});
+
+test('pickFerryPort y ferryPortName: el puerto de ese nodo, y su nombre', () => {
+  const puertos = [{ x: 0, z: 0, raw: 'Priwall' }, { x: 118, z: 0, raw: 'Travemünde' }, { x: 5000, z: 0, raw: 'Lejos' }];
+  assert.equal(nav4.pickFerryPort(puertos, 20, 5).raw, 'Priwall');
+  assert.equal(nav4.pickFerryPort(puertos, 90, 5).raw, 'Travemünde');
+  assert.equal(nav4.pickFerryPort(puertos, 2500, 0), null);
+  assert.equal(nav4.pickFerryPort([], 0, 0), null);
+  const ciudades = [
+    { Name: 'Tórshavn', X: 500, Y: 0 }, { Name: 'Newcastle upon Tyne', X: 1800, Y: 0 }, { Name: 'Vesterø Havn', X: 100, Y: 100 },
+    { Name: 'Bar', X: 50, Y: 0 }, { Name: 'Gdańsk', X: 700, Y: 0 }, { Name: 'Rosslare Harbour', X: 90000, Y: 0 },
+  ];
+  const n = (raw) => nav4.ferryPortName(raw, ciudades, 0, 0);
+  assert.equal(n('Gdynia'), 'Gdynia');                    // el del juego, no la ciudad de al lado
+  assert.equal(n('@@torshavn2@@'), 'Tórshavn');
+  assert.equal(n('@@newcastle@@'), 'Newcastle upon Tyne');
+  assert.equal(n('@@vestero_havn@@'), 'Vesterø Havn');
+  assert.equal(n('@@rosslare@@'), 'Rosslare');            // la ciudad esta lejos: la clave
+  assert.equal(n('@@puttgarden@@'), 'Puttgarden');
+  assert.equal(n('@@larnaka1@@'), 'Larnaka');
+  assert.equal(n('@@bar_me@@'), null);                    // 'Bar' es muy corto para estar seguro
+  assert.equal(n('@@s6ru@@'), null);
+  assert.equal(n(''), null);
+  assert.equal(n(undefined), null);
+  assert.equal(n('x'.repeat(90)).length, 40);
+});
+
+test('el ferry en el panel, en la voz y en el turn report', () => {
+  const textos = { navFerry: 'Take the ferry', navFerryTo: 'Take the ferry to {port}', navTrain: 'Take the train', navTrainTo: 'Take the train to {port}', navIn: 'in' };
+  const t = (k) => textos[k] || `??${k}`;
+  const que = (info) => nav4.turnInstructionText({ kind: 'ferry', meters: 3000, ...info }, { t, imperial: false, lang: 'en' });
+  assert.equal(que({ port: 'Dover' }), '⛴ Take the ferry to Dover in 3 km');
+  assert.equal(que({ port: 'Folkestone', train: true }), '⇨ Take the train to Folkestone in 3 km');
+  assert.equal(que({ port: null }), '⛴ Take the ferry in 3 km');
+  assert.equal(que({ port: 'Dover', meters: 20 }), '⛴ Take the ferry to Dover'); // en el muelle
+  // Sin los emojis de afuera del BMP, que el overlay del juego no dibuja
+  assert.ok([...que({ port: 'X', train: true }), ...que({ port: 'X' })].every(c => c.codePointAt(0) <= 0xffff));
+  // La voz no tiene frase: callada, no "turn right"
+  const voz = nav4.createVoiceGuide();
+  const turn = { kind: 'ferry', direction: null, distanceMeters: 10, node: [5000, 0] };
+  assert.equal(voz.maneuver(turn, 50), null);
+  assert.equal(voz.maneuver({ ...turn, kind: 'turn', direction: 'right' }, 50), 'turn_right'); // y un giro si
+  // El icono grande de la vista de cabina
+  assert.deepEqual(nav4.turnIconShape({ kind: 'ferry' }), { shape: 'ferry' });
+  assert.deepEqual(nav4.turnIconShape({ kind: 'ferry', train: true }), { shape: 'train' });
+  assert.match(nav4.turnIconHtml({ kind: 'ferry' }), /^<svg /);
+  assert.match(nav4.turnIconHtml({ kind: 'ferry', train: true }), /<rect /);
+  // Se estabiliza como un giro: dos datos para aparecer, y la distancia al dia
+  const st = {};
+  assert.equal(nav4.stabilizeManeuver(st, { ...turn, distanceMeters: 500 }, 2), null);
+  assert.equal(nav4.stabilizeManeuver(st, { ...turn, distanceMeters: 480 }, 2).distanceMeters, 480);
+  assert.equal(nav4.stabilizeManeuver(st, { ...turn, distanceMeters: 460 }, 2).distanceMeters, 460);
+  const log = nav4.createTurnLog();
+  log.push(turn, () => ({ t: 0, truck: [0, 0], text: '⛴ Take the ferry to Dover' }));
+  const rep = nav4.turnReportText({ game: 'ets2', map: 'ets2', web: 'x', client: 'y', truck: [0, 0], now: 0, items: log.list(), formatTime: () => '10:00' });
+  assert.match(rep, /ferry/);
+  assert.doesNotMatch(rep, /turn \?/);
+});
+
+// Una corrida del aviso de F5: un dato por segundo con lo que cambie en cada paso.
+// Parado (speedKmh 0) si no se dice otra cosa: asi se pone un destino en el juego.
+function corridaF5(pasos, base = {}) {
+  const h = nav4.createGpsSaveHint();
+  let d = { now: 0, ts: 1000, savedAt: 900, gameKm: 200, ownKm: 200, targetKey: 'dest:a', skip: false, comparable: true, pos: [0, 0],
+    speedKmh: 0, paused: false, offRouteAt: null, ...base };
+  const out = [];
+  for (const p of pasos) {
+    for (let k = 0; k < (p.n || 1); k++) {
+      const { n, ...cambios } = p;
+      d = { ...d, ...cambios, now: d.now + 1000, ts: d.ts + 1 };
+      out.push(h.push(d));
+    }
+  }
+  return { h, out, d, ultimo: out[out.length - 1] };
+}
+const ESPERA_F5 = nav4.GPS_SAVE_HINT.settleMs / 1000 + 2;
+
+test('aviso de F5: con trabajo, el GPS del juego cambia y la ruta de la app no', () => {
+  // 200 km a la entrega; ponen un pin en el juego y pasa a 260
+  const r = corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }]);
+  assert.equal(r.ultimo, true);
+  assert.ok(r.out.slice(0, 10 + 8).every(v => v === false), 'no avisa antes de esperar a que recalcule');
+  // Una estacion a 2,5 km de la ruta, puesta a mano: mas de 1 km
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 202.5 }]).ultimo, true);
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 200.6 }]).ultimo, false);
+  // Y en uno corto, el 10 %: de 6 a 6,8 km
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 6.8 }], { gameKm: 6, ownKm: 6 }).ultimo, true);
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 3.4 }], { gameKm: 3, ownKm: 3 }).ultimo, false); // medio km, nada
+  // Puso un pin lejos y enseguida lo cambio por uno cerca: se compara con lo de antes de los dos
+  assert.equal(corridaF5([{ n: 10 }, { n: 3, gameKm: 260 }, { n: ESPERA_F5, gameKm: 203 }]).ultimo, true);
+  // Saca la ruta del juego: el aviso se va, aunque la vuelva a poner
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }, { n: 3, gameKm: 0 }, { n: 3, gameKm: 260 }]).ultimo, false);
+  // En un viaje largo 3 km no dicen nada (1 %)
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 1003 }], { gameKm: 1000, ownKm: 1000 }).ultimo, false);
+});
+
+test('aviso de F5: sin gameGps nunca avisa, y sin ruta en el juego tampoco', () => {
+  for (const savedAt of [null, undefined, NaN]) {
+    const r = corridaF5([{ n: 10 }, { n: 40, gameKm: 400, targetKey: null, ownKm: null }], { savedAt });
+    assert.ok(r.out.every(v => v === false));
+  }
+  assert.equal(corridaF5([{ n: 10 }, { n: 40, gameKm: 0 }]).ultimo, false);
+  // Deja de leer partidas con el aviso a la vista: se va
+  const r = corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }, { n: 1, savedAt: null }]);
+  assert.equal(r.out[r.out.length - 2], true);
+  assert.equal(r.ultimo, false);
+});
+
+test('aviso de F5: una partida guardada despues del cambio lo saca, y una de antes no lo evita', () => {
+  const r = corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }, { n: 1, savedAt: 1000 + 10 + ESPERA_F5 }]);
+  assert.equal(r.out[r.out.length - 2], true);
+  assert.equal(r.ultimo, false);
+  // Guardada en el medio de la espera: ni aparece
+  const r2 = corridaF5([{ n: 10 }, { n: 3, gameKm: 260 }, { n: 30, savedAt: 1014 }]);
+  assert.ok(r2.out.every(v => v === false));
+  // Otro cambio despues de ese guardado vuelve a avisar
+  const r3 = corridaF5([{ n: 10 }, { n: 3, gameKm: 260 }, { n: 10, savedAt: 1014 }, { n: ESPERA_F5, gameKm: 340 }]);
+  assert.equal(r3.ultimo, true);
+  // Con el aviso a la vista cambia otra vez: un guardado de entre los dos no alcanza
+  const r4 = corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }, { n: 20, gameKm: 340 }, { n: 1, savedAt: 1000 + 10 + ESPERA_F5 }]);
+  assert.equal(r4.ultimo, true);
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }, { n: 20, gameKm: 340 }, { n: 1, savedAt: 1000 + 12 + ESPERA_F5 }]).ultimo, false);
+});
+
+test('aviso de F5: un desvio no avisa (andando, o suben las dos)', () => {
+  const andando = { speedKmh: 80 };
+  // El juego recalcula a 225 y la app, 3 s despues, a 224
+  assert.equal(corridaF5([{ n: 10 }, { n: 3, gameKm: 225 }, { n: 30, ownKm: 224 }], andando).ultimo, false);
+  // Un area de descanso: el juego cree que hay que volver (14 km), la app sigue igual
+  assert.equal(corridaF5([{ n: 10 }, { n: 40, gameKm: 214 }], andando).ultimo, false);
+  // Y cerca del final, donde 14 km son mucho: el camion quedo lejos de la linea
+  assert.equal(corridaF5([{ n: 10 }, { n: 40, gameKm: 54, offRouteAt: 10500 }], { ...andando, gameKm: 40, ownKm: 40 }).ultimo, false);
+  assert.equal(corridaF5([{ n: 10 }, { n: 40, gameKm: 54 }], { ...andando, gameKm: 40, ownKm: 40 }).ultimo, true);
+  assert.equal(corridaF5([{ n: 10 }, { n: 40, gameKm: 46 }], { ...andando, gameKm: 40, ownKm: 40 }).ultimo, false); // 6 km
+  // La app recalcula primero, y el juego despues por otro lado
+  assert.equal(corridaF5([{ n: 10 }, { n: 4, ownKm: 224, offRouteAt: 10500 }, { n: 30, gameKm: 255 }], andando).ultimo, false);
+  // Un destino bien distinto, andando y sobre la ruta
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }], andando).ultimo, true);
+  // Haberse salido hace rato no tapa nada
+  assert.equal(corridaF5([{ n: 100, offRouteAt: 1 }, { n: ESPERA_F5, gameKm: 260 }], andando).ultimo, true);
+  // Y parado en el area de descanso, con el mapa del juego, se pone un destino
+  assert.equal(corridaF5([{ n: 10, offRouteAt: 9000 }, { n: ESPERA_F5, gameKm: 260 }]).ultimo, true);
+  // Tambien a 80 km/h si viene de la pausa del mapa
+  assert.equal(corridaF5([{ n: 10 }, { n: 5, paused: true }, { n: ESPERA_F5, paused: false, gameKm: 204 }], andando).ultimo, true);
+  assert.equal(corridaF5([{ n: 10 }, { n: 5, paused: true }, { n: 10, paused: false }, { n: ESPERA_F5, gameKm: 204 }], andando).ultimo, false);
+});
+
+test('aviso de F5: la diferencia de siempre no es un cambio, y coincidir mejor que antes tampoco', () => {
+  // Nuestra ruta siempre midio 12 km de mas: un salto de las dos juntas sigue siendo lo mismo
+  assert.equal(corridaF5([{ n: 10 }, { n: 30, gameKm: 150, ownKm: 162.3 }], { gameKm: 100, ownKm: 112 }).ultimo, false);
+  // El juego cambia a una ruta que coincide con la nuestra
+  assert.equal(corridaF5([{ n: 10 }, { n: 30, gameKm: 203 }], { gameKm: 160, ownKm: 200 }).ultimo, false);
+  // Y una que se aleja, aunque este dentro del 5 %, no
+  assert.equal(corridaF5([{ n: 10 }, { n: 30, gameKm: 209 }]).ultimo, true);
+});
+
+test('aviso de F5: una parada propia, otro destino de la app o uno que no se puede comparar no avisan', () => {
+  const salto = { n: 40, gameKm: 300 };
+  assert.equal(corridaF5([{ n: 10 }, { ...salto, skip: true }]).ultimo, false);
+  assert.equal(corridaF5([{ n: 10 }, { ...salto, targetKey: 'dest:b', ownKm: 380 }]).ultimo, false); // otro trabajo
+  assert.equal(corridaF5([{ n: 10 }, { ...salto, comparable: false }]).ultimo, false);                // centro de la ciudad, bus
+  assert.equal(corridaF5([{ n: 10 }, { ...salto, ownKm: null }]).ultimo, false);                      // sin ruta calculada
+  // Con el aviso a la vista, poner una parada propia lo saca
+  const r = corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 300 }, { n: 6, skip: true }]);
+  assert.equal(r.out[10 + ESPERA_F5 - 1], true);
+  assert.equal(r.ultimo, false);
+  // Un dato suelto no (la ruta recalculandose)
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 300 }, { n: 1, skip: true }, { n: 1, skip: false }]).ultimo, true);
+});
+
+test('aviso de F5: sin trabajo, cuando aparece una ruta que la app no sabe seguir', () => {
+  const libre = { targetKey: null, ownKm: null, gameKm: 0, comparable: false, speedKmh: 60 };
+  assert.equal(corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 120 }], libre).ultimo, true);
+  // Si la partida ya la tenia, la app la encuentra y la sigue: no avisa
+  assert.equal(corridaF5([{ n: 10 }, { n: 3, gameKm: 120 }, { n: 30, targetKey: 'gamegps:900:1,2', ownKm: 119, comparable: true }], libre).ultimo, false);
+  // Abierta con la ruta ya puesta en el juego: tambien
+  assert.equal(corridaF5([{ n: ESPERA_F5 }], { ...libre, gameKm: 120 }).ultimo, true);
+  // Con trabajo, al abrir no: la ruta del juego puede medir otra cosa desde siempre
+  assert.equal(corridaF5([{ n: 60 }], { gameKm: 200, ownKm: 260 }).ultimo, false);
+  // Un 0 de paso (recalculando) no es una ruta nueva. El primer aviso, cerrado con un guardado.
+  const guardo = [{ n: ESPERA_F5, gameKm: 200 }, { n: 1, savedAt: 1000 + ESPERA_F5 }];
+  assert.equal(corridaF5([...guardo, { n: 5, gameKm: 0 }, { n: 40, gameKm: 199.5 }], libre).ultimo, false);
+  assert.equal(corridaF5([...guardo, { n: 5, gameKm: 0 }, { n: 40, gameKm: 90 }], libre).ultimo, true);
+  assert.equal(corridaF5([...guardo, { n: 100, gameKm: 0 }, { n: 40, gameKm: 199.5 }], libre).ultimo, true);
+  // Andando sin ruta en la app, un recalculo del juego no dice nada; parado si
+  assert.equal(corridaF5([...guardo, { n: 40, gameKm: 290 }], libre).ultimo, false);
+  assert.equal(corridaF5([...guardo, { n: 40, gameKm: 290, speedKmh: 0 }], libre).ultimo, true);
+});
+
+test('aviso de F5: un salto del camion (ferry, otra partida) no cuenta y saca el aviso', () => {
+  assert.equal(corridaF5([{ n: 10 }, { n: 40, gameKm: 90, pos: [9000, 0] }]).ultimo, false);
+  const r = corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }, { n: 1, pos: [50000, 0] }]);
+  assert.equal(r.out[r.out.length - 2], true);
+  assert.equal(r.ultimo, false);
+  // Y despues del salto, lo que aparezca se compara con lo de despues
+  assert.equal(corridaF5([{ n: 10 }, { n: 3, gameKm: 90, ownKm: 88, pos: [9000, 0] }, { n: 40 }]).ultimo, false);
+});
+
+test('aviso de F5: en pausa espera, se cierra a mano, vence solo y calla un rato', () => {
+  // En el mapa del juego (pausa) el cambio se ve, pero la espera corre al volver a manejar
+  const p = corridaF5([{ n: 10 }, { n: 60, gameKm: 260, paused: true }]);
+  assert.ok(p.out.every(v => v === false));
+  const p2 = corridaF5([{ n: 10 }, { n: 60, gameKm: 260, paused: true }, { n: ESPERA_F5, paused: false }]);
+  assert.equal(p2.ultimo, true);
+  // Cerrado con la X: no vuelve con otro cambio
+  const c = corridaF5([{ n: 10 }, { n: ESPERA_F5, gameKm: 260 }]);
+  c.h.close(c.d.now);
+  let d = c.d;
+  const seguir = (n, cambios) => { let v; for (let k = 0; k < n; k++) { d = { ...d, ...cambios, now: d.now + 1000, ts: d.ts + 1 }; v = c.h.push(d); } return v; };
+  assert.equal(seguir(30, { gameKm: 330 }), false);
+  // Pero si guarda y vuelve a cambiar el GPS, si
+  assert.equal(seguir(5, { savedAt: d.ts + 1 }), false);
+  assert.equal(seguir(ESPERA_F5, { gameKm: 420 }), true);
+  // A los diez minutos se va solo, y calla
+  assert.equal(seguir(nav4.GPS_SAVE_HINT.maxMs / 1000 + 2, {}), false);
+  assert.equal(seguir(ESPERA_F5, { gameKm: 600 }), false);
+  // Y si el GPS del juego queda sin ruta, vuelve a mirar
+  assert.equal(seguir(3, { gameKm: 0 }), false);
+  assert.equal(seguir(ESPERA_F5, { gameKm: 777 }), false); // con trabajo y sin saber como estaba antes, no se afirma
+  assert.equal(seguir(ESPERA_F5, { gameKm: 900 }), true);
+});

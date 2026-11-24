@@ -58,10 +58,11 @@ GUIDE_TEXT.de = {
     gps: `
 <p>Die Route zum Ziel deines Auftrags wird <b>automatisch</b> gezeichnet, sobald du einen Auftrag annimmst: Schnellaufträge und Frachtmarkt, auch die Autoaufträge aus Road Trip: Ford (Client 1.5.21 oder neuer). Sie folgt deiner Wahl in den Einstellungen: die schnellste, wie das Navi im Spiel, oder die kürzeste.</p>
 <p>Beginnt der Auftrag bei einer anderen Firma, führt sie dich zuerst dorthin, um die Ladung oder den Auflieger abzuholen. Die Route zur Lieferung beginnt, sobald geladen oder angekuppelt ist.</p>
-<p>Die <b>Routenübersicht</b> unten auf der Karte zeigt Reststrecke, Restzeit und Ankunftszeit mit einem Fortschrittsbalken. Der Pfeil verkleinert sie zu einem schmalen Fortschrittsbalken (antippen, um sie wieder zu öffnen), und der Knopf mit der durchgestrichenen Route entfernt die Route von der Karte.</p>
+<p>Die <b>Routenübersicht</b> unten auf der Karte zeigt Reststrecke, Restzeit und Ankunftszeit mit einem Fortschrittsbalken, und wie weit dein nächster Halt entfernt ist und wann du dort bist, wenn du einen hinzugefügt hast. Der Pfeil verkleinert sie zu einem schmalen Fortschrittsbalken (antippen, um sie wieder zu öffnen), und der Knopf mit der durchgestrichenen Route entfernt die Route von der Karte.</p>
 <h3>Navigationsmodus</h3>
-<p>Die Karte dreht sich mit deiner Fahrtrichtung, zoomt vor Abzweigungen heran und zeigt oben Anweisungen wie <i>Rechts halten auf I-15 Richtung Provo</i>. Wie nah sie dir folgt, stellst du in den Einstellungen ein. Mit zwei Fingern zoomen geht trotzdem; der Zentrieren-Knopf holt dich zurück.</p>
-<p>An Kreuzungen mit mehreren Spuren zeigt sie auch, <b>welche Spuren passen</b>: ein Feld pro Spur mit ihren Pfeilen, und blau die, die zu deiner Abbiegung führen.</p>
+<p>Die Karte dreht sich mit deiner Fahrtrichtung und zeigt oben Anweisungen wie <i>Rechts halten auf I-15 Richtung Provo</i>. Wie nah sie dir folgt, stellst du in den Einstellungen ein, oder du lässt sie selbst zoomen: bei hohem Tempo weiter weg, in Städten näher. Mit zwei Fingern zoomen geht trotzdem; der Zentrieren-Knopf holt dich zurück.</p>
+<p>An Kreuzungen mit mehreren Spuren zeigt sie auch, <b>welche Spuren passen</b>: ein Feld pro Spur mit ihren Pfeilen, und blau die, die zu deiner Abbiegung führen. Nimmt die Route eine <b>Fähre oder einen Zug</b>, steht dabei, welche: mit dem Namen des Zielhafens.</p>
+<p>Ist im Setup <b>Dem Navi im Spiel folgen</b> an, geht die Route dorthin, wohin das Navi im Spiel führt. Truck Dash liest das aus deinem neuesten Spielstand: Änderst du das Navi, speichere mit <b>F5</b>. Die Karte erinnert dich, wenn es nötig ist.</p>
 <h3>Wegpunkte</h3>
 <p>Tippe auf die Fahne und dann auf eine Stelle der Karte, bis zu 9 Stopps. Die App fragt, ob du den Punkt auch im Navi des Spiels gesetzt hast:</p>
 <ul>
@@ -129,7 +130,7 @@ GUIDE_TEXT.de = {
 <li><b>Pausenhinweis</b>: wie lange vor der fälligen Pause (in Spielzeit) die Stimme und die Abkürzung zum nächsten Rastplatz kommen, 1 bis 3 Stunden.</li>
 <li><b>Auftragslohn in deiner Währung</b>, neben den € oder $ des Spiels.</li>
 <li><b>Farbe der Routenlinie</b>: Rot, Blau oder Grün.</li>
-<li><b>Kartenzoom im Navigationsmodus</b>.</li>
+<li><b>Kartenzoom im Navigationsmodus</b>: fest oder automatisch je nach Tempo.</li>
 <li><b>Sprachansagen</b>: im Navigationsmodus wird jede Abbiegung vorher und an der Abbiegung angesagt, dazu die Ankunft, ohne Straßennamen. Im Kreisverkehr sagt sie, welche Ausfahrt du nehmen sollst.</li>
 <li><b>Tasten belegen</b> für das Tastenfeld.</li>
 <li><b>Armaturenbrett auf einem anderen Gerät</b>: den Link kopieren.</li>
@@ -228,7 +229,7 @@ GUIDE_TEXT.de = {
   ic: {
     recenterBtn: ['Zentrieren', 'Zurück zu deinem Lkw und zu deinem Navi-Zoom.'],
     fullscreenBtn: ['Vollbild', 'Blendet die obere Leiste und die Leisten des Handys aus.'],
-    navToggleBtn: ['Navigationsmodus', 'Die Karte dreht sich mit, zoomt an Abzweigungen und zeigt Anweisungen.'],
+    navToggleBtn: ['Navigationsmodus', 'Die Karte dreht sich mit und zeigt Anweisungen.'],
     tilt3dBtn: ['3D-Ansicht', 'Geneigte Ansicht, im Navigationsmodus.'],
     waypointBtn: ['Wegpunkt', 'Antippen, dann auf die Karte tippen. Bis zu 9.'],
     pipBtn: ["Schwebendes Fenster", "Chrome und Edge am PC: ein kleines Fenster mit nächster Abbiegung, Tempo und Ankunft, das über dem Spiel bleibt (randloses Vollbild)."],
@@ -310,10 +311,11 @@ GUIDE_TEXT.fr = {
     gps: `
 <p>L'itinéraire vers la destination de ta livraison se trace <b>tout seul</b> dès que tu prends un contrat : contrats rapides et marché du fret, y compris les livraisons de voitures de Road Trip: Ford (client 1.5.21 ou plus récent). Il suit ta préférence dans les Paramètres : le plus rapide, comme le GPS du jeu, ou le plus court.</p>
 <p>Si le contrat commence dans une autre entreprise, il t'y conduit d'abord pour prendre la cargaison ou la remorque, et l'itinéraire vers la livraison commence une fois chargé ou attelé.</p>
-<p>Le <b>résumé de l'itinéraire</b>, en bas de la carte, affiche la distance et le temps restants et l'heure d'arrivée, avec une barre de progression. La flèche le réduit à une fine barre de progression (touche-la pour le rouvrir), et le bouton à l'itinéraire barré efface l'itinéraire de la carte.</p>
+<p>Le <b>résumé de l'itinéraire</b>, en bas de la carte, affiche la distance et le temps restants et l'heure d'arrivée, avec une barre de progression, ainsi que la distance et l'heure d'arrivée à ton prochain arrêt si tu en as ajouté un. La flèche le réduit à une fine barre de progression (touche-la pour le rouvrir), et le bouton à l'itinéraire barré efface l'itinéraire de la carte.</p>
 <h3>Mode navigation</h3>
-<p>La carte tourne avec ton cap, zoome avant les virages et affiche les indications en haut, par exemple <i>Serrez à droite sur I-15 vers Provo</i>. Tu choisis dans les Paramètres à quelle distance elle te suit. Tu peux toujours zoomer avec deux doigts ; le bouton recentrer te ramène.</p>
-<p>Aux carrefours à plusieurs voies, elle montre aussi <b>quelles voies prendre</b> : une case par voie, avec ses flèches, et en bleu celles qui mènent à ton virage.</p>
+<p>La carte tourne avec ton cap et affiche les indications en haut, par exemple <i>Serrez à droite sur I-15 vers Provo</i>. Tu choisis dans les Paramètres à quelle distance elle te suit, ou tu la laisses zoomer toute seule : plus loin à vive allure, plus près en ville. Tu peux toujours zoomer avec deux doigts ; le bouton recentrer te ramène.</p>
+<p>Aux carrefours à plusieurs voies, elle montre aussi <b>quelles voies prendre</b> : une case par voie, avec ses flèches, et en bleu celles qui mènent à ton virage. Si l'itinéraire prend un <b>ferry ou un train</b>, il dit lequel, avec le nom du port d'arrivée.</p>
+<p>Avec <b>Suivre le GPS du jeu</b> activé dans Setup, l'itinéraire va là où va le GPS du jeu. Truck Dash le lit dans ta dernière sauvegarde : si tu changes le GPS, sauvegarde avec <b>F5</b>. La carte te le rappelle quand il le faut.</p>
 <h3>Points de passage</h3>
 <p>Touche le drapeau puis un endroit de la carte, jusqu'à 9 arrêts. L'appli demande si tu as aussi placé ce point dans le GPS du jeu :</p>
 <ul>
@@ -381,7 +383,7 @@ GUIDE_TEXT.fr = {
 <li><b>Alerte de repos</b> : combien de temps avant la pause obligatoire (en temps de jeu) arrivent la voix et le raccourci vers l'aire de repos la plus proche, de 1 à 3 heures.</li>
 <li><b>Paie dans ta devise</b>, à côté des € ou $ du jeu.</li>
 <li><b>Couleur de l'itinéraire</b> : rouge, bleu ou vert.</li>
-<li><b>Zoom de la carte en mode navigation</b>.</li>
+<li><b>Zoom de la carte en mode navigation</b> : fixe, ou automatique selon ta vitesse.</li>
 <li><b>Guidage vocal</b> : en mode navigation, annonce chaque virage à l’avance puis au virage, ainsi que l’arrivée, sans noms de routes. Aux ronds-points, il indique quelle sortie prendre.</li>
 <li><b>Réassigner les touches</b> de la boîte à boutons.</li>
 <li><b>Tableau de bord sur un autre appareil</b> : copier son lien.</li>
@@ -480,7 +482,7 @@ GUIDE_TEXT.fr = {
   ic: {
     recenterBtn: ['Recentrer', 'Revient sur ton camion et sur ton zoom de navigation.'],
     fullscreenBtn: ['Plein écran', 'Masque la barre du haut et celles du téléphone.'],
-    navToggleBtn: ['Mode navigation', 'La carte tourne avec toi, zoome dans les virages et donne les indications.'],
+    navToggleBtn: ['Mode navigation', 'La carte tourne avec toi et donne les indications.'],
     tilt3dBtn: ['Vue 3D', 'Vue inclinée, en mode navigation.'],
     waypointBtn: ['Point de passage', 'Touche-le, puis touche la carte. Jusqu’à 9.'],
     pipBtn: ["Fenêtre flottante", "Chrome et Edge sur PC : une petite fenêtre avec le prochain virage, la vitesse et l’arrivée, qui reste au-dessus du jeu (plein écran sans bordure)."],
@@ -562,10 +564,11 @@ GUIDE_TEXT.pt = {
     gps: `
 <p>A rota até o destino do frete é desenhada <b>sozinha</b> assim que você pega um frete: fretes rápidos e mercado de fretes, incluindo os fretes de carro do Road Trip: Ford (cliente 1.5.21 ou mais novo). Ela segue a sua preferência nas Configurações: a mais rápida, como o GPS do jogo, ou a mais curta.</p>
 <p>Se o frete começa em outra empresa, primeiro ela te leva até lá para buscar a carga ou o reboque, e a rota até a entrega começa quando estiver carregado ou engatado.</p>
-<p>O <b>resumo da rota</b>, embaixo do mapa, mostra a distância e o tempo que faltam e a hora de chegada, com uma barra de progresso. A seta reduz ele a uma barrinha de progresso (toque nela para abrir de novo), e o botão da rota riscada apaga a rota do mapa.</p>
+<p>O <b>resumo da rota</b>, embaixo do mapa, mostra a distância e o tempo que faltam e a hora de chegada, com uma barra de progresso, e quanto falta para a sua próxima parada e a que horas você chega nela, se adicionou uma. A seta reduz ele a uma barrinha de progresso (toque nela para abrir de novo), e o botão da rota riscada apaga a rota do mapa.</p>
 <h3>Modo navegação</h3>
-<p>O mapa gira com a sua direção, aproxima antes das curvas e mostra as instruções no alto, como <i>Mantenha-se à direita na I-15 sentido Provo</i>. Nas Configurações você escolhe o quão perto ele te acompanha. Dá para dar zoom com os dedos; o botão de centralizar te traz de volta.</p>
-<p>Nos cruzamentos com várias faixas, também mostra <b>quais faixas usar</b>: uma caixa por faixa, com as setas, e em azul as que levam à sua curva.</p>
+<p>O mapa gira com a sua direção e mostra as instruções no alto, como <i>Mantenha-se à direita na I-15 sentido Provo</i>. Nas Configurações você escolhe o quão perto ele te acompanha, ou deixa no automático: mais longe em alta velocidade, mais perto na cidade. Dá para dar zoom com os dedos; o botão de centralizar te traz de volta.</p>
+<p>Nos cruzamentos com várias faixas, também mostra <b>quais faixas usar</b>: uma caixa por faixa, com as setas, e em azul as que levam à sua curva. Se a rota pega uma <b>balsa ou um trem</b>, ele diz qual, pelo porto de destino.</p>
+<p>Com <b>Seguir o GPS do jogo</b> ligado no Setup, a rota vai para onde o GPS do jogo está indo. O Truck Dash lê isso do seu último save: se você mudar o GPS, salve com <b>F5</b>. O mapa te lembra quando precisa.</p>
 <h3>Waypoints</h3>
 <p>Toque na bandeira e depois num ponto do mapa, até 9 paradas. O app pergunta se você também marcou esse ponto no GPS do jogo:</p>
 <ul>
@@ -633,7 +636,7 @@ GUIDE_TEXT.pt = {
 <li><b>Aviso de descanso</b>: quanto tempo antes da hora de descansar (em tempo de jogo) aparecem a voz e o atalho para a área de descanso mais próxima, de 1 a 3 horas.</li>
 <li><b>Pagamento na sua moeda</b>, ao lado do € ou $ do jogo.</li>
 <li><b>Cor da linha da rota</b>: vermelho, azul ou verde.</li>
-<li><b>Zoom do mapa no modo navegação</b>.</li>
+<li><b>Zoom do mapa no modo navegação</b>: fixo, ou automático com a sua velocidade.</li>
 <li><b>Orientação por voz</b>: no modo navegação, avisa cada curva com antecedência e de novo na curva, além da chegada, sem nomes de estradas. Nas rotatórias, diz qual saída pegar.</li>
 <li><b>Remapear teclas</b> da botoeira.</li>
 <li><b>Painel em outro aparelho</b>: copiar o link.</li>
@@ -732,7 +735,7 @@ GUIDE_TEXT.pt = {
   ic: {
     recenterBtn: ['Centralizar', 'Volta para o seu caminhão e para o zoom de navegação.'],
     fullscreenBtn: ['Tela cheia', 'Esconde a barra de cima e as do celular.'],
-    navToggleBtn: ['Modo navegação', 'O mapa gira com você, aproxima nas curvas e dá instruções.'],
+    navToggleBtn: ['Modo navegação', 'O mapa gira com você e dá instruções.'],
     tilt3dBtn: ['Visão 3D', 'Visão inclinada, no modo navegação.'],
     waypointBtn: ['Waypoint', 'Toque nele e depois no mapa. Até 9.'],
     pipBtn: ["Janela flutuante", "Chrome e Edge no PC: uma janelinha com a próxima curva, a velocidade e a chegada que fica por cima do jogo (tela cheia sem bordas)."],
@@ -814,10 +817,11 @@ GUIDE_TEXT.pl = {
     gps: `
 <p>Trasa do celu zlecenia rysuje się <b>sama</b>, gdy tylko weźmiesz zlecenie: szybkie zlecenia i giełda frachtów, w tym zlecenia z samochodami z Road Trip: Ford (klient 1.5.21 lub nowszy). Trasa uwzględnia twój wybór w Ustawieniach: najszybsza, jak GPS w grze, albo najkrótsza.</p>
 <p>Jeśli zlecenie zaczyna się w innej firmie, najpierw prowadzi cię tam po ładunek albo naczepę, a trasa do dostawy zaczyna się po załadunku lub podpięciu.</p>
-<p><b>Podsumowanie trasy</b> na dole mapy pokazuje pozostały dystans, pozostały czas i godzinę przyjazdu, z paskiem postępu. Strzałka zwija je do cienkiego paska postępu (dotknij go, by otworzyć ponownie), a przycisk z przekreśloną trasą usuwa trasę z mapy.</p>
+<p><b>Podsumowanie trasy</b> na dole mapy pokazuje pozostały dystans, pozostały czas i godzinę przyjazdu, z paskiem postępu, a jeśli dodasz przystanek, także odległość do najbliższego i godzinę dojazdu. Strzałka zwija je do cienkiego paska postępu (dotknij go, by otworzyć ponownie), a przycisk z przekreśloną trasą usuwa trasę z mapy.</p>
 <h3>Tryb nawigacji</h3>
-<p>Mapa obraca się zgodnie z kierunkiem jazdy, przybliża się przed skrętami i pokazuje wskazówki u góry, np. <i>Trzymaj się prawej na I-15 w kierunku Provo</i>. W Ustawieniach wybierzesz, jak blisko mapa za tobą podąża. Nadal możesz przybliżać dwoma palcami; przycisk wyśrodkowania przywraca widok.</p>
-<p>Na skrzyżowaniach z kilkoma pasami pokazuje też, <b>których pasów użyć</b>: jedno pole na pas, ze strzałkami, a na niebiesko te, które prowadzą do twojego skrętu.</p>
+<p>Mapa obraca się zgodnie z kierunkiem jazdy i pokazuje wskazówki u góry, np. <i>Trzymaj się prawej na I-15 w kierunku Provo</i>. W Ustawieniach wybierzesz, jak blisko mapa za tobą podąża, albo włączysz przybliżenie automatyczne: dalej przy dużej prędkości, bliżej w mieście. Nadal możesz przybliżać dwoma palcami; przycisk wyśrodkowania przywraca widok.</p>
+<p>Na skrzyżowaniach z kilkoma pasami pokazuje też, <b>których pasów użyć</b>: jedno pole na pas, ze strzałkami, a na niebiesko te, które prowadzą do twojego skrętu. Jeśli trasa prowadzi przez <b>prom lub pociąg</b>, mapa mówi który, podając port docelowy.</p>
+<p>Z włączoną w Setup opcją <b>Podążaj za GPS-em w grze</b> trasa prowadzi tam, dokąd GPS w grze. Truck Dash odczytuje to z najnowszego zapisu: jeśli zmienisz cel w GPS-ie, zapisz grę klawiszem <b>F5</b>. Mapa przypomni, gdy będzie trzeba.</p>
 <h3>Punkty trasy</h3>
 <p>Dotknij flagi, a potem miejsca na mapie, maksymalnie 9 przystanków. Aplikacja zapyta, czy ustawiłeś ten punkt także w GPS gry:</p>
 <ul>
@@ -885,7 +889,7 @@ GUIDE_TEXT.pl = {
 <li><b>Przypomnienie o odpoczynku</b>: jak długo przed wymaganym odpoczynkiem (w czasie gry) odzywa się głos i pojawia się skrót do najbliższego parkingu, od 1 do 3 godzin.</li>
 <li><b>Zapłata w twojej walucie</b>, obok € lub $ z gry.</li>
 <li><b>Kolor linii trasy</b>: czerwony, niebieski lub zielony.</li>
-<li><b>Przybliżenie mapy w trybie nawigacji</b>.</li>
+<li><b>Przybliżenie mapy w trybie nawigacji</b>: stałe albo automatyczne, zależne od prędkości.</li>
 <li><b>Wskazówki głosowe</b>: w trybie nawigacji zapowiadają każdy skręt z wyprzedzeniem i ponownie przy skręcie, a także przyjazd, bez nazw dróg. Na rondzie mówią, którym zjazdem zjechać.</li>
 <li><b>Zmień klawisze</b> przycisków ciężarówki.</li>
 <li><b>Deska rozdzielcza na innym urządzeniu</b>: skopiuj link.</li>
@@ -984,7 +988,7 @@ GUIDE_TEXT.pl = {
   ic: {
     recenterBtn: ['Wyśrodkuj', 'Wraca do ciężarówki i do twojego przybliżenia nawigacji.'],
     fullscreenBtn: ['Pełny ekran', 'Ukrywa górny pasek i paski telefonu.'],
-    navToggleBtn: ['Tryb nawigacji', 'Mapa obraca się z tobą, przybliża przy skrętach i daje wskazówki.'],
+    navToggleBtn: ['Tryb nawigacji', 'Mapa obraca się z tobą i daje wskazówki.'],
     tilt3dBtn: ['Widok 3D', 'Pochylony widok, w trybie nawigacji.'],
     waypointBtn: ['Punkt trasy', 'Dotknij, a potem dotknij mapy. Do 9.'],
     pipBtn: ["Pływające okno", "Chrome i Edge na PC: małe okno z następnym skrętem, prędkością i godziną przyjazdu, które zostaje nad grą (pełny ekran bez ramki)."],
@@ -1066,10 +1070,11 @@ GUIDE_TEXT.tr = {
     gps: `
 <p>Bir iş aldığın anda, işin varış noktasına giden rota <b>otomatik olarak</b> çizilir: hızlı işler ve yük pazarı, Road Trip: Ford'daki araba taşıma işleri de dahil (istemci 1.5.21 veya daha yenisi). Rota, Ayarlar'daki tercihine uyar: oyunun GPS'i gibi en hızlı veya en kısa.</p>
 <p>İş başka bir firmada başlıyorsa, rota önce yükü ya da dorseyi almak için seni oraya götürür; teslimat rotası yükleme bitince ya da dorse bağlanınca başlar.</p>
-<p>Haritanın altındaki <b>rota özeti</b> kalan mesafeyi, kalan süreyi ve varış saatini bir ilerleme çubuğuyla gösterir. Ok onu ince bir ilerleme çubuğuna küçültür (tekrar açmak için çubuğa dokun); üstü çizili rota düğmesi ise rotayı haritadan kaldırır.</p>
+<p>Haritanın altındaki <b>rota özeti</b> kalan mesafeyi, kalan süreyi ve varış saatini bir ilerleme çubuğuyla gösterir; bir durak eklediysen sonraki durağa kalan mesafeyi ve varış saatini de gösterir. Ok onu ince bir ilerleme çubuğuna küçültür (tekrar açmak için çubuğa dokun); üstü çizili rota düğmesi ise rotayı haritadan kaldırır.</p>
 <h3>Navigasyon modu</h3>
-<p>Harita gidiş yönünle birlikte döner, dönüşlerden önce yakınlaşır ve üstte <i>I-15 üzerinden Provo yönüne sağdan devam et</i> gibi yönlendirmeler gösterir. Ne kadar yakından takip edeceğini Ayarlar'da seçersin. İki parmakla yakınlaştırmaya devam edebilirsin; ortalama düğmesi seni geri getirir.</p>
-<p>Birden fazla şeritli kavşaklarda <b>hangi şeritlerin uygun olduğunu</b> da gösterir: her şerit için oklarıyla bir kutu, dönüşüne götürenler mavi.</p>
+<p>Harita gidiş yönünle birlikte döner ve üstte <i>I-15 üzerinden Provo yönüne sağdan devam et</i> gibi yönlendirmeler gösterir. Ne kadar yakından takip edeceğini Ayarlar'da seçersin ya da otomatiğe bırakırsın: hızlıyken daha uzak, şehirde daha yakın. İki parmakla yakınlaştırmaya devam edebilirsin; ortalama düğmesi seni geri getirir.</p>
+<p>Birden fazla şeritli kavşaklarda <b>hangi şeritlerin uygun olduğunu</b> da gösterir: her şerit için oklarıyla bir kutu, dönüşüne götürenler mavi. Rota <b>feribot ya da tren</b> kullanıyorsa hangisi olduğunu varış limanının adıyla söyler.</p>
+<p>Setup'ta <b>Oyun içi GPS'i takip et</b> açıksa rota, oyun içi GPS'in gittiği yere gider. Truck Dash bunu son kaydından okur: GPS'i değiştirirsen <b>F5</b> ile kaydet. Gerektiğinde harita hatırlatır.</p>
 <h3>Ara noktalar</h3>
 <p>Bayrağa, sonra haritada bir yere dokun; en fazla 9 durak. Uygulama, bu noktayı oyunun kendi GPS'inde de işaretleyip işaretlemediğini sorar:</p>
 <ul>
@@ -1137,7 +1142,7 @@ GUIDE_TEXT.tr = {
 <li><b>Mola uyarısı</b>: mola zamanından ne kadar önce (oyun saatiyle) sesin ve en yakın dinlenme alanına giden kısayolun geleceği, 1 ile 3 saat arası.</li>
 <li><b>Kendi para biriminde ücret</b>, oyunun € veya $ değerinin yanında.</li>
 <li><b>Rota çizgisi rengi</b>: kırmızı, mavi veya yeşil.</li>
-<li><b>Navigasyon modunda harita yakınlaştırması</b>.</li>
+<li><b>Navigasyon modunda harita yakınlaştırması</b>: sabit ya da hızına göre otomatik.</li>
 <li><b>Sesli yönlendirme</b>: navigasyon modunda her dönüşü önceden ve dönüşte tekrar, ayrıca varışı, yol adları olmadan söyler. Türkçede cihazının sesini kullanır. Döner kavşaklarda hangi çıkıştan çıkacağını söyler.</li>
 <li>Düğme kutusu için <b>Tuş ata</b>.</li>
 <li><b>Başka bir cihazda gösterge paneli</b>: bağlantısını kopyala.</li>
@@ -1236,7 +1241,7 @@ GUIDE_TEXT.tr = {
   ic: {
     recenterBtn: ['Ortala', 'Kamyonuna ve navigasyon yakınlaştırmana döner.'],
     fullscreenBtn: ['Tam ekran', 'Üst çubuğu ve telefonun çubuklarını gizler.'],
-    navToggleBtn: ['Navigasyon modu', 'Harita seninle döner, dönüşlerde yakınlaşır ve yön gösterir.'],
+    navToggleBtn: ['Navigasyon modu', 'Harita seninle döner ve yön gösterir.'],
     tilt3dBtn: ['3B görünüm', 'Eğik görünüm, navigasyon modunda.'],
     waypointBtn: ['Ara nokta', 'Dokun, sonra haritaya dokun. En fazla 9.'],
     pipBtn: ["Yüzen pencere", "PC’de Chrome ve Edge: bir sonraki dönüş, hız ve varış saatini gösteren, oyunun üstünde kalan küçük bir pencere (kenarlıksız tam ekran)."],
@@ -1318,10 +1323,11 @@ GUIDE_TEXT.ru = {
     gps: `
 <p>Маршрут до пункта назначения заказа рисуется <b>автоматически</b>, как только вы берёте заказ: быстрые заказы и биржа грузов, включая перевозку автомобилей из Road Trip: Ford (клиент 1.5.21 или новее). Он учитывает ваш выбор в настройках: самый быстрый, как GPS в игре, или самый короткий.</p>
 <p>Если заказ начинается в другой компании, маршрут сначала ведёт туда за грузом или прицепом, а маршрут до доставки начинается после погрузки или сцепки.</p>
-<p><b>Сводка маршрута</b> внизу карты показывает оставшееся расстояние, оставшееся время и время прибытия с полосой прогресса. Стрелка сворачивает её в тонкую полосу прогресса (нажмите на полосу, чтобы развернуть), а кнопка с перечёркнутым маршрутом убирает маршрут с карты.</p>
+<p><b>Сводка маршрута</b> внизу карты показывает оставшееся расстояние, оставшееся время и время прибытия с полосой прогресса, а если вы добавили остановку, то и расстояние до ближайшей и время прибытия на неё. Стрелка сворачивает её в тонкую полосу прогресса (нажмите на полосу, чтобы развернуть), а кнопка с перечёркнутым маршрутом убирает маршрут с карты.</p>
 <h3>Режим навигации</h3>
-<p>Карта поворачивается по направлению движения, приближается перед поворотами и показывает подсказки сверху, например <i>Держитесь правее на I-15 в сторону Provo</i>. Насколько близко она следует за вами, выбирается в настройках. Масштабировать двумя пальцами по-прежнему можно; кнопка центрирования вернёт вид.</p>
-<p>На перекрёстках с несколькими полосами она также показывает, <b>какие полосы подходят</b>: по клетке на полосу со стрелками, и синим те, что ведут к вашему повороту.</p>
+<p>Карта поворачивается по направлению движения и показывает подсказки сверху, например <i>Держитесь правее на I-15 в сторону Provo</i>. Насколько близко она следует за вами, выбирается в настройках, или включите автоматический масштаб: дальше на скорости, ближе в городе. Масштабировать двумя пальцами по-прежнему можно; кнопка центрирования вернёт вид.</p>
+<p>На перекрёстках с несколькими полосами она также показывает, <b>какие полосы подходят</b>: по клетке на полосу со стрелками, и синим те, что ведут к вашему повороту. Если маршрут идёт через <b>паром или поезд</b>, карта говорит, какой именно, по названию порта прибытия.</p>
+<p>Если в Setup включено <b>Следовать за GPS в игре</b>, маршрут ведёт туда же, куда GPS в игре. Truck Dash читает это из последнего сохранения: если вы изменили цель GPS, сохранитесь клавишей <b>F5</b>. Карта напомнит, когда нужно.</p>
 <h3>Путевые точки</h3>
 <p>Нажмите на флажок, затем на место на карте, до 9 остановок. Приложение спросит, поставили ли вы эту точку и в GPS игры:</p>
 <ul>
@@ -1389,7 +1395,7 @@ GUIDE_TEXT.ru = {
 <li><b>Напоминание об отдыхе</b>: за сколько до обязательного отдыха (по игровому времени) звучит голос и появляется ярлык к ближайшей зоне отдыха, от 1 до 3 часов.</li>
 <li><b>Оплата в вашей валюте</b> рядом с € или $ из игры.</li>
 <li><b>Цвет линии маршрута</b>: красный, синий или зелёный.</li>
-<li><b>Масштаб карты в режиме навигации</b>.</li>
+<li><b>Масштаб карты в режиме навигации</b>: постоянный или автоматический, по скорости.</li>
 <li><b>Голосовые подсказки</b>: в режиме навигации заранее и в момент поворота сообщают о каждом повороте, а также о прибытии, без названий дорог. На круговом движении подсказывают, в какой съезд свернуть.</li>
 <li><b>Назначить клавиши</b> для кнопок грузовика.</li>
 <li><b>Панель приборов на другом устройстве</b>: скопировать ссылку.</li>
@@ -1488,7 +1494,7 @@ GUIDE_TEXT.ru = {
   ic: {
     recenterBtn: ['Центрировать', 'Возвращает к грузовику и к масштабу навигации.'],
     fullscreenBtn: ['Полный экран', 'Скрывает верхнюю панель и панели телефона.'],
-    navToggleBtn: ['Режим навигации', 'Карта поворачивается с вами, приближается на поворотах и даёт подсказки.'],
+    navToggleBtn: ['Режим навигации', 'Карта поворачивается с вами и даёт подсказки.'],
     tilt3dBtn: ['3D-вид', 'Наклонный вид, в режиме навигации.'],
     waypointBtn: ['Путевая точка', 'Нажмите, затем нажмите на карту. До 9.'],
     pipBtn: ["Плавающее окно", "Chrome и Edge на ПК: маленькое окно со следующим поворотом, скоростью и временем прибытия, которое остаётся поверх игры (полноэкранный режим без рамки)."],

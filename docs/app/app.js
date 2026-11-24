@@ -102,7 +102,7 @@ function loadSettings() {
   return {};
 }
 function currentSettings() {
-  return { miniHud: miniHudSettings, routeColor, atsMod, atsVersion, ets2Version, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, mapDash, btnLayout, layoutGrid, navZoom, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
+  return { miniHud: miniHudSettings, routeColor, atsMod, atsVersion, ets2Version, ets2Mod, liveShareEnabled, hideOtherPlayers, useImperial, routeProfile, modsAuto, nav3d, currency: currencyPref, customButtons, liteMode, liteNoRouting, realBase, darkButtons, fadeButtons, keepCompass, mapDash, btnLayout, layoutGrid, navZoom, navZoomAuto, truckSize, clockFormat, routeSummaryMin, voiceOn, voiceByLang, voiceTiming, liveShareRoute, dlcOff, dlcAuto, navEveryExit, restWarnMin, showTmpPlayers };
 }
 // Solo se escribe lo que cambio ESTA pestana desde que cargo (o desde que
 // guardo por ultima vez): escribir todo lo que tiene en memoria hacia que una
@@ -184,6 +184,9 @@ let routeColor = _savedSettings.routeColor || '#a30000';
 // junto a navTargetZoom: saveSettings lo lee, y usar un let antes de su
 // declaracion tumba app.js entero.
 let navZoom = navZoomSetting(_savedSettings.navZoom);
+// Que ese zoom se aleje con la velocidad y se acerque en ciudad (createNavAutoZoom
+// en pure.js). Apagado por defecto: queda el fijo de siempre.
+let navZoomAuto = !!_savedSettings.navZoomAuto;
 let truckSize = truckSizeSetting(_savedSettings.truckSize);
 // 'auto' | '24' | '12' (clockIs12h en pure.js): vale para todos los relojes.
 let clockFormat = clockFormatSetting(_savedSettings.clockFormat);
@@ -488,6 +491,7 @@ function initSettingsUi() {
   document.getElementById('setTmpPlayers').checked = showTmpPlayers;
   renderLiveShareControls();
   document.getElementById('setNavZoom').value = navZoom;
+  document.getElementById('setNavZoomAuto').checked = navZoomAuto;
   document.getElementById('setTruckSize').value = truckSize;
   document.getElementById('setClockSelect').value = clockFormat;
   document.getElementById('setVoice').checked = voiceOn;
@@ -749,6 +753,11 @@ function applyNavZoom(value) {
 }
 document.getElementById('setNavZoom').addEventListener('input', (e) => applyNavZoom(e.target.value));
 document.getElementById('setNavZoomDefault').addEventListener('click', () => applyNavZoom(NAV_ZOOM_DEFAULT));
+document.getElementById('setNavZoomAuto').addEventListener('change', (e) => {
+  navZoomAuto = e.target.checked;
+  navAutoZoom.reset(); // prendido a mitad de viaje: de una en lo que toca, sin deslizar
+  applyNavZoom(navZoom);
+});
 // Igual que el zoom: la flecha cambia en el mapa mientras se arrastra.
 function applyTruckSize(value) {
   truckSize = truckSizeSetting(value);
@@ -2093,6 +2102,7 @@ for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, c
 // y el resto del tablero funciona: se avisa una vez, en el lugar del mapa, y
 // no se reintenta en cada dato.
 let mapUnavailable = false;
+let pmtilesProtocol = null; // el de ensureMapInitialized: loadFerryPort lee del mismo archivo
 function webglAvailable() {
   try {
     const c = document.createElement('canvas');
@@ -2128,8 +2138,8 @@ function localGlyphs(url, resourceType) {
 function ensureMapInitialized() {
   if (map || mapUnavailable) return;
   if (!webglAvailable()) { showNoWebgl(); return; }
-  const protocol = new pmtiles.Protocol();
-  maplibregl.addProtocol('pmtiles', protocol.tile);
+  pmtilesProtocol = new pmtiles.Protocol();
+  maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
   try {
     map = new maplibregl.Map({
     container: 'mapCanvas',
@@ -3034,6 +3044,7 @@ function checkWaypointReached(x, z) {
 // en horas de juego, el de abajo del ETA real en tiempo real. Los de cada
 // waypoint de la lista son una parte de esos (waypointLegEtas), con o sin
 // waypoints que el juego no conoce.
+let nextStopLeg = null; // el tramo hasta la proxima parada propia, para el resumen (nextStopText)
 function updateWaypointRoute(data) {
   const gameRow = document.getElementById('etaGameWaypointRow');
   const realRow = document.getElementById('etaRealWaypointRow');
@@ -3055,6 +3066,7 @@ function updateWaypointRoute(data) {
       medida.legs.map(m => (m == null ? null : { worldM: m, km: scale.routeMeters(currentRouteFull, currentRouteWorldPoints, m) / 1000 })),
       { worldM: medida.total, km: viaKm }, eta);
   }
+  nextStopLeg = legs ? legs[0] : null;
   updateWaypointListEta(legs);
   if (!eta || !waypoints.some(wp => !wp.inGame)) {
     gameRow.hidden = true;
@@ -4544,11 +4556,12 @@ function restoreDismissedRoute() {
   sendLiveRoute(true);
 }
 
-// El resumen a la vista y con numeros: en "Ruta oculta" o con el aviso de
-// destino fuera del mapa se ve pero no tiene.
+// El resumen a la vista y con numeros: en "Ruta oculta", con el aviso de destino
+// fuera del mapa o con el de guardar con F5 se ve pero no tiene.
 function routeSummaryShown() {
   const panel = document.getElementById('routeSummary');
-  return !!panel && !panel.hidden && !panel.classList.contains('dismissed') && !panel.classList.contains('offmap');
+  return !!panel && !panel.hidden && !panel.classList.contains('dismissed') && !panel.classList.contains('offmap')
+    && !panel.classList.contains('savehint');
 }
 
 // Ciudades y POIs de la variante ya cargados (o los POIs fallaron): recien
@@ -4559,20 +4572,23 @@ function jobPlacesReady() {
 
 // view: null (sin ruta), { dismissed: true } (borrada a mano, con el boton
 // para traerla), { offMap: nombre } (trabajo a un lugar que no esta en el
-// mapa, con el boton para poner un waypoint) o los numeros de la ruta.
+// mapa, con el boton para poner un waypoint), { saveHint: true } (sin ruta, solo el
+// aviso de guardar con F5) o los numeros de la ruta.
 function renderRouteSummary(view) {
   const panel = document.getElementById('routeSummary');
   if (!panel) return;
   panel.hidden = !view;
   panel.classList.toggle('dismissed', !!(view && view.dismissed));
   panel.classList.toggle('offmap', !!(view && view.offMap));
+  panel.classList.toggle('savehint', !!(view && view.saveHint));
+  document.getElementById('gpsSaveHint').hidden = !(view && gpsSaveHintOn);
   document.getElementById('mapPanel').classList.toggle('hasRouteSummary', !!view);
   if (view && view.offMap) {
     document.getElementById('routeOffMapText').textContent =
       t(view.build ? 'routeOffMapBuild' : 'routeOffMap').replace('{name}', view.offMap);
   }
   keepPanelsClearOfRouteSummary();
-  if (!view || view.dismissed || view.offMap) return;
+  if (!view || view.dismissed || view.offMap || view.saveHint) return;
   const bar = document.getElementById('routeProgressBar');
   bar.style.width = `${view.percent}%`;
   bar.parentElement.title = `${Math.round(view.percent)}%`;
@@ -4589,6 +4605,9 @@ function renderRouteSummary(view) {
     const wp = waypoints[0];
     parada.hidden = !wp;
     if (wp) document.getElementById('routeStopName').textContent = t('routeNextStop').replace('{name}', wp.label || `${t('waypoint')} 1`);
+    const eta = document.getElementById('routeStopEta');
+    eta.textContent = view.nextStop || '';
+    eta.hidden = !view.nextStop;
   }
   // La proxima parada de un trabajo de bus, con la hora del horario en el
   // reloj del juego (en rojo si ya paso sin llegar).
@@ -4624,7 +4643,8 @@ function updateRouteSummary(data) {
     const fuera = oculta ? null : offMapJobPlace(data, raw, jobPlacesReady());
     if (fuera) checkJobPlace(data, fuera);
     renderRouteSummary(oculta ? { dismissed: true }
-      : fuera ? { offMap: fuera, build: !jobPlaceChecking && offerMapBuild(data.game) } : null);
+      : fuera ? { offMap: fuera, build: !jobPlaceChecking && offerMapBuild(data.game) }
+      : gpsSaveHintOn ? { saveHint: true } : null);
     return;
   }
   // Con waypoints propios la distancia del juego no cuenta el desvio: se mide
@@ -4687,6 +4707,10 @@ function updateRouteSummary(data) {
     approx: !!target.approx,
     approxKey: approxNoticeKey(target),
     busStop: busNextStopLine(busJobOf(data), data.gameTimeMinutes, hour12()),
+    nextStop: waypoints.length ? nextStopText(nextStopLeg, {
+      imperial: useImperial, lang: currentLang, hour12: hour12(), now: Date.now(),
+      last: target.kind === 'waypoint' && waypoints.length === 1,
+    }) : '',
     dlc: routeUsesUncheckedDlc,
     percent,
     remaining: remainingKm == null ? '--'
@@ -4837,6 +4861,7 @@ function updateDestinationMarker(data) {
       key: routeKey, target: destinoClave, forced: routeForcedReason, offRoute, far: lejos, recheck,
     });
     const kmAntes = currentRouteWorldPoints ? gameKmOf(currentRouteWorldPoints) : null;
+    if (offRoute) offRouteAt = Date.now(); // para el aviso de F5
     let eleccion = null;
     routeForcedReason = null;
     lastRouteKeys = { key: routeKey, target: destinoClave };
@@ -4908,6 +4933,9 @@ function updateDestinationMarker(data) {
     if (!routePoints.length) routePoints = null;
     currentRouteWorldPoints = routePoints;
     currentRouteFull = routePoints;
+    // El nombre del puerto del primer cruce, pedido ya: cuando haga falta esta.
+    const cruce = ferryAhead(routePoints, Infinity);
+    if (cruce) ferryPortAt(cruce.node[0], cruce.node[1]);
     routeChangeLog.push({
       t: calculoDesde, reason: motivo, truck: [data.position.x, data.position.z],
       before: kmAntes, after: routePoints ? gameKmOf(routePoints) : null, game: data.routeDistanceKm,
@@ -4933,6 +4961,12 @@ function updateDestinationMarker(data) {
     const calculoHasta = Date.now();
     offRouteRetry.computed(data.position.x, data.position.z, calculoHasta, calculoHasta - calculoDesde);
   }
+}
+
+// El .pmtiles de la variante, con su ?v=: la fuente 'vec' y loadFerryPort tienen que
+// pedir la misma URL para usar el mismo directorio ya bajado.
+function vecTilesUrl(game) {
+  return `${GAME_MAPS[game].pmtilesUrl}?v=${MAP_DATA_VERSION[game] || ''}`;
 }
 
 async function loadGameMap(game) {
@@ -4985,7 +5019,7 @@ async function loadGameMap(game) {
   for (const id of VEC_LAYER_IDS) { if (map.getLayer(id)) map.removeLayer(id); }
   if (map.getSource('vec')) map.removeSource('vec');
   companyIconsAsked.clear(); // los que ya estan no se vuelven a pedir (hasImage)
-  map.addSource('vec', { type: 'vector', url: `pmtiles://${mapInfo.pmtilesUrl}?v=${MAP_DATA_VERSION[game] || ''}` });
+  map.addSource('vec', { type: 'vector', url: `pmtiles://${vecTilesUrl(game)}` });
   // Se insertan justo antes de 'trail-line' para que el trail/ruta/marcadores
   // queden siempre por encima del mapa base. try/catch por capa: si una sola
   // definicion tiene un error, que no tumbe a las demas (ya paso una vez con
@@ -5169,8 +5203,9 @@ function navCameraOn() {
 function navPadding() {
   const h = map ? map.getContainer().clientHeight : 0;
   // Rellenar ARRIBA desplaza el centro hacia abajo: el camion queda en el
-  // tercio inferior y se ve mas camino adelante.
-  return navCameraOn() ? { top: Math.round(h * 0.45), bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 };
+  // tercio inferior y se ve mas camino adelante, sin meterse debajo del resumen
+  // de la ruta (en la ventana flotante no hay resumen).
+  return { top: navCameraOn() ? navPaddingTop(h, pipMapOn ? 0 : routeSummaryH) : 0, bottom: 0, left: 0, right: 0 };
 }
 function applyNavCamera() {
   if (!map) return;
@@ -5225,12 +5260,14 @@ placeMiniHud();
 // (--route-summary-h), y un panel que el usuario dejo donde el resumen lo
 // tapa sube lo justo mientras el resumen esta a la vista. Sin tocar la
 // posicion guardada: al cerrar la ruta vuelve a donde lo puso.
+let routeSummaryH = 0; // px que mide el resumen a la vista (navPadding)
 function keepPanelsClearOfRouteSummary() {
   const panel = document.getElementById('mapPanel');
   const summary = document.getElementById('routeSummary');
   if (!panel || !summary) return;
   const visible = !summary.hidden && summary.offsetHeight > 0;
-  panel.style.setProperty('--route-summary-h', `${visible ? summary.offsetHeight : 0}px`);
+  routeSummaryH = visible ? summary.offsetHeight : 0;
+  panel.style.setProperty('--route-summary-h', `${routeSummaryH}px`);
   const sr = summary.getBoundingClientRect();
   for (const id of MOVABLE_PANEL_IDS) {
     const el = document.getElementById(id);
@@ -5954,6 +5991,45 @@ function initCab() {
   });
 }
 
+// A que puerto lleva un cruce, para "Tomar el ferry a Dover": { name, train } o
+// null (todavia bajando, sin nombre, o sin tiles: la app nativa). El nombre sale de
+// los puertos del .pmtiles del mapa (poiName de la capa ferry-poi), leyendo el tile
+// de donde llega el cruce: la vista solo trae los de alrededor del camion. Un pedido
+// chico por puerto, con el directorio que el mapa ya bajo.
+const FERRY_PORT_ZOOM = 10;
+const FERRY_PORT_RETRY_MS = 30000;
+const ferryPorts = new Map(); // variante y punto -> { port, at (ms, si fallo) }
+function ferryPortAt(x, z) {
+  if (!pmtilesProtocol || !currentGame || !GAME_MAPS[currentGame] || !toLngLat) return null;
+  const clave = `${currentGame}|${Math.round(x)},${Math.round(z)}`;
+  const hay = ferryPorts.get(clave);
+  if (hay && (hay.at == null || performance.now() - hay.at < FERRY_PORT_RETRY_MS)) return hay.port;
+  ferryPorts.set(clave, { port: null, at: null });
+  loadFerryPort(currentGame, x, z, { toLngLat, cities: citiesAll }).then(
+    (port) => ferryPorts.set(clave, { port, at: null }),
+    () => ferryPorts.set(clave, { port: null, at: performance.now() }));
+  return null;
+}
+async function loadFerryPort(game, x, z, { toLngLat, cities }) {
+  const url = vecTilesUrl(game);
+  const archivo = pmtilesProtocol.get(url) || new pmtiles.PMTiles(url);
+  const zoom = Math.min(FERRY_PORT_ZOOM, (await archivo.getHeader()).maxZoom);
+  const r = FERRY_PORT_MAX_M;
+  const esquinas = [[-r, -r], [-r, r], [r, -r], [r, r]].map(([dx, dz]) => toLngLat(x + dx, z + dz));
+  const puertos = [];
+  for (const [tx, ty] of tilesCovering(esquinas, zoom)) {
+    const tile = await archivo.getZxy(zoom, tx, ty);
+    if (!tile) continue; // en el mar no hay tile
+    for (const p of mvtPoints(new Uint8Array(tile.data), GAME_MAPS[game].sourceLayer)) {
+      if (p.props.poiType !== 'ferry' && p.props.poiType !== 'train') continue;
+      const [px, pz] = worldNear(x, z, tilePointLngLat(zoom, tx, ty, p.x, p.y, p.extent), toLngLat);
+      puertos.push({ x: px, z: pz, raw: p.props.poiName, train: p.props.poiType === 'train' });
+    }
+  }
+  const puerto = pickFerryPort(puertos, x, z);
+  return puerto ? { name: ferryPortName(puerto.raw, cities, puerto.x, puerto.z), train: puerto.train } : null;
+}
+
 let navPanelParts = null; // lo ultimo que mostro el panel, para el mini-HUD
 const turnAnnouncer = createTurnAnnouncer();
 // Los ultimos avisos mostrados, para "Copy turn report" (createTurnLog)
@@ -6120,6 +6196,42 @@ function checkGameGpsViaReached(x, z) {
     gameGpsSave[con] = { ...gameGpsSave[con], via: via.slice(1) };
   }
 }
+
+// "Guarda con F5": el cliente lee la partida pero el GPS del juego cambio despues
+// (createGpsSaveHint en pure.js). Solo un aviso, en el resumen de la ruta, con su X.
+// Hasta tener el grafo y los lugares no se mira: sin ellos no se sabe si la app ya
+// tiene a donde ir.
+const gpsSaveHint = createGpsSaveHint();
+let gpsSaveHintOn = false;
+let offRouteAt = null; // ms: la ultima vez que el camion estuvo fuera de la ruta de la app
+const GPS_HINT_OFF_ROUTE_M = 30; // a esto de la linea: un area de descanso, una estacion
+function updateGpsSaveHint(data) {
+  const gg = data.gameGps && typeof data.gameGps === 'object' ? data.gameGps : null;
+  if (gg && (!routeGraph || !jobPlacesReady())) return;
+  const target = gg ? resolveRouteTarget(data) : null;
+  const antes = gpsSaveHintOn;
+  gpsSaveHintOn = gpsSaveHint.push({
+    now: Date.now(), ts: Number(data.ts), savedAt: gg ? gg.savedAt : null,
+    gameKm: Number(data.routeDistanceKm) || 0,
+    ownKm: target ? gameKmOf(currentRouteWorldPoints) : null,
+    targetKey: target ? target.key : null,
+    comparable: !!target && !target.approx && !target.bus,
+    // Una parada propia, la ruta borrada, o un trabajo a un lugar fuera del mapa: lo
+    // que haga el GPS del juego no cambia a donde va la app.
+    skip: waypoints.length > 0 || (!target && (!!data.onJob || !!resolveRawRouteTarget(data))),
+    pos: data.position && data.position.x != null ? [data.position.x, data.position.z] : null,
+    speedKmh: data.speedKmh, paused: !!data.paused, offRouteAt,
+  });
+  // Con el resumen minimizado, o en el hueco chico del tablero, el renglon no entra:
+  // una vez, como aviso.
+  if (gpsSaveHintOn && !antes && ((target && routeSummaryMin) || document.body.classList.contains('mapDashSmall'))) showToast(t('gpsSaveHint'), 'wrap', 7000);
+}
+document.getElementById('gpsSaveHintClose').addEventListener('click', () => {
+  gpsSaveHint.close(Date.now());
+  gpsSaveHintOn = false;
+  if (lastData) updateRouteSummary(lastData);
+});
+
 function clearGameGpsGuess() {
   gameGpsGuess = { km: null, list: [], run: gameGpsGuess.run + 1 };
 }
@@ -6218,6 +6330,11 @@ function navTurnParts(turn) {
         : turn.distanceMeters * distanceScale(),
       sign: turn.nearSign ? { kind: turn.nearSign.kind, label: turn.nearSign.label } : null,
     };
+    if (turn.kind === 'ferry') {
+      const puerto = ferryPortAt(turn.node[0], turn.node[1]);
+      info.port = puerto ? puerto.name : null;
+      info.train = !!(puerto && puerto.train);
+    }
   } else if (currentRouteWorldPoints) {
     info = 'straight';
   }
@@ -6646,7 +6763,8 @@ document.addEventListener('visibilitychange', () => {
 // (probado antes) generaba saltos molestos justo en intersecciones/enlaces,
 // que es donde mas importa ver el contexto completo, no menos. Fijo pero
 // elegible: cada uno lo pone en Ajustes (navZoom); este es el de referencia
-// para el tamano de la flecha.
+// para el tamano de la flecha. Desde el 24-11 puede moverse solo con la velocidad
+// (navZoomAuto, apagado por defecto), de a poco y sin mirar el giro.
 const NAV_FIXED_ZOOM = NAV_ZOOM_DEFAULT;
 // La flecha se achica al alejarse y crece al acercarse: alejado tapaba media
 // ciudad. Solo escala el div interno; la posicion y el rumbo los maneja
@@ -6657,8 +6775,21 @@ function updateTruckArrowSize() {
   truckArrowEl.style.transform = `scale(${scale})`;
 }
 
+const navAutoZoom = createNavAutoZoom();
+const reducedMotionMq = window.matchMedia('(prefers-reduced-motion: reduce)');
 function navTargetZoom(turn) {
-  return nav3d ? navZoom + 0.7 : navZoom;
+  const z = navZoomAuto ? navAutoZoomOf(navZoom, navAutoZoom.offset()) : navZoom;
+  return nav3d ? z + 0.7 : z;
+}
+// En cada dato, con la camara del modo navegacion puesta. inCity: el camion esta en
+// una caja de ciudad (la misma que cuenta para las distancias, gameScale).
+function updateNavAutoZoom(x, z) {
+  if (!navZoomAuto) return;
+  const escala = gameScale();
+  navAutoZoom.push({
+    speedKmh: lastData ? lastData.speedKmh : null, inCity: escala.at(x, z) !== escala.outside,
+    now: performance.now(), paused: !!(lastData && lastData.paused), reduced: reducedMotionMq.matches,
+  });
 }
 
 // Recorta del frente de la ruta calculada (linea roja) el tramo ya recorrido,
@@ -6703,6 +6834,7 @@ function trimRouteBehindTruck(x, z) {
   const cerca = projectAheadOnRoute(currentRouteWorldPoints, x, z, TRIM_WINDOW_M);
   if (!cerca) return;
   const { idx: bestIdx, point: bestPoint, dist: bestDist } = cerca;
+  if (bestDist > GPS_HINT_OFF_ROUTE_M) offRouteAt = Date.now(); // para el aviso de F5
   // Si estamos lejos de la ruta calculada, es un desvio real: offRoute ya se
   // encarga de recalcularla entera, no recortar sobre una ruta vieja. Pero
   // offRoute mira la ruta ENTERA: si el camion quedo sobre ella mas adelante
@@ -7176,7 +7308,10 @@ function updateMap(position, game, gameHeadingDeg, sample = null) {
   // celular o la PC donde este abierto el tablero).
   // El de OBS muestra el giro pero no guia: con el solo, la voz no habla.
   const guiando = navMode || !!pipWin || clientOverlayOn;
-  const giroAhora = guiando || obsOverlayOn ? findUpcomingTurn(lastHeadingDeg) : null;
+  // Sin giro antes, el ferry o tren que haya que tomar (findUpcomingTurn no mira
+  // mas alla del cruce).
+  const giroAhora = guiando || obsOverlayOn
+    ? findUpcomingTurn(lastHeadingDeg) || ferryAhead(currentRouteWorldPoints, NAV_TURN_LOOKAHEAD_M) : null;
   const turn = guiando || obsOverlayOn ? stabilizeManeuver(navManeuverState, giroAhora, NAV_TURN_DEBOUNCE_TICKS) : null;
   // Sin giro (ni uno a punto de aparecer), las flechas del proximo cruce
   // donde no sirven todos los carriles: abajo de "Continue straight", sin voz.
@@ -7202,7 +7337,13 @@ function updateMap(position, game, gameHeadingDeg, sample = null) {
     if (navMode) updateNavPanel(turn);
     // Si el usuario zoomeo a mano, no se lo pisamos cada tick - solo
     // seguimos actualizando centro/bearing hasta que recentre.
+    updateNavAutoZoom(position.x, position.z);
     const zoomOverride = navAutoZoomPaused ? {} : { zoom: navTargetZoom(turn) };
+    // Con prefers-reduced-motion el zoom automatico corta en vez de deslizarse:
+    // followCameraTo lo animaria entre este dato y el que viene.
+    if (navZoomAuto && zoomOverride.zoom != null && reducedMotionMq.matches && Math.abs(map.getZoom() - zoomOverride.zoom) > 0.05) {
+      map.jumpTo({ zoom: zoomOverride.zoom });
+    }
     // pitch y padding van en cada llamada: un easeTo nuevo cancela el
     // anterior, asi que la inclinacion 3D / el desplazamiento del camion al
     // tercio inferior tienen que viajar con la camara de cada tick.
@@ -8888,6 +9029,7 @@ function handleTelemetry(data) {
   updateDestinationMarker(data);
   updateGameGpsGuess(data);
   updateGameGpsGuessPanel(data);
+  updateGpsSaveHint(data);
   updateRouteSummary(data);
   refreshNavReport();
   checkMissingCompanies(data);
