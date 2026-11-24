@@ -16,6 +16,14 @@ updates on its own and is not versioned here.
   fork with the ramp to the north wasn't announced, so the truck took the ramp to the north.
   Each direction now keeps its own path. Maps built with an earlier version keep routing as
   before until they are rebuilt.
+- The truck buttons (hazards, lights, wipers, engine, parking brake and the rest of the button
+  box) now reach the game through SCS's official input SDK, in the Truck Dash plugin, instead of
+  key presses. They work without a key assigned in the game and whatever your keyboard layout
+  is, and with the game in front Truck Dash no longer touches the window focus. With the game in
+  the background it brings the game to the front first, as before. If the plugin isn't updated
+  yet (it updates itself with the game closed) or the game isn't taking SDK input, the buttons
+  keep using the keys. Custom buttons are still key presses, and the plugin can press only these
+  13 buttons.
 
 ## 1.5.46 (2026-11-23)
 

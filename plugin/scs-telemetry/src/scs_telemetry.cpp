@@ -32,6 +32,7 @@
 #include "scs_config_handlers.hpp"
 #include "scs_gameplay_event_handlers.hpp"
 #include "sharedmemory.hpp"
+#include "truckdash_input.hpp"
 
 #define UNUSED(x)
 /**
@@ -1456,11 +1457,14 @@ SCSAPI_VOID scs_telemetry_shutdown() {
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason_for_call, LPVOID reseved) {
   if (reason_for_call == DLL_PROCESS_DETACH) {
     scs_telemetry_shutdown();
+    // With the whole process ending there is nothing to free.
+    if (reseved == nullptr) truckdash_input_close();
   }
   return TRUE;
 }
 #else
 __attribute__((destructor)) void on_unload() {
   scs_telemetry_shutdown();
+  truckdash_input_close();
 }
 #endif

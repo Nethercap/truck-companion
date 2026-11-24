@@ -18,8 +18,11 @@ Euro Truck Simulator 2 and American Truck Simulator.
 - On request (Setup window), it copies the SCS Telemetry SDK plugin into the
   game's `bin\win_x64\plugins\` folder, and reads Steam's library list to
   find where the game is installed.
-- On request, it presses keys in the game window when you tap a button in
-  the dashboard's button box, using the bindings from your own `controls.sii`.
+- When you tap a button in the dashboard's button box, it asks the plugin to
+  press it through **SCS Software's official input SDK** (the plugin can press
+  only the 13 buttons of the box). If the plugin or the game isn't taking that
+  input, and for the custom buttons, it presses keys in the game window
+  instead, using the bindings from your own `controls.sii`.
 - Only if you allow it (it asks once, and Setup has a checkbox to change it),
   it reads your latest save in the game's profile folders (in Steam's
   `userdata` folder for Steam Cloud profiles) to see where the in-game GPS is

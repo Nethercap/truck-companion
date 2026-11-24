@@ -110,6 +110,13 @@ def test_build_payload_trailer_attached_false_when_no_trailer_data():
     assert client.build_payload({"trailer": []})["trailerAttached"] is False
 
 
+@pytest.fixture(autouse=True)
+def _sin_botones_por_el_sdk(monkeypatch):
+    # Con el juego abierto en esta PC, un test de la botonera le apretaria los
+    # botones de verdad. Los del SDK estan en test_entrada_sdk.py.
+    monkeypatch.setattr(client.botones_sdk, "abrir", lambda: None)
+
+
 def test_send_game_command_ignored_when_no_key_assigned(monkeypatch):
     called = []
     monkeypatch.setattr(client, "find_game_window", lambda: called.append("find_window"))

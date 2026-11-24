@@ -2,7 +2,7 @@
 
 Uso: python tools/probar_plugin_linux.py <ruta a truckdash-telemetry.so>
 
-Dos pasadas, cada una en un proceso aparte (si el plugin se cae, se ve en el
+Tres pasadas, cada una en un proceso aparte (si el plugin se cae, se ve en el
 codigo de salida del hijo):
 - "init": dlopen, scs_telemetry_init con un juego de mentira que guarda los
   eventos y canales que registra el plugin, un "started", dos cuadros con
@@ -14,6 +14,8 @@ codigo de salida del hijo):
   llamar a shutdown desde el destructor.
 - "sin-init": dlopen y dlclose, como cuando init falla y el juego suelta el
   plugin (en macOS eso se caia).
+- "entrada": los botones por el SDK de entrada, como en probar_plugin.py
+  (probar_entrada.py).
 
 El plugin escribia en /tmp/TruckDashTelemetry y el cliente lee
 /dev/shm/TruckDashTelemetry: el bloque no le llegaba nunca a nadie, y nadie
@@ -34,7 +36,7 @@ import sys
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "client"))
 
-PASADAS = ("init", "sin-init")
+PASADAS = ("init", "sin-init", "entrada")
 TELEMETRY_1_01 = (1 << 16) | 1
 ATS_SDK_1_05 = (1 << 16) | 5
 EVENTO_FRAME_START = 1
@@ -388,16 +390,24 @@ def _pasada_sin_init(so: str) -> None:
     _ctypes.dlclose(lib._handle)
 
 
+def _pasada_entrada(so: str) -> None:
+    import _ctypes
+    import probar_entrada
+    lib = ctypes.CDLL(so, mode=os.RTLD_NOW)
+    probar_entrada.probar(lib)
+    _ctypes.dlclose(lib._handle)
+
+
 def _hijo(pasada: str, so: str) -> None:
-    {"init": _pasada_init, "sin-init": _pasada_sin_init}[pasada](so)
+    {"init": _pasada_init, "sin-init": _pasada_sin_init, "entrada": _pasada_entrada}[pasada](so)
     print(f"{pasada}: ok")
 
 
 def probar(so: str) -> list[str]:
     """Corre cada pasada en un proceso aparte. Devuelve los errores."""
+    from entrada_sdk import RUTA
     from telemetry_compat import LINUX_PATHS
-    bloque = LINUX_PATHS[0]
-    existia = os.path.exists(bloque)
+    nuevos = [b for b in (LINUX_PATHS[0], RUTA) if not os.path.exists(b)]
     errores = []
     try:
         for pasada in PASADAS:
@@ -410,8 +420,9 @@ def probar(so: str) -> list[str]:
                     detalle = f"se cayo con la senal {-r.returncode}. {detalle}"
                 errores.append(f"{pasada}: {detalle}")
     finally:
-        if not existia and os.path.exists(bloque):
-            os.remove(bloque)
+        for bloque in nuevos:
+            if os.path.exists(bloque):
+                os.remove(bloque)
     return errores
 
 
