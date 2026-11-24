@@ -1231,8 +1231,11 @@ Salieron de comparar con los pedidos y resenas de TruckSim GPS.
   mitad de los de ProMods traen la clave sin traducir (`ferryPortName`). Medido con la
   app: 138 de 138 en ETS2, 10 de 10 en ATS, 263 de 266 en ProMods y ninguno mal. Las
   coordenadas del puerto van con `worldNear`, no con `fromLngLat`, que junto al borde de
-  Gran Bretana tiene que elegir un lado. La voz se calla: ningun paquete tiene la frase (pide regenerarlos
-  con `tools/build_voice_packs.py`).
+  Gran Bretana tiene que elegir un lado.
+- La voz dice el ferry o el tren como un giro, anticipado y en el punto (paquetes v5;
+  `voiceManeuverKey`, `take_ferry` y `take_train`), sin el puerto. Cual de los dos sale de
+  `ferryPortAt` (`voiceManeuverTick`): mientras no llega se calla sin darlo por dicho,
+  porque en Calais salen los dos. La app nativa no lee tiles y sigue callada.
 - Aviso de F5 (`createGpsSaveHint`, renglon del resumen): solo con `gameGps`. Nunca
   aprieta nada. Un salto de los km del juego parado o recien salido de la pausa es un
   destino puesto a mano y alcanza con poco; andando puede ser un desvio o un area de

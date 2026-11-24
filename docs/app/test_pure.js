@@ -1223,6 +1223,103 @@ test('voz: si el aviso va a otra maniobra y vuelve, no la repite (Salem, Cheyenn
   assert.equal(x.maneuver(keep(30), 50), 'keep_right');
 });
 
+test('voz: el ferry y el tren, anticipado y en el punto como un giro (24-11)', () => {
+  const cruce = (d, train, node = [5000, 0]) => ({ kind: 'ferry', direction: null, distanceMeters: d, node, train });
+  const v = createVoiceGuide();
+  // 50 km/h = 13,9 m/s
+  assert.equal(v.maneuver(cruce(600, false), 50), null);               // 43 s
+  assert.equal(v.maneuver(cruce(270, false), 50), 'soon_take_ferry');  // 19 s
+  assert.equal(v.maneuver(cruce(200, false), 50), null);
+  assert.equal(v.maneuver(cruce(60, false), 50), 'take_ferry');        // 4,3 s
+  assert.equal(v.maneuver(cruce(3, false), 0), null);                  // ya dicho: esperando en el muelle
+  // el tren, con su frase
+  const tren = createVoiceGuide();
+  assert.equal(tren.maneuver(cruce(270, true), 50), 'soon_take_train');
+  assert.equal(tren.maneuver(cruce(60, true), 50), 'take_train');
+  // cerca aunque se venga rapido, y con el momento elegido en Ajustes, como un giro
+  const rapido = createVoiceGuide();
+  assert.equal(rapido.maneuver(cruce(400, false), 80), 'soon_take_ferry');
+  assert.equal(rapido.maneuver(cruce(100, false), 80), null);          // 4,5 s, pero a 100 m
+  assert.equal(rapido.maneuver(cruce(65, false), 80), 'take_ferry');
+  const tarde = createVoiceGuide({ timing: 'late' });
+  assert.equal(tarde.maneuver(cruce(60, false), 60), null);
+  assert.equal(tarde.maneuver(cruce(30, false), 60), 'take_ferry');
+  // parado en el muelle, recien aparecido
+  assert.equal(createVoiceGuide().maneuver(cruce(0, false), 0), 'take_ferry');
+  // dos cruces seguidos (A -> B -> C): cada uno el suyo
+  const dos = createVoiceGuide();
+  assert.equal(dos.maneuver(cruce(10, false), 10), 'take_ferry');
+  assert.equal(dos.maneuver(cruce(10, true, [8000, 0]), 10), 'take_train');
+});
+
+test('voz: sin el puerto no adivina si es ferry o tren, y lo dice si llega a tiempo (24-11)', () => {
+  const cruce = (d, extra) => ({ kind: 'ferry', direction: null, distanceMeters: d, node: [5000, 0], ...extra });
+  // Todavia bajando (o la app nativa, que no lee los tiles): callada
+  for (const extra of [{}, { train: null }, { train: undefined }]) {
+    const v = createVoiceGuide();
+    for (let d = 800; d >= 0; d -= 10) assert.equal(v.maneuver(cruce(d, extra), 50), null);
+  }
+  // El puerto llega despues del momento del anticipado: no se dio por dicho
+  const v = createVoiceGuide();
+  assert.equal(v.maneuver(cruce(270), 50), null);
+  assert.equal(v.maneuver(cruce(180, { train: true }), 50), 'soon_take_train'); // 13 s
+  // o ya en el punto
+  const w = createVoiceGuide();
+  assert.equal(w.maneuver(cruce(270), 50), null);
+  assert.equal(w.maneuver(cruce(50), 50), null);
+  assert.equal(w.maneuver(cruce(20, { train: false }), 20), 'take_ferry');
+  // y si el tipo se pierde entre medio (el mapa recargando), no se repite al volver
+  assert.equal(w.maneuver(cruce(15), 10), null);
+  assert.equal(w.maneuver(cruce(10, { train: false }), 10), null);
+});
+
+test('voz: lo que se puede decir tiene frase en los 8 idiomas, y audio en todos los paquetes', () => {
+  const fs = require('fs'), path = require('path');
+  const { voiceManeuverKey } = require('./pure.js');
+  const dir = path.join(__dirname, 'voice');
+  const catalogo = JSON.parse(fs.readFileSync(path.join(dir, 'voices.json'), 'utf8'));
+  const maniobras = [false, true].map(train => ({ kind: 'ferry', train }));
+  for (const direction of ['left', 'right']) for (const kind of ['turn', 'fork']) maniobras.push({ kind, direction });
+  for (let exit = 1; exit <= 9; exit++) maniobras.push({ kind: 'roundabout', exit, direction: 'right' });
+  const claves = new Set(['arrive_dest', 'arrive_pickup', 'job_new', 'fuel_low', 'rest_soon']);
+  for (const m of maniobras) { claves.add(voiceManeuverKey(m)); claves.add(`soon_${voiceManeuverKey(m)}`); }
+  for (const [idioma, frases] of Object.entries(catalogo.phrases)) {
+    assert.deepEqual(Object.keys(frases).sort(), [...claves].sort(), idioma); // ni de menos ni de mas
+    // Sin nombres ni numeros que pronunciar mal
+    for (const texto of Object.values(frases)) assert.doesNotMatch(texto, /\d|\{/);
+  }
+  assert.deepEqual([...new Set(catalogo.voices.map(v => v.lang))].sort(), ['de', 'en', 'es', 'fr', 'pl', 'pt', 'ru', 'tr']);
+  for (const voz of catalogo.voices.filter(v => !v.system)) {
+    const paquete = JSON.parse(fs.readFileSync(path.join(dir, voz.file), 'utf8'));
+    assert.equal(paquete.id, voz.id);
+    assert.deepEqual(Object.keys(paquete.clips).sort(), [...claves].sort(), voz.file);
+    for (const [k, src] of Object.entries(paquete.clips)) {
+      assert.match(src, /^data:audio\/mpeg;base64,/, `${voz.file} ${k}`);
+      // 48 kbps: mas de medio segundo, con su silencio del comienzo
+      assert.ok(Buffer.from(src.split(',')[1], 'base64').length > 3000, `${voz.file} ${k}`);
+    }
+  }
+});
+
+test('voiceManeuverTick (app.js): el cruce va a la guia con el tipo de su puerto', () => {
+  const app = require('fs').readFileSync(require('path').join(__dirname, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+  const codigo = /^function voiceManeuverTick\(turn\) \{[\s\S]*?\n\}\n/m.exec(app)[0];
+  const correr = (turn, puerto) => {
+    const pedidos = [], dichos = [];
+    const f = new Function('voiceOn', 'ferryPortAt', 'voiceGuide', 'lastData', 'voiceHere', 'speakVoice', `${codigo}; return voiceManeuverTick;`)(
+      true, (x, z) => { pedidos.push([x, z]); return puerto; }, createVoiceGuide(), { speedKmh: 20 }, () => true, (k) => dichos.push(k));
+    f(turn);
+    return { pedidos, dichos };
+  };
+  const cruce = { kind: 'ferry', direction: null, distanceMeters: 20, node: [5000, 7] };
+  assert.deepEqual(correr(cruce, { name: 'Dover', train: false }), { pedidos: [[5000, 7]], dichos: ['take_ferry'] });
+  assert.deepEqual(correr(cruce, { name: null, train: true }).dichos, ['take_train']); // sin nombre tambien se sabe
+  assert.deepEqual(correr(cruce, null), { pedidos: [[5000, 7]], dichos: [] });
+  // un giro no pregunta por el puerto
+  assert.deepEqual(correr(giro(20), { name: 'Dover', train: true }), { pedidos: [], dichos: ['turn_right'] });
+  assert.deepEqual(correr(null, null), { pedidos: [], dichos: [] });
+});
+
 test('voz: llegada una vez por destino, y no al tomar un trabajo ya en la empresa', () => {
   const v = createVoiceGuide();
   assert.equal(v.arrival('job1|dest', 'dest', 5, 120), null);
@@ -1861,6 +1958,9 @@ test('voiceManeuverKey: rotonda hasta la octava salida, despues hacia que lado',
   assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 7, direction: 'left' }), 'roundabout_7');
   assert.equal(voiceManeuverKey({ kind: 'roundabout', exit: 9, direction: 'left' }), 'turn_left');
   assert.equal(voiceManeuverKey({ kind: 'fork', direction: 'right' }), 'keep_right');
+  assert.equal(voiceManeuverKey({ kind: 'ferry', train: false }), 'take_ferry');
+  assert.equal(voiceManeuverKey({ kind: 'ferry', train: true }), 'take_train');
+  assert.equal(voiceManeuverKey({ kind: 'ferry' }), null); // no se sabe: ni ferry ni "turn right"
 });
 
 test('correctProModsFlags: un mod que nombra ProMods no carga el mapa de ProMods (reportes #56 y #58)', () => {
@@ -5646,10 +5746,15 @@ test('voz: una frase nueva no corta la que suena, salvo un aviso en el punto a u
   // el giro ya esta encima: corta al anticipado o a un aviso del camion
   assert.equal(voiceQueueAction('soon_turn_left', 'roundabout_2'), 'play');
   assert.equal(voiceQueueAction('fuel_low', 'turn_right'), 'play');
+  assert.equal(voiceQueueAction('soon_turn_left', 'take_ferry'), 'play');
+  assert.equal(voiceQueueAction('rest_soon', 'take_train'), 'play');
+  assert.equal(voiceQueueAction('take_ferry', 'soon_turn_left'), 'queue');
+  assert.equal(voiceQueueAction('soon_turn_left', 'soon_take_ferry'), 'queue');
   // en espera queda una: la urgente le gana a la anticipada; si no, la ultima
   assert.equal(voiceQueuePick(null, 'soon_keep_left'), 'soon_keep_left');
   assert.equal(voiceQueuePick('turn_left', 'soon_turn_right'), 'turn_left');
   assert.equal(voiceQueuePick('soon_turn_right', 'turn_right'), 'turn_right');
+  assert.equal(voiceQueuePick('take_train', 'soon_turn_right'), 'take_train');
   assert.equal(voiceQueuePick('soon_turn_right', 'soon_keep_left'), 'soon_keep_left');
 });
 
@@ -7840,7 +7945,7 @@ test('el ferry en el panel, en la voz y en el turn report', () => {
   assert.equal(que({ port: 'Dover', meters: 20 }), '⛴ Take the ferry to Dover'); // en el muelle
   // Sin los emojis de afuera del BMP, que el overlay del juego no dibuja
   assert.ok([...que({ port: 'X', train: true }), ...que({ port: 'X' })].every(c => c.codePointAt(0) <= 0xffff));
-  // La voz no tiene frase: callada, no "turn right"
+  // La voz, sin saber si es ferry o tren: callada, no "turn right"
   const voz = nav4.createVoiceGuide();
   const turn = { kind: 'ferry', direction: null, distanceMeters: 10, node: [5000, 0] };
   assert.equal(voz.maneuver(turn, 50), null);

@@ -1,15 +1,15 @@
 {
   "version": 1,
   "voices": [
-    { "id": "en-kristin", "lang": "en", "label": "Kristin", "phrases": "en", "file": "en-kristin-v4.json", "model": "en_US-kristin-medium" },
-    { "id": "en-joe", "lang": "en", "label": "Joe", "phrases": "en", "file": "en-joe-v4.json", "model": "en_US-joe-medium" },
-    { "id": "es-daniela", "lang": "es", "label": "Daniela (AR)", "phrases": "es-AR", "file": "es-daniela-v4.json", "model": "es_AR-daniela-high" },
-    { "id": "es-claude", "lang": "es", "label": "Claude (MX)", "phrases": "es-MX", "file": "es-claude-v4.json", "model": "es_MX-claude-high" },
-    { "id": "de-thorsten", "lang": "de", "label": "Thorsten", "phrases": "de", "file": "de-thorsten-v4.json", "model": "de_DE-thorsten-high" },
-    { "id": "fr-siwis", "lang": "fr", "label": "Siwis", "phrases": "fr", "file": "fr-siwis-v4.json", "model": "fr_FR-siwis-medium" },
-    { "id": "pt-cadu", "lang": "pt", "label": "Cadu", "phrases": "pt", "file": "pt-cadu-v4.json", "model": "pt_BR-cadu-medium" },
-    { "id": "pl-gosia", "lang": "pl", "label": "Gosia", "phrases": "pl", "file": "pl-gosia-v4.json", "model": "pl_PL-gosia-medium" },
-    { "id": "ru-dmitri", "lang": "ru", "label": "Dmitri", "phrases": "ru", "file": "ru-dmitri-v4.json", "model": "ru_RU-dmitri-medium" },
+    { "id": "en-kristin", "lang": "en", "label": "Kristin", "phrases": "en", "file": "en-kristin-v5.json", "model": "en_US-kristin-medium" },
+    { "id": "en-joe", "lang": "en", "label": "Joe", "phrases": "en", "file": "en-joe-v5.json", "model": "en_US-joe-medium" },
+    { "id": "es-daniela", "lang": "es", "label": "Daniela (AR)", "phrases": "es-AR", "file": "es-daniela-v5.json", "model": "es_AR-daniela-high" },
+    { "id": "es-claude", "lang": "es", "label": "Claude (MX)", "phrases": "es-MX", "file": "es-claude-v5.json", "model": "es_MX-claude-high" },
+    { "id": "de-thorsten", "lang": "de", "label": "Thorsten", "phrases": "de", "file": "de-thorsten-v5.json", "model": "de_DE-thorsten-high" },
+    { "id": "fr-siwis", "lang": "fr", "label": "Siwis", "phrases": "fr", "file": "fr-siwis-v5.json", "model": "fr_FR-siwis-medium" },
+    { "id": "pt-cadu", "lang": "pt", "label": "Cadu", "phrases": "pt", "file": "pt-cadu-v5.json", "model": "pt_BR-cadu-medium" },
+    { "id": "pl-gosia", "lang": "pl", "label": "Gosia", "phrases": "pl", "file": "pl-gosia-v5.json", "model": "pl_PL-gosia-medium" },
+    { "id": "ru-dmitri", "lang": "ru", "label": "Dmitri", "phrases": "ru", "file": "ru-dmitri-v5.json", "model": "ru_RU-dmitri-medium" },
     { "id": "tr-system", "lang": "tr", "label": null, "phrases": "tr", "system": true }
   ],
   "phrases": {
@@ -42,7 +42,11 @@
       "roundabout_8": "Take the eighth exit.",
       "job_new": "New job received.",
       "fuel_low": "Fuel is running low.",
-      "rest_soon": "Time to rest soon."
+      "rest_soon": "Time to rest soon.",
+      "soon_take_ferry": "Prepare to take the ferry.",
+      "take_ferry": "Take the ferry.",
+      "soon_take_train": "Prepare to take the train.",
+      "take_train": "Take the train."
     },
     "es-AR": {
       "soon_turn_left": "Más adelante, girá a la izquierda.",
@@ -73,7 +77,11 @@
       "roundabout_8": "Tomá la octava salida.",
       "job_new": "Tenés un trabajo nuevo.",
       "fuel_low": "Queda poco combustible.",
-      "rest_soon": "Pronto vas a tener que descansar."
+      "rest_soon": "Pronto vas a tener que descansar.",
+      "soon_take_ferry": "Más adelante, tomá el ferry.",
+      "take_ferry": "Tomá el ferry.",
+      "soon_take_train": "Más adelante, tomá el tren.",
+      "take_train": "Tomá el tren."
     },
     "es-MX": {
       "soon_turn_left": "Más adelante, gira a la izquierda.",
@@ -104,7 +112,11 @@
       "roundabout_8": "Toma la octava salida.",
       "job_new": "Tienes un trabajo nuevo.",
       "fuel_low": "Queda poco combustible.",
-      "rest_soon": "Pronto tendrás que descansar."
+      "rest_soon": "Pronto tendrás que descansar.",
+      "soon_take_ferry": "Más adelante, toma el ferry.",
+      "take_ferry": "Toma el ferry.",
+      "soon_take_train": "Más adelante, toma el tren.",
+      "take_train": "Toma el tren."
     },
     "de": {
       "soon_turn_left": "Demnächst links abbiegen.",
@@ -135,7 +147,11 @@
       "roundabout_8": "Jetzt die achte Ausfahrt nehmen.",
       "job_new": "Neuer Auftrag erhalten.",
       "fuel_low": "Der Kraftstoff wird knapp.",
-      "rest_soon": "Bald ist eine Pause fällig."
+      "rest_soon": "Bald ist eine Pause fällig.",
+      "soon_take_ferry": "Demnächst die Fähre nehmen.",
+      "take_ferry": "Jetzt die Fähre nehmen.",
+      "soon_take_train": "Demnächst den Zug nehmen.",
+      "take_train": "Jetzt den Zug nehmen."
     },
     "fr": {
       "soon_turn_left": "Bientôt, tournez à gauche.",
@@ -166,7 +182,11 @@
       "roundabout_8": "Prenez la huitième sortie.",
       "job_new": "Nouvelle mission reçue.",
       "fuel_low": "Le niveau de carburant est bas.",
-      "rest_soon": "Une pause sera bientôt nécessaire."
+      "rest_soon": "Une pause sera bientôt nécessaire.",
+      "soon_take_ferry": "Bientôt, prenez le ferry.",
+      "take_ferry": "Prenez le ferry.",
+      "soon_take_train": "Bientôt, prenez le train.",
+      "take_train": "Prenez le train."
     },
     "pt": {
       "soon_turn_left": "Em breve, vire à esquerda.",
@@ -197,7 +217,11 @@
       "roundabout_8": "Pegue a oitava saída.",
       "job_new": "Novo trabalho recebido.",
       "fuel_low": "O combustível está acabando.",
-      "rest_soon": "Você vai precisar descansar em breve."
+      "rest_soon": "Você vai precisar descansar em breve.",
+      "soon_take_ferry": "Em breve, pegue a balsa.",
+      "take_ferry": "Pegue a balsa.",
+      "soon_take_train": "Em breve, pegue o trem.",
+      "take_train": "Pegue o trem."
     },
     "pl": {
       "soon_turn_left": "Za chwilę skręć w lewo.",
@@ -228,7 +252,11 @@
       "roundabout_8": "Zjedź ósmym zjazdem.",
       "job_new": "Nowe zlecenie.",
       "fuel_low": "Kończy się paliwo.",
-      "rest_soon": "Wkrótce czas na odpoczynek."
+      "rest_soon": "Wkrótce czas na odpoczynek.",
+      "soon_take_ferry": "Za chwilę wjedź na prom.",
+      "take_ferry": "Wjedź na prom.",
+      "soon_take_train": "Za chwilę wjedź na pociąg.",
+      "take_train": "Wjedź na pociąg."
     },
     "ru": {
       "soon_turn_left": "Скоро поверните налево.",
@@ -259,7 +287,11 @@
       "roundabout_8": "Сверните на восьмой съезд.",
       "job_new": "Получен новый заказ.",
       "fuel_low": "Топливо заканчивается.",
-      "rest_soon": "Скоро нужно отдохнуть."
+      "rest_soon": "Скоро нужно отдохнуть.",
+      "soon_take_ferry": "Скоро заезд на паром.",
+      "take_ferry": "Заезжайте на паром.",
+      "soon_take_train": "Скоро заезд на поезд.",
+      "take_train": "Заезжайте на поезд."
     },
     "tr": {
       "soon_turn_left": "Birazdan sola dönün.",
@@ -290,7 +322,11 @@
       "roundabout_8": "Sekizinci çıkıştan çıkın.",
       "job_new": "Yeni iş alındı.",
       "fuel_low": "Yakıt azalıyor.",
-      "rest_soon": "Yakında mola vermelisin."
+      "rest_soon": "Yakında mola vermelisin.",
+      "soon_take_ferry": "Birazdan feribota binin.",
+      "take_ferry": "Feribota binin.",
+      "soon_take_train": "Birazdan trene binin.",
+      "take_train": "Trene binin."
     }
   }
 }
