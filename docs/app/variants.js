@@ -1,6 +1,6 @@
 // GENERADO por tools/build_variants_js.py desde docs/data/map-manifest.json.
 // No editar a mano: se regenera al publicar o actualizar una variante.
-// Fuente: manifest del 2026-11-16.
+// Fuente: manifest del 2026-11-24.
 const MAP_DATA_VERSION = {
   "ats": "20261103",
   "ats_161": "20261103",
@@ -9,13 +9,13 @@ const MAP_DATA_VERSION = {
   "ats_c2c_promods": "20261112",
   "ats_canada": "20261112",
   "ats_c2c_canada": "20261112",
-  "ats_expansion": "20261101",
-  "ats_c2c_expansion": "20261112",
+  "ats_expansion": "20261124",
+  "ats_c2c_expansion": "20261124",
   "ats_reforma": "20261112",
   "ats_reforma_c2c_promods": "20261112",
   "ets2": "20261110",
   "ets2_161": "20261105",
-  "ets2_promods": "20261022",
+  "ets2_promods": "20261124",
   "ets2_promods_rusmap": "20261022",
   "ets2_promods_roex": "20261103",
   "ets2_promods_rusmap_roex": "20261103",
@@ -139,7 +139,7 @@ const VARIANT_META = {
     "mods": [
       "ats_expansion"
     ],
-    "gameVersion": "1.61.3.18"
+    "gameVersion": "1.62.2.0"
   },
   "ats_c2c_expansion": {
     "label": "American Truck Simulator + Coast to Coast + ATS Expansion",
@@ -230,7 +230,8 @@ const VARIANT_META = {
       "promods_maghreb",
       "promods_tgs"
     ],
-    "gameVersion": "1.61.1"
+    "gameVersion": "1.62.3.2",
+    "basemap": "europe-promods285"
   },
   "ets2_promods_rusmap": {
     "label": "Euro Truck Simulator 2 + ProMods + RusMap",

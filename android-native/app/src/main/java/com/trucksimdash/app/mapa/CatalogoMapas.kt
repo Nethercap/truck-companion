@@ -30,6 +30,8 @@ data class VarianteMapa(
     val logosPropios: Boolean = false,
     /** Los `mods` del manifest: con ProMods el mapa base es otro (fondoDelMapa). */
     val mods: List<String> = emptyList(),
+    /** El fondo propio del manifest, si no es el que le toca por sus mods (fondoDelMapa). */
+    val fondoPropio: String? = null,
 ) {
     val esLocal: Boolean get() = raiz != null
     val urlDeDescarga: String get() = "${raiz ?: Red.MAPAS}/vector/$id.pmtiles?v=$version"
@@ -41,7 +43,7 @@ data class VarianteMapa(
      * nada que ver con la tierra de verdad (basemapFitsCities en la web lo mide): va liso.
      */
     val mapaBase: String?
-        get() = if (esLocal) null else fondoDelMapa(proyeccion, mods)?.let { "${Red.MAPAS}/basemap/$it.geojson?v=$VERSION_MAPA_BASE" }
+        get() = if (esLocal) null else fondoDelMapa(proyeccion, mods, fondoPropio)?.let { "${Red.MAPAS}/basemap/$it.geojson?v=$VERSION_MAPA_BASE" }
 }
 
 // BASEMAP_BY_PROJECTION en app.js.
@@ -50,9 +52,11 @@ private val BASE_POR_PROYECCION = mapOf("ats" to "usa", "ets2" to "europe")
 /**
  * basemapForVariant en pure.js: el de la proyeccion, salvo ETS2 con ProMods, que tiene su
  * Islandia (y sus Feroe) en otro lugar del juego que la del DLC de SCS y su propio archivo.
+ * Con la 2.85 la variante nombra el suyo en el manifest (`basemap`).
  */
-internal fun fondoDelMapa(proyeccion: String, mods: List<String>): String? {
+internal fun fondoDelMapa(proyeccion: String, mods: List<String>, propio: String? = null): String? {
     val base = BASE_POR_PROYECCION[proyeccion]
+    if (base == "europe" && !propio.isNullOrEmpty()) return propio
     return if (base == "europe" && "promods" in mods) "europe-promods" else base
 }
 
@@ -161,6 +165,7 @@ class CatalogoMapas(val variantes: Map<String, VarianteMapa>) {
                     anteriorDe = v.texto("previousVersionOf"),
                     centro = if (origen != null && origen.size == 2) LngLat(origen[0], origen[1]) else LngLat(0.0, 20.0),
                     mods = v.lista("mods")?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty(),
+                    fondoPropio = v.texto("basemap"),
                 )
             }
             return if (lista.isEmpty()) null else CatalogoMapas(lista.toMap())

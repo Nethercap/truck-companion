@@ -6590,6 +6590,11 @@ test('basemapForVariant: las variantes con ProMods llevan su Islandia (10-11)', 
   assert.equal(elegido.ets2_gu, null);
   assert.equal(basemapForVariant('europe', undefined), 'europe');
   assert.equal(basemapForVariant(undefined, ['promods']), null);
+  // ProMods 2.85 usa la Islandia del DLC: nombra su fondo en el manifest. Las
+  // combinaciones que siguen en la 2.84 no, y un fondo propio nunca cambia el de ATS.
+  assert.equal(basemapForVariant('europe', ['promods'], 'europe-promods285'), 'europe-promods285');
+  assert.equal(basemapForVariant('europe', ['promods'], ''), BASEMAP_PROMODS);
+  assert.equal(basemapForVariant('usa', ['promods_canada'], 'europe-promods285'), 'usa');
 });
 
 test('mapa base: BASE_LAYER_IDS tiene cada capa y los limites se apagan al acercarse (Discord 12-11)', () => {

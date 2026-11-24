@@ -61,6 +61,9 @@ def build():
             # Ajustes la muestra al lado de "La de ahora" (gameVersionVariant)
             "gameVersion": var.get("gameVersion"),
         }
+        if var.get("basemap"):
+            # fondo propio, si no es el que le toca por sus mods (basemapForVariant)
+            meta[name]["basemap"] = var["basemap"]
     credits = {}
     for mod_id, mod in manifest.get("mods", {}).items():
         credits[mod_id] = {"name": mod["name"], "author": mod.get("author") or None,

@@ -144,7 +144,8 @@ class ReferenciaWebTest {
             val f = fila.jsonObject
             val mods = f.getValue("mods").jsonArray.map { it.jsonPrimitive.content }
             val esperado = f.getValue("fondo").let { if (it is JsonNull) null else it.jsonPrimitive.content }
-            assertEquals("$mods", esperado, fondoDelMapa(f.getValue("proyeccion").jsonPrimitive.content, mods))
+            val propio = f["propio"]?.jsonPrimitive?.content
+            assertEquals("$mods", esperado, fondoDelMapa(f.getValue("proyeccion").jsonPrimitive.content, mods, propio))
         }
     }
 
