@@ -39,7 +39,7 @@ OTHER_DLL_NAME = "scs-telemetry.dll"
 # "Build plugin" (tools/pin_plugin.py). La version tambien va en
 # truckersmp_init (plugin/scs-telemetry/src/truckersmp_players.cpp).
 PLUGIN_DLL_VERSION = "1.12.1-truckdash.6"
-PLUGIN_DLL_SHA256 = "431c29fad12a451192afa501f6a402e2784dbc2f490548bc6731b61ed218319a"
+PLUGIN_DLL_SHA256 = "76f7d98def87e5d3b35b947e36cb7e77253a2e8f069bc7e8316dd783832b3e08"
 # El mismo plugin para macOS, universal (Intel y Apple Silicon): la .dylib y
 # su hash tambien los escribe "Build plugin" (plataforma macos, con
 # plugin/build.sh). Vacio hasta la primera compilacion; el cliente todavia no
