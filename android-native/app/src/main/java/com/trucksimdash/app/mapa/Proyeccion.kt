@@ -84,14 +84,26 @@ private object ProyeccionAts : Proyeccion {
 private class ProyeccionEts2(private val truco: Boolean) : Proyeccion {
     private val lcc = Lcc(37.0, 65.0, 50.0, 15.0)
 
-    private fun esUk(sx: Double, sz: Double) = truco && sx <= -8 && sz <= -2 && !(sx == -8.0 && sz == -2.0)
+    // ets2InGb de pure.js.
+    private fun esUk(p: PuntoJuego): Boolean {
+        val sx = floor(p.x / 4000)
+        val sz = floor(p.z / 4000)
+        return truco && sx <= -8 && sz <= -2 && !(sx == -8.0 && sz == -2.0)
+    }
+
+    // ets2PickSide de pure.js: achicada, UK se mete en el sector de Calais y ahi valen las
+    // dos lecturas. Gana la que tiene algo de verdad (Dover y el tunel, o el Calais de ProMods).
+    private fun elegirLado(comun: PuntoJuego, uk: PuntoJuego) = when {
+        esUk(comun) -> uk
+        !esUk(uk) -> comun
+        comun.z > CALAIS_NORTE && comun.z < CALAIS_SUR -> comun
+        else -> uk
+    }
 
     override fun aLngLat(x: Double, z: Double): LngLat {
-        val sx = floor(x / 4000)
-        val sz = floor(z / 4000)
         var px = x - OFFSET_X
         var pz = z - OFFSET_Z
-        if (esUk(sx, sz)) {
+        if (esUk(PuntoJuego(x, z))) {
             px = (px + CALAIS_X / 2) * ESCALA_UK
             pz = (pz + CALAIS_Z / 2) * ESCALA_UK
         }
@@ -110,9 +122,9 @@ private class ProyeccionEts2(private val truco: Boolean) : Proyeccion {
             return PuntoJuego(x + OFFSET_X, z + OFFSET_Z)
         }
         // Si es UK depende del sector antes de la escala, que es lo que se esta
-        // por calcular: primero se asume que no y se mira donde cae.
+        // por calcular: se hacen las dos cuentas y se elige.
         val comun = probar(false)
-        return if (esUk(floor(comun.x / 4000), floor(comun.z / 4000))) probar(true) else comun
+        return if (truco) elegirLado(comun, probar(true)) else comun
     }
 
     override val metrosPorMetroDeJuego = abs(FACTOR_X) * LARGO_DE_GRADO
@@ -125,6 +137,10 @@ private class ProyeccionEts2(private val truco: Boolean) : Proyeccion {
         const val ESCALA_UK = 0.75
         const val CALAIS_X = -31100.0
         const val CALAIS_Z = -5500.0
+
+        // ETS2_CALAIS_Z de pure.js.
+        const val CALAIS_NORTE = -6100.0
+        const val CALAIS_SUR = -4900.0
     }
 }
 

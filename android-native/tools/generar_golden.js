@@ -36,7 +36,7 @@ function lineaConst(nombre) {
 }
 
 // Las proyecciones, en un contexto con el proj4 de la web.
-const contexto = vm.createContext({ proj4, Math });
+const contexto = vm.createContext({ proj4, Math, ets2InGb: pure.ets2InGb, ets2PickSide: pure.ets2PickSide });
 vm.runInContext([
   lineaConst('EARTH_RADIUS_M'),
   lineaConst('LENGTH_OF_DEGREE'),
@@ -60,10 +60,13 @@ const proyecciones = {
   ets2: ['ets2ToLngLat', 'ets2FromLngLat'],
   gu: ['guToLngLat', 'guFromLngLat'],
 };
-// Lugares repartidos, con los dos lados de la frontera del truco de UK en ETS2.
+// Lugares repartidos, con los dos lados de la frontera del truco de UK en ETS2 y la franja
+// donde se pisan: los puertos de Dover y Folkestone, el Calais de ProMods y el tunel.
 const puntos = {
   ats: [[0, 0], [-48320, -6177], [-104665, 7299], [7245, -14697], [-13248, 54085], [-98772, -5680], [-81881, -63722]],
-  ets2: [[0, 0], [24060, -51876], [-31999, -8001], [-32001, -7999], [-32001, -8001], [-40000, -20000], [-31000, -5000], [64750, -59810], [51356, -58843]],
+  ets2: [[0, 0], [24060, -51876], [-31999, -8001], [-32001, -7999], [-32001, -8001], [-40000, -20000], [-31000, -5000], [64750, -59810], [51356, -58843],
+    [-32502, -7179], [-36082, -7001], [-33772, -8554], [-31141, -5506], [-31866, -5788], [-31600, -5620], [-32600, -4100],
+    [-31000, -7500], [-31700, -6000], [-32300, -6000]],
   gu: [[-40000, -20000], [-31000, -5000], [10000, 10000]],
 };
 const proyeccion = {};
