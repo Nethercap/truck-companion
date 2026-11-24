@@ -48,7 +48,10 @@ empaquetar() {
 # lo usa para juntar las calles que se tocan punta con punta), zip-entries.ts
 # (lee los .scs que son ZIP, tambien los de firmas cambiadas), ruta-textura.ts
 # (la textura de un icono .mat, tambien desde la raiz), arreglo-json.ts y
-# leer-geojson.ts (leen y escriben de a pedazos, con archivos de mas de 512 MB).
+# leer-geojson.ts (leen y escriben de a pedazos, con archivos de mas de 512 MB),
+# scs-archive.ts (HashFS v1 y v2 de mods protegidos o sin comprimir),
+# partes-de-mod.ts (los mods en "base" y "dlc_") y los .sii (comentarios /* */,
+# paises con el nombre ya escrito).
 echo "== pruebas"
 (cd "$WORK/maps" && node --experimental-strip-types --no-warnings --test \
   packages/clis/truckdash-builder/unir-calles.prueba.ts)
@@ -58,6 +61,9 @@ echo "== pruebas"
   packages/clis/parser/game-files/ruta-textura.prueba.ts)
 (cd "$WORK/maps" && NODE_OPTIONS=--max-old-space-size=4096 npx --no-install tsx --test \
   packages/libs/io/arreglo-json.prueba.ts packages/clis/truckdash-builder/leer-geojson.prueba.ts)
+(cd "$WORK/maps/packages/clis/parser" && npx --no-install vitest run \
+  game-files/tests/scs-archive-v1.test.ts game-files/tests/scs-archive-v2.test.ts \
+  game-files/tests/partes-de-mod.test.ts game-files/tests/sii-text.test.ts)
 
 echo "== esbuild"
 empaquetar packages/clis/parser/run-with-mod.ts parser.mjs

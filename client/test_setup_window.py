@@ -916,14 +916,72 @@ def test_armar_mi_mapa_con_mods_y_primero_si_salio_del_mapa(ventana, monkeypatch
     v.build_my_map("ats")
     assert arrancados == ["ats"]
 
-    # Ya armado para esos mods: solo dice que esta listo, sin boton.
+    # Ya armado para esos mods: dice que esta listo y se puede armar de nuevo.
     tray_client.state.offmap_games.clear()
     tray_client.state.local_maps = {"ats": {"fingerprint": "f", "cities": 12, "built": "2026-10-21"}}
     v.render_local_map()
     v.root.update()
     textos = _textos(v.local_map_body)
     assert tray_client.T("local_map_build") not in textos
+    assert tray_client.T("local_map_rebuild") in textos
     assert any("12" in t for t in textos)
+
+
+def test_un_mapa_armado_se_puede_armar_de_nuevo(ventana, monkeypatch, tmp_path):
+    """Con los mismos mods el mapa queda para siempre y Setup no tenia boton: quien
+    lo armo con una version que no leia uno de sus mods tocaba "Re-read mods" y no
+    pasaba nada (Discord, 24-11). La pista va solo si es de otra version."""
+    v, _ = ventana
+    _logs(monkeypatch, tmp_path, ats=True)
+    bin_dir = _install(tmp_path, "ATS", "ats")
+    tray_client.state.installs = [plugin_installer.describe_install("ats", bin_dir)]
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": [str(tmp_path / "mod.scs")], "ets2": None})
+    monkeypatch.setattr(tray_client.state, "offmap_games", set())
+    monkeypatch.setattr(tray_client.state, "map_build", None)
+    pista = tray_client.T("local_map_rebuild_hint", version="1.5.45")
+    mapa = {"fingerprint": "f", "cities": 12, "built": "2026-11-23T18:55:46", "clientVersion": "1.5.45"}
+    monkeypatch.setattr(tray_client.state, "local_maps", {"ats": mapa})
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert pista in textos
+    assert tray_client.T("local_map_rebuild") in textos
+
+    arrancados = []
+    monkeypatch.setattr(tray_client, "start_map_build", lambda g: arrancados.append(g))
+    monkeypatch.setattr(tray_client.map_builder, "game_running", lambda: False)
+    monkeypatch.setattr(tray_client.map_builder, "free_memory_gb", lambda: 16.0)
+    boton = next(w for w in v.local_map_body.winfo_children()
+                 if w.winfo_class() == "Button" and w.cget("text") == tray_client.T("local_map_rebuild"))
+    boton.invoke()
+    assert arrancados == ["ats"]
+
+    # Armado otra vez, con esta version: la seccion se rehace aunque los mods (la
+    # huella) sean los mismos, y ya no dice nada de la version.
+    tray_client.state.local_maps = {"ats": {**mapa, "cities": 1300, "built": "2026-11-24T20:00:00",
+                                            "clientVersion": tray_client.client_lib.CLIENT_VERSION}}
+    v.render_local_map()
+    v.root.update()
+    textos = _textos(v.local_map_body)
+    assert any("1300" in t for t in textos)
+    assert not any("1.5.45" in t for t in textos)
+    assert tray_client.T("local_map_rebuild") in textos
+
+    # Mientras se arma, el paso y el boton de cancelar, no el de armar.
+    monkeypatch.setattr(tray_client.state, "map_build", {"game": "ats", "step": "parser", "running": True})
+    v.render_local_map()
+    v.root.update()
+    assert tray_client.T("local_map_rebuild") not in _textos(v.local_map_body)
+
+
+def test_armar_de_nuevo_esta_en_las_ocho_lenguas():
+    import i18n
+    ingles = i18n._STRINGS["en"]
+    for lang, textos in i18n._STRINGS.items():
+        assert "{version}" in textos["local_map_rebuild_hint"], lang
+        for clave in ("local_map_rebuild", "local_map_rebuild_hint"):
+            assert textos.get(clave), (lang, clave)
+            assert lang == "en" or textos[clave] != ingles[clave], (lang, clave)
 
 
 def test_sin_mods_dice_donde_los_busco_y_se_pueden_releer(ventana, monkeypatch, tmp_path):

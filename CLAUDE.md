@@ -88,6 +88,21 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   NNMap, M12 Vostok, Altai Map) los lee solo "Build my map", en la PC de quien
   ya los tiene. No van a `variants.json` ni a R2: lo decidio el maintainer el
   04-11, porque sus autores los protegieron a proposito.
+- Un mod que falta entero en un mapa armado en la PC (build.log del 23-11, 77 mods de
+  ATS, "Not all map mods/RCs are being detected"): mirar la lista "unknown .scs files
+  containing map data" del log, que dice que mods aportaron sectores. Dos motivos: "no se
+  pudo leer (incorrect header check)", que en HashFS v2 sale de una entrada basura o de la
+  tabla de metadatos guardada sin comprimir (el campo de la cabecera es una cantidad de
+  valores de 4 bytes, no bytes); y un mod en partes (`base/` y `dlc_<nombre>/` en la raiz,
+  `partes-de-mod.ts`), que se leia por la raiz y no daba nada sin avisar. El juego monta
+  solo las partes, y un `dlc_` solo con ese DLC (en el game.log.txt, un "requested
+  subdirectory" por parte). ATS Expansion viene asi; en el taller `variants.json` apunta a
+  su `base`. Lo de Beyond sigue sin probar con sus archivos.
+- Armar de nuevo con los mismos mods ("Build it again" de Setup) no cambia la huella: para
+  la web la version de los archivos es `build` del manifest, que el cliente manda en
+  `fingerprint` (`local_maps_summary`; los mapas de antes no lo traen). Si cambia con la
+  misma variante, el tablero recarga el mapa (`localMapRebuilt`): el .pmtiles abierto tiene
+  el indice del de antes.
 - Escudos de ruta en el mapa (capa `road-shield`, Discord 19-10): salen de
   `road-names.json` (`roadShieldPoints`, uno por ruta cada
   `ROAD_SHIELD_CELL_M` = 4 km, desde zoom 8), dibujados en un canvas con la

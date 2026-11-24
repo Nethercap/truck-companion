@@ -638,6 +638,107 @@ def test_un_armado_cancelado_no_deja_gigas_en_el_disco(tmp_path, monkeypatch):
     assert sorted(os.listdir(os.path.join(map_builder.maps_dir(), carpetas[0]))) == ["build.log", "mods.txt"]
 
 
+def _carpeta(ruta, **archivos):
+    ruta.mkdir(parents=True)
+    for nombre, texto in archivos.items():
+        (ruta / nombre).write_text(texto)
+    return str(ruta)
+
+
+def test_armar_de_nuevo_reemplaza_el_mapa(tmp_path):
+    final = _carpeta(tmp_path / "ats-abc", manifest="viejo", sobra="x")
+    nuevo = _carpeta(tmp_path / "ats-abc.part", manifest="nuevo")
+    map_builder._poner_en_su_lugar(nuevo, final)
+    assert sorted(os.listdir(tmp_path)) == ["ats-abc"]
+    assert os.listdir(final) == ["manifest"]
+    assert (tmp_path / "ats-abc" / "manifest").read_text() == "nuevo"
+    # Sin uno de antes, como siempre
+    otro = _carpeta(tmp_path / "ets2-def.part", manifest="otro")
+    map_builder._poner_en_su_lugar(otro, str(tmp_path / "ets2-def"))
+    assert sorted(os.listdir(tmp_path)) == ["ats-abc", "ets2-def"]
+
+
+def test_armar_de_nuevo_espera_a_que_el_tablero_suelte_el_archivo(tmp_path, monkeypatch):
+    """Windows no deja mover la carpeta con un archivo abierto, y el servidor local
+    abre el .pmtiles en cada pedido del tablero."""
+    final = _carpeta(tmp_path / "ats-abc", manifest="viejo")
+    nuevo = _carpeta(tmp_path / "ats-abc.part", manifest="nuevo")
+    de_verdad, veces = os.replace, []
+
+    def replace(a, b):
+        veces.append((a, b))
+        if len(veces) in (1, 3):  # no deja apartar el viejo, ni despues entrar el nuevo
+            raise PermissionError(5, "Access is denied")
+        de_verdad(a, b)
+
+    monkeypatch.setattr(map_builder, "REEMPLAZO_ESPERA_S", 0)
+    monkeypatch.setattr(map_builder.os, "replace", replace)
+    map_builder._poner_en_su_lugar(nuevo, final)
+    assert len(veces) == 4
+    assert sorted(os.listdir(tmp_path)) == ["ats-abc"]
+    assert (tmp_path / "ats-abc" / "manifest").read_text() == "nuevo"
+
+
+def test_si_no_se_puede_reemplazar_queda_el_mapa_de_antes(tmp_path, monkeypatch):
+    final = _carpeta(tmp_path / "ats-abc", manifest="viejo")
+    nuevo = _carpeta(tmp_path / "ats-abc.part", manifest="nuevo")
+    de_verdad = os.replace
+
+    def replace(a, b):
+        if a == nuevo:
+            raise PermissionError(5, "Access is denied")
+        de_verdad(a, b)
+
+    monkeypatch.setattr(map_builder, "REEMPLAZO_INTENTOS", 3)
+    monkeypatch.setattr(map_builder, "REEMPLAZO_ESPERA_S", 0)
+    monkeypatch.setattr(map_builder.os, "replace", replace)
+    with pytest.raises(PermissionError):
+        map_builder._poner_en_su_lugar(nuevo, final)
+    assert sorted(os.listdir(tmp_path)) == ["ats-abc", "ats-abc.part"]
+    assert (tmp_path / "ats-abc" / "manifest").read_text() == "viejo"
+
+
+def test_un_resto_de_un_rearmado_no_deja_afuera_otro_mapa(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    maps = tmp_path / "TruckDash" / "maps"
+    for i, nombre in enumerate(("ats-otro", "ats-abc.123.old", "ats-abc")):
+        _carpeta(maps / nombre, manifest="x")
+        os.utime(maps / nombre, (1000 + i, 1000 + i))
+    map_builder.prune_old_maps("ats", "abc")
+    assert sorted(os.listdir(maps)) == ["ats-abc", "ats-otro"]
+
+
+def test_la_version_que_ve_la_web_cambia_al_armar_de_nuevo(monkeypatch):
+    """La huella (los mods) es la misma y los archivos no: con el mismo ?v= el
+    tablero seguia con el indice del .pmtiles de antes. Un mapa de antes de la
+    1.5.47 no trae "build" y va con su huella. El relay acepta de 6 a 16 hex."""
+    import re
+    import tray_client
+    mapa = {"fingerprint": "45cb161739e4", "variant": "local_ats", "built": "2026-11-23T18:55:46", "cities": 1236,
+            "mods": ["x"], "companyIcons": 3}
+    monkeypatch.setattr(tray_client.state, "local_maps", {"ats": mapa})
+    antes = tray_client.local_maps_summary()
+    assert antes == {"ats": mapa}
+    monkeypatch.setattr(tray_client.state, "local_maps", {"ats": {**mapa, "build": "0123456789ab"}})
+    ahora = tray_client.local_maps_summary()
+    assert ahora["ats"]["fingerprint"] == "0123456789ab" and "build" not in ahora["ats"]
+    assert re.fullmatch(r"[0-9a-f]{6,16}", ahora["ats"]["fingerprint"])
+
+
+def test_armar_de_nuevo_avisa_que_cambio_aunque_los_mods_sean_los_mismos(monkeypatch, tmp_path):
+    import tray_client
+    monkeypatch.setattr(tray_client.state, "mounted_mods", {"ats": ["mod.scs"], "ets2": None})
+    monkeypatch.setattr(tray_client.state, "local_maps", {})
+    monkeypatch.setattr(tray_client, "game_dir_for", lambda game: str(tmp_path))
+    monkeypatch.setattr(local_server, "local_map_dirs", {})
+    mapa = {"fingerprint": "abc", "built": "2026-11-23T18:55:46", "dir": str(tmp_path)}
+    monkeypatch.setattr(map_builder, "built_map", lambda game, fp: dict(mapa))
+    assert tray_client.refresh_local_maps() is True
+    assert tray_client.refresh_local_maps() is False
+    mapa["built"] = "2026-11-24T20:00:00"
+    assert tray_client.refresh_local_maps() is True
+
+
 def test_un_armado_que_falla_guarda_su_log(tmp_path, monkeypatch):
     """Es lo que suma "Report a problem" (failed_build_log)."""
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))

@@ -6,6 +6,21 @@ updates on its own and is not versioned here.
 
 ## Unreleased
 
+- Build my map: mods packed in parts are now read: a "base" folder, plus "dlc_" folders for the
+  DLCs you own, the way the game loads them. The builder only looked at the top of the mod, so
+  ATS Expansion (and any mod packed like that) was missing from the map without a word about it.
+- Build my map: more map mods are no longer skipped whole with "incorrect header check" in the
+  build log. Two causes are fixed: mods packed without compression, and the junk entries that
+  packers add against extraction tools, which the game never reads (a folder listing stored
+  without its folder mark is also read now). In a player's log with 77 mods this hit all four
+  files of Beyond by Terramaps and two fix mods of the map combos; we don't have those files to
+  try, so if yours is still skipped, please send us the build log.
+- Build my map: definition files with /* */ comments are read (two Alaska ferries and the British
+  Columbia signs of ProMods Canada were skipped because of one), and so are states and provinces
+  of mods whose name or time zone is written directly (Florida, Alberta, Quebec and others).
+- Setup: a map you already built has a "Build it again" button. Until now it stayed the same as
+  long as your mods did, so there was no way to get the missing parts with a newer version. The
+  dashboard loads the new map on its own.
 - Follow the in-game GPS: saves of Steam Cloud profiles are now found. The game keeps them in Steam's
   own folder, not in Documents, and Truck Dash only looked in Documents: with this turned on it
   never found a save and did nothing, without saying so. It still only reads the newest save, and

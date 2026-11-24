@@ -172,6 +172,11 @@ def prune_old_maps(game: str, keep: str, max_keep: int = 2):
         nombres = [n for n in os.listdir(maps_dir()) if n.startswith(f"{game}-")]
     except OSError:
         return
+    # El mapa anterior de un rearmado que no se pudo borrar (_poner_en_su_lugar)
+    # no cuenta: si no, dejaba afuera al mapa de otro perfil.
+    for n in [n for n in nombres if n.endswith(".old")]:
+        shutil.rmtree(os.path.join(maps_dir(), n), ignore_errors=True)
+        nombres.remove(n)
     nombres.sort(key=lambda n: os.path.getmtime(os.path.join(maps_dir(), n)), reverse=True)
     for n in nombres[max_keep:]:
         if n != f"{game}-{keep}":
@@ -635,6 +640,35 @@ def _dejar_solo_el_log(carpeta: str):
                 pass
 
 
+# Cuanto se insiste en cambiar el mapa por el nuevo: el servidor local abre los
+# archivos del que esta en uso para cada pedido del tablero, y con uno abierto
+# Windows no deja mover la carpeta.
+REEMPLAZO_INTENTOS = 40
+REEMPLAZO_ESPERA_S = 0.5
+
+
+def _poner_en_su_lugar(tmp: str, final: str):
+    """El armado terminado (tmp) pasa a ser el mapa (final). Si ya habia uno (se
+    armo de nuevo con los mismos mods), se lo aparta entero y se borra recien con
+    el nuevo en su lugar: borrarlo antes lo dejaba por la mitad si el tablero
+    estaba leyendo un archivo, y el nuevo no entraba. Si no hay caso, vuelve el
+    de antes y tira el error."""
+    viejo = f"{final}.{time.time_ns()}.old"
+    for intento in range(REEMPLAZO_INTENTOS):
+        try:
+            if os.path.isdir(final):
+                os.replace(final, viejo)
+            os.replace(tmp, final)
+            break
+        except OSError:
+            if intento == REEMPLAZO_INTENTOS - 1:
+                if os.path.isdir(viejo) and not os.path.isdir(final):
+                    os.replace(viejo, final)
+                raise
+            time.sleep(REEMPLAZO_ESPERA_S)
+    shutil.rmtree(viejo, ignore_errors=True)
+
+
 def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
               progress=lambda paso: None, cancel: threading.Event | None = None,
               mod_names: list | None = None) -> dict:
@@ -717,6 +751,9 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
             os.remove(sobra)
     manifest = {
         "format": map_format(game), "game": game, "variant": variante, "fingerprint": fp,
+        # Distinto en cada armado, aunque la huella (los mods) sea la misma: es
+        # la version con que la web pide los archivos (local_maps_summary).
+        "build": hashlib.sha1(f"{fp}|{time.time_ns()}".encode()).hexdigest()[:12],
         "built": time.strftime("%Y-%m-%dT%H:%M:%S"), "seconds": round(time.time() - t0),
         "cities": ciudades, "mods": mod_names or [os.path.basename(p) for p in mod_paths],
         # Sin el campo (mapas armados antes de la 1.5.32), la web usa los de R2.
@@ -725,8 +762,7 @@ def build_map(game: str, game_dir: str, mod_paths: list, client_version: str,
     }
     with open(os.path.join(tmp, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=1)
-    shutil.rmtree(final, ignore_errors=True)
-    os.replace(tmp, final)
+    _poner_en_su_lugar(tmp, final)
     prune_old_maps(game, fp)
     logging.info("Map built for %s (%s): %d cities in %d s", game, fp, ciudades, manifest["seconds"])
     manifest["dir"] = final
