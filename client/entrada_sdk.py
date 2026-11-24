@@ -168,6 +168,11 @@ def _raw_de_la_telemetria() -> dict | None:
         return None
 
 
+def _juego_al_frente() -> bool:
+    import window_compat
+    return not IS_WINDOWS or bool(window_compat.game_window_in_front())
+
+
 class Botones:
     """Los botones de esta PC. Un toque por vez: pueden llegar a la vez del
     relay y de la red local, cada uno en su thread."""
@@ -181,6 +186,7 @@ class Botones:
         # Para los tests.
         self.abrir = abrir
         self.leer_raw = _raw_de_la_telemetria
+        self.juego_al_frente = _juego_al_frente
 
     def apretar(self, mix: str, al_frente) -> bool:
         """Aprieta el boton de ese mix. `al_frente` trae la ventana del juego
@@ -230,9 +236,17 @@ class Botones:
         inicio = time.monotonic()
         if not pedir(bloque, boton):
             return "not taken in time"
-        logging.info("Button %s sent through the game's SDK (%d ms%s)", mix,
-                     (time.monotonic() - inicio) * 1000, ", game brought to the front" if como == QUIETO else "")
-        if not self._se_nota(mix, antes):
+        detalle = ["%d ms" % ((time.monotonic() - inicio) * 1000)]
+        if como == QUIETO:
+            detalle.append("game brought to the front")
+        elif not self.juego_al_frente():
+            detalle.append("game not in front")
+        probado = self._hace_caso
+        se_nota = self._se_nota(mix, antes)
+        if self._hace_caso and not probado:
+            detalle.append("seen in the telemetry")
+        logging.info("Button %s sent through the game's SDK (%s)", mix, ", ".join(detalle))
+        if not se_nota:
             self._sin_efecto += 1
             return "taken, but nothing changed in the game"
         return None

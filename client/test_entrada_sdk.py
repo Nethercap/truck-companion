@@ -113,6 +113,7 @@ class PluginFalso:
         self.botones = entrada_sdk.Botones()
         self.botones.abrir = self.abrir
         self.botones.leer_raw = lambda: self.raw
+        self.botones.juego_al_frente = lambda: True
 
     def poner(self, campo, valor):
         donde, formato = entrada_sdk.CAMPOS[campo]
@@ -367,6 +368,48 @@ def test_los_demas_botones_no_dicen_nada_del_juego(plugin):
         for _ in range(3):
             assert plugin.apretar(mix)
     assert len(plugin.apretados) == 30
+
+
+def _anotado(caplog):
+    lineas = [re.sub(r"\d+ ms", "N ms", r.getMessage()) for r in caplog.records]
+    caplog.clear()
+    return lineas
+
+
+def test_el_log_dice_por_donde_fue_cada_toque(plugin, caplog):
+    """Es lo unico que hay para saber, del log de alguien, si el juego le hace
+    caso y si toma la entrada sin estar al frente."""
+    caplog.set_level("INFO")
+    plugin.apretar("beacon")
+    assert _anotado(caplog) == ["Button beacon sent through the game's SDK (N ms)"]
+    con_telemetria(plugin)
+    plugin.al_apretar = lambda mix: plugin.raw.update(lightsHazards=not plugin.raw["lightsHazards"])
+    plugin.apretar("flasher4way")
+    plugin.apretar("flasher4way")
+    assert _anotado(caplog) == ["Button flasher4way sent through the game's SDK (N ms, seen in the telemetry)",
+                                "Button flasher4way sent through the game's SDK (N ms)"]
+    plugin.botones.juego_al_frente = lambda: False
+    plugin.apretar("beacon")
+    assert _anotado(caplog) == ["Button beacon sent through the game's SDK (N ms, game not in front)"]
+    sin_foco(plugin)
+    plugin.al_frente_activa = True
+    plugin.apretar("beacon")
+    assert _anotado(caplog) == ["Button beacon sent through the game's SDK (N ms, game brought to the front)"]
+
+
+def test_el_log_dice_por_que_fue_por_la_tecla(plugin, caplog):
+    caplog.set_level("INFO")
+    con_telemetria(plugin)
+    plugin.apretar("light")
+    assert _anotado(caplog) == [
+        "Button light sent through the game's SDK (N ms)",
+        "Button light not sent through the game's SDK (taken, but nothing changed in the game), using the key"]
+    plugin.toma = False
+    plugin.apretar("engine")
+    assert _anotado(caplog) == ["Button engine not sent through the game's SDK (not taken in time), using the key"]
+    plugin.botones.abrir = lambda: None  # con el juego cerrado no se anota nada
+    plugin.apretar("engine")
+    assert _anotado(caplog) == []
 
 
 # ------------------------------------------------------ varios a la vez, errores
