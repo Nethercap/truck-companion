@@ -314,7 +314,8 @@
      Tocarla (el boton transparente que la cubre) lo vuelve a abrir. */
   .routeExpandBtn { display: none; position: absolute; inset: 0; border: 0; background: transparent; cursor: pointer; border-radius: inherit; }
   .routeSummary.min { width: min(180px, calc(100% - 1.2rem)); padding: 0.45rem 0.6rem; }
-  .routeSummary.min .routeSummaryRow, .routeSummary.min .routeApprox, .routeSummary.min .routeStop { display: none; }
+  .routeSummary.min .routeSummaryRow, .routeSummary.min .routeApprox, .routeSummary.min .routeStop,
+  .routeSummary.min .routeSaveHint { display: none; }
   .routeSummary.min .routeProgressTrack { margin-bottom: 0; height: 6px; }
   .routeSummary.min .routeExpandBtn { display: block; }
   /* Ruta borrada a mano: solo "Ruta oculta" y el boton para traerla, tambien
@@ -331,6 +332,19 @@
   .routeSummary.offmap > :not(.routeOffMap) { display: none; }
   .routeSummary.offmap .routeOffMap { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--muted); }
   .routeSummary.offmap .routeStopSkip { min-height: 28px; flex-shrink: 0; }
+  /* Guardar con F5 (createGpsSaveHint): un renglon mas del resumen, o solo eso si
+     no hay ruta, tambien con el resumen minimizado. */
+  .routeSaveHint { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.3rem; font-size: 0.8rem; color: #ffd27a; line-height: 1.25; }
+  .routeSaveHint[hidden] { display: none; }
+  .routeSaveHint > span { flex: 1; min-width: 0; }
+  .routeSaveHintClose {
+    flex-shrink: 0; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent;
+    color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer;
+  }
+  .routeSaveHintClose:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .routeSummary.savehint { width: max-content; max-width: min(420px, calc(100% - 1.2rem)); padding: 0.3rem 0.35rem 0.3rem 0.8rem; }
+  .routeSummary.savehint > :not(.routeSaveHint) { display: none; }
+  .routeSummary.savehint .routeSaveHint:not([hidden]) { display: flex; margin-top: 0; }
   /* Que el resumen no tape el mini-HUD ni el cartel del mapa. El alto lo
      mide app.js (keepPanelsClearOfRouteSummary): con el aviso de destino
      aproximado el resumen crece y un valor fijo quedaba corto. */
@@ -1097,6 +1111,12 @@
 .routeStop { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.3rem; font-size: 0.8rem; }
 .routeStop[hidden] { display: none; }
 .routeStop #routeStopName, .routeStop #routeBusStopName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* El nombre y, al lado si entra o abajo si no, cuanto falta y a que hora se llega:
+   en un celular el nombre se comia entero para dejarle lugar. */
+.routeStopInfo { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 0.6rem; line-height: 1.25; }
+.routeStop .routeStopInfo #routeStopName { flex: 0 1 auto; max-width: 100%; }
+.routeStopEta { flex-shrink: 0; color: #fff; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.routeStopEta[hidden] { display: none; }
 .routeBusStopDue { flex-shrink: 0; color: var(--muted, #aaa); }
 .routeBusStopDue.late { color: var(--danger); font-weight: 700; }
 .routeStopSkip { flex-shrink: 0; background: #2b2f36; color: var(--text); border: 1px solid #444; border-radius: 6px; padding: 0.15rem 0.6rem; font-size: 0.78rem; cursor: pointer; }
@@ -1274,6 +1294,9 @@ body.mapDashSmall .routeSummaryRow { gap: 0.5rem; font-size: 0.68rem; }
 body.mapDashSmall .routeStat b { font-size: 0.8rem; }
 body.mapDashSmall .routeResetBtn { width: 26px; height: 26px; }
 body.mapDashSmall .routeSummary.min { width: min(140px, calc(100% - 0.7rem)); padding: 0.35rem 0.5rem; }
+/* En el hueco no entra un renglon mas: lo de guardar con F5 va como aviso (updateGpsSaveHint)
+   y la proxima parada, con el nombre solo, como antes. */
+body.mapDashSmall .routeSummary.savehint, body.mapDashSmall .routeSummary .routeSaveHint, body.mapDashSmall .routeStopEta { display: none; }
 body.mapDashSmall .navPanel {
   top: 2.3rem; left: calc(var(--map-left-w, 2.4rem) + 0.35rem); right: 2.8rem; transform: none;
   white-space: normal; text-align: center; font-size: 0.78rem; padding: 0.3rem 0.55rem;

@@ -62,10 +62,11 @@ GUIDE_TEXT.en = {
     gps: `
 <p>The route to your job's destination is drawn <b>automatically</b> as soon as you take a job: quick jobs and freight market, including the car jobs from Road Trip: Ford (client 1.5.21 or newer). It follows your preference in Settings: fastest, like the game's GPS, or shortest.</p>
 <p>If the job starts at another company, it first takes you there to pick up the cargo or the trailer, and the route to the delivery starts once it's loaded or hooked up.</p>
-<p>The <b>route summary</b> at the bottom of the map shows distance left, time left and arrival time, with a progress bar. The arrow shrinks it to a thin progress bar (tap the bar to open it again), and the crossed-out route button clears the route from the map.</p>
+<p>The <b>route summary</b> at the bottom of the map shows distance left, time left and arrival time, with a progress bar, and how far your next stop is and when you get there if you added one. The arrow shrinks it to a thin progress bar (tap the bar to open it again), and the crossed-out route button clears the route from the map.</p>
 <h3>Navigation mode</h3>
-<p>The map turns with your heading, zooms in before turns and shows directions at the top, such as <i>Keep right onto I-15 toward Provo</i>. Choose how close it follows you in Settings. You can still pinch to zoom; the recenter button takes you back.</p>
-<p>At junctions with several lanes it also shows <b>which lanes to use</b>: one box per lane, with its arrows, and the ones that lead to your turn in blue.</p>
+<p>The map turns with your heading and shows directions at the top, such as <i>Keep right onto I-15 toward Provo</i>. Choose how close it follows you in Settings, or let it zoom on its own: farther out at speed, closer in cities. You can still pinch to zoom; the recenter button takes you back.</p>
+<p>At junctions with several lanes it also shows <b>which lanes to use</b>: one box per lane, with its arrows, and the ones that lead to your turn in blue. If the route takes a <b>ferry or a train</b>, it says which one, by the port it goes to.</p>
+<p>With <b>Follow the in-game GPS</b> on in Setup, the route goes where the game's own GPS is going. Truck Dash reads it from your latest save: if you change the GPS, save with <b>F5</b>. The map reminds you when it needs it.</p>
 <h3>Waypoints</h3>
 <p>Tap the flag and then a spot on the map, up to 9 stops. The app asks whether you also set that point in the game's own GPS:</p>
 <ul>
@@ -133,7 +134,7 @@ GUIDE_TEXT.en = {
 <li><b>Rest warning</b>: how long before a rest is due (in game time) the voice and the shortcut to the nearest rest area come up, from 1 to 3 hours.</li>
 <li><b>Job pay in your currency</b>, next to the game's € or $.</li>
 <li><b>Route line color</b>: red, blue or green.</li>
-<li><b>Map zoom in navigation mode</b>.</li>
+<li><b>Map zoom in navigation mode</b>: fixed, or automatic with your speed.</li>
 <li><b>Voice guidance</b>: in navigation mode, says each turn ahead of time and again at the turn, plus arrival, without road names. Two voices in English and Spanish; Turkish uses your device's voice. At roundabouts it tells you which exit to take.</li>
 <li><b>Remap keys</b> for the button box.</li>
 <li><b>Dashboard on another device</b>: copy its link.</li>
@@ -232,7 +233,7 @@ GUIDE_TEXT.en = {
   ic: {
     recenterBtn: ['Recenter', 'Back to your truck, and to your navigation zoom.'],
     fullscreenBtn: ['Fullscreen', 'Hides the header and the phone bars.'],
-    navToggleBtn: ['Navigation mode', 'The map turns with you, zooms in on turns and shows directions.'],
+    navToggleBtn: ['Navigation mode', 'The map turns with you and shows directions.'],
     tilt3dBtn: ['3D view', 'Tilted view, in navigation mode.'],
     waypointBtn: ['Waypoint', 'Tap it, then tap the map. Up to 9.'],
     pipBtn: ["Floating window", "Chrome and Edge on PC: a small window with the next turn, speed and arrival that stays on top of the game (borderless fullscreen)."],
@@ -315,10 +316,11 @@ GUIDE_TEXT.es = {
     gps: `
 <p>La ruta al destino del trabajo se dibuja <b>sola</b> apenas tomás un trabajo: trabajos rápidos y mercado de cargas, incluidos los trabajos con auto de Road Trip: Ford (cliente 1.5.21 o más nuevo). Sigue tu preferencia de Configuración: la más rápida, como el GPS del juego, o la más corta.</p>
 <p>Si el trabajo empieza en otra empresa, primero te lleva ahí a buscar la carga o el remolque, y la ruta a la entrega arranca cuando está cargado o enganchado.</p>
-<p>El <b>resumen de la ruta</b>, abajo del mapa, muestra lo que falta, el tiempo restante y la hora de llegada, con una barra de progreso. La flecha lo achica a una barrita de progreso (tocala para abrirlo de nuevo), y el botón de la ruta tachada borra la ruta del mapa.</p>
+<p>El <b>resumen de la ruta</b>, abajo del mapa, muestra lo que falta, el tiempo restante y la hora de llegada, con una barra de progreso, y cuánto falta para tu próxima parada y a qué hora llegás si agregaste una. La flecha lo achica a una barrita de progreso (tocala para abrirlo de nuevo), y el botón de la ruta tachada borra la ruta del mapa.</p>
 <h3>Modo navegación</h3>
-<p>El mapa gira con tu rumbo, se acerca antes de las curvas y muestra las indicaciones arriba, por ejemplo <i>Mantenete a la derecha por I-15 hacia Provo</i>. En Configuración elegís qué tan cerca te sigue. Igual podés hacer zoom con los dedos; el botón de centrar te devuelve.</p>
-<p>En los cruces con varios carriles también muestra <b>qué carriles sirven</b>: una caja por carril, con sus flechas, y en azul los que llevan a tu giro.</p>
+<p>El mapa gira con tu rumbo y muestra las indicaciones arriba, por ejemplo <i>Mantenete a la derecha por I-15 hacia Provo</i>. En Configuración elegís qué tan cerca te sigue, o lo dejás en automático: más lejos al ir rápido, más cerca en ciudad. Igual podés hacer zoom con los dedos; el botón de centrar te devuelve.</p>
+<p>En los cruces con varios carriles también muestra <b>qué carriles sirven</b>: una caja por carril, con sus flechas, y en azul los que llevan a tu giro. Si la ruta toma un <b>ferry o un tren</b>, dice cuál, por el puerto al que va.</p>
+<p>Con <b>Seguir el GPS del juego</b> prendido en Setup, la ruta va a donde va el GPS del juego. Truck Dash lo lee de tu última partida guardada: si cambiás el GPS, guardá con <b>F5</b>. El mapa te lo recuerda cuando hace falta.</p>
 <h3>Waypoints</h3>
 <p>Tocá la bandera y después un lugar del mapa, hasta 9 paradas. La app pregunta si también marcaste ese punto en el GPS del juego:</p>
 <ul>
@@ -386,7 +388,7 @@ GUIDE_TEXT.es = {
 <li><b>Aviso de descanso</b>: cuánto antes de que toque descansar (en tiempo del juego) avisan la voz y el atajo al área de descanso más cercana, de 1 a 3 horas.</li>
 <li><b>Pago del trabajo en tu moneda</b>, al lado de los € o $ del juego.</li>
 <li><b>Color de la línea de ruta</b>: rojo, azul o verde.</li>
-<li><b>Zoom del mapa en modo navegación</b>.</li>
+<li><b>Zoom del mapa en modo navegación</b>: fijo, o automático con tu velocidad.</li>
 <li><b>Guía por voz</b>: en modo navegación, avisa cada giro con anticipación y otra vez en el giro, y la llegada, sin nombres de rutas. Dos voces en inglés y en español; en turco usa la voz de tu dispositivo. En las rotondas te dice qué salida tomar.</li>
 <li><b>Remapear teclas</b> de la botonera.</li>
 <li><b>Tablero en otro dispositivo</b>: copiar el link.</li>
@@ -485,7 +487,7 @@ GUIDE_TEXT.es = {
   ic: {
     recenterBtn: ['Centrar', 'Vuelve a tu camión y a tu zoom de navegación.'],
     fullscreenBtn: ['Pantalla completa', 'Oculta la barra de arriba y las del celular.'],
-    navToggleBtn: ['Modo navegación', 'El mapa gira con vos, se acerca en las curvas y da indicaciones.'],
+    navToggleBtn: ['Modo navegación', 'El mapa gira con vos y da indicaciones.'],
     tilt3dBtn: ['Vista 3D', 'Vista inclinada, en modo navegación.'],
     waypointBtn: ['Waypoint', 'Tocalo y después tocá el mapa. Hasta 9.'],
     pipBtn: ["Ventana flotante", "Chrome y Edge en la PC: una ventanita con el próximo giro, la velocidad y la llegada que queda arriba del juego (pantalla completa sin bordes)."],

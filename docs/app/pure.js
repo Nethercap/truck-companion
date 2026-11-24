@@ -2571,6 +2571,164 @@ function stabilizeManeuver(state, turn, ticks) {
   return state.shown || null;
 }
 
+// ---------------------------------------------------- ferry y tren (24-11)
+// La ruta dibujaba los cruces (p[2] === 1: el tramo que llega a p) pero nada
+// decia que ferry tomar, y un puerto puede tener varios (9 votos en el tablero de
+// pedidos de TruckSim GPS). El proximo cruce a menos de maxM metros de mundo por
+// la ruta recortada al camion, como un giro mas: { kind: 'ferry', distanceMeters,
+// node }, o null. node es donde LLEGA: es fijo, y de ahi sale el nombre. El
+// punto de partida, una vez en el muelle, es el camion y se mueve en cada dato.
+// Con dos cruces seguidos (A -> B -> C) el del primero: es el que se elige en A.
+function ferryAhead(points, maxM) {
+  if (!points) return null;
+  let m = 0;
+  for (let i = 1; i < points.length && m <= maxM; i++) {
+    if (points[i][2] === 1) return { kind: 'ferry', direction: null, distanceMeters: m, node: [points[i][0], points[i][1]] };
+    m += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  }
+  return null;
+}
+
+// Los puntos de una capa de un tile vectorial (MVT), con sus propiedades de
+// texto: [{ x, y, extent, props }], x e y en unidades del tile. Para leer los
+// puertos del mismo .pmtiles del mapa (los que dibuja la capa ferry-poi) sin
+// que esten en pantalla: MapLibre solo da los de los tiles a la vista, y el
+// puerto de llegada esta a cientos de km. Solo lo que hace falta del formato.
+function mvtPoints(bytes, layerName) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || 0);
+  const texto = new TextDecoder();
+  let pos = 0;
+  const varint = () => {
+    let v = 0, peso = 1, c;
+    do {
+      if (pos >= b.length) throw new Error('MVT cortado');
+      c = b[pos++];
+      v += (c & 127) * peso;
+      peso *= 128;
+    } while (c > 127);
+    return v;
+  };
+  // Recorre los campos de un mensaje: fn(campo, fin) con los que tienen largo
+  // (pos queda al principio del contenido), fn(campo, null, valor) con los enteros.
+  const campos = (fin, fn) => {
+    while (pos < fin) {
+      const tag = varint(), tipo = tag % 8, campo = (tag - tipo) / 8;
+      if (tipo === 0) fn(campo, null, varint());
+      else if (tipo === 2) { const n = varint(), hasta = pos + n; fn(campo, hasta); pos = hasta; }
+      else if (tipo === 1) pos += 8;
+      else if (tipo === 5) pos += 4;
+      else throw new Error('MVT raro');
+    }
+  };
+  const empaquetados = (fin) => { const out = []; while (pos < fin) out.push(varint()); return out; };
+  const zigzag = (n) => (n % 2 ? -(n + 1) / 2 : n / 2);
+  const out = [];
+  campos(b.length, (campoTile, finCapa) => {
+    if (campoTile !== 3 || finCapa == null) return;
+    let nombre = '', extent = 4096;
+    const claves = [], valores = [], figuras = [];
+    campos(finCapa, (campo, fin, n) => {
+      if (campo === 1 && fin != null) nombre = texto.decode(b.subarray(pos, fin));
+      else if (campo === 2 && fin != null) figuras.push([pos, fin]);
+      else if (campo === 3 && fin != null) claves.push(texto.decode(b.subarray(pos, fin)));
+      else if (campo === 4 && fin != null) {
+        let valor = null; // los que no son texto no hacen falta
+        campos(fin, (c, f) => { if (c === 1 && f != null) valor = texto.decode(b.subarray(pos, f)); });
+        valores.push(valor);
+      } else if (campo === 5 && fin == null) extent = n;
+    });
+    if (nombre !== layerName) return;
+    for (const [desde, hasta] of figuras) {
+      pos = desde;
+      let tipo = 0, tags = [], geo = [];
+      campos(hasta, (campo, fin, n) => {
+        if (campo === 3 && fin == null) tipo = n;
+        else if (campo === 2 && fin != null) tags = empaquetados(fin);
+        else if (campo === 4 && fin != null && tipo <= 1) geo = empaquetados(fin);
+      });
+      if (tipo !== 1 || geo.length < 3) continue;
+      const props = {};
+      for (let k = 0; k + 1 < tags.length; k += 2) props[claves[tags[k]]] = valores[tags[k + 1]];
+      out.push({ x: zigzag(geo[1]), y: zigzag(geo[2]), extent, props });
+    }
+  });
+  return out;
+}
+
+// Los tiles de zoom z que tocan el rectangulo de esos puntos [lng, lat].
+function tilesCovering(lngLats, z) {
+  const n = 2 ** z;
+  const xs = [], ys = [];
+  for (const [lng, lat] of lngLats) {
+    const r = Math.max(-85.05, Math.min(85.05, lat)) * Math.PI / 180;
+    xs.push((lng + 180) / 360 * n);
+    ys.push((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n);
+  }
+  const out = [];
+  for (let x = Math.floor(Math.min(...xs)); x <= Math.floor(Math.max(...xs)); x++) {
+    for (let y = Math.floor(Math.min(...ys)); y <= Math.floor(Math.max(...ys)); y++) out.push([x, y]);
+  }
+  return out;
+}
+function tilePointLngLat(z, tx, ty, px, py, extent) {
+  const n = 2 ** z;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty + py / extent) / n)));
+  return [(tx + px / extent) / n * 360 - 180, lat * 180 / Math.PI];
+}
+
+// Las coordenadas de juego de un punto [lng, lat] cercano a [x, z], con la
+// proyeccion directa alrededor de ahi. La inversa de ETS2 (fromLngLat) se
+// equivoca pegado al borde de Gran Bretana, que va a otra escala: al puerto de
+// Dover lo corre 993 m.
+function worldNear(x, z, lngLat, toLngLat, step = 100) {
+  const o = toLngLat(x, z), ex = toLngLat(x + step, z), ez = toLngLat(x, z + step);
+  const a = ex[0] - o[0], c = ex[1] - o[1], b = ez[0] - o[0], d = ez[1] - o[1];
+  const det = a * d - b * c, dx = lngLat[0] - o[0], dy = lngLat[1] - o[1];
+  return [x + (d * dx - b * dy) / det * step, z + (a * dy - c * dx) / det * step];
+}
+
+// El puerto de un cruce: el mas cercano a donde llega, entre los de ferry y tren
+// del mapa ([{ x, z, name, train }]), a menos de maxM metros de mundo. En ETS2
+// hay dos a 118 m (Priwall y Travemunde): el mas cercano es el de ese nodo.
+const FERRY_PORT_MAX_M = 1000;
+function pickFerryPort(ports, x, z, maxM = FERRY_PORT_MAX_M) {
+  let mejor = null, d = maxM;
+  for (const p of ports || []) {
+    const r = Math.hypot(p.x - x, p.z - z);
+    if (r <= d) { d = r; mejor = p; }
+  }
+  return mejor;
+}
+
+// El nombre de un puerto para mostrar, o null. El juego base los trae escritos;
+// la mitad de los de ProMods son la clave sin traducir del juego
+// ("@@holyhead@@"). De esa, la ciudad que se llama igual a menos de
+// FERRY_CITY_MAX_M ("torshavn2" -> Torshavn, "newcastle" -> Newcastle upon Tyne),
+// y si no hay, la clave misma con mayuscula si es una palabra ("Puttgarden",
+// "Rosslare"); con guiones o numeros en el medio, nada. La ciudad mas cercana a
+// secas no sirve: en 45 de los 137 cruces de ETS2 no es el puerto (en Hirtshals es
+// Frederikshavn), y un nombre equivocado es peor que ninguno.
+// Con esto, en los 138 cruces de ETS2 y los 10 de ATS sale el del juego, y en 263
+// de los 266 de ProMods hay nombre (24-11).
+const FERRY_CITY_MAX_M = 4000;
+function ferryPortName(raw, cities, x, z) {
+  const nombre = String(raw == null ? '' : raw).trim();
+  if (!nombre) return null;
+  if (!nombre.includes('@@')) return nombre.slice(0, 40);
+  const letras = (s) => foldText(s).replace(/[^\p{L}]/gu, '');
+  const clave = letras(nombre);
+  let mejor = null, d = FERRY_CITY_MAX_M;
+  for (const c of clave.length >= 4 ? cities || [] : []) {
+    const r = Math.hypot(c.X - x, c.Y - z);
+    if (r > d) continue;
+    const ciudad = letras(c.Name);
+    if (ciudad.length >= 4 && (ciudad.startsWith(clave) || clave.startsWith(ciudad))) { d = r; mejor = c.Name; }
+  }
+  if (mejor) return mejor;
+  const palabra = /^@@([a-z]{3,30})\d?@@$/.exec(nombre);
+  return palabra ? palabra[1][0].toUpperCase() + palabra[1].slice(1) : null;
+}
+
 // Consumo medido de verdad: litros gastados / km recorridos segun el odometro
 // y el nivel del tanque, sobre una ventana movil de windowKm. El SDK trae un
 // "consumo promedio" y una "autonomia" que el juego calcula con un valor
@@ -3505,6 +3663,77 @@ function navZoomSetting(raw) {
   return Math.round(Math.min(NAV_ZOOM_MAX, Math.max(NAV_ZOOM_MIN, z)) * 2) / 2;
 }
 
+// Zoom automatico del modo navegacion (Ajustes, apagado por defecto): un
+// corrimiento sobre el zoom elegido (navZoom). A refKmh es el elegido, y de ahi
+// lo que se ve adelante dura siempre lo mismo: a la mitad de velocidad, un nivel
+// mas cerca. En una caja de ciudad (areas de los POIs) la velocidad cuenta hasta
+// cityKmh, asi que ahi nunca queda como en la autopista. No mira el giro: acercar
+// al doblar ya se probo y daba saltos en los cruces, que es donde mas hace falta
+// ver el contexto (NAV_FIXED_ZOOM en app.js).
+// Contra los saltos: la velocidad se promedia (speedS), la meta cambia recien
+// cuando se aparta band niveles por holdS segundos, parado no cambia (un
+// semaforo, un peaje), y el zoom va hacia la meta a lo sumo a maxPerS niveles por
+// segundo. Con prefers-reduced-motion no se desliza: un corte, y recien con
+// reducedBand niveles de diferencia.
+const NAV_AUTO_ZOOM = {
+  refKmh: 90, cityKmh: 60, slowKmh: 22.5, fastKmh: 130, stoppedKmh: 5,
+  speedS: 8, band: 0.35, reducedBand: 0.8, holdS: 2, easeS: 5, maxPerS: 0.15, gapS: 10,
+};
+function navAutoZoomOffset(speedKmh, inCity, o = NAV_AUTO_ZOOM) {
+  const v = Math.abs(Number(speedKmh) || 0);
+  return Math.log2(o.refKmh / Math.min(inCity ? o.cityKmh : o.fastKmh, Math.max(o.slowKmh, v)));
+}
+// push({ speedKmh, inCity, now, paused, reduced }) en cada dato (now en ms) da el
+// corrimiento; offset() el ultimo, sin dato nuevo. Un hueco de mas de gapS
+// segundos (pestana dormida, recien prendido) arranca de una en lo que toca.
+function createNavAutoZoom(o = NAV_AUTO_ZOOM) {
+  let t = null, v = 0, meta = 0, out = 0, desde = null;
+  return {
+    offset() { return out; },
+    reset() { t = null; desde = null; },
+    push({ speedKmh, inCity, now, paused, reduced }) {
+      const v0 = Math.abs(Number(speedKmh));
+      if (!Number.isFinite(v0) || !Number.isFinite(now)) return out;
+      const dt = t == null ? Infinity : Math.max(0, (now - t) / 1000);
+      t = now;
+      if (dt > o.gapS) {
+        v = v0;
+        meta = out = navAutoZoomOffset(v, inCity, o);
+        desde = null;
+        return out;
+      }
+      if (paused) return out;
+      v += (v0 - v) * (1 - Math.exp(-dt / o.speedS));
+      const pide = navAutoZoomOffset(v, inCity, o);
+      if (v0 >= o.stoppedKmh && Math.abs(pide - meta) >= (reduced ? o.reducedBand : o.band)) {
+        if (desde == null) desde = now;
+        if (now - desde >= o.holdS * 1000) { meta = pide; desde = null; }
+      } else desde = null;
+      if (reduced) { out = meta; return out; }
+      const falta = meta - out;
+      const paso = Math.min(Math.abs(falta) * (1 - Math.exp(-dt / o.easeS)), o.maxPerS * dt);
+      out = Math.abs(falta) < 0.01 ? meta : out + Math.sign(falta) * paso;
+      return out;
+    },
+  };
+}
+// El zoom con ese corrimiento, dentro de lo que se puede elegir en Ajustes.
+function navAutoZoomOf(base, offset) {
+  return Math.min(NAV_ZOOM_MAX, Math.max(NAV_ZOOM_MIN, base + (Number(offset) || 0)));
+}
+
+// Cuanto se rellena el mapa arriba en modo navegacion, en px de los h que mide: el
+// camion queda al 72 % del alto, para ver mas camino adelante. Si ahi lo taparia el
+// resumen de la ruta (summaryH px, a 10 del borde), sube lo justo: en un celular
+// acostado, con el renglon de la proxima parada o el de guardar con F5, la flecha
+// quedaba debajo (24-11).
+const NAV_TRUCK_CLEAR_PX = 34;
+function navPaddingTop(h, summaryH) {
+  const normal = Math.round(h * 0.45);
+  if (!(summaryH > 0)) return normal;
+  return Math.max(0, Math.min(normal, Math.round(h - 2 * (summaryH + NAV_TRUCK_CLEAR_PX))));
+}
+
 // Si "lo que falta" sale de nuestra ruta y no del GPS del juego. El juego en 0
 // con una ruta nuestra larga: todavia no tiene ruta (partida recien cargada).
 // El juego muy por debajo de la nuestra: apunta a otra cosa, como el remolque
@@ -3615,6 +3844,21 @@ function waypointLegEtas(legs, total, eta) {
       realSeconds: eta && eta.realSeconds != null ? eta.realSeconds * parte(leg.worldM, total.worldM) : null,
     };
   });
+}
+
+// Lo que se dice al lado del nombre de la proxima parada propia, en el resumen de
+// la ruta: cuanto falta y a que hora (real) se llega, en las unidades y el formato
+// de hora de lo demas. leg: su tramo en waypointLegEtas. last: es el final de la
+// ruta (sin trabajo y con esa sola): los numeros de arriba ya son los suyos y no
+// se repiten. Devuelve el texto, o '' si no hay nada que agregar.
+function nextStopText(leg, { imperial, lang, hour12, now, last }) {
+  if (last || !leg || !Number.isFinite(leg.km)) return '';
+  const partes = [`${formatDec(imperial ? leg.km * 0.621371 : leg.km, lang)} ${imperial ? 'mi' : 'km'}`];
+  if (Number.isFinite(leg.realSeconds)) {
+    const f = new Date(now + leg.realSeconds * 1000);
+    partes.push(formatClockHM(f.getHours(), f.getMinutes(), hour12));
+  }
+  return partes.join(' · ');
 }
 
 // Escala del juego segun la zona. La ruta va a 1:19 (ETS2) o 1:20 (ATS),
@@ -4356,7 +4600,7 @@ function turnReportDlcLine(d) {
 // turnReportMapLines y turnReportDlcLine (sin ellos, sin esas lineas).
 function turnReportText({ game, map, web, client, truck, heading, now, items, formatTime, routeKm = null, route = null, job = null, bus = null, speed = null, graph = null, changes = null, mapChoice = null, dlc = null }) {
   const r = (v) => Math.round(v);
-  const que = (it) => (it.kind === 'roundabout'
+  const que = (it) => (it.kind === 'ferry' ? 'ferry' : it.kind === 'roundabout'
     ? `roundabout exit ${it.exit != null ? it.exit : '?'}`
     : `${it.kind === 'fork' ? 'keep' : 'turn'} ${it.direction || '?'}`);
   const km = (v) => (Number.isFinite(v) ? `${v.toFixed(1)} km` : '?');
@@ -4560,6 +4804,9 @@ function createVoiceGuide(opts = {}) {
   return {
     maneuver(turn, speedKmh) {
       if (!turn || !turn.node || !Number.isFinite(turn.distanceMeters)) return null;
+      // Un ferry no tiene frase grabada en ningun paquete de voz (24-11): sin esto
+      // se decia "turn right". El panel lo muestra con el nombre del puerto.
+      if (turn.kind === 'ferry') return null;
       const id = turnIdentity(turn);
       const current = dichos.get(id) || dichos.set(id, { soon: false, now: false });
       const speedMs = Math.max(minSpeedMs, (Number(speedKmh) || 0) / 3.6);
@@ -5361,6 +5608,113 @@ function gameGpsViaTails(via) {
   return out;
 }
 
+// "Guarda con F5": el cliente lee la partida (gameGps) pero el GPS del juego cambio
+// despues de guardarla, asi que el destino nuevo todavia no esta ahi. TruckSim GPS
+// en ese caso aprieta el guardado rapido solo; aca solo se avisa (Discord, 15-11:
+// leer, nunca apretar). Cambio: aparece una ruta, o los km saltan mas de jumpKm o
+// jumpFrac.
+// Un salto solo no alcanza: al desviarse (o al entrar a un area de descanso) el juego
+// recalcula y salta igual, hasta 20 km por tener que volver en la otra salida. Eso
+// pasa andando; un destino nuevo se pone en el mapa, que en un jugador pausa, o
+// parado. Por eso el salto parado o recien salido de la pausa (manual) alcanza con
+// manualKm o manualFrac, y andando hacen falta movingKm o movingFrac, sin haberse
+// salido de la ruta en detourMs. Se espera settleMs y settleTicks datos a que la app
+// recalcule tambien, y no se avisa si en ese rato algo lo explica (gpsChangeExplained):
+// - hay una parada propia en la app, o la ruta esta borrada: no va por la del juego;
+// - la app tiene otro destino que antes (otro trabajo, el remolque enganchado, o
+//   uno que encontro en la partida): lo sigue sola;
+// - lo que difieren los km del juego y los nuestros es lo de antes (subieron
+//   juntos), o ahora coinciden mejor (gameGpsSaveMatches);
+// - no se pueden comparar (el centro de una ciudad, un trabajo de bus).
+// Sin ningun destino en la app alcanza con que haya una ruta que no se puede seguir,
+// tambien al abrir la pagina; andando, recien con otra ruta.
+// Se va sola: con una partida nueva (savedAt, los dos relojes son el de la PC), sin
+// ruta en el juego, si algo lo explica despues, si el camion salta (un ferry, otra
+// partida) o a los maxMs; y con close(). Cerrado o vencido, calla muteMs, hasta la
+// proxima partida o hasta que el GPS del juego quede sin ruta.
+// Sin gameGps (no lee partidas, o no encontro ninguna) nunca avisa.
+const GPS_SAVE_HINT = {
+  jumpKm: 1, jumpFrac: 0.1, backMs: 60000, backKm: 0.3, backFrac: 0.05,
+  stoppedKmh: 1, pausedMs: 5000, manualKm: 0.5, manualFrac: 0.01, movingKm: 10, movingFrac: 0.1,
+  settleMs: 12000, settleTicks: 8, detourMs: 60000, hideTicks: 4,
+  maxMs: 10 * 60000, muteMs: 15 * 60000,
+};
+// d: { gameKm, ownKm, targetKey, skip, comparable }. base: como estaba antes del
+// cambio, { key, diff, manual } (diff: km del juego menos los nuestros, null si no
+// se sabe).
+function gpsChangeExplained(d, base, o = GPS_SAVE_HINT) {
+  if (d.skip) return true;
+  if (d.targetKey == null) return false;
+  if (!d.comparable || !Number.isFinite(d.ownKm)) return true;
+  if (d.targetKey !== base.key || base.diff == null) return true;
+  const diff = d.gameKm - d.ownKm;
+  if (gameGpsSaveMatches(d.ownKm, d.gameKm) && Math.abs(diff) <= Math.abs(base.diff)) return true;
+  const margen = base.manual ? Math.max(o.manualKm, d.gameKm * o.manualFrac) : Math.max(o.movingKm, d.gameKm * o.movingFrac);
+  return Math.abs(diff - base.diff) <= margen;
+}
+// push(d) en cada dato, con lo de arriba y { now (ms), ts (s, reloj de la PC),
+// savedAt (s, o null sin gameGps), pos ([x, z] del camion), speedKmh, paused,
+// offRouteAt (ms, la ultima vez que estuvo fuera de la ruta de la app, o null) }:
+// true mientras hay que avisar.
+function createGpsSaveHint(o = GPS_SAVE_HINT) {
+  let antes = null;      // el dato anterior con gameGps: { km, key, diff }
+  let ultimaRuta = null; // { km, now } del ultimo dato con ruta en el juego
+  let pend = null;       // { ts, key, diff, manual, desde, ticks }
+  let aviso = null;      // { ts, key, diff, manual, desde, bien }
+  let callado = -Infinity, savedAt = null, posAntes = null, pausadoAt = -Infinity;
+  const limpiar = () => { pend = null; aviso = null; };
+  return {
+    close(now) { limpiar(); callado = now + o.muteMs; },
+    push(d) {
+      const salto = posAntes && d.pos ? Math.hypot(d.pos[0] - posAntes[0], d.pos[1] - posAntes[1]) : 0;
+      posAntes = d.pos || null;
+      if (d.paused) pausadoAt = d.now;
+      if (!Number.isFinite(d.savedAt)) { antes = ultimaRuta = null; savedAt = null; limpiar(); return false; }
+      const km = d.gameKm > 0 ? d.gameKm : 0;
+      if (savedAt !== d.savedAt) { savedAt = d.savedAt; callado = -Infinity; }
+      const base = antes;
+      antes = { km, key: d.targetKey, diff: km > 0 && Number.isFinite(d.ownKm) && d.targetKey != null ? km - d.ownKm : null };
+      if (salto > 1000) { limpiar(); ultimaRuta = km > 0 ? { km, now: d.now } : null; return false; }
+      if (!(km > 0)) { limpiar(); callado = -Infinity; return false; }
+      const manual = d.now - pausadoAt <= o.pausedMs || Math.abs(Number(d.speedKmh) || 0) < o.stoppedKmh;
+      let cambio = true; // recien abierto, o aparecio una ruta
+      if (base && base.km > 0) {
+        const dif = Math.abs(km - base.km);
+        cambio = (dif > o.jumpKm || dif > base.km * o.jumpFrac) && (manual || d.targetKey != null);
+      } else if (base) {
+        // Un 0 de paso (el juego recalculando) no es una ruta nueva.
+        cambio = !(ultimaRuta && d.now - ultimaRuta.now <= o.backMs
+          && Math.abs(km - ultimaRuta.km) <= Math.max(o.backKm, ultimaRuta.km * o.backFrac));
+      }
+      ultimaRuta = { km, now: d.now };
+      if (cambio && d.now >= callado) {
+        // Con un aviso a la vista, un cambio mas es el mismo aviso con otra hora.
+        if (aviso) aviso.ts = d.ts;
+        else pend = { key: base ? base.key : d.targetKey, diff: base ? base.diff : null, ...pend, ts: d.ts, manual, desde: null, ticks: 0 };
+      }
+      const ev = aviso || pend;
+      if (!ev) return false;
+      if (d.savedAt >= ev.ts) { limpiar(); return false; } // ya se guardo
+      const ok = gpsChangeExplained({ ...d, gameKm: km }, ev, o);
+      if (aviso) {
+        aviso.bien = ok ? aviso.bien + 1 : 0;
+        if (aviso.bien >= o.hideTicks) limpiar();
+        else if (d.now - aviso.desde > o.maxMs) { limpiar(); callado = d.now + o.muteMs; }
+        return !!aviso;
+      }
+      const desvio = !pend.manual && d.offRouteAt != null && d.now - d.offRouteAt <= o.detourMs;
+      if (ok || desvio) { pend = null; return false; }
+      if (d.paused) return false; // en el mapa del juego: se cuenta al volver a manejar
+      if (pend.desde == null) pend.desde = d.now;
+      pend.ticks += 1;
+      if (pend.ticks < o.settleTicks || d.now - pend.desde < o.settleMs) return false;
+      aviso = { ts: pend.ts, key: pend.key, diff: pend.diff, manual: pend.manual, desde: d.now, bien: 0 };
+      pend = null;
+      return true;
+    },
+  };
+}
+
 // Que hacer con lo ya buscado cuando llega otro dato: 'search', 'clear' o
 // 'keep'. lastKm: los km de la ultima busqueda, o null. Se busca con el camion
 // parado (un trabajo se toma parado, y son decenas de rutas: andando trabaria
@@ -6071,7 +6425,11 @@ function createScreenKeeper({ wakeLock, doc }) {
 // arman el panel de navegacion del tablero (navTurnParts) y el overlay de
 // OBS, que recibe info en nav_hud y lo escribe en su propio idioma y
 // unidades: el streamer puede tener el tablero en castellano y el stream en
-// ingles. t es la funcion de traducciones de quien lo llama.
+// ingles. t es la funcion de traducciones de quien lo llama. Un ferry o tren
+// (ferryAhead) trae port y train (ferryPortAt en app.js); a menos de
+// FERRY_DISTANCE_MIN_M metros del juego va sin la distancia. El tren lleva una
+// flecha y no su emoji: el overlay del juego (Tk) no dibuja los de fuera del BMP.
+const FERRY_DISTANCE_MIN_M = 150;
 function turnInstructionText(info, { t, imperial, lang }) {
   if (info === 'straight') return `⬆ ${t('navStraight')}`;
   if (!info || typeof info !== 'object' || !Number.isFinite(info.meters)) return '';
@@ -6085,6 +6443,10 @@ function turnInstructionText(info, { t, imperial, lang }) {
     // La flecha gira para el lado de la rotonda: antihoraria con mano
     // derecha (ccw), horaria con mano izquierda o si no se sabe.
     return `${info.ccw === true ? '↺' : '↻'} ${t('navRoundaboutIn').replace('{d}', dist).replace('{n}', n)}${onto}`;
+  }
+  if (info.kind === 'ferry') {
+    const texto = info.port ? t(info.train ? 'navTrainTo' : 'navFerryTo').replace('{port}', info.port) : t(info.train ? 'navTrain' : 'navFerry');
+    return `${info.train ? '⇨' : '⛴'} ${texto}${info.meters >= FERRY_DISTANCE_MIN_M ? ` ${t('navIn')} ${dist}` : ''}`;
   }
   const left = info.direction === 'left';
   if (info.kind === 'fork') return `${left ? '↖' : '↗'} ${left ? t('navKeepLeft') : t('navKeepRight')}${onto} ${t('navIn')} ${dist}`;
@@ -6549,6 +6911,7 @@ function turnIconShape(info) {
   if (info.kind === 'roundabout') {
     return { shape: 'roundabout', exit: Number.isInteger(info.exit) && info.exit > 0 && info.exit < 100 ? info.exit : null };
   }
+  if (info.kind === 'ferry') return { shape: info.train ? 'train' : 'ferry' };
   const left = info.direction === 'left';
   if (info.kind === 'fork') return { shape: left ? 'slightLeft' : 'slightRight' };
   if (info.kind === 'turn') return { shape: left ? 'left' : 'right' };
@@ -6564,6 +6927,8 @@ function turnIconHtml(info) {
     const num = s.exit ? `<text x="12" y="13.9" text-anchor="middle" font-size="8" font-weight="800" font-family="system-ui, sans-serif" fill="#ffffff" stroke="none">${s.exit}</text>` : '';
     return svg(`<path d="M12 28V17.5"/><circle cx="12" cy="11" r="6.5"/>${num}`);
   }
+  if (s.shape === 'ferry') return svg('<path d="M3 17.5h18l-2.6 6H5.6z"/><path d="M6.5 17.5v-5h11v5"/><path d="M12 12.5V7"/><path d="M3 27.5c2 0 2-1.2 4.5-1.2s2.5 1.2 4.5 1.2 2-1.2 4.5-1.2 2.5 1.2 4.5 1.2"/>');
+  if (s.shape === 'train') return svg('<rect x="5.5" y="4" width="13" height="18" rx="3.5"/><path d="M5.5 13.5h13"/><path d="M9.5 18h.01M14.5 18h.01"/><path d="M8.5 22l-2.5 5M15.5 22l2.5 5"/>');
   const [trazo, punta] = LANE_PATHS[s.shape];
   return svg(`<path d="M12 28V17"/><path d="${trazo}"/><polygon points="${punta}" fill="#ffffff" stroke="none"/>`);
 }
@@ -8125,6 +8490,6 @@ function savedPairingCode(search, saved, backend) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createBusyGate, BUSY_GATE_FACTOR, createOffRouteRetry, OFF_ROUTE_RETRY_M, alternateModVariants, variantForJobPlace, localMapRebuilt, canOfferMapBuild, navReportRefreshDue, NAV_REPORT_REFRESH_MS, webVersionIn, webVersionNewer, webUpdateAction, PAIRING_CODE_KEY, normalPairingCode, pairingCodeToSave, savedPairingCode, gameGpsKmMatches, gameGpsCandidates, gameGpsGuessList, gameGpsPlaces, gameGpsSaveCandidates, gameGpsSaveJobCandidates, GAME_GPS_SAVE_SAME_M, gameGpsSaveMatches, gameGpsSavePick, gameGpsSaveStale, GAME_GPS_KM_PER_WORLD_M, createGameGpsViaCheck, gameGpsViaTails, GAME_GPS_VIA_RECHECK_TICKS, GAME_GPS_VIA_RECHECK_MS, GAME_GPS_SAVE_TOL_KM, GAME_GPS_SAVE_TOL_FRAC, gameGpsGuessStep, gameGpsGuessPanelShown, GAME_GPS_GUESS_MAX_KM, GAME_GPS_GUESS_MAX, turnReportJobLine, turnReportBusLine, TURN_REPORT_BUS_CHARS, companyForJob, companyRouteEnd, COMPANY_ENTRY_MAX_M, routeEndPoint, approxNoticeKey, turnReportMapLines, turnReportDlcLine, TURN_REPORT_MODS_CHARS, nearStopCandidates, createNearStopPick, createNearStops, roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, basemapForVariant, BASEMAP_PROMODS, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, createTrailerPickupWatch, trailerPickupJobKey, TRAILER_PICKUP_MARKET_RE, offMapJobPlace, hasJobDestination, jobPanelFields, busJobOf, busStopPlace, busStopList, busRouteTarget, busPassengersOnBoard, busNextStopLine, createBusJobMemory, busDeliveryStops, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, busStopArcs, busStopRoadPoint, BUS_STOP_ARC_M, BUS_STOP_ARC_TIE_M, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, routeGameMayDiffer, routeSharedFrac, pickRouteLikeGame, ROUTE_GAME_FERRY, routeFerryLegs, routeGameFerryShorter, routeFerrySearch, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, navHudHeadingRoad, NAV_HUD_ROAD_MAX, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, createRouteChangeLog, ROUTE_CHANGES_MAX, ROUTE_CHANGE_MERGE_MS, ROUTE_CHANGE_REASONS, routeChangeReason, turnReportText, turnReportSpeedLine, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportLooksEmpty, navReportCanSend, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, routeTimeAhead, ROUTE_TIME_DEFAULT_KMH, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, truckDashLamps, truckGaugeScales, MAP_DASH_MODES, MAP_DASH_STYLES, mapDashSetting, mapDashHosts, mapDashLimitOnMap, mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, correctProModsFlags, ACTIVE_MOD_NAMES_MAX, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, voiceElsewhere, DLC_GUARDS, DLC_LIST, dlcGameOf, GAME_VERSION_VARIANTS, gameVersionSetting, gameVersionVariant, sharedMapVariant, gameVersionTag, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, truckJumped, TRUCK_JUMP_MIN_M, TRUCK_JUMP_MAX_GAP_S, parseWsJson, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
+  module.exports = { createBusyGate, BUSY_GATE_FACTOR, createOffRouteRetry, OFF_ROUTE_RETRY_M, alternateModVariants, variantForJobPlace, localMapRebuilt, canOfferMapBuild, navReportRefreshDue, NAV_REPORT_REFRESH_MS, webVersionIn, webVersionNewer, webUpdateAction, PAIRING_CODE_KEY, normalPairingCode, pairingCodeToSave, savedPairingCode, gameGpsKmMatches, gameGpsCandidates, gameGpsGuessList, gameGpsPlaces, gameGpsSaveCandidates, gameGpsSaveJobCandidates, GAME_GPS_SAVE_SAME_M, gameGpsSaveMatches, gameGpsSavePick, gameGpsSaveStale, GAME_GPS_KM_PER_WORLD_M, createGameGpsViaCheck, gameGpsViaTails, GAME_GPS_VIA_RECHECK_TICKS, GAME_GPS_VIA_RECHECK_MS, GAME_GPS_SAVE_TOL_KM, GAME_GPS_SAVE_TOL_FRAC, gameGpsGuessStep, gameGpsGuessPanelShown, GAME_GPS_GUESS_MAX_KM, GAME_GPS_GUESS_MAX, turnReportJobLine, turnReportBusLine, TURN_REPORT_BUS_CHARS, companyForJob, companyRouteEnd, COMPANY_ENTRY_MAX_M, routeEndPoint, approxNoticeKey, turnReportMapLines, turnReportDlcLine, TURN_REPORT_MODS_CHARS, nearStopCandidates, createNearStopPick, createNearStops, roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, basemapForVariant, BASEMAP_PROMODS, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, createTrailerPickupWatch, trailerPickupJobKey, TRAILER_PICKUP_MARKET_RE, offMapJobPlace, hasJobDestination, jobPanelFields, busJobOf, busStopPlace, busStopList, busRouteTarget, busPassengersOnBoard, busNextStopLine, createBusJobMemory, busDeliveryStops, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, busStopArcs, busStopRoadPoint, BUS_STOP_ARC_M, BUS_STOP_ARC_TIE_M, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, routeGameMayDiffer, routeSharedFrac, pickRouteLikeGame, ROUTE_GAME_FERRY, routeFerryLegs, routeGameFerryShorter, routeFerrySearch, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, navHudHeadingRoad, NAV_HUD_ROAD_MAX, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, createRouteChangeLog, ROUTE_CHANGES_MAX, ROUTE_CHANGE_MERGE_MS, ROUTE_CHANGE_REASONS, routeChangeReason, turnReportText, turnReportSpeedLine, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportLooksEmpty, navReportCanSend, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, routeTimeAhead, ROUTE_TIME_DEFAULT_KMH, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, truckDashLamps, truckGaugeScales, MAP_DASH_MODES, MAP_DASH_STYLES, mapDashSetting, mapDashHosts, mapDashLimitOnMap, mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, correctProModsFlags, ACTIVE_MOD_NAMES_MAX, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, voiceElsewhere, DLC_GUARDS, DLC_LIST, dlcGameOf, GAME_VERSION_VARIANTS, gameVersionSetting, gameVersionVariant, sharedMapVariant, gameVersionTag, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, truckJumped, TRUCK_JUMP_MIN_M, TRUCK_JUMP_MAX_GAP_S, parseWsJson, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, NAV_AUTO_ZOOM, navAutoZoomOffset, createNavAutoZoom, navAutoZoomOf, navPaddingTop, NAV_TRUCK_CLEAR_PX, nextStopText, ferryAhead, mvtPoints, tilesCovering, tilePointLngLat, worldNear, pickFerryPort, FERRY_PORT_MAX_M, ferryPortName, FERRY_CITY_MAX_M, FERRY_DISTANCE_MIN_M, GPS_SAVE_HINT, gpsChangeExplained, createGpsSaveHint, routeHasLine, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText, routeGraphRetryDue, ROUTE_GRAPH_LATE_RETRY_S, turnReportGraphLine };
 }
