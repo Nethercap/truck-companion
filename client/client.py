@@ -387,10 +387,10 @@ def read_map_mods() -> dict:
     return result
 
 
-def find_controls_sii_files() -> list:
+def find_controls_sii_files(game_dirs=("Euro Truck Simulator 2", "American Truck Simulator")) -> list:
     docs = documents_folder()
     files = []
-    for game_dir in ("Euro Truck Simulator 2", "American Truck Simulator"):
+    for game_dir in game_dirs:
         for pattern in ("steam_profiles/*/controls.sii", "profiles/*/controls.sii"):
             files.extend(glob.glob(os.path.join(docs, game_dir, pattern)))
     # Los backups de perfil tras un update de version (ej. "steam_profiles(1.61.x).bak")
@@ -414,14 +414,15 @@ def parse_controls_sii(text: str) -> dict:
     return result
 
 
-def detect_keybinds_from_controls_sii() -> dict:
+def detect_keybinds_from_controls_sii(game_dir: str | None = None) -> dict:
     """Lee el controls.sii real del juego (el perfil modificado mas
-    recientemente, de cualquiera de los dos juegos) y devuelve nuestras
-    acciones mapeadas a la tecla que el usuario tiene configurada de verdad.
+    recientemente, de `game_dir` o de cualquiera de los dos juegos) y devuelve
+    nuestras acciones mapeadas a la tecla que el usuario tiene configurada de
+    verdad, o a None si en el juego no tiene ninguna de teclado.
     Best-effort: cualquier error (no encontro el archivo, formato
     inesperado) devuelve {} sin romper nada - el llamador sigue teniendo los
     defaults hardcodeados como respaldo."""
-    files = find_controls_sii_files()
+    files = find_controls_sii_files((game_dir,)) if game_dir else find_controls_sii_files()
     if not files:
         return {}
     newest = max(files, key=os.path.getmtime)
@@ -437,6 +438,21 @@ def detect_keybinds_from_controls_sii() -> dict:
         for our_action, scs_action in ACTION_TO_SCS_ACTION.items()
         if scs_action in scs_binds
     }
+
+
+def con_las_del_juego(keybinds: dict, detectadas: dict) -> dict:
+    """`keybinds` con las teclas que el juego tiene de verdad, que pisan a las
+    guardadas. Una accion sin tecla en el juego no se queda con la nuestra de
+    fabrica, que ahi es de otra cosa: con la baliza solo en el volante, el
+    boton mandaba la "o", que abria el infotainment (24-11). Si en Remap le
+    pusieron otra, esa queda."""
+    resultado = dict(keybinds)
+    for accion, tecla in detectadas.items():
+        if tecla:
+            resultado[accion] = tecla
+        elif resultado.get(accion) == DEFAULT_KEYBINDS.get(accion):
+            resultado[accion] = None
+    return resultado
 
 
 def keybinds_path() -> str:
@@ -461,7 +477,7 @@ def load_keybinds() -> dict:
     # Lo detectado del controls.sii pisa tanto los defaults como lo guardado
     # - es la fuente mas confiable (la tecla que el juego tiene de verdad
     # asignada ahora mismo), mucho mejor que un valor viejo cacheado.
-    keybinds.update({k: v for k, v in detect_keybinds_from_controls_sii().items() if v})
+    keybinds = con_las_del_juego(keybinds, detect_keybinds_from_controls_sii())
     if not os.path.exists(path):
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -515,6 +531,19 @@ def running_game_info(hwnd) -> dict | None:
     if full:
         _kernel32.CloseHandle(full)
     return {"pid": pid.value, "exe_path": exe_path, "elevated_guess": bool(elevated_guess)}
+
+
+_CARPETA_DEL_EXE = {"eurotrucks2": "Euro Truck Simulator 2", "amtrucks": "American Truck Simulator"}
+
+
+def carpeta_del_juego(hwnd) -> str | None:
+    """La carpeta de Documentos del juego de esa ventana, o None si no se sabe."""
+    try:
+        exe = (running_game_info(hwnd) or {}).get("exe_path") or ""
+    except Exception:
+        logging.exception("running_game_info")
+        return None
+    return _CARPETA_DEL_EXE.get(os.path.splitext(os.path.basename(exe))[0].lower())
 
 
 _VK_MENU = 0x12  # Alt
@@ -630,11 +659,16 @@ def send_game_command(action: str, keybinds: dict) -> str:
     funciono, en vez de fallar en silencio sin que nadie se de cuenta."""
     if botones_sdk.apretar(ACTION_TO_SCS_ACTION.get(action), traer_juego_al_frente):
         return "ok"
+    hwnd = find_game_window()
+    # Las teclas cargadas son las del controls.sii mas nuevo de los dos juegos:
+    # la que vale es la del que esta abierto.
+    carpeta = carpeta_del_juego(hwnd) if hwnd else None
+    if carpeta:
+        keybinds = con_las_del_juego(keybinds, detect_keybinds_from_controls_sii(carpeta))
     key = keybinds.get(action)
     if not key:
-        logging.info(f"Comando '{action}' no tiene tecla asignada en keybinds.json, se ignora.")
+        logging.info(f"Comando '{action}' no tiene tecla asignada, se ignora.")
         return "no_key"
-    hwnd = find_game_window()
     if not hwnd:
         logging.info("No se encontro la ventana del juego, se ignora el comando.")
         return "no_window"
@@ -1122,9 +1156,7 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
                 await send(json.dumps({"type": "command_result", "action": action, "ok": False, "reason": result}))
         elif msg_type == "get_keybinds":
             detected = await asyncio.to_thread(detect_keybinds_from_controls_sii)
-            live = dict(keybinds)
-            live.update({a: k for a, k in detected.items() if k})
-            await send(json.dumps({"type": "keybinds", "data": live}))
+            await send(json.dumps({"type": "keybinds", "data": con_las_del_juego(keybinds, detected)}))
         elif msg_type == "offmap":
             if on_offmap and payload.get("game") in ("ats", "ets2"):
                 on_offmap(payload["game"])
