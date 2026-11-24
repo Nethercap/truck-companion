@@ -104,6 +104,10 @@ def test_bundled_dll_publica_en_su_propio_bloque():
         datos = f.read()
     assert "Local\\TruckDashTelemetry".encode("utf-16-le") in datos
     assert "Local\\SCSTelemetry".encode("utf-16-le") not in datos
+    # Los botones por el SDK de entrada (truckdash_input.cpp): sin esta DLL el
+    # cliente sigue con las teclas y nadie se entera de que no llego.
+    assert "Local\\TruckDashInput".encode("utf-16-le") in datos
+    assert b"scs_input_init" in datos
 
 
 def test_bundled_dll_no_pide_el_runtime_de_visual_cpp():
