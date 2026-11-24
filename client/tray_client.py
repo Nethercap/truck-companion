@@ -1217,7 +1217,7 @@ class SetupWindow:
 
     def _local_map_signature(self):
         build = state.map_build or {}
-        return (tuple(sorted((g, m.get("fingerprint")) for g, m in state.local_maps.items())),
+        return (tuple(sorted((g, m.get("fingerprint"), str(m.get("built"))) for g, m in state.local_maps.items())),
                 tuple(sorted(state.offmap_places.items())), tuple(sorted(state.offmap_games)),
                 tuple(g for g in ("ats", "ets2") if needs_map_build(g)),
                 tuple(g for g in ("ats", "ets2") if can_build_map(g)),
@@ -1245,6 +1245,16 @@ class SetupWindow:
                 self.label(self.local_map_body, T("local_map_ready", game=nombre, cities=man.get("cities", "?"),
                                                   date=str(man.get("built", ""))[:10]),
                            fg=GREEN, wraplength=520).pack(anchor="w", pady=2)
+                # Con los mismos mods el mapa queda para siempre: sin el boton,
+                # quien lo armo con una version que no leia uno de sus mods no
+                # tenia como volver a armarlo (Discord, 24-11).
+                version = man.get("clientVersion")
+                if version and version != client_lib.CLIENT_VERSION:
+                    self.label(self.local_map_body, T("local_map_rebuild_hint", version=version), fg=MUTED,
+                               wraplength=520).pack(anchor="w", pady=(2, 4))
+                if can_rebuild_map(game):
+                    self.button(self.local_map_body, T("local_map_rebuild"),
+                                lambda g=game: self.build_my_map(g)).pack(anchor="w")
             elif needs_map_build(game):
                 self.label(self.local_map_body, local_map_needed_text(game, nombre), wraplength=520).pack(anchor="w", pady=(2, 0))
                 self.label(self.local_map_body, T("local_map_requirements"), fg=MUTED, wraplength=520).pack(anchor="w", pady=(2, 4))
@@ -1990,7 +2000,11 @@ def status_message() -> str:
 
 
 def local_maps_summary() -> dict:
-    return {g: {k: m.get(k) for k in ("variant", "fingerprint", "built", "cities", "mods", "companyIcons")}
+    """Para la web, "fingerprint" es la version de los archivos (va en su ?v=):
+    armado de nuevo con los mismos mods la huella no cambia y los archivos si.
+    Los mapas de antes de la 1.5.47 no traen "build"."""
+    return {g: {**{k: m.get(k) for k in ("variant", "fingerprint", "built", "cities", "mods", "companyIcons")},
+                **({"fingerprint": m["build"]} if m.get("build") else {})}
             for g, m in state.local_maps.items()}
 
 
@@ -2068,8 +2082,8 @@ def refresh_local_maps() -> bool:
             man = None
         if man:
             nuevos[game] = man
-    cambio = {g: m.get("fingerprint") for g, m in nuevos.items()} != \
-        {g: m.get("fingerprint") for g, m in state.local_maps.items()}
+    cambio = {g: (m.get("fingerprint"), m.get("built")) for g, m in nuevos.items()} != \
+        {g: (m.get("fingerprint"), m.get("built")) for g, m in state.local_maps.items()}
     state.local_maps = nuevos
     local_server.local_map_dirs.clear()
     local_server.local_map_dirs.update({g: m["dir"] for g, m in nuevos.items()})
@@ -2083,6 +2097,12 @@ def can_build_map(game: str) -> bool:
     vale con el juego cerrado), se sabe donde esta el juego y no hay ya un
     mapa armado para esos mods. Setup ofrece armarlo a mano."""
     return (game not in state.local_maps and bool((state.mounted_mods or {}).get(game))
+            and game_dir_for(game) is not None)
+
+
+def can_rebuild_map(game: str) -> bool:
+    """Ya hay un mapa armado para los mods activos y se puede armar otra vez."""
+    return (game in state.local_maps and bool((state.mounted_mods or {}).get(game))
             and game_dir_for(game) is not None)
 
 

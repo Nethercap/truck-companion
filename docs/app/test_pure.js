@@ -3458,6 +3458,18 @@ test('variantForJobPlace: el primer mapa con el destino y con el camion adentro'
   assert.equal(variantForJobPlace([], { id: 'kerson' }), null);
 });
 
+test('localMapRebuilt: el mapa armado en la PC que se ve, con otros archivos', () => {
+  const { localMapRebuilt } = require('./pure.js');
+  assert.equal(localMapRebuilt('local_ats', 'aaaaaaaaaaaa', 'bbbbbbbbbbbb'), true);
+  assert.equal(localMapRebuilt('local_ats', 'aaaaaaaaaaaa', 'aaaaaaaaaaaa'), false);
+  // la primera vez que se lo ve, o si deja de estar, no hay nada que recargar
+  assert.equal(localMapRebuilt('local_ats', undefined, 'bbbbbbbbbbbb'), false);
+  assert.equal(localMapRebuilt('local_ats', 'aaaaaaaaaaaa', undefined), false);
+  // uno de R2 no se recarga por esto, ni si todavia no hay mapa
+  assert.equal(localMapRebuilt('ats', '20261104', '20261105'), false);
+  assert.equal(localMapRebuilt(null, null, undefined), false);
+});
+
 test('canOfferMapBuild: con mods, con cliente con armador y sin mapa armado', () => {
   const { canOfferMapBuild } = require('./pure.js');
   const si = { modsAuto: true, clientConnected: true, spectator: false, demo: false, hasLocalMap: false, clientHasBuilder: true, modNames: ['RusMap'] };

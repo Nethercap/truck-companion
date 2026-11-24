@@ -1272,6 +1272,7 @@ async function applyLocalMaps(maps, port) {
   const sig = JSON.stringify([maps || null, port || null, conn.local]);
   if (sig === localMapsSig) return;
   localMapsSig = sig;
+  const versionAntes = currentGame ? MAP_DATA_VERSION[currentGame] : null;
   const usables = {};
   for (const game of ['ats', 'ets2']) {
     const m = maps && maps[game];
@@ -1301,6 +1302,11 @@ async function applyLocalMaps(maps, port) {
   // Si cambio el mapa que corresponde, se recarga (como al detectar mods).
   if (antes !== JSON.stringify(usables) && modsAuto && lastData && currentGame
       && resolveEffectiveGame(lastData.game) !== currentGame) currentGame = null;
+  // O si es el mismo, armado de nuevo (sus POIs tambien: se guardan por variante).
+  if (localMapRebuilt(currentGame, versionAntes, MAP_DATA_VERSION[currentGame])) {
+    poisVariant = null;
+    currentGame = null;
+  }
 }
 
 // Conversion de coordenadas de juego (x,z) a lng/lat WGS84 real, con el mismo

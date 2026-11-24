@@ -608,7 +608,7 @@ index ece847d..200bcc7 100644
 +  return value;
 +}
 diff --git a/packages/clis/parser/game-files/def-parser.ts b/packages/clis/parser/game-files/def-parser.ts
-index 4094551..a1234c4 100644
+index 4094551..4b2853a 100644
 --- a/packages/clis/parser/game-files/def-parser.ts
 +++ b/packages/clis/parser/game-files/def-parser.ts
 @@ -26,7 +26,7 @@ import type {
@@ -829,6 +829,23 @@ index 4094551..a1234c4 100644
      countryToken: rawCity.country,
      population: rawCity.population ?? 0,
    };
+@@ -388,14 +460,14 @@ function processCountryJson(obj: CountrySii) {
+   return {
+     token: token.split('.')[2],
+     name: rawCountry.name,
+-    nameLocalized: rawCountry.nameLocalized,
++    nameLocalized: localeTokenOr(rawCountry.nameLocalized, undefined),
+     id: rawCountry.countryId,
+     x: rawCountry.pos[0],
+     y: rawCountry.pos[2],
+     code: rawCountry.countryCode,
+     fuelPrice: rawCountry.fuelPrice,
+     timeZone: rawCountry.timeZone,
+-    timeZoneName: rawCountry.timeZoneName,
++    timeZoneName: rawCountry.timeZoneName ?? '',
+     secondaryTimeZones:
+       rawCountry.secondaryTimeZoneArea?.map((area, i) => {
+         const [minX, maxX, minY, maxY] = area;
 @@ -449,11 +521,15 @@ function processCompanyJson(
    );
    if (editorFolder) {
@@ -1974,6 +1991,126 @@ index b65d4c8..3cca82a 100644
      };
    };
  }
+diff --git a/packages/clis/parser/game-files/partes-de-mod.ts b/packages/clis/parser/game-files/partes-de-mod.ts
+new file mode 100755
+index 0000000..6f130ce
+--- /dev/null
++++ b/packages/clis/parser/game-files/partes-de-mod.ts
+@@ -0,0 +1,114 @@
++// Un mod puede traer su contenido en partes: una carpeta "base" y carpetas
++// "dlc_<nombre>" en la raiz, o los mismos nombres en .zip (wiki de SCS, "Mod
++// manager", desde la 1.48). El juego monta cada parte como si fuera un mod
++// aparte: "base" siempre y un "dlc_" solo si esta ese DLC. La raiz no se monta:
++// en el game.log.txt de un mod asi hay un "requested subdirectory" y un "mounted
++// to mod pool" por parte, y ninguno mas. ATS Expansion viene asi: leyendo la raiz
++// no aparecia nada de el, sin ningun aviso, y faltaba entero del mapa armado
++// (Discord, 23-11).
++
++import type { Entries, ScsArchive } from './scs-archive';
++
++export type ModArchive = Pick<
++  ScsArchive,
++  'path' | 'isValid' | 'parseEntries' | 'dispose'
++>;
++
++interface Partes {
++  /** las que se leen, en el orden en que se montan */
++  montadas: string[];
++  /** las de un DLC que no esta en el juego */
++  sinDlc: string[];
++}
++
++/**
++ * Que partes trae un mod, de los nombres de su raiz. `undefined` si no viene en
++ * partes. `dlcs`: los DLC de la carpeta del juego, con el nombre de su .scs sin
++ * la extension ("dlc_wa").
++ */
++export function elegirPartes(
++  nombres: readonly string[],
++  dlcs: ReadonlySet<string>,
++): Partes | undefined {
++  const parte = (n: string) => n.replace(/\.zip$/, '');
++  const todas = [...new Set(nombres)].filter(
++    n => parte(n) === 'base' || parte(n).startsWith('dlc_'),
++  );
++  if (!todas.length) return undefined;
++  const base = todas.filter(n => parte(n) === 'base').sort();
++  const deDlc = todas.filter(n => parte(n) !== 'base').sort();
++  return {
++    montadas: [...base, ...deDlc.filter(n => dlcs.has(parte(n)))],
++    sinDlc: deDlc.filter(n => !dlcs.has(parte(n))),
++  };
++}
++
++/** La linea del build.log de un mod en partes. */
++export function avisoDePartes(modPath: string, { montadas, sinDlc }: Partes): string {
++  return (
++    `${modPath}: en partes, se leen: ${montadas.join(', ') || 'ninguna'}` +
++    (sinDlc.length ? ` (sin el DLC: ${sinDlc.join(', ')})` : '')
++  );
++}
++
++function conPrefijo(entries: Entries, prefijo: string): Entries {
++  const ruta = (key: string) => {
++    const k = key.replace(/^\/+/, '');
++    return k ? `${prefijo}/${k}` : prefijo;
++  };
++  return {
++    directories: { get: key => entries.directories.get(ruta(key)) },
++    files: { get: key => entries.files.get(ruta(key)) },
++  };
++}
++
++/**
++ * Las partes de un mod que es un solo archivo (.scs o .zip), o el mod tal cual
++ * si no viene en partes.
++ */
++export function partesDeMod(
++  mod: ModArchive,
++  dlcs: ReadonlySet<string>,
++  avisar: (texto: string) => void = () => undefined,
++): ModArchive[] {
++  if (!mod.isValid()) return [mod];
++  const entries = mod.parseEntries();
++  const raiz = entries.directories.get('');
++  // Por nombre y no solo por el listado de la raiz: a un mod protegido le puede
++  // faltar, y sus carpetas se encuentran igual por el hash de la ruta.
++  const partes = elegirPartes(
++    ['base', ...dlcs, ...(raiz?.subdirectories ?? [])].filter(n =>
++      entries.directories.get(n),
++    ),
++    dlcs,
++  );
++  // Un zip adentro de otro archivo no se lee: que por lo menos quede dicho.
++  const zips = elegirPartes(
++    (raiz?.files ?? []).filter(f => f.endsWith('.zip')),
++    dlcs,
++  );
++  if (zips) {
++    avisar(
++      `${mod.path}: no se puede leer un zip adentro del mod: ${[...zips.montadas, ...zips.sinDlc].join(', ')}`,
++    );
++  }
++  if (!partes) return [mod];
++
++  avisar(avisoDePartes(mod.path, partes));
++  if (!partes.montadas.length) {
++    mod.dispose();
++    return [];
++  }
++  return partes.montadas.map((nombre, i) => {
++    const parte = conPrefijo(entries, nombre);
++    return {
++      path: `${mod.path}/${nombre}`,
++      isValid: () => true,
++      parseEntries: () => parte,
++      // El archivo es uno solo: lo cierra la primera.
++      dispose: () => {
++        if (i === 0) mod.dispose();
++      },
++    };
++  });
++}
 diff --git a/packages/clis/parser/game-files/prefab-ppd-parser.ts b/packages/clis/parser/game-files/prefab-ppd-parser.ts
 index 10fdc04..46f7831 100644
 --- a/packages/clis/parser/game-files/prefab-ppd-parser.ts
@@ -2472,7 +2609,7 @@ index 10fdc04..46f7831 100644
      }),
      navNodes: rawPrefab.navNodes.map(rn => {
 diff --git a/packages/clis/parser/game-files/scs-archive.ts b/packages/clis/parser/game-files/scs-archive.ts
-index 73a4a8f..3424ee9 100644
+index 73a4a8f..a4c35f8 100644
 --- a/packages/clis/parser/game-files/scs-archive.ts
 +++ b/packages/clis/parser/game-files/scs-archive.ts
 @@ -1,23 +1,38 @@
@@ -2523,6 +2660,15 @@ index 73a4a8f..3424ee9 100644
  };
  
  const FileHeader = new r.Struct({
+@@ -27,7 +42,7 @@ const FileHeader = new r.Struct({
+   hashMethod: new r.String(4),
+   entryTableCount: r.uint32le,
+   entryTableCompressedSize: r.uint32le,
+-  metadataTableSize: r.uint32le,
++  metadataTableCount: r.uint32le, // valores de 4 bytes, no bytes
+   metadataTableCompressedSize: r.uint32le,
+   entryTableOffset: uint64le,
+   metadataTableOffset: uint64le,
 @@ -179,11 +194,14 @@ export class ScsArchive {
      fs.closeSync(this.fd);
    }
@@ -2550,7 +2696,7 @@ index 73a4a8f..3424ee9 100644
  
      const entryHeaders = new r.Array(
        EntryHeader,
-@@ -205,23 +227,117 @@ export class ScsArchive {
+@@ -205,85 +227,145 @@ export class ScsArchive {
      );
      const metadataMap = this.createMetadataMap(entryHeaders);
  
@@ -2586,12 +2732,17 @@ index 73a4a8f..3424ee9 100644
 +        `${this.path}: ${unreadable} entries could not be read (junk entries of a protected mod?), skipped.`,
 +      );
 +    }
-+    const fileStore = createStore(files);
++    // Con salt, se hashea la ruta con el salt en decimal adelante, igual que en
++    // v1 (TruckLib, Util.HashPath). Sin esto un mod con salt se abria y no se
++    // encontraba nada adentro, sin ningun aviso.
++    const salt = this.header.salt & 0xffff;
++    const hash = salt ? (key: string) => city64(`${salt}${key}`) : city64;
++    const fileStore = createStore(files, hash);
      this.entries = {
 -      directories: createStore(directories),
 -      files: createStore(files),
 +      directories: withUnflaggedListings(
-+        createStore(directories),
++        createStore(directories, hash),
 +        fileStore,
 +        directoryListingV2,
 +      ),
@@ -2671,7 +2822,17 @@ index 73a4a8f..3424ee9 100644
    private createMetadataMap(
      entryHeaders: BaseOf<typeof EntryHeader>[],
    ): Map<number, MetadataEntry> {
-@@ -234,56 +350,13 @@ export class ScsArchive {
+     const metadataMap = new Map<number, MetadataEntry>();
+ 
++    // El campo de la cabecera es la cantidad de valores de 4 bytes (ConverterPIX,
++    // m_metadata_table_count). Tomado como bytes, una tabla guardada sin comprimir
++    // (un mod empaquetado sin compresion) se trataba de inflar igual: "incorrect
++    // header check" y el mod entero afuera.
+     const metadataTable = this.readData({
+       offset: this.header.metadataTableOffset,
+       compressedSize: this.header.metadataTableCompressedSize,
+-      uncompressedSize: this.header.metadataTableSize,
++      uncompressedSize: 4 * this.header.metadataTableCount,
      });
      const skippedMetaTypes = new Set();
      for (const header of entryHeaders) {
@@ -2735,7 +2896,7 @@ index 73a4a8f..3424ee9 100644
        }
      }
      if (skippedMetaTypes.size) {
-@@ -293,6 +366,67 @@ export class ScsArchive {
+@@ -293,6 +375,67 @@ export class ScsArchive {
      return metadataMap;
    }
  
@@ -2803,7 +2964,7 @@ index 73a4a8f..3424ee9 100644
    private readData({
      offset,
      compressedSize,
-@@ -313,13 +447,122 @@ export class ScsArchive {
+@@ -313,13 +456,122 @@ export class ScsArchive {
    }
  }
  
@@ -2928,7 +3089,7 @@ index 73a4a8f..3424ee9 100644
  interface EntryMetadata {
    hash: bigint;
    offset: bigint;
-@@ -471,7 +714,7 @@ abstract class ScsArchiveEntry {
+@@ -471,7 +723,7 @@ abstract class ScsArchiveEntry {
        case Compression.NONE:
          return rawData;
        case Compression.ZLIB:
@@ -2937,7 +3098,7 @@ index 73a4a8f..3424ee9 100644
        case Compression.GDEFLATE: {
          const tileStreamHeader = TileStreamHeader.decode(
            new r.DecodeStream(rawData),
-@@ -618,11 +861,56 @@ class ScsArchiveTobjFile extends ScsArchiveFile {
+@@ -618,11 +870,56 @@ class ScsArchiveTobjFile extends ScsArchiveFile {
    }
  }
  
@@ -3450,8 +3611,32 @@ index 0000000..f54d9b7
 +    ).toThrow();
 +  });
 +});
+diff --git a/packages/clis/parser/game-files/sii-parser.ts b/packages/clis/parser/game-files/sii-parser.ts
+index 7d5e6cf..f8aadb2 100644
+--- a/packages/clis/parser/game-files/sii-parser.ts
++++ b/packages/clis/parser/game-files/sii-parser.ts
+@@ -58,6 +58,11 @@ const Comment = createToken({
+   pattern: /(\/\/|#).*/,
+   group: Lexer.SKIPPED,
+ });
++const MultiLineComment = createToken({
++  name: 'MultiLineComment',
++  pattern: /\/\*[\s\S]*?\*\//,
++  group: Lexer.SKIPPED,
++});
+ 
+ const allTokens = [
+   SiiNunit,
+@@ -78,6 +83,7 @@ const allTokens = [
+   Property,
+   WhiteSpace,
+   Comment,
++  MultiLineComment,
+ ];
+ 
+ const SiiLexer = new Lexer(allTokens);
 diff --git a/packages/clis/parser/game-files/sii-schemas.ts b/packages/clis/parser/game-files/sii-schemas.ts
-index b8accdc..5bf2438 100644
+index b8accdc..ce148a8 100644
 --- a/packages/clis/parser/game-files/sii-schemas.ts
 +++ b/packages/clis/parser/game-files/sii-schemas.ts
 @@ -115,8 +115,12 @@ const numberTriple = fixedLengthArray(number, 3);
@@ -3630,7 +3815,27 @@ index b8accdc..5bf2438 100644
      name: string,
    }),
  });
-@@ -524,7 +533,7 @@ export const CountrySiiSchema: JSONSchemaType<CountrySii> = object(
+@@ -503,13 +512,17 @@ export interface CountrySii {
+     string,
+     {
+       name: string;
+-      nameLocalized: string;
++      // Opcionales y con el texto ya escrito en vez de un @@token@@, como los
++      // nombres de ciudad: algunos mods los dejan asi (Florida y Quebec sin
++      // nameLocalized; Alberta y Nova Scotia con el huso escrito) y el estado
++      // entero se salteaba.
++      nameLocalized?: string;
+       countryCode: string;
+       countryId: number;
+       pos: [number, number, number];
+       fuelPrice: number;
+       timeZone: number;
+-      timeZoneName: string;
++      timeZoneName?: string;
+       secondaryTimeZoneArea?: [
+         minX: number,
+         maxX: number,
+@@ -524,28 +537,26 @@ export const CountrySiiSchema: JSONSchemaType<CountrySii> = object(
    {
      countryData: nullable(
        patternRecord(
@@ -3638,8 +3843,31 @@ index b8accdc..5bf2438 100644
 +        /^country\.data\.[0-9a-zA-Z_.]{1,40}$/,
          {
            name: string,
-           nameLocalized: localeToken,
-@@ -558,7 +567,13 @@ export interface CitySii {
+-          nameLocalized: localeToken,
++          nameLocalized: nullable(localeTokenOrName),
+           countryCode: string,
+           countryId: integer,
+           pos: numberTriple,
+           fuelPrice: number,
+           timeZone: integer,
+-          timeZoneName: localeToken,
++          timeZoneName: nullable(localeTokenOrName),
+           secondaryTimeZoneArea: nullable(arrayOf(numberQuadruple)),
+           secondaryTimeZone: nullable(arrayOf(integer)),
+         },
+         [
+           'name',
+-          'nameLocalized',
+           'countryCode',
+           'countryId',
+           'pos',
+           'fuelPrice',
+           'timeZone',
+-          'timeZoneName',
+         ],
+       ),
+     ),
+@@ -558,7 +569,13 @@ export interface CitySii {
      string,
      {
        cityName: string;
@@ -3654,7 +3882,7 @@ index b8accdc..5bf2438 100644
        country: string;
        population?: number;
      }
-@@ -568,14 +583,14 @@ export const CitySiiSchema: JSONSchemaType<CitySii> = object(
+@@ -568,14 +585,14 @@ export const CitySiiSchema: JSONSchemaType<CitySii> = object(
    {
      cityData: nullable(
        patternRecord(
@@ -3672,7 +3900,7 @@ index b8accdc..5bf2438 100644
        ),
      ),
    },
-@@ -601,7 +616,7 @@ export const MileageTargetsSiiSchema: JSONSchemaType<MileageTargetsSii> =
+@@ -601,7 +618,7 @@ export const MileageTargetsSiiSchema: JSONSchemaType<MileageTargetsSii> =
    object(
      {
        mileageTarget: patternRecord(
@@ -3681,7 +3909,7 @@ index b8accdc..5bf2438 100644
          {
            editorName: string,
            defaultName: string,
-@@ -648,7 +663,7 @@ export interface ViewpointsSii {
+@@ -648,7 +665,7 @@ export interface ViewpointsSii {
  }
  export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
    photoAlbumItem: patternRecord(
@@ -3690,7 +3918,7 @@ index b8accdc..5bf2438 100644
      {
        name: localeToken,
        dlcId: token,
-@@ -656,7 +671,7 @@ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
+@@ -656,7 +673,7 @@ export const ViewpointsSiiSchema: JSONSchemaType<ViewpointsSii> = object({
      },
    ),
    photoAlbumGroup: patternRecord(
@@ -3699,7 +3927,7 @@ index b8accdc..5bf2438 100644
      {
        name: localeToken,
        items: stringArray,
-@@ -679,7 +694,7 @@ interface FerryConnectionSii {
+@@ -679,7 +696,7 @@ interface FerryConnectionSii {
  export const FerryConnectionSiiSchema: JSONSchemaType<FerryConnectionSii> =
    object({
      ferryConnection: patternRecord(
@@ -3708,7 +3936,7 @@ index b8accdc..5bf2438 100644
        {
          price: number,
          time: number,
-@@ -705,7 +720,7 @@ export const PrefabSiiSchema: JSONSchemaType<PrefabSii> = object(
+@@ -705,7 +722,7 @@ export const PrefabSiiSchema: JSONSchemaType<PrefabSii> = object(
    {
      prefabModel: nullable(
        patternRecord(
@@ -3717,7 +3945,7 @@ index b8accdc..5bf2438 100644
          {
            prefabDesc: string,
            modelDesc: string,
-@@ -725,7 +740,7 @@ export const ModelSiiSchema: JSONSchemaType<ModelSii> = object(
+@@ -725,7 +742,7 @@ export const ModelSiiSchema: JSONSchemaType<ModelSii> = object(
    {
      modelDef: nullable(
        patternRecord(
@@ -3726,7 +3954,7 @@ index b8accdc..5bf2438 100644
          {
            modelDesc: nullable(string),
            vegetationModel: nullable(string),
-@@ -761,7 +776,7 @@ export const RoadLookSiiSchema: JSONSchemaType<RoadLookSii> = object(
+@@ -761,7 +778,7 @@ export const RoadLookSiiSchema: JSONSchemaType<RoadLookSii> = object(
    {
      roadLook: nullable(
        patternRecord(
@@ -3735,7 +3963,7 @@ index b8accdc..5bf2438 100644
          {
            name: string,
            lanesLeft: nullable(stringArray),
-@@ -830,7 +845,13 @@ export interface CityCompanySii {
+@@ -830,7 +847,13 @@ export interface CityCompanySii {
    companyDef: Record<string, { city: string }>;
  }
  export const CityCompanySiiSchema: JSONSchemaType<CityCompanySii> = object({
@@ -3750,7 +3978,7 @@ index b8accdc..5bf2438 100644
      city: token,
    }),
  });
-@@ -839,9 +860,9 @@ export interface CargoDefSii {
+@@ -839,9 +862,9 @@ export interface CargoDefSii {
    cargoDef: Record<string, { cargo: string }>;
  }
  export const CargoDefSiiSchema: JSONSchemaType<CargoDefSii> = object({
@@ -3762,7 +3990,7 @@ index b8accdc..5bf2438 100644
    }),
  });
  
-@@ -864,7 +885,7 @@ export interface CargoDataSii {
+@@ -864,7 +887,7 @@ export interface CargoDataSii {
  }
  export const CargoDataSiiSchema: JSONSchemaType<CargoDataSii> = object({
    cargoData: patternRecord(
@@ -3771,7 +3999,7 @@ index b8accdc..5bf2438 100644
      {
        name: string, // should be `localeToken`, but Valentines cargo :(
        volume: number,
-@@ -895,9 +916,12 @@ export const SignSiiSchema: JSONSchemaType<SignSii> = object(
+@@ -895,9 +918,12 @@ export const SignSiiSchema: JSONSchemaType<SignSii> = object(
    {
      signModel: nullable(
        patternRecord(
@@ -3788,12 +4016,14 @@ index b8accdc..5bf2438 100644
          },
 diff --git a/packages/clis/parser/game-files/tests/sii-text.test.ts b/packages/clis/parser/game-files/tests/sii-text.test.ts
 new file mode 100644
-index 0000000..4d8e537
+index 0000000..34deca5
 --- /dev/null
 +++ b/packages/clis/parser/game-files/tests/sii-text.test.ts
-@@ -0,0 +1,53 @@
-+import { siiText } from '../convert-sii-to-json';
+@@ -0,0 +1,124 @@
++import { convertSiiToJson, siiText } from '../convert-sii-to-json';
++import type { Entries } from '../scs-archive';
 +import { parseSii } from '../sii-parser';
++import { CountrySiiSchema } from '../sii-schemas';
 +import { includeDirectiveCollector } from '../sii-visitors';
 +
 +// Lo inverso de siiText: el mismo XOR con la misma clave que va subiendo.
@@ -3843,6 +4073,75 @@ index 0000000..4d8e537
 +    expect(() => siiText(Buffer.from('BSII....', 'latin1'), 'def/city.sii')).toThrow(
 +      /binary \(BSII\)/,
 +    );
++  });
++});
++
++describe('comentarios /* */', () => {
++  it('se saltean, tambien de varias lineas y con llaves adentro', () => {
++    // def/cargo.ak.sii y dos ferrys de Alaska NTTF, y los carteles de British
++    // Columbia de ProMods Canada: el archivo entero se salteaba.
++    const res = parseSii(`SiiNunit
++{
++@include "city/uno.sui"
++/*
++@include "city/viejo.sui"
++sign_model : sign.0147bc {
++}
++*/
++@include "city/dos.sui" /* al final */
++}
++`);
++    expect(res.ok).toBe(true);
++    expect(includeDirectiveCollector.collect(res.cst, 'def')).toEqual([
++      'def/city/uno.sui',
++      'def/city/dos.sui',
++    ]);
++  });
++});
++
++describe('paises de mods', () => {
++  const pais = (extra: string) => `SiiNunit
++{
++country_data : country.data.florida
++{
++\tname: "Florida"
++\tcountry_code: "FL"
++\tcountry_id: 99
++\tpos: (1.0, 2.0, 3.0)
++\tfuel_price: 3.5
++\ttime_zone: -300
++${extra}}
++}
++`;
++  const leer = (texto: string) => {
++    const entries = {
++      directories: { get: () => undefined },
++      files: {
++        get: () => ({
++          type: 'file' as const,
++          hash: 0n,
++          scsSource: 'mod.scs',
++          read: () => Buffer.from(texto, 'utf8'),
++        }),
++      },
++    } satisfies Entries;
++    return convertSiiToJson('def/country/florida.sui', entries, CountrySiiSchema)
++      .countryData?.['country.data.florida'];
++  };
++
++  it('sin el nombre traducido ni el huso', () => {
++    expect(leer(pais(''))?.name).toBe('Florida');
++  });
++
++  it('con el nombre y el huso ya escritos', () => {
++    const c = leer(pais('\tname_localized: "Florida"\n\ttime_zone_name: "Eastern"\n'));
++    expect(c?.nameLocalized).toBe('Florida');
++    expect(c?.timeZoneName).toBe('Eastern');
++  });
++
++  it('con los tokens de siempre', () => {
++    const c = leer(pais('\tname_localized: "@@fl@@"\n\ttime_zone_name: "@@est@@"\n'));
++    expect(c?.nameLocalized).toBe('@@fl@@');
 +  });
 +});
 diff --git a/packages/clis/parser/game-files/zip-entries.ts b/packages/clis/parser/game-files/zip-entries.ts
@@ -4009,10 +4308,10 @@ index 8a13c01..3ec05a7 100755
  }
 diff --git a/packages/clis/parser/run-with-mod.ts b/packages/clis/parser/run-with-mod.ts
 new file mode 100755
-index 0000000..65b2ca1
+index 0000000..00d84e9
 --- /dev/null
 +++ b/packages/clis/parser/run-with-mod.ts
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,242 @@
 +#!/usr/bin/env -S NODE_OPTIONS=--max-old-space-size=12288 npx tsx
 +// Corre el parser de truckermudgeon/maps incluyendo un mod de mapa que viene
 +// como carpeta ya extraida en disco (en vez de un .scs real), inyectandolo
@@ -4033,6 +4332,12 @@ index 0000000..65b2ca1
 +import fs from 'fs';
 +import path from 'path';
 +import { parseMapFiles } from './game-files/map-files-parser';
++import type { ModArchive } from './game-files/partes-de-mod';
++import {
++  avisoDePartes,
++  elegirPartes,
++  partesDeMod,
++} from './game-files/partes-de-mod';
 +import { ScsArchive } from './game-files/scs-archive';
 +import { ZipEntries } from './game-files/zip-entries';
 +import { logger } from './logger';
@@ -4110,7 +4415,7 @@ index 0000000..65b2ca1
 +// bajo la persona (su PC): HashFS v2 se abre con el ScsArchive del parser,
 +// que es el mismo formato que los archivos del juego, y un ZIP con
 +// ZipEntries. Asi no hace falta extraer nada.
-+function createModArchive(modPath: string) {
++function createModArchive(modPath: string): ModArchive | null {
 +  if (fs.statSync(modPath).isFile()) {
 +    const magic = Buffer.alloc(4);
 +    const fd = fs.openSync(modPath, 'r');
@@ -4163,6 +4468,22 @@ index 0000000..65b2ca1
 +  };
 +}
 +
++// Los archivos de un mod, en el orden en que los monta el juego: el mod mismo o
++// sus partes, si viene en "base" y "dlc_<nombre>" (ver partes-de-mod.ts).
++function abrirMod(modPath: string, dlcs: ReadonlySet<string>): ModArchive[] {
++  if (fs.statSync(modPath).isDirectory()) {
++    const partes = elegirPartes(fs.readdirSync(modPath), dlcs);
++    if (partes) {
++      console.log(avisoDePartes(modPath, partes));
++      return partes.montadas
++        .map(n => createModArchive(path.join(modPath, n)))
++        .filter(a => a !== null);
++    }
++  }
++  const archive = createModArchive(modPath);
++  return archive ? partesDeMod(archive, dlcs, t => console.log(t)) : [];
++}
++
 +// La lista de mods: separados por coma (el taller, carpetas sin comas en el
 +// nombre) o en un archivo con uno por linea, "@lista.txt" (el cliente): el
 +// nombre de un mod puede tener comas ("FREE-TM DAF 2021 XF, XG & XG+ ...",
@@ -4193,7 +4514,12 @@ index 0000000..65b2ca1
 +  // "dlcsupport") van en la lista y se combinan como archivos
 +  // independientes - el orden importa para paths duplicados (el ultimo gana,
 +  // igual que con .scs reales, ver CombinedEntries.files.get).
-+  const modArchives = listaDeMods(modDirsArg).map(createModArchive).filter(a => a !== null);
++  const dlcs = new Set(
++    scsFilePaths
++      .map(p => path.basename(p, '.scs').toLowerCase())
++      .filter(n => n.startsWith('dlc_')),
++  );
++  const modArchives = listaDeMods(modDirsArg).flatMap(m => abrirMod(m, dlcs));
 +
 +  const result = parseMapFiles(scsFilePaths, {
 +    includeDlc: true,
@@ -5724,6 +6050,151 @@ index 43e9a36..55e63a7 100644
    cities: City[];
  }
  
+diff --git a/packages/clis/parser/game-files/tests/partes-de-mod.test.ts b/packages/clis/parser/game-files/tests/partes-de-mod.test.ts
+new file mode 100755
+index 0000000..04dde70
+--- /dev/null
++++ b/packages/clis/parser/game-files/tests/partes-de-mod.test.ts
+@@ -0,0 +1,139 @@
++import fs from 'fs';
++import os from 'os';
++import path from 'path';
++import { elegirPartes, partesDeMod } from '../partes-de-mod';
++import { ZipEntries } from '../zip-entries';
++
++// Un ZIP minimo, sin comprimir: lo que lee ZipEntries (indice central y, de cada
++// archivo, los dos largos de su cabecera).
++function zip(archivos: Record<string, string>): string {
++  const partes: Buffer[] = [];
++  const indice: Buffer[] = [];
++  let offset = 0;
++  for (const [nombre, texto] of Object.entries(archivos)) {
++    const n = Buffer.from(nombre, 'utf8');
++    const datos = Buffer.from(texto, 'utf8');
++    const local = Buffer.alloc(30);
++    local.writeUInt32LE(0x04034b50, 0);
++    local.writeUInt16LE(n.length, 26);
++    partes.push(local, n, datos);
++    const c = Buffer.alloc(46);
++    c.writeUInt32LE(0x02014b50, 0);
++    c.writeUInt32LE(datos.length, 20);
++    c.writeUInt32LE(datos.length, 24);
++    c.writeUInt16LE(n.length, 28);
++    c.writeUInt32LE(offset, 42);
++    indice.push(c, n);
++    offset += 30 + n.length + datos.length;
++  }
++  const cd = Buffer.concat(indice);
++  const fin = Buffer.alloc(22);
++  fin.writeUInt32LE(0x06054b50, 0);
++  fin.writeUInt16LE(Object.keys(archivos).length, 10);
++  fin.writeUInt32LE(cd.length, 12);
++  fin.writeUInt32LE(offset, 16);
++  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'partes-')), 'mod.scs');
++  fs.writeFileSync(archivo, Buffer.concat([...partes, cd, fin]));
++  return archivo;
++}
++
++const abrir = (archivos: Record<string, string>) => {
++  const p = zip(archivos);
++  return { p, mod: new ZipEntries(p, 'mod.scs') };
++};
++
++describe('elegirPartes', () => {
++  const dlcs = new Set(['dlc_wa', 'dlc_or']);
++
++  it('un mod comun no viene en partes', () => {
++    expect(elegirPartes(['def', 'map', 'manifest.sii', 'database'], dlcs)).toBeUndefined();
++  });
++
++  it('base primero, despues los DLC que estan en el juego', () => {
++    expect(elegirPartes(['dlc_wa', 'manifest.sii', 'dlc_mt', 'base', 'dlc_or'], dlcs)).toEqual({
++      montadas: ['base', 'dlc_or', 'dlc_wa'],
++      sinDlc: ['dlc_mt'],
++    });
++  });
++
++  it('tambien con los nombres en .zip', () => {
++    expect(elegirPartes(['base.zip', 'dlc_wa.zip', 'dlc_mt.zip', 'icon.jpg'], dlcs)).toEqual({
++      montadas: ['base.zip', 'dlc_wa.zip'],
++      sinDlc: ['dlc_mt.zip'],
++    });
++  });
++});
++
++describe('partesDeMod', () => {
++  it('lee adentro de base (ATS Expansion)', () => {
++    const { mod } = abrir({
++      'manifest.sii': 'SiiNunit {}',
++      'base/def/city.reconlobster.sii': '@include "city/wolfpoint.sui"',
++      'base/def/city/wolfpoint.sui': 'ciudad',
++      'base/map/usa/sec+0000+0000.base': 'sector',
++    });
++    const avisos: string[] = [];
++    const partes = partesDeMod(mod, new Set(['dlc_wa']), t => avisos.push(t));
++    expect(partes.length).toBe(1);
++    const e = partes[0].parseEntries();
++    expect(e.directories.get('')?.subdirectories.slice().sort()).toEqual(['def', 'map']);
++    expect(e.directories.get('def')?.files).toEqual(['city.reconlobster.sii']);
++    expect(e.directories.get('map/usa')?.files).toEqual(['sec+0000+0000.base']);
++    const ciudad = e.files.get('def/city/wolfpoint.sui');
++    expect(ciudad?.read().toString()).toBe('ciudad');
++    expect(e.files.get('/def/city/wolfpoint.sui')?.read().toString()).toBe('ciudad');
++    // El log dice que .scs aportaron mapa: el nombre es el del mod.
++    expect(ciudad?.scsSource).toBe('mod.scs');
++    expect(avisos.length).toBe(1);
++    expect(avisos[0]).toMatch(/en partes, se leen: base$/);
++    partes.forEach(p => p.dispose());
++  });
++
++  it('un dlc_ solo si el DLC esta, y la raiz no se monta', () => {
++    const { mod } = abrir({
++      'def/city.raiz.sii': 'raiz',
++      'base/def/a.sii': 'base',
++      'dlc_wa/def/a.sii': 'wa',
++      'dlc_mt/def/a.sii': 'mt',
++    });
++    const avisos: string[] = [];
++    const partes = partesDeMod(mod, new Set(['dlc_wa', 'dlc_or']), t => avisos.push(t));
++    expect(partes.map(p => p.parseEntries().files.get('def/a.sii')?.read().toString())).toEqual([
++      'base',
++      'wa',
++    ]);
++    expect(partes.some(p => p.parseEntries().files.get('def/city.raiz.sii'))).toBe(false);
++    expect(avisos[0]).toMatch(/base, dlc_wa \(sin el DLC: dlc_mt\)$/);
++    partes.forEach(p => p.dispose());
++  });
++
++  it('un mod comun queda tal cual', () => {
++    const { mod } = abrir({ 'def/a.sii': 'a', 'map/usa.mbd': 'x' });
++    const avisos: string[] = [];
++    expect(partesDeMod(mod, new Set(['dlc_wa']), t => avisos.push(t))).toEqual([mod]);
++    expect(avisos).toEqual([]);
++    mod.dispose();
++  });
++
++  it('avisa de un zip adentro del mod, que no se lee', () => {
++    const { mod } = abrir({ 'base.zip': 'PK', 'manifest.sii': 'x' });
++    const avisos: string[] = [];
++    expect(partesDeMod(mod, new Set(), t => avisos.push(t))).toEqual([mod]);
++    expect(avisos[0]).toMatch(/no se puede leer un zip adentro del mod: base\.zip$/);
++    mod.dispose();
++  });
++
++  it('el archivo se cierra una sola vez', () => {
++    const { mod } = abrir({ 'base/def/a.sii': 'a', 'dlc_wa/def/a.sii': 'b' });
++    let cierres = 0;
++    const cerrar = mod.dispose.bind(mod);
++    mod.dispose = () => {
++      cierres++;
++      cerrar();
++    };
++    const partes = partesDeMod(mod, new Set(['dlc_wa']));
++    expect(partes.length).toBe(2);
++    partes.forEach(p => p.dispose());
++    expect(cierres).toBe(1);
++  });
++});
 diff --git a/packages/clis/parser/game-files/tests/scs-archive-v1.test.ts b/packages/clis/parser/game-files/tests/scs-archive-v1.test.ts
 new file mode 100644
 index 0000000..ad1a987
@@ -5815,10 +6286,10 @@ index 0000000..ad1a987
 +});
 diff --git a/packages/clis/parser/game-files/tests/scs-archive-v2.test.ts b/packages/clis/parser/game-files/tests/scs-archive-v2.test.ts
 new file mode 100644
-index 0000000..e0fe14d
+index 0000000..a17c6c1
 --- /dev/null
 +++ b/packages/clis/parser/game-files/tests/scs-archive-v2.test.ts
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,225 @@
 +import fs from 'fs';
 +import os from 'os';
 +import path from 'path';
@@ -5860,9 +6331,12 @@ index 0000000..e0fe14d
 +
 +// Un HashFS v2 como lo lee ScsArchive: cabecera de 53 bytes, los datos
 +// alineados a 16, la tabla de entradas (16 bytes por entrada) y la de
-+// metadatos (un encabezado de 4 bytes y un PlainMeta de 16 por entrada),
-+// las dos con zlib.
-+function hashfsV2(entradas: Entrada[]): string {
++// metadatos (un encabezado de 4 bytes y un PlainMeta de 16 por entrada), las
++// dos con zlib o, en un mod empaquetado sin compresion, tal cual.
++function hashfsV2(
++  entradas: Entrada[],
++  { salt = 0, comprimirTablas = true } = {},
++): string {
 +  const partes: Buffer[] = [Buffer.alloc(64)];
 +  let offset = 64;
 +  const offsets: number[] = [];
@@ -5880,7 +6354,10 @@ index 0000000..e0fe14d
 +  const tabla = Buffer.alloc(entradas.length * 16);
 +  const metadatos = Buffer.alloc(entradas.length * 20);
 +  entradas.forEach((e, i) => {
-+    const hash = typeof e.ruta === 'bigint' ? e.ruta : city64(e.ruta);
++    const hash =
++      typeof e.ruta === 'bigint'
++        ? e.ruta
++        : city64(salt ? `${salt}${e.ruta}` : e.ruta);
 +    const datos = typeof e.datos === 'number' ? entradas[e.datos].datos : e.datos;
 +    const comprimido = (datos as Buffer).length;
 +    tabla.writeBigUInt64LE(hash, i * 16);
@@ -5894,18 +6371,24 @@ index 0000000..e0fe14d
 +    metadatos.writeUInt32LE(e.tamano, m + 8);
 +    metadatos.writeUInt32LE(offsets[i] / 16, m + 16);
 +  });
-+  const tablaZ = zlib.deflateSync(tabla);
-+  const metadatosZ = zlib.deflateSync(metadatos);
++  // Como un empaquetador: comprimida solo si queda mas chica.
++  const guardar = (t: Buffer) => {
++    const z = zlib.deflateSync(t);
++    return comprimirTablas && z.length < t.length ? z : t;
++  };
++  const tablaZ = guardar(tabla);
++  const metadatosZ = guardar(metadatos);
 +  partes.push(tablaZ, metadatosZ);
 +
 +  const cabecera = partes[0];
 +  cabecera.write('SCS#', 0, 'latin1');
 +  cabecera.writeUInt16LE(2, 4);
-+  cabecera.writeUInt16LE(0, 6);
++  cabecera.writeUInt16LE(salt, 6);
 +  cabecera.write('CITY', 8, 'latin1');
 +  cabecera.writeUInt32LE(entradas.length, 12);
 +  cabecera.writeUInt32LE(tablaZ.length, 16);
-+  cabecera.writeUInt32LE(metadatos.length, 20);
++  // la cantidad de valores de 4 bytes, no el tamano
++  cabecera.writeUInt32LE(metadatos.length / 4, 20);
 +  cabecera.writeUInt32LE(metadatosZ.length, 24);
 +  cabecera.writeBigUInt64LE(BigInt(offset), 28);
 +  cabecera.writeBigUInt64LE(BigInt(offset + tablaZ.length), 36);
@@ -5964,6 +6447,42 @@ index 0000000..e0fe14d
 +    expect(entries.directories.get('def/city.sii')).toBeUndefined();
 +    expect(entries.directories.get('no/existe')).toBeUndefined();
 +    scs.dispose();
++  });
++});
++
++describe('ScsArchive HashFS v2 sin comprimir o con salt', () => {
++  const raiz = listado(['/def']);
++  const def = listado(['city.sii']);
++  const ciudad = Buffer.from('SiiNunit\n{\n}\n', 'utf8');
++  const entradas: Entrada[] = [
++    { ruta: '', directorio: true, tipo: DIRECTORY, compresion: NONE, datos: raiz, tamano: raiz.length },
++    { ruta: 'def', directorio: true, tipo: DIRECTORY, compresion: NONE, datos: def, tamano: def.length },
++    { ruta: 'def/city.sii', directorio: false, tipo: PLAIN, compresion: NONE, datos: ciudad, tamano: ciudad.length },
++  ];
++
++  function leer(archivo: string) {
++    const scs = new ScsArchive(archivo, 'mod.scs');
++    const entries = scs.parseEntries();
++    expect(entries.directories.get('')?.subdirectories).toEqual(['def']);
++    expect(entries.directories.get('def')?.files).toEqual(['city.sii']);
++    expect(entries.files.get('def/city.sii')?.read()).toEqual(ciudad);
++    scs.dispose();
++  }
++
++  it('con las tablas comprimidas, como siempre', () => {
++    leer(hashfsV2(entradas));
++  });
++
++  it('con las tablas sin comprimir', () => {
++    // El campo de la cabecera es una cantidad y se tomaba como bytes: la tabla
++    // de metadatos se trataba de inflar, "incorrect header check".
++    leer(hashfsV2(entradas, { comprimirTablas: false }));
++  });
++
++  it('con salt', () => {
++    leer(hashfsV2(entradas, { salt: 4321 }));
++    // un salt de mas de 32767 se lee sin signo
++    leer(hashfsV2(entradas, { salt: 40000, comprimirTablas: false }));
 +  });
 +});
 +
