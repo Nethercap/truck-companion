@@ -119,9 +119,10 @@ def _sin_botones_por_el_sdk(monkeypatch):
 
 def test_send_game_command_ignored_when_no_key_assigned(monkeypatch):
     called = []
-    monkeypatch.setattr(client, "find_game_window", lambda: called.append("find_window"))
-    client.send_game_command("toggle_differential_lock", client.DEFAULT_KEYBINDS)
-    assert called == []  # ni siquiera busca la ventana si no hay tecla asignada
+    monkeypatch.setattr(client, "find_game_window", lambda: None)
+    monkeypatch.setattr(client.keys_compat, "press", lambda key: called.append(key))
+    assert client.send_game_command("toggle_differential_lock", client.DEFAULT_KEYBINDS) == "no_key"
+    assert called == []
 
 
 def test_send_game_command_ignored_when_game_window_not_found(monkeypatch):
@@ -239,6 +240,111 @@ def test_detect_keybinds_from_controls_sii_maps_to_our_action_names(tmp_path, mo
     assert detected["toggle_infotainment"] == "o"
     assert detected["toggle_wipers"] == "p"
     assert detected["toggle_beacon"] is None
+
+
+def test_una_accion_sin_tecla_en_el_juego_no_usa_la_de_fabrica():
+    """La de fabrica de Beacon es "o", que en un juego sin tecla para la baliza
+    es el infotainment: el boton apretaba otra cosa."""
+    del_juego = {"toggle_beacon": None, "toggle_hazards": "f", "toggle_lift_axle": None}
+    fabrica = dict(client.DEFAULT_KEYBINDS)
+    teclas = client.con_las_del_juego(fabrica, del_juego)
+    assert teclas["toggle_beacon"] is None
+    assert teclas["toggle_hazards"] == "f"
+    assert teclas["toggle_lift_axle"] is None
+    assert teclas["toggle_engine"] == "e"  # de esa el juego no dijo nada
+    assert fabrica == client.DEFAULT_KEYBINDS  # no toca el que le pasan
+    # La que pusieron en Remap si: puede ser de algo que no es el juego.
+    assert client.con_las_del_juego({"toggle_beacon": "x"}, del_juego)["toggle_beacon"] == "x"
+    # Sin controls.sii, las de fabrica.
+    assert client.con_las_del_juego(fabrica, {}) == fabrica
+
+
+def test_load_keybinds_saca_la_de_fabrica_que_quedo_guardada(tmp_path, monkeypatch):
+    """keybinds.json se crea con las de fabrica la primera vez: los que ya lo
+    tienen traen la "o" guardada."""
+    fake_path = tmp_path / "keybinds.json"
+    monkeypatch.setattr(client, "keybinds_path", lambda: str(fake_path))
+    monkeypatch.setattr(client, "detect_keybinds_from_controls_sii", lambda: {"toggle_beacon": None, "toggle_wipers": "u"})
+    client.save_keybinds(dict(client.DEFAULT_KEYBINDS))
+    cargadas = client.load_keybinds()
+    assert cargadas["toggle_beacon"] is None
+    assert cargadas["toggle_wipers"] == "u"
+    assert cargadas["toggle_engine"] == "e"
+
+
+def test_get_keybinds_muestra_sin_tecla_la_que_no_tiene_en_el_juego(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(client, "detect_keybinds_from_controls_sii", lambda: {"toggle_beacon": None, "toggle_engine": "r"})
+    ws = _FakeWs([client.json.dumps({"type": "get_keybinds"})])
+    asyncio.run(client.receive_commands(ws, dict(client.DEFAULT_KEYBINDS)))
+    teclas = client.json.loads(ws.sent[0])["data"]
+    assert teclas["toggle_beacon"] is None
+    assert teclas["toggle_engine"] == "r"
+
+
+@pytest.fixture
+def dos_juegos(tmp_path, monkeypatch):
+    """Los perfiles de los dos juegos, con ETS2 como el mas nuevo: ahi la baliza
+    no tiene tecla y en ATS es la b. Devuelve (abrir un juego, lo apretado)."""
+    ets2 = tmp_path / "Euro Truck Simulator 2" / "steam_profiles" / "A" / "controls.sii"
+    ats = tmp_path / "American Truck Simulator" / "profiles" / "B" / "controls.sii"
+    for archivo, texto, hora in ((ets2, _SAMPLE_CONTROLS_SII, 2_000_000),
+                                 (ats, _SAMPLE_CONTROLS_SII.replace("unbound?0 || long_press(joy.b3?0) | semantical.beacon",
+                                                                    "keyboard.b?0 | semantical.beacon")
+                                  .replace("keyboard.f?0", "keyboard.h?0"), 1_000_000)):
+        archivo.parent.mkdir(parents=True)
+        archivo.write_text(texto, encoding="utf-8")
+        os.utime(archivo, (hora, hora))
+    monkeypatch.setattr(client, "documents_folder", lambda: str(tmp_path))
+    monkeypatch.setattr(client, "find_game_window", lambda: 12345)
+    monkeypatch.setattr(client, "bring_window_to_foreground", lambda hwnd: None)
+    apretadas = []
+    monkeypatch.setattr(client.keys_compat, "press", apretadas.append)
+
+    def abrir(exe):
+        ruta = os.path.join("D:", "juego", exe) if exe else None
+        monkeypatch.setattr(client, "running_game_info", lambda hwnd: {"exe_path": ruta})
+
+    return abrir, apretadas
+
+
+def test_la_tecla_es_la_del_juego_que_esta_abierto(dos_juegos):
+    abrir, apretadas = dos_juegos
+    keybinds = client.con_las_del_juego(client.DEFAULT_KEYBINDS, client.detect_keybinds_from_controls_sii())
+    assert keybinds["toggle_beacon"] is None and keybinds["toggle_hazards"] == "f"  # las de ETS2
+    abrir("eurotrucks2.exe")
+    assert client.send_game_command("toggle_beacon", keybinds) == "no_key"
+    assert client.send_game_command("toggle_hazards", keybinds) == "ok"
+    assert apretadas == ["f"]
+    apretadas.clear()
+    abrir("amtrucks.exe")
+    assert client.send_game_command("toggle_beacon", keybinds) == "ok"
+    assert client.send_game_command("toggle_hazards", keybinds) == "ok"
+    assert apretadas == ["b", "h"]
+    assert keybinds["toggle_beacon"] is None  # las cargadas no cambian
+
+
+def test_si_no_se_sabe_que_juego_es_van_las_cargadas(dos_juegos, monkeypatch):
+    abrir, apretadas = dos_juegos
+    for exe in (None, "chrome.exe"):
+        abrir(exe)
+        assert client.send_game_command("toggle_beacon", {"toggle_beacon": "o"}) == "ok"
+    monkeypatch.setattr(client, "running_game_info", lambda hwnd: 1 / 0)
+    assert client.send_game_command("toggle_beacon", {"toggle_beacon": "o"}) == "ok"
+    assert apretadas == ["o", "o", "o"]
+
+
+@pytest.mark.parametrize("exe, carpeta", [
+    ("eurotrucks2.exe", "Euro Truck Simulator 2"), ("AMTRUCKS.EXE", "American Truck Simulator"),
+    ("eurotrucks2", "Euro Truck Simulator 2"), ("brave.exe", None), ("", None),
+])
+def test_carpeta_del_juego(monkeypatch, caplog, exe, carpeta):
+    ruta = os.path.join("bin", "win_x64", exe) if exe else None
+    monkeypatch.setattr(client, "running_game_info", lambda hwnd: {"exe_path": ruta})
+    assert client.carpeta_del_juego(1) == carpeta
+    monkeypatch.setattr(client, "running_game_info", lambda hwnd: None)
+    assert client.carpeta_del_juego(1) is None
+    assert not caplog.records  # no saber que juego es no es un error
 
 
 def test_detect_keybinds_from_controls_sii_returns_empty_without_files(monkeypatch):

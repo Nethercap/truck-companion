@@ -24,6 +24,10 @@ updates on its own and is not versioned here.
   yet (it updates itself with the game closed) or the game isn't taking SDK input, the buttons
   keep using the keys. Custom buttons are still key presses, and the plugin can press only these
   13 buttons.
+- When a button does go by key: an action with no key in the game is no longer sent with Truck
+  Dash's default key, which can belong to something else (Beacon opened the infotainment for a
+  player who has the beacon only on the wheel), and the key is now the one of the game that is
+  open, not the one of whichever game's controls changed last.
 
 ## 1.5.46 (2026-11-23)
 
