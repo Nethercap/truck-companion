@@ -49,8 +49,8 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `-prefabs.bin` (de que prefab es cada arista, `decodePrefabsBin`, desde el
   22-10; los de antes no lo tienen). Si se regenera el grafo, se regeneran y
   suben los cinco juntos (`rebuild_graphs_only.py` del taller) y se sube
-  `ROUTE_GRAPH_V3_REV` en `app.js` (7 desde el 10-11, con `ROUTE_PREFABS_REV`
-  en 1): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
+  `ROUTE_GRAPH_V3_REV` en `app.js` (8 desde el 24-11, con `ROUTE_PREFABS_REV`
+  en 1), no `mapDataVersion` (haria bajar de nuevo los tiles): un grafo del constructor de hoy sin su `-prefabs.bin` deja otra vez
   la vuelta de Kiel (ver el ruteo). Los prefabs sin navCurves que lista el
   log del constructor (unidos todos contra todos, sin contramano) son
   patios, estaciones y talleres de dos nodos, y 15 `cross_temp` de ProMods.
@@ -1076,20 +1076,31 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   indice y los s64.
 - Reporte #60 (21-11, ETS2, Ostrava -> Brno): el constructor juntaba en una
   arista de doble mano los dos sentidos de un par de nodos de prefab del mismo
-  largo y del mismo costado de la recta aunque fueran por caminos distintos: en
-  el trebol del D1 (27618,5276) de la calle del este a Brno se dobla a la
-  izquierda (lo dicen los carriles del ramal al norte: "right", y el carril
-  izquierdo solo dobla a la izquierda) y de vuelta se sale por el rulo, los dos
-  de unos 700 m. La ruta a Brno se dibujaba por el rulo, a la derecha, sin aviso
-  en la bifurcacion (los dos ramales salen derechos, a 8 m a los 100 m), y el
-  camion tomo el ramal al norte (recalculo a 356 km). Desde el 23-11 van
+  largo y del mismo costado de la recta aunque fueran por caminos distintos. En
+  el trebol del D1 (27618,5276, prefab 178) de la calle del este a Brno se
+  sigue derecho por arriba de la autopista y se baja por un rulo del otro lado
+  (729 m; los carriles le dan "left") y de vuelta se sale por otro rulo, del
+  lado de la calle (695 m). Quedaba una arista con el dibujo del de 695: la ruta
+  a Brno se dibujaba a la derecha por ese rulo, que sale junto con el ramal al
+  norte, y el camion tomo el ramal (recalculo a 356 km). Desde el 23-11 van
   separados a mas de `PREFAB_OTRO_CAMINO_M` (40 m; el carril de giro de
-  Wroclaw va a 12). En el grafo publicado del 10-11 son 43 aristas de prefab de
-  doble mano largas y con rulo en ETS2 (casi todas del mismo trebol, tambien la
-  llegada a Brno) y ninguna en ATS. La web no cambia: falta regenerar los
-  grafos de R2 (los cinco archivos y `ROUTE_GRAPH_V3_REV` a 8, como con el #38)
-  y medir como siempre; el log del constructor dice cuantos pares separa y de
-  que prefabs ("por otro camino"). Hasta entonces el #60 sigue pasando.
+  Wroclaw va a 12; `separar_sentidos`, y `diag_prefab_pares.py` del taller dice
+  que hace con cada par). Los grafos de R2 van asi desde el 24-11
+  (`ROUTE_GRAPH_V3_REV` 8): 41 pares en ets2, ets2_161, ets2_eugu y ets2_tmp,
+  31 con ProMods, 43 con ROEX, 60 con RusMap y 70 con los dos (prefabs 134,
+  166, 178, 225, 226, 244 y `arak17`/`arak19` de ROEX); ATS y ets2_gu quedaron
+  iguales byte a byte en el ruteo. Cruzando cada par de ets2 en los dos
+  sentidos (82 rutas cortas) cambian 31 avisos: 28 bifurcaciones pasan al otro
+  lado, todas al que dicen los carriles del juego (antes todas al contrario,
+  por el dibujo del otro sentido); 2 se callan, donde la ruta va 400 a 600 m
+  por la misma calzada que otra rama y se separa adentro del prefab, sin nodo
+  donde avisar; y 1 ruta de prueba va por otro lado (el sentido largo dejo de
+  costar lo del corto). En Ostrava no se avisa la bifurcacion: la ruta va por
+  todos los carriles y el ramal al norte tiene flecha a la derecha, y para
+  `parallelFork` eso es una salida y la ruta sigue; ahora se dibuja derecho.
+  El simulador (120 rutas, semilla 7) da igual; con 200 rutas de Polonia,
+  Hungria, Chequia, Eslovaquia y Reino Unido, los mismos avisos en ets2 y 3
+  menos en ProMods, sin sospechosos nuevos; check_avisos, igual.
 - Comandos por voz: siguen en `exploring` en `docs/data/roadmap.json` a
   proposito (el maintainer lo dejo "en evaluacion"). La app habla, no escucha.
 - Las flechas de carril (con giro o sin aviso) no tienen ajuste para
