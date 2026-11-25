@@ -45,10 +45,16 @@ BLOCK_SIZE = 32 * 1024  # SCS_PLUGIN_MMF_SIZE
 # asi que el bloque sigue siendo de la revision 12. Mismas posiciones que el
 # .hpp: si cambia uno, cambia el otro y sube BUS_ZONE_REVISION.
 BUS_OFFSET = 21600
-BUS_ZONE_REVISION = 1
-BUS_STAGES_MAX = 16
+BUS_ZONE_REVISION = 2
+BUS_STOPS_MAX = 65
 _BUS_CABEZA = struct.Struct("<4I")  # revision, stageCount, stageCurrent, updates
-_BUS_PARADA = struct.Struct("<64s64s64s8I")  # scsBusStop_t, 224 bytes
+_BUS_PARADA = struct.Struct("<24s48s64s8I")  # scsBusStop_t, 168 bytes
+# La revision 1 (plugins de la 1.5.40 a la 1.5.48) guardaba las dos puntas de
+# hasta 16 etapas. Sigue en uso donde el plugin no se cambio: con el juego
+# abierto la DLL no se puede reemplazar, y la .dylib de macOS se compila
+# aparte.
+BUS_R1_STAGES_MAX = 16
+_BUS_R1_PARADA = struct.Struct("<64s64s64s8I")  # 224 bytes
 _BUS_CAMPOS = ("arrivalPlanned", "arrivalActual", "departurePlanned", "departureActual",
                "enteringPlanned", "enteringActual", "leavingPlanned", "leavingActual")
 
@@ -163,28 +169,37 @@ def leer_bus(buf) -> dict | None:
     un plugin sin ella (revision 0: los de Truck Dash hasta la 1.5.39).
 
         {"stageCount": 2, "stageCurrent": 0, "updates": 3,
-         "stages": [{"source": {"type": "city", "id": "oulu", "name": "Oulu",
-                                "departurePlanned": 256620, ...},
-                     "destination": {...}}, ...]}
+         "stops": [{"type": "city", "id": "oulu", "name": "Oulu",
+                    "departurePlanned": 256620, ...}, ...]}
 
-    Los numeros van tal cual (0 = el juego no lo mando); trabajo_bus.del_raw
-    los pasa a paradas."""
+    Con la revision 1, en vez de "stops" van las etapas con sus dos puntas:
+
+         "stages": [{"source": {"type": "city", ...}, "destination": {...}}, ...]
+
+    Los numeros van tal cual (0 = el juego no lo mando) y la lista trae lo que
+    entra en el bloque, que puede ser menos que `stageCount`;
+    trabajo_bus.del_raw lo pasa a paradas."""
     revision, cantidad, actual, cambios = _BUS_CABEZA.unpack_from(buf, BUS_OFFSET)
-    if revision != BUS_ZONE_REVISION or cantidad == 0:
+    if revision not in (1, BUS_ZONE_REVISION) or cantidad == 0:
         return None
-    etapas = []
+    datos = {"stageCount": cantidad, "stageCurrent": actual, "updates": cambios}
     base = BUS_OFFSET + _BUS_CABEZA.size
-    for i in range(min(cantidad, BUS_STAGES_MAX)):
-        etapa = {}
-        for j, lado in enumerate(("source", "destination")):
-            valores = _BUS_PARADA.unpack_from(buf, base + (2 * i + j) * _BUS_PARADA.size)
-            parada = {"type": _texto(valores[0]), "id": _texto(valores[1]),
-                      "name": _texto(valores[2])}
-            parada.update(zip(_BUS_CAMPOS, valores[3:]))
-            etapa[lado] = parada
-        etapas.append(etapa)
-    return {"stageCount": cantidad, "stageCurrent": actual, "updates": cambios,
-            "stages": etapas}
+    if revision == 1:
+        datos["stages"] = [
+            {lado: _leer_parada(_BUS_R1_PARADA, buf, base + (2 * i + j) * _BUS_R1_PARADA.size)
+             for j, lado in enumerate(("source", "destination"))}
+            for i in range(min(cantidad, BUS_R1_STAGES_MAX))]
+    else:
+        datos["stops"] = [_leer_parada(_BUS_PARADA, buf, base + i * _BUS_PARADA.size)
+                          for i in range(min(cantidad + 1, BUS_STOPS_MAX))]
+    return datos
+
+
+def _leer_parada(forma: struct.Struct, buf, donde: int) -> dict:
+    tipo, ident, nombre, *numeros = forma.unpack_from(buf, donde)
+    parada = {"type": _texto(tipo), "id": _texto(ident), "name": _texto(nombre)}
+    parada.update(zip(_BUS_CAMPOS, numeros))
+    return parada
 
 
 def get_version_number():

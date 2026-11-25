@@ -455,11 +455,13 @@ void set_job_values_zero() {
 // the game.log.txt of a tourist job, 12-11-2026: Oulu -> Viitasaari viewpoint
 // -> Oulu). The whole configuration comes again whenever something changes
 // (the departure time once the passengers got on), so the zone is cleared
-// and filled again each time, and cleared when the job ends.
+// and filled again each time, and cleared when the job ends. The zone keeps
+// stops: stage k goes from stop k to stop k + 1, and both stages that touch
+// a stop fill it.
 void clear_bus_values() {
   telem_ptr->bus.stageCount = 0;
   telem_ptr->bus.stageCurrent = 0;
-  memset(telem_ptr->bus.stage, 0, sizeof telem_ptr->bus.stage);
+  memset(telem_ptr->bus.stop, 0, sizeof telem_ptr->bus.stop);
 }
 
 static bool value_as_u32(const scs_value_t& value, unsigned int* out) {
@@ -478,24 +480,36 @@ static bool value_as_u32(const scs_value_t& value, unsigned int* out) {
   }
 }
 
-static void copy_bus_text(char* to, const scs_value_t& value) {
+// The stage that starts at the stop (`source`) has the last word on its
+// texts; the one that ends there only fills what is still empty.
+static void copy_bus_text(char* to, size_t size, const scs_value_t& value,
+                          bool source) {
   if (value.type != SCS_VALUE_TYPE_string || !value.value_string.value) return;
-  strncpy(to, value.value_string.value, stringsize - 1);
-  to[stringsize - 1] = '\0';
+  const char* text = value.value_string.value;
+  if (!text[0] || (!source && to[0])) return;
+  strncpy(to, text, size - 1);
+  to[size - 1] = '\0';
 }
 
+// `of_source`: the end of a stage the number belongs to. The game sends each
+// one only on its own end; if it ever came on both, the own one stays.
 static const struct {
   const char* field;
   size_t offset;
+  bool of_source;
 } bus_stop_numbers[] = {
-    {"arrival_time.planned", offsetof(scsBusStop_t, arrivalPlanned)},
-    {"arrival_time.actual", offsetof(scsBusStop_t, arrivalActual)},
-    {"departure_time.planned", offsetof(scsBusStop_t, departurePlanned)},
-    {"departure_time.actual", offsetof(scsBusStop_t, departureActual)},
-    {"entering_passengers.planned", offsetof(scsBusStop_t, enteringPlanned)},
-    {"entering_passengers.actual", offsetof(scsBusStop_t, enteringActual)},
-    {"leaving_passengers.planned", offsetof(scsBusStop_t, leavingPlanned)},
-    {"leaving_passengers.actual", offsetof(scsBusStop_t, leavingActual)},
+    {"arrival_time.planned", offsetof(scsBusStop_t, arrivalPlanned), false},
+    {"arrival_time.actual", offsetof(scsBusStop_t, arrivalActual), false},
+    {"departure_time.planned", offsetof(scsBusStop_t, departurePlanned), true},
+    {"departure_time.actual", offsetof(scsBusStop_t, departureActual), true},
+    {"entering_passengers.planned", offsetof(scsBusStop_t, enteringPlanned),
+     true},
+    {"entering_passengers.actual", offsetof(scsBusStop_t, enteringActual),
+     true},
+    {"leaving_passengers.planned", offsetof(scsBusStop_t, leavingPlanned),
+     false},
+    {"leaving_passengers.actual", offsetof(scsBusStop_t, leavingActual),
+     false},
 };
 
 // Whether the attribute is one of the bus job's own (and then it is stored).
@@ -517,25 +531,30 @@ static bool handle_bus_attribute(const scs_named_value_t* current) {
   if (!source && !destination) return false;
   const char* field = name + (source ? 12 : 17);
   const auto index = current->index == SCS_U32_NIL ? 0 : current->index;
-  if (index >= BUS_STAGES_MAX) return true;  // no room: known, not stored
-  auto& stage = telem_ptr->bus.stage[index];
-  scsBusStop_t* stop = source ? &stage.source : &stage.destination;
+  // No room: known, not stored. The last stop only ends a stage.
+  if (index >= BUS_STOPS_MAX || (destination && index >= BUS_STOPS_MAX - 1)) {
+    return true;
+  }
+  scsBusStop_t* stop = &telem_ptr->bus.stop[source ? index : index + 1];
   if (strcmp(field, "type") == 0) {
-    copy_bus_text(stop->type, current->value);
+    copy_bus_text(stop->type, sizeof stop->type, current->value, source);
     return true;
   }
   if (strcmp(field, "id") == 0) {
-    copy_bus_text(stop->id, current->value);
+    copy_bus_text(stop->id, sizeof stop->id, current->value, source);
     return true;
   }
   if (strcmp(field, "name") == 0) {
-    copy_bus_text(stop->name, current->value);
+    copy_bus_text(stop->name, sizeof stop->name, current->value, source);
     return true;
   }
   for (const auto& entry : bus_stop_numbers) {
     if (strcmp(field, entry.field) == 0) {
-      if (value_as_u32(current->value, &number)) {
-        *reinterpret_cast<unsigned int*>(reinterpret_cast<char*>(stop) + entry.offset) = number;
+      auto* to = reinterpret_cast<unsigned int*>(
+          reinterpret_cast<char*>(stop) + entry.offset);
+      if (value_as_u32(current->value, &number) && number != 0 &&
+          (entry.of_source == source || *to == 0)) {
+        *to = number;
       }
       return true;
     }

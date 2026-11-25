@@ -1069,7 +1069,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `destination_stop.*`, tipo `city` o `viewpoints`). El plugin las guarda en
   una zona propia al final del bloque (offset 21600, `bus` de
   `scsTelemetryMap_t`, `BUS_ZONE_REVISION`), y el bloque sigue en la revision
-  12. `telemetry_compat.leer_bus` la deja en `raw["bus"]` y
+  12. Desde el 25-11 (revision 2) guarda paradas y no etapas, 65, en los mismos
+  32 KB: la revision 1 tenia lugar para 16 etapas y en un trabajo de 30 paradas
+  (HaulMP) el tablero decia 16 y desde la 18 mandaba de vuelta a la 17. El
+  bloque no se agranda: quien lo tenga abierto con 32 KB (el cliente, o el otro
+  juego con el plugin de antes) deja sin memoria al plugin que pida mas. El
+  cliente lee las dos revisiones (la .dylib de macOS se compila aparte, y la DLL
+  no se cambia con el juego abierto) y lo que no entra va como parada vacia: el
+  total y la etapa son los de verdad y la proxima queda sin saberse. El tope de
+  la API (`MAX_PARADAS` de truckdash-loginapp) es el mismo.
+  `telemetry_compat.leer_bus` la deja en `raw["bus"]` y
   `trabajo_bus.del_raw` la pasa a paradas: `payload["bus"]` (la clave existe
   solo con un trabajo de bus), el viaje de la cuenta de la primera parada a
   la ultima y `cityDst` con la proxima solo si es una ciudad (un mirador la

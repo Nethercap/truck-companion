@@ -82,7 +82,7 @@ def _datos_del_trabajo_de_bus(raw: dict, bus: dict, nombre_juego: str) -> dict:
     cada etapa; no entran en la huella, porque las llegadas reales cambian en
     cada parada. La API las guarda con `job_kind` desde su migracion 0024; una
     de antes las tira y toma el viaje por uno de camion."""
-    primera, ultima = bus["stops"][0], bus["stops"][-1]
+    primera, ultima = bus["stops"][0], trabajo_bus.ultima_parada(bus)
     return {
         "game": nombre_juego,
         # --- huella ---

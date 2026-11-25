@@ -26,19 +26,44 @@ ETAPAS = [
 
 def bloque(etapas=ETAPAS, actual=0, cambios=1, revision=telemetry_compat.BUS_ZONE_REVISION,
            cantidad=None):
-    """El bloque de 32 KB con la zona de bus como la escribe el plugin."""
+    """El bloque de 32 KB con la zona de bus como la escribe el plugin: una
+    parada por punta de etapa en la revision 2, y las dos puntas de cada etapa
+    (hasta 16) en la revision 1."""
     datos = bytearray(telemetry_compat.BLOCK_SIZE)
     telemetry_compat._BUS_CABEZA.pack_into(
         datos, telemetry_compat.BUS_OFFSET, revision,
         len(etapas) if cantidad is None else cantidad, actual, cambios)
     base = telemetry_compat.BUS_OFFSET + telemetry_compat._BUS_CABEZA.size
+    if revision == 1:
+        for i, (origen, destino, nums_origen, nums_destino) in enumerate(etapas[:16]):
+            for j, (punta, nums) in enumerate(((origen, nums_origen), (destino, nums_destino))):
+                telemetry_compat._BUS_R1_PARADA.pack_into(
+                    datos, base + (2 * i + j) * telemetry_compat._BUS_R1_PARADA.size,
+                    *(t.encode("utf-8") for t in punta),
+                    *[nums.get(c, 0) for c in telemetry_compat._BUS_CAMPOS])
+        return bytes(datos)
+    paradas = {}
     for i, (origen, destino, nums_origen, nums_destino) in enumerate(etapas):
-        for j, (punta, nums) in enumerate(((origen, nums_origen), (destino, nums_destino))):
-            numeros = [nums.get(c, 0) for c in telemetry_compat._BUS_CAMPOS]
+        paradas.setdefault(i, [None, {}])[0] = origen
+        paradas[i][1].update(nums_origen)
+        siguiente = paradas.setdefault(i + 1, [None, {}])
+        siguiente[0] = siguiente[0] or destino
+        siguiente[1].update(nums_destino)
+    for k, (punta, nums) in paradas.items():
+        if k < telemetry_compat.BUS_STOPS_MAX:
             telemetry_compat._BUS_PARADA.pack_into(
-                datos, base + (2 * i + j) * telemetry_compat._BUS_PARADA.size,
-                *(t.encode("utf-8") for t in punta), *numeros)
+                datos, base + k * telemetry_compat._BUS_PARADA.size,
+                *(t.encode("utf-8") for t in punta),
+                *[nums.get(c, 0) for c in telemetry_compat._BUS_CAMPOS])
     return bytes(datos)
+
+
+def linea(paradas):
+    """Las etapas de una linea de ese largo: c0 -> c1 -> c2..."""
+    return [(("city", f"c{i}", f"Parada {i}"), ("city", f"c{i + 1}", f"Parada {i + 1}"),
+             {"departurePlanned": 1005 + 10 * i, "enteringPlanned": 30 + i},
+             {"arrivalPlanned": 1010 + 10 * i, "leavingPlanned": 1 + i})
+            for i in range(paradas - 1)]
 
 
 def raw_de_bus(**cambios):
@@ -63,11 +88,14 @@ PARADAS = [
 def test_lee_la_zona_de_bus_del_bloque():
     bus = telemetry_compat.leer_bus(bloque(actual=1, cambios=3))
     assert (bus["stageCount"], bus["stageCurrent"], bus["updates"]) == (2, 1, 3)
-    assert bus["stages"][0]["source"]["id"] == "oulu"
-    assert bus["stages"][0]["source"]["departurePlanned"] == 256620
-    assert bus["stages"][0]["source"]["arrivalActual"] == 0
-    assert bus["stages"][1]["destination"]["name"] == "Oulu"
-    assert bus["stages"][1]["destination"]["leavingPlanned"] == 25
+    assert bus["stops"][0]["id"] == "oulu"
+    assert bus["stops"][0]["departurePlanned"] == 256620
+    assert bus["stops"][0]["arrivalActual"] == 0
+    assert bus["stops"][1]["arrivalPlanned"] == 256880
+    assert bus["stops"][1]["departurePlanned"] == 257000
+    assert bus["stops"][2]["name"] == "Oulu"
+    assert bus["stops"][2]["leavingPlanned"] == 25
+    assert len(bus["stops"]) == 3
 
 
 def test_sin_la_zona_no_hay_bus():
@@ -75,19 +103,89 @@ def test_sin_la_zona_no_hay_bus():
     y sin trabajo de bus no hay etapas."""
     assert telemetry_compat.leer_bus(bytes(telemetry_compat.BLOCK_SIZE)) is None
     assert telemetry_compat.leer_bus(bloque(revision=0)) is None
+    # Una zona de un plugin mas nuevo, con otra disposicion: no se adivina.
+    assert telemetry_compat.leer_bus(bloque(revision=telemetry_compat.BUS_ZONE_REVISION + 1)) is None
     assert telemetry_compat.leer_bus(bloque(etapas=[])) is None
 
 
-def test_no_lee_mas_etapas_que_las_que_entran():
-    bus = telemetry_compat.leer_bus(bloque(cantidad=40))
-    assert len(bus["stages"]) == telemetry_compat.BUS_STAGES_MAX
+def test_no_lee_mas_paradas_que_las_que_entran():
+    assert len(telemetry_compat.leer_bus(bloque(cantidad=40))["stops"]) == 41
+    bus = telemetry_compat.leer_bus(bloque(cantidad=400))
+    assert len(bus["stops"]) == telemetry_compat.BUS_STOPS_MAX == 65
+    assert bus["stageCount"] == 400
+    bus = telemetry_compat.leer_bus(bloque(cantidad=40, revision=1))
+    assert len(bus["stages"]) == telemetry_compat.BUS_R1_STAGES_MAX == 16
+    assert "stops" not in bus
+
+
+def test_un_trabajo_de_30_paradas_va_entero():
+    """HaulMP, 25-11: el tablero decia 16 y desde la parada 18 mandaba a la 17."""
+    for actual in range(29):
+        bus = trabajo_bus.del_raw(raw_de_bus(bus=telemetry_compat.leer_bus(bloque(linea(30), actual))))
+        assert (bus["stage"], bus["stages"], len(bus["stops"])) == (actual, 29, 30)
+        assert trabajo_bus.proxima_parada(bus)["id"] == f"c{actual + 1}"
+    assert bus["stops"][0] == {"type": "city", "id": "c0", "name": "Parada 0",
+                               "departurePlanned": 1005, "boardingPlanned": 30}
+    assert bus["stops"][20] == {"type": "city", "id": "c20", "name": "Parada 20",
+                                "arrivalPlanned": 1200, "departurePlanned": 1205,
+                                "boardingPlanned": 50, "alightingPlanned": 20}
+    assert bus["stops"][29] == {"type": "city", "id": "c29", "name": "Parada 29",
+                                "arrivalPlanned": 1290, "alightingPlanned": 29}
+    assert trabajo_bus.ultima_parada(bus)["id"] == "c29"
+
+
+def test_con_el_plugin_de_antes_no_manda_a_una_parada_que_ya_paso():
+    """La revision 1 guarda 16 etapas: lo que sigue no se sabe, pero el total
+    y la etapa si, y la proxima parada no puede ser la ultima guardada."""
+    def en(actual):
+        return trabajo_bus.del_raw(raw_de_bus(
+            bus=telemetry_compat.leer_bus(bloque(linea(30), actual, revision=1))))
+    bus = en(15)
+    assert (bus["stage"], bus["stages"], len(bus["stops"])) == (15, 29, 30)
+    assert trabajo_bus.proxima_parada(bus)["id"] == "c16"
+    for actual in (16, 20, 28):
+        bus = en(actual)
+        assert (bus["stage"], bus["stages"]) == (actual, 29)
+        assert trabajo_bus.proxima_parada(bus) == {}
+        # El viaje de la cuenta sigue siendo el mismo: de la primera a la
+        # ultima que se sabe (la huella no cambia en el medio).
+        assert trabajo_bus.ultima_parada(bus)["id"] == "c16"
+        raw = raw_de_bus(bus=telemetry_compat.leer_bus(bloque(linea(30), actual, revision=1)))
+        datos = trip_tracker.datos_del_trabajo(raw)
+        assert (datos["city_dst_id"], datos["deadline_game_time"]) == ("c16", 1160)
+        payload = client.build_payload(raw)
+        assert payload["cityDst"] is None and payload["cityDstId"] is None
+    assert trabajo_bus.descripcion(en(20)).endswith("c16 -> " + " -> ".join("?" * 13) + ", etapa 21 de 29")
+
+
+def test_una_cantidad_de_etapas_imposible_no_arma_una_lista_enorme():
+    bus = trabajo_bus.del_raw(raw_de_bus(bus=telemetry_compat.leer_bus(bloque(cantidad=4_000_000_000))))
+    assert bus["stages"] == trabajo_bus.ETAPAS_MAX and len(bus["stops"]) == trabajo_bus.ETAPAS_MAX + 1
+
+
+def test_las_dos_revisiones_dan_lo_mismo():
+    for etapas in (ETAPAS, linea(2), linea(17)):
+        nueva, vieja = (trabajo_bus.del_raw(raw_de_bus(bus=telemetry_compat.leer_bus(
+            bloque(etapas, actual=1, cambios=4, revision=r)))) for r in (2, 1))
+        assert nueva == vieja
+
+
+def test_30_paradas_entran_en_el_dato():
+    """La tabla viaja en cada dato: 4 por segundo al relay."""
+    import json
+    raw = raw_de_bus(bus=telemetry_compat.leer_bus(bloque(linea(30), 10)))
+    assert len(json.dumps(client.build_payload(raw)["bus"])) < 6000
 
 
 def test_un_texto_de_64_bytes_sin_cero_no_rompe():
-    """El plugin corta los textos a 63 y pone el 0, pero el lector no confia."""
+    """El plugin corta los textos y pone el 0, pero el lector no confia."""
     largo = "Ä" * 40  # 80 bytes en UTF-8
     etapas = [((largo, "x" * 70, "Ñandú"), ("city", "oulu", "Oulu"), {}, {})]
-    origen = telemetry_compat.leer_bus(bloque(etapas))["stages"][0]["source"]
+    origen = telemetry_compat.leer_bus(bloque(etapas))["stops"][0]
+    assert origen["type"] == "Ä" * 12
+    assert origen["id"] == "x" * 48
+    assert origen["name"] == "Ñandú"
+    origen = telemetry_compat.leer_bus(bloque(etapas, revision=1))["stages"][0]["source"]
     assert origen["type"] == "Ä" * 32
     assert origen["id"] == "x" * 64
     assert origen["name"] == "Ñandú"
@@ -122,16 +220,19 @@ def test_la_disposicion_es_la_del_plugin():
         hpp = f.read()
 
     def define(nombre):
-        return int(re.search(rf"#define {nombre} (\d+)", hpp).group(1))
+        return int(re.search(rf"#define {nombre}\s+(\d+)", hpp).group(1))
 
     assert define("BUS_ZONE_REVISION") == telemetry_compat.BUS_ZONE_REVISION
-    assert define("BUS_STAGES_MAX") == telemetry_compat.BUS_STAGES_MAX
+    assert define("BUS_STOPS_MAX") == telemetry_compat.BUS_STOPS_MAX
     assert "offsetof(scsTelemetryMap_t, bus) == %d" % telemetry_compat.BUS_OFFSET in hpp
-    assert "sizeof(scsBusStage_t) == %d" % (2 * telemetry_compat._BUS_PARADA.size) in hpp
-    assert telemetry_compat._BUS_PARADA.size == 224 and telemetry_compat._BUS_CABEZA.size == 16
+    assert "sizeof(scsBusStop_t) == %d" % telemetry_compat._BUS_PARADA.size in hpp
+    textos = (define("BUS_TYPE_SIZE"), define("BUS_ID_SIZE"), define("stringsize"))
+    assert telemetry_compat._BUS_PARADA.format == "<%ds%ds%ds8I" % textos
+    assert telemetry_compat._BUS_CABEZA.size == 16
     fin = (telemetry_compat.BUS_OFFSET + 16
-           + telemetry_compat.BUS_STAGES_MAX * 2 * telemetry_compat._BUS_PARADA.size)
+           + telemetry_compat.BUS_STOPS_MAX * telemetry_compat._BUS_PARADA.size)
     assert fin <= telemetry_compat.BLOCK_SIZE
+    assert "OFFSET %d -----//" % (fin - 1) in hpp
     # El orden de los numeros de la parada es el del struct.
     campos = re.search(r"typedef struct \{(.*?)\}scsBusStop_t;", hpp, re.S).group(1)
     assert re.findall(r"unsigned int (\w+);", campos) == list(telemetry_compat._BUS_CAMPOS)

@@ -7225,11 +7225,22 @@ test('turnReportBusLine: la tabla de paradas del cliente en el turn report (repo
   assert.equal(turnReportBusLine({ onJob: true }), null);
   assert.equal(turnReportBusLine({ ...linea, onJob: false }), null);
   assert.equal(turnReportBusLine(null), null);
-  // una linea larga se corta
-  const larga = { onJob: true, bus: { stage: 0, stops: Array.from({ length: 17 }, (_, k) => ({ type: 'city', id: `ciudad_con_un_nombre_largo_${k}` })) } };
-  const cortada = turnReportBusLine(larga);
-  assert.equal(cortada.length, TURN_REPORT_BUS_CHARS);
-  assert.ok(cortada.endsWith('...'));
+  // una linea larga va alrededor de la parada que sigue, con las que quedan afuera contadas
+  const larga = (stage) => ({ onJob: true, bus: { stage, stops: Array.from({ length: 30 }, (_, k) => ({ type: 'city', id: `ciudad_con_un_nombre_largo_${k}`, ...(k && k <= stage ? { arrivalActual: 100 + k } : {}) })) } });
+  for (let stage = 0; stage < 29; stage++) {
+    const corta = turnReportBusLine(larga(stage));
+    assert.ok(corta.length <= TURN_REPORT_BUS_CHARS && corta.length > TURN_REPORT_BUS_CHARS / 2, `${stage}: ${corta.length}`);
+    assert.ok(corta.includes(`[ciudad_con_un_nombre_largo_${stage + 1}]`), corta);
+    assert.ok(corta.startsWith(`Bus: stage ${stage + 1} of 29`));
+    const antes = Number((corta.match(/\((\d+) before\)/) || [0, 0])[1]);
+    const despues = Number((corta.match(/\((\d+) after\)/) || [0, 0])[1]);
+    assert.equal(antes + despues + corta.split(' -> ').length, 30, corta);
+  }
+  // en el medio se ven las dos puntas, y un nombre que solo no entra se corta
+  assert.match(turnReportBusLine(larga(14)), /^Bus: stage 15 of 29: \(\d+ before\) .*\(\d+ after\)$/);
+  const enorme = turnReportBusLine({ onJob: true, bus: { stage: 0, stops: [{ id: 'a'.repeat(300) }, { id: 'b'.repeat(500) }] } });
+  assert.equal(enorme.length, TURN_REPORT_BUS_CHARS);
+  assert.ok(enorme.endsWith('...'));
   // va despues de la linea del trabajo
   const base = { game: 'ets2', map: 'ets2', web: 'x', client: '1.5.40', truck: [1, 2], now: 1, items: [], formatTime: () => 'h' };
   const txt = turnReportText({ ...base, job: 'Job: market company_job', bus: turnReportBusLine(linea) });
