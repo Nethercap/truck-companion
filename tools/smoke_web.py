@@ -8,7 +8,9 @@ docs/ en local y comprueba:
   - la demo de ATS: mapa, ciudades, grafo de rutas y POIs (de R2, los de
     produccion) y la ruta armada, sin errores en la pagina;
   - sin WebGL: el cartel que lo explica, y el tablero sin errores;
-  - la landing (ingles y castellano), la guia y la cuenta cargan sin errores.
+  - la landing (ingles y castellano), la guia y la cuenta cargan sin errores;
+  - adentro de un marco de otro sitio, /app/, /live/, /account/ y /vtc/ no
+    cargan (framed.html) y no piden un solo archivo de mapa.
 
 Uso: python tools/smoke_web.py   (pide: pip install playwright && playwright install chromium)
 Sale con 1 si algo falla. Lo corre el job web-smoke de .github/workflows/tests.yml.
@@ -16,6 +18,7 @@ Sale con 1 si algo falla. Lo corre el job web-smoke de .github/workflows/tests.y
 
 import functools
 import http.server
+import mimetypes
 import os
 import sys
 import threading
@@ -191,6 +194,41 @@ def main():
             tomo = False
         chequear("dos pestanas: al cerrar la lider, la otra toma el lugar", tomo)
         b.close()
+
+        # 5) Adentro de un marco de otro sitio. El guard mira el dominio, asi
+        # que docs/ se sirve como si fuera trucksim-dash.com. Sin el, cualquier
+        # pagina mostraba la app entera con nuestros mapas: los pedidos salen
+        # con el Referer nuestro y Cloudflare los deja pasar (25-11).
+        def como_produccion(ruta):
+            u = ruta.request.url.split("?")[0].split("#")[0].replace("https://trucksim-dash.com", "")
+            archivo = DOCS + u + ("index.html" if u.endswith("/") else "")
+            if os.path.isfile(archivo):
+                ruta.fulfill(path=archivo, content_type=mimetypes.guess_type(archivo)[0] or "text/plain")
+            else:
+                ruta.fulfill(status=404, body="")
+
+        def en_marco(afuera, src, espera=4000):
+            """La URL final del marco y cuantos archivos de mapa pidio."""
+            b, page, _ = pagina(p, CON_WEBGL, base)
+            mapas = []
+            page.on("request", lambda r: mapas.append(r.url) if "maps.trucksim-dash.com" in r.url else None)
+            page.route("https://trucksim-dash.com/**", como_produccion)
+            page.goto(afuera)
+            page.set_content(f'<iframe src="{src}" width="900" height="600"></iframe>')
+            page.wait_for_timeout(espera)
+            url = page.frames[-1].url
+            b.close()
+            return url, len(mapas)
+
+        for pag in ("/app/", "/live/", "/account/", "/vtc/"):
+            url, pedidos = en_marco(base + "/robots.txt", "https://trucksim-dash.com" + pag)
+            chequear(f"marco de otro sitio: {pag} no carga",
+                     url == "https://trucksim-dash.com/framed.html#" + pag and pedidos == 0, f"{url}, {pedidos} pedidos de mapa")
+        url, _ = en_marco("https://trucksim-dash.com/robots.txt", "https://trucksim-dash.com/live/")
+        chequear("marco del mismo sitio: /live/ carga", url == "https://trucksim-dash.com/live/", url)
+        # La copia LAN en el marco de otro origen de la casa (un panel propio)
+        url, _ = en_marco(base.replace("127.0.0.1", "localhost") + "/robots.txt", base + "/live/")
+        chequear("marco de la copia LAN: /live/ carga", url == base + "/live/", url)
     srv.shutdown()
     print(f"\n{len(fallas)} fallas" if fallas else "\ntodo bien")
     return 1 if fallas else 0

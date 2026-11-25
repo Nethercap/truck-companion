@@ -2,6 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<script>
+// Adentro de un marco de otro sitio esta pagina no se carga: pedia los mapas
+// con el permiso de trucksim-dash.com (los terminos no dejan mostrarlos desde
+// otra pagina) y en la cuenta seria clickjacking. Pages no deja mandar
+// X-Frame-Options. Solo en el dominio propio: la copia LAN puede ir en el
+// marco que quiera su dueno. El mismo texto en /app/, /live/, /account/ y /vtc/.
+(function () {
+  if (window.top === window.self || !/^(www\.)?trucksim-dash\.com$/.test(location.hostname)) return;
+  try { if (window.top.location.origin === location.origin) return; } catch (e) { /* de otro origen */ }
+  window.stop();
+  location.replace('/framed.html#' + location.pathname.replace(/index\.html$/, ''));
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title data-i18n-text="metaTitle">Live Map – Truck Dash drivers online right now (ETS2 &amp; ATS)</title>
 <meta name="description" data-i18n-content="metaDescription" content="Watch Truck Dash drivers moving live on the ETS2 and ATS maps, including ProMods, Coast to Coast, RusMap, Reforma and more. No account needed." />

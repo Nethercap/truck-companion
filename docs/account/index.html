@@ -2,13 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<script>
+// Adentro de un marco de otro sitio esta pagina no se carga: pedia los mapas
+// con el permiso de trucksim-dash.com (los terminos no dejan mostrarlos desde
+// otra pagina) y en la cuenta seria clickjacking. Pages no deja mandar
+// X-Frame-Options. Solo en el dominio propio: la copia LAN puede ir en el
+// marco que quiera su dueno. El mismo texto en /app/, /live/, /account/ y /vtc/.
+(function () {
+  if (window.top === window.self || !/^(www\.)?trucksim-dash\.com$/.test(location.hostname)) return;
+  try { if (window.top.location.origin === location.origin) return; } catch (e) { /* de otro origen */ }
+  window.stop();
+  location.replace('/framed.html#' + location.pathname.replace(/index\.html$/, ''));
+})();
+</script>
 <!-- noindex: es una pantalla de cuenta, no tiene nada que buscar en Google. -->
 <meta name="robots" content="noindex, nofollow" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Truck Dash — Account</title>
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="account.css?v=20261125a" />
+<link rel="stylesheet" href="account.css?v=20261125c" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -443,7 +456,7 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
 
 <!-- Mismo ?v= que docs/app/index.html a proposito: es el mismo archivo,
      asi el navegador lo reusa y los dos se bumpean juntos. -->
-<script src="../app/i18n.js?v=20261125a"></script>
-<script src="account.js?v=20261125a"></script>
+<script src="../app/i18n.js?v=20261125c"></script>
+<script src="account.js?v=20261125c"></script>
 </body>
 </html>
