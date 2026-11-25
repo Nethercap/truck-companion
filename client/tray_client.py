@@ -824,7 +824,8 @@ class SetupWindow:
                        justify="left").pack(anchor="w", pady=(4, 6))
 
         # --- Update ---
-        # --- Update ---
+        self._update_mostrada = None  # la version que dice la barra
+        self._actualizando = False
         self.update_frame = tk.Frame(self.abajo, bg="#1f2a3a", padx=16, pady=8)
         self.update_label = self.label(self.update_frame, "", bg="#1f2a3a", wraplength=400)
         self.update_label.pack(side="left")
@@ -1456,11 +1457,13 @@ class SetupWindow:
 
     def check_updates(self):
         def _run():
-            latest, url, sha = check_for_update(state.backend_url or "")
+            latest, _url, _sha = anotar_actualizacion(state.backend_url or "")
+            # Con la barra de la actualizacion ya a la vista, el boton no mostraba nada.
             if latest:
-                state.update_available = (latest, url, sha)
+                texto = T("update_available", new=latest, cur=client_lib.CLIENT_VERSION)
+                self.en_ventana(lambda: self.flash(texto, BLUE))
             else:
-                self.root.after(0, lambda: self.flash(T("up_to_date", v=client_lib.CLIENT_VERSION), GREEN))
+                self.en_ventana(lambda: self.flash(T("up_to_date", v=client_lib.CLIENT_VERSION), GREEN))
         threading.Thread(target=_run, daemon=True).start()
 
     def copy_winget_command(self):
@@ -1471,14 +1474,29 @@ class SetupWindow:
     def do_update(self):
         if not state.update_available:
             return
-        version, url, sha = state.update_available
         self.update_button.configure(state="disabled")
+        self._actualizando = True
 
         def progress(key):
-            self.root.after(0, lambda: self.update_label.configure(text=T(key)))
+            self.en_ventana(lambda: self.update_label.configure(text=T(key)))
+
+        def fallo(texto):
+            def pintar():
+                self._actualizando = False
+                # Lo que vino al consultar recien no tapa el error en refresh_status.
+                self._update_mostrada = state.update_available[0] if state.update_available else None
+                self.update_label.configure(text=T("update_failed", err=texto))
+                self.update_button.configure(state="normal")
+            self.en_ventana(pintar)
 
         def _run():
             try:
+                progress("downloading")
+                # El link y el hash de ahora, no los de cuando arranco el cliente: abierto
+                # desde antes de una release, con el link de latest del relay de antes bajaba
+                # el zip nuevo con el hash viejo (Discord 25-11). Sin respuesta, lo de antes.
+                anotar_actualizacion(state.backend_url or "")
+                _version, url, sha = state.update_available
                 staged = win_integration.stage_update(url, sha, progress)
                 progress("restarting")
                 time.sleep(0.4)
@@ -1490,7 +1508,10 @@ class SetupWindow:
                 win_integration.stop_and_exit(stop_callback=lambda: state.icon and state.icon.stop())
             except Exception as exc:
                 logging.exception("Update failed")
-                self.root.after(0, lambda: (self.update_label.configure(text=T("update_failed", err=exc)), self.update_button.configure(state="normal")))
+                # El texto ya, no exc dentro de un lambda: Python borra exc al salir del
+                # except, el lambda tiraba NameError al correr y la barra quedaba en
+                # "Downloading update..." con el boton apagado, sin decir el error.
+                fallo(str(exc))
         threading.Thread(target=_run, daemon=True).start()
 
     def refresh_status(self):
@@ -1524,15 +1545,19 @@ class SetupWindow:
         if getattr(self, "_last_lan_url", "?") != clave_lan:
             self._last_lan_url = clave_lan
             self.render_lan()
-        if state.update_available:
+        # Se rehace si cambia la version (la consulta de cada 30 minutos o "Check for
+        # updates"), salvo mientras se actualiza: ahi la barra dice como va.
+        if state.update_available and not self._actualizando:
             version = state.update_available[0]
-            if not self.update_frame.winfo_ismapped():
+            if version != self._update_mostrada:
+                self._update_mostrada = version
                 if self.via_winget:
                     self.update_label.configure(text=T("update_available_winget", new=version, cur=client_lib.CLIENT_VERSION,
                                                        cmd=win_integration.winget_upgrade_command()))
                 else:
                     self.update_label.configure(text=T("update_available", new=version, cur=client_lib.CLIENT_VERSION))
-                self.update_frame.pack(fill="x", before=self.footer)
+                if not self.update_frame.winfo_manager():
+                    self.update_frame.pack(fill="x", before=self.footer)
         try:
             self.root.after(500, self.refresh_status)
         except tk.TclError:
@@ -1720,30 +1745,39 @@ def check_for_update(backend_url: str):
     return None, None, None
 
 
+def anotar_actualizacion(backend_url: str):
+    """check_for_update, y si hay una version mas nueva la deja en
+    state.update_available (version, link y hash de esa consulta). Si la consulta
+    falla queda lo de antes."""
+    latest, download_url, sha = check_for_update(backend_url)
+    if latest:
+        if not state.update_available or state.update_available[0] != latest:
+            logging.info("Update available: v%s (running v%s)", latest, client_lib.CLIENT_VERSION)
+        state.update_available = (latest, download_url, sha)
+    return latest, download_url, sha
+
+
 async def vigilar_interruptor(backend_url: str, cada_s: float = 1800) -> None:
     """Vuelve a mirar /version cada 30 minutos: apagar las cuentas desde el
-    relay tiene que llegar tambien a quien deja el cliente abierto dias."""
+    relay tiene que llegar tambien a quien deja el cliente abierto dias. Y la
+    version que ofrece Setup se pone al dia (sin abrir la ventana)."""
     while True:
         await asyncio.sleep(cada_s)
-        await asyncio.to_thread(check_for_update, backend_url)
+        await asyncio.to_thread(anotar_actualizacion, backend_url)
 
 
 def check_for_update_silent(backend_url: str):
-    latest, download_url, sha = check_for_update(backend_url)
-    if latest:
-        logging.info("Update available: v%s (running v%s)", latest, client_lib.CLIENT_VERSION)
-        state.update_available = (latest, download_url, sha)
-        if not state.autostart_mode:
-            open_setup_window()
+    latest, _url, _sha = anotar_actualizacion(backend_url)
+    if latest and not state.autostart_mode:
+        open_setup_window()
 
 
 def check_for_update_menu_item(icon, item):
     if not state.backend_url:
         show_text_dialog("Truck Dash", T("dlg_not_connected"))
         return
-    latest, download_url, sha = check_for_update(state.backend_url)
+    latest, _url, _sha = anotar_actualizacion(state.backend_url)
     if latest:
-        state.update_available = (latest, download_url, sha)
         open_setup_window()
     else:
         show_text_dialog("Truck Dash", T("up_to_date", v=client_lib.CLIENT_VERSION))

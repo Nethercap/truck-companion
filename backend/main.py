@@ -2213,12 +2213,25 @@ def health():
     }
 
 
-# Version mas nueva del cliente disponible - se actualiza a mano (via
-# /admin/stats/seed) cada vez que se sube un .exe nuevo al Release de GitHub.
-# El link de descarga es siempre el mismo (.../releases/latest/download/...),
-# no hace falta guardar uno por version.
+# Version mas nueva del cliente disponible - la carga build-client.yml (via
+# /admin/stats/seed) despues de publicar la release de GitHub.
 DEFAULT_CLIENT_VERSION = "1.0.0"
+# Sin version cargada, el link de la ultima release.
 CLIENT_DOWNLOAD_URL = "https://github.com/Nethercap/truck-companion/releases/latest/download/TruckDash-windows.zip"
+# Con version, el zip de ESA release (el tag es "v" + la version): el sha256 es el
+# de ese zip. Con el de latest, un cliente abierto desde antes de una release nueva
+# bajaba el zip nuevo con el hash que guardo al arrancar, y "Update now" fallaba
+# siempre con "does not match the published SHA-256" hasta reiniciarlo (Discord 25-11,
+# Lightningroc771: abierto desde antes de la 1.5.47, tres veces la 1.5.46).
+CLIENT_RELEASE_DOWNLOAD_URL = "https://github.com/Nethercap/truck-companion/releases/download/v{version}/TruckDash-windows.zip"
+_CLIENT_VERSION_RE = re.compile(r"\d+(?:\.\d+){1,3}")
+
+
+def client_download_url(version) -> str:
+    """El zip de esa version, o el de la ultima release si no es una version."""
+    if isinstance(version, str) and _CLIENT_VERSION_RE.fullmatch(version):
+        return CLIENT_RELEASE_DOWNLOAD_URL.format(version=version)
+    return CLIENT_DOWNLOAD_URL
 
 
 @app.get("/version")
@@ -2227,7 +2240,7 @@ def version():
     stats = _load_stats()
     return {
         "latest_client_version": stats.get("latest_client_version", DEFAULT_CLIENT_VERSION),
-        "download_url": CLIENT_DOWNLOAD_URL,
+        "download_url": client_download_url(stats.get("latest_client_version")),
         # SHA-256 del zip del release (publicado junto al release). El cliente
         # lo verifica antes de auto-actualizarse; si no esta, actualiza igual.
         "sha256": stats.get("latest_client_sha256"),
