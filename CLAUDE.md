@@ -115,7 +115,12 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `partes-de-mod.ts`), que se leia por la raiz y no daba nada sin avisar. El juego monta
   solo las partes, y un `dlc_` solo con ese DLC (en el game.log.txt, un "requested
   subdirectory" por parte). ATS Expansion viene asi; en el taller `variants.json` apunta a
-  su `base`. Lo de Beyond sigue sin probar con sus archivos.
+  su `base`. Lo de Beyond sigue sin probar con sus archivos. Con la 1.5.47 se abria pero
+  22.147 de las 31.946 entradas de su primer .scs quedaban afuera y el armado se cortaba en
+  `parseSectorFiles` (build.log del 25-11): ahora un sector ilegible se saltea con el mod, la
+  compresion 2 (deflate sin cabecera) y la 4 (zstd) se leen, y lo que `createEntry` no acepta
+  se lee otra vez como TruckLib (`leerEntradaFlexible`). El build.log dice cuantas entradas
+  entraron asi y por que quedo afuera cada una de las otras: mirar eso antes de adivinar.
 - Armar de nuevo con los mismos mods ("Build it again" de Setup) no cambia la huella: para
   la web la version de los archivos es `build` del manifest, que el cliente manda en
   `fingerprint` (`local_maps_summary`; los mapas de antes no lo traen). Si cambia con la

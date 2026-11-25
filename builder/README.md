@@ -35,6 +35,15 @@ as a separate program.
   "incorrect header check". A folder listing stored as a plain file, without
   the folder mark, is read as a folder when it has the exact shape of a
   listing. A salt in the header is used for the hashes, as in HashFS v1.
+  An entry that still doesn't fit is read again the way TruckLib reads it
+  (the metadata type says folder or file, extra metadata is ignored, and the
+  metadata may sit right after its headers whatever its index says), and is
+  kept only if it is plausible: a known compression and its data inside the
+  file. The build log counts the entries read that way and, by reason, the
+  ones skipped.
+- Compression types 2 (deflate without the zlib header) and 4 (zstd) are read.
+- A sector that a folder listing names but that can't be read is skipped with
+  the name of the mod that lists it, instead of stopping the build.
 - HashFS v2 mods packed without compression are read. The header gives the
   metadata table as a count of 4-byte values; taken as bytes, the stored table
   looked compressed and the mod was dropped with that same message.
