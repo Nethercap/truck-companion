@@ -539,6 +539,23 @@ def test_version_endpoint_exposes_seeded_sha256(client, main):
     assert body["sha256"] == "abc123"
 
 
+def test_version_download_url_es_la_release_de_esa_version(client, main):
+    """El hash es el del zip de esa version: con el link de latest, un cliente
+    abierto desde antes de una release nueva bajaba el zip nuevo con el hash
+    viejo y no podia actualizar (Discord 25-11)."""
+    client.post("/admin/stats/seed", json={"latest_client_version": "1.5.47", "latest_client_sha256": "abc123"},
+                headers={"X-Admin-Key": "test-admin-key"})
+    body = client.get("/version").json()
+    assert body["download_url"] == "https://github.com/Nethercap/truck-companion/releases/download/v1.5.47/TruckDash-windows.zip"
+
+
+def test_version_download_url_sin_version_valida_va_a_latest(main):
+    assert main.client_download_url(None) == main.CLIENT_DOWNLOAD_URL
+    assert main.client_download_url("1.5.47/../../x") == main.CLIENT_DOWNLOAD_URL
+    assert main.client_download_url("v1.5.47") == main.CLIENT_DOWNLOAD_URL
+    assert main.client_download_url(1.5) == main.CLIENT_DOWNLOAD_URL
+
+
 def test_client_reconnect_with_unknown_code_recreates_session_without_counting(client, main):
     # Simula un redeploy: el cliente tiene un codigo valido que ya no esta en memoria.
     assert "ABCD1234" not in main.sessions

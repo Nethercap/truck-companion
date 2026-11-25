@@ -624,6 +624,127 @@ def test_con_winget_el_aviso_da_el_comando_en_vez_de_actualizar(monkeypatch, tmp
         v.root.destroy()
 
 
+# ------------------------------------------------------------- actualizar
+# Discord 25-11 (Lightningroc771): el cliente abierto desde antes de la 1.5.47 tenia
+# el hash de la 1.5.46, y el link de latest del relay ya daba el zip de la 1.5.47.
+# "Update now" fallaba con el hash, y el error no se veia: la barra quedaba en
+# "Downloading update..." con el boton apagado.
+
+def _ventana_con_actualizacion(monkeypatch, raiz, version="9.9.9"):
+    monkeypatch.setattr(tk, "Tk", lambda: tk.Toplevel(raiz))
+    monkeypatch.setattr(tray_client.win_integration, "installed_by_winget", lambda path=None: False)
+    monkeypatch.setattr(tray_client.win_integration, "load_settings", lambda: {})
+    monkeypatch.setattr(plugin_installer, "find_game_installs", lambda: [])
+    monkeypatch.setattr(tray_client.state, "backend_url", "wss://relay.example")
+    monkeypatch.setattr(tray_client.state, "update_available",
+                        (version, f"https://x/v{version}.zip", "hash-" + version))
+    return tray_client.SetupWindow()
+
+
+def test_si_la_actualizacion_falla_lo_dice_y_se_puede_reintentar(monkeypatch, raiz):
+    pedidos = []
+
+    def bajar(url, sha, progress=None):
+        pedidos.append((url, sha))
+        progress("downloading")
+        raise RuntimeError("Downloaded file does not match the published SHA-256, update aborted")
+
+    monkeypatch.setattr(tray_client.win_integration, "stage_update", bajar)
+    monkeypatch.setattr(tray_client, "check_for_update", lambda url: (None, None, None))
+    v = _ventana_con_actualizacion(monkeypatch, raiz)
+    try:
+        _esperar(v, lambda: "9.9.9" in v.update_label.cget("text"))
+        v.update_button.invoke()
+        _esperar(v, lambda: str(v.update_button.cget("state")) == "normal")
+        assert "does not match the published SHA-256" in v.update_label.cget("text")
+        # Sin respuesta de /version, lo que ya tenia.
+        assert pedidos == [("https://x/v9.9.9.zip", "hash-9.9.9")]
+        # refresh_status (cada 500 ms) no lo tapa con "New version available".
+        import time
+        hasta = time.time() + 0.8
+        while time.time() < hasta:
+            v.root.update()
+            time.sleep(0.05)
+        assert "does not match" in v.update_label.cget("text")
+    finally:
+        v.root.destroy()
+
+
+def test_actualizar_baja_lo_que_dice_el_relay_ahora(monkeypatch, raiz):
+    """Ni el link ni el hash de cuando arranco: los de una consulta al apretar."""
+    pedidos = []
+
+    def bajar(url, sha, progress=None):
+        pedidos.append((url, sha))
+        raise RuntimeError("corte")
+
+    monkeypatch.setattr(tray_client.win_integration, "stage_update", bajar)
+    monkeypatch.setattr(tray_client, "check_for_update",
+                        lambda url: ("9.9.10", "https://x/v9.9.10.zip", "hash-9.9.10"))
+    v = _ventana_con_actualizacion(monkeypatch, raiz)
+    try:
+        v.root.update()
+        v.update_button.invoke()
+        _esperar(v, lambda: str(v.update_button.cget("state")) == "normal")
+        assert pedidos == [("https://x/v9.9.10.zip", "hash-9.9.10")]
+        assert tray_client.state.update_available == ("9.9.10", "https://x/v9.9.10.zip", "hash-9.9.10")
+        assert "corte" in v.update_label.cget("text")
+    finally:
+        v.root.destroy()
+
+
+def test_la_barra_sigue_a_la_version_nueva(monkeypatch, raiz):
+    v = _ventana_con_actualizacion(monkeypatch, raiz)
+    try:
+        _esperar(v, lambda: "9.9.9" in v.update_label.cget("text"))
+        monkeypatch.setattr(tray_client.state, "update_available", ("9.9.10", "https://x/v9.9.10.zip", "h"))
+        _esperar(v, lambda: "9.9.10" in v.update_label.cget("text"))
+    finally:
+        v.root.destroy()
+
+
+def test_buscar_actualizaciones_dice_algo_aunque_la_barra_ya_este(monkeypatch, raiz):
+    monkeypatch.setattr(tray_client, "check_for_update",
+                        lambda url: ("9.9.10", "https://x/v9.9.10.zip", "hash-9.9.10"))
+    v = _ventana_con_actualizacion(monkeypatch, raiz)
+    try:
+        v.root.update()
+        v.check_updates()
+        _esperar(v, lambda: hasattr(v, "flash_label") and "9.9.10" in v.flash_label.cget("text"))
+        _esperar(v, lambda: "9.9.10" in v.update_label.cget("text"))
+    finally:
+        v.root.destroy()
+
+
+def test_la_consulta_de_cada_30_minutos_pone_al_dia_la_version(monkeypatch, caplog):
+    import asyncio
+    import logging
+    monkeypatch.setattr(tray_client.state, "update_available", ("9.9.9", "https://x/v9.9.9.zip", "h9"))
+    monkeypatch.setattr(tray_client, "check_for_update",
+                        lambda url: ("9.9.10", "https://x/v9.9.10.zip", "h10"))
+
+    async def correr():
+        tarea = asyncio.create_task(tray_client.vigilar_interruptor("wss://relay.example", cada_s=0))
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if tray_client.state.update_available[0] == "9.9.10":
+                break
+        tarea.cancel()
+
+    with caplog.at_level(logging.INFO):
+        asyncio.run(correr())
+    assert tray_client.state.update_available == ("9.9.10", "https://x/v9.9.10.zip", "h10")
+    # Una linea por version nueva, no una cada 30 minutos.
+    assert sum("Update available: v9.9.10" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_si_no_se_pudo_consultar_queda_la_version_de_antes(monkeypatch):
+    monkeypatch.setattr(tray_client.state, "update_available", ("9.9.9", "https://x/v9.9.9.zip", "h9"))
+    monkeypatch.setattr(tray_client, "check_for_update", lambda url: (None, None, None))
+    assert tray_client.anotar_actualizacion("wss://relay.example") == (None, None, None)
+    assert tray_client.state.update_available == ("9.9.9", "https://x/v9.9.9.zip", "h9")
+
+
 # ------------------------------------------------------- estado en el log
 # Un log de usuario no decia si el tablero llego a estar en vivo ni con que
 # vehiculo, justo cuando ATS 1.61 agrego autos manejables.

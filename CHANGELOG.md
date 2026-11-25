@@ -4,6 +4,20 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Update now: with Truck Dash left open since before a new release, the update failed every
+  time with "Downloaded file does not match the published SHA-256" until Truck Dash was
+  restarted: it downloaded the newest version but checked it against the checksum of the one
+  it had seen at startup. It now asks for the latest version again when you click the button,
+  and the version Setup offers stays current while Truck Dash is open. The relay now sends the
+  download of that exact version, so earlier versions of the client no longer fail like this
+  either.
+- When an update failed, Setup didn't say so: it stayed on "Downloading update..." with the
+  button greyed out, and looked frozen. It now shows the error, and you can try again.
+- "Check for updates" now says when there is a new version, even with the update bar already
+  showing. Before, the button seemed to do nothing.
+
 ## 1.5.47 (2026-11-24)
 
 - Build my map: mods packed in parts are now read: a "base" folder, plus "dlc_" folders for the
