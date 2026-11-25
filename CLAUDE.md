@@ -84,16 +84,27 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   app (con solo `?g=` Cloudflare les daba el grafo de antes de la 1.62): el PR
   que sube la version de `ats` o `ets2` se abre con el mapa ya en R2 y trae
   `tools/avisos-golden.json` regenerado (`check_avisos.js --update`).
-- Otra regla de Cloudflare (WAF, plan Free: sin regex) bloquea los mapas
-  sin Referer de trucksim-dash.com o de la copia LAN (`http://`), salvo con
-  el header `x-truckdash-tools` igual al secreto `TRUCKDASH_MAPS_KEY` (en
-  Actions y en la PC del maintainer). check_avisos, el simulador y
+- Otra regla de Cloudflare (WAF, plan Free: sin regex) deja los mapas solo a
+  la web propia, a la copia LAN (siempre el puerto 27765), a un servidor de
+  desarrollo en localhost y a la app nativa, o con el header
+  `x-truckdash-tools` igual al secreto `TRUCKDASH_MAPS_KEY` (en Actions y en
+  la PC del maintainer). La expresion y la prueba que se corre despues de
+  cada Deploy estan en el taller (`regla-mapas-cloudflare.md`,
+  `probar_regla_mapas.py`), no aca.
+  check_avisos, el simulador y
   `check_map_*` lo mandan solo a maps.trucksim-dash.com; sin el secreto,
   check_avisos se saltea con un aviso (el PR de un fork no lo recibe).
   Si se cambia el secreto, en los tres lugares a la vez (GitHub, la regla
   con su Deploy, la PC), o check_avisos falla con 403. La URL r2.dev del
   bucket esta apagada (saltearia la regla); el CORS del bucket queda en `*`
   porque el modo LAN pide desde direcciones que cambian en cada casa.
+- Las paginas con mapa o con cuenta (/app/, /live/, /account/, /vtc/) no cargan
+  adentro de un marco de otro sitio: el guard es el primer script del `<head>`,
+  igual en las cuatro, y lleva a `framed.html`. Un iframe pedia los mapas con
+  nuestro Referer y la regla lo dejaba pasar (25-11). Una pagina nueva con mapa
+  o con cuenta lo lleva (smoke_web lo prueba). /dash/ y /overlay/ no: no tienen
+  mapa y hay quien los pone en un panel propio. Solo en el dominio propio, la
+  copia LAN no se toca.
 - El pais de cada viaje en la cuenta sale de `app/data/city_regions.json` de
   truckdash-loginapp (`build_city_regions.py` del taller, todas las variantes
   juntas): un mapa con ciudades nuevas va con la tabla regenerada. Sin eso, la

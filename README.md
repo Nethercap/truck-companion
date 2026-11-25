@@ -159,6 +159,14 @@ official. They also need their own relay and map hosting: the Truck Dash relay
 and maps only answer pages served from trucksim-dash.com (and the copy the
 client serves on your local network).
 
+### Map data
+
+The license does not cover the map data either: the files on
+`maps.trucksim-dash.com` and the lists in `docs/data/` come from the game and,
+for modded maps, from each mod, and they belong to SCS Software and to the
+authors of those mods. They are here only so that Truck Dash can show them;
+see the [terms](https://trucksim-dash.com/terms.html).
+
 The country flag font used on the account page
 (`docs/assets/TwemojiCountryFlags.woff2`) is a subset of Twemoji Mozilla,
 from [country-flag-emoji-polyfill](https://github.com/talkjs/country-flag-emoji-polyfill);
