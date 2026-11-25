@@ -292,6 +292,11 @@
       privateLocked: (n) => 'This profile is private. Follow ' + n + ' to see their trips once they accept.',
       signInToFollow: 'Sign in to follow',
       navSettings: "Settings",
+      navVtc: "VTC",
+      tripVtc: "Delivered for your company.",
+      tripVtcNo: "It doesn't count for your company.",
+      tripVtcReason: (m) => "Your company's reason: " + m,
+      vtc_member_is_public: "Your profile stays public while you're in a company.",
       dashLabel: "Driver dashboard",
       welcomeBack: (n) => 'Welcome back, ' + n + '!',
       quickDistance: "Distance driven",
@@ -708,6 +713,11 @@
       privateLocked: (n) => 'Este perfil es privado. Seguí a ' + n + ' para ver sus viajes cuando acepte.',
       signInToFollow: 'Entrá para seguir',
       navSettings: "Ajustes",
+      navVtc: "VTC",
+      tripVtc: "Entregado para tu empresa.",
+      tripVtcNo: "No cuenta para tu empresa.",
+      tripVtcReason: (m) => "Motivo de tu empresa: " + m,
+      vtc_member_is_public: "Tu perfil es público mientras estés en una empresa.",
       dashLabel: "Panel del conductor",
       welcomeBack: (n) => 'Hola de nuevo, ' + n + '!',
       quickDistance: "Distancia manejada",
@@ -1521,9 +1531,43 @@
       pedirNombre(PARAMS.get('sugerido') || sugeridoMail || '');
       return;
     }
+    if (volverAVtc()) return;
     pintarCuenta();
+    pintarVtc();
     // Cuantas solicitudes esperan respuesta, para el numerito del menu.
     pedir('/follow').then((r) => { if (r.ok) pintarBadge((r.datos.requests || []).length); });
+  }
+
+  // Vino de la pagina de una VTC a entrar (irAEntrar de vtc.js): de vuelta
+  // ahi. Solo a /vtc/, solo un rato, y no si estaba vinculando la PC.
+  function volverAVtc() {
+    let guardado = null;
+    try {
+      guardado = JSON.parse(sessionStorage.getItem('truckdash_volver'));
+      sessionStorage.removeItem('truckdash_volver');
+    } catch (e) {}
+    if (!guardado || linkPendiente() || typeof guardado.a !== 'string' || guardado.a.indexOf('/vtc/') !== 0) return false;
+    if (Date.now() - guardado.cuando > 30 * 60 * 1000) return false;
+    location.replace(guardado.a);
+    return true;
+  }
+
+  // La VTC: el link del menu (si esta abierta para esta cuenta) y la empresa
+  // debajo del nombre.
+  async function pintarVtc() {
+    const { ok, datos } = await pedir('/vtc/me');
+    if (!ok || !datos.enabled) return;
+    $('navVtc').hidden = false;
+    pintarEmpresa(datos.vtc);
+  }
+
+  function pintarEmpresa(v) {
+    const caja = $('userVtc');
+    caja.hidden = !v;
+    if (!v) return;
+    caja.href = '/vtc/?' + encodeURIComponent(v.tag);
+    caja.textContent = '[' + v.tag + '] ' + v.name;
+    caja.style.setProperty('--e', v.color || 'var(--accent)');
   }
 
   function mostrarErrorDeVuelta() {
@@ -2352,6 +2396,11 @@
     // Paso un tope del servidor (tramos o puntos): se dice que falta, para
     // que un hueco en el mapa o unos km de menos no parezcan un error.
     if (d.trimmed) sumar(caja, renglon([t('tripTrimmed')]));
+    // Un viaje para la VTC: si cuenta, y si la empresa lo saco, por que.
+    if (d.vtc && d.status === 'delivered') {
+      sumar(caja, renglon([t(d.vtc_counts ? 'tripVtc' : 'tripVtcNo'),
+        d.vtc_review_reason ? t('tripVtcReason', d.vtc_review_reason) : null]));
+    }
     // Abandonado no es un error nuestro ni del jugador: dejamos de verlo. Lo
     // mas comun es haberlo entregado con el cliente cerrado, y sin esto
     // llegaba como "entregue y dice abandonado".
@@ -2659,6 +2708,7 @@
     if (!p) return;
     $('displayName').textContent = p.user.username;
     pintarTitulo(p.user.title);
+    pintarEmpresa(p.vtc);
     $('dashLabel').textContent = t('publicLabel');
     // Son las de otra persona: "Your stats" no va.
     const tituloStats = document.querySelector('#cardStats h2');

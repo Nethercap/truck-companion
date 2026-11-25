@@ -109,6 +109,22 @@
   </div>
   <div class="status" id="status">Enter the admin key to load stats.</div>
 
+  <!-- ------------------------------------------------ VTC -->
+  <!-- Las empresas virtuales y sus reportes (/admin/vtcs de la API de
+       cuentas). Ocultar una la saca del directorio y de su pagina publica;
+       sus miembros la siguen viendo. -->
+  <details class="sec" data-sec="vtcs" id="vtcsSec" hidden>
+    <summary>Virtual companies <span class="note" id="vtcsNote"></span></summary>
+    <div class="body">
+      <h3>Open reports</h3>
+      <div class="tableWrap"><table><thead><tr><th>Company</th><th>Reason</th><th>Text</th><th>By</th><th>When</th><th></th></tr></thead><tbody id="vtcReportsBody"></tbody></table></div>
+      <div class="pager" data-for="vtcReportsBody"></div>
+      <h3>Companies</h3>
+      <div class="tableWrap"><table><thead><tr><th>Company</th><th>Founder</th><th>Founded</th><th>Members</th><th>Deliveries</th><th>km</th><th></th></tr></thead><tbody id="vtcsBody"></tbody></table></div>
+      <div class="pager" data-for="vtcsBody"></div>
+    </div>
+  </details>
+
   <!-- ------------------------------------------------ reportes de navegacion -->
   <!-- Los de la app (Ajustes > "Report a navigation problem"), en la API de
        cuentas (/admin/nav-reports). Se arreglan de a tandas: con 10 abiertos
@@ -520,6 +536,36 @@ $('copyOpenBtn').addEventListener('click', async () => {
   }
 });
 
+// ---- VTC ----
+const VTCS_URL = 'https://api.trucksim-dash.com/admin/vtcs';
+const VTC_URL = 'https://api.trucksim-dash.com/admin/vtc';
+function pintarVtcs(d) {
+  const vivas = d.vtcs.filter(v => !v.dissolved);
+  $('vtcsNote').textContent = `· ${vivas.length} companies, ${vivas.reduce((a, v) => a + v.members, 0)} members${d.reports.length ? `, ${d.reports.length} open reports` : ''}`;
+  const empresa = (v) => `<a href="/vtc/?${encodeURIComponent(v.tag)}" target="_blank" rel="noopener"><b>[${escapeHtml(v.tag)}]</b> ${escapeHtml(v.name)}</a>`;
+  paginar('vtcReportsBody', d.reports.map(r => `<tr><td>${empresa(r)}</td><td>${escapeHtml(r.reason)}</td><td>${escapeHtml(r.text || '')}</td><td>${escapeHtml(r.by || '—')}</td><td class="muted">${fecha(r.created_at)}</td>
+    <td><button type="button" data-vtc-hide="${escapeHtml(r.tag)}" data-hidden="1">Hide company</button> <button type="button" data-vtc-resolve="${r.id}">Nothing to do</button></td></tr>`), 'No open reports', 6);
+  paginar('vtcsBody', d.vtcs.map(v => `<tr><td>${empresa(v)}${v.slogan ? `<br><span class="muted">${escapeHtml(v.slogan)}</span>` : ''}</td><td>${escapeHtml(v.founder || '—')}</td><td class="muted">${fecha(v.created_at).slice(0, 10)}</td><td>${fmt(v.members)}</td><td>${fmt(v.deliveries)}</td><td>${fmt(Math.round(v.km))}</td>
+    <td>${v.dissolved ? '<span class="muted">dissolved</span>' : `<button type="button" data-vtc-hide="${escapeHtml(v.tag)}" data-hidden="${v.hidden ? '' : '1'}">${v.hidden ? 'Show again' : 'Hide'}</button>`}</td></tr>`), 'No companies yet', 7);
+  $('vtcsSec').hidden = false;
+}
+async function cargarVtcs(key) {
+  const r = await traer(VTCS_URL, key);
+  if (r.datos) pintarVtcs(r.datos);
+  return r;
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-vtc-hide], [data-vtc-resolve]');
+  if (!b) return;
+  const key = keyInput.value.trim();
+  const ocultar = b.dataset.hidden === '1';
+  if (b.dataset.vtcHide && !confirm(`${ocultar ? 'Hide' : 'Show'} [${b.dataset.vtcHide}]?`)) return;
+  b.disabled = true;
+  const res = await fetch(b.dataset.vtcHide ? `${VTC_URL}/hide` : `${VTC_URL}/reports/${b.dataset.vtcResolve}/resolve`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key }, body: JSON.stringify(b.dataset.vtcHide ? { tag: b.dataset.vtcHide, hidden: ocultar } : {}) });
+  if (res.ok) cargarVtcs(key); else { alert(`HTTP ${res.status}`); b.disabled = false; }
+});
+
 async function traer(url, key) {
   const res = await fetch(url, { headers: { 'X-Admin-Key': key } });
   if (res.status === 403) return { prohibido: true };
@@ -532,6 +578,8 @@ async function loadStats() {
   if (!key) { statusEl.textContent = 'Enter the admin key to load stats.'; statusEl.className = 'status'; return; }
   statusEl.textContent = 'Loading...';
   statusEl.className = 'status';
+  // Una API de cuentas de antes de la VTC no tiene /admin/vtcs: la seccion no sale.
+  cargarVtcs(key).catch(() => {});
   const [relay, cuentas, reportes] = await Promise.allSettled([traer(RELAY_URL, key), traer(ACCOUNTS_URL, key), cargarReportes(key)]);
   const partes = [];
   if (reportes.status === 'fulfilled' && reportes.value.datos) partes.push('reports ok');
@@ -595,6 +643,7 @@ $('forgetBtn').addEventListener('click', () => {
   $('relaySec').hidden = true;
   $('accountsSec').hidden = true;
   $('reportsSec').hidden = true;
+  $('vtcsSec').hidden = true;
   statusEl.textContent = 'Key forgotten. Enter the admin key to load stats.';
   statusEl.className = 'status';
 });

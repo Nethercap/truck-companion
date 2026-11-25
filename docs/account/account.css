@@ -129,6 +129,10 @@ input[type="text"], #usernameInput {
 }
 .titulo-usuario::before { content: '\2605'; }
 .titulo-usuario[hidden] { display: none; }
+/* Su empresa (VTC), del color de ella. */
+.empresa-usuario { display: inline-block; margin: 0.2rem 0 0.1rem; font-size: 0.88rem; font-weight: 600; color: var(--e, var(--accent)); text-decoration: none; }
+.empresa-usuario:hover { text-decoration: underline; }
+.empresa-usuario[hidden] { display: none; }
 
 .logins, .sessions { list-style: none; margin: 0; padding: 0; }
 .logins li, .sessions li {
@@ -306,6 +310,7 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
   border-bottom: 1px solid var(--line);
 }
 .lado a:last-child { border-bottom: none; }
+.lado a[hidden] { display: none; }
 .lado a:hover { background: #1d2127; }
 .lado a.activo { background: #1f2630; box-shadow: inset 3px 0 0 var(--accent); }
 .lado svg { width: 1.1em; height: 1.1em; fill: var(--warn); flex: none; }
