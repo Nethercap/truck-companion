@@ -4,13 +4,14 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.49 (2026-11-25)
 
 - Coach jobs with more than 16 legs: all the stops are there, up to 65. The plugin kept 16 legs
   (the base game allows 9), so on a job of 30 stops, like the ones on HaulMP, the dashboard said
   16 and from stop 18 on it kept sending you back to stop 17. The plugin in your game is replaced
   on its own the next time Truck Dash runs with the game closed; until then, the total is right
-  and past stop 17 it just doesn't know the next stop.
+  and past stop 17 it just doesn't know the next stop. Trips of a linked account keep every
+  stop too.
 
 ## 1.5.48 (2026-11-25)
 
