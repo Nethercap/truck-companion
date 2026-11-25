@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.48 (2026-11-25)
 
 - Update now: with Truck Dash left open since before a new release, the update failed every
   time with "Downloaded file does not match the published SHA-256" until Truck Dash was
