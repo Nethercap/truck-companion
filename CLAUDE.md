@@ -14,7 +14,7 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   event loop para todas las conexiones). Un `TestClient` suelto corre cada
   conexion en su propio thread y los tests se cuelgan a veces en CI.
 - Todo cambio en `docs/` sube `CACHE_NAME` en `docs/app/sw.js` y el `?v=`
-  de `docs/{app,account,dash,overlay}/index.html` y del APP_SHELL (mismo token en todos).
+  de `docs/{app,account,dash,overlay,vtc}/index.html` y del APP_SHELL (mismo token en todos).
 - El `?v=` tiene que seguir siendo fecha y letra (`20261106c`): con el, una pestana
   abierta se entera de que hay web nueva (`checkWebUpdate`, `webUpdateAction`, cada 30
   min). Lee el de `app.js` en `sw.js`, y en LAN el de `index.html` de la copia del
@@ -40,6 +40,24 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - La guia (`docs/guide/`) tiene su propio `?v=` en `docs/guide/index.html`:
   subirlo al tocar `text.js`, `text_extra.js` o `guide.css`. Las 8 lenguas
   llevan las mismas secciones (`test_guide.js`).
+
+## VTC (24-11)
+
+- Paginas en `docs/vtc/` (directorio, empresa `/vtc/?TAG`, fundar, invitacion), sobre la
+  API de cuentas (`/vtc/*` de truckdash-loginapp; el plan es `vtc-plan.md` de ese repo).
+  Las reglas las decide la API: aca se muestran sus respuestas. Apagadas en produccion
+  hasta que la API tenga `VTC_ABIERTO=1` (o el usuario en `VTC_BETA`): `/vtc/me` dice
+  `enabled` y sin eso no hay link en la cuenta.
+- Lo que escribe la gente entra al DOM como texto: todo nodo se arma con `el()` de
+  `vtc.js` (append, nunca innerHTML). Los links de una empresa los valida la API.
+- Textos en `docs/vtc/i18n.js`, los ocho idiomas en el mismo archivo.
+  `node --test docs/vtc/test_vtc.js` controla claves, huecos y los motivos que devuelve
+  la API: uno nuevo alla va en su lista y en los ocho idiomas.
+- `qr.js` es propio (la web no carga JS de terceros) y se compara con la libreria de
+  Python que usa el cliente. `tarjeta.js` solo dibuja; el logo es el icono del servidor
+  de Discord (con CORS; si no carga, va el tag).
+- Entrar desde `/vtc/` deja en sessionStorage a donde volver (`truckdash_volver`,
+  30 minutos) y `account.js` vuelve solo a rutas `/vtc/`.
 
 ## Datos de mapa y R2
 

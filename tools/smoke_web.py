@@ -128,15 +128,16 @@ def main():
         # 3) Las demas paginas cargan sin errores de JavaScript
         b, page, errores = pagina(p, CON_WEBGL, base)
         for ruta, selector in (("/", "#mods"), ("/es/", "#mods"), ("/de/", "#mods"), ("/fr/", "#mods"), ("/pt/", "#mods"),
-                        ("/pl/", "#mods"), ("/tr/", "#mods"), ("/ru/", "#mods"), ("/guide/", "body"), ("/account/", "body"),
+                        ("/pl/", "#mods"), ("/tr/", "#mods"), ("/ru/", "#mods"), ("/guide/", "body"), ("/account/", "body"), ("/vtc/", "#main .notice"),
                                ("/overlay/", "#setup:not([hidden])")):
             errores.clear()
             page.goto(base + ruta)
             page.wait_for_timeout(2500)
             hay = page.query_selector(selector) is not None
             # La API de cuentas solo acepta pedidos desde trucksim-dash.com: desde
-            # 127.0.0.1 el navegador los corta por CORS, y eso no es de la pagina.
-            propios = [e for e in errores if ruta != "/account/" or not ("CORS policy" in e or "Failed to fetch" in e)]
+            # 127.0.0.1 el navegador los corta por CORS, y eso no es de la pagina
+            # (la de VTC muestra que el servicio no responde).
+            propios = [e for e in errores if ruta not in ("/account/", "/vtc/") or not ("CORS policy" in e or "Failed to fetch" in e)]
             chequear(f"{ruta}: carga sin errores", hay and not propios, "; ".join(propios[:3]))
         b.close()
 
