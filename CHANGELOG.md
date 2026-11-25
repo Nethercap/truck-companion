@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.48 (2026-11-25)
 
 - Update now: with Truck Dash left open since before a new release, the update failed every
   time with "Downloaded file does not match the published SHA-256" until Truck Dash was
@@ -17,6 +17,16 @@ updates on its own and is not versioned here.
   button greyed out, and looked frozen. It now shows the error, and you can try again.
 - "Check for updates" now says when there is a new version, even with the update bar already
   showing. Before, the button seemed to do nothing.
+- Build my map: with version 1.5.47, a protected map mod (Beyond by Terramaps in a player's log)
+  could stop the whole build at "parsing usa sector files", where before it was only missing
+  from the map. The mod now opened, but most of its files still couldn't be read, and the
+  builder stopped at the first sector it couldn't find. Now:
+  - A sector that can't be read is skipped, with the name of its mod in the build log.
+  - Files compressed with the two methods the builder didn't support are read: 872 of that
+    mod's files said "unsupported compression type 2".
+  - Entries the builder rejected are read a second time, the way other tools read them.
+  - The build log now says how many entries were read that way, and why each skipped one was
+    left out. We still don't have the files to test with, so please send us the build log.
 
 ## 1.5.47 (2026-11-24)
 
