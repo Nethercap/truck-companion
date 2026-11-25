@@ -1042,7 +1042,7 @@ def update_job_snapshot(raw: dict):
     if raw.get("onJob") and (raw.get("cityDst") or bus):
         _last_job_snapshot = {
             "citySrc": (bus["stops"][0].get("name") if bus else raw.get("citySrc")) or None,
-            "cityDst": (bus["stops"][-1].get("name") if bus else raw.get("cityDst")) or None,
+            "cityDst": (trabajo_bus.ultima_parada(bus).get("name") if bus else raw.get("cityDst")) or None,
             "truckBrand": raw.get("truckBrand") or None,
             "truckName": raw.get("truckName") or None,
             "cargo": raw.get("cargo") or None,

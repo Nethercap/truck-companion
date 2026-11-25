@@ -4549,7 +4549,10 @@ function turnReportJobLine(d) {
 // real, y entre corchetes a la que va la ruta (busJobOf). En el reporte #48
 // (13-11, linea de Oslo a Liepaja) la ruta iba a Jonkoping mientras el bus paraba
 // en Linkoping, y despues a Liepaja con el GPS del juego por otro lado: sin la
-// tabla no se podia saber que decia el cliente. Sin bus, nada.
+// tabla no se podia saber que decia el cliente. Una linea larga (30 paradas en
+// HaulMP, 25-11) va alrededor de la parada que sigue, con cuantas quedan afuera
+// de cada lado: cortada por el final, en la mitad del viaje no se veia. Sin bus,
+// nada.
 const TURN_REPORT_BUS_CHARS = 420;
 function turnReportBusLine(d) {
   const bus = busJobOf(d);
@@ -4561,8 +4564,16 @@ function turnReportBusLine(d) {
     const nombre = `${p.type && p.type !== 'city' ? `${p.type}:` : ''}${p.id || p.name || '?'}`;
     const llego = Number.isFinite(p.arrivalActual) && p.arrivalActual > 0 ? ' (arrived)' : '';
     return k === bus.nextIndex ? `[${nombre}]${llego}` : `${nombre}${llego}`;
-  }).join(' -> ');
-  const linea = `Bus: ${etapa}${cambios}: ${paradas}`;
+  });
+  let desde = 0;
+  let hasta = paradas.length;
+  const armar = () => `Bus: ${etapa}${cambios}: ${desde ? `(${desde} before) ` : ''}${paradas.slice(desde, hasta).join(' -> ')}`
+    + (hasta < paradas.length ? ` (${paradas.length - hasta} after)` : '');
+  while (armar().length > TURN_REPORT_BUS_CHARS && hasta - desde > 1) {
+    if (bus.nextIndex - desde >= hasta - 1 - bus.nextIndex) desde++;
+    else hasta--;
+  }
+  const linea = armar();
   return linea.length > TURN_REPORT_BUS_CHARS ? `${linea.slice(0, TURN_REPORT_BUS_CHARS - 3)}...` : linea;
 }
 

@@ -54,10 +54,15 @@
 #define SUBSTANCE_SIZE 25
 
 // Truck Dash: bus jobs (Coaches, ETS2 1.62.3). The game allows up to 10
-// stops per route (stops_per_route_max in def/bus_economy_data.sii), so 9
-// stages; mods can raise it, hence the room for 16.
-#define BUS_ZONE_REVISION 1
-#define BUS_STAGES_MAX 16
+// stops per route (stops_per_route_max in def/bus_economy_data.sii), but a
+// player had a job of 30 on HaulMP (25-11-2026). Revision 1 of the zone kept
+// both ends of up to 16 stages and the rest was lost. Stage k goes from stop
+// k to stop k + 1, so revision 2 keeps one record per stop, and 65 of them
+// (64 stages) fit in the block.
+#define BUS_ZONE_REVISION 2
+#define BUS_STOPS_MAX 65
+#define BUS_TYPE_SIZE 24
+#define BUS_ID_SIZE 48
 
 bool check_min_version(unsigned const int min_ets2, unsigned const int min_ats);
 bool check_max_version(unsigned const int min_ets2, unsigned const int min_ats);
@@ -158,15 +163,17 @@ typedef struct scsTrailer_s { // Size: 1560
 }scsTrailer_t;
 
 /**
- * \brief Truck Dash: one end of a bus job stage, `source_stop.*` or
- * `destination_stop.*` of the `bus_job` configuration (an indexed attribute,
- * one index per stage). Times are absolute game minutes, like
+ * \brief Truck Dash: one stop of a bus job. The `bus_job` configuration sends
+ * each stage with its two ends (`source_stop.*` and `destination_stop.*`, an
+ * index per stage): the arrival and the passengers getting off come with the
+ * stage that ends here, the departure and the ones getting on with the stage
+ * that starts here. Times are absolute game minutes, like
  * `common_ui.time_abs`; 0 while the game has not sent them (the actual ones
- * come once it happens). Size 224.
+ * come once it happens). Size 168.
  */
 typedef struct {
-	char type[stringsize];  // "city" or "viewpoints" in the first coach jobs seen
-	char id[stringsize];    // city token, or the viewpoint (album.viewpoints.<id>)
+	char type[BUS_TYPE_SIZE];  // "city" or "viewpoints" in the first coach jobs seen
+	char id[BUS_ID_SIZE];      // city token, or the viewpoint (album.viewpoints.<id>)
 	char name[stringsize];
 	unsigned int arrivalPlanned;
 	unsigned int arrivalActual;
@@ -177,11 +184,6 @@ typedef struct {
 	unsigned int leavingPlanned;   // passengers getting off
 	unsigned int leavingActual;
 }scsBusStop_t;
-
-typedef struct {
-	scsBusStop_t source;
-	scsBusStop_t destination;
-}scsBusStage_t;
 
 /**
    *  \brief Telemetry object
@@ -609,12 +611,12 @@ typedef struct scsTelemetryMap_s
 		unsigned int stageCount;    // bus.stages.count; 0 without a bus job
 		unsigned int stageCurrent;  // bus.stages.current, from 0
 		unsigned int updates;       // +1 with every bus_job configuration
-		scsBusStage_t stage[BUS_STAGES_MAX];
+		scsBusStop_t stop[BUS_STOPS_MAX];  // stageCount + 1 in use
 	}bus;
-	//----- END OF 15TH ZONE AT OFFSET 28783 -----//
+	//----- END OF 15TH ZONE AT OFFSET 32535 -----//
 } scsTelemetryMap_t;
 
-static_assert(sizeof(scsBusStage_t) == 448, "scsBusStage_t layout");
+static_assert(sizeof(scsBusStop_t) == 168, "scsBusStop_t layout");
 static_assert(offsetof(scsTelemetryMap_t, bus) == 21600, "bus zone offset");
 static_assert(sizeof(scsTelemetryMap_t) <= SCS_PLUGIN_MMF_SIZE, "the map fits the block");
 

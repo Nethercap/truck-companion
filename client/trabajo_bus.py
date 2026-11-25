@@ -1,11 +1,16 @@
 """Los trabajos de bus del DLC Coaches (ETS2 1.62.3), como los lee el cliente.
 
-El plugin guarda las etapas del trabajo en su zona de bus (plugin/,
-`scsTelemetryMap_t.bus`) y telemetry_compat.get_data() las deja en
-`raw["bus"]`: una etapa por indice, cada una con su parada de origen y la de
-destino, como las manda el juego (`source_stop.*`, `destination_stop.*`). Aca
-se pasan a una lista de paradas en orden, que es lo que sirve para mostrar:
-la parada k es el destino de la etapa k-1 y el origen de la etapa k.
+El juego manda una etapa por indice, cada una con su parada de origen y la de
+destino (`source_stop.*`, `destination_stop.*`). El plugin las guarda en su zona
+de bus (plugin/, `scsTelemetryMap_t.bus`) ya como paradas en orden (la parada k
+es el destino de la etapa k-1 y el origen de la etapa k) y
+telemetry_compat.get_data() las deja en `raw["bus"]`. El de la 1.5.40 a la
+1.5.48 guardaba las dos puntas de cada etapa: aca se juntan igual.
+
+Lo que no entra en el bloque (mas de 64 etapas, o mas de 16 con aquel plugin: un
+trabajo de 30 paradas en HaulMP, 25-11-2026) va como parada sin datos: el total
+y la etapa en curso son los de verdad, y la proxima parada queda sin saberse. Con
+la lista cortada, desde la parada 18 el tablero mandaba de vuelta a la 17.
 
 Lo visto en el game.log.txt de un trabajo de bus de punta a punta (12-11-2026,
 turismo Oulu -> mirador de Viitasaari -> Oulu): dos etapas, el tipo de parada
@@ -18,6 +23,10 @@ salida real de la etapa siguiente: el reloj se adelanta en la parada) y al
 llegar a la ultima (la etapa queda en 1 y llega la llegada real). Unos 40 s
 despues, `bus_job.completed`. Ningun evento en las paradas del medio.
 """
+
+# Un numero de etapas mas grande no es de un trabajo de verdad, y la lista de
+# paradas viaja en cada dato.
+ETAPAS_MAX = 255
 
 # (campo de la parada que arma esto, campo de la etapa del plugin, de que lado
 # de la etapa es propio). La llegada y los que bajan son del destino de la etapa
@@ -64,31 +73,44 @@ def del_raw(raw: dict) -> dict | None:
 
     `stage` es la etapa en curso, que va de stops[stage] a stops[stage + 1].
     `updates` cuenta las configuraciones `bus_job` que llegaron (sirve para
-    ver en el log cuando el juego cambia algo)."""
+    ver en el log cuando el juego cambia algo). Una parada que no entro en el
+    bloque del plugin es un dict vacio."""
     bus = raw.get("bus")
     if not raw.get("onJob") or not bus:
         return None
-    etapas = bus.get("stages") or []
-    if not etapas:
+    paradas = [_parada(p, p) for p in bus.get("stops") or []] or _de_las_etapas(bus.get("stages") or [])
+    if len(paradas) < 2 or not any(p.get("id") or p.get("name") for p in paradas):
         return None
-    paradas = [_parada(None, etapas[0].get("source"))]
-    for i, etapa in enumerate(etapas):
-        siguiente = etapas[i + 1].get("source") if i + 1 < len(etapas) else None
-        paradas.append(_parada(etapa.get("destination"), siguiente))
-    if not any(p.get("id") or p.get("name") for p in paradas):
-        return None
+    total = min(max(bus.get("stageCount") or 0, len(paradas) - 1), ETAPAS_MAX)
+    paradas += [{} for _ in range(total + 1 - len(paradas))]
     actual = bus.get("stageCurrent") or 0
     return {
-        "stage": min(max(actual, 0), len(etapas) - 1),
-        "stages": len(etapas),
+        "stage": min(max(actual, 0), total - 1),
+        "stages": total,
         "updates": bus.get("updates") or 0,
         "stops": paradas,
     }
 
 
+def _de_las_etapas(etapas: list) -> list:
+    """Las paradas de un plugin con la revision 1 de la zona."""
+    if not etapas:
+        return []
+    paradas = [_parada(None, etapas[0].get("source"))]
+    for i, etapa in enumerate(etapas):
+        siguiente = etapas[i + 1].get("source") if i + 1 < len(etapas) else None
+        paradas.append(_parada(etapa.get("destination"), siguiente))
+    return paradas
+
+
 def proxima_parada(bus: dict) -> dict:
     """A donde va el bus ahora: el destino de la etapa en curso."""
     return bus["stops"][bus["stage"] + 1]
+
+
+def ultima_parada(bus: dict) -> dict:
+    """La ultima que se sabe cual es (las que no entraron no tienen datos)."""
+    return next(p for p in reversed(bus["stops"]) if p.get("id") or p.get("name"))
 
 
 def es_ciudad(parada: dict) -> bool:

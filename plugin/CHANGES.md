@@ -63,11 +63,18 @@ something changes (it came back with the actual departure time after the
 boarding scene).
 
 They go to a zone of their own at the end of the block, offset 21600
-(`bus` in `scsTelemetryMap_t`): `revision` (`BUS_ZONE_REVISION`, 1),
+(`bus` in `scsTelemetryMap_t`): `revision` (`BUS_ZONE_REVISION`, 2),
 `stageCount`, `stageCurrent`, `updates` (one more per `bus_job`
-configuration) and up to 16 stages, each with both ends (`scsBusStop_t`:
-type, id, name and the eight numbers, `*.actual` passengers included in case
-the game sends them). The zone is cleared and filled again with every
+configuration) and up to 65 stops (`scsBusStop_t`: type, id, name and the
+eight numbers, `*.actual` passengers included in case the game sends them).
+Stage k goes from stop k to stop k + 1: the arrival and the passengers
+getting off come from the stage that ends at the stop, the departure and the
+ones getting on from the stage that starts there. Revision 1 (client 1.5.40
+to 1.5.48) kept both ends of up to 16 stages, and the rest of a longer job
+was lost: a player had one of 30 stops on HaulMP (25-11-2026), and from stop
+18 on the dashboard kept sending them back to stop 17. One record per stop
+makes 64 stages fit in the same 32 KB block, so nothing that opens it has to
+change its size. The zone is cleared and filled again with every
 non-empty `bus_job` configuration, cleared by any other non-empty job
 configuration, and cleared when the job ends. `client/telemetry_compat.py`
 reads it with the same offsets.
