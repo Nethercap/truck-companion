@@ -38,7 +38,7 @@ OTHER_DLL_NAME = "scs-telemetry.dll"
 # de TruckersMP y los botones (plugin/). La DLL y su hash los escribe el workflow
 # "Build plugin" (tools/pin_plugin.py). La version tambien va en
 # truckersmp_init (plugin/scs-telemetry/src/truckersmp_players.cpp).
-PLUGIN_DLL_VERSION = "1.12.1-truckdash.6"
+PLUGIN_DLL_VERSION = "1.12.1-truckdash.7"
 PLUGIN_DLL_SHA256 = "76f7d98def87e5d3b35b947e36cb7e77253a2e8f069bc7e8316dd783832b3e08"
 # El mismo plugin para macOS, universal (Intel y Apple Silicon): la .dylib y
 # su hash tambien los escribe "Build plugin" (plataforma macos, con
