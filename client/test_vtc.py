@@ -81,7 +81,7 @@ def test_refrescar_lee_y_avisa_una_vez_por_cambio(api):
     v.refrescar()
     v.refrescar()
     assert v.actual == EMPRESA and avisos == ["vtc"]
-    assert api.pedidos[0] == ("GET", "https://api.prueba/vtc/me", None, "tok")
+    assert api.pedidos[0] == ("GET", "https://api.prueba/vtc/me?live_pass=1", None, "tok")
     api.modo = "personal"
     v.refrescar()
     assert avisos == ["vtc", "personal"]
@@ -342,8 +342,11 @@ def test_al_tomar_un_trabajo_se_vuelve_a_mirar_la_empresa(monkeypatch):
     monkeypatch.setattr(tray_client.state.vtc, "despertar", lambda forzar=False: veces.append(forzar))
 
     async def mientras():
+        # Al empezar a manejar, una (el pase del mapa en vivo pudo vencer)
+        await hasta(lambda: veces)
         await asyncio.sleep(0.1)
-        assert veces == []
+        assert veces == [False]
+        veces.clear()
         trabajo[0] = True
         await hasta(lambda: veces)
         await asyncio.sleep(0.1)
@@ -411,3 +414,68 @@ def test_los_textos_estan_en_los_ocho_idiomas():
         assert "{who}" in textos["menu_vtc"], lang
         if lang != "en":
             assert textos["vtc_hint"] != i18n._STRINGS["en"]["vtc_hint"], lang
+
+
+# ------------------------------------------------------ el mapa en vivo
+
+PASE = "cuerpo.firma"
+
+
+def test_el_pase_viene_con_la_empresa(api):
+    api.get = lambda: (200, {**con(), "live_pass": {"pass": PASE, "expires_at": "2026-11-27T20:12:00Z"}})
+    v = api.vtc()
+    v.refrescar()
+    assert v.pase == PASE and v.pase_para_relay() == PASE
+    # En personal no va al relay (el mapa de la empresa no lo ve)
+    api.get = lambda: (200, {**con(mode="personal"), "live_pass": {"pass": PASE}})
+    v.refrescar()
+    assert v.pase == PASE and v.pase_para_relay() is None
+    # Sin empresa, ni pase; uno raro tampoco
+    for datos in ({"enabled": True, "vtc": None, "live_pass": {"pass": PASE}},
+                  {**con(), "live_pass": {"pass": "sin-punto"}}, {**con(), "live_pass": "x"}, con()):
+        api.get = lambda d=datos: (200, d)
+        v.refrescar()
+        assert v.pase_para_relay() is None, datos
+    # Que la API no conteste no lo borra
+    api.get = lambda: (200, {**con(), "live_pass": {"pass": PASE}})
+    v.refrescar()
+    api.get = lambda: (503, {})
+    v.refrescar()
+    assert v.pase_para_relay() == PASE
+
+
+def test_cambiar_el_modo_lo_saca_del_mapa_en_el_acto_y_pide_otro_pase(api):
+    api.get = lambda: (200, {**con(), "live_pass": {"pass": PASE}})
+    v = api.vtc()
+    v.refrescar()
+    despertado = []
+    v.despertar = lambda forzar=False: despertado.append(forzar)
+    assert v.poner_modo("personal") is True
+    assert v.pase_para_relay() is None and despertado == [True]
+
+
+def test_el_pase_va_al_relay_cuando_cambia_y_al_reconectar(monkeypatch):
+    nube = Destino()
+    estado = types.SimpleNamespace(pase=PASE)
+    monkeypatch.setattr(tray_client.state.vtc, "pase_para_relay", lambda: estado.pase)
+
+    async def correr():
+        await tray_client.mandar_pase_vtc(nube)
+        await tray_client.mandar_pase_vtc(nube)  # igual: no se repite
+        estado.pase = None                      # paso a personal o se fue
+        await tray_client.mandar_pase_vtc(nube)
+        await tray_client.mandar_pase_vtc(nube, forzar=True)  # reconecto
+    asyncio.run(correr())
+    assert [m for m in nube.llego] == [{"type": "vtc_pass", "pass": PASE}, {"type": "vtc_pass", "pass": None},
+                                       {"type": "vtc_pass", "pass": None}]
+
+
+def test_el_bucle_manda_el_pase_al_relay_y_no_al_lan(monkeypatch):
+    monkeypatch.setattr(tray_client.state.vtc, "actual", EMPRESA)
+    monkeypatch.setattr(tray_client.state.vtc, "pase", PASE)
+
+    async def mientras():
+        await asyncio.sleep(0.15)
+    nube, lan = bucle_de_telemetria(monkeypatch, mientras)
+    assert [m for m in nube.llego if m.get("type") == "vtc_pass"] == [{"type": "vtc_pass", "pass": PASE}]
+    assert not [m for m in lan.llego if m.get("type") == "vtc_pass"]

@@ -8,6 +8,11 @@ del cliente (`PATCH /vtc/me`, que alcanza al viaje que este abierto).
 Como en account.py, nada de esto levanta ni bloquea: sin cuenta, sin empresa, con
 las VTC apagadas o sin internet, el cliente anda igual y no muestra nada. Que la
 API no conteste no es dejar la empresa: queda lo ultimo que se supo.
+
+Con la misma lectura llega el pase del mapa en vivo de la empresa (vtc_pase.py de
+la API, 12 minutos): el cliente se lo pasa al relay, que asi sabe de que empresa
+es esta sesion. Solo manejando para la empresa (`pase_para_relay`): en personal no
+sale en ningun mapa.
 """
 
 import logging
@@ -30,6 +35,7 @@ _COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 NOMBRE_MAX = 40
 
 SIN_DATO = object()  # la API no contesto, o contesto algo que no se entiende
+PASE_MAX = 4096
 
 
 def de_la_api(datos) -> dict | None:
@@ -50,13 +56,27 @@ def de_la_api(datos) -> dict | None:
             "mode": modo}
 
 
+def pase_de_la_api(datos) -> str | None:
+    """El pase del mapa en vivo de la respuesta de /vtc/me?live_pass=1, si vino."""
+    vivo = datos.get("live_pass") if isinstance(datos, dict) else None
+    pase = vivo.get("pass") if isinstance(vivo, dict) else None
+    return pase if isinstance(pase, str) and 0 < len(pase) <= PASE_MAX and pase.count(".") == 1 else None
+
+
+def traer_con_pase(token: str, settings: dict):
+    """(la empresa de ese token o None si no tiene, el pase o None), o
+    (SIN_DATO, None)."""
+    codigo, datos = account._pedir(account.base_api(settings) + "/vtc/me?live_pass=1", token=token)
+    if codigo == 200:
+        empresa = de_la_api(datos)
+        return empresa, pase_de_la_api(datos) if empresa else None
+    # 401: el token ya no vale. 403 y 404: una API sin VTC, o apagada.
+    return (None, None) if codigo in (401, 403, 404) else (SIN_DATO, None)
+
+
 def traer(token: str, settings: dict):
     """La empresa de ese token, None si no tiene, o SIN_DATO."""
-    codigo, datos = account._pedir(account.base_api(settings) + "/vtc/me", token=token)
-    if codigo == 200:
-        return de_la_api(datos)
-    # 401: el token ya no vale. 403 y 404: una API sin VTC, o apagada.
-    return None if codigo in (401, 403, 404) else SIN_DATO
+    return traer_con_pase(token, settings)[0]
 
 
 def poner(token: str, modo: str, settings: dict) -> int:
@@ -77,6 +97,7 @@ class Vtc:
         self._al_cambiar = al_cambiar
         self._ahora = ahora
         self.actual: dict | None = None
+        self.pase: str | None = None  # el del mapa en vivo, ver pase_para_relay
         self._rev = 0  # sube con cada cambio de modo hecho aca
         self._candado = threading.Lock()   # actual y _rev
         self._cambiando = threading.Lock()  # un cambio de modo por vez
@@ -88,13 +109,20 @@ class Vtc:
         token = account.token_guardado(settings)
         rev = self._rev
         self._pedida_at = self._ahora()
-        nueva = traer(token, settings) if token and self._prendida() else None
+        nueva, pase = traer_con_pase(token, settings) if token and self._prendida() else (None, None)
         with self._candado:
             # Se cambio el modo mientras la respuesta viajaba: es la de antes.
             if nueva is SIN_DATO or rev != self._rev:
                 return
-            antes, self.actual = self.actual, nueva
+            antes, self.actual, self.pase = self.actual, nueva, pase
         self._avisar(antes, nueva)
+
+    def pase_para_relay(self) -> str | None:
+        """El pase que va al relay: solo manejando para la empresa. En personal
+        la empresa no ve nada, ni que se esta manejando (el relay tambien lo
+        mira en el pase, pero asi pasar a personal vale en el acto)."""
+        with self._candado:
+            return self.pase if self.actual and self.actual["mode"] == "vtc" else None
 
     def poner_modo(self, modo: str) -> bool:
         """Cambia el modo en la API. Tarda lo que tarde la red: se llama desde
@@ -118,6 +146,8 @@ class Vtc:
                 nueva = {**antes, "mode": modo}
                 self.actual = nueva
         self._avisar(antes, nueva)
+        # El pase dice el modo de antes: uno nuevo.
+        self.despertar(forzar=True)
         return True
 
     def despertar(self, forzar: bool = False) -> None:

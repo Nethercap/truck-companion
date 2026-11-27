@@ -1,8 +1,9 @@
-// El mapa de viajes de una empresa (pestana Mapa, /vtc/{tag}/map). Como el
-// mapa de la cuenta (account.js, "mapa de todo"): MapLibre y pmtiles de la app
-// (../app/vendor), cargados recien al abrir la pestana, los tiles del juego de
-// R2 con un estilo minimo y lo manejado encima, aca con un color por chofer.
-// Solo dibuja: los datos y la leyenda los pone vtc.js.
+// El mapa de viajes de una empresa (pestana Mapa, /vtc/{tag}/map) y el mapa en
+// vivo (pestana Live, /ws/vtcmap/{id} del relay). Como el mapa de la cuenta
+// (account.js, "mapa de todo"): MapLibre y pmtiles de la app (../app/vendor),
+// cargados recien al abrir la pestana, los tiles del juego de R2 con un estilo
+// minimo y lo manejado encima, aca con un color por chofer. Solo dibuja: los
+// datos y la leyenda los pone vtc.js.
 (function (raiz) {
   'use strict';
   const R2 = 'https://maps.trucksim-dash.com';
@@ -13,6 +14,34 @@
   // leyenda dice cual es cual.
   const PALETA = ['#ff8a3d', '#4dabf7', '#69db7c', '#f783ac', '#ffd43b', '#9775fa', '#3bc9db', '#ff6b6b', '#a9e34b', '#e599f7'];
   const color = (i) => PALETA[i % PALETA.length];
+
+  // Coordenadas del juego a lng/lat: la Lambert de la web (atsToLngLat y
+  // ets2ToLngLat de app.js, con proj4) en forma cerrada, como app/proyeccion.py
+  // de la API. El mapa de viajes llega ya proyectado; el relay manda el juego.
+  const RADIO = 6370997, GRADO = RADIO * Math.PI / 180;
+  function lambert(lat1, lat2, lat0, lon0) {
+    const r = (g) => g * Math.PI / 180, tg = (p) => Math.tan(Math.PI / 4 + p / 2);
+    const p1 = r(lat1), p2 = r(lat2), p0 = r(lat0);
+    const n = Math.log(Math.cos(p1) / Math.cos(p2)) / Math.log(tg(p2) / tg(p1));
+    const f = Math.cos(p1) * Math.pow(tg(p1), n) / n;
+    const rho0 = RADIO * f / Math.pow(tg(p0), n);
+    return (x, y) => {
+      const dy = rho0 - y;
+      const rho = (n < 0 ? -1 : 1) * Math.hypot(x, dy);
+      const theta = n > 0 ? Math.atan2(x, dy) : Math.atan2(-x, -dy);
+      const lat = 2 * Math.atan(Math.pow(RADIO * f / rho, 1 / n)) - Math.PI / 2;
+      return [(r(lon0) + theta / n) * 180 / Math.PI, lat * 180 / Math.PI];
+    };
+  }
+  const ATS = lambert(33, 45, 39, -96), ETS2 = lambert(37, 65, 50, 15);
+  function aLngLat(juego, x, z) {
+    if (juego === 'ats') return ATS(x * 0.000176689948 * GRADO, z * -0.00017706234 * GRADO);
+    const sx = Math.floor(x / 4000), sz = Math.floor(z / 4000);
+    x -= 16660; z -= 4150;
+    // Gran Bretana esta a otra escala: arriba a la izquierda del sector de Calais
+    if (sx <= -8 && sz <= -2 && !(sx === -8 && sz === -2)) { x = (x - 15550) * 0.75; z = (z - 2750) * 0.75; }
+    return ETS2(x * 0.0001729241463 * GRADO, z * -0.000171570875 * GRADO);
+  }
 
   let libs = null;
   let mapa = null;
@@ -170,5 +199,38 @@
       : ['interpolate', ['linear'], ['zoom'], 4, ['case', ['==', ['get', 'd'], d], 2.6, 1.2], 10, ['case', ['==', ['get', 'd'], d], 5, 2.5]]);
   }
 
-  raiz.VtcMapa = { abrir, dibujar, resaltar, cerrar, color, porChofer, PALETA };
+  // En vivo: un punto por camion, con el nombre (sin nombre en el publico
+  // anonimo). `lista` son los jugadores del relay de este juego.
+  let encuadrado = false;
+  function vivos(lista, juego, colorDeLaEmpresa) {
+    if (!mapa || !mapa.getSource('viajes')) return;
+    if (!mapa.getSource('vivos')) {
+      mapa.addSource('vivos', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      mapa.addLayer({ id: 'vivos', type: 'circle', source: 'vivos',
+        paint: { 'circle-color': ['get', 'c'], 'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 5, 10, 8],
+                 'circle-stroke-color': '#0d0f12', 'circle-stroke-width': 2 } });
+      mapa.addLayer({ id: 'vivos-nombre', type: 'symbol', source: 'vivos',
+        layout: { 'text-field': ['get', 'n'], 'text-size': 12, 'text-offset': [0, 1.1], 'text-anchor': 'top', 'text-font': ['Open Sans Regular'] },
+        paint: { 'text-color': '#eee', 'text-halo-color': '#000', 'text-halo-width': 1.2 } });
+    }
+    const puntos = lista.map((j) => aLngLat(juego, j.x, j.z));
+    mapa.getSource('vivos').setData({ type: 'FeatureCollection', features: lista.map((j, i) => ({
+      type: 'Feature', properties: { n: j.name || '', c: j.rankColor || colorDeLaEmpresa || PALETA[0] },
+      geometry: { type: 'Point', coordinates: puntos[i] } })) });
+    // Se encuadra una vez, con los primeros que aparecen; despues lo mueve quien mira.
+    if (!encuadrado && puntos.length) {
+      encuadrado = true;
+      const caja = puntos.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])],
+        [Infinity, Infinity, -Infinity, -Infinity]);
+      mapa.fitBounds([[caja[0], caja[1]], [caja[2], caja[3]]], { padding: 60, maxZoom: 8, duration: 0 });
+    }
+  }
+
+  function irA(juego, x, z) {
+    if (mapa) mapa.jumpTo({ center: aLngLat(juego, x, z), zoom: Math.max(mapa.getZoom(), 9) });
+  }
+
+  function cerrarVivo() { encuadrado = false; }
+
+  raiz.VtcMapa = { abrir, dibujar, resaltar, cerrar, color, porChofer, PALETA, aLngLat, vivos, irA, cerrarVivo };
 })(typeof window !== 'undefined' ? window : globalThis);

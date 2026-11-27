@@ -82,6 +82,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `pintarEmpresa`). El CSS de MapLibre se carga despues y pone `position: relative` a
   `.maplibregl-map`: un contenedor con `position: absolute` necesita un selector mas
   especifico, o queda de alto 0 y el mapa se dibuja escondido.
+- Mapa en vivo de la empresa (27-11, decisiones 4 y 5 del plan): la API firma un pase de
+  12 minutos (`vtc_pase.py` de truckdash-loginapp, en `/vtc/me?live_pass=1`) con la clave
+  `VTC_PASS_KEY`, que va igual en los dos servicios de Railway (API y relay). El cliente lo
+  lee con la misma consulta de siempre (`client/vtc.py`, cada 5 min con el juego) y lo manda
+  al relay como `{"type": "vtc_pass"}` solo en modo empresa (`pase_para_relay`); el relay lo
+  verifica (`vtc_pass_valido`, copia de la de la API con un ejemplo comun en las dos pruebas),
+  no lo reenvia a las pestanas y sirve `/ws/vtcmap/{id de la empresa}`: con el pase de un
+  miembro, todos con nombre; sin pase, lo publico segun `pub` del pase (apagado, anonimo a
+  250 unidades del mundo, o con nombres salvo `out`, y sin nombre con `hn`). Sin la clave,
+  4503. El cliente siempre habla con el relay, tambien en modo LAN: no hizo falta nada para
+  la decision 5. La pestana Live proyecta en el navegador (`aLngLat` de `mapa.js`, la forma
+  cerrada de `proyeccion.py` de la API, probada con sus mismos valores de proj4).
 - Entrar desde `/vtc/` deja en sessionStorage a donde volver (`truckdash_volver`,
   30 minutos) y `account.js` vuelve solo a rutas `/vtc/`.
 
