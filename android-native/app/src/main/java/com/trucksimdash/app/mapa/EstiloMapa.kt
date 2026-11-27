@@ -11,6 +11,9 @@ import kotlin.math.hypot
 /** De donde sale el .pmtiles de una variante: lo decide MapasSinInternet. */
 internal object TilesDeMapa {
     var url: (VarianteMapa) -> String = { it.urlTiles }
+
+    /** El .pmtiles bajado de esa URL de R2, si esta: los pedazos que pide el motor salen de ahi. */
+    var archivoLocal: (String) -> java.io.File? = { null }
 }
 
 internal object CapasMapa {
@@ -31,11 +34,16 @@ internal object CapasMapa {
     const val FUENTE_CIUDADES_RECORRIDO = "ciudades"
     const val FUENTE_ESCUDOS = "road-shields"
     const val FUENTE_ATLAS = "atlas"
+    const val FUENTE_BUSES = "bus-stops"
     const val FUENTE_ESTACIONAMIENTO = "car-parking"
     const val FUENTE_COMBUSTIBLE = "fuel"
     const val PREFIJO_ESCUDO = "road-shield:"
     const val IMAGEN_DESTINO = "bandera-destino"
     const val IMAGEN_CARGA = "bandera-carga"
+
+    /** Las terminales de bus: se dibujan aca, como en la web (addBusStopImages). */
+    const val IMAGEN_BUS_LINEA = "bus_station"
+    const val IMAGEN_BUS_TURISMO = "bus_tourist_stop"
 
     const val IMAGEN_CAMION = "flecha-camion"
 
@@ -144,6 +152,7 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double, a: AparienciaMapa = Ap
         "${CapasMapa.FUENTE_CIUDADES_RECORRIDO}": {"type":"geojson","data":{"type":"FeatureCollection","features":[]}},
         "${CapasMapa.FUENTE_ESCUDOS}": {"type":"geojson","data":{"type":"FeatureCollection","features":[]}},
         "${CapasMapa.FUENTE_ATLAS}": {"type":"geojson","data":{"type":"FeatureCollection","features":[]}},
+        "${CapasMapa.FUENTE_BUSES}": {"type":"geojson","data":{"type":"FeatureCollection","features":[]}},
         "${CapasMapa.FUENTE_ESTACIONAMIENTO}": {"type":"geojson","data":{"type":"FeatureCollection","features":[]}},
         "${CapasMapa.FUENTE_COMBUSTIBLE}": {"type":"geojson","data":{"type":"FeatureCollection","features":[]}},
         "${CapasMapa.FUENTE_OTROS}": {"type":"geojson","data":{"type":"FeatureCollection","features":[]}},
@@ -183,6 +192,9 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double, a: AparienciaMapa = Ap
                    "text-field":["step",["zoom"],"",9,["match",["get","k"],"t",["get","name"],""],11,["get","name"]],
                    "text-size":11,"text-offset":[0,1.3],"text-anchor":"top","text-optional":true},
          "paint":{"text-color":"#ffd166","text-halo-color":"#000","text-halo-width":1}},
+        {"id":"bus-stop","type":"symbol","source":"${CapasMapa.FUENTE_BUSES}","minzoom":$zoomPoi,
+         "layout":{"icon-image":["match",["get","k"],"t",${cadena(CapasMapa.IMAGEN_BUS_TURISMO)},${cadena(CapasMapa.IMAGEN_BUS_LINEA)}],
+                   "icon-size":["interpolate",["linear"],["zoom"],7,0.65,11,0.85],"icon-allow-overlap":true,"icon-ignore-placement":true}},
         {"id":"ferry-poi","type":"symbol","source":"vec","source-layer":$l,"minzoom":7,
          "filter":["in",["get","poiType"],["literal",["ferry","train"]]],
          "layout":{"icon-image":["get","sprite"],"icon-size":["interpolate",["linear"],["zoom"],5,0.5,9,0.8],"icon-allow-overlap":true,"icon-ignore-placement":true}},

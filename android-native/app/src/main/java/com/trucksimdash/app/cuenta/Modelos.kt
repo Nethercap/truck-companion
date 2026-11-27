@@ -106,6 +106,11 @@ data class Viaje(
     val dano: Double?,
     val multas: Double?,
     val nota: String? = null,
+    /** Horas reales de principio a fin, para la tarjeta para compartir. */
+    val horasReales: Double? = null,
+    val entregado: String? = null,
+    /** "car", "bus" o null (camion): como se llama el vehiculo en la tarjeta. */
+    val tipoTrabajo: String? = null,
 ) {
     /** La del juego cuando esta (se sabe al entregar) y la medida mientras tanto. */
     val km: Double? get() = kmJuego ?: kmMedidos
@@ -239,5 +244,8 @@ internal fun parsearViajeLista(lista: List<kotlinx.serialization.json.JsonElemen
             dano = v.numero("damage_delta"),
             multas = v.numero("fines"),
             nota = v.texto("note"),
+            horasReales = v.numero("real_hours"),
+            entregado = v.texto("delivered_at"),
+            tipoTrabajo = v.texto("job_kind"),
         )
     } ?: emptyList()

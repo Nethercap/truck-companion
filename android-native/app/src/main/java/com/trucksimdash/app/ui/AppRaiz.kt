@@ -85,6 +85,8 @@ private fun Pantallas(c: Contenedor, alFlotante: () -> Unit) {
     val catalogo by c.catalogo.collectAsStateWithLifecycle()
     var seccion by rememberSaveable { mutableStateOf(Seccion.Panel) }
     var enAjustes by rememberSaveable { mutableStateOf(false) }
+    // "Mover los botones" de Ajustes: el mapa abre acomodando.
+    var acomodando by rememberSaveable { mutableStateOf(false) }
     var enReporte by rememberSaveable { mutableStateOf(false) }
     var enConvoy by rememberSaveable { mutableStateOf(false) }
     var codigoConvoy by rememberSaveable { mutableStateOf<String?>(null) }
@@ -181,7 +183,18 @@ private fun Pantallas(c: Contenedor, alFlotante: () -> Unit) {
 
     if (enAjustes) {
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            AjustesScreen(estado, ajustes, c.prefs, c.sesion, c.nav, catalogo, alReportar = { enReporte = true }, alTeclas = { enTeclas = true }, alMapasSinInternet = { enSinInternet = true }) { enAjustes = false }
+            AjustesScreen(
+                estado, ajustes, c.prefs, c.sesion, c.nav, catalogo,
+                alReportar = { enReporte = true },
+                alTeclas = { enTeclas = true },
+                alMapasSinInternet = { enSinInternet = true },
+                // "Mover los botones": al mapa, en modo acomodar.
+                alAcomodar = {
+                    enAjustes = false
+                    seccion = Seccion.Mapa
+                    acomodando = true
+                },
+            ) { enAjustes = false }
         }
         return
     }
@@ -201,7 +214,14 @@ private fun Pantallas(c: Contenedor, alFlotante: () -> Unit) {
                     alMirarConvoy = ::mirarConvoy,
                     alAjustes = { enAjustes = true },
                 )
-                Seccion.Mapa -> MapaScreen(estado, ajustes, catalogo, c.prefs, c.nav, alReportar = { enReporte = true }, alConvoy = { enConvoy = true }, alFlotante = alFlotante) { seccion = Seccion.Panel }
+                Seccion.Mapa -> MapaScreen(
+                    estado, ajustes, catalogo, c.prefs, c.nav,
+                    alReportar = { enReporte = true },
+                    alConvoy = { enConvoy = true },
+                    alFlotante = alFlotante,
+                    acomodando = acomodando,
+                    alAcomodado = { acomodando = false },
+                ) { seccion = Seccion.Panel }
                 Seccion.EnVivo -> EnVivoScreen(c.vivo, catalogo, ajustes) { enAjustes = true }
                 Seccion.Stats -> StatsScreen(c.cuenta, ajustes, catalogo) { enAjustes = true }
             }

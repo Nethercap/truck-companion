@@ -355,4 +355,37 @@
     <string name="fallo_titulo">Truck Dash closed unexpectedly</string>
     <string name="fallo_texto">You can share a report with whoever gave you this beta. It has the error, the app\'s recent log and your phone model, not your account or your codes.</string>
     <string name="fallo_seguir">Continue</string>
+
+    <!-- La tarjeta para compartir un viaje o el ano (tarjetaDeViaje y tarjetaDelAno de la cuenta en la web) -->
+    <string name="tarjeta_distancia">Distance</string>
+    <string name="tarjeta_vehiculo">Vehicle</string>
+    <string name="tarjeta_bus">Bus</string>
+    <string name="tarjeta_tiempo">Real time</string>
+    <string name="tarjeta_estado">Status</string>
+    <string name="tarjeta_medida">we tracked %1$s</string>
+    <string name="tarjeta_sin_recorrido">No route was recorded for this trip.</string>
+    <string name="tarjeta_ano_titulo">My %1$d on the road</string>
+    <string name="tarjeta_manejado">driven this year</string>
+    <string name="tarjeta_vueltas">≈ %1$s times around the Earth</string>
+    <string name="tarjeta_al_volante">At the wheel</string>
+    <string name="tarjeta_entregas">Deliveries</string>
+    <string name="tarjeta_dias_manejados">Days driven</string>
+    <string name="tarjeta_racha">Longest streak</string>
+    <string name="tarjeta_recorriste">Visited</string>
+    <plurals name="tarjeta_estados">
+        <item quantity="one">%d state or province</item>
+        <item quantity="other">%d states and provinces</item>
+    </plurals>
+    <plurals name="tarjeta_paises">
+        <item quantity="one">%d country</item>
+        <item quantity="other">%d countries</item>
+    </plurals>
+    <plurals name="tarjeta_dias">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <!-- "Mover los botones" en el mapa (el modo acomodar de la web) -->
+    <string name="acomodar_ayuda">Drag a block to move it, and its corner to resize it.</string>
+    <!-- La pestana Tablero de antes, al lado del panel Moderno de la web -->
+    <string name="tablero_detallado">Detailed</string>
 </resources>

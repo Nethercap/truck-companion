@@ -9,7 +9,7 @@
 var fuentesRuta = { route: null, 'route-next': null, 'route-ferry': null };
 var rutaCambio = false;
 // Lo demas que la web le pone al mapa: los datos los calcula ella y los dibuja Kotlin.
-var fuentesCapas = { 'road-shields': null, atlas: null, 'car-parking': null, fuel: null };
+var fuentesCapas = { 'road-shields': null, atlas: null, 'car-parking': null, fuel: null, 'bus-stops': null };
 var capasCambiaron = false;
 var filtroPoi = null;
 var estacionamientoVisible = false;
@@ -91,7 +91,9 @@ var ultimoGiro = null;
 function voiceManeuverTick(turn) {
   ultimoGiro = turn;
   if (!voiceOn) return;
-  const key = voiceGuide.maneuver(turn, Math.abs(Number(lastData && lastData.speedKmh) || 0));
+  // Como la web: un cruce es ferry o tren segun su puerto, que se lee aparte (ferryPortAt).
+  const puerto = turn && turn.kind === 'ferry' ? ferryPortAt(turn.node[0], turn.node[1]) : null;
+  const key = voiceGuide.maneuver(puerto ? { ...turn, train: puerto.train } : turn, Math.abs(Number(lastData && lastData.speedKmh) || 0));
   if (key && voiceHere()) speakVoice(key);
 }
 
@@ -228,7 +230,10 @@ function navegacion() {
     destino: destinoAhora(),
     proximaCiudad: nextCityName || null,
     rumbo: lastHeadingDeg,
-    zoomNav: navTargetZoom(ultimoGiro),
+    // El zoom con que se sigue al camion: plano, o con la vista 3D (navTargetZoom lo acerca un
+    // poco). Kotlin usa el que toca segun la vista de ahora; la vista 3D la guarda el (vista3d).
+    zoomNav: zoomDeNavegacion(false),
+    zoomNav3d: zoomDeNavegacion(true),
     hayRuta: !!currentRouteWorldPoints,
     carriles: laneGuidance(laneHudRecord(navLanesFor(ultimoGiro))),
     waypoints: waypoints.map((w) => ({ etiqueta: w.label, tipo: w.kind, lng: w.lngLat[0], lat: w.lngLat[1] })),
@@ -248,13 +253,215 @@ function navegacion() {
       ? t('voiceOtherDevice').replace('{device}', deviceLabel(voiceDevice)) : null,
     textoVozAca: t('voiceSpeakHere'),
     avisoRuta: avisoDeRuta(resumenRuta),
+    parada: paradaDelResumen(resumenRuta),
+    paradaBus: paradaDeBus(resumenRuta),
+    // El renglon de guardar con F5 (createGpsSaveHint), con su X.
+    avisoGuardar: gpsSaveHintOn ? t('gpsSaveHint') : null,
+    // Ruta en el GPS del juego que la app no puede seguir: las empresas a esa distancia, y un
+    // toque pone el waypoint (updateNavPanel en la web).
+    adivinanzas: noRouteNow === 'game_gps' && !partes ? gameGpsGuess.list.map((c) => c.label) : [],
+    textoAdivinanzas: t('navGameRouteGuess'),
     actualizarCliente: avisoDeVersion(),
     perfil: routeProfile,
     pagoTrabajo: lastData && lastData.jobIncome ? moneyLine(lastData.jobIncome, lastData.game) : null,
     hora12: hour12(),
     miniHud: lineasMiniHud(lastData),
     sesion: totalesDeSesion(),
+    tablero: tableroModerno(),
   };
+}
+
+function zoomDeNavegacion(tres) {
+  const antes = nav3d;
+  nav3d = tres;
+  try { return navTargetZoom(ultimoGiro); } finally { nav3d = antes; }
+}
+
+// ------------------------------------------------------ el tablero moderno
+// El panel Moderno de la web (createDashPanel en docs/dash/dash.js, que entra entero al motor
+// por sus constantes): lo que su render() escribe en la pagina, ya en frases, con las mismas
+// funciones de pure.js. Kotlin lo dibuja (ui/TableroModerno.kt) en la pestana del tablero.
+var tmEscala = createTimeScale();
+var tmRitmo = createPaceEta();
+var tmCombustible = createFuelTracker();
+var tmSesion = createSessionStats();
+function tableroAlimentar(d) {
+  tmEscala.push(d.gameTimeMinutes, d.ts);
+  if (d.onJob && d.cityDst) tmRitmo.push(d.cityDst, d.ts, d.routeDistanceKm);
+  tmSesion.push(d);
+  tmCombustible.push(d.odometerKm, d.fuel, [d.game, d.truckBrand, d.truckName].join('|'));
+}
+function tableroModerno() {
+  const d = lastData;
+  if (!d) return null;
+  const imp = useImperial;
+  const nb = ' ';
+  const num = (v, dec) => (dec ? formatDec(v, currentLang, dec) : formatInt(v, currentLang));
+  const dist = (km) => (km == null || !isFinite(km) ? null : imp ? num(km * KM_TO_MI) + nb + 'mi' : num(km) + nb + 'km');
+  const vel = (kmh) => (kmh == null || !isFinite(kmh) ? null : num(imp ? kmh * KM_TO_MI : kmh));
+  const dur = (seg) => {
+    if (seg == null || !isFinite(seg) || seg < 0) return null;
+    const total = Math.round(seg / 60);
+    const h = Math.floor(total / 60), m = total % 60;
+    return h >= 1 ? h + nb + t('hourShort') + ' ' + String(m).padStart(2, '0') + nb + t('minShort') : m + nb + t('minShort');
+  };
+  const hm = (seg) => {
+    if (seg == null || !isFinite(seg) || seg < 0) return null;
+    const total = Math.round(seg / 60);
+    return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+  };
+  const reloj = (fecha) => formatClockHM(fecha.getHours(), fecha.getMinutes(), hour12());
+  const relojJuego = (min) => { const c = gameClockFromMinutes(min); return c ? formatClockHM(c.hours, c.minutes, hour12()) : null; };
+  const consumoTexto = (l) => (imp ? num(235.215 / l, 1) + nb + 'mpg' : num(l, 1) + nb + 'l/100');
+  const plataSimple = (monto) => (monto == null ? null : (monto < 0 ? '-' : '') + (DASH_SIMBOLO[d.game] || '$') + num(Math.abs(monto)));
+  const medido = tmEscala.value();
+  const s = medido != null ? medido : (DASH_NOMINAL_SCALE[d.game] || 19);
+  const enViaje = !!(d.onJob && d.cityDst);
+  const restanteKm = enViaje ? d.routeDistanceKm : null;
+  const juegoCrudo = enViaje && d.routeTimeSeconds > 0 ? d.routeTimeSeconds : null;
+  const realSeg = enViaje ? tmRitmo.estimate(juegoCrudo != null ? juegoCrudo / s : null, d.ts) : null;
+  const viajeJuegoSeg = realSeg != null ? realSeg * s : null;
+  const consumoMedido = tmCombustible.avgLPer100();
+  const alcance = consumoMedido && d.fuel != null ? d.fuel / consumoMedido * 100 : d.fuelRangeKm;
+  const descansoMin = restMinutesOf(d);
+  const descansoSeg = descansoMin != null ? descansoMin * 60 : null;
+
+  // La cinta (renderCinta): el descanso en tiempo de juego y la carga en km, sobre lo que falta.
+  let cinta = null;
+  if (enViaje) {
+    const hecho = d.plannedDistanceKm && restanteKm != null ? Math.max(0, Math.min(1, 1 - restanteKm / d.plannedDistanceKm)) : 0;
+    const marca = (fraccion, etiqueta) => {
+      if (fraccion == null || !isFinite(fraccion) || fraccion >= 1 || fraccion < 0) return null;
+      const centro = (hecho + (1 - hecho) * fraccion) * 100;
+      return { izq: Math.max(0, Math.min(100 - DASH_ANCHO_MARCA, centro - DASH_ANCHO_MARCA / 2)), ancho: DASH_ANCHO_MARCA, etiqueta };
+    };
+    const llegadaReal = realSeg != null ? reloj(new Date(Date.now() + realSeg * 1000)) : null;
+    const enJuego = viajeJuegoSeg != null && d.gameTimeMinutes != null ? relojJuego(d.gameTimeMinutes + viajeJuegoSeg / 60) : null;
+    cinta = {
+      desde: d.citySrc || '', desdeSub: d.companySrc || null,
+      falta: dist(restanteKm) || '--',
+      faltaSub: [t('remainingLabel'), realSeg != null ? hm(realSeg) + ' ' + t('realShort') : null].filter(Boolean).join(' · '),
+      hasta: d.cityDst,
+      hastaSub: [d.companyDst, llegadaReal ? t('arrivalLabel') + ' ' + llegadaReal : null, enJuego ? enJuego + ' ' + t('inGameShort') : null].filter(Boolean).join(' · ') || null,
+      hecho,
+      descanso: marca(descansoSeg != null && viajeJuegoSeg ? descansoSeg / viajeJuegoSeg : null, t('restHere')),
+      carga: marca(alcance != null && restanteKm ? alcance / restanteKm : null, t('refuelHere')),
+    };
+  }
+
+  // La conduccion (renderConduccion).
+  const luces = d.lights || {};
+  const encendido = {
+    beamLow: luces.beamLow, beamHigh: luces.beamHigh, parking: luces.parking,
+    blinkerLeft: luces.blinkerLeft, blinkerRight: luces.blinkerRight, hazards: luces.hazards, beacon: luces.beacon,
+    wipers: d.wipers, motorBrake: d.motorBrake, retarder: d.retarderSteps > 0 ? d.retarder > 0 : undefined,
+    differentialLock: d.differentialLock, parkingBrake: d.parkingBrake, liftAxle: d.liftAxle, trailerAttached: d.trailerAttached,
+  };
+  const rpmMax = d.engineRpmMax || 2500;
+  const limite = d.speedLimitKmh > 0 ? vel(d.speedLimitKmh) : null;
+  const conduccion = {
+    vel: vel(d.speedKmh) || '--', unidad: imp ? 'mph' : 'km/h',
+    limite, exceso: !!limite && d.speedKmh > d.speedLimitKmh + 2,
+    marcha: d.gear === 0 || d.gear == null ? 'N' : (d.gear < 0 ? 'R' : String(d.gear)),
+    crucero: d.cruiseControl && d.cruiseControlSpeedKmh > 0 ? vel(d.cruiseControlSpeedKmh) : null,
+    rpm: Math.max(0, Math.min(1, (d.engineRpm || 0) / rpmMax)), rpmAlta: (d.engineRpm || 0) > rpmMax * 0.85,
+    // Los que el cliente no manda no van (undefined): mostrarlos apagados seria mentir.
+    testigos: DASH_INDICATORS.filter(([k]) => encendido[k] !== undefined).map(([k, titulo]) => [k, !!encendido[k], t(titulo)]),
+    retarder: d.retarder > 0 && d.retarderSteps > 0 ? d.retarder + '/' + d.retarderSteps : null,
+  };
+
+  // La llegada (renderLlegada): solo con plazo.
+  const plazo = jobDeadlineSeconds(d);
+  const margen = enViaje && plazo != null && viajeJuegoSeg != null ? plazo - viajeJuegoSeg : null;
+  const llegada = margen == null ? null : {
+    titular: margen >= 0 ? t('deadlineEarly', dur(margen)) : t('deadlineLate', dur(-margen)),
+    estado: margen >= 0 ? 'bien' : 'mal',
+    linea: plazo != null ? t('deadlineIn', dur(plazo)) : null,
+    pago: [d.jobIncome ? moneyLine(d.jobIncome, d.game) : null,
+      d.jobIncome && d.plannedDistanceKm ? plataSimple(Math.round(d.jobIncome / d.plannedDistanceKm)) + ' ' + t('perKm') : null].filter(Boolean).join(' · ') || null,
+  };
+
+  // Combustible y descanso (renderCombustible).
+  const pct = d.fuel != null && d.fuelCapacity ? d.fuel / d.fuelCapacity * 100 : null;
+  let combTitular = null, combEstado = null;
+  if (restanteKm != null && alcance != null) {
+    const suficiente = alcance > restanteKm * 1.08;
+    combTitular = suficiente ? t('fuelEnoughTo', d.cityDst) : t('fuelShort');
+    combEstado = suficiente ? 'bien' : 'mal';
+  } else if (alcance != null) combTitular = t('rangeIs', dist(alcance));
+  let descTitular = null, descEstado = null;
+  if (descansoSeg != null && viajeJuegoSeg != null) {
+    const sinDormir = descansoSeg > viajeJuegoSeg;
+    descTitular = sinDormir ? t('sleepNone') : t('sleepNeeded');
+    descEstado = sinDormir ? 'bien' : 'mal';
+  } else if (descansoSeg != null) descTitular = t('untilRest') + ' ' + dur(descansoSeg) + ' · ' + hm(descansoSeg / s) + ' ' + t('realShort');
+  const consumo = consumoMedido || d.fuelAvgConsumption || null;
+  const combustible = {
+    titular: combTitular, titularEstado: combEstado, descanso: descTitular, descansoEstado: descEstado,
+    linea: [d.fuel != null ? num(d.fuel) + nb + 'l' + (pct != null ? ' · ' + num(pct) + nb + '%' : '') : null,
+      alcance != null && restanteKm != null ? dist(alcance) + ' ' + t('rangeWord') : null].filter(Boolean).join(' · ') || null,
+    bajo: [consumo != null ? consumoTexto(consumo) : null,
+      d.adblue != null && d.adblueCapacity ? t('adblueLabel') + ' ' + num(d.adblue / d.adblueCapacity * 100) + nb + '%' : null].filter(Boolean).join(' · ') || null,
+    bajoAlerta: !!(d.mechanicalWarnings || {}).adblue,
+  };
+
+  // El camion (renderCamion): la peor pieza de las dos listas manda el titular.
+  const wear = d.wear || {};
+  const remolque = d.trailerWear;
+  const nivel = (p) => { for (const [tope, n] of DASH_DESGASTE_ESCALA) if (p < tope) return n; return 'mal'; };
+  const piezas = [];
+  let peor = null, peorPct = -1;
+  const pieza = (valor, nombre, enRemolque, titular) => {
+    if (valor == null) return;
+    const p = valor * 100;
+    piezas.push([nombre, num(p) + nb + '%', nivel(p), enRemolque]);
+    if (p > peorPct) { peorPct = p; peor = titular; }
+  };
+  for (const [k, clave] of DASH_WEAR) pieza(wear[k], t(clave), false, t(clave));
+  if (remolque) for (const [k, clave] of DASH_TRAILER_WEAR) pieza(remolque[k], t(clave), true, t('cmdTrailer') + ' · ' + t(clave));
+  const alertas = d.mechanicalWarnings || {};
+  const medidor = (valor, texto, clave, alerta) => (valor == null ? null : [texto(valor), t(clave), !!alerta]);
+  const camion = {
+    titular: peor == null ? null : peorPct < DASH_DESGASTE_SANO ? t('truckFine') : t('wearWorst', peor, Math.round(peorPct)),
+    titularEstado: peor == null ? null : peorPct < DASH_DESGASTE_SANO ? 'bien' : peorPct >= DASH_DESGASTE_AVISA ? 'mal' : null,
+    piezas,
+    linea: [[d.truckBrand, d.truckName].filter(Boolean).join(' ') || null, d.odometerKm != null ? dist(d.odometerKm) : null,
+      d.cargoDamage ? t('cargoDamage') + ' ' + num(d.cargoDamage * 100, 1) + nb + '%' : null].filter(Boolean).join(' · ') || null,
+    lineaAlerta: d.cargoDamage > 0.02,
+    medidores: [
+      medidor(d.oilTemperature, (v) => num(v) + nb + '°C', 'oilTempLabel', d.oilTemperature > 125),
+      medidor(d.waterTemperature, (v) => num(v) + nb + '°C', 'waterTempLabel', alertas.waterTemperature),
+      medidor(d.brakeTemperature, (v) => num(v) + nb + '°C', 'brakeTempLabel', d.brakeTemperature > 300),
+      medidor(d.airPressure, (v) => num(v) + nb + 'psi', 'airPressureLabel', alertas.airPressure),
+      medidor(d.oilPressure, (v) => num(v) + nb + 'psi', 'oilPressureLabel', alertas.oilPressure),
+      medidor(d.batteryVoltage, (v) => num(v, 1) + nb + 'V', 'batteryLabel', alertas.batteryVoltage),
+    ].filter(Boolean),
+  };
+
+  // La franja de abajo (renderFranja): la carga y la sesion.
+  const st = tmSesion.state();
+  const metricas = [
+    [dist(st.kmDriven) || '-', t('drivenLabel')],
+    [st.wheelSeconds < 60 ? Math.round(st.wheelSeconds) + ' s' : hm(st.wheelSeconds), t('atWheel')],
+    [st.avgSpeedKmh == null ? '-' : vel(st.avgSpeedKmh) + (st.topSpeedKmh ? ' · ' + t('topSpeed') + ' ' + vel(st.topSpeedKmh) : ''), t('avgSpeed')],
+    [st.fuelUsedL < 1 ? '-' : num(st.fuelUsedL) + nb + 'l' + (st.fuelPer100Km ? ' · ' + consumoTexto(st.fuelPer100Km) : ''), t('fuelUsed')],
+  ];
+  // Las que solo aparecen cuando paso algo, antes del neto, que es lo que explican.
+  if (st.overLimitSeconds >= 60) metricas.push([hm(st.overLimitSeconds) + ' · ' + num(st.overLimitRatio * 100) + nb + '%', t('overLimit')]);
+  if (st.jobs.count) metricas.push([String(st.jobs.count), t('jobsDone')]);
+  if (st.tolls.count) metricas.push([plataSimple(st.tolls.amount), t('tolls')]);
+  if (st.fines.count) metricas.push([plataSimple(st.fines.amount), t('fines')]);
+  if (st.ferries.count) metricas.push([plataSimple(st.ferries.amount), t('ferryTrain')]);
+  metricas.push([plataSimple(st.netProfit || 0), t('netProfit')]);
+  const franja = {
+    carga: enViaje ? (d.cargo || t('noCargo')) : null,
+    cargaSub: [d.cargoMassKg ? formatCargoMass(d.cargoMassKg, currentLang, imp) : null,
+      d.plannedDistanceKm ? t('routeLength') + ' ' + dist(d.plannedDistanceKm) : null].filter(Boolean).join(' · ') || null,
+    metricas,
+    reiniciar: t('sessionReset'),
+    desde: st.startedAt ? t('sessionSince', reloj(new Date(st.startedAt * 1000))) : null,
+  };
+  return { cinta, conduccion, llegada, combustible, camion, franja };
 }
 
 // updateMiniHudExtra sin el HTML. Sin "GPS directions": en la app el giro va siempre arriba
@@ -302,12 +509,13 @@ function totalesDeSesion() {
 
 // La tarjeta "Trabajo entregado": la web la escribe en la pagina, y aca la dibuja Kotlin.
 var entregaNueva = null;
-showDeliveryCard = function (event, costs, game) {
-  const r = deliverySummary(event, costs);
+showDeliveryCard = function (event, costs, game, bus = null) {
+  const r = deliverySummary(event, costs, bus);
   if (!r) return;
   const valor = ([, tipo, v]) => {
     if (tipo === 'money') return moneyLine(v, game);
     if (tipo === 'xp') return `+${formatInt(v, currentLang)} XP`;
+    if (tipo === 'count') return formatInt(v, currentLang);
     if (tipo === 'km') return `${formatInt(useImperial ? v * 0.621371 : v, currentLang)} ${useImperial ? 'mi' : 'km'}`;
     if (tipo === 'minutes') return formatGameMinutes(v, t('hourShort'), t('minShort'));
     if (tipo === 'percent') return `${v < 10 && v > 0 ? formatDec(v, currentLang) : Math.round(v)}\u00a0%`;
@@ -318,6 +526,16 @@ showDeliveryCard = function (event, costs, game) {
     ruta: r.route,
     carga: r.cargo,
     filas: r.rows.map((f) => [t(f[0]), valor(f)]),
+    // Las paradas de un bus, como deliveryStopsHtml: la hora del juego de cada una y la demora.
+    tituloParadas: t('deliveredStops'),
+    paradas: r.stops && r.stops.length >= 2 ? r.stops.map((s) => {
+      const reloj = gameClockFromMinutes(s.time);
+      return {
+        nombre: s.name,
+        hora: reloj ? formatClockHM(reloj.hours, reloj.minutes, hour12()) : '',
+        tarde: s.late ? t('deliveredStopLate', formatInt(s.late, currentLang)) : null,
+      };
+    }) : [],
     cerrar: t('close'),
     ms: DELIVERY_CARD_MS,
   };
@@ -345,7 +563,46 @@ function avisoDeRuta(r) {
   return textos.length ? textos.join(' ') : null;
 }
 
+// La proxima parada propia del resumen (#routeStop en la web): el nombre, los km y la llegada
+// (nextStopText) y el boton para saltearla.
+function paradaDelResumen(r) {
+  if (!r || r.dismissed || r.offMap || r.saveHint || !waypoints.length) return null;
+  const wp = waypoints[0];
+  return {
+    nombre: t('routeNextStop').replace('{name}', wp.label || `${t('waypoint')} 1`),
+    eta: r.nextStop || null,
+    saltear: t('routeSkipStop'),
+  };
+}
+
+// La proxima parada de un trabajo de bus (#routeBusStop): la hora es la del juego, en rojo si
+// ya paso sin llegar.
+function paradaDeBus(r) {
+  const p = r && r.busStop;
+  if (!p) return null;
+  return { texto: t('busNextStop', p.n, p.total, p.name), hora: p.due ? t('busDue', p.due) : null, tarde: !!p.late };
+}
+
 var resultadosBusqueda = [];
+
+// El puerto de un ferry (loadFerryPort): la web lee el tile de donde llega el cruce del .pmtiles
+// del mapa con la libreria pmtiles, que aca tambien corre (descomprime sola, sin
+// DecompressionStream). Lo que no hay es un fetch con Range: los pedazos los pide Kotlin.
+function FuenteRangos(url) { this.url = url; }
+FuenteRangos.prototype.getKey = function () { return this.url; };
+FuenteRangos.prototype.getBytes = function (desde, largo) {
+  return fetch(this.url, { rango: [desde, largo] }).then((r) => {
+    if (!r.ok) throw new Error(`tiles ${r.status}`);
+    return r.arrayBuffer().then((data) => ({ data }));
+  });
+};
+var archivosDeTiles = new Map();
+pmtilesProtocol = {
+  get(url) {
+    if (!archivosDeTiles.has(url)) archivosDeTiles.set(url, new pmtiles.PMTiles(new FuenteRangos(url)));
+    return archivosDeTiles.get(url);
+  },
+};
 
 // ------------------------------------------------------ el convoy
 // convoy.js corre entero: quien entra, quien maneja, reconectar, seguir al lider. Lo que
@@ -514,9 +771,10 @@ function ajustesNav() {
     'settingsRouteFastest', 'settingsRouteShortest', 'settingsEveryExitTitle', 'settingsEveryExit', 'settingsEveryExitHint',
     'settingsRestWarnTitle', 'settingsRestWarn', 'settingsRestWarnHint', 'dlcTitle', 'dlcHint', 'dlcAutoLabel', 'modsManualLabel',
     'close', 'navReportOpen', 'settingsMiniHudTitle', 'settingsLiveShareRoute', 'settingsTmpPlayers', 'settingsTmpPlayersHint',
-    'settingsButtonsTitle', 'settingsFadeButtons', 'settingsKeepCompass', 'settingsBaseTitle', 'settingsRealBase', 'settingsRealBaseHint',
+    'settingsButtonsTitle', 'settingsFadeButtons', 'settingsKeepCompass', 'settingsMoveButtons', 'layoutReset',
+    'dashStyle', 'dashStyleModern', 'settingsBaseTitle', 'settingsRealBase', 'settingsRealBaseHint',
     'settingsLiteTitle', 'settingsLiteMode', 'settingsLiteNoRouting', 'settingsLiteHint', 'settingsCurrencyTitle', 'currencyHint',
-    'settingsRouteColorTitle', 'settingsNavZoomTitle', 'settingsNavZoomHint', 'navZoomFar', 'navZoomNear', 'navZoomDefault',
+    'settingsRouteColorTitle', 'settingsNavZoomTitle', 'settingsNavZoomHint', 'settingsNavZoomAuto', 'toggle3d', 'navZoomFar', 'navZoomNear', 'navZoomDefault',
     'settingsTruckSizeTitle', 'truckSizeNormal', 'truckSizeHuge', 'dashSecondDeviceTitle', 'dashConnectHint', 'dashCopyLink',
     'obsOverlayLink', 'convoyCopied', 'pipOverlay'];
   const textos = {};
@@ -537,6 +795,7 @@ function ajustesNav() {
     colorRuta: routeColor,
     colores: [['#a30000', 'colorRed'], ['#3b9eff', 'colorBlue'], ['#4caf50', 'colorGreen']].map(([id, k]) => ({ id, label: t(k) })),
     zoomNav: navZoom,
+    zoomAuto: navZoomAuto,
     zoomDefecto: NAV_ZOOM_DEFAULT,
     tamanoCamion: truckSize,
     tamanoDefecto: TRUCK_SIZE_DEFAULT,
@@ -746,14 +1005,29 @@ var motor = {
     conn.hasTelemetry = true;
     conn.paused = !!data.paused;
     lastData = data;
+    tableroAlimentar(data);
     // Lo de updateHud que le importa a la ruta: la llegada en tiempo real.
     routeSummaryEtaSeconds = computeRealEtaSeconds(data);
+    // Y despues, como en updateHud: el tramo hasta la proxima parada propia (nextStopLeg), que
+    // el resumen dice con km y llegada.
+    updateWaypointRoute(data);
     updateMap(data.position || {}, data.game, data.heading, data);
+    // La web lo hace en updateMap mientras su camara sigue al camion (autoFollow), que aca es
+    // siempre false: la camara es de Kotlin, que deja de usarlo si se pellizco el mapa.
+    if (data.position) updateNavAutoZoom(data.position.x, data.position.z);
+    // En el orden de handleTelemetry: a donde va el GPS del juego segun la partida guardada
+    // (y sus waypoints), las empresas a esa distancia si la app no lo puede seguir, y el aviso
+    // de guardar con F5. Las busquedas van de a poco, con timers, como en la web.
+    updateGameGpsSave(data);
     updateDestinationMarker(data);
+    updateGameGpsGuess(data);
+    updateGpsSaveHint(data);
     updateRouteSummary(data);
     checkMissingCompanies(data);
     if (clientOverlayOn || obsOverlayOn) sendNavHud();
-    // Peajes y multas del trabajo, la tarjeta de entrega y el historial, como updateHud.
+    // Peajes y multas del trabajo, la tarjeta de entrega y el historial, como updateHud. Las
+    // paradas del bus, antes: en el dato de la entrega ya no estan.
+    busJobMemory.push(data);
     updateSessionEvents(data.event || {}, data.game, data.onJob);
     convoyOnTelemetry(data);
     if (convoyInRoom()) convoyCambio = true; // las distancias, con cada dato
@@ -896,11 +1170,11 @@ var motor = {
     const q = String(texto || '').trim();
     resultadosBusqueda = q
       ? searchCompanies(q, pos.x, pos.z, 20).map((r) => ({ ...r, name: r.label, sub: cityLabel(r.city) }))
-      : nearestFacilities(categoria || 'g', pos.x, pos.z, 15).map((r) => (r.code === 'a'
-        ? { ...r, sub: [t(r.kind === 't' ? 'atlasTouristBoard' : 'atlasPoi'), nearestCityName(r.x, r.z)].filter(Boolean).join(' · ') }
-        : { ...r, name: t(POI_CODES[r.code]), sub: nearestCityName(r.x, r.z) || '' }));
+      : nearestFacilities(categoria || 'g', pos.x, pos.z, 15).map(poiFacilityRow);
     const rumbo = lastData && Number.isFinite(lastData.heading) ? lastData.heading : null;
     return JSON.stringify({
+      // Los chips que la variante tiene, como updateAtlasChip: el Atlas en ATS, los buses en ETS2.
+      hay: { a: !!(pois.atlas && pois.atlas.length), b: busStopList(pois).length > 0 },
       aviso: resultadosBusqueda.length ? null : t('poiNoResults'),
       lista: resultadosBusqueda.map((r, i) => {
         const rel = poiRelative(pos.x, pos.z, rumbo, r.x, r.z);
@@ -926,6 +1200,17 @@ var motor = {
     addWaypoint(fromLngLat(lng, lat), [lng, lat], false, null);
   },
   sacarWaypoint(i) { removeWaypoint(i); },
+  /** La X del renglon de guardar con F5 (gpsSaveHintClose). */
+  cerrarAvisoGuardar() {
+    gpsSaveHint.close(Date.now());
+    gpsSaveHintOn = false;
+    if (lastData) updateRouteSummary(lastData);
+  },
+  /** Una de las empresas a la distancia del GPS del juego: ahi va un waypoint. */
+  elegirAdivinanza(i) {
+    const c = gameGpsGuess.list[i];
+    if (c) addPoiWaypoint([c.x, c.z], c.label);
+  },
   limpiarWaypoints() { clearWaypoint(); },
   ocultarRuta() { resetDisplayedRoute(); },
   mostrarRuta() { restoreDismissedRoute(); },
@@ -1004,6 +1289,10 @@ var motor = {
   apariencia(clave, valor) {
     if (clave === 'color') routeColor = String(valor);
     else if (clave === 'zoom') navZoom = navZoomSetting(valor);
+    else if (clave === 'zoomAuto') {
+      navZoomAuto = !!valor;
+      navAutoZoom.reset(); // prendido a mitad de viaje: de una en lo que toca, como en la web
+    }
     else if (clave === 'camion') truckSize = truckSizeSetting(valor);
     else if (clave === 'base') realBase = !!valor;
     else if (clave === 'desvanecer') fadeButtons = !!valor;
@@ -1023,6 +1312,8 @@ var motor = {
     ajustesCambiaron = true;
   },
   reiniciarSesion() { resetSessionTotals(lastData && lastData.game); },
+  /** "Reiniciar" en la franja del panel Moderno: su propia sesion, como el boton de la web. */
+  reiniciarTablero() { tmSesion.reset(lastData && lastData.game, lastData && lastData.ts); },
 
   demo() { startDemo(); },
   urlsDeMapa: (id, version) => JSON.stringify(urlsDeMapa(id, version)),

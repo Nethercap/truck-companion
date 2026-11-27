@@ -16,6 +16,7 @@ import com.trucksimdash.app.core.logico
 import com.trucksimdash.app.core.objeto
 import com.trucksimdash.app.core.parsearObjeto
 import com.trucksimdash.app.core.texto
+import com.trucksimdash.app.mapa.TilesDeMapa
 import com.trucksimdash.app.mapa.VarianteMapa
 import com.whl.quickjs.android.QuickJSLoader
 import com.whl.quickjs.wrapper.JSFunction
@@ -58,7 +59,7 @@ import java.util.concurrent.atomic.AtomicReference
 // Los textos del buscador, de la web: en los ocho idiomas, y sin una segunda copia.
 internal val CLAVES_BUSCADOR = listOf(
     "poiNearestFuel", "poiNearestRest", "poiSearchPlaceholder", "poiCatFuel", "poiCatRest",
-    "poiCatService", "poiCatGarage", "poiCatDealer", "poiCatWeigh", "navReportOpen",
+    "poiCatService", "poiCatGarage", "poiCatDealer", "poiCatWeigh", "poiCatAtlas", "poiCatBus", "navReportOpen",
 )
 
 private const val OCUPADO_TRAS_MS = 4000L
@@ -294,6 +295,8 @@ class MotorNav(
     fun elegir(indice: Int) = pedir("elegir", indice)
     fun waypointEnMapa(lng: Double, lat: Double) = pedir("waypointEnMapa", lng, lat)
     fun sacarWaypoint(indice: Int) = pedir("sacarWaypoint", indice)
+    fun cerrarAvisoGuardar() = pedir("cerrarAvisoGuardar")
+    fun elegirAdivinanza(indice: Int) = pedir("elegirAdivinanza", indice)
     fun limpiarWaypoints() = pedir("limpiarWaypoints")
     fun ocultarRuta() = pedir("ocultarRuta")
     fun mostrarRuta() = pedir("mostrarRuta")
@@ -313,6 +316,7 @@ class MotorNav(
     fun liviano(modo: Boolean, sinRuteo: Boolean) = pedir("liviano", modo, sinRuteo)
     fun rutaEnVivo(valor: Boolean) = pedir("rutaEnVivo", valor)
     fun reiniciarSesion() = pedir("reiniciarSesion")
+    fun reiniciarTablero() = pedir("reiniciarTablero")
     fun cerrarEntrega() {
         cierreEntrega?.cancel()
         _entrega.value = null
@@ -387,6 +391,7 @@ class MotorNav(
             } ?: emptyList(),
             geoEscudos = capa("road-shields"),
             atlas = capa("atlas"),
+            buses = capa("bus-stops"),
             estacionamiento = capa("car-parking"),
             combustible = capa("fuel"),
             filtroPoi = info["filtroPoi"]?.takeIf { it is kotlinx.serialization.json.JsonArray }?.toString(),
@@ -551,7 +556,12 @@ class MotorNav(
             val p = fila.comoObjeto() ?: return@forEach
             val id = p.entero("id") ?: return@forEach
             val url = p.texto("url") ?: return@forEach
-            if (p.texto("method") != null) enviar(id, url, p.texto("body").orEmpty()) else bajar(id, url)
+            val rango = p.lista("rango")?.mapNotNull { (it as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong() }
+            when {
+                p.texto("method") != null -> enviar(id, url, p.texto("body").orEmpty())
+                rango != null && rango.size == 2 -> bajarPedazo(id, url, rango[0], rango[1])
+                else -> bajar(id, url)
+            }
         }
 
         proximoPulso?.cancel(false)
@@ -588,6 +598,17 @@ class MotorNav(
                 }
                 llamar("respuesta", id, r.status, cuerpo)
             }
+        }
+    }
+
+    /**
+     * Un pedazo de un archivo grande: los tiles del puerto de un ferry, del .pmtiles del mapa
+     * (FuenteRangos en conduccion.js). Del mapa bajado si esta, si no con Range y sin cache.
+     */
+    private fun bajarPedazo(id: Int, url: String, desde: Long, largo: Long) {
+        alcance.launch {
+            val bytes = withContext(Dispatchers.IO) { Pedazos.leer(url, desde, largo, TilesDeMapa.archivoLocal(url), Red.http) }
+            enMotor { llamar("respuesta", id, if (bytes != null) 206 else 0, bytes ?: "") }
         }
     }
 

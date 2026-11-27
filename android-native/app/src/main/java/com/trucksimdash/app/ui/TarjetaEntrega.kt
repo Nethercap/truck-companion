@@ -1,11 +1,14 @@
 package com.trucksimdash.app.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
@@ -59,6 +62,27 @@ fun TarjetaEntrega(motor: MotorNav, modifier: Modifier = Modifier) {
                             fontWeight = if (i == 0) FontWeight.Bold else null,
                             color = if (i == 0) Paleta.Verde else Paleta.Texto,
                         )
+                    }
+                }
+                // Un bus: cada parada con la hora del juego de su salida o llegada, y la demora.
+                if (e.paradas.isNotEmpty()) {
+                    Text(
+                        e.tituloParadas,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Paleta.TextoSuave,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+                    )
+                    // Hasta 65 paradas: la lista se desplaza y la tarjeta no tapa toda la pantalla.
+                    Column(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
+                        e.paradas.forEachIndexed { i, p ->
+                            Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+                                Text("${i + 1}. ${p.nombre}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                Text(p.hora, style = MaterialTheme.typography.bodySmall.merge(NumerosTabulares))
+                                p.tarde?.let {
+                                    Text(" $it", style = MaterialTheme.typography.bodySmall, color = Paleta.Rojo)
+                                }
+                            }
+                        }
                     }
                 }
             }

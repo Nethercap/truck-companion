@@ -63,6 +63,9 @@ class ControlMapa(
     /** La persona movio el mapa: la camara deja de seguir al camion. */
     var alMoverConLaMano: () -> Unit = {}
 
+    /** Y lo solto: el mapa quedo quieto despues de moverlo con la mano. */
+    var alSoltarElMapa: () -> Unit = {}
+
     /** Se movio la camara, a lo sumo cinco veces por segundo: las chapitas del convoy. */
     var alMoverCamara: (() -> Unit)? = null
     private var ultimoAvisoCamaraMs = 0L
@@ -101,6 +104,32 @@ class ControlMapa(
             aplicarPerspectiva()
         }
 
+    /** Con el rumbo, el mapa inclinado (el boton 3D de la web); sin rumbo, siempre plano. */
+    var vista3d: Boolean = true
+        set(valor) {
+            if (field == valor) return
+            field = valor
+            aplicarPerspectiva()
+        }
+
+    /**
+     * El zoom con el que se sigue al camion, con el norte arriba o con el rumbo: el de Ajustes, o
+     * el del zoom automatico alrededor de ese (navTargetZoom de la web). Null mientras no se sabe.
+     */
+    var zoomObjetivo: Double? = null
+
+    /**
+     * Se pellizco el mapa: el zoom queda como lo dejo la mano, aunque la camara vuelva a seguir
+     * sola (navAutoZoomPaused en la web). Lo vuelve a false la pantalla: recentrar, cambiar de
+     * vista o elegir otro zoom en Ajustes.
+     */
+    var zoomAMano = false
+
+    /** Avisa que el zoom paso a ser el de la mano. */
+    var alZoomearConLaMano: () -> Unit = {}
+    private var enGesto = false
+    private var zoomAlEmpezarGesto = 0.0
+
     private var saltarAlObjetivo = false
     private var hayCamion = false
     private var objetivoLng = 0.0
@@ -127,11 +156,24 @@ class ControlMapa(
             setCompassMargins((16 * d).toInt(), 0, 0, (210 * d).toInt())
         }
         mapa.addOnCameraMoveStartedListener { razon ->
-            if (razon == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) alMoverConLaMano()
+            if (razon == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                if (!enGesto) zoomAlEmpezarGesto = mapa.cameraPosition.zoom
+                enGesto = true
+                alMoverConLaMano()
+            }
         }
         mapa.addOnCameraIdleListener {
             actualizarAnchos()
             alMoverCamara?.invoke()
+            if (enGesto) {
+                enGesto = false
+                // Arrastrar sin pellizcar no cambia el zoom: ese sigue siendo el elegido.
+                if (abs(mapa.cameraPosition.zoom - zoomAlEmpezarGesto) > 0.01) {
+                    zoomAMano = true
+                    alZoomearConLaMano()
+                }
+                alSoltarElMapa()
+            }
         }
         mapa.addOnCameraMoveListener {
             val ahora = SystemClock.uptimeMillis()
@@ -187,6 +229,8 @@ class ControlMapa(
             }
             s.addImage(CapasMapa.IMAGEN_DESTINO, bandera(Color.parseColor("#2AD3A4")))
             s.addImage(CapasMapa.IMAGEN_CARGA, bandera(Color.parseColor("#FFB020")))
+            s.addImage(CapasMapa.IMAGEN_BUS_LINEA, terminalDeBus(Color.parseColor("#2F6FD6")))
+            s.addImage(CapasMapa.IMAGEN_BUS_TURISMO, terminalDeBus(Color.parseColor("#16A07A")))
             bajarIconos(s)
             if (!mismoMundo && !hayCamion) {
                 mapa.cameraPosition = CameraPosition.Builder()
@@ -280,23 +324,36 @@ class ControlMapa(
         ultimoCuadroMs = ahoraMs
         ultimoEnvioMs = ahoraMs
         val k = if (saltarAlObjetivo) 1.0 else 1 - exp(-dt / SUAVIZADO_MS)
+        // Con un dedo en el mapa la camara es de la persona, aunque el aviso de dejar de seguir
+        // todavia no haya llegado.
+        val camara = seguir && !enGesto
+        val zoom = zoomObjetivo?.takeIf { camara && !zoomAMano }
         val quieto = abs(objetivoLng - actualLng) + abs(objetivoLat - actualLat) < 1e-7 &&
             abs(diferenciaAngular(objetivoRumbo, actualRumbo)) < 0.1
-        if (quieto && !saltarAlObjetivo) return
-        actualLng += (objetivoLng - actualLng) * k
-        actualLat += (objetivoLat - actualLat) * k
-        actualRumbo = (actualRumbo + diferenciaAngular(objetivoRumbo, actualRumbo) * k + 360) % 360
-        s.getSourceAs<GeoJsonSource>(CapasMapa.FUENTE_CAMION)
-            ?.setGeoJson(geojsonPunto(LngLat(actualLng, actualLat), actualRumbo))
-        if (seguir) {
+        // El zoom tambien llega con el camion parado: el de Ajustes recien cambiado, o recentrar.
+        val zoomQuieto = zoom == null || abs(zoom - mapa.cameraPosition.zoom) < 0.005
+        if (quieto && zoomQuieto && !saltarAlObjetivo) return
+        if (!quieto || saltarAlObjetivo) {
+            actualLng += (objetivoLng - actualLng) * k
+            actualLat += (objetivoLat - actualLat) * k
+            actualRumbo = (actualRumbo + diferenciaAngular(objetivoRumbo, actualRumbo) * k + 360) % 360
+            s.getSourceAs<GeoJsonSource>(CapasMapa.FUENTE_CAMION)
+                ?.setGeoJson(geojsonPunto(LngLat(actualLng, actualLat), actualRumbo))
+        }
+        if (camara) {
             val actual = mapa.cameraPosition
             val pos = CameraPosition.Builder(actual)
                 .target(LatLng(actualLat, actualLng))
                 .bearing(if (conRumbo) actualRumbo else actual.bearing)
-            if (saltarAlObjetivo) {
+            if (zoom != null) {
+                // Mas lento que el camion: el zoom automatico cambia de a centesimos y no tiene
+                // que verse a saltos, y elegir otro en Ajustes se ve llegar.
+                val kZoom = if (saltarAlObjetivo) 1.0 else 1 - exp(-dt / SUAVIZADO_ZOOM_MS)
+                pos.zoom(actual.zoom + (zoom - actual.zoom) * kZoom)
+            } else if (saltarAlObjetivo) {
                 pos.zoom(if (actual.zoom < ZOOM_SEGUIR_MIN) ZOOM_SEGUIR else actual.zoom)
-                if (!conRumbo) pos.bearing(0.0)
             }
+            if (saltarAlObjetivo && !conRumbo) pos.bearing(0.0)
             mapa.moveCamera(CameraUpdateFactory.newCameraPosition(pos.build()))
         }
         saltarAlObjetivo = false
@@ -311,7 +368,7 @@ class ControlMapa(
                 CameraPosition.Builder(mapa.cameraPosition)
                     .padding(0.0, arriba, 0.0, 0.0)
                     // Sin 3D en liviano, como la web.
-                    .tilt(if (conRumbo && !apariencia.liviano) 45.0 else 0.0)
+                    .tilt(if (conRumbo && !apariencia.liviano && vista3d) INCLINACION_3D else 0.0)
                     .apply { if (!conRumbo) bearing(0.0) }
                     .build(),
             ),
@@ -373,17 +430,13 @@ class ControlMapa(
             poner(CapasMapa.FUENTE_ESCUDOS, c?.geoEscudos)
         }
         poner(CapasMapa.FUENTE_ATLAS, c?.atlas)
+        poner(CapasMapa.FUENTE_BUSES, c?.buses)
         poner(CapasMapa.FUENTE_ESTACIONAMIENTO, c?.estacionamiento)
         poner(CapasMapa.FUENTE_COMBUSTIBLE, c?.combustible)
         s.getLayer("car-parking")?.setProperties(
             PropertyFactory.visibility(if (c?.estacionamientoVisible == true) Property.VISIBLE else Property.NONE),
         )
         c?.filtroPoi?.let { f -> s.getLayerAs<SymbolLayer>("poi")?.setFilter(Expression.raw(f)) }
-    }
-
-    /** El zoom de navegacion de la web, al pasar a seguir con el rumbo. */
-    fun zoomDeNavegacion(zoom: Double) {
-        mapa.moveCamera(CameraUpdateFactory.zoomTo(zoom))
     }
 
     fun ponerRastro(puntos: List<LngLat>) {
@@ -473,6 +526,33 @@ class ControlMapa(
     }
 
     /** La bandera del destino: el mastil sale del punto exacto, abajo a la izquierda. */
+    /**
+     * El frente de un bus en blanco sobre un cuadrado de color con borde blanco, como el del mapa
+     * del juego (addBusStopImages en la web, en una grilla de 40): el parser no saca el del juego.
+     */
+    private fun terminalDeBus(fondo: Int): Bitmap {
+        val densidad = mapView.resources.displayMetrics.density
+        val lado = (20 * densidad).toInt().coerceAtLeast(20)
+        val b = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+        val u = lado / 40f
+        val blanco = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+        val color = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fondo }
+        fun caja(x: Float, y: Float, w: Float, h: Float, r: Float, p: Paint) =
+            c.drawRoundRect(RectF(x * u, y * u, (x + w) * u, (y + h) * u), r * u, r * u, p)
+        caja(1f, 1f, 38f, 38f, 7f, blanco)
+        caja(4f, 4f, 32f, 32f, 5f, color)
+        // la carroceria, el parabrisas y las ruedas
+        caja(11f, 9f, 18f, 20f, 3f, blanco)
+        c.drawRect(12 * u, 29 * u, 16 * u, 32 * u, blanco)
+        c.drawRect(24 * u, 29 * u, 28 * u, 32 * u, blanco)
+        caja(13f, 12f, 14f, 8f, 1.5f, color)
+        c.drawCircle(15 * u, 25 * u, 1.6f * u, color)
+        c.drawCircle(25 * u, 25 * u, 1.6f * u, color)
+        b.density = mapView.resources.displayMetrics.densityDpi
+        return b
+    }
+
     private fun bandera(color: Int): Bitmap {
         val densidad = mapView.resources.displayMetrics.density
         val lado = (30 * densidad).toInt()
@@ -571,6 +651,10 @@ class ControlMapa(
         val TOKEN_EMPRESA = Regex("^[a-z0-9_]{1,64}$")
         const val MS_POR_CUADRO = 50L
         const val SUAVIZADO_MS = 180.0
+        const val SUAVIZADO_ZOOM_MS = 400.0
+
+        /** La de la web en modo navegacion con 3D (applyNavCamera): antes la app usaba 45. */
+        const val INCLINACION_3D = 58.0
         const val SALTO_GRADOS = 0.2
         const val ZOOM_SEGUIR = 11.0
         const val ZOOM_SEGUIR_MIN = 7.0

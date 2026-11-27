@@ -84,6 +84,15 @@ data class Ajustes(
     val segundoPlano: Boolean = true,
     /** Al salir de la app manejando, queda la ventana flotante. */
     val flotanteAlSalir: Boolean = false,
+    /**
+     * Con el rumbo, el mapa inclinado (el boton 3D de la web). Aca y no en los ajustes de la web:
+     * la app siempre se inclino, y quien ya guardo algo alla tiene nav3d en false sin haberlo elegido.
+     */
+    val vista3d: Boolean = true,
+    /** Los bloques del mapa movidos a mano ("Mover los botones"): giro, botones, minihud. */
+    val disposicion: Map<String, PosBloque> = emptyMap(),
+    /** La pestana Tablero: "moderno" (el panel Moderno de la web) o "detallado" (el de antes de la app). */
+    val estiloTablero: String = "moderno",
 )
 
 /**
@@ -105,6 +114,9 @@ class Preferencias(contexto: Context) {
             botones = leerBotones(sp.getString("botones", null)),
             segundoPlano = sp.getBoolean("segundoPlano", true),
             flotanteAlSalir = sp.getBoolean("flotanteAlSalir", false),
+            vista3d = sp.getBoolean("vista3d", true),
+            disposicion = leerDisposicion(sp.getString("disposicion", null)),
+            estiloTablero = sp.getString("estiloTablero", null) ?: "moderno",
         ),
     )
     val ajustes: StateFlow<Ajustes> = _ajustes.asStateFlow()
@@ -127,6 +139,28 @@ class Preferencias(contexto: Context) {
     fun ponerMostrarTmp(valor: Boolean) {
         sp.edit { putBoolean("mostrarTmp", valor) }
         _ajustes.value = _ajustes.value.copy(mostrarTmp = valor)
+    }
+
+    fun ponerBloque(clave: String, pos: PosBloque) {
+        val nueva = _ajustes.value.disposicion + (clave to pos)
+        sp.edit { putString("disposicion", escribirDisposicion(nueva)) }
+        _ajustes.value = _ajustes.value.copy(disposicion = nueva)
+    }
+
+    /** "Restablecer": todo vuelve a donde estaba siempre. */
+    fun borrarDisposicion() {
+        sp.edit { remove("disposicion") }
+        _ajustes.value = _ajustes.value.copy(disposicion = emptyMap())
+    }
+
+    fun ponerEstiloTablero(valor: String) {
+        sp.edit { putString("estiloTablero", valor) }
+        _ajustes.value = _ajustes.value.copy(estiloTablero = valor)
+    }
+
+    fun ponerVista3d(valor: Boolean) {
+        sp.edit { putBoolean("vista3d", valor) }
+        _ajustes.value = _ajustes.value.copy(vista3d = valor)
     }
 
     fun ponerSegundoPlano(valor: Boolean) {

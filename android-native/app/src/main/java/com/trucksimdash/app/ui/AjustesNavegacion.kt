@@ -105,7 +105,7 @@ private fun TarjetaVoz(ajustes: Ajustes, prefs: Preferencias, motor: MotorNav, n
 
 /** Como se ve el mapa y lo que muestra: las mismas partes de Ajustes de la web, con sus textos. */
 @Composable
-fun AjustesDelMapa(motor: MotorNav) {
+fun AjustesDelMapa(motor: MotorNav, ajustes: Ajustes, prefs: Preferencias, alAcomodar: () -> Unit) {
     val nav by motor.ajustesNav.collectAsStateWithLifecycle()
     val n = nav ?: return
     Tarjeta {
@@ -140,6 +140,9 @@ fun AjustesDelMapa(motor: MotorNav) {
             n.t("settingsNavZoomTitle"), n.t("navZoomFar"), n.t("navZoomNear"), n.t("navZoomDefault"),
             n.zoomNav, 8.0..13.0, 0.5, n.zoomDefecto,
         ) { motor.apariencia("zoom", it) }
+        FilaInterruptor(n.t("settingsNavZoomAuto"), null, n.zoomAuto) { motor.apariencia("zoomAuto", it) }
+        // El boton 3D de la web: el mapa inclinado cuando gira con el camion. Sin 3D en liviano.
+        if (!n.liviano) FilaInterruptor(n.t("toggle3d"), null, ajustes.vista3d) { prefs.ponerVista3d(it) }
         Text(n.t("settingsNavZoomHint"), style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
         Spacer(Modifier.height(10.dp))
         Deslizador(
@@ -147,10 +150,26 @@ fun AjustesDelMapa(motor: MotorNav) {
             n.tamanoCamion, 1.0..3.0, 0.25, n.tamanoDefecto,
         ) { motor.apariencia("camion", it) }
     }
+    // La pestana Tablero: el panel Moderno de la web o el detallado de la app.
+    Tarjeta {
+        TituloSeccion(n.t("dashStyle"))
+        Selector(
+            null,
+            listOf(OpcionNav("moderno", n.t("dashStyleModern")), OpcionNav("detallado", stringResource(R.string.tablero_detallado))),
+            ajustes.estiloTablero,
+        ) { prefs.ponerEstiloTablero(it) }
+    }
     Tarjeta {
         TituloSeccion(n.t("settingsButtonsTitle").trimEnd(':'))
         FilaInterruptor(n.t("settingsFadeButtons"), null, n.desvanecerBotones) { motor.apariencia("desvanecer", it) }
         FilaInterruptor(n.t("settingsKeepCompass"), null, n.mantenerBrujula) { motor.apariencia("brujula", it) }
+        // Mover y agrandar el panel del giro, los botones y el mini-HUD, en el mapa (btnLayout de la web).
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = alAcomodar) { Text(n.t("settingsMoveButtons")) }
+            if (ajustes.disposicion.isNotEmpty()) {
+                TextButton(onClick = { prefs.borrarDisposicion() }) { Text(n.t("layoutReset")) }
+            }
+        }
     }
     Tarjeta {
         TituloSeccion(n.t("settingsBaseTitle").trimEnd(':'))

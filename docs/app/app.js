@@ -8532,6 +8532,10 @@ function renderConnectionUi() {
 
 document.getElementById('changeCodeBtn').addEventListener('click', () => {
   if (conn.demo) { location.href = location.pathname; return; }
+  // Espectador de un convoy: "otro codigo" es el de pairing para entrar a manejar
+  // (convoy.js, convoyDrive). Antes borraba el codigo guardado y mostraba el campo
+  // con el espectador todavia conectado.
+  if (conn.spectator) { convoyOpenModal(); document.getElementById('convoyDriveCode').focus(); return; }
   // La salida a mano del codigo recordado: el proximo que acepte el relay lo reemplaza,
   // y sin ninguno /app vuelve a abrir pidiendolo.
   if (!conn.local) { try { localStorage.removeItem(PAIRING_CODE_KEY); } catch (e) { /* nada */ } }
@@ -9505,17 +9509,18 @@ initCab();
     window.__liveMapSpectator = { variant: liveParam, backend: document.getElementById('backendUrl').value.replace('wss://', 'https://').replace('ws://', 'http://') };
     return;
   }
-  const convoyParam = (params.get('convoy') || '').toUpperCase();
-  if (convoyParam && !code && !params.get('local')) {
-    // Link de convoy sin cliente: espectador. Con cliente (?code=...) se
-    // conecta normal y se abre el modal con el codigo puesto.
+  // Link de convoy (convoyLinkStart): sin cliente, espectador; con ?code= o con el
+  // codigo guardado en este dispositivo se conecta normal y se abre el modal con el
+  // codigo del convoy puesto.
+  const convoyStart = convoyLinkStart(location.search, lsGet(PAIRING_CODE_KEY), document.getElementById('backendUrl').value);
+  if (convoyStart && convoyStart.mode === 'spectator') {
     // convoy.js se carga despues de este archivo y arranca el modo
     // espectador al leer esta variable (un setTimeout puede dispararse antes
     // de que ese script llegue).
-    window.__convoySpectator = { code: convoyParam, backend: document.getElementById('backendUrl').value.replace('wss://', 'https://').replace('ws://', 'http://') };
+    window.__convoySpectator = { code: convoyStart.convoy, backend: document.getElementById('backendUrl').value.replace('wss://', 'https://').replace('ws://', 'http://') };
     return;
   }
-  if (convoyParam) setTimeout(() => convoyOpenModal(convoyParam), 800);
+  if (convoyStart) setTimeout(() => convoyOpenModal(convoyStart.convoy), 800);
   if (params.get('local')) {
     // Servido por el cliente en la LAN: el WebSocket esta en el mismo host,
     // puerto fijo (ver client/local_server.py).
@@ -9531,7 +9536,7 @@ initCab();
   // Sin codigo en la URL: el ultimo que el relay acepto en este dispositivo (abrir
   // /app pelado, o la app instalada, que abre ./index.html). Con la PC apagada espera
   // al cliente igual que un link guardado.
-  const saved = savedPairingCode(location.search, lsGet(PAIRING_CODE_KEY), document.getElementById('backendUrl').value);
+  const saved = (convoyStart && convoyStart.pairing) || savedPairingCode(location.search, lsGet(PAIRING_CODE_KEY), document.getElementById('backendUrl').value);
   if (saved) {
     document.getElementById('code').value = saved;
     rememberedCode = saved;
