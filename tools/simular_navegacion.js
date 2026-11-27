@@ -395,7 +395,9 @@ function salidaPorAngulo(ctx, pts, kEnter, manoIzq) {
   const outs = (g.adjacency.get(v) || []).filter(([n]) => n !== u);
   if (outs.length < 2) return null;
   const prefab = new Set([v, ...outs.map(([n]) => n)]);
-  const salidas = outs.filter(([n]) => n === b || pure.leadsAway(g.adjacency, g.nodeXY, n, n, prefab, 120));
+  // un toco (brazo con la calle oculta) es una salida, como en detectRoundabout
+  const tocos = pure.prefabStubs(g);
+  const salidas = outs.filter(([n]) => n === b || (tocos && tocos[n] === 1) || pure.leadsAway(g.adjacency, g.nodeXY, n, n, prefab, 120));
   const todos = [v, ...outs.map(([n]) => n)].map(n => g.nodeXY(n));
   const c = [todos.reduce((s, p) => s + p[0], 0) / todos.length, todos.reduce((s, p) => s + p[1], 0) / todos.length];
   const antihorario = !manoIzq;
@@ -653,7 +655,7 @@ function analizarRuta(ctx, ruta, hallazgos) {
     const verdad = salidaPorAngulo(ctx, pts, r.k, ctx.manoIzq(r.node));
     if (!verdad || verdad.exit == null) { add('rotonda_sin_verificar', { donde: xy(r.node), exit: r.exit, motivo: verdad ? verdad.motivo : 'sin anillo ni prefab' }); continue; }
     ctx.rotondas.push({ v: ctx.v, donde: xy(r.node), app: r.exit, angulo: verdad.exit, tipo: verdad.tipo, brazos: verdad.brazos, dobla: r.verdad ? Math.round(r.verdad.delta) : null });
-    if (verdad.exit !== r.exit) add('rotonda_salida_distinta', { donde: xy(r.node), app: r.exit, porAngulo: verdad.exit, tipo: verdad.tipo, brazos: verdad.brazos, mismoNodo: verdad.mismoNodo, porLargo: verdad.porLargo });
+    if (verdad.exit !== r.exit) add('rotonda_salida_distinta', { donde: xy(r.node), app: r.exit, porAngulo: verdad.exit, tipoRotonda: verdad.tipo, brazos: verdad.brazos, mismoNodo: verdad.mismoNodo, porLargo: verdad.porLargo });
   }
   return { sim, lista, cruces };
 }

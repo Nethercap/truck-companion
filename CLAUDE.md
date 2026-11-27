@@ -644,6 +644,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   compactos sin isla (`compactIslandM`: cruces de ATS con curvas cuadradas).
   Los umbrales salen de medir contra el nombre del prefab del parser; antes
   de moverlos, correr el simulador con `--rotondas`.
+  En un prefab compacto, un toco (`prefabStubs`: brazo con la calle oculta en
+  el mapa del juego) cuenta como salida, porque se ve y se maneja: en la de
+  Frederikshavn -> Hirtshals (ETS2, 1185,-37177), de cinco brazos, los dos
+  que siguen a la entrada son ocultos y se decia "primera salida" por la
+  tercera. Y si el prefab tiene un toco y desde la entrada no hay dos curvas
+  que rodean la isla, cuentan tambien las que salen de los otros brazos: en
+  una de tres brazos la primera salida dobla una vez y la segunda rodea media
+  isla (0 y 48 grados de mas en la de Zurich, reporte #63, que se callaba).
+  El simulador cuenta igual las salidas por angulo (`salidaPorAngulo`).
+  En esas 300 rutas de ETS2 se anuncian 242 rotondas en vez de 191, y las de
+  salida distinta por angulo bajan de 4 a 1.
   Las rotondas ovaladas armadas con calles (sin prefab de rotonda, sin
   nombre que ayude) pasan por otra regla (`ovalRing`, `OVAL_RING`): hasta
   x2 de redondez, a lo sumo dos lados rectos (el tercero, `straightRuns`,
@@ -700,6 +711,38 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   rutas de ATS, ETS2, Coast to Coast y ProMods) suma 45 avisos, dibujados
   uno por uno: cruces con el brazo de enfrente oculto, y tres rotondas sin
   reconocer con brazos ocultos que dicen "turn right" en la primera salida.
+  Ni la T o la Y con la otra calle oculta (`stubTee`, 27-11): el otro brazo
+  es un toco y la ruta no tiene otra salida de verdad, asi que la esquina se
+  callaba aunque se ve la otra calle (en el parser es `hidden`: el grafo no
+  la tiene, pero se maneja). En la T de Odense -> Kiel (ETS2, 888,-21811) la
+  ruta llega por la barra y dobla al norte, y el brazo sur sigue por una
+  calle oculta. Se mide donde el toco se separa de la ruta (a mas de 3 m, por
+  la curva de la arista): la ruta dobla 50 grados o mas entre los 25 m de
+  antes y de despues, hasta 150, y el toco se va 30 grados o mas para el
+  otro lado. Asi tambien la T cuyo palo se curva antes de la barra, que a
+  60 m no dobla. El toco de enfrente (Tulsa) y el del mismo lado siguen
+  callados, y la entrada a una rotonda no cuenta. Tampoco una rotonda
+  compacta con los otros brazos ocultos (Bilbao, Murcia, Innsbruck ->
+  Zurich): adentro del prefab la ruta tambien dobla con un toco del otro
+  lado, y "turn left" ahi era pasar derecho. La separa una curva del prefab
+  (de las que salen del toco o del nodo del cruce) que rodea la isla,
+  `extraTurningDeg` de 60 o mas (74 a 148 en las rotondas de la muestra, 0
+  en todas las T); esas ahora las reconoce `detectRoundabout` (ver
+  rotondas). El aviso va en el nodo de donde sale el toco, la entrada al
+  prefab, como los otros giros. Lo busco el reporte #63, que resulto ser una
+  de esas rotondas.
+  En 60 rutas de ETS2 habia 71 esquinas con un toco del otro lado y sin
+  aviso (dibujadas con las calles ocultas del parser: T e Y de verdad, y
+  las rotondas); quedan 13, rotondas, puntas de ruta o cruces con otra salida.
+  Con las dos reglas (y las rotondas de abajo), en 300 rutas por juego
+  (semilla 7): ETS2 pasa de 2.441 a 2.738 avisos y ATS de 2.162 a 2.279;
+  giros nuevos en 265 lugares (183 y 82), 51 rotondas mas en ETS2, y los
+  `giro_sin_aviso` bajan de 65 a 58 y de 37 a 31. Ninguno se pierde: 17 se
+  corren al nodo del toco (hasta 75 m, para el mismo lado) o pasan a
+  rotonda. Dibujados 72 nuevos, con las calles ocultas del parser. Suben
+  `giro_sin_otra_salida`, `aviso_sin_opcion` y `giro_en_recta`: el simulador
+  no ve las calles ocultas, y en una T cuyo palo se curva la zona dobla poco.
+  check_avisos: ATS +3 (Helena, Yankton, Pendleton) y ETS2 +13.
 - Los puntos de la curva de un prefab cortan el grupo de nodos de cruce
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.

@@ -491,6 +491,54 @@ test('maneuver: la cruz con el brazo de enfrente oculto se anuncia aunque la cal
   assert.equal(detectManeuver({ ...vuelta, stubs: tocos }).quiet, true);
 });
 
+test('maneuver: la T con la otra calle oculta se anuncia, aunque el palo se curve antes de la barra (Odense -> Kiel)', () => {
+  // Se entra por el palo (nodo 1), que sube 32 m, y en la barra la ruta dobla
+  // a la izquierda hasta el nodo 4. El brazo derecho (nodo 6) sigue por una
+  // calle oculta: es un toco, que solo se une a los otros brazos del prefab.
+  // A 60 m la ruta dobla 31 grados.
+  const T = (tocoLinea, extra = {}) => {
+    const route = [[0, -300], [0, 0], [0, 32], [-8, 40], [-60, 42], [-300, 45]];
+    const s = scenario({ route, extraNodes: [tocoLinea[tocoLinea.length - 1]], edges: [[1, 6], [6, 4], [4, 6]] });
+    const lineas = { '1>6': tocoLinea };
+    const edgeLine = (a, b) => lineas[`${a}>${b}`] || [s.nodes[a], s.nodes[b]];
+    return { ...s, edgeLine, stubs: [0, 0, 0, 0, 0, 0, 1], ...extra };
+  };
+  const derecha = [[0, 0], [0, 32], [10, 40], [55, 42]];
+  const m = detectManeuver(T(derecha));
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.stubTee, m.at], ['turn', 'left', false, true, 1]);
+  // sin los tocos (un grafo sin -prefabs.bin) o sin la curva de cada arista, como antes
+  assert.equal(detectManeuver(T(derecha, { stubs: undefined })), null);
+  assert.equal(detectManeuver(T(derecha, { edgeLine: undefined })), null);
+  // un brazo muerto que no es un toco (el otro lado de un rombo, un callejon) no cuenta
+  assert.equal(detectManeuver(T(derecha, { stubs: [0, 0, 0, 0, 0, 0, 0] })), null);
+  // el toco de enfrente (la T de Tulsa) sigue callado
+  assert.equal(detectManeuver(T([[0, 0], [0, 32], [0, 60], [1, 100]])), null);
+  // y el que se va para el mismo lado que la ruta, tambien
+  assert.equal(detectManeuver(T([[0, 0], [0, 32], [-6, 50], [-14, 90]])), null);
+  assert.equal(detectManeuver(T([[0, 0], [0, 32], [-6, 34], [-40, 10]])), null);
+  // una rotonda compacta con los otros brazos ocultos: la curva del toco a la
+  // salida rodea la isla (Bilbao, Innsbruck -> Zurich); "turn left" ahi es pasar
+  // derecho
+  const rotonda = T(derecha);
+  const isla = [[55, 42], [50, 62], [30, 80], [0, 85], [-25, 75], [-35, 55], [-40, 45], [-60, 42]];
+  const recta = rotonda.edgeLine;
+  rotonda.edgeLine = (a, b) => (a === 6 && b === 4 ? isla : recta(a, b));
+  assert.equal(detectManeuver(rotonda), null);
+  // una calle de verdad en el brazo derecho: decide la regla de siempre, no esta
+  const conCalle = T(derecha);
+  conCalle.adjacency.get(6).push([7]);
+  conCalle.nodes.push([400, 50]);
+  const r = detectManeuver(conCalle);
+  assert.ok(!r || !r.stubTee);
+  // una curva suave con una entrada del otro lado no es una T: la ruta dobla
+  // 30 grados donde se separa el toco
+  const curva = scenario({ route: [[0, -300], [0, 0], [0, 30], [-12, 60], [-60, 140]], extraNodes: [[40, 50]], edges: [[1, 5], [5, 3]] });
+  assert.equal(detectManeuver({ ...curva, edgeLine: (a, b) => (a === 1 && b === 5 ? [[0, 0], [0, 30], [8, 38], [40, 50]] : [curva.nodes[a], curva.nodes[b]]), stubs: [0, 0, 0, 0, 0, 1] }), null);
+  // ni una esquina de 42 grados: menos que stubTeeDeg
+  const abierta = scenario({ route: [[0, -300], [0, 0], [0, 30], [-27, 60], [-160, 208]], extraNodes: [[40, 50]], edges: [[1, 5], [5, 3]] });
+  assert.equal(detectManeuver({ ...abierta, edgeLine: (a, b) => (a === 1 && b === 5 ? [[0, 0], [0, 30], [8, 38], [40, 50]] : [abierta.nodes[a], abierta.nodes[b]]), stubs: [0, 0, 0, 0, 0, 1] }), null);
+});
+
 test('continuesTurn: una esquina partida en dos nodos se anuncia una vez; dos giros de verdad, dos', () => {
   const prev = { direction: 'left', inBearing: 0, outBearing: 315, quiet: false, end: 1000 };
   // segunda mitad de la misma esquina: de la entrada (norte) a la salida (oeste) son 90 grados
@@ -1779,6 +1827,52 @@ test('detectRoundabout: anillo de un sentido, cuenta las salidas hasta la de la 
   assert.equal(detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, este]), i: 1, iEnd: 1, ...g2, bearingBetween: planarBearing }), null);
 });
 
+test('detectRoundabout: la rotonda de tres brazos con uno oculto, con la geometria del grafo (Zurich, reporte #63)', () => {
+  const { detectRoundabout } = require('./pure.js');
+  // El prefab mod_ger_71 de ETS2 (-4320,18540), con +y al norte: se entra por
+  // el brazo sur (1) y se sale por el oeste (2); el noreste (4) es un toco,
+  // con la calle oculta. Desde la entrada la curva al toco dobla una vez y la
+  // de la ruta rodea media isla: no llegaban a las dos curvas que rodean.
+  const lineas = {
+    '0>1': [[98.4, -55.9], [86.5, -47.9], [73.2, -41.7], [59.1, -36.4], [44.8, -31.5], [31.1, -26], [18.6, -19.5], [8, -11], [0, 0]],
+    '1>0': [[0, 0], [8, -11], [18.6, -19.5], [31.1, -26], [44.8, -31.5], [59.1, -36.4], [73.2, -41.7], [86.5, -47.9], [98.4, -55.9]],
+    '1>4': [[0, 0], [-6, 16.3], [-5.4, 29.1], [15.5, 48.7]],
+    '1>2': [[0, 0], [-9.5, 40.4], [-16.9, 43.6], [-36.8, 39.7], [-51.1, 43]],
+    '4>1': [[15.5, 48.7], [0.4, 43], [-20.4, 43.4], [-27.7, 35], [-25.3, 23.9], [-12.7, 17], [0, 0]],
+    '4>2': [[15.5, 48.7], [-0.2, 42.4], [-28.7, 39.6], [-51.1, 43]],
+    '2>3': [[-51.1, 43], [-60.7, 47.7], [-68.9, 54.8], [-75.7, 63.7], [-81.2, 74.1], [-85.4, 85.5], [-88.3, 97.3], [-90.1, 109.1], [-90.8, 120.4]],
+    '2>4': [[-51.1, 43], [-36.1, 36.6], [-24.1, 23.2], [-16.8, 21.1], [-9, 24.1], [-1.1, 36.5], [15.5, 48.7]],
+    '2>1': [[-51.1, 43], [-35.4, 36.4], [-22.7, 22.7], [-12.9, 18], [0, 0]],
+  };
+  const nodos = [[98.4, -55.9], [0, 0], [-51.1, 43], [-90.8, 120.4], [15.5, 48.7]];
+  const largo = (l) => l.reduce((acc, p, k) => (k ? acc + Math.hypot(p[0] - l[k - 1][0], p[1] - l[k - 1][1]) : 0), 0);
+  const adjacency = new Map();
+  for (const [clave, l] of Object.entries(lineas)) {
+    const [a, b] = clave.split('>').map(Number);
+    if (!adjacency.has(a)) adjacency.set(a, []);
+    adjacency.get(a).push([b, largo(l)]);
+  }
+  const edgeLine = (a, b) => lineas[`${a}>${b}`] || null;
+  const pts = [];
+  const tramo = (a, b) => lineas[`${a}>${b}`].forEach((p, k, l) => {
+    if (k === 0 && pts.length) return;
+    const nodo = k === 0 ? a : k === l.length - 1 ? b : null;
+    pts.push([p[0], p[1], 0, nodo === 1 || nodo === 2 ? 1 : 0, nodo]);
+  });
+  tramo(0, 1); tramo(1, 2); tramo(2, 3);
+  const { cum, pointAt } = routeMetrics(pts);
+  const i = pts.findIndex(p => p[4] === 1);
+  const ctx = { pts, cum, pointAt, i, iEnd: i, adjacency, nodeAt: (n) => nodos[n], edgeLine, bearingBetween: planarBearing };
+  // sin los tocos, como antes: no es una rotonda
+  assert.equal(detectRoundabout(ctx), null);
+  // con el toco: la rotonda, y la salida de la ruta es la segunda (el toco es la primera)
+  const r = detectRoundabout({ ...ctx, stubs: [0, 0, 0, 0, 1] });
+  assert.deepEqual([r.exit, r.enter, r.leave], [2, i, pts.findIndex(p => p[4] === 2)]);
+  // y la T con la calle oculta no se la toma: sus curvas rodean la isla
+  const m = detectManeuver({ ...ctx, nodes: nodos, nodeXY: (n) => nodos[n], stubs: [0, 0, 0, 0, 1] });
+  assert.ok(!m || !m.stubTee);
+});
+
 test('detectRoundabout: la salida que se abre en el mismo nodo de la entrada es la primera (Discord, 15-10)', () => {
   const { detectRoundabout } = require('./pure.js');
   // rotonda de 4 brazos como la del nodo 9654 de ATS: anillo antihorario de
@@ -1950,6 +2044,14 @@ test('detectRoundabout: rotonda compacta de un prefab, las salidas por el largo 
   const recta = (a, b) => [nodos[a], [0, 0], nodos[b]];
   assert.equal(detectRoundabout({ ...ctx([sur, 0, 2, norte]), edgeLine: recta }), null);
   assert.equal(detectRoundabout({ ...ctx([sur, 0, 3, oeste]), edgeLine: recta }), null);
+  // el brazo este sin calle en el grafo (oculta en el mapa del juego): sin los
+  // tocos el norte era la primera salida; con ellos, la segunda, como se ve
+  // (Frederikshavn -> Hirtshals, ETS2, decia "primera salida" por la tercera)
+  adjacency.set(1, adjacency.get(1).filter(([n]) => n < 4));
+  assert.equal(detectRoundabout(ctx([sur, 0, 2, norte])).exit, 1);
+  const tocos = nodos.map((_, k) => (k === 1 ? 1 : 0));
+  assert.equal(detectRoundabout({ ...ctx([sur, 0, 2, norte]), stubs: tocos }).exit, 2);
+  assert.equal(detectRoundabout({ ...ctx([sur, 0, 3, oeste]), stubs: tocos }).exit, 3);
 });
 
 test('voiceManeuverKey: rotonda hasta la octava salida, despues hacia que lado', () => {
