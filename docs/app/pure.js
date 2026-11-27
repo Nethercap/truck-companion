@@ -1833,17 +1833,23 @@ function detectManeuver(ctx) {
   // Se mide donde el toco se separa de la ruta (a mas de stubSplitM): la ruta
   // dobla al menos stubTeeDeg entre los stubLegM de antes y de despues (un
   // quiebre corto de una calle que sigue derecha no llega: lo suavizan los 25
-  // m), y el toco se va para el otro lado al menos stubSideDeg. Asi tambien
+  // m), y el toco sigue derecho o se va para el otro lado: solo no cuenta el
+  // que se va stubSideDeg o mas para el mismo lado que la ruta. Asi tambien
   // la T cuyo palo se curva antes de la barra, que a legM no dobla. El toco
-  // de enfrente (la T de Tulsa) no cuenta: ese sigue callado. Solo si no hay
-  // otra salida de verdad (las demas ya se miden contra ella) y no es la
-  // entrada a una rotonda.
+  // de enfrente (la calle que sigue derecho es oculta y la ruta dobla, como
+  // la T de Tulsa) se callaba hasta el 27-11: era la mayoria de los giros sin
+  // aviso del simulador contando los tocos como salidas (en ATS, en San
+  // Antonio, Aberdeen y Des Moines, la ruta dobla 90 grados y la calle de
+  // enfrente sigue oculta), y dibujados son T de verdad. Una curva de la calle
+  // con una entrada de enfrente no llega: dobla de a poco y en 25 m no pasa
+  // los stubTeeDeg. Solo si no hay otra salida de verdad (las demas ya se
+  // miden contra ella) y no es la entrada a una rotonda.
   const stubSplitM = ctx.stubSplitM != null ? ctx.stubSplitM : 3;
   const stubLegM = ctx.stubLegM != null ? ctx.stubLegM : 25;
   const stubTeeDeg = ctx.stubTeeDeg != null ? ctx.stubTeeDeg : 50;
   const stubSideDeg = ctx.stubSideDeg != null ? ctx.stubSideDeg : 30;
   const stubMaxDeg = ctx.stubMaxDeg != null ? ctx.stubMaxDeg : 150;
-  const stubIslandDeg = ctx.stubIslandDeg != null ? ctx.stubIslandDeg : 60;
+  const stubIslandDeg = ctx.stubIslandDeg != null ? ctx.stubIslandDeg : 30;
   const stubTee = () => {
     if (!ctx.stubs || !ctx.edgeLine || !adjacency) return null;
     if (altExits().length) return null;
@@ -1861,24 +1867,35 @@ function detectManeuver(ctx) {
     };
     // Una rotonda compacta con los otros brazos ocultos tambien tiene un toco
     // del otro lado de donde dobla la ruta adentro del prefab, y "turn left"
-    // ahi es pasar derecho. Sus curvas rodean la isla (extraTurningDeg de 74
-    // a 148 en Bilbao, Murcia, Pitesti, Graz, Innsbruck y Skopje); las de una
-    // T doblan una sola vez (0 en todas las de la muestra). Se miran las que
-    // salen del toco (todas son del prefab) y las del nodo del cruce, menos la
-    // calle por la que se llega.
+    // ahi es pasar derecho. Sus curvas rodean la isla (extraTurningDeg de 37
+    // en la chica de Malaga -> Almeria a 148 en Bilbao, Murcia, Pitesti, Graz,
+    // Innsbruck y Skopje); las de una T doblan una sola vez (0, o 1, en las 60
+    // de la muestra). Se miran las
+    // curvas entre los brazos: el nodo del cruce, el toco y los vecinos de los
+    // dos, menos la calle por la que se llega. Con solo las que salen del
+    // toco y del nodo del cruce se colaba una de tres brazos (Malaga ->
+    // Almeria, ETS2, con el toco de enfrente).
     let nodoAntes = null;
     for (let k = i - 1; k >= 0 && nodoAntes == null; k--) nodoAntes = pts[k][4];
-    const rodeaIsla = (from) => (adjacency.get(from) || []).some(([m]) => {
-      if (m === nodoAntes) return false;
-      const l = ctx.edgeLine(from, m);
-      return l && extraTurningDeg(l, bearingBetween) >= stubIslandDeg;
-    });
+    const rodeaIsla = (idx, n) => {
+      const brazos = new Set([idx, n]);
+      for (const [m] of (adjacency.get(idx) || [])) if (m !== nodoAntes) brazos.add(m);
+      for (const [m] of (adjacency.get(n) || [])) brazos.add(m); // las del toco son todas del prefab
+      for (const a of brazos) {
+        for (const [m] of (adjacency.get(a) || [])) {
+          if (m === a || !brazos.has(m)) continue;
+          const l = ctx.edgeLine(a, m);
+          if (l && extraTurningDeg(l, bearingBetween) >= stubIslandDeg) return true;
+        }
+      }
+      return false;
+    };
     let best = null;
     for (const [k, idx, n] of deads) {
       if (ctx.stubs[n] !== 1) continue;
       const line = ctx.edgeLine(idx, n);
       if (!line || line.length < 2) continue;
-      if (rodeaIsla(n) || rodeaIsla(idx)) continue;
+      if (rodeaIsla(idx, n)) continue;
       // el primer punto del toco (cada 2 m) que queda a mas de stubSplitM
       let acum = 0, sep = null, pToco = null;
       for (let j = 1; j < line.length && pToco == null; j++) {
@@ -1901,7 +1918,7 @@ function detectManeuver(ctx) {
       const dRuta = normDeg(despues - antes);
       const dToco = normDeg(bearingBetween(pointAt(Math.max(0, S - 2)), pToco) - antes);
       if (Math.abs(dRuta) < stubTeeDeg || Math.abs(dRuta) > stubMaxDeg) continue;
-      if (Math.sign(dToco) === Math.sign(dRuta) || Math.abs(dToco) < stubSideDeg) continue;
+      if (Math.sign(dToco) === Math.sign(dRuta) && Math.abs(dToco) >= stubSideDeg) continue;
       if (best && Math.abs(best.dRuta) >= Math.abs(dRuta)) continue;
       // el aviso, en el nodo de donde sale el toco (la entrada al prefab),
       // como los otros giros: en un punto de la curva no es un nodo
@@ -1946,7 +1963,8 @@ function detectManeuver(ctx) {
       // Bakersfield (ATS, -104665,7299, reporte del 26-10) la cruz con
       // semaforos tiene ocultos el brazo norte y el este; la ruta dobla 90
       // grados al oeste y a los 10 m la calzada partida vuelve al norte:
-      // medido a legM dobla 40 y no se decia nada. Una T sigue como antes,
+      // medido a legM dobla 40 y no se decia nada. Una T sigue como antes aca
+      // (la anuncia stubTee, mas abajo, si dobla donde se separa el toco),
       // tambien la de Messina (ETS2, 18399,70950), pegada a otro prefab con
       // un toco que no es suyo; el cruce chico en medio de una curva que se
       // pasa derecho (Moline, Coast to Coast, 23224,-15659: llegando en curva,
