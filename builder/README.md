@@ -89,6 +89,9 @@ as a separate program.
   that can't be read at all is skipped with a warning naming it, and its icon
   still counts without the image, instead of stopping the build after all the
   sectors were parsed.
+- Roads whose lanes have names the generator doesn't know (lane types a mod
+  defines itself) come out with road type `unknown`. The log counts them by
+  road look, with their lanes. The web draws them as local roads.
 
 ## Building it
 

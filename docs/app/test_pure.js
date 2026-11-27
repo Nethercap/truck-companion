@@ -6626,6 +6626,39 @@ test('mapa base: BASE_LAYER_IDS tiene cada capa y los limites se apagan al acerc
   assert.equal(capas.find(c => c.id === 'base-border').filter[2], 'border');
 });
 
+test('roadLayerFilter: una calle con carriles que el generator no conoce se dibuja como local', () => {
+  const { roadLayerFilter, ROAD_LAYER_TYPES } = require('./pure.js');
+  // Lo justo de las expresiones de MapLibre para evaluar el filtro contra un feature.
+  const evaluar = (e, props) => {
+    if (!Array.isArray(e)) return e;
+    switch (e[0]) {
+      case 'all': return e.slice(1).every(x => evaluar(x, props));
+      case '==': return evaluar(e[1], props) === evaluar(e[2], props);
+      case 'in': return evaluar(e[2], props).includes(evaluar(e[1], props));
+      case 'get': return props[e[1]];
+      case 'literal': return e[1];
+      default: throw new Error('expresion sin evaluar: ' + e[0]);
+    }
+  };
+  const capas = Object.keys(ROAD_LAYER_TYPES);
+  assert.deepEqual(capas, ['road-local', 'road-divided', 'road-freeway']);
+  const capasDe = props => capas.filter(id => evaluar(roadLayerFilter(id), props));
+  assert.deepEqual(capasDe({ type: 'road', roadType: 'local' }), ['road-local']);
+  // carriles propios de un mod (build.log del 27-11: Canada entera sin calles)
+  assert.deepEqual(capasDe({ type: 'road', roadType: 'unknown' }), ['road-local']);
+  assert.deepEqual(capasDe({ type: 'road', roadType: 'divided' }), ['road-divided']);
+  assert.deepEqual(capasDe({ type: 'road', roadType: 'freeway' }), ['road-freeway']);
+  // vias y tranvia, y lo que no es calle, en ninguna
+  assert.deepEqual(capasDe({ type: 'road', roadType: 'train' }), []);
+  assert.deepEqual(capasDe({ type: 'road', roadType: 'tram' }), []);
+  assert.deepEqual(capasDe({ type: 'prefab', roadType: 'local' }), []);
+  // cada filtro es nuevo: MapLibre puede quedarse con el array
+  const f = roadLayerFilter('road-local');
+  f[2][2][1].push('train');
+  assert.deepEqual(capasDe({ type: 'road', roadType: 'train' }), []);
+  assert.throws(() => roadLayerFilter('road-otra'));
+});
+
 test('roadLineWidth: el ancho de siempre de lejos y el de la calle del juego de cerca', () => {
   const { roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE } = require('./pure.js');
   const base = [5, 0.5, 12, 1.5, 17, 5]; // road-local
