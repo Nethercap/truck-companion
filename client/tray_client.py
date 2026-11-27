@@ -233,6 +233,10 @@ class AppState:
         if changed or vehicle != self.vehicle:
             detalle = ", ".join(p for p in (game, vehicle) if p)
             logging.info("Status: %s%s", status, f" ({detalle})" if detalle else "")
+        if status == "live" and self.status != "live":
+            # Sin el juego se lee la empresa cada 15 minutos: al empezar a
+            # manejar, el pase del mapa en vivo pudo haber vencido.
+            self.vtc.despertar()
         self.status = status
         self.game = game
         self.vehicle = vehicle
@@ -2398,6 +2402,8 @@ class CloudLink:
         self.url = f"{backend_url}/ws/client/{code}"
         self.keybinds = keybinds
         self.ws = None
+        # El ultimo pase de la VTC que se le mando al relay (ver mandar_pase_vtc).
+        self.pase_vtc = None
 
     async def send(self, text: str):
         ws = self.ws
@@ -2423,6 +2429,7 @@ class CloudLink:
                     state.set_cloud("connected")
                     logging.info("Connected to backend")
                     await ws.send(status_message())
+                    await mandar_pase_vtc(self, forzar=True)
                     await client_lib.receive_commands(ws, self.keybinds)
             except (websockets.ConnectionClosed, OSError) as exc:
                 logging.warning("Backend connection lost: %s", exc)
@@ -2434,6 +2441,16 @@ class CloudLink:
                     ruta.fallo_al_conectar()
             state.set_cloud("reconnecting")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
+
+
+async def mandar_pase_vtc(cloud, forzar: bool = False):
+    """El pase del mapa en vivo de la empresa al relay, si cambio o al
+    conectar (un relay redesplegado no se acuerda de nada). Solo al relay: el
+    servidor LAN no tiene mapa de empresas."""
+    pase = state.vtc.pase_para_relay()
+    if forzar or pase != getattr(cloud, "pase_vtc", None):
+        cloud.pase_vtc = pase
+        await cloud.send(json.dumps({"type": "vtc_pass", "pass": pase}))
 
 
 async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
@@ -2461,6 +2478,7 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
             msg = status_message()
             await cloud.send(msg)
             await local.broadcast(msg, is_status=True)
+        await mandar_pase_vtc(cloud)
 
     sin_memoria_desde = None
     ultimo_render, render_cambio_en, avisado_congelado = None, time.time(), False

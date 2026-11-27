@@ -19,6 +19,12 @@
     const param = local ? PARAMS.get('api') : null;
     return param ? param.replace(/\/+$/, '') : 'https://api.trucksim-dash.com';
   })();
+  // El relay, para el mapa en vivo (pestana Live). Como ?api=, solo en local.
+  const RELAY = (function () {
+    const local = ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) >= 0;
+    const param = local ? PARAMS.get('relay') : null;
+    return (param || 'https://truck-companion-production.up.railway.app').replace(/\/+$/, '').replace(/^http/, 'ws');
+  })();
 
   async function pedir(ruta, opciones) {
     const cfg = Object.assign({ credentials: 'include' }, opciones || {});
@@ -492,6 +498,8 @@
     ['stats', 'tabStats', (p) => p.relation.member],
     ['trips', 'tabTrips', (p) => p.relation.member],
     ['map', 'tabMap', (p) => p.relation.member],
+    // En vivo: los miembros siempre; los demas si la empresa tiene mapa publico.
+    ['live', 'tabLive', (p) => !!yo.live && (p.relation.member || (p.vtc.live_public || 'off') !== 'off')],
     ['applications', 'tabApplications', (p) => puede(p, 'applications')],
     ['roles', 'tabRoles', (p) => puede(p, 'roles')],
     ['discord', 'tabDiscord', (p) => puede(p, 'discord')],
@@ -552,6 +560,7 @@
     // El mapa se arma de nuevo al volver a su pestana: uno vivo afuera de la
     // pagina se queda con un contexto de WebGL.
     if (window.VtcMapa) VtcMapa.cerrar();
+    if (vivo) { vivo(); vivo = null; }
     const p = pagina, v = p.vtc, rel = p.relation;
     const acciones = [];
     if (!rel.member) {
@@ -711,7 +720,7 @@
   }
 
   // --------------------------------------------------------------- miembros
-  const estado = { periodoMiembros: 'month', juegoMiembros: '', orden: 'distance_km', periodo: 'month', metrica: 'distance', juego: '', statsPeriodo: 'month', revision: false, mapaJuego: '', mapaPeriodo: 'month' };
+  const estado = { periodoMiembros: 'month', juegoMiembros: '', orden: 'distance_km', periodo: 'month', metrica: 'distance', juego: '', statsPeriodo: 'month', revision: false, mapaJuego: '', mapaPeriodo: 'month', vivoJuego: '' };
   const opcionesPeriodo = () => ['week', 'month', 'last_month', 'year', 'total'].map((x) => [x, t('period_' + x)]);
   const opcionesJuego = () => [['', t('anyGame')]].concat((pagina.vtc.games || []).map((j) => [j, j.toUpperCase()]));
 
@@ -894,6 +903,82 @@
     aviso.hidden = !!m.trips;
     VtcMapa.dibujar(m, juego);
   };
+
+  // ---------------------------------------------------------------- en vivo
+  // Los camiones de la empresa ahora, por el relay (/ws/vtcmap/{id}). Un
+  // miembro saluda con su pase (/vtc/me?live_pass=1, 12 minutos, se renueva a
+  // los 10) y ve a todos con nombre; los demas, lo que la empresa eligio que
+  // sea publico. De los viajes personales no llega nada.
+  let vivo = null;  // la funcion que cierra la conexion de la pestana abierta
+  VISTAS.live = async function (cuerpo, p) {
+    const juegos = (p.vtc.games && p.vtc.games.length) ? p.vtc.games : ['ets2', 'ats'];
+    if (!juegos.includes(estado.vivoJuego)) estado.vivoJuego = juegos[0];
+    const juego = estado.vivoJuego, miembro = !!p.relation.member;
+    const lienzo = el('div', { class: 'mapa-vtc' });
+    const aviso = el('p', { class: 'mapa-aviso-vtc', role: 'status' }, t('mapLoading'));
+    const lista = el('div', {});
+    const publico = p.vtc.live_public || 'off';
+    cuerpo.replaceChildren(el('section', { class: 'card' },
+      juegos.length > 1 ? el('div', { class: 'filtros' }, selector(juegos.map((j) => [j, j.toUpperCase()]), juego, (x) => { estado.vivoJuego = x; VISTAS.live(cuerpo, p); }, t('fGames'))) : null,
+      el('div', { class: 'mapa-caja-vtc' }, lienzo, aviso), lista,
+      el('p', { class: 'muted small' }, miembro ? t('liveMembersNote') : t('livePublicNote_' + publico))));
+    if (vivo) { vivo(); vivo = null; }
+    const problema = await VtcMapa.abrir(lienzo, juego);
+    if (problema === 'cancelado' || !lienzo.isConnected) return;
+    if (problema) { aviso.textContent = t(problema); return; }
+    VtcMapa.cerrarVivo();
+    let ws = null, cerrado = false, reintento = null, renovar = null, pase = null;
+    async function traerPase() {
+      if (!miembro) return null;
+      const r = await pedir('/vtc/me?live_pass=1');
+      return r.ok && r.datos.live_pass ? r.datos.live_pass.pass : null;
+    }
+    function saludar() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', pass: pase })); }
+    async function conectar() {
+      pase = await traerPase();
+      if (cerrado) return;
+      ws = new WebSocket(RELAY + '/ws/vtcmap/' + encodeURIComponent(p.vtc.id));
+      ws.onopen = saludar;
+      ws.onmessage = (e) => {
+        let msg;
+        try { msg = JSON.parse(e.data); } catch (err) { return; }
+        if (!msg || msg.type !== 'vtc_players' || !Array.isArray(msg.players)) return;
+        const deEste = msg.players.filter((j) => j.game === juego && typeof j.x === 'number' && typeof j.z === 'number');
+        aviso.hidden = !!deEste.length;
+        aviso.textContent = deEste.length ? '' : t('nobodyDriving');
+        VtcMapa.vivos(deEste, juego, p.vtc.color);
+        pintarEnVivo(lista, deEste, juego, msg.view);
+      };
+      ws.onclose = (e) => {
+        ws = null;
+        if (cerrado) return;
+        if (e.code === 4503) { aviso.hidden = false; aviso.textContent = t('liveOff'); return; }
+        aviso.hidden = false;
+        aviso.textContent = t('liveReconnecting');
+        reintento = setTimeout(conectar, 5000);
+      };
+    }
+    renovar = setInterval(async () => { pase = await traerPase(); saludar(); }, 10 * 60 * 1000);
+    vivo = () => { cerrado = true; clearTimeout(reintento); clearInterval(renovar); if (ws) ws.close(); };
+    conectar();
+  };
+
+  // La lista de abajo del mapa en vivo: quien, de donde a donde, cuanto falta.
+  // En el publico anonimo solo cuantos.
+  function pintarEnVivo(caja, jugadores, juego, vista) {
+    if (!jugadores.length) { caja.replaceChildren(); return; }
+    if (!jugadores[0].id) { caja.replaceChildren(el('p', { class: 'small' }, t('liveTrucks', { n: numero(jugadores.length) }))); return; }
+    const llegada = (s) => new Date(Date.now() + s * 1000).toLocaleTimeString(idioma, { hour: '2-digit', minute: '2-digit' });
+    caja.replaceChildren(el('ul', { class: 'lista en-ruta' }, jugadores.map((j) => el('li', {},
+      el('span', { class: 'punto', vars: { background: j.rankColor || pagina.vtc.color || 'var(--vtc)' } }),
+      el('button', { type: 'button', class: 'linkish', on: { click: () => VtcMapa.irA(juego, j.x, j.z) } }, j.name || t('hiddenDriver')),
+      j.rank && vista === 'members' ? el('span', { class: 'chip' }, j.rank) : null,
+      el('span', { class: 'crece small' },
+        j.cityDst ? [j.citySrc || '?', ' → ', j.cityDst, j.cargo ? el('span', { class: 'muted' }, ' · ' + j.cargo) : null] : el('span', { class: 'muted' }, t('liveNoJob')),
+        j.paused ? [' ', el('span', { class: 'chip warn' }, t('livePaused'))] : null),
+      typeof j.distanceKm === 'number' && j.cityDst ? el('span', { class: 'valor small' }, distancia(j.distanceKm),
+        typeof j.etaSeconds === 'number' && j.etaSeconds > 0 ? el('span', { class: 'muted' }, ' · ' + llegada(j.etaSeconds)) : null) : null))));
+  }
 
   // Un boton por chofer con su color: tocarlo lo deja adelante en el mapa.
   function pintarLeyenda(caja, choferes) {
@@ -1151,7 +1236,11 @@
     if (yo.member) {
       const esconder = casilla(t('hideMyName'), yo.member.hide_name);
       esconder.input.addEventListener('change', () => hacerPedido('PATCH', '/vtc/me', { hide_name: esconder.input.checked }, (d) => { yo.member.hide_name = d.hide_name; }, t('saved')));
+      // Del mapa en vivo publico se puede salir; del de los miembros no (es parte de unirse).
+      const fueraDelPublico = casilla(t('liveHideMe'), yo.member.public_map_out);
+      fueraDelPublico.input.addEventListener('change', () => hacerPedido('PATCH', '/vtc/me', { public_map_out: fueraDelPublico.input.checked }, (d) => { yo.member.public_map_out = d.public_map_out; }, t('saved')));
       nodos.push(tarjeta(t('myMembership'), el('p', { class: 'muted small' }, t('memberSince', { date: fecha(yo.member.joined_at) })), esconder.etq,
+        yo.live ? fueraDelPublico.etq : null,
         el('p', { class: 'muted small' }, t('memberPublic')),
         p.relation.owner ? el('p', { class: 'muted small' }, t('vtc_owner_must_transfer'))
           : el('div', { class: 'botones' }, botonArmado(t('leave'), 'danger chico', () => hacerPedido('POST', '/vtc/' + tag + '/leave', {}, () => { location.href = enlace(''); })))));
@@ -1170,6 +1259,7 @@
       });
       nodos.push(formulario);
     }
+    if (yo.live && puede(p, 'settings', 'edit')) nodos.push(tarjetaDelMapaPublico(v));
     if (p.relation.owner) nodos.push(tarjetaDeNombre(v));
     if (p.relation.owner) {
       const confirma = el('input', { type: 'text', maxlength: 6, autocomplete: 'off' });
@@ -1178,6 +1268,14 @@
     }
     cuerpo.replaceChildren(...nodos);
   };
+
+  // El mapa en vivo publico: apagado, sin nombres (posicion redondeada) o con
+  // nombres. El de los miembros no se elige.
+  function tarjetaDelMapaPublico(v) {
+    const opciones = ['off', 'anonymous', 'names'].map((x) => [x, t('livePublic_' + x)]);
+    const elegir = selector(opciones, v.live_public || 'off', (x) => hacerPedido('PATCH', '/vtc/' + v.tag, { live_public: x }, (d) => { pagina.vtc.live_public = d.vtc.live_public; }, t('saved')), t('livePublicTitle'));
+    return tarjeta(t('livePublicTitle'), el('p', { class: 'muted small' }, t('livePublicHelp')), elegir);
+  }
 
   // Cambiar nombre y tag: el dueno, una vez cada 90 dias (la API lo controla y
   // dice desde cuando se puede otra vez en rename_available_at).
