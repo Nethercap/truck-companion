@@ -778,7 +778,25 @@ function detectRoundabout(ctx) {
     if (outs.some(([, m]) => !(m <= 150))) continue;
     if (!roundish([v, ...outs.map(([n]) => n)].map(nodeAt), 1.7)) continue;
     const rodean = outs.filter(([n]) => { const line = edgeLine(v, n); return line && extraTurningDeg(line, bearingBetween) >= 90; });
-    if (rodean.length < 2) continue;
+    // Con brazos ocultos (ctx.stubs, prefabStubs): en una rotonda de tres
+    // brazos, desde la entrada la primera salida dobla una vez y la segunda
+    // rodea media isla (de 0 y 48 grados de mas en la de Zurich, reporte #63,
+    // 27-11), y no llegaban a las dos curvas. Ahi cuentan tambien las que
+    // salen de los otros brazos del prefab. Sin eso la rotonda se callaba, o
+    // salia "turn left" donde se sigue derecho.
+    const conTocos = !!ctx.stubs && rodean.length < 2 && outs.some(([n]) => n !== b && ctx.stubs[n] === 1);
+    const curvas = rodean.map(([n]) => edgeLine(v, n));
+    if (conTocos) {
+      const brazos = new Set([v, ...outs.map(([n]) => n)]);
+      for (const [n] of outs) {
+        for (const [m] of (adjacency.get(n) || [])) {
+          if (m === n || !brazos.has(m)) continue;
+          const line = edgeLine(n, m);
+          if (line && extraTurningDeg(line, bearingBetween) >= 90) curvas.push(line);
+        }
+      }
+    }
+    if (curvas.length < 2) continue;
     if (compactIslandM(v, outs.map(([n]) => n), nodeAt, edgeLine) < COMPACT_MIN_ISLAND_M) continue;
     // Y la ruta la usa: rodea la isla o dobla (la primera salida). Pasar
     // derecho por un prefab chico con curvas raras no es una rotonda.
@@ -786,12 +804,16 @@ function detectRoundabout(ctx) {
     if (!propia || (extraTurningDeg(propia, bearingBetween) < 90
       && Math.abs(normDeg(bearingBetween(propia[propia.length - 2], propia[propia.length - 1]) - bearingBetween(propia[0], propia[1]))) < 45)) continue;
     const prefab = new Set([v, ...outs.map(([n]) => n)]);
-    const salidas = outs.filter(([n]) => n === b || leadsAway(adjacency, nodeAt, n, n, prefab, escapeM))
+    // Un toco es una salida: su calle es oculta en el mapa del juego, pero se
+    // ve y se maneja. En la de Frederikshavn -> Hirtshals (ETS2, 1185,-37177),
+    // de cinco brazos, los dos que vienen despues de la entrada son ocultos y
+    // se decia "primera salida" por la tercera.
+    const salidas = outs.filter(([n]) => n === b || (!!ctx.stubs && ctx.stubs[n] === 1) || leadsAway(adjacency, nodeAt, n, n, prefab, escapeM))
       .sort((x, y) => x[1] - y[1]);
     const exit = salidas.findIndex(([n]) => n === b) + 1;
     if (exit >= 1) {
       // el sentido: como rodea el centro la curva que mas da la vuelta
-      const masVuelta = rodean.map(([n]) => edgeLine(v, n)).sort((x, y) => extraTurningDeg(y, bearingBetween) - extraTurningDeg(x, bearingBetween))[0];
+      const masVuelta = curvas.slice().sort((x, y) => extraTurningDeg(y, bearingBetween) - extraTurningDeg(x, bearingBetween))[0];
       const puntas = [v, ...outs.map(([n]) => n)].map(nodeAt);
       const c = [puntas.reduce((s2, p) => s2 + p[0], 0) / puntas.length, puntas.reduce((s2, p) => s2 + p[1], 0) / puntas.length];
       return { exit, enter: kEnter, leave: kLeave, ccw: sweepCcw(masVuelta, c, bearingBetween) };
@@ -1800,6 +1822,96 @@ function detectManeuver(ctx) {
     return null;
   };
 
+  // Una T o una Y cuya otra calle es oculta: el otro brazo es un toco
+  // (ctx.stubs, prefabStubs) porque su calle no sale en el mapa del juego ni
+  // en el grafo, pero se ve y se maneja. Sin otra salida, la esquina quedaba
+  // callada: en la T de Odense -> Kiel (ETS2, 888,-21811) la ruta llega por
+  // la barra y dobla al norte, y el brazo sur sigue por una calle oculta. En
+  // 60 rutas de ETS2 eran 71 esquinas asi sin aviso (las busco el reporte
+  // #63, 27-11, que resulto una rotonda con un brazo oculto: ver
+  // detectRoundabout).
+  // Se mide donde el toco se separa de la ruta (a mas de stubSplitM): la ruta
+  // dobla al menos stubTeeDeg entre los stubLegM de antes y de despues (un
+  // quiebre corto de una calle que sigue derecha no llega: lo suavizan los 25
+  // m), y el toco se va para el otro lado al menos stubSideDeg. Asi tambien
+  // la T cuyo palo se curva antes de la barra, que a legM no dobla. El toco
+  // de enfrente (la T de Tulsa) no cuenta: ese sigue callado. Solo si no hay
+  // otra salida de verdad (las demas ya se miden contra ella) y no es la
+  // entrada a una rotonda.
+  const stubSplitM = ctx.stubSplitM != null ? ctx.stubSplitM : 3;
+  const stubLegM = ctx.stubLegM != null ? ctx.stubLegM : 25;
+  const stubTeeDeg = ctx.stubTeeDeg != null ? ctx.stubTeeDeg : 50;
+  const stubSideDeg = ctx.stubSideDeg != null ? ctx.stubSideDeg : 30;
+  const stubMaxDeg = ctx.stubMaxDeg != null ? ctx.stubMaxDeg : 150;
+  const stubIslandDeg = ctx.stubIslandDeg != null ? ctx.stubIslandDeg : 60;
+  const stubTee = () => {
+    if (!ctx.stubs || !ctx.edgeLine || !adjacency) return null;
+    if (altExits().length) return null;
+    const total = cum[cum.length - 1];
+    // distancia de p a la ruta entre los puntos k0 y el que esta a hastaM
+    const aLaRuta = (p, k0, hastaM) => {
+      let best = Infinity;
+      for (let k = Math.max(1, k0); k < pts.length && cum[k - 1] - cum[k0] <= hastaM; k++) {
+        const [ax, az] = pts[k - 1], [bx, bz] = pts[k];
+        const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+        const t = L2 ? Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / L2)) : 0;
+        best = Math.min(best, Math.hypot(p[0] - ax - dx * t, p[1] - az - dz * t));
+      }
+      return best;
+    };
+    // Una rotonda compacta con los otros brazos ocultos tambien tiene un toco
+    // del otro lado de donde dobla la ruta adentro del prefab, y "turn left"
+    // ahi es pasar derecho. Sus curvas rodean la isla (extraTurningDeg de 74
+    // a 148 en Bilbao, Murcia, Pitesti, Graz, Innsbruck y Skopje); las de una
+    // T doblan una sola vez (0 en todas las de la muestra). Se miran las que
+    // salen del toco (todas son del prefab) y las del nodo del cruce, menos la
+    // calle por la que se llega.
+    let nodoAntes = null;
+    for (let k = i - 1; k >= 0 && nodoAntes == null; k--) nodoAntes = pts[k][4];
+    const rodeaIsla = (from) => (adjacency.get(from) || []).some(([m]) => {
+      if (m === nodoAntes) return false;
+      const l = ctx.edgeLine(from, m);
+      return l && extraTurningDeg(l, bearingBetween) >= stubIslandDeg;
+    });
+    let best = null;
+    for (const [k, idx, n] of deads) {
+      if (ctx.stubs[n] !== 1) continue;
+      const line = ctx.edgeLine(idx, n);
+      if (!line || line.length < 2) continue;
+      if (rodeaIsla(n) || rodeaIsla(idx)) continue;
+      // el primer punto del toco (cada 2 m) que queda a mas de stubSplitM
+      let acum = 0, sep = null, pToco = null;
+      for (let j = 1; j < line.length && pToco == null; j++) {
+        const L = Math.hypot(line[j][0] - line[j - 1][0], line[j][1] - line[j - 1][1]);
+        for (let s = sep == null ? 0 : 2; s <= L; s += 2) {
+          const t = L ? s / L : 0;
+          const p = [line[j - 1][0] + (line[j][0] - line[j - 1][0]) * t, line[j - 1][1] + (line[j][1] - line[j - 1][1]) * t];
+          if (sep == null) {
+            if (aLaRuta(p, k, acum + s + 80) > stubSplitM) sep = acum + s;
+          } else if (acum + s >= sep + 15) { pToco = p; break; }
+        }
+        acum += L;
+      }
+      if (sep == null) continue;
+      if (pToco == null) pToco = line[line.length - 1];
+      const S = cum[k] + sep;
+      if (S < stubLegM || S + stubLegM > total) continue;
+      const antes = bearingBetween(pointAt(S - stubLegM), pointAt(S - 5));
+      const despues = bearingBetween(pointAt(S + 5), pointAt(S + stubLegM));
+      const dRuta = normDeg(despues - antes);
+      const dToco = normDeg(bearingBetween(pointAt(Math.max(0, S - 2)), pToco) - antes);
+      if (Math.abs(dRuta) < stubTeeDeg || Math.abs(dRuta) > stubMaxDeg) continue;
+      if (Math.sign(dToco) === Math.sign(dRuta) || Math.abs(dToco) < stubSideDeg) continue;
+      if (best && Math.abs(best.dRuta) >= Math.abs(dRuta)) continue;
+      // el aviso, en el nodo de donde sale el toco (la entrada al prefab),
+      // como los otros giros: en un punto de la curva no es un nodo
+      best = { dRuta, at: k, antes, despues };
+    }
+    if (!best || entersRing()) return null;
+    return { kind: 'turn', direction: best.dRuta > 0 ? 'right' : 'left', delta: best.dRuta, at: best.at,
+      inBearing: best.antes, outBearing: best.despues, quiet: false, stubTee: true };
+  };
+
   if (Math.abs(delta) > turnThreshold) {
     // Con el grafo a mano, un giro se anuncia solo si habia por donde
     // equivocarse: la calle que dobla 40 grados con un camino lateral del
@@ -1863,6 +1975,8 @@ function detectManeuver(ctx) {
         for (const [, idx, n] of deads) muertosPorNodo.set(idx, (muertosPorNodo.get(idx) || new Set()).add(n));
         const cruz = [...muertosPorNodo.values()].some(s => s.size >= 2);
         if (cruz && (esquinaEnEscuadra() || enfrente())) quiet = false;
+        // La T con la otra calle oculta (stubTee)
+        if (quiet) { const st = stubTee(); if (st) return st; }
       }
       // Salvo que la otra salida arranque pareja con la ruta: es una
       // bifurcacion en una curva (el rulo de un trebol que se abre en dos
@@ -1892,6 +2006,9 @@ function detectManeuver(ctx) {
   }
 
   if (!adjacency || !nodes) return null;
+  // La T con la otra calle oculta cuyo palo se curva antes de la barra: a
+  // legM no dobla, en la separacion si (stubTee).
+  { const st = stubTee(); if (st) return st; }
   // Bifurcacion abierta: la autopista se parte en dos calzadas paralelas que
   // recien se separan de verdad cientos de metros despues. A forkLegM la
   // ruta y la otra salida todavia van casi juntas y no se anunciaba nada; al
@@ -5833,6 +5950,101 @@ function gameRouteDistanceText(km, imperial, lang) {
   return `${n < 10 ? formatDec(n, lang) : formatInt(n, lang)} ${imperial ? 'mi' : 'km'}`;
 }
 
+// --- La empresa virtual (VTC) de quien maneja ---
+// La manda el cliente en client_status ({ tag, name, color, mode }), con una
+// cuenta que es de una empresa, y el relay la guarda para las pestanas que
+// abren despues. Viene de afuera: se acota aca y al DOM entra como texto.
+const VTC_MODES = ['vtc', 'personal'];
+function vtcOf(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (typeof raw.tag !== 'string' || !/^[A-Za-z0-9]{1,8}$/.test(raw.tag) || !VTC_MODES.includes(raw.mode)) return null;
+  return {
+    tag: raw.tag,
+    name: typeof raw.name === 'string' ? raw.name.replace(/\s+/g, ' ').trim().slice(0, 40) : '',
+    color: typeof raw.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(raw.color) ? raw.color : null,
+    mode: raw.mode,
+  };
+}
+
+// El chip de la tarjeta del viaje, o null: sin empresa, o sin cliente conectado
+// (no habria quien cambie el modo). label null: "Personal", en el idioma de la
+// pagina. next: lo que se pide al tocarlo, explicito y no un toggle (dos
+// dispositivos a la vez no se pisan).
+function vtcChipView(vtc, clientConnected) {
+  if (!vtc || clientConnected !== true) return null;
+  const propia = vtc.mode === 'vtc';
+  return {
+    mode: vtc.mode,
+    label: propia ? `[${vtc.tag}]` : null,
+    titleKey: propia ? 'vtcChipTitle' : 'vtcChipTitlePersonal',
+    company: `[${vtc.tag}] ${vtc.name}`.trim(),
+    color: propia ? vtc.color : null,
+    next: propia ? 'personal' : 'vtc',
+  };
+}
+
+// El cambio pedido desde este dispositivo, hasta que el cliente dice que esta en
+// ese modo, contesta que no pudo o no contesta. El cliente habla con la API: con
+// un proxy de por medio son hasta 16 s.
+const VTC_MODE_TIMEOUT_MS = 20000;
+function createVtcModeRequest(timeoutMs = VTC_MODE_TIMEOUT_MS) {
+  let pedido = null;
+  return {
+    pending: () => (pedido ? pedido.mode : null),
+    start(mode, now) { pedido = { mode, hasta: now + timeoutMs }; },
+    // true si con esto quedo hecho lo que se pidio
+    onVtc(vtc) {
+      if (!pedido || !vtc || vtc.mode !== pedido.mode) return false;
+      pedido = null;
+      return true;
+    },
+    // true si el que fallo era de este dispositivo (el aviso les llega a todos)
+    onFail() {
+      const habia = pedido !== null;
+      pedido = null;
+      return habia;
+    },
+    expired(now) { return pedido !== null && now >= pedido.hasta ? this.onFail() : false; },
+  };
+}
+
+// El trabajo, con lo que no cambia mientras dura. De un bus no sirve el destino,
+// que es la proxima parada: las puntas de la linea.
+function vtcJobKey(data) {
+  if (!data || !data.onJob) return null;
+  const bus = busJobOf(data);
+  if (bus) {
+    const id = (p) => p.id || p.name || null;
+    return JSON.stringify([data.game, 'bus', bus.stops.length, id(bus.stops[0]), id(bus.stops[bus.stops.length - 1]),
+      // Sin `??`: este archivo lo carga /dash/, que tiene que andar en Safari 12 (check_web_syntax.js).
+      data.plannedDistanceKm != null ? data.plannedDistanceKm : null, data.jobIncome != null ? data.jobIncome : null]);
+  }
+  return hasJobDestination(data) ? trailerPickupJobKey(data) : null;
+}
+
+// El aviso de "este trabajo es personal", al tomarlo: quien se olvido el modo
+// en Personal lo veia recien en la cuenta, despues de entregar. push(data, vtc)
+// con cada dato: true una vez por trabajo tomado con el tablero a la vista y en
+// Personal. No al abrir la pagina en medio de uno, ni por volver a cargar la
+// partida (onJob se apaga y vuelve con el mismo trabajo); el mismo viaje tomado
+// otra vez, despues de entregar o cancelar, si.
+function createVtcJobNotice() {
+  let visto; // undefined: todavia no se miro ningun dato
+  return {
+    push(data, vtc) {
+      if (!vtc || !data) return false;
+      const primero = visto === undefined;
+      const ev = data.event || {};
+      if (ev.jobDelivered || ev.jobCancelled) { visto = null; return false; }
+      const clave = vtcJobKey(data);
+      if (primero) { visto = clave; return false; }
+      if (clave == null || clave === visto) return false;
+      visto = clave;
+      return vtc.mode === 'personal';
+    },
+  };
+}
+
 // El plazo del trabajo en segundos de juego, o null si no hay. Sin plazo el
 // SDK manda la entrega en 4294967295 minutos (2^32 - 1) y el cliente le
 // resta la hora del juego: el panel decia "Job deadline 71567355h 55m"
@@ -8569,13 +8781,49 @@ function savedPairingCode(search, saved, backend) {
   let params;
   try { params = new URLSearchParams(search || ''); } catch (e) { return null; }
   if (['code', 'demo', 'local', 'live', 'convoy'].some((p) => params.get(p))) return null;
+  return storedPairingCode(saved, backend);
+}
+
+// Lo de PAIRING_CODE_KEY si es de este relay, o null.
+function storedPairingCode(saved, backend) {
   let data;
   try { data = JSON.parse(saved); } catch (e) { return null; }
   if (!data || typeof data !== 'object' || data.backend !== backend) return null;
   return normalPairingCode(data.code);
 }
 
+// Como se abre el link de un convoy (/app/?convoy=CODIGO, el de "Copy link"):
+// { convoy, mode: 'join' } se conecta como siempre y abre la ventana del convoy con
+// el codigo puesto; con pairing, conectandose con el codigo guardado en este
+// dispositivo. { mode: 'spectator' } mira sin juego. null: no es un link de convoy.
+// Sin ?code= era siempre espectador, aunque el navegador recordara el codigo: quien
+// maneja abria el link que le pasaron en Discord y quedaba mirando, sin aparecer
+// para los demas (Discord 27-11, gabbo). La demo y el mapa en vivo los mira app.js antes.
+function convoyLinkStart(search, saved, backend) {
+  let params;
+  try { params = new URLSearchParams(search || ''); } catch (e) { return null; }
+  const convoy = (params.get('convoy') || '').trim().toUpperCase();
+  if (!convoy) return null;
+  if (params.get('code') || params.get('local')) return { convoy, mode: 'join', pairing: null };
+  const pairing = storedPairingCode(saved, backend);
+  return pairing ? { convoy, mode: 'join', pairing } : { convoy, mode: 'spectator', pairing: null };
+}
+
+// El link para pasar de espectador a conductor: la misma pagina con el codigo de
+// pairing y el del convoy (se conecta y abre la ventana del convoy con el codigo
+// puesto). null si el codigo de pairing no es uno.
+function convoyDriverUrl(href, pairing, convoy) {
+  const code = normalPairingCode(pairing);
+  if (!code || !convoy) return null;
+  let url;
+  try { url = new URL(href); } catch (e) { return null; }
+  url.searchParams.set('code', code);
+  url.searchParams.set('convoy', String(convoy).toUpperCase());
+  url.hash = '';
+  return url.toString();
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createBusyGate, BUSY_GATE_FACTOR, createOffRouteRetry, OFF_ROUTE_RETRY_M, alternateModVariants, variantForJobPlace, localMapRebuilt, canOfferMapBuild, navReportRefreshDue, NAV_REPORT_REFRESH_MS, webVersionIn, webVersionNewer, webUpdateAction, PAIRING_CODE_KEY, normalPairingCode, pairingCodeToSave, savedPairingCode, gameGpsKmMatches, gameGpsCandidates, gameGpsGuessList, gameGpsPlaces, gameGpsSaveCandidates, gameGpsSaveJobCandidates, GAME_GPS_SAVE_SAME_M, gameGpsSaveMatches, gameGpsSavePick, gameGpsSaveStale, GAME_GPS_KM_PER_WORLD_M, createGameGpsViaCheck, gameGpsViaTails, GAME_GPS_VIA_RECHECK_TICKS, GAME_GPS_VIA_RECHECK_MS, GAME_GPS_SAVE_TOL_KM, GAME_GPS_SAVE_TOL_FRAC, gameGpsGuessStep, gameGpsGuessPanelShown, GAME_GPS_GUESS_MAX_KM, GAME_GPS_GUESS_MAX, turnReportJobLine, turnReportBusLine, TURN_REPORT_BUS_CHARS, companyForJob, companyRouteEnd, COMPANY_ENTRY_MAX_M, routeEndPoint, approxNoticeKey, turnReportMapLines, turnReportDlcLine, TURN_REPORT_MODS_CHARS, nearStopCandidates, createNearStopPick, createNearStops, roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, basemapForVariant, BASEMAP_PROMODS, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, createTrailerPickupWatch, trailerPickupJobKey, TRAILER_PICKUP_MARKET_RE, offMapJobPlace, hasJobDestination, jobPanelFields, busJobOf, busStopPlace, busStopList, busRouteTarget, busPassengersOnBoard, busNextStopLine, createBusJobMemory, busDeliveryStops, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, busStopArcs, busStopRoadPoint, BUS_STOP_ARC_M, BUS_STOP_ARC_TIE_M, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, routeGameMayDiffer, routeSharedFrac, pickRouteLikeGame, ROUTE_GAME_FERRY, routeFerryLegs, routeGameFerryShorter, routeFerrySearch, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, navHudHeadingRoad, NAV_HUD_ROAD_MAX, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, createRouteChangeLog, ROUTE_CHANGES_MAX, ROUTE_CHANGE_MERGE_MS, ROUTE_CHANGE_REASONS, routeChangeReason, turnReportText, turnReportSpeedLine, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportLooksEmpty, navReportCanSend, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, routeTimeAhead, ROUTE_TIME_DEFAULT_KMH, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, truckDashLamps, truckGaugeScales, MAP_DASH_MODES, MAP_DASH_STYLES, mapDashSetting, mapDashHosts, mapDashLimitOnMap, mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, correctProModsFlags, ACTIVE_MOD_NAMES_MAX, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, voiceElsewhere, DLC_GUARDS, DLC_LIST, dlcGameOf, GAME_VERSION_VARIANTS, gameVersionSetting, gameVersionVariant, sharedMapVariant, gameVersionTag, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, truckJumped, TRUCK_JUMP_MIN_M, TRUCK_JUMP_MAX_GAP_S, parseWsJson, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, NAV_AUTO_ZOOM, navAutoZoomOffset, createNavAutoZoom, navAutoZoomOf, navPaddingTop, NAV_TRUCK_CLEAR_PX, nextStopText, ferryAhead, landAround, mvtPoints, tilesCovering, tilePointLngLat, ets2InGb, ets2PickSide, worldNear, pickFerryPort, FERRY_PORT_MAX_M, ferryPortName, FERRY_CITY_MAX_M, FERRY_DISTANCE_MIN_M, GPS_SAVE_HINT, gpsChangeExplained, createGpsSaveHint, routeHasLine, ROAD_LAYER_TYPES, roadLayerFilter, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
+  module.exports = { vtcOf, vtcChipView, createVtcModeRequest, VTC_MODE_TIMEOUT_MS, vtcJobKey, createVtcJobNotice, createBusyGate, BUSY_GATE_FACTOR, createOffRouteRetry, OFF_ROUTE_RETRY_M, alternateModVariants, variantForJobPlace, localMapRebuilt, canOfferMapBuild, navReportRefreshDue, NAV_REPORT_REFRESH_MS, webVersionIn, webVersionNewer, webUpdateAction, PAIRING_CODE_KEY, normalPairingCode, pairingCodeToSave, savedPairingCode, storedPairingCode, convoyLinkStart, convoyDriverUrl, gameGpsKmMatches, gameGpsCandidates, gameGpsGuessList, gameGpsPlaces, gameGpsSaveCandidates, gameGpsSaveJobCandidates, GAME_GPS_SAVE_SAME_M, gameGpsSaveMatches, gameGpsSavePick, gameGpsSaveStale, GAME_GPS_KM_PER_WORLD_M, createGameGpsViaCheck, gameGpsViaTails, GAME_GPS_VIA_RECHECK_TICKS, GAME_GPS_VIA_RECHECK_MS, GAME_GPS_SAVE_TOL_KM, GAME_GPS_SAVE_TOL_FRAC, gameGpsGuessStep, gameGpsGuessPanelShown, GAME_GPS_GUESS_MAX_KM, GAME_GPS_GUESS_MAX, turnReportJobLine, turnReportBusLine, TURN_REPORT_BUS_CHARS, companyForJob, companyRouteEnd, COMPANY_ENTRY_MAX_M, routeEndPoint, approxNoticeKey, turnReportMapLines, turnReportDlcLine, TURN_REPORT_MODS_CHARS, nearStopCandidates, createNearStopPick, createNearStops, roadShieldPoints, citiesOnLand, basemapFitsCities, BASEMAP_MIN_LAND_SHARE, basemapForVariant, BASEMAP_PROMODS, compassView, layoutResizeCornerPx, turnPassed, stoppedRouteLead, snapRouteStartToNode, ROUTE_START_SNAP_M, recalcRouteStart, recalcOnRoute, STOPPED_LEAD_MAX_M, STOPPED_LEAD_BACK_M, CAB_WINDOW_SIZE, cabModeFromSearch, CAB_MAP_HEIGHT, CAB_SIZE_MIN, CAB_SIZE_MAX, CAB_SIZE_DEFAULT, cabSizeSetting, cabMapScale, cabSizeStep, cabViewUrl, turnIconShape, turnIconHtml, turnTextWithoutArrow, routeIdentity, routeDismissed, plainWaypoints, createTrailerPickupWatch, trailerPickupJobKey, TRAILER_PICKUP_MARKET_RE, offMapJobPlace, hasJobDestination, jobPanelFields, busJobOf, busStopPlace, busStopList, busRouteTarget, busPassengersOnBoard, busNextStopLine, createBusJobMemory, busDeliveryStops, ringCcw, sweepCcw, decodeTimesBin, voiceIsUrgent, voiceQueueAction, voiceQueuePick, longestStraightFrac, RING_MAX_STRAIGHT, ovalRing, straightRuns, OVAL_RING, compactIslandM, COMPACT_MIN_ISLAND_M, startArcForHeading, START_ARC_TIE_M, START_ARC_MAX_ALTS, arcsNearPoint, waypointArcs, waypointPassesBy, busStopArcs, busStopRoadPoint, BUS_STOP_ARC_M, BUS_STOP_ARC_TIE_M, routeReachability, slowNodes, yardNodes, stopEndNodes, STOP_SLOW_KMH, STOP_SLOW_NODE_M, STOP_SLOW_TIE_M, STOP_SIDE_SWITCH_M, WAYPOINT_ARC_M, WAYPOINT_ARC_TIE_M, routeEdgeCost, ROUTE_TIE_S_PER_M, ROUTE_SHORT_M_PER_S, routeUTurnCost, ROUTE_UTURN_PENALTY_S, ROUTE_UTURN_PENALTY_M, ROUTE_GAME_MATCH, routeGameAgreement, routeGameMayDiffer, routeSharedFrac, pickRouteLikeGame, ROUTE_GAME_FERRY, routeFerryLegs, routeGameFerryShorter, routeFerrySearch, followGameRoute, routeAlternatives, dropRouteDetours, ROUTE_DETOUR_MAX_M, dropRampDetours, ROUTE_RAMP_DETOUR_MAX_S, ROUTE_RAMP_STRAIGHT_M, ROUTE_RAMP_STRAIGHT_TOL_DEG, dropSideStreetShortcuts, ROUTE_MAIN_ROAD_KMH, ROUTE_SIDE_STREET_MAX_S, ROUTE_SIDE_STREET_MAX_M, ROUTE_SIDE_STREET_STRAIGHT_DEG, offRouteBranch, OFF_BRANCH_BACK_M, OFF_BRANCH_FOLLOW_M, OFF_BRANCH_MIN_M, OFF_BRANCH_RATIO, OFF_BRANCH_MAX_DEG, LANE_PATHS, laneHudRecord, lanesHtml, laneKeepSide, everyExitKeepSide, LANE_DROP_BIT, routeArcDirections, isUTurnArc, routeUTurnTest, prefabStubs, uTurnShortcuts, UTURN_SHORTCUT_TOL_M, UTURN_SHORTCUT_MIN_DEG, findArcRoute, UTURN_MIN_DEG, LANE_ARROW_BITS, decodeLanesBin, lanesForEdge, laneGuidance, laneTurnMatches, turnInstructionText, gameArrivalClock, CLOCK_FORMATS, clockFormatSetting, clockIs12h, formatClockHM, OBS_ITEMS, obsOverlayItems, navHudHeadingRoad, NAV_HUD_ROAD_MAX, formatGear, pipWindowSize, pipSavedSize, pipRequestSize, PIP_SIZE_MIN, PIP_SIZE_MAX, createFrameRace, turnIdentity, createTurnLog, TURN_LOG_MAX, createRouteChangeLog, ROUTE_CHANGES_MAX, ROUTE_CHANGE_MERGE_MS, ROUTE_CHANGE_REASONS, routeChangeReason, turnReportText, turnReportSpeedLine, TURN_REPORT_VIA_MAX, NAV_REPORT_KINDS, NAV_REPORT_DESC_MAX, NAV_REPORT_URL, navReportBody, navReportLooksEmpty, navReportCanSend, navReportCredentials, navReportOutcome, NAV_REPORTS_KEY, NAV_REPORTS_MAX, NAV_REPORTS_DAYS, NAV_REPORT_STATUS_URL, NAV_REPORT_CHECK_MS, navReportsParse, navReportsAdd, navReportsAfterStatus, focusTrapTarget, createTurnAnnouncer, routeProgressTotal, waypointRouteKey, stopInsertIndex, waypointReached, WAYPOINT_ROUTE_END_M, WAYPOINT_STOPPED_M, WAYPOINT_NODE_WINDOW_M, WAYPOINT_SNAP_M, waypointEta, routeTimeAhead, ROUTE_TIME_DEFAULT_KMH, waypointLegMeters, waypointLegEtas, CITY_SCALE, CITY_GAP_M, CITY_MARGIN_M, createCityScale, layoutAnchor, layoutCss, trimRouteBehind, passedRoutePoints, miniDialReadings, gaugeAngle, gaugeScaleMax, truckDashLamps, truckGaugeScales, MAP_DASH_MODES, MAP_DASH_STYLES, mapDashSetting, mapDashHosts, mapDashLimitOnMap, mapHoleCompact, MAP_HOLE_COMPACT_W, MAP_HOLE_COMPACT_H, createRestWatch, jobLooksFresh, jobDeadlineSeconds, JOB_DEADLINE_MAX_SECONDS, createStatusAlerts, REST_WARN_OPTIONS, REST_WARN_DEFAULT, restWarnSetting, restWarnLabel, createStopSuggestion, regionLabel, cityChoiceLabels, citiesMatchingInput, poiRelative, stopsAlongRoute, pickFuelStop, createRefuelWatch, restMinutesOf, REST_MINUTES_MAX, restReachMeters, REST_REACH_KMH, gameRouteSeconds, settingsChangedKeys, createMissingCompanyWatch, foldText, useOwnRemaining, truckSizeSetting, TRUCK_SIZE_DEFAULT, deliverySummary, formatGameMinutes, holdDetectedMods, correctProModsFlags, ACTIVE_MOD_NAMES_MAX, CAR_BRANDS, isDrivingCar, facilityCodesFor, projectAheadOnRoute, storedWaypoints, routePlanOffers, routePlanAction, syncAction, routePrefsOf, sameRoutePrefs, samePlanList, deviceInfo, voiceSpeaksHere, voiceElsewhere, DLC_GUARDS, DLC_LIST, dlcGameOf, GAME_VERSION_VARIANTS, gameVersionSetting, gameVersionVariant, sharedMapVariant, gameVersionTag, normalizeDlcOff, dlcBlockedGuards, effectiveDlcOff, mapBoundsFromCities, insideMapBounds, positionAtOrigin, truckJumped, TRUCK_JUMP_MIN_M, TRUCK_JUMP_MAX_GAP_S, parseWsJson, createRecentManeuvers, RECENT_MANEUVERS_MAX, createVoiceGuide, voiceManeuverKey, VOICE_TIMINGS, VOICE_TIMING_DEFAULT, voiceTimingSetting, sideExitToward, otherBranchesAt, laneFromOnRamp, quietLanesAhead, pickVoice, voiceChoices, createFatigue, REST_INTERVAL_MINUTES, spreadEdgeShift, routeDrawShift, dropShortExcursions, taperShortSteps, cleanRouteForDrawing, COMPANY_ICON_PREFIX, companyIconToken, companyIconUrls, navZoomSetting, NAV_ZOOM_DEFAULT, NAV_ZOOM_MIN, NAV_ZOOM_MAX, NAV_AUTO_ZOOM, navAutoZoomOffset, createNavAutoZoom, navAutoZoomOf, navPaddingTop, NAV_TRUCK_CLEAR_PX, nextStopText, ferryAhead, landAround, mvtPoints, tilesCovering, tilePointLngLat, ets2InGb, ets2PickSide, worldNear, pickFerryPort, FERRY_PORT_MAX_M, ferryPortName, FERRY_CITY_MAX_M, FERRY_DISTANCE_MIN_M, GPS_SAVE_HINT, gpsChangeExplained, createGpsSaveHint, routeHasLine, ROAD_LAYER_TYPES, roadLayerFilter, roadLineWidth, ROAD_WIDTH_GAME_M, ROAD_WIDTH_SHARE, layoutScaleFor, LAYOUT_SCALE_MIN, LAYOUT_SCALE_MAX, geoBearingDeg, gridHeadingToGeo, smoothLineCoords, roundTurnDistanceMeters, formatTurnDistance, formatTurnDistanceImperial, liveShareControls, liveShareChoice, tmpPlayersUpdate, TMP_PLAYERS_STALE_MS, TMP_PLAYERS_MAX, connectionViewFor, routeMetrics, junctionClusterEnd, junctionManeuver, turnAfterFork, ringThrough, leadsAway, routeNodesAhead, branchLeadsAway, oneWayRing, extraTurningDeg, ringOutline, roundish, detectRoundabout, detectManeuver, continuesTurn, stabilizeManeuver, createFuelTracker, gameClockFromMinutes, createTimeScale, createPaceEta, createSessionStats, decodePrefabsBin,
     createDemoTelemetry, DEMO_ROUTE, demoPathUsable, formatInt, formatDec, formatCargoMass, nextCityAlongRoute, groupSignsByPoint, buildPointGrid, nearestInGrid, roadSignForTurn, ROAD_SIGN_FORK_NEAR_M, exitSignTest, createScreenKeeper, noRouteReason, gameRouteDistanceText, routeGraphRetryDue, ROUTE_GRAPH_LATE_RETRY_S, turnReportGraphLine };
 }

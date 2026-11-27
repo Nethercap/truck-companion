@@ -522,6 +522,25 @@ def clean_port(valor) -> Optional[int]:
     return valor if isinstance(valor, int) and 1024 <= valor <= 65535 else None
 
 
+VTC_TAG_RE = re.compile(r"[A-Za-z0-9]{1,8}")
+VTC_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
+VTC_NAME_MAX = 40
+
+
+def clean_vtc(valor) -> Optional[dict]:
+    """La empresa virtual del cliente y en que modo esta, para el chip del
+    tablero de una pestana que abre despues. El relay no sabe de cuentas: es
+    lo que dice el cliente, acotado."""
+    if not isinstance(valor, dict):
+        return None
+    tag, mode, name, color = (valor.get(k) for k in ("tag", "mode", "name", "color"))
+    if not isinstance(tag, str) or not VTC_TAG_RE.fullmatch(tag) or mode not in ("vtc", "personal"):
+        return None
+    return {"tag": tag, "mode": mode,
+            "name": " ".join(name.split())[:VTC_NAME_MAX] if isinstance(name, str) else "",
+            "color": color if isinstance(color, str) and VTC_COLOR_RE.fullmatch(color) else None}
+
+
 def clean_offmap_report(payload: dict) -> Optional[dict]:
     variant = payload.get("variant")
     if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
@@ -996,6 +1015,12 @@ class Session:
         # codigo de pairing a otros viewers - con el codigo se puede conectar
         # a la sesion y mandarle comandos al camion.
         self.public_id = secrets.token_hex(4)
+        # El pase del mapa en vivo de su empresa virtual (VTC), ya verificado:
+        # lo manda el cliente ({"type": "vtc_pass"}, ver vtc_pass_valido). Y
+        # el juego de la telemetria: map_variant solo existe compartiendo en
+        # el mapa publico, y el de la empresa no depende de eso.
+        self.vtc_pass: Optional[dict] = None
+        self.last_game: Optional[str] = None
         # Ultimo resumen de telemetria (subconjunto chico) para el convoy.
         self.last_summary: Optional[dict] = None
         self.convoy_code: Optional[str] = None
@@ -1047,6 +1072,10 @@ async def broadcast_live_positions_loop():
             broadcast_live_positions()
         except Exception:
             logging.exception("Error en broadcast_live_positions_loop")
+        try:
+            broadcast_vtc_maps()
+        except Exception:
+            logging.exception("Error en broadcast_vtc_maps")
         if ticks % 30 == 0:  # cada ~1 min
             try:
                 cleanup_expired_sessions()
@@ -1280,6 +1309,183 @@ async def ws_live_map(websocket: WebSocket, variant: str):
         pass
     finally:
         live_map_spectators[variant].pop(websocket, None)
+        outbox.close()
+
+
+# ------------------------------------------------------------ mapa de las VTC
+
+# El mapa en vivo de cada empresa virtual (plan de la VTC, 3.5). El relay no
+# sabe de cuentas: la API de cuentas le firma a cada miembro un pase corto
+# (vtc_pase.py de truckdash-loginapp) y el cliente lo manda por su conexion.
+# Con la misma clave, aca se verifica. Sin la clave, no hay mapa de empresas.
+VTC_PASS_KEY = os.environ.get("VTC_PASS_KEY", "")
+VTC_PASS_VERSION = 1
+VTC_ID_RE = re.compile(r"^[0-9a-f-]{36}$")
+VTC_MAP_MAX_SPECTATORS = 40  # por empresa
+# El publico anonimo va redondeado a ~5 km como los mide el juego (las
+# distancias del mundo se ven por 20 en el GPS): 250 unidades del mundo.
+VTC_MAP_ANON_GRID = 250
+# Cuanto espera el primer mensaje (el saludo, con o sin pase) del espectador.
+VTC_MAP_HELLO_TIMEOUT_S = 10
+vtc_map_spectators: dict[str, dict[WebSocket, dict]] = defaultdict(dict)
+
+
+def _b64_a_bytes(texto: str) -> bytes:
+    return base64.urlsafe_b64decode(texto + "=" * (-len(texto) % 4))
+
+
+def vtc_pass_valido(pase, now: float) -> Optional[dict]:
+    """Lo que dice el pase si la firma es buena y no vencio (la misma regla
+    que vtc_pase.verificar de la API); si no, None."""
+    if not VTC_PASS_KEY or not isinstance(pase, str) or pase.count(".") != 1 or len(pase) > 4096:
+        return None
+    cuerpo, firma = pase.split(".")
+    esperada = base64.urlsafe_b64encode(
+        hmac.new(VTC_PASS_KEY.encode("utf-8"), cuerpo.encode("ascii", "replace"), hashlib.sha256).digest()
+    ).rstrip(b"=").decode("ascii")
+    if not hmac.compare_digest(esperada, firma):
+        return None
+    try:
+        datos = json.loads(_b64_a_bytes(cuerpo))
+    except ValueError:
+        return None
+    if (not isinstance(datos, dict) or datos.get("v") != VTC_PASS_VERSION or not isinstance(datos.get("exp"), int)
+            or not isinstance(datos.get("vtc"), str) or datos["exp"] <= now):
+        return None
+    return datos
+
+
+def vtc_drivers(now: float) -> dict[str, list["Session"]]:
+    """Por empresa, quienes salen en su mapa: pase vigente, manejando para la
+    empresa (de un viaje personal la empresa no ve nada, ni que se esta
+    manejando) y con posicion fresca."""
+    salida: dict[str, list[Session]] = defaultdict(list)
+    for s in sessions.values():
+        p = s.vtc_pass
+        if (p and p["exp"] > now and p.get("mode") == "vtc" and s.last_game and s.last_position
+                and now - s.last_position["ts"] <= LIVE_POSITION_STALE_SECONDS):
+            salida[p["vtc"]].append(s)
+    return salida
+
+
+def _vtc_driver_id(s: "Session", vtc_id: str) -> str:
+    """Un id propio de este mapa: el public_id tambien sale en el mapa publico
+    y en el convoy, y juntos dirian quien es el de nombre escondido."""
+    return hashlib.sha256((s.public_id + ":" + vtc_id).encode()).hexdigest()[:10]
+
+
+def vtc_map_player(s: "Session", vtc_id: str, vista: str) -> Optional[dict]:
+    """Como sale en el mapa de su empresa. En el de los miembros, todo; en el
+    publico, segun lo que eligio la empresa (en el pase): nada, una posicion
+    redondeada sin nombre, o con nombre salvo que el chofer haya salido del
+    publico (sin el no sale) o esconda el nombre en los rankings."""
+    p, sm = s.vtc_pass, s.last_summary or {}
+    x, z = s.last_position["x"], s.last_position["z"]
+    if vista == "public":
+        modo = p.get("pub")
+        if modo == "anonymous":
+            return {"game": s.last_game, "x": round(x / VTC_MAP_ANON_GRID) * VTC_MAP_ANON_GRID,
+                    "z": round(z / VTC_MAP_ANON_GRID) * VTC_MAP_ANON_GRID}
+        if modo != "names" or p.get("out"):
+            return None
+    nombre = p.get("n") if vista == "members" or not p.get("hn") else None
+    return {
+        "id": _vtc_driver_id(s, vtc_id), "game": s.last_game, "name": nombre,
+        "rank": p.get("rn"), "rankColor": p.get("rc"),
+        "x": _decimetro(x), "z": _decimetro(z),
+        "heading": sm.get("heading"), "speedKmh": sm.get("speedKmh"), "paused": sm.get("paused", False),
+        "truck": sm.get("truck"), "cargo": sm.get("cargo"), "citySrc": sm.get("citySrc"), "cityDst": sm.get("cityDst"),
+        "distanceKm": sm.get("distanceKm"), "etaSeconds": sm.get("etaSeconds"),
+    }
+
+
+def vtc_map_message(vtc_id: str, vista: str, choferes: list["Session"]) -> str:
+    jugadores = [j for j in (vtc_map_player(s, vtc_id, vista) for s in choferes) if j]
+    return json.dumps({"type": "vtc_players", "vtc": vtc_id, "view": vista, "players": jugadores})
+
+
+def _vista_de(espectador: dict, now: float) -> str:
+    # Un miembro cuyo pase vencio sin renovarse pasa a ver lo publico.
+    return "members" if espectador.get("exp", 0) > now else "public"
+
+
+def broadcast_vtc_maps():
+    if not vtc_map_spectators:
+        return
+    now = time.time()
+    por_empresa = vtc_drivers(now)
+    for vtc_id, espectadores in list(vtc_map_spectators.items()):
+        if not espectadores:
+            vtc_map_spectators.pop(vtc_id, None)
+            continue
+        mensajes: dict[str, str] = {}
+        for e in list(espectadores.values()):
+            vista = _vista_de(e, now)
+            if vista not in mensajes:
+                mensajes[vista] = vtc_map_message(vtc_id, vista, por_empresa.get(vtc_id, []))
+            e["outbox"].push_telemetry(mensajes[vista])
+
+
+def _saludo_vtc(texto: str, vtc_id: str) -> Optional[dict]:
+    """El espectador que saluda ({"exp": vencimiento de su pase, 0 sin pase}),
+    o None si el mensaje no es un saludo o el pase no es de esta empresa."""
+    try:
+        msg = json.loads(texto)
+    except ValueError:
+        return None
+    if not isinstance(msg, dict) or msg.get("type") != "hello":
+        return None
+    if msg.get("pass") is None:
+        return {"exp": 0}
+    p = vtc_pass_valido(msg.get("pass"), time.time())
+    return {"exp": p["exp"]} if p and p["vtc"] == vtc_id else None
+
+
+@app.websocket("/ws/vtcmap/{vtc_id}")
+async def ws_vtc_map(websocket: WebSocket, vtc_id: str):
+    """Espectador del mapa en vivo de una empresa. Saluda con
+    {"type": "hello", "pass": "..."} (miembro: el pase de /vtc/me?live_pass=1
+    de la API, de esa empresa) o sin pase (lo publico), y puede volver a
+    saludar con un pase nuevo antes de que venza el anterior."""
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    if not check_rate_limit(client_ip):
+        await websocket.close(code=4429, reason="demasiados intentos, esperá un minuto")
+        return
+    # Se acepta antes de cerrar, como en ws_live_map: si no el navegador ve
+    # 1006 sin el codigo.
+    await websocket.accept()
+    if not VTC_PASS_KEY:
+        await websocket.close(code=4503, reason="mapa de empresas apagado")
+        return
+    if not VTC_ID_RE.match(vtc_id):
+        await websocket.close(code=4404, reason="empresa invalida")
+        return
+    if len(vtc_map_spectators[vtc_id]) >= VTC_MAP_MAX_SPECTATORS:
+        await websocket.close(code=4403, reason="mapa lleno de espectadores")
+        return
+    try:
+        primero = await asyncio.wait_for(websocket.receive_text(), VTC_MAP_HELLO_TIMEOUT_S)
+    except (asyncio.TimeoutError, WebSocketDisconnect):
+        await websocket.close(code=4400, reason="falta el saludo")
+        return
+    espectador = _saludo_vtc(primero, vtc_id)
+    if espectador is None:
+        await websocket.close(code=4401, reason="pase invalido")
+        return
+    outbox = ViewerOutbox(websocket)
+    espectador["outbox"] = outbox
+    vtc_map_spectators[vtc_id][websocket] = espectador
+    now = time.time()
+    outbox.push_control(vtc_map_message(vtc_id, _vista_de(espectador, now), vtc_drivers(now).get(vtc_id, [])))
+    try:
+        while True:
+            otro = _saludo_vtc(await websocket.receive_text(), vtc_id)
+            if otro is not None:
+                espectador["exp"] = otro["exp"]
+    except WebSocketDisconnect:
+        pass
+    finally:
+        vtc_map_spectators[vtc_id].pop(websocket, None)
         outbox.close()
 
 
@@ -2387,12 +2593,19 @@ async def ws_client(websocket: WebSocket, code: str):
                                                   "mapMods": clean_map_mods(payload.get("mapMods"), payload.get("activeMods")),
                                                   "localMaps": clean_local_maps(payload.get("localMaps")),
                                                   "localMapPort": clean_port(payload.get("localMapPort")),
-                                                  "overlay": payload.get("overlay") is True}
+                                                  "overlay": payload.get("overlay") is True,
+                                                  "vtc": clean_vtc(payload.get("vtc"))}
                 # Mensajes de control (client_status, etc.) no son telemetria:
                 # no deben tocar el flanco de jobDelivered. Antes el primer
                 # client_status de cada conexion dejaba el estado en False y el
                 # primer tick real (con el flag todavia en true desde antes)
                 # parecia una entrega nueva - una por cada redeploy/reconexion.
+                if payload.get("type") == "vtc_pass":
+                    # El pase de la VTC no se reenvia a las pestanas: es del
+                    # relay. Uno que no verifica (o null: dejo la empresa o la
+                    # cuenta) lo saca del mapa de la empresa.
+                    session.vtc_pass = vtc_pass_valido(payload.get("pass"), time.time())
+                    continue
                 if payload.get("type") == "set_live_share":
                     # El tilde del tablero por LAN, que no habla con el relay:
                     # se lo pasa el cliente. Antes la casilla estaba gris en
@@ -2417,6 +2630,8 @@ async def ws_client(websocket: WebSocket, code: str):
                 if pos.get("x") is not None and pos.get("z") is not None:
                     session.last_position = {"x": pos["x"], "z": pos["z"], "ts": now}
                 session.last_summary = summarize_for_convoy(payload, session.last_summary, now)
+                if payload.get("game") in ("ats", "ets2"):
+                    session.last_game = payload["game"]
                 # La variante de mapa la elige la web (set_live_share), pero la
                 # telemetria es la que sabe de verdad en que juego esta el
                 # camion: si no coinciden (la web mando "ats" antes de recibir
@@ -2555,6 +2770,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
                 # "offmap_place": lo mismo con el destino del trabajo.
                 # "nav_hud": el giro y lo que falta para el overlay en el
                 # juego; texto corto, se descarta si viene grande.
+                # "set_vtc_mode": el chip de la empresa virtual; el cliente lo
+                # cambia en la API con el token de su cuenta.
                 if msg_type == "nav_hud" and len(data) > NAV_HUD_MAX_BYTES:
                     continue
                 if msg_type == "nav_hud":
@@ -2564,7 +2781,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         outbox = session.viewer_outboxes.get(obs)
                         if outbox is not None and obs is not websocket:
                             outbox.push_control(data)
-                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "offmap_place", "nav_hud"):
+                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "offmap_place", "nav_hud",
+                                "set_vtc_mode"):
                     if session.client_ws is not None:
                         await session.client_ws.send_text(data)
                 elif msg_type == "set_live_share":

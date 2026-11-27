@@ -19,6 +19,12 @@
     const param = local ? PARAMS.get('api') : null;
     return param ? param.replace(/\/+$/, '') : 'https://api.trucksim-dash.com';
   })();
+  // El relay, para el mapa en vivo (pestana Live). Como ?api=, solo en local.
+  const RELAY = (function () {
+    const local = ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) >= 0;
+    const param = local ? PARAMS.get('relay') : null;
+    return (param || 'https://truck-companion-production.up.railway.app').replace(/\/+$/, '').replace(/^http/, 'ws');
+  })();
 
   async function pedir(ruta, opciones) {
     const cfg = Object.assign({ credentials: 'include' }, opciones || {});
@@ -491,6 +497,9 @@
     ['ranking', 'tabRanking', () => true],
     ['stats', 'tabStats', (p) => p.relation.member],
     ['trips', 'tabTrips', (p) => p.relation.member],
+    ['map', 'tabMap', (p) => p.relation.member],
+    // En vivo: los miembros siempre; los demas si la empresa tiene mapa publico.
+    ['live', 'tabLive', (p) => !!yo.live && (p.relation.member || (p.vtc.live_public || 'off') !== 'off')],
     ['applications', 'tabApplications', (p) => puede(p, 'applications')],
     ['roles', 'tabRoles', (p) => puede(p, 'roles')],
     ['discord', 'tabDiscord', (p) => puede(p, 'discord')],
@@ -514,6 +523,8 @@
     return el('section', { class: 'cabeza-vtc' },
       el('div', { class: 'arriba' }, escudo(v, 'grande'),
         el('div', { class: 'quien' }, el('h1', {}, etiquetaTag(v), ' ', v.name), v.slogan ? el('p', { class: 'slogan' }, v.slogan) : null,
+          // Hasta 90 dias despues de cambiarlo: como se llamaba (nadie se hace pasar por otra).
+          v.former ? el('p', { class: 'muted small antes' }, t('formerly', { old: '[' + v.former.tag + '] ' + v.former.name })) : null,
           el('div', { class: 'chips' }, (v.games || []).map(juegoChip), bandera(v.country),
             v.language ? el('span', { class: 'chip' }, nombreDeIdioma(v.language)) : null,
             v.min_age ? el('span', { class: 'chip' }, v.min_age + '+') : null,
@@ -534,6 +545,10 @@
       return;
     }
     pagina = r.datos;
+    // Un link con el tag de antes de un cambio: la API da la empresa, y la direccion pasa al de ahora.
+    if (pagina.vtc.tag.toLowerCase() !== String(tag).toLowerCase() && !PARAMS.get('invite')) {
+      try { history.replaceState(null, '', enlace(pagina.vtc.tag, location.hash)); } catch (e) { /* sin historial */ }
+    }
     document.title = '[' + pagina.vtc.tag + '] ' + pagina.vtc.name + ' – Truck Dash';
     ponerColor(pagina.vtc);
     pintarEmpresa();
@@ -542,6 +557,10 @@
 
   function pintarEmpresa() {
     clearInterval(latido);
+    // El mapa se arma de nuevo al volver a su pestana: uno vivo afuera de la
+    // pagina se queda con un contexto de WebGL.
+    if (window.VtcMapa) VtcMapa.cerrar();
+    if (vivo) { vivo(); vivo = null; }
     const p = pagina, v = p.vtc, rel = p.relation;
     const acciones = [];
     if (!rel.member) {
@@ -659,6 +678,7 @@
     const r = await pedir('/vtc/' + pagina.vtc.tag + '/road');
     if (!r.ok) { caja.replaceChildren(vacio('error')); return; }
     caja.replaceChildren(r.datos.drivers.length ? el('ul', { class: 'lista en-ruta' }, r.datos.drivers.map((d) => el('li', {},
+      // La API ya no manda los viajes personales (27-11); esto queda por una API vieja.
       el('span', { class: 'punto' + (d.for_vtc ? '' : ' personal'), title: d.for_vtc ? pagina.vtc.tag : t('modePersonal') }),
       persona(d), el('span', { class: 'crece small' },
         // De un viaje personal solo se sabe por donde anda.
@@ -693,12 +713,14 @@
         e.type === 'delivered' && x.on_time === false ? [' ', el('span', { class: 'chip warn' }, t('late'))] : null,
         x.drive_mode === 'race' ? [' ', el('span', { class: 'chip' }, t('race'))] : null,
         e.type === 'delivered' && !x.counts ? [' ', el('span', { class: 'chip bad' }, t('notCounted'))] : null];
+    } else if (e.type === 'renamed') {
+      texto = t('feed_renamed', { old: '[' + e.from_tag + '] ' + e.from_name, new: '[' + e.to_tag + '] ' + e.to_name });
     } else texto = t('feed_' + e.type, { rank: e.rank, role: e.role });
     return el('li', {}, e.user ? persona(e.user) : null, el('span', { class: 'crece small' }, texto), el('span', { class: 'cuando', title: fecha(e.at, true) }, hace(e.at)));
   }
 
   // --------------------------------------------------------------- miembros
-  const estado = { periodoMiembros: 'month', juegoMiembros: '', orden: 'distance_km', periodo: 'month', metrica: 'distance', juego: '', statsPeriodo: 'month', revision: false };
+  const estado = { periodoMiembros: 'month', juegoMiembros: '', orden: 'distance_km', periodo: 'month', metrica: 'distance', juego: '', statsPeriodo: 'month', revision: false, mapaJuego: '', mapaPeriodo: 'month', vivoJuego: '' };
   const opcionesPeriodo = () => ['week', 'month', 'last_month', 'year', 'total'].map((x) => [x, t('period_' + x)]);
   const opcionesJuego = () => [['', t('anyGame')]].concat((pagina.vtc.games || []).map((j) => [j, j.toUpperCase()]));
 
@@ -846,6 +868,130 @@
       if ((semanas.length - 1 - i) % cada === 0) dibujo.appendChild(svg('text', { x: Math.min(Math.max(i * paso + paso / 2, 22), ancho - 22), y: alto - 8, 'text-anchor': 'middle' }, texto(s.inicio)));
     });
     caja.replaceChildren(dibujo);
+  }
+
+  // ------------------------------------------------------------------- mapa
+  // Los recorridos de los viajes hechos para la empresa, un color por chofer
+  // (mapa.js). De los personales nada: la API no los manda.
+  VISTAS.map = async function (cuerpo, p) {
+    const juegos = (p.vtc.games && p.vtc.games.length) ? p.vtc.games : ['ets2', 'ats'];
+    if (!juegos.includes(estado.mapaJuego)) estado.mapaJuego = juegos[0];
+    const juego = estado.mapaJuego, periodo = estado.mapaPeriodo;
+    const recargar = () => VISTAS.map(cuerpo, p);
+    const lienzo = el('div', { class: 'mapa-vtc' });
+    const aviso = el('p', { class: 'mapa-aviso-vtc', role: 'status' }, t('mapLoading'));
+    const resumen = el('p', { class: 'muted small' });
+    const leyenda = el('div', { class: 'leyenda-vtc', role: 'group', 'aria-label': t('drivers') });
+    cuerpo.replaceChildren(el('section', { class: 'card' },
+      el('div', { class: 'filtros' },
+        juegos.length > 1 ? selector(juegos.map((j) => [j, j.toUpperCase()]), juego, (x) => { estado.mapaJuego = x; recargar(); }, t('fGames')) : null,
+        selector(opcionesPeriodo(), periodo, (x) => { estado.mapaPeriodo = x; recargar(); }, t('period'))),
+      el('div', { class: 'mapa-caja-vtc' }, lienzo, aviso), resumen, leyenda,
+      el('p', { class: 'muted small' }, t('mapOnlyCompany'))));
+    const [problema, r] = await Promise.all([
+      VtcMapa.abrir(lienzo, juego),
+      pedir('/vtc/' + p.vtc.tag + '/map?game=' + juego + '&period=' + periodo),
+    ]);
+    // Se cambio de pestana, de juego o de periodo mientras tanto
+    if (problema === 'cancelado' || !lienzo.isConnected) return;
+    if (!r.ok) { aviso.textContent = t('error'); return; }
+    const m = r.datos.map, choferes = r.datos.drivers;
+    resumen.textContent = m.trips ? t('mapSummary', { trips: numero(m.trips), drivers: numero(choferes.length), cities: numero(m.cities.length) }) : '';
+    pintarLeyenda(leyenda, choferes);
+    if (problema) { aviso.textContent = t(problema); return; }
+    aviso.textContent = m.trips ? '' : t('mapEmpty');
+    aviso.hidden = !!m.trips;
+    VtcMapa.dibujar(m, juego);
+  };
+
+  // ---------------------------------------------------------------- en vivo
+  // Los camiones de la empresa ahora, por el relay (/ws/vtcmap/{id}). Un
+  // miembro saluda con su pase (/vtc/me?live_pass=1, 12 minutos, se renueva a
+  // los 10) y ve a todos con nombre; los demas, lo que la empresa eligio que
+  // sea publico. De los viajes personales no llega nada.
+  let vivo = null;  // la funcion que cierra la conexion de la pestana abierta
+  VISTAS.live = async function (cuerpo, p) {
+    const juegos = (p.vtc.games && p.vtc.games.length) ? p.vtc.games : ['ets2', 'ats'];
+    if (!juegos.includes(estado.vivoJuego)) estado.vivoJuego = juegos[0];
+    const juego = estado.vivoJuego, miembro = !!p.relation.member;
+    const lienzo = el('div', { class: 'mapa-vtc' });
+    const aviso = el('p', { class: 'mapa-aviso-vtc', role: 'status' }, t('mapLoading'));
+    const lista = el('div', {});
+    const publico = p.vtc.live_public || 'off';
+    cuerpo.replaceChildren(el('section', { class: 'card' },
+      juegos.length > 1 ? el('div', { class: 'filtros' }, selector(juegos.map((j) => [j, j.toUpperCase()]), juego, (x) => { estado.vivoJuego = x; VISTAS.live(cuerpo, p); }, t('fGames'))) : null,
+      el('div', { class: 'mapa-caja-vtc' }, lienzo, aviso), lista,
+      el('p', { class: 'muted small' }, miembro ? t('liveMembersNote') : t('livePublicNote_' + publico))));
+    if (vivo) { vivo(); vivo = null; }
+    const problema = await VtcMapa.abrir(lienzo, juego);
+    if (problema === 'cancelado' || !lienzo.isConnected) return;
+    if (problema) { aviso.textContent = t(problema); return; }
+    VtcMapa.cerrarVivo();
+    let ws = null, cerrado = false, reintento = null, renovar = null, pase = null;
+    async function traerPase() {
+      if (!miembro) return null;
+      const r = await pedir('/vtc/me?live_pass=1');
+      return r.ok && r.datos.live_pass ? r.datos.live_pass.pass : null;
+    }
+    function saludar() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', pass: pase })); }
+    async function conectar() {
+      pase = await traerPase();
+      if (cerrado) return;
+      ws = new WebSocket(RELAY + '/ws/vtcmap/' + encodeURIComponent(p.vtc.id));
+      ws.onopen = saludar;
+      ws.onmessage = (e) => {
+        let msg;
+        try { msg = JSON.parse(e.data); } catch (err) { return; }
+        if (!msg || msg.type !== 'vtc_players' || !Array.isArray(msg.players)) return;
+        const deEste = msg.players.filter((j) => j.game === juego && typeof j.x === 'number' && typeof j.z === 'number');
+        aviso.hidden = !!deEste.length;
+        aviso.textContent = deEste.length ? '' : t('nobodyDriving');
+        VtcMapa.vivos(deEste, juego, p.vtc.color);
+        pintarEnVivo(lista, deEste, juego, msg.view);
+      };
+      ws.onclose = (e) => {
+        ws = null;
+        if (cerrado) return;
+        if (e.code === 4503) { aviso.hidden = false; aviso.textContent = t('liveOff'); return; }
+        aviso.hidden = false;
+        aviso.textContent = t('liveReconnecting');
+        reintento = setTimeout(conectar, 5000);
+      };
+    }
+    renovar = setInterval(async () => { pase = await traerPase(); saludar(); }, 10 * 60 * 1000);
+    vivo = () => { cerrado = true; clearTimeout(reintento); clearInterval(renovar); if (ws) ws.close(); };
+    conectar();
+  };
+
+  // La lista de abajo del mapa en vivo: quien, de donde a donde, cuanto falta.
+  // En el publico anonimo solo cuantos.
+  function pintarEnVivo(caja, jugadores, juego, vista) {
+    if (!jugadores.length) { caja.replaceChildren(); return; }
+    if (!jugadores[0].id) { caja.replaceChildren(el('p', { class: 'small' }, t('liveTrucks', { n: numero(jugadores.length) }))); return; }
+    const llegada = (s) => new Date(Date.now() + s * 1000).toLocaleTimeString(idioma, { hour: '2-digit', minute: '2-digit' });
+    caja.replaceChildren(el('ul', { class: 'lista en-ruta' }, jugadores.map((j) => el('li', {},
+      el('span', { class: 'punto', vars: { background: j.rankColor || pagina.vtc.color || 'var(--vtc)' } }),
+      el('button', { type: 'button', class: 'linkish', on: { click: () => VtcMapa.irA(juego, j.x, j.z) } }, j.name || t('hiddenDriver')),
+      j.rank && vista === 'members' ? el('span', { class: 'chip' }, j.rank) : null,
+      el('span', { class: 'crece small' },
+        j.cityDst ? [j.citySrc || '?', ' → ', j.cityDst, j.cargo ? el('span', { class: 'muted' }, ' · ' + j.cargo) : null] : el('span', { class: 'muted' }, t('liveNoJob')),
+        j.paused ? [' ', el('span', { class: 'chip warn' }, t('livePaused'))] : null),
+      typeof j.distanceKm === 'number' && j.cityDst ? el('span', { class: 'valor small' }, distancia(j.distanceKm),
+        typeof j.etaSeconds === 'number' && j.etaSeconds > 0 ? el('span', { class: 'muted' }, ' · ' + llegada(j.etaSeconds)) : null) : null))));
+  }
+
+  // Un boton por chofer con su color: tocarlo lo deja adelante en el mapa.
+  function pintarLeyenda(caja, choferes) {
+    const TOPE = 12;
+    let elegido = null;
+    const botones = choferes.slice(0, TOPE).map((d, i) => el('button', {
+      type: 'button', class: 'chofer-mapa', 'aria-pressed': 'false', vars: { '--c': VtcMapa.color(i) },
+      on: { click: () => { elegido = elegido === i ? null : i; VtcMapa.resaltar(elegido); marcar(); } },
+    }, el('span', { class: 'muestra', 'aria-hidden': 'true' }),
+      el('b', {}, d.user && d.user.username ? d.user.username : t('hiddenDriver')),
+      el('span', { class: 'muted' }, t('mapDriverLine', { trips: numero(d.trips), km: distancia(d.km) }))));
+    function marcar() { botones.forEach((b, i) => b.setAttribute('aria-pressed', String(i === elegido))); }
+    caja.replaceChildren(...botones, choferes.length > TOPE ? el('span', { class: 'muted small' }, t('andMore', { n: choferes.length - TOPE })) : '');
   }
 
   // ----------------------------------------------------------------- viajes
@@ -1090,7 +1236,11 @@
     if (yo.member) {
       const esconder = casilla(t('hideMyName'), yo.member.hide_name);
       esconder.input.addEventListener('change', () => hacerPedido('PATCH', '/vtc/me', { hide_name: esconder.input.checked }, (d) => { yo.member.hide_name = d.hide_name; }, t('saved')));
+      // Del mapa en vivo publico se puede salir; del de los miembros no (es parte de unirse).
+      const fueraDelPublico = casilla(t('liveHideMe'), yo.member.public_map_out);
+      fueraDelPublico.input.addEventListener('change', () => hacerPedido('PATCH', '/vtc/me', { public_map_out: fueraDelPublico.input.checked }, (d) => { yo.member.public_map_out = d.public_map_out; }, t('saved')));
       nodos.push(tarjeta(t('myMembership'), el('p', { class: 'muted small' }, t('memberSince', { date: fecha(yo.member.joined_at) })), esconder.etq,
+        yo.live ? fueraDelPublico.etq : null,
         el('p', { class: 'muted small' }, t('memberPublic')),
         p.relation.owner ? el('p', { class: 'muted small' }, t('vtc_owner_must_transfer'))
           : el('div', { class: 'botones' }, botonArmado(t('leave'), 'danger chico', () => hacerPedido('POST', '/vtc/' + tag + '/leave', {}, () => { location.href = enlace(''); })))));
@@ -1109,6 +1259,8 @@
       });
       nodos.push(formulario);
     }
+    if (yo.live && puede(p, 'settings', 'edit')) nodos.push(tarjetaDelMapaPublico(v));
+    if (p.relation.owner) nodos.push(tarjetaDeNombre(v));
     if (p.relation.owner) {
       const confirma = el('input', { type: 'text', maxlength: 6, autocomplete: 'off' });
       nodos.push(el('section', { class: 'card peligro' }, el('h2', {}, t('dissolveTitle')), el('p', { class: 'muted small' }, t('dissolveHelp')), campo(t('dissolveConfirm', { tag }), confirma),
@@ -1116,6 +1268,59 @@
     }
     cuerpo.replaceChildren(...nodos);
   };
+
+  // El mapa en vivo publico: apagado, sin nombres (posicion redondeada) o con
+  // nombres. El de los miembros no se elige.
+  function tarjetaDelMapaPublico(v) {
+    const opciones = ['off', 'anonymous', 'names'].map((x) => [x, t('livePublic_' + x)]);
+    const elegir = selector(opciones, v.live_public || 'off', (x) => hacerPedido('PATCH', '/vtc/' + v.tag, { live_public: x }, (d) => { pagina.vtc.live_public = d.vtc.live_public; }, t('saved')), t('livePublicTitle'));
+    return tarjeta(t('livePublicTitle'), el('p', { class: 'muted small' }, t('livePublicHelp')), elegir);
+  }
+
+  // Cambiar nombre y tag: el dueno, una vez cada 90 dias (la API lo controla y
+  // dice desde cuando se puede otra vez en rename_available_at).
+  function tarjetaDeNombre(v) {
+    const espera = v.rename_available_at;
+    const nombre = el('input', { type: 'text', maxlength: 40, autocomplete: 'off', value: v.name });
+    const tag = el('input', { type: 'text', maxlength: 6, autocomplete: 'off', value: v.tag });
+    const pistas = { name: el('p', { class: 'pista', 'aria-live': 'polite' }), tag: el('p', { class: 'pista', 'aria-live': 'polite' }) };
+    [nombre, tag].forEach((i) => { i.disabled = !!espera; });
+    const cambio = () => {
+      const d = {};
+      if (nombre.value.trim() !== v.name) d.name = nombre.value.trim();
+      if (tag.value.trim() !== v.tag) d.tag = tag.value.trim();
+      return d;
+    };
+    let reloj = null;
+    async function revisar() {
+      const d = cambio(), q = new URLSearchParams();
+      const mismo = (a, b) => a.toLowerCase().replace(/\s+/g, ' ') === b.toLowerCase().replace(/\s+/g, ' ');
+      if (d.name && !mismo(d.name, v.name)) q.set('name', d.name);
+      if (d.tag && !mismo(d.tag, v.tag)) q.set('tag', d.tag);
+      ['name', 'tag'].forEach((k) => { if (!q.has(k)) { pistas[k].textContent = ''; pistas[k].className = 'pista'; } });
+      if (!q.toString()) return;
+      const r = await pedir('/vtc/check?' + q.toString());
+      if (!r.ok) return;
+      ['name', 'tag'].forEach((k) => {
+        if (!q.has(k)) return;
+        const error = r.datos[k];
+        pistas[k].className = 'pista ' + (error ? 'mal' : 'bien');
+        pistas[k].textContent = error ? t(error, { min: k === 'tag' ? 2 : 3, max: k === 'tag' ? 6 : 40 }) : t('available');
+      });
+    }
+    [nombre, tag].forEach((i) => i.addEventListener('input', () => { clearTimeout(reloj); reloj = setTimeout(revisar, 350); }));
+    const guardar = botonArmado(t('renameSave'), 'primary', () => {
+      const d = cambio();
+      if (!Object.keys(d).length) return;
+      return hacerPedido('PATCH', '/vtc/' + v.tag, d, (r) => { location.href = enlace(r.vtc.tag, '#settings'); });
+    });
+    guardar.disabled = !!espera;
+    return el('section', { class: 'card' }, el('h2', {}, t('renameTitle')),
+      el('p', { class: 'muted small' }, t('renameHelp')),
+      espera ? el('p', { class: 'notice' }, t('renameNext', { date: fecha(espera) })) : null,
+      el('div', { class: 'campos' }, campo(t('fName'), nombre, pistas.name), campo(t('fTag'), tag, pistas.tag)),
+      el('div', { class: 'botones' }, guardar));
+  }
 
   // ------------------------------------------------- imagen de reclutamiento
   function dialogoTarjeta(p) {
@@ -1165,6 +1370,8 @@
     $('navAccount').textContent = t('navAccount');
     $('pieTerms').textContent = t('terms');
     $('piePrivacy').textContent = t('privacy');
+    $('betaTexto').textContent = t('betaNotice');
+    $('betaLink').textContent = t('betaFeedback');
   }
 
   async function arrancar() {
@@ -1197,6 +1404,7 @@
       return;
     }
     yo = r.datos;
+    $('betaAviso').hidden = !yo.enabled;
     const tag = tagDeLaDireccion(), codigo = PARAMS.get('invite');
     if (!yo.enabled) vista = () => pintar(el('div', { class: 'portada' }, el('h1', {}, t('dirTitle')), el('p', {}, t('closed')), yo.signed_in ? null : el('div', { class: 'botones' }, boton(t('signIn'), '', irAEntrar))));
     else if (codigo) vista = () => verInvitacion(codigo);

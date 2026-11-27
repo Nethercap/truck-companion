@@ -33,7 +33,7 @@ const convoy = {
   // su "compartir ingresos": la ruta del lider aparecia y desaparecia para
   // los demas (auditoria del 10-10). Las otras pestanas solo muestran.
   active: false,
-  spectator: false, spectatorWs: null, spectatorGame: null,
+  spectator: false, spectatorWs: null, spectatorGame: null, spectatorCode: null,
   follow: false, followWaypoint: null,
   showLeaderRoute: true,
   markers: new Map(),         // id -> { marker, el, arrow, label }
@@ -540,6 +540,9 @@ function convoyRenderModal() {
   document.getElementById('convoyMute').checked = convoyMuted;
   document.getElementById('convoyShowMarkers').checked = convoyShowMarkers;
   if (!inRoom) return;
+  // Espectador: entrar a manejar con el codigo de pairing (convoyDriverUrl). Quien
+  // maneja y abrio el link que le pasaron quedaba mirando sin saberlo (Discord 27-11).
+  document.getElementById('convoyDrive').hidden = !convoy.spectator;
   document.getElementById('convoyCodeBig').textContent = convoy.code || '';
   document.getElementById('convoySpectators').textContent = t('convoySpectators').replace('{n}', convoy.spectators);
   const me = convoyMe();
@@ -573,6 +576,16 @@ function convoyWireUi() {
   $('convoyMute').addEventListener('change', e => { convoyMuted = e.target.checked; convoySaveSettings(); });
   $('convoyShowMarkers').addEventListener('change', e => { convoyShowMarkers = e.target.checked; convoySaveSettings(); convoyRenderMarkers(); });
   $('convoyCodeInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6); });
+  $('convoyDriveCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); });
+  const drive = () => {
+    // Se recarga con ?code=...&convoy=...: se conecta como siempre y abre esta ventana
+    // con el codigo del convoy puesto (convoyLinkStart). El relay guarda el codigo.
+    const url = convoyDriverUrl(location.href, $('convoyDriveCode').value, convoy.code || convoy.spectatorCode);
+    if (!url) { showToast(t('convoyDriveBadCode'), 'danger'); return; }
+    location.href = url;
+  };
+  $('convoyDriveBtn').addEventListener('click', drive);
+  $('convoyDriveCode').addEventListener('keydown', e => { if (e.key === 'Enter') drive(); });
   const start = (kind) => {
     const nickname = ($('convoyNick').value || '').trim();
     if (nickname.length < 2) { showToast(t('convoyErrNick'), 'danger'); return; }
@@ -631,6 +644,7 @@ function convoyPlaySound(kind) {
 // ---------------------------------------------------------------- espectador (/app/?convoy=CODE sin cliente)
 function convoyStartSpectator(code, backend) {
   convoy.spectator = true;
+  convoy.spectatorCode = code; // el del link: convoy.code llega con el primer estado
   conn.spectator = true;
   conn.socket = 'connecting';
   renderConnectionUi();
@@ -678,7 +692,15 @@ function convoyFitMembers() {
 // El mapa rota en modo nav: las flechas y las chapitas del borde se rehacen.
 document.addEventListener('DOMContentLoaded', () => {
   convoyWireUi();
-  if (window.__convoySpectator) { const sp = window.__convoySpectator; window.__convoySpectator = null; convoyStartSpectator(sp.code, sp.backend); }
+  if (window.__convoySpectator) {
+    const sp = window.__convoySpectator;
+    window.__convoySpectator = null;
+    convoyStartSpectator(sp.code, sp.backend);
+    // Como el link con cliente: se abre la ventana del convoy, que al espectador le
+    // ofrece entrar a manejar. El chip "Spectator" solo no lo explicaba, y la linea
+    // de detalle (detailSpectator) no se ve con la vista en vivo.
+    setTimeout(() => convoyOpenModal(), 800);
+  }
   // Sin convoy no hay nada que dibujar: antes esto media el mapa
   // (getBoundingClientRect, que fuerza un layout) en cada cuadro de
   // movimiento aunque nadie estuviera en un convoy.

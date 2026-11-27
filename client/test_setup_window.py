@@ -41,6 +41,17 @@ def raiz():
     r.destroy()
 
 
+@pytest.fixture(autouse=True)
+def _basura_de_tk_en_este_hilo():
+    """La basura de Tk de cada test (las variables de una ventana cerrada) se
+    junta aca, en el hilo principal. Si la junta el hilo de otro test (bajar
+    una actualizacion, armar el mapa), cada Variable.__del__ espera 1 s al
+    loop de Tk, tira "main thread is not in main loop" y el test se queda
+    sin tiempo (en el Windows de CI, 27-11, con la variable de la VTC)."""
+    yield
+    gc.collect()
+
+
 @pytest.fixture
 def ventana(monkeypatch, tmp_path, raiz):
     monkeypatch.setattr(tk, "Tk", lambda: tk.Toplevel(raiz))
@@ -529,6 +540,99 @@ def _esperar(v, condicion, segundos=10):
             return
         time.sleep(0.05)
     raise AssertionError("no se cumplio a tiempo")
+
+
+# ---------------------------------------- para quien cuentan los trabajos
+
+EMPRESA = {"tag": "KL", "name": "Kappa Logistics", "color": None, "mode": "vtc"}
+
+
+def _radios(v):
+    return [w for w in v.vtc_frame.winfo_children() if isinstance(w, tk.Radiobutton)]
+
+
+def _textos_vtc(v):
+    return [w.cget("text") for w in v.vtc_frame.winfo_children()]
+
+
+def test_sin_empresa_virtual_setup_no_muestra_nada(ventana, monkeypatch):
+    v, _ = ventana
+    monkeypatch.setattr(tray_client.state.vtc, "actual", None)
+    v.render_vtc()
+    assert not v.vtc_frame.winfo_manager() and not v.vtc_frame.winfo_children()
+
+
+def test_setup_muestra_el_modo_y_sigue_al_que_se_cambia_en_otro_lado(ventana, monkeypatch):
+    v, _ = ventana
+    monkeypatch.setattr(tray_client.state.vtc, "actual", EMPRESA)
+    v.refresh_status()
+    assert v.vtc_frame.winfo_manager() and v.vtc_var.get() == "vtc"
+    assert [r.cget("text") for r in _radios(v)] == ["[KL] Kappa Logistics", tray_client.T("vtc_personal")]
+    assert _textos_vtc(v)[-1] == tray_client.T("vtc_hint")
+    monkeypatch.setattr(tray_client.state.vtc, "actual", {**EMPRESA, "mode": "personal"})
+    v.refresh_status()
+    assert v.vtc_var.get() == "personal"
+    monkeypatch.setattr(tray_client.state.vtc, "actual", None)  # se fue de la empresa
+    v.refresh_status()
+    assert not v.vtc_frame.winfo_manager()
+
+
+def test_elegir_el_modo_en_setup_no_traba_la_ventana(ventana, monkeypatch):
+    v, _ = ventana
+    soltar, modos = threading.Event(), []
+    monkeypatch.setattr(tray_client.state.vtc, "actual", EMPRESA)
+
+    def poner(modo):
+        modos.append(modo)
+        soltar.wait(5)
+        tray_client.state.vtc.actual = {**EMPRESA, "mode": modo}
+        return True
+    monkeypatch.setattr(tray_client.state.vtc, "poner_modo", poner)
+    v.render_vtc()
+    import time
+    t0 = time.monotonic()
+    _radios(v)[1].invoke()
+    assert time.monotonic() - t0 < 2  # la API todavia no contesto
+    assert all(r.cget("state") == "disabled" for r in _radios(v))
+    soltar.set()
+    _esperar(v, lambda: not v._vtc_cambiando)
+    assert modos == ["personal"] and v.vtc_var.get() == "personal"
+    assert all(r.cget("state") == "normal" for r in _radios(v))
+    _radios(v)[1].invoke()  # el que ya esta elegido no pide nada
+    assert modos == ["personal"]
+
+
+def test_si_no_se_pudo_setup_vuelve_al_modo_de_antes_y_lo_dice(ventana, monkeypatch):
+    v, _ = ventana
+    monkeypatch.setattr(tray_client.state.vtc, "actual", EMPRESA)
+    monkeypatch.setattr(tray_client.state.vtc, "poner_modo", lambda modo: False)
+    v.render_vtc()
+    _radios(v)[1].invoke()
+    _esperar(v, lambda: not v._vtc_cambiando)
+    assert v.vtc_var.get() == "vtc"
+    assert _textos_vtc(v)[-1] == tray_client.T("vtc_failed")
+    # Al volver a probar, el aviso se va.
+    monkeypatch.setattr(tray_client.state.vtc, "poner_modo", lambda modo: True)
+    _radios(v)[1].invoke()
+    _esperar(v, lambda: not v._vtc_cambiando)
+    assert _textos_vtc(v)[-1] == tray_client.T("vtc_hint")
+
+
+def test_vincular_y_desvincular_vuelven_a_mirar_la_empresa(ventana, monkeypatch):
+    v, guardados = ventana
+    veces = []
+    monkeypatch.setattr(tray_client.state.vtc, "despertar", lambda forzar=False: veces.append(forzar))
+    monkeypatch.setattr(tray_client.account, "pedir_codigo", lambda n, s=None: {
+        "code": "ABCD2345", "secret": "s", "expires_in": 600, "url": "https://x"})
+    monkeypatch.setattr(tray_client.account, "consultar_codigo", lambda secret, s=None: ("listo", "tok"))
+    monkeypatch.setattr(tray_client.account, "quien_soy", lambda token, s=None: {"username": "ana"})
+    monkeypatch.setattr(tray_client, "abrir_navegador", lambda url: None)
+    v.link_account()
+    _esperar(v, lambda: guardados.get("account_token") == "tok" and veces)
+    assert veces == [True]
+    _esperar(v, lambda: v.account_button.cget("state") == "normal")
+    v.link_account()  # con cuenta, desvincula
+    assert "account_token" not in guardados and veces == [True, True]
 
 
 # --------------------------------------------- cierre automatico (Proton)

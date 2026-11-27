@@ -50,6 +50,7 @@ import account
 import account_sync
 import plugin_installer
 import tmp_players
+import vtc
 import win_integration
 import i18n
 from i18n import T
@@ -167,6 +168,9 @@ class AppState:
         self.update_available = None  # (version, download_url, sha256) o None
         self.installs = []  # ver plugin_installer.find_game_installs()
         self.plugins_revisados_at = 0.0  # ver actualizar_plugins_viejos
+        # La empresa virtual de la cuenta, si tiene, y en que modo esta (vtc.py).
+        self.vtc = vtc.Vtc(lambda: win_integration.load_settings(), lambda: cuentas_visibles(),
+                           self.refresh_menu)
         self.local: local_server.LocalServer | None = None  # modo LAN (ver local_server.py)
         # Si el modo LAN arranca escuchando en la red o solo en esta PC
         # (local_server.lan_al_arrancar); abrir_modo_lan lo cambia.
@@ -214,6 +218,13 @@ class AppState:
             code_part = f" - code {self.code}" if self.code else ""
             self.icon.title = recortar_titulo(f"Truck Dash{code_part} - {self.status_text()}")
 
+    def refresh_menu(self):
+        if self.icon is not None:
+            try:
+                self.icon.update_menu()
+            except Exception:
+                pass
+
     def set_status(self, status: str, game: str | None = None, vehicle: str | None = None):
         changed = status != self.status or game != self.game
         # Una linea por cambio, no por frame: sin esto un log no dice si el
@@ -222,6 +233,10 @@ class AppState:
         if changed or vehicle != self.vehicle:
             detalle = ", ".join(p for p in (game, vehicle) if p)
             logging.info("Status: %s%s", status, f" ({detalle})" if detalle else "")
+        if status == "live" and self.status != "live":
+            # Sin el juego se lee la empresa cada 15 minutos: al empezar a
+            # manejar, el pase del mapa en vivo pudo haber vencido.
+            self.vtc.despertar()
         self.status = status
         self.game = game
         self.vehicle = vehicle
@@ -520,6 +535,37 @@ def texto_menu(clave: str):
     return lambda item: T(clave)
 
 
+def vtc_en_el_menu(item=None) -> str:
+    """El item de la bandeja: para quien cuentan los trabajos ahora."""
+    empresa = state.vtc.actual
+    quien = f"[{empresa['tag']}]" if empresa and empresa["mode"] == "vtc" else T("vtc_personal")
+    return T("menu_vtc", who=quien)
+
+
+def poner_modo_vtc_desde_el_menu(modo: str) -> None:
+    """En un hilo: la API puede tardar, y el de la bandeja es el del menu."""
+    def cambiar():
+        if not state.vtc.poner_modo(modo) and state.icon is not None:
+            try:
+                state.icon.notify(T("vtc_failed"), "Truck Dash")
+            except Exception as exc:
+                logging.info("No se pudo mostrar el aviso de la VTC: %s", exc)
+    threading.Thread(target=cambiar, daemon=True).start()
+
+
+def menu_vtc():
+    """Solo con una empresa virtual en la cuenta."""
+    def opcion(texto, modo):
+        return pystray.MenuItem(texto, lambda icon, item: poner_modo_vtc_desde_el_menu(modo), radio=True,
+                                checked=lambda item: bool(state.vtc.actual) and state.vtc.actual["mode"] == modo)
+
+    def nombre(item):
+        empresa = state.vtc.actual
+        return f"[{empresa['tag']}] {empresa['name']}".strip() if empresa else ""
+    return pystray.MenuItem(vtc_en_el_menu, pystray.Menu(opcion(nombre, "vtc"), opcion(texto_menu("vtc_personal"), "personal")),
+                            visible=lambda item: state.vtc.actual is not None)
+
+
 def set_client_language(codigo: str) -> None:
     """Idioma del cliente elegido en Setup ("auto" = el de Windows)."""
     settings = win_integration.load_settings()
@@ -528,11 +574,7 @@ def set_client_language(codigo: str) -> None:
     i18n.set_language(codigo)
     logging.info("Idioma del cliente: %s (%s)", codigo, i18n.LANG)
     state.refresh_title()
-    if state.icon is not None:
-        try:
-            state.icon.update_menu()
-        except Exception:
-            pass
+    state.refresh_menu()
 
 
 def open_setup_window(icon=None, item=None):
@@ -937,7 +979,56 @@ class SetupWindow:
         self.account_code.pack(side="left", padx=12)
         # Aparece solo con un codigo a la vista: el que se escribe en la web.
         self.account_copy = self.button(fila, T("copy"), self.copy_account_code)
+        # Con una empresa virtual (VTC): para quien cuentan los trabajos. La
+        # pinta render_vtc, en cada refresh_status.
+        self.vtc_frame = tk.Frame(caja, bg=CARD)
+        self.vtc_var = tk.StringVar(master=self.root, value="")
+        self._vtc_cambiando = self._vtc_fallo = False
+        self._vtc_pintado = ()
         self.refresh_account()
+        state.vtc.despertar()
+
+    def render_vtc(self):
+        if not hasattr(self, "vtc_frame"):
+            return  # cuentas apagadas
+        empresa = state.vtc.actual
+        clave = (empresa, self._vtc_cambiando, self._vtc_fallo)
+        if clave == self._vtc_pintado:
+            return
+        self._vtc_pintado = clave
+        for hijo in self.vtc_frame.winfo_children():
+            hijo.destroy()
+        if not empresa:
+            self.vtc_frame.pack_forget()
+            return
+        self.vtc_var.set(empresa["mode"])
+        self.label(self.vtc_frame, T("vtc_label"), bg=CARD, fg=MUTED).pack(anchor="w")
+        for modo, texto in (("vtc", f"[{empresa['tag']}] {empresa['name']}".strip()), ("personal", T("vtc_personal"))):
+            tk.Radiobutton(self.vtc_frame, text=texto, value=modo, variable=self.vtc_var,
+                           command=self.change_vtc_mode, bg=CARD, fg=FG, selectcolor="#262b33",
+                           activebackground=CARD, activeforeground=FG,
+                           state="disabled" if self._vtc_cambiando else "normal").pack(anchor="w")
+        self.label(self.vtc_frame, T("vtc_failed" if self._vtc_fallo else "vtc_hint"), bg=CARD,
+                   fg=RED if self._vtc_fallo else MUTED, wraplength=500).pack(anchor="w", pady=(2, 0))
+        if not self.vtc_frame.winfo_manager():
+            self.vtc_frame.pack(anchor="w", pady=(8, 0), fill="x")
+
+    def change_vtc_mode(self):
+        modo = self.vtc_var.get()
+        if not state.vtc.actual or modo == state.vtc.actual["mode"]:
+            return
+        self._vtc_cambiando, self._vtc_fallo = True, False
+        self.render_vtc()
+
+        def cambiar():
+            ok = state.vtc.poner_modo(modo)
+
+            def pintar():
+                self._vtc_cambiando, self._vtc_fallo = False, not ok
+                self.render_vtc()
+            self.en_ventana(pintar)
+
+        threading.Thread(target=cambiar, daemon=True).start()
 
     def _mostrar_pitch(self, ver: bool):
         """La explicacion solo sin cuenta; vinculado ya no hace falta venderla."""
@@ -1032,6 +1123,7 @@ class SetupWindow:
             # token de esta PC; la sesion se corta del todo desde la web.
             settings.pop(account.CLAVE_TOKEN, None)
             win_integration.save_settings(settings)
+            state.vtc.despertar(forzar=True)
             self.set_account_code("")
             self.flash(T("account_unlinked"), MUTED)
             self.refresh_account()
@@ -1078,6 +1170,7 @@ class SetupWindow:
                 settings[account.CLAVE_TOKEN] = token
                 win_integration.save_settings(settings)
                 logging.info("Cuenta vinculada")
+                state.vtc.despertar(forzar=True)
                 self.en_ventana(lambda: (
                     self.set_account_code(""),
                     self.flash(T("account_ok"), GREEN),
@@ -1523,6 +1616,7 @@ class SetupWindow:
             text += "\n" + state.status_detail
         self.status_label.configure(text=text, fg=color)
         self.code_label.configure(text=state.code or "-")
+        self.render_vtc()
         self.render_phone_qr()  # el codigo cambia con "Codigo nuevo"
         if hasattr(self, "overlay_var") and self.overlay_var.get() != state.overlay.enabled:
             self.overlay_var.set(state.overlay.enabled)  # se toco desde la bandeja o con la tecla
@@ -2030,6 +2124,9 @@ def status_message() -> str:
         # Con el overlay prendido la web manda el giro y lo que falta
         # ({"type": "nav_hud"}); apagado no manda nada.
         "overlay": state.overlay.enabled,
+        # La empresa virtual de la cuenta y en que modo esta, para el chip del
+        # tablero; None sin empresa. El cambio vuelve por set_vtc_mode.
+        "vtc": state.vtc.actual,
     })
 
 
@@ -2305,6 +2402,8 @@ class CloudLink:
         self.url = f"{backend_url}/ws/client/{code}"
         self.keybinds = keybinds
         self.ws = None
+        # El ultimo pase de la VTC que se le mando al relay (ver mandar_pase_vtc).
+        self.pase_vtc = None
 
     async def send(self, text: str):
         ws = self.ws
@@ -2330,6 +2429,7 @@ class CloudLink:
                     state.set_cloud("connected")
                     logging.info("Connected to backend")
                     await ws.send(status_message())
+                    await mandar_pase_vtc(self, forzar=True)
                     await client_lib.receive_commands(ws, self.keybinds)
             except (websockets.ConnectionClosed, OSError) as exc:
                 logging.warning("Backend connection lost: %s", exc)
@@ -2341,6 +2441,16 @@ class CloudLink:
                     ruta.fallo_al_conectar()
             state.set_cloud("reconnecting")
             await asyncio.sleep(client_lib.RECONNECT_DELAY_SECONDS)
+
+
+async def mandar_pase_vtc(cloud, forzar: bool = False):
+    """El pase del mapa en vivo de la empresa al relay, si cambio o al
+    conectar (un relay redesplegado no se acuerda de nada). Solo al relay: el
+    servidor LAN no tiene mapa de empresas."""
+    pase = state.vtc.pase_para_relay()
+    if forzar or pase != getattr(cloud, "pase_vtc", None):
+        cloud.pase_vtc = pase
+        await cloud.send(json.dumps({"type": "vtc_pass", "pass": pase}))
 
 
 async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
@@ -2361,15 +2471,18 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
         refresh_map_mods()
         key = (state.status, state.status_detail, json.dumps(state.map_mods, sort_keys=True),
                json.dumps(state.active_mods, sort_keys=True), json.dumps(state.map_dlcs, sort_keys=True),
-               json.dumps(local_maps_summary(), sort_keys=True), state.overlay.enabled)
+               json.dumps(local_maps_summary(), sort_keys=True), state.overlay.enabled,
+               json.dumps(state.vtc.actual, sort_keys=True))
         if key != last_status_sent:
             last_status_sent = key
             msg = status_message()
             await cloud.send(msg)
             await local.broadcast(msg, is_status=True)
+        await mandar_pase_vtc(cloud)
 
     sin_memoria_desde = None
     ultimo_render, render_cambio_en, avisado_congelado = None, time.time(), False
+    en_trabajo = False
 
     while True:
         if not telemetry_ready:
@@ -2434,6 +2547,12 @@ async def telemetry_loop(cloud: CloudLink, local: local_server.LocalServer):
         if raw.get("sdkActive") and not congelado:
             inactive_since = None
             client_lib.update_job_snapshot(raw)
+            if bool(raw.get("onJob")) != en_trabajo:
+                en_trabajo = not en_trabajo
+                if en_trabajo:
+                    # Al tomar un trabajo el tablero dice para quien cuenta: con
+                    # el modo de ahora, que se pudo cambiar en la web.
+                    state.vtc.despertar()
             payload = client_lib.build_payload(raw)
             client_lib.attach_job_snapshot_if_finished(payload, raw)
             state.overlay_data.telemetria(payload)
@@ -2684,6 +2803,7 @@ def main():
     client_lib.on_offmap_place = on_offmap_place
     client_lib.on_nav_hud = state.overlay_data.navegacion
     client_lib.on_viewers = lambda n: setattr(state, "cloud_viewers", n)
+    client_lib.on_vtc_mode = state.vtc.poner_modo
     ajustes_overlay = win_integration.overlay_settings()
     state.overlay_layout = {k: ajustes_overlay[k] for k in ("corner", "size", "items", "pos", "opacity")}
     if ajustes_overlay["enabled"]:
@@ -2700,6 +2820,7 @@ def main():
     state.lan_en_la_red = local_server.lan_al_arrancar(win_integration.load_settings())
     start_asyncio_thread(args.backend, args.code)
     threading.Thread(target=vigilar_partidas, daemon=True).start()
+    threading.Thread(target=state.vtc.vigilar, args=(lambda: state.status == "live",), daemon=True).start()
     # Unos segundos despues, para no salir encima del arranque. Daemon: puede
     # quedarse esperando el juego, y no tiene que trabar la salida.
     aviso = threading.Timer(10, preguntar_leer_partidas)
@@ -2728,6 +2849,7 @@ def main():
         pystray.MenuItem(texto_menu("menu_open_dashboard"), open_web_menu_item),
         pystray.MenuItem(texto_menu("menu_account"), open_account_menu_item,
                          visible=lambda item: cuentas_visibles()),
+        menu_vtc(),
         pystray.MenuItem(texto_menu("menu_show_code"), show_code_notification),
         pystray.MenuItem(texto_menu("menu_lan"), show_lan_menu_item),
         pystray.MenuItem(texto_menu("menu_overlay"), toggle_overlay_menu_item,

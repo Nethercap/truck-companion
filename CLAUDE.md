@@ -53,7 +53,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   API de cuentas (`/vtc/*` de truckdash-loginapp; el plan es `vtc-plan.md` de ese repo).
   Las reglas las decide la API: aca se muestran sus respuestas. Apagadas en produccion
   hasta que la API tenga `VTC_ABIERTO=1` (o el usuario en `VTC_BETA`): `/vtc/me` dice
-  `enabled` y sin eso no hay link en la cuenta.
+  `enabled` y sin eso no hay link en la cuenta. Abierta a todos (`VTC_ABIERTO=1`) es la
+  beta: las paginas llevan el aviso (`betaAviso`, con el link a Discord) y la marca
+  `.betaTag` en el link de la cuenta, y siguen con `noindex`. Al salir de beta se sacan
+  las tres cosas.
 - Lo que escribe la gente entra al DOM como texto: todo nodo se arma con `el()` de
   `vtc.js` (append, nunca innerHTML). Los links de una empresa los valida la API.
 - Textos en `docs/vtc/i18n.js`, los ocho idiomas en el mismo archivo.
@@ -62,6 +65,35 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - `qr.js` es propio (la web no carga JS de terceros) y se compara con la libreria de
   Python que usa el cliente. `tarjeta.js` solo dibuja; el logo es el icono del servidor
   de Discord (con CORS; si no carga, va el tag).
+- El modo (los trabajos cuentan para la empresa o son personales) vive en la API
+  (`vtc_members.mode`) y alcanza al viaje abierto. El cliente lo lee y lo cambia con su
+  token (`client/vtc.py`: cada 5 min con el juego en vivo, al tomar un trabajo, al abrir
+  Setup), lo muestra en la bandeja y en Setup, y lo manda en `client_status.vtc`. El chip
+  de la tarjeta del viaje (`vtcChipView`) pide `set_vtc_mode` con el modo, no un toggle;
+  contesta el `client_status` siguiente, o `command_result` con `action: 'vtc_mode'` si no
+  se pudo. Que la API no conteste no es dejar la empresa: queda lo ultimo que se supo. El
+  aviso de "este trabajo es personal" sale al tomarlo (`createVtcJobNotice`); de un bus la
+  clave son las puntas de la linea, porque el destino cambia en cada parada. `/dash/` y la
+  app nativa todavia no lo muestran.
+- Pestana Mapa (27-11, etapa 2): los recorridos de los viajes que cuentan para la empresa
+  (`GET /vtc/{tag}/map`, solo miembros; de los personales nada), un color por chofer.
+  `mapa.js` es el mapa de la cuenta (`account.js`, "mapa de todo") sin compartir codigo:
+  MapLibre se carga al abrir la pestana y se cierra al salir (`VtcMapa.cerrar` en
+  `pintarEmpresa`). El CSS de MapLibre se carga despues y pone `position: relative` a
+  `.maplibregl-map`: un contenedor con `position: absolute` necesita un selector mas
+  especifico, o queda de alto 0 y el mapa se dibuja escondido.
+- Mapa en vivo de la empresa (27-11, decisiones 4 y 5 del plan): la API firma un pase de
+  12 minutos (`vtc_pase.py` de truckdash-loginapp, en `/vtc/me?live_pass=1`) con la clave
+  `VTC_PASS_KEY`, que va igual en los dos servicios de Railway (API y relay). El cliente lo
+  lee con la misma consulta de siempre (`client/vtc.py`, cada 5 min con el juego) y lo manda
+  al relay como `{"type": "vtc_pass"}` solo en modo empresa (`pase_para_relay`); el relay lo
+  verifica (`vtc_pass_valido`, copia de la de la API con un ejemplo comun en las dos pruebas),
+  no lo reenvia a las pestanas y sirve `/ws/vtcmap/{id de la empresa}`: con el pase de un
+  miembro, todos con nombre; sin pase, lo publico segun `pub` del pase (apagado, anonimo a
+  250 unidades del mundo, o con nombres salvo `out`, y sin nombre con `hn`). Sin la clave,
+  4503. El cliente siempre habla con el relay, tambien en modo LAN: no hizo falta nada para
+  la decision 5. La pestana Live proyecta en el navegador (`aLngLat` de `mapa.js`, la forma
+  cerrada de `proyeccion.py` de la API, probada con sus mismos valores de proj4).
 - Entrar desde `/vtc/` deja en sessionStorage a donde volver (`truckdash_volver`,
   30 minutos) y `account.js` vuelve solo a rutas `/vtc/`.
 
@@ -251,6 +283,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`rememberedCode`: solo ese codigo, uno escrito despues avisa enseguida si esta
   mal), y el lapiz (`changeCodeBtn`) lo olvida. La cuenta no sirve para esto: el
   relay no sabe de cuentas.
+- El link de un convoy (`/app/?convoy=CODIGO`, el de "Copy link") con ese codigo guardado
+  se conecta con el y abre la ventana del convoy con el codigo puesto (`convoyLinkStart`);
+  sin codigo es espectador, y la ventana se abre sola con "Join as driver" (`convoyDrive`,
+  `convoyDriverUrl`: recarga con `?code=`). El lapiz del chip del espectador abre esa
+  ventana. Antes el link era siempre de espectador: quien maneja abria el que le pasaron
+  en Discord y nadie lo veia, sin entender por que (Discord 27-11, gabbo). La linea de
+  `detailSpectator` no se ve con la vista en vivo.
 - Plan de ruta y voz por sesion (Discord 22-10, Gargamosch: los waypoints en
   la tablet, la navegacion en el celular y la voz en la PC). El relay guarda
   los waypoints de cada variante (`Session.route_plans`, con `rev` = su hora
@@ -612,6 +651,17 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   compactos sin isla (`compactIslandM`: cruces de ATS con curvas cuadradas).
   Los umbrales salen de medir contra el nombre del prefab del parser; antes
   de moverlos, correr el simulador con `--rotondas`.
+  En un prefab compacto, un toco (`prefabStubs`: brazo con la calle oculta en
+  el mapa del juego) cuenta como salida, porque se ve y se maneja: en la de
+  Frederikshavn -> Hirtshals (ETS2, 1185,-37177), de cinco brazos, los dos
+  que siguen a la entrada son ocultos y se decia "primera salida" por la
+  tercera. Y si el prefab tiene un toco y desde la entrada no hay dos curvas
+  que rodean la isla, cuentan tambien las que salen de los otros brazos: en
+  una de tres brazos la primera salida dobla una vez y la segunda rodea media
+  isla (0 y 48 grados de mas en la de Zurich, reporte #63, que se callaba).
+  El simulador cuenta igual las salidas por angulo (`salidaPorAngulo`).
+  En esas 300 rutas de ETS2 se anuncian 242 rotondas en vez de 191, y las de
+  salida distinta por angulo bajan de 4 a 1.
   Las rotondas ovaladas armadas con calles (sin prefab de rotonda, sin
   nombre que ayude) pasan por otra regla (`ovalRing`, `OVAL_RING`): hasta
   x2 de redondez, a lo sumo dos lados rectos (el tercero, `straightRuns`,
@@ -668,6 +718,38 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   rutas de ATS, ETS2, Coast to Coast y ProMods) suma 45 avisos, dibujados
   uno por uno: cruces con el brazo de enfrente oculto, y tres rotondas sin
   reconocer con brazos ocultos que dicen "turn right" en la primera salida.
+  Ni la T o la Y con la otra calle oculta (`stubTee`, 27-11): el otro brazo
+  es un toco y la ruta no tiene otra salida de verdad, asi que la esquina se
+  callaba aunque se ve la otra calle (en el parser es `hidden`: el grafo no
+  la tiene, pero se maneja). En la T de Odense -> Kiel (ETS2, 888,-21811) la
+  ruta llega por la barra y dobla al norte, y el brazo sur sigue por una
+  calle oculta. Se mide donde el toco se separa de la ruta (a mas de 3 m, por
+  la curva de la arista): la ruta dobla 50 grados o mas entre los 25 m de
+  antes y de despues, hasta 150, y el toco se va 30 grados o mas para el
+  otro lado. Asi tambien la T cuyo palo se curva antes de la barra, que a
+  60 m no dobla. El toco de enfrente (Tulsa) y el del mismo lado siguen
+  callados, y la entrada a una rotonda no cuenta. Tampoco una rotonda
+  compacta con los otros brazos ocultos (Bilbao, Murcia, Innsbruck ->
+  Zurich): adentro del prefab la ruta tambien dobla con un toco del otro
+  lado, y "turn left" ahi era pasar derecho. La separa una curva del prefab
+  (de las que salen del toco o del nodo del cruce) que rodea la isla,
+  `extraTurningDeg` de 60 o mas (74 a 148 en las rotondas de la muestra, 0
+  en todas las T); esas ahora las reconoce `detectRoundabout` (ver
+  rotondas). El aviso va en el nodo de donde sale el toco, la entrada al
+  prefab, como los otros giros. Lo busco el reporte #63, que resulto ser una
+  de esas rotondas.
+  En 60 rutas de ETS2 habia 71 esquinas con un toco del otro lado y sin
+  aviso (dibujadas con las calles ocultas del parser: T e Y de verdad, y
+  las rotondas); quedan 13, rotondas, puntas de ruta o cruces con otra salida.
+  Con las dos reglas (y las rotondas de abajo), en 300 rutas por juego
+  (semilla 7): ETS2 pasa de 2.441 a 2.738 avisos y ATS de 2.162 a 2.279;
+  giros nuevos en 265 lugares (183 y 82), 51 rotondas mas en ETS2, y los
+  `giro_sin_aviso` bajan de 65 a 58 y de 37 a 31. Ninguno se pierde: 17 se
+  corren al nodo del toco (hasta 75 m, para el mismo lado) o pasan a
+  rotonda. Dibujados 72 nuevos, con las calles ocultas del parser. Suben
+  `giro_sin_otra_salida`, `aviso_sin_opcion` y `giro_en_recta`: el simulador
+  no ve las calles ocultas, y en una T cuyo palo se curva la zona dobla poco.
+  check_avisos: ATS +3 (Helena, Yankton, Pendleton) y ETS2 +13.
 - Los puntos de la curva de un prefab cortan el grupo de nodos de cruce
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.
@@ -951,6 +1033,33 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   en ETS2 (57 y 70 avisos al reves); con el arreglo, 78 y 151 (7 y 3). Los
   que quedan son casi todos recalculando encima del nodo o el mismo giro en
   otro nodo de una cadena de cruces. `--antesDelGiro 0` lo saltea.
+
+## Parser propio, fase 1: lector de archivos (27-11)
+
+- `client/juego/` lee los archivos del juego en Python, sin Node ni modulos
+  nativos: `cityhash` (CityHash64, igual al nativo en 69 vectores de 0 a 299
+  bytes), `archivos` (HashFS v1 y v2, ZIP tambien con firma `AEM!`, carpetas y
+  mods en partes), `sii` (texto, BSII y ScsC, y el locale) y `montaje` (base,
+  DLC y mods, el ultimo gana). Es la fase 1 del plan del 25-11
+  (`plan-independencia-mapas-2026-11-25.md` del taller): todavia no lo usa el
+  armador, solo `partida_gps.py`, que toma de `juego/sii.py` el descifrado y
+  los lectores de .sii (los nombres viejos siguen ahi para sus tests).
+- Las trampas de los mods protegidos son las mismas que resuelve el armador
+  (`builder/README.md`): entradas basura con su motivo en `salteadas`, la
+  lectura flexible de una entrada que no cierra (`leidas_como_truco`), listados
+  guardados como archivo, la tabla de metadatos sin comprimir (el campo cuenta
+  valores de 4 bytes), zlib cortado, deflate sin cabecera (2) y zstd (4, con
+  Python 3.14 o la libreria zstandard; el .exe y CI van con 3.12 y no lo leen).
+  gdeflate (texturas) no: `CompresionNoSoportada` para ese archivo solo.
+- Un caso nuevo de un mod va con su test en `test_juego_archivos.py`, armando
+  el archivo a mano (`armar_v2`, `armar_v1`, `_zip`); CI no tiene el juego. La
+  comparacion contra archivos reales (zipfile de Python para los ZIP y el
+  extractor de WSL para HashFS) y la medicion de tiempo y memoria estan en
+  `validar_lector_scs.py` del taller.
+- No portar codigo de TruckLib ni del Extractor de sk-zk (GPL-2.0, no se puede
+  mezclar con la AGPL-3.0). truckermudgeon/maps (GPL-3.0) y ts-map (MIT) si
+  sirven de referencia, con sus avisos. Solo archivos: nunca la memoria del
+  juego.
 
 ## Reportes de navegacion (25-10)
 

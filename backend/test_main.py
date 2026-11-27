@@ -1581,6 +1581,7 @@ def test_contrato_client_status(client, main):
             "detail": "The running game (D:\\ATS\\bin\\win_x64) has no telemetry plugin.",
             "mapMods": {"ats": {"c2c": True}, "ets2": None}, "activeMods": ["Coast to Coast"],
             "mapDlcs": None, "localMaps": None, "localMapPort": 27765, "overlay": True,
+            "vtc": {"tag": "KL", "name": "Kappa Logistics", "color": "#3b9eff", "mode": "personal"},
         }))
         import time as _time
         _time.sleep(0.1)
@@ -1592,6 +1593,34 @@ def test_contrato_client_status(client, main):
             assert not faltan, f"el relay no guarda {sorted(faltan)}: agregarlos o explicar en CLIENT_STATUS_NO_GUARDADO"
             assert guardado["detail"].startswith("The running game")
             assert "activeMods" not in guardado
+            assert guardado["vtc"] == {"tag": "KL", "name": "Kappa Logistics", "color": "#3b9eff", "mode": "personal"}
+
+
+def test_clean_vtc_acota_lo_que_dice_el_cliente(main):
+    bueno = {"tag": "KL", "name": " Kappa  Logistics ", "color": "#3B9EFF", "mode": "vtc", "secreto": "x"}
+    assert main.clean_vtc(bueno) == {"tag": "KL", "name": "Kappa Logistics", "color": "#3B9EFF", "mode": "vtc"}
+    assert main.clean_vtc({**bueno, "color": "red"})["color"] is None
+    assert main.clean_vtc({**bueno, "color": "#3b9eff;x"})["color"] is None
+    assert main.clean_vtc({**bueno, "name": None})["name"] == ""
+    assert len(main.clean_vtc({**bueno, "name": "x" * 500})["name"]) == main.VTC_NAME_MAX
+    for malo in (None, "KL", [], {}, {**bueno, "tag": "<b>"}, {**bueno, "tag": "KL\n"}, {**bueno, "tag": "123456789"},
+                 {**bueno, "tag": 1}, {**bueno, "mode": "otro"}, {**bueno, "mode": None}, {"tag": "KL"}):
+        assert main.clean_vtc(malo) is None, malo
+
+
+def test_el_chip_de_la_vtc_le_llega_al_cliente(client, main):
+    """El tablero pide el modo y el cliente lo cambia en la API. Un cliente
+    viejo no manda la empresa: el tablero no muestra nada."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as cliente, \
+            client.websocket_connect(f"/ws/live/{code}") as tablero, \
+            client.websocket_connect(f"/ws/live/{code}?role=plan") as lan:
+        lan.send_text(main.json.dumps({"type": "set_vtc_mode", "mode": "vtc"}))  # la de plan no
+        tablero.send_text(main.json.dumps({"type": "set_vtc_mode", "mode": "personal"}))
+        assert _hasta_tipo(cliente, main, "set_vtc_mode") == {"type": "set_vtc_mode", "mode": "personal"}
+        cliente.send_text(main.json.dumps({"type": "client_status", "status": "live", "game": "ets2"}))
+        assert _hasta_tipo(tablero, main, "client_status")["status"] == "live"
+        assert main.sessions[code].last_client_status["vtc"] is None
 
 
 def test_client_status_detail_acotado(client, main):
@@ -1975,3 +2004,180 @@ def test_admin_stats_trae_los_conductores(client, main):
     body = client.get("/admin/stats", headers={"X-Admin-Key": "test-admin-key"}).json()
     assert body["drivers"]["last_24h"] == 1 and body["drivers"]["today"] == 1
     assert body["drivers"]["full_window"] is False and isinstance(body["drivers"]["daily"], dict)
+
+
+# ------------------------------------------------------------ mapa de las VTC
+
+VTC_CLAVE = "clave-de-prueba"
+VTC_ID = "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b"
+# El mismo ejemplo que tests/test_vtc_pase.py de truckdash-loginapp: firmado
+# alla con esta clave, vence en 1795810320.
+VTC_EJEMPLO = ("eyJjIjoiI2ZmOGEzZCIsImV4cCI6MTc5NTgxMDMyMCwiaG4iOmZhbHNlLCJtb2RlIjoidnRjIiwibiI6ImFuYSIsIm91dCI6ZmFsc2Us"
+               "InB1YiI6Im5hbWVzIiwicmMiOm51bGwsInJuIjpudWxsLCJ0YWciOiJLTCIsInUiOiJ1MSIsInYiOjEsInZ0YyI6InYxIn0"
+               ".14oxB99wKRitQvO--qe5Fw9pyMlmId97Q8_F5IJkgo4")
+
+
+def _pase(main, **contenido):
+    """Un pase como los de la API (vtc_pase.firmar), vigente 12 minutos."""
+    import base64, hashlib, hmac
+    datos = {"u": "u1", "n": "ana", "vtc": VTC_ID, "tag": "KL", "c": "#ff8a3d", "rn": "Driver", "rc": "#88aaff",
+             "mode": "vtc", "pub": "off", "out": False, "hn": False, "v": 1, "exp": int(main.time.time()) + 720}
+    datos.update(contenido)
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+    cuerpo = b64(main.json.dumps(datos, separators=(",", ":"), sort_keys=True).encode())
+    return cuerpo + "." + b64(hmac.new(VTC_CLAVE.encode(), cuerpo.encode(), hashlib.sha256).digest())
+
+
+def _chofer(main, code, **contenido):
+    s = main.Session(code)
+    s.vtc_pass = main.vtc_pass_valido(_pase(main, **contenido), main.time.time())
+    s.last_game = "ets2"
+    s.last_position = {"x": 12345.678, "z": -6789.12, "ts": main.time.time()}
+    s.last_summary = {"heading": 1.5, "speedKmh": 80, "cargo": "Cement", "citySrc": "Berlin", "cityDst": "Praha"}
+    main.sessions[code] = s
+    return s
+
+
+@pytest.fixture
+def con_clave_vtc(main, monkeypatch):
+    monkeypatch.setattr(main, "VTC_PASS_KEY", VTC_CLAVE)
+
+
+def test_el_pase_de_la_api_verifica_aca(main, con_clave_vtc):
+    datos = main.vtc_pass_valido(VTC_EJEMPLO, 1795810320 - 60)
+    assert (datos["n"], datos["vtc"], datos["pub"], datos["mode"]) == ("ana", "v1", "names", "vtc")
+    assert main.vtc_pass_valido(VTC_EJEMPLO, 1795810320) is None  # vencido
+    cuerpo, firma = VTC_EJEMPLO.split(".")
+    for roto in (cuerpo + "." + firma[:-2] + "AA", cuerpo + "x." + firma, "nada", None, 7):
+        assert main.vtc_pass_valido(roto, 1795810320 - 60) is None
+    main.VTC_PASS_KEY = "otra"
+    assert main.vtc_pass_valido(VTC_EJEMPLO, 1795810320 - 60) is None
+
+
+def test_el_pase_lo_manda_el_cliente_y_no_le_llega_al_tablero(client, main, con_clave_vtc):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/live/{code}") as viewer:
+        viewer.receive_text(); viewer.receive_text()
+        with client.websocket_connect(f"/ws/client/{code}") as cliente:
+            viewer.receive_text()
+            cliente.receive_text(); cliente.receive_text()
+            cliente.send_text(main.json.dumps({"type": "vtc_pass", "pass": _pase(main)}))
+            cliente.send_text(main.json.dumps({"type": "probe"}))
+            # Lo siguiente que ve el tablero es lo que vino despues, no el pase
+            assert main.json.loads(viewer.receive_text())["type"] == "probe"
+            assert main.sessions[code].vtc_pass["n"] == "ana"
+            cliente.send_text(main.json.dumps({"type": "vtc_pass", "pass": None}))
+            cliente.send_text(main.json.dumps({"type": "probe"}))
+            assert main.json.loads(viewer.receive_text())["type"] == "probe"
+            assert main.sessions[code].vtc_pass is None
+
+
+def _espectador(client, main, saludo):
+    ws = client.websocket_connect(f"/ws/vtcmap/{VTC_ID}")
+    conexion = ws.__enter__()
+    conexion.send_text(main.json.dumps(saludo))
+    return ws, conexion
+
+
+def test_los_miembros_ven_a_todos_con_nombre(client, main, con_clave_vtc):
+    _chofer(main, "AAAA1111", hn=True, out=True)
+    _chofer(main, "BBBB2222", n="juan", mode="personal")      # personal: nadie lo ve
+    _chofer(main, "CCCC3333", n="otro", vtc="9" * 36)          # de otra empresa
+    with client.websocket_connect(f"/ws/vtcmap/{VTC_ID}") as ws:
+        ws.send_text(main.json.dumps({"type": "hello", "pass": _pase(main, n="eva")}))
+        msg = main.json.loads(ws.receive_text())
+    assert msg["type"] == "vtc_players" and msg["view"] == "members"
+    assert len(msg["players"]) == 1
+    p = msg["players"][0]
+    assert (p["name"], p["rank"], p["game"], p["x"], p["cargo"], p["cityDst"]) == ("ana", "Driver", "ets2", 12345.7, "Cement", "Praha")
+    assert p["id"] != main.sessions["AAAA1111"].public_id
+
+
+def test_lo_publico_segun_la_empresa(client, main, con_clave_vtc):
+    def publico():
+        with client.websocket_connect(f"/ws/vtcmap/{VTC_ID}") as ws:
+            ws.send_text(main.json.dumps({"type": "hello"}))
+            msg = main.json.loads(ws.receive_text())
+        assert msg["view"] == "public"
+        return msg["players"]
+
+    s = _chofer(main, "AAAA1111", pub="off")
+    assert publico() == []
+    s.vtc_pass["pub"] = "anonymous"
+    assert publico() == [{"game": "ets2", "x": 12250, "z": -6750}]
+    s.vtc_pass["pub"] = "names"
+    assert publico()[0]["name"] == "ana"
+    s.vtc_pass["hn"] = True
+    assert publico()[0]["name"] is None
+    s.vtc_pass["out"] = True
+    assert publico() == []
+
+
+def test_el_mapa_de_la_empresa_sigue_en_cada_tick(client, main, con_clave_vtc):
+    with client.websocket_connect(f"/ws/vtcmap/{VTC_ID}") as ws:
+        ws.send_text(main.json.dumps({"type": "hello", "pass": _pase(main)}))
+        assert main.json.loads(ws.receive_text())["players"] == []
+        _chofer(main, "AAAA1111")
+        main.broadcast_vtc_maps()
+        assert [p["name"] for p in main.json.loads(ws.receive_text())["players"]] == ["ana"]
+        # Sin datos hace rato (cerro el juego): sale
+        main.sessions["AAAA1111"].last_position["ts"] -= main.LIVE_POSITION_STALE_SECONDS + 1
+        main.broadcast_vtc_maps()
+        assert main.json.loads(ws.receive_text())["players"] == []
+
+
+def test_un_pase_ajeno_o_sin_clave_no_entra(client, main, con_clave_vtc):
+    import starlette.websockets
+    for saludo in ({"type": "hello", "pass": _pase(main, vtc="9" * 36)}, {"type": "hello", "pass": "basura"},
+                   {"type": "otra cosa"}):
+        with client.websocket_connect(f"/ws/vtcmap/{VTC_ID}") as ws:
+            ws.send_text(main.json.dumps(saludo))
+            with pytest.raises(starlette.websockets.WebSocketDisconnect) as fin:
+                ws.receive_text()
+        assert fin.value.code == 4401, saludo
+    with client.websocket_connect("/ws/vtcmap/no-es-un-id") as ws:
+        with pytest.raises(starlette.websockets.WebSocketDisconnect) as fin:
+            ws.receive_text()
+    assert fin.value.code == 4404
+    main.VTC_PASS_KEY = ""
+    with client.websocket_connect(f"/ws/vtcmap/{VTC_ID}") as ws:
+        with pytest.raises(starlette.websockets.WebSocketDisconnect) as fin:
+            ws.receive_text()
+    assert fin.value.code == 4503
+    # Y sin clave el pase del cliente no vale
+    assert main.vtc_pass_valido(_pase(main), main.time.time()) is None
+
+
+def test_un_miembro_con_el_pase_vencido_ve_lo_publico(client, main, con_clave_vtc):
+    s = _chofer(main, "AAAA1111", pub="anonymous")
+    with client.websocket_connect(f"/ws/vtcmap/{VTC_ID}") as ws:
+        ws.send_text(main.json.dumps({"type": "hello", "pass": _pase(main)}))
+        assert main.json.loads(ws.receive_text())["view"] == "members"
+        espectador = next(iter(main.vtc_map_spectators[VTC_ID].values()))
+        espectador["exp"] = int(main.time.time()) - 1
+        main.broadcast_vtc_maps()
+        msg = main.json.loads(ws.receive_text())
+        assert msg["view"] == "public" and "name" not in msg["players"][0]
+        # Renovado, otra vez de miembro
+        ws.send_text(main.json.dumps({"type": "hello", "pass": _pase(main)}))
+        ws.send_text("{}")  # otro mensaje para saber que el saludo ya se proceso
+        for _ in range(50):
+            if espectador["exp"] > main.time.time():
+                break
+            main.time.sleep(0.02)
+        main.broadcast_vtc_maps()
+        assert main.json.loads(ws.receive_text())["view"] == "members"
+    assert s.vtc_pass["pub"] == "anonymous"
+
+
+def test_el_juego_se_guarda_de_la_telemetria(client, main):
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as cliente:
+        cliente.receive_text()
+        cliente.send_text(main.json.dumps({"event": {}, "game": "ats", "position": {"x": 1.0, "z": 2.0}}))
+        cliente.send_text(main.json.dumps({"type": "probe"}))
+        for _ in range(50):
+            if main.sessions[code].last_game:
+                break
+            main.time.sleep(0.02)
+    assert main.sessions[code].last_game == "ats" and main.sessions[code].map_variant is None

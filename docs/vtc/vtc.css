@@ -8,6 +8,9 @@
 .vtc-nav a { color: var(--muted); text-decoration: none; }
 .vtc-nav a:hover, .vtc-nav a[aria-current] { color: var(--text); }
 .vtc-pie { max-width: 1120px; margin: 2rem auto 0; }
+.betaTag { display: inline-block; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; background: #ffb020; color: #1a1002; border-radius: 4px; padding: 1px 6px; vertical-align: 0.1em; }
+.beta-aviso { max-width: 1120px; margin: 0.8rem auto 0; padding: 0.55rem 0.8rem; border: 1px solid #5a4410; border-radius: 8px; background: #2a2210; font-size: 0.9rem; line-height: 1.45; }
+.beta-aviso a { color: #ffcf6b; white-space: nowrap; }
 .vtc-pie a { color: var(--muted); }
 #unitSelect, #langSelect { max-width: 9rem; }
 
@@ -230,6 +233,22 @@ dialog.vtc-dialogo .botones { margin-top: 1rem; justify-content: flex-end; }
 .logro-vtc.listo b { color: var(--warn); }
 .logro-vtc .linea { display: flex; justify-content: space-between; gap: 0.8rem; }
 .logro-vtc .linea span { color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+
+/* Mapa de viajes de la empresa (mapa.js) */
+.mapa-caja-vtc { position: relative; height: min(62vh, 560px); min-height: 300px; margin: 0.6rem 0 0.4rem;
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #1b1e23; }
+/* Mas especifico que .maplibregl-map (position: relative), que se carga despues */
+.mapa-caja-vtc > .mapa-vtc { position: absolute; inset: 0; }
+.mapa-aviso-vtc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0;
+  padding: 1rem; text-align: center; color: var(--muted); background: rgba(13, 15, 18, 0.55); pointer-events: none; }
+.leyenda-vtc { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.4rem 0; }
+.chofer-mapa { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 32px; padding: 0.25rem 0.65rem;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); font: inherit; font-size: 0.86rem; cursor: pointer; }
+.chofer-mapa:hover { border-color: var(--muted); }
+.chofer-mapa[aria-pressed="true"] { border-color: var(--c, var(--vtc)); background: var(--panel); }
+.chofer-mapa:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chofer-mapa .muestra { width: 0.9rem; height: 0.3rem; border-radius: 2px; background: var(--c); flex: none; }
+.chofer-mapa .muted { font-size: 0.8rem; }
 
 @media (max-width: 820px) { .dos { grid-template-columns: minmax(0, 1fr); gap: 0; } }
 @media (max-width: 640px) {

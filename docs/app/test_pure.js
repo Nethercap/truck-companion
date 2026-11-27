@@ -491,6 +491,54 @@ test('maneuver: la cruz con el brazo de enfrente oculto se anuncia aunque la cal
   assert.equal(detectManeuver({ ...vuelta, stubs: tocos }).quiet, true);
 });
 
+test('maneuver: la T con la otra calle oculta se anuncia, aunque el palo se curve antes de la barra (Odense -> Kiel)', () => {
+  // Se entra por el palo (nodo 1), que sube 32 m, y en la barra la ruta dobla
+  // a la izquierda hasta el nodo 4. El brazo derecho (nodo 6) sigue por una
+  // calle oculta: es un toco, que solo se une a los otros brazos del prefab.
+  // A 60 m la ruta dobla 31 grados.
+  const T = (tocoLinea, extra = {}) => {
+    const route = [[0, -300], [0, 0], [0, 32], [-8, 40], [-60, 42], [-300, 45]];
+    const s = scenario({ route, extraNodes: [tocoLinea[tocoLinea.length - 1]], edges: [[1, 6], [6, 4], [4, 6]] });
+    const lineas = { '1>6': tocoLinea };
+    const edgeLine = (a, b) => lineas[`${a}>${b}`] || [s.nodes[a], s.nodes[b]];
+    return { ...s, edgeLine, stubs: [0, 0, 0, 0, 0, 0, 1], ...extra };
+  };
+  const derecha = [[0, 0], [0, 32], [10, 40], [55, 42]];
+  const m = detectManeuver(T(derecha));
+  assert.deepEqual([m.kind, m.direction, m.quiet, m.stubTee, m.at], ['turn', 'left', false, true, 1]);
+  // sin los tocos (un grafo sin -prefabs.bin) o sin la curva de cada arista, como antes
+  assert.equal(detectManeuver(T(derecha, { stubs: undefined })), null);
+  assert.equal(detectManeuver(T(derecha, { edgeLine: undefined })), null);
+  // un brazo muerto que no es un toco (el otro lado de un rombo, un callejon) no cuenta
+  assert.equal(detectManeuver(T(derecha, { stubs: [0, 0, 0, 0, 0, 0, 0] })), null);
+  // el toco de enfrente (la T de Tulsa) sigue callado
+  assert.equal(detectManeuver(T([[0, 0], [0, 32], [0, 60], [1, 100]])), null);
+  // y el que se va para el mismo lado que la ruta, tambien
+  assert.equal(detectManeuver(T([[0, 0], [0, 32], [-6, 50], [-14, 90]])), null);
+  assert.equal(detectManeuver(T([[0, 0], [0, 32], [-6, 34], [-40, 10]])), null);
+  // una rotonda compacta con los otros brazos ocultos: la curva del toco a la
+  // salida rodea la isla (Bilbao, Innsbruck -> Zurich); "turn left" ahi es pasar
+  // derecho
+  const rotonda = T(derecha);
+  const isla = [[55, 42], [50, 62], [30, 80], [0, 85], [-25, 75], [-35, 55], [-40, 45], [-60, 42]];
+  const recta = rotonda.edgeLine;
+  rotonda.edgeLine = (a, b) => (a === 6 && b === 4 ? isla : recta(a, b));
+  assert.equal(detectManeuver(rotonda), null);
+  // una calle de verdad en el brazo derecho: decide la regla de siempre, no esta
+  const conCalle = T(derecha);
+  conCalle.adjacency.get(6).push([7]);
+  conCalle.nodes.push([400, 50]);
+  const r = detectManeuver(conCalle);
+  assert.ok(!r || !r.stubTee);
+  // una curva suave con una entrada del otro lado no es una T: la ruta dobla
+  // 30 grados donde se separa el toco
+  const curva = scenario({ route: [[0, -300], [0, 0], [0, 30], [-12, 60], [-60, 140]], extraNodes: [[40, 50]], edges: [[1, 5], [5, 3]] });
+  assert.equal(detectManeuver({ ...curva, edgeLine: (a, b) => (a === 1 && b === 5 ? [[0, 0], [0, 30], [8, 38], [40, 50]] : [curva.nodes[a], curva.nodes[b]]), stubs: [0, 0, 0, 0, 0, 1] }), null);
+  // ni una esquina de 42 grados: menos que stubTeeDeg
+  const abierta = scenario({ route: [[0, -300], [0, 0], [0, 30], [-27, 60], [-160, 208]], extraNodes: [[40, 50]], edges: [[1, 5], [5, 3]] });
+  assert.equal(detectManeuver({ ...abierta, edgeLine: (a, b) => (a === 1 && b === 5 ? [[0, 0], [0, 30], [8, 38], [40, 50]] : [abierta.nodes[a], abierta.nodes[b]]), stubs: [0, 0, 0, 0, 0, 1] }), null);
+});
+
 test('continuesTurn: una esquina partida en dos nodos se anuncia una vez; dos giros de verdad, dos', () => {
   const prev = { direction: 'left', inBearing: 0, outBearing: 315, quiet: false, end: 1000 };
   // segunda mitad de la misma esquina: de la entrada (norte) a la salida (oeste) son 90 grados
@@ -1779,6 +1827,52 @@ test('detectRoundabout: anillo de un sentido, cuenta las salidas hasta la de la 
   assert.equal(detectRoundabout({ ...rutaPor(nodos, [sur, 0, 1, 2, este]), i: 1, iEnd: 1, ...g2, bearingBetween: planarBearing }), null);
 });
 
+test('detectRoundabout: la rotonda de tres brazos con uno oculto, con la geometria del grafo (Zurich, reporte #63)', () => {
+  const { detectRoundabout } = require('./pure.js');
+  // El prefab mod_ger_71 de ETS2 (-4320,18540), con +y al norte: se entra por
+  // el brazo sur (1) y se sale por el oeste (2); el noreste (4) es un toco,
+  // con la calle oculta. Desde la entrada la curva al toco dobla una vez y la
+  // de la ruta rodea media isla: no llegaban a las dos curvas que rodean.
+  const lineas = {
+    '0>1': [[98.4, -55.9], [86.5, -47.9], [73.2, -41.7], [59.1, -36.4], [44.8, -31.5], [31.1, -26], [18.6, -19.5], [8, -11], [0, 0]],
+    '1>0': [[0, 0], [8, -11], [18.6, -19.5], [31.1, -26], [44.8, -31.5], [59.1, -36.4], [73.2, -41.7], [86.5, -47.9], [98.4, -55.9]],
+    '1>4': [[0, 0], [-6, 16.3], [-5.4, 29.1], [15.5, 48.7]],
+    '1>2': [[0, 0], [-9.5, 40.4], [-16.9, 43.6], [-36.8, 39.7], [-51.1, 43]],
+    '4>1': [[15.5, 48.7], [0.4, 43], [-20.4, 43.4], [-27.7, 35], [-25.3, 23.9], [-12.7, 17], [0, 0]],
+    '4>2': [[15.5, 48.7], [-0.2, 42.4], [-28.7, 39.6], [-51.1, 43]],
+    '2>3': [[-51.1, 43], [-60.7, 47.7], [-68.9, 54.8], [-75.7, 63.7], [-81.2, 74.1], [-85.4, 85.5], [-88.3, 97.3], [-90.1, 109.1], [-90.8, 120.4]],
+    '2>4': [[-51.1, 43], [-36.1, 36.6], [-24.1, 23.2], [-16.8, 21.1], [-9, 24.1], [-1.1, 36.5], [15.5, 48.7]],
+    '2>1': [[-51.1, 43], [-35.4, 36.4], [-22.7, 22.7], [-12.9, 18], [0, 0]],
+  };
+  const nodos = [[98.4, -55.9], [0, 0], [-51.1, 43], [-90.8, 120.4], [15.5, 48.7]];
+  const largo = (l) => l.reduce((acc, p, k) => (k ? acc + Math.hypot(p[0] - l[k - 1][0], p[1] - l[k - 1][1]) : 0), 0);
+  const adjacency = new Map();
+  for (const [clave, l] of Object.entries(lineas)) {
+    const [a, b] = clave.split('>').map(Number);
+    if (!adjacency.has(a)) adjacency.set(a, []);
+    adjacency.get(a).push([b, largo(l)]);
+  }
+  const edgeLine = (a, b) => lineas[`${a}>${b}`] || null;
+  const pts = [];
+  const tramo = (a, b) => lineas[`${a}>${b}`].forEach((p, k, l) => {
+    if (k === 0 && pts.length) return;
+    const nodo = k === 0 ? a : k === l.length - 1 ? b : null;
+    pts.push([p[0], p[1], 0, nodo === 1 || nodo === 2 ? 1 : 0, nodo]);
+  });
+  tramo(0, 1); tramo(1, 2); tramo(2, 3);
+  const { cum, pointAt } = routeMetrics(pts);
+  const i = pts.findIndex(p => p[4] === 1);
+  const ctx = { pts, cum, pointAt, i, iEnd: i, adjacency, nodeAt: (n) => nodos[n], edgeLine, bearingBetween: planarBearing };
+  // sin los tocos, como antes: no es una rotonda
+  assert.equal(detectRoundabout(ctx), null);
+  // con el toco: la rotonda, y la salida de la ruta es la segunda (el toco es la primera)
+  const r = detectRoundabout({ ...ctx, stubs: [0, 0, 0, 0, 1] });
+  assert.deepEqual([r.exit, r.enter, r.leave], [2, i, pts.findIndex(p => p[4] === 2)]);
+  // y la T con la calle oculta no se la toma: sus curvas rodean la isla
+  const m = detectManeuver({ ...ctx, nodes: nodos, nodeXY: (n) => nodos[n], stubs: [0, 0, 0, 0, 1] });
+  assert.ok(!m || !m.stubTee);
+});
+
 test('detectRoundabout: la salida que se abre en el mismo nodo de la entrada es la primera (Discord, 15-10)', () => {
   const { detectRoundabout } = require('./pure.js');
   // rotonda de 4 brazos como la del nodo 9654 de ATS: anillo antihorario de
@@ -1950,6 +2044,14 @@ test('detectRoundabout: rotonda compacta de un prefab, las salidas por el largo 
   const recta = (a, b) => [nodos[a], [0, 0], nodos[b]];
   assert.equal(detectRoundabout({ ...ctx([sur, 0, 2, norte]), edgeLine: recta }), null);
   assert.equal(detectRoundabout({ ...ctx([sur, 0, 3, oeste]), edgeLine: recta }), null);
+  // el brazo este sin calle en el grafo (oculta en el mapa del juego): sin los
+  // tocos el norte era la primera salida; con ellos, la segunda, como se ve
+  // (Frederikshavn -> Hirtshals, ETS2, decia "primera salida" por la tercera)
+  adjacency.set(1, adjacency.get(1).filter(([n]) => n < 4));
+  assert.equal(detectRoundabout(ctx([sur, 0, 2, norte])).exit, 1);
+  const tocos = nodos.map((_, k) => (k === 1 ? 1 : 0));
+  assert.equal(detectRoundabout({ ...ctx([sur, 0, 2, norte]), stubs: tocos }).exit, 2);
+  assert.equal(detectRoundabout({ ...ctx([sur, 0, 3, oeste]), stubs: tocos }).exit, 3);
 });
 
 test('voiceManeuverKey: rotonda hasta la octava salida, despues hacia que lado', () => {
@@ -5150,6 +5252,36 @@ test('codigo recordado: /app sin ?code= se conecta con el ultimo que el relay ac
   }
 });
 
+test('link de convoy: con el codigo guardado entra a manejar, sin el mira (Discord 27-11)', () => {
+  const { convoyLinkStart, convoyDriverUrl, pairingCodeToSave } = require('./pure.js');
+  const RELAY = 'wss://truck-companion-production.up.railway.app';
+  const saved = pairingCodeToSave('ABCD2345', RELAY);
+  // El link de "Copy link" en el navegador de quien ya uso la app: se conecta con su
+  // codigo y abre la ventana del convoy (antes quedaba de espectador y no aparecia)
+  assert.deepEqual(convoyLinkStart('?convoy=qwerty', saved, RELAY), { convoy: 'QWERTY', mode: 'join', pairing: 'ABCD2345' });
+  // Sin codigo guardado, de otro relay o basura: espectador, como antes
+  for (const s of [null, '', '{', pairingCodeToSave('ABCD2345', 'ws://localhost:8000')]) {
+    assert.deepEqual(convoyLinkStart('?convoy=QWERTY', s, RELAY), { convoy: 'QWERTY', mode: 'spectator', pairing: null }, String(s));
+  }
+  // Con ?code= o en la copia LAN se conecta como siempre (en LAN el convoy avisa que no anda)
+  assert.deepEqual(convoyLinkStart('?code=WXYZ6789&convoy=QWERTY', saved, RELAY), { convoy: 'QWERTY', mode: 'join', pairing: null });
+  assert.deepEqual(convoyLinkStart('?local=1&convoy=QWERTY', null, RELAY), { convoy: 'QWERTY', mode: 'join', pairing: null });
+  // No es un link de convoy
+  for (const search of ['', '?code=WXYZ6789', '?convoy=', '?convoy=%20']) assert.equal(convoyLinkStart(search, saved, RELAY), null, search);
+
+  // De espectador a conductor: la misma pagina con los dos codigos, sin perder ?lang= ni ?backend=
+  const url = new URL(convoyDriverUrl('https://trucksim-dash.com/app/?convoy=QWERTY&lang=es#x', ' abcd2345 ', 'qwerty'));
+  assert.equal(url.pathname, '/app/');
+  assert.equal(url.searchParams.get('code'), 'ABCD2345');
+  assert.equal(url.searchParams.get('convoy'), 'QWERTY');
+  assert.equal(url.searchParams.get('lang'), 'es');
+  assert.equal(url.hash, '');
+  // Y ese link ya no es de espectador
+  assert.equal(convoyLinkStart(url.search, null, RELAY).mode, 'join');
+  for (const bad of ['', 'DEMO', 'ABCD234', null]) assert.equal(convoyDriverUrl('https://trucksim-dash.com/app/?convoy=QWERTY', bad, 'QWERTY'), null, String(bad));
+  assert.equal(convoyDriverUrl('https://trucksim-dash.com/app/', 'ABCD2345', ''), null);
+});
+
 test('vista de cabina: la flecha grande sale de la maniobra', () => {
   const { turnIconShape, turnIconHtml, LANE_PATHS } = require('./pure.js');
   assert.deepEqual(turnIconShape('straight'), { shape: 'straight' });
@@ -7279,6 +7411,136 @@ test('turnReportBusLine: la tabla de paradas del cliente en el turn report (repo
   const txt = turnReportText({ ...base, job: 'Job: market company_job', bus: turnReportBusLine(linea) });
   assert.ok(txt.includes('\nJob: market company_job\nBus: stage 2 of 3, 5 updates: '));
   assert.ok(!turnReportText(base).includes('Bus:'));
+});
+
+// --- La empresa virtual (VTC) de quien maneja (client/vtc.py) ---
+
+test('vtcOf: lo que manda el cliente, acotado', () => {
+  const { vtcOf } = require('./pure.js');
+  const kl = { tag: 'KL', name: ' Kappa  Logistics ', color: '#3B9eff', mode: 'vtc' };
+  assert.deepEqual(vtcOf(kl), { tag: 'KL', name: 'Kappa Logistics', color: '#3B9eff', mode: 'vtc' });
+  assert.equal(vtcOf({ ...kl, color: 'red;background:url(x)' }).color, null);
+  assert.equal(vtcOf({ ...kl, name: 7 }).name, '');
+  assert.equal(vtcOf({ ...kl, name: 'x'.repeat(99) }).name.length, 40);
+  for (const malo of [undefined, null, '', 'KL', 1, [], {}, { ...kl, tag: '<img>' }, { ...kl, tag: 'KL\n' }, { ...kl, tag: '' },
+    { ...kl, tag: '123456789' }, { ...kl, mode: 'otro' }, { ...kl, mode: undefined }]) assert.equal(vtcOf(malo), null);
+});
+
+test('vtcChipView: con empresa y cliente conectado; al tocarlo pide el otro modo, explicito', () => {
+  const { vtcChipView } = require('./pure.js');
+  const kl = { tag: 'KL', name: 'Kappa Logistics', color: '#3b9eff', mode: 'vtc' };
+  assert.deepEqual(vtcChipView(kl, true), { mode: 'vtc', label: '[KL]', titleKey: 'vtcChipTitle', company: '[KL] Kappa Logistics', color: '#3b9eff', next: 'personal' });
+  assert.deepEqual(vtcChipView({ ...kl, mode: 'personal' }, true), { mode: 'personal', label: null, titleKey: 'vtcChipTitlePersonal', company: '[KL] Kappa Logistics', color: null, next: 'vtc' });
+  assert.equal(vtcChipView({ ...kl, name: '' }, true).company, '[KL]');
+  assert.equal(vtcChipView(null, true), null);
+  for (const sinCliente of [false, null, undefined]) assert.equal(vtcChipView(kl, sinCliente), null);
+});
+
+test('createVtcModeRequest: hecho, no se pudo o no contesto', () => {
+  const { createVtcModeRequest, VTC_MODE_TIMEOUT_MS } = require('./pure.js');
+  const kl = (mode) => ({ tag: 'KL', name: '', color: null, mode });
+  const p = createVtcModeRequest();
+  // sin un pedido de aca, el cambio de otro dispositivo o su error no avisan nada
+  assert.equal(p.pending(), null);
+  assert.equal(p.onVtc(kl('personal')), false);
+  assert.equal(p.onFail(), false);
+  assert.equal(p.expired(1e9), false);
+  p.start('personal', 1000);
+  assert.equal(p.pending(), 'personal');
+  assert.equal(p.onVtc(kl('vtc')), false); // otro client_status, con el modo de antes
+  assert.equal(p.onVtc(null), false);
+  assert.equal(p.onVtc(kl('personal')), true);
+  assert.equal(p.pending(), null);
+  assert.equal(p.onVtc(kl('personal')), false); // una vez sola
+  p.start('vtc', 1000);
+  assert.equal(p.onFail(), true);
+  assert.equal(p.pending(), null);
+  p.start('vtc', 1000);
+  assert.equal(p.expired(1000 + VTC_MODE_TIMEOUT_MS - 1), false);
+  assert.equal(p.expired(1000 + VTC_MODE_TIMEOUT_MS), true);
+  assert.equal(p.pending(), null);
+  assert.equal(p.expired(1e9), false);
+});
+
+test('createVtcJobNotice: "este trabajo es personal", una vez por trabajo tomado', () => {
+  const { createVtcJobNotice } = require('./pure.js');
+  const personal = { tag: 'KL', name: '', color: null, mode: 'personal' };
+  const propia = { ...personal, mode: 'vtc' };
+  const libre = { game: 'ets2', onJob: false, event: {} };
+  const job = { game: 'ets2', onJob: true, citySrcId: 'berlin', cityDstId: 'lyon', cityDst: 'Lyon', cargo: 'Cheese', plannedDistanceKm: 900, jobIncome: 20000, event: {} };
+  const otro = { ...job, cityDstId: 'wien', cityDst: 'Wien' };
+  const entrega = { ...job, event: { jobDelivered: true } };
+
+  let a = createVtcJobNotice();
+  assert.equal(a.push(libre, personal), false);
+  assert.equal(a.push(job, personal), true);
+  assert.equal(a.push(job, personal), false); // el mismo, en cada dato
+  assert.equal(a.push(libre, personal), false); // volver a cargar la partida
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(otro, personal), true); // otro trabajo
+  assert.equal(a.push({ ...otro, event: { jobCancelled: true } }, personal), false);
+  assert.equal(a.push(libre, personal), false);
+  assert.equal(a.push(otro, personal), true); // el mismo viaje otra vez, despues de cancelar
+
+  // con los trabajos para la empresa, nada; y pasar a personal en el medio es a proposito
+  a = createVtcJobNotice();
+  a.push(libre, propia);
+  assert.equal(a.push(job, propia), false);
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(entrega, personal), false);
+  assert.equal(a.push(libre, personal), false);
+  assert.equal(a.push(job, personal), true);
+
+  // abrir la pagina en medio de un trabajo no es tomarlo
+  a = createVtcJobNotice();
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(otro, personal), true);
+
+  // sin empresa no se mira nada: la que llega con el trabajo tomado no avisa
+  a = createVtcJobNotice();
+  assert.equal(a.push(libre, null), false);
+  assert.equal(a.push(job, null), false);
+  assert.equal(a.push(job, personal), false);
+
+  // onJob sin el resto todavia (los primeros datos de un trabajo) espera; un cliente sin onJob, nunca
+  a = createVtcJobNotice();
+  a.push(libre, personal);
+  assert.equal(a.push({ game: 'ets2', onJob: true, event: {} }, personal), false);
+  assert.equal(a.push(job, personal), true);
+  a = createVtcJobNotice();
+  a.push({ game: 'ets2' }, personal);
+  assert.equal(a.push({ ...job, onJob: undefined }, personal), false);
+  assert.equal(a.push(null, personal), false);
+});
+
+test('createVtcJobNotice: un bus cambia de destino en cada parada y sigue siendo el mismo trabajo', () => {
+  const { createVtcJobNotice, vtcJobKey } = require('./pure.js');
+  const personal = { tag: 'KL', name: '', color: null, mode: 'personal' };
+  const bus = (stage, fin = 'lyon') => ({ game: 'ets2', onJob: true, event: {}, plannedDistanceKm: 700, jobIncome: 9000, cityDstId: ['wien', 'graz', fin][stage], cityDst: 'x',
+    bus: { stage, stages: 3, stops: ['berlin', 'wien', 'graz', fin].map(id => ({ type: 'city', id, name: id })) } });
+  const a = createVtcJobNotice();
+  a.push({ game: 'ets2', onJob: false, event: {} }, personal);
+  assert.equal(a.push(bus(0), personal), true);
+  assert.equal(a.push(bus(1), personal), false);
+  assert.equal(a.push(bus(2), personal), false);
+  assert.equal(a.push(bus(0, 'roma'), personal), true);
+  assert.equal(vtcJobKey({ game: 'ets2', onJob: false }), null);
+});
+
+test('los textos de la empresa virtual estan en los ocho idiomas', () => {
+  const fs = require('fs');
+  const vm = require('vm');
+  const ctx = vm.createContext({});
+  for (const f of ['i18n_en_es.js', 'i18n.js']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, f), 'utf8'), ctx);
+  const textos = vm.runInContext('({ ...TRANSLATIONS, ...TRANSLATIONS_EXTRA })', ctx);
+  const conVtc = ['vtcChipTitle', 'vtcChipTitlePersonal', 'vtcModeNow', 'vtcModeNowPersonal', 'vtcJobPersonal'];
+  assert.equal(Object.keys(textos).length, 8);
+  for (const [lang, d] of Object.entries(textos)) {
+    for (const clave of [...conVtc, 'vtcPersonal', 'vtcJobCount', 'vtcModeFailed']) assert.ok(d[clave], `${lang}: ${clave}`);
+    for (const clave of conVtc) assert.ok(d[clave].includes('{vtc}'), `${lang}: ${clave}`);
+    if (lang !== 'en') assert.notEqual(d.vtcModeFailed, textos.en.vtcModeFailed, lang);
+  }
 });
 
 // Trabajo de bus del DLC Coaches como lo manda el cliente (client/trabajo_bus.py),
