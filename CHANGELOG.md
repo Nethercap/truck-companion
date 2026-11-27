@@ -15,6 +15,8 @@ updates on its own and is not versioned here.
 - Virtual companies (beta): if your account is in one, Setup and the tray menu have a "Jobs for"
   selector (the company or personal), and the dashboard shows it as a chip on the trip card that you
   can tap. It also tells you when you take a job while in Personal.
+- Virtual companies: while you drive for your company, you show up on its live map, also in LAN
+  mode. In Personal you don't show up on any map.
 
 ## 1.5.49 (2026-11-25)
 

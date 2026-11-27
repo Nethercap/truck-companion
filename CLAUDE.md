@@ -82,6 +82,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `pintarEmpresa`). El CSS de MapLibre se carga despues y pone `position: relative` a
   `.maplibregl-map`: un contenedor con `position: absolute` necesita un selector mas
   especifico, o queda de alto 0 y el mapa se dibuja escondido.
+- Mapa en vivo de la empresa (27-11, decisiones 4 y 5 del plan): la API firma un pase de
+  12 minutos (`vtc_pase.py` de truckdash-loginapp, en `/vtc/me?live_pass=1`) con la clave
+  `VTC_PASS_KEY`, que va igual en los dos servicios de Railway (API y relay). El cliente lo
+  lee con la misma consulta de siempre (`client/vtc.py`, cada 5 min con el juego) y lo manda
+  al relay como `{"type": "vtc_pass"}` solo en modo empresa (`pase_para_relay`); el relay lo
+  verifica (`vtc_pass_valido`, copia de la de la API con un ejemplo comun en las dos pruebas),
+  no lo reenvia a las pestanas y sirve `/ws/vtcmap/{id de la empresa}`: con el pase de un
+  miembro, todos con nombre; sin pase, lo publico segun `pub` del pase (apagado, anonimo a
+  250 unidades del mundo, o con nombres salvo `out`, y sin nombre con `hn`). Sin la clave,
+  4503. El cliente siempre habla con el relay, tambien en modo LAN: no hizo falta nada para
+  la decision 5. La pestana Live proyecta en el navegador (`aLngLat` de `mapa.js`, la forma
+  cerrada de `proyeccion.py` de la API, probada con sus mismos valores de proj4).
 - Entrar desde `/vtc/` deja en sessionStorage a donde volver (`truckdash_volver`,
   30 minutos) y `account.js` vuelve solo a rutas `/vtc/`.
 
@@ -1014,6 +1026,33 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   en ETS2 (57 y 70 avisos al reves); con el arreglo, 78 y 151 (7 y 3). Los
   que quedan son casi todos recalculando encima del nodo o el mismo giro en
   otro nodo de una cadena de cruces. `--antesDelGiro 0` lo saltea.
+
+## Parser propio, fase 1: lector de archivos (27-11)
+
+- `client/juego/` lee los archivos del juego en Python, sin Node ni modulos
+  nativos: `cityhash` (CityHash64, igual al nativo en 69 vectores de 0 a 299
+  bytes), `archivos` (HashFS v1 y v2, ZIP tambien con firma `AEM!`, carpetas y
+  mods en partes), `sii` (texto, BSII y ScsC, y el locale) y `montaje` (base,
+  DLC y mods, el ultimo gana). Es la fase 1 del plan del 25-11
+  (`plan-independencia-mapas-2026-11-25.md` del taller): todavia no lo usa el
+  armador, solo `partida_gps.py`, que toma de `juego/sii.py` el descifrado y
+  los lectores de .sii (los nombres viejos siguen ahi para sus tests).
+- Las trampas de los mods protegidos son las mismas que resuelve el armador
+  (`builder/README.md`): entradas basura con su motivo en `salteadas`, la
+  lectura flexible de una entrada que no cierra (`leidas_como_truco`), listados
+  guardados como archivo, la tabla de metadatos sin comprimir (el campo cuenta
+  valores de 4 bytes), zlib cortado, deflate sin cabecera (2) y zstd (4, con
+  Python 3.14 o la libreria zstandard; el .exe y CI van con 3.12 y no lo leen).
+  gdeflate (texturas) no: `CompresionNoSoportada` para ese archivo solo.
+- Un caso nuevo de un mod va con su test en `test_juego_archivos.py`, armando
+  el archivo a mano (`armar_v2`, `armar_v1`, `_zip`); CI no tiene el juego. La
+  comparacion contra archivos reales (zipfile de Python para los ZIP y el
+  extractor de WSL para HashFS) y la medicion de tiempo y memoria estan en
+  `validar_lector_scs.py` del taller.
+- No portar codigo de TruckLib ni del Extractor de sk-zk (GPL-2.0, no se puede
+  mezclar con la AGPL-3.0). truckermudgeon/maps (GPL-3.0) y ts-map (MIT) si
+  sirven de referencia, con sus avisos. Solo archivos: nunca la memoria del
+  juego.
 
 ## Reportes de navegacion (25-10)
 
