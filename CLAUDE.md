@@ -75,6 +75,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   aviso de "este trabajo es personal" sale al tomarlo (`createVtcJobNotice`); de un bus la
   clave son las puntas de la linea, porque el destino cambia en cada parada. `/dash/` y la
   app nativa todavia no lo muestran.
+- Pestana Mapa (27-11, etapa 2): los recorridos de los viajes que cuentan para la empresa
+  (`GET /vtc/{tag}/map`, solo miembros; de los personales nada), un color por chofer.
+  `mapa.js` es el mapa de la cuenta (`account.js`, "mapa de todo") sin compartir codigo:
+  MapLibre se carga al abrir la pestana y se cierra al salir (`VtcMapa.cerrar` en
+  `pintarEmpresa`). El CSS de MapLibre se carga despues y pone `position: relative` a
+  `.maplibregl-map`: un contenedor con `position: absolute` necesita un selector mas
+  especifico, o queda de alto 0 y el mapa se dibuja escondido.
 - Entrar desde `/vtc/` deja en sessionStorage a donde volver (`truckdash_volver`,
   30 minutos) y `account.js` vuelve solo a rutas `/vtc/`.
 
