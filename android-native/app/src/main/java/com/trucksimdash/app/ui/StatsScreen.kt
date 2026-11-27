@@ -662,11 +662,50 @@ internal fun FilaViaje(v: Viaje, ajustes: Ajustes, cuenta: CuentaRepo?) {
                 }
                 v.combustible?.takeIf { it > 0 }?.let { FilaDato(stringResource(R.string.combustible), com.trucksimdash.app.core.volumen(it, millas)) }
                 v.dano?.takeIf { it > 0 }?.let { FilaDato(stringResource(R.string.dano_carga), "${com.trucksimdash.app.core.porcentaje(it)} %") }
-                if (cuenta != null) CorregirViaje(v, cuenta)
                 v.multas?.takeIf { it > 0 }?.let { FilaDato(stringResource(R.string.stats_multas), plata(it, v.moneda)) }
+                if (cuenta != null) {
+                    CompartirViaje(v, cuenta, millas)
+                    CorregirViaje(v, cuenta)
+                }
             }
         }
     }
+}
+
+/**
+ * La tarjeta del viaje como imagen (botonCompartir en la cuenta de la web): con el recorrido, que
+ * se pide recien aca.
+ */
+@Composable
+private fun CompartirViaje(v: Viaje, cuenta: CuentaRepo, millas: Boolean) {
+    val contexto = LocalContext.current
+    val alcance = rememberCoroutineScope()
+    var armando by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+    OutlinedButton(
+        enabled = !armando,
+        onClick = {
+            armando = true
+            error = false
+            alcance.launch {
+                val tramos = cuenta.recorridoViaje(v.id)
+                if (tramos == null) {
+                    error = true
+                } else {
+                    val usuario = (cuenta.estado.value as? EstadoCuenta.Vinculada)?.usuario?.nombre
+                    val imagen = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        tarjetaDeViaje(contexto, v, tramos, usuario, millas)
+                    }
+                    val nombre = listOfNotNull(v.ciudadOrigen, v.ciudadDestino).joinToString("-").lowercase()
+                        .replace(Regex("[^a-z0-9]+"), "-").trim('-').ifBlank { "trip" }
+                    compartirImagen(contexto, imagen, "truckdash-$nombre.png")
+                }
+                armando = false
+            }
+        },
+        modifier = Modifier.padding(top = 8.dp),
+    ) { Text(stringResource(R.string.compartir)) }
+    if (error) Text(stringResource(R.string.stats_sin_red), style = MaterialTheme.typography.bodySmall, color = Paleta.Rojo)
 }
 
 @Composable

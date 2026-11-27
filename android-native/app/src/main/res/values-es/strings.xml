@@ -345,4 +345,37 @@
     <string name="fallo_titulo">Truck Dash se cerró de golpe</string>
     <string name="fallo_texto">Podés compartir un informe con quien te pasó esta beta. Lleva el error, el registro reciente de la app y el modelo de tu teléfono, no tu cuenta ni tus códigos.</string>
     <string name="fallo_seguir">Continuar</string>
+
+    <!-- La tarjeta para compartir un viaje o el ano (tarjetaDeViaje y tarjetaDelAno de la cuenta en la web) -->
+    <string name="tarjeta_distancia">Distancia</string>
+    <string name="tarjeta_vehiculo">Vehículo</string>
+    <string name="tarjeta_bus">Bus</string>
+    <string name="tarjeta_tiempo">Tiempo real</string>
+    <string name="tarjeta_estado">Estado</string>
+    <string name="tarjeta_medida">rastreamos %1$s</string>
+    <string name="tarjeta_sin_recorrido">De este viaje no se guardó el recorrido.</string>
+    <string name="tarjeta_ano_titulo">Mi %1$d en la ruta</string>
+    <string name="tarjeta_manejado">manejados este año</string>
+    <string name="tarjeta_vueltas">≈ %1$s vueltas al mundo</string>
+    <string name="tarjeta_al_volante">Al volante</string>
+    <string name="tarjeta_entregas">Entregas</string>
+    <string name="tarjeta_dias_manejados">Días manejados</string>
+    <string name="tarjeta_racha">Racha más larga</string>
+    <string name="tarjeta_recorriste">Recorriste</string>
+    <plurals name="tarjeta_estados">
+        <item quantity="one">%d estado o provincia</item>
+        <item quantity="other">%d estados y provincias</item>
+    </plurals>
+    <plurals name="tarjeta_paises">
+        <item quantity="one">%d país</item>
+        <item quantity="other">%d países</item>
+    </plurals>
+    <plurals name="tarjeta_dias">
+        <item quantity="one">%d día</item>
+        <item quantity="other">%d días</item>
+    </plurals>
+    <!-- "Mover los botones" en el mapa (el modo acomodar de la web) -->
+    <string name="acomodar_ayuda">Arrastrá un bloque para moverlo, y su esquina para cambiarle el tamaño.</string>
+    <!-- La pestana Tablero de antes, al lado del panel Moderno de la web -->
+    <string name="tablero_detallado">Detallado</string>
 </resources>

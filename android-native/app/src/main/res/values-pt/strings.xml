@@ -349,4 +349,37 @@
     <string name="fallo_titulo">O Truck Dash fechou inesperadamente</string>
     <string name="fallo_texto">Você pode compartilhar um relatório com quem lhe passou esta beta. Ele traz o erro, o registro recente do app e o modelo do seu celular, mas não a sua conta nem os seus códigos.</string>
     <string name="fallo_seguir">Continuar</string>
+
+    <!-- La tarjeta para compartir un viaje o el ano (tarjetaDeViaje y tarjetaDelAno de la cuenta en la web) -->
+    <string name="tarjeta_distancia">Distância</string>
+    <string name="tarjeta_vehiculo">Veículo</string>
+    <string name="tarjeta_bus">Ônibus</string>
+    <string name="tarjeta_tiempo">Tempo</string>
+    <string name="tarjeta_estado">Status</string>
+    <string name="tarjeta_medida">registramos %1$s</string>
+    <string name="tarjeta_sin_recorrido">Desta viagem não foi guardado o trajeto.</string>
+    <string name="tarjeta_ano_titulo">Meu %1$d na estrada</string>
+    <string name="tarjeta_manejado">dirigidos neste ano</string>
+    <string name="tarjeta_vueltas">≈ %1$s voltas ao mundo</string>
+    <string name="tarjeta_al_volante">Ao volante</string>
+    <string name="tarjeta_entregas">Entregas</string>
+    <string name="tarjeta_dias_manejados">Dias dirigidos</string>
+    <string name="tarjeta_racha">Maior sequência</string>
+    <string name="tarjeta_recorriste">Visitados</string>
+    <plurals name="tarjeta_estados">
+        <item quantity="one">%d estado ou província</item>
+        <item quantity="other">%d estados e províncias</item>
+    </plurals>
+    <plurals name="tarjeta_paises">
+        <item quantity="one">%d país</item>
+        <item quantity="other">%d países</item>
+    </plurals>
+    <plurals name="tarjeta_dias">
+        <item quantity="one">%d dia</item>
+        <item quantity="other">%d dias</item>
+    </plurals>
+    <!-- "Mover los botones" en el mapa (el modo acomodar de la web) -->
+    <string name="acomodar_ayuda">Arraste um bloco para movê-lo, e o canto dele para mudar o tamanho.</string>
+    <!-- La pestana Tablero de antes, al lado del panel Moderno de la web -->
+    <string name="tablero_detallado">Detalhado</string>
 </resources>

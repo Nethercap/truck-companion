@@ -66,6 +66,7 @@ fun AjustesScreen(
     alReportar: () -> Unit,
     alTeclas: () -> Unit,
     alMapasSinInternet: () -> Unit,
+    alAcomodar: () -> Unit = {},
     alVolver: () -> Unit,
 ) {
     BackHandler { alVolver() }
@@ -85,7 +86,7 @@ fun AjustesScreen(
             TarjetaConexion(estado, sesion)
             TarjetaCompartir(estado, ajustes, prefs, sesion, nav, motor)
             AjustesNavegacion(ajustes, prefs, motor, alReportar)
-            AjustesDelMapa(motor)
+            AjustesDelMapa(motor, ajustes, prefs, alAcomodar)
             TarjetaTeclas(motor, alTeclas)
             TarjetaHistorial(motor)
             TarjetaUnidades(ajustes, prefs, nav, motor)

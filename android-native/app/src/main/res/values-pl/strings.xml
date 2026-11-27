@@ -355,4 +355,43 @@
     <string name="fallo_titulo">Truck Dash nieoczekiwanie się zamknął</string>
     <string name="fallo_texto">Możesz udostępnić raport osobie, od której masz tę wersję beta. Zawiera błąd, ostatni dziennik aplikacji i model telefonu, ale nie Twoje konto ani kody.</string>
     <string name="fallo_seguir">Kontynuuj</string>
+
+    <!-- La tarjeta para compartir un viaje o el ano (tarjetaDeViaje y tarjetaDelAno de la cuenta en la web) -->
+    <string name="tarjeta_distancia">Dystans</string>
+    <string name="tarjeta_vehiculo">Pojazd</string>
+    <string name="tarjeta_bus">Autobus</string>
+    <string name="tarjeta_tiempo">Czas</string>
+    <string name="tarjeta_estado">Status</string>
+    <string name="tarjeta_medida">zapisaliśmy %1$s</string>
+    <string name="tarjeta_sin_recorrido">Dla tej trasy nie zapisano przebiegu.</string>
+    <string name="tarjeta_ano_titulo">Mój rok %1$d w trasie</string>
+    <string name="tarjeta_manejado">przejechane w tym roku</string>
+    <string name="tarjeta_vueltas">≈ %1$s okrążenia Ziemi</string>
+    <string name="tarjeta_al_volante">Za kierownicą</string>
+    <string name="tarjeta_entregas">Dostawy</string>
+    <string name="tarjeta_dias_manejados">Dni za kierownicą</string>
+    <string name="tarjeta_racha">Najdłuższa seria</string>
+    <string name="tarjeta_recorriste">Odwiedzone</string>
+    <plurals name="tarjeta_estados">
+        <item quantity="one">%d stan lub prowincja</item>
+        <item quantity="few">%d stany i prowincje</item>
+        <item quantity="many">%d stanów i prowincji</item>
+        <item quantity="other">%d stanów i prowincji</item>
+    </plurals>
+    <plurals name="tarjeta_paises">
+        <item quantity="one">%d kraj</item>
+        <item quantity="few">%d kraje</item>
+        <item quantity="many">%d krajów</item>
+        <item quantity="other">%d krajów</item>
+    </plurals>
+    <plurals name="tarjeta_dias">
+        <item quantity="one">%d dzień</item>
+        <item quantity="few">%d dni</item>
+        <item quantity="many">%d dni</item>
+        <item quantity="other">%d dni</item>
+    </plurals>
+    <!-- "Mover los botones" en el mapa (el modo acomodar de la web) -->
+    <string name="acomodar_ayuda">Przeciągnij blok, aby go przesunąć, a jego róg, aby zmienić rozmiar.</string>
+    <!-- La pestana Tablero de antes, al lado del panel Moderno de la web -->
+    <string name="tablero_detallado">Szczegółowy</string>
 </resources>

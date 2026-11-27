@@ -37,8 +37,17 @@ class MapasSinInternet(
     private val _estado = MutableStateFlow<Map<String, EstadoBajada>>(emptyMap())
     val estado: StateFlow<Map<String, EstadoBajada>> = _estado.asStateFlow()
 
+    // La URL de R2 de cada mapa bajado que se uso: el puerto de un ferry se lee de ahi (Pedazos).
+    private val bajados = java.util.concurrent.ConcurrentHashMap<String, File>()
+
     init {
-        TilesDeMapa.url = { v -> archivoDe(v).takeIf { it.exists() }?.let { "pmtiles://file://${it.absolutePath}" } ?: v.urlTiles }
+        TilesDeMapa.url = { v ->
+            archivoDe(v).takeIf { it.exists() }?.let {
+                bajados[v.urlTiles] = it
+                "pmtiles://file://${it.absolutePath}"
+            } ?: v.urlTiles
+        }
+        TilesDeMapa.archivoLocal = { url -> bajados[url]?.takeIf { it.exists() } }
     }
 
     private fun archivoDe(v: VarianteMapa) = File(carpeta, "${v.id}-${v.version}.pmtiles")

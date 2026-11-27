@@ -22,7 +22,23 @@ data class MapaRecorrido(
     val regiones: List<Pair<String, Int>>,
     /** La caja de todo lo manejado: oeste, sur, este, norte. */
     val caja: List<Double>?,
+    /** Lo mismo sin GeoJSON, para dibujarlo en la tarjeta del ano: lineas en lng/lat. */
+    val lineas: List<List<Pair<Double, Double>>> = emptyList(),
+    /** Las ciudades, de la mas visitada a la menos (como las manda la API). */
+    val listaCiudades: List<CiudadRecorrido> = emptyList(),
+    /** Cuantos paises o estados se pasaron. */
+    val cuantasRegiones: Int = 0,
 )
+
+@Immutable
+data class CiudadRecorrido(val nombre: String, val visitas: Int, val lng: Double, val lat: Double)
+
+private fun lngLat(p: kotlinx.serialization.json.JsonElement?): Pair<Double, Double>? {
+    val a = p as? JsonArray ?: return null
+    val lng = a.getOrNull(0)?.toString()?.toDoubleOrNull() ?: return null
+    val lat = a.getOrNull(1)?.toString()?.toDoubleOrNull() ?: return null
+    return lng to lat
+}
 
 internal fun parsearMapa(d: JsonObject?): MapaRecorrido? {
     val m = d?.objeto("map") ?: return null
@@ -57,6 +73,13 @@ internal fun parsearMapa(d: JsonObject?): MapaRecorrido? {
         caja = coordenadas.takeIf { it.isNotEmpty() }?.let { c ->
             listOf(c.minOf { it.first }, c.minOf { it.second }, c.maxOf { it.first }, c.maxOf { it.second })
         },
+        lineas = validas.map { l -> (l as JsonArray).mapNotNull(::lngLat) },
+        listaCiudades = ciudades.mapNotNull { fila ->
+            val c = fila.comoObjeto() ?: return@mapNotNull null
+            val (lng, lat) = lngLat(c["lnglat"]) ?: return@mapNotNull null
+            CiudadRecorrido(c.texto("name") ?: c.texto("token") ?: "", c.entero("visits") ?: 1, lng, lat)
+        },
+        cuantasRegiones = m.lista("regions")?.size ?: 0,
     )
 }
 
