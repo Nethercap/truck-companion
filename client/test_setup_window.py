@@ -41,6 +41,17 @@ def raiz():
     r.destroy()
 
 
+@pytest.fixture(autouse=True)
+def _basura_de_tk_en_este_hilo():
+    """La basura de Tk de cada test (las variables de una ventana cerrada) se
+    junta aca, en el hilo principal. Si la junta el hilo de otro test (bajar
+    una actualizacion, armar el mapa), cada Variable.__del__ espera 1 s al
+    loop de Tk, tira "main thread is not in main loop" y el test se queda
+    sin tiempo (en el Windows de CI, 27-11, con la variable de la VTC)."""
+    yield
+    gc.collect()
+
+
 @pytest.fixture
 def ventana(monkeypatch, tmp_path, raiz):
     monkeypatch.setattr(tk, "Tk", lambda: tk.Toplevel(raiz))
