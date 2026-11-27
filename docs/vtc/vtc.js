@@ -1165,6 +1165,8 @@
     $('navAccount').textContent = t('navAccount');
     $('pieTerms').textContent = t('terms');
     $('piePrivacy').textContent = t('privacy');
+    $('betaTexto').textContent = t('betaNotice');
+    $('betaLink').textContent = t('betaFeedback');
   }
 
   async function arrancar() {
@@ -1197,6 +1199,7 @@
       return;
     }
     yo = r.datos;
+    $('betaAviso').hidden = !yo.enabled;
     const tag = tagDeLaDireccion(), codigo = PARAMS.get('invite');
     if (!yo.enabled) vista = () => pintar(el('div', { class: 'portada' }, el('h1', {}, t('dirTitle')), el('p', {}, t('closed')), yo.signed_in ? null : el('div', { class: 'botones' }, boton(t('signIn'), '', irAEntrar))));
     else if (codigo) vista = () => verInvitacion(codigo);

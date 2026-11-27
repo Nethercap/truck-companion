@@ -18,8 +18,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Truck Dash – Virtual trucking companies</title>
 <meta name="description" content="Virtual trucking companies for ETS2 and ATS on Truck Dash: your deliveries count on their own, with fair rankings and nothing to pay." />
-<!-- La pagina de cada empresa es /vtc/?TAG. Sin indexar hasta que la VTC este
-     abierta: hoy la API la da por inexistente a quien no esta en la beta. -->
+<!-- La pagina de cada empresa es /vtc/?TAG. Sin indexar mientras sea beta (o
+     este apagada: entonces la API la da por inexistente). -->
 <meta name="robots" content="noindex" />
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
@@ -49,6 +49,10 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
     <select id="langSelect" aria-label="Language"></select>
   </div>
 </header>
+
+<!-- Beta: la ve quien entra mientras la API la tenga prendida (yo.enabled). -->
+<p class="beta-aviso" id="betaAviso" hidden><span class="betaTag">beta</span> <span id="betaTexto"></span>
+  <a id="betaLink" href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener"></a></p>
 
 <!-- Todo lo arma vtc.js: lo que se ve depende de si es el directorio, la
      pagina de una empresa o una invitacion, y de quien la mira. -->

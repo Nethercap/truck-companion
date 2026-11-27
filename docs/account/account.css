@@ -314,6 +314,8 @@ hr { border: none; border-top: 1px solid var(--line); margin: 1rem 0; }
 .lado a:hover { background: #1d2127; }
 .lado a.activo { background: #1f2630; box-shadow: inset 3px 0 0 var(--accent); }
 .lado svg { width: 1.1em; height: 1.1em; fill: var(--warn); flex: none; }
+/* La VTC en beta: la marca al lado del nombre (en el celular, chica arriba a la derecha). */
+.lado .betaTag { margin-left: auto; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; background: #ffb020; color: #1a1002; border-radius: 4px; padding: 0 4px; }
 .contenido { min-width: 0; }
 .pagina[hidden] { display: none; }
 .rotulo { margin: 0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
@@ -404,6 +406,7 @@ table.viajes td.detalle-celda { padding: 0 0.5rem 0.8rem; background: #1d232b; }
   .lado a { flex-direction: column; gap: 0.2rem; font-size: 0.7rem; padding: 0.5rem 0.15rem; position: relative; min-width: 0; }
   .lado a span[data-i18n] { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lado .nav-badge { position: absolute; top: 0.25rem; right: 0.3rem; margin: 0; }
+  .lado .betaTag { position: absolute; top: 0.2rem; right: 0.2rem; margin: 0; font-size: 0.5rem; }
 }
 
 /* En el celular la tabla no entra: cada viaje pasa a ser un bloque, con la

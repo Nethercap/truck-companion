@@ -53,7 +53,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   API de cuentas (`/vtc/*` de truckdash-loginapp; el plan es `vtc-plan.md` de ese repo).
   Las reglas las decide la API: aca se muestran sus respuestas. Apagadas en produccion
   hasta que la API tenga `VTC_ABIERTO=1` (o el usuario en `VTC_BETA`): `/vtc/me` dice
-  `enabled` y sin eso no hay link en la cuenta.
+  `enabled` y sin eso no hay link en la cuenta. Abierta a todos (`VTC_ABIERTO=1`) es la
+  beta: las paginas llevan el aviso (`betaAviso`, con el link a Discord) y la marca
+  `.betaTag` en el link de la cuenta, y siguen con `noindex`. Al salir de beta se sacan
+  las tres cosas.
 - Lo que escribe la gente entra al DOM como texto: todo nodo se arma con `el()` de
   `vtc.js` (append, nunca innerHTML). Los links de una empresa los valida la API.
 - Textos en `docs/vtc/i18n.js`, los ocho idiomas en el mismo archivo.

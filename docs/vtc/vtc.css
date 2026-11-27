@@ -8,6 +8,9 @@
 .vtc-nav a { color: var(--muted); text-decoration: none; }
 .vtc-nav a:hover, .vtc-nav a[aria-current] { color: var(--text); }
 .vtc-pie { max-width: 1120px; margin: 2rem auto 0; }
+.betaTag { display: inline-block; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; background: #ffb020; color: #1a1002; border-radius: 4px; padding: 1px 6px; vertical-align: 0.1em; }
+.beta-aviso { max-width: 1120px; margin: 0.8rem auto 0; padding: 0.55rem 0.8rem; border: 1px solid #5a4410; border-radius: 8px; background: #2a2210; font-size: 0.9rem; line-height: 1.45; }
+.beta-aviso a { color: #ffcf6b; white-space: nowrap; }
 .vtc-pie a { color: var(--muted); }
 #unitSelect, #langSelect { max-width: 9rem; }
 
