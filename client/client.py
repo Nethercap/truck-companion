@@ -1139,6 +1139,23 @@ on_viewers = None
 on_live_share = None
 
 
+# Lo define la bandeja: pasar los trabajos de la persona a su empresa virtual o
+# a personales, desde el chip del tablero ({"type": "set_vtc_mode", "mode":
+# "vtc" | "personal"}; explicito, no un toggle: hay mas de un dispositivo).
+# Habla con la API: se llama en un hilo, y dice si se pudo.
+on_vtc_mode = None
+_tareas_sueltas: set = set()  # sin una referencia, asyncio puede soltarlas a mitad
+
+
+async def _cambiar_modo_vtc(modo: str, send) -> None:
+    try:
+        if not await asyncio.to_thread(on_vtc_mode, modo):
+            await send(json.dumps({"type": "command_result", "action": "vtc_mode",
+                                   "ok": False, "reason": "vtc_mode"}))
+    except Exception as exc:  # el tablero se fue mientras la API contestaba
+        logging.info("No se pudo avisar del modo de la VTC: %s", exc)
+
+
 async def handle_control_message(message: str, keybinds: dict, send) -> None:
     """Procesa un mensaje de control de la web (comando de botonera, get/set
     de keybinds) y responde via `send` (coroutine que manda un str). Lo usan
@@ -1170,6 +1187,13 @@ async def handle_control_message(message: str, keybinds: dict, send) -> None:
         elif msg_type == "live_share_state":
             if on_live_share and isinstance(payload.get("enabled"), bool):
                 on_live_share(payload["enabled"])
+        elif msg_type == "set_vtc_mode":
+            if on_vtc_mode and payload.get("mode") in ("vtc", "personal"):
+                # Aparte: por este mismo socket llegan los botones del camion,
+                # y la API puede tardar segundos.
+                tarea = asyncio.create_task(_cambiar_modo_vtc(payload["mode"], send))
+                _tareas_sueltas.add(tarea)
+                tarea.add_done_callback(_tareas_sueltas.discard)
         elif msg_type == "nav_hud":
             if on_nav_hud:
                 on_nav_hud(payload)

@@ -522,6 +522,25 @@ def clean_port(valor) -> Optional[int]:
     return valor if isinstance(valor, int) and 1024 <= valor <= 65535 else None
 
 
+VTC_TAG_RE = re.compile(r"[A-Za-z0-9]{1,8}")
+VTC_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
+VTC_NAME_MAX = 40
+
+
+def clean_vtc(valor) -> Optional[dict]:
+    """La empresa virtual del cliente y en que modo esta, para el chip del
+    tablero de una pestana que abre despues. El relay no sabe de cuentas: es
+    lo que dice el cliente, acotado."""
+    if not isinstance(valor, dict):
+        return None
+    tag, mode, name, color = (valor.get(k) for k in ("tag", "mode", "name", "color"))
+    if not isinstance(tag, str) or not VTC_TAG_RE.fullmatch(tag) or mode not in ("vtc", "personal"):
+        return None
+    return {"tag": tag, "mode": mode,
+            "name": " ".join(name.split())[:VTC_NAME_MAX] if isinstance(name, str) else "",
+            "color": color if isinstance(color, str) and VTC_COLOR_RE.fullmatch(color) else None}
+
+
 def clean_offmap_report(payload: dict) -> Optional[dict]:
     variant = payload.get("variant")
     if not isinstance(variant, str) or not LIVE_MAP_VARIANT_RE.match(variant):
@@ -2387,7 +2406,8 @@ async def ws_client(websocket: WebSocket, code: str):
                                                   "mapMods": clean_map_mods(payload.get("mapMods"), payload.get("activeMods")),
                                                   "localMaps": clean_local_maps(payload.get("localMaps")),
                                                   "localMapPort": clean_port(payload.get("localMapPort")),
-                                                  "overlay": payload.get("overlay") is True}
+                                                  "overlay": payload.get("overlay") is True,
+                                                  "vtc": clean_vtc(payload.get("vtc"))}
                 # Mensajes de control (client_status, etc.) no son telemetria:
                 # no deben tocar el flanco de jobDelivered. Antes el primer
                 # client_status de cada conexion dejaba el estado en False y el
@@ -2555,6 +2575,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
                 # "offmap_place": lo mismo con el destino del trabajo.
                 # "nav_hud": el giro y lo que falta para el overlay en el
                 # juego; texto corto, se descarta si viene grande.
+                # "set_vtc_mode": el chip de la empresa virtual; el cliente lo
+                # cambia en la API con el token de su cuenta.
                 if msg_type == "nav_hud" and len(data) > NAV_HUD_MAX_BYTES:
                     continue
                 if msg_type == "nav_hud":
@@ -2564,7 +2586,8 @@ async def ws_viewer(websocket: WebSocket, code: str):
                         outbox = session.viewer_outboxes.get(obs)
                         if outbox is not None and obs is not websocket:
                             outbox.push_control(data)
-                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "offmap_place", "nav_hud"):
+                if msg_type in ("command", "get_keybinds", "set_keybinds", "offmap", "offmap_place", "nav_hud",
+                                "set_vtc_mode"):
                     if session.client_ws is not None:
                         await session.client_ws.send_text(data)
                 elif msg_type == "set_live_share":

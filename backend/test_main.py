@@ -1581,6 +1581,7 @@ def test_contrato_client_status(client, main):
             "detail": "The running game (D:\\ATS\\bin\\win_x64) has no telemetry plugin.",
             "mapMods": {"ats": {"c2c": True}, "ets2": None}, "activeMods": ["Coast to Coast"],
             "mapDlcs": None, "localMaps": None, "localMapPort": 27765, "overlay": True,
+            "vtc": {"tag": "KL", "name": "Kappa Logistics", "color": "#3b9eff", "mode": "personal"},
         }))
         import time as _time
         _time.sleep(0.1)
@@ -1592,6 +1593,34 @@ def test_contrato_client_status(client, main):
             assert not faltan, f"el relay no guarda {sorted(faltan)}: agregarlos o explicar en CLIENT_STATUS_NO_GUARDADO"
             assert guardado["detail"].startswith("The running game")
             assert "activeMods" not in guardado
+            assert guardado["vtc"] == {"tag": "KL", "name": "Kappa Logistics", "color": "#3b9eff", "mode": "personal"}
+
+
+def test_clean_vtc_acota_lo_que_dice_el_cliente(main):
+    bueno = {"tag": "KL", "name": " Kappa  Logistics ", "color": "#3B9EFF", "mode": "vtc", "secreto": "x"}
+    assert main.clean_vtc(bueno) == {"tag": "KL", "name": "Kappa Logistics", "color": "#3B9EFF", "mode": "vtc"}
+    assert main.clean_vtc({**bueno, "color": "red"})["color"] is None
+    assert main.clean_vtc({**bueno, "color": "#3b9eff;x"})["color"] is None
+    assert main.clean_vtc({**bueno, "name": None})["name"] == ""
+    assert len(main.clean_vtc({**bueno, "name": "x" * 500})["name"]) == main.VTC_NAME_MAX
+    for malo in (None, "KL", [], {}, {**bueno, "tag": "<b>"}, {**bueno, "tag": "KL\n"}, {**bueno, "tag": "123456789"},
+                 {**bueno, "tag": 1}, {**bueno, "mode": "otro"}, {**bueno, "mode": None}, {"tag": "KL"}):
+        assert main.clean_vtc(malo) is None, malo
+
+
+def test_el_chip_de_la_vtc_le_llega_al_cliente(client, main):
+    """El tablero pide el modo y el cliente lo cambia en la API. Un cliente
+    viejo no manda la empresa: el tablero no muestra nada."""
+    code = client.post("/pair/new").json()["code"]
+    with client.websocket_connect(f"/ws/client/{code}") as cliente, \
+            client.websocket_connect(f"/ws/live/{code}") as tablero, \
+            client.websocket_connect(f"/ws/live/{code}?role=plan") as lan:
+        lan.send_text(main.json.dumps({"type": "set_vtc_mode", "mode": "vtc"}))  # la de plan no
+        tablero.send_text(main.json.dumps({"type": "set_vtc_mode", "mode": "personal"}))
+        assert _hasta_tipo(cliente, main, "set_vtc_mode") == {"type": "set_vtc_mode", "mode": "personal"}
+        cliente.send_text(main.json.dumps({"type": "client_status", "status": "live", "game": "ets2"}))
+        assert _hasta_tipo(tablero, main, "client_status")["status"] == "live"
+        assert main.sessions[code].last_client_status["vtc"] is None
 
 
 def test_client_status_detail_acotado(client, main):
