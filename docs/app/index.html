@@ -324,6 +324,11 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
         <p class="settingsHint" data-i18n="convoyPrivacyHint">Convoy members see your position and trip data while you are in. Nothing is stored when the convoy ends. The buttons always control only your own truck.</p>
       </div>
       <div id="convoyIn" hidden>
+        <div id="convoyDrive" class="convoyDrive" hidden>
+          <p class="settingsSectionTitle" data-i18n="convoyDriveTitle">Driving with them?</p>
+          <p class="settingsHint" data-i18n="convoyDriveHint">You are only watching: the others do not see you on the map. Enter your client's pairing code (tray icon → "Show pairing code") to join with your truck.</p>
+          <div class="convoyJoinRow"><input id="convoyDriveCode" type="text" maxlength="8" class="convoyInput code" data-i18n-placeholder="pairingCode" placeholder="Pairing code" autocapitalize="characters" autocomplete="off"><button id="convoyDriveBtn" class="settingsLinkBtn" data-i18n="convoyDriveBtn">Join as driver</button></div>
+        </div>
         <div class="convoyCodeRow"><span id="convoyCodeBig" class="convoyCodeBig"></span><button id="convoyCopyBtn" class="settingsLinkBtn" data-i18n="convoyCopyLink">Copy link</button></div>
         <div id="convoyMemberList" class="convoyMemberList"></div>
         <div class="convoyMeta"><span id="convoySpectators"></span></div>

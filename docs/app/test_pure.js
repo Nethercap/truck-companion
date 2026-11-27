@@ -5252,6 +5252,36 @@ test('codigo recordado: /app sin ?code= se conecta con el ultimo que el relay ac
   }
 });
 
+test('link de convoy: con el codigo guardado entra a manejar, sin el mira (Discord 27-11)', () => {
+  const { convoyLinkStart, convoyDriverUrl, pairingCodeToSave } = require('./pure.js');
+  const RELAY = 'wss://truck-companion-production.up.railway.app';
+  const saved = pairingCodeToSave('ABCD2345', RELAY);
+  // El link de "Copy link" en el navegador de quien ya uso la app: se conecta con su
+  // codigo y abre la ventana del convoy (antes quedaba de espectador y no aparecia)
+  assert.deepEqual(convoyLinkStart('?convoy=qwerty', saved, RELAY), { convoy: 'QWERTY', mode: 'join', pairing: 'ABCD2345' });
+  // Sin codigo guardado, de otro relay o basura: espectador, como antes
+  for (const s of [null, '', '{', pairingCodeToSave('ABCD2345', 'ws://localhost:8000')]) {
+    assert.deepEqual(convoyLinkStart('?convoy=QWERTY', s, RELAY), { convoy: 'QWERTY', mode: 'spectator', pairing: null }, String(s));
+  }
+  // Con ?code= o en la copia LAN se conecta como siempre (en LAN el convoy avisa que no anda)
+  assert.deepEqual(convoyLinkStart('?code=WXYZ6789&convoy=QWERTY', saved, RELAY), { convoy: 'QWERTY', mode: 'join', pairing: null });
+  assert.deepEqual(convoyLinkStart('?local=1&convoy=QWERTY', null, RELAY), { convoy: 'QWERTY', mode: 'join', pairing: null });
+  // No es un link de convoy
+  for (const search of ['', '?code=WXYZ6789', '?convoy=', '?convoy=%20']) assert.equal(convoyLinkStart(search, saved, RELAY), null, search);
+
+  // De espectador a conductor: la misma pagina con los dos codigos, sin perder ?lang= ni ?backend=
+  const url = new URL(convoyDriverUrl('https://trucksim-dash.com/app/?convoy=QWERTY&lang=es#x', ' abcd2345 ', 'qwerty'));
+  assert.equal(url.pathname, '/app/');
+  assert.equal(url.searchParams.get('code'), 'ABCD2345');
+  assert.equal(url.searchParams.get('convoy'), 'QWERTY');
+  assert.equal(url.searchParams.get('lang'), 'es');
+  assert.equal(url.hash, '');
+  // Y ese link ya no es de espectador
+  assert.equal(convoyLinkStart(url.search, null, RELAY).mode, 'join');
+  for (const bad of ['', 'DEMO', 'ABCD234', null]) assert.equal(convoyDriverUrl('https://trucksim-dash.com/app/?convoy=QWERTY', bad, 'QWERTY'), null, String(bad));
+  assert.equal(convoyDriverUrl('https://trucksim-dash.com/app/', 'ABCD2345', ''), null);
+});
+
 test('vista de cabina: la flecha grande sale de la maniobra', () => {
   const { turnIconShape, turnIconHtml, LANE_PATHS } = require('./pure.js');
   assert.deepEqual(turnIconShape('straight'), { shape: 'straight' });

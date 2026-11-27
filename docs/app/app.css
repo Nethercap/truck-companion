@@ -970,6 +970,10 @@
   .navReportData pre { max-height: 10rem; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 0.72rem;
     background: #15181d; border-radius: 6px; padding: 0.4rem 0.5rem; margin: 0.3rem 0 0; }
   .convoyJoinRow { display: flex; gap: 0.4rem; align-items: center; }
+  /* El boton es width: 100% (settingsLinkBtn) y dejaba el campo del codigo en nada: el
+     del convoy ya puesto por el link no se veia (Discord 27-11). */
+  .convoyJoinRow .settingsLinkBtn { width: auto; flex: 0 0 auto; padding-left: 0.8rem; padding-right: 0.8rem; }
+  .convoyDrive { border-bottom: 1px solid #333; padding-bottom: 0.7rem; margin-bottom: 0.4rem; }
   .convoyCodeRow { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin: 0.3rem 0 0.6rem; }
   .convoyCodeBig { font-family: ui-monospace, monospace; font-size: 1.6rem; font-weight: 800; letter-spacing: 0.25em; }
   .convoyMemberList { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.4rem 0; }
