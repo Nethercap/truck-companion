@@ -4,7 +4,7 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
-## Unreleased
+## 1.5.50 (2026-11-27)
 
 - Build my map: the build log now lists the roads whose lanes the builder doesn't recognize
   (lane types a map mod defines itself), with the lanes of each road look. Those roads were
