@@ -28,10 +28,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="vendor/maplibre-gl-5.24.0.css" />
-<link rel="stylesheet" href="../dash/dash.css?v=20261127a" />
-<link rel="stylesheet" href="../dash/classic.css?v=20261127a" />
-<link rel="stylesheet" href="../dash/trucks.css?v=20261127a" />
-<link rel="stylesheet" href="app.css?v=20261127a" />
+<link rel="stylesheet" href="../dash/dash.css?v=20261127b" />
+<link rel="stylesheet" href="../dash/classic.css?v=20261127b" />
+<link rel="stylesheet" href="../dash/trucks.css?v=20261127b" />
+<link rel="stylesheet" href="app.css?v=20261127b" />
 <script>
 // Dentro de la app de Android (TWA, android/) no van los links de donar:
 // Play no deja mandar a pagar fuera de su sistema. La primera pagina llega
@@ -845,15 +845,64 @@ if (/[?&]cab=1(&|$)/.test(location.search)) document.documentElement.classList.a
 <script src="vendor/maplibre-gl-5.24.0.js"></script>
 <script src="vendor/pmtiles-4.5.0.js"></script>
 <script src="vendor/proj4-2.15.0.js"></script>
-<script src="variants.js?v=20261127a"></script>
-<script src="pure.js?v=20261127a"></script>
-<script src="i18n.js?v=20261127a"></script>
-<script src="i18n_en_es.js?v=20261127a"></script>
-<script src="../dash/dash.js?v=20261127a"></script>
-<script src="../dash/classic.js?v=20261127a"></script>
-<script src="../dash/trucks.js?v=20261127a"></script>
-<script src="app.js?v=20261127a"></script>
-<script src="convoy.js?v=20261127a"></script>
-<script src="livemap.js?v=20261127a"></script>
+<script src="variants.js?v=20261127b"></script>
+<script src="pure.js?v=20261127b"></script>
+<script src="i18n.js?v=20261127b"></script>
+<script src="i18n_en_es.js?v=20261127b"></script>
+<script src="../dash/dash.js?v=20261127b"></script>
+<script src="../dash/classic.js?v=20261127b"></script>
+<script src="../dash/trucks.js?v=20261127b"></script>
+<script src="app.js?v=20261127b"></script>
+<script src="convoy.js?v=20261127b"></script>
+<script src="livemap.js?v=20261127b"></script>
+<script>
+// Navegador viejo. MapLibre 5 usa Object.hasOwn y Array.prototype.at sin
+// respaldo (Safari/iOS 15.4, Chrome 93, Firefox 92): sin eso el mapa no carga.
+// Debajo de Safari 13.4 app.js ni se lee y el boton Connect queda muerto sin
+// ningun error a la vista (iPad Mini 2 con iOS 12, 27-11-2026). Se avisa y se
+// ofrece /dash/, que anda desde iOS 12 (tools/check_web_syntax.js lo cuida).
+// ES5 y al final a proposito: corre aunque app.js no haya cargado. Al subir
+// MapLibre, revisar si pide algo mas nuevo.
+(function () {
+  if (typeof Object.hasOwn === 'function' && typeof [].at === 'function') return;
+  function texto(clave, ingles) {
+    try { var v = t(clave); return typeof v === 'string' ? v : ingles; } catch (e) { return ingles; }
+  }
+  var appViva = typeof handleTelemetry === 'function';
+  var destino = '../dash/';
+  if (/[?&]local=[^&]/.test(location.search)) destino += '?local=1';
+  else {
+    var codigo = /[?&]code=([^&#]+)/.exec(location.search);
+    if (codigo) destino += '?code=' + codigo[1];
+  }
+  var aviso = document.createElement('div');
+  aviso.className = 'oldBrowserNote';
+  aviso.setAttribute('role', 'alert');
+  var titulo = document.createElement('b');
+  titulo.textContent = texto('oldBrowserTitle', 'This browser is too old for the map');
+  var cuerpo = document.createElement('p');
+  cuerpo.textContent = texto('oldBrowserBody', 'The map needs iOS 15.4 or newer on an iPhone or iPad, or a recent Chrome, Edge or Firefox. The dashboard without the map works here: speed, trip, fuel and truck.');
+  var link = document.createElement('a');
+  link.href = destino;
+  link.textContent = texto('oldBrowserOpenDash', 'Open the dashboard without the map');
+  aviso.appendChild(titulo);
+  aviso.appendChild(cuerpo);
+  aviso.appendChild(link);
+  if (appViva) {
+    // app.js corrio: el tablero sin mapa de esta pagina puede andar, se deja cerrar.
+    var cerrar = document.createElement('button');
+    cerrar.className = 'oldBrowserClose';
+    cerrar.setAttribute('aria-label', texto('close', 'Close'));
+    cerrar.textContent = '×';
+    cerrar.onclick = function () { aviso.parentNode.removeChild(aviso); };
+    aviso.appendChild(cerrar);
+  } else {
+    // app.js no se pudo leer: el boton Connect no hace nada, mejor que no este.
+    var grupo = document.getElementById('connectGroup');
+    if (grupo) grupo.style.display = 'none';
+  }
+  document.body.appendChild(aviso);
+})();
+</script>
 </body>
 </html>

@@ -3286,8 +3286,15 @@ function sinHistoricas(votantes) {
     return labels.length === (s.labels || [s.label]).length ? s : { ...s, label: labels[0], labels };
   });
 }
+// `v ?? d` sin `??`: /dash/ carga este archivo y el iPad Mini 2 (iOS 12, Safari
+// 12.1) no sabe leer `??` ni `?.`. Un solo `??` hacia que el archivo entero no
+// cargara y el boton Connect quedara muerto (reporte del 27-11-2026).
+// tools/check_web_syntax.js lo controla en CI.
+function valueOr(v, d) {
+  return v === undefined || v === null ? d : v;
+}
 function roadSignForTurn(pointAt, fromM, totalM, nearest, fallbackXY, opts = {}) {
-  const radius = opts.radius ?? 200, fallbackRadius = opts.fallbackRadius ?? 400;
+  const radius = valueOr(opts.radius, 200), fallbackRadius = valueOr(opts.fallbackRadius, 400);
   const salida = opts.onExit || null;
   const votes = new Map(); // en orden de aparicion: un empate lo gana la primera
   let votantes = [];
@@ -3488,8 +3495,8 @@ function exitSignTest({ pts, cum, pointAt, bearingBetween, i, at = i, iEnd = i, 
 // por la que la ruta pasa a menos de 1 km deja de salir antes (con 300 m,
 // 24 y 95 idas y vueltas).
 function nextCityAlongRoute(points, cities, truck, opts = {}) {
-  const radius = opts.radius ?? 2500, minAhead = opts.minAhead ?? 300, approachM = opts.approachM ?? 1000;
-  const currentCity = opts.currentCityRadius ?? 2000, maxSamples = opts.maxSamples ?? 400;
+  const radius = valueOr(opts.radius, 2500), minAhead = valueOr(opts.minAhead, 300), approachM = valueOr(opts.approachM, 1000);
+  const currentCity = valueOr(opts.currentCityRadius, 2000), maxSamples = valueOr(opts.maxSamples, 400);
   if (!points || points.length < 2 || !cities || !cities.length) return null;
   const step = Math.max(1, Math.floor(points.length / maxSamples));
   const sx = [], sy = [], along = [];
@@ -5233,7 +5240,7 @@ function trailerPickupJobKey(data) {
   return JSON.stringify([data.game, data.companySrcId || data.companySrc || null,
     data.citySrcId || data.citySrc || null, data.companyDstId || data.companyDst || null,
     data.cityDstId || data.cityDst || null, data.cargo || null,
-    data.plannedDistanceKm ?? null, data.jobIncome ?? null]);
+    valueOr(data.plannedDistanceKm, null), valueOr(data.jobIncome, null)]);
 }
 
 // load(): la clave del trabajo cuyo remolque ya se engancho, o null;

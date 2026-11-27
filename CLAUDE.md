@@ -8,7 +8,8 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 ## Antes de dar algo por terminado
 
 - Web: `node --test docs/app/test_pure.js`, `python tools/check_pois.py`,
-  `python tools/build_variants_js.py --check`, `node --check` del .js tocado.
+  `python tools/build_variants_js.py --check`, `node --check` del .js tocado,
+  `node tools/check_web_syntax.js`.
   Relay: `python -m pytest backend/test_main.py`. Cliente: `python -m pytest client/`.
 - Tests del relay con websockets: siempre con el fixture `client` (un solo
   event loop para todas las conexiones). Un `TestClient` suelto corre cada
@@ -25,6 +26,11 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   el session_state LAN), no dice "reinicia" sino que la PC no la puede bajar, con un boton
   al sitio con el codigo, y Setup lo dice con el error (`lan_copy_old`): una PC no llegaba
   a trucksim-dash.com desde el 16-11 y su tablet siguio con esa copia (Discord 21-11).
+- /dash/ anda desde iOS 12 (Safari 12.1, iPad Mini 2): lo que carga (`pure.js`,
+  `i18n*.js`, `dash/*.js`) va sin `??`, `?.`, campos de clase ni lookbehind, y el CSS
+  de /dash/ sin `clamp()` (va `max(a, min(b, c))`). `node tools/check_web_syntax.js`
+  lo controla. El mapa (/app/) pide iOS 15.4 por MapLibre 5; al subir MapLibre, revisar
+  el aviso de navegador viejo del final de `docs/app/index.html`.
 - La logica de decision va en `docs/app/pure.js` con su test, no suelta en
   app.js: la mayoria de los bugs del 10-10 estaban en app.js, donde no hay tests.
 - Cambios de cliente: anotarlos en CHANGELOG.md (seccion de la proxima
