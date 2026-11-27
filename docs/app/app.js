@@ -7776,6 +7776,84 @@ function renderSessionTotals() {
 }
 document.getElementById('sessionResetBtn').addEventListener('click', () => resetSessionTotals(lastData?.game));
 
+// Un aviso con un boton. No toma el foco: aparece manejando.
+function showActionToast(text, label, onClick, durationMs = 12000) {
+  const el = document.createElement('div');
+  el.className = 'toast wrap action';
+  const frase = document.createElement('span');
+  frase.textContent = text;
+  const boton = document.createElement('button');
+  boton.type = 'button';
+  boton.textContent = label;
+  el.append(frase, boton);
+  document.getElementById('toastContainer').appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  const cerrar = () => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  };
+  const reloj = setTimeout(cerrar, durationMs);
+  boton.addEventListener('click', () => { clearTimeout(reloj); cerrar(); onClick(); });
+}
+
+// --- Empresa virtual (VTC): el chip de la tarjeta del viaje ---
+let clientVtc = null; // vtcOf del client_status; null sin empresa o con un cliente viejo
+const vtcModeRequest = createVtcModeRequest();
+const vtcJobNotice = createVtcJobNotice();
+let vtcModeTimer = null;
+
+function applyClientVtc(raw) {
+  clientVtc = vtcOf(raw);
+  if (vtcModeRequest.onVtc(clientVtc)) {
+    clearTimeout(vtcModeTimer);
+    showToast(t(clientVtc.mode === 'vtc' ? 'vtcModeNow' : 'vtcModeNowPersonal').replace('{vtc}', `[${clientVtc.tag}]`), 'success wrap');
+  }
+  renderVtcChip();
+}
+
+function renderVtcChip() {
+  const chip = document.getElementById('vtcChip');
+  const vista = vtcChipView(clientVtc, conn.clientConnected);
+  chip.hidden = !vista;
+  if (!vista) return;
+  const titulo = t(vista.titleKey).replace('{vtc}', vista.company);
+  chip.textContent = vista.label || t('vtcPersonal');
+  chip.title = titulo;
+  chip.setAttribute('aria-label', titulo);
+  chip.classList.toggle('personal', vista.mode === 'personal');
+  chip.style.setProperty('--vtc', vista.color || '');
+  chip.disabled = vtcModeRequest.pending() !== null;
+}
+
+function requestVtcMode(mode) {
+  if (!clientVtc || clientVtc.mode === mode || !ws || ws.readyState !== WebSocket.OPEN) return;
+  vtcModeRequest.start(mode, Date.now());
+  ws.send(JSON.stringify({ type: 'set_vtc_mode', mode }));
+  clearTimeout(vtcModeTimer);
+  vtcModeTimer = setTimeout(() => { if (vtcModeRequest.expired(Date.now())) vtcModeFailedToast(); }, VTC_MODE_TIMEOUT_MS + 50);
+  renderVtcChip();
+}
+
+function vtcModeFailedToast() {
+  showToast(t('vtcModeFailed'), 'danger wrap');
+  renderVtcChip();
+}
+
+// El cliente no pudo (la API no contesto, o ya no es miembro).
+function vtcModeFailed() {
+  clearTimeout(vtcModeTimer);
+  if (vtcModeRequest.onFail()) vtcModeFailedToast();
+}
+
+function showVtcJobNotice() {
+  showActionToast(t('vtcJobPersonal').replace('{vtc}', `[${clientVtc.tag}]`), t('vtcJobCount'), () => requestVtcMode('vtc'));
+}
+
+document.getElementById('vtcChip').addEventListener('click', () => {
+  const vista = vtcChipView(clientVtc, conn.clientConnected);
+  if (vista) requestVtcMode(vista.next);
+});
+
 function showToast(text, kind = 'success', durationMs = 5000) {
   const container = document.getElementById('toastContainer');
   const el = document.createElement('div');
@@ -8403,6 +8481,7 @@ window.addEventListener('online', reopenIfStale);
 setInterval(() => { if (staleWatchArmed && document.visibilityState === 'visible') reopenIfStale(); }, 3000);
 
 function renderConnectionUi() {
+  renderVtcChip();
   const view = connectionView();
   screenKeeper.want(!!view);
   const chip = document.getElementById('statusChip');
@@ -8827,6 +8906,7 @@ function handleKeybindsMessage(data) {
 const COMMAND_RESULT_REASON_KEY = { no_key: 'commandResultNoKey', no_window: 'commandResultNoWindow', bad_key: 'commandResultBadKey' };
 function handleCommandResult(data) {
   if (data.ok) return;
+  if (data.action === 'vtc_mode') { vtcModeFailed(); return; }
   const reasonKey = COMMAND_RESULT_REASON_KEY[data.reason];
   const text = reasonKey ? t(reasonKey) : t('commandResultError').replace('{reason}', data.reason || '?');
   showToast(text, 'danger', 4000);
@@ -8991,6 +9071,7 @@ function handleTelemetry(data) {
   if (trailerPickupWatch.update(data)) data = { ...data, trailerPickup: true };
   trackFuel(data);
   trackStatus(data);
+  if (vtcJobNotice.push(data, clientVtc)) showVtcJobNotice();
   if (pipWin) setTimeout(refreshPip, 0); // despues de que el tablero se actualice
   if (cabMode) setTimeout(refreshCab, 0); // idem
   if (clientOverlayOn || obsOverlayOn) setTimeout(sendNavHud, 0); // idem
@@ -9112,6 +9193,7 @@ function connectWs(backend, code, options = {}) {
       if (data.client_status) applyDetectedDlcs(data.client_status.mapDlcs);
       if (data.client_status) applyLocalMaps(data.client_status.localMaps, data.client_status.localMapPort);
       if (data.client_status) applyClientMapMods(data.client_status);
+      if (data.client_status) applyClientVtc(data.client_status.vtc); // un relay o un cliente viejo no lo manda: sin chip
       if (!conn.clientConnected) conn.hasTelemetry = false;
       renderConnectionUi();
       return;
@@ -9123,6 +9205,7 @@ function connectWs(backend, code, options = {}) {
       applyDetectedDlcs(data.mapDlcs);
       applyLocalMaps(data.localMaps, data.localMapPort);
       applyClientMapMods(data);
+      applyClientVtc(data.vtc);
       if (data.status !== 'live') conn.hasTelemetry = false;
       renderConnectionUi();
       checkUpdateBanner(data.clientVersion);

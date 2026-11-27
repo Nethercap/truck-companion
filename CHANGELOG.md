@@ -12,6 +12,9 @@ updates on its own and is not versioned here.
   Saskatchewan, northern BC, Yukon, New Brunswick, Nova Scotia and the North Shore of Quebec.
   The web map already draws them now, as local roads, with the map you built before; the list
   in the log tells us which of them are highways, so they can be drawn as such.
+- Virtual companies (beta): if your account is in one, Setup and the tray menu have a "Jobs for"
+  selector (the company or personal), and the dashboard shows it as a chip on the trip card that you
+  can tap. It also tells you when you take a job while in Personal.
 
 ## 1.5.49 (2026-11-25)
 

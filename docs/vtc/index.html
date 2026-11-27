@@ -18,13 +18,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Truck Dash – Virtual trucking companies</title>
 <meta name="description" content="Virtual trucking companies for ETS2 and ATS on Truck Dash: your deliveries count on their own, with fair rankings and nothing to pay." />
-<!-- La pagina de cada empresa es /vtc/?TAG. Sin indexar hasta que la VTC este
-     abierta: hoy la API la da por inexistente a quien no esta en la beta. -->
+<!-- La pagina de cada empresa es /vtc/?TAG. Sin indexar mientras sea beta (o
+     este apagada: entonces la API la da por inexistente). -->
 <meta name="robots" content="noindex" />
 <link rel="icon" type="image/svg+xml" href="../app/assets/logo.svg" />
 <meta name="theme-color" content="#0d0f12" />
-<link rel="stylesheet" href="../account/account.css?v=20261127b" />
-<link rel="stylesheet" href="vtc.css?v=20261127b" />
+<link rel="stylesheet" href="../account/account.css?v=20261127c" />
+<link rel="stylesheet" href="vtc.css?v=20261127c" />
 <script>
 // Dentro de la app de Android (TWA): ver el comentario de /account/.
 try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0) sessionStorage.setItem('truckdash_twa', '1'); if (sessionStorage.getItem('truckdash_twa') === '1') document.documentElement.classList.add('twa'); } catch (e) {}
@@ -50,6 +50,10 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
   </div>
 </header>
 
+<!-- Beta: la ve quien entra mientras la API la tenga prendida (yo.enabled). -->
+<p class="beta-aviso" id="betaAviso" hidden><span class="betaTag">beta</span> <span id="betaTexto"></span>
+  <a id="betaLink" href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener"></a></p>
+
 <!-- Todo lo arma vtc.js: lo que se ve depende de si es el directorio, la
      pagina de una empresa o una invitacion, y de quien la mira. -->
 <main id="main" aria-live="off"></main>
@@ -59,9 +63,9 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
   <a href="/terms.html" id="pieTerms"></a> · <a href="/privacy.html" id="piePrivacy"></a>
 </footer>
 
-<script src="i18n.js?v=20261127b"></script>
-<script src="qr.js?v=20261127b"></script>
-<script src="tarjeta.js?v=20261127b"></script>
-<script src="vtc.js?v=20261127b"></script>
+<script src="i18n.js?v=20261127c"></script>
+<script src="qr.js?v=20261127c"></script>
+<script src="tarjeta.js?v=20261127c"></script>
+<script src="vtc.js?v=20261127c"></script>
 </body>
 </html>

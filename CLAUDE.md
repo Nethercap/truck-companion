@@ -53,7 +53,10 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   API de cuentas (`/vtc/*` de truckdash-loginapp; el plan es `vtc-plan.md` de ese repo).
   Las reglas las decide la API: aca se muestran sus respuestas. Apagadas en produccion
   hasta que la API tenga `VTC_ABIERTO=1` (o el usuario en `VTC_BETA`): `/vtc/me` dice
-  `enabled` y sin eso no hay link en la cuenta.
+  `enabled` y sin eso no hay link en la cuenta. Abierta a todos (`VTC_ABIERTO=1`) es la
+  beta: las paginas llevan el aviso (`betaAviso`, con el link a Discord) y la marca
+  `.betaTag` en el link de la cuenta, y siguen con `noindex`. Al salir de beta se sacan
+  las tres cosas.
 - Lo que escribe la gente entra al DOM como texto: todo nodo se arma con `el()` de
   `vtc.js` (append, nunca innerHTML). Los links de una empresa los valida la API.
 - Textos en `docs/vtc/i18n.js`, los ocho idiomas en el mismo archivo.
@@ -62,6 +65,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
 - `qr.js` es propio (la web no carga JS de terceros) y se compara con la libreria de
   Python que usa el cliente. `tarjeta.js` solo dibuja; el logo es el icono del servidor
   de Discord (con CORS; si no carga, va el tag).
+- El modo (los trabajos cuentan para la empresa o son personales) vive en la API
+  (`vtc_members.mode`) y alcanza al viaje abierto. El cliente lo lee y lo cambia con su
+  token (`client/vtc.py`: cada 5 min con el juego en vivo, al tomar un trabajo, al abrir
+  Setup), lo muestra en la bandeja y en Setup, y lo manda en `client_status.vtc`. El chip
+  de la tarjeta del viaje (`vtcChipView`) pide `set_vtc_mode` con el modo, no un toggle;
+  contesta el `client_status` siguiente, o `command_result` con `action: 'vtc_mode'` si no
+  se pudo. Que la API no conteste no es dejar la empresa: queda lo ultimo que se supo. El
+  aviso de "este trabajo es personal" sale al tomarlo (`createVtcJobNotice`); de un bus la
+  clave son las puntas de la linea, porque el destino cambia en cada parada. `/dash/` y la
+  app nativa todavia no lo muestran.
 - Entrar desde `/vtc/` deja en sessionStorage a donde volver (`truckdash_volver`,
   30 minutos) y `account.js` vuelve solo a rutas `/vtc/`.
 

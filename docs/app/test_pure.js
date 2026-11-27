@@ -7281,6 +7281,136 @@ test('turnReportBusLine: la tabla de paradas del cliente en el turn report (repo
   assert.ok(!turnReportText(base).includes('Bus:'));
 });
 
+// --- La empresa virtual (VTC) de quien maneja (client/vtc.py) ---
+
+test('vtcOf: lo que manda el cliente, acotado', () => {
+  const { vtcOf } = require('./pure.js');
+  const kl = { tag: 'KL', name: ' Kappa  Logistics ', color: '#3B9eff', mode: 'vtc' };
+  assert.deepEqual(vtcOf(kl), { tag: 'KL', name: 'Kappa Logistics', color: '#3B9eff', mode: 'vtc' });
+  assert.equal(vtcOf({ ...kl, color: 'red;background:url(x)' }).color, null);
+  assert.equal(vtcOf({ ...kl, name: 7 }).name, '');
+  assert.equal(vtcOf({ ...kl, name: 'x'.repeat(99) }).name.length, 40);
+  for (const malo of [undefined, null, '', 'KL', 1, [], {}, { ...kl, tag: '<img>' }, { ...kl, tag: 'KL\n' }, { ...kl, tag: '' },
+    { ...kl, tag: '123456789' }, { ...kl, mode: 'otro' }, { ...kl, mode: undefined }]) assert.equal(vtcOf(malo), null);
+});
+
+test('vtcChipView: con empresa y cliente conectado; al tocarlo pide el otro modo, explicito', () => {
+  const { vtcChipView } = require('./pure.js');
+  const kl = { tag: 'KL', name: 'Kappa Logistics', color: '#3b9eff', mode: 'vtc' };
+  assert.deepEqual(vtcChipView(kl, true), { mode: 'vtc', label: '[KL]', titleKey: 'vtcChipTitle', company: '[KL] Kappa Logistics', color: '#3b9eff', next: 'personal' });
+  assert.deepEqual(vtcChipView({ ...kl, mode: 'personal' }, true), { mode: 'personal', label: null, titleKey: 'vtcChipTitlePersonal', company: '[KL] Kappa Logistics', color: null, next: 'vtc' });
+  assert.equal(vtcChipView({ ...kl, name: '' }, true).company, '[KL]');
+  assert.equal(vtcChipView(null, true), null);
+  for (const sinCliente of [false, null, undefined]) assert.equal(vtcChipView(kl, sinCliente), null);
+});
+
+test('createVtcModeRequest: hecho, no se pudo o no contesto', () => {
+  const { createVtcModeRequest, VTC_MODE_TIMEOUT_MS } = require('./pure.js');
+  const kl = (mode) => ({ tag: 'KL', name: '', color: null, mode });
+  const p = createVtcModeRequest();
+  // sin un pedido de aca, el cambio de otro dispositivo o su error no avisan nada
+  assert.equal(p.pending(), null);
+  assert.equal(p.onVtc(kl('personal')), false);
+  assert.equal(p.onFail(), false);
+  assert.equal(p.expired(1e9), false);
+  p.start('personal', 1000);
+  assert.equal(p.pending(), 'personal');
+  assert.equal(p.onVtc(kl('vtc')), false); // otro client_status, con el modo de antes
+  assert.equal(p.onVtc(null), false);
+  assert.equal(p.onVtc(kl('personal')), true);
+  assert.equal(p.pending(), null);
+  assert.equal(p.onVtc(kl('personal')), false); // una vez sola
+  p.start('vtc', 1000);
+  assert.equal(p.onFail(), true);
+  assert.equal(p.pending(), null);
+  p.start('vtc', 1000);
+  assert.equal(p.expired(1000 + VTC_MODE_TIMEOUT_MS - 1), false);
+  assert.equal(p.expired(1000 + VTC_MODE_TIMEOUT_MS), true);
+  assert.equal(p.pending(), null);
+  assert.equal(p.expired(1e9), false);
+});
+
+test('createVtcJobNotice: "este trabajo es personal", una vez por trabajo tomado', () => {
+  const { createVtcJobNotice } = require('./pure.js');
+  const personal = { tag: 'KL', name: '', color: null, mode: 'personal' };
+  const propia = { ...personal, mode: 'vtc' };
+  const libre = { game: 'ets2', onJob: false, event: {} };
+  const job = { game: 'ets2', onJob: true, citySrcId: 'berlin', cityDstId: 'lyon', cityDst: 'Lyon', cargo: 'Cheese', plannedDistanceKm: 900, jobIncome: 20000, event: {} };
+  const otro = { ...job, cityDstId: 'wien', cityDst: 'Wien' };
+  const entrega = { ...job, event: { jobDelivered: true } };
+
+  let a = createVtcJobNotice();
+  assert.equal(a.push(libre, personal), false);
+  assert.equal(a.push(job, personal), true);
+  assert.equal(a.push(job, personal), false); // el mismo, en cada dato
+  assert.equal(a.push(libre, personal), false); // volver a cargar la partida
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(otro, personal), true); // otro trabajo
+  assert.equal(a.push({ ...otro, event: { jobCancelled: true } }, personal), false);
+  assert.equal(a.push(libre, personal), false);
+  assert.equal(a.push(otro, personal), true); // el mismo viaje otra vez, despues de cancelar
+
+  // con los trabajos para la empresa, nada; y pasar a personal en el medio es a proposito
+  a = createVtcJobNotice();
+  a.push(libre, propia);
+  assert.equal(a.push(job, propia), false);
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(entrega, personal), false);
+  assert.equal(a.push(libre, personal), false);
+  assert.equal(a.push(job, personal), true);
+
+  // abrir la pagina en medio de un trabajo no es tomarlo
+  a = createVtcJobNotice();
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(job, personal), false);
+  assert.equal(a.push(otro, personal), true);
+
+  // sin empresa no se mira nada: la que llega con el trabajo tomado no avisa
+  a = createVtcJobNotice();
+  assert.equal(a.push(libre, null), false);
+  assert.equal(a.push(job, null), false);
+  assert.equal(a.push(job, personal), false);
+
+  // onJob sin el resto todavia (los primeros datos de un trabajo) espera; un cliente sin onJob, nunca
+  a = createVtcJobNotice();
+  a.push(libre, personal);
+  assert.equal(a.push({ game: 'ets2', onJob: true, event: {} }, personal), false);
+  assert.equal(a.push(job, personal), true);
+  a = createVtcJobNotice();
+  a.push({ game: 'ets2' }, personal);
+  assert.equal(a.push({ ...job, onJob: undefined }, personal), false);
+  assert.equal(a.push(null, personal), false);
+});
+
+test('createVtcJobNotice: un bus cambia de destino en cada parada y sigue siendo el mismo trabajo', () => {
+  const { createVtcJobNotice, vtcJobKey } = require('./pure.js');
+  const personal = { tag: 'KL', name: '', color: null, mode: 'personal' };
+  const bus = (stage, fin = 'lyon') => ({ game: 'ets2', onJob: true, event: {}, plannedDistanceKm: 700, jobIncome: 9000, cityDstId: ['wien', 'graz', fin][stage], cityDst: 'x',
+    bus: { stage, stages: 3, stops: ['berlin', 'wien', 'graz', fin].map(id => ({ type: 'city', id, name: id })) } });
+  const a = createVtcJobNotice();
+  a.push({ game: 'ets2', onJob: false, event: {} }, personal);
+  assert.equal(a.push(bus(0), personal), true);
+  assert.equal(a.push(bus(1), personal), false);
+  assert.equal(a.push(bus(2), personal), false);
+  assert.equal(a.push(bus(0, 'roma'), personal), true);
+  assert.equal(vtcJobKey({ game: 'ets2', onJob: false }), null);
+});
+
+test('los textos de la empresa virtual estan en los ocho idiomas', () => {
+  const fs = require('fs');
+  const vm = require('vm');
+  const ctx = vm.createContext({});
+  for (const f of ['i18n_en_es.js', 'i18n.js']) vm.runInContext(fs.readFileSync(require('path').join(__dirname, f), 'utf8'), ctx);
+  const textos = vm.runInContext('({ ...TRANSLATIONS, ...TRANSLATIONS_EXTRA })', ctx);
+  const conVtc = ['vtcChipTitle', 'vtcChipTitlePersonal', 'vtcModeNow', 'vtcModeNowPersonal', 'vtcJobPersonal'];
+  assert.equal(Object.keys(textos).length, 8);
+  for (const [lang, d] of Object.entries(textos)) {
+    for (const clave of [...conVtc, 'vtcPersonal', 'vtcJobCount', 'vtcModeFailed']) assert.ok(d[clave], `${lang}: ${clave}`);
+    for (const clave of conVtc) assert.ok(d[clave].includes('{vtc}'), `${lang}: ${clave}`);
+    if (lang !== 'en') assert.notEqual(d.vtcModeFailed, textos.en.vtcModeFailed, lang);
+  }
+});
+
 // Trabajo de bus del DLC Coaches como lo manda el cliente (client/trabajo_bus.py),
 // el del primer game.log.txt visto (12-11): turismo Oulu -> mirador de
 // Viitasaari -> Oulu.
