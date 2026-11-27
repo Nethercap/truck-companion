@@ -349,4 +349,37 @@
     <string name="fallo_titulo">Truck Dash s\'est fermé de façon inattendue</string>
     <string name="fallo_texto">Vous pouvez partager un rapport avec la personne qui vous a donné cette bêta. Il contient l\'erreur, le journal récent de l\'appli et le modèle de votre téléphone, mais ni votre compte ni vos codes.</string>
     <string name="fallo_seguir">Continuer</string>
+
+    <!-- La tarjeta para compartir un viaje o el ano (tarjetaDeViaje y tarjetaDelAno de la cuenta en la web) -->
+    <string name="tarjeta_distancia">Distance</string>
+    <string name="tarjeta_vehiculo">Véhicule</string>
+    <string name="tarjeta_bus">Bus</string>
+    <string name="tarjeta_tiempo">Durée</string>
+    <string name="tarjeta_estado">Statut</string>
+    <string name="tarjeta_medida">relevé : %1$s</string>
+    <string name="tarjeta_sin_recorrido">Aucun tracé n\'a été enregistré pour ce trajet.</string>
+    <string name="tarjeta_ano_titulo">Mon année %1$d sur la route</string>
+    <string name="tarjeta_manejado">conduits cette année</string>
+    <string name="tarjeta_vueltas">≈ %1$s fois le tour de la Terre</string>
+    <string name="tarjeta_al_volante">Au volant</string>
+    <string name="tarjeta_entregas">Livraisons</string>
+    <string name="tarjeta_dias_manejados">Jours de conduite</string>
+    <string name="tarjeta_racha">Plus longue série</string>
+    <string name="tarjeta_recorriste">Visités</string>
+    <plurals name="tarjeta_estados">
+        <item quantity="one">%d État ou province</item>
+        <item quantity="other">%d États et provinces</item>
+    </plurals>
+    <plurals name="tarjeta_paises">
+        <item quantity="one">%d pays</item>
+        <item quantity="other">%d pays</item>
+    </plurals>
+    <plurals name="tarjeta_dias">
+        <item quantity="one">%d jour</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+    <!-- "Mover los botones" en el mapa (el modo acomodar de la web) -->
+    <string name="acomodar_ayuda">Fais glisser un bloc pour le déplacer, et son coin pour le redimensionner.</string>
+    <!-- La pestana Tablero de antes, al lado del panel Moderno de la web -->
+    <string name="tablero_detallado">Détaillé</string>
 </resources>

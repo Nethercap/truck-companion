@@ -208,8 +208,28 @@ fun AnoScreen(cuenta: CuentaRepo, ajustes: Ajustes, alVolver: () -> Unit) {
                         ContenidoAno(d, ajustes)
                         Text("trucksim-dash.com", style = MaterialTheme.typography.labelMedium, color = Paleta.TextoSuave)
                     }
+                    // La tarjeta de la web (tarjetaDelAno), con el mapa de lo manejado de ese ano. Sin
+                    // red para los mapas, lo que se ve en la pantalla, como antes.
+                    var armando by remember { mutableStateOf(false) }
                     OutlinedButton(
-                        onClick = { alcance.launch { compartirImagen(contexto, capa.toImageBitmap().asAndroidBitmap(), "truckdash-$ano.png") } },
+                        enabled = !armando,
+                        onClick = {
+                            armando = true
+                            alcance.launch {
+                                val mapas = d.resumenes.mapNotNull { r -> cuenta.mapaRecorrido(r.juego, ano)?.let { r.juego to it } }.toMap()
+                                val usuario = (cuenta.estado.value as? EstadoCuenta.Vinculada)?.usuario?.nombre
+                                val millas = usaMillas(ajustes.unidades, d.totales.maxByOrNull { it.km }?.juego ?: "ets2")
+                                val imagen = if (mapas.isEmpty() && d.resumenes.isNotEmpty()) {
+                                    capa.toImageBitmap().asAndroidBitmap()
+                                } else {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                        tarjetaDelAno(contexto, d, mapas, usuario, millas)
+                                    }
+                                }
+                                compartirImagen(contexto, imagen, "truckdash-$ano.png")
+                                armando = false
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.compartir)) }
                 }

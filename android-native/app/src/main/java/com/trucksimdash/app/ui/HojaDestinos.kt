@@ -70,6 +70,9 @@ private val CATEGORIAS = listOf(
     "w" to "poiCatWeigh",
 )
 
+/** Solo en las variantes que los traen (updateAtlasChip en la web). */
+private val CATEGORIAS_EXTRA = listOf("a" to "poiCatAtlas", "b" to "poiCatBus")
+
 /** Paradas y destinos: el buscador de la web, para usar con una mano y sin mirar mucho. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -182,7 +185,7 @@ fun HojaDestinos(nav: EstadoNav, motor: MotorNav, alReportar: () -> Unit, alCerr
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    CATEGORIAS.forEach { (codigo, clave) ->
+                    (CATEGORIAS + CATEGORIAS_EXTRA.filter { it.first in resultado.extras || it.first == categoria }).forEach { (codigo, clave) ->
                         FilterChip(
                             selected = categoria == codigo,
                             onClick = { categoria = codigo },

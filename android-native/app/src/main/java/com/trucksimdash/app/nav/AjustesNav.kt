@@ -76,6 +76,8 @@ data class AjustesNav(
     val colorRuta: String,
     val colores: List<OpcionNav>,
     val zoomNav: Double,
+    /** El zoom se aleja con la velocidad y se acerca en ciudad, alrededor de zoomNav (navZoomAuto). */
+    val zoomAuto: Boolean,
     val zoomDefecto: Double,
     val tamanoCamion: Double,
     val tamanoDefecto: Double,
@@ -151,6 +153,7 @@ internal fun parsearAjustesNav(texto: String): AjustesNav? {
         colorRuta = d.texto("colorRuta") ?: "#a30000",
         colores = opciones(d, "colores"),
         zoomNav = d.numero("zoomNav") ?: 10.0,
+        zoomAuto = d.logico("zoomAuto") ?: false,
         zoomDefecto = d.numero("zoomDefecto") ?: 10.0,
         tamanoCamion = d.numero("tamanoCamion") ?: 1.0,
         tamanoDefecto = d.numero("tamanoDefecto") ?: 1.0,

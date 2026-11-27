@@ -43,10 +43,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.TurnRight
+import androidx.compose.ui.unit.IntSize
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -91,6 +95,8 @@ import com.trucksimdash.app.mapa.rumboDeGrillaAGeo
 import com.trucksimdash.app.nav.EstadoNav
 import com.trucksimdash.app.nav.MarcaConvoy
 import com.trucksimdash.app.nav.MotorNav
+import com.trucksimdash.app.nav.ParadaBusNav
+import com.trucksimdash.app.nav.ParadaNav
 import com.trucksimdash.app.nav.ResumenNav
 import com.trucksimdash.app.nav.SugerenciaNav
 import com.trucksimdash.app.nav.WaypointNav
@@ -115,6 +121,9 @@ fun MapaScreen(
     alFlotante: () -> Unit = {},
     /** En la ventana chica: sin botones, y el camion siempre en el centro con el rumbo arriba. */
     flotante: Boolean = false,
+    /** "Mover los botones": los bloques se arrastran y se agrandan (el modo acomodar de la web). */
+    acomodando: Boolean = false,
+    alAcomodado: () -> Unit = {},
     alConectar: () -> Unit,
 ) {
     val convoy by motor.convoy.collectAsStateWithLifecycle()
@@ -156,9 +165,29 @@ fun MapaScreen(
     }
     LaunchedEffect(control, seguir) { control?.seguir = seguir }
     LaunchedEffect(control, flotante) { control?.mostrarBrujula(!flotante) }
-    LaunchedEffect(control, conRumbo, nav.zoomNav) {
-        control?.conRumbo = conRumbo
-        if (conRumbo) nav.zoomNav?.let { control?.zoomDeNavegacion(it) }
+    LaunchedEffect(control, conRumbo) { control?.conRumbo = conRumbo }
+    LaunchedEffect(control, ajustes.vista3d) { control?.vista3d = ajustes.vista3d }
+    // El zoom elegido en Ajustes vale con el norte arriba y con el rumbo: aca el mapa siempre guia,
+    // no hay un modo navegacion aparte como en la web. Lo de Ajustes, mientras la navegacion no
+    // dijo nada: asi el primer dato ya cae en ese zoom.
+    val ajustesNav by motor.ajustesNav.collectAsStateWithLifecycle()
+    // Inclinado, un poco mas cerca, como la web con la vista 3D (navTargetZoom).
+    val inclinado = conRumbo && ajustes.vista3d && !apariencia.liviano
+    LaunchedEffect(control, inclinado, nav.zoomNav, nav.zoomNav3d, ajustesNav?.zoomNav) {
+        ((if (inclinado) nav.zoomNav3d else nav.zoomNav) ?: ajustesNav?.zoomNav)?.let { control?.zoomObjetivo = it }
+    }
+    // Pellizcar deja el zoom de la mano hasta recentrar, cambiar de vista o elegir otro en Ajustes
+    // (applyNavZoom en la web): si no, mover el deslizador no hacia nada.
+    var zoomAMano by remember { mutableStateOf(false) }
+    LaunchedEffect(ajustesNav?.zoomNav, ajustesNav?.zoomAuto) { zoomAMano = false }
+    LaunchedEffect(control, zoomAMano) { control?.zoomAMano = zoomAMano }
+    // Soltar el mapa vuelve a seguir al camion a los 10 s, como la web (MAP_FOLLOW_DELAY_MS); el
+    // boton de recentrar es para volver en el acto. Ir a un companero del convoy no cuenta.
+    var soltadoEn by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(soltadoEn, seguir, mirando) {
+        if (seguir || soltadoEn == 0L || mirando) return@LaunchedEffect
+        delay(VOLVER_A_SEGUIR_MS)
+        seguir = true
     }
     // El que mira sin juego no tiene camion que seguir: se encuadra a los que estan.
     var encuadrado by remember(control, versionEstilo, convoy?.codigo) { mutableStateOf(false) }
@@ -237,8 +266,9 @@ fun MapaScreen(
         c.ponerJugadores(cerca + tmp + delConvoy)
     }
 
+    var area by remember { mutableStateOf(IntSize.Zero) }
     Box(
-        Modifier.fillMaxSize().pointerInput(Unit) {
+        Modifier.fillMaxSize().onSizeChanged { area = it }.pointerInput(Unit) {
             // Sin consumir nada: el toque sigue viaje al mapa o al boton.
             awaitPointerEventScope {
                 while (true) {
@@ -251,7 +281,12 @@ fun MapaScreen(
     ) {
         MapaNativo(Modifier.fillMaxSize()) { c ->
             c.alMoverCamara = { camara++ }
-            c.alMoverConLaMano = { seguir = false }
+            c.alMoverConLaMano = {
+                seguir = false
+                soltadoEn = 0L
+            }
+            c.alSoltarElMapa = { soltadoEn = SystemClock.uptimeMillis() }
+            c.alZoomearConLaMano = { zoomAMano = true }
             c.alMantenerApretado = { p ->
                 vibrar.performHapticFeedback(HapticFeedbackType.LongPress)
                 motor.waypointEnMapa(p.lng, p.lat)
@@ -264,10 +299,17 @@ fun MapaScreen(
             ContenidoFlotante(t, usaMillas(ajustes.unidades, t?.juego), nav)
             return@Box
         }
-        Column(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Acomodable(
+            ajustes.disposicion[BLOQUE_GIRO],
+            area,
+            acomodando,
+            porDefecto = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(10.dp),
+            movido = Modifier.widthIn(max = 460.dp),
+            alCambiar = { prefs.ponerBloque(BLOQUE_GIRO, it) },
         ) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Acomodando sin ruta: algo del tamano del panel, para tener que mover.
+            if (acomodando && giro == null) MuestraDeBloque(Icons.Filled.TurnRight)
             convoy?.takeIf { it.mirando }?.let { co ->
                 AvisoConBoton("${co.t("chipSpectator")} · ${co.codigo.orEmpty()}", co.t("close")) { motor.convoyDejarDeMirar() }
             }
@@ -278,7 +320,14 @@ fun MapaScreen(
                 AvisoConBoton(nav.textoRutaOculta, nav.textoMostrarRuta) { motor.mostrarRuta() }
             } else if (t != null && nav.sinRuta != null && !mirando && !ocupado) {
                 AvisoMapa(nav.sinRuta.orEmpty())
+                // El GPS del juego va a algun lado que la app no sabe: las empresas a esa distancia.
+                if (nav.adivinanzas.isNotEmpty()) {
+                    Adivinanzas(nav.textoAdivinanzas, nav.adivinanzas) { motor.elegirAdivinanza(it) }
+                }
             }
+            nav.parada?.takeIf { !mirando }?.let { p -> ParadaDelResumen(p) { motor.sacarWaypoint(0) } }
+            nav.paradaBus?.takeIf { !mirando }?.let { ParadaDeBus(it) }
+            nav.avisoGuardar?.takeIf { !mirando }?.let { AvisoCerrable(it) { motor.cerrarAvisoGuardar() } }
             nav.sugerencia?.let { s ->
                 SugerenciaParada(s, alAceptar = { motor.aceptarSugerencia() }, alCerrar = { motor.cerrarSugerencia() })
             }
@@ -291,10 +340,12 @@ fun MapaScreen(
                     tarjetaAbierta = id
                     co.marcas.firstOrNull { it.id == id }?.let { m ->
                         seguir = false
+                        soltadoEn = 0L
                         control?.irA(LngLat(m.lng, m.lat))
                     }
                 }
             }
+        }
         }
 
         variante?.takeIf { giro == null && nav.sinRuta == null }?.let { v ->
@@ -318,8 +369,16 @@ fun MapaScreen(
         val pantalla = LocalConfiguration.current
         // Lo que ocupan los botones, con su margen: el panel de abajo termina antes (MiniHud).
         var anchoBotones by remember { mutableIntStateOf(0) }
+        val botonesMovidos = ajustes.disposicion[BLOQUE_BOTONES] != null
+        Acomodable(
+            ajustes.disposicion[BLOQUE_BOTONES],
+            area,
+            acomodando,
+            porDefecto = Modifier.align(Alignment.BottomEnd).onSizeChanged { anchoBotones = it.width }.padding(12.dp),
+            alCambiar = { prefs.ponerBloque(BLOQUE_BOTONES, it) },
+        ) {
         FlowColumn(
-            Modifier.align(Alignment.BottomEnd).onSizeChanged { anchoBotones = it.width }.padding(12.dp).alpha(opacidadBotones),
+            Modifier.alpha(if (acomodando) 1f else opacidadBotones),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             maxItemsInEachColumn = if (pantalla.screenWidthDp > pantalla.screenHeightDp) 4 else 8,
@@ -357,19 +416,25 @@ fun MapaScreen(
                     icono = if (conRumbo) Icons.Filled.Navigation else Icons.Filled.Explore,
                     descripcion = stringResource(if (conRumbo) R.string.mapa_norte_arriba else R.string.mapa_con_rumbo),
                     activo = conRumbo,
-                ) { conRumbo = !conRumbo }
+                ) {
+                    conRumbo = !conRumbo
+                    // Como setNavMode en la web: cambiar de vista vuelve al zoom elegido.
+                    zoomAMano = false
+                }
             }
             if (!mirando && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val texto = textosWeb(motor, "pipOverlay")["pipOverlay"].orEmpty()
                 BotonMapa(Icons.Filled.PictureInPictureAlt, texto, activo = false, alTocar = alFlotante)
             }
-            if (!seguir && t?.tienePosicion == true) {
+            // Tambien siguiendo, si el zoom es el de la mano: la ayuda del zoom dice que este boton
+            // vuelve al elegido, y volver a seguir solo no lo hace.
+            if ((!seguir || zoomAMano) && t?.tienePosicion == true) {
                 BotonMapa(Icons.Filled.MyLocation, stringResource(R.string.mapa_recentrar), activo = false) {
+                    zoomAMano = false
                     seguir = true
-                    // Vuelve al zoom elegido en Ajustes, como dice su ayuda.
-                    if (conRumbo) nav.zoomNav?.let { control?.zoomDeNavegacion(it) }
                 }
             }
+        }
         }
 
         if (hojaAbierta) {
@@ -396,15 +461,19 @@ fun MapaScreen(
         }
 
         if (t != null) {
-            // Sin tapar los botones: un panel ancho quedaba encima y no se los podia tocar.
-            val margenBotones = with(LocalDensity.current) { anchoBotones.toDp() }.coerceAtLeast(12.dp)
-            MiniHud(
-                t,
-                usaMillas(ajustes.unidades, t.juego),
-                nav.resumen,
-                nav.miniHud,
-                Modifier.align(Alignment.BottomStart).padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = margenBotones),
-            )
+            // Sin tapar los botones: un panel ancho quedaba encima y no se los podia tocar. Con
+            // los botones movidos a otro lado, ese lugar queda libre.
+            val margenBotones = if (botonesMovidos) 12.dp else with(LocalDensity.current) { anchoBotones.toDp() }.coerceAtLeast(12.dp)
+            Acomodable(
+                ajustes.disposicion[BLOQUE_MINIHUD],
+                area,
+                acomodando,
+                porDefecto = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = margenBotones),
+                movido = Modifier.widthIn(max = 420.dp),
+                alCambiar = { prefs.ponerBloque(BLOQUE_MINIHUD, it) },
+            ) {
+                MiniHud(t, usaMillas(ajustes.unidades, t.juego), nav.resumen, nav.miniHud)
+            }
         } else if (!mirando) {
             Surface(
                 shape = MaterialTheme.shapes.large,
@@ -431,7 +500,29 @@ fun MapaScreen(
             convoy?.takeIf { it.enSala && it.marcas.isNotEmpty() }?.let { co ->
                 ChipsConvoy(co.marcas, c, camara) { m ->
                     seguir = false
+                    soltadoEn = 0L
                     c.irA(LngLat(m.lng, m.lat))
+                }
+            }
+        }
+
+        // La barra del modo acomodar (layoutBar en la web): que hacer, restablecer y listo.
+        if (acomodando) {
+            BackHandler { alAcomodado() }
+            val textos = textosWeb(motor, "layoutReset", "layoutDone")
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = Paleta.Superficie.copy(alpha = 0.95f),
+                border = BorderStroke(1.dp, Paleta.Acento),
+                modifier = Modifier.align(Alignment.Center).padding(24.dp).widthIn(max = 360.dp),
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(stringResource(R.string.acomodar_ayuda), style = MaterialTheme.typography.bodyMedium)
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { prefs.borrarDisposicion() }) { Text(textos["layoutReset"].orEmpty()) }
+                        Spacer(Modifier.size(8.dp))
+                        Button(onClick = alAcomodado) { Text(textos["layoutDone"].orEmpty()) }
+                    }
                 }
             }
         }
@@ -606,6 +697,74 @@ internal fun AvisoConBoton(texto: String, boton: String, alCerrar: (() -> Unit)?
     }
 }
 
+/** La proxima parada propia (#routeStop de la web): nombre, km y llegada, y el boton de saltearla. */
+@Composable
+private fun ParadaDelResumen(p: ParadaNav, alSaltear: () -> Unit) {
+    Surface(shape = MaterialTheme.shapes.small, color = Paleta.Fondo.copy(alpha = 0.88f)) {
+        Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f, fill = false).padding(vertical = 4.dp)) {
+                Text(p.nombre, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                p.eta?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall.merge(NumerosTabulares), color = Paleta.TextoSuave, maxLines = 1)
+                }
+            }
+            TextButton(onClick = alSaltear) { Text(p.saltear, maxLines = 1) }
+        }
+    }
+}
+
+/** La proxima parada de un trabajo de bus y su hora (del juego), en rojo si ya paso. */
+@Composable
+private fun ParadaDeBus(p: ParadaBusNav) {
+    Surface(shape = MaterialTheme.shapes.small, color = Paleta.Fondo.copy(alpha = 0.88f)) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                p.texto,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            p.hora?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall.merge(NumerosTabulares),
+                    color = if (p.tarde) Paleta.Rojo else Paleta.TextoSuave,
+                    fontWeight = if (p.tarde) FontWeight.SemiBold else null,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Un aviso que solo se cierra, como el de guardar con F5. */
+@Composable
+private fun AvisoCerrable(texto: String, alCerrar: () -> Unit) {
+    Surface(shape = MaterialTheme.shapes.small, color = Paleta.Fondo.copy(alpha = 0.88f), border = BorderStroke(1.dp, Paleta.Ambar)) {
+        Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(texto, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f, fill = false).padding(vertical = 6.dp))
+            IconButton(onClick = alCerrar) { Icon(Icons.Filled.Close, stringResource(R.string.cerrar), tint = Paleta.TextoSuave) }
+        }
+    }
+}
+
+/** Las empresas a la distancia que dice el GPS del juego: un toque pone ahi un waypoint. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Adivinanzas(titulo: String, lista: List<String>, alElegir: (Int) -> Unit) {
+    Surface(shape = MaterialTheme.shapes.small, color = Paleta.Fondo.copy(alpha = 0.88f)) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Text(titulo, style = MaterialTheme.typography.bodySmall, color = Paleta.TextoSuave)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                lista.forEachIndexed { i, nombre ->
+                    TextButton(onClick = { alElegir(i) }) { Text(nombre, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AvisoMapa(texto: String) {
     Surface(shape = MaterialTheme.shapes.small, color = Paleta.Fondo.copy(alpha = 0.88f)) {
@@ -705,4 +864,20 @@ private fun DatoHud(titulo: String, valor: String) {
     }
 }
 
+/** Lo que se ve mientras se acomoda un bloque que ahora no esta (el giro sin ruta). */
+@Composable
+private fun MuestraDeBloque(icono: androidx.compose.ui.graphics.vector.ImageVector) {
+    Surface(shape = MaterialTheme.shapes.medium, color = Paleta.Fondo.copy(alpha = 0.88f), modifier = Modifier.fillMaxWidth()) {
+        Box(Modifier.padding(16.dp), contentAlignment = Alignment.CenterStart) {
+            Icon(icono, null, tint = Paleta.Acento, modifier = Modifier.size(44.dp))
+        }
+    }
+}
+
+/** Las claves de cada bloque en "Mover los botones" (Ajustes.disposicion). */
+internal const val BLOQUE_GIRO = "giro"
+internal const val BLOQUE_BOTONES = "botones"
+internal const val BLOQUE_MINIHUD = "minihud"
+
 private const val BOTONES_QUIETOS_MS = 6000L
+private const val VOLVER_A_SEGUIR_MS = 10_000L

@@ -1259,7 +1259,7 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   igual byte a byte al de la 1.62.2.1 publicada). No se sigue la ruta del GPS
   del juego (`followGameRoute`): va por todas las paradas hasta el final. Lo
   que falta es el de nuestra ruta, y abajo del resumen la parada con su
-  horario (`busNextStopLine`). La app nativa todavia no lo dibuja.
+  horario (`busNextStopLine`). La app nativa lo dibuja desde el 27-11 (`paradaBus`).
   Un trabajo de linea o de turismo se elige en el mapa del juego y se toma en
   la terminal (Discord 14-11, 1.5.41; el rapido te lleva ahi y anda): hasta
   ahi el GPS del juego va a la terminal y la telemetria no trae trabajo (la
@@ -1270,8 +1270,8 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   ofrece la terminal y AeroBaltica. Tambien van en el mapa (capa `bus-stop`, de
   `busStopList`, con iconos dibujados en un canvas, `addBusStopImages`: uno en
   R2 habria que subirlo antes, por los 404 guardados) y en el buscador (chip
-  `b`, oculto si la variante no tiene terminales). La app nativa no tiene
-  ninguna de las tres.
+  `b`, oculto si la variante no tiene terminales). La app nativa tiene las tres
+  desde el 27-11 (`bus-stops` en `fuentesCapas`, iconos en `ControlMapa.terminalDeBus`).
   Visto en el juego (log de un usuario, 12-11, turismo de punta a punta): la
   configuracion vuelve al embarcar y en cada llegada (`current` sube en la
   parada del medio y queda en la ultima etapa al llegar al final), y unos 40 s
@@ -1403,7 +1403,7 @@ Salieron de comparar con los pedidos y resenas de TruckSim GPS.
 - La voz dice el ferry o el tren como un giro, anticipado y en el punto (paquetes v5;
   `voiceManeuverKey`, `take_ferry` y `take_train`), sin el puerto. Cual de los dos sale de
   `ferryPortAt` (`voiceManeuverTick`): mientras no llega se calla sin darlo por dicho,
-  porque en Calais salen los dos. La app nativa no lee tiles y sigue callada.
+  porque en Calais salen los dos. La app nativa lo dice desde el 27-11 (ver abajo).
 - Aviso de F5 (`createGpsSaveHint`, renglon del resumen): solo con `gameGps`. Nunca
   aprieta nada. Un salto de los km del juego parado o recien salido de la pausa es un
   destino puesto a mano y alcanza con poco; andando puede ser un desvio o un area de
@@ -1412,8 +1412,31 @@ Salieron de comparar con los pedidos y resenas de TruckSim GPS.
   despues, no contra un largo fijo: si subieron juntas no avisa. Se va solo (partida
   nueva, sin ruta, salto del camion, parada propia, 10 min) y con la X. Con el resumen
   minimizado o en el hueco chico del tablero va como toast. Sin probar en el juego.
-- La app nativa muestra "Take the ferry" sin el puerto (el motor no lee tiles) y sin
-  icono propio, y no tiene el ajuste del zoom, la hora de la proxima parada ni el aviso.
+- La app nativa tiene todo esto desde el 27-11: ver "App nativa a la par de la web".
+
+## App nativa a la par de la web (27-11)
+
+- El motor lee tiles: `vendor/pmtiles` entra en el motor (`armar_motor.js`) y el `fetch`
+  de `puente.js` acepta `{ rango: [desde, largo] }` (`FuenteRangos` en `conduccion.js`).
+  Kotlin lo pide con Range, o del mapa bajado (`nav/Pedazos.kt`, `TilesDeMapa.archivoLocal`).
+  `puente.js` tiene un `TextDecoder` (UTF-8, `mvtPoints`) y un `AbortController` con avisos
+  (pmtiles los escucha): QuickJS no trae ninguno. En el guion, cada pedazo va como
+  `url#desde+largo`. Con eso salen el puerto del ferry y su voz, iguales a la web.
+- Lo que la web hace en `handleTelemetry` y el motor no llamaba: `updateWaypointRoute`
+  (km y hora de la proxima parada), `updateGameGpsSave`, `updateGameGpsGuess`,
+  `updateGpsSaveHint` y `busJobMemory.push`. Algo nuevo que la web llame por dato hay
+  que sumarlo en `motor.telemetria` o no llega.
+- El panel Moderno de la pestana Tablero es la excepcion a "el motor corre el codigo de la
+  web": `docs/dash/dash.js` entra al motor por sus constantes, pero lo que su `render()`
+  escribe lo rehace `tableroModerno()` en `conduccion.js` (ya en frases) y Kotlin lo dibuja
+  (`ui/TableroModerno.kt`, colores y medidas de dash.css). Un cambio en el render del
+  Moderno hay que hacerlo tambien ahi. Los otros estilos y el tablero alrededor del mapa no
+  estan (pedido del usuario, 27-11); "Detallado" en Ajustes es el tablero de antes de la app.
+- El zoom de navegacion vale tambien con el norte arriba (la app siempre guia). La vista 3D
+  la guarda la app (`vista3d` en sus preferencias, prendida por defecto), no `nav3d` de la
+  web: quien guardo cualquier ajuste alla tiene `nav3d: false` sin haberlo elegido.
+- "Mover los botones" de la app mueve bloques (el giro, los botones, el mini-HUD), no cada
+  boton; las posiciones con la misma forma que `layoutAnchor` (`core/Disposicion.kt`).
 
 ## Modales, overlay de OBS y accesibilidad (13-10)
 

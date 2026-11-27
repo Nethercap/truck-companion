@@ -65,12 +65,15 @@ class MotorGuionTest {
                 for (i in 0 until pedidos.length()) {
                     val p = pedidos.getJSONObject(i)
                     val url = p.getString("url")
-                    val a = archivos.optJSONObject(url)
+                    // Un pedazo (los tiles del puerto de un ferry) va en el guion como url#desde+largo.
+                    val rango = p.optJSONArray("rango")
+                    val clave = if (rango != null) "$url#${rango.getLong(0)}+${rango.getLong(1)}" else url
+                    val a = archivos.optJSONObject(clave)
                     val nombre = a?.optString("archivo").takeUnless { a?.isNull("archivo") != false }
                     val bytes = nombre?.let { File(carpeta, it).readBytes() }
                     val cuerpo: Any = when {
                         bytes == null -> ""
-                        ArchivosMapa.esBinario(url) -> bytes
+                        rango != null || ArchivosMapa.esBinario(url) -> bytes
                         else -> String(bytes, Charsets.UTF_8)
                     }
                     f("respuesta").call(p.getInt("id"), a?.optInt("status", 404) ?: 404, cuerpo)

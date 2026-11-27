@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.ForkRight
 import androidx.compose.material.icons.filled.RoundaboutLeft
 import androidx.compose.material.icons.filled.RoundaboutRight
 import androidx.compose.material.icons.filled.Straight
+import androidx.compose.material.icons.filled.Train
+import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -57,6 +59,8 @@ internal fun iconoDe(m: Maniobra): ImageVector = when (m) {
     Maniobra.ForkDerecha -> Icons.Filled.ForkRight
     Maniobra.RotondaHoraria -> Icons.Filled.RoundaboutRight
     Maniobra.RotondaAntihoraria -> Icons.Filled.RoundaboutLeft
+    Maniobra.Ferry -> Icons.Filled.DirectionsBoat
+    Maniobra.Tren -> Icons.Filled.Train
 }
 
 /**

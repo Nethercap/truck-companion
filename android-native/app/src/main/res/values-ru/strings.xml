@@ -355,4 +355,43 @@
     <string name="fallo_titulo">Truck Dash неожиданно закрылся</string>
     <string name="fallo_texto">Можно поделиться отчётом с тем, кто дал вам эту бету. В нём ошибка, недавний журнал приложения и модель телефона, но нет вашей учётной записи и кодов.</string>
     <string name="fallo_seguir">Продолжить</string>
+
+    <!-- La tarjeta para compartir un viaje o el ano (tarjetaDeViaje y tarjetaDelAno de la cuenta en la web) -->
+    <string name="tarjeta_distancia">Расстояние</string>
+    <string name="tarjeta_vehiculo">Машина</string>
+    <string name="tarjeta_bus">Автобус</string>
+    <string name="tarjeta_tiempo">Время</string>
+    <string name="tarjeta_estado">Статус</string>
+    <string name="tarjeta_medida">мы записали %1$s</string>
+    <string name="tarjeta_sin_recorrido">Для этого рейса маршрут не сохранён.</string>
+    <string name="tarjeta_ano_titulo">Мой %1$d год в дороге</string>
+    <string name="tarjeta_manejado">проехано за год</string>
+    <string name="tarjeta_vueltas">≈ %1$s оборота вокруг Земли</string>
+    <string name="tarjeta_al_volante">За рулём</string>
+    <string name="tarjeta_entregas">Доставки</string>
+    <string name="tarjeta_dias_manejados">Дней за рулём</string>
+    <string name="tarjeta_racha">Самая длинная серия</string>
+    <string name="tarjeta_recorriste">Посещено</string>
+    <plurals name="tarjeta_estados">
+        <item quantity="one">%d штат или провинция</item>
+        <item quantity="few">%d штата и провинции</item>
+        <item quantity="many">%d штатов и провинций</item>
+        <item quantity="other">%d штата и провинции</item>
+    </plurals>
+    <plurals name="tarjeta_paises">
+        <item quantity="one">%d страна</item>
+        <item quantity="few">%d страны</item>
+        <item quantity="many">%d стран</item>
+        <item quantity="other">%d страны</item>
+    </plurals>
+    <plurals name="tarjeta_dias">
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дня</item>
+        <item quantity="many">%d дней</item>
+        <item quantity="other">%d дня</item>
+    </plurals>
+    <!-- "Mover los botones" en el mapa (el modo acomodar de la web) -->
+    <string name="acomodar_ayuda">Перетащите блок, чтобы переместить его, и его угол, чтобы изменить размер.</string>
+    <!-- La pestana Tablero de antes, al lado del panel Moderno de la web -->
+    <string name="tablero_detallado">Подробный</string>
 </resources>

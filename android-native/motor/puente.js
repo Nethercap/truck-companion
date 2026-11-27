@@ -90,7 +90,52 @@ var Notification = undefined;
 var MutationObserver = class { observe() {} disconnect() {} };
 var ResizeObserver = class { observe() {} disconnect() {} };
 var IntersectionObserver = class { observe() {} disconnect() {} };
-var AbortController = class { constructor() { this.signal = {}; } abort() {} };
+// UTF-8 nada mas: mvtPoints lee asi los nombres de los puertos de un tile (loadFerryPort).
+var TextDecoder = class {
+  decode(entrada) {
+    const b = entrada instanceof Uint8Array ? entrada : new Uint8Array(entrada || []);
+    let fuera = '';
+    let codigos = [];
+    for (let i = 0; i < b.length;) {
+      const c = b[i];
+      let cp = 0xfffd, largo = 1;
+      if (c < 0x80) cp = c;
+      else if (c >= 0xc2 && c < 0xe0 && i + 1 < b.length) { cp = ((c & 0x1f) << 6) | (b[i + 1] & 0x3f); largo = 2; }
+      else if (c >= 0xe0 && c < 0xf0 && i + 2 < b.length) { cp = ((c & 0x0f) << 12) | ((b[i + 1] & 0x3f) << 6) | (b[i + 2] & 0x3f); largo = 3; }
+      else if (c >= 0xf0 && c < 0xf5 && i + 3 < b.length) {
+        cp = ((c & 0x07) << 18) | ((b[i + 1] & 0x3f) << 12) | ((b[i + 2] & 0x3f) << 6) | (b[i + 3] & 0x3f);
+        largo = 4;
+      }
+      i += largo;
+      if (cp > 0xffff) {
+        cp -= 0x10000;
+        codigos.push(0xd800 + (cp >> 10), 0xdc00 + (cp & 0x3ff));
+      } else codigos.push(cp);
+      if (codigos.length > 4096) { fuera += String.fromCharCode.apply(null, codigos); codigos = []; }
+    }
+    return fuera + String.fromCharCode.apply(null, codigos);
+  }
+};
+
+// La senal con sus avisos: la libreria pmtiles (el puerto de los ferries) los escucha.
+var AbortController = class {
+  constructor() {
+    const avisos = [];
+    this.signal = {
+      aborted: false,
+      addEventListener(tipo, fn) { if (tipo === 'abort') avisos.push(fn); },
+      removeEventListener(tipo, fn) { const i = avisos.indexOf(fn); if (i >= 0) avisos.splice(i, 1); },
+    };
+    this.avisos = avisos;
+  }
+  abort() {
+    if (this.signal.aborted) return;
+    this.signal.aborted = true;
+    for (const fn of this.avisos.splice(0)) {
+      try { fn(); } catch (e) {}
+    }
+  }
+};
 var navigator = {
   // deviceInfo de la web: Android sin "Mobile" es una tablet. Es lo que los demas dispositivos
   // de la sesion leen cuando la voz esta aca.
@@ -195,6 +240,9 @@ function urlAbsoluta(url) {
 function fetch(url, opciones) {
   const id = proximoPedido++;
   const pedido = { id, url: urlAbsoluta(url) };
+  // Un pedazo de un archivo grande ([desde, largo]): los tiles del puerto de un ferry, del
+  // .pmtiles del mapa (FuenteRangos en conduccion.js). Kotlin lo pide con Range, sin cache.
+  if (opciones && Array.isArray(opciones.rango)) pedido.rango = [Number(opciones.rango[0]), Number(opciones.rango[1])];
   // Un POST nunca va al cache (el reporte de navegacion y su estado).
   if (opciones && opciones.method && opciones.method !== 'GET') {
     pedido.method = opciones.method;

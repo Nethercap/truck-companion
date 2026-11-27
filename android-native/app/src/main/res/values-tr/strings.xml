@@ -343,4 +343,37 @@
     <string name="fallo_titulo">Truck Dash beklenmedik şekilde kapandı</string>
     <string name="fallo_texto">Bu betayı sana veren kişiyle bir rapor paylaşabilirsin. Raporda hata, uygulamanın son günlüğü ve telefon modelin var; hesabın ve kodların yok.</string>
     <string name="fallo_seguir">Devam et</string>
+
+    <!-- La tarjeta para compartir un viaje o el ano (tarjetaDeViaje y tarjetaDelAno de la cuenta en la web) -->
+    <string name="tarjeta_distancia">Mesafe</string>
+    <string name="tarjeta_vehiculo">Araç</string>
+    <string name="tarjeta_bus">Otobüs</string>
+    <string name="tarjeta_tiempo">Süre</string>
+    <string name="tarjeta_estado">Durum</string>
+    <string name="tarjeta_medida">kaydettiğimiz %1$s</string>
+    <string name="tarjeta_sin_recorrido">Bu sefer için rota kaydedilmedi.</string>
+    <string name="tarjeta_ano_titulo">Yolda geçen %1$d yılım</string>
+    <string name="tarjeta_manejado">bu yıl sürüldü</string>
+    <string name="tarjeta_vueltas">≈ Dünya çevresinde %1$s tur</string>
+    <string name="tarjeta_al_volante">Direksiyonda</string>
+    <string name="tarjeta_entregas">Teslimatlar</string>
+    <string name="tarjeta_dias_manejados">Sürüş günleri</string>
+    <string name="tarjeta_racha">En uzun seri</string>
+    <string name="tarjeta_recorriste">Ziyaret edilen</string>
+    <plurals name="tarjeta_estados">
+        <item quantity="one">%d eyalet ve il</item>
+        <item quantity="other">%d eyalet ve il</item>
+    </plurals>
+    <plurals name="tarjeta_paises">
+        <item quantity="one">%d ülke</item>
+        <item quantity="other">%d ülke</item>
+    </plurals>
+    <plurals name="tarjeta_dias">
+        <item quantity="one">%d gün</item>
+        <item quantity="other">%d gün</item>
+    </plurals>
+    <!-- "Mover los botones" en el mapa (el modo acomodar de la web) -->
+    <string name="acomodar_ayuda">Taşımak için bir bloğu, boyutunu değiştirmek için köşesini sürükle.</string>
+    <!-- La pestana Tablero de antes, al lado del panel Moderno de la web -->
+    <string name="tablero_detallado">Ayrıntılı</string>
 </resources>

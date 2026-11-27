@@ -5,6 +5,7 @@ import com.trucksimdash.app.core.Boveda
 import com.trucksimdash.app.core.Red
 import com.trucksimdash.app.core.entero
 import com.trucksimdash.app.core.logico
+import com.trucksimdash.app.core.lista
 import com.trucksimdash.app.core.objeto
 import com.trucksimdash.app.core.parsearObjeto
 import com.trucksimdash.app.core.texto
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -163,6 +165,24 @@ class CuentaRepo(
         val filtro = if (ano != null) "&year=$ano&tz=$zonaHoraria" else ""
         val r = pedir("/trips/map?game=$juego$filtro", token = token)
         return if (r.codigo == 200) parsearMapa(r.datos) else null
+    }
+
+    /**
+     * El recorrido de un viaje (/trips/{id}): tramos de puntos [x, z] o [x, z, km/h] en
+     * coordenadas del juego. Se pide recien para la tarjeta para compartir: son un par de KB.
+     */
+    suspend fun recorridoViaje(id: String): List<List<DoubleArray>>? {
+        val token = boveda.token ?: return null
+        val r = pedir("/trips/$id", token = token)
+        if (r.codigo != 200) return null
+        val ruta = r.datos?.objeto("trip")?.lista("route") ?: return emptyList()
+        return ruta.mapNotNull { tramo ->
+            (tramo as? JsonArray)?.mapNotNull { p ->
+                val a = p as? JsonArray ?: return@mapNotNull null
+                val numeros = a.mapNotNull { it.toString().toDoubleOrNull() }
+                numeros.takeIf { it.size >= 2 }?.toDoubleArray()
+            }
+        }
     }
 
     suspend fun resumenAno(ano: Int): ResumenAno? {

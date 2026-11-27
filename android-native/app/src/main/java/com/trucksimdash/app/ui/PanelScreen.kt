@@ -32,6 +32,8 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -144,6 +146,46 @@ private fun TableroContenido(
     val nav by motor.estado.collectAsStateWithLifecycle()
     val trazos by motor.trazos.collectAsStateWithLifecycle()
     val millas = usaMillas(ajustes.unidades, t.juego)
+    val comandos: @Composable (Int) -> Unit = { porFila ->
+        BloqueComandos(
+            t,
+            { sesion.enviarComando(it) },
+            porFila = porFila,
+            propios = ajustes.botones,
+            alApretarPropio = { sesion.enviarTecla(it) },
+            alEditarPropio = { alEditarBoton(it ?: NUEVO_BOTON) },
+        )
+    }
+    // El panel Moderno de la web (Ajustes > Estilo del tablero), con lo propio de la app al lado:
+    // el giro y los botones de comandos. "Detallado" es el tablero de siempre de la app.
+    val tablero = nav.tablero.takeIf { ajustes.estiloTablero != "detallado" }
+    if (tablero != null) {
+        if (apaisado) {
+            Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    BarraEstado(estado, nav.hora12, alAjustes)
+                    AvisosTablero(estado, sesion, motor, nav.actualizarCliente)
+                    TarjetaNav(nav, trazos)
+                    comandos(4)
+                }
+                TableroModerno(tablero, { motor.reiniciarTablero() }, Modifier.weight(1.4f).verticalScroll(rememberScrollState()))
+            }
+        } else {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                BarraEstado(estado, nav.hora12, alAjustes)
+                AvisosTablero(estado, sesion, motor, nav.actualizarCliente)
+                TarjetaNav(nav, trazos)
+                TableroModerno(tablero, { motor.reiniciarTablero() }, Modifier.fillMaxWidth()) { comandos(4) }
+            }
+        }
+        return
+    }
     if (apaisado) {
         Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(
@@ -161,14 +203,7 @@ private fun TableroContenido(
             ) {
                 TarjetaNav(nav, trazos)
                 BloqueViaje(t, millas)
-                BloqueComandos(
-                    t,
-                    { sesion.enviarComando(it) },
-                    porFila = 4,
-                    propios = ajustes.botones,
-                    alApretarPropio = { sesion.enviarTecla(it) },
-                    alEditarPropio = { alEditarBoton(it ?: NUEVO_BOTON) },
-                )
+                comandos(4)
                 BloqueTrabajo(t, millas, nav.pagoTrabajo)
                 BloqueSesion(nav.sesion, { motor.reiniciarSesion() })
                 BloqueCamion(t, millas)
@@ -185,13 +220,7 @@ private fun TableroContenido(
             BloqueManejo(t, millas)
             FilaTestigos(t)
             BloqueViaje(t, millas)
-            BloqueComandos(
-                t,
-                { sesion.enviarComando(it) },
-                propios = ajustes.botones,
-                alApretarPropio = { sesion.enviarTecla(it) },
-                alEditarPropio = { alEditarBoton(it ?: NUEVO_BOTON) },
-            )
+            comandos(4)
             BloqueTrabajo(t, millas, nav.pagoTrabajo)
             BloqueSesion(nav.sesion, { motor.reiniciarSesion() })
             BloqueCamion(t, millas)

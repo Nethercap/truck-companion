@@ -10,28 +10,30 @@ side because this one has its own application id (`com.trucksimdash.app.nativa`,
 
 | | |
 |---|---|
-| **Dashboard** | Speed gauge with the limit, gear, RPM, cruise, warning lights, fuel, GPS distance and time, rest, consumption, current job with pay in your currency, tolls and fines of the session, truck and wear; the delivery card with what the job earned and cost |
+| **Dashboard** | The web's Modern panel (the trip ribbon with where to rest and refuel, and cards that start with the conclusion: arriving early or late, enough fuel, the worst wear), with the turn and the command buttons next to it; or, under Settings, the app's detailed one: speed gauge with the limit, gear, RPM, cruise, warning lights, fuel, GPS distance and time, rest, consumption, current job with pay in your currency, tolls and fines of the session, truck and wear; the delivery card with what the job earned and cost, and a coach job's stops and passengers |
 | **Commands** | The 12 buttons of the web panel, up to 3 of your own with any key, and remapping the keys; they press the key on the PC, and their state comes from the game |
 | **Connection** | Pairing code through the relay, or directly over the local network; reconnects by itself, and keeps going with another app in front (Moonlight, for example), with a notification showing the next turn, speed and speed limit (the speed is also the status bar icon) |
 | **Floating window** | Android's picture-in-picture: the map, the next turn and your speed on top of another app, from a map button or on leaving the app |
-| **Your map** | The same vector maps as the web with road shields, the Atlas, car parking and car-only fuel, truck with smooth movement, trail, follow or heading-up, other drivers and TruckersMP players |
-| **Navigation** | Route to the job, turn instructions, lanes, spoken directions with a choice of voice, volume and timing, nearest fuel or rest, search, waypoints (long-press the map), fastest or shortest, DLCs you don't own, every highway exit, rest warning, the same stop suggestions as the web, reporting a navigation problem |
+| **Your map** | The same vector maps as the web with road shields, the Atlas, bus terminals, car parking and car-only fuel, truck with smooth movement, trail, follow or heading-up with or without 3D, other drivers and TruckersMP players. The turn panel, the buttons and the mini-HUD can be moved and resized ("Move the buttons" in Settings); after moving the map by hand it follows the truck again in 10 seconds |
+| **Navigation** | Route to the job, turn instructions, lanes, spoken directions with a choice of voice, volume and timing, nearest fuel or rest, search (with the Atlas and bus terminals where the map has them), waypoints (long-press the map) with the next one's distance and arrival, fastest or shortest, DLCs you don't own, every highway exit, rest warning, the same stop suggestions as the web, which ferry or train to take and its port, a coach job's next stop and timetable, following the game's GPS read from the save (its waypoints as stops, the F5 save warning, places at that distance when the app can't follow it), reporting a navigation problem |
 | **With your other devices** | Waypoints, route settings and which device speaks are shared with the session, also over the local network. The app feeds the in-game overlay and your route on the live map, like a dashboard tab |
 | **Convoy** | Create or join one, members on the map and in cards, chips at the map's edge for those off screen, quick messages, follow the leader and see their route, kick, share your pay; watching one with its code or link, no game needed |
 | **Maps without internet** | Download a map and its road network: the tiles come from a file, and routes keep working |
 | **Maps built on the PC** | What "Build my map" built, read from the client over the local network |
 | **Demo** | The web's demo drive, with no PC or game |
 | **Live map** | Drivers sharing their position on each map, their routes, follow one |
-| **Stats** | Totals by game, driving per day, money by currency, records, most used, achievements, logbook with notes and corrections, map of everything driven, year in review to share as an image, following other drivers, their profiles, and public profiles with no account |
-| **Settings** | Share position, route and nickname, units, clock, map override, keep the screen on, mini-HUD contents, route color, navigation zoom, truck size, fading the map buttons, real base map, lite mode, pay in your currency, the panel link and the OBS overlay for other devices |
+| **Stats** | Totals by game, driving per day, money by currency, records, most used, achievements, logbook with notes and corrections, map of everything driven, year in review to share as an image with the map of the year, any trip as an image with its route, following other drivers, their profiles, and public profiles with no account |
+| **Settings** | Share position, route and nickname, units, clock, map override, keep the screen on, mini-HUD contents, route color, navigation zoom (fixed at the level you pick, north up or heading up, or automatic with the speed), 3D view, truck size, fading the map buttons, real base map, lite mode, pay in your currency, the panel link and the OBS overlay for other devices |
 
 The 8 languages of the web. Phone in portrait or landscape.
 
 ## What's missing to match the web
 
-- The gauge styles of the web's panel (`docs/dash/`: classic and truck dashboards) and the
-  dashboard around the map. A second device can open that panel: Settings copies its link.
-- Moving the map buttons around, and sharing a single trip or the driven map as an image.
+- The other styles of the web's panel (`docs/dash/`: classic, European, digital and American)
+  and the truck dashboard around the map: only the Modern one is here. A second device can open
+  that panel: Settings copies its link.
+- Moving each map button on its own: here the buttons move and resize as one block, and so do
+  the turn panel and the mini-HUD.
 - Before replacing the TWA on Play: this has to reach feature parity, use the package
   name `com.trucksimdash.app`, and get its store listing, Data safety form and the
   foreground service (`connectedDevice`, declared in the Play Console) reviewed.
@@ -50,6 +52,9 @@ On purpose, not like the web:
   cities fall on real land, and it can only be read over the local network: with a pairing
   code the page tries `127.0.0.1`, and a phone never gets there.
 - Showing the turn in the mini-HUD isn't offered: the turn panel is always on the map.
+- The navigation zoom applies with north up too: the map here always guides, there is no
+  separate navigation mode. The 3D view is kept by the app (on by default, as the map here was
+  always tilted with the heading) and uses the web's tilt.
 
 ## How navigation works
 
@@ -63,7 +68,13 @@ draws the result.
 never into git:
 
 1. `motor/puente.js`, a fake browser: timers, `fetch`, audio, an empty DOM.
-2. proj4, `variants.js`, `pure.js` and the translations.
+2. proj4, pmtiles (for the port of each ferry, read from one tile of the map), `variants.js`,
+   `pure.js` and the translations.
+
+The Modern panel is the exception: `docs/dash/dash.js` goes into the motor for its constants,
+`tableroModerno()` in `conduccion.js` writes what its `render()` puts on the page, already as
+sentences, and Kotlin lays it out (`ui/TableroModerno.kt`, with the colours and sizes of
+`dash.css`). A change to that panel on the web has to be made in `tableroModerno()` too.
 3. The declarations of `app.js` that are needed, found by following names from the
    `RAICES` list and what the next two files use; the web isn't touched.
 4. `convoy.js`, whole.
@@ -96,7 +107,9 @@ the same: each one is a function of `motor`.
   to the relay when the client passes one. This is why the app allows cleartext traffic
   (`res/xml/red.xml`); everything else is https/wss.
 - **Maps**: `.pmtiles` from R2 with range requests, sending a trucksim-dash.com Referer
-  (`core/Red.kt`). The tools secret is never in the app: an APK can be opened.
+  (`core/Red.kt`). The tools secret is never in the app: an APK can be opened. The motor's
+  `fetch` takes a `rango` too (`FuenteRangos` in `conduccion.js`): `nav/Pedazos.kt` reads that
+  piece with Range, or from the downloaded map, for the tile with a ferry's port.
 - **Account**: the device link flow of the PC client (`/auth/device`). You approve it on
   the website, and the token stays encrypted with a key from the Android Keystore. The
   app never sees a password. The token works for trips and following; changing the name

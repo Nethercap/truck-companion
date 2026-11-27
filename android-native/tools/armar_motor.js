@@ -269,10 +269,16 @@ function armar() {
     puente,
     '// ---- vendor/proj4',
     leer('vendor/proj4-2.15.0.js'),
+    // Para el puerto de los ferries (loadFerryPort): los tiles, de a pedazos (FuenteRangos).
+    '// ---- vendor/pmtiles',
+    leer('vendor/pmtiles-4.5.0.js'),
     '// ---- variants.js',
     leer('variants.js'),
     '// ---- pure.js',
     pure,
+    // El panel Moderno (docs/dash/dash.js): sus constantes y el armado, para tableroModerno().
+    '// ---- dash/dash.js',
+    leerTexto(path.join(APP, '..', 'dash', 'dash.js')),
     '// ---- i18n',
     leer('i18n.js'),
     leer('i18n_en_es.js'),

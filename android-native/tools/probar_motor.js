@@ -101,6 +101,31 @@ async function bajar(url) {
   return { status: 200, bytes };
 }
 
+// Un pedazo de un archivo grande, como lo pide MotorNav.kt (Range): los tiles del puerto de un
+// ferry. En el guion va con la URL y el pedazo: url#desde+largo.
+const clavePedazo = (url, desde, largo) => `${url}#${desde}+${largo}`;
+async function bajarPedazo(url, desde, largo) {
+  fs.mkdirSync(CACHE, { recursive: true });
+  const clave = clavePedazo(url, desde, largo);
+  const ruta = path.join(CACHE, nombreEnCache(clave));
+  if (fs.existsSync(ruta)) {
+    archivosPedidos.set(clave, { status: 206, archivo: nombreEnCache(clave) });
+    return { status: 206, bytes: fs.readFileSync(ruta) };
+  }
+  const llave = process.env.TRUCKDASH_MAPS_KEY;
+  const headers = { Range: `bytes=${desde}-${desde + largo - 1}`,
+    ...(llave && url.startsWith('https://maps.trucksim-dash.com/') ? { 'x-truckdash-tools': llave } : { Referer: 'https://trucksim-dash.com/app/' }) };
+  const r = await fetch(url, { headers });
+  if (r.status !== 206) {
+    archivosPedidos.set(clave, { status: 0, archivo: null });
+    return { status: 0, bytes: null };
+  }
+  const bytes = Buffer.from(await r.arrayBuffer());
+  fs.writeFileSync(ruta, bytes);
+  archivosPedidos.set(clave, { status: 206, archivo: nombreEnCache(clave) });
+  return { status: 206, bytes };
+}
+
 // Un motor recien armado y lo que hace MotorNav.kt alrededor. Con grabar, cada llamada queda
 // en pasos con lo que dio despues: eso es el guion.
 function abrir({ variante = 'ats', lang = 'en', imperial = true, voz = false, grabar = false, almacen = null, zona = null, tasas = null } = {}) {
@@ -162,6 +187,11 @@ function abrir({ variante = 'ats', lang = 'en', imperial = true, voz = false, gr
         if (p.url.endsWith('/rates')) {
           if (tasas) motor.respuesta(p.id, 200, JSON.stringify({ base: 'USD', rates: tasas }));
           else motor.respuesta(p.id, 500, '');
+          continue;
+        }
+        if (p.rango) {
+          const r = await bajarPedazo(p.url, p.rango[0], p.rango[1]);
+          motor.respuesta(p.id, r.status, r.bytes ? r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.length) : '');
           continue;
         }
         const r = await bajar(p.url);
@@ -326,6 +356,201 @@ const ESCENARIOS = {
     await otra.paso('telemetria', [dato(otra, TRABAJO_DEMO, puntos[5][0], puntos[5][1], 90)]);
     await otra.tragar();
     chequear(otra.j('routeGraphState') === 'off' && !otra.nav().hayRuta, `liviano sin ruteo: ${otra.j('routeGraphState')}`);
+  },
+
+  // Lo que el resumen de la web dice de las paradas: la propia con km y llegada (nextStopText) y
+  // el boton de saltearla, la de un trabajo de bus con su hora (en rojo si ya paso), y las
+  // paradas del bus con sus pasajeros en la tarjeta de entrega.
+  async resumenParadasYBus() {
+    const m = await conRuta();
+    const puntos = puntosDeRuta(m);
+    await manejar(m, TRABAJO_DEMO, puntos, { tope: 4 });
+    const lejos = m.j(`toLngLat(${puntos[900][0]}, ${puntos[900][1]})`);
+    await m.paso('waypointEnMapa', [lejos[0], lejos[1]]);
+    // Los tramos salen de la ruta del dato anterior, como en la web (updateHud antes que updateMap).
+    for (let i = 0; i < 2; i++) await m.paso('telemetria', [dato(m, TRABAJO_DEMO, puntos[6][0], puntos[6][1], 90)], 250);
+    const p = m.nav().parada;
+    chequear(p && /^Next stop: /.test(p.nombre) && /\d mi/.test(p.eta || '') && p.saltear === 'Skip', `parada: ${JSON.stringify(p)}`);
+    await m.paso('sacarWaypoint', [0]);
+    await m.paso('telemetria', [dato(m, TRABAJO_DEMO, puntos[6][0], puntos[6][1], 90)], 250);
+    chequear(!m.nav().parada, 'la parada sigue despues de saltearla');
+
+    const BUS = { stage: 0, stops: [
+      { type: 'city', id: 'salt_lake', name: 'Salt Lake City', departurePlanned: 4000, departureActual: 4002, boardingPlanned: 20 },
+      { type: 'city', id: 'provo', name: 'Provo', arrivalPlanned: 4030, boardingPlanned: 5 },
+      { type: 'city', id: 'las_vegas', name: 'Las Vegas', arrivalPlanned: 4500 },
+    ] };
+    const conBus = (extra) => JSON.stringify({ ...JSON.parse(dato(m, TRABAJO_DEMO, puntos[6][0], puntos[6][1], 90)), bus: BUS, ...extra });
+    for (let i = 0; i < 4; i++) await m.paso('telemetria', [conBus({ gameTimeMinutes: 4010 })], 250);
+    let b = m.nav().paradaBus;
+    chequear(b && /\(1\/2\): Provo/.test(b.texto) && /^due /.test(b.hora || '') && !b.tarde, `bus a tiempo: ${JSON.stringify(b)}`);
+    await m.paso('telemetria', [conBus({ gameTimeMinutes: 4100 })], 250);
+    b = m.nav().paradaBus;
+    chequear(b && b.tarde, `bus tarde: ${JSON.stringify(b)}`);
+    // La entrega llega sin el bus: las paradas salen de lo que se vio antes.
+    const entrega = JSON.parse(dato(m, TRABAJO_DEMO, puntos[6][0], puntos[6][1], 0));
+    entrega.onJob = false;
+    entrega.event = { jobDelivered: true, jobSrc: 'Salt Lake City', jobDst: 'Las Vegas', jobDeliveredRevenue: 900 };
+    await m.paso('telemetria', [JSON.stringify(entrega)], 250);
+    const t = m.entrega;
+    chequear(t && t.paradas.length === 3 && t.paradas[0].nombre === 'Salt Lake City' && t.tituloParadas === 'Stops', `paradas: ${JSON.stringify(t)}`);
+    chequear(t && Object.fromEntries(t.filas).Passengers === '25', `pasajeros: ${JSON.stringify(t && t.filas)}`);
+    chequear(t && /\+2 min late/.test(t.paradas[0].tarde || ''), `demora de la salida: ${JSON.stringify(t && t.paradas[0])}`);
+    chequear(!m.errores.length, m.errores.join('; '));
+  },
+
+  // La partida guardada (gameGps del cliente): sin trabajo, la app va a donde va el GPS del
+  // juego. Si el GPS cambia despues de guardar, el renglon de guardar con F5, que se cierra.
+  async gpsDeLaPartida() {
+    const m = await conRuta();
+    const puntos = puntosDeRuta(m);
+    const desde = puntos[6], hasta = puntos[700];
+    const km = m.j(`gameGpsCandidateKm({ via: [], x: ${hasta[0]}, z: ${hasta[1]}, patio: false }, [${desde[0]}, ${desde[1]}], null)`);
+    chequear(km > 10, `km hasta el destino de la partida: ${km}`);
+    const libre = (extra) => JSON.stringify({ ...JSON.parse(dato(m, {}, desde[0], desde[1], 90, 0)), onJob: false, ...extra });
+    const gg = { savedAt: (1790000000000 + m.reloj) / 1000 - 60, waypoints: [[hasta[0], hasta[1]]] };
+    for (let i = 0; i < 6; i++) {
+      await m.paso('telemetria', [libre({ routeDistanceKm: km, gameGps: gg })], 250);
+      await m.paso('pulso', [], 50);
+    }
+    chequear(m.j('gameGpsSave.target && gameGpsSave.target.gameGps') === true && m.nav().hayRuta, `no sigue la partida: ${JSON.stringify(m.j('gameGpsSave.target'))}`);
+    chequear(!m.nav().avisoGuardar, 'avisa de guardar sin que el GPS cambie');
+    // Un destino nuevo en el mapa del juego, parado: 60 km mas, y la partida es la de antes.
+    for (let i = 0; i < 12; i++) {
+      await m.paso('telemetria', [libre({ routeDistanceKm: km + 60, gameGps: gg })], 1500);
+      await m.paso('pulso', [], 50);
+    }
+    const nav = m.nav();
+    chequear(/F5/.test(nav.avisoGuardar || ''), `sin el aviso de F5: ${JSON.stringify(nav.avisoGuardar)}`);
+    chequear(Array.isArray(nav.adivinanzas) && nav.textoAdivinanzas, 'sin las empresas a esa distancia');
+    console.log(`  a ${Math.round(km + 60)} km puede ser: ${nav.adivinanzas.slice(0, 3).join(' | ') || '(nada)'}`);
+    await m.paso('cerrarAvisoGuardar');
+    await m.paso('telemetria', [libre({ routeDistanceKm: km + 60, gameGps: gg })], 1500);
+    chequear(!m.nav().avisoGuardar, 'la X no cierra el aviso de F5');
+    // Sin partida y con una ruta en el juego que la app no conoce: lo que hay a esa distancia,
+    // y elegir uno pone ahi un waypoint.
+    for (let i = 0; i < 8 && !m.nav().adivinanzas.length; i++) {
+      await m.paso('telemetria', [libre({ routeDistanceKm: 40 })], 1000);
+      for (let k = 0; k < 20; k++) await m.paso('pulso', [], 10);
+    }
+    const lista = m.nav().adivinanzas;
+    chequear(lista.length > 0, 'sin empresas a 40 km');
+    console.log(`  a 40 km puede ser: ${lista.slice(0, 3).join(' | ')}`);
+    if (lista.length) {
+      await m.paso('elegirAdivinanza', [0]);
+      const w = m.nav().waypoints;
+      chequear(w.length === 1 && w[0].etiqueta === lista[0], `elegir no pone el waypoint: ${JSON.stringify(w)}`);
+    }
+    chequear(!m.errores.length, m.errores.join('; '));
+  },
+
+  // Las terminales de bus de ETS2 (DLC Coaches): en el mapa y como categoria del buscador, que
+  // en ATS no aparece; el Atlas, al reves.
+  async terminalesDeBus() {
+    const { trabajo, origen } = trabajoEntre('ets2', 'calais', 'london');
+    const m = await abrir({ variante: 'ets2' }).iniciar();
+    await m.paso('telemetria', [dato(m, trabajo, origen[0], origen[1], 0, 0)], 250);
+    const buscar = async (mm, cat) => {
+      let r = JSON.parse(mm.motor.buscar('', cat));
+      for (let i = 0; i < 20 && r.cargando; i++) {
+        await mm.tragar();
+        await mm.paso('pulso', [], 500);
+        r = JSON.parse(mm.motor.buscar('', cat));
+      }
+      return r;
+    };
+    const r = await buscar(m, 'b');
+    const capa = m.motor.capaGeo('bus-stops') ? JSON.parse(m.motor.capaGeo('bus-stops')).features : [];
+    chequear(capa.length > 20 && capa.every((f) => ['l', 't'].includes(f.properties.k)), `terminales en el mapa: ${capa.length}`);
+    chequear(r.hay && r.hay.b && !r.hay.a, `chips en ETS2: ${JSON.stringify(r.hay)}`);
+    chequear(r.lista.length && /^Bus /.test(r.lista[0].nombre) && r.lista[0].sub, `terminal en el buscador: ${JSON.stringify(r.lista[0])}`);
+    const ats = await conRuta();
+    const ra = await buscar(ats, 'a');
+    chequear(ra.hay && ra.hay.a && !ra.hay.b && ra.lista.length, `chips en ATS: ${JSON.stringify(ra.hay)}, ${ra.lista.length} del Atlas`);
+    chequear(!m.errores.length && !ats.errores.length, m.errores.concat(ats.errores).join('; '));
+  },
+
+  // El ferry con su puerto, como la web: "Take the ferry to Dover", leido del tile del puerto
+  // con la libreria pmtiles y pedazos del .pmtiles (Range), y la voz que lo dice.
+  async ferryConPuerto() {
+    const { trabajo, origen } = trabajoEntre('ets2', 'calais', 'dover');
+    const m = await abrir({ variante: 'ets2', voz: true }).iniciar();
+    chequear(await esperarRuta(m, trabajo, origen[0], origen[1], 0), 'sin ruta a Dover');
+    m.j('var clavesDichas = []; var speakVoiceWeb = speakVoice; speakVoice = function (k) { clavesDichas.push(k); return speakVoiceWeb(k); };');
+    const puntos = puntosDeRuta(m);
+    // Desde un poco antes del muelle: el primer punto marcado de ferry (o tren) de la ruta.
+    const muelle = m.j('currentRouteFull.findIndex(function (p) { return p[2] === 1; })');
+    chequear(muelle > 0, `la ruta a Dover no cruza: ${muelle}`);
+    let visto = null;
+    await manejar(m, trabajo, puntos, {
+      desde: Math.max(0, muelle - 30),
+      tope: 200,
+      alPaso: async () => {
+        for (let k = 0; k < 3; k++) await m.paso('pulso', [], 10);
+        const g = m.nav().giro;
+        if (!visto && g && g.info && g.info.kind === 'ferry' && g.info.port) visto = g;
+      },
+    });
+    chequear(visto && /^Take the (ferry to Dover|train to Folkestone)/.test(visto.text.replace(/^\S+\s/, '')), `sin el puerto: ${JSON.stringify(visto || m.nav().giro)}`);
+    const dichas = m.j('clavesDichas');
+    chequear(dichas.some((k) => /take_(ferry|train)$/.test(k)), `la voz no dice el ferry: ${JSON.stringify(dichas)}`);
+    if (visto) console.log(`  ${visto.text}; voz: ${dichas.filter((k) => /ferry|train/.test(k)).join(', ')}`);
+    chequear(!m.errores.length, m.errores.join('; '));
+  },
+
+  // El panel Moderno (docs/dash/dash.js): las frases que dibuja Kotlin, sacadas de cada dato con
+  // las mismas funciones y textos de la web.
+  async tableroModerno() {
+    const m = await conRuta();
+    const puntos = puntosDeRuta(m);
+    const extra = { gear: 9, engineRpm: 1350, engineRpmMax: 2500, cruiseControl: true, cruiseControlSpeedKmh: 90,
+      lights: { beamLow: true, blinkerLeft: false }, waterTemperature: 85, airPressure: 120, oilTemperature: 90,
+      plannedDistanceKm: 1100, adblue: 40, adblueCapacity: 80, jobIncome: 61158, jobDeadlineSeconds: 9 * 3600 * 20, fuelRangeKm: 1500,
+      wear: { engine: 0.03, transmission: 0.02, cabin: 0.06, chassis: 0.04, wheels: 0.31 }, trailerWear: { chassis: 0.08, wheels: 0.14, body: 0.01 } };
+    await manejar(m, TRABAJO_DEMO, puntos, { tope: 6, kmh: 92, extra });
+    const tm = m.nav().tablero;
+    const c = tm && tm.cinta;
+    chequear(c && c.desde === 'Salt Lake City' && c.hasta === 'Las Vegas' && /mi$/.test(c.falta) && c.hecho > 0.3, `cinta: ${JSON.stringify(c)}`);
+    chequear(/^Coastline Mining/.test(c.desdeSub || '') && /^Bitumen · arrival /.test(c.hastaSub || ''), `puntas: ${c.desdeSub} | ${c.hastaSub}`);
+    const v = tm.conduccion;
+    chequear(v.vel === '57' && v.unidad === 'mph' && v.marcha === '9' && v.crucero === '56' && Math.abs(v.rpm - 0.54) < 0.01, `conduccion: ${JSON.stringify(v)}`);
+    chequear(v.testigos.length === 2 && v.testigos[0][0] === 'beamLow' && v.testigos[0][1] === true && v.testigos[1][0] === 'blinkerLeft', `testigos: ${JSON.stringify(v.testigos)}`);
+    const camion = tm.camion;
+    chequear(/^Wheels at 31/.test(camion.titular || '') && camion.titularEstado === 'mal' && camion.piezas.length === 8, `camion: ${JSON.stringify(camion)}`);
+    chequear(camion.piezas.find((p) => p[3] && /Wheels/.test(p[0]))[2] === 'medio', `nivel del remolque: ${JSON.stringify(camion.piezas)}`);
+    chequear(camion.medidores.length === 3 && /°C$/.test(camion.medidores[0][0]), `medidores: ${JSON.stringify(camion.medidores)}`);
+    chequear(/AdBlue 50/.test(tm.combustible.bajo || '') && tm.combustible.titular === 'Enough fuel to Las Vegas' && tm.combustible.titularEstado === 'bien', `combustible: ${JSON.stringify(tm.combustible)}`);
+    chequear(tm.llegada && /^Arriving .* early$/.test(tm.llegada.titular) && tm.llegada.estado === 'bien' && /per km/.test(tm.llegada.pago || ''), `llegada: ${JSON.stringify(tm.llegada)}`);
+    chequear(tm.franja.carga === 'Bulldozer' && tm.franja.metricas.length >= 5 && tm.franja.metricas[tm.franja.metricas.length - 1][1] === 'net', `franja: ${JSON.stringify(tm.franja)}`);
+    // Sin trabajo: sin cinta ni llegada, y la autonomia sola en el titular del combustible.
+    await m.paso('telemetria', [JSON.stringify({ ...JSON.parse(dato(m, TRABAJO_DEMO, puntos[8][0], puntos[8][1], 90, 50, extra)), onJob: false, cityDst: null })], 250);
+    const libre = m.nav().tablero;
+    chequear(libre.cinta === null && libre.llegada === null && libre.franja.carga === null, `sin trabajo: ${JSON.stringify(libre.cinta)} ${JSON.stringify(libre.llegada)}`);
+    chequear(!m.errores.length, m.errores.join('; '));
+  },
+
+  // El zoom automatico de la web (navZoomAuto): apagado, la navegacion da el zoom elegido tal
+  // cual; prendido, mas cerca despacio y mas lejos rapido, alrededor del elegido. Kotlin sigue
+  // al camion con lo que diga zoomNav.
+  async zoomAutomatico() {
+    const m = await conRuta();
+    const aca = puntosDeRuta(m)[6];
+    const a = (kmh, ms) => m.paso('telemetria', [dato(m, TRABAJO_DEMO, aca[0], aca[1], 90, kmh)], ms);
+    for (let i = 0; i < 20; i++) await a(30, 250);
+    chequear(m.nav().zoomNav === 10 && JSON.parse(m.motor.ajustesNav()).zoomAuto === false, `apagado: ${m.nav().zoomNav}`);
+    // Con la vista 3D, un poco mas cerca, como navTargetZoom en la web.
+    chequear(Math.abs(m.nav().zoomNav3d - 10.7) < 1e-9, `con 3D: ${m.nav().zoomNav3d}`);
+    await m.paso('apariencia', ['zoomAuto', true]);
+    chequear(JSON.parse(m.motor.ajustesNav()).zoomAuto === true, 'no se prendio');
+    for (let i = 0; i < 8; i++) await a(30, 250);
+    const despacio = m.nav().zoomNav;
+    for (let i = 0; i < 160; i++) await a(120, 250);
+    const rapido = m.nav().zoomNav;
+    chequear(despacio > 11 && rapido < despacio - 0.5, `despacio ${despacio}, rapido ${rapido}`);
+    chequear(/"navZoomAuto":true/.test(m.guardado.truckdash_settings || ''), 'no se guardo');
+    await m.paso('apariencia', ['zoomAuto', false]);
+    await a(120, 250);
+    chequear(m.nav().zoomNav === 10, `apagado otra vez: ${m.nav().zoomNav}`);
   },
 
   // La moneda local sale de la zona del telefono, y el pago la muestra al lado.
