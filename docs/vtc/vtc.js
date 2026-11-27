@@ -514,6 +514,8 @@
     return el('section', { class: 'cabeza-vtc' },
       el('div', { class: 'arriba' }, escudo(v, 'grande'),
         el('div', { class: 'quien' }, el('h1', {}, etiquetaTag(v), ' ', v.name), v.slogan ? el('p', { class: 'slogan' }, v.slogan) : null,
+          // Hasta 90 dias despues de cambiarlo: como se llamaba (nadie se hace pasar por otra).
+          v.former ? el('p', { class: 'muted small antes' }, t('formerly', { old: '[' + v.former.tag + '] ' + v.former.name })) : null,
           el('div', { class: 'chips' }, (v.games || []).map(juegoChip), bandera(v.country),
             v.language ? el('span', { class: 'chip' }, nombreDeIdioma(v.language)) : null,
             v.min_age ? el('span', { class: 'chip' }, v.min_age + '+') : null,
@@ -534,6 +536,10 @@
       return;
     }
     pagina = r.datos;
+    // Un link con el tag de antes de un cambio: la API da la empresa, y la direccion pasa al de ahora.
+    if (pagina.vtc.tag.toLowerCase() !== String(tag).toLowerCase() && !PARAMS.get('invite')) {
+      try { history.replaceState(null, '', enlace(pagina.vtc.tag, location.hash)); } catch (e) { /* sin historial */ }
+    }
     document.title = '[' + pagina.vtc.tag + '] ' + pagina.vtc.name + ' – Truck Dash';
     ponerColor(pagina.vtc);
     pintarEmpresa();
@@ -659,6 +665,7 @@
     const r = await pedir('/vtc/' + pagina.vtc.tag + '/road');
     if (!r.ok) { caja.replaceChildren(vacio('error')); return; }
     caja.replaceChildren(r.datos.drivers.length ? el('ul', { class: 'lista en-ruta' }, r.datos.drivers.map((d) => el('li', {},
+      // La API ya no manda los viajes personales (27-11); esto queda por una API vieja.
       el('span', { class: 'punto' + (d.for_vtc ? '' : ' personal'), title: d.for_vtc ? pagina.vtc.tag : t('modePersonal') }),
       persona(d), el('span', { class: 'crece small' },
         // De un viaje personal solo se sabe por donde anda.
@@ -693,6 +700,8 @@
         e.type === 'delivered' && x.on_time === false ? [' ', el('span', { class: 'chip warn' }, t('late'))] : null,
         x.drive_mode === 'race' ? [' ', el('span', { class: 'chip' }, t('race'))] : null,
         e.type === 'delivered' && !x.counts ? [' ', el('span', { class: 'chip bad' }, t('notCounted'))] : null];
+    } else if (e.type === 'renamed') {
+      texto = t('feed_renamed', { old: '[' + e.from_tag + '] ' + e.from_name, new: '[' + e.to_tag + '] ' + e.to_name });
     } else texto = t('feed_' + e.type, { rank: e.rank, role: e.role });
     return el('li', {}, e.user ? persona(e.user) : null, el('span', { class: 'crece small' }, texto), el('span', { class: 'cuando', title: fecha(e.at, true) }, hace(e.at)));
   }
@@ -1109,6 +1118,7 @@
       });
       nodos.push(formulario);
     }
+    if (p.relation.owner) nodos.push(tarjetaDeNombre(v));
     if (p.relation.owner) {
       const confirma = el('input', { type: 'text', maxlength: 6, autocomplete: 'off' });
       nodos.push(el('section', { class: 'card peligro' }, el('h2', {}, t('dissolveTitle')), el('p', { class: 'muted small' }, t('dissolveHelp')), campo(t('dissolveConfirm', { tag }), confirma),
@@ -1116,6 +1126,51 @@
     }
     cuerpo.replaceChildren(...nodos);
   };
+
+  // Cambiar nombre y tag: el dueno, una vez cada 90 dias (la API lo controla y
+  // dice desde cuando se puede otra vez en rename_available_at).
+  function tarjetaDeNombre(v) {
+    const espera = v.rename_available_at;
+    const nombre = el('input', { type: 'text', maxlength: 40, autocomplete: 'off', value: v.name });
+    const tag = el('input', { type: 'text', maxlength: 6, autocomplete: 'off', value: v.tag });
+    const pistas = { name: el('p', { class: 'pista', 'aria-live': 'polite' }), tag: el('p', { class: 'pista', 'aria-live': 'polite' }) };
+    [nombre, tag].forEach((i) => { i.disabled = !!espera; });
+    const cambio = () => {
+      const d = {};
+      if (nombre.value.trim() !== v.name) d.name = nombre.value.trim();
+      if (tag.value.trim() !== v.tag) d.tag = tag.value.trim();
+      return d;
+    };
+    let reloj = null;
+    async function revisar() {
+      const d = cambio(), q = new URLSearchParams();
+      const mismo = (a, b) => a.toLowerCase().replace(/\s+/g, ' ') === b.toLowerCase().replace(/\s+/g, ' ');
+      if (d.name && !mismo(d.name, v.name)) q.set('name', d.name);
+      if (d.tag && !mismo(d.tag, v.tag)) q.set('tag', d.tag);
+      ['name', 'tag'].forEach((k) => { if (!q.has(k)) { pistas[k].textContent = ''; pistas[k].className = 'pista'; } });
+      if (!q.toString()) return;
+      const r = await pedir('/vtc/check?' + q.toString());
+      if (!r.ok) return;
+      ['name', 'tag'].forEach((k) => {
+        if (!q.has(k)) return;
+        const error = r.datos[k];
+        pistas[k].className = 'pista ' + (error ? 'mal' : 'bien');
+        pistas[k].textContent = error ? t(error, { min: k === 'tag' ? 2 : 3, max: k === 'tag' ? 6 : 40 }) : t('available');
+      });
+    }
+    [nombre, tag].forEach((i) => i.addEventListener('input', () => { clearTimeout(reloj); reloj = setTimeout(revisar, 350); }));
+    const guardar = botonArmado(t('renameSave'), 'primary', () => {
+      const d = cambio();
+      if (!Object.keys(d).length) return;
+      return hacerPedido('PATCH', '/vtc/' + v.tag, d, (r) => { location.href = enlace(r.vtc.tag, '#settings'); });
+    });
+    guardar.disabled = !!espera;
+    return el('section', { class: 'card' }, el('h2', {}, t('renameTitle')),
+      el('p', { class: 'muted small' }, t('renameHelp')),
+      espera ? el('p', { class: 'notice' }, t('renameNext', { date: fecha(espera) })) : null,
+      el('div', { class: 'campos' }, campo(t('fName'), nombre, pistas.name), campo(t('fTag'), tag, pistas.tag)),
+      el('div', { class: 'botones' }, guardar));
+  }
 
   // ------------------------------------------------- imagen de reclutamiento
   function dialogoTarjeta(p) {

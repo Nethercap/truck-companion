@@ -37,8 +37,8 @@ test('las que se arman con lo que manda la API estan todas', () => {
   const de = (prefijo, lista) => lista.forEach((x) => assert.ok((prefijo + x) in TEXTOS.en, prefijo + x));
   de('metric_', ['distance', 'deliveries', 'hours', 'on_time', 'care', 'tonnes', 'economy']);
   de('period_', ['week', 'month', 'last_month', 'year', 'total']);
-  de('feed_', ['founded', 'joined', 'left', 'kicked', 'applied', 'delivered', 'cancelled', 'promoted', 'role', 'owner', 'dissolved']);
-  de('event_', ['delivered', 'cancelled', 'joined', 'left', 'kicked', 'applied', 'promoted', 'role', 'owner']);
+  de('feed_', ['founded', 'joined', 'left', 'kicked', 'applied', 'delivered', 'cancelled', 'promoted', 'role', 'owner', 'dissolved', 'renamed']);
+  de('event_', ['delivered', 'cancelled', 'joined', 'left', 'kicked', 'applied', 'promoted', 'role', 'owner', 'renamed']);
   de('area_', ['members', 'applications', 'roles', 'dispatch', 'events', 'competitions', 'trips', 'settings', 'discord']);
   de('reason_', ['impossible_speed', 'impossible_pace', 'no_distance', 'distance_over_plan', 'low_coverage', 'top_speed', 'modded_economy', 'heavy_damage']);
   de('report_', ['name', 'content', 'impersonation', 'other']);
@@ -55,7 +55,7 @@ const ERRORES = [
   'vtc_link', 'vtc_member_is_public', 'vtc_member_not_found', 'vtc_name_chars', 'vtc_name_fixed',
   'vtc_name_length', 'vtc_name_reserved', 'vtc_name_taken', 'vtc_no_discord_icon', 'vtc_no_permission',
   'vtc_not_found', 'vtc_not_member', 'vtc_not_recruiting', 'vtc_not_yourself', 'vtc_owner_must_transfer',
-  'vtc_owner_only', 'vtc_owner_role', 'vtc_permission_above_yours', 'vtc_rank_not_found', 'vtc_ranks_count',
+  'vtc_owner_only', 'vtc_owner_role', 'vtc_permission_above_yours', 'vtc_rank_not_found', 'vtc_ranks_count', 'vtc_rename_wait',
   'vtc_ranks_from_zero', 'vtc_ranks_repeated', 'vtc_reason_needed', 'vtc_role_name', 'vtc_role_not_found',
   'vtc_tag_chars', 'vtc_tag_length', 'vtc_tag_reserved', 'vtc_tag_taken', 'vtc_text_long',
   'vtc_too_many_applications', 'vtc_too_many_invites', 'vtc_too_many_roles', 'vtc_too_many_webhooks',
