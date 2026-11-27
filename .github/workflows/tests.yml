@@ -95,6 +95,9 @@ jobs:
       # .js sueltos, que es donde viven las traducciones. Un apostrofo sin
       # escapar en una de ellas rompe el archivo entero y con el la pagina.
       - run: for f in $(git ls-files 'docs/*.js' 'docs/**/*.js'); do node --check "$f" || exit 1; done
+      # /dash/ tiene que andar en iOS 12 (Safari 12.1, el tope del iPad Mini 2):
+      # un solo `??` en pure.js dejaba el boton Connect muerto (27-11-2026).
+      - run: node tools/check_web_syntax.js
 
   # La web abierta en un navegador de verdad: la demo de ATS con los datos de
   # mapa de produccion (R2), el aviso sin WebGL y las demas paginas sin

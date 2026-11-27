@@ -8,9 +8,12 @@
   touch-action: manipulation;
   /* Todo el panel escala con una sola variable: es un tablero que se mira a
      distinta distancia segun donde este apoyado el dispositivo, y el control
-     de tamano solo cambia esto. */
+     de tamano solo cambia esto.
+     max(a, min(b, c)) y no clamp(a, b, c), que es lo mismo: Safari 12 (iOS 12,
+     el tope del iPad Mini 2) tiene min() y max() pero no clamp(), y sin el
+     la unidad quedaba invalida y el panel en la letra por defecto. */
   --d-scale: 1;
-  --d-unit: calc(clamp(12px, 0.55vw + 0.5vh + 7px, 19px) * var(--d-scale));
+  --d-unit: calc(max(12px, min(calc(0.55vw + 0.5vh + 7px), 19px)) * var(--d-scale));
   --d-gap: calc(var(--d-unit) * 0.55);
   --d-panel: #171a1f;
   --d-line: #272c33;
@@ -128,7 +131,7 @@
    Los telefonos (menos de 34rem, una sola columna) no entran aca: ya
    venian usando el 78-86 % del alto. */
 @media (min-width: 34rem) and (max-aspect-ratio: 5/4) {
-  .dashRoot { --d-unit: calc(clamp(13.5px, min(2.1vh, 2.9vw), 40px) * var(--d-scale)); }
+  .dashRoot { --d-unit: calc(max(13.5px, min(2.1vh, 2.9vw, 40px)) * var(--d-scale)); }
 }
 /* En vertical las tres columnas de la cinta son angostas y el renglon de
    abajo se comia la hora de llegada con puntos suspensivos. Aca envuelve:
@@ -156,7 +159,7 @@
      pantalla y no del ancho, que sobra. Con la formula comun un monitor de
      1080 se quedaba en el tope de 19 px y el tablero ocupaba un tercio de
      la pantalla, con las tarjetas vacias por dentro. */
-  .dashRoot { --d-unit: calc(clamp(13.5px, 3vh, 40px) * var(--d-scale)); }
+  .dashRoot { --d-unit: calc(max(13.5px, min(3vh, 40px)) * var(--d-scale)); }
   .dGrid {
     grid-template-columns: 1.15fr repeat(3, minmax(0, 1fr));
     grid-template-areas: "drive eta fuel truck" "strip strip strip strip";

@@ -181,9 +181,19 @@ function setScale(valor) {
 }
 document.querySelectorAll('[data-scale]').forEach(b => b.addEventListener('click', () => setScale(b.dataset.scale)));
 
-document.getElementById('fullscreenBtn').addEventListener('click', () => {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else document.documentElement.requestFullscreen().catch(() => {});
+// El iPad con Safari 12 solo tiene la version webkit, que no devuelve una
+// promesa; el iPhone no tiene ninguna (solo pantalla completa de video): ahi
+// el boton no se muestra en vez de tirar un error al tocarlo.
+const raizPagina = document.documentElement;
+const pedirPantallaCompleta = raizPagina.requestFullscreen || raizPagina.webkitRequestFullscreen;
+const salirPantallaCompleta = document.exitFullscreen || document.webkitExitFullscreen;
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+fullscreenBtn.hidden = !pedirPantallaCompleta;
+fullscreenBtn.addEventListener('click', () => {
+  const p = (document.fullscreenElement || document.webkitFullscreenElement)
+    ? salirPantallaCompleta.call(document)
+    : pedirPantallaCompleta.call(raizPagina);
+  if (p && p.catch) p.catch(() => {});
 });
 
 // Que la tablet no se apague sola mirando el tablero (createScreenKeeper,
@@ -192,6 +202,7 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
 const pantalla = createScreenKeeper({ wakeLock: navigator.wakeLock, doc: document });
 document.addEventListener('visibilitychange', pantalla.sync);
 document.addEventListener('fullscreenchange', pantalla.sync);
+document.addEventListener('webkitfullscreenchange', pantalla.sync);
 document.addEventListener('pointerup', pantalla.sync, true);
 document.addEventListener('keydown', pantalla.sync, true);
 
