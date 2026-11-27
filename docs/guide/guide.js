@@ -33,6 +33,7 @@
     { id: 'mapbuild', fig: 'mapbuild' },
     { id: 'overlay', fig: 'overlay' },
     { id: 'account' },
+    { id: 'vtc' },
   ];
 
   const $ = (id) => document.getElementById(id);

@@ -24,6 +24,7 @@ GUIDE_TEXT.de = {
     mapbuild: 'Meine Karte bauen: Karten-Mods, die wir nicht haben',
     overlay: 'Das Overlay im Spiel',
     account: 'Dein Konto (optional)',
+    vtc: 'Virtuelle Speditionen (Beta)',
   },
   legend: { gps: 'Kartenschaltflächen', settings: 'Obere Leiste' },
   cap: {
@@ -216,6 +217,28 @@ GUIDE_TEXT.de = {
 <li>Aufträge mit einem Geld-Mod werden markiert und nicht zu deinen Geldsummen gezählt.</li>
 <li>In den <b>Einstellungen</b> kannst du alle deine Daten herunterladen oder dein Konto löschen.</li>
 </ul>`,
+    vtc: `
+<p>Eine virtuelle Spedition (VTC) ist eine Gruppe von Fahrern, die unter demselben Namen fahren. Bei Truck Dash zählen deine Lieferungen von selbst für deine Firma: kein Fahrtenbuch zum Ausfüllen, keine Screenshots. Dafür brauchst du ein <a href="#account">Konto</a> mit verbundenem Client, und es ist kostenlos.</p>
+<ol>
+<li>Öffne <a href="/vtc/">trucksim-dash.com/vtc</a> oder <b>VTC</b> in deinem Konto, um die Firmen zu sehen. Bewirb dich auf der Seite einer Firma oder tritt mit einem Einladungslink bei. Du kannst auch deine eigene gründen.</li>
+<li>Ab dann zählt jeder Auftrag, den du mit dem Client ablieferst, für die Firma: Strecke, Lohn, Stunden und die Route.</li>
+</ol>
+<h3>Für die Firma oder privat</h3>
+<p>Jeder Auftrag zählt für die Firma oder ist privat. Das wählst du auf der Firmenseite (<b>Meine Fahrten zählen für</b>) und ab Client 1.5.50 auch im Tray-Menü, in <b>Einrichtung &amp; Status</b> und auf der Fahrtkarte des Dashboards. Du kannst es bis zur Ablieferung ändern. Von deinen privaten Fahrten sieht die Firma nichts, nicht einmal, dass du fährst.</p>
+<h3>Die Firmenseite</h3>
+<ul>
+<li><b>Übersicht</b>: wer unterwegs ist, die letzten Ereignisse, die Monatsrangliste und die Erfolge.</li>
+<li><b>Mitglieder</b>, <b>Rangliste</b> und <b>Statistiken</b>: Strecke, Lieferungen, Stunden, Pünktlichkeit, Sorgfalt, Tonnen und Verbrauch (nur Lkw), nach Woche, Monat oder Jahr. Auto- und Busaufträge zählen auch als Lieferungen.</li>
+<li><b>Fahrten</b>: jede Lieferung für die Firma, mit Route und ob sie real oder race gefahren wurde. Ungewöhnliche (viel mehr km als geplant, ein Tempo, das kein Lkw erreicht) kommen in eine Prüfliste, und die Firma entscheidet.</li>
+<li><b>Karte</b>: alles, was die Firma geliefert hat, eine Farbe pro Fahrer.</li>
+<li><b>Live</b>: wer gerade für die Firma fährt, mit seiner Fahrt. Die Firma wählt, ob diese Karte öffentlich ist, ohne oder mit Namen, und jeder Fahrer kann die öffentliche in den <b>Einstellungen</b> verlassen. Fahrer erscheinen mit Client 1.5.50.</li>
+</ul>
+<h3>Gut zu wissen</h3>
+<ul>
+<li>Wenn du einer Firma beitrittst, ist dein Profil öffentlich, solange du Mitglied bist. Wenn du austrittst, ist es wieder so wie vorher.</li>
+<li>Inhaber und Manager legen Rollen mit Rechten, Ränge nach Strecke, Einladungen und die Discord-Kanäle der Firma fest und können ein Rekrutierungsbild mit QR-Code teilen.</li>
+<li>Es ist eine Beta: Manches kann sich ändern. Sag uns auf unserem <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>, was du denkst.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -277,6 +300,7 @@ GUIDE_TEXT.fr = {
     mapbuild: 'Construire ma carte : les mods de carte qu\'on n\'a pas',
     overlay: "L'overlay en jeu",
     account: 'Votre compte (facultatif)',
+    vtc: 'Entreprises virtuelles (bêta)',
   },
   legend: { gps: 'Boutons de la carte', settings: 'Barre du haut' },
   cap: {
@@ -469,6 +493,28 @@ GUIDE_TEXT.fr = {
 <li>Les missions avec un mod d'argent sont marquées et exclues de vos totaux d'argent.</li>
 <li>Dans les <b>Paramètres</b>, vous pouvez télécharger toutes vos données ou supprimer votre compte.</li>
 </ul>`,
+    vtc: `
+<p>Une entreprise virtuelle (VTC) est un groupe de chauffeurs qui roulent sous le même nom. Sur Truck Dash, vos livraisons comptent toutes seules pour votre entreprise : pas de carnet à remplir, pas de captures d’écran. Il faut un <a href="#account">compte</a> avec le client lié, et c’est gratuit.</p>
+<ol>
+<li>Ouvrez <a href="/vtc/">trucksim-dash.com/vtc</a>, ou <b>VTC</b> dans votre compte, pour voir les entreprises. Postulez sur la page d’une entreprise ou rejoignez-la avec un lien d’invitation. Vous pouvez aussi fonder la vôtre.</li>
+<li>Ensuite, chaque mission livrée avec le client compte pour l’entreprise : distance, paie, heures et itinéraire.</li>
+</ol>
+<h3>Pour l’entreprise ou personnel</h3>
+<p>Chaque mission compte pour l’entreprise ou est personnelle. Vous le choisissez sur la page de l’entreprise (<b>Mes trajets comptent pour</b>) et, à partir du client 1.5.50, aussi dans le menu de la barre des tâches, dans <b>Configuration et état</b> et sur la carte du trajet du tableau de bord. Vous pouvez le changer jusqu’à la livraison. L’entreprise ne voit rien de vos trajets personnels, pas même que vous conduisez.</p>
+<h3>La page de l’entreprise</h3>
+<ul>
+<li><b>Aperçu</b> : qui est sur la route, l’activité récente, le classement du mois et les succès.</li>
+<li><b>Membres</b>, <b>Classement</b> et <b>Stats</b> : distance, livraisons, heures, ponctualité, soin, tonnes et consommation (camions seulement), par semaine, mois ou année. Les missions en voiture et en autocar comptent aussi comme livraisons.</li>
+<li><b>Trajets</b> : chaque livraison faite pour l’entreprise, avec son itinéraire et si elle a été conduite en réel ou en course. Les inhabituelles (bien plus de km que prévu, une vitesse qu’aucun camion n’atteint) vont dans une file de vérification et l’entreprise décide.</li>
+<li><b>Carte</b> : tout ce que l’entreprise a livré, une couleur par chauffeur.</li>
+<li><b>En direct</b> : qui roule pour l’entreprise en ce moment, avec son trajet. L’entreprise choisit si cette carte est publique, sans noms ou avec noms, et chaque chauffeur peut quitter la carte publique dans les <b>Réglages</b>. Les chauffeurs apparaissent avec le client 1.5.50.</li>
+</ul>
+<h3>Bon à savoir</h3>
+<ul>
+<li>Rejoindre une entreprise rend votre profil public tant que vous êtes membre. En partant, il redevient comme avant.</li>
+<li>Les propriétaires et responsables définissent les rôles et leurs droits, les grades selon la distance, les invitations et les salons Discord de l’entreprise, et peuvent partager une image de recrutement avec QR code.</li>
+<li>C’est une bêta : des choses peuvent changer. Dites-nous ce que vous en pensez sur notre <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -530,6 +576,7 @@ GUIDE_TEXT.pt = {
     mapbuild: 'Montar meu mapa: mods de mapa que não temos',
     overlay: 'O overlay no jogo',
     account: 'Sua conta (opcional)',
+    vtc: 'Empresas virtuais (beta)',
   },
   legend: { gps: 'Botões do mapa', settings: 'Barra de cima' },
   cap: {
@@ -722,6 +769,28 @@ GUIDE_TEXT.pt = {
 <li>Entregas com um mod de dinheiro ficam marcadas e fora dos seus totais de dinheiro.</li>
 <li>Em <b>Configurações</b> você pode baixar todos os seus dados ou excluir a conta.</li>
 </ul>`,
+    vtc: `
+<p>Uma empresa virtual (VTC) é um grupo de motoristas que dirigem com o mesmo nome. No Truck Dash suas entregas contam sozinhas para a sua empresa: sem planilhas para preencher, sem capturas de tela. Precisa de uma <a href="#account">conta</a> com o cliente vinculado, e é grátis.</p>
+<ol>
+<li>Abra <a href="/vtc/">trucksim-dash.com/vtc</a>, ou <b>VTC</b> na sua conta, para ver as empresas. Candidate-se na página de uma empresa ou entre com um link de convite. Você também pode fundar a sua.</li>
+<li>A partir daí, cada frete que você entrega com o cliente conta para a empresa: distância, pagamento, horas e o percurso.</li>
+</ol>
+<h3>Para a empresa ou pessoal</h3>
+<p>Cada frete conta para a empresa ou é pessoal. Você escolhe na página da empresa (<b>Minhas viagens contam para</b>) e, a partir do cliente 1.5.50, também no menu da bandeja, em <b>Configuração e status</b> e no cartão da viagem do painel. Dá para mudar até entregar. Das suas viagens pessoais a empresa não vê nada, nem que você está dirigindo.</p>
+<h3>A página da empresa</h3>
+<ul>
+<li><b>Resumo</b>: quem está na estrada, as últimas atividades, o ranking do mês e as conquistas.</li>
+<li><b>Membros</b>, <b>Ranking</b> e <b>Estatísticas</b>: distância, entregas, horas, pontualidade, cuidado, toneladas e consumo (só caminhões), por semana, mês ou ano. Fretes de carro e de ônibus também contam como entregas.</li>
+<li><b>Viagens</b>: cada entrega feita para a empresa, com o percurso e se foi dirigida em real ou race. As estranhas (muito mais km que o planejado, uma velocidade que nenhum caminhão alcança) vão para uma fila de revisão e a empresa decide.</li>
+<li><b>Mapa</b>: tudo o que a empresa entregou, uma cor por motorista.</li>
+<li><b>Ao vivo</b>: quem está dirigindo para a empresa agora, com a viagem. A empresa escolhe se este mapa é público, sem nomes ou com nomes, e cada motorista pode sair do público em <b>Configurações</b>. Os motoristas aparecem com o cliente 1.5.50.</li>
+</ul>
+<h3>Bom saber</h3>
+<ul>
+<li>Entrar em uma empresa deixa seu perfil público enquanto você for membro. Quando você sai, ele volta a ser como era.</li>
+<li>Donos e gerentes definem cargos com permissões, patentes por distância, convites e os canais do Discord da empresa, e podem compartilhar uma imagem de recrutamento com QR code.</li>
+<li>É uma beta: algumas coisas podem mudar. Conte o que achou no nosso <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -783,6 +852,7 @@ GUIDE_TEXT.pl = {
     mapbuild: 'Zbuduj moją mapę: mody map, których nie mamy',
     overlay: 'Nakładka w grze',
     account: 'Twoje konto (opcjonalne)',
+    vtc: 'Wirtualne firmy (beta)',
   },
   legend: { gps: 'Przyciski mapy', settings: 'Górny pasek' },
   cap: {
@@ -975,6 +1045,28 @@ GUIDE_TEXT.pl = {
 <li>Zlecenia z modem pieniędzy są oznaczone i nie wliczają się do sum pieniędzy.</li>
 <li>W <b>Ustawieniach</b> możesz pobrać wszystkie swoje dane albo usunąć konto.</li>
 </ul>`,
+    vtc: `
+<p>Wirtualna firma (VTC) to grupa kierowców, którzy jeżdżą pod jedną nazwą. W Truck Dash twoje dostawy liczą się dla firmy same: bez wypełniania dziennika i bez zrzutów ekranu. Potrzebne jest <a href="#account">konto</a> z połączonym klientem, a całość jest darmowa.</p>
+<ol>
+<li>Otwórz <a href="/vtc/">trucksim-dash.com/vtc</a> albo <b>VTC</b> na swoim koncie, żeby zobaczyć firmy. Złóż podanie na stronie firmy albo dołącz przez link z zaproszeniem. Możesz też założyć własną.</li>
+<li>Od tej pory każde zlecenie dostarczone z klientem liczy się dla firmy: dystans, zapłata, godziny i trasa.</li>
+</ol>
+<h3>Dla firmy albo prywatnie</h3>
+<p>Każde zlecenie liczy się dla firmy albo jest prywatne. Wybierasz to na stronie firmy (<b>Moje trasy liczą się dla</b>), a od klienta 1.5.50 także w menu w zasobniku, w oknie <b>Konfiguracja i stan</b> i na karcie trasy na pulpicie. Możesz to zmienić do dostawy. Z twoich prywatnych tras firma nie widzi nic, nawet tego, że jedziesz.</p>
+<h3>Strona firmy</h3>
+<ul>
+<li><b>Przegląd</b>: kto jest w trasie, ostatnie wydarzenia, ranking miesiąca i osiągnięcia.</li>
+<li><b>Członkowie</b>, <b>Ranking</b> i <b>Statystyki</b>: dystans, dostawy, godziny, punktualność, staranność, tony i spalanie (tylko ciężarówki), w tygodniu, miesiącu albo roku. Zlecenia z autem i autobusem też liczą się jako dostawy.</li>
+<li><b>Trasy</b>: każda dostawa dla firmy, z trasą i tym, czy była jechana jako real czy race. Nietypowe (dużo więcej km niż w planie, prędkość, jakiej nie osiąga żadna ciężarówka) trafiają do kolejki do sprawdzenia i firma decyduje.</li>
+<li><b>Mapa</b>: wszystko, co firma dostarczyła, jeden kolor na kierowcę.</li>
+<li><b>Na żywo</b>: kto teraz jedzie dla firmy, z trasą. Firma wybiera, czy ta mapa jest publiczna, bez nazw czy z nazwami, a każdy kierowca może zniknąć z publicznej w <b>Ustawieniach</b>. Kierowcy pojawiają się z klientem 1.5.50.</li>
+</ul>
+<h3>Warto wiedzieć</h3>
+<ul>
+<li>Dołączenie do firmy sprawia, że twój profil jest publiczny, dopóki jesteś członkiem. Po odejściu wraca do poprzedniego ustawienia.</li>
+<li>Właściciele i menedżerowie ustawiają role z uprawnieniami, rangi według dystansu, zaproszenia i kanały Discorda firmy oraz mogą udostępnić obrazek rekrutacyjny z kodem QR.</li>
+<li>To wersja beta: coś może się zmienić. Napisz nam, co myślisz, na naszym <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -1036,6 +1128,7 @@ GUIDE_TEXT.tr = {
     mapbuild: 'Haritamı oluştur: bizde olmayan harita modları',
     overlay: 'Oyun içi katman',
     account: 'Hesabın (isteğe bağlı)',
+    vtc: 'Sanal şirketler (beta)',
   },
   legend: { gps: 'Harita düğmeleri', settings: 'Üst çubuk' },
   cap: {
@@ -1228,6 +1321,28 @@ GUIDE_TEXT.tr = {
 <li>Para modu kullanılan işler işaretlenir ve para toplamlarına katılmaz.</li>
 <li><b>Ayarlar</b>'dan tüm verilerini indirebilir veya hesabını silebilirsin.</li>
 </ul>`,
+    vtc: `
+<p>Sanal şirket (VTC), aynı isimle sürüş yapan bir sürücü grubudur. Truck Dash'te teslimatların kendiliğinden şirketin için sayılır: doldurulacak kayıt defteri yok, ekran görüntüsü yok. İstemcisi bağlı bir <a href="#account">hesap</a> gerekir ve ücretsizdir.</p>
+<ol>
+<li>Şirketleri görmek için <a href="/vtc/">trucksim-dash.com/vtc</a> adresini ya da hesabındaki <b>VTC</b> bağlantısını aç. Bir şirketin sayfasından başvur ya da bir davet bağlantısıyla katıl. Kendi şirketini de kurabilirsin.</li>
+<li>Bundan sonra istemciyle teslim ettiğin her iş şirket için sayılır: mesafe, ödeme, saatler ve rota.</li>
+</ol>
+<h3>Şirket için ya da kişisel</h3>
+<p>Her iş şirket için sayılır ya da kişiseldir. Bunu şirket sayfasında seçersin (<b>Seferlerim şuraya sayılır</b>); istemci 1.5.50'den itibaren sistem tepsisi menüsünde, <b>Kurulum ve durum</b> penceresinde ve panodaki sefer kartında da seçebilirsin. Teslim edene kadar değiştirebilirsin. Şirket kişisel seferlerinden hiçbir şey görmez, sürüş yaptığını bile.</p>
+<h3>Şirket sayfası</h3>
+<ul>
+<li><b>Genel bakış</b>: kim yolda, son olaylar, ayın sıralaması ve başarımlar.</li>
+<li><b>Üyeler</b>, <b>Sıralama</b> ve <b>İstatistikler</b>: mesafe, teslimatlar, saatler, zamanında teslim, özen, ton ve yakıt tüketimi (yalnızca kamyon), haftalık, aylık ya da yıllık. Araba ve otobüs işleri de teslimat sayılır.</li>
+<li><b>Seferler</b>: şirket için yapılan her teslimat, rotası ve gerçekçi mi yarış mı sürüldüğüyle. Olağandışı olanlar (planlanandan çok daha fazla km, hiçbir kamyonun ulaşamayacağı bir hız) inceleme sırasına düşer ve şirket karar verir.</li>
+<li><b>Harita</b>: şirketin teslim ettiği her şey, her sürücüye bir renk.</li>
+<li><b>Canlı</b>: şu anda şirket için kimin sürdüğü, seferiyle birlikte. Şirket bu haritanın herkese açık olup olmayacağını, isimsiz ya da isimli, seçer; her sürücü <b>Ayarlar</b> bölümünden herkese açık haritadan çıkabilir. Sürücüler istemci 1.5.50 ile görünür.</li>
+</ul>
+<h3>Bilmekte fayda var</h3>
+<ul>
+<li>Bir şirkete katılmak, üye olduğun sürece profilini herkese açık yapar. Ayrıldığında önceki haline döner.</li>
+<li>Sahipler ve yöneticiler yetkili görevleri, mesafeye göre rütbeleri, davetleri ve şirketin Discord kanallarını ayarlar; QR kodlu bir işe alım görseli de paylaşabilirler.</li>
+<li>Bu bir beta: bazı şeyler değişebilir. Ne düşündüğünü <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a> sunucumuzda anlat.</li>
+</ul>`,
   },
   b2: {
     buttons: `
@@ -1289,6 +1404,7 @@ GUIDE_TEXT.ru = {
     mapbuild: 'Собрать мою карту: моды карт, которых у нас нет',
     overlay: 'Оверлей в игре',
     account: 'Ваш аккаунт (необязательно)',
+    vtc: 'Виртуальные компании (бета)',
   },
   legend: { gps: 'Кнопки на карте', settings: 'Верхняя панель' },
   cap: {
@@ -1480,6 +1596,28 @@ GUIDE_TEXT.ru = {
 <li>Пропал интернет? Ничего не теряется: клиент сохраняет рейс и отправит его, когда связь вернётся.</li>
 <li>Рейсы с модом на деньги помечаются и не входят в денежные итоги.</li>
 <li>В <b>Настройках</b> можно скачать все свои данные или удалить аккаунт.</li>
+</ul>`,
+    vtc: `
+<p>Виртуальная компания (VTC) — это группа водителей, которые ездят под одним названием. В Truck Dash ваши доставки засчитываются компании сами: без журналов и скриншотов. Нужен <a href="#account">аккаунт</a> с привязанным клиентом, и это бесплатно.</p>
+<ol>
+<li>Откройте <a href="/vtc/">trucksim-dash.com/vtc</a> или <b>VTC</b> в своём аккаунте, чтобы посмотреть компании. Подайте заявку на странице компании или вступите по ссылке-приглашению. Можно и основать свою.</li>
+<li>С этого момента каждый заказ, доставленный с клиентом, засчитывается компании: расстояние, оплата, часы и маршрут.</li>
+</ol>
+<h3>Для компании или для себя</h3>
+<p>Каждый заказ засчитывается компании или остаётся личным. Это выбирается на странице компании (<b>Мои рейсы засчитываются</b>), а с клиента 1.5.50 ещё и в меню в трее, в окне <b>Настройка и состояние</b> и на карточке рейса на приборной панели. Изменить можно до доставки. О ваших личных рейсах компания не видит ничего, даже того, что вы за рулём.</p>
+<h3>Страница компании</h3>
+<ul>
+<li><b>Обзор</b>: кто в пути, последние события, рейтинг месяца и достижения.</li>
+<li><b>Участники</b>, <b>Рейтинг</b> и <b>Статистика</b>: расстояние, доставки, часы, вовремя, аккуратность, тонны и расход (только грузовики), за неделю, месяц или год. Заказы на машине и на автобусе тоже считаются доставками.</li>
+<li><b>Рейсы</b>: каждая доставка для компании, с маршрутом и тем, как она проехана: реально или гоночно. Необычные (намного больше км, чем по плану, скорость, недоступная грузовику) попадают в очередь на проверку, и решает компания.</li>
+<li><b>Карта</b>: всё, что доставила компания, один цвет на водителя.</li>
+<li><b>В эфире</b>: кто сейчас едет для компании, с его рейсом. Компания выбирает, будет ли эта карта публичной, без имён или с именами, а каждый водитель может уйти с публичной в <b>Настройках</b>. Водители появляются с клиентом 1.5.50.</li>
+</ul>
+<h3>Полезно знать</h3>
+<ul>
+<li>Пока вы состоите в компании, ваш профиль публичный. Когда вы выйдете, он вернётся к прежним настройкам.</li>
+<li>Владельцы и менеджеры настраивают должности с правами, звания по расстоянию, приглашения и Discord-каналы компании и могут поделиться картинкой для набора с QR-кодом.</li>
+<li>Это бета: что-то может измениться. Расскажите, что думаете, в нашем <a href="https://discord.gg/K7Xq4628tg" target="_blank" rel="noopener">Discord</a>.</li>
 </ul>`,
   },
   b2: {

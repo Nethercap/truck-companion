@@ -218,6 +218,8 @@
   .accountsList { margin: 0.8rem 0 1.4rem; padding-left: 1.2rem; color: #d7dbe0; line-height: 1.7; }
   .accountsShot { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); cursor: zoom-in; }
   @media (max-width: 860px) { .accountsGrid { grid-template-columns: 1fr; } }
+  .vtcBlock { max-width: 760px; margin-top: 1.2rem; }
+  .vtcBlock p { color: #d7dbe0; }
   .teaBtn:hover { background: #1d4ed8; }
   .teaBtn svg { width: 1.2em; height: 1.2em; }
   .ctaNote { font-size: 0.78rem; color: var(--muted); margin: 0.6rem 0 0; }
@@ -731,6 +733,25 @@ try { if (document.referrer.indexOf('android-app://com.trucksimdash.app') === 0)
     </div>
   </section>
 
+  <section id="vtc">
+    <h2 data-i18n="vtcTitle">Manejá para una empresa virtual. <span class="accent">Gratis.</span></h2>
+    <div class="vtcBlock">
+      <p data-i18n="vtcBody">Fundá o sumate a una empresa de transporte virtual. Cada entrega que hacés con el cliente de Truck Dash cuenta para ella sola: sin planillas ni capturas.</p>
+      <ul class="accountsList">
+        <li data-i18n="vtcLi1">Una página de la empresa con miembros, puestos y rangos, ranking del mes y estadísticas</li>
+        <li data-i18n="vtcLi2">Un mapa de todo lo que entregó la empresa, y un mapa en vivo de quién está manejando</li>
+        <li data-i18n="vtcLi3">Entregas revisadas como real o race, con el motivo a la vista</li>
+        <li data-i18n="vtcLi4">Avisos en los canales de Discord de la empresa y una imagen de reclutamiento con QR</li>
+        <li data-i18n="vtcLi5">Los viajes personales son tuyos: la empresa no ve nada de ellos</li>
+      </ul>
+      <div class="ctaRow">
+        <a class="cta" href="/vtc/" data-i18n="vtcCta">Ver las empresas</a>
+        <a class="cta secondary" href="/guide/#vtc" data-i18n="vtcHow">Cómo funciona</a>
+      </div>
+      <p class="ctaNote" data-i18n="vtcNote">En beta. Necesita una cuenta gratis con el cliente vinculado. No se paga nada y no hay funciones reservadas.</p>
+    </div>
+  </section>
+
   <section id="community">
     <h2 data-i18n="communityTitle">Comunidad</h2>
     <div class="community">
@@ -967,6 +988,16 @@ const TRANSLATIONS = {
     accountsCta: 'Create a free account',
     accountsHow: 'How it works',
     accountsNote: 'Optional: everything else works without an account, and nothing is saved until you link it.',
+    vtcTitle: 'Drive for a virtual company. <span class="accent">Free.</span>',
+    vtcBody: 'Found or join a virtual trucking company. Every delivery you make with the Truck Dash client counts for it by itself: no logbook to fill in, no screenshots.',
+    vtcLi1: 'A company page with members, roles and ranks, a monthly ranking and stats',
+    vtcLi2: 'A map of everything the company delivered, and a live map of who is driving now',
+    vtcLi3: 'Deliveries checked for real or race driving, with the reason shown',
+    vtcLi4: 'Posts to the company’s Discord channels and a recruitment image with a QR code',
+    vtcLi5: 'Personal trips stay yours: the company sees nothing of them',
+    vtcCta: 'See the companies',
+    vtcHow: 'How it works',
+    vtcNote: 'In beta. Needs a free account with the client linked. Nothing to pay and no features held back.',
     overlayTitle: 'The GPS, <span class="accent">on top of the game.</span>',
     overlayBody: 'No second screen at hand, or you just don\'t want to look down? The client draws a small panel over ETS2 and ATS while you drive.',
     overlayLi1: 'Speed and speed limit, blinking when you go over',
@@ -1194,6 +1225,16 @@ const TRANSLATIONS = {
     accountsCta: 'Crear una cuenta gratis',
     accountsHow: 'Cómo funciona',
     accountsNote: 'Opcional: todo lo demás funciona sin cuenta, y no se guarda nada hasta que lo vinculás.',
+    vtcTitle: 'Manejá para una empresa virtual. <span class="accent">Gratis.</span>',
+    vtcBody: 'Fundá o sumate a una empresa de transporte virtual. Cada entrega que hacés con el cliente de Truck Dash cuenta para ella sola: sin planillas ni capturas.',
+    vtcLi1: 'Una página de la empresa con miembros, puestos y rangos, ranking del mes y estadísticas',
+    vtcLi2: 'Un mapa de todo lo que entregó la empresa, y un mapa en vivo de quién está manejando',
+    vtcLi3: 'Entregas revisadas como real o race, con el motivo a la vista',
+    vtcLi4: 'Avisos en los canales de Discord de la empresa y una imagen de reclutamiento con QR',
+    vtcLi5: 'Los viajes personales son tuyos: la empresa no ve nada de ellos',
+    vtcCta: 'Ver las empresas',
+    vtcHow: 'Cómo funciona',
+    vtcNote: 'En beta. Necesita una cuenta gratis con el cliente vinculado. No se paga nada y no hay funciones reservadas.',
     overlayTitle: 'El GPS, <span class="accent">arriba del juego.</span>',
     overlayBody: '¿No tenés una segunda pantalla a mano, o no querés bajar la vista? El cliente dibuja un recuadro chico sobre ETS2 y ATS mientras manejás.',
     overlayLi1: 'Velocidad y límite, que titila si te pasás',
