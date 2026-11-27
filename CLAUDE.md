@@ -283,6 +283,13 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   (`rememberedCode`: solo ese codigo, uno escrito despues avisa enseguida si esta
   mal), y el lapiz (`changeCodeBtn`) lo olvida. La cuenta no sirve para esto: el
   relay no sabe de cuentas.
+- El link de un convoy (`/app/?convoy=CODIGO`, el de "Copy link") con ese codigo guardado
+  se conecta con el y abre la ventana del convoy con el codigo puesto (`convoyLinkStart`);
+  sin codigo es espectador, y la ventana se abre sola con "Join as driver" (`convoyDrive`,
+  `convoyDriverUrl`: recarga con `?code=`). El lapiz del chip del espectador abre esa
+  ventana. Antes el link era siempre de espectador: quien maneja abria el que le pasaron
+  en Discord y nadie lo veia, sin entender por que (Discord 27-11, gabbo). La linea de
+  `detailSpectator` no se ve con la vista en vivo.
 - Plan de ruta y voz por sesion (Discord 22-10, Gargamosch: los waypoints en
   la tablet, la navegacion en el celular y la voz en la PC). El relay guarda
   los waypoints de cada variante (`Session.route_plans`, con `rev` = su hora
