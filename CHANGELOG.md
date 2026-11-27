@@ -4,6 +4,15 @@ Changes to the Truck Dash client, newest first. Each release on GitHub
 shows its own section from this file. The web app at trucksim-dash.com
 updates on its own and is not versioned here.
 
+## Unreleased
+
+- Build my map: the build log now lists the roads whose lanes the builder doesn't recognize
+  (lane types a map mod defines itself), with the lanes of each road look. Those roads were
+  missing from the map: in a player's build with 77 ATS mods, most of the roads in Alberta,
+  Saskatchewan, northern BC, Yukon, New Brunswick, Nova Scotia and the North Shore of Quebec.
+  The web map already draws them now, as local roads, with the map you built before; the list
+  in the log tells us which of them are highways, so they can be drawn as such.
+
 ## 1.5.49 (2026-11-25)
 
 - Coach jobs with more than 16 legs: all the stops are there, up to 65. The plugin kept 16 legs

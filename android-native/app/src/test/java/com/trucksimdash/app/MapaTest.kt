@@ -152,6 +152,20 @@ class MapaTest {
     }
 
     @Test
+    fun `las calles con carriles propios de un mod van con las locales, como en la web`() {
+        // roadType 'unknown' (ROAD_LAYER_TYPES de pure.js): sin capa no se dibujaban,
+        // y a un mapa armado en la PC le faltaba media Canada (build.log del 27-11).
+        val capas = JsonLaxo.parseToJsonElement(estiloDe(atsVainilla, 45.0)).jsonObject
+            .getValue("layers").jsonArray.map { it.jsonObject }
+        fun tipos(id: String): List<String> {
+            val filtro = capas.first { it.getValue("id").jsonPrimitive.content == id }.getValue("filter").jsonArray
+            val enLista = filtro.drop(1).map { it.jsonArray }.first { it[0].jsonPrimitive.content == "in" }
+            return enLista[2].jsonArray[1].jsonArray.map { it.jsonPrimitive.content }
+        }
+        assertEquals(listOf("local", "unknown"), tipos("road-local"))
+    }
+
+    @Test
     fun `sin mapa base no hay fuente ni capas de base`() {
         val v = VarianteMapa("x", "x", "ets2", "gu", "1", null, LngLat(0.0, 0.0))
         val estilo = JsonLaxo.parseToJsonElement(estiloDe(v, 45.0)).jsonObject

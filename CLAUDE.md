@@ -132,6 +132,16 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   compresion 2 (deflate sin cabecera) y la 4 (zstd) se leen, y lo que `createEntry` no acepta
   se lee otra vez como TruckLib (`leerEntradaFlexible`). El build.log dice cuantas entradas
   entraron asi y por que quedo afuera cada una de las otras: mirar eso antes de adivinar.
+- Calles que faltan en un mapa armado en la PC con el mod leido entero (build.log del 27-11,
+  los mismos 77 mods con la 1.5.49: Alberta, Saskatchewan, el norte de BC, Yukon, New
+  Brunswick, Nova Scotia y la costa norte de Quebec sin calles): los carriles de su road
+  look tienen nombres que `getRoadType` de truckermudgeon no conoce (un `traffic_lane` del
+  mod), la calle sale con roadType `unknown` y ninguna capa la dibujaba. En el log se ve como
+  "could not infer road type for prefab road" juntos en una zona (132 en Canada, ninguno en
+  EE. UU.). Ahora van como locales (`ROAD_LAYER_TYPES` de pure.js, y lo mismo en `account.js`
+  y `EstiloMapa.kt`), y el armador lista esos road looks con sus carriles ("roads of N road
+  looks have lanes of unknown type"): si alguno es de autopista, se clasifica en
+  `getRoadType` del parche. El ruteo no cambia (`lane_speed` del cliente les da 50 km/h).
 - Armar de nuevo con los mismos mods ("Build it again" de Setup) no cambia la huella: para
   la web la version de los archivos es `build` del manifest, que el cliente manda en
   `fingerprint` (`local_maps_summary`; los mapas de antes no lo traen). Si cambia con la

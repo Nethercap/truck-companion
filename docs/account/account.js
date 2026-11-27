@@ -3639,8 +3639,10 @@
 
   function estiloMapa(juego) {
     const v = (typeof MAP_DATA_VERSION !== 'undefined' && MAP_DATA_VERSION[juego]) || '';
-    const capa = (tipo, extra) => Object.assign({ source: 'vec', 'source-layer': juego }, extra,
-      { filter: ['all', ['==', ['get', 'type'], 'road'], ['==', ['get', 'roadType'], tipo]] });
+    // tipos: los de ROAD_LAYER_TYPES de app/pure.js (que esta pagina no carga); 'unknown'
+    // es una calle con carriles propios de un mod, y va con las locales.
+    const capa = (tipos, extra) => Object.assign({ source: 'vec', 'source-layer': juego }, extra,
+      { filter: ['all', ['==', ['get', 'type'], 'road'], ['in', ['get', 'roadType'], ['literal', tipos]]] });
     const ancho = (a, b) => ['interpolate', ['linear'], ['zoom'], 4, a, 10, b];
     return {
       version: 8,
@@ -3648,9 +3650,9 @@
       sources: { vec: { type: 'vector', url: `pmtiles://${MAPA_R2}/vector/${juego}.pmtiles?v=${v}` } },
       layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': '#1b1e23' } },
-        capa('local', { id: 'road-local', type: 'line', paint: { 'line-color': '#363b43', 'line-width': ancho(0.4, 1.2) } }),
-        capa('divided', { id: 'road-divided', type: 'line', paint: { 'line-color': '#444a53', 'line-width': ancho(0.6, 1.8) } }),
-        capa('freeway', { id: 'road-freeway', type: 'line', paint: { 'line-color': '#545b65', 'line-width': ancho(0.8, 2.4) } }),
+        capa(['local', 'unknown'], { id: 'road-local', type: 'line', paint: { 'line-color': '#363b43', 'line-width': ancho(0.4, 1.2) } }),
+        capa(['divided'], { id: 'road-divided', type: 'line', paint: { 'line-color': '#444a53', 'line-width': ancho(0.6, 1.8) } }),
+        capa(['freeway'], { id: 'road-freeway', type: 'line', paint: { 'line-color': '#545b65', 'line-width': ancho(0.8, 2.4) } }),
         { id: 'country-label', type: 'symbol', source: 'vec', 'source-layer': juego, maxzoom: 8,
           filter: ['==', ['get', 'type'], 'country'],
           layout: { 'text-field': ['get', 'name'], 'text-size': 12 },

@@ -159,7 +159,7 @@ internal fun estiloDe(v: VarianteMapa, latCentro: Double, a: AparienciaMapa = Ap
         {"id":"ferry-line","type":"line","source":"vec","source-layer":$l,"filter":["in",["get","type"],["literal",["ferry","train"]]],
          "layout":{"line-cap":"round"},
          "paint":{"line-color":"#5a9ec4","line-opacity":0.55,"line-dasharray":[2,2],"line-width":["interpolate",["linear"],["zoom"],5,1,12,2.5]}},
-        {"id":"road-local","type":"line","source":"vec","source-layer":$l,"filter":["all",["==",["get","type"],"road"],["==",["get","roadType"],"local"]],
+        {"id":"road-local","type":"line","source":"vec","source-layer":$l,"filter":["all",["==",["get","type"],"road"],["in",["get","roadType"],["literal",["local","unknown"]]]],
          "layout":{"line-cap":"square","line-join":"miter"},"paint":{"line-color":"#7d838c","line-width":${ancho("road-local", v, latCentro)}}},
         {"id":"road-divided","type":"line","source":"vec","source-layer":$l,"filter":["all",["==",["get","type"],"road"],["==",["get","roadType"],"divided"]],
          "layout":{"line-cap":"square","line-join":"miter"},"paint":{"line-color":"#cbd0d6","line-width":${ancho("road-divided", v, latCentro)}}},

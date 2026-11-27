@@ -156,14 +156,15 @@ index 0bde4a8..52e1c34 100644
    }
  }
 diff --git a/packages/clis/generator/geo-json/map.ts b/packages/clis/generator/geo-json/map.ts
-index eb72759..92559e5 100644
+index eb72759..84163ef 100644
 --- a/packages/clis/generator/geo-json/map.ts
 +++ b/packages/clis/generator/geo-json/map.ts
-@@ -259,13 +259,24 @@ export function convertToMapGeoJson(
+@@ -259,13 +259,35 @@ export function convertToMapGeoJson(
  
    logger.log('creating roads and quadtree of prefab-adjacent roads...');
    const roadFeatures: RoadFeature[] = [];
 +  const missingRoadLooks = new Set<string>();
++  const unknownTypeLooks = new Map<string, number>();
    for (const r of roads.values()) {
 -    const fs = roadToFeature(
 -      r,
@@ -186,11 +187,44 @@ index eb72759..92559e5 100644
 +      }
 +      continue;
 +    }
++    // Carriles con nombres que getRoadType no conoce (un traffic_lane propio de
++    // un mod): la calle sale con roadType 'unknown', que la web dibuja como
++    // local. Se cuentan por road look para el log, con sus carriles: con eso se
++    // sabe si son rutas o autopistas (build.log del 27-11, media Canada asi).
++    if (getRoadType(roadLook) === 'unknown') {
++      unknownTypeLooks.set(
++        r.roadLookToken,
++        (unknownTypeLooks.get(r.roadLookToken) ?? 0) + 1,
++      );
++    }
 +    const fs = roadToFeature(r, roadLook, nodes, dividerFeatures);
      for (const f of fs) {
        roadFeatures.push(f);
        if (prefabNodeUids.has(r.startNodeUid)) {
-@@ -334,7 +345,14 @@ export function convertToMapGeoJson(
+@@ -317,6 +339,22 @@ export function convertToMapGeoJson(
+       }
+     }
+   }
++  if (unknownTypeLooks.size > 0) {
++    const looks = [...unknownTypeLooks].sort((a, b) => b[1] - a[1]);
++    const total = looks.reduce((sum, [, n]) => sum + n, 0);
++    logger.warn(
++      `${total} roads of ${looks.length} road looks have lanes of unknown type`,
++      '(drawn as local roads):',
++    );
++    for (const [token, n] of looks.slice(0, 30)) {
++      const look = assertExists(roadLooks.get(token));
++      const lanes = [...new Set([...look.lanesLeft, ...look.lanesRight])];
++      logger.warn(`  ${token} (${n} roads): ${lanes.join(', ')}`);
++    }
++    if (looks.length > 30) {
++      logger.warn(`  ... and ${looks.length - 30} more road looks`);
++    }
++  }
+ 
+   logger.info(lutSize, 'prefab-adjacent road quadtree entries');
+   logger.log('creating prefabs...');
+@@ -334,7 +372,14 @@ export function convertToMapGeoJson(
    const prefabAndRoadFeatures: (PrefabFeature | RoadFeature)[] = [];
  
    for (const p of prefabs.values()) {
@@ -206,7 +240,7 @@ index eb72759..92559e5 100644
      if (!options.skipCoalescing && comps.isVJunction) {
        vJunctionList.add(p);
        continue;
-@@ -581,7 +599,17 @@ export function convertToMapGeoJson(
+@@ -581,7 +626,17 @@ export function convertToMapGeoJson(
          .toLowerCase();
  
      rankedCities = cities.values().map(c => {
@@ -225,7 +259,7 @@ index eb72759..92559e5 100644
        const isoA2 = ets2IsoA2.get(country.code) ?? country.code;
        const countryCities = citiesByCountryIsoA2.get(isoA2);
        if (countryCities == null) {
-@@ -733,9 +761,18 @@ function createTrafficFeatures(
+@@ -733,9 +788,18 @@ function createTrafficFeatures(
        continue;
      }
  
@@ -246,7 +280,7 @@ index eb72759..92559e5 100644
        const nodePoints = p.nodeUids.map(nid => assertExists(nodes.get(nid)));
        features.push(
          turf.point(midPoint(nodePoints[0], nodePoints[1]), {
-@@ -750,7 +787,9 @@ function createTrafficFeatures(
+@@ -750,7 +814,9 @@ function createTrafficFeatures(
        (map === 'usa' && pd.path.includes('_xrail_')) ||
        (map === 'europe' && /[_/]rail\d_x_road/.test(pd.path))
      ) {
@@ -257,7 +291,7 @@ index eb72759..92559e5 100644
        const nodePoints = p.nodeUids.map(nid => assertExists(nodes.get(nid)));
        features.push(
          turf.point(center(getExtent(nodePoints)), {
-@@ -846,13 +885,17 @@ function createExitFeatures(
+@@ -846,13 +912,17 @@ function createExitFeatures(
  
    logger.info(likelySigns.length, 'likely exit signs');
    return likelySigns.map(sign => {
@@ -282,7 +316,7 @@ index eb72759..92559e5 100644
      const exitText = sign.textItems[0].replaceAll(/EXIT|\s/g, '');
      const { x, y } = assertExists(nodes.get(sign.nodeUid));
      return turf.point([x, y], { type: 'exit', name: exitText });
-@@ -1086,8 +1129,12 @@ function ferryToFeature(
+@@ -1086,8 +1156,12 @@ function ferryToFeature(
          return { ferry, country: undefined };
        }
  
@@ -296,7 +330,7 @@ index eb72759..92559e5 100644
          : countriesFallback.get(ferry.name);
        if (!country) {
          logger.warn('could not find country info for', ferry.name, ferry.token);
-@@ -1194,7 +1241,15 @@ function poiToFeature(poi: Poi): PoiFeature {
+@@ -1194,7 +1268,15 @@ function poiToFeature(poi: Poi): PoiFeature {
    if (isLabeledPoi(poi)) {
      poiName = poi.label;
    } else if (poi.type === 'facility' && poi.icon === 'dealer_ico') {
@@ -313,7 +347,7 @@ index eb72759..92559e5 100644
    }
  
    return point([poi.x, poi.y], {
-@@ -1341,21 +1396,25 @@ function prefabToFeatures(
+@@ -1341,21 +1423,25 @@ function prefabToFeatures(
        .find(n => distance(n, point) < 10);
  
    return [
