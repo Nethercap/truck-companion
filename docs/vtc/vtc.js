@@ -491,6 +491,7 @@
     ['ranking', 'tabRanking', () => true],
     ['stats', 'tabStats', (p) => p.relation.member],
     ['trips', 'tabTrips', (p) => p.relation.member],
+    ['map', 'tabMap', (p) => p.relation.member],
     ['applications', 'tabApplications', (p) => puede(p, 'applications')],
     ['roles', 'tabRoles', (p) => puede(p, 'roles')],
     ['discord', 'tabDiscord', (p) => puede(p, 'discord')],
@@ -548,6 +549,9 @@
 
   function pintarEmpresa() {
     clearInterval(latido);
+    // El mapa se arma de nuevo al volver a su pestana: uno vivo afuera de la
+    // pagina se queda con un contexto de WebGL.
+    if (window.VtcMapa) VtcMapa.cerrar();
     const p = pagina, v = p.vtc, rel = p.relation;
     const acciones = [];
     if (!rel.member) {
@@ -707,7 +711,7 @@
   }
 
   // --------------------------------------------------------------- miembros
-  const estado = { periodoMiembros: 'month', juegoMiembros: '', orden: 'distance_km', periodo: 'month', metrica: 'distance', juego: '', statsPeriodo: 'month', revision: false };
+  const estado = { periodoMiembros: 'month', juegoMiembros: '', orden: 'distance_km', periodo: 'month', metrica: 'distance', juego: '', statsPeriodo: 'month', revision: false, mapaJuego: '', mapaPeriodo: 'month' };
   const opcionesPeriodo = () => ['week', 'month', 'last_month', 'year', 'total'].map((x) => [x, t('period_' + x)]);
   const opcionesJuego = () => [['', t('anyGame')]].concat((pagina.vtc.games || []).map((j) => [j, j.toUpperCase()]));
 
@@ -855,6 +859,54 @@
       if ((semanas.length - 1 - i) % cada === 0) dibujo.appendChild(svg('text', { x: Math.min(Math.max(i * paso + paso / 2, 22), ancho - 22), y: alto - 8, 'text-anchor': 'middle' }, texto(s.inicio)));
     });
     caja.replaceChildren(dibujo);
+  }
+
+  // ------------------------------------------------------------------- mapa
+  // Los recorridos de los viajes hechos para la empresa, un color por chofer
+  // (mapa.js). De los personales nada: la API no los manda.
+  VISTAS.map = async function (cuerpo, p) {
+    const juegos = (p.vtc.games && p.vtc.games.length) ? p.vtc.games : ['ets2', 'ats'];
+    if (!juegos.includes(estado.mapaJuego)) estado.mapaJuego = juegos[0];
+    const juego = estado.mapaJuego, periodo = estado.mapaPeriodo;
+    const recargar = () => VISTAS.map(cuerpo, p);
+    const lienzo = el('div', { class: 'mapa-vtc' });
+    const aviso = el('p', { class: 'mapa-aviso-vtc', role: 'status' }, t('mapLoading'));
+    const resumen = el('p', { class: 'muted small' });
+    const leyenda = el('div', { class: 'leyenda-vtc', role: 'group', 'aria-label': t('drivers') });
+    cuerpo.replaceChildren(el('section', { class: 'card' },
+      el('div', { class: 'filtros' },
+        juegos.length > 1 ? selector(juegos.map((j) => [j, j.toUpperCase()]), juego, (x) => { estado.mapaJuego = x; recargar(); }, t('fGames')) : null,
+        selector(opcionesPeriodo(), periodo, (x) => { estado.mapaPeriodo = x; recargar(); }, t('period'))),
+      el('div', { class: 'mapa-caja-vtc' }, lienzo, aviso), resumen, leyenda,
+      el('p', { class: 'muted small' }, t('mapOnlyCompany'))));
+    const [problema, r] = await Promise.all([
+      VtcMapa.abrir(lienzo, juego),
+      pedir('/vtc/' + p.vtc.tag + '/map?game=' + juego + '&period=' + periodo),
+    ]);
+    // Se cambio de pestana, de juego o de periodo mientras tanto
+    if (problema === 'cancelado' || !lienzo.isConnected) return;
+    if (!r.ok) { aviso.textContent = t('error'); return; }
+    const m = r.datos.map, choferes = r.datos.drivers;
+    resumen.textContent = m.trips ? t('mapSummary', { trips: numero(m.trips), drivers: numero(choferes.length), cities: numero(m.cities.length) }) : '';
+    pintarLeyenda(leyenda, choferes);
+    if (problema) { aviso.textContent = t(problema); return; }
+    aviso.textContent = m.trips ? '' : t('mapEmpty');
+    aviso.hidden = !!m.trips;
+    VtcMapa.dibujar(m, juego);
+  };
+
+  // Un boton por chofer con su color: tocarlo lo deja adelante en el mapa.
+  function pintarLeyenda(caja, choferes) {
+    const TOPE = 12;
+    let elegido = null;
+    const botones = choferes.slice(0, TOPE).map((d, i) => el('button', {
+      type: 'button', class: 'chofer-mapa', 'aria-pressed': 'false', vars: { '--c': VtcMapa.color(i) },
+      on: { click: () => { elegido = elegido === i ? null : i; VtcMapa.resaltar(elegido); marcar(); } },
+    }, el('span', { class: 'muestra', 'aria-hidden': 'true' }),
+      el('b', {}, d.user && d.user.username ? d.user.username : t('hiddenDriver')),
+      el('span', { class: 'muted' }, t('mapDriverLine', { trips: numero(d.trips), km: distancia(d.km) }))));
+    function marcar() { botones.forEach((b, i) => b.setAttribute('aria-pressed', String(i === elegido))); }
+    caja.replaceChildren(...botones, choferes.length > TOPE ? el('span', { class: 'muted small' }, t('andMore', { n: choferes.length - TOPE })) : '');
   }
 
   // ----------------------------------------------------------------- viajes
