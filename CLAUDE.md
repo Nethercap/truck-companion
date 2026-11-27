@@ -984,6 +984,33 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   que quedan son casi todos recalculando encima del nodo o el mismo giro en
   otro nodo de una cadena de cruces. `--antesDelGiro 0` lo saltea.
 
+## Parser propio, fase 1: lector de archivos (27-11)
+
+- `client/juego/` lee los archivos del juego en Python, sin Node ni modulos
+  nativos: `cityhash` (CityHash64, igual al nativo en 69 vectores de 0 a 299
+  bytes), `archivos` (HashFS v1 y v2, ZIP tambien con firma `AEM!`, carpetas y
+  mods en partes), `sii` (texto, BSII y ScsC, y el locale) y `montaje` (base,
+  DLC y mods, el ultimo gana). Es la fase 1 del plan del 25-11
+  (`plan-independencia-mapas-2026-11-25.md` del taller): todavia no lo usa el
+  armador, solo `partida_gps.py`, que toma de `juego/sii.py` el descifrado y
+  los lectores de .sii (los nombres viejos siguen ahi para sus tests).
+- Las trampas de los mods protegidos son las mismas que resuelve el armador
+  (`builder/README.md`): entradas basura con su motivo en `salteadas`, la
+  lectura flexible de una entrada que no cierra (`leidas_como_truco`), listados
+  guardados como archivo, la tabla de metadatos sin comprimir (el campo cuenta
+  valores de 4 bytes), zlib cortado, deflate sin cabecera (2) y zstd (4, con
+  Python 3.14 o la libreria zstandard; el .exe y CI van con 3.12 y no lo leen).
+  gdeflate (texturas) no: `CompresionNoSoportada` para ese archivo solo.
+- Un caso nuevo de un mod va con su test en `test_juego_archivos.py`, armando
+  el archivo a mano (`armar_v2`, `armar_v1`, `_zip`); CI no tiene el juego. La
+  comparacion contra archivos reales (zipfile de Python para los ZIP y el
+  extractor de WSL para HashFS) y la medicion de tiempo y memoria estan en
+  `validar_lector_scs.py` del taller.
+- No portar codigo de TruckLib ni del Extractor de sk-zk (GPL-2.0, no se puede
+  mezclar con la AGPL-3.0). truckermudgeon/maps (GPL-3.0) y ts-map (MIT) si
+  sirven de referencia, con sus avisos. Solo archivos: nunca la memoria del
+  juego.
+
 ## Reportes de navegacion (25-10)
 
 - El reporte abierto se rehace cada segundo con la telemetria (`refreshNavReport`,
