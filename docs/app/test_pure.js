@@ -4950,6 +4950,10 @@ test('giro para lector de pantalla: una vez por maniobra y sin la flecha', () =>
   // la identidad es la misma que usa la voz: redondeo del nodo incluido
   assert.equal(turnIdentity(giro(1, 100.2)), turnIdentity(giro(5, 99.8)));
   assert.notEqual(turnIdentity(giro(1, 100)), turnIdentity({ ...giro(1, 100), direction: 'right' }));
+  // una rotonda, por su salida: el lado cambia recalculando cerca de la entrada
+  const rotonda3 = { kind: 'roundabout', exit: 3, direction: 'left', node: [100, 200], distanceMeters: 50 };
+  assert.equal(turnIdentity(rotonda3), turnIdentity({ ...rotonda3, direction: 'right' }));
+  assert.notEqual(turnIdentity(rotonda3), turnIdentity({ ...rotonda3, exit: 2 }));
   const v = createVoiceGuide({ timing: 'early' });
   assert.equal(v.maneuver(giro(300), 90), 'soon_turn_left');
   assert.equal(v.maneuver(giro(250, 100.3), 90), null); // mismo nodo redondeado: ya avisado

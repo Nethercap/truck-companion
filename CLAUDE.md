@@ -695,6 +695,9 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   anillos, todos ovalos, y ninguna manzana, rombo de autovia ni estrella.
 - La voz habla de a una frase (`voiceQueueAction`): una nueva espera a que
   termine la que suena, salvo un aviso en el punto contra uno anticipado.
+  Una rotonda se identifica por su salida, no por el lado (`direction`, que
+  recalculando cerca de la entrada cambia en las salidas casi derechas y la
+  voz repetia la frase: 7 rotondas en 300 rutas de ETS2 del simulador).
   Lo dicho se recuerda por maniobra (`turnIdentity`) para las ultimas 8
   (`createRecentManeuvers`, tambien el lector de pantalla), no solo la
   ultima: al pisar el nodo de un giro el aviso pasaba al siguiente, volvia

@@ -4588,9 +4588,15 @@ function voiceManeuverKey(turn) {
 // Que maniobra es, para no avisarla dos veces: tipo, lado y el nodo donde se
 // hace. La distancia no entra, que cambia en cada dato. La usan la voz y el
 // aviso para lectores de pantalla (createTurnAnnouncer).
+// Una rotonda va por su salida, no por el lado: direction sale de comparar
+// 60 m antes de la entrada con 60 m despues de la salida, y recalculando
+// cerca de la entrada (con menos camino antes) cambia en las salidas casi
+// derechas. Era otra maniobra y la voz repetia "roundabout_3" (7 rotondas
+// en 300 rutas de ETS2 del simulador); el icono y la voz usan la salida.
 function turnIdentity(turn) {
   if (!turn || !turn.node) return null;
-  return `${turn.kind}|${turn.direction}|${Math.round(turn.node[0])},${Math.round(turn.node[1])}`;
+  const lado = turn.kind === 'roundabout' ? `salida${turn.exit}` : turn.direction;
+  return `${turn.kind}|${lado}|${Math.round(turn.node[0])},${Math.round(turn.node[1])}`;
 }
 // Los ultimos avisos de giro que se mostraron, para reportar uno equivocado
 // ("Turn right where there is no right turn ... what information would you
