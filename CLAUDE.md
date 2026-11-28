@@ -660,6 +660,20 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   una de tres brazos la primera salida dobla una vez y la segunda rodea media
   isla (0 y 48 grados de mas en la de Zurich, reporte #63, que se callaba).
   El simulador cuenta igual las salidas por angulo (`salidaPorAngulo`).
+  Sin un nodo de la ruta antes de la entrada (recalculada a pocos metros: la
+  ruta arranca en el tramo del camion, `startArcForHeading`, y sin lo
+  recorrido) la entrada no se miraba como entrada y la rotonda salia como
+  "turn left" (Almeria -> Murcia, ETS2, -56413,64667: "tercera salida" sin
+  recalcular). Ahora la calle de llegada es el vecino de la entrada hacia
+  donde queda el comienzo de la ruta, a menos de 30 grados por la curva de la
+  arista, tambien entre las que llegan (`incoming` en el ctx: la llegada a una
+  rotonda suele ser de un sentido). En 300 rutas por juego (semilla 7), los
+  avisos de rotonda distintos tras recalcular antes del cruce bajan de 150 a 2
+  en ETS2 y de 10 a 0 en ATS, y los al reves de 21 a 7; manejando sin
+  recalcular nada cambia. Los 7 son el lado del icono (`direction`, de 60 m
+  antes de la entrada contra 60 m despues de la salida): con menos camino
+  antes cambia en las salidas casi derechas, y como esta en `turnIdentity`
+  la voz puede repetir la frase.
   En esas 300 rutas de ETS2 se anuncian 242 rotondas en vez de 191, y las de
   salida distinta por angulo bajan de 4 a 1.
   Las rotondas ovaladas armadas con calles (sin prefab de rotonda, sin

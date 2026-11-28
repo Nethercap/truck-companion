@@ -1825,6 +1825,22 @@ test('detectRoundabout: anillo de un sentido, cuenta las salidas hasta la de la 
   assert.deepEqual([r.exit, r.enter, r.leave], [3, 1, 7]);
   r = detectRoundabout(ctx([sur, 0, 1, 2, este]));
   assert.equal(r.exit, 1);
+  // recalculada a 10 m de la entrada, sin el nodo de antes: la ruta arranca en el
+  // tramo del camion (Almeria -> Murcia, ETS2: decia "turn left")
+  const recalculada = (ids) => {
+    const pts = [[0, -40, 0, 0, null], ...ids.slice(1).map((n) => [nodos[n][0], nodos[n][1], 0, 1, n])];
+    const { cum, pointAt } = routeMetrics(pts);
+    return { pts, cum, pointAt, i: 1, iEnd: 1, ...g, bearingBetween: planarBearing };
+  };
+  r = detectRoundabout(recalculada([sur, 0, 1, 2, 3, 4, 5, 6, oeste]));
+  assert.deepEqual([r.exit, r.enter, r.leave], [3, 1, 7]);
+  assert.equal(detectRoundabout(recalculada([sur, 0, 1, 2, este])).exit, 1);
+  // con la calle de llegada de un solo sentido, hacia la entrada: se la busca entre las que llegan
+  const unaMano = aristas.map(([a, b, dos]) => (a === 0 && b === sur ? [sur, 0, false] : [a, b, dos]));
+  const g3 = grafoChico(nodos, unaMano);
+  const llegan = (n) => unaMano.flatMap(([a, b, dos]) => (b === n ? [a] : dos && a === n ? [b] : []));
+  const r3 = detectRoundabout({ ...recalculada([sur, 0, 1, 2, 3, 4, 5, 6, oeste]), ...g3, incoming: llegan });
+  assert.deepEqual([r3.exit, r3.enter], [3, 1]);
   // la misma forma con calles de doble mano (una calle que da la vuelta a una plaza): no
   const dobles = aristas.map(([a, b]) => [a, b, true]);
   const g2 = grafoChico(nodos, dobles);

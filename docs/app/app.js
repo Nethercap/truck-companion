@@ -5359,7 +5359,7 @@ function findUpcomingTurn(heading) {
   let lastKeep = null; // ultimo "keep" por carriles, aunque haya quedado atras (NAV_LANE_KEEP_REPEAT_M)
   const passed = []; // cruces sin aviso de aca al proximo giro: [i, iEnd] (ver sideExitToward)
   const roundaboutAt = (i, iEnd) => graph.adjacency
-    ? detectRoundabout({ pts, cum, i, iEnd, adjacency: graph.adjacency, nodeAt: graph.nodeXY, edgeLine, bearingBetween, stubs: graph.stubs }) : null;
+    ? detectRoundabout({ pts, cum, i, iEnd, adjacency: graph.adjacency, incoming: graph.incoming, nodeAt: graph.nodeXY, edgeLine, bearingBetween, stubs: graph.stubs }) : null;
   for (let i = 1; i < pts.length - 1; i++) {
     if (cum[i] - cum[here] > NAV_TURN_LOOKAHEAD_M) break;
     if (pts[i][3] !== 1) continue; // no es interseccion: una curva no es un giro
