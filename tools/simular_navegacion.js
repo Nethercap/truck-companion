@@ -260,6 +260,7 @@ function verdadDeCruces(ctx, pts, met) {
   const { g, pure } = ctx;
   const { cum, pointAt } = met;
   const dirs = pure.routeArcDirections(g);
+  const tocos = pure.prefabStubs(g);
   const grupos = [];
   for (let i = 1; i < pts.length - 1; i++) {
     if (pts[i][3] !== 1) continue;
@@ -284,12 +285,15 @@ function verdadDeCruces(ctx, pts, met) {
         if (n === sig || n === u || enGrupo.has(n)) continue;
         if (kIn !== -1 && pure.isUTurnArc(dirs, kIn, k2)) continue;
         const bloq = new Set([...enGrupo, u, sig]);
-        if (!pure.leadsAway(g.adjacency, g.nodeXY, w, n, bloq, 80)) continue;
+        // Un toco (brazo de prefab con la calle oculta en el mapa del juego, que
+        // el grafo no tiene) tambien es otra salida: la calle se ve y se maneja.
+        const oculta = !pure.leadsAway(g.adjacency, g.nodeXY, w, n, bloq, 80);
+        if (oculta && !(tocos && tocos[n] === 1)) continue;
         // el rumbo a unos 40 m por la salida (el primer nodo de un prefab
         // puede estar pegado)
         const linea = lineaArista(g, w, n) || [g.nodeXY(w), g.nodeXY(n)];
         const ml = metrica(linea), lejos = ml.pointAt(Math.min(40, ml.cum[ml.cum.length - 1]));
-        otras.push({ node: n, rumbo: normDeg(rumbo(g.nodeXY(w), lejos) - enIn), kmh: velArista(g, w, n), m: Math.round(ml.cum[ml.cum.length - 1]) });
+        otras.push({ node: n, rumbo: normDeg(rumbo(g.nodeXY(w), lejos) - enIn), kmh: velArista(g, w, n), m: Math.round(ml.cum[ml.cum.length - 1]), oculta });
       }
     }
     grupos.push({ i, iEnd, otra: otras[0] || null, otras });
@@ -514,7 +518,7 @@ function analizarRuta(ctx, ruta, hallazgos) {
     if (cum[c.iEnd] + 60 > ultimoTick.s) continue; // la ruta termina antes
     if (cum[c.i] < 100) { c.arranque = true; continue; } // la ventana de entrada cae antes de la ruta
     if (!c.avisos.length && !c.rotonda && c.otra && Math.abs(c.delta) >= 60) {
-      add('giro_sin_aviso', { donde: xy(pts[c.i]), dobla: Math.round(c.delta), otraSalida: Math.round(c.otra.rumbo), km: (cum[c.i] / 1000).toFixed(2), cruces: c.grupos.length });
+      add('giro_sin_aviso', { donde: xy(pts[c.i]), dobla: Math.round(c.delta), otraSalida: Math.round(c.otra.rumbo), oculta: c.otras.every(o => o.oculta), km: (cum[c.i] / 1000).toFixed(2), cruces: c.grupos.length });
     } else if (c.avisos.length && !c.rotonda) {
       // zona con avisos: un cruce de la zona que dobla fuerte, con otra
       // salida, lejos de todo aviso (dos giros seguidos avisados como uno)
@@ -566,7 +570,7 @@ function analizarRuta(ctx, ruta, hallazgos) {
         largoZona: Math.round(cum[c.iEnd] - cum[c.i]), cruces: c.grupos.length,
         kmhEntra: nAntes != null && nI != null ? velArista(g, nAntes, nI) : null,
         kmhSale: nF != null && nDespues != null ? velArista(g, nF, nDespues) : null,
-        otras: c.otras.map(o => ({ rumbo: Math.round(o.rumbo), kmh: o.kmh, m: o.m })), decoy: r.decoy });
+        otras: c.otras.map(o => ({ rumbo: Math.round(o.rumbo), kmh: o.kmh, m: o.m, oculta: o.oculta })), decoy: r.decoy });
     }
   }
   // 4. avisos tarde, que cambian o que desaparecen, y voz

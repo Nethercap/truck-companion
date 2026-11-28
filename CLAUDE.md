@@ -727,14 +727,19 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   la curva de la arista): la ruta dobla 50 grados o mas entre los 25 m de
   antes y de despues, hasta 150, y el toco se va 30 grados o mas para el
   otro lado. Asi tambien la T cuyo palo se curva antes de la barra, que a
-  60 m no dobla. El toco de enfrente (Tulsa) y el del mismo lado siguen
-  callados, y la entrada a una rotonda no cuenta. Tampoco una rotonda
+  60 m no dobla. Desde el 27-11 tambien el toco de enfrente (la calle que
+  sigue derecho es oculta y la ruta dobla, la T de Tulsa, que se callaba): con
+  el simulador contando los tocos como salidas eran la mayoria de sus giros
+  sin aviso, y dibujados son T de verdad; una curva con una entrada enfrente
+  no llega porque en 25 m no dobla 50. Solo el del mismo lado sigue callado
+  (las dos calles doblan), y la entrada a una rotonda no cuenta. Tampoco una rotonda
   compacta con los otros brazos ocultos (Bilbao, Murcia, Innsbruck ->
   Zurich): adentro del prefab la ruta tambien dobla con un toco del otro
   lado, y "turn left" ahi era pasar derecho. La separa una curva del prefab
-  (de las que salen del toco o del nodo del cruce) que rodea la isla,
-  `extraTurningDeg` de 60 o mas (74 a 148 en las rotondas de la muestra, 0
-  en todas las T); esas ahora las reconoce `detectRoundabout` (ver
+  (entre el nodo del cruce, el toco y los vecinos de los dos) que rodea la
+  isla, `extraTurningDeg` de 30 o mas (de 37 en la chica de Malaga -> Almeria
+  a 148 en las rotondas de la muestra; 0, o 1, en las 60 T); esas ahora las
+  reconoce casi siempre `detectRoundabout` (ver
   rotondas). El aviso va en el nodo de donde sale el toco, la entrada al
   prefab, como los otros giros. Lo busco el reporte #63, que resulto ser una
   de esas rotondas.
@@ -750,6 +755,18 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   `giro_sin_otra_salida`, `aviso_sin_opcion` y `giro_en_recta`: el simulador
   no ve las calles ocultas, y en una T cuyo palo se curva la zona dobla poco.
   check_avisos: ATS +3 (Helena, Yankton, Pendleton) y ETS2 +13.
+  Con el toco de enfrente (27-11) y el simulador contando los tocos como otra
+  salida en los cruces (`verdadDeCruces`, la marca `oculta` en giros y en
+  `giro_sin_aviso`), en 300 rutas por juego: `giro_sin_aviso` de 146 a 55 en
+  ATS y de 257 a 173 en ETS2, `decision_sin_aviso_en_zona` de 12 a 7 y de 23
+  a 12; avisos de 2.279 a 2.416 y de 2.738 a 2.899 (139 y 198 lugares). Los
+  83 que se corren tienen uno igual a menos de 80 m. Dibujados 50 nuevos y
+  los 26 de check_avisos (ATS +8, ETS2 +19): T e Y con la calle de enfrente
+  oculta. De los `giro_sin_aviso` que quedan, los de calle de verdad son casi
+  todos rulos de trebol (la bifurcacion de antes ya se aviso) y rotondas
+  compactas que `detectRoundabout` no reconoce por forma (brazos poco
+  redondos, curvas de 79 a 89 grados donde pide 90: Kiruna, Munchen, Atenas):
+  lo robusto es marcar los prefabs de rotonda en el constructor.
 - Los puntos de la curva de un prefab cortan el grupo de nodos de cruce
   (`junctionClusterEnd`). Si un grupo no avisa nada o se calla,
   `junctionManeuver` mira el prefab entero (60 m): partida, una T se callaba.

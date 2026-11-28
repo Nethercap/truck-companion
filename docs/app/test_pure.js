@@ -473,7 +473,8 @@ test('maneuver: la cruz con el brazo de enfrente oculto se anuncia aunque la cal
   assert.deepEqual([detectManeuver(cruz(brazos)).kind, detectManeuver(cruz(brazos)).quiet], ['turn', true]);
   const m = detectManeuver(cruz(brazos, tocos));
   assert.deepEqual([m.kind, m.direction, m.quiet], ['turn', 'left', false]);
-  // una T (el brazo de enfrente es el unico toco): callada, como en Tulsa
+  // una T (el brazo de enfrente es el unico toco): aca callada, como en Tulsa;
+  // con la curva de cada arista la anuncia stubTee (ver la T con la otra calle oculta)
   assert.equal(detectManeuver(cruz([[1, 5], [5, 2], [2, 5]], [0, 0, 0, 0, 0, 1])).quiet, true);
   // dos tocos que no se unen entre si son de dos prefabs pegados (Messina): callada
   assert.equal(detectManeuver(cruz([[1, 5], [1, 6], [5, 2], [6, 2]], tocos)).quiet, true);
@@ -511,10 +512,13 @@ test('maneuver: la T con la otra calle oculta se anuncia, aunque el palo se curv
   assert.equal(detectManeuver(T(derecha, { edgeLine: undefined })), null);
   // un brazo muerto que no es un toco (el otro lado de un rombo, un callejon) no cuenta
   assert.equal(detectManeuver(T(derecha, { stubs: [0, 0, 0, 0, 0, 0, 0] })), null);
-  // el toco de enfrente (la T de Tulsa) sigue callado
-  assert.equal(detectManeuver(T([[0, 0], [0, 32], [0, 60], [1, 100]])), null);
-  // y el que se va para el mismo lado que la ruta, tambien
-  assert.equal(detectManeuver(T([[0, 0], [0, 32], [-6, 50], [-14, 90]])), null);
+  // el toco de enfrente (la calle que sigue derecho es oculta, como la T de
+  // Tulsa): se ve la calle y la ruta dobla, se anuncia (desde el 27-11)
+  const enfrente = detectManeuver(T([[0, 0], [0, 32], [0, 60], [1, 100]]));
+  assert.deepEqual([enfrente.kind, enfrente.direction, enfrente.stubTee], ['turn', 'left', true]);
+  // y el que se abre apenas para el mismo lado, tambien: sigue casi derecho
+  assert.equal(detectManeuver(T([[0, 0], [0, 32], [-6, 50], [-14, 90]])).stubTee, true);
+  // el que se va para el mismo lado que la ruta, no: las dos calles doblan
   assert.equal(detectManeuver(T([[0, 0], [0, 32], [-6, 34], [-40, 10]])), null);
   // una rotonda compacta con los otros brazos ocultos: la curva del toco a la
   // salida rodea la isla (Bilbao, Innsbruck -> Zurich); "turn left" ahi es pasar
