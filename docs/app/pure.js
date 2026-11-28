@@ -727,11 +727,41 @@ function detectRoundabout(ctx) {
   // siguiente.
   const idxs = [];
   for (let k = i - 1; k >= 0; k--) if (pts[k][4] != null) { idxs.push(k); break; }
+  const sinAnterior = !idxs.length;
   for (let k = i; k <= iEnd; k++) if (pts[k][4] != null) idxs.push(k);
   for (let k = iEnd + 1; k < pts.length; k++) if (pts[k][4] != null) { idxs.push(k); break; }
-  for (let a = 1; a < idxs.length; a++) {
-    const kPrev = idxs[a - 1], kEnter = idxs[a];
-    const u = pts[kPrev][4], v = pts[kEnter][4];
+  // Sin un nodo de la ruta antes del cruce: recalculada a pocos metros de la
+  // entrada, la ruta arranca en el tramo del camion (startArcForHeading) y no
+  // tiene el nodo de donde viene. Sin el, la entrada no se miraba como entrada
+  // y la rotonda salia como "turn left" (Almeria -> Murcia, ETS2,
+  // -56413,64667: "tercera salida" sin recalcular). Se toma por calle de
+  // llegada el vecino de la entrada hacia donde queda el comienzo de la ruta
+  // (a menos de 30 grados, por la curva de la arista).
+  let u0 = null;
+  if (sinAnterior && idxs.length && idxs[0] === i && i >= 1) {
+    const v0 = pts[i][4], pv = nodeAt(v0);
+    let atras = null;
+    for (let k = i - 1; k >= 0 && atras == null; k--) if (Math.hypot(pts[k][0] - pv[0], pts[k][1] - pv[1]) >= 3) atras = bearingBetween(pv, pts[k]);
+    let mejor = 30;
+    const probar = (w, l) => {
+      const dir = l && l.length > 1 ? bearingBetween(l[0], l[1]) : bearingBetween(pv, nodeAt(w));
+      const dd = Math.abs(normDeg(dir - atras));
+      if (dd < mejor) { mejor = dd; u0 = w; }
+    };
+    if (atras != null) {
+      for (const [w] of (adjacency.get(v0) || [])) probar(w, edgeLine && edgeLine(v0, w));
+      // la calle de llegada suele ser de un sentido, hacia la entrada (ctx.incoming)
+      if (ctx.incoming) {
+        for (const w of (ctx.incoming(v0) || [])) {
+          const l = edgeLine && edgeLine(w, v0);
+          probar(w, l ? l.slice().reverse() : null);
+        }
+      }
+    }
+  }
+  for (let a = sinAnterior && u0 != null ? 0 : 1; a < idxs.length; a++) {
+    const kEnter = idxs[a];
+    const u = a === 0 && sinAnterior ? u0 : pts[idxs[a - 1]][4], v = pts[kEnter][4];
     // Anillo
     // Redondo: un tramo corto de calle dividida (las dos manos y los nodos
     // donde se separan y se juntan) tambien es un ciclo de un sentido, pero
