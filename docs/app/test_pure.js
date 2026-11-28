@@ -5607,6 +5607,27 @@ test('recalcOnRoute: sin desviarse, la ruta nueva sigue con lo recorrido y el ru
   assert.equal(recalcOnRoute(), false);
 });
 
+test('startArcForHeading: no arranca en el carril que va a un brazo con la calle oculta (Dortmund -> Osnabruck)', () => {
+  const { startArcForHeading, START_ARC_STUB_M } = require('./pure.js');
+  // Una cruz: se pasa derecho de 0 a 1 (al este); de la entrada sale tambien
+  // un carril que dobla al brazo norte (2), un toco (su calle es oculta). El
+  // camion va 3 m mas cerca del carril que dobla que del que sigue derecho.
+  const nodos = [[0, 0], [100, 0], [40, -60], [-300, 0], [400, 0]];
+  const { g } = grafoDePrueba(nodos, [
+    { a: 0, b: 1, uno: true }, { a: 0, b: 2, uno: true, mids: [[30, -8]] }, { a: 2, b: 1, uno: true },
+    { a: 3, b: 0, uno: true }, { a: 1, b: 4, uno: true }, // las calles de afuera
+  ]);
+  const punto = [20, -4.5];
+  // sin -prefabs.bin, como antes: el mas cercano, el que dobla
+  assert.equal(startArcForHeading(g, punto[0], punto[1], 80).to, 2);
+  // con el: los tres tramos son del mismo prefab y el 2 no tiene calle, es un toco
+  g.edgePrefab = new Uint8Array([1, 1, 1, 0, 0]);
+  const r = startArcForHeading(g, punto[0], punto[1], 80);
+  assert.equal(r.to, 1);
+  assert.ok(!r.alts.some(c => c.to === 2));
+  assert.ok(START_ARC_STUB_M > 3);
+});
+
 test('startArcForHeading: recalcular andando arranca en la calzada y el sentido del camion', () => {
   const { startArcForHeading } = require('./pure.js');
   // Autovia: calzada al este en z = 0 y al oeste en z = -20, de un sentido,

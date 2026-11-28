@@ -407,7 +407,15 @@ Los comentarios y los tests van en castellano, como el resto del codigo.
   las calzadas y le ganaba un carril de prefab (Grimsby -> Sheffield, ETS2,
   21-10). Los carriles de un prefab casi a la misma distancia
   (`START_ARC_TIE_M`) van como alternativas y se sigue por el que da la ruta
-  mas barata. `tools/simular_navegacion.js` cuenta los recalculos malos.
+  mas barata. El carril que va a un toco (el brazo con la calle oculta)
+  cuenta `START_ARC_STUB_M` (8 m) mas lejos y no va de alternativa: pasando
+  derecho por una cruz con los brazos de los costados ocultos, al recalcular
+  el camion quedaba mas cerca del carril que dobla al brazo oculto y la ruta
+  iba hasta el toco, se daba vuelta y volvia, con un "turn right" a 20 m
+  (Dortmund -> Osnabruck, ETS2, -7575,-9249). En 300 rutas por juego saca 7
+  avisos que cambiaban al recalcular y suma 1, el mismo giro en otro nodo de
+  una cadena de cruces (El Centro -> Lake Havasu).
+  `tools/simular_navegacion.js` cuenta los recalculos malos.
 - La ruta no se baja por una salida para volver a subir a la misma calle
   (`dropRampDetours`, en `porAristas` de `findRouteWith`; turn report del
   24-10, US-6 en Price, Utah: "Keep right onto US-191" y "onto US-6" en las
