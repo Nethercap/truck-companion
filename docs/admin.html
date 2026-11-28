@@ -113,9 +113,32 @@
   <!-- Las empresas virtuales y sus reportes (/admin/vtcs de la API de
        cuentas). Ocultar una la saca del directorio y de su pagina publica;
        sus miembros la siguen viendo. -->
-  <details class="sec" data-sec="vtcs" id="vtcsSec" hidden>
+  <details class="sec" data-sec="vtcs" open id="vtcsSec" hidden>
     <summary>Virtual companies <span class="note" id="vtcsNote"></span></summary>
     <div class="body">
+      <!-- El resumen ("summary" de /admin/vtcs, vtc_admin.py de la API): de
+           todas las empresas juntas. De un viaje personal no cuenta nada; del
+           modo, cuantos lo eligieron. Una API sin el campo no lo muestra. -->
+      <div id="vtcSummary" hidden>
+        <div class="cards">
+          <div class="card"><div class="label">Companies</div><div class="value" id="vtcCompanies">-</div><div class="sub" id="vtcCompaniesSub"></div></div>
+          <div class="card"><div class="label">Members</div><div class="value" id="vtcMembers">-</div><div class="sub" id="vtcMembersSub"></div></div>
+          <div class="card"><div class="label">Linked clients in a company</div><div class="value small" id="vtcLinked">-</div><div class="sub" id="vtcLinkedSub"></div></div>
+          <div class="card"><div class="label">Driving for a company now</div><div class="value" id="vtcDriving">-</div></div>
+          <div class="card"><div class="label">Company deliveries, 7 days</div><div class="value" id="vtcWeek">-</div><div class="sub" id="vtcWeekSub"></div></div>
+          <div class="card"><div class="label">Company deliveries, 30 days</div><div class="value" id="vtcMonth">-</div><div class="sub" id="vtcMonthSub"></div></div>
+          <div class="card"><div class="label">Pending applications</div><div class="value small" id="vtcApps">-</div><div class="sub" id="vtcAppsSub"></div></div>
+          <div class="card"><div class="label">Trip checks, 30 days</div><div class="value small" id="vtcChecks">-</div><div class="sub" id="vtcChecksSub"></div></div>
+          <div class="card"><div class="label">Discord webhooks</div><div class="value small" id="vtcDiscord">-</div><div class="sub" id="vtcDiscordSub"></div></div>
+          <div class="card"><div class="label">Public live map</div><div class="value small" id="vtcLive">-</div><div class="sub" id="vtcLiveSub"></div></div>
+        </div>
+        <h3>Top companies, 30 days (by km)</h3>
+        <div class="tableWrap"><table><thead><tr><th>Company</th><th>Deliveries</th><th>km</th><th>Drivers</th><th>Members</th></tr></thead><tbody id="vtcTopBody"></tbody></table></div>
+        <div class="pager" data-for="vtcTopBody"></div>
+        <h3>Per day (UTC)</h3>
+        <div class="tableWrap"><table><thead><tr><th>Date</th><th>New companies</th><th>Joined</th><th>Deliveries</th><th>km</th></tr></thead><tbody id="vtcDailyBody"></tbody></table></div>
+        <div class="pager" data-for="vtcDailyBody"></div>
+      </div>
       <h3>Open reports</h3>
       <div class="tableWrap"><table><thead><tr><th>Company</th><th>Reason</th><th>Text</th><th>By</th><th>When</th><th></th></tr></thead><tbody id="vtcReportsBody"></tbody></table></div>
       <div class="pager" data-for="vtcReportsBody"></div>
@@ -547,7 +570,44 @@ function pintarVtcs(d) {
     <td><button type="button" data-vtc-hide="${escapeHtml(r.tag)}" data-hidden="1">Hide company</button> <button type="button" data-vtc-resolve="${r.id}">Nothing to do</button></td></tr>`), 'No open reports', 6);
   paginar('vtcsBody', d.vtcs.map(v => `<tr><td>${empresa(v)}${v.slogan ? `<br><span class="muted">${escapeHtml(v.slogan)}</span>` : ''}</td><td>${escapeHtml(v.founder || '—')}</td><td class="muted">${fecha(v.created_at).slice(0, 10)}</td><td>${fmt(v.members)}</td><td>${fmt(v.deliveries)}</td><td>${fmt(Math.round(v.km))}</td>
     <td>${v.dissolved ? '<span class="muted">dissolved</span>' : `<button type="button" data-vtc-hide="${escapeHtml(v.tag)}" data-hidden="${v.hidden ? '' : '1'}">${v.hidden ? 'Show again' : 'Hide'}</button>`}</td></tr>`), 'No companies yet', 7);
+  if (d.summary) pintarResumenVtc(d.summary, empresa);
+  $('vtcSummary').hidden = !d.summary;
   $('vtcsSec').hidden = false;
+}
+const pct = (a, b) => (b ? `${Math.round((100 * a) / b)} %` : '-');
+const lista = (partes) => partes.filter(Boolean).join(' · ');
+function pintarResumenVtc(s, empresa) {
+  const c = s.companies, m = s.members, t = s.trips, semana = t.last_7d, mes = t.last_30d;
+  $('vtcCompanies').textContent = fmt(c.active);
+  $('vtcCompaniesSub').textContent = lista([`+${fmt(c.last_24h)} today`, `+${fmt(c.last_7d)} this week`,
+    `${fmt(c.solo)} with only the founder`, `${fmt(c.recruiting)} recruiting`,
+    c.hidden && `${fmt(c.hidden)} hidden`, c.dissolved && `${fmt(c.dissolved)} dissolved`]);
+  $('vtcMembers').textContent = fmt(m.total);
+  $('vtcMembersSub').textContent = lista([`${fmt(m.company_mode)} company mode`, `${fmt(m.personal_mode)} personal`,
+    `+${fmt(m.joined_7d)} this week`, m.left_7d && `${fmt(m.left_7d)} left`, m.kicked_7d && `${fmt(m.kicked_7d)} kicked`]);
+  $('vtcLinked').textContent = `${fmt(m.linked_in_company)} / ${fmt(m.linked_clients)}`;
+  $('vtcLinkedSub').textContent = `${pct(m.linked_in_company, m.linked_clients)} of the PCs linked to an account`;
+  $('vtcDriving').textContent = fmt(t.driving_now);
+  $('vtcWeek').textContent = fmt(semana.deliveries);
+  $('vtcWeekSub').textContent = lista([`${fmt(Math.round(semana.km))} km`, `${fmt(semana.drivers)} drivers`, `${fmt(semana.companies)} companies`]);
+  $('vtcMonth').textContent = fmt(mes.deliveries);
+  $('vtcMonthSub').textContent = lista([`${fmt(Math.round(mes.km))} km`, `${fmt(mes.drivers)} drivers`, `${fmt(mes.companies)} companies`]);
+  $('vtcApps').textContent = fmt(s.applications.pending);
+  $('vtcAppsSub').textContent = lista([`+${fmt(s.applications.last_7d)} this week`, `${fmt(s.invites.open)} open invites`,
+    `${fmt(s.invites.used_7d)} invites used this week`]);
+  $('vtcChecks').textContent = `${fmt(t.review_pending)} waiting for review`;
+  $('vtcChecksSub').textContent = lista([`${fmt(t.excluded_by_check)} left out by the check`,
+    `${fmt(t.excluded_by_company)} left out by the company`, `${fmt(t.race_mode)} race mode`]);
+  const dc = s.discord;
+  $('vtcDiscord').textContent = `${fmt(dc.webhooks)} in ${fmt(dc.companies)} companies`;
+  $('vtcDiscord').classList.toggle('warn', dc.with_error > 0);
+  $('vtcDiscordSub').textContent = lista([dc.with_error && `${fmt(dc.with_error)} failing`, dc.disabled && `${fmt(dc.disabled)} turned off`]) || 'all working';
+  $('vtcLive').textContent = `${fmt(s.live_map.anonymous)} anonymous · ${fmt(s.live_map.names)} with names`;
+  $('vtcLiveSub').textContent = `${fmt(s.live_map.members_out)} members left out of it`;
+  paginar('vtcTopBody', (s.top_30d || []).map(v => `<tr><td>${empresa(v)}</td><td>${fmt(v.deliveries)}</td><td>${fmt(Math.round(v.km))}</td><td>${fmt(v.drivers)}</td><td>${fmt(v.members)}</td></tr>`),
+    'No company deliveries in 30 days', 5);
+  paginar('vtcDailyBody', (s.daily || []).map(x => `<tr><td>${escapeHtml(x.date)}</td><td>${fmt(x.companies)}</td><td>${fmt(x.joined)}</td><td>${fmt(x.deliveries)}</td><td>${fmt(Math.round(x.km))}</td></tr>`),
+    'No data yet', 5);
 }
 async function cargarVtcs(key) {
   const r = await traer(VTCS_URL, key);
